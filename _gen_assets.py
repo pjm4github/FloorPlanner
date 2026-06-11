@@ -1,0 +1,235 @@
+# One-shot generator for assets/icons (toolbar) and assets/furnishings
+# (top-view furniture symbol library, CC0).  Furnishing SVGs use a viewBox
+# in INCHES so the app can render them at true scale (1 scene unit = 1").
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent / "assets"
+ICONS = ROOT / "icons"
+FURN = ROOT / "furnishings"
+ICONS.mkdir(parents=True, exist_ok=True)
+FURN.mkdir(parents=True, exist_ok=True)
+
+INK = "#374151"
+FILL = "#f8fafc"
+
+
+def svg(w, d, body):
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {d}" '
+            f'width="{w}" height="{d}">\n' + "\n".join(body) + "\n</svg>\n")
+
+
+def R(x, y, w, h, rx=0.0, fill=FILL, sw=1.0):
+    return (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" '
+            f'fill="{fill}" stroke="{INK}" stroke-width="{sw}"/>')
+
+
+def L(x1, y1, x2, y2, sw=0.7, dash=None):
+    extra = f' stroke-dasharray="{dash}"' if dash else ""
+    return (f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" '
+            f'stroke="{INK}" stroke-width="{sw}"{extra}/>')
+
+
+def Ci(cx, cy, r, fill="none", sw=0.7):
+    return (f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="{fill}" '
+            f'stroke="{INK}" stroke-width="{sw}"/>')
+
+
+def El(cx, cy, rx, ry, fill="#ffffff", sw=0.8):
+    return (f'<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" '
+            f'fill="{fill}" stroke="{INK}" stroke-width="{sw}"/>')
+
+
+# ---------------------------------------------------------------- furniture
+def bed(w, d, pillows):
+    parts = [R(0.75, 0.75, w - 1.5, d - 1.5, 2, sw=1.2)]
+    if pillows == 1:
+        parts.append(R(w * 0.18, 3, w * 0.64, 10, 2.5, "#ffffff", 0.8))
+    else:
+        pw = (w - 13) / 2
+        parts.append(R(4.5, 3, pw, 10, 2.5, "#ffffff", 0.8))
+        parts.append(R(w - 4.5 - pw, 3, pw, 10, 2.5, "#ffffff", 0.8))
+    parts.append(L(0.75, 19, w - 0.75, 19, 0.8))      # blanket fold line
+    return parts
+
+
+def seat(w, d, cushions, arm=7.0):
+    parts = [R(0.75, 0.75, w - 1.5, d - 1.5, 3, sw=1.2),
+             L(0.75, 7, w - 0.75, 7, 0.7),            # back band
+             L(arm, 7, arm, d - 0.75, 0.7),           # arms
+             L(w - arm, 7, w - arm, d - 0.75, 0.7)]
+    for i in range(1, cushions):
+        x = arm + (w - 2 * arm) * i / cushions
+        parts.append(L(x, 7, x, d - 0.75, 0.55))
+    return parts
+
+
+FURNISHINGS = [
+    # (id, name, category, width", depth", body parts)
+    ("sofa", "Sofa", "Living", 84, 36, seat(84, 36, 3)),
+    ("loveseat", "Loveseat", "Living", 58, 36, seat(58, 36, 2)),
+    ("armchair", "Armchair", "Living", 33, 33, seat(33, 33, 1, arm=6)),
+    ("coffee_table", "Coffee Table", "Living", 48, 24,
+     [R(0.6, 0.6, 46.8, 22.8, 3)]),
+    ("side_table", "Side Table", "Living", 20, 20,
+     [R(0.6, 0.6, 18.8, 18.8, 1.5)]),
+    ("tv_stand", "TV Stand", "Living", 60, 16,
+     [R(0.6, 0.6, 58.8, 14.8, 1), L(20, 0.6, 20, 15.4, 0.5),
+      L(40, 0.6, 40, 15.4, 0.5)]),
+
+    ("dining_table", "Dining Table 6'", "Dining", 72, 36,
+     [R(0.75, 0.75, 70.5, 34.5, 1.5, sw=1.2),
+      R(3, 3, 66, 30, 1, "none", 0.5)]),
+    ("dining_table_round", "Round Table 4'", "Dining", 48, 48,
+     [Ci(24, 24, 23.25, FILL, 1.2), Ci(24, 24, 20.5, "none", 0.5)]),
+    ("dining_chair", "Dining Chair", "Dining", 18, 18,
+     [R(1, 0.75, 16, 2.8, 1.4, "#ffffff", 0.8),
+      R(1.4, 3.8, 15.2, 13.4, 2.5)]),
+
+    ("refrigerator", "Refrigerator", "Kitchen", 36, 30,
+     [R(0.75, 0.75, 34.5, 28.5, 1, sw=1.2), L(18, 1.5, 18, 28.5, 0.7)]),
+    ("range", "Range / Stove", "Kitchen", 30, 26,
+     [R(0.75, 0.75, 28.5, 24.5, 1, sw=1.2),
+      Ci(8, 8, 4), Ci(22, 8, 4), Ci(8, 18, 4), Ci(22, 18, 4),
+      L(1, 22.5, 29, 22.5, 0.5)]),
+    ("dishwasher", "Dishwasher", "Kitchen", 24, 24,
+     [R(0.75, 0.75, 22.5, 22.5, 1, sw=1.2),
+      R(2.5, 2.5, 19, 19, 1, "none", 0.5), L(2.5, 2.5, 21.5, 21.5, 0.5)]),
+    ("kitchen_sink", "Kitchen Sink", "Kitchen", 33, 22,
+     [R(0.75, 0.75, 31.5, 20.5, 1, sw=1.2),
+      R(3, 4, 12, 14, 2.5, "#ffffff", 0.8),
+      R(18, 4, 12, 14, 2.5, "#ffffff", 0.8), Ci(16.5, 2.2, 1, "none", 0.6)]),
+
+    ("bed_king", "King Bed", "Bedroom", 76, 80, bed(76, 80, 2)),
+    ("bed_queen", "Queen Bed", "Bedroom", 60, 80, bed(60, 80, 2)),
+    ("bed_full", "Full Bed", "Bedroom", 54, 75, bed(54, 75, 2)),
+    ("bed_twin", "Twin Bed", "Bedroom", 39, 75, bed(39, 75, 1)),
+    ("nightstand", "Nightstand", "Bedroom", 20, 16,
+     [R(0.6, 0.6, 18.8, 14.8, 1)]),
+    ("dresser", "Dresser", "Bedroom", 60, 18,
+     [R(0.75, 0.75, 58.5, 16.5, 1, sw=1.2),
+      L(20, 0.75, 20, 17.25, 0.6), L(40, 0.75, 40, 17.25, 0.6),
+      Ci(10, 9, 0.9), Ci(30, 9, 0.9), Ci(50, 9, 0.9)]),
+
+    ("bathtub", "Bathtub 5'", "Bathroom", 30, 60,
+     [R(0.75, 0.75, 28.5, 58.5, 2.5, sw=1.2),
+      R(3.5, 3.5, 23, 53, 8, "#ffffff", 0.8), Ci(15, 10, 1.5, "none", 0.6)]),
+    ("shower", "Shower 36\"", "Bathroom", 36, 36,
+     [R(0.75, 0.75, 34.5, 34.5, 1, sw=1.2), R(3, 3, 30, 30, 1, "none", 0.6),
+      L(3, 3, 33, 33, 0.4), L(33, 3, 3, 33, 0.4),
+      Ci(18, 18, 1.8, "none", 0.7)]),
+    ("toilet", "Toilet", "Bathroom", 20, 28,
+     [R(2, 0.75, 16, 7, 1.5, FILL, 1),
+      El(10, 17.5, 7.5, 9.5, "#ffffff", 1), El(10, 18, 5.5, 7, "none", 0.5)]),
+    ("vanity", "Bath Vanity 30\"", "Bathroom", 30, 21,
+     [R(0.75, 0.75, 28.5, 19.5, 1, sw=1.2), El(15, 11, 9, 6.5),
+      Ci(15, 3.5, 1.2, "none", 0.6)]),
+
+    ("washer", "Washer", "Laundry", 27, 30,
+     [R(0.75, 0.75, 25.5, 28.5, 1, sw=1.2),
+      Ci(13.5, 16, 9, "#ffffff", 0.9), Ci(13.5, 16, 5.5, "none", 0.6)]),
+    ("dryer", "Dryer", "Laundry", 27, 30,
+     [R(0.75, 0.75, 25.5, 28.5, 1, sw=1.2),
+      Ci(13.5, 16, 9, "#ffffff", 0.9), L(5, 4, 22, 4, 0.7)]),
+
+    ("desk", "Desk 5'", "Office / Storage", 60, 30,
+     [R(0.75, 0.75, 58.5, 28.5, 1, sw=1.2), L(2, 4, 58, 4, 0.5)]),
+    ("office_chair", "Office Chair", "Office / Storage", 24, 24,
+     [R(4, 1, 16, 4, 2, "#ffffff", 0.8), Ci(12, 13, 8.5, FILL, 1),
+      Ci(12, 13, 3, "none", 0.5)]),
+    ("bookshelf", "Bookshelf 3'", "Office / Storage", 36, 12,
+     [R(0.6, 0.6, 34.8, 10.8, 0.5, sw=1),
+      L(12, 0.6, 12, 11.4, 0.5), L(24, 0.6, 24, 11.4, 0.5)]),
+    ("wardrobe", "Wardrobe 4'", "Office / Storage", 48, 24,
+     [R(0.75, 0.75, 46.5, 22.5, 1, sw=1.2), L(24, 0.75, 24, 23.25, 0.7),
+      L(2, 7, 46, 7, 0.5, "2,2")]),
+]
+
+manifest = []
+for fid, name, cat, w, d, body in FURNISHINGS:
+    (FURN / f"{fid}.svg").write_text(svg(w, d, body), encoding="utf-8")
+    manifest.append({"id": fid, "name": name, "category": cat,
+                     "file": f"{fid}.svg", "width_in": w, "depth_in": d})
+(FURN / "manifest.json").write_text(
+    json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+(FURN / "LICENSE").write_text(
+    "Floor Planner furnishing symbol library\n"
+    "----------------------------------------\n"
+    "These top-view furniture/fixture symbols were drawn for this project\n"
+    "and are released under CC0 1.0 Universal (public domain dedication).\n"
+    "https://creativecommons.org/publicdomain/zero/1.0/\n",
+    encoding="utf-8")
+(FURN / "README.md").write_text(
+    "# Furnishing symbol library (CC0)\n\n"
+    "Top-view architectural symbols used by the Furnishings palette.\n\n"
+    "* Every SVG `viewBox` is in **inches** (`0 0 WIDTH DEPTH`), so the app\n"
+    "  renders each symbol at true scale (1 scene unit = 1\").\n"
+    "* `manifest.json` lists the catalog: `id`, `name`, `category`, `file`,\n"
+    "  `width_in`, `depth_in`.\n\n"
+    "To add your own symbol: drop an SVG here whose viewBox matches the\n"
+    "real-world footprint in inches and add a manifest entry.\n",
+    encoding="utf-8")
+
+# ---------------------------------------------------------------- tool icons
+TOOL_ICONS = {
+    "select": [
+        '<path d="M7 3 L7 18 L11 14.5 L13.5 20 L16 18.9 L13.5 13.5 '
+        'L18.5 13.5 Z" fill="#1f2937"/>'],
+    "wall_ext": [
+        '<rect x="2.5" y="9" width="19" height="6" fill="#1f2937"/>',
+        '<line x1="2.5" y1="12" x2="21.5" y2="12" stroke="#f8fafc" '
+        'stroke-width="1" stroke-dasharray="3,2"/>'],
+    "wall_int": [
+        '<rect x="2.5" y="10" width="19" height="4" fill="#9ca3af"/>',
+        '<line x1="2.5" y1="12" x2="21.5" y2="12" stroke="#f8fafc" '
+        'stroke-width="1" stroke-dasharray="3,2"/>'],
+    "door": [
+        '<line x1="2" y1="20" x2="6" y2="20" stroke="#1f2937" '
+        'stroke-width="2.4"/>',
+        '<line x1="18" y1="20" x2="22" y2="20" stroke="#1f2937" '
+        'stroke-width="2.4"/>',
+        '<line x1="6.5" y1="19.5" x2="6.5" y2="7.5" stroke="#1f2937" '
+        'stroke-width="1.6"/>',
+        '<path d="M6.5 7.5 A12 12 0 0 1 18.5 19.5" fill="none" '
+        'stroke="#1f2937" stroke-width="1.2" stroke-dasharray="2.5,2"/>'],
+    "window": [
+        '<rect x="2.5" y="9" width="19" height="6" fill="#f8fafc" '
+        'stroke="#1f2937" stroke-width="1.4"/>',
+        '<line x1="2.5" y1="12" x2="21.5" y2="12" stroke="#1f2937" '
+        'stroke-width="1"/>'],
+    "room": [
+        '<rect x="3" y="6.5" width="18" height="11" rx="2" fill="#f8fafc" '
+        'stroke="#1f2937" stroke-width="1.5"/>',
+        '<line x1="6" y1="10.5" x2="15" y2="10.5" stroke="#1f2937" '
+        'stroke-width="1.3"/>',
+        '<line x1="6" y1="13.8" x2="12" y2="13.8" stroke="#1f2937" '
+        'stroke-width="1.3"/>'],
+    "delete": [
+        '<line x1="4.5" y1="6.5" x2="19.5" y2="6.5" stroke="#1f2937" '
+        'stroke-width="1.6"/>',
+        '<line x1="9.5" y1="4" x2="14.5" y2="4" stroke="#1f2937" '
+        'stroke-width="1.6"/>',
+        '<path d="M6.5 6.5 L7.5 20.5 L16.5 20.5 L17.5 6.5" fill="none" '
+        'stroke="#1f2937" stroke-width="1.6"/>',
+        '<line x1="10" y1="9.5" x2="10.3" y2="17.5" stroke="#1f2937" '
+        'stroke-width="1.2"/>',
+        '<line x1="14" y1="9.5" x2="13.7" y2="17.5" stroke="#1f2937" '
+        'stroke-width="1.2"/>'],
+    "zoomfit": [
+        '<circle cx="10.5" cy="10.5" r="6" fill="none" stroke="#1f2937" '
+        'stroke-width="1.7"/>',
+        '<line x1="15" y1="15" x2="20.5" y2="20.5" stroke="#1f2937" '
+        'stroke-width="2.2"/>'],
+}
+for name, body in TOOL_ICONS.items():
+    (ICONS / f"{name}.svg").write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+        'width="24" height="24">\n' + "\n".join(body) + "\n</svg>\n",
+        encoding="utf-8")
+(ICONS / "README.md").write_text(
+    "# Toolbar icons\n\nSVG icons for the Floor Planner toolbar, drawn for "
+    "this project (CC0).\n", encoding="utf-8")
+
+print(f"wrote {len(FURNISHINGS)} furnishing symbols + manifest, "
+      f"{len(TOOL_ICONS)} tool icons")

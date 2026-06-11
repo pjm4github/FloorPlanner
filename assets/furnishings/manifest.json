@@ -1,0 +1,234 @@
+[
+  {
+    "id": "sofa",
+    "name": "Sofa",
+    "category": "Living",
+    "file": "sofa.svg",
+    "width_in": 84,
+    "depth_in": 36
+  },
+  {
+    "id": "loveseat",
+    "name": "Loveseat",
+    "category": "Living",
+    "file": "loveseat.svg",
+    "width_in": 58,
+    "depth_in": 36
+  },
+  {
+    "id": "armchair",
+    "name": "Armchair",
+    "category": "Living",
+    "file": "armchair.svg",
+    "width_in": 33,
+    "depth_in": 33
+  },
+  {
+    "id": "coffee_table",
+    "name": "Coffee Table",
+    "category": "Living",
+    "file": "coffee_table.svg",
+    "width_in": 48,
+    "depth_in": 24
+  },
+  {
+    "id": "side_table",
+    "name": "Side Table",
+    "category": "Living",
+    "file": "side_table.svg",
+    "width_in": 20,
+    "depth_in": 20
+  },
+  {
+    "id": "tv_stand",
+    "name": "TV Stand",
+    "category": "Living",
+    "file": "tv_stand.svg",
+    "width_in": 60,
+    "depth_in": 16
+  },
+  {
+    "id": "dining_table",
+    "name": "Dining Table 6'",
+    "category": "Dining",
+    "file": "dining_table.svg",
+    "width_in": 72,
+    "depth_in": 36
+  },
+  {
+    "id": "dining_table_round",
+    "name": "Round Table 4'",
+    "category": "Dining",
+    "file": "dining_table_round.svg",
+    "width_in": 48,
+    "depth_in": 48
+  },
+  {
+    "id": "dining_chair",
+    "name": "Dining Chair",
+    "category": "Dining",
+    "file": "dining_chair.svg",
+    "width_in": 18,
+    "depth_in": 18
+  },
+  {
+    "id": "refrigerator",
+    "name": "Refrigerator",
+    "category": "Kitchen",
+    "file": "refrigerator.svg",
+    "width_in": 36,
+    "depth_in": 30
+  },
+  {
+    "id": "range",
+    "name": "Range / Stove",
+    "category": "Kitchen",
+    "file": "range.svg",
+    "width_in": 30,
+    "depth_in": 26
+  },
+  {
+    "id": "dishwasher",
+    "name": "Dishwasher",
+    "category": "Kitchen",
+    "file": "dishwasher.svg",
+    "width_in": 24,
+    "depth_in": 24
+  },
+  {
+    "id": "kitchen_sink",
+    "name": "Kitchen Sink",
+    "category": "Kitchen",
+    "file": "kitchen_sink.svg",
+    "width_in": 33,
+    "depth_in": 22
+  },
+  {
+    "id": "bed_king",
+    "name": "King Bed",
+    "category": "Bedroom",
+    "file": "bed_king.svg",
+    "width_in": 76,
+    "depth_in": 80
+  },
+  {
+    "id": "bed_queen",
+    "name": "Queen Bed",
+    "category": "Bedroom",
+    "file": "bed_queen.svg",
+    "width_in": 60,
+    "depth_in": 80
+  },
+  {
+    "id": "bed_full",
+    "name": "Full Bed",
+    "category": "Bedroom",
+    "file": "bed_full.svg",
+    "width_in": 54,
+    "depth_in": 75
+  },
+  {
+    "id": "bed_twin",
+    "name": "Twin Bed",
+    "category": "Bedroom",
+    "file": "bed_twin.svg",
+    "width_in": 39,
+    "depth_in": 75
+  },
+  {
+    "id": "nightstand",
+    "name": "Nightstand",
+    "category": "Bedroom",
+    "file": "nightstand.svg",
+    "width_in": 20,
+    "depth_in": 16
+  },
+  {
+    "id": "dresser",
+    "name": "Dresser",
+    "category": "Bedroom",
+    "file": "dresser.svg",
+    "width_in": 60,
+    "depth_in": 18
+  },
+  {
+    "id": "bathtub",
+    "name": "Bathtub 5'",
+    "category": "Bathroom",
+    "file": "bathtub.svg",
+    "width_in": 30,
+    "depth_in": 60
+  },
+  {
+    "id": "shower",
+    "name": "Shower 36\"",
+    "category": "Bathroom",
+    "file": "shower.svg",
+    "width_in": 36,
+    "depth_in": 36
+  },
+  {
+    "id": "toilet",
+    "name": "Toilet",
+    "category": "Bathroom",
+    "file": "toilet.svg",
+    "width_in": 20,
+    "depth_in": 28
+  },
+  {
+    "id": "vanity",
+    "name": "Bath Vanity 30\"",
+    "category": "Bathroom",
+    "file": "vanity.svg",
+    "width_in": 30,
+    "depth_in": 21
+  },
+  {
+    "id": "washer",
+    "name": "Washer",
+    "category": "Laundry",
+    "file": "washer.svg",
+    "width_in": 27,
+    "depth_in": 30
+  },
+  {
+    "id": "dryer",
+    "name": "Dryer",
+    "category": "Laundry",
+    "file": "dryer.svg",
+    "width_in": 27,
+    "depth_in": 30
+  },
+  {
+    "id": "desk",
+    "name": "Desk 5'",
+    "category": "Office / Storage",
+    "file": "desk.svg",
+    "width_in": 60,
+    "depth_in": 30
+  },
+  {
+    "id": "office_chair",
+    "name": "Office Chair",
+    "category": "Office / Storage",
+    "file": "office_chair.svg",
+    "width_in": 24,
+    "depth_in": 24
+  },
+  {
+    "id": "bookshelf",
+    "name": "Bookshelf 3'",
+    "category": "Office / Storage",
+    "file": "bookshelf.svg",
+    "width_in": 36,
+    "depth_in": 12
+  },
+  {
+    "id": "wardrobe",
+    "name": "Wardrobe 4'",
+    "category": "Office / Storage",
+    "file": "wardrobe.svg",
+    "width_in": 48,
+    "depth_in": 24
+  }
+]
