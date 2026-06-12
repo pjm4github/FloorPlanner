@@ -216,6 +216,83 @@ FURNISHINGS = [
      [Ci(12, 12, 11, FILL, 1.2), Ci(12, 12, 8.5, "none", 0.6),
       L(1.5, 12, 4.5, 12, 1.2), L(19.5, 12, 22.5, 12, 1.2)]),
 
+    ("toolchest", "Tool Chest", "Shop", 41, 18,
+     [R(0.75, 0.75, 39.5, 16.5, 1, sw=1.2),
+      L(14, 0.75, 14, 17.25, 0.6), L(27, 0.75, 27, 17.25, 0.6),
+      L(3, 3, 11, 3, 0.8), L(30, 3, 38, 3, 0.8)]),     # side handles
+    ("table_saw", "Table Saw", "Shop", 40, 27,
+     [R(0.75, 0.75, 38.5, 25.5, 1, sw=1.2),
+      R(19, 7, 2, 13, 0.5, "#ffffff", 0.8),            # blade slot
+      L(20, 9, 20, 18, 1.2),                           # blade
+      L(13, 2, 13, 25, 0.5, "2,2"), L(27, 2, 27, 25, 0.5, "2,2"),
+      L(2, 5, 38, 5, 0.8)]),                           # rip fence
+    ("lathe", "Lathe 5'", "Shop", 60, 18,
+     [R(0.75, 5, 58.5, 8, 1, sw=1.2),                  # bed
+      R(2, 2, 11, 14, 1, FILL, 1),                     # headstock
+      R(46, 4, 8, 10, 1, FILL, 1),                     # tailstock
+      L(13, 9, 46, 9, 0.6, "3,2")]),                   # spindle axis
+    ("jointer", "Jointer 5'", "Shop", 60, 20,
+     [R(0.75, 5, 26.5, 11, 0.5, sw=1.2),               # infeed table
+      R(32.75, 5, 26.5, 11, 0.5, sw=1.2),              # outfeed table
+      R(27.8, 3.5, 4.4, 14, 0.5, "#d8dde3", 0.9),      # cutterhead
+      L(2, 6.5, 58, 6.5, 0.8)]),                       # fence
+    ("drill_press", "Drill Press", "Shop", 20, 28,
+     [R(2.5, 20.5, 15, 6.75, 1, sw=1),                 # base
+      R(4, 0.75, 12, 17, 3, FILL, 1.2),                # head
+      Ci(10, 6, 2.6, "#ffffff", 0.8),                  # chuck
+      Ci(10, 18.5, 7, "none", 0.8)]),                  # table below
+    ("cutoff_saw", "Cutoff Saw", "Shop", 40, 24,
+     [R(0.6, 9, 38.8, 6.5, 1, sw=1),                   # stand rails
+      Ci(20, 15, 7.5, FILL, 0.9),                      # turntable
+      R(13.5, 2, 13, 14, 2, FILL, 1.1),                # saw body
+      L(20, 3.5, 20, 14.5, 1.2)]),                     # blade
+    ("bandsaw", "Bandsaw", "Shop", 24, 30,
+     [Ci(12, 8, 8.5, FILL, 1.1),                       # wheel housing
+      R(2, 13, 20, 14.5, 1, FILL, 1.2),                # table
+      L(12, 13, 12, 20.5, 0.8, "2,1.5"),               # blade slot
+      Ci(12, 20.5, 1, "#1f2937", 0.5)]),               # blade
+    ("planer", "Planer", "Shop", 24, 24,
+     [R(0.6, 8, 22.8, 8, 0.5, sw=0.9),                 # in/outfeed tables
+      R(3, 3.5, 18, 17, 2, FILL, 1.2),                 # body
+      L(3, 9, 21, 9, 0.7), L(3, 15, 21, 15, 0.7),      # rollers
+      Ci(12, 2, 1.4, "none", 0.7)]),                   # height crank
+
+    ("lounge_chair", "Lounge Chair", "Sunroom", 27, 78,
+     [R(0.75, 0.75, 25.5, 76.5, 4, sw=1.2),
+      R(4, 3.5, 19, 9, 2.5, "#ffffff", 0.8),           # headrest
+      L(2, 28, 25, 28, 0.8),                           # backrest hinge
+      L(2, 56, 25, 56, 0.6)]),                         # leg hinge
+    ("sauna", "Sauna 6'", "Sunroom", 72, 72,
+     [R(0.75, 0.75, 70.5, 70.5, 1.5, sw=1.5),
+      R(4, 4, 64, 14, 1, "none", 0.7),                 # bench (back)
+      R(4, 18, 14, 50, 1, "none", 0.7),                # bench (side)
+      R(52, 52, 14, 14, 1, FILL, 1),                   # heater
+      Ci(59, 59, 3.5, "none", 0.6),                    # rocks
+      L(30, 71.25, 46, 71.25, 1.8)]),                  # door
+    ("umbrella_table", "Umbrella Table", "Sunroom", 96, 96,
+     ['<circle cx="48" cy="48" r="46.5" fill="none" stroke="#374151" '
+      'stroke-width="0.9" stroke-dasharray="5,4"/>',   # canopy overhead
+      L(48, 1.5, 48, 17, 0.5, "5,4"), L(48, 79, 48, 94.5, 0.5, "5,4"),
+      L(1.5, 48, 17, 48, 0.5, "5,4"), L(79, 48, 94.5, 48, 0.5, "5,4"),
+      Ci(48, 48, 21, FILL, 1.2),                       # table
+      Ci(48, 48, 1.8, "#374151", 0.5),                 # pole
+      R(39, 17, 18, 14, 3, FILL, 0.9), R(39, 65, 18, 14, 3, FILL, 0.9),
+      R(17, 41, 14, 18, 3, FILL, 0.9), R(65, 41, 14, 18, 3, FILL, 0.9)]),
+    ("swim_spa", "Swim Spa", "Sunroom", 90, 180,
+     [R(0.75, 0.75, 88.5, 178.5, 6, sw=1.5),
+      R(7, 7, 76, 166, 5, "#ffffff", 0.9),             # water line
+      Ci(25, 16, 2.2, "none", 0.8), Ci(45, 16, 2.2, "none", 0.8),
+      Ci(65, 16, 2.2, "none", 0.8),                    # swim jets
+      L(45, 30, 45, 140, 0.6, "5,4"),                  # swim lane
+      R(13, 148, 64, 20, 4, "none", 0.7)]),            # bench seat
+    ("whirlpool", "Whirlpool", "Sunroom", 84, 84,
+     [R(0.75, 0.75, 82.5, 82.5, 9, sw=1.5),
+      Ci(42, 42, 32, "#ffffff", 1),                    # water
+      Ci(42, 14.5, 2, "none", 0.7), Ci(42, 69.5, 2, "none", 0.7),
+      Ci(14.5, 42, 2, "none", 0.7), Ci(69.5, 42, 2, "none", 0.7),
+      Ci(22.5, 22.5, 2, "none", 0.7), Ci(61.5, 61.5, 2, "none", 0.7),
+      Ci(42, 42, 2.2, "none", 0.6)]),                  # drain
+
     ("desk", "Desk 5'", "Office / Storage", 60, 30,
      [R(0.75, 0.75, 58.5, 28.5, 1, sw=1.2), L(2, 4, 58, 4, 0.5)]),
     ("office_chair", "Office Chair", "Office / Storage", 24, 24,
@@ -254,6 +331,11 @@ GROUPS = [
     ("Garage", ["suv", "car", "motorcycle", "bicycle", "boat",
                 "boat_trailer", "workbench", "storage_shelves", "lawnmower",
                 "snowblower", "wheelbarrow", "trashcan"]),
+    ("Shop", ["toolchest", "table_saw", "lathe", "jointer", "drill_press",
+              "cutoff_saw", "bandsaw", "planer", "workbench",
+              "storage_shelves"]),
+    ("Sunroom", ["lounge_chair", "sauna", "umbrella_table", "swim_spa",
+                 "whirlpool", "armchair", "side_table"]),
     ("Office", ["desk", "office_chair", "bookshelf", "armchair",
                 "side_table"]),
 ]

@@ -296,6 +296,110 @@
     "depth_in": 24
   },
   {
+    "id": "toolchest",
+    "name": "Tool Chest",
+    "category": "Shop",
+    "file": "toolchest.svg",
+    "width_in": 41,
+    "depth_in": 18
+  },
+  {
+    "id": "table_saw",
+    "name": "Table Saw",
+    "category": "Shop",
+    "file": "table_saw.svg",
+    "width_in": 40,
+    "depth_in": 27
+  },
+  {
+    "id": "lathe",
+    "name": "Lathe 5'",
+    "category": "Shop",
+    "file": "lathe.svg",
+    "width_in": 60,
+    "depth_in": 18
+  },
+  {
+    "id": "jointer",
+    "name": "Jointer 5'",
+    "category": "Shop",
+    "file": "jointer.svg",
+    "width_in": 60,
+    "depth_in": 20
+  },
+  {
+    "id": "drill_press",
+    "name": "Drill Press",
+    "category": "Shop",
+    "file": "drill_press.svg",
+    "width_in": 20,
+    "depth_in": 28
+  },
+  {
+    "id": "cutoff_saw",
+    "name": "Cutoff Saw",
+    "category": "Shop",
+    "file": "cutoff_saw.svg",
+    "width_in": 40,
+    "depth_in": 24
+  },
+  {
+    "id": "bandsaw",
+    "name": "Bandsaw",
+    "category": "Shop",
+    "file": "bandsaw.svg",
+    "width_in": 24,
+    "depth_in": 30
+  },
+  {
+    "id": "planer",
+    "name": "Planer",
+    "category": "Shop",
+    "file": "planer.svg",
+    "width_in": 24,
+    "depth_in": 24
+  },
+  {
+    "id": "lounge_chair",
+    "name": "Lounge Chair",
+    "category": "Sunroom",
+    "file": "lounge_chair.svg",
+    "width_in": 27,
+    "depth_in": 78
+  },
+  {
+    "id": "sauna",
+    "name": "Sauna 6'",
+    "category": "Sunroom",
+    "file": "sauna.svg",
+    "width_in": 72,
+    "depth_in": 72
+  },
+  {
+    "id": "umbrella_table",
+    "name": "Umbrella Table",
+    "category": "Sunroom",
+    "file": "umbrella_table.svg",
+    "width_in": 96,
+    "depth_in": 96
+  },
+  {
+    "id": "swim_spa",
+    "name": "Swim Spa",
+    "category": "Sunroom",
+    "file": "swim_spa.svg",
+    "width_in": 90,
+    "depth_in": 180
+  },
+  {
+    "id": "whirlpool",
+    "name": "Whirlpool",
+    "category": "Sunroom",
+    "file": "whirlpool.svg",
+    "width_in": 84,
+    "depth_in": 84
+  },
+  {
     "id": "desk",
     "name": "Desk 5'",
     "category": "Office / Storage",

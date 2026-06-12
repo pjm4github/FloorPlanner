@@ -245,7 +245,7 @@ ROOM_CELL = 3.0           # flood-fill cell size for room detection (inches)
 ROOM_TYPES = [
     "", "Bedroom", "Bathroom", "Kitchen", "Living Room", "Dining Room",
     "Family Room", "Office", "Closet", "Laundry", "Garage", "Hallway",
-    "Foyer", "Pantry", "Mudroom", "Utility",
+    "Foyer", "Pantry", "Mudroom", "Utility", "Shop", "Sunroom",
 ]
 CEILING_TYPES = ["Flat", "Tray", "Vaulted", "Cathedral", "Coffered",
                  "Shed", "Beamed", "Drop"]

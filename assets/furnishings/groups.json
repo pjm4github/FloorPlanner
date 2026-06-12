@@ -39,6 +39,19 @@
       "snowblower.svg",
       "wheelbarrow.svg",
       "trashcan.svg",
+      "toolchest.svg",
+      "table_saw.svg",
+      "lathe.svg",
+      "jointer.svg",
+      "drill_press.svg",
+      "cutoff_saw.svg",
+      "bandsaw.svg",
+      "planer.svg",
+      "lounge_chair.svg",
+      "sauna.svg",
+      "umbrella_table.svg",
+      "swim_spa.svg",
+      "whirlpool.svg",
       "desk.svg",
       "office_chair.svg",
       "bookshelf.svg",
@@ -123,6 +136,33 @@
       "snowblower.svg",
       "wheelbarrow.svg",
       "trashcan.svg"
+    ]
+  },
+  {
+    "name": "Shop",
+    "items": [
+      "toolchest.svg",
+      "table_saw.svg",
+      "lathe.svg",
+      "jointer.svg",
+      "drill_press.svg",
+      "cutoff_saw.svg",
+      "bandsaw.svg",
+      "planer.svg",
+      "workbench.svg",
+      "storage_shelves.svg"
+    ]
+  },
+  {
+    "name": "Sunroom",
+    "items": [
+      "lounge_chair.svg",
+      "sauna.svg",
+      "umbrella_table.svg",
+      "swim_spa.svg",
+      "whirlpool.svg",
+      "armchair.svg",
+      "side_table.svg"
     ]
   },
   {
