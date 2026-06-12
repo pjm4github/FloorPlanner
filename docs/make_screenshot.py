@@ -2,7 +2,9 @@ import os
 import sys
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+os.chdir(ROOT)                       # writes docs/screenshot.png
 
 from PyQt6.QtCore import QPointF
 from PyQt6.QtGui import QFont
