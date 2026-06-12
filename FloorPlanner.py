@@ -92,6 +92,11 @@ Behaviour
 * Room names are unique in the plan; clashes get " 2", " 3", ... appended.
 * Right-click a room name to COPY it (walls included); with the Room Name
   tool active, right-click a blank spot to PASTE it there.
+* SELECTION SET: Ctrl is the multi-select modifier.  Ctrl+click an item
+  to toggle it in/out of the selection set; Ctrl+drag on empty canvas
+  sweeps a rubber band that ADDS everything it touches to the set
+  (grouped items join as their group).  Edit > Group enables once the
+  set holds two or more walls/furnishings.
 * GROUPS: Ctrl+click to multi-select walls/furnishings, then Edit >
   Group (Ctrl+G) makes them select and move as one unit (dashed
   outline; Ctrl+Shift+G ungroups, right-click for a menu).  Edit >
@@ -141,7 +146,8 @@ import sys
 from collections import deque
 from pathlib import Path
 
-from PyQt6.QtCore import QLineF, QMimeData, QPoint, QPointF, QRectF, QSize, Qt
+from PyQt6.QtCore import (QLineF, QMimeData, QPoint, QPointF, QRect, QRectF,
+                          QSize, Qt)
 from PyQt6.QtGui import (
     QAction,
     QActionGroup,
@@ -184,6 +190,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPlainTextEdit,
+    QRubberBand,
     QToolBox,
     QVBoxLayout,
 )
@@ -1013,9 +1020,14 @@ class WallItem(QGraphicsItem):
         if e.button() != Qt.MouseButton.LeftButton:
             super().mousePressEvent(e)
             return
-        if not (e.modifiers() & Qt.KeyboardModifier.ControlModifier):
-            if not self.isSelected():
-                self.scene().clearSelection()
+        if e.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            # Ctrl+click toggles membership of the selection set
+            self.setSelected(not self.isSelected())
+            self._mode = None
+            e.accept()
+            return
+        if not self.isSelected():
+            self.scene().clearSelection()
         self.setSelected(True)
 
         sp = e.scenePos()
@@ -1353,9 +1365,12 @@ class OpeningItem(QGraphicsItem):
         if e.button() != Qt.MouseButton.LeftButton:
             super().mousePressEvent(e)
             return
-        if not (e.modifiers() & Qt.KeyboardModifier.ControlModifier):
-            if not self.isSelected():
-                self.scene().clearSelection()
+        if e.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            self.setSelected(not self.isSelected())    # toggle membership
+            e.accept()
+            return
+        if not self.isSelected():
+            self.scene().clearSelection()
         self.setSelected(True)
         e.accept()
 
@@ -2329,6 +2344,8 @@ class PlanView(QGraphicsView):
         self._pan_last = None
         self._temp_wall = None
         self._last_scene = None           # last mouse position (paste target)
+        self._rubber = None               # Ctrl+drag selection rubber band
+        self._rubber_origin = None
 
     # -- zoom ------------------------------------------------------------------
     def wheelEvent(self, e):
@@ -2430,6 +2447,19 @@ class PlanView(QGraphicsView):
             return
 
         if e.button() == Qt.MouseButton.LeftButton:
+            # Ctrl+drag on empty space: rubber-band that ADDS to the
+            # selection set (Ctrl+click on items toggles membership)
+            if (tool == TOOL_SELECT
+                    and e.modifiers() & Qt.KeyboardModifier.ControlModifier
+                    and self.itemAt(pos) is None):
+                self._rubber_origin = pos
+                if self._rubber is None:
+                    self._rubber = QRubberBand(
+                        QRubberBand.Shape.Rectangle, self.viewport())
+                self._rubber.setGeometry(QRect(pos, QSize(1, 1)))
+                self._rubber.show()
+                e.accept()
+                return
             if tool in (TOOL_WALL_EXT, TOOL_WALL_INT):
                 p = self._snap_start(sp)
                 wt = "exterior" if tool == TOOL_WALL_EXT else "interior"
@@ -2479,6 +2509,12 @@ class PlanView(QGraphicsView):
         self._last_scene = QPointF(sp)
         self.win.show_coords(sp)
 
+        if self._rubber_origin is not None:
+            self._rubber.setGeometry(
+                QRect(self._rubber_origin, pos).normalized())
+            e.accept()
+            return
+
         if self._panning and self._pan_last is not None:
             d = pos - self._pan_last
             self._pan_last = pos
@@ -2499,6 +2535,22 @@ class PlanView(QGraphicsView):
         super().mouseMoveEvent(e)
 
     def mouseReleaseEvent(self, e):
+        if (self._rubber_origin is not None
+                and e.button() == Qt.MouseButton.LeftButton):
+            rect = QRect(self._rubber_origin,
+                         e.position().toPoint()).normalized()
+            self._rubber.hide()
+            self._rubber_origin = None
+            area = self.mapToScene(rect).boundingRect()
+            for it in self.scene().items(
+                    area, Qt.ItemSelectionMode.IntersectsItemShape):
+                top = it.group() or it     # grouped items select the group
+                if isinstance(top, (WallItem, FurnishingItem, GroupItem,
+                                    RoomItem, OpeningItem)):
+                    top.setSelected(True)  # additive: joins the set
+            e.accept()
+            return
+
         if self._panning and e.button() in (Qt.MouseButton.LeftButton,
                                             Qt.MouseButton.MiddleButton):
             self._panning, self._pan_last = False, None
@@ -2619,9 +2671,10 @@ class MainWindow(QMainWindow):
         TOOL_SELECT: ("Select: drag wall BODY to slide it sideways (Ctrl = "
                       "free move) \u2022 drag wall ENDS to lengthen/shorten "
                       "(Shift = free angle) \u2022 drag furnishings from the "
-                      "right palette onto the plan \u2022 Ctrl+click to "
-                      "multi-select, Ctrl+G group, Ctrl+X/C/V cut-copy-"
-                      "paste \u2022 drag empty space to pan \u2022 wheel zoom"),
+                      "right palette onto the plan \u2022 Ctrl+click toggles "
+                      "items in the selection set, Ctrl+drag rubber-bands "
+                      "more in, Ctrl+G groups, Ctrl+X/C/V cut-copy-paste "
+                      "\u2022 drag empty space to pan \u2022 wheel zoom"),
         TOOL_WALL_EXT: "Exterior wall (6\"): click-drag to draw. Orthogonal "
                        "from the anchor (hold Shift for free angle). Esc "
                        "cancels.",
@@ -2752,17 +2805,22 @@ class MainWindow(QMainWindow):
                 ("Cu&t", QKeySequence.StandardKey.Cut, self.cut_selected),
                 ("&Copy", QKeySequence.StandardKey.Copy, self.copy_selected),
                 ("&Paste", QKeySequence.StandardKey.Paste,
-                 self.paste_clipboard),
-                (None, None, None),
-                ("&Group", "Ctrl+G", self.group_selected),
-                ("&Ungroup", "Ctrl+Shift+G", self.ungroup_selected)]:
-            if label is None:
-                m_edit.addSeparator()
-                continue
+                 self.paste_clipboard)]:
             a = QAction(label, self)
             a.setShortcut(QKeySequence(keys))
             a.triggered.connect(slot)
             m_edit.addAction(a)
+        m_edit.addSeparator()
+        self.a_group = QAction("&Group", self)
+        self.a_group.setShortcut(QKeySequence("Ctrl+G"))
+        self.a_group.triggered.connect(self.group_selected)
+        m_edit.addAction(self.a_group)
+        self.a_ungroup = QAction("&Ungroup", self)
+        self.a_ungroup.setShortcut(QKeySequence("Ctrl+Shift+G"))
+        self.a_ungroup.triggered.connect(self.ungroup_selected)
+        m_edit.addAction(self.a_ungroup)
+        self.scene.selectionChanged.connect(self._update_edit_actions)
+        self._update_edit_actions()
 
         m_file.addSeparator()
         a_set = QAction("Se&ttings…", self)
@@ -2823,6 +2881,16 @@ class MainWindow(QMainWindow):
         rebuild_all_walls(self.scene)
 
     # -- group / ungroup / cut / copy / paste -------------------------------------
+    def _update_edit_actions(self):
+        """Group is enabled once the selection set holds 2+ groupable
+        items; Ungroup once it holds a group."""
+        sel = self.scene.selectedItems()
+        n = sum(1 for it in sel
+                if isinstance(it, (WallItem, FurnishingItem, GroupItem)))
+        self.a_group.setEnabled(n >= 2)
+        self.a_ungroup.setEnabled(
+            any(isinstance(it, GroupItem) for it in sel))
+
     def group_selected(self):
         """Group the selected walls/furnishings (existing groups merge)."""
         members, old_groups = [], []
