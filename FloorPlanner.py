@@ -98,6 +98,18 @@ Behaviour
 * Doors and windows cut an opening in the wall and ride along it when
   dragged; sizes use the WWHH convention (e.g. 3280 = 32" w x 80" h).
 
+CSV room import
+---------------
+File > Import rooms from CSV… bulk-creates walled rooms.  Columns:
+Name,Type,X_ft,Y_ft,X_loc_ft,Y_loc_ft,Notes — Type (a room type),
+locations and Notes are optional.  Lengths are feet and accept
+12, 12.5, 12.5' or 12'6".  X_ft/Y_ft are the room's width/length
+(wall centreline to centreline); X_loc_ft/Y_loc_ft place the room's
+bottom-left corner measured from the canvas's BOTTOM-LEFT corner
+(y upward).  Rows without a location are placed on the first clear
+spot of the canvas.  Shared edges between imported rooms reuse the
+existing wall instead of doubling it.
+
 File format
 -----------
 File > Save / Open store the plan as plain human-editable JSON (all
@@ -113,9 +125,11 @@ the walls around `anchor` on load.
 Run:  pip install PyQt6    then    python floor_planner.py
 """
 
+import csv
 import json
 import math
 import os
+import re
 import sys
 from collections import deque
 from pathlib import Path
@@ -386,6 +400,29 @@ def fmt_ftin(inches: float) -> str:
     else:
         rem_s = f"{int(rem)} 1/2"
     return f"{sign}{ft}'-{rem_s}\""
+
+
+def parse_feet(text) -> float:
+    """Parse a length given in feet into INCHES.
+
+    Accepts:  12   12.5   12'   12.5'   12'6   12'6"   12' 6"   12'-6"
+    (plain numbers are feet; 6" alone is inches).  Raises ValueError on
+    anything else."""
+    s = str(text).strip().replace("’", "'").replace("”", '"')
+    if not s:
+        raise ValueError("empty length")
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*'\s*(?:-?\s*"
+                     r"(\d+(?:\.\d+)?)\s*\"?)?", s)
+    if m:
+        return float(m.group(1)) * 12.0 + float(m.group(2) or 0.0)
+    m = re.fullmatch(r'(\d+(?:\.\d+)?)\s*"', s)
+    if m:
+        return float(m.group(1))
+    m = re.fullmatch(r"\d+(?:\.\d+)?", s)
+    if m:
+        return float(s) * 12.0
+    raise ValueError(f"cannot parse length {text!r} "
+                     "(use 12, 12.5, 12.5' or 12'6\")")
 
 
 def grid_snap(p: QPointF, step: float = SNAP_STEP) -> QPointF:
@@ -2648,6 +2685,9 @@ class MainWindow(QMainWindow):
         a_open.setShortcut(QKeySequence.StandardKey.Open)
         a_open.triggered.connect(self.open_plan)
         m_file.addAction(a_open)
+        a_imp = QAction("&Import rooms from CSV…", self)
+        a_imp.triggered.connect(self.import_rooms_csv)
+        m_file.addAction(a_imp)
         m_file.addSeparator()
         a_save = QAction("&Save", self)
         a_save.setShortcut(QKeySequence.StandardKey.Save)
@@ -3054,6 +3094,126 @@ class MainWindow(QMainWindow):
         room.show_dims = bool(spec["show_dimensions"])
         self.scene.addItem(room)
         self.status(f"Pasted room '{name}'.")
+
+    # -- CSV room import ----------------------------------------------------------
+    def _wall_exists(self, p1: QPointF, p2: QPointF) -> bool:
+        for it in self.scene.items():
+            if isinstance(it, WallItem) and (
+                    (QLineF(it.p1, p1).length() < 0.6
+                     and QLineF(it.p2, p2).length() < 0.6)
+                    or (QLineF(it.p1, p2).length() < 0.6
+                        and QLineF(it.p2, p1).length() < 0.6)):
+                return True
+        return False
+
+    def _free_spot(self, w_in: float, h_in: float):
+        """Top-left corner (snapped) of a canvas spot where a w x h room
+        won't touch existing walls or rooms (24" clearance)."""
+        margin = 24.0
+        canvas = canvas_rect()
+        occupied = []
+        for it in self.scene.items():
+            if isinstance(it, WallItem):
+                occupied.append(it.boundingRect())
+            elif isinstance(it, RoomItem):
+                occupied.append(it.path.boundingRect())
+        step = max(SETTINGS["wall_snap_in"], 12.0)
+        y = canvas.top() + margin
+        while y + h_in + margin <= canvas.bottom():
+            x = canvas.left() + margin
+            while x + w_in + margin <= canvas.right():
+                cand = QRectF(x - margin / 2, y - margin / 2,
+                              w_in + margin, h_in + margin)
+                if not any(cand.intersects(r) for r in occupied):
+                    return x, y
+                x += step
+            y += step
+        # canvas full: park it to the right of everything
+        right = max([r.right() for r in occupied], default=canvas.left())
+        return wall_snap_len(right + margin), canvas.top() + margin
+
+    def import_rooms_csv(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import rooms from CSV", "",
+            "CSV files (*.csv);;All files (*)")
+        if path:
+            self._import_rooms(path)
+
+    def _import_rooms(self, path: str, interactive: bool = True):
+        """Create walled rooms from a CSV with the columns
+        Name,Type,X_ft,Y_ft,X_loc_ft,Y_loc_ft,Notes (Type, locations and
+        Notes optional).  X_ft/Y_ft are the room's perimeter width and
+        length; X_loc/Y_loc place its BOTTOM-LEFT corner, measured in
+        feet from the canvas's bottom-left corner.  Rooms without a
+        location go to the first clear spot on the canvas."""
+        try:
+            with open(path, "r", encoding="utf-8-sig", newline="") as f:
+                reader = csv.DictReader(f)
+                if reader.fieldnames is None:
+                    raise ValueError("Empty CSV file.")
+                rows = [{(k or "").strip().lower(): (v or "").strip()
+                         for k, v in row.items()} for row in reader]
+        except (OSError, csv.Error, ValueError) as ex:
+            if interactive:
+                QMessageBox.critical(self, "Import failed", str(ex))
+            self.status(f"Import failed: {ex}")
+            return
+        canvas = canvas_rect()
+        imported, errors = 0, []
+        for i, row in enumerate(rows, start=2):     # 1 = header line
+            name = row.get("name", "")
+            try:
+                if not name:
+                    raise ValueError("missing Name")
+                w_in = parse_feet(row["x_ft"])
+                h_in = parse_feet(row["y_ft"])
+                if w_in < 36.0 or h_in < 36.0:
+                    raise ValueError("rooms must be at least 3' x 3'")
+                xl, yl = row.get("x_loc_ft", ""), row.get("y_loc_ft", "")
+                if xl and yl:
+                    left = wall_snap_len(parse_feet(xl))
+                    top = wall_snap_len(canvas.bottom()
+                                        - parse_feet(yl) - h_in)
+                elif xl or yl:
+                    raise ValueError("give both X_loc_ft and Y_loc_ft, "
+                                     "or neither")
+                else:
+                    left, top = self._free_spot(w_in, h_in)
+            except (KeyError, ValueError) as ex:
+                errors.append(f"line {i} ({name or '?'}): {ex}")
+                continue
+            corners = [QPointF(left, top), QPointF(left + w_in, top),
+                       QPointF(left + w_in, top + h_in),
+                       QPointF(left, top + h_in)]
+            for j in range(4):
+                p1, p2 = corners[j], corners[(j + 1) % 4]
+                if not self._wall_exists(p1, p2):
+                    self.scene.addItem(WallItem(QPointF(p1), QPointF(p2),
+                                                "interior"))
+            rebuild_all_walls(self.scene)
+            centre = QPointF(left + w_in / 2, top + h_in / 2)
+            res = detect_room(self.scene, centre)
+            if res is None:
+                errors.append(f"line {i} ({name}): no enclosed area "
+                              "detected (overlapping another room?)")
+                continue
+            room = RoomItem(unique_room_name(self.scene, name), centre,
+                            res[0], res[1], corners=res[2])
+            rt = row.get("type", "")
+            if rt:
+                room.properties["room_type"] = next(
+                    (t for t in ROOM_TYPES if t.lower() == rt.lower()), rt)
+            if row.get("notes"):
+                room.properties["notes"] = row["notes"]
+            self.scene.addItem(room)
+            imported += 1
+        self.status(f"Imported {imported} room(s) from {path}"
+                    + (f" — {len(errors)} row(s) skipped." if errors
+                       else "."))
+        self._import_errors = errors      # inspectable (and testable)
+        if errors and interactive:
+            QMessageBox.warning(self, "Import finished with problems",
+                                "\n".join(errors[:20]))
 
     def open_plan(self):
         path, _ = QFileDialog.getOpenFileName(
