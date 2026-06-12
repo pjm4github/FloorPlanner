@@ -99,7 +99,10 @@ Behaviour
   set holds two or more walls/furnishings.
 * GROUPS: Ctrl+click to multi-select walls/furnishings, then Edit >
   Group (Ctrl+G) makes them select and move as one unit (dashed
-  outline; Ctrl+Shift+G ungroups, right-click for a menu).  Edit >
+  outline; Ctrl+Shift+G ungroups leaving the members where they sit,
+  right-click for a menu).  A room whose walls all belong to a moved
+  group rides along: its label, outline and shaded region re-detect at
+  the new location.  Edit >
   Cut/Copy (Ctrl+X / Ctrl+C) takes the selection or group to an
   internal clipboard and Paste (Ctrl+V) recreates it centred on the
   mouse position, re-grouped; walls keep the on-centre snap and bring
@@ -147,7 +150,7 @@ from collections import deque
 from pathlib import Path
 
 from PyQt6.QtCore import (QLineF, QMimeData, QPoint, QPointF, QRect, QRectF,
-                          QSize, Qt)
+                          QSize, Qt, QTimer)
 from PyQt6.QtGui import (
     QAction,
     QActionGroup,
@@ -841,14 +844,49 @@ def unique_room_name(scene, base: str, exclude=None) -> str:
 
 
 def refresh_rooms(scene):
-    """Re-detect every room's region + perimeter after walls change."""
+    """Re-detect every room's region + perimeter after walls change.
+
+    When the stored anchor no longer falls inside the room (its walls
+    were moved or resized past it), probe points across the room's last
+    known region for its new extent and move the anchor (and label)
+    there — skipping any region that already belongs to another room."""
     if scene is None:
         return
-    for it in list(scene.items()):
-        if isinstance(it, RoomItem):
-            res = detect_room(scene, it.anchor)
-            if res is not None:
-                it.set_region(*res)
+    rooms = [it for it in scene.items() if isinstance(it, RoomItem)]
+    for it in rooms:
+        res = detect_room(scene, it.anchor)
+        if res is None:
+            others = [r for r in rooms if r is not it]
+            for p in _room_probe_points(it):
+                cand = detect_room(scene, p)
+                if cand is None or any(cand[0].contains(o.anchor)
+                                       for o in others):
+                    continue
+                res = cand
+                it.prepareGeometryChange()
+                it.anchor = QPointF(p)
+                break
+        if res is not None:
+            it.set_region(*res)
+
+
+def _room_probe_points(room) -> list:
+    """Candidate interior points for re-finding a room whose anchor was
+    left outside: the old perimeter's centroid, then a grid sample of
+    the old region."""
+    pts = []
+    if room.corners:
+        n = len(room.corners)
+        pts.append(QPointF(sum(p.x() for p in room.corners) / n,
+                           sum(p.y() for p in room.corners) / n))
+    br = room.path.boundingRect()
+    for iy in range(1, 6):
+        for ix in range(1, 6):
+            p = QPointF(br.left() + br.width() * ix / 6.0,
+                        br.top() + br.height() * iy / 6.0)
+            if room.path.contains(p):
+                pts.append(p)
+    return pts
 
 
 def rebuild_all_walls(scene):
@@ -2213,12 +2251,53 @@ class GroupItem(QGraphicsItemGroup):
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRect(self.childrenBoundingRect().adjusted(-2, -2, 2, 2))
 
+    def adopt(self, item):
+        """addToGroup without Qt's transform juggling.  The group always
+        sits at (0,0) untransformed, so children can simply keep their
+        own scene position and rotation.  (Qt's addToGroup bakes a
+        rotated child's rotation into its transform(), which then
+        combines with the still-set rotation() and double-rotates.)"""
+        sp, rot = item.scenePos(), item.rotation()
+        self.addToGroup(item)
+        item.setTransform(QTransform())
+        if isinstance(item, WallItem):
+            item.setPos(0.0, 0.0)         # walls live in their p1/p2
+        else:
+            item.setPos(sp)
+        item.setRotation(rot)
+
+    def dissolve(self) -> list:
+        """Remove the group, leaving its members in the scene exactly
+        where they are now; returns the members."""
+        children = list(self.childItems())
+        for c in children:
+            sp, rot = c.scenePos(), c.rotation()
+            self.removeFromGroup(c)
+            c.setTransform(QTransform())
+            c.setPos(QPointF(0.0, 0.0) if isinstance(c, WallItem) else sp)
+            c.setRotation(rot)
+        if self.scene() is not None:
+            self.scene().removeItem(self)
+        return children
+
     def bake(self):
         """Fold the group's current translation into its members and
-        reset the group to (0, 0)."""
+        reset the group to (0, 0).  Rooms whose walls all belong to the
+        group ride along: their anchor (label) shifts too, so the room
+        region re-detects at the new location."""
         d = self.pos()
         if abs(d.x()) < 1e-9 and abs(d.y()) < 1e-9:
             return
+        sc = self.scene()
+        moved_rooms = []
+        group_walls = {ch for ch in self.childItems()
+                       if isinstance(ch, WallItem)}
+        if sc is not None and group_walls:
+            for it in sc.items():
+                if isinstance(it, RoomItem):
+                    bw = it.bounding_walls()
+                    if bw and all(w in group_walls for w in bw):
+                        moved_rooms.append(it)
         self.prepareGeometryChange()
         for ch in self.childItems():
             if isinstance(ch, WallItem):
@@ -2226,8 +2305,11 @@ class GroupItem(QGraphicsItemGroup):
                 ch.p2 = QPointF(ch.p2.x() + d.x(), ch.p2.y() + d.y())
             else:
                 ch.setPos(ch.pos().x() + d.x(), ch.pos().y() + d.y())
+        for r in moved_rooms:
+            r.prepareGeometryChange()
+            r.anchor = QPointF(r.anchor.x() + d.x(), r.anchor.y() + d.y())
         self.setPos(0.0, 0.0)
-        rebuild_all_walls(self.scene())
+        rebuild_all_walls(sc)             # re-detects rooms at new anchors
 
     def mouseReleaseEvent(self, e):
         super().mouseReleaseEvent(e)
@@ -2245,18 +2327,18 @@ class GroupItem(QGraphicsItemGroup):
         menu.addSeparator()
         a_del = menu.addAction("Delete group")
         chosen = menu.exec(e.screenPos())
-        if win is not None and chosen in (a_un, a_cut, a_copy):
+        if win is not None and chosen in (a_un, a_cut, a_del):
             sc.clearSelection()
             self.setSelected(True)
-            if chosen is a_un:
-                win.ungroup_selected()
-            elif chosen is a_cut:
-                win.cut_selected()
-            else:
-                win.copy_selected()
-        elif chosen is a_del and sc is not None:
-            sc.removeItem(self)
-            rebuild_all_walls(sc)
+            # defer: these destroy this item, which must not happen
+            # while Qt is still delivering its context-menu event
+            slot = {a_un: win.ungroup_selected, a_cut: win.cut_selected,
+                    a_del: win.delete_selected}[chosen]
+            QTimer.singleShot(0, slot)
+        elif chosen is a_copy and win is not None:
+            sc.clearSelection()
+            self.setSelected(True)
+            win.copy_selected()
         e.accept()
 
 
@@ -2901,8 +2983,7 @@ class MainWindow(QMainWindow):
                 members.append(it)
         for g in old_groups:
             g.bake()
-            members += g.childItems()
-            self.scene.destroyItemGroup(g)
+            members += g.dissolve()
         if len(members) < 2:
             self.status("Select at least two walls/furnishings to group "
                         "(Ctrl+click to multi-select).")
@@ -2911,7 +2992,7 @@ class MainWindow(QMainWindow):
         group = GroupItem()
         self.scene.addItem(group)
         for it in members:
-            group.addToGroup(it)
+            group.adopt(it)
         group.setSelected(True)
         self.status(f"Grouped {len(members)} items — drag to move, "
                     "Ctrl+Shift+G to ungroup.")
@@ -2923,13 +3004,11 @@ class MainWindow(QMainWindow):
             self.status("Select a group to ungroup.")
             return
         for g in groups:
-            g.bake()
-            children = g.childItems()
-            self.scene.destroyItemGroup(g)
-            for c in children:
+            g.bake()                      # members keep their moved spot
+            for c in g.dissolve():
                 c.setSelected(True)
-        rebuild_all_walls(self.scene)
-        self.status("Ungrouped.")
+        rebuild_all_walls(self.scene)     # rooms re-detect region/outline
+        self.status("Ungrouped — items left in place.")
 
     def _selection_spec(self):
         """Selected walls/furnishings (groups expand to their members)
@@ -3037,7 +3116,7 @@ class MainWindow(QMainWindow):
             group = GroupItem()
             self.scene.addItem(group)
             for it in pasted:
-                group.addToGroup(it)
+                group.adopt(it)
             group.setSelected(True)
         else:
             for it in pasted:
