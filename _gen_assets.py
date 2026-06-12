@@ -174,8 +174,26 @@ FURNISHINGS = [
     ("lawnmower", "Lawn Mower", "Garage", 22, 62,
      [R(1, 2, 20, 25, 8, FILL, 1.1),               # deck
       Ci(11, 14.5, 6, "none", 0.6),
+      R(0.4, 4.5, 3, 6.5, 1.2, FILL, 0.8),         # four wheels
+      R(18.6, 4.5, 3, 6.5, 1.2, FILL, 0.8),
+      R(0.4, 18.5, 3, 6.5, 1.2, FILL, 0.8),
+      R(18.6, 18.5, 3, 6.5, 1.2, FILL, 0.8),
       L(6, 27, 8.5, 59, 1.1), L(16, 27, 13.5, 59, 1.1),
       L(8.5, 59, 13.5, 59, 1.4)]),                 # handle
+    ("boat_trailer", "Boat Trailer", "Garage", 78, 216,
+     [L(39, 6, 39, 62, 1.4),                       # tongue
+      R(35.5, 1, 7, 7, 1.5, FILL, 1),              # coupler
+      L(12, 62, 39, 8, 1.2), L(66, 62, 39, 8, 1.2),  # A-frame
+      L(12, 62, 12, 205, 1.4), L(66, 62, 66, 205, 1.4),  # side rails
+      L(12, 75, 66, 75, 0.8), L(12, 125, 66, 125, 0.8),  # cross members
+      L(12, 175, 66, 175, 0.8), L(12, 205, 66, 205, 1.2),
+      L(24, 70, 24, 200, 0.8, "4,3"),              # hull bunks
+      L(54, 70, 54, 200, 0.8, "4,3"),
+      Ci(39, 30, 3.2, "#ffffff", 0.9),             # winch post
+      R(2, 130, 8, 32, 3, FILL, 1),                # fenders / wheels
+      R(68, 130, 8, 32, 3, FILL, 1),
+      R(7.5, 206.5, 6.5, 5, 1, "#ffffff", 0.8),    # tail lights
+      R(64, 206.5, 6.5, 5, 1, "#ffffff", 0.8)]),
     ("snowblower", "Snow Blower", "Garage", 28, 58,
      [R(1, 1, 26, 13, 2, FILL, 1.2),              # auger housing
       L(8, 2, 8, 13.5, 0.5), L(14, 2, 14, 13.5, 0.5),
@@ -233,9 +251,9 @@ GROUPS = [
                  "tv_stand", "desk", "office_chair", "bookshelf"]),
     ("Bathroom", ["bathtub", "shower", "toilet", "vanity"]),
     ("Laundry", ["washer", "dryer"]),
-    ("Garage", ["suv", "car", "motorcycle", "bicycle", "boat", "workbench",
-                "storage_shelves", "lawnmower", "snowblower", "wheelbarrow",
-                "trashcan"]),
+    ("Garage", ["suv", "car", "motorcycle", "bicycle", "boat",
+                "boat_trailer", "workbench", "storage_shelves", "lawnmower",
+                "snowblower", "wheelbarrow", "trashcan"]),
     ("Office", ["desk", "office_chair", "bookshelf", "armchair",
                 "side_table"]),
 ]

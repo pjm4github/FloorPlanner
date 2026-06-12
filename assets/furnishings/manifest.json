@@ -264,6 +264,14 @@
     "depth_in": 62
   },
   {
+    "id": "boat_trailer",
+    "name": "Boat Trailer",
+    "category": "Garage",
+    "file": "boat_trailer.svg",
+    "width_in": 78,
+    "depth_in": 216
+  },
+  {
     "id": "snowblower",
     "name": "Snow Blower",
     "category": "Garage",
