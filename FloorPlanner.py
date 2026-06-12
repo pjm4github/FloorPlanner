@@ -108,7 +108,9 @@ locations and Notes are optional.  Lengths are feet and accept
 bottom-left corner measured from the canvas's BOTTOM-LEFT corner
 (y upward).  Rows without a location are placed on the first clear
 spot of the canvas.  Shared edges between imported rooms reuse the
-existing wall instead of doubling it.
+existing wall instead of doubling it.  File > Export rooms to CSV…
+writes the plan's rooms back out in the same format (decimal feet),
+so room schedules round-trip.
 
 File format
 -----------
@@ -2688,6 +2690,9 @@ class MainWindow(QMainWindow):
         a_imp = QAction("&Import rooms from CSV…", self)
         a_imp.triggered.connect(self.import_rooms_csv)
         m_file.addAction(a_imp)
+        a_exp = QAction("&Export rooms to CSV…", self)
+        a_exp.triggered.connect(self.export_rooms_csv)
+        m_file.addAction(a_exp)
         m_file.addSeparator()
         a_save = QAction("&Save", self)
         a_save.setShortcut(QKeySequence.StandardKey.Save)
@@ -3214,6 +3219,57 @@ class MainWindow(QMainWindow):
         if errors and interactive:
             QMessageBox.warning(self, "Import finished with problems",
                                 "\n".join(errors[:20]))
+
+    def export_rooms_csv(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export rooms to CSV", "rooms.csv",
+            "CSV files (*.csv);;All files (*)")
+        if path:
+            self._export_rooms(path)
+
+    def _export_rooms(self, path: str, interactive: bool = True):
+        """Write every room as a CSV row in the same format the importer
+        reads (Name,Type,X_ft,Y_ft,X_loc_ft,Y_loc_ft,Notes), so a plan's
+        rooms round-trip.  Sizes/locations come from the room perimeter
+        (wall centrelines); locations are the bottom-left corner in feet
+        from the canvas's bottom-left corner, lengths in decimal feet."""
+
+        def ft(v: float) -> str:
+            return f"{v / 12.0:g}"
+
+        canvas = canvas_rect()
+        rooms = sorted((it for it in self.scene.items()
+                        if isinstance(it, RoomItem)),
+                       key=lambda r: r.name.lower())
+        try:
+            with open(path, "w", encoding="utf-8", newline="") as f:
+                wr = csv.writer(f)
+                wr.writerow(["Name", "Type", "X_ft", "Y_ft",
+                             "X_loc_ft", "Y_loc_ft", "Notes"])
+                for r in rooms:
+                    if r.corners:
+                        xs = [c.x() for c in r.corners]
+                        ys = [c.y() for c in r.corners]
+                    else:                   # no traced perimeter: use the
+                        rect = r.interior_rect()      # flood region box
+                        xs = [rect.left(), rect.right()]
+                        ys = [rect.top(), rect.bottom()]
+                    wr.writerow([
+                        r.name,
+                        r.properties.get("room_type", ""),
+                        ft(max(xs) - min(xs)),
+                        ft(max(ys) - min(ys)),
+                        ft(min(xs)),
+                        ft(canvas.bottom() - max(ys)),
+                        " ".join(str(r.properties.get("notes", ""))
+                                 .split()),
+                    ])
+        except OSError as ex:
+            if interactive:
+                QMessageBox.critical(self, "Export failed", str(ex))
+            self.status(f"Export failed: {ex}")
+            return
+        self.status(f"Exported {len(rooms)} room(s) to {path}")
 
     def open_plan(self):
         path, _ = QFileDialog.getOpenFileName(
