@@ -132,6 +132,72 @@ FURNISHINGS = [
      [R(0.75, 0.75, 25.5, 28.5, 1, sw=1.2),
       Ci(13.5, 16, 9, "#ffffff", 0.9), L(5, 4, 22, 4, 0.7)]),
 
+    ("suv", "SUV", "Garage", 78, 192,
+     [R(1, 1, 76, 190, 14, FILL, 1.5),
+      R(9, 52, 60, 104, 9, "#ffffff", 0.9),       # cabin glasshouse
+      L(9, 74, 69, 74, 0.7), L(9, 134, 69, 134, 0.7),
+      R(0.5, 58, 7, 4, 1.5, FILL, 0.8), R(70.5, 58, 7, 4, 1.5, FILL, 0.8),
+      L(14, 14, 64, 14, 0.6), L(14, 180, 64, 180, 0.6)]),
+    ("car", "Car", "Garage", 72, 180,
+     [R(1, 1, 70, 178, 16, FILL, 1.5),
+      R(8, 50, 56, 92, 9, "#ffffff", 0.9),
+      L(8, 70, 64, 70, 0.7), L(8, 122, 64, 122, 0.7),
+      R(0.5, 55, 7, 4, 1.5, FILL, 0.8), R(64.5, 55, 7, 4, 1.5, FILL, 0.8),
+      L(14, 12, 58, 12, 0.6), L(14, 170, 58, 170, 0.6)]),
+    ("motorcycle", "Motorcycle", "Garage", 32, 84,
+     [El(16, 12, 3, 10, FILL, 1.1), El(16, 71, 3.5, 10, FILL, 1.1),
+      L(16, 22, 16, 61, 1.4),
+      R(10.5, 32, 11, 30, 5.5, FILL, 1),           # tank + seat
+      L(4, 22, 28, 22, 1.4),                       # handlebars
+      Ci(4, 22, 1.2), Ci(28, 22, 1.2)]),
+    ("bicycle", "Bicycle", "Garage", 24, 68,
+     [El(12, 13, 2.2, 11, FILL, 1), El(12, 55, 2.2, 11, FILL, 1),
+      L(12, 13, 12, 55, 1.2),
+      L(2, 23, 22, 23, 1.2),                       # handlebars
+      El(12, 42, 3.2, 5, FILL, 0.9),               # saddle
+      L(5, 33, 19, 33, 0.9)]),                     # pedals
+    ("boat", "Boat 14'", "Garage", 68, 168,
+     ['<path d="M34 2 C 12 28 4 72 4 122 L4 148 Q4 166 22 166 L46 166 '
+      'Q64 166 64 148 L64 122 C64 72 56 28 34 2 Z" '
+      f'fill="{FILL}" stroke="{INK}" stroke-width="1.5"/>',
+      '<path d="M34 12 C 17 34 10 74 10 120 L10 146 Q10 160 24 160 L44 160 '
+      'Q58 160 58 146 L58 120 C58 74 51 34 34 12 Z" '
+      f'fill="none" stroke="{INK}" stroke-width="0.6"/>',
+      L(10, 96, 58, 96, 0.8), L(10, 128, 58, 128, 0.8)]),   # thwart seats
+    ("workbench", "Workbench 6'", "Garage", 72, 24,
+     [R(0.75, 0.75, 70.5, 22.5, 1, sw=1.2),
+      R(3, 3, 66, 18, 0.5, "none", 0.5), Ci(64, 7, 3, "none", 0.8)]),
+    ("storage_shelves", "Storage Shelves", "Garage", 48, 18,
+     [R(0.6, 0.6, 46.8, 16.8, 0.5, sw=1),
+      L(12, 0.6, 12, 17.4, 0.5), L(24, 0.6, 24, 17.4, 0.5),
+      L(36, 0.6, 36, 17.4, 0.5), L(0.6, 9, 47.4, 9, 0.4, "2,2")]),
+    ("lawnmower", "Lawn Mower", "Garage", 22, 62,
+     [R(1, 2, 20, 25, 8, FILL, 1.1),               # deck
+      Ci(11, 14.5, 6, "none", 0.6),
+      L(6, 27, 8.5, 59, 1.1), L(16, 27, 13.5, 59, 1.1),
+      L(8.5, 59, 13.5, 59, 1.4)]),                 # handle
+    ("snowblower", "Snow Blower", "Garage", 28, 58,
+     [R(1, 1, 26, 13, 2, FILL, 1.2),              # auger housing
+      L(8, 2, 8, 13.5, 0.5), L(14, 2, 14, 13.5, 0.5),
+      L(20, 2, 20, 13.5, 0.5),
+      Ci(9, 7.5, 2.8, "#ffffff", 0.8),            # discharge chute
+      R(7.5, 14, 13, 17, 3, FILL, 1),             # engine body
+      R(4, 18, 3.5, 9, 1.5, FILL, 0.8), R(20.5, 18, 3.5, 9, 1.5, FILL, 0.8),
+      L(9, 31, 6.5, 55, 1.1), L(19, 31, 21.5, 55, 1.1),
+      L(6.5, 55, 21.5, 55, 1.4)]),                # handlebar
+    ("wheelbarrow", "Wheelbarrow", "Garage", 27, 58,
+     [El(13.5, 5.5, 2.5, 4.5, FILL, 1),           # front wheel
+      '<path d="M9.5 10 L17.5 10 L23 36 L4 36 Z" '
+      f'fill="{FILL}" stroke="{INK}" stroke-width="1.2" '
+      'stroke-linejoin="round"/>',                # tub (narrow at wheel)
+      '<path d="M11 14 L16 14 L19.5 32.5 L7.5 32.5 Z" '
+      f'fill="none" stroke="{INK}" stroke-width="0.5" '
+      'stroke-linejoin="round"/>',
+      L(6, 36, 8.5, 57, 1.1), L(21, 36, 18.5, 57, 1.1)]),
+    ("trashcan", "Trash Can", "Garage", 24, 24,
+     [Ci(12, 12, 11, FILL, 1.2), Ci(12, 12, 8.5, "none", 0.6),
+      L(1.5, 12, 4.5, 12, 1.2), L(19.5, 12, 22.5, 12, 1.2)]),
+
     ("desk", "Desk 5'", "Office / Storage", 60, 30,
      [R(0.75, 0.75, 58.5, 28.5, 1, sw=1.2), L(2, 4, 58, 4, 0.5)]),
     ("office_chair", "Office Chair", "Office / Storage", 24, 24,
@@ -153,6 +219,33 @@ for fid, name, cat, w, d, body in FURNISHINGS:
 (FURN / "manifest.json").write_text(
     json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
+# Palette sections: furnishings grouped by room type; items are the SVG
+# file names and may appear in several groups.  "All" lists everything
+# and is the section the app opens by default.
+GROUPS = [
+    ("Living Room", ["sofa", "loveseat", "armchair", "coffee_table",
+                     "side_table", "tv_stand", "bookshelf"]),
+    ("Dining Room", ["dining_table", "dining_table_round", "dining_chair"]),
+    ("Kitchen", ["refrigerator", "range", "dishwasher", "kitchen_sink",
+                 "dining_chair"]),
+    ("Bedroom", ["bed_king", "bed_queen", "bed_full", "bed_twin",
+                 "nightstand", "dresser", "wardrobe", "armchair",
+                 "tv_stand", "desk", "office_chair", "bookshelf"]),
+    ("Bathroom", ["bathtub", "shower", "toilet", "vanity"]),
+    ("Laundry", ["washer", "dryer"]),
+    ("Garage", ["suv", "car", "motorcycle", "bicycle", "boat", "workbench",
+                "storage_shelves", "lawnmower", "snowblower", "wheelbarrow",
+                "trashcan"]),
+    ("Office", ["desk", "office_chair", "bookshelf", "armchair",
+                "side_table"]),
+]
+groups_out = [{"name": "All",
+               "items": [f"{fid}.svg" for fid, *_ in FURNISHINGS]}]
+groups_out += [{"name": name, "items": [f"{i}.svg" for i in ids]}
+               for name, ids in GROUPS]
+(FURN / "groups.json").write_text(
+    json.dumps(groups_out, indent=2) + "\n", encoding="utf-8")
+
 (FURN / "LICENSE").write_text(
     "Floor Planner furnishing symbol library\n"
     "----------------------------------------\n"
@@ -166,9 +259,14 @@ for fid, name, cat, w, d, body in FURNISHINGS:
     "* Every SVG `viewBox` is in **inches** (`0 0 WIDTH DEPTH`), so the app\n"
     "  renders each symbol at true scale (1 scene unit = 1\").\n"
     "* `manifest.json` lists the catalog: `id`, `name`, `category`, `file`,\n"
-    "  `width_in`, `depth_in`.\n\n"
+    "  `width_in`, `depth_in`.\n"
+    "* `groups.json` defines the palette's expandable sections: a list of\n"
+    "  `{name, items}` where each item is an SVG file name from this\n"
+    "  directory.  A furnishing may appear in several groups.  The `All`\n"
+    "  group always shows the whole library and is open by default.\n\n"
     "To add your own symbol: drop an SVG here whose viewBox matches the\n"
-    "real-world footprint in inches and add a manifest entry.\n",
+    "real-world footprint in inches, add a manifest entry, and list it in\n"
+    "the groups it belongs to.\n",
     encoding="utf-8")
 
 # ---------------------------------------------------------------- tool icons

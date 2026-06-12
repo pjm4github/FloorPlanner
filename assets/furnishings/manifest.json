@@ -200,6 +200,94 @@
     "depth_in": 30
   },
   {
+    "id": "suv",
+    "name": "SUV",
+    "category": "Garage",
+    "file": "suv.svg",
+    "width_in": 78,
+    "depth_in": 192
+  },
+  {
+    "id": "car",
+    "name": "Car",
+    "category": "Garage",
+    "file": "car.svg",
+    "width_in": 72,
+    "depth_in": 180
+  },
+  {
+    "id": "motorcycle",
+    "name": "Motorcycle",
+    "category": "Garage",
+    "file": "motorcycle.svg",
+    "width_in": 32,
+    "depth_in": 84
+  },
+  {
+    "id": "bicycle",
+    "name": "Bicycle",
+    "category": "Garage",
+    "file": "bicycle.svg",
+    "width_in": 24,
+    "depth_in": 68
+  },
+  {
+    "id": "boat",
+    "name": "Boat 14'",
+    "category": "Garage",
+    "file": "boat.svg",
+    "width_in": 68,
+    "depth_in": 168
+  },
+  {
+    "id": "workbench",
+    "name": "Workbench 6'",
+    "category": "Garage",
+    "file": "workbench.svg",
+    "width_in": 72,
+    "depth_in": 24
+  },
+  {
+    "id": "storage_shelves",
+    "name": "Storage Shelves",
+    "category": "Garage",
+    "file": "storage_shelves.svg",
+    "width_in": 48,
+    "depth_in": 18
+  },
+  {
+    "id": "lawnmower",
+    "name": "Lawn Mower",
+    "category": "Garage",
+    "file": "lawnmower.svg",
+    "width_in": 22,
+    "depth_in": 62
+  },
+  {
+    "id": "snowblower",
+    "name": "Snow Blower",
+    "category": "Garage",
+    "file": "snowblower.svg",
+    "width_in": 28,
+    "depth_in": 58
+  },
+  {
+    "id": "wheelbarrow",
+    "name": "Wheelbarrow",
+    "category": "Garage",
+    "file": "wheelbarrow.svg",
+    "width_in": 27,
+    "depth_in": 58
+  },
+  {
+    "id": "trashcan",
+    "name": "Trash Can",
+    "category": "Garage",
+    "file": "trashcan.svg",
+    "width_in": 24,
+    "depth_in": 24
+  },
+  {
     "id": "desk",
     "name": "Desk 5'",
     "category": "Office / Storage",

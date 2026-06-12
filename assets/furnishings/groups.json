@@ -1,0 +1,136 @@
+[
+  {
+    "name": "All",
+    "items": [
+      "sofa.svg",
+      "loveseat.svg",
+      "armchair.svg",
+      "coffee_table.svg",
+      "side_table.svg",
+      "tv_stand.svg",
+      "dining_table.svg",
+      "dining_table_round.svg",
+      "dining_chair.svg",
+      "refrigerator.svg",
+      "range.svg",
+      "dishwasher.svg",
+      "kitchen_sink.svg",
+      "bed_king.svg",
+      "bed_queen.svg",
+      "bed_full.svg",
+      "bed_twin.svg",
+      "nightstand.svg",
+      "dresser.svg",
+      "bathtub.svg",
+      "shower.svg",
+      "toilet.svg",
+      "vanity.svg",
+      "washer.svg",
+      "dryer.svg",
+      "suv.svg",
+      "car.svg",
+      "motorcycle.svg",
+      "bicycle.svg",
+      "boat.svg",
+      "workbench.svg",
+      "storage_shelves.svg",
+      "lawnmower.svg",
+      "snowblower.svg",
+      "wheelbarrow.svg",
+      "trashcan.svg",
+      "desk.svg",
+      "office_chair.svg",
+      "bookshelf.svg",
+      "wardrobe.svg"
+    ]
+  },
+  {
+    "name": "Living Room",
+    "items": [
+      "sofa.svg",
+      "loveseat.svg",
+      "armchair.svg",
+      "coffee_table.svg",
+      "side_table.svg",
+      "tv_stand.svg",
+      "bookshelf.svg"
+    ]
+  },
+  {
+    "name": "Dining Room",
+    "items": [
+      "dining_table.svg",
+      "dining_table_round.svg",
+      "dining_chair.svg"
+    ]
+  },
+  {
+    "name": "Kitchen",
+    "items": [
+      "refrigerator.svg",
+      "range.svg",
+      "dishwasher.svg",
+      "kitchen_sink.svg",
+      "dining_chair.svg"
+    ]
+  },
+  {
+    "name": "Bedroom",
+    "items": [
+      "bed_king.svg",
+      "bed_queen.svg",
+      "bed_full.svg",
+      "bed_twin.svg",
+      "nightstand.svg",
+      "dresser.svg",
+      "wardrobe.svg",
+      "armchair.svg",
+      "tv_stand.svg",
+      "desk.svg",
+      "office_chair.svg",
+      "bookshelf.svg"
+    ]
+  },
+  {
+    "name": "Bathroom",
+    "items": [
+      "bathtub.svg",
+      "shower.svg",
+      "toilet.svg",
+      "vanity.svg"
+    ]
+  },
+  {
+    "name": "Laundry",
+    "items": [
+      "washer.svg",
+      "dryer.svg"
+    ]
+  },
+  {
+    "name": "Garage",
+    "items": [
+      "suv.svg",
+      "car.svg",
+      "motorcycle.svg",
+      "bicycle.svg",
+      "boat.svg",
+      "workbench.svg",
+      "storage_shelves.svg",
+      "lawnmower.svg",
+      "snowblower.svg",
+      "wheelbarrow.svg",
+      "trashcan.svg"
+    ]
+  },
+  {
+    "name": "Office",
+    "items": [
+      "desk.svg",
+      "office_chair.svg",
+      "bookshelf.svg",
+      "armchair.svg",
+      "side_table.svg"
+    ]
+  }
+]

@@ -24,9 +24,13 @@ The toolbar shows SVG icons from assets/icons (hover for the name/key).
 
 Furnishings palette (right side)
 --------------------------------
-The dock on the right lists the bundled furnishing library
+The dock on the right shows the bundled furnishing library
 (assets/furnishings: CC0 top-view symbols + manifest.json with each
-item's true width/depth in inches).  DRAG a symbol onto the plan to
+item's true width/depth in inches) as EXPANDING SECTIONS, one per room
+group from assets/furnishings/groups.json (a furnishing may belong to
+several groups).  Click a section header (e.g. Bedroom) to expand it;
+the "All" section — the whole library — is open by default.
+DRAG a symbol onto the plan to
 place it at real scale (scene units are inches).  Placed furnishings
 can be dragged to move (1" snap) and are saved in the plan file.
 Selecting one shows a round ROTATOR HANDLE above it: drag the handle
@@ -147,6 +151,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPlainTextEdit,
+    QToolBox,
 )
 
 try:
@@ -251,6 +256,7 @@ FURN_DIR = Path(__file__).resolve().parent / "assets" / "furnishings"
 FURN_MIME = "application/x-floorplanner-furnishing"
 
 _FURN_CATALOG = None
+_FURN_GROUPS = None
 _FURN_RENDERERS = {}
 
 
@@ -293,6 +299,48 @@ def furnishing_spec(kind: str):
         if spec["id"] == kind:
             return spec
     return None
+
+
+def furnishing_groups() -> list:
+    """Palette sections from assets/furnishings/groups.json:
+    [{"name", "specs"}], in file order.  Items are SVG file names (ids
+    also accepted); unknown names are skipped and a furnishing may sit
+    in several groups.  The "All" group always holds the whole catalog.
+    Without a usable groups.json, falls back to All + the manifest
+    categories."""
+    global _FURN_GROUPS
+    if _FURN_GROUPS is None:
+        cat = furnishing_catalog()
+        by_name = {s["file"]: s for s in cat}
+        by_name.update({s["id"]: s for s in cat})
+        sections = []
+        try:
+            entries = json.loads((FURN_DIR / "groups.json")
+                                 .read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            entries = []
+        for ent in entries if isinstance(entries, list) else []:
+            name = str(ent.get("name", "")).strip()
+            if not name:
+                continue
+            if name.lower() == "all":
+                specs = list(cat)
+            else:
+                specs = []
+                for raw in ent.get("items", []):
+                    spec = by_name.get(str(raw))
+                    if spec is not None and spec not in specs:
+                        specs.append(spec)
+            if specs:
+                sections.append({"name": name, "specs": specs})
+        if not sections:
+            sections = [{"name": "All", "specs": list(cat)}]
+            by_cat = {}
+            for s in cat:
+                by_cat.setdefault(s["category"], []).append(s)
+            sections += [{"name": k, "specs": v} for k, v in by_cat.items()]
+        _FURN_GROUPS = sections
+    return _FURN_GROUPS
 
 
 def furnishing_renderer(kind: str):
@@ -1920,11 +1968,11 @@ class FurnishingItem(QGraphicsItem):
         e.accept()
 
 
-class FurnishingPalette(QListWidget):
-    """Right-hand palette listing the furnishing library; drag a symbol
-    onto the plan to place it at true scale."""
+class FurnishingList(QListWidget):
+    """One palette section: an icon grid of furnishing symbols; drag a
+    symbol onto the plan to place it at true scale."""
 
-    def __init__(self, parent=None):
+    def __init__(self, specs, parent=None):
         super().__init__(parent)
         self.setViewMode(QListWidget.ViewMode.IconMode)
         self.setIconSize(QSize(52, 52))
@@ -1934,7 +1982,7 @@ class FurnishingPalette(QListWidget):
         self.setDragEnabled(True)
         self.setWordWrap(True)
         self.setSpacing(2)
-        for spec in furnishing_catalog():
+        for spec in specs:
             it = QListWidgetItem(self._icon(spec), spec["name"])
             it.setData(Qt.ItemDataRole.UserRole, spec["id"])
             it.setToolTip(f'{spec["name"]} — {fmt_ftin(spec["width_in"])} × '
@@ -1970,6 +2018,23 @@ class FurnishingPalette(QListWidget):
         drag.setPixmap(pm)
         drag.setHotSpot(QPoint(pm.width() // 2, pm.height() // 2))
         drag.exec(Qt.DropAction.CopyAction)
+
+
+class FurnishingPalette(QToolBox):
+    """Right-hand palette: one expandable tab per room group from
+    assets/furnishings/groups.json (a furnishing may appear in several
+    groups).  Clicking a tab expands that section; "All" — the whole
+    library — is the section open by default."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        all_index = 0
+        for i, group in enumerate(furnishing_groups()):
+            lst = FurnishingList(group["specs"], self)
+            self.addItem(lst, f'{group["name"]}  ({len(group["specs"])})')
+            if group["name"].lower() == "all":
+                all_index = i
+        self.setCurrentIndex(all_index)
 
 
 class PlanView(QGraphicsView):
