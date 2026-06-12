@@ -44,7 +44,11 @@ Wheel               zoom (anchored under cursor)
 Left-drag (empty)   pan                (middle-drag pans in any tool)
 Left-drag item      move / stretch
 Right-click door    popup: LH, RH, BIFOLD, POCKET, SLIDER, FRENCH, DOORWAY
-Right-click room name   popup: show dimensions, properties, rename, delete
+Right-click room name   popup: show dimensions, properties, inventory,
+                        rename, copy, delete.  Inventory… lists the room's
+                        properties and everything in the room (furnishings,
+                        doors, windows) as name/quantity rows of
+                        tab-separated text to copy into Excel.
 Double-click door/window/room label    edit size / text
 
 Behaviour
@@ -152,6 +156,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QToolBox,
+    QVBoxLayout,
 )
 
 try:
@@ -1442,8 +1447,11 @@ class RoomItem(QGraphicsItem):
         }
 
     def _boundary_band(self) -> QPainterPath:
+        # wide enough to safely contain the wall centrelines: the flood
+        # region edge sits up to t/2 + one raster cell from a centreline,
+        # and a point exactly on the stroke edge tests as outside
         stroker = QPainterPathStroker()
-        stroker.setWidth(2.0 * EXTERIOR_T)
+        stroker.setWidth(3.0 * EXTERIOR_T)
         return stroker.createStroke(self.path)
 
     def bounding_walls(self):
@@ -1471,6 +1479,71 @@ class RoomItem(QGraphicsItem):
                 else:
                     doors += 1
         return wins, win_area, doors
+
+    # editable properties, in display order, for the inventory listing
+    PROP_LABELS = [
+        ("room_type", "Room type"),
+        ("ceiling_height_in", "Ceiling height"),
+        ("ceiling_type", "Ceiling type"),
+        ("floor_finish", "Floor finish"),
+        ("wall_finish", "Wall finish"),
+        ("baseboard", "Baseboard / trim"),
+        ("crown_molding", "Crown molding"),
+        ("hvac", "Heating / cooling"),
+        ("electrical", "Electrical"),
+        ("notes", "Notes"),
+    ]
+
+    def inventory_rows(self) -> list:
+        """Two-column (name, value/quantity) rows describing the room:
+        its properties, then every item in it — furnishings whose centre
+        sits inside the room plus the doors/windows on its walls."""
+
+        def clean(v) -> str:
+            return " ".join(str(v).split())     # no tabs/newlines in cells
+
+        rows = [("Room", self.name), ("", ""), ("Property", "Value"),
+                ("Area (sq ft)", f"{self.area_sqft:.1f}")]
+        r = self.interior_rect()
+        rows.append(("Interior width", fmt_ftin(r.width())))
+        rows.append(("Interior length", fmt_ftin(r.height())))
+        rows.append(("Perimeter", fmt_ftin(self.perimeter_in())))
+        wins, win_area, doors = self.opening_stats()
+        rows.append(("Window glazing (sq ft)", f"{win_area:.1f}"))
+        for key, label in self.PROP_LABELS:
+            v = self.properties.get(key, "")
+            if key == "ceiling_height_in":
+                v = fmt_ftin(float(v or 0))
+            elif key == "crown_molding":
+                v = "Yes" if v else "No"
+            rows.append((label, clean(v)))
+
+        counts = {}
+        sc = self.scene()
+        if sc is not None:
+            for it in sc.items():
+                if isinstance(it, FurnishingItem) and \
+                        self.path.contains(it.pos()):
+                    counts[it.name] = counts.get(it.name, 0) + 1
+        band = self._boundary_band()
+        for wall in self.bounding_walls():
+            for op in wall.openings:
+                if not band.contains(wall.point_at(op.s)):
+                    continue
+                if op.kind == "window":
+                    name = f'Window {op.width:g}" × {op.height:g}"'
+                else:
+                    name = (f'Door {op.width:g}" × {op.height:g}" '
+                            f'({op.door_type})')
+                counts[name] = counts.get(name, 0) + 1
+
+        rows += [("", ""), ("Item", "Quantity")]
+        rows += [(n, str(q)) for n, q in sorted(counts.items())]
+        return rows
+
+    def inventory_text(self) -> str:
+        """The inventory as tab-separated text, ready for Excel."""
+        return "\n".join(f"{a}\t{b}" for a, b in self.inventory_rows())
 
     # -- QGraphicsItem -----------------------------------------------------------
     def _label_rect(self) -> QRectF:
@@ -1631,6 +1704,7 @@ class RoomItem(QGraphicsItem):
         a_dims.setCheckable(True)
         a_dims.setChecked(self.show_dims)
         a_props = menu.addAction("Properties…")
+        a_inv = menu.addAction("Inventory…")
         a_ren = menu.addAction("Rename…")
         a_copy = menu.addAction("Copy room")
         menu.addSeparator()
@@ -1652,11 +1726,41 @@ class RoomItem(QGraphicsItem):
                 dlg.apply()
                 self.prepareGeometryChange()
                 self.update()
+        elif chosen is a_inv:
+            RoomInventoryDialog(self, self._view()).exec()
         elif chosen is a_ren:
             self._rename()
         elif chosen is a_del and self.scene() is not None:
             self.scene().removeItem(self)
         e.accept()
+
+
+class RoomInventoryDialog(QDialog):
+    """Room inventory as two tab-separated columns (name, quantity /
+    value) — copy to the clipboard and paste straight into Excel."""
+
+    def __init__(self, room: RoomItem, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Inventory — {room.name}")
+        lay = QVBoxLayout(self)
+        lay.addWidget(QLabel("Tab-separated, two columns — paste straight "
+                             "into Excel."))
+        self.ed = QPlainTextEdit(room.inventory_text())
+        self.ed.setReadOnly(True)
+        self.ed.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        self.ed.setFont(QFont("DejaVu Sans Mono", 9))
+        self.ed.setMinimumSize(420, 380)
+        lay.addWidget(self.ed)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        self.btn_copy = buttons.addButton(
+            "Copy to clipboard", QDialogButtonBox.ButtonRole.ActionRole)
+        self.btn_copy.clicked.connect(self._copy)
+        buttons.rejected.connect(self.reject)
+        lay.addWidget(buttons)
+
+    def _copy(self):
+        QApplication.clipboard().setText(self.ed.toPlainText())
+        self.btn_copy.setText("Copied ✓")
 
 
 class RoomPropertiesDialog(QDialog):
