@@ -43,7 +43,11 @@ Mouse
 Wheel               zoom (anchored under cursor)
 Left-drag (empty)   pan                (middle-drag pans in any tool)
 Left-drag item      move / stretch
-Right-click door    popup: LH, RH, BIFOLD, POCKET, SLIDER, FRENCH, DOORWAY
+Right-click door    popup: LH, RH, BIFOLD, POCKET, SLIDER, FRENCH, DOORWAY,
+                    GARAGE-1 (single 9'), GARAGE-2 (double 16').  Garage
+                    doors draw the opening plus a dashed OVERHEAD outline
+                    of the open door projecting inward; picking one
+                    auto-sizes an undersized opening (9'x7' / 16'x7').
 Right-click room name   popup: show dimensions, properties, inventory,
                         rename, copy, delete.  Inventory… lists the room's
                         properties and everything in the room (furnishings,
@@ -96,7 +100,8 @@ Behaviour
   mouse position, re-grouped; walls keep the on-centre snap and bring
   their doors/windows along.
 * Doors and windows cut an opening in the wall and ride along it when
-  dragged; sizes use the WWHH convention (e.g. 3280 = 32" w x 80" h).
+  dragged; sizes use the WWHH convention (e.g. 3280 = 32" w x 80" h);
+  openings 100" or wider use WWWHH (e.g. 19284 = 192" w x 84" h).
 
 CSV room import
 ---------------
@@ -222,7 +227,11 @@ def canvas_rect() -> QRectF:
 
 TOOL_SELECT, TOOL_WALL_EXT, TOOL_WALL_INT, TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM = range(6)
 
-DOOR_TYPES = ["LH", "RH", "BIFOLD", "POCKET", "SLIDER", "FRENCH", "DOORWAY"]
+DOOR_TYPES = ["LH", "RH", "BIFOLD", "POCKET", "SLIDER", "FRENCH", "DOORWAY",
+              "GARAGE-1", "GARAGE-2"]
+# picking a garage type auto-sizes undersized openings to these defaults
+GARAGE_DEFAULTS = {"GARAGE-1": ("10884", 96.0),    # single 9'-0" x 7'-0"
+                   "GARAGE-2": ("19284", 144.0)}   # double 16'-0" x 7'-0"
 
 ROOM_CELL = 3.0           # flood-fill cell size for room detection (inches)
 
@@ -443,11 +452,17 @@ def wall_snap_len(s: float) -> float:
 
 
 def parse_wwhh(code: str):
-    """Parse the WWHH size code -> (width_in, height_in). Raises ValueError."""
+    """Parse a size code -> (width_in, height_in). Raises ValueError.
+
+    4 digits = WWHH (3280 = 32" x 80"); widths of 100" or more use
+    5 digits WWWHH (10884 = 108" x 84") or 6 digits WWWHHH."""
     code = code.strip()
-    if len(code) != 4 or not code.isdigit():
-        raise ValueError('Size must be 4 digits "WWHH" (e.g. 3280 = 32" x 80").')
-    w, h = int(code[:2]), int(code[2:])
+    if not code.isdigit() or len(code) not in (4, 5, 6):
+        raise ValueError('Size must be digits "WWHH" (e.g. 3280 = 32" x '
+                         '80"); wide openings use WWWHH (e.g. 10884 = '
+                         '108" x 84").')
+    split = 2 if len(code) == 4 else 3
+    w, h = int(code[:split]), int(code[split:])
     if w < 8:
         raise ValueError("Width must be at least 8 inches.")
     if h < 8:
@@ -1198,6 +1213,20 @@ class OpeningItem(QGraphicsItem):
         if rebuild:
             self.wall.rebuild()           # re-cuts the gap, re-syncs children
 
+    def set_door_type(self, name: str):
+        """Change the door type; garage doors auto-size an undersized
+        opening to their standard size (if the wall is long enough)."""
+        self.prepareGeometryChange()
+        self.door_type = name
+        if name in GARAGE_DEFAULTS:
+            code, min_w = GARAGE_DEFAULTS[name]
+            if self.width < min_w:
+                try:
+                    self.set_code(code)
+                except ValueError:
+                    pass                  # wall too short: keep the size
+        self.update()
+
     def sync(self):
         """Reposition/orient on the wall after any wall geometry change."""
         self.prepareGeometryChange()
@@ -1209,6 +1238,8 @@ class OpeningItem(QGraphicsItem):
     def boundingRect(self) -> QRectF:
         w, t = self.width, self.wall.t
         m = w + 16.0
+        if self.kind == "door" and self.door_type in GARAGE_DEFAULTS:
+            m = max(m, min(self.height, 96.0) + 16.0)
         return QRectF(-w / 2 - m, -t / 2 - m, w + 2 * m, t + 2 * m)
 
     def shape(self) -> QPainterPath:
@@ -1301,6 +1332,21 @@ class OpeningItem(QGraphicsItem):
             painter.setPen(dash)
             painter.drawLine(QPointF(-w / 2, -t / 2), QPointF(w / 2, -t / 2))
             painter.drawLine(QPointF(-w / 2, t / 2), QPointF(w / 2, t / 2))
+        elif dt in GARAGE_DEFAULTS:
+            # closed panel in the opening + dashed OVERHEAD outline of the
+            # open door projecting inward (the swing side), as deep as the
+            # door is tall
+            painter.setBrush(white)
+            painter.drawRect(QRectF(-w / 2, -t * 0.25, w, t * 0.5))
+            depth = sy * min(self.height, 96.0)
+            y0 = sy * t / 2
+            dash = QPen(QColor(20, 20, 20), 0, Qt.PenStyle.DashLine)
+            painter.setPen(dash)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRect(QRectF(-w / 2, min(y0, y0 + depth),
+                                    w, abs(depth)))
+            if dt == "GARAGE-2":          # double-wide: two-car divider
+                painter.drawLine(QPointF(0, y0), QPointF(0, y0 + depth))
 
     # -- interaction -------------------------------------------------------------
     def mousePressEvent(self, e):
@@ -1360,8 +1406,7 @@ class OpeningItem(QGraphicsItem):
 
         chosen = menu.exec(e.screenPos())
         if chosen in type_actions:
-            self.door_type = type_actions[chosen]
-            self.update()
+            self.set_door_type(type_actions[chosen])
         elif chosen is a_flip and a_flip is not None:
             self.swing = -self.swing
             self.update()
