@@ -315,11 +315,14 @@ TOOL_ICONS = {
         '<line x1="2.5" y1="12" x2="21.5" y2="12" stroke="#1f2937" '
         'stroke-width="1"/>'],
     "room": [
-        '<rect x="3" y="6.5" width="18" height="11" rx="2" fill="#f8fafc" '
-        'stroke="#1f2937" stroke-width="1.5"/>',
-        '<line x1="6" y1="10.5" x2="15" y2="10.5" stroke="#1f2937" '
+        # speech-bubble callout with a tail at the lower left
+        '<path d="M6 3.5 H18 Q21 3.5 21 6.5 V12 Q21 15 18 15 H12.5 '
+        'L6.5 20.5 L8.5 15 H6 Q3 15 3 12 V6.5 Q3 3.5 6 3.5 Z" '
+        'fill="#f8fafc" stroke="#1f2937" stroke-width="1.5" '
+        'stroke-linejoin="round"/>',
+        '<line x1="7" y1="8" x2="17" y2="8" stroke="#1f2937" '
         'stroke-width="1.3"/>',
-        '<line x1="6" y1="13.8" x2="12" y2="13.8" stroke="#1f2937" '
+        '<line x1="7" y1="11" x2="13.5" y2="11" stroke="#1f2937" '
         'stroke-width="1.3"/>'],
     "delete": [
         '<line x1="4.5" y1="6.5" x2="19.5" y2="6.5" stroke="#1f2937" '

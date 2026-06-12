@@ -88,6 +88,13 @@ Behaviour
 * Room names are unique in the plan; clashes get " 2", " 3", ... appended.
 * Right-click a room name to COPY it (walls included); with the Room Name
   tool active, right-click a blank spot to PASTE it there.
+* GROUPS: Ctrl+click to multi-select walls/furnishings, then Edit >
+  Group (Ctrl+G) makes them select and move as one unit (dashed
+  outline; Ctrl+Shift+G ungroups, right-click for a menu).  Edit >
+  Cut/Copy (Ctrl+X / Ctrl+C) takes the selection or group to an
+  internal clipboard and Paste (Ctrl+V) recreates it centred on the
+  mouse position, re-grouped; walls keep the on-centre snap and bring
+  their doors/windows along.
 * Doors and windows cut an opening in the wall and ride along it when
   dragged; sizes use the WWHH convention (e.g. 3280 = 32" w x 80" h).
 
@@ -144,6 +151,7 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QGraphicsItem,
+    QGraphicsItemGroup,
     QGraphicsScene,
     QGraphicsView,
     QInputDialog,
@@ -2072,6 +2080,87 @@ class FurnishingItem(QGraphicsItem):
         e.accept()
 
 
+class GroupItem(QGraphicsItemGroup):
+    """A group of walls / furnishings that selects and moves as one
+    (Ctrl+G to group, Ctrl+Shift+G to ungroup).
+
+    After every drag the group's translation is BAKED back into its
+    members — wall p1/p2 are scene coordinates, so they must be shifted
+    for hit-testing, joining and room detection to keep working — and
+    the group itself returns to (0, 0).
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges,
+                     True)
+        self.setZValue(1)
+
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
+            return grid_snap(value)
+        return super().itemChange(change, value)
+
+    def boundingRect(self) -> QRectF:
+        return self.childrenBoundingRect().adjusted(-3, -3, 3, 3)
+
+    def paint(self, painter, option, widget=None):
+        sel = self.isSelected()
+        pen = QPen(QColor(0, 110, 255) if sel else QColor(165, 173, 185), 0,
+                   Qt.PenStyle.DashLine)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRect(self.childrenBoundingRect().adjusted(-2, -2, 2, 2))
+
+    def bake(self):
+        """Fold the group's current translation into its members and
+        reset the group to (0, 0)."""
+        d = self.pos()
+        if abs(d.x()) < 1e-9 and abs(d.y()) < 1e-9:
+            return
+        self.prepareGeometryChange()
+        for ch in self.childItems():
+            if isinstance(ch, WallItem):
+                ch.p1 = QPointF(ch.p1.x() + d.x(), ch.p1.y() + d.y())
+                ch.p2 = QPointF(ch.p2.x() + d.x(), ch.p2.y() + d.y())
+            else:
+                ch.setPos(ch.pos().x() + d.x(), ch.pos().y() + d.y())
+        self.setPos(0.0, 0.0)
+        rebuild_all_walls(self.scene())
+
+    def mouseReleaseEvent(self, e):
+        super().mouseReleaseEvent(e)
+        self.bake()
+
+    def contextMenuEvent(self, e):
+        win = None
+        sc = self.scene()
+        if sc and sc.views():
+            win = sc.views()[0].win
+        menu = QMenu()
+        a_un = menu.addAction("Ungroup")
+        a_cut = menu.addAction("Cut group")
+        a_copy = menu.addAction("Copy group")
+        menu.addSeparator()
+        a_del = menu.addAction("Delete group")
+        chosen = menu.exec(e.screenPos())
+        if win is not None and chosen in (a_un, a_cut, a_copy):
+            sc.clearSelection()
+            self.setSelected(True)
+            if chosen is a_un:
+                win.ungroup_selected()
+            elif chosen is a_cut:
+                win.cut_selected()
+            else:
+                win.copy_selected()
+        elif chosen is a_del and sc is not None:
+            sc.removeItem(self)
+            rebuild_all_walls(sc)
+        e.accept()
+
+
 class FurnishingList(QListWidget):
     """One palette section: an icon grid of furnishing symbols; drag a
     symbol onto the plan to place it at true scale."""
@@ -2155,6 +2244,7 @@ class PlanView(QGraphicsView):
         self._panning = False
         self._pan_last = None
         self._temp_wall = None
+        self._last_scene = None           # last mouse position (paste target)
 
     # -- zoom ------------------------------------------------------------------
     def wheelEvent(self, e):
@@ -2302,6 +2392,7 @@ class PlanView(QGraphicsView):
     def mouseMoveEvent(self, e):
         pos = e.position().toPoint()
         sp = self.mapToScene(pos)
+        self._last_scene = QPointF(sp)
         self.win.show_coords(sp)
 
         if self._panning and self._pan_last is not None:
@@ -2444,8 +2535,9 @@ class MainWindow(QMainWindow):
         TOOL_SELECT: ("Select: drag wall BODY to slide it sideways (Ctrl = "
                       "free move) \u2022 drag wall ENDS to lengthen/shorten "
                       "(Shift = free angle) \u2022 drag furnishings from the "
-                      "right palette onto the plan \u2022 drag empty space "
-                      "to pan \u2022 wheel zoom"),
+                      "right palette onto the plan \u2022 Ctrl+click to "
+                      "multi-select, Ctrl+G group, Ctrl+X/C/V cut-copy-"
+                      "paste \u2022 drag empty space to pan \u2022 wheel zoom"),
         TOOL_WALL_EXT: "Exterior wall (6\"): click-drag to draw. Orthogonal "
                        "from the anchor (hold Shift for free angle). Esc "
                        "cancels.",
@@ -2468,6 +2560,7 @@ class MainWindow(QMainWindow):
         self.last_window = "3648"
         self.current_path = None
         self.room_clipboard = None
+        self.item_clipboard = None        # cut/copied walls + furnishings
         self._update_title()
 
         self.scene = QGraphicsScene(self)
@@ -2564,6 +2657,23 @@ class MainWindow(QMainWindow):
         a_saveas.setShortcut(QKeySequence.StandardKey.SaveAs)
         a_saveas.triggered.connect(self.save_plan_as)
         m_file.addAction(a_saveas)
+        m_edit = self.menuBar().addMenu("&Edit")
+        for label, keys, slot in [
+                ("Cu&t", QKeySequence.StandardKey.Cut, self.cut_selected),
+                ("&Copy", QKeySequence.StandardKey.Copy, self.copy_selected),
+                ("&Paste", QKeySequence.StandardKey.Paste,
+                 self.paste_clipboard),
+                (None, None, None),
+                ("&Group", "Ctrl+G", self.group_selected),
+                ("&Ungroup", "Ctrl+Shift+G", self.ungroup_selected)]:
+            if label is None:
+                m_edit.addSeparator()
+                continue
+            a = QAction(label, self)
+            a.setShortcut(QKeySequence(keys))
+            a.triggered.connect(slot)
+            m_edit.addAction(a)
+
         m_file.addSeparator()
         a_set = QAction("Se&ttings…", self)
         a_set.triggered.connect(self.edit_settings)
@@ -2617,9 +2727,164 @@ class MainWindow(QMainWindow):
                 self.scene.removeItem(it)
                 if wall.scene() is not None:
                     wall.rebuild()
-            elif isinstance(it, (WallItem, RoomItem, FurnishingItem)):
+            elif isinstance(it, (WallItem, RoomItem, FurnishingItem,
+                                 GroupItem)):
                 self.scene.removeItem(it)
         rebuild_all_walls(self.scene)
+
+    # -- group / ungroup / cut / copy / paste -------------------------------------
+    def group_selected(self):
+        """Group the selected walls/furnishings (existing groups merge)."""
+        members, old_groups = [], []
+        for it in list(self.scene.selectedItems()):
+            if isinstance(it, GroupItem):
+                old_groups.append(it)
+            elif isinstance(it, (WallItem, FurnishingItem)):
+                members.append(it)
+        for g in old_groups:
+            g.bake()
+            members += g.childItems()
+            self.scene.destroyItemGroup(g)
+        if len(members) < 2:
+            self.status("Select at least two walls/furnishings to group "
+                        "(Ctrl+click to multi-select).")
+            return
+        self.scene.clearSelection()
+        group = GroupItem()
+        self.scene.addItem(group)
+        for it in members:
+            group.addToGroup(it)
+        group.setSelected(True)
+        self.status(f"Grouped {len(members)} items — drag to move, "
+                    "Ctrl+Shift+G to ungroup.")
+
+    def ungroup_selected(self):
+        groups = [it for it in self.scene.selectedItems()
+                  if isinstance(it, GroupItem)]
+        if not groups:
+            self.status("Select a group to ungroup.")
+            return
+        for g in groups:
+            g.bake()
+            children = g.childItems()
+            self.scene.destroyItemGroup(g)
+            for c in children:
+                c.setSelected(True)
+        rebuild_all_walls(self.scene)
+        self.status("Ungrouped.")
+
+    def _selection_spec(self):
+        """Selected walls/furnishings (groups expand to their members)
+        as a clipboard dict, or None when nothing usable is selected."""
+        items = []
+        for it in self.scene.selectedItems():
+            if isinstance(it, GroupItem):
+                it.bake()
+                items += it.childItems()
+            elif isinstance(it, (WallItem, FurnishingItem)):
+                items.append(it)
+        if not items:
+            return None
+        walls, furns = [], []
+        xs, ys = [], []
+        for it in items:
+            if isinstance(it, WallItem):
+                walls.append({
+                    "type": it.wall_type,
+                    "p1": [it.p1.x(), it.p1.y()],
+                    "p2": [it.p2.x(), it.p2.y()],
+                    "openings": [{
+                        "kind": op.kind, "code": op.code, "s": op.s,
+                        "door_type": op.door_type, "swing": op.swing,
+                    } for op in it.openings],
+                })
+                xs += [it.p1.x(), it.p2.x()]
+                ys += [it.p1.y(), it.p2.y()]
+            else:
+                p = it.scenePos()
+                furns.append({"kind": it.kind, "pos": [p.x(), p.y()],
+                              "rotation": it.rotation()})
+                xs.append(p.x())
+                ys.append(p.y())
+        ref = [(min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2]
+        return {"ref": ref, "walls": walls, "furnishings": furns,
+                "grouped": len(items) > 1}
+
+    def cut_selected(self):
+        spec = self._selection_spec()
+        if spec is None:
+            self.status("Select walls/furnishings (or a group) to cut.")
+            return
+        self.item_clipboard = spec
+        for it in list(self.scene.selectedItems()):
+            if isinstance(it, (GroupItem, WallItem, FurnishingItem)) \
+                    and it.scene() is not None:
+                self.scene.removeItem(it)
+        rebuild_all_walls(self.scene)
+        n = len(spec["walls"]) + len(spec["furnishings"])
+        self.status(f"Cut {n} item(s) — Ctrl+V to paste at the mouse "
+                    "position.")
+
+    def copy_selected(self):
+        spec = self._selection_spec()
+        if spec is None:
+            self.status("Select walls/furnishings (or a group) to copy.")
+            return
+        self.item_clipboard = spec
+        n = len(spec["walls"]) + len(spec["furnishings"])
+        self.status(f"Copied {n} item(s) — Ctrl+V to paste at the mouse "
+                    "position.")
+
+    def paste_clipboard(self):
+        """Paste the cut/copied items centred on the mouse position,
+        re-grouped when more than one item was taken."""
+        spec = self.item_clipboard
+        if not spec:
+            self.status("Nothing to paste — cut or copy items first.")
+            return
+        target = self.view._last_scene
+        if target is None:
+            target = self.view.mapToScene(
+                self.view.viewport().rect().center())
+        dx, dy = target.x() - spec["ref"][0], target.y() - spec["ref"][1]
+        if spec["walls"]:                 # keep walls on the on-centre grid
+            dx, dy = wall_snap_len(dx), wall_snap_len(dy)
+        else:
+            dx, dy = round(dx), round(dy)
+        pasted = []
+        for wd in spec["walls"]:
+            wall = WallItem(QPointF(wd["p1"][0] + dx, wd["p1"][1] + dy),
+                            QPointF(wd["p2"][0] + dx, wd["p2"][1] + dy),
+                            wd["type"])
+            self.scene.addItem(wall)
+            for od in wd["openings"]:
+                try:
+                    op = OpeningItem(wall, od["kind"], od["code"], od["s"])
+                except ValueError:
+                    continue
+                op.door_type = od["door_type"]
+                op.swing = od["swing"]
+                wall.openings.append(op)
+            wall.rebuild()
+            pasted.append(wall)
+        for fd in spec["furnishings"]:
+            f = FurnishingItem(fd["kind"],
+                               QPointF(fd["pos"][0] + dx, fd["pos"][1] + dy),
+                               fd["rotation"])
+            self.scene.addItem(f)
+            pasted.append(f)
+        rebuild_all_walls(self.scene)
+        self.scene.clearSelection()
+        if spec.get("grouped") and len(pasted) > 1:
+            group = GroupItem()
+            self.scene.addItem(group)
+            for it in pasted:
+                group.addToGroup(it)
+            group.setSelected(True)
+        else:
+            for it in pasted:
+                it.setSelected(True)
+        self.status(f"Pasted {len(pasted)} item(s).")
 
     def zoom_fit(self):
         items = [it for it in self.scene.items() if isinstance(it, WallItem)]
