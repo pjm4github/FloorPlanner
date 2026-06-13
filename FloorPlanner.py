@@ -2446,6 +2446,78 @@ class FurnishingPalette(QToolBox):
         self.setCurrentIndex(all_index)
 
 
+# ----------------------------------------------------------------------------
+# Rubber-band selection helpers
+# ----------------------------------------------------------------------------
+def item_fully_inside(item, area: QRectF) -> bool:
+    """True when `item` lies entirely within the scene rectangle `area`."""
+    if isinstance(item, WallItem):
+        return area.contains(item.p1) and area.contains(item.p2)
+    if isinstance(item, RoomItem):
+        if item.corners:
+            return all(area.contains(c) for c in item.corners)
+        return area.contains(item.path.boundingRect())
+    if isinstance(item, FurnishingItem):
+        foot = item.mapToScene(
+            QRectF(-item.w / 2, -item.d / 2, item.w, item.d)).boundingRect()
+        return area.contains(foot)
+    if isinstance(item, GroupItem):
+        return area.contains(item.sceneBoundingRect())
+    return False
+
+
+def _wall_endpoints_match(w, a: QPointF, b: QPointF, tol: float = 1.0) -> bool:
+    return ((QLineF(w.p1, a).length() <= tol and QLineF(w.p2, b).length() <= tol)
+            or (QLineF(w.p1, b).length() <= tol
+                and QLineF(w.p2, a).length() <= tol))
+
+
+def _wall_along_segment(scene, a: QPointF, b: QPointF):
+    """The wall whose body runs along (and spans) the segment a->b -- i.e.
+    the longer wall that carries a room edge.  None if there isn't one."""
+    for w in scene.items():
+        if not isinstance(w, WallItem):
+            continue
+        u, length = w.unit(), w.length()
+        if length < 1e-6:
+            continue
+        spans = True
+        for p in (a, b):
+            vx, vy = p.x() - w.p1.x(), p.y() - w.p1.y()
+            s = vx * u.x() + vy * u.y()
+            if not (-0.6 <= s <= length + 0.6
+                    and abs(vy * u.x() - vx * u.y()) <= 1.5):
+                spans = False
+                break
+        if spans:
+            return w
+    return None
+
+
+def synthesize_room_edge(scene, a: QPointF, b: QPointF):
+    """Create a new wall along a->b, copied from the longer wall that
+    carries that edge (its type and any openings on the span).  Used to
+    give a rubber-banded room its own copy of a shared/party wall."""
+    src = _wall_along_segment(scene, a, b)
+    nw = WallItem(QPointF(a), QPointF(b),
+                  src.wall_type if src is not None else "interior")
+    scene.addItem(nw)
+    if src is not None and nw.length() > 1e-6:
+        nu = nw.unit()
+        for op in src.openings:
+            p = src.point_at(op.s)
+            s = (p.x() - a.x()) * nu.x() + (p.y() - a.y()) * nu.y()
+            if 0.0 <= s <= nw.length():
+                try:
+                    no = OpeningItem(nw, op.kind, op.code, s)
+                except ValueError:
+                    continue
+                no.door_type, no.swing = op.door_type, op.swing
+                nw.openings.append(no)
+        nw.rebuild()
+    return nw
+
+
 class PlanView(QGraphicsView):
     def __init__(self, scene, win):
         super().__init__(scene)
@@ -2651,6 +2723,46 @@ class PlanView(QGraphicsView):
 
         super().mouseMoveEvent(e)
 
+    def select_in_rect(self, area: QRectF):
+        """Additively select everything the rubber band fully encloses.
+
+        Only items wholly inside `area` are selected, so a room can be
+        picked out by its walls while the longer party walls that run past
+        it stay unselected.  When a room's interior is enclosed but an edge
+        is carried by such a longer wall, a fresh copy of that edge is
+        synthesized (and selected) so the room comes through as a complete,
+        movable loop -- the original long wall is left untouched."""
+        scene = self.scene()
+        if scene is None:
+            return
+        # walls / furnishings / groups that sit entirely within the band
+        for it in scene.items(area, Qt.ItemSelectionMode.IntersectsItemShape):
+            top = it.group() or it         # grouped items select the group
+            if (isinstance(top, (WallItem, FurnishingItem, GroupItem))
+                    and item_fully_inside(top, area)):
+                top.setSelected(True)
+        # rooms whose perimeter is enclosed: select the room and make sure
+        # every edge is a selected wall (duplicating shared/longer walls)
+        rooms = [it for it in scene.items() if isinstance(it, RoomItem)]
+        made_edges = False
+        for room in rooms:
+            if not room.corners or not item_fully_inside(room, area):
+                continue
+            room.setSelected(True)
+            n = len(room.corners)
+            for i in range(n):
+                a, b = room.corners[i], room.corners[(i + 1) % n]
+                w = next((x for x in scene.items()
+                          if isinstance(x, WallItem)
+                          and _wall_endpoints_match(x, a, b)), None)
+                if w is not None:
+                    w.setSelected(True)      # the room's own edge wall
+                else:
+                    synthesize_room_edge(scene, a, b).setSelected(True)
+                    made_edges = True
+        if made_edges:
+            rebuild_all_walls(scene)
+
     def mouseReleaseEvent(self, e):
         if (self._rubber_origin is not None
                 and e.button() == Qt.MouseButton.LeftButton):
@@ -2659,12 +2771,7 @@ class PlanView(QGraphicsView):
             self._rubber.hide()
             self._rubber_origin = None
             area = self.mapToScene(rect).boundingRect()
-            for it in self.scene().items(
-                    area, Qt.ItemSelectionMode.IntersectsItemShape):
-                top = it.group() or it     # grouped items select the group
-                if isinstance(top, (WallItem, FurnishingItem, GroupItem,
-                                    RoomItem, OpeningItem)):
-                    top.setSelected(True)  # additive: joins the set
+            self.select_in_rect(area)
             e.accept()
             return
 
