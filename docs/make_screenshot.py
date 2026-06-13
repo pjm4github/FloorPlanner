@@ -18,6 +18,7 @@ app = QApplication([])
 FP.load_fonts()
 app.setFont(QFont(FP.FONT_FAMILY, 10))
 
+FP.SETTINGS["cost_per_sqft"] = 225.0     # drives the toolbar Totals label
 win = FP.MainWindow()
 sc = win.scene
 
@@ -167,6 +168,7 @@ win.furn_palette.setCurrentIndex(names.index("HVAC"))
 # activate the one-shot Room Name tool: the toolbar highlights it and the
 # status bar explains it reverts to Select (Ctrl-pick to keep it)
 win.set_tool(FP.TOOL_ROOM)
+win._update_totals()                     # toolbar Totals: Cost / Sq. Feet
 
 # --- grab --------------------------------------------------------------------
 win.resize(1500, 950)
