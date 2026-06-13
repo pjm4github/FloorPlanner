@@ -92,9 +92,27 @@ def room(name, anchor, rtype="", dims=False, sel=False):
 room("Bedroom", (96, 96), "Bedroom", dims=True)
 room("Bath", (48, 264), "Bathroom")
 room("Shop", (144, 264), "Shop")
-room("Living Room", (336, 168), "Living Room", sel=True)
+room("Living Room", (336, 168), "Living Room")
 room("Garage", (612, 192), "Garage")
 room("Sunroom", (336, 456), "Sunroom")
+
+
+# --- room operation: an L-shaped "Studio" from two overlapping rectangles
+# via Rooms ▸ Combine (its dashed outline shows the non-rectangular result)
+def _demo_rect(x, y, w, h, name):
+    cs = [QPointF(x, y), QPointF(x + w, y), QPointF(x + w, y + h),
+          QPointF(x, y + h)]
+    r = FP.RoomItem(name, QPointF(x + w / 2, y + h / 2),
+                    FP.room_path_from_corners(cs), FP.poly_area_sqft(cs),
+                    corners=cs)
+    sc.addItem(r)
+    return r
+
+
+_ra = _demo_rect(516, 372, 156, 96, "Studio")
+_rb = _demo_rect(588, 432, 132, 108, "Studio B")
+win._sel_order = [_ra, _rb]
+win.room_boolean("combine")
 
 # --- furnishings -------------------------------------------------------------
 F = [("bed_queen", (96, 78), 0), ("nightstand", (38, 26), 0),
