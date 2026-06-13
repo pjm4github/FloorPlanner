@@ -330,6 +330,34 @@ def test_room_op_resolves_grouped_wall_loops(fp, win):
     assert rooms[0].area_sqft == pytest.approx(144, abs=2)
 
 
+def _box_walls(fp, sc, x, y, w, h):
+    for p1, p2 in [((x, y), (x + w, y)), ((x + w, y), (x + w, y + h)),
+                   ((x + w, y + h), (x, y + h)), ((x, y + h), (x, y))]:
+        sc.addItem(fp.WallItem(QPointF(*p1), QPointF(*p2), "interior"))
+    fp.rebuild_all_walls(sc)
+
+
+def test_room_tool_is_one_shot(fp, win):
+    sc = win.scene
+    _box_walls(fp, sc, 0, 0, 144, 96)
+    win.set_tool(fp.TOOL_ROOM)
+    assert win.tool == fp.TOOL_ROOM
+    assert win._room_sticky is False
+    res = fp.detect_room(sc, QPointF(72, 48))
+    win.view._make_named_room(QPointF(72, 48), "Den", res)
+    assert win.tool == fp.TOOL_SELECT            # reverted to the pointer
+
+
+def test_room_tool_sticky_stays_active(fp, win):
+    sc = win.scene
+    _box_walls(fp, sc, 0, 0, 144, 96)
+    win.set_tool(fp.TOOL_ROOM)
+    win._room_sticky = True                      # as if the tool was Ctrl-set
+    res = fp.detect_room(sc, QPointF(72, 48))
+    win.view._make_named_room(QPointF(72, 48), "Den", res)
+    assert win.tool == fp.TOOL_ROOM              # stays active
+
+
 def test_detect_rectangular_room(fp, scene, make_room):
     room = make_room(scene, 0, 0, 144, 120, "Den")    # 12' x 10' = 120 sqft
     assert room.area_sqft == pytest.approx(120, abs=2)

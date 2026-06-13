@@ -3011,6 +3011,17 @@ class PlanView(QGraphicsView):
         # align the endpoint with the nearest orthogonal wall, staying H/V
         return self._align_to_wall(wall, pt, horizontal)
 
+    def _make_named_room(self, sp, name, res):
+        """Create a named room at sp from a detection result; the Room tool
+        is one-shot, so it reverts to Select unless it was Ctrl-set sticky."""
+        path, area, corners = res
+        name = unique_room_name(self.scene(), name)
+        room = RoomItem(name, grid_snap(sp), path, area, corners=corners)
+        self.scene().addItem(room)
+        if not self.win._room_sticky:
+            self.win.set_tool(TOOL_SELECT)
+        return room
+
     # -- mouse / tools ----------------------------------------------------------
     def mousePressEvent(self, e):
         pos = e.position().toPoint()
@@ -3063,11 +3074,7 @@ class PlanView(QGraphicsView):
                 else:
                     name, ok = QInputDialog.getText(self, "Room name", "Name:")
                     if ok and name.strip():
-                        path, area, corners = res
-                        name = unique_room_name(self.scene(), name.strip())
-                        room = RoomItem(name, grid_snap(sp), path, area,
-                                        corners=corners)
-                        self.scene().addItem(room)
+                        self._make_named_room(sp, name.strip(), res)
                 e.accept()
                 return
             # SELECT tool: pan when pressing empty space
@@ -3308,14 +3315,15 @@ class MainWindow(QMainWindow):
                    "(e.g. 3280 = 32\" x 80\").",
         TOOL_WINDOW: "Window: click on a wall, then enter the WWHH size "
                      "(e.g. 3648 = 36\" x 48\").",
-        TOOL_ROOM: "Room name: click inside an enclosed area to create a "
-                   "named room. Right-click the name for dimensions / "
-                   "properties.",
+        TOOL_ROOM: "Room name: click inside an enclosed area to name a room, "
+                   "then the tool reverts to Select. Ctrl+click the tool to "
+                   "keep it active for several rooms.",
     }
 
     def __init__(self):
         super().__init__()
         self.tool = TOOL_SELECT
+        self._room_sticky = False        # one-shot Room tool unless Ctrl-set
         self.last_door = "3280"
         self.last_window = "3648"
         self.current_path = None
@@ -3505,6 +3513,11 @@ class MainWindow(QMainWindow):
         self.view.cancel_temp()
         self._tool_actions[tool].setChecked(True)
         self.status(self.HINTS[tool])
+        if tool == TOOL_ROOM:
+            # Ctrl held while choosing the tool keeps it active (sticky);
+            # otherwise it reverts to Select after one room is named
+            self._room_sticky = bool(QApplication.keyboardModifiers()
+                                     & Qt.KeyboardModifier.ControlModifier)
 
     def status(self, msg):
         self.statusBar().showMessage(msg)

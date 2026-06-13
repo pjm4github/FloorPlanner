@@ -100,7 +100,7 @@ so no system fonts are needed.
 | Draw a wall | Click-drag (Shift = free angle, Esc = cancel) |
 | Stretch / slide a wall | Drag its end / body in Select mode |
 | Place a door or window | Tool 4 / 5, click a wall, enter WWHH size |
-| Name a room | Tool 6, click inside an enclosed area |
+| Name a room | Tool 6, click an enclosed area (one-shot; Ctrl-pick the tool to keep it) |
 | Room dimensions / properties / inventory | Right-click the room name |
 | Place furniture | Drag from the right palette onto the plan |
 | Rotate furniture | Select it, drag the round handle (Ctrl = snapped) |
