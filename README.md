@@ -30,11 +30,14 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   furnishing and opening in the room as two tab-separated columns, ready to
   paste into Excel. Rooms can be copied and pasted elsewhere with their
   walls and openings.
-- **Furnishings** — a bundled CC0 library of 54 top-view symbols across
+- **Furnishings** — a bundled CC0 library of 67 top-view symbols across
   Living, Dining, Kitchen, Bedroom, Bathroom, Laundry, Office, Garage
   (cars, boat + trailer, workbench, yard equipment), **Shop** (table saw,
-  lathe, jointer, drill press, bandsaw, planer…) and **Sunroom** (swim
-  spa, sauna, whirlpool, lounge chairs…). Drag one from the right-hand
+  lathe, jointer, drill press, bandsaw, planer…), **Sunroom** (swim spa,
+  sauna, whirlpool, lounge chairs…) and **HVAC** (gas/electric/oil
+  furnaces, water heaters, water softener, gas/oil tanks, electric panel,
+  car charger, battery wall, well pump, heat exchanger). Drag one from the
+  right-hand
   palette onto the plan and it lands at **true scale** (scene units are
   inches; a 16' SUV takes up 16'). The palette is organised in expandable
   room sections; placed items move with 1" snap and rotate via a grab

@@ -430,5 +430,109 @@
     "file": "wardrobe.svg",
     "width_in": 48,
     "depth_in": 24
+  },
+  {
+    "id": "gas_furnace",
+    "name": "Gas Furnace",
+    "category": "HVAC",
+    "file": "gas_furnace.svg",
+    "width_in": 24,
+    "depth_in": 30
+  },
+  {
+    "id": "electric_furnace",
+    "name": "Electric Furnace",
+    "category": "HVAC",
+    "file": "electric_furnace.svg",
+    "width_in": 21,
+    "depth_in": 30
+  },
+  {
+    "id": "oil_furnace",
+    "name": "Oil Furnace",
+    "category": "HVAC",
+    "file": "oil_furnace.svg",
+    "width_in": 26,
+    "depth_in": 34
+  },
+  {
+    "id": "gas_water_heater",
+    "name": "Gas Water Heater",
+    "category": "HVAC",
+    "file": "gas_water_heater.svg",
+    "width_in": 22,
+    "depth_in": 22
+  },
+  {
+    "id": "electric_water_heater",
+    "name": "Electric Water Heater",
+    "category": "HVAC",
+    "file": "electric_water_heater.svg",
+    "width_in": 22,
+    "depth_in": 22
+  },
+  {
+    "id": "water_softener",
+    "name": "Water Softener",
+    "category": "HVAC",
+    "file": "water_softener.svg",
+    "width_in": 24,
+    "depth_in": 15
+  },
+  {
+    "id": "gas_tank",
+    "name": "Gas Tank",
+    "category": "HVAC",
+    "file": "gas_tank.svg",
+    "width_in": 120,
+    "depth_in": 36
+  },
+  {
+    "id": "oil_tank",
+    "name": "Oil Tank",
+    "category": "HVAC",
+    "file": "oil_tank.svg",
+    "width_in": 60,
+    "depth_in": 27
+  },
+  {
+    "id": "electric_panel",
+    "name": "Electric Panel",
+    "category": "HVAC",
+    "file": "electric_panel.svg",
+    "width_in": 16,
+    "depth_in": 4
+  },
+  {
+    "id": "car_charger",
+    "name": "Car Charger",
+    "category": "HVAC",
+    "file": "car_charger.svg",
+    "width_in": 8,
+    "depth_in": 6
+  },
+  {
+    "id": "battery_wall",
+    "name": "Battery Wall",
+    "category": "HVAC",
+    "file": "battery_wall.svg",
+    "width_in": 45,
+    "depth_in": 6
+  },
+  {
+    "id": "well_pump",
+    "name": "Well Pump",
+    "category": "HVAC",
+    "file": "well_pump.svg",
+    "width_in": 24,
+    "depth_in": 24
+  },
+  {
+    "id": "heat_exchanger",
+    "name": "Heat Exchanger",
+    "category": "HVAC",
+    "file": "heat_exchanger.svg",
+    "width_in": 30,
+    "depth_in": 30
   }
 ]

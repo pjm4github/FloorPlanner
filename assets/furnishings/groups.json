@@ -55,7 +55,20 @@
       "desk.svg",
       "office_chair.svg",
       "bookshelf.svg",
-      "wardrobe.svg"
+      "wardrobe.svg",
+      "gas_furnace.svg",
+      "electric_furnace.svg",
+      "oil_furnace.svg",
+      "gas_water_heater.svg",
+      "electric_water_heater.svg",
+      "water_softener.svg",
+      "gas_tank.svg",
+      "oil_tank.svg",
+      "electric_panel.svg",
+      "car_charger.svg",
+      "battery_wall.svg",
+      "well_pump.svg",
+      "heat_exchanger.svg"
     ]
   },
   {
@@ -173,6 +186,24 @@
       "bookshelf.svg",
       "armchair.svg",
       "side_table.svg"
+    ]
+  },
+  {
+    "name": "HVAC",
+    "items": [
+      "gas_furnace.svg",
+      "electric_furnace.svg",
+      "oil_furnace.svg",
+      "gas_water_heater.svg",
+      "electric_water_heater.svg",
+      "water_softener.svg",
+      "gas_tank.svg",
+      "oil_tank.svg",
+      "electric_panel.svg",
+      "car_charger.svg",
+      "battery_wall.svg",
+      "well_pump.svg",
+      "heat_exchanger.svg"
     ]
   }
 ]

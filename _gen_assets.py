@@ -40,6 +40,11 @@ def El(cx, cy, rx, ry, fill="#ffffff", sw=0.8):
             f'fill="{fill}" stroke="{INK}" stroke-width="{sw}"/>')
 
 
+def Pth(d, fill="none", sw=0.8):
+    return (f'<path d="{d}" fill="{fill}" stroke="{INK}" '
+            f'stroke-width="{sw}"/>')
+
+
 # ---------------------------------------------------------------- furniture
 def bed(w, d, pillows):
     parts = [R(0.75, 0.75, w - 1.5, d - 1.5, 2, sw=1.2)]
@@ -304,6 +309,65 @@ FURNISHINGS = [
     ("wardrobe", "Wardrobe 4'", "Office / Storage", 48, 24,
      [R(0.75, 0.75, 46.5, 22.5, 1, sw=1.2), L(24, 0.75, 24, 23.25, 0.7),
       L(2, 7, 46, 7, 0.5, "2,2")]),
+
+    # --- HVAC / mechanicals --------------------------------------------------
+    ("gas_furnace", "Gas Furnace", "HVAC", 24, 30,
+     [R(0.75, 0.75, 22.5, 28.5, 1.5, sw=1.2),
+      Ci(12, 9, 6, FILL, 0.9), Ci(12, 9, 1.6, "none", 0.5),     # blower
+      L(2, 18, 22, 18, 0.6),                                    # burner deck
+      Pth("M12 20 c-3 3 -3 6 0 7 c3 -1 3 -4 0 -7 z", "#ffffff", 0.7)]),
+    ("electric_furnace", "Electric Furnace", "HVAC", 21, 30,
+     [R(0.75, 0.75, 19.5, 28.5, 1.5, sw=1.2),
+      Ci(10.5, 9, 5.5, FILL, 0.9), Ci(10.5, 9, 1.5, "none", 0.5),
+      L(2, 18, 19, 18, 0.6),
+      Pth("M4 24 l3 -4 l3 4 l3 -4 l3 4 l3 -4", "none", 0.8)]),   # heat coil
+    ("oil_furnace", "Oil Furnace", "HVAC", 26, 34,
+     [R(0.75, 0.75, 24.5, 32.5, 1.5, sw=1.2),
+      Ci(13, 11, 6.5, FILL, 0.9), Ci(13, 11, 1.7, "none", 0.5),
+      Ci(13, 25, 3.5, "none", 0.8),                             # burner
+      L(13, 28.5, 13, 33.5, 0.8)]),                             # fuel line
+    ("gas_water_heater", "Gas Water Heater", "HVAC", 22, 22,
+     [Ci(11, 11, 10.25, FILL, 1.3),
+      Ci(11, 11, 2.2, "none", 0.8),                             # flue
+      Pth("M11 13.5 c-2 2 -2 4 0 4.6 c2 -0.6 2 -2.6 0 -4.6 z",
+          "#ffffff", 0.6)]),                                    # pilot flame
+    ("electric_water_heater", "Electric Water Heater", "HVAC", 22, 22,
+     [Ci(11, 11, 10.25, FILL, 1.3),
+      R(7.5, 13.5, 7, 4, 0.6, "#ffffff", 0.7),                  # element panel
+      L(9, 15.5, 13, 15.5, 0.5)]),
+    ("water_softener", "Water Softener", "HVAC", 24, 15,
+     [Ci(7.5, 7.5, 6.75, FILL, 1.1), Ci(7.5, 7.5, 2, "none", 0.5),  # resin
+      R(15.5, 1.5, 8, 12, 1.5, FILL, 1),                        # brine tank
+      L(14.25, 7.5, 15.5, 7.5, 0.7)]),
+    ("gas_tank", "Gas Tank", "HVAC", 120, 36,
+     [R(0.75, 0.75, 118.5, 34.5, 17.25, sw=1.5),                # propane cyl.
+      Ci(60, 18, 4.5, "none", 0.9),                             # dome valve
+      L(18, 18, 42, 18, 0.5), L(78, 18, 102, 18, 0.5)]),
+    ("oil_tank", "Oil Tank", "HVAC", 60, 27,
+     [R(0.75, 0.75, 58.5, 25.5, 12.75, sw=1.5),
+      Ci(16, 13.5, 2.6, "none", 0.8), Ci(44, 13.5, 2.6, "none", 0.8),
+      L(30, 4, 30, 23, 0.4, "3,3")]),                           # fittings
+    ("electric_panel", "Electric Panel", "HVAC", 16, 4,
+     [R(0.5, 0.5, 15, 3, 0.4, sw=1.1), L(8, 0.5, 8, 3.5, 0.5),
+      L(3, 1.3, 7, 1.3, 0.4), L(3, 2.7, 7, 2.7, 0.4),
+      L(9, 1.3, 13, 1.3, 0.4), L(9, 2.7, 13, 2.7, 0.4)]),       # breakers
+    ("car_charger", "Car Charger", "HVAC", 8, 6,
+     [R(0.6, 0.6, 6.8, 3.8, 0.8, sw=1.1),
+      Ci(4, 2.5, 1.5, "none", 0.7), Ci(4, 2.5, 0.5, "none", 0.5),
+      L(4, 4.4, 4, 6, 0.8)]),                                   # plug + cable
+    ("battery_wall", "Battery Wall", "HVAC", 45, 6,
+     [R(0.75, 0.75, 43.5, 4.5, 2, sw=1.2),
+      L(15, 0.75, 15, 5.25, 0.4), L(30, 0.75, 30, 5.25, 0.4),
+      Pth("M23 1.8 l-2.2 2.2 l1.6 0 l-1.6 1.4 l3.6 -2.4 l-1.6 0 "
+          "l1.6 -1.2 z", "#ffffff", 0.6)]),                     # bolt
+    ("well_pump", "Well Pump", "HVAC", 24, 24,
+     [Ci(12, 13.5, 9.8, FILL, 1.3), Ci(12, 13.5, 2.2, "none", 0.6),
+      R(10, 1.5, 4, 3, 0.5, "none", 0.7)]),                     # pressure tank
+    ("heat_exchanger", "Heat Exchanger", "HVAC", 30, 30,
+     [R(0.75, 0.75, 28.5, 28.5, 2, sw=1.2),
+      Ci(15, 15, 12.5, "none", 0.9), Ci(15, 15, 2.5, FILL, 0.7),
+      L(15, 15, 15, 3.5, 0.7), L(15, 15, 25, 21, 0.7),
+      L(15, 15, 5, 21, 0.7)]),                                  # fan
 ]
 
 manifest = []
@@ -338,6 +402,10 @@ GROUPS = [
                  "whirlpool", "armchair", "side_table"]),
     ("Office", ["desk", "office_chair", "bookshelf", "armchair",
                 "side_table"]),
+    ("HVAC", ["gas_furnace", "electric_furnace", "oil_furnace",
+              "gas_water_heater", "electric_water_heater", "water_softener",
+              "gas_tank", "oil_tank", "electric_panel", "car_charger",
+              "battery_wall", "well_pump", "heat_exchanger"]),
 ]
 groups_out = [{"name": "All",
                "items": [f"{fid}.svg" for fid, *_ in FURNISHINGS]}]
