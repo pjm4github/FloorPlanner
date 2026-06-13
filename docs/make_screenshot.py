@@ -97,36 +97,26 @@ room("Garage", (612, 192), "Garage")
 room("Sunroom", (336, 456), "Sunroom")
 
 
-# --- room operations: Fragment two overlapping rooms into three pieces,
-# each in its own group with a full wall loop -- shown lightly exploded with
-# their group outlines, then Align to grid snaps the pieces onto the grid
-def _demo_rect(x, y, w, h, name):
-    cs = [QPointF(x, y), QPointF(x + w, y), QPointF(x + w, y + h),
-          QPointF(x, y + h)]
-    r = FP.RoomItem(name, QPointF(x + w / 2, y + h / 2),
-                    FP.room_path_from_corners(cs), FP.poly_area_sqft(cs),
-                    corners=cs)
+# --- room operation: three rooms placed at uneven gaps, then spaced with
+# equal gaps by Rooms ▸ Distribute horizontally
+def _walled_room(x, y, w, h, name):
+    for a, b in [((x, y), (x + w, y)), ((x + w, y), (x + w, y + h)),
+                 ((x + w, y + h), (x, y + h)), ((x, y + h), (x, y))]:
+        sc.addItem(FP.WallItem(QPointF(*a), QPointF(*b), "interior"))
+    FP.rebuild_all_walls(sc)
+    res = FP.detect_room(sc, QPointF(x + w / 2, y + h / 2))
+    r = FP.RoomItem(name, QPointF(x + w / 2, y + h / 2), res[0], res[1],
+                    corners=res[2])
     sc.addItem(r)
+    r.setSelected(True)
     return r
 
 
-_ra = _demo_rect(500, 360, 150, 96, "Room A")
-_rb = _demo_rect(578, 420, 150, 96, "Room B")
-win._sel_order = [_ra, _rb]
-win.room_boolean("fragment")
-_frags = [it for it in sc.items() if isinstance(it, FP.GroupItem)]
-_fcx = sum(g.childrenBoundingRect().center().x() for g in _frags) / len(_frags)
-_fcy = sum(g.childrenBoundingRect().center().y() for g in _frags) / len(_frags)
-for _g in _frags:                   # nudge each piece outward, then select it
-    _c = _g.childrenBoundingRect().center()
-    _dx, _dy = _c.x() - _fcx, _c.y() - _fcy
-    _d = math.hypot(_dx, _dy) or 1.0
-    _g.setPos(_dx / _d * 17, _dy / _d * 17)   # off-grid nudge
-    _g.bake()
-    _g.setSelected(True)
-# Rooms > Align to grid: snap the exploded (off-grid) pieces onto the grid
-win._sel_order = _frags[:]
-win.align_rooms_to_grid()
+_d1 = _walled_room(500, 396, 56, 108, "Den")
+_d2 = _walled_room(584, 396, 56, 108, "Study")    # uneven gaps to start
+_d3 = _walled_room(664, 396, 56, 108, "Nook")
+win._sel_order = [_d1, _d2, _d3]
+win.distribute_rooms(horizontal=True)
 
 # --- furnishings -------------------------------------------------------------
 F = [("bed_queen", (96, 78), 0), ("nightstand", (38, 26), 0),
