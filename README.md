@@ -26,10 +26,10 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   (room type, ceiling, finishes, HVAC, notes…). Move or resize the
   bounding walls and the room region re-detects and follows. Left-drag the
   name to reposition the label within the room (it rides along when the
-  room moves). Right-click a room name for an **inventory** — every
-  furnishing and opening in the room as two tab-separated columns, ready to
-  paste into Excel. Rooms can be copied and pasted elsewhere with their
-  walls and openings.
+  room moves). Right-click a room name for an **inventory** — its
+  properties plus every furnishing and opening in the room, in an aligned
+  table you can copy as TSV for Excel. Rooms can be copied and pasted
+  elsewhere with their walls and openings.
 - **Furnishings** — a bundled CC0 library of 67 top-view symbols across
   Living, Dining, Kitchen, Bedroom, Bathroom, Laundry, Office, Garage
   (cars, boat + trailer, workbench, yard equipment), **Shop** (table saw,
@@ -77,6 +77,14 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   whose walls have been moved away, clearing gray areas left behind.
 - **Nudging** — arrow keys move the selected group or furnishing by the
   wall-snap step; hold Ctrl for a fine 1" step.
+- **Inventory menu** — itemised, Excel-ready tables for the whole plan:
+  *House* (rooms, doors, windows and walls), *Interior furnishings* and
+  *Yard items* (furnishings split by location — cars, yard equipment and
+  anything in the garage or outside the walls count as yard, each with
+  quantities and AI-sourced prices), and *Total* (a summary with the grand
+  building-plus-furnishings cost). Each opens as an aligned table; **Copy
+  to clipboard (TSV)** emits tab-separated values that paste straight into
+  a spreadsheet.
 - **AI pricing** — the **AI** menu's *Update furnishing prices…* opens a
   dialog with a drop-down of AI systems (Anthropic Claude) and a fully
   editable, pre-filled prompt that asks for current US retail prices for
@@ -126,6 +134,7 @@ so no system fonts are needed.
 | Rotate a group | Select it, drag the rotation handle (Ctrl = snapped) |
 | Nudge selection | Arrow keys (Ctrl = fine 1" step) |
 | Room boolean ops | Select two rooms, use the **Rooms** menu |
+| Plan inventories (TSV) | **Inventory** menu → House / Interior / Yard / Total |
 | Update furnishing prices (AI) | **AI** menu → *Update furnishing prices…* |
 | Cut / copy / paste | **Ctrl+X** / **Ctrl+C** / **Ctrl+V** |
 | Import / export rooms (CSV) | File menu |

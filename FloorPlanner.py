@@ -172,6 +172,7 @@ from PyQt6.QtGui import (
     QTransform,
 )
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QCheckBox,
     QComboBox,
@@ -185,6 +186,7 @@ from PyQt6.QtWidgets import (
     QGraphicsItemGroup,
     QGraphicsScene,
     QGraphicsView,
+    QHeaderView,
     QInputDialog,
     QLabel,
     QLineEdit,
@@ -196,6 +198,8 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QRubberBand,
     QSizePolicy,
+    QTableWidget,
+    QTableWidgetItem,
     QToolBox,
     QVBoxLayout,
     QWidget,
@@ -2098,32 +2102,213 @@ class RoomItem(QGraphicsItem):
         e.accept()
 
 
-class RoomInventoryDialog(QDialog):
-    """Room inventory as two tab-separated columns (name, quantity /
-    value) — copy to the clipboard and paste straight into Excel."""
+# ----------------------------------------------------------------------------
+# Inventories — itemised tables of the plan, exportable to Excel as CSV.
+# ----------------------------------------------------------------------------
+FURN_INV_HEADERS = ["Item", "Quantity", "Unit price", "Line total"]
+HOUSE_INV_HEADERS = ["Item", "Detail", "Quantity", "Size"]
+TOTAL_INV_HEADERS = ["Category", "Item", "Quantity", "Value"]
 
-    def __init__(self, room: RoomItem, parent=None):
+
+def _money(v: float) -> str:
+    return f"${v:,.0f}" if v > 0 else "-"
+
+
+def classify_furnishings(scene):
+    """Split the scene's furnishings into (interior, yard).  An item is
+    interior only when its centre sits inside a non-garage room and it is
+    not itself a garage-category item; cars, yard equipment and anything in
+    the garage count as yard, as does anything outside the walls."""
+    rooms = [it for it in scene.items() if isinstance(it, RoomItem)]
+    interior, yard = [], []
+    for it in scene.items():
+        if not isinstance(it, FurnishingItem):
+            continue
+        pt = it.scenePos()
+        room = next((r for r in rooms if r.path.contains(pt)), None)
+        spec = furnishing_spec(it.kind) or {}
+        is_garage_room = (room is not None
+                          and room.properties.get("room_type", "") == "Garage")
+        is_garage_item = spec.get("category", "") == "Garage"
+        if room is not None and not is_garage_room and not is_garage_item:
+            interior.append(it)
+        else:
+            yard.append(it)
+    return interior, yard
+
+
+def furnishing_inventory_rows(items):
+    """Rows for FURN_INV_HEADERS aggregated by name, with a TOTAL row.
+    Returns (rows, total_qty, total_cost)."""
+    agg = {}
+    for it in items:
+        rec = agg.setdefault(it.name, {"qty": 0,
+                                       "price": float(getattr(it, "price",
+                                                              0.0) or 0.0)})
+        rec["qty"] += 1
+    rows, total_qty, total_cost = [], 0, 0.0
+    for name in sorted(agg, key=str.lower):
+        qty, price = agg[name]["qty"], agg[name]["price"]
+        line = qty * price
+        total_qty += qty
+        total_cost += line
+        rows.append([name, str(qty), _money(price), _money(line)])
+    rows.append(["TOTAL", str(total_qty), "", _money(total_cost)])
+    return rows, total_qty, total_cost
+
+
+def _opening_counts(scene):
+    """{label: qty} of doors/windows across every wall (each opening once)."""
+    counts = {}
+    for w in scene.items():
+        if not isinstance(w, WallItem):
+            continue
+        for op in w.openings:
+            if op.kind == "window":
+                name = f'Window {op.width:g}" x {op.height:g}"'
+            else:
+                name = f'Door {op.width:g}" x {op.height:g}" ({op.door_type})'
+            counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
+def house_inventory_rows(scene):
+    """Rows for HOUSE_INV_HEADERS: rooms, openings and walls. Returns
+    (rows, total_sqft)."""
+    rooms = [it for it in scene.items() if isinstance(it, RoomItem)]
+    rows, total_sqft = [], 0.0
+    for r in sorted(rooms, key=lambda x: x.name.lower()):
+        total_sqft += r.area_sqft
+        rows.append([r.name, r.properties.get("room_type", "") or "Room",
+                     "1", f"{r.area_sqft:,.1f} sq ft"])
+    for name, qty in sorted(_opening_counts(scene).items()):
+        kind, _, detail = name.partition(" ")
+        rows.append([kind, detail.strip(), str(qty), ""])
+    for wt in ("exterior", "interior"):
+        walls = [w for w in scene.items()
+                 if isinstance(w, WallItem) and w.wall_type == wt]
+        if walls:
+            ft = sum(w.length() for w in walls) / FOOT
+            rows.append([f"{wt.title()} wall", "", str(len(walls)),
+                         f"{ft:,.1f} ft total"])
+    return rows, total_sqft
+
+
+def total_inventory_rows(scene):
+    """Rows for TOTAL_INV_HEADERS: an executive summary of structure and
+    furnishings with a grand total cost."""
+    rooms = [it for it in scene.items() if isinstance(it, RoomItem)]
+    total_sqft = sum(r.area_sqft for r in rooms)
+    building_cost = total_sqft * float(SETTINGS.get("cost_per_sqft", 0.0))
+    opens = _opening_counts(scene)
+    doors = sum(q for n, q in opens.items() if n.startswith("Door"))
+    windows = sum(q for n, q in opens.items() if n.startswith("Window"))
+    interior, yard = classify_furnishings(scene)
+    _, iq, ic = furnishing_inventory_rows(interior)
+    _, yq, yc = furnishing_inventory_rows(yard)
+    grand = building_cost + ic + yc
+    return [
+        ["Structure", "Rooms", str(len(rooms)), f"{total_sqft:,.1f} sq ft"],
+        ["Structure", "Doors", str(doors), ""],
+        ["Structure", "Windows", str(windows), ""],
+        ["Structure", "Est. building cost", "", _money(building_cost)],
+        ["Furnishings", "Interior items", str(iq), _money(ic)],
+        ["Furnishings", "Yard items", str(yq), _money(yc)],
+        ["Grand total", "Building + furnishings", str(iq + yq),
+         _money(grand)],
+    ]
+
+
+def inventory_tsv(headers, rows) -> str:
+    """Headers + rows as tab-separated text — Excel splits it into columns on
+    paste.  Any tab/newline inside a cell is collapsed to single spaces."""
+    def cell(v) -> str:
+        return " ".join(str(v).split())
+
+    lines = ["\t".join(cell(h) for h in headers)]
+    for row in rows:
+        cells = [cell(c) for c in row]
+        cells += [""] * (len(headers) - len(cells))
+        lines.append("\t".join(cells))
+    return "\n".join(lines) + "\n"
+
+
+class InventoryDialog(QDialog):
+    """A read-only inventory shown as an aligned table.  'Copy to clipboard
+    (TSV)' puts tab-separated values on the clipboard, which Excel splits
+    straight into columns when pasted."""
+
+    def __init__(self, title, headers, rows, parent=None, note=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Inventory — {room.name}")
+        self.setWindowTitle(title)
+        self.headers = list(headers)
+        self.rows = [list(r) for r in rows]
         lay = QVBoxLayout(self)
-        lay.addWidget(QLabel("Tab-separated, two columns — paste straight "
-                             "into Excel."))
-        self.ed = QPlainTextEdit(room.inventory_text())
-        self.ed.setReadOnly(True)
-        self.ed.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        self.ed.setFont(QFont("DejaVu Sans Mono", 9))
-        self.ed.setMinimumSize(420, 380)
-        lay.addWidget(self.ed)
+        if note:
+            lab = QLabel(note)
+            lab.setWordWrap(True)
+            lab.setStyleSheet("color: #555;")
+            lay.addWidget(lab)
+        self.table = QTableWidget(len(self.rows), len(self.headers))
+        self.table.setHorizontalHeaderLabels(self.headers)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setAlternatingRowColors(True)
+        right = [self._align_right(h) for h in self.headers]
+        for ri, row in enumerate(self.rows):
+            bold = bool(row) and str(row[0]).strip().upper() in (
+                "TOTAL", "GRAND TOTAL")
+            for ci in range(len(self.headers)):
+                val = row[ci] if ci < len(row) else ""
+                cell = QTableWidgetItem(str(val))
+                if right[ci]:
+                    cell.setTextAlignment(Qt.AlignmentFlag.AlignRight
+                                          | Qt.AlignmentFlag.AlignVCenter)
+                if bold:
+                    f = cell.font()
+                    f.setBold(True)
+                    cell.setFont(f)
+                self.table.setItem(ri, ci, cell)
+        self.table.resizeColumnsToContents()
+        self.table.horizontalHeader().setStretchLastSection(True)
+        if self.headers:
+            self.table.horizontalHeader().setSectionResizeMode(
+                0, QHeaderView.ResizeMode.Stretch)
+        self.table.setMinimumSize(560, 440)
+        lay.addWidget(self.table)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         self.btn_copy = buttons.addButton(
-            "Copy to clipboard", QDialogButtonBox.ButtonRole.ActionRole)
+            "Copy to clipboard (TSV)", QDialogButtonBox.ButtonRole.ActionRole)
         self.btn_copy.clicked.connect(self._copy)
         buttons.rejected.connect(self.reject)
         lay.addWidget(buttons)
 
+    @staticmethod
+    def _align_right(header) -> bool:
+        h = str(header).lower()
+        return any(k in h for k in ("price", "total", "quantity", "qty",
+                                    "value", "cost", "size", "$"))
+
+    def tsv_text(self) -> str:
+        return inventory_tsv(self.headers, self.rows)
+
     def _copy(self):
-        QApplication.clipboard().setText(self.ed.toPlainText())
+        QApplication.clipboard().setText(self.tsv_text())
         self.btn_copy.setText("Copied ✓")
+
+
+class RoomInventoryDialog(InventoryDialog):
+    """Per-room inventory (right-click a room name) as an aligned table:
+    its properties followed by the furnishings and openings it contains."""
+
+    def __init__(self, room: RoomItem, parent=None):
+        super().__init__(f"Inventory — {room.name}", ["Field", "Value"],
+                         room.inventory_rows(), parent=parent,
+                         note="Copy to clipboard (TSV) to paste straight "
+                              "into Excel.")
 
 
 class RoomPropertiesDialog(QDialog):
@@ -3762,6 +3947,16 @@ class MainWindow(QMainWindow):
         a_refresh.triggered.connect(self.refresh_rooms_cmd)
         m_rooms.addAction(a_refresh)
 
+        m_inv = self.menuBar().addMenu("In&ventory")
+        for label, slot in [("&House (structure)…", self.inventory_house),
+                            ("&Interior furnishings…",
+                             self.inventory_interior),
+                            ("&Yard items…", self.inventory_yard),
+                            ("&Total…", self.inventory_total)]:
+            a = QAction(label, self)
+            a.triggered.connect(slot)
+            m_inv.addAction(a)
+
         m_ai = self.menuBar().addMenu("&AI")
         a_prices = QAction("Update furnishing &prices…", self)
         a_prices.triggered.connect(self.update_furnishing_prices)
@@ -3827,6 +4022,40 @@ class MainWindow(QMainWindow):
                     it.setToolTip(tip)
         self.status(f"Updated purchase prices for {n} furnishing(s) "
                     "from the AI.")
+
+    # -- inventories ----------------------------------------------------------
+    def _show_inventory(self, title, headers, rows, note=None):
+        InventoryDialog(title, headers, rows, parent=self, note=note).exec()
+
+    def inventory_house(self):
+        rows, sqft = house_inventory_rows(self.scene)
+        self._show_inventory(
+            "Inventory — House (structure)", HOUSE_INV_HEADERS, rows,
+            note=f"Rooms, doors, windows and walls.  "
+                 f"Total floor area {sqft:,.1f} sq ft.")
+
+    def inventory_interior(self):
+        interior, _ = classify_furnishings(self.scene)
+        rows, qty, cost = furnishing_inventory_rows(interior)
+        self._show_inventory(
+            "Inventory — Interior furnishings", FURN_INV_HEADERS, rows,
+            note=f"{qty} furnishing(s) inside rooms.  Prices come from the "
+                 "AI ▸ Update furnishing prices… tool.")
+
+    def inventory_yard(self):
+        _, yard = classify_furnishings(self.scene)
+        rows, qty, cost = furnishing_inventory_rows(yard)
+        self._show_inventory(
+            "Inventory — Yard items", FURN_INV_HEADERS, rows,
+            note=f"{qty} item(s) outside any room (vehicles, yard "
+                 "equipment, patio furniture…).")
+
+    def inventory_total(self):
+        rows = total_inventory_rows(self.scene)
+        self._show_inventory(
+            "Inventory — Total", TOTAL_INV_HEADERS, rows,
+            note="Whole-plan summary.  Building cost uses File ▸ Settings ▸ "
+                 "cost per sq ft; furnishing prices come from the AI menu.")
 
     def _apply_canvas(self):
         """Resize the scene around the configured canvas and refresh."""
