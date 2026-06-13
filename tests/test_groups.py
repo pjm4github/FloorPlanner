@@ -150,6 +150,19 @@ def test_group_rotation_turns_members_about_centre(fp, win, make_room,
     assert room.corners is not None            # region rotated with it
 
 
+def test_grouped_furnishing_hides_its_own_handle(fp, win, make_room,
+                                                 first_furnishing):
+    # selecting a group also selects its members (Qt couples them); a
+    # grouped furnishing must not draw its own box/handle, only the group's
+    g = _group_room_with_furnishing(fp, win, make_room, first_furnishing)
+    furn = next(c for c in g.childItems() if isinstance(c, fp.FurnishingItem))
+    assert furn.isSelected()              # selected via the group
+    assert not furn._handle_visible()     # but shows no individual handle
+    g.dissolve()                          # ungrouped + still selected
+    furn.setSelected(True)
+    assert furn._handle_visible()         # on its own it does
+
+
 def test_group_box_orients_with_rotation(fp, win, make_room, first_furnishing):
     g = _group_room_with_furnishing(fp, win, make_room, first_furnishing)
     c = g.childrenBoundingRect().center()

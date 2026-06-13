@@ -2152,6 +2152,12 @@ class FurnishingItem(QGraphicsItem):
         c, r = self._handle()
         return QLineF(item_pt, c).length() <= r * 1.8
 
+    def _handle_visible(self) -> bool:
+        """The individual selection box + rotator only show when the item
+        is selected on its own; inside a group the group's outline and
+        handle govern the whole set."""
+        return self.isSelected() and self.group() is None
+
     def boundingRect(self) -> QRectF:
         rect = QRectF(-self.w / 2 - 1.5, -self.d / 2 - 1.5,
                       self.w + 3, self.d + 3)
@@ -2176,7 +2182,7 @@ class FurnishingItem(QGraphicsItem):
             painter.setPen(QPen(QColor(55, 65, 81), 1.0))
             painter.setBrush(QBrush(QColor(248, 250, 252)))
             painter.drawRect(rect)
-        if self.isSelected():
+        if self._handle_visible():
             blue = QColor(0, 110, 255)
             painter.setPen(QPen(blue, 0, Qt.PenStyle.DashLine))
             painter.setBrush(Qt.BrushStyle.NoBrush)
@@ -2192,7 +2198,7 @@ class FurnishingItem(QGraphicsItem):
             painter.drawEllipse(c, hr * 0.35, hr * 0.35)
 
     def hoverMoveEvent(self, e):
-        if self.isSelected() and self._on_handle(e.pos()):
+        if self._handle_visible() and self._on_handle(e.pos()):
             self.setCursor(Qt.CursorShape.CrossCursor)
         else:
             self.unsetCursor()
@@ -2208,7 +2214,7 @@ class FurnishingItem(QGraphicsItem):
                                        scene_pt.x() - self.pos().x()))
 
     def mousePressEvent(self, e):
-        if (e.button() == Qt.MouseButton.LeftButton and self.isSelected()
+        if (e.button() == Qt.MouseButton.LeftButton and self._handle_visible()
                 and self._on_handle(e.pos())):
             self._rotating = True
             self._rot_offset = self.rotation() - self._mouse_angle(e.scenePos())
