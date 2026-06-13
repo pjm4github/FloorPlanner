@@ -5,7 +5,8 @@
     "category": "Living",
     "file": "sofa.svg",
     "width_in": 84,
-    "depth_in": 36
+    "depth_in": 36,
+    "price": 0.0
   },
   {
     "id": "loveseat",
@@ -13,7 +14,8 @@
     "category": "Living",
     "file": "loveseat.svg",
     "width_in": 58,
-    "depth_in": 36
+    "depth_in": 36,
+    "price": 0.0
   },
   {
     "id": "armchair",
@@ -21,7 +23,8 @@
     "category": "Living",
     "file": "armchair.svg",
     "width_in": 33,
-    "depth_in": 33
+    "depth_in": 33,
+    "price": 0.0
   },
   {
     "id": "coffee_table",
@@ -29,7 +32,8 @@
     "category": "Living",
     "file": "coffee_table.svg",
     "width_in": 48,
-    "depth_in": 24
+    "depth_in": 24,
+    "price": 0.0
   },
   {
     "id": "side_table",
@@ -37,7 +41,8 @@
     "category": "Living",
     "file": "side_table.svg",
     "width_in": 20,
-    "depth_in": 20
+    "depth_in": 20,
+    "price": 0.0
   },
   {
     "id": "tv_stand",
@@ -45,7 +50,8 @@
     "category": "Living",
     "file": "tv_stand.svg",
     "width_in": 60,
-    "depth_in": 16
+    "depth_in": 16,
+    "price": 0.0
   },
   {
     "id": "dining_table",
@@ -53,7 +59,8 @@
     "category": "Dining",
     "file": "dining_table.svg",
     "width_in": 72,
-    "depth_in": 36
+    "depth_in": 36,
+    "price": 0.0
   },
   {
     "id": "dining_table_round",
@@ -61,7 +68,8 @@
     "category": "Dining",
     "file": "dining_table_round.svg",
     "width_in": 48,
-    "depth_in": 48
+    "depth_in": 48,
+    "price": 0.0
   },
   {
     "id": "dining_chair",
@@ -69,7 +77,8 @@
     "category": "Dining",
     "file": "dining_chair.svg",
     "width_in": 18,
-    "depth_in": 18
+    "depth_in": 18,
+    "price": 0.0
   },
   {
     "id": "refrigerator",
@@ -77,7 +86,8 @@
     "category": "Kitchen",
     "file": "refrigerator.svg",
     "width_in": 36,
-    "depth_in": 30
+    "depth_in": 30,
+    "price": 0.0
   },
   {
     "id": "range",
@@ -85,7 +95,8 @@
     "category": "Kitchen",
     "file": "range.svg",
     "width_in": 30,
-    "depth_in": 26
+    "depth_in": 26,
+    "price": 0.0
   },
   {
     "id": "dishwasher",
@@ -93,7 +104,8 @@
     "category": "Kitchen",
     "file": "dishwasher.svg",
     "width_in": 24,
-    "depth_in": 24
+    "depth_in": 24,
+    "price": 0.0
   },
   {
     "id": "kitchen_sink",
@@ -101,7 +113,8 @@
     "category": "Kitchen",
     "file": "kitchen_sink.svg",
     "width_in": 33,
-    "depth_in": 22
+    "depth_in": 22,
+    "price": 0.0
   },
   {
     "id": "bed_king",
@@ -109,7 +122,8 @@
     "category": "Bedroom",
     "file": "bed_king.svg",
     "width_in": 76,
-    "depth_in": 80
+    "depth_in": 80,
+    "price": 0.0
   },
   {
     "id": "bed_queen",
@@ -117,7 +131,8 @@
     "category": "Bedroom",
     "file": "bed_queen.svg",
     "width_in": 60,
-    "depth_in": 80
+    "depth_in": 80,
+    "price": 0.0
   },
   {
     "id": "bed_full",
@@ -125,7 +140,8 @@
     "category": "Bedroom",
     "file": "bed_full.svg",
     "width_in": 54,
-    "depth_in": 75
+    "depth_in": 75,
+    "price": 0.0
   },
   {
     "id": "bed_twin",
@@ -133,7 +149,8 @@
     "category": "Bedroom",
     "file": "bed_twin.svg",
     "width_in": 39,
-    "depth_in": 75
+    "depth_in": 75,
+    "price": 0.0
   },
   {
     "id": "nightstand",
@@ -141,7 +158,8 @@
     "category": "Bedroom",
     "file": "nightstand.svg",
     "width_in": 20,
-    "depth_in": 16
+    "depth_in": 16,
+    "price": 0.0
   },
   {
     "id": "dresser",
@@ -149,7 +167,8 @@
     "category": "Bedroom",
     "file": "dresser.svg",
     "width_in": 60,
-    "depth_in": 18
+    "depth_in": 18,
+    "price": 0.0
   },
   {
     "id": "bathtub",
@@ -157,7 +176,8 @@
     "category": "Bathroom",
     "file": "bathtub.svg",
     "width_in": 30,
-    "depth_in": 60
+    "depth_in": 60,
+    "price": 0.0
   },
   {
     "id": "shower",
@@ -165,7 +185,8 @@
     "category": "Bathroom",
     "file": "shower.svg",
     "width_in": 36,
-    "depth_in": 36
+    "depth_in": 36,
+    "price": 0.0
   },
   {
     "id": "toilet",
@@ -173,7 +194,8 @@
     "category": "Bathroom",
     "file": "toilet.svg",
     "width_in": 20,
-    "depth_in": 28
+    "depth_in": 28,
+    "price": 0.0
   },
   {
     "id": "vanity",
@@ -181,7 +203,8 @@
     "category": "Bathroom",
     "file": "vanity.svg",
     "width_in": 30,
-    "depth_in": 21
+    "depth_in": 21,
+    "price": 0.0
   },
   {
     "id": "washer",
@@ -189,7 +212,8 @@
     "category": "Laundry",
     "file": "washer.svg",
     "width_in": 27,
-    "depth_in": 30
+    "depth_in": 30,
+    "price": 0.0
   },
   {
     "id": "dryer",
@@ -197,7 +221,8 @@
     "category": "Laundry",
     "file": "dryer.svg",
     "width_in": 27,
-    "depth_in": 30
+    "depth_in": 30,
+    "price": 0.0
   },
   {
     "id": "suv",
@@ -205,7 +230,8 @@
     "category": "Garage",
     "file": "suv.svg",
     "width_in": 78,
-    "depth_in": 192
+    "depth_in": 192,
+    "price": 0.0
   },
   {
     "id": "car",
@@ -213,7 +239,8 @@
     "category": "Garage",
     "file": "car.svg",
     "width_in": 72,
-    "depth_in": 180
+    "depth_in": 180,
+    "price": 0.0
   },
   {
     "id": "motorcycle",
@@ -221,7 +248,8 @@
     "category": "Garage",
     "file": "motorcycle.svg",
     "width_in": 32,
-    "depth_in": 84
+    "depth_in": 84,
+    "price": 0.0
   },
   {
     "id": "bicycle",
@@ -229,7 +257,8 @@
     "category": "Garage",
     "file": "bicycle.svg",
     "width_in": 24,
-    "depth_in": 68
+    "depth_in": 68,
+    "price": 0.0
   },
   {
     "id": "boat",
@@ -237,7 +266,8 @@
     "category": "Garage",
     "file": "boat.svg",
     "width_in": 68,
-    "depth_in": 168
+    "depth_in": 168,
+    "price": 0.0
   },
   {
     "id": "workbench",
@@ -245,7 +275,8 @@
     "category": "Garage",
     "file": "workbench.svg",
     "width_in": 72,
-    "depth_in": 24
+    "depth_in": 24,
+    "price": 0.0
   },
   {
     "id": "storage_shelves",
@@ -253,7 +284,8 @@
     "category": "Garage",
     "file": "storage_shelves.svg",
     "width_in": 48,
-    "depth_in": 18
+    "depth_in": 18,
+    "price": 0.0
   },
   {
     "id": "lawnmower",
@@ -261,7 +293,8 @@
     "category": "Garage",
     "file": "lawnmower.svg",
     "width_in": 22,
-    "depth_in": 62
+    "depth_in": 62,
+    "price": 0.0
   },
   {
     "id": "boat_trailer",
@@ -269,7 +302,8 @@
     "category": "Garage",
     "file": "boat_trailer.svg",
     "width_in": 78,
-    "depth_in": 216
+    "depth_in": 216,
+    "price": 0.0
   },
   {
     "id": "snowblower",
@@ -277,7 +311,8 @@
     "category": "Garage",
     "file": "snowblower.svg",
     "width_in": 28,
-    "depth_in": 58
+    "depth_in": 58,
+    "price": 0.0
   },
   {
     "id": "wheelbarrow",
@@ -285,7 +320,8 @@
     "category": "Garage",
     "file": "wheelbarrow.svg",
     "width_in": 27,
-    "depth_in": 58
+    "depth_in": 58,
+    "price": 0.0
   },
   {
     "id": "trashcan",
@@ -293,7 +329,8 @@
     "category": "Garage",
     "file": "trashcan.svg",
     "width_in": 24,
-    "depth_in": 24
+    "depth_in": 24,
+    "price": 0.0
   },
   {
     "id": "toolchest",
@@ -301,7 +338,8 @@
     "category": "Shop",
     "file": "toolchest.svg",
     "width_in": 41,
-    "depth_in": 18
+    "depth_in": 18,
+    "price": 0.0
   },
   {
     "id": "table_saw",
@@ -309,7 +347,8 @@
     "category": "Shop",
     "file": "table_saw.svg",
     "width_in": 40,
-    "depth_in": 27
+    "depth_in": 27,
+    "price": 0.0
   },
   {
     "id": "lathe",
@@ -317,7 +356,8 @@
     "category": "Shop",
     "file": "lathe.svg",
     "width_in": 60,
-    "depth_in": 18
+    "depth_in": 18,
+    "price": 0.0
   },
   {
     "id": "jointer",
@@ -325,7 +365,8 @@
     "category": "Shop",
     "file": "jointer.svg",
     "width_in": 60,
-    "depth_in": 20
+    "depth_in": 20,
+    "price": 0.0
   },
   {
     "id": "drill_press",
@@ -333,7 +374,8 @@
     "category": "Shop",
     "file": "drill_press.svg",
     "width_in": 20,
-    "depth_in": 28
+    "depth_in": 28,
+    "price": 0.0
   },
   {
     "id": "cutoff_saw",
@@ -341,7 +383,8 @@
     "category": "Shop",
     "file": "cutoff_saw.svg",
     "width_in": 40,
-    "depth_in": 24
+    "depth_in": 24,
+    "price": 0.0
   },
   {
     "id": "bandsaw",
@@ -349,7 +392,8 @@
     "category": "Shop",
     "file": "bandsaw.svg",
     "width_in": 24,
-    "depth_in": 30
+    "depth_in": 30,
+    "price": 0.0
   },
   {
     "id": "planer",
@@ -357,7 +401,8 @@
     "category": "Shop",
     "file": "planer.svg",
     "width_in": 24,
-    "depth_in": 24
+    "depth_in": 24,
+    "price": 0.0
   },
   {
     "id": "lounge_chair",
@@ -365,7 +410,8 @@
     "category": "Sunroom",
     "file": "lounge_chair.svg",
     "width_in": 27,
-    "depth_in": 78
+    "depth_in": 78,
+    "price": 0.0
   },
   {
     "id": "sauna",
@@ -373,7 +419,8 @@
     "category": "Sunroom",
     "file": "sauna.svg",
     "width_in": 72,
-    "depth_in": 72
+    "depth_in": 72,
+    "price": 0.0
   },
   {
     "id": "umbrella_table",
@@ -381,7 +428,8 @@
     "category": "Sunroom",
     "file": "umbrella_table.svg",
     "width_in": 96,
-    "depth_in": 96
+    "depth_in": 96,
+    "price": 0.0
   },
   {
     "id": "swim_spa",
@@ -389,7 +437,8 @@
     "category": "Sunroom",
     "file": "swim_spa.svg",
     "width_in": 90,
-    "depth_in": 180
+    "depth_in": 180,
+    "price": 0.0
   },
   {
     "id": "whirlpool",
@@ -397,7 +446,8 @@
     "category": "Sunroom",
     "file": "whirlpool.svg",
     "width_in": 84,
-    "depth_in": 84
+    "depth_in": 84,
+    "price": 0.0
   },
   {
     "id": "desk",
@@ -405,7 +455,8 @@
     "category": "Office / Storage",
     "file": "desk.svg",
     "width_in": 60,
-    "depth_in": 30
+    "depth_in": 30,
+    "price": 0.0
   },
   {
     "id": "office_chair",
@@ -413,7 +464,8 @@
     "category": "Office / Storage",
     "file": "office_chair.svg",
     "width_in": 24,
-    "depth_in": 24
+    "depth_in": 24,
+    "price": 0.0
   },
   {
     "id": "bookshelf",
@@ -421,7 +473,8 @@
     "category": "Office / Storage",
     "file": "bookshelf.svg",
     "width_in": 36,
-    "depth_in": 12
+    "depth_in": 12,
+    "price": 0.0
   },
   {
     "id": "wardrobe",
@@ -429,7 +482,8 @@
     "category": "Office / Storage",
     "file": "wardrobe.svg",
     "width_in": 48,
-    "depth_in": 24
+    "depth_in": 24,
+    "price": 0.0
   },
   {
     "id": "gas_furnace",
@@ -437,7 +491,8 @@
     "category": "HVAC",
     "file": "gas_furnace.svg",
     "width_in": 24,
-    "depth_in": 30
+    "depth_in": 30,
+    "price": 0.0
   },
   {
     "id": "electric_furnace",
@@ -445,7 +500,8 @@
     "category": "HVAC",
     "file": "electric_furnace.svg",
     "width_in": 21,
-    "depth_in": 30
+    "depth_in": 30,
+    "price": 0.0
   },
   {
     "id": "oil_furnace",
@@ -453,7 +509,8 @@
     "category": "HVAC",
     "file": "oil_furnace.svg",
     "width_in": 26,
-    "depth_in": 34
+    "depth_in": 34,
+    "price": 0.0
   },
   {
     "id": "gas_water_heater",
@@ -461,7 +518,8 @@
     "category": "HVAC",
     "file": "gas_water_heater.svg",
     "width_in": 22,
-    "depth_in": 22
+    "depth_in": 22,
+    "price": 0.0
   },
   {
     "id": "electric_water_heater",
@@ -469,7 +527,8 @@
     "category": "HVAC",
     "file": "electric_water_heater.svg",
     "width_in": 22,
-    "depth_in": 22
+    "depth_in": 22,
+    "price": 0.0
   },
   {
     "id": "water_softener",
@@ -477,7 +536,8 @@
     "category": "HVAC",
     "file": "water_softener.svg",
     "width_in": 24,
-    "depth_in": 15
+    "depth_in": 15,
+    "price": 0.0
   },
   {
     "id": "gas_tank",
@@ -485,7 +545,8 @@
     "category": "HVAC",
     "file": "gas_tank.svg",
     "width_in": 120,
-    "depth_in": 36
+    "depth_in": 36,
+    "price": 0.0
   },
   {
     "id": "oil_tank",
@@ -493,7 +554,8 @@
     "category": "HVAC",
     "file": "oil_tank.svg",
     "width_in": 60,
-    "depth_in": 27
+    "depth_in": 27,
+    "price": 0.0
   },
   {
     "id": "electric_panel",
@@ -501,7 +563,8 @@
     "category": "HVAC",
     "file": "electric_panel.svg",
     "width_in": 16,
-    "depth_in": 4
+    "depth_in": 4,
+    "price": 0.0
   },
   {
     "id": "car_charger",
@@ -509,7 +572,8 @@
     "category": "HVAC",
     "file": "car_charger.svg",
     "width_in": 8,
-    "depth_in": 6
+    "depth_in": 6,
+    "price": 0.0
   },
   {
     "id": "battery_wall",
@@ -517,7 +581,8 @@
     "category": "HVAC",
     "file": "battery_wall.svg",
     "width_in": 45,
-    "depth_in": 6
+    "depth_in": 6,
+    "price": 0.0
   },
   {
     "id": "well_pump",
@@ -525,7 +590,8 @@
     "category": "HVAC",
     "file": "well_pump.svg",
     "width_in": 24,
-    "depth_in": 24
+    "depth_in": 24,
+    "price": 0.0
   },
   {
     "id": "heat_exchanger",
@@ -533,6 +599,7 @@
     "category": "HVAC",
     "file": "heat_exchanger.svg",
     "width_in": 30,
-    "depth_in": 30
+    "depth_in": 30,
+    "price": 0.0
   }
 ]

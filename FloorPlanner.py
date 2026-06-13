@@ -151,7 +151,7 @@ from pathlib import Path
 
 from PyQt6 import sip
 from PyQt6.QtCore import (QLineF, QMimeData, QPoint, QPointF, QRect, QRectF,
-                          QSize, Qt, QTimer)
+                          QSettings, QSize, Qt, QTimer)
 from PyQt6.QtGui import (
     QAction,
     QActionGroup,
@@ -341,6 +341,7 @@ def furnishing_catalog() -> list:
                     "file": str(ent["file"]),
                     "width_in": float(ent["width_in"]),
                     "depth_in": float(ent["depth_in"]),
+                    "price": float(ent.get("price", 0.0) or 0.0),
                 }
             except (KeyError, TypeError, ValueError):
                 continue
@@ -409,6 +410,138 @@ def furnishing_renderer(kind: str):
         _FURN_RENDERERS[kind] = QSvgRenderer(str(FURN_DIR / spec["file"]))
     r = _FURN_RENDERERS[kind]
     return r if r.isValid() else None
+
+
+# ----------------------------------------------------------------------------
+# AI-assisted pricing — ask a model for current furnishing purchase prices
+# and write them into manifest.json's `price` field.
+# ----------------------------------------------------------------------------
+ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+ANTHROPIC_VERSION = "2023-06-01"
+
+# AI systems offered in the AI ▸ Update prices… dialog drop-down.
+AI_PROVIDERS = [
+    {"name": "Anthropic Claude",
+     "models": ["claude-sonnet-4-6", "claude-opus-4-8",
+                "claude-haiku-4-5-20251001"]},
+]
+
+
+def default_pricing_prompt(catalog=None) -> str:
+    """The editable prompt pre-filled into the pricing dialog: lists every
+    catalog item and asks for a single current US retail price each, returned
+    as a strict JSON object {id: dollars}."""
+    if catalog is None:
+        catalog = furnishing_catalog()
+    lines = [f'{s["id"]}\t{s["name"]} '
+             f'({fmt_ftin(s["width_in"])} x {fmt_ftin(s["depth_in"])}, '
+             f'{s["category"]})'
+             for s in catalog]
+    return (
+        "You are a procurement assistant pricing home furnishings and "
+        "fixtures.\n"
+        "For each catalog item below, give a single representative CURRENT "
+        "US retail purchase price for a new, mid-range product, in US "
+        "dollars.\n\n"
+        "Respond with ONLY a JSON object that maps each item id to a number "
+        "(plain dollars, no currency symbols, no ranges, no commentary and "
+        "no markdown fences). Example: {\"sofa\": 899, \"toilet\": 180}\n\n"
+        "Items (id <tab> description):\n" + "\n".join(lines) + "\n")
+
+
+def parse_price_json(text: str) -> dict:
+    """Extract a {id: float-price} mapping from an AI text reply, tolerating
+    surrounding prose or ```json fences. Raises RuntimeError if nothing
+    usable is found."""
+    s = (text or "").strip()
+    a, b = s.find("{"), s.rfind("}")
+    if a == -1 or b == -1 or b < a:
+        raise RuntimeError("No JSON object found in the AI reply.")
+    try:
+        obj = json.loads(s[a:b + 1])
+    except ValueError as ex:
+        raise RuntimeError(f"Could not parse the AI reply as JSON: {ex}") \
+            from ex
+    out = {}
+    for key, val in (obj.items() if isinstance(obj, dict) else []):
+        try:
+            out[str(key)] = float(val)
+        except (TypeError, ValueError):
+            continue
+    if not out:
+        raise RuntimeError("The AI reply contained no usable prices.")
+    return out
+
+
+def anthropic_fetch_prices(api_key: str, model: str, prompt: str,
+                           *, timeout: float = 60.0) -> dict:
+    """POST the prompt to the Anthropic Messages API and return the parsed
+    {id: price} mapping. Raises RuntimeError on any network/API failure.
+    Uses only the standard library (no SDK dependency)."""
+    import urllib.error
+    import urllib.request
+    body = json.dumps({
+        "model": model,
+        "max_tokens": 4096,
+        "messages": [{"role": "user", "content": prompt}],
+    }).encode("utf-8")
+    req = urllib.request.Request(ANTHROPIC_API_URL, data=body, method="POST")
+    req.add_header("content-type", "application/json")
+    req.add_header("x-api-key", api_key)
+    req.add_header("anthropic-version", ANTHROPIC_VERSION)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as ex:
+        detail = ex.read().decode("utf-8", "replace")[:300]
+        raise RuntimeError(f"API error {ex.code}: {detail}") from ex
+    except (urllib.error.URLError, TimeoutError, OSError) as ex:
+        raise RuntimeError(f"Could not reach the AI service: {ex}") from ex
+    except ValueError as ex:
+        raise RuntimeError(f"Unexpected reply from the AI service: {ex}") \
+            from ex
+    text = "".join(blk.get("text", "") for blk in payload.get("content", [])
+                   if isinstance(blk, dict) and blk.get("type") == "text")
+    return parse_price_json(text)
+
+
+def apply_furnishing_prices(prices: dict) -> int:
+    """Write {id: price} into manifest.json and the live catalog in place.
+    Returns the number of catalog items whose price was set."""
+    path = FURN_DIR / "manifest.json"
+    try:
+        entries = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        entries = []
+    if isinstance(entries, list):
+        for ent in entries:
+            if isinstance(ent, dict) and str(ent.get("id")) in prices:
+                ent["price"] = float(prices[str(ent["id"])])
+        path.write_text(json.dumps(entries, indent=2) + "\n",
+                        encoding="utf-8")
+    n = 0
+    for spec in furnishing_catalog():
+        if spec["id"] in prices:
+            spec["price"] = float(prices[spec["id"]])
+            n += 1
+    return n
+
+
+def load_saved_api_key() -> str:
+    """The Anthropic API key remembered on this machine (QSettings), if any."""
+    try:
+        return str(QSettings("FloorPlanner", "FloorPlanner")
+                   .value("anthropic_api_key", "") or "")
+    except Exception:                       # noqa: BLE001 - best effort
+        return ""
+
+
+def save_api_key(key: str) -> None:
+    try:
+        QSettings("FloorPlanner", "FloorPlanner").setValue(
+            "anthropic_api_key", key)
+    except Exception:                       # noqa: BLE001 - best effort
+        pass
 
 
 # ----------------------------------------------------------------------------
@@ -2161,6 +2294,93 @@ class SettingsDialog(QDialog):
         SETTINGS["cost_per_sqft"] = float(self.sp_cost.value())
 
 
+class AIPricingDialog(QDialog):
+    """AI ▸ Update furnishing prices…: choose an AI system, edit the prompt,
+    and fetch up-to-date purchase prices for the whole furnishing catalog.
+    On success, `result_prices` holds the {id: price} mapping and the dialog
+    accepts; the prompt and provider drop-down are fully editable."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("AI · Update furnishing prices")
+        self.result_prices = None
+        v = QVBoxLayout(self)
+
+        form = QFormLayout()
+        self.cb_provider = QComboBox()
+        for prov in AI_PROVIDERS:
+            self.cb_provider.addItem(prov["name"])
+        form.addRow("AI system", self.cb_provider)
+
+        self.cb_model = QComboBox()
+        self.cb_model.setEditable(True)
+        form.addRow("Model", self.cb_model)
+
+        self.ed_key = QLineEdit()
+        self.ed_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.ed_key.setPlaceholderText("sk-ant-…  (or set ANTHROPIC_API_KEY)")
+        form.addRow("API key", self.ed_key)
+
+        self.ck_remember = QCheckBox("Remember this key on this computer")
+        form.addRow("", self.ck_remember)
+        v.addLayout(form)
+
+        v.addWidget(QLabel("Prompt (sent to the AI — edit freely):"))
+        self.ed_prompt = QPlainTextEdit()
+        self.ed_prompt.setPlainText(default_pricing_prompt())
+        v.addWidget(self.ed_prompt, 1)
+
+        self.lbl_status = QLabel("")
+        self.lbl_status.setWordWrap(True)
+        self.lbl_status.setStyleSheet("color: #555;")
+        v.addWidget(self.lbl_status)
+
+        self.buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Cancel)
+        self.btn_fetch = self.buttons.addButton(
+            "Fetch prices", QDialogButtonBox.ButtonRole.AcceptRole)
+        self.buttons.rejected.connect(self.reject)
+        self.btn_fetch.clicked.connect(self._fetch)
+        v.addWidget(self.buttons)
+
+        self.cb_provider.currentIndexChanged.connect(self._sync_models)
+        self._sync_models()
+        self.ed_key.setText(load_saved_api_key()
+                            or os.environ.get("ANTHROPIC_API_KEY", ""))
+        self.resize(640, 580)
+
+    def _sync_models(self):
+        self.cb_model.clear()
+        idx = max(self.cb_provider.currentIndex(), 0)
+        self.cb_model.addItems(AI_PROVIDERS[idx]["models"])
+
+    def _fetch(self):
+        key = self.ed_key.text().strip()
+        if not key:
+            self.lbl_status.setText(
+                "Enter an API key, or set the ANTHROPIC_API_KEY "
+                "environment variable.")
+            return
+        model = self.cb_model.currentText().strip()
+        prompt = self.ed_prompt.toPlainText()
+        self.lbl_status.setText("Contacting the AI…  this may take a moment.")
+        self.btn_fetch.setEnabled(False)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        QApplication.processEvents()
+        try:
+            prices = anthropic_fetch_prices(key, model, prompt)
+        except Exception as ex:             # noqa: BLE001 - shown to the user
+            QApplication.restoreOverrideCursor()
+            self.btn_fetch.setEnabled(True)
+            self.lbl_status.setText(str(ex))
+            return
+        QApplication.restoreOverrideCursor()
+        if self.ck_remember.isChecked():
+            save_api_key(key)
+        self.result_prices = prices
+        self.accept()
+
+
 class FurnishingItem(QGraphicsItem):
     """A furniture / fixture symbol placed on the plan at true scale.
 
@@ -2180,6 +2400,7 @@ class FurnishingItem(QGraphicsItem):
         self.name = spec["name"]
         self.w = float(spec["width_in"])
         self.d = float(spec["depth_in"])
+        self.price = float(spec.get("price", 0.0) or 0.0)
         self._rotating = False
         self._rot_offset = 0.0
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
@@ -2190,6 +2411,10 @@ class FurnishingItem(QGraphicsItem):
         self.setZValue(3)                 # over walls, under room labels
         self.setPos(pos)                  # pos = symbol centre
         self.setRotation(rotation)        # rotates about the centre
+        tip = f"{self.name} — {fmt_ftin(self.w)} × {fmt_ftin(self.d)}"
+        if self.price > 0:
+            tip += f"  ·  ${self.price:,.0f}"
+        self.setToolTip(tip)
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
@@ -2660,10 +2885,26 @@ class FurnishingList(QListWidget):
         for spec in specs:
             it = QListWidgetItem(self._icon(spec), spec["name"])
             it.setData(Qt.ItemDataRole.UserRole, spec["id"])
-            it.setToolTip(f'{spec["name"]} — {fmt_ftin(spec["width_in"])} × '
-                          f'{fmt_ftin(spec["depth_in"])}  '
-                          f'({spec["category"]})')
+            it.setToolTip(self._tooltip(spec))
             self.addItem(it)
+
+    @staticmethod
+    def _tooltip(spec) -> str:
+        t = (f'{spec["name"]} — {fmt_ftin(spec["width_in"])} × '
+             f'{fmt_ftin(spec["depth_in"])}  ({spec["category"]})')
+        price = float(spec.get("price", 0.0) or 0.0)
+        if price > 0:
+            t += f'  ·  ${price:,.0f}'
+        return t
+
+    def refresh_tooltips(self):
+        """Re-read each item's price from the live catalog (after an AI
+        price update) and rebuild its tooltip."""
+        for row in range(self.count()):
+            it = self.item(row)
+            spec = furnishing_spec(it.data(Qt.ItemDataRole.UserRole))
+            if spec is not None:
+                it.setToolTip(self._tooltip(spec))
 
     @staticmethod
     def _icon(spec) -> QIcon:
@@ -2710,6 +2951,13 @@ class FurnishingPalette(QToolBox):
             if group["name"].lower() == "all":
                 all_index = i
         self.setCurrentIndex(all_index)
+
+    def refresh_prices(self):
+        """Refresh every section's tooltips after an AI price update."""
+        for i in range(self.count()):
+            w = self.widget(i)
+            if isinstance(w, FurnishingList):
+                w.refresh_tooltips()
 
 
 # ----------------------------------------------------------------------------
@@ -3514,6 +3762,11 @@ class MainWindow(QMainWindow):
         a_refresh.triggered.connect(self.refresh_rooms_cmd)
         m_rooms.addAction(a_refresh)
 
+        m_ai = self.menuBar().addMenu("&AI")
+        a_prices = QAction("Update furnishing &prices…", self)
+        a_prices.triggered.connect(self.update_furnishing_prices)
+        m_ai.addAction(a_prices)
+
         self.scene.selectionChanged.connect(self._update_edit_actions)
         self._update_edit_actions()
 
@@ -3552,6 +3805,28 @@ class MainWindow(QMainWindow):
                     f'snap {SETTINGS["rotate_snap_deg"]:g}° · canvas '
                     f"{fmt_ftin(c.width())} × {fmt_ftin(c.height())} · "
                     f'${SETTINGS["cost_per_sqft"]:g}/sq ft.')
+
+    def update_furnishing_prices(self):
+        """AI ▸ Update furnishing prices…: fetch current purchase prices for
+        the whole catalog from the chosen AI system and store them in the
+        manifest, refreshing palette tooltips and any placed items."""
+        dlg = AIPricingDialog(self)
+        if dlg.exec() != QDialog.DialogCode.Accepted or not dlg.result_prices:
+            return
+        n = apply_furnishing_prices(dlg.result_prices)
+        if hasattr(self, "furn_palette"):
+            self.furn_palette.refresh_prices()
+        for it in self.scene.items():
+            if isinstance(it, FurnishingItem):
+                spec = furnishing_spec(it.kind)
+                if spec is not None:
+                    it.price = float(spec.get("price", 0.0) or 0.0)
+                    tip = (f"{it.name} — {fmt_ftin(it.w)} × {fmt_ftin(it.d)}")
+                    if it.price > 0:
+                        tip += f"  ·  ${it.price:,.0f}"
+                    it.setToolTip(tip)
+        self.status(f"Updated purchase prices for {n} furnishing(s) "
+                    "from the AI.")
 
     def _apply_canvas(self):
         """Resize the scene around the configured canvas and refresh."""

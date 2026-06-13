@@ -370,11 +370,22 @@ FURNISHINGS = [
       L(15, 15, 5, 21, 0.7)]),                                  # fan
 ]
 
+# Purchase prices are filled in at runtime by the app's AI ▸ Update
+# furnishing prices… tool, so carry any existing prices across regeneration
+# rather than resetting them to 0.
+try:
+    _prev_price = {e["id"]: float(e.get("price", 0.0))
+                   for e in json.loads((FURN / "manifest.json")
+                                       .read_text(encoding="utf-8"))}
+except (OSError, ValueError, KeyError, TypeError):
+    _prev_price = {}
+
 manifest = []
 for fid, name, cat, w, d, body in FURNISHINGS:
     (FURN / f"{fid}.svg").write_text(svg(w, d, body), encoding="utf-8")
     manifest.append({"id": fid, "name": name, "category": cat,
-                     "file": f"{fid}.svg", "width_in": w, "depth_in": d})
+                     "file": f"{fid}.svg", "width_in": w, "depth_in": d,
+                     "price": _prev_price.get(fid, 0.0)})
 (FURN / "manifest.json").write_text(
     json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
@@ -427,7 +438,8 @@ groups_out += [{"name": name, "items": [f"{i}.svg" for i in ids]}
     "* Every SVG `viewBox` is in **inches** (`0 0 WIDTH DEPTH`), so the app\n"
     "  renders each symbol at true scale (1 scene unit = 1\").\n"
     "* `manifest.json` lists the catalog: `id`, `name`, `category`, `file`,\n"
-    "  `width_in`, `depth_in`.\n"
+    "  `width_in`, `depth_in`, `price` (USD purchase cost; the app's\n"
+    "  AI ‣ Update furnishing prices… tool fills these in).\n"
     "* `groups.json` defines the palette's expandable sections: a list of\n"
     "  `{name, items}` where each item is an SVG file name from this\n"
     "  directory.  A furnishing may appear in several groups.  The `All`\n"

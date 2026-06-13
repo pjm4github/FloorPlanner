@@ -77,6 +77,14 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   whose walls have been moved away, clearing gray areas left behind.
 - **Nudging** — arrow keys move the selected group or furnishing by the
   wall-snap step; hold Ctrl for a fine 1" step.
+- **AI pricing** — the **AI** menu's *Update furnishing prices…* opens a
+  dialog with a drop-down of AI systems (Anthropic Claude) and a fully
+  editable, pre-filled prompt that asks for current US retail prices for
+  the whole catalog. The reply (a JSON `{id: dollars}` map) is written into
+  each furnishing's new `price` field in `manifest.json`, and palette and
+  placed-item tooltips show the cost. The call uses your Anthropic API key
+  (entered in the dialog — optionally remembered on this computer — or read
+  from the `ANTHROPIC_API_KEY` environment variable).
 - **Building totals** — the far right of the toolbar shows a live
   **Totals: Cost / Sq. Feet** label: the floor area of every room with
   *Include in total square footage* ticked (in its right-click Properties),
@@ -118,6 +126,7 @@ so no system fonts are needed.
 | Rotate a group | Select it, drag the rotation handle (Ctrl = snapped) |
 | Nudge selection | Arrow keys (Ctrl = fine 1" step) |
 | Room boolean ops | Select two rooms, use the **Rooms** menu |
+| Update furnishing prices (AI) | **AI** menu → *Update furnishing prices…* |
 | Cut / copy / paste | **Ctrl+X** / **Ctrl+C** / **Ctrl+V** |
 | Import / export rooms (CSV) | File menu |
 | Delete | Select + **Del** |
