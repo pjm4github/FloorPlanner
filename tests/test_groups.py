@@ -8,7 +8,7 @@
 import gc
 
 import pytest
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import QPointF, QRectF
 
 pytestmark = pytest.mark.groups
 
@@ -73,6 +73,37 @@ def test_bake_translates_room_region(fp, win, make_room):
     g.bake()
     after = room.path.boundingRect().x()
     assert after - before == pytest.approx(72, abs=6)
+
+
+def test_extracted_room_region_follows_move(fp, win):
+    # extract a room whose right edge is a longer party wall, then move the
+    # group clear of that wall: the grey region/outline must follow (baked
+    # on release, not live)
+    sc = win.scene
+    party = fp.WallItem(QPointF(120, 0), QPointF(120, 300), "interior")
+    sc.addItem(party)
+    for p1, p2 in [((0, 0), (120, 0)), ((120, 144), (0, 144)),
+                   ((0, 144), (0, 0))]:
+        sc.addItem(fp.WallItem(QPointF(*p1), QPointF(*p2), "interior"))
+    fp.rebuild_all_walls(sc)
+    res = fp.detect_room(sc, QPointF(60, 72))
+    room = fp.RoomItem("Den", QPointF(60, 72), res[0], res[1], corners=res[2])
+    sc.addItem(room)
+
+    win.view.select_in_rect(QRectF(-12, -12, 150, 174))   # duplicates the edge
+    before = room.path.boundingRect()
+
+    win.group_selected()
+    g = next(i for i in sc.items() if isinstance(i, fp.GroupItem))
+    g.setPos(200, 100)            # move clear of the stationary party wall
+    g.bake()
+
+    after = room.path.boundingRect()
+    assert after.x() - before.x() == pytest.approx(200, abs=8)
+    assert after.y() - before.y() == pytest.approx(100, abs=8)
+    # the original party wall is left exactly where it was
+    assert party.p1.x() == pytest.approx(120)
+    assert party.p2.y() == pytest.approx(300)
 
 
 def test_furnishings_ride_along(fp, win, make_room, first_furnishing):

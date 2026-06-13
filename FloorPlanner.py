@@ -2308,9 +2308,10 @@ class GroupItem(QGraphicsItemGroup):
 
     def bake(self):
         """Fold the group's current translation into its members and
-        reset the group to (0, 0).  Rooms whose walls all belong to the
-        group ride along: their anchor (label) shifts too, so the room
-        region re-detects at the new location."""
+        reset the group to (0, 0).  A room whose perimeter is fully walled
+        by the group rides along -- its anchor (label) and region shift too
+        -- even when an extra coincident wall (e.g. a shared party wall the
+        room edge was copied from) also touches its boundary."""
         d = self.pos()
         if abs(d.x()) < 1e-9 and abs(d.y()) < 1e-9:
             return
@@ -2320,10 +2321,8 @@ class GroupItem(QGraphicsItemGroup):
                        if isinstance(ch, WallItem)}
         if sc is not None and group_walls:
             for it in sc.items():
-                if isinstance(it, RoomItem):
-                    bw = it.bounding_walls()
-                    if bw and all(w in group_walls for w in bw):
-                        moved_rooms.append(it)
+                if isinstance(it, RoomItem) and walls_cover_room(group_walls, it):
+                    moved_rooms.append(it)
         self.prepareGeometryChange()
         for ch in self.childItems():
             if isinstance(ch, WallItem):
@@ -2472,26 +2471,42 @@ def _wall_endpoints_match(w, a: QPointF, b: QPointF, tol: float = 1.0) -> bool:
                 and QLineF(w.p2, a).length() <= tol))
 
 
+def _wall_spans_segment(w, a: QPointF, b: QPointF) -> bool:
+    """True when wall `w`'s body runs along and contains the segment a->b
+    (both ends project within the wall's length, ~collinear with it)."""
+    u, length = w.unit(), w.length()
+    if length < 1e-6:
+        return False
+    for p in (a, b):
+        vx, vy = p.x() - w.p1.x(), p.y() - w.p1.y()
+        s = vx * u.x() + vy * u.y()
+        if not (-0.6 <= s <= length + 0.6
+                and abs(vy * u.x() - vx * u.y()) <= 1.5):
+            return False
+    return True
+
+
 def _wall_along_segment(scene, a: QPointF, b: QPointF):
     """The wall whose body runs along (and spans) the segment a->b -- i.e.
     the longer wall that carries a room edge.  None if there isn't one."""
     for w in scene.items():
-        if not isinstance(w, WallItem):
-            continue
-        u, length = w.unit(), w.length()
-        if length < 1e-6:
-            continue
-        spans = True
-        for p in (a, b):
-            vx, vy = p.x() - w.p1.x(), p.y() - w.p1.y()
-            s = vx * u.x() + vy * u.y()
-            if not (-0.6 <= s <= length + 0.6
-                    and abs(vy * u.x() - vx * u.y()) <= 1.5):
-                spans = False
-                break
-        if spans:
+        if isinstance(w, WallItem) and _wall_spans_segment(w, a, b):
             return w
     return None
+
+
+def walls_cover_room(walls, room) -> bool:
+    """True when `walls` form a complete loop along every edge of the
+    room's perimeter -- so moving exactly those walls moves the whole
+    room, even if extra (coincident) walls also touch the boundary."""
+    if not room.corners:
+        return False
+    n = len(room.corners)
+    for i in range(n):
+        a, b = room.corners[i], room.corners[(i + 1) % n]
+        if not any(_wall_spans_segment(w, a, b) for w in walls):
+            return False
+    return True
 
 
 def synthesize_room_edge(scene, a: QPointF, b: QPointF):
