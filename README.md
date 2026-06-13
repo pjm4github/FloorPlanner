@@ -24,10 +24,12 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   area, can draw double-headed dimension arrows on every enclosing wall
   (opposite equal walls dimensioned once), and carries a property sheet
   (room type, ceiling, finishes, HVAC, notes…). Move or resize the
-  bounding walls and the room region re-detects and follows. Right-click
-  a room name for an **inventory** — every furnishing and opening in the
-  room as two tab-separated columns, ready to paste into Excel. Rooms can
-  be copied and pasted elsewhere with their walls and openings.
+  bounding walls and the room region re-detects and follows. Left-drag the
+  name to reposition the label within the room (it rides along when the
+  room moves). Right-click a room name for an **inventory** — every
+  furnishing and opening in the room as two tab-separated columns, ready to
+  paste into Excel. Rooms can be copied and pasted elsewhere with their
+  walls and openings.
 - **Furnishings** — a bundled CC0 library of 54 top-view symbols across
   Living, Dining, Kitchen, Bedroom, Bathroom, Laundry, Office, Garage
   (cars, boat + trailer, workbench, yard equipment), **Shop** (table saw,

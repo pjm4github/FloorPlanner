@@ -1,8 +1,57 @@
 """Room detection, area, inventory, naming, and region-follows-walls."""
+import json
+
 import pytest
 from PyQt6.QtCore import QPointF
 
 pytestmark = pytest.mark.rooms
+
+
+def test_room_label_offset_rides_with_move(fp, win, make_room):
+    sc = win.scene
+    room = make_room(sc, 0, 0, 144, 96, "Den")
+    room.label_offset = QPointF(40, -20)        # as if the user dragged it
+    c0 = room._label_centre()
+    assert (c0.x(), c0.y()) == pytest.approx(
+        (room.anchor.x() + 40, room.anchor.y() - 20))
+
+    for w in [it for it in sc.items() if isinstance(it, fp.WallItem)]:
+        w.setSelected(True)
+    win.group_selected()
+    g = next(it for it in sc.items() if isinstance(it, fp.GroupItem))
+    g.setPos(120, 60)
+    g.bake()
+    c1 = room._label_centre()
+    assert (c1.x() - c0.x(), c1.y() - c0.y()) == pytest.approx((120, 60), abs=4)
+    assert room.label_offset == QPointF(40, -20)
+
+
+def test_room_label_offset_round_trips(fp, win, make_room):
+    sc = win.scene
+    room = make_room(sc, 0, 0, 144, 96, "Den")
+    room.label_offset = QPointF(33, -17)
+    w2 = fp.MainWindow()
+    try:
+        w2.load_data(json.loads(json.dumps(win.serialize())))
+        r2 = next(it for it in w2.scene.items() if isinstance(it, fp.RoomItem))
+        assert (r2.label_offset.x(), r2.label_offset.y()) == \
+            pytest.approx((33, -17))
+    finally:
+        w2.close()
+
+
+@pytest.mark.gui
+def test_room_label_drag(fp, win, make_room, drag):
+    sc = win.scene
+    room = make_room(sc, 0, 0, 240, 180, "Den")
+    win.set_tool(fp.TOOL_SELECT)
+    win.show()
+    win.zoom_fit()
+    assert room.label_offset == QPointF(0, 0)
+    drag(win, room._label_centre(), 60, -40)     # drag the label right + up
+    assert room.label_offset.x() > 5
+    assert room.label_offset.y() < -5
+    assert room.anchor == QPointF(120, 90)       # anchor unchanged
 
 
 def _overlapping_rooms(fp, win):

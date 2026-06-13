@@ -1526,6 +1526,8 @@ class RoomItem(QGraphicsItem):
         super().__init__()
         self.name = name
         self.anchor = QPointF(anchor)
+        self.label_offset = QPointF(0.0, 0.0)   # label drag, relative to anchor
+        self._dragging_label = False
         self.path = QPainterPath(path)
         self.area_sqft = float(area_sqft)
         self.corners = [QPointF(c) for c in corners] if corners else None
@@ -1727,11 +1729,16 @@ class RoomItem(QGraphicsItem):
         return "\n".join(f"{a}\t{b}" for a, b in self.inventory_rows())
 
     # -- QGraphicsItem -----------------------------------------------------------
+    def _label_centre(self) -> QPointF:
+        return QPointF(self.anchor.x() + self.label_offset.x(),
+                       self.anchor.y() + self.label_offset.y())
+
     def _label_rect(self) -> QRectF:
         fm = QFontMetricsF(self._font)
         w = max(fm.horizontalAdvance(self.name), 48.0) + 10.0
         h = fm.height() + 13.0
-        return QRectF(self.anchor.x() - w / 2, self.anchor.y() - h / 2, w, h)
+        c = self._label_centre()
+        return QRectF(c.x() - w / 2, c.y() - h / 2, w, h)
 
     def boundingRect(self) -> QRectF:
         r = self.path.boundingRect().united(self._label_rect())
@@ -1826,17 +1833,18 @@ class RoomItem(QGraphicsItem):
         r = self.interior_rect()
         if r.width() < 12 or r.height() < 12:
             return
+        lc = self._label_centre()
         y = r.center().y()                # keep clear of the name label
-        if abs(y - self.anchor.y()) < 22:
-            y = min(r.bottom() - 8, self.anchor.y() + 26)
+        if abs(y - lc.y()) < 22:
+            y = min(r.bottom() - 8, lc.y() + 26)
         self._arrow(painter, QPointF(r.left() + 1, y), QPointF(r.right() - 1, y))
         text = fmt_ftin(r.width())
         painter.drawText(QPointF(r.center().x() - fm.horizontalAdvance(text) / 2,
                                  y - 3), text)
 
         x = r.center().x()
-        if abs(x - self.anchor.x()) < 50:
-            x = max(r.left() + 10, self.anchor.x() - 60)
+        if abs(x - lc.x()) < 50:
+            x = max(r.left() + 10, lc.x() - 60)
         self._arrow(painter, QPointF(x, r.top() + 1), QPointF(x, r.bottom() - 1))
         text = fmt_ftin(r.height())
         painter.save()
@@ -1874,6 +1882,40 @@ class RoomItem(QGraphicsItem):
             self.name = unique_room_name(self.scene(), name.strip(),
                                          exclude=self)
             self.update()
+
+    def mousePressEvent(self, e):
+        # left-drag on the name label moves the label (the room region and
+        # detection anchor stay put -- the offset rides along if the room
+        # later moves)
+        if (e.button() == Qt.MouseButton.LeftButton
+                and self._label_rect().contains(e.pos())):
+            self.setSelected(True)
+            c = self._label_centre()
+            self._label_grab = QPointF(e.scenePos().x() - c.x(),
+                                       e.scenePos().y() - c.y())
+            self._dragging_label = True
+            e.accept()
+            return
+        super().mousePressEvent(e)
+
+    def mouseMoveEvent(self, e):
+        if self._dragging_label:
+            self.prepareGeometryChange()
+            nx = e.scenePos().x() - self._label_grab.x()
+            ny = e.scenePos().y() - self._label_grab.y()
+            self.label_offset = QPointF(nx - self.anchor.x(),
+                                        ny - self.anchor.y())
+            self.update()
+            e.accept()
+            return
+        super().mouseMoveEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        if self._dragging_label:
+            self._dragging_label = False
+            e.accept()
+            return
+        super().mouseReleaseEvent(e)
 
     def mouseDoubleClickEvent(self, e):
         self._rename()
@@ -3866,6 +3908,7 @@ class MainWindow(QMainWindow):
                 rooms.append({
                     "name": it.name,
                     "anchor": [it.anchor.x(), it.anchor.y()],
+                    "label_offset": [it.label_offset.x(), it.label_offset.y()],
                     "show_dimensions": it.show_dims,
                     "properties": it.properties,
                 })
@@ -3920,6 +3963,7 @@ class MainWindow(QMainWindow):
             room = RoomItem(name, anchor, res[0], res[1],
                             rd.get("properties"), res[2])
             room.show_dims = bool(rd.get("show_dimensions", False))
+            room.label_offset = QPointF(*rd.get("label_offset", [0.0, 0.0]))
             self.scene.addItem(room)
         unknown = []
         for fd in data.get("furnishings", []):
