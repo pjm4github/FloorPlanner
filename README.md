@@ -8,12 +8,12 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
 ## Features
 
 - **Walls** — exterior (6") and interior (4½") walls drawn by click-drag,
-  orthogonal from the anchor (Shift for free angles). Endpoints snap and
-  join into mitred corners, wall ends fuse onto other walls as T-junctions,
-  and gaps up to 2' close themselves: ends project forward onto the wall
-  they point at, and existing walls grow to meet a newly drawn one.
-  Dragging a wall's body slides it orthogonally — attached walls stretch
-  and shrink so rooms stay rectangular (Ctrl for free movement).
+  orthogonal from the anchor (Shift for free angles). While drawing, the
+  endpoint snaps to **line up with the nearest orthogonal wall** it points
+  at while staying horizontal/vertical; any gap is left for you to extend
+  to manually. Shared endpoints join into mitred corners. Dragging a wall's
+  body slides it orthogonally — attached walls stretch and shrink so rooms
+  stay rectangular (Ctrl for free movement).
 - **Doors & windows** — placed on a wall with WWHH sizes
   (`3280` = 32" × 80"), they cut the opening and ride the wall when
   dragged. Door types: LH, RH, bifold, pocket, slider, French, doorway,

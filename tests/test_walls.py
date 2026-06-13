@@ -1,8 +1,49 @@
 """Wall geometry plus door/window opening sizing and garage-door defaults."""
 import pytest
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import QPointF, Qt
 
 pytestmark = pytest.mark.walls
+
+NOMOD = Qt.KeyboardModifier.NoModifier
+
+
+def _draw_end(fp, win, p1, drag_to):
+    """End point of a wall drawn from p1 toward drag_to (no modifiers)."""
+    temp = fp.WallItem(QPointF(*p1), QPointF(*p1), "interior")
+    return win.view._wall_end_point(temp, QPointF(*drag_to), NOMOD)
+
+
+def test_wall_draw_aligns_end_to_orthogonal_wall(fp, win):
+    sc = win.scene
+    sc.addItem(fp.WallItem(QPointF(300, 0), QPointF(300, 200), "interior"))
+    fp.rebuild_all_walls(sc)
+    end = _draw_end(fp, win, (0, 102), (291, 108))
+    assert end.x() == pytest.approx(300)   # x lines up with the vertical wall
+    assert end.y() == pytest.approx(102)   # stays horizontal
+
+
+def test_wall_draw_stays_orthogonal_not_diagonal(fp, win):
+    sc = win.scene
+    sc.addItem(fp.WallItem(QPointF(300, 0), QPointF(300, 200), "interior"))
+    fp.rebuild_all_walls(sc)
+    # drag toward the wall's off-axis bottom endpoint (300, 200)
+    end = _draw_end(fp, win, (0, 100), (305, 195))
+    assert end.y() == pytest.approx(100)   # not pulled diagonally to 200
+    assert end.x() == pytest.approx(300)
+
+
+def test_wall_draw_leaves_gap_when_not_meeting(fp, win):
+    sc = win.scene
+    sc.addItem(fp.WallItem(QPointF(300, 0), QPointF(300, 200), "interior"))
+    fp.rebuild_all_walls(sc)
+    # y is past the vertical wall's extent -> aligned x, but a gap remains
+    end = _draw_end(fp, win, (0, 300), (291, 305))
+    assert (end.x(), end.y()) == pytest.approx((300, 300))
+
+
+def test_wall_draw_orthogonal_far_from_walls(fp, win):
+    end = _draw_end(fp, win, (0, 500), (250, 540))
+    assert end.y() == pytest.approx(500)   # horizontal, no off-axis pull
 
 
 def test_wall_length_and_point_at(fp, scene):

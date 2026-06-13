@@ -2931,30 +2931,43 @@ class PlanView(QGraphicsView):
             q = nearest_wall_body_point(self.scene(), sp, tol)
         return q if q is not None else wall_snap(sp)
 
+    def _align_to_wall(self, exclude, pt, horizontal) -> QPointF:
+        """Snap the drawn endpoint's free coordinate (x when horizontal, y
+        when vertical) to the nearest wall endpoint on that axis -- so the
+        wall lines up with the orthogonal wall it points at while staying
+        H/V.  Any gap is left as-is; the user extends to meet manually."""
+        sc = self.scene()
+        if sc is None:
+            return pt
+        tol = max(JOIN_TOL, 16.0 / max(self.transform().m11(), 1e-6))
+        base = pt.x() if horizontal else pt.y()
+        best, bestd = None, tol
+        for w in sc.items():
+            if not isinstance(w, WallItem) or w is exclude:
+                continue
+            for c in ((w.p1.x(), w.p2.x()) if horizontal
+                      else (w.p1.y(), w.p2.y())):
+                d = abs(base - c)
+                if d < bestd:
+                    bestd, best = d, c
+        if best is None:
+            return pt
+        return QPointF(best, pt.y()) if horizontal else QPointF(pt.x(), best)
+
     def _wall_end_point(self, wall, sp, mods) -> QPointF:
-        q = nearest_wall_endpoint(self.scene(), sp, JOIN_TOL * 1.5, exclude=wall)
-        if q is not None:
-            return q
         dx, dy = sp.x() - wall.p1.x(), sp.y() - wall.p1.y()
         if math.hypot(dx, dy) < 1e-6:
             return QPointF(wall.p1)
-        if not (mods & Qt.KeyboardModifier.ShiftModifier):
-            ang = math.atan2(dy, dx)          # orthogonal from the anchor
-            a = round(ang / (math.pi / 2)) * (math.pi / 2)
-            proj = dx * math.cos(a) + dy * math.sin(a)
-            proj = wall_snap_len(proj)        # snapped length on the axis
-            pt = QPointF(wall.p1.x() + math.cos(a) * proj,
-                         wall.p1.y() + math.sin(a) * proj)
-        else:
-            pt = wall_snap(QPointF(sp))
-        hit = nearest_wall_body(self.scene(), pt, JOIN_TOL, exclude=wall)
-        if hit is not None:                   # snap to the wall we stop at,
-            target, q = hit                   # staying on our own axis
-            ip = axis_wall_intersection(target, wall.p1, pt)
-            if ip is not None and QLineF(ip, pt).length() <= JOIN_TOL * 2:
-                return ip
-            return q
-        return pt
+        if mods & Qt.KeyboardModifier.ShiftModifier:
+            return wall_snap(QPointF(sp))     # free angle
+        ang = math.atan2(dy, dx)              # orthogonal from the anchor
+        a = round(ang / (math.pi / 2)) * (math.pi / 2)
+        horizontal = abs(math.cos(a)) > 0.5
+        proj = wall_snap_len(dx * math.cos(a) + dy * math.sin(a))
+        pt = QPointF(wall.p1.x() + math.cos(a) * proj,
+                     wall.p1.y() + math.sin(a) * proj)
+        # align the endpoint with the nearest orthogonal wall, staying H/V
+        return self._align_to_wall(wall, pt, horizontal)
 
     # -- mouse / tools ----------------------------------------------------------
     def mousePressEvent(self, e):
@@ -3121,8 +3134,9 @@ class PlanView(QGraphicsView):
             if w.length() < MIN_WALL_LEN:
                 self.scene().removeItem(w)
             else:
-                w.join_endpoints()
-                grow_walls_to_meet(self.scene(), w)
+                # the drawn endpoint is already aligned to the nearest
+                # orthogonal wall; do NOT fuse or grow walls to meet -- any
+                # gap is left for the user to extend to manually
                 rebuild_all_walls(self.scene())
             e.accept()
             return
