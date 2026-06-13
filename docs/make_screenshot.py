@@ -97,9 +97,9 @@ room("Garage", (612, 192), "Garage")
 room("Sunroom", (336, 456), "Sunroom")
 
 
-# --- room operation: Fragment two overlapping rooms into three pieces,
-# each in its own group with a full wall loop -- shown lightly exploded
-# with their group outlines so the three grouped pieces read as separate
+# --- room operations: Fragment two overlapping rooms into three pieces,
+# each in its own group with a full wall loop -- shown lightly exploded with
+# their group outlines, then Align to grid snaps the pieces onto the grid
 def _demo_rect(x, y, w, h, name):
     cs = [QPointF(x, y), QPointF(x + w, y), QPointF(x + w, y + h),
           QPointF(x, y + h)]
@@ -121,9 +121,12 @@ for _g in _frags:                   # nudge each piece outward, then select it
     _c = _g.childrenBoundingRect().center()
     _dx, _dy = _c.x() - _fcx, _c.y() - _fcy
     _d = math.hypot(_dx, _dy) or 1.0
-    _g.setPos(_dx / _d * 16, _dy / _d * 16)
+    _g.setPos(_dx / _d * 17, _dy / _d * 17)   # off-grid nudge
     _g.bake()
     _g.setSelected(True)
+# Rooms > Align to grid: snap the exploded (off-grid) pieces onto the grid
+win._sel_order = _frags[:]
+win.align_rooms_to_grid()
 
 # --- furnishings -------------------------------------------------------------
 F = [("bed_queen", (96, 78), 0), ("nightstand", (38, 26), 0),
