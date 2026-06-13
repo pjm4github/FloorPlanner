@@ -2807,6 +2807,19 @@ def add_wall_unique(scene, a: QPointF, b: QPointF, wall_type="interior"):
     return w
 
 
+def group_room(group):
+    """The room whose perimeter the group's walls fully enclose, or None --
+    so a grouped (extracted) room can be picked up from its group."""
+    sc = group.scene()
+    gw = {c for c in group.childItems() if isinstance(c, WallItem)}
+    if sc is None or not gw:
+        return None
+    for it in sc.items():
+        if isinstance(it, RoomItem) and walls_cover_room(gw, it):
+            return it
+    return None
+
+
 class PlanView(QGraphicsView):
     def __init__(self, scene, win):
         super().__init__(scene)
@@ -3433,9 +3446,9 @@ class MainWindow(QMainWindow):
         self.a_group.setEnabled(n >= 2)
         self.a_ungroup.setEnabled(
             any(isinstance(it, GroupItem) for it in sel))
-        rooms = sum(1 for it in sel if isinstance(it, RoomItem))
+        # room ops act on two rooms, selected directly or via their groups
         for a in getattr(self, "_room_op_actions", []):
-            a.setEnabled(rooms == 2)
+            a.setEnabled(len(self._selected_rooms()) == 2)
 
     def nudge_selected(self, dx: int, dy: int, fine: bool = False) -> bool:
         """Arrow-key nudge of selected groups / ungrouped furnishings by one
@@ -3453,18 +3466,36 @@ class MainWindow(QMainWindow):
                 moved += 1
         return moved > 0
 
+    def _selected_rooms(self):
+        """Ordered (room, source) pairs from the selection: a directly
+        selected room, or the room a selected group encloses."""
+        pairs, seen = [], set()
+        for it in getattr(self, "_sel_order", []):
+            room = it if isinstance(it, RoomItem) else (
+                group_room(it) if isinstance(it, GroupItem) else None)
+            if room is not None and room not in seen:
+                seen.add(room)
+                pairs.append((room, it))
+        return pairs
+
     def room_boolean(self, op: str):
         """Boolean op on the two selected rooms' perimeter polygons.
 
         combine = union, intersect = overlap only, subtract = first room
         minus second (selection order), fragment = the three pieces
-        (first-only, second-only, overlap).  The inputs and their walls are
+        (first-only, second-only, overlap).  The two rooms may be selected
+        directly or via their groups.  The inputs and their walls are
         replaced by freshly walled result rooms."""
-        rooms = [it for it in self._sel_order if isinstance(it, RoomItem)]
-        if len(rooms) != 2:
-            self.status("Select exactly two rooms (Ctrl+click their names).")
+        pairs = self._selected_rooms()
+        if len(pairs) != 2:
+            self.status("Select two rooms (or two grouped rooms) first.")
             return
-        r1, r2 = rooms[0], rooms[1]
+        (r1, src1), (r2, src2) = pairs
+        # free any grouped rooms so their walls become normal scene walls
+        for src in (src1, src2):
+            if isinstance(src, GroupItem) and src.scene() is not None:
+                src.bake()
+                src.dissolve()
         if not r1.corners or not r2.corners:
             self.status("Both rooms need a traced wall perimeter.")
             return

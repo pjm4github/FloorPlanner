@@ -69,6 +69,37 @@ def test_room_op_needs_two_rooms(fp, win):
     assert len(_rooms(fp, win)) == 2            # unchanged, no crash
 
 
+def _grouped_room(fp, win, x, y, w, h, name):
+    sc = win.scene
+    corners = [QPointF(x, y), QPointF(x + w, y),
+               QPointF(x + w, y + h), QPointF(x, y + h)]
+    g = fp.GroupItem()
+    sc.addItem(g)
+    for i in range(4):
+        wseg = fp.WallItem(corners[i], corners[(i + 1) % 4], "interior")
+        sc.addItem(wseg)
+        g.adopt(wseg)
+    room = fp.RoomItem(name, QPointF(x + w / 2, y + h / 2),
+                       fp.room_path_from_corners(corners),
+                       fp.poly_area_sqft(corners), corners=corners)
+    sc.addItem(room)
+    return g, room
+
+
+def test_room_op_resolves_grouped_rooms(fp, win):
+    # the rooms are selected via their groups, not their labels
+    g1, _ = _grouped_room(fp, win, 0, 0, 120, 96, "Room 1")
+    g2, _ = _grouped_room(fp, win, 72, 48, 120, 96, "Room 2")
+    win._sel_order = [g1, g2]
+    assert len(win._selected_rooms()) == 2      # two groups -> two rooms
+    win.room_boolean("combine")
+    rooms = _rooms(fp, win)
+    groups = [it for it in win.scene.items() if isinstance(it, fp.GroupItem)]
+    assert len(rooms) == 1
+    assert len(groups) == 0                      # source groups dissolved
+    assert rooms[0].area_sqft == pytest.approx(144, abs=2)
+
+
 def test_detect_rectangular_room(fp, scene, make_room):
     room = make_room(scene, 0, 0, 144, 120, "Den")    # 12' x 10' = 120 sqft
     assert room.area_sqft == pytest.approx(120, abs=2)
