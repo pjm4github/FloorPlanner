@@ -151,12 +151,13 @@ from pathlib import Path
 
 from PyQt6 import sip
 from PyQt6.QtCore import (QLineF, QMimeData, QPoint, QPointF, QRect, QRectF,
-                          QSettings, QSize, Qt, QTimer)
+                          QSettings, QSize, QStandardPaths, Qt, QTimer, QUrl)
 from PyQt6.QtGui import (
     QAction,
     QActionGroup,
     QBrush,
     QColor,
+    QDesktopServices,
     QDrag,
     QFont,
     QFontDatabase,
@@ -289,6 +290,49 @@ DEFAULT_ROOM_PROPS = {
 
 FILE_FORMAT = "floorplanner-json"
 FILE_VERSION = 1
+
+APP_NAME = "FloorPlanner"
+APP_VERSION = "1.0"
+APP_URL = "https://github.com/pjm4github/FloorPlanner"
+
+
+def config_dir() -> Path:
+    """Per-user config directory in the OS-standard location, created on
+    demand (e.g. %APPDATA%/FloorPlanner on Windows, ~/.config/FloorPlanner
+    on Linux, ~/Library/Application Support/FloorPlanner on macOS)."""
+    base = QStandardPaths.writableLocation(
+        QStandardPaths.StandardLocation.AppConfigLocation)
+    p = Path(base) if base else (Path.home() / ".floorplanner")
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    return p
+
+
+def settings_file() -> Path:
+    """The app-wide settings file (INI) holding cross-session preferences
+    such as a remembered AI API key."""
+    return config_dir() / "floorplanner.ini"
+
+
+def designs_dir() -> Path:
+    """The OS-standard folder where plans are opened/saved by default
+    (Documents/FloorPlanner), created on demand."""
+    base = QStandardPaths.writableLocation(
+        QStandardPaths.StandardLocation.DocumentsLocation)
+    p = (Path(base) if base else Path.home()) / "FloorPlanner"
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    return p
+
+
+def app_settings() -> QSettings:
+    """QSettings backed by settings_file() so preferences live in a real,
+    standard-location INI file (not the Windows registry)."""
+    return QSettings(str(settings_file()), QSettings.Format.IniFormat)
 
 # Bundled fonts: Qt no longer ships fonts, so the DejaVu family in
 # assets/fonts is registered at startup and used as the app default.
@@ -532,18 +576,16 @@ def apply_furnishing_prices(prices: dict) -> int:
 
 
 def load_saved_api_key() -> str:
-    """The Anthropic API key remembered on this machine (QSettings), if any."""
+    """The Anthropic API key remembered in the settings file, if any."""
     try:
-        return str(QSettings("FloorPlanner", "FloorPlanner")
-                   .value("anthropic_api_key", "") or "")
+        return str(app_settings().value("anthropic_api_key", "") or "")
     except Exception:                       # noqa: BLE001 - best effort
         return ""
 
 
 def save_api_key(key: str) -> None:
     try:
-        QSettings("FloorPlanner", "FloorPlanner").setValue(
-            "anthropic_api_key", key)
+        app_settings().setValue("anthropic_api_key", key)
     except Exception:                       # noqa: BLE001 - best effort
         pass
 
@@ -2311,6 +2353,60 @@ class RoomInventoryDialog(InventoryDialog):
                               "into Excel.")
 
 
+class AboutDialog(QDialog):
+    """Help ▸ About: app identity plus where FloorPlanner keeps designs and
+    its settings file, using the operating system's standard locations."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"About {APP_NAME}")
+        v = QVBoxLayout(self)
+        head = QLabel(
+            f'<h2 style="margin-bottom:2px;">{APP_NAME}</h2>'
+            f'<p style="color:#555;margin-top:0;">Version {APP_VERSION} '
+            "— a 2D architectural floor-plan editor built with PyQt6.<br>"
+            f'<a href="{APP_URL}">{APP_URL}</a></p>')
+        head.setTextFormat(Qt.TextFormat.RichText)
+        head.setOpenExternalLinks(True)
+        v.addWidget(head)
+
+        info = QLabel(
+            "<b>Where your files are kept</b>"
+            "<ul style='margin-left:-20px;'>"
+            "<li><b>Designs</b> (your plans) open and save by default in:"
+            f"<br><code>{designs_dir()}</code></li>"
+            "<li>The <b>settings file</b> (app preferences, including a "
+            "remembered AI key) is:"
+            f"<br><code>{settings_file()}</code></li>"
+            "<li><b>Per-plan settings</b> — wall snap, rotation snap, canvas "
+            "size and cost per square foot — are saved inside each plan's "
+            "<code>.json</code> file.</li>"
+            "</ul>"
+            "These all use your operating system's standard locations. The "
+            "AI key can also be supplied via the "
+            "<code>ANTHROPIC_API_KEY</code> environment variable.")
+        info.setTextFormat(Qt.TextFormat.RichText)
+        info.setWordWrap(True)
+        info.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextBrowserInteraction)
+        v.addWidget(info)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        self.btn_designs = buttons.addButton(
+            "Open designs folder", QDialogButtonBox.ButtonRole.ActionRole)
+        self.btn_config = buttons.addButton(
+            "Open settings folder", QDialogButtonBox.ButtonRole.ActionRole)
+        self.btn_designs.clicked.connect(
+            lambda: QDesktopServices.openUrl(
+                QUrl.fromLocalFile(str(designs_dir()))))
+        self.btn_config.clicked.connect(
+            lambda: QDesktopServices.openUrl(
+                QUrl.fromLocalFile(str(config_dir()))))
+        buttons.rejected.connect(self.reject)
+        v.addWidget(buttons)
+        self.setMinimumWidth(480)
+
+
 class RoomPropertiesDialog(QDialog):
     """Property sheet for a room.  Measured values (area, dimensions,
     perimeter, glazing, counts) are computed from the plan and shown
@@ -3962,6 +4058,11 @@ class MainWindow(QMainWindow):
         a_prices.triggered.connect(self.update_furnishing_prices)
         m_ai.addAction(a_prices)
 
+        m_help = self.menuBar().addMenu("&Help")
+        a_about = QAction(f"&About {APP_NAME}…", self)
+        a_about.triggered.connect(self.show_about)
+        m_help.addAction(a_about)
+
         self.scene.selectionChanged.connect(self._update_edit_actions)
         self._update_edit_actions()
 
@@ -4022,6 +4123,9 @@ class MainWindow(QMainWindow):
                     it.setToolTip(tip)
         self.status(f"Updated purchase prices for {n} furnishing(s) "
                     "from the AI.")
+
+    def show_about(self):
+        AboutDialog(self).exec()
 
     # -- inventories ----------------------------------------------------------
     def _show_inventory(self, title, headers, rows, note=None):
@@ -4905,8 +5009,10 @@ class MainWindow(QMainWindow):
         self.status(f"Exported {len(rooms)} room(s) to {path}")
 
     def open_plan(self):
+        start = self.current_path or str(designs_dir())
         path, _ = QFileDialog.getOpenFileName(
-            self, "Open plan", "", "Floor plan JSON (*.json);;All files (*)")
+            self, "Open plan", start,
+            "Floor plan JSON (*.json);;All files (*)")
         if not path:
             return
         try:
@@ -4927,8 +5033,9 @@ class MainWindow(QMainWindow):
         self._write_plan(self.current_path)
 
     def save_plan_as(self):
+        start = self.current_path or str(designs_dir() / "floorplan.json")
         path, _ = QFileDialog.getSaveFileName(
-            self, "Save plan", self.current_path or "floorplan.json",
+            self, "Save plan", start,
             "Floor plan JSON (*.json);;All files (*)")
         if not path:
             return
@@ -4953,6 +5060,10 @@ def main():
     if FONT_DIR.is_dir():
         os.environ.setdefault("QT_QPA_FONTDIR", str(FONT_DIR))
     app = QApplication(sys.argv)
+    # set only the application name (no org) so the standard AppConfig path
+    # is .../FloorPlanner rather than .../FloorPlanner/FloorPlanner
+    app.setApplicationName(APP_NAME)
+    app.setApplicationVersion(APP_VERSION)
     load_fonts()
     app.setFont(QFont(FONT_FAMILY, 10))
     win = MainWindow()

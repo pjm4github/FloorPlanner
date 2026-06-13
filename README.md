@@ -105,6 +105,13 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
 - **Plans are plain JSON** — human-editable, documented in the module
   docstring: walls, openings, rooms, furnishings and settings, all lengths
   in inches.
+- **Where files live** — **Help ▸ About** shows the app version and the
+  OS-standard storage locations: plans open/save by default in
+  `Documents/FloorPlanner`, and the app settings file (preferences,
+  including a remembered AI key) lives in the standard per-user config
+  directory (e.g. `%APPDATA%/FloorPlanner` on Windows, `~/.config/
+  FloorPlanner` on Linux). Per-plan settings stay inside each plan's
+  `.json`. Buttons in the dialog open either folder.
 
 ## Install & run
 
@@ -136,6 +143,7 @@ so no system fonts are needed.
 | Room boolean ops | Select two rooms, use the **Rooms** menu |
 | Plan inventories (TSV) | **Inventory** menu → House / Interior / Yard / Total |
 | Update furnishing prices (AI) | **AI** menu → *Update furnishing prices…* |
+| About / file locations | **Help** menu → *About FloorPlanner…* |
 | Cut / copy / paste | **Ctrl+X** / **Ctrl+C** / **Ctrl+V** |
 | Import / export rooms (CSV) | File menu |
 | Delete | Select + **Del** |
