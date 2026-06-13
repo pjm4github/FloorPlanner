@@ -1,3 +1,16 @@
 __pycache__/
 *.pyc
 .idea/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# scratch repro scripts (named _repro*.py / _diag*.py by convention)
+_repro*.py
+_diag*.py
+_*.png
+
+# personal floor-plan data — never commit
+floorplan*.json
+layout_*.csv
+CLAUDE.local.md

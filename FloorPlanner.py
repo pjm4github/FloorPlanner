@@ -745,7 +745,7 @@ def trace_room_perimeter(scene, anchor: QPointF):
                     if 0.5 < s < length - 0.5:
                         splits.add(s)
         ss = sorted(splits)
-        for a, b in zip(ss, ss[1:]):
+        for a, b in zip(ss, ss[1:], strict=False):
             if b - a < 0.5:
                 continue
             na, nb = node_id(w.point_at(a)), node_id(w.point_at(b))

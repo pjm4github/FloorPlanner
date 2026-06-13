@@ -1,0 +1,17 @@
+line-length = 100
+target-version = "py310"
+
+[lint]
+select = ["E", "F", "W", "B"]
+# E501: the single-file app has long Qt call chains; line length is advisory
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+# generator script defines big literal tables
+"_gen_assets.py" = ["E501"]
+# headless scripts must set QT_QPA_PLATFORM before importing PyQt6
+"docs/make_screenshot.py" = ["E402"]
+"examples/make_examples.py" = ["E402"]
+"_*.py" = ["E402"]
+# conftest sets the Qt platform + creates QApplication before importing
+"tests/conftest.py" = ["E402"]
