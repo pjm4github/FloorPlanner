@@ -195,8 +195,10 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QRubberBand,
+    QSizePolicy,
     QToolBox,
     QVBoxLayout,
+    QWidget,
 )
 
 try:
@@ -227,6 +229,7 @@ DEFAULT_SETTINGS = {
     "rotate_snap_deg": ROTATE_SNAP_DEFAULT,
     "canvas_w_in": CANVAS_W_DEFAULT,
     "canvas_h_in": CANVAS_H_DEFAULT,
+    "cost_per_sqft": 150.0,           # building cost estimate, $/sq ft
 }
 SETTINGS = dict(DEFAULT_SETTINGS)
 JOIN_TOL = 9.0            # endpoints within 9" join together
@@ -268,6 +271,7 @@ HVAC_TYPES = ["Forced Air", "Radiant Floor", "Baseboard", "Mini-Split",
 # computed live from the plan and are not stored here.
 DEFAULT_ROOM_PROPS = {
     "room_type": "",
+    "include_sqft": True,             # count in the building's total area
     "ceiling_height_in": 96.0,
     "ceiling_type": "Flat",
     "floor_finish": "Hardwood",
@@ -1949,6 +1953,9 @@ class RoomItem(QGraphicsItem):
                 dlg.apply()
                 self.prepareGeometryChange()
                 self.update()
+                v = self._view()
+                if v is not None:
+                    v.win._update_totals()    # include / name may have changed
         elif chosen is a_inv:
             RoomInventoryDialog(self, self._view()).exec()
         elif chosen is a_ren:
@@ -2006,6 +2013,9 @@ class RoomPropertiesDialog(QDialog):
         form.addRow("Room type", self.cb_type)
 
         form.addRow("Area", QLabel(f"{room.area_sqft:.1f} sq ft"))
+        self.ck_include = QCheckBox("Include in total square footage")
+        self.ck_include.setChecked(bool(p.get("include_sqft", True)))
+        form.addRow("", self.ck_include)
         form.addRow("Interior width", QLabel(fmt_ftin(r.width())))
         form.addRow("Interior length", QLabel(fmt_ftin(r.height())))
         form.addRow("Perimeter", QLabel(fmt_ftin(room.perimeter_in())))
@@ -2068,6 +2078,7 @@ class RoomPropertiesDialog(QDialog):
             self.room.name = name
         self.room.properties.update({
             "room_type": self.cb_type.currentText().strip(),
+            "include_sqft": self.ck_include.isChecked(),
             "ceiling_height_in": self.sp_ceiling.value(),
             "ceiling_type": self.cb_ceiling.currentText().strip(),
             "floor_finish": self.cb_floor.currentText().strip(),
@@ -2122,13 +2133,21 @@ class SettingsDialog(QDialog):
         self.sp_ch.setValue(SETTINGS["canvas_h_in"] / FOOT)
         form.addRow("Canvas height", self.sp_ch)
 
+        self.sp_cost = QDoubleSpinBox()
+        self.sp_cost.setRange(0.0, 100000.0)
+        self.sp_cost.setDecimals(0)
+        self.sp_cost.setPrefix("$ ")
+        self.sp_cost.setSuffix(" / sq ft")
+        self.sp_cost.setValue(float(SETTINGS.get("cost_per_sqft", 0.0)))
+        form.addRow("Building cost", self.sp_cost)
+
         note = QLabel("Defaults: 6\" wall snap, 15° rotation snap, "
-                      "100' × 70' canvas.\n"
+                      "100' × 70' canvas, $150 / sq ft.\n"
                       "Settings are saved with the plan.")
         note.setStyleSheet("color: #666;")
         form.addRow(note)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save
                                    | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -2139,6 +2158,7 @@ class SettingsDialog(QDialog):
         SETTINGS["rotate_snap_deg"] = float(self.sp_rot.value())
         SETTINGS["canvas_w_in"] = float(self.sp_cw.value()) * FOOT
         SETTINGS["canvas_h_in"] = float(self.sp_ch.value()) * FOOT
+        SETTINGS["cost_per_sqft"] = float(self.sp_cost.value())
 
 
 class FurnishingItem(QGraphicsItem):
@@ -3345,6 +3365,10 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self.coord_label)
         self.status(self.HINTS[TOOL_SELECT])
 
+        # keep the toolbar totals current as rooms are added/resized/removed
+        self.scene.changed.connect(self._update_totals)
+        self._update_totals()
+
         self.resize(1280, 860)
         self.view.scale(1.1, 1.1)
         self.view.centerOn(QPointF(24 * FOOT, 16 * FOOT))
@@ -3391,6 +3415,20 @@ class MainWindow(QMainWindow):
         a_fit.setToolTip("Zoom to fit the plan  [F]")
         a_fit.triggered.connect(self.zoom_fit)
         tb.addAction(a_fit)
+
+        spacer = QWidget()                       # push the totals to the right
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding,
+                             QSizePolicy.Policy.Preferred)
+        tb.addWidget(spacer)
+        self.totals_label = QLabel("Totals:  Cost-$0K   Sq. Feet-0")
+        self.totals_label.setStyleSheet("padding: 0 12px; font-weight: 600;")
+        self.totals_label.setToolTip(
+            "Building total: the floor area of every room with “Include "
+            "in total square footage” ticked (right-click a room name "
+            "→ Properties…), priced at the cost per square foot set "
+            "in File ▸ Settings….  Cost is shown in thousands of "
+            "dollars.")
+        tb.addWidget(self.totals_label)
 
         a_esc = QAction("select-esc", self)
         a_esc.setShortcut(QKeySequence(Qt.Key.Key_Escape))
@@ -3490,16 +3528,30 @@ class MainWindow(QMainWindow):
         m_file.addAction(a_quit)
 
     # -- actions ----------------------------------------------------------------
+    def _update_totals(self, *args):
+        """Refresh the toolbar Totals label: floor area of the rooms flagged
+        for inclusion, and that area priced at the cost per square foot."""
+        if not hasattr(self, "totals_label"):
+            return
+        sqft = sum(it.area_sqft for it in self.scene.items()
+                   if isinstance(it, RoomItem)
+                   and it.properties.get("include_sqft", True))
+        cost_k = sqft * float(SETTINGS.get("cost_per_sqft", 0.0)) / 1000.0
+        self.totals_label.setText(
+            f"Totals:  Cost-${cost_k:,.0f}K   Sq. Feet-{sqft:,.0f}")
+
     def edit_settings(self):
         dlg = SettingsDialog(self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         dlg.apply()
         self._apply_canvas()
+        self._update_totals()            # cost per sq ft may have changed
         c = canvas_rect()
         self.status(f'Wall snap {SETTINGS["wall_snap_in"]:g}" · rotation '
                     f'snap {SETTINGS["rotate_snap_deg"]:g}° · canvas '
-                    f"{fmt_ftin(c.width())} × {fmt_ftin(c.height())}.")
+                    f"{fmt_ftin(c.width())} × {fmt_ftin(c.height())} · "
+                    f'${SETTINGS["cost_per_sqft"]:g}/sq ft.')
 
     def _apply_canvas(self):
         """Resize the scene around the configured canvas and refresh."""

@@ -77,9 +77,15 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   whose walls have been moved away, clearing gray areas left behind.
 - **Nudging** — arrow keys move the selected group or furnishing by the
   wall-snap step; hold Ctrl for a fine 1" step.
+- **Building totals** — the far right of the toolbar shows a live
+  **Totals: Cost / Sq. Feet** label: the floor area of every room with
+  *Include in total square footage* ticked (in its right-click Properties),
+  priced at the cost per square foot set in Settings. Cost is shown in
+  thousands; it updates as rooms are added, removed, resized, or toggled.
 - **Settings** — File ▸ Settings… controls the wall snap (default 6" on
-  centre), the rotation snap (default 15°) and the canvas size (default
-  100' × 70'). All are saved with the plan.
+  centre), the rotation snap (default 15°), the canvas size (default
+  100' × 70') and the building **cost per square foot** (default $150).
+  Save with the **Save** button; all settings are stored with the plan.
 - **Plans are plain JSON** — human-editable, documented in the module
   docstring: walls, openings, rooms, furnishings and settings, all lengths
   in inches.

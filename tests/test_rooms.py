@@ -151,6 +151,51 @@ def _corner_room(fp, sc, x, y, w, h, name):
     return r
 
 
+def test_building_totals_sum_included_rooms(fp, win):
+    sc = win.scene
+    fp.SETTINGS["cost_per_sqft"] = 200.0
+    _corner_room(fp, sc, 0, 0, 144, 96, "Den")        # 96 sq ft
+    _corner_room(fp, sc, 300, 0, 240, 120, "Great")   # 200 sq ft
+    win._update_totals()
+    assert "Sq. Feet-296" in win.totals_label.text()
+    assert "$59K" in win.totals_label.text()          # 296 * 200 / 1000
+
+
+def test_building_totals_excludes_unchecked_rooms(fp, win):
+    sc = win.scene
+    fp.SETTINGS["cost_per_sqft"] = 200.0
+    _corner_room(fp, sc, 0, 0, 144, 96, "Den")
+    great = _corner_room(fp, sc, 300, 0, 240, 120, "Great")
+    great.properties["include_sqft"] = False
+    win._update_totals()
+    assert "Sq. Feet-96" in win.totals_label.text()
+
+
+def test_cost_per_sqft_round_trips(fp, win):
+    fp.SETTINGS["cost_per_sqft"] = 275.0
+    data = json.loads(json.dumps(win.serialize()))
+    assert data["settings"]["cost_per_sqft"] == pytest.approx(275.0)
+    w2 = fp.MainWindow()
+    try:
+        w2.load_data(data)
+        assert fp.SETTINGS["cost_per_sqft"] == pytest.approx(275.0)
+    finally:
+        w2.close()
+
+
+def test_room_include_sqft_round_trips(fp, win):
+    r = _corner_room(fp, win.scene, 0, 0, 144, 96, "Den")
+    r.properties["include_sqft"] = False
+    data = json.loads(json.dumps(win.serialize()))
+    w2 = fp.MainWindow()
+    try:
+        w2.load_data(data)
+        rr = next(it for it in w2.scene.items() if isinstance(it, fp.RoomItem))
+        assert rr.properties.get("include_sqft") is False
+    finally:
+        w2.close()
+
+
 def test_distribute_rooms_horizontally(fp, win):
     sc = win.scene
     r1 = _corner_room(fp, sc, 0, 0, 100, 80, "A")     # 0..100
