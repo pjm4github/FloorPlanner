@@ -61,7 +61,8 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   the overlap, *Subtract* removes the second room from the first, and
   *Fragment* splits them into three walled rooms (each room minus the
   overlap, plus the overlap itself). Each result is freshly walled and
-  re-detected.
+  re-detected; the *Fragment* pieces are each put in their own group with a
+  full set of walls, so you can move any piece and it stays enclosed.
 - **Nudging** — arrow keys move the selected group or furnishing by the
   wall-snap step; hold Ctrl for a fine 1" step.
 - **Settings** — File ▸ Settings… controls the wall snap (default 6" on

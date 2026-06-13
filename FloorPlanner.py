@@ -2793,20 +2793,6 @@ def interior_point(poly) -> QPointF:
     return c
 
 
-def add_wall_unique(scene, a: QPointF, b: QPointF, wall_type="interior"):
-    """Add a wall a->b unless a coincident one already exists."""
-    if QLineF(a, b).length() < MIN_WALL_LEN:
-        return None
-    existing = next((w for w in scene.items()
-                     if isinstance(w, WallItem)
-                     and _wall_endpoints_match(w, a, b)), None)
-    if existing is not None:
-        return existing
-    w = WallItem(QPointF(a), QPointF(b), wall_type)
-    scene.addItem(w)
-    return w
-
-
 def group_room(group):
     """The room whose perimeter the group's walls fully enclose, or None --
     so a grouped (extracted) room can be picked up from its group."""
@@ -3585,22 +3571,35 @@ class MainWindow(QMainWindow):
             if w.scene() is not None:
                 sc.removeItem(w)
 
-        # gather result sub-polygons, build their (deduped) walls
+        # gather result sub-polygons
         regions = []
         for path, base, props in results:
             for poly in path.simplified().toSubpathPolygons():
                 corners = simplify_corners(poly)
                 if len(corners) >= 3 and poly_area_sqft(corners) >= 1.0:
                     regions.append((corners, base, props))
+        # build a COMPLETE wall loop for every region -- shared edges get a
+        # wall per region (no dedup), tracked per region, so each fragment
+        # owns all its walls
+        region_walls = []
         for corners, _, _ in regions:
-            for j in range(len(corners)):
-                add_wall_unique(sc, corners[j], corners[(j + 1) % len(corners)])
+            ws, n = [], len(corners)
+            for j in range(n):
+                a, b = corners[j], corners[(j + 1) % n]
+                if QLineF(a, b).length() >= MIN_WALL_LEN:
+                    w = WallItem(QPointF(a), QPointF(b), "interior")
+                    sc.addItem(w)
+                    ws.append(w)
+            region_walls.append(ws)
         rebuild_all_walls(sc)
 
-        # detect + create the result rooms
+        # detect + create the result rooms; for fragment, group each
+        # fragment with its own walls so it moves as a self-contained,
+        # fully-enclosed unit (coincident neighbour walls stay put)
         sc.clearSelection()
         created = 0
-        for corners, base, props in regions:
+        for (corners, base, props), ws in zip(regions, region_walls,
+                                              strict=True):
             res = detect_room(sc, interior_point(QPolygonF(corners)))
             if res is None:
                 continue
@@ -3608,8 +3607,14 @@ class MainWindow(QMainWindow):
                             interior_point(QPolygonF(corners)),
                             res[0], res[1], corners=res[2], properties=props)
             sc.addItem(room)
-            room.setSelected(True)
             created += 1
+            if op == "fragment" and len(ws) >= 2:
+                grp = GroupItem()
+                sc.addItem(grp)
+                for w in ws:
+                    grp.adopt(w)
+            else:
+                room.setSelected(True)
         self.status(f"{op.title()}: {name1} + {name2} -> {created} room(s).")
 
     def group_selected(self):

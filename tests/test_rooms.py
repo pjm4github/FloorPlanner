@@ -62,6 +62,31 @@ def test_room_fragment_makes_three(fp, win):
     assert sorted(round(r.area_sqft) for r in rooms) == [16, 64, 64]
 
 
+def test_fragment_groups_each_piece_with_its_own_walls(fp, win):
+    _overlapping_rooms(fp, win)
+    win.room_boolean("fragment")
+    sc = win.scene
+    rooms = _rooms(fp, win)
+    groups = [it for it in sc.items() if isinstance(it, fp.GroupItem)]
+    assert len(groups) == 3                  # each fragment is its own group
+    for g in groups:                         # each group is a complete loop
+        gw = [c for c in g.childItems() if isinstance(c, fp.WallItem)]
+        assert fp.trace_wall_loop(gw) is not None
+
+    def enclosed(r):
+        return fp.detect_room(
+            sc, QPointF(r.anchor.x(), r.anchor.y())) is not None
+
+    assert all(enclosed(r) for r in rooms)
+    # move the overlap fragment clear: every fragment stays enclosed
+    overlap = next(r for r in rooms if r.name == "Overlap")
+    g = next(gp for gp in groups if fp.walls_cover_room(
+        {c for c in gp.childItems() if isinstance(c, fp.WallItem)}, overlap))
+    g.setPos(300, 300)
+    g.bake()
+    assert all(enclosed(r) for r in _rooms(fp, win))
+
+
 def test_room_op_needs_two_rooms(fp, win):
     r1, _ = _overlapping_rooms(fp, win)
     win._sel_order = [r1]                       # only one selected
