@@ -119,6 +119,28 @@ def test_furnishings_ride_along(fp, win, make_room, first_furnishing):
     assert (f.scenePos().x(), f.scenePos().y()) == pytest.approx((100, 90))
 
 
+def test_group_box_not_inflated_by_wide_window(fp, win):
+    # a wide window on a room wall must not balloon the group's selection
+    # box out past the room (regression: opening bounding rects were huge)
+    sc = win.scene
+    for p1, p2 in [((0, 0), (144, 0)), ((144, 0), (144, 96)),
+                   ((144, 96), (0, 96)), ((0, 96), (0, 0))]:
+        sc.addItem(fp.WallItem(QPointF(*p1), QPointF(*p2), "interior"))
+    top = next(w for w in sc.items() if isinstance(w, fp.WallItem)
+               and w.p1.y() == 0 and w.p2.y() == 0)
+    op = fp.OpeningItem(top, "window", "9648", 72)   # 96" window on top wall
+    top.openings.append(op)
+    top.rebuild()
+    fp.rebuild_all_walls(sc)
+    for w in [it for it in sc.items() if isinstance(it, fp.WallItem)]:
+        w.setSelected(True)
+    win.group_selected()
+    g = next(i for i in sc.items() if isinstance(i, fp.GroupItem))
+    box = g.childrenBoundingRect()
+    # room is 96" tall; the box must hug it, not extend a window-width above
+    assert box.height() < 150            # was ~210 with the old margin
+
+
 @pytest.mark.gui
 def test_drag_group_by_wall_preserves_items(fp, win, make_room,
                                             first_furnishing, drag, counts):

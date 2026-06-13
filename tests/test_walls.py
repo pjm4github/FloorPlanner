@@ -50,6 +50,31 @@ def test_garage2_autosizes_to_double(fp, scene):
     assert op.width == pytest.approx(192)         # double garage door = 16'
 
 
+def test_window_bounding_rect_is_tight(fp, scene):
+    # a wide opening must not inflate its bounding rect perpendicular to the
+    # wall (that used to balloon any enclosing group's selection box)
+    w = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    scene.addItem(w)
+    op = fp.OpeningItem(w, "window", "9648", 60)     # 96" wide window
+    w.openings.append(op)
+    w.rebuild()
+    br = op.boundingRect()
+    assert br.height() < 60                # ~ wall thickness + pad, not ~228
+
+
+def test_door_swing_stays_within_bounding_rect(fp, scene):
+    w = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    scene.addItem(w)
+    op = fp.OpeningItem(w, "door", "3280", 60)       # 32" LH door
+    op.swing = -1
+    w.openings.append(op)
+    w.rebuild()
+    br = op.boundingRect()
+    # the quarter-circle swing reaches ~width on the swing side; the rect
+    # must still cover it
+    assert br.top() <= -op.width
+
+
 def test_garage_keeps_size_when_wall_too_short(fp, scene):
     w = fp.WallItem(QPointF(0, 0), QPointF(100, 0), "interior")  # 8'4"
     scene.addItem(w)

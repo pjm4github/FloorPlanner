@@ -1297,11 +1297,28 @@ class OpeningItem(QGraphicsItem):
 
     # -- QGraphicsItem ---------------------------------------------------------
     def boundingRect(self) -> QRectF:
+        # Tightly bound only what paint() actually draws (local coords: x
+        # along the wall, y across it).  A swing arc / overhead outline
+        # reaches out on its swing side; everything else stays in the
+        # opening footprint.  (A symmetric width+16 margin made the rect
+        # huge for wide openings, ballooning any enclosing group's box.)
         w, t = self.width, self.wall.t
-        m = w + 16.0
-        if self.kind == "door" and self.door_type in GARAGE_DEFAULTS:
-            m = max(m, min(self.height, 96.0) + 16.0)
-        return QRectF(-w / 2 - m, -t / 2 - m, w + 2 * m, t + 2 * m)
+        x0, x1, y0, y1 = -w / 2, w / 2, -t / 2, t / 2
+        if self.kind == "door":
+            dt = self.door_type
+            reach = {"LH": w, "RH": w, "FRENCH": w / 2,
+                     "BIFOLD": 0.4 * w}.get(dt, 0.0)
+            if dt in GARAGE_DEFAULTS:
+                reach = min(self.height, 96.0)
+            if self.swing < 0:
+                y0 -= reach
+            else:
+                y1 += reach
+            if dt == "POCKET":
+                x0 -= w               # the panel slides into the wall
+        pad = 18.0                    # line widths + the WWHH label
+        return QRectF(x0 - pad, y0 - pad,
+                      (x1 - x0) + 2 * pad, (y1 - y0) + 2 * pad)
 
     def shape(self) -> QPainterPath:
         w, t = self.width, self.wall.t
