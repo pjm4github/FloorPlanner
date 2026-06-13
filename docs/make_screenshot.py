@@ -1,3 +1,4 @@
+import math
 import os
 import sys
 
@@ -117,13 +118,20 @@ for kind, pos, rot in F:
     sc.addItem(it)
     items.setdefault(kind, []).append(it)
 
-# umbrella table grouped with the lounge chairs (selected group outline)
+# umbrella table grouped with the lounge chairs, then rotated to show the
+# group's rotation handle and oriented (tilted) selection box
 umb = FP.FurnishingItem("umbrella_table", QPointF(348, 460), 0)
 sc.addItem(umb)
 g = FP.GroupItem()
 sc.addItem(g)
 for it in [umb] + items["lounge_chair"]:
     g.adopt(it)
+gc = g.childrenBoundingRect().center()
+g._begin_rotation(QPointF(gc.x() + 100, gc.y()))
+_ang = math.radians(22)
+g._apply_rotation(QPointF(gc.x() + 100 * math.cos(_ang),
+                          gc.y() + 100 * math.sin(_ang)), False)
+g._finish_rotation()
 g.setSelected(True)
 
 # show the new Sunroom palette section
