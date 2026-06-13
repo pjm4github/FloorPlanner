@@ -5,6 +5,70 @@ from PyQt6.QtCore import QPointF
 pytestmark = pytest.mark.rooms
 
 
+def _overlapping_rooms(fp, win):
+    """Two corner-only rooms that overlap: R1 lower-left, R2 upper-right.
+    R1 and R2 are each 10'x8' (80 sqft); the overlap is 4'x4' (16 sqft)."""
+    sc = win.scene
+
+    def mk(x, y, w, h, name):
+        corners = [QPointF(x, y), QPointF(x + w, y),
+                   QPointF(x + w, y + h), QPointF(x, y + h)]
+        r = fp.RoomItem(name, QPointF(x + w / 2, y + h / 2),
+                        fp.room_path_from_corners(corners),
+                        fp.poly_area_sqft(corners), corners=corners)
+        sc.addItem(r)
+        return r
+
+    r1 = mk(0, 0, 120, 96, "Room 1")
+    r2 = mk(72, 48, 120, 96, "Room 2")
+    win._sel_order = [r1, r2]
+    return r1, r2
+
+
+def _rooms(fp, win):
+    return [it for it in win.scene.items() if isinstance(it, fp.RoomItem)]
+
+
+def test_room_combine_unions(fp, win):
+    _overlapping_rooms(fp, win)
+    win.room_boolean("combine")
+    rooms = _rooms(fp, win)
+    assert len(rooms) == 1
+    assert rooms[0].area_sqft == pytest.approx(144, abs=2)   # 80 + 80 - 16
+
+
+def test_room_intersect_keeps_overlap(fp, win):
+    _overlapping_rooms(fp, win)
+    win.room_boolean("intersect")
+    rooms = _rooms(fp, win)
+    assert len(rooms) == 1
+    assert rooms[0].area_sqft == pytest.approx(16, abs=2)
+
+
+def test_room_subtract_uses_first_selected(fp, win):
+    _overlapping_rooms(fp, win)
+    win.room_boolean("subtract")
+    rooms = _rooms(fp, win)
+    assert len(rooms) == 1
+    assert rooms[0].name == "Room 1"
+    assert rooms[0].area_sqft == pytest.approx(64, abs=2)    # 80 - 16
+
+
+def test_room_fragment_makes_three(fp, win):
+    _overlapping_rooms(fp, win)
+    win.room_boolean("fragment")
+    rooms = _rooms(fp, win)
+    assert len(rooms) == 3
+    assert sorted(round(r.area_sqft) for r in rooms) == [16, 64, 64]
+
+
+def test_room_op_needs_two_rooms(fp, win):
+    r1, _ = _overlapping_rooms(fp, win)
+    win._sel_order = [r1]                       # only one selected
+    win.room_boolean("combine")
+    assert len(_rooms(fp, win)) == 2            # unchanged, no crash
+
+
 def test_detect_rectangular_room(fp, scene, make_room):
     room = make_room(scene, 0, 0, 144, 120, "Den")    # 12' x 10' = 120 sqft
     assert room.area_sqft == pytest.approx(120, abs=2)

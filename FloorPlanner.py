@@ -2738,6 +2738,75 @@ def synthesize_room_edge(scene, a: QPointF, b: QPointF):
     return nw
 
 
+# ----------------------------------------------------------------------------
+# Room boolean operations (treat room perimeters as polygons)
+# ----------------------------------------------------------------------------
+def room_path_from_corners(corners) -> QPainterPath:
+    path = QPainterPath()
+    path.addPolygon(QPolygonF([QPointF(c) for c in corners]))
+    path.closeSubpath()
+    return path
+
+
+def path_area_sqft(path: QPainterPath) -> float:
+    poly = path.toFillPolygon()
+    pts = [poly[i] for i in range(poly.count())]
+    return poly_area_sqft(pts) if len(pts) >= 3 else 0.0
+
+
+def simplify_corners(poly) -> list:
+    """Clean corner list from a boolean-result polygon: drop the closing
+    duplicate, merge near-duplicates, and drop collinear points."""
+    pts = [QPointF(poly[i]) for i in range(poly.count())]
+    if len(pts) > 1 and QLineF(pts[0], pts[-1]).length() < 0.5:
+        pts.pop()
+    dedup = []
+    for p in pts:
+        if not dedup or QLineF(dedup[-1], p).length() > 0.5:
+            dedup.append(p)
+    n = len(dedup)
+    if n < 3:
+        return dedup
+    corners = []
+    for i in range(n):
+        a, b, c = dedup[(i - 1) % n], dedup[i], dedup[(i + 1) % n]
+        cross = ((b.x() - a.x()) * (c.y() - b.y())
+                 - (b.y() - a.y()) * (c.x() - b.x()))
+        if abs(cross) > 1.0:           # a real corner, not collinear filler
+            corners.append(b)
+    return corners if len(corners) >= 3 else dedup
+
+
+def interior_point(poly) -> QPointF:
+    """A point strictly inside a (possibly concave) polygon."""
+    rule = Qt.FillRule.OddEvenFill
+    c = poly.boundingRect().center()
+    if poly.containsPoint(c, rule):
+        return c
+    br = poly.boundingRect()
+    for iy in range(1, 12):
+        for ix in range(1, 12):
+            p = QPointF(br.left() + br.width() * ix / 12.0,
+                        br.top() + br.height() * iy / 12.0)
+            if poly.containsPoint(p, rule):
+                return p
+    return c
+
+
+def add_wall_unique(scene, a: QPointF, b: QPointF, wall_type="interior"):
+    """Add a wall a->b unless a coincident one already exists."""
+    if QLineF(a, b).length() < MIN_WALL_LEN:
+        return None
+    existing = next((w for w in scene.items()
+                     if isinstance(w, WallItem)
+                     and _wall_endpoints_match(w, a, b)), None)
+    if existing is not None:
+        return existing
+    w = WallItem(QPointF(a), QPointF(b), wall_type)
+    scene.addItem(w)
+    return w
+
+
 class PlanView(QGraphicsView):
     def __init__(self, scene, win):
         super().__init__(scene)
@@ -3273,6 +3342,18 @@ class MainWindow(QMainWindow):
         self.a_ungroup.setShortcut(QKeySequence("Ctrl+Shift+G"))
         self.a_ungroup.triggered.connect(self.ungroup_selected)
         m_edit.addAction(self.a_ungroup)
+
+        m_rooms = self.menuBar().addMenu("&Rooms")
+        self._room_op_actions = []
+        for label, op in [("&Combine (union)", "combine"),
+                          ("&Fragment into pieces", "fragment"),
+                          ("&Subtract (1st − 2nd)", "subtract"),
+                          ("&Intersect (overlap only)", "intersect")]:
+            a = QAction(label, self)
+            a.triggered.connect(lambda _checked, o=op: self.room_boolean(o))
+            m_rooms.addAction(a)
+            self._room_op_actions.append(a)
+
         self.scene.selectionChanged.connect(self._update_edit_actions)
         self._update_edit_actions()
 
@@ -3337,13 +3418,24 @@ class MainWindow(QMainWindow):
     # -- group / ungroup / cut / copy / paste -------------------------------------
     def _update_edit_actions(self):
         """Group is enabled once the selection set holds 2+ groupable
-        items; Ungroup once it holds a group."""
+        items; Ungroup once it holds a group; room ops once exactly two
+        rooms are selected.  Also tracks click order for subtract."""
         sel = self.scene.selectedItems()
+        selset = set(sel)
+        order = getattr(self, "_sel_order", [])
+        order = [it for it in order if it in selset]
+        for it in sel:
+            if it not in order:
+                order.append(it)
+        self._sel_order = order
         n = sum(1 for it in sel
                 if isinstance(it, (WallItem, FurnishingItem, GroupItem)))
         self.a_group.setEnabled(n >= 2)
         self.a_ungroup.setEnabled(
             any(isinstance(it, GroupItem) for it in sel))
+        rooms = sum(1 for it in sel if isinstance(it, RoomItem))
+        for a in getattr(self, "_room_op_actions", []):
+            a.setEnabled(rooms == 2)
 
     def nudge_selected(self, dx: int, dy: int, fine: bool = False) -> bool:
         """Arrow-key nudge of selected groups / ungrouped furnishings by one
@@ -3360,6 +3452,79 @@ class MainWindow(QMainWindow):
                 it.setPos(it.pos().x() + dx * step, it.pos().y() + dy * step)
                 moved += 1
         return moved > 0
+
+    def room_boolean(self, op: str):
+        """Boolean op on the two selected rooms' perimeter polygons.
+
+        combine = union, intersect = overlap only, subtract = first room
+        minus second (selection order), fragment = the three pieces
+        (first-only, second-only, overlap).  The inputs and their walls are
+        replaced by freshly walled result rooms."""
+        rooms = [it for it in self._sel_order if isinstance(it, RoomItem)]
+        if len(rooms) != 2:
+            self.status("Select exactly two rooms (Ctrl+click their names).")
+            return
+        r1, r2 = rooms[0], rooms[1]
+        if not r1.corners or not r2.corners:
+            self.status("Both rooms need a traced wall perimeter.")
+            return
+        sc = self.scene
+        p1, p2 = (room_path_from_corners(r1.corners),
+                  room_path_from_corners(r2.corners))
+        overlap = p1.intersected(p2)
+        name1, name2 = r1.name, r2.name
+        if op in ("intersect", "subtract", "fragment") \
+                and path_area_sqft(overlap) < 1.0:
+            self.status(f"{name1} and {name2} do not overlap.")
+            return
+
+        if op == "combine":
+            results = [(p1.united(p2), name1, dict(r1.properties))]
+        elif op == "subtract":
+            results = [(p1.subtracted(p2), name1, dict(r1.properties))]
+        elif op == "intersect":
+            results = [(overlap, "Overlap", {})]
+        elif op == "fragment":
+            results = [(p1.subtracted(p2), name1, dict(r1.properties)),
+                       (p2.subtracted(p1), name2, dict(r2.properties)),
+                       (overlap, "Overlap", {})]
+        else:
+            return
+
+        # drop the input rooms and the walls that bounded them
+        old_walls = set(r1.bounding_walls()) | set(r2.bounding_walls())
+        sc.removeItem(r1)
+        sc.removeItem(r2)
+        for w in old_walls:
+            if w.scene() is not None:
+                sc.removeItem(w)
+
+        # gather result sub-polygons, build their (deduped) walls
+        regions = []
+        for path, base, props in results:
+            for poly in path.simplified().toSubpathPolygons():
+                corners = simplify_corners(poly)
+                if len(corners) >= 3 and poly_area_sqft(corners) >= 1.0:
+                    regions.append((corners, base, props))
+        for corners, _, _ in regions:
+            for j in range(len(corners)):
+                add_wall_unique(sc, corners[j], corners[(j + 1) % len(corners)])
+        rebuild_all_walls(sc)
+
+        # detect + create the result rooms
+        sc.clearSelection()
+        created = 0
+        for corners, base, props in regions:
+            res = detect_room(sc, interior_point(QPolygonF(corners)))
+            if res is None:
+                continue
+            room = RoomItem(unique_room_name(sc, base),
+                            interior_point(QPolygonF(corners)),
+                            res[0], res[1], corners=res[2], properties=props)
+            sc.addItem(room)
+            room.setSelected(True)
+            created += 1
+        self.status(f"{op.title()}: {name1} + {name2} -> {created} room(s).")
 
     def group_selected(self):
         """Group the selected walls/furnishings (existing groups merge)."""
