@@ -45,8 +45,10 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   the room comes through as a complete, movable loop (the shared wall is
   left in place). Group the set (Ctrl+G) to move it as one unit — walls,
   furnishings and the rooms they enclose travel together — then ungroup
-  (Ctrl+Shift+G) to drop everything in place. Groups can be cut, copied and
-  pasted.
+  (Ctrl+Shift+G) to drop everything in place. A selected group also has a
+  **rotation handle**: drag it to spin the whole group about its centre
+  (Ctrl snaps to the rotation increment), e.g. to re-orient a room. Groups
+  can be cut, copied and pasted.
 - **Room import / export (CSV)** — File ▸ Import / Export rooms… reads and
   writes `Name,Type,X_ft,Y_ft,X_loc_ft,Y_loc_ft,Notes`. Sizes and
   locations accept feet-and-inches (`12`, `12.5`, `12'6"`); rooms without
@@ -85,6 +87,7 @@ so no system fonts are needed.
 | Rotate furniture | Select it, drag the round handle (Ctrl = snapped) |
 | Multi-select | Ctrl+drag a rubber band (encloses items / a room), Ctrl+click to toggle |
 | Group / ungroup | **Ctrl+G** / **Ctrl+Shift+G** |
+| Rotate a group | Select it, drag the rotation handle (Ctrl = snapped) |
 | Cut / copy / paste | **Ctrl+X** / **Ctrl+C** / **Ctrl+V** |
 | Import / export rooms (CSV) | File menu |
 | Delete | Select + **Del** |

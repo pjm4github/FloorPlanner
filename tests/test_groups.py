@@ -6,6 +6,7 @@
    no external reference the walls were garbage-collected out of the scene on
    ungroup. test_*_survives_gc forces a collection to lock this down."""
 import gc
+import math
 
 import pytest
 from PyQt6.QtCore import QPointF, QRectF
@@ -117,6 +118,70 @@ def test_furnishings_ride_along(fp, win, make_room, first_furnishing):
     g.setPos(40, 30)
     g.bake()
     assert (f.scenePos().x(), f.scenePos().y()) == pytest.approx((100, 90))
+
+
+def _group_room_with_furnishing(fp, win, make_room, first_furnishing):
+    sc = win.scene
+    make_room(sc, 0, 0, 144, 72, "Den")        # wide room
+    sc.addItem(fp.FurnishingItem(first_furnishing, QPointF(72, 36), 0))
+    for it in list(sc.items()):
+        if isinstance(it, (fp.WallItem, fp.FurnishingItem)):
+            it.setSelected(True)
+    win.group_selected()
+    return next(i for i in sc.items() if isinstance(i, fp.GroupItem))
+
+
+def test_group_rotation_turns_members_about_centre(fp, win, make_room,
+                                                   first_furnishing):
+    sc = win.scene
+    g = _group_room_with_furnishing(fp, win, make_room, first_furnishing)
+    furn = next(c for c in g.childItems() if isinstance(c, fp.FurnishingItem))
+    box0 = g.childrenBoundingRect()
+    c = box0.center()
+    g._begin_rotation(QPointF(c.x() + 100, c.y()))         # start angle 0
+    g._apply_rotation(QPointF(c.x(), c.y() + 100), False)  # end angle 90
+    g._finish_rotation()
+
+    assert furn.rotation() == pytest.approx(90, abs=1)
+    box1 = g.childrenBoundingRect()
+    assert box0.width() > box0.height()        # was wide
+    assert box1.height() > box1.width()        # now tall (quarter turn)
+    room = next(r for r in sc.items() if isinstance(r, fp.RoomItem))
+    assert room.corners is not None            # region rotated with it
+
+
+def test_group_box_orients_with_rotation(fp, win, make_room, first_furnishing):
+    g = _group_room_with_furnishing(fp, win, make_room, first_furnishing)
+    c = g.childrenBoundingRect().center()
+    g._begin_rotation(QPointF(c.x() + 100, c.y()))
+    ang = math.radians(30)
+    g._apply_rotation(QPointF(c.x() + 100 * math.cos(ang),
+                              c.y() + 100 * math.sin(ang)), False)
+    g._finish_rotation()
+
+    assert g._angle == pytest.approx(30, abs=1)
+    local, _ = g._oriented_box()
+    aabb = g.childrenBoundingRect()
+    # the oriented box hugs the (rotated) content, so it is tighter than the
+    # axis-aligned bounding box -- proving it turns with the group
+    assert local.height() < aabb.height()
+
+
+def test_group_rotation_ctrl_snaps_to_increment(fp, win, make_room,
+                                                first_furnishing):
+    g = _group_room_with_furnishing(fp, win, make_room, first_furnishing)
+    furn = next(c for c in g.childItems() if isinstance(c, fp.FurnishingItem))
+    step = fp.SETTINGS["rotate_snap_deg"]
+    c = g.childrenBoundingRect().center()
+    g._begin_rotation(QPointF(c.x() + 100, c.y()))         # start angle 0
+    ang = math.radians(37)                                 # a non-multiple
+    g._apply_rotation(
+        QPointF(c.x() + 100 * math.cos(ang), c.y() + 100 * math.sin(ang)),
+        True)
+    g._finish_rotation()
+
+    assert round(furn.rotation()) % int(step) == 0
+    assert furn.rotation() == pytest.approx(30, abs=1)     # 37 -> nearest 15
 
 
 def test_group_box_not_inflated_by_wide_window(fp, win):

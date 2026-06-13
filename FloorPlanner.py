@@ -2269,23 +2269,182 @@ class GroupItem(QGraphicsItemGroup):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges,
                      True)
+        self.setAcceptHoverEvents(True)
         self.setZValue(1)
+        self._rotating = False
+        self._angle = 0.0                 # current orientation of the box
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
             return grid_snap(value)
         return super().itemChange(change, value)
 
+    # -- rotator handle -------------------------------------------------------
+    def _view_scale(self) -> float:
+        sc = self.scene()
+        if sc and sc.views():
+            return max(sc.views()[0].transform().m11(), 1e-6)
+        return 1.0
+
+    @staticmethod
+    def _rot_transform(center: QPointF, angle: float) -> QTransform:
+        tr = QTransform()
+        tr.translate(center.x(), center.y())
+        tr.rotate(angle)
+        tr.translate(-center.x(), -center.y())
+        return tr
+
+    def _content_points(self) -> list:
+        """Scene-coord extreme points of the members (wall endpoints and
+        furnishing footprint corners) -- the box hugs these."""
+        pts = []
+        for ch in self.childItems():
+            if isinstance(ch, WallItem):
+                pts += [ch.p1, ch.p2]
+            elif isinstance(ch, FurnishingItem):
+                r = QRectF(-ch.w / 2, -ch.d / 2, ch.w, ch.d)
+                pts += [ch.mapToScene(r.topLeft()), ch.mapToScene(r.topRight()),
+                        ch.mapToScene(r.bottomRight()),
+                        ch.mapToScene(r.bottomLeft())]
+        return pts
+
+    def _oriented_box(self) -> tuple:
+        """(localRect, centre): an axis-aligned rectangle in the frame
+        rotated by -self._angle that tightly contains the content.  Drawn
+        back through +self._angle it becomes an oriented box hugging the
+        members at the group's current orientation."""
+        pts = self._content_points()
+        if not pts:
+            b = self.childrenBoundingRect()
+            return b, b.center()
+        cx = sum(p.x() for p in pts) / len(pts)
+        cy = sum(p.y() for p in pts) / len(pts)
+        center = QPointF(cx, cy)
+        local = [self._rot_transform(center, -self._angle).map(p) for p in pts]
+        xs = [p.x() for p in local]
+        ys = [p.y() for p in local]
+        m = EXTERIOR_T                    # margin for wall half-thickness
+        rect = QRectF(min(xs) - m, min(ys) - m,
+                      max(xs) - min(xs) + 2 * m, max(ys) - min(ys) + 2 * m)
+        return rect, center
+
+    def _handle(self) -> tuple:
+        """(centre, radius) of the rotator handle in scene coords; floats
+        above the oriented box and turns with it."""
+        rect, center = self._oriented_box()
+        s = self._view_scale()
+        stem, r = 18.0 / s, 6.0 / s
+        local_c = QPointF(rect.center().x(), rect.top() - stem - r)
+        return self._rot_transform(center, self._angle).map(local_c), r
+
+    def _on_handle(self, item_pt: QPointF) -> bool:
+        c, r = self._handle()
+        return QLineF(item_pt, c).length() <= r * 1.8
+
     def boundingRect(self) -> QRectF:
-        return self.childrenBoundingRect().adjusted(-3, -3, 3, 3)
+        rect, center = self._oriented_box()
+        poly = self._rot_transform(center, self._angle).map(QPolygonF(rect))
+        br = poly.boundingRect()
+        c, r = self._handle()
+        return br.united(
+            QRectF(c.x() - r, c.y() - r, 2 * r, 2 * r)).adjusted(-4, -4, 4, 4)
 
     def paint(self, painter, option, widget=None):
         sel = self.isSelected()
+        rect, center = self._oriented_box()
         pen = QPen(QColor(0, 110, 255) if sel else QColor(165, 173, 185), 0,
                    Qt.PenStyle.DashLine)
+        painter.save()
+        painter.translate(center.x(), center.y())   # draw in the box's frame
+        painter.rotate(self._angle)
+        painter.translate(-center.x(), -center.y())
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRect(self.childrenBoundingRect().adjusted(-2, -2, 2, 2))
+        painter.drawRect(rect.adjusted(-2, -2, 2, 2))
+        if sel:
+            s = self._view_scale()
+            stem, hr = 18.0 / s, 6.0 / s
+            c = QPointF(rect.center().x(), rect.top() - stem - hr)
+            blue = QColor(0, 110, 255)
+            painter.setPen(QPen(blue, 0))
+            painter.drawLine(QPointF(rect.center().x(), rect.top()),
+                             QPointF(c.x(), c.y() + hr))
+            painter.setBrush(QBrush(QColor(255, 255, 255)))
+            painter.drawEllipse(c, hr, hr)
+            painter.setBrush(QBrush(blue))
+            painter.drawEllipse(c, hr * 0.35, hr * 0.35)
+        painter.restore()
+
+    def hoverMoveEvent(self, e):
+        if self.isSelected() and self._on_handle(e.pos()):
+            self.setCursor(Qt.CursorShape.CrossCursor)
+        else:
+            self.unsetCursor()
+        super().hoverMoveEvent(e)
+
+    def hoverLeaveEvent(self, e):
+        self.unsetCursor()
+        super().hoverLeaveEvent(e)
+
+    # -- rotation (baked live into the members about a fixed centre) ----------
+    def _angle_to(self, scene_pt: QPointF) -> float:
+        c = self._rot_center
+        return math.degrees(math.atan2(scene_pt.y() - c.y(),
+                                       scene_pt.x() - c.x()))
+
+    def _begin_rotation(self, scene_pt: QPointF):
+        self._rotating = True
+        self._rot_center = self.childrenBoundingRect().center()
+        self._rot_start = self._angle_to(scene_pt)
+        self._rot_angle0 = self._angle
+        self._snap_walls = [(w, QPointF(w.p1), QPointF(w.p2))
+                            for w in self.childItems()
+                            if isinstance(w, WallItem)]
+        self._snap_furn = [(f, QPointF(f.pos()), f.rotation())
+                           for f in self.childItems()
+                           if isinstance(f, FurnishingItem)]
+        group_walls = {w for w, _, _ in self._snap_walls}
+        self._snap_rooms = []
+        sc = self.scene()
+        if sc is not None and group_walls:
+            for it in sc.items():
+                if isinstance(it, RoomItem) and walls_cover_room(group_walls, it):
+                    self._snap_rooms.append(
+                        (it, [QPointF(c) for c in (it.corners or [])],
+                         QPointF(it.anchor), QPainterPath(it.path)))
+
+    def _apply_rotation(self, scene_pt: QPointF, snap: bool):
+        theta = self._angle_to(scene_pt) - self._rot_start
+        if snap:
+            step = max(SETTINGS["rotate_snap_deg"], 1.0)
+            theta = round(theta / step) * step
+        self._angle = (self._rot_angle0 + theta) % 360.0
+        c = self._rot_center
+        tr = QTransform()
+        tr.translate(c.x(), c.y())
+        tr.rotate(theta)
+        tr.translate(-c.x(), -c.y())
+        self.prepareGeometryChange()
+        for w, p1_0, p2_0 in self._snap_walls:
+            w.p1, w.p2 = tr.map(p1_0), tr.map(p2_0)
+            w.rebuild()                       # re-syncs its openings too
+        for f, pos_0, rot_0 in self._snap_furn:
+            f.setPos(tr.map(pos_0))
+            f.setRotation((rot_0 + theta) % 360.0)
+        for room, corners_0, anchor_0, path_0 in self._snap_rooms:
+            room.prepareGeometryChange()
+            if corners_0:
+                room.corners = [tr.map(p) for p in corners_0]
+            room.anchor = tr.map(anchor_0)
+            room.path = tr.map(path_0)
+            room._sync_corner_props()
+            room.update()
+        self.update()
+
+    def _finish_rotation(self):
+        self._snap_walls = self._snap_furn = self._snap_rooms = []
+        self.prepareGeometryChange()
+        self.update()
 
     def adopt(self, item):
         """addToGroup without Qt's transform juggling.  The group always
@@ -2362,7 +2521,30 @@ class GroupItem(QGraphicsItemGroup):
         self.setPos(0.0, 0.0)
         rebuild_all_walls(sc)             # re-detects rooms at new anchors
 
+    def mousePressEvent(self, e):
+        if (e.button() == Qt.MouseButton.LeftButton and self.isSelected()
+                and self._on_handle(e.pos())):
+            self._begin_rotation(e.scenePos())
+            e.accept()
+            return
+        self._rotating = False
+        super().mousePressEvent(e)
+
+    def mouseMoveEvent(self, e):
+        if self._rotating:
+            self._apply_rotation(
+                e.scenePos(),
+                bool(e.modifiers() & Qt.KeyboardModifier.ControlModifier))
+            e.accept()
+            return
+        super().mouseMoveEvent(e)
+
     def mouseReleaseEvent(self, e):
+        if self._rotating:
+            self._rotating = False
+            self._finish_rotation()
+            e.accept()
+            return
         super().mouseReleaseEvent(e)
         self.bake()
 
