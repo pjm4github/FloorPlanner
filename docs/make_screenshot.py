@@ -160,6 +160,10 @@ g.setSelected(True)
 names = [grp["name"] for grp in FP.furnishing_groups()]
 win.furn_palette.setCurrentIndex(names.index("Sunroom"))
 
+# activate the one-shot Room Name tool: the toolbar highlights it and the
+# status bar explains it reverts to Select (Ctrl-pick to keep it)
+win.set_tool(FP.TOOL_ROOM)
+
 # --- grab --------------------------------------------------------------------
 win.resize(1500, 950)
 win.show()
