@@ -3454,6 +3454,9 @@ class MainWindow(QMainWindow):
             m_rooms.addAction(a)
             self._room_op_actions.append(a)
         m_rooms.addSeparator()
+        self.a_align = QAction("&Align to grid", self)
+        self.a_align.triggered.connect(self.align_rooms_to_grid)
+        m_rooms.addAction(self.a_align)
         a_refresh = QAction("&Refresh rooms (drop unwalled)", self)
         a_refresh.triggered.connect(self.refresh_rooms_cmd)
         m_rooms.addAction(a_refresh)
@@ -3537,9 +3540,13 @@ class MainWindow(QMainWindow):
         self.a_group.setEnabled(n >= 2)
         self.a_ungroup.setEnabled(
             any(isinstance(it, GroupItem) for it in sel))
-        # room ops act on two rooms/wall-loops, selected directly or grouped
+        # room ops act on two rooms/wall-loops, selected directly or grouped;
+        # align works on one or more
+        nshapes = len(self._selected_room_shapes())
         for a in getattr(self, "_room_op_actions", []):
-            a.setEnabled(len(self._selected_room_shapes()) == 2)
+            a.setEnabled(nshapes == 2)
+        if hasattr(self, "a_align"):
+            self.a_align.setEnabled(nshapes >= 1)
 
     def nudge_selected(self, dx: int, dy: int, fine: bool = False) -> bool:
         """Arrow-key nudge of selected groups / ungrouped furnishings by one
@@ -3556,6 +3563,26 @@ class MainWindow(QMainWindow):
                 it.setPos(it.pos().x() + dx * step, it.pos().y() + dy * step)
                 moved += 1
         return moved > 0
+
+    def align_rooms_to_grid(self):
+        """Snap the walls of every selected room (or grouped wall-loop) to
+        the wall-snap grid, so off-grid rooms line up.  Axis-aligned walls
+        stay orthogonal because both endpoints share a coordinate that
+        snaps to the same grid line."""
+        shapes = self._selected_room_shapes()
+        if not shapes:
+            self.status("Select rooms (or grouped rooms) to align to the grid.")
+            return
+        step = SETTINGS["wall_snap_in"]
+        walls = set()
+        for s in shapes:
+            walls.update(s["walls"])
+        for w in walls:
+            w.p1 = grid_snap(w.p1, step)
+            w.p2 = grid_snap(w.p2, step)
+        rebuild_all_walls(self.scene)     # rooms re-detect on the new walls
+        self.status(f"Aligned {len(shapes)} room(s) to the "
+                    f'{step:g}" grid.')
 
     def refresh_rooms_cmd(self):
         """Re-scan the canvas: delete any room whose region is no longer

@@ -66,9 +66,11 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   pieces — each room minus the overlap, plus the overlap itself — and puts
   **each piece in its own group with a complete set of walls** (shared
   edges get a wall per piece). So you can drag any fragment away and it
-  stays a fully enclosed room while the others keep theirs. *Rooms ▸
-  Refresh rooms* re-scans the canvas and drops any room whose walls have
-  been moved away, clearing gray areas left behind.
+  stays a fully enclosed room while the others keep theirs. *Rooms ▸ Align
+  to grid* snaps the selected rooms' walls to the wall-snap grid (keeping
+  them orthogonal), and *Rooms ▸ Refresh rooms* re-scans the canvas and
+  drops any room whose walls have been moved away, clearing gray areas left
+  behind.
 - **Nudging** — arrow keys move the selected group or furnishing by the
   wall-snap step; hold Ctrl for a fine 1" step.
 - **Settings** — File ▸ Settings… controls the wall snap (default 6" on

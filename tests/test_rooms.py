@@ -136,6 +136,56 @@ def test_fragment_groups_each_piece_with_its_own_walls(fp, win):
     assert all(enclosed(r) for r in _rooms(fp, win))
 
 
+def _on_grid(v, step):
+    return abs(v - round(v / step) * step) < 0.01
+
+
+def test_align_rooms_to_grid_snaps_walls(fp, win):
+    sc = win.scene
+    corners = [(1, 2), (157, 2), (157, 98), (1, 98)]    # off-grid room
+    for i in range(4):
+        a, b = corners[i], corners[(i + 1) % 4]
+        sc.addItem(fp.WallItem(QPointF(*a), QPointF(*b), "interior"))
+    fp.rebuild_all_walls(sc)
+    res = fp.detect_room(sc, QPointF(79, 50))
+    room = fp.RoomItem("Den", QPointF(79, 50), res[0], res[1], corners=res[2])
+    sc.addItem(room)
+    room.setSelected(True)
+    win._sel_order = [room]
+
+    win.align_rooms_to_grid()
+    step = fp.SETTINGS["wall_snap_in"]
+    walls = [it for it in sc.items() if isinstance(it, fp.WallItem)]
+    for w in walls:
+        for p in (w.p1, w.p2):
+            assert _on_grid(p.x(), step) and _on_grid(p.y(), step)
+        assert abs(w.p1.x() - w.p2.x()) < 1 or abs(w.p1.y() - w.p2.y()) < 1
+
+
+def test_align_grouped_wall_loop_to_grid(fp, win):
+    sc = win.scene
+    corners = [(1, 2), (157, 2), (157, 98), (1, 98)]
+    g = fp.GroupItem()
+    sc.addItem(g)
+    for i in range(4):
+        a, b = corners[i], corners[(i + 1) % 4]
+        wseg = fp.WallItem(QPointF(*a), QPointF(*b), "interior")
+        sc.addItem(wseg)
+        g.adopt(wseg)
+    win._sel_order = [g]
+
+    win.align_rooms_to_grid()
+    step = fp.SETTINGS["wall_snap_in"]
+    for w in [c for c in g.childItems() if isinstance(c, fp.WallItem)]:
+        for p in (w.p1, w.p2):
+            assert _on_grid(p.x(), step) and _on_grid(p.y(), step)
+
+
+def test_align_no_selection_is_noop(fp, win):
+    win._sel_order = []
+    win.align_rooms_to_grid()                  # no rooms selected -> no crash
+
+
 def test_refresh_rooms_drops_unwalled(fp, win):
     sc = win.scene
 
