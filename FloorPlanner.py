@@ -3457,6 +3457,13 @@ class MainWindow(QMainWindow):
         self.a_align = QAction("&Align to grid", self)
         self.a_align.triggered.connect(self.align_rooms_to_grid)
         m_rooms.addAction(self.a_align)
+        self._distribute_actions = []
+        for label, horiz in [("Distribute &horizontally", True),
+                             ("Distribute &vertically", False)]:
+            a = QAction(label, self)
+            a.triggered.connect(lambda _c, h=horiz: self.distribute_rooms(h))
+            m_rooms.addAction(a)
+            self._distribute_actions.append(a)
         a_refresh = QAction("&Refresh rooms (drop unwalled)", self)
         a_refresh.triggered.connect(self.refresh_rooms_cmd)
         m_rooms.addAction(a_refresh)
@@ -3547,6 +3554,8 @@ class MainWindow(QMainWindow):
             a.setEnabled(nshapes == 2)
         if hasattr(self, "a_align"):
             self.a_align.setEnabled(nshapes >= 1)
+        for a in getattr(self, "_distribute_actions", []):
+            a.setEnabled(nshapes >= 3)
 
     def nudge_selected(self, dx: int, dy: int, fine: bool = False) -> bool:
         """Arrow-key nudge of selected groups / ungrouped furnishings by one
@@ -3583,6 +3592,51 @@ class MainWindow(QMainWindow):
         rebuild_all_walls(self.scene)     # rooms re-detect on the new walls
         self.status(f"Aligned {len(shapes)} room(s) to the "
                     f'{step:g}" grid.')
+
+    @staticmethod
+    def _translate_shape(shape, dx, dy):
+        """Rigidly shift a room shape (its walls and, if any, its region)."""
+        for w in shape["walls"]:
+            w.p1 = QPointF(w.p1.x() + dx, w.p1.y() + dy)
+            w.p2 = QPointF(w.p2.x() + dx, w.p2.y() + dy)
+        r = shape["room"]
+        if r is not None:
+            r.prepareGeometryChange()
+            r.anchor = QPointF(r.anchor.x() + dx, r.anchor.y() + dy)
+            r.path = QTransform.fromTranslate(dx, dy).map(r.path)
+            if r.corners:
+                r.corners = [QPointF(c.x() + dx, c.y() + dy) for c in r.corners]
+            r._sync_corner_props()
+
+    def distribute_rooms(self, horizontal: bool):
+        """Space the selected rooms so the gaps between them are equal,
+        keeping the two outermost rooms fixed (3+ rooms needed)."""
+        shapes = self._selected_room_shapes()
+        if len(shapes) < 3:
+            self.status("Select at least three rooms to distribute evenly.")
+            return
+        items = [(s, QPolygonF(s["corners"]).boundingRect()) for s in shapes]
+        if horizontal:
+            items.sort(key=lambda t: t[1].left())
+            free = ((items[-1][1].right() - items[0][1].left())
+                    - sum(b.width() for _, b in items))
+            gap = free / (len(items) - 1)
+            cursor = items[0][1].left()
+            for s, b in items:
+                self._translate_shape(s, cursor - b.left(), 0.0)
+                cursor += b.width() + gap
+        else:
+            items.sort(key=lambda t: t[1].top())
+            free = ((items[-1][1].bottom() - items[0][1].top())
+                    - sum(b.height() for _, b in items))
+            gap = free / (len(items) - 1)
+            cursor = items[0][1].top()
+            for s, b in items:
+                self._translate_shape(s, 0.0, cursor - b.top())
+                cursor += b.height() + gap
+        rebuild_all_walls(self.scene)
+        self.status(f"Distributed {len(shapes)} rooms evenly "
+                    f"{'horizontally' if horizontal else 'vertically'}.")
 
     def refresh_rooms_cmd(self):
         """Re-scan the canvas: delete any room whose region is no longer

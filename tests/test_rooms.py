@@ -136,6 +136,60 @@ def test_fragment_groups_each_piece_with_its_own_walls(fp, win):
     assert all(enclosed(r) for r in _rooms(fp, win))
 
 
+def _box(fp, room):
+    from PyQt6.QtGui import QPolygonF
+    return QPolygonF(room.corners).boundingRect()
+
+
+def _corner_room(fp, sc, x, y, w, h, name):
+    cs = [QPointF(x, y), QPointF(x + w, y), QPointF(x + w, y + h),
+          QPointF(x, y + h)]
+    r = fp.RoomItem(name, QPointF(x + w / 2, y + h / 2),
+                    fp.room_path_from_corners(cs), fp.poly_area_sqft(cs),
+                    corners=cs)
+    sc.addItem(r)
+    return r
+
+
+def test_distribute_rooms_horizontally(fp, win):
+    sc = win.scene
+    r1 = _corner_room(fp, sc, 0, 0, 100, 80, "A")     # 0..100
+    r2 = _corner_room(fp, sc, 120, 0, 80, 80, "B")    # 120..200 (uneven)
+    r3 = _corner_room(fp, sc, 400, 0, 100, 80, "C")   # 400..500
+    win._sel_order = [r1, r2, r3]
+    win.distribute_rooms(horizontal=True)
+
+    bs = sorted((_box(fp, r) for r in (r1, r2, r3)), key=lambda b: b.left())
+    g1 = bs[1].left() - bs[0].right()
+    g2 = bs[2].left() - bs[1].right()
+    assert g1 == pytest.approx(g2, abs=1)             # equal gaps
+    assert g1 == pytest.approx(110, abs=1)
+    assert bs[0].left() == pytest.approx(0)           # extremes fixed
+    assert bs[2].right() == pytest.approx(500)
+
+
+def test_distribute_rooms_vertically(fp, win):
+    sc = win.scene
+    r1 = _corner_room(fp, sc, 0, 0, 80, 100, "A")
+    r2 = _corner_room(fp, sc, 0, 120, 80, 80, "B")
+    r3 = _corner_room(fp, sc, 0, 400, 80, 100, "C")
+    win._sel_order = [r1, r2, r3]
+    win.distribute_rooms(horizontal=False)
+
+    bs = sorted((_box(fp, r) for r in (r1, r2, r3)), key=lambda b: b.top())
+    assert (bs[1].top() - bs[0].bottom()) == pytest.approx(
+        bs[2].top() - bs[1].bottom(), abs=1)
+
+
+def test_distribute_needs_three_rooms(fp, win):
+    sc = win.scene
+    r1 = _corner_room(fp, sc, 0, 0, 100, 80, "A")
+    r2 = _corner_room(fp, sc, 200, 0, 100, 80, "B")
+    win._sel_order = [r1, r2]
+    win.distribute_rooms(horizontal=True)             # < 3 -> no-op, no crash
+    assert _box(fp, r2).left() == pytest.approx(200)  # unchanged
+
+
 def _on_grid(v, step):
     return abs(v - round(v / step) * step) < 0.01
 
