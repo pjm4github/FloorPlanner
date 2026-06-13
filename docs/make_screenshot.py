@@ -97,8 +97,9 @@ room("Garage", (612, 192), "Garage")
 room("Sunroom", (336, 456), "Sunroom")
 
 
-# --- room operation: an L-shaped "Studio" from two overlapping rectangles
-# via Rooms ▸ Combine (its dashed outline shows the non-rectangular result)
+# --- room operation: Fragment two overlapping rooms into three pieces,
+# each in its own group with a full wall loop -- shown lightly exploded
+# with their group outlines so the three grouped pieces read as separate
 def _demo_rect(x, y, w, h, name):
     cs = [QPointF(x, y), QPointF(x + w, y), QPointF(x + w, y + h),
           QPointF(x, y + h)]
@@ -109,10 +110,20 @@ def _demo_rect(x, y, w, h, name):
     return r
 
 
-_ra = _demo_rect(516, 372, 156, 96, "Studio")
-_rb = _demo_rect(588, 432, 132, 108, "Studio B")
+_ra = _demo_rect(500, 360, 150, 96, "Room A")
+_rb = _demo_rect(578, 420, 150, 96, "Room B")
 win._sel_order = [_ra, _rb]
-win.room_boolean("combine")
+win.room_boolean("fragment")
+_frags = [it for it in sc.items() if isinstance(it, FP.GroupItem)]
+_fcx = sum(g.childrenBoundingRect().center().x() for g in _frags) / len(_frags)
+_fcy = sum(g.childrenBoundingRect().center().y() for g in _frags) / len(_frags)
+for _g in _frags:                   # nudge each piece outward, then select it
+    _c = _g.childrenBoundingRect().center()
+    _dx, _dy = _c.x() - _fcx, _c.y() - _fcy
+    _d = math.hypot(_dx, _dy) or 1.0
+    _g.setPos(_dx / _d * 16, _dy / _d * 16)
+    _g.bake()
+    _g.setSelected(True)
 
 # --- furnishings -------------------------------------------------------------
 F = [("bed_queen", (96, 78), 0), ("nightstand", (38, 26), 0),
