@@ -149,6 +149,7 @@ import sys
 from collections import deque
 from pathlib import Path
 
+from PyQt6 import sip
 from PyQt6.QtCore import (QLineF, QMimeData, QPoint, QPointF, QRect, QRectF,
                           QSize, Qt, QTimer)
 from PyQt6.QtGui import (
@@ -1055,6 +1056,14 @@ class WallItem(QGraphicsItem):
         return 1.0
 
     def mousePressEvent(self, e):
+        if self.group() is not None:
+            # grouped: let the group own the drag.  Running the wall-slide
+            # / join logic on a group child mutates p1/p2 in the wrong
+            # coordinate space and join_endpoints/grow_walls can collapse
+            # walls -- ignore so the press falls through to the group.
+            self._mode = None
+            e.ignore()
+            return
         if e.button() != Qt.MouseButton.LeftButton:
             super().mousePressEvent(e)
             return
@@ -1400,6 +1409,11 @@ class OpeningItem(QGraphicsItem):
 
     # -- interaction -------------------------------------------------------------
     def mousePressEvent(self, e):
+        if self.wall is not None and self.wall.group() is not None:
+            # the opening's wall is grouped: let the group own the drag
+            # instead of sliding the opening along its wall
+            e.ignore()
+            return
         if e.button() != Qt.MouseButton.LeftButton:
             super().mousePressEvent(e)
             return
@@ -1413,6 +1427,9 @@ class OpeningItem(QGraphicsItem):
         e.accept()
 
     def mouseMoveEvent(self, e):
+        if self.wall is not None and self.wall.group() is not None:
+            e.ignore()
+            return
         # slide along the wall, snapping to the nearest inch
         s = round(self.wall.s_of(e.scenePos()))
         half = self.width / 2
@@ -2270,14 +2287,21 @@ class GroupItem(QGraphicsItemGroup):
         """Remove the group, leaving its members in the scene exactly
         where they are now; returns the members."""
         children = list(self.childItems())
+        sc = self.scene()
         for c in children:
             sp, rot = c.scenePos(), c.rotation()
             self.removeFromGroup(c)
             c.setTransform(QTransform())
             c.setPos(QPointF(0.0, 0.0) if isinstance(c, WallItem) else sp)
             c.setRotation(rot)
-        if self.scene() is not None:
-            self.scene().removeItem(self)
+            # removeFromGroup() hands ownership back to Python; with no
+            # external reference the wrapper (and its C++ item) would be
+            # garbage-collected straight out of the scene.  Tie its
+            # lifetime to the scene so it survives.
+            if sc is not None:
+                sip.transferto(c, sc)
+        if sc is not None:
+            sc.removeItem(self)
         return children
 
     def bake(self):
@@ -2305,9 +2329,18 @@ class GroupItem(QGraphicsItemGroup):
                 ch.p2 = QPointF(ch.p2.x() + d.x(), ch.p2.y() + d.y())
             else:
                 ch.setPos(ch.pos().x() + d.x(), ch.pos().y() + d.y())
+        tr = QTransform.fromTranslate(d.x(), d.y())
         for r in moved_rooms:
             r.prepareGeometryChange()
             r.anchor = QPointF(r.anchor.x() + d.x(), r.anchor.y() + d.y())
+            # carry the region itself: a rigid translation of the walls
+            # translates the room rigidly, so the fill/outline stay put
+            # even before (and in case) re-detection runs
+            r.path = tr.map(r.path)
+            if r.corners:
+                r.corners = [QPointF(c.x() + d.x(), c.y() + d.y())
+                             for c in r.corners]
+            r._sync_corner_props()
         self.setPos(0.0, 0.0)
         rebuild_all_walls(sc)             # re-detects rooms at new anchors
 
