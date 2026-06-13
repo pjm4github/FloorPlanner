@@ -1,0 +1,275 @@
+{
+  "format": "floorplanner-json",
+  "version": 1,
+  "units": "inches",
+  "settings": {
+    "wall_snap_in": 6.0,
+    "rotate_snap_deg": 15.0,
+    "canvas_w_in": 1200.0,
+    "canvas_h_in": 840.0
+  },
+  "walls": [
+    {
+      "type": "exterior",
+      "p1": [
+        0.0,
+        0.0
+      ],
+      "p2": [
+        432.0,
+        0.0
+      ],
+      "openings": [
+        {
+          "kind": "window",
+          "code": "4848",
+          "s": 108,
+          "door_type": "LH",
+          "swing": -1
+        }
+      ]
+    },
+    {
+      "type": "exterior",
+      "p1": [
+        432.0,
+        0.0
+      ],
+      "p2": [
+        432.0,
+        288.0
+      ],
+      "openings": []
+    },
+    {
+      "type": "exterior",
+      "p1": [
+        432.0,
+        288.0
+      ],
+      "p2": [
+        0.0,
+        288.0
+      ],
+      "openings": [
+        {
+          "kind": "door",
+          "code": "3680",
+          "s": 96,
+          "door_type": "FRENCH",
+          "swing": -1
+        }
+      ]
+    },
+    {
+      "type": "exterior",
+      "p1": [
+        0.0,
+        288.0
+      ],
+      "p2": [
+        0.0,
+        0.0
+      ],
+      "openings": []
+    },
+    {
+      "type": "interior",
+      "p1": [
+        216.0,
+        0.0
+      ],
+      "p2": [
+        216.0,
+        288.0
+      ],
+      "openings": []
+    },
+    {
+      "type": "interior",
+      "p1": [
+        216.0,
+        144.0
+      ],
+      "p2": [
+        432.0,
+        144.0
+      ],
+      "openings": []
+    }
+  ],
+  "rooms": [
+    {
+      "name": "Living Room",
+      "anchor": [
+        108.0,
+        200.0
+      ],
+      "show_dimensions": false,
+      "properties": {
+        "room_type": "Living Room",
+        "ceiling_height_in": 96.0,
+        "ceiling_type": "Flat",
+        "floor_finish": "Hardwood",
+        "wall_finish": "Painted Drywall",
+        "baseboard": "Standard 3 1/4\"",
+        "crown_molding": false,
+        "hvac": "Forced Air",
+        "electrical": "",
+        "notes": "",
+        "perimeter_corners": [
+          [
+            216.0,
+            288.0
+          ],
+          [
+            0.0,
+            288.0
+          ],
+          [
+            0.0,
+            0.0
+          ],
+          [
+            216.0,
+            0.0
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Kitchen",
+      "anchor": [
+        324.0,
+        72.0
+      ],
+      "show_dimensions": false,
+      "properties": {
+        "room_type": "Kitchen",
+        "ceiling_height_in": 96.0,
+        "ceiling_type": "Flat",
+        "floor_finish": "Hardwood",
+        "wall_finish": "Painted Drywall",
+        "baseboard": "Standard 3 1/4\"",
+        "crown_molding": false,
+        "hvac": "Forced Air",
+        "electrical": "",
+        "notes": "",
+        "perimeter_corners": [
+          [
+            432.0,
+            0.0
+          ],
+          [
+            432.0,
+            144.0
+          ],
+          [
+            216.0,
+            144.0
+          ],
+          [
+            216.0,
+            0.0
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Bedroom",
+      "anchor": [
+        324.0,
+        216.0
+      ],
+      "show_dimensions": false,
+      "properties": {
+        "room_type": "Bedroom",
+        "ceiling_height_in": 96.0,
+        "ceiling_type": "Flat",
+        "floor_finish": "Hardwood",
+        "wall_finish": "Painted Drywall",
+        "baseboard": "Standard 3 1/4\"",
+        "crown_molding": false,
+        "hvac": "Forced Air",
+        "electrical": "",
+        "notes": "",
+        "perimeter_corners": [
+          [
+            432.0,
+            144.0
+          ],
+          [
+            432.0,
+            288.0
+          ],
+          [
+            216.0,
+            288.0
+          ],
+          [
+            216.0,
+            144.0
+          ]
+        ]
+      }
+    }
+  ],
+  "furnishings": [
+    {
+      "kind": "sofa",
+      "pos": [
+        108.0,
+        150.0
+      ],
+      "rotation": 0.0
+    },
+    {
+      "kind": "coffee_table",
+      "pos": [
+        108.0,
+        196.0
+      ],
+      "rotation": 0.0
+    },
+    {
+      "kind": "tv_stand",
+      "pos": [
+        108.0,
+        60.0
+      ],
+      "rotation": 180.0
+    },
+    {
+      "kind": "refrigerator",
+      "pos": [
+        250.0,
+        40.0
+      ],
+      "rotation": 90.0
+    },
+    {
+      "kind": "dining_table",
+      "pos": [
+        340.0,
+        70.0
+      ],
+      "rotation": 0.0
+    },
+    {
+      "kind": "bed_queen",
+      "pos": [
+        330.0,
+        250.0
+      ],
+      "rotation": 0.0
+    },
+    {
+      "kind": "nightstand",
+      "pos": [
+        390.0,
+        250.0
+      ],
+      "rotation": 0.0
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+Name,Type,X_ft,Y_ft,X_loc_ft,Y_loc_ft,Notes
+Main House,,40,30,5,5,
+Workshop,Shop,30,24,60,5,
+Barn,,40,30,110,5,Sits beyond the default 100' canvas - it grows to fit

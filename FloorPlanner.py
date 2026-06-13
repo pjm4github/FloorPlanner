@@ -218,6 +218,8 @@ WALL_SNAP_CHOICES = [1.0, 2.0, 3.0, 6.0, 12.0]
 ROTATE_SNAP_DEFAULT = 15.0          # Ctrl-drag rotation increment (degrees)
 CANVAS_W_DEFAULT = 100.0 * FOOT     # default canvas 100'-0" x 70'-0"
 CANVAS_H_DEFAULT = 70.0 * FOOT
+MAX_CANVAS_IN = 500.0 * FOOT        # CSV import won't grow the canvas past
+#                                     500' in either direction (typo guard)
 
 # Plan-wide settings, edited in File > Settings… and saved in the file.
 DEFAULT_SETTINGS = {
@@ -3375,7 +3377,11 @@ class MainWindow(QMainWindow):
         Notes optional).  X_ft/Y_ft are the room's perimeter width and
         length; X_loc/Y_loc place its BOTTOM-LEFT corner, measured in
         feet from the canvas's bottom-left corner.  Rooms without a
-        location go to the first clear spot on the canvas."""
+        location go to the first clear spot on the canvas.
+
+        The canvas grows (never shrinks) so every room fits, up to
+        MAX_CANVAS_IN; a room whose size/location needs more than that is
+        rejected as a likely typo."""
         try:
             with open(path, "r", encoding="utf-8-sig", newline="") as f:
                 reader = csv.DictReader(f)
@@ -3388,8 +3394,11 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Import failed", str(ex))
             self.status(f"Import failed: {ex}")
             return
-        canvas = canvas_rect()
-        imported, errors = 0, []
+        margin = 2.0 * FOOT
+        max_in = MAX_CANVAS_IN
+
+        # -- pass 1: parse + validate every row (no placement yet) --------
+        specs, errors = [], []
         for i, row in enumerate(rows, start=2):     # 1 = header line
             name = row.get("name", "")
             try:
@@ -3401,17 +3410,54 @@ class MainWindow(QMainWindow):
                     raise ValueError("rooms must be at least 3' x 3'")
                 xl, yl = row.get("x_loc_ft", ""), row.get("y_loc_ft", "")
                 if xl and yl:
-                    left = wall_snap_len(parse_feet(xl))
-                    top = wall_snap_len(canvas.bottom()
-                                        - parse_feet(yl) - h_in)
+                    xl_in, yl_in, located = parse_feet(xl), parse_feet(yl), True
                 elif xl or yl:
                     raise ValueError("give both X_loc_ft and Y_loc_ft, "
                                      "or neither")
                 else:
-                    left, top = self._free_spot(w_in, h_in)
+                    xl_in = yl_in = None
+                    located = False
+                far_w = (xl_in + w_in) if located else w_in
+                far_h = (yl_in + h_in) if located else h_in
+                if far_w > max_in or far_h > max_in:
+                    raise ValueError(
+                        f"exceeds the {max_in / FOOT:g}' canvas limit "
+                        "(check for a typo)")
             except (KeyError, ValueError) as ex:
                 errors.append(f"line {i} ({name or '?'}): {ex}")
                 continue
+            specs.append({"name": name, "w": w_in, "h": h_in,
+                          "located": located, "xl": xl_in, "yl": yl_in,
+                          "type": row.get("type", ""),
+                          "notes": row.get("notes", "")})
+
+        # -- grow the canvas so every room fits (grow only, capped) -------
+        # located rooms drive both dimensions; auto-placed rooms only need
+        # the height to be tall enough to hold them (width grows afterwards)
+        req_w = max([s["xl"] + s["w"] + margin
+                     for s in specs if s["located"]], default=0.0)
+        req_h = max([s["yl"] + s["h"] + margin
+                     for s in specs if s["located"]]
+                    + [s["h"] + 2 * margin
+                       for s in specs if not s["located"]], default=0.0)
+        new_w = min(max(SETTINGS["canvas_w_in"], req_w), max_in)
+        new_h = min(max(SETTINGS["canvas_h_in"], req_h), max_in)
+        resized = (new_w > SETTINGS["canvas_w_in"]
+                   or new_h > SETTINGS["canvas_h_in"])
+        if resized:
+            SETTINGS["canvas_w_in"], SETTINGS["canvas_h_in"] = new_w, new_h
+            self._apply_canvas()
+
+        # -- pass 2: build the rooms (canvas height is now final) ---------
+        canvas = canvas_rect()
+        imported = 0
+        for s in specs:
+            w_in, h_in = s["w"], s["h"]
+            if s["located"]:
+                left = wall_snap_len(s["xl"])
+                top = wall_snap_len(canvas.bottom() - s["yl"] - h_in)
+            else:
+                left, top = self._free_spot(w_in, h_in)
             corners = [QPointF(left, top), QPointF(left + w_in, top),
                        QPointF(left + w_in, top + h_in),
                        QPointF(left, top + h_in)]
@@ -3424,22 +3470,39 @@ class MainWindow(QMainWindow):
             centre = QPointF(left + w_in / 2, top + h_in / 2)
             res = detect_room(self.scene, centre)
             if res is None:
-                errors.append(f"line {i} ({name}): no enclosed area "
-                              "detected (overlapping another room?)")
+                errors.append(f"{s['name']}: no enclosed area detected "
+                              "(overlapping another room?)")
                 continue
-            room = RoomItem(unique_room_name(self.scene, name), centre,
+            room = RoomItem(unique_room_name(self.scene, s["name"]), centre,
                             res[0], res[1], corners=res[2])
-            rt = row.get("type", "")
-            if rt:
+            if s["type"]:
                 room.properties["room_type"] = next(
-                    (t for t in ROOM_TYPES if t.lower() == rt.lower()), rt)
-            if row.get("notes"):
-                room.properties["notes"] = row["notes"]
+                    (t for t in ROOM_TYPES if t.lower() == s["type"].lower()),
+                    s["type"])
+            if s["notes"]:
+                room.properties["notes"] = s["notes"]
             self.scene.addItem(room)
             imported += 1
+
+        # -- grow width for any auto-placed room parked past the edge -----
+        walls = [it for it in self.scene.items() if isinstance(it, WallItem)]
+        right = max([p.x() for it in walls for p in (it.p1, it.p2)],
+                    default=0.0)
+        if right + margin > canvas.right():
+            grow_w = min(right + margin, max_in)
+            if grow_w > SETTINGS["canvas_w_in"]:
+                SETTINGS["canvas_w_in"] = grow_w
+                self._apply_canvas()
+                resized = True
+
+        note = ""
+        if resized:
+            c = canvas_rect()
+            note = (f" Canvas resized to {c.width() / FOOT:g}' × "
+                    f"{c.height() / FOOT:g}'.")
         self.status(f"Imported {imported} room(s) from {path}"
-                    + (f" — {len(errors)} row(s) skipped." if errors
-                       else "."))
+                    + (f" — {len(errors)} row(s) skipped." if errors else ".")
+                    + note)
         self._import_errors = errors      # inspectable (and testable)
         if errors and interactive:
             QMessageBox.warning(self, "Import finished with problems",

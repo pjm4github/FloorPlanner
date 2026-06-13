@@ -1,0 +1,6 @@
+Name,Type,X_ft,Y_ft,X_loc_ft,Y_loc_ft,Notes
+Living Room,Living Room,18,16,4,4,
+Kitchen,Kitchen,12,12,24,8,
+Bedroom,Bedroom,14,12,4,22,
+Bath,Bathroom,8,8,20,24,
+Garage,Garage,22,22,40,4,
