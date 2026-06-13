@@ -133,7 +133,11 @@ F = [("bed_queen", (96, 78), 0), ("nightstand", (38, 26), 0),
      ("suv", (560, 200), 0), ("bicycle", (706, 110), 0),
      ("workbench", (620, 70), 0), ("trashcan", (718, 310), 0),
      ("whirlpool", (428, 522), 0), ("lounge_chair", (222, 480), 0),
-     ("lounge_chair", (258, 480), 0)]
+     ("lounge_chair", (258, 480), 0),
+     # HVAC equipment tucked along the garage's left wall
+     ("gas_furnace", (506, 100), 0), ("gas_water_heater", (506, 146), 0),
+     ("electric_panel", (500, 64), 90), ("well_pump", (520, 250), 0),
+     ("car_charger", (700, 252), 0)]
 items = {}
 for kind, pos, rot in F:
     it = FP.FurnishingItem(kind, QPointF(*pos), rot)
@@ -156,9 +160,9 @@ g._apply_rotation(QPointF(gc.x() + 100 * math.cos(_ang),
 g._finish_rotation()
 g.setSelected(True)
 
-# show the new Sunroom palette section
+# show the new HVAC palette section
 names = [grp["name"] for grp in FP.furnishing_groups()]
-win.furn_palette.setCurrentIndex(names.index("Sunroom"))
+win.furn_palette.setCurrentIndex(names.index("HVAC"))
 
 # activate the one-shot Room Name tool: the toolbar highlights it and the
 # status bar explains it reverts to Select (Ctrl-pick to keep it)
