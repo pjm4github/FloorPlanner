@@ -16,20 +16,38 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   and shrink so rooms stay rectangular (Ctrl for free movement).
 - **Doors & windows** — placed on a wall with WWHH sizes
   (`3280` = 32" × 80"), they cut the opening and ride the wall when
-  dragged. Door types: LH, RH, bifold, pocket, slider, French, doorway.
+  dragged. Door types: LH, RH, bifold, pocket, slider, French, doorway,
+  and single / double **garage doors** (shown as the opening plus a
+  dashed overhead outline of the open door).
 - **Rooms** — click inside any enclosed area to name it. The room traces
   its perimeter along the wall centrelines, computes the true interior
   area, can draw double-headed dimension arrows on every enclosing wall
   (opposite equal walls dimensioned once), and carries a property sheet
-  (room type, ceiling, finishes, HVAC, notes…). Rooms can be copied and
-  pasted elsewhere on the plan with their walls and openings.
-- **Furnishings** — a bundled CC0 library of 40 top-view symbols (beds,
-  seating, kitchen, bath, laundry, office, garage — including cars, boat,
-  workbench and yard equipment). Drag one from the right-hand palette onto
-  the plan and it lands at **true scale** (scene units are inches; a 16'
-  SUV takes up 16'). The palette is organised in expandable room sections;
-  placed items move with 1" snap and rotate via a grab handle
-  (Ctrl = snap to the configured increment).
+  (room type, ceiling, finishes, HVAC, notes…). Move or resize the
+  bounding walls and the room region re-detects and follows. Right-click
+  a room name for an **inventory** — every furnishing and opening in the
+  room as two tab-separated columns, ready to paste into Excel. Rooms can
+  be copied and pasted elsewhere with their walls and openings.
+- **Furnishings** — a bundled CC0 library of 54 top-view symbols across
+  Living, Dining, Kitchen, Bedroom, Bathroom, Laundry, Office, Garage
+  (cars, boat + trailer, workbench, yard equipment), **Shop** (table saw,
+  lathe, jointer, drill press, bandsaw, planer…) and **Sunroom** (swim
+  spa, sauna, whirlpool, lounge chairs…). Drag one from the right-hand
+  palette onto the plan and it lands at **true scale** (scene units are
+  inches; a 16' SUV takes up 16'). The palette is organised in expandable
+  room sections; placed items move with 1" snap and rotate via a grab
+  handle (Ctrl = snap to the configured increment).
+- **Groups & multi-select** — Ctrl+drag a rubber band to add items to a
+  selection set, or Ctrl+click to toggle individual items. Group the set
+  (Ctrl+G) to move it as one unit — walls, furnishings and the rooms they
+  enclose travel together — then ungroup (Ctrl+Shift+G) to drop everything
+  in place. Groups can be cut, copied and pasted.
+- **Room import / export (CSV)** — File ▸ Import / Export rooms… reads and
+  writes `Name,Type,X_ft,Y_ft,X_loc_ft,Y_loc_ft,Notes`. Sizes and
+  locations accept feet-and-inches (`12`, `12.5`, `12'6"`); rooms without
+  a location auto-place on the first clear spot. Rooms that fall outside
+  the canvas **grow it to fit** (up to 500'; larger values are rejected as
+  typos). See [`examples/`](examples/) for sample files and previews.
 - **Settings** — File ▸ Settings… controls the wall snap (default 6" on
   centre), the rotation snap (default 15°) and the canvas size (default
   100' × 70'). All are saved with the plan.
@@ -57,9 +75,13 @@ so no system fonts are needed.
 | Stretch / slide a wall | Drag its end / body in Select mode |
 | Place a door or window | Tool 4 / 5, click a wall, enter WWHH size |
 | Name a room | Tool 6, click inside an enclosed area |
-| Room dimensions / properties | Right-click the room name |
+| Room dimensions / properties / inventory | Right-click the room name |
 | Place furniture | Drag from the right palette onto the plan |
 | Rotate furniture | Select it, drag the round handle (Ctrl = snapped) |
+| Multi-select | Ctrl+drag a rubber band, or Ctrl+click to toggle items |
+| Group / ungroup | **Ctrl+G** / **Ctrl+Shift+G** |
+| Cut / copy / paste | **Ctrl+X** / **Ctrl+C** / **Ctrl+V** |
+| Import / export rooms (CSV) | File menu |
 | Delete | Select + **Del** |
 | Zoom to fit | **F** |
 
@@ -70,7 +92,21 @@ All SVG artwork (toolbar icons, furnishing symbols, `manifest.json`,
 change or extend the library. Every furnishing SVG uses a viewBox in
 inches matching its real footprint, which is what makes true-scale
 placement work; see `assets/furnishings/README.md` for how to add your
-own symbols. `docs/make_screenshot.py` rebuilds the screenshot above.
+own symbols. `docs/make_screenshot.py` rebuilds the screenshot above, and
+`examples/make_examples.py` regenerates the sample files and previews.
+
+## Development
+
+```bash
+pip install -r requirements-dev.txt
+pytest              # full headless test suite
+pytest --quick      # skip the slower gui tests during feature work
+ruff check .        # lint
+```
+
+Tests live in `tests/` (see `tests/README.md`); they run headless via Qt's
+offscreen platform. Categories are tagged with markers so subsets can be
+run or skipped, e.g. `pytest -m "not gui"`.
 
 ## Licenses
 
