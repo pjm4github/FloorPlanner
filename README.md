@@ -58,11 +58,13 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
 - **Room boolean operations** — select two rooms (Ctrl+click their names)
   and the **Rooms** menu treats their perimeters as polygons: *Combine*
   unions them (dropping the shared interior walls), *Intersect* keeps just
-  the overlap, *Subtract* removes the second room from the first, and
-  *Fragment* splits them into three walled rooms (each room minus the
-  overlap, plus the overlap itself). Each result is freshly walled and
-  re-detected; the *Fragment* pieces are each put in their own group with a
-  full set of walls, so you can move any piece and it stays enclosed.
+  the overlap, and *Subtract* removes the second room from the first. Each
+  result is freshly walled and re-detected.
+- **Fragment** — *Rooms ▸ Fragment* splits two overlapping rooms into three
+  pieces — each room minus the overlap, plus the overlap itself — and puts
+  **each piece in its own group with a complete set of walls** (shared
+  edges get a wall per piece). So you can drag any fragment away and it
+  stays a fully enclosed room while the others keep theirs.
 - **Nudging** — arrow keys move the selected group or furnishing by the
   wall-snap step; hold Ctrl for a fine 1" step.
 - **Settings** — File ▸ Settings… controls the wall snap (default 6" on
