@@ -55,6 +55,8 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   a location auto-place on the first clear spot. Rooms that fall outside
   the canvas **grow it to fit** (up to 500'; larger values are rejected as
   typos). See [`examples/`](examples/) for sample files and previews.
+- **Nudging** — arrow keys move the selected group or furnishing by the
+  wall-snap step; hold Ctrl for a fine 1" step.
 - **Settings** — File ▸ Settings… controls the wall snap (default 6" on
   centre), the rotation snap (default 15°) and the canvas size (default
   100' × 70'). All are saved with the plan.
@@ -88,6 +90,7 @@ so no system fonts are needed.
 | Multi-select | Ctrl+drag a rubber band (encloses items / a room), Ctrl+click to toggle |
 | Group / ungroup | **Ctrl+G** / **Ctrl+Shift+G** |
 | Rotate a group | Select it, drag the rotation handle (Ctrl = snapped) |
+| Nudge selection | Arrow keys (Ctrl = fine 1" step) |
 | Cut / copy / paste | **Ctrl+X** / **Ctrl+C** / **Ctrl+V** |
 | Import / export rooms (CSV) | File menu |
 | Delete | Select + **Del** |

@@ -3058,6 +3058,16 @@ class PlanView(QGraphicsView):
     def keyPressEvent(self, e):
         if e.key() == Qt.Key.Key_Escape:
             self.cancel_temp()
+            super().keyPressEvent(e)
+            return
+        nudges = {Qt.Key.Key_Left: (-1, 0), Qt.Key.Key_Right: (1, 0),
+                  Qt.Key.Key_Up: (0, -1), Qt.Key.Key_Down: (0, 1)}
+        if e.key() in nudges:
+            dx, dy = nudges[e.key()]
+            fine = bool(e.modifiers() & Qt.KeyboardModifier.ControlModifier)
+            if self.win.nudge_selected(dx, dy, fine):
+                e.accept()
+                return
         super().keyPressEvent(e)
 
     def cancel_temp(self):
@@ -3334,6 +3344,22 @@ class MainWindow(QMainWindow):
         self.a_group.setEnabled(n >= 2)
         self.a_ungroup.setEnabled(
             any(isinstance(it, GroupItem) for it in sel))
+
+    def nudge_selected(self, dx: int, dy: int, fine: bool = False) -> bool:
+        """Arrow-key nudge of selected groups / ungrouped furnishings by one
+        wall-snap step (a fine 1" step with Ctrl).  Returns True if anything
+        moved."""
+        step = SNAP_STEP if fine else SETTINGS["wall_snap_in"]
+        moved = 0
+        for it in self.scene.selectedItems():
+            if isinstance(it, GroupItem):
+                it.setPos(it.pos().x() + dx * step, it.pos().y() + dy * step)
+                it.bake()                 # fold the move into the members
+                moved += 1
+            elif isinstance(it, FurnishingItem) and it.group() is None:
+                it.setPos(it.pos().x() + dx * step, it.pos().y() + dy * step)
+                moved += 1
+        return moved > 0
 
     def group_selected(self):
         """Group the selected walls/furnishings (existing groups merge)."""
