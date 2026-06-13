@@ -91,12 +91,39 @@ def test_room_op_resolves_grouped_rooms(fp, win):
     g1, _ = _grouped_room(fp, win, 0, 0, 120, 96, "Room 1")
     g2, _ = _grouped_room(fp, win, 72, 48, 120, 96, "Room 2")
     win._sel_order = [g1, g2]
-    assert len(win._selected_rooms()) == 2      # two groups -> two rooms
+    assert len(win._selected_room_shapes()) == 2   # two groups -> two rooms
     win.room_boolean("combine")
     rooms = _rooms(fp, win)
     groups = [it for it in win.scene.items() if isinstance(it, fp.GroupItem)]
     assert len(rooms) == 1
     assert len(groups) == 0                      # source groups dissolved
+    assert rooms[0].area_sqft == pytest.approx(144, abs=2)
+
+
+def test_room_op_resolves_grouped_wall_loops(fp, win):
+    # grouped wall-loops with NO RoomItem labels (the saved-overlap case):
+    # the polygon comes from tracing the loop
+    sc = win.scene
+
+    def loop(x, y, w, h):
+        corners = [QPointF(x, y), QPointF(x + w, y),
+                   QPointF(x + w, y + h), QPointF(x, y + h)]
+        g = fp.GroupItem()
+        sc.addItem(g)
+        for i in range(4):
+            wseg = fp.WallItem(corners[i], corners[(i + 1) % 4], "interior")
+            sc.addItem(wseg)
+            g.adopt(wseg)
+        return g
+
+    g1, g2 = loop(0, 0, 120, 96), loop(72, 48, 120, 96)
+    win._sel_order = [g1, g2]
+    assert len(win._selected_room_shapes()) == 2
+    win.room_boolean("combine")
+    rooms = _rooms(fp, win)
+    groups = [it for it in win.scene.items() if isinstance(it, fp.GroupItem)]
+    assert len(rooms) == 1
+    assert len(groups) == 0
     assert rooms[0].area_sqft == pytest.approx(144, abs=2)
 
 

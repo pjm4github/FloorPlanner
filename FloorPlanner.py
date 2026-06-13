@@ -2820,6 +2820,41 @@ def group_room(group):
     return None
 
 
+def trace_wall_loop(walls):
+    """Ordered corner points of the single closed loop formed by `walls`
+    (e.g. a grouped wall-loop with no RoomItem), or None if they don't form
+    one simple loop."""
+    if len(walls) < 3:
+        return None
+
+    def key(p):
+        return (round(p.x() * 2) / 2.0, round(p.y() * 2) / 2.0)
+
+    pts, adj = {}, {}
+    for w in walls:
+        a, b = key(w.p1), key(w.p2)
+        if a == b:
+            continue
+        pts[a], pts[b] = w.p1, w.p2
+        adj.setdefault(a, []).append(b)
+        adj.setdefault(b, []).append(a)
+    if not adj or any(len(v) != 2 for v in adj.values()):
+        return None
+    start = next(iter(adj))
+    loop, prev, cur = [start], None, start
+    while True:
+        nxt = next((n for n in adj[cur] if n != prev), None)
+        if nxt is None or nxt == start:
+            break
+        loop.append(nxt)
+        prev, cur = cur, nxt
+        if len(loop) > len(adj):
+            return None
+    if len(loop) != len(adj):
+        return None                # not one loop covering every node
+    return [QPointF(pts[k]) for k in loop]
+
+
 class PlanView(QGraphicsView):
     def __init__(self, scene, win):
         super().__init__(scene)
@@ -3446,9 +3481,9 @@ class MainWindow(QMainWindow):
         self.a_group.setEnabled(n >= 2)
         self.a_ungroup.setEnabled(
             any(isinstance(it, GroupItem) for it in sel))
-        # room ops act on two rooms, selected directly or via their groups
+        # room ops act on two rooms/wall-loops, selected directly or grouped
         for a in getattr(self, "_room_op_actions", []):
-            a.setEnabled(len(self._selected_rooms()) == 2)
+            a.setEnabled(len(self._selected_room_shapes()) == 2)
 
     def nudge_selected(self, dx: int, dy: int, fine: bool = False) -> bool:
         """Arrow-key nudge of selected groups / ungrouped furnishings by one
@@ -3466,17 +3501,38 @@ class MainWindow(QMainWindow):
                 moved += 1
         return moved > 0
 
-    def _selected_rooms(self):
-        """Ordered (room, source) pairs from the selection: a directly
-        selected room, or the room a selected group encloses."""
-        pairs, seen = [], set()
+    def _selected_room_shapes(self):
+        """Ordered list of room shapes from the selection.  Each is a dict
+        {corners, name, props, walls, room, group}.  A shape comes from a
+        directly selected room, the room a selected group encloses, or --
+        when a group is just a closed wall-loop with no RoomItem -- the
+        traced loop itself."""
+        shapes, seen = [], set()
         for it in getattr(self, "_sel_order", []):
-            room = it if isinstance(it, RoomItem) else (
-                group_room(it) if isinstance(it, GroupItem) else None)
-            if room is not None and room not in seen:
-                seen.add(room)
-                pairs.append((room, it))
-        return pairs
+            shape = None
+            if isinstance(it, RoomItem) and it.corners:
+                shape = {"corners": [QPointF(c) for c in it.corners],
+                         "name": it.name, "props": dict(it.properties),
+                         "walls": list(it.bounding_walls()),
+                         "room": it, "group": None, "key": id(it)}
+            elif isinstance(it, GroupItem):
+                gw = [c for c in it.childItems() if isinstance(c, WallItem)]
+                room = group_room(it)
+                if room is not None and room.corners:
+                    shape = {"corners": [QPointF(c) for c in room.corners],
+                             "name": room.name, "props": dict(room.properties),
+                             "walls": gw, "room": room, "group": it,
+                             "key": id(room)}
+                else:
+                    loop = trace_wall_loop(gw)
+                    if loop:
+                        shape = {"corners": loop, "name": "Room", "props": {},
+                                 "walls": gw, "room": None, "group": it,
+                                 "key": id(it)}
+            if shape is not None and shape["key"] not in seen:
+                seen.add(shape["key"])
+                shapes.append(shape)
+        return shapes
 
     def room_boolean(self, op: str):
         """Boolean op on the two selected rooms' perimeter polygons.
@@ -3484,48 +3540,47 @@ class MainWindow(QMainWindow):
         combine = union, intersect = overlap only, subtract = first room
         minus second (selection order), fragment = the three pieces
         (first-only, second-only, overlap).  The two rooms may be selected
-        directly or via their groups.  The inputs and their walls are
-        replaced by freshly walled result rooms."""
-        pairs = self._selected_rooms()
-        if len(pairs) != 2:
-            self.status("Select two rooms (or two grouped rooms) first.")
+        directly, via their groups, or as grouped wall-loops.  The inputs
+        and their walls are replaced by freshly walled result rooms."""
+        shapes = self._selected_room_shapes()
+        if len(shapes) != 2:
+            self.status("Select two rooms or grouped wall-loops first.")
             return
-        (r1, src1), (r2, src2) = pairs
-        # free any grouped rooms so their walls become normal scene walls
-        for src in (src1, src2):
-            if isinstance(src, GroupItem) and src.scene() is not None:
-                src.bake()
-                src.dissolve()
-        if not r1.corners or not r2.corners:
-            self.status("Both rooms need a traced wall perimeter.")
-            return
+        s1, s2 = shapes
         sc = self.scene
-        p1, p2 = (room_path_from_corners(r1.corners),
-                  room_path_from_corners(r2.corners))
+        # free any grouped sources so their walls are normal scene walls
+        for s in (s1, s2):
+            g = s["group"]
+            if g is not None and g.scene() is not None:
+                g.bake()
+                g.dissolve()
+        p1, p2 = (room_path_from_corners(s1["corners"]),
+                  room_path_from_corners(s2["corners"]))
         overlap = p1.intersected(p2)
-        name1, name2 = r1.name, r2.name
+        name1, name2 = s1["name"], s2["name"]
         if op in ("intersect", "subtract", "fragment") \
                 and path_area_sqft(overlap) < 1.0:
             self.status(f"{name1} and {name2} do not overlap.")
             return
 
         if op == "combine":
-            results = [(p1.united(p2), name1, dict(r1.properties))]
+            results = [(p1.united(p2), name1, s1["props"])]
         elif op == "subtract":
-            results = [(p1.subtracted(p2), name1, dict(r1.properties))]
+            results = [(p1.subtracted(p2), name1, s1["props"])]
         elif op == "intersect":
             results = [(overlap, "Overlap", {})]
         elif op == "fragment":
-            results = [(p1.subtracted(p2), name1, dict(r1.properties)),
-                       (p2.subtracted(p1), name2, dict(r2.properties)),
+            results = [(p1.subtracted(p2), name1, s1["props"]),
+                       (p2.subtracted(p1), name2, s2["props"]),
                        (overlap, "Overlap", {})]
         else:
             return
 
-        # drop the input rooms and the walls that bounded them
-        old_walls = set(r1.bounding_walls()) | set(r2.bounding_walls())
-        sc.removeItem(r1)
-        sc.removeItem(r2)
+        # drop the input rooms and the walls that defined them
+        old_walls = set(s1["walls"]) | set(s2["walls"])
+        for s in (s1, s2):
+            if s["room"] is not None and s["room"].scene() is not None:
+                sc.removeItem(s["room"])
         for w in old_walls:
             if w.scene() is not None:
                 sc.removeItem(w)
