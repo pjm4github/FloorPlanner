@@ -87,6 +87,31 @@ def test_fragment_groups_each_piece_with_its_own_walls(fp, win):
     assert all(enclosed(r) for r in _rooms(fp, win))
 
 
+def test_refresh_rooms_drops_unwalled(fp, win):
+    sc = win.scene
+
+    def make(x, y, w, h, name):
+        for p1, p2 in [((x, y), (x + w, y)), ((x + w, y), (x + w, y + h)),
+                       ((x + w, y + h), (x, y + h)), ((x, y + h), (x, y))]:
+            sc.addItem(fp.WallItem(QPointF(*p1), QPointF(*p2), "interior"))
+        fp.rebuild_all_walls(sc)
+        res = fp.detect_room(sc, QPointF(x + w / 2, y + h / 2))
+        r = fp.RoomItem(name, QPointF(x + w / 2, y + h / 2), res[0], res[1],
+                        corners=res[2])
+        sc.addItem(r)
+        return r
+
+    make(0, 0, 144, 96, "Den")
+    orphan = make(300, 0, 144, 96, "Orphan")
+    for w in list(orphan.bounding_walls()):       # leave its gray behind
+        sc.removeItem(w)
+    fp.rebuild_all_walls(sc)
+
+    win.refresh_rooms_cmd()
+    names = {r.name for r in sc.items() if isinstance(r, fp.RoomItem)}
+    assert names == {"Den"}                       # the unwalled room is gone
+
+
 def test_room_op_needs_two_rooms(fp, win):
     r1, _ = _overlapping_rooms(fp, win)
     win._sel_order = [r1]                       # only one selected

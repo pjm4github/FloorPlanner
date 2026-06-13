@@ -2793,6 +2793,16 @@ def interior_point(poly) -> QPointF:
     return c
 
 
+def room_walled(scene, room) -> bool:
+    """True while the room's region is still enclosed by walls -- a flood
+    fill from inside it doesn't escape to the canvas edge."""
+    pts = []
+    if room.corners:
+        pts.append(interior_point(QPolygonF(room.corners)))
+    pts.append(room.anchor)
+    return any(detect_room(scene, p) is not None for p in pts)
+
+
 def group_room(group):
     """The room whose perimeter the group's walls fully enclose, or None --
     so a grouped (extracted) room can be picked up from its group."""
@@ -3387,6 +3397,10 @@ class MainWindow(QMainWindow):
             a.triggered.connect(lambda _checked, o=op: self.room_boolean(o))
             m_rooms.addAction(a)
             self._room_op_actions.append(a)
+        m_rooms.addSeparator()
+        a_refresh = QAction("&Refresh rooms (drop unwalled)", self)
+        a_refresh.triggered.connect(self.refresh_rooms_cmd)
+        m_rooms.addAction(a_refresh)
 
         self.scene.selectionChanged.connect(self._update_edit_actions)
         self._update_edit_actions()
@@ -3486,6 +3500,20 @@ class MainWindow(QMainWindow):
                 it.setPos(it.pos().x() + dx * step, it.pos().y() + dy * step)
                 moved += 1
         return moved > 0
+
+    def refresh_rooms_cmd(self):
+        """Re-scan the canvas: delete any room whose region is no longer
+        enclosed by walls (e.g. a gray area left behind after its walls
+        were moved away), then re-detect the survivors."""
+        sc = self.scene
+        removed = 0
+        for it in list(sc.items()):
+            if isinstance(it, RoomItem) and not room_walled(sc, it):
+                sc.removeItem(it)
+                removed += 1
+        refresh_rooms(sc)                 # re-detect the survivors' regions
+        self.status(f"Rooms refreshed — removed {removed} orphaned room(s)."
+                    if removed else "Rooms refreshed — all rooms are walled.")
 
     def _selected_room_shapes(self):
         """Ordered list of room shapes from the selection.  Each is a dict
