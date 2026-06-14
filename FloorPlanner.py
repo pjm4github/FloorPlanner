@@ -289,7 +289,7 @@ DEFAULT_ROOM_PROPS = {
 }
 
 FILE_FORMAT = "floorplanner-json"
-FILE_VERSION = 1
+FILE_VERSION = 2          # v2: walls carry an owning-room tag (rooms own walls)
 
 APP_NAME = "FloorPlanner"
 APP_VERSION = "1.0"
@@ -1054,6 +1054,9 @@ def refresh_rooms(scene):
                 break
         if res is not None:
             it.set_region(*res)
+            # re-affirm wall ownership against the new perimeter; settle=False
+            # so we don't recurse back into rebuild_all_walls/refresh_rooms
+            bind_room_walls(scene, it, settle=False)
 
 
 def _room_probe_points(room) -> list:
@@ -1101,6 +1104,7 @@ class WallItem(QGraphicsItem):
         self.p1 = QPointF(p1)
         self.p2 = QPointF(p2)
         self.openings = []            # OpeningItem children
+        self.room = None              # owning RoomItem (None = unbound)
         self._drawing = False         # True while being rubber-banded
         self._mode = None             # None | 'p1' | 'p2' | 'move'
         self._path = QPainterPath()
@@ -1109,6 +1113,15 @@ class WallItem(QGraphicsItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setZValue(0)
         self.rebuild()
+
+    def itemChange(self, change, value):
+        # when removed from the scene, release the room that owns this wall so
+        # RoomItem.walls never keeps a reference to a deleted item
+        if (change == QGraphicsItem.GraphicsItemChange.ItemSceneChange
+                and value is None and self.room is not None
+                and not sip.isdeleted(self.room)):
+            self.room.unbind_wall(self)
+        return super().itemChange(change, value)
 
     # -- basic geometry ------------------------------------------------------
     @property
@@ -1261,6 +1274,8 @@ class WallItem(QGraphicsItem):
         if not self.isSelected():
             self.scene().clearSelection()
         self.setSelected(True)
+        if self.room is not None:          # bring the owning room to the front
+            self.room.raise_to_front()
 
         sp = e.scenePos()
         tol = max(8.0, 12.0 / self._view_scale())
@@ -1626,6 +1641,8 @@ class OpeningItem(QGraphicsItem):
         if not self.isSelected():
             self.scene().clearSelection()
         self.setSelected(True)
+        if self.wall is not None and self.wall.room is not None:
+            self.wall.room.raise_to_front()
         e.accept()
 
     def mouseMoveEvent(self, e):
@@ -1714,6 +1731,9 @@ class RoomItem(QGraphicsItem):
         self.path = QPainterPath(path)
         self.area_sqft = float(area_sqft)
         self.corners = [QPointF(c) for c in corners] if corners else None
+        self.walls = []                  # WallItems this room owns (edge loop)
+        self._moving_room = False        # drag-the-name moves the whole room
+        self._room_grab = QPointF(0.0, 0.0)
         self.show_dims = False
         self.properties = dict(DEFAULT_ROOM_PROPS)
         if properties:
@@ -1828,6 +1848,50 @@ class RoomItem(QGraphicsItem):
         band = self._boundary_band()
         return [it for it in sc.items()
                 if isinstance(it, WallItem) and it._hit.intersects(band)]
+
+    # -- owned walls (the room's edge loop) ----------------------------------
+    def bind_wall(self, w):
+        """Make this room the owner of wall `w` (stealing it from any prior
+        owner).  A wall belongs to at most one room."""
+        if w.room is self:
+            if w not in self.walls:
+                self.walls.append(w)
+            return
+        if w.room is not None:
+            w.room.unbind_wall(w)
+        w.room = self
+        if w not in self.walls:
+            self.walls.append(w)
+
+    def unbind_wall(self, w):
+        if w.room is self:
+            w.room = None
+        if w in self.walls:
+            self.walls.remove(w)
+
+    def clear_walls(self):
+        for w in list(self.walls):
+            self.unbind_wall(w)
+
+    def room_openings(self):
+        return [op for w in self.walls for op in w.openings]
+
+    def raise_to_front(self):
+        """Bring this room and its owned walls/openings above every other
+        room (uses a running max-z on the window; z is not serialized)."""
+        win = None
+        v = self._view()
+        if v is not None:
+            win = getattr(v, "win", None)
+        if win is None or not hasattr(win, "_z_top"):
+            return
+        win._z_top += 1
+        base = win._z_top * 10
+        for w in self.walls:
+            w.setZValue(base)
+        for op in self.room_openings():
+            op.setZValue(base + 2)
+        self.setZValue(base + 4)
 
     def opening_stats(self):
         """(window count, window glazing sq ft, door count) on this
@@ -2066,22 +2130,56 @@ class RoomItem(QGraphicsItem):
                                          exclude=self)
             self.update()
 
+    def _translate(self, dx: float, dy: float):
+        """Rigidly shift the room's owned walls, openings and region."""
+        if not dx and not dy:
+            return
+        self.prepareGeometryChange()
+        for w in self.walls:
+            w.p1 = QPointF(w.p1.x() + dx, w.p1.y() + dy)
+            w.p2 = QPointF(w.p2.x() + dx, w.p2.y() + dy)
+            w.rebuild()                       # repositions its openings too
+        self.path = QTransform.fromTranslate(dx, dy).map(self.path)
+        if self.corners:
+            self.corners = [QPointF(c.x() + dx, c.y() + dy)
+                            for c in self.corners]
+        self.anchor = QPointF(self.anchor.x() + dx, self.anchor.y() + dy)
+        self._sync_corner_props()
+        self.update()
+
     def mousePressEvent(self, e):
-        # left-drag on the name label moves the label (the room region and
-        # detection anchor stay put -- the offset rides along if the room
-        # later moves)
+        # left-drag on the name moves the WHOLE room (walls, doors/windows and
+        # region) when the room owns walls; Ctrl-drag keeps the legacy
+        # label-only nudge (and unbound rooms always nudge the label).
         if (e.button() == Qt.MouseButton.LeftButton
                 and self._label_rect().contains(e.pos())):
             self.setSelected(True)
-            c = self._label_centre()
-            self._label_grab = QPointF(e.scenePos().x() - c.x(),
-                                       e.scenePos().y() - c.y())
+            self.raise_to_front()
+            ctrl = bool(e.modifiers() & Qt.KeyboardModifier.ControlModifier)
             self._dragging_label = True
+            if self.walls and not ctrl:
+                self._moving_room = True
+                self._room_grab = QPointF(e.scenePos())
+            else:
+                self._moving_room = False
+                c = self._label_centre()
+                self._label_grab = QPointF(e.scenePos().x() - c.x(),
+                                           e.scenePos().y() - c.y())
             e.accept()
             return
         super().mousePressEvent(e)
 
     def mouseMoveEvent(self, e):
+        if self._dragging_label and self._moving_room:
+            sp = e.scenePos()
+            dx = wall_snap_len(sp.x() - self._room_grab.x())
+            dy = wall_snap_len(sp.y() - self._room_grab.y())
+            if dx or dy:
+                self._translate(dx, dy)
+                self._room_grab = QPointF(self._room_grab.x() + dx,
+                                          self._room_grab.y() + dy)
+            e.accept()
+            return
         if self._dragging_label:
             self.prepareGeometryChange()
             nx = e.scenePos().x() - self._label_grab.x()
@@ -2095,7 +2193,13 @@ class RoomItem(QGraphicsItem):
 
     def mouseReleaseEvent(self, e):
         if self._dragging_label:
-            self._dragging_label = False
+            moved, self._dragging_label, self._moving_room = (
+                self._moving_room, False, False)
+            if moved:
+                sc = self.scene()
+                if sc is not None:
+                    rebuild_all_walls(sc)     # re-detect region + re-bind walls
+                self.raise_to_front()
             e.accept()
             return
         super().mouseReleaseEvent(e)
@@ -2140,6 +2244,7 @@ class RoomItem(QGraphicsItem):
         elif chosen is a_ren:
             self._rename()
         elif chosen is a_del and self.scene() is not None:
+            self.clear_walls()           # release walls (they stay on canvas)
             self.scene().removeItem(self)
         e.accept()
 
@@ -3564,6 +3669,39 @@ def synthesize_room_edge(scene, a: QPointF, b: QPointF):
     return nw
 
 
+def bind_room_walls(scene, room, settle=True):
+    """Bind the walls enclosing `room` to it as its owned edge loop.
+
+    For each perimeter edge, an existing ownable wall whose endpoints match
+    the edge is bound directly; otherwise (a shared/party or longer wall, or
+    one already owned by a neighbour) a room-owned copy of just that edge is
+    synthesized.  This keeps adjacent rooms fully decoupled.  Idempotent:
+    re-running re-affirms the same loop without growing the wall count
+    (the previously synthesized copy is reused on the next pass).
+    Pass settle=False when called from refresh_rooms to avoid recursion."""
+    if not room.corners:
+        return
+    room.clear_walls()
+    corners = room.corners
+    n = len(corners)
+    band_walls = room.bounding_walls()
+    for i in range(n):
+        a, b = corners[i], corners[(i + 1) % n]
+        if QLineF(a, b).length() < MIN_WALL_LEN:
+            continue
+        match = next((w for w in band_walls
+                      if (w.room is None or w.room is room)
+                      and _wall_endpoints_match(w, a, b)), None)
+        if match is not None:
+            room.bind_wall(match)
+            continue
+        nw = synthesize_room_edge(scene, a, b)   # the room's own copy
+        room.bind_wall(nw)
+        band_walls.append(nw)
+    if settle:
+        rebuild_all_walls(scene)
+
+
 # ----------------------------------------------------------------------------
 # Room boolean operations (treat room perimeters as polygons)
 # ----------------------------------------------------------------------------
@@ -3802,6 +3940,8 @@ class PlanView(QGraphicsView):
         name = unique_room_name(self.scene(), name)
         room = RoomItem(name, grid_snap(sp), path, area, corners=corners)
         self.scene().addItem(room)
+        bind_room_walls(self.scene(), room)   # fuse the enclosing walls in
+        room.raise_to_front()
         if not self.win._room_sticky:
             self.win.set_tool(TOOL_SELECT)
         return room
@@ -4132,6 +4272,8 @@ class MainWindow(QMainWindow):
         # keep the toolbar totals current as rooms are added/resized/removed
         self.scene.changed.connect(self._update_totals)
         self._update_totals()
+
+        self._z_top = 0                  # running max-z for bring-to-front
 
         # undo / redo: full-document snapshots captured after each change
         # settles (debounced), so every canvas operation is reversible
@@ -4711,6 +4853,7 @@ class MainWindow(QMainWindow):
                             interior_point(QPolygonF(corners)),
                             res[0], res[1], corners=res[2], properties=props)
             sc.addItem(room)
+            bind_room_walls(sc, room)
             created += 1
             if op == "fragment" and len(ws) >= 2:
                 grp = GroupItem()
@@ -4833,6 +4976,7 @@ class MainWindow(QMainWindow):
         """Drop the history (after New / Open): the current plan becomes the
         baseline state."""
         self._dirty_timer.stop()
+        self._z_top = 0
         self._undo_stack.clear()
         self._redo_stack.clear()
         self._committed_state = self.serialize()
@@ -4969,7 +5113,12 @@ class MainWindow(QMainWindow):
                                 f"{fmt_ftin(c.height())}")
 
     def serialize(self) -> dict:
-        """Plan -> plain dict matching the documented JSON format."""
+        """Plan -> plain dict matching the documented JSON format.
+
+        The walls/rooms/furnishings arrays are emitted in a stable,
+        z-independent order (sorted by geometry) so that bring-to-front
+        z changes never alter the serialized document — keeping the
+        undo/redo snapshot comparison correct."""
         walls, rooms, furnishings = [], [], []
         for it in self.scene.items():
             if isinstance(it, FurnishingItem):
@@ -4984,13 +5133,14 @@ class MainWindow(QMainWindow):
                     "type": it.wall_type,
                     "p1": [it.p1.x(), it.p1.y()],
                     "p2": [it.p2.x(), it.p2.y()],
+                    "room": it.room.name if it.room is not None else None,
                     "openings": [{
                         "kind": op.kind,
                         "code": op.code,
                         "s": op.s,
                         "door_type": op.door_type,
                         "swing": op.swing,
-                    } for op in it.openings],
+                    } for op in sorted(it.openings, key=lambda o: o.s)],
                 })
             elif isinstance(it, RoomItem):
                 rooms.append({
@@ -5000,6 +5150,10 @@ class MainWindow(QMainWindow):
                     "show_dimensions": it.show_dims,
                     "properties": it.properties,
                 })
+        walls.sort(key=lambda w: (w["p1"], w["p2"], w["type"],
+                                  w["room"] or ""))
+        rooms.sort(key=lambda r: r["name"])
+        furnishings.sort(key=lambda f: (f["pos"], f["kind"], f["rotation"]))
         return {
             "format": FILE_FORMAT,
             "version": FILE_VERSION,
@@ -5021,6 +5175,7 @@ class MainWindow(QMainWindow):
                 SETTINGS[key] = default
         self._apply_canvas()
         self.scene.clear()
+        self._z_top = 0                  # bring-to-front counter resets per doc
         for wd in data.get("walls", []):
             wall = WallItem(QPointF(*wd["p1"]), QPointF(*wd["p2"]),
                             wd.get("type", "interior"))
@@ -5053,6 +5208,9 @@ class MainWindow(QMainWindow):
             room.show_dims = bool(rd.get("show_dimensions", False))
             room.label_offset = QPointF(*rd.get("label_offset", [0.0, 0.0]))
             self.scene.addItem(room)
+            # bind this room's walls by geometry (works for both v2 plans,
+            # which store coincident party walls, and legacy v1 plans)
+            bind_room_walls(self.scene, room, settle=False)
         unknown = []
         for fd in data.get("furnishings", []):
             kind = str(fd.get("kind", ""))
@@ -5108,6 +5266,7 @@ class MainWindow(QMainWindow):
                         dict(spec["properties"]), corners)
         room.show_dims = bool(spec["show_dimensions"])
         self.scene.addItem(room)
+        bind_room_walls(self.scene, room)
         self.status(f"Pasted room '{name}'.")
 
     # -- CSV room import ----------------------------------------------------------
@@ -5265,6 +5424,7 @@ class MainWindow(QMainWindow):
             if s["notes"]:
                 room.properties["notes"] = s["notes"]
             self.scene.addItem(room)
+            bind_room_walls(self.scene, room)
             imported += 1
 
         # -- grow width for any auto-placed room parked past the edge -----

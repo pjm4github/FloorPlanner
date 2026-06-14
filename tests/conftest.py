@@ -116,6 +116,7 @@ def make_room(fp, add_walls):
         room = fp.RoomItem(fp.unique_room_name(scene, name), centre,
                            res[0], res[1], corners=res[2])
         scene.addItem(room)
+        fp.bind_room_walls(scene, room)      # rooms own their enclosing walls
         return room
     return _make
 
@@ -134,13 +135,14 @@ def drag(qapp):
 
     QTest.mouseMove can't synthesize button-held moves, so we build real
     QMouseEvents with buttons=LeftButton and post them to the viewport."""
-    def _drag(win, scene_pt, dx_px, dy_px, steps=2):
+    def _drag(win, scene_pt, dx_px, dy_px, steps=2,
+              mods=Qt.KeyboardModifier.NoModifier):
         vp = win.view.viewport()
         start = win.view.mapFromScene(QPointF(scene_pt))
 
         def send(etype, pt, button, buttons):
             ev = QMouseEvent(etype, QPointF(pt), vp.mapToGlobal(QPointF(pt)),
-                             button, buttons, Qt.KeyboardModifier.NoModifier)
+                             button, buttons, mods)
             QApplication.sendEvent(vp, ev)
             qapp.processEvents()
 

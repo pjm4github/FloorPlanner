@@ -41,17 +41,34 @@ def test_room_label_offset_round_trips(fp, win, make_room):
 
 
 @pytest.mark.gui
-def test_room_label_drag(fp, win, make_room, drag):
+def test_room_label_ctrl_drag_nudges_label(fp, win, make_room, drag):
+    from PyQt6.QtCore import Qt
     sc = win.scene
     room = make_room(sc, 0, 0, 240, 180, "Den")
     win.set_tool(fp.TOOL_SELECT)
     win.show()
     win.zoom_fit()
     assert room.label_offset == QPointF(0, 0)
-    drag(win, room._label_centre(), 60, -40)     # drag the label right + up
+    # Ctrl+drag nudges only the label; the room (anchor) stays put
+    drag(win, room._label_centre(), 60, -40,
+         mods=Qt.KeyboardModifier.ControlModifier)
     assert room.label_offset.x() > 5
     assert room.label_offset.y() < -5
     assert room.anchor == QPointF(120, 90)       # anchor unchanged
+
+
+@pytest.mark.gui
+def test_room_plain_drag_moves_whole_room(fp, win, make_room, drag):
+    sc = win.scene
+    room = make_room(sc, 0, 0, 240, 180, "Den")
+    win.set_tool(fp.TOOL_SELECT)
+    win.show()
+    win.zoom_fit()
+    wall_y0 = [it.p1.y() for it in sc.items() if isinstance(it, fp.WallItem)]
+    drag(win, room._label_centre(), 0, 48)       # plain drag moves the room
+    assert room.anchor.y() > 90 + 5              # anchor moved with the room
+    wall_y1 = [it.p1.y() for it in sc.items() if isinstance(it, fp.WallItem)]
+    assert sum(wall_y1) > sum(wall_y0)           # the walls moved too
 
 
 def _overlapping_rooms(fp, win):

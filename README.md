@@ -23,10 +23,14 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   its perimeter along the wall centrelines, computes the true interior
   area, can draw double-headed dimension arrows on every enclosing wall
   (opposite equal walls dimensioned once), and carries a property sheet
-  (room type, ceiling, finishes, HVAC, notes…). Move or resize the
-  bounding walls and the room region re-detects and follows. Left-drag the
-  name to reposition the label within the room (it rides along when the
-  room moves). Right-click a room name for an **inventory** — its
+  (room type, ceiling, finishes, HVAC, notes…). A labelled room **owns its
+  boundary walls**: left-drag the name to move the whole room — walls,
+  doors and windows travel together — and on a shared boundary each room
+  keeps its own wall, so adjacent rooms stay aligned without disturbing one
+  another. Clicking a room's name or any of its walls brings that room to
+  the front. Ctrl-drag the name to nudge just the label; stretch an
+  individual wall to reshape the room as before. Right-click a room name
+  for an **inventory** — its
   properties plus every furnishing and opening in the room, in an aligned
   table you can copy as TSV for Excel. Rooms can be copied and pasted
   elsewhere with their walls and openings.
@@ -146,6 +150,7 @@ so no system fonts are needed.
 | Stretch / slide a wall | Drag its end / body in Select mode |
 | Place a door or window | Tool 4 / 5, click a wall, enter WWHH size |
 | Name a room | Tool 6, click an enclosed area (one-shot; Ctrl-pick the tool to keep it) |
+| Move a room (with its walls) | Drag the room name (Ctrl-drag = nudge the label only) |
 | Room dimensions / properties / inventory | Right-click the room name |
 | Place furniture | Drag from the right palette onto the plan |
 | Rotate furniture | Select it, drag the round handle (Ctrl = snapped) |
