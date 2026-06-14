@@ -29,8 +29,13 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   keeps its own wall, so adjacent rooms stay aligned without disturbing one
   another. Clicking a room's name or any of its walls brings that room to
   the front. Ctrl-drag the name to nudge just the label; stretch an
-  individual wall to reshape the room as before. Right-click a room name
-  for an **inventory** — its
+  individual wall to reshape the room as before. A room wall's end-knobs
+  are locked while it belongs to the room — right-click it and **Detach
+  wall from room** to free it (then drag its ends along the wall, or hold
+  Shift for any angle). Move a wall away and the edge it left becomes a
+  dashed **open wall** that keeps the room closed for area, drags like a
+  real wall, and disappears once a wall fills the gap again. Right-click a
+  room name for an **inventory** — its
   properties plus every furnishing and opening in the room, in an aligned
   table you can copy as TSV for Excel. Rooms can be copied and pasted
   elsewhere with their walls and openings.
@@ -151,6 +156,7 @@ so no system fonts are needed.
 | Place a door or window | Tool 4 / 5, click a wall, enter WWHH size |
 | Name a room | Tool 6, click an enclosed area (one-shot; Ctrl-pick the tool to keep it) |
 | Move a room (with its walls) | Drag the room name (Ctrl-drag = nudge the label only) |
+| Detach a wall from its room | Right-click the wall → *Detach wall from room* |
 | Room dimensions / properties / inventory | Right-click the room name |
 | Place furniture | Drag from the right palette onto the plan |
 | Rotate furniture | Select it, drag the round handle (Ctrl = snapped) |

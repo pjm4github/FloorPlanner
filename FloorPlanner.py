@@ -804,7 +804,8 @@ def detect_room_region(scene, p: QPointF):
     canvas = canvas_rect()
     if scene is None or not canvas.contains(p):
         return None
-    walls = [it for it in scene.items() if isinstance(it, WallItem)]
+    walls = [it for it in scene.items()
+             if isinstance(it, WallItem) and not it.is_open]
     if not walls:
         return None
 
@@ -893,7 +894,8 @@ def trace_room_perimeter(scene, anchor: QPointF):
     if scene is None:
         return None
     walls = [it for it in scene.items()
-             if isinstance(it, WallItem) and it.length() > 1e-6]
+             if isinstance(it, WallItem) and not it.is_open
+             and it.length() > 1e-6]
     if not walls:
         return None
 
@@ -1052,6 +1054,17 @@ def refresh_rooms(scene):
                 it.prepareGeometryChange()
                 it.anchor = QPointF(p)
                 break
+        if res is None and it.corners:
+            # the room is open (a wall was moved/detached away) so flood-fill
+            # escapes.  Trace the room's OWN loop (real + open walls) so it
+            # follows wall/open-wall drags; if an edge lost its wall the loop
+            # won't close, so spawn open walls from the last corners and retry
+            loop = trace_wall_loop(it.walls)
+            if loop is None:
+                bind_room_walls(scene, it, settle=False)
+                loop = trace_wall_loop(it.walls)
+            if loop:
+                res = (room_path_from_corners(loop), poly_area_sqft(loop), loop)
         if res is not None:
             it.set_region(*res)
             # re-affirm wall ownership against the new perimeter; settle=False
@@ -1098,6 +1111,8 @@ class WallItem(QGraphicsItem):
     `s` along the wall from p1, so they ride along when the wall moves.
     """
 
+    is_open = False                   # OpenWall (a dashed gap) sets this True
+
     def __init__(self, p1: QPointF, p2: QPointF, wall_type: str = "exterior"):
         super().__init__()
         self.wall_type = wall_type
@@ -1105,6 +1120,7 @@ class WallItem(QGraphicsItem):
         self.p2 = QPointF(p2)
         self.openings = []            # OpeningItem children
         self.room = None              # owning RoomItem (None = unbound)
+        self._detached = False        # pulled out of its room via the menu
         self._drawing = False         # True while being rubber-banded
         self._mode = None             # None | 'p1' | 'p2' | 'move'
         self._path = QPainterPath()
@@ -1227,11 +1243,13 @@ class WallItem(QGraphicsItem):
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.setPen(QPen(QColor(0, 122, 255), 0))
             painter.drawPath(self._path)
-            hs = 9.0 / lod
-            painter.setPen(QPen(QColor(40, 40, 40), 0))
-            painter.setBrush(QBrush(QColor(255, 200, 0)))
-            for q in (self.p1, self.p2):
-                painter.drawRect(QRectF(q.x() - hs / 2, q.y() - hs / 2, hs, hs))
+            if self._ends_editable():       # endpoint knobs only when active
+                hs = 9.0 / lod
+                painter.setPen(QPen(QColor(40, 40, 40), 0))
+                painter.setBrush(QBrush(QColor(255, 200, 0)))
+                for q in (self.p1, self.p2):
+                    painter.drawRect(QRectF(q.x() - hs / 2, q.y() - hs / 2,
+                                            hs, hs))
 
         if self.isSelected() or self._drawing:
             u = self.unit()
@@ -1252,6 +1270,11 @@ class WallItem(QGraphicsItem):
         if sc and sc.views():
             return max(sc.views()[0].transform().m11(), 1e-6)
         return 1.0
+
+    def _ends_editable(self) -> bool:
+        """Endpoint knobs are active only when the wall is not part of a
+        room (detach it via the right-click menu) or it is an open wall."""
+        return self.room is None or self.is_open
 
     def mousePressEvent(self, e):
         if self.group() is not None:
@@ -1279,10 +1302,11 @@ class WallItem(QGraphicsItem):
 
         sp = e.scenePos()
         tol = max(8.0, 12.0 / self._view_scale())
-        if QLineF(sp, self.p1).length() <= tol:
+        ends = self._ends_editable()       # endpoints locked while in a room
+        if ends and QLineF(sp, self.p1).length() <= tol:
             self._mode = "p1"
             self._anchor = QPointF(self.p2)
-        elif QLineF(sp, self.p2).length() <= tol:
+        elif ends and QLineF(sp, self.p2).length() <= tol:
             self._mode = "p2"
             self._anchor = QPointF(self.p1)
         else:
@@ -1387,6 +1411,7 @@ class WallItem(QGraphicsItem):
 
     def mouseReleaseEvent(self, e):
         if self._mode is not None:
+            self._detached = False        # a moved wall re-joins normally
             self.join_endpoints()
             grow_walls_to_meet(self.scene(), self)
             rebuild_all_walls(self.scene())
@@ -1424,6 +1449,10 @@ class WallItem(QGraphicsItem):
         a_int = menu.addAction("Interior wall (4 1/2\")")
         a_int.setCheckable(True)
         a_int.setChecked(self.wall_type == "interior")
+        a_detach = None
+        if self.room is not None:
+            menu.addSeparator()
+            a_detach = menu.addAction("Detach wall from room")
         menu.addSeparator()
         a_del = menu.addAction("Delete wall")
         chosen = menu.exec(e.screenPos())
@@ -1434,10 +1463,46 @@ class WallItem(QGraphicsItem):
         elif chosen is a_int:
             self.wall_type = "interior"
             self.rebuild()
+        elif a_detach is not None and chosen is a_detach and sc is not None:
+            self.setSelected(True)
+            detach_wall_from_room(sc, self)   # opens the vacated edge
         elif chosen is a_del and sc is not None:
             sc.removeItem(self)
             rebuild_all_walls(sc)
         e.accept()
+
+
+class OpenWall(WallItem):
+    """A dashed placeholder for a room edge that has no built wall.
+
+    It belongs to a room's edge loop (so the room stays closed for area
+    and re-detection through the gap) and carries the SAME drag controls
+    as a wall, but it does not block room flood-fill and is drawn as a thin
+    dashed line.  Open walls are derived from a room's open edges, so they
+    are regenerated by bind_room_walls rather than serialized."""
+
+    is_open = True
+
+    def __init__(self, p1: QPointF, p2: QPointF, room=None):
+        super().__init__(p1, p2, "interior")
+        self.room = room
+        self.setZValue(0)
+
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        lod = max(option.levelOfDetailFromTransform(painter.worldTransform()),
+                  1e-6)
+        pen = QPen(QColor(90, 120, 170), max(1.2, 1.6 / lod),
+                   Qt.PenStyle.DashLine)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawLine(self.p1, self.p2)
+        if self.isSelected():
+            hs = 9.0 / lod
+            painter.setPen(QPen(QColor(40, 40, 40), 0))
+            painter.setBrush(QBrush(QColor(255, 200, 0)))
+            for q in (self.p1, self.p2):
+                painter.drawRect(QRectF(q.x() - hs / 2, q.y() - hs / 2, hs, hs))
 
 
 # ----------------------------------------------------------------------------
@@ -3626,7 +3691,8 @@ def _wall_along_segment(scene, a: QPointF, b: QPointF):
     """The wall whose body runs along (and spans) the segment a->b -- i.e.
     the longer wall that carries a room edge.  None if there isn't one."""
     for w in scene.items():
-        if isinstance(w, WallItem) and _wall_spans_segment(w, a, b):
+        if (isinstance(w, WallItem) and not w.is_open
+                and _wall_spans_segment(w, a, b)):
             return w
     return None
 
@@ -3670,36 +3736,76 @@ def synthesize_room_edge(scene, a: QPointF, b: QPointF):
 
 
 def bind_room_walls(scene, room, settle=True):
-    """Bind the walls enclosing `room` to it as its owned edge loop.
+    """Bind `room`'s edge loop, backing every perimeter edge with exactly one
+    item, in priority order:
 
-    For each perimeter edge, an existing ownable wall whose endpoints match
-    the edge is bound directly; otherwise (a shared/party or longer wall, or
-    one already owned by a neighbour) a room-owned copy of just that edge is
-    synthesized.  This keeps adjacent rooms fully decoupled.  Idempotent:
-    re-running re-affirms the same loop without growing the wall count
-    (the previously synthesized copy is reused on the next pass).
-    Pass settle=False when called from refresh_rooms to avoid recursion."""
+      1. a real ownable, non-detached wall whose endpoints match the edge
+         (bound directly);
+      2. else, if the edge is physically covered by a free wall (e.g. a
+         detached wall still sitting on it), leave it closed but unowned --
+         no open wall yet (the wall has to be moved away to open the room);
+      3. else, if a neighbour-owned exact wall or a longer/party wall spans
+         the edge, a room-owned copy is synthesized (keeps adjacent rooms
+         decoupled);
+      4. else an OpenWall -- a dashed gap that keeps the loop closed but is
+         not a built wall.
+
+    Idempotent: a previously synthesized copy or OpenWall is reused, so the
+    count does not grow; leftover OpenWalls that closed up are removed.
+    Pass settle=False from refresh_rooms."""
     if not room.corners:
         return
+    old_open = [w for w in room.walls if w.is_open]
     room.clear_walls()
     corners = room.corners
     n = len(corners)
     band_walls = room.bounding_walls()
+    reused_open = set()
     for i in range(n):
         a, b = corners[i], corners[(i + 1) % n]
         if QLineF(a, b).length() < MIN_WALL_LEN:
             continue
-        match = next((w for w in band_walls
+        spanning = [w for w in band_walls
+                    if not w.is_open and _wall_spans_segment(w, a, b)]
+        match = next((w for w in spanning
                       if (w.room is None or w.room is room)
+                      and not w._detached
                       and _wall_endpoints_match(w, a, b)), None)
-        if match is not None:
+        if match is not None:                            # 1. own this wall
             room.bind_wall(match)
             continue
-        nw = synthesize_room_edge(scene, a, b)   # the room's own copy
-        room.bind_wall(nw)
-        band_walls.append(nw)
+        if any(w.room is None and _wall_endpoints_match(w, a, b)
+               for w in spanning):                       # 2. covered, unowned
+            continue
+        if spanning:                                     # 3. party / neighbour
+            nw = synthesize_room_edge(scene, a, b)
+            room.bind_wall(nw)
+            band_walls.append(nw)
+            continue
+        ow = next((w for w in old_open if w not in reused_open    # 4. open edge
+                   and _wall_endpoints_match(w, a, b)), None)
+        if ow is None:
+            ow = OpenWall(QPointF(a), QPointF(b), room)
+            scene.addItem(ow)
+        else:
+            reused_open.add(ow)
+        room.bind_wall(ow)
+    for w in old_open:                       # drop open edges that closed up
+        if w not in reused_open and w.room is None and w.scene() is not None:
+            scene.removeItem(w)
     if settle:
         rebuild_all_walls(scene)
+
+
+def detach_wall_from_room(scene, wall):
+    """Pull `wall` out of its room: it becomes an independent wall (endpoints
+    editable) and its room edge opens (a dashed OpenWall takes its place)."""
+    room = wall.room
+    if room is None:
+        return
+    room.unbind_wall(wall)
+    wall._detached = True
+    bind_room_walls(scene, room)
 
 
 # ----------------------------------------------------------------------------
@@ -5128,12 +5234,15 @@ class MainWindow(QMainWindow):
                     "rotation": it.rotation(),
                     **it.extra_state(),
                 })
-            elif isinstance(it, WallItem):
+            elif isinstance(it, WallItem) and not it.is_open:
+                # open walls are derived from a room's open edges, so they are
+                # regenerated on load rather than stored
                 walls.append({
                     "type": it.wall_type,
                     "p1": [it.p1.x(), it.p1.y()],
                     "p2": [it.p2.x(), it.p2.y()],
                     "room": it.room.name if it.room is not None else None,
+                    **({"detached": True} if it._detached else {}),
                     "openings": [{
                         "kind": op.kind,
                         "code": op.code,
@@ -5179,6 +5288,7 @@ class MainWindow(QMainWindow):
         for wd in data.get("walls", []):
             wall = WallItem(QPointF(*wd["p1"]), QPointF(*wd["p2"]),
                             wd.get("type", "interior"))
+            wall._detached = bool(wd.get("detached", False))
             self.scene.addItem(wall)
             for od in wd.get("openings", []):
                 try:
@@ -5197,11 +5307,20 @@ class MainWindow(QMainWindow):
             anchor = QPointF(*rd.get("anchor", [0, 0]))
             res = detect_room(self.scene, anchor)
             if res is None:
-                # keep the room (so it survives a re-save); placeholder region
-                path = QPainterPath()
-                path.addRect(QRectF(anchor.x() - 12, anchor.y() - 12, 24, 24))
-                res = (path, 0.0, None)
-                missing.append(rd.get("name", "?"))
+                # an open room (a wall was detached/moved away) won't flood-fill
+                # -> rebuild it from the saved perimeter corners
+                saved = (rd.get("properties") or {}).get("perimeter_corners")
+                if saved and len(saved) >= 3:
+                    corners = [QPointF(c[0], c[1]) for c in saved]
+                    res = (room_path_from_corners(corners),
+                           poly_area_sqft(corners), corners)
+                else:
+                    # keep the room (so it survives a re-save); placeholder
+                    path = QPainterPath()
+                    path.addRect(QRectF(anchor.x() - 12, anchor.y() - 12,
+                                        24, 24))
+                    res = (path, 0.0, None)
+                    missing.append(rd.get("name", "?"))
             name = unique_room_name(self.scene, rd.get("name", "Room"))
             room = RoomItem(name, anchor, res[0], res[1],
                             rd.get("properties"), res[2])
