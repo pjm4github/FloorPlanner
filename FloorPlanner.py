@@ -1259,21 +1259,25 @@ class WallItem(QGraphicsItem):
             self._press = QPointF(sp)
             self._o1 = QPointF(self.p1)
             self._o2 = QPointF(self.p2)
-            # walls attached to this one stretch/shrink as it slides:
-            # corner joints (shared endpoint) and T-joints (their endpoint
-            # fused onto our body) both ride along
+            # the whole collinear side slides as one (so an open-wall gap rides
+            # along); perpendicular walls attached to the SIDE's endpoints then
+            # stretch -- corner joints fully, T-joints sideways only
             self._slide_u = self.unit()
+            self._run = self._collinear_run()
+            self._run_orig = [(w, QPointF(w.p1), QPointF(w.p2))
+                              for w in self._run]
+            run_ids = {id(w) for w in self._run}
+            run_pts = [p for w in self._run for p in (w.p1, w.p2)]
             self._attached = []
             sc, length = self.scene(), self.length()
             ux, uy = self._slide_u.x(), self._slide_u.y()
             if sc is not None:
                 for w in sc.items():
-                    if not isinstance(w, WallItem) or w is self:
+                    if not isinstance(w, WallItem) or id(w) in run_ids:
                         continue
                     for attr in ("p1", "p2"):
                         q = getattr(w, attr)
-                        if (QLineF(q, self.p1).length() < 0.6
-                                or QLineF(q, self.p2).length() < 0.6):
+                        if any(QLineF(q, rp).length() < 0.6 for rp in run_pts):
                             self._attached.append((w, attr, QPointF(q), True))
                         else:
                             vx, vy = q.x() - self.p1.x(), q.y() - self.p1.y()
@@ -1327,6 +1331,30 @@ class WallItem(QGraphicsItem):
         t = max(MIN_WALL_LEN, wall_snap_len(t))
         return QPointF(o.x() + u.x() * t, o.y() + u.y() * t)
 
+    def _collinear_run(self):
+        """The full room 'side' this wall lies on: every wall of the same room
+        (real and dashed open walls) that is collinear with it.  Body-sliding
+        the wall moves the whole side -- including the open-wall gap -- as one,
+        so the dashed segment travels with the wall."""
+        if self.room is None or self.length() < 1e-6:
+            return [self]
+        u = self.unit()
+        run = []
+        for w in self.room.walls:
+            if w is self:
+                run.append(w)
+                continue
+            if w.length() < 1e-6:
+                continue
+            wu = w.unit()
+            if abs(wu.x() * u.y() - wu.y() * u.x()) > 0.02:   # not parallel
+                continue
+            d = abs((w.p1.x() - self.p1.x()) * u.y()           # off this line?
+                    - (w.p1.y() - self.p1.y()) * u.x())
+            if d <= 1.5:
+                run.append(w)
+        return run
+
     def mouseMoveEvent(self, e):
         if self._mode is None:
             return
@@ -1352,8 +1380,13 @@ class WallItem(QGraphicsItem):
                 nx_, ny_ = -uy, ux
                 s = wall_snap_len(delta.x() * nx_ + delta.y() * ny_)
                 dx, dy = nx_ * s, ny_ * s
-            self.p1 = QPointF(self._o1.x() + dx, self._o1.y() + dy)
-            self.p2 = QPointF(self._o2.x() + dx, self._o2.y() + dy)
+            # translate the whole collinear side (self + open-wall gap + any
+            # collinear neighbours) by the same delta
+            for w, o1, o2 in self._run_orig:
+                w.p1 = QPointF(o1.x() + dx, o1.y() + dy)
+                w.p2 = QPointF(o2.x() + dx, o2.y() + dy)
+                if w is not self:
+                    w.rebuild()
             # corner joints follow fully; T-joints follow only the sideways
             # part of the slide so they stretch instead of tilting
             ux, uy = self._slide_u.x(), self._slide_u.y()
@@ -1376,6 +1409,13 @@ class WallItem(QGraphicsItem):
             if not corner_drag:
                 self.join_endpoints()
             rebuild_all_walls(self.scene())
+            # dragging a corner back so the room is fully walled again fuses
+            # the wall back in: re-lock its corners (right-click to detach
+            # again)
+            if (corner_drag and self._corners_unlocked
+                    and not any(w.is_open for w in self.room.walls)):
+                self._corners_unlocked = False
+                self.room.raise_to_front()       # normalise z back to siblings
         self._mode = None
         e.accept()
 
@@ -3757,15 +3797,17 @@ def reloop_open_room(room):
     inserted wherever consecutive walls no longer meet.  Returns
     (path, area, corners) or None."""
     prev = room.corners
-    reals = [w for w in room.walls if not w.is_open and w.length() > 1e-6]
-    if not prev or not reals:
+    # include open walls: a body-slid side carries its dashed gap, so the open
+    # edge must follow the open wall's CURRENT position, not the stale corners
+    walls = [w for w in room.walls if w.length() > 1e-6]
+    if not prev or not walls:
         return None
     n = len(prev)
     used, segs = set(), []
     for i in range(n):
         a, b = prev[i], prev[(i + 1) % n]
         best, best_d, orient = None, 1e18, None
-        for w in reals:
+        for w in walls:
             if id(w) in used:
                 continue
             d1 = QLineF(w.p1, a).length() + QLineF(w.p2, b).length()

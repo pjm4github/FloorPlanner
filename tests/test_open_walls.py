@@ -124,6 +124,48 @@ def test_corner_drag_opens_side_via_mouse(fp, win, make_room, drag):
     assert sum(isinstance(w, fp.OpenWall) for w in sc.items()) == 1
 
 
+@pytest.mark.gui
+def test_body_slide_carries_open_segment(fp, win, make_room, drag):
+    sc = win.scene
+    room = make_room(sc, 0, 0, 120, 120, "Den")
+    win.set_tool(fp.TOOL_SELECT)
+    win.resize(1100, 900)
+    win.show()
+    win.zoom_fit()
+    right = next(w for w in room.walls if not w.is_open
+                 and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
+    fp.detach_wall_from_room(sc, right)
+    m = win.view.transform().m11()
+    drag(win, QPointF(120, 120), 0, int(-60 * m), steps=4)   # open lower-right
+    assert _open_count(fp, sc) == 1
+    drag(win, QPointF(120, 30), int(36 * m), 0, steps=4)     # body-slide to x156
+    ow = next(w for w in sc.items() if isinstance(w, fp.OpenWall))
+    assert ow.p1.x() == pytest.approx(156, abs=3)            # translated, not
+    assert ow.p2.x() == pytest.approx(156, abs=3)            # sheared
+    top = next(w for w in sc.items() if isinstance(w, fp.WallItem)
+               and not w.is_open and abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1)
+    assert max(top.p1.x(), top.p2.x()) == pytest.approx(156, abs=3)  # stretched
+
+
+@pytest.mark.gui
+def test_closing_gap_refuses_and_relocks(fp, win, make_room, drag):
+    sc = win.scene
+    room = make_room(sc, 0, 0, 120, 120, "Den")
+    win.set_tool(fp.TOOL_SELECT)
+    win.resize(1100, 900)
+    win.show()
+    win.zoom_fit()
+    right = next(w for w in room.walls if not w.is_open
+                 and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
+    fp.detach_wall_from_room(sc, right)
+    m = win.view.transform().m11()
+    drag(win, QPointF(120, 120), 0, int(-60 * m), steps=4)   # open
+    assert _open_count(fp, sc) == 1 and right._corners_unlocked
+    drag(win, QPointF(120, 60), 0, int(60 * m), steps=4)     # drag end back down
+    assert _open_count(fp, sc) == 0                          # gap closed
+    assert right._corners_unlocked is False                  # fused, re-locked
+
+
 def test_undo_restores_closed_room(fp, qapp, win):
     sc = win.scene
     room = _room(fp, sc)
