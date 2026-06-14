@@ -5,6 +5,8 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
 
 ![Floor Planner screenshot](docs/screenshot.png)
 
+📸 **[Feature gallery](docs/gallery/)** — a screenshot per feature.
+
 ## Features
 
 - **Walls** — exterior (6") and interior (4½") walls drawn by click-drag,
@@ -186,8 +188,9 @@ All SVG artwork (toolbar icons, furnishing symbols, `manifest.json`,
 change or extend the library. Every furnishing SVG uses a viewBox in
 inches matching its real footprint, which is what makes true-scale
 placement work; see `assets/furnishings/README.md` for how to add your
-own symbols. `docs/make_screenshot.py` rebuilds the screenshot above, and
-`examples/make_examples.py` regenerates the sample files and previews.
+own symbols. `docs/make_gallery.py` rebuilds the hero screenshot above and
+the [feature gallery](docs/gallery/), and `examples/make_examples.py`
+regenerates the sample files and previews.
 
 ## Development
 

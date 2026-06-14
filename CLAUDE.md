@@ -36,9 +36,9 @@ When a throwaway repro is quicker than a test, use this pattern:
 - `QTest.mouseMove` does not synthesize button-held drags; build `QMouseEvent`s with `buttons=Qt.MouseButton.LeftButton` and send via `QApplication.sendEvent` to the view's viewport.
 - Delete throwaway test scripts when done.
 
-## README screenshot
+## Screenshots / feature gallery
 
-Regenerate with `python docs/make_screenshot.py` (writes `docs/screenshot.png`); update it when features change the UI.
+Regenerate with `python docs/make_gallery.py` — builds one demo plan and writes the hero `docs/screenshot.png` plus a per-feature gallery in `docs/gallery/` (canvas shots + dialog shots). When a feature changes the UI, update the relevant gallery shot there (don't hand-edit PNGs).
 
 ## Repo etiquette
 
