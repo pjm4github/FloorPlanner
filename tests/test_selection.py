@@ -80,7 +80,9 @@ def test_room_edge_on_party_wall_is_duplicated(fp, win):
     assert dup[0].length() == pytest.approx(144, abs=2)
 
 
-def test_duplicated_edge_copies_a_door(fp, win):
+def test_duplicated_edge_does_not_stack_the_door(fp, win):
+    # the duplicated party wall stays plain (the door belongs to ONE wall);
+    # it just opens its body so the door shows through -- never two on top
     sc = win.scene
     party = fp.WallItem(QPointF(120, 0), QPointF(120, 300), "interior")
     door = fp.OpeningItem(party, "door", "3280", 72)   # within the room edge
@@ -99,5 +101,6 @@ def test_duplicated_edge_copies_a_door(fp, win):
     dup = next(w for w in sc.items()
                if isinstance(w, fp.WallItem) and w is not party
                and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
-    assert len(dup.openings) == 1             # the door rode along to the copy
-    assert dup.openings[0].kind == "door"
+    assert len(dup.openings) == 0             # no duplicate door symbol
+    # but the duplicate's body is opened where the party wall's door is
+    assert not dup._path.contains(QPointF(120, 72))

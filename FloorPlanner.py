@@ -729,6 +729,36 @@ def axis_wall_intersection(target, anchor: QPointF, through: QPointF):
     return QPointF(target.p1.x() + wx * s, target.p1.y() + wy * s)
 
 
+def coincident_walls(scene, wall):
+    """Real walls that lie on the same line as `wall` and overlap its span --
+    the duplicate party walls created when adjacent rooms each own their own
+    wall on a shared boundary.  Used so a plain wall opens for the door or
+    window carried by the wall coincident with it."""
+    if scene is None or wall.length() < 1e-6:
+        return []
+    u = wall.unit()
+    length = wall.length()
+    out = []
+    for w in scene.items():
+        if not isinstance(w, WallItem) or w is wall or w.is_open \
+                or w.length() < 1e-6:
+            continue
+        wu = w.unit()
+        if abs(wu.x() * u.y() - wu.y() * u.x()) > 0.02:        # not parallel
+            continue
+        d1 = abs((w.p1.x() - wall.p1.x()) * u.y()              # off the line?
+                 - (w.p1.y() - wall.p1.y()) * u.x())
+        d2 = abs((w.p2.x() - wall.p1.x()) * u.y()
+                 - (w.p2.y() - wall.p1.y()) * u.x())
+        if d1 > 1.5 or d2 > 1.5:
+            continue
+        s1 = (w.p1.x() - wall.p1.x()) * u.x() + (w.p1.y() - wall.p1.y()) * u.y()
+        s2 = (w.p2.x() - wall.p1.x()) * u.x() + (w.p2.y() - wall.p1.y()) * u.y()
+        if max(s1, s2) > 0.5 and min(s1, s2) < length - 0.5:   # spans overlap
+            out.append(w)
+    return out
+
+
 def wall_endpoint_open(scene, p: QPointF, ignore=()) -> bool:
     """True when `p` is a free, dangling wall end: no other (non-open) wall has
     an endpoint within JOIN_TOL of it.  Walls in `ignore` are skipped (the
@@ -1040,7 +1070,7 @@ def rebuild_all_walls(scene):
         return
     for it in list(scene.items()):
         if isinstance(it, WallItem):
-            it.rebuild()
+            it.rebuild(cascade=False)        # every wall is rebuilt anyway
     refresh_rooms(scene)
 
 
@@ -1124,8 +1154,12 @@ class WallItem(QGraphicsItem):
                     return True
         return False
 
-    def rebuild(self):
-        """Recompute the painted path (with openings cut out) and hit shape."""
+    def rebuild(self, cascade=True):
+        """Recompute the painted path (with openings cut out) and hit shape.
+
+        When `cascade`, also rebuild any coincident party walls so they reopen
+        for this wall's openings (and re-solidify when an opening leaves).
+        rebuild_all_walls passes cascade=False since it rebuilds every wall."""
         self.prepareGeometryChange()
         length, t, ang = self.length(), self.t, self.angle_rad()
 
@@ -1135,12 +1169,25 @@ class WallItem(QGraphicsItem):
 
         body = QPainterPath()
         body.addRect(QRectF(-ext1, -t / 2, length + ext1 + ext2, t))
-        if self.openings:
-            holes = QPainterPath()
-            for op in self.openings:
-                half = op.width / 2
-                op.s = min(max(op.s, half), max(half, length - half))
-                holes.addRect(QRectF(op.s - half, -t / 2 - 0.5, op.width, t + 1.0))
+        holes = QPainterPath()
+        for op in self.openings:
+            half = op.width / 2
+            op.s = min(max(op.s, half), max(half, length - half))
+            holes.addRect(QRectF(op.s - half, -t / 2 - 0.5, op.width, t + 1.0))
+        # open the body where a coincident wall carries a door/window, so a
+        # plain party wall doesn't cover the opening on the wall next to it
+        if not self.is_open:
+            u = self.unit()
+            for w in coincident_walls(self.scene(), self):
+                for op in w.openings:
+                    p = w.point_at(op.s)
+                    sl = ((p.x() - self.p1.x()) * u.x()
+                          + (p.y() - self.p1.y()) * u.y())
+                    half = op.width / 2
+                    if -half < sl < length + half:
+                        holes.addRect(QRectF(sl - half, -t / 2 - 0.5,
+                                             op.width, t + 1.0))
+        if not holes.isEmpty():
             body = body.subtracted(holes)
 
         tr = QTransform()
@@ -1165,6 +1212,9 @@ class WallItem(QGraphicsItem):
         for op in self.openings:
             op.sync()
         self.update()
+        if cascade and not self.is_open:
+            for w in coincident_walls(self.scene(), self):
+                w.rebuild(cascade=False)
 
     # -- QGraphicsItem interface ---------------------------------------------
     def boundingRect(self) -> QRectF:
@@ -1715,7 +1765,7 @@ class OpeningItem(QGraphicsItem):
         s = round(self.wall.s_of(e.scenePos()))
         half = self.width / 2
         self.s = min(max(s, half), max(half, self.wall.length() - half))
-        self.wall.rebuild()
+        self.wall.rebuild()             # cascades to the coincident party wall
         e.accept()
 
     def mouseDoubleClickEvent(self, e):
@@ -3711,26 +3761,15 @@ def walls_cover_room(walls, room) -> bool:
 
 
 def synthesize_room_edge(scene, a: QPointF, b: QPointF):
-    """Create a new wall along a->b, copied from the longer wall that
-    carries that edge (its type and any openings on the span).  Used to
-    give a rubber-banded room its own copy of a shared/party wall."""
+    """Create a new wall along a->b for a room's own copy of a shared/party
+    wall.  It takes the carrier's type but NOT its openings -- a door/window
+    belongs to one wall only; this plain copy opens its body for it instead
+    (so there are never two doors or windows on top of each other)."""
     src = _wall_along_segment(scene, a, b)
     nw = WallItem(QPointF(a), QPointF(b),
                   src.wall_type if src is not None else "interior")
     scene.addItem(nw)
-    if src is not None and nw.length() > 1e-6:
-        nu = nw.unit()
-        for op in src.openings:
-            p = src.point_at(op.s)
-            s = (p.x() - a.x()) * nu.x() + (p.y() - a.y()) * nu.y()
-            if 0.0 <= s <= nw.length():
-                try:
-                    no = OpeningItem(nw, op.kind, op.code, s)
-                except ValueError:
-                    continue
-                no.door_type, no.swing = op.door_type, op.swing
-                nw.openings.append(no)
-        nw.rebuild()
+    nw.rebuild()
     return nw
 
 
@@ -4357,9 +4396,21 @@ class PlanView(QGraphicsView):
 
         s = round(wall.s_of(sp))
         s = min(max(s, w / 2), wall.length() - w / 2)
+        # never stack two openings on top of each other (on this wall or a
+        # coincident party wall): refuse if one already overlaps this span
+        ctr = wall.point_at(s)
+        for ow in [wall, *coincident_walls(self.scene(), wall)]:
+            for ex in ow.openings:
+                if QLineF(ow.point_at(ex.s), ctr).length() < (w + ex.width) / 2:
+                    QMessageBox.warning(
+                        self, "Opening in the way",
+                        "There is already a door or window here (on this wall "
+                        "or the wall coincident with it). Move or resize that "
+                        "one instead.")
+                    return
         op = OpeningItem(wall, kind, code.strip(), s)
         wall.openings.append(op)
-        wall.rebuild()
+        rebuild_all_walls(self.scene())   # coincident walls open for the new one
         if kind == "door":
             self.win.last_door = code.strip()
         else:

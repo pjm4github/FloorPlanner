@@ -124,6 +124,37 @@ def test_garage2_autosizes_to_double(fp, scene):
     assert op.width == pytest.approx(192)         # double garage door = 16'
 
 
+def _coincident_pair(fp, scene):
+    """Wall A (with a door) and a plain coincident wall B on the same line."""
+    a = fp.WallItem(QPointF(120, 0), QPointF(120, 200), "interior")
+    scene.addItem(a)
+    door = fp.OpeningItem(a, "door", "3280", 100)
+    a.openings.append(door)
+    b = fp.WallItem(QPointF(120, 0), QPointF(120, 200), "interior")
+    scene.addItem(b)
+    fp.rebuild_all_walls(scene)
+    return a, b, door
+
+
+def test_coincident_plain_wall_opens_for_neighbor_door(fp, scene):
+    a, b, door = _coincident_pair(fp, scene)
+    assert b in fp.coincident_walls(scene, a)
+    assert not b._path.contains(QPointF(120, 100))   # opened at the door
+    assert b._path.contains(QPointF(120, 180))       # solid elsewhere
+    assert len(b.openings) == 0                       # never a stacked door
+
+
+def test_coincident_void_follows_slide_and_clears_on_delete(fp, scene):
+    a, b, door = _coincident_pair(fp, scene)
+    door.s = 150
+    a.rebuild()                                       # cascades to b
+    assert b._path.contains(QPointF(120, 100))        # old spot solid again
+    assert not b._path.contains(QPointF(120, 150))    # new spot opened
+    a.openings.remove(door)
+    a.rebuild()
+    assert b._path.contains(QPointF(120, 150))        # re-solidified
+
+
 def test_window_bounding_rect_is_tight(fp, scene):
     # a wide opening must not inflate its bounding rect perpendicular to the
     # wall (that used to balloon any enclosing group's selection box)
