@@ -189,6 +189,15 @@
     "price": 0.0
   },
   {
+    "id": "walk_in_shower",
+    "name": "Luxury Walk-in Shower",
+    "category": "Bathroom",
+    "file": "walk_in_shower.svg",
+    "width_in": 60,
+    "depth_in": 42,
+    "price": 0.0
+  },
+  {
     "id": "toilet",
     "name": "Toilet",
     "category": "Bathroom",

@@ -23,6 +23,7 @@
       "dresser.svg",
       "bathtub.svg",
       "shower.svg",
+      "walk_in_shower.svg",
       "toilet.svg",
       "vanity.svg",
       "washer.svg",
@@ -123,6 +124,7 @@
     "items": [
       "bathtub.svg",
       "shower.svg",
+      "walk_in_shower.svg",
       "toilet.svg",
       "vanity.svg"
     ]

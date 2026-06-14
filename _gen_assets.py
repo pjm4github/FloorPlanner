@@ -123,6 +123,21 @@ FURNISHINGS = [
      [R(0.75, 0.75, 34.5, 34.5, 1, sw=1.2), R(3, 3, 30, 30, 1, "none", 0.6),
       L(3, 3, 33, 33, 0.4), L(33, 3, 3, 33, 0.4),
       Ci(18, 18, 1.8, "none", 0.7)]),
+    ("walk_in_shower", "Luxury Walk-in Shower", "Bathroom", 60, 42,
+     [R(0.75, 0.75, 58.5, 40.5, 1.5, sw=1.2),               # tiled enclosure
+      # faint tile grout grid
+      L(15, 0.75, 15, 41.25, 0.3), L(30, 0.75, 30, 41.25, 0.3),
+      L(45, 0.75, 45, 41.25, 0.3),
+      L(0.75, 14, 59.25, 14, 0.3), L(0.75, 28, 59.25, 28, 0.3),
+      # built-in bench seat at the left end
+      R(2.5, 2.5, 11, 37, 1.2, "#ffffff", 0.8), L(13.5, 2.5, 13.5, 39.5, 0.5),
+      # ceiling rainfall head (centre) plus a hand shower and valve trim
+      Ci(37, 21, 7.5, "none", 0.7), Ci(37, 21, 2.2, "none", 0.5),
+      Ci(24, 6.5, 1.6, "none", 0.6), Ci(30, 6.5, 1.1, "none", 0.6),
+      # linear drain along the right end
+      R(53, 4, 3.5, 34, 0.4, "none", 0.6), L(54.75, 4, 54.75, 38, 0.4),
+      # frameless glass screen on the front with a walk-in opening
+      L(31, 39.8, 58.5, 39.8, 1.6), L(31, 39.8, 31, 33, 1.2)]),
     ("toilet", "Toilet", "Bathroom", 20, 28,
      [R(2, 0.75, 16, 7, 1.5, FILL, 1),
       El(10, 17.5, 7.5, 9.5, "#ffffff", 1), El(10, 18, 5.5, 7, "none", 0.5)]),
@@ -401,7 +416,7 @@ GROUPS = [
     ("Bedroom", ["bed_king", "bed_queen", "bed_full", "bed_twin",
                  "nightstand", "dresser", "wardrobe", "armchair",
                  "tv_stand", "desk", "office_chair", "bookshelf"]),
-    ("Bathroom", ["bathtub", "shower", "toilet", "vanity"]),
+    ("Bathroom", ["bathtub", "shower", "walk_in_shower", "toilet", "vanity"]),
     ("Laundry", ["washer", "dryer"]),
     ("Garage", ["suv", "car", "motorcycle", "bicycle", "boat",
                 "boat_trailer", "workbench", "storage_shelves", "lawnmower",
