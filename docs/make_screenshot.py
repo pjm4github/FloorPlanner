@@ -7,7 +7,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.chdir(ROOT)                       # writes docs/screenshot.png
 
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QApplication
 
@@ -164,8 +164,11 @@ g.setSelected(True)
 # Framing: a full flight of stairs in the living room (steps + UP arrow are
 # drawn live from the room's ceiling height) and a residential elevator in
 # the garage
-sc.addItem(FP.make_furnishing("stairs", QPointF(250, 250), 0))
+stair = FP.make_furnishing("stairs", QPointF(250, 250), 0)
+sc.addItem(stair)
 sc.addItem(FP.make_furnishing("elevator", QPointF(650, 288), 0))
+g.setSelected(False)
+stair.setSelected(True)             # highlight the stairs for the close-up
 
 # show the new Framing palette section
 names = [grp["name"] for grp in FP.furnishing_groups()]
@@ -180,7 +183,10 @@ win._update_totals()                     # toolbar Totals: Cost / Sq. Feet
 win.resize(1500, 950)
 win.show()
 app.processEvents()
-win.zoom_fit()
+stair.setSelected(True)                  # (set_tool may have cleared it)
+# zoom in on the stairs (plus a little context) instead of fitting the plan
+target = stair.sceneBoundingRect().adjusted(-90, -50, 150, 50)
+win.view.fitInView(target, Qt.AspectRatioMode.KeepAspectRatio)
 app.processEvents()
 os.makedirs("docs", exist_ok=True)
 win.grab().save("docs/screenshot.png")
