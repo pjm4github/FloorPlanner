@@ -46,6 +46,39 @@ def test_wall_draw_orthogonal_far_from_walls(fp, win):
     assert end.y() == pytest.approx(500)   # horizontal, no off-axis pull
 
 
+def test_no_autogrow_when_released_short(fp, scene):
+    # a wall released short of another must NOT grow to reach it
+    target = fp.WallItem(QPointF(300, 0), QPointF(300, 200), "interior")
+    scene.addItem(target)
+    w = fp.WallItem(QPointF(0, 100), QPointF(250, 100), "interior")
+    scene.addItem(w)
+    fp.rebuild_all_walls(scene)
+    w.join_endpoints()
+    assert w.p2.x() == pytest.approx(250)        # stayed short, no growth
+    assert target.p2.y() == pytest.approx(200)   # target wall unchanged
+
+
+def test_draw_snaps_to_open_ended_wall(fp, win):
+    sc = win.scene
+    w = fp.WallItem(QPointF(300, 0), QPointF(300, 200), "interior")
+    sc.addItem(w)
+    fp.rebuild_all_walls(sc)
+    assert fp.wall_endpoint_open(sc, QPointF(300, 200), ignore=(w,))  # dangling
+    end = _draw_end(fp, win, (0, 102), (291, 108))
+    assert end.x() == pytest.approx(300)         # lines up with its projection
+
+
+def test_draw_ignores_fully_joined_wall(fp, win):
+    sc = win.scene
+    for a, b in [((0, 0), (200, 0)), ((200, 0), (200, 200)),
+                 ((200, 200), (0, 200)), ((0, 200), (0, 0))]:
+        sc.addItem(fp.WallItem(QPointF(*a), QPointF(*b), "interior"))
+    fp.rebuild_all_walls(sc)
+    assert not fp.wall_endpoint_open(sc, QPointF(200, 0))  # corner, not open
+    end = _draw_end(fp, win, (300, 102), (211, 108))
+    assert end.x() != pytest.approx(200)         # no snap to the joined wall
+
+
 def test_wall_length_and_point_at(fp, scene):
     w = fp.WallItem(QPointF(0, 0), QPointF(100, 0), "interior")
     scene.addItem(w)

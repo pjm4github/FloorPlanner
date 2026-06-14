@@ -238,7 +238,6 @@ DEFAULT_SETTINGS = {
 }
 SETTINGS = dict(DEFAULT_SETTINGS)
 JOIN_TOL = 9.0            # endpoints within 9" join together
-GROW_TOL = 24.0           # walls grow up to 2'-0" to meet a wall they point at
 MIN_WALL_LEN = 6.0
 
 
@@ -730,68 +729,19 @@ def axis_wall_intersection(target, anchor: QPointF, through: QPointF):
     return QPointF(target.p1.x() + wx * s, target.p1.y() + wy * s)
 
 
-def project_to_nearest_wall(scene, anchor: QPointF, p: QPointF, exclude=None,
-                            max_gap: float = GROW_TOL):
-    """Extend the ray anchor->p past `p` onto the nearest wall centreline.
-
-    Used when a wall end is released short of the wall it points at: the
-    end projects forward (up to `max_gap`) so the two connect."""
+def wall_endpoint_open(scene, p: QPointF, ignore=()) -> bool:
+    """True when `p` is a free, dangling wall end: no other (non-open) wall has
+    an endpoint within JOIN_TOL of it.  Walls in `ignore` are skipped (the
+    endpoint's own wall, and the wall being drawn)."""
     if scene is None:
-        return None
-    dx, dy = p.x() - anchor.x(), p.y() - anchor.y()
-    length = math.hypot(dx, dy)
-    if length < 1e-6:
-        return None
-    ux, uy = dx / length, dy / length
-    best, best_t = None, None
-    for it in scene.items():
-        if not isinstance(it, WallItem) or it is exclude:
+        return False
+    for w in scene.items():
+        if not isinstance(w, WallItem) or w.is_open or w in ignore:
             continue
-        ip = axis_wall_intersection(it, anchor, p)
-        if ip is None:
-            continue
-        t = (ip.x() - anchor.x()) * ux + (ip.y() - anchor.y()) * uy
-        perp = abs((ip.x() - anchor.x()) * uy - (ip.y() - anchor.y()) * ux)
-        if perp > 1.0:                    # clamped to a wall end off the ray
-            continue
-        if 0.5 < t - length <= max_gap and (best_t is None or t < best_t):
-            best, best_t = ip, t
-    return best
-
-
-def grow_walls_to_meet(scene, wall, max_gap: float = GROW_TOL):
-    """Lengthen existing walls that point at `wall` but stop short of it.
-
-    A wall grows along its own axis when its centreline's crossing with
-    `wall`'s centreline lies within `max_gap` past one of its ends, so a
-    newly drawn wall pulls the walls aimed at it into contact."""
-    if scene is None or wall.length() < 1e-6:
-        return
-    bx, by = wall.p2.x() - wall.p1.x(), wall.p2.y() - wall.p1.y()
-    lb = math.hypot(bx, by)
-    for it in scene.items():
-        if not isinstance(it, WallItem) or it is wall:
-            continue
-        la = it.length()
-        if la < 1e-6:
-            continue
-        ax_, ay_ = it.p2.x() - it.p1.x(), it.p2.y() - it.p1.y()
-        den = ax_ * by - ay_ * bx
-        if abs(den) < 1e-9:
-            continue                      # parallel: nothing to grow toward
-        ex, ey = wall.p1.x() - it.p1.x(), wall.p1.y() - it.p1.y()
-        t = (ex * by - ey * bx) / den     # crossing param along the old wall
-        u = (ex * ay_ - ey * ax_) / den   # ... and along `wall`
-        if not (-3.0 <= u * lb <= lb + 3.0):
-            continue                      # crossing misses the new wall
-        s = t * la
-        x = QPointF(it.p1.x() + ax_ * t, it.p1.y() + ay_ * t)
-        if la < s <= la + max_gap:
-            it.p2 = x
-            it.rebuild()
-        elif -max_gap <= s < 0:
-            it.p1 = x
-            it.rebuild()
+        if (QLineF(w.p1, p).length() < JOIN_TOL
+                or QLineF(w.p2, p).length() < JOIN_TOL):
+            return False
+    return True
 
 
 def detect_room_region(scene, p: QPointF):
@@ -1425,16 +1375,15 @@ class WallItem(QGraphicsItem):
             corner_drag = self._mode in ("p1", "p2") and self.room is not None
             if not corner_drag:
                 self.join_endpoints()
-                grow_walls_to_meet(self.scene(), self)
             rebuild_all_walls(self.scene())
         self._mode = None
         e.accept()
 
     def join_endpoints(self):
-        """Snap each endpoint onto a nearby endpoint of another wall, or
-        fuse it onto the body of a wall it stops near or on (T-junction).
-        Body fusing extends along this wall's own axis so the wall keeps
-        its direction."""
+        """Snap each endpoint onto a nearby endpoint of another wall, or fuse
+        it onto the body of a wall it stops on (T-junction), within JOIN_TOL.
+        Never grows a wall toward a far one -- if it doesn't reach, the gap is
+        left for the user to close by hand."""
         for attr, other in (("p1", "p2"), ("p2", "p1")):
             p = getattr(self, attr)
             q = nearest_wall_endpoint(self.scene(), p, JOIN_TOL, exclude=self)
@@ -1445,10 +1394,6 @@ class WallItem(QGraphicsItem):
                     ip = axis_wall_intersection(target, getattr(self, other), p)
                     if ip is not None and QLineF(ip, p).length() <= JOIN_TOL * 2:
                         q = ip
-            if q is None:                 # released short of the wall this
-                q = project_to_nearest_wall(self.scene(),   # end points at
-                                            getattr(self, other), p,
-                                            exclude=self)
             if q is not None:
                 setattr(self, attr, q)
         self.rebuild()
@@ -4056,9 +4001,10 @@ class PlanView(QGraphicsView):
 
     def _align_to_wall(self, exclude, pt, horizontal) -> QPointF:
         """Snap the drawn endpoint's free coordinate (x when horizontal, y
-        when vertical) to the nearest wall endpoint on that axis -- so the
-        wall lines up with the orthogonal wall it points at while staying
-        H/V.  Any gap is left as-is; the user extends to meet manually."""
+        when vertical) to the projected line of a nearby OPEN-ENDED wall (a
+        dangling end), so the new wall lines up with it while staying H/V.
+        Fully-joined walls are ignored, and any gap is left as-is -- nothing
+        auto-grows; the user extends to meet by hand."""
         sc = self.scene()
         if sc is None:
             return pt
@@ -4066,10 +4012,12 @@ class PlanView(QGraphicsView):
         base = pt.x() if horizontal else pt.y()
         best, bestd = None, tol
         for w in sc.items():
-            if not isinstance(w, WallItem) or w is exclude:
+            if not isinstance(w, WallItem) or w is exclude or w.is_open:
                 continue
-            for c in ((w.p1.x(), w.p2.x()) if horizontal
-                      else (w.p1.y(), w.p2.y())):
+            for end in (w.p1, w.p2):
+                if not wall_endpoint_open(sc, end, ignore=(w, exclude)):
+                    continue
+                c = end.x() if horizontal else end.y()
                 d = abs(base - c)
                 if d < bestd:
                     bestd, best = d, c
