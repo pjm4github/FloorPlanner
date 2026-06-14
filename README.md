@@ -85,6 +85,11 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   whose walls have been moved away, clearing gray areas left behind.
 - **Nudging** — arrow keys move the selected group or furnishing by the
   wall-snap step; hold Ctrl for a fine 1" step.
+- **Undo / redo** — the **↺ / ↻** toolbar buttons (to the right of the
+  zoom-fit magnifier, also **Ctrl+Z** / **Ctrl+Y**) step back and forward
+  through every canvas operation — drawing and moving walls, openings,
+  rooms, furnishings, groups, room boolean ops, nudges, deletes and pastes.
+  History resets when you start a new plan or open one.
 - **Inventory menu** — itemised, Excel-ready tables for the whole plan:
   *House* (rooms, doors, windows and walls), *Interior furnishings* and
   *Yard items* (furnishings split by location — cars, yard equipment and
@@ -152,6 +157,7 @@ so no system fonts are needed.
 | Plan inventories (TSV) | **Inventory** menu → House / Interior / Yard / Total |
 | Update furnishing prices (AI) | **AI** menu → *Update furnishing prices…* |
 | About / file locations | **Help** menu → *About FloorPlanner…* |
+| Undo / redo | **Ctrl+Z** / **Ctrl+Y** (or the ↺ / ↻ toolbar buttons) |
 | Cut / copy / paste | **Ctrl+X** / **Ctrl+C** / **Ctrl+V** |
 | Import / export rooms (CSV) | File menu |
 | Delete | Select + **Del** |

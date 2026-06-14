@@ -4133,6 +4133,19 @@ class MainWindow(QMainWindow):
         self.scene.changed.connect(self._update_totals)
         self._update_totals()
 
+        # undo / redo: full-document snapshots captured after each change
+        # settles (debounced), so every canvas operation is reversible
+        self._undo_stack = []
+        self._redo_stack = []
+        self._restoring = False
+        self._committed_state = self.serialize()
+        self._dirty_timer = QTimer(self)
+        self._dirty_timer.setSingleShot(True)
+        self._dirty_timer.setInterval(180)
+        self._dirty_timer.timeout.connect(self._commit_if_changed)
+        self.scene.changed.connect(self._mark_dirty)
+        self._update_undo_actions()
+
         self.resize(1280, 860)
         self.view.scale(1.1, 1.1)
         self.view.centerOn(QPointF(24 * FOOT, 16 * FOOT))
@@ -4179,6 +4192,21 @@ class MainWindow(QMainWindow):
         a_fit.setToolTip("Zoom to fit the plan  [F]")
         a_fit.triggered.connect(self.zoom_fit)
         tb.addAction(a_fit)
+
+        tb.addSeparator()
+        self.a_undo = QAction(tool_icon("undo"), "Undo", self)
+        self.a_undo.setShortcut(QKeySequence.StandardKey.Undo)
+        self.a_undo.setToolTip("Undo  [Ctrl+Z]")
+        self.a_undo.triggered.connect(self.undo)
+        self.a_undo.setEnabled(False)
+        tb.addAction(self.a_undo)
+        self.a_redo = QAction(tool_icon("redo"), "Redo", self)
+        self.a_redo.setShortcuts([QKeySequence.StandardKey.Redo,
+                                  QKeySequence("Ctrl+Y")])
+        self.a_redo.setToolTip("Redo  [Ctrl+Y]")
+        self.a_redo.triggered.connect(self.redo)
+        self.a_redo.setEnabled(False)
+        tb.addAction(self.a_redo)
 
         spacer = QWidget()                       # push the totals to the right
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding,
@@ -4234,6 +4262,9 @@ class MainWindow(QMainWindow):
         a_saveas.triggered.connect(self.save_plan_as)
         m_file.addAction(a_saveas)
         m_edit = self.menuBar().addMenu("&Edit")
+        m_edit.addAction(self.a_undo)    # same actions as the toolbar buttons
+        m_edit.addAction(self.a_redo)
+        m_edit.addSeparator()
         for label, keys, slot in [
                 ("Cu&t", QKeySequence.StandardKey.Cut, self.cut_selected),
                 ("&Copy", QKeySequence.StandardKey.Copy, self.copy_selected),
@@ -4764,6 +4795,72 @@ class MainWindow(QMainWindow):
         return {"ref": ref, "walls": walls, "furnishings": furns,
                 "grouped": len(items) > 1}
 
+    # -- undo / redo ---------------------------------------------------------
+    UNDO_LIMIT = 100
+
+    def _mark_dirty(self, *args):
+        """A scene change happened: (re)start the debounce so a burst of
+        changes (e.g. a drag) becomes one undo step once it settles."""
+        if not self._restoring:
+            self._dirty_timer.start()
+
+    def _commit_if_changed(self):
+        """Snapshot the plan as one undo step if it differs from the last
+        committed state."""
+        if self._restoring:
+            return
+        state = self.serialize()
+        if state == self._committed_state:
+            return
+        self._undo_stack.append(self._committed_state)
+        if len(self._undo_stack) > self.UNDO_LIMIT:
+            self._undo_stack.pop(0)
+        self._redo_stack.clear()
+        self._committed_state = state
+        self._update_undo_actions()
+
+    def _restore_state(self, state):
+        self._dirty_timer.stop()
+        self._restoring = True
+        try:
+            self.load_data(state)
+        finally:
+            self._restoring = False
+        self._committed_state = self.serialize()
+        self._update_undo_actions()
+
+    def _reset_undo(self):
+        """Drop the history (after New / Open): the current plan becomes the
+        baseline state."""
+        self._dirty_timer.stop()
+        self._undo_stack.clear()
+        self._redo_stack.clear()
+        self._committed_state = self.serialize()
+        self._update_undo_actions()
+
+    def undo(self):
+        self._commit_if_changed()        # fold in any pending change first
+        if not self._undo_stack:
+            self.status("Nothing to undo.")
+            return
+        self._redo_stack.append(self._committed_state)
+        self._restore_state(self._undo_stack.pop())
+        self.status("Undo.")
+
+    def redo(self):
+        self._commit_if_changed()
+        if not self._redo_stack:
+            self.status("Nothing to redo.")
+            return
+        self._undo_stack.append(self._committed_state)
+        self._restore_state(self._redo_stack.pop())
+        self.status("Redo.")
+
+    def _update_undo_actions(self):
+        if hasattr(self, "a_undo"):
+            self.a_undo.setEnabled(bool(self._undo_stack))
+            self.a_redo.setEnabled(bool(self._redo_stack))
+
     def cut_selected(self):
         spec = self._selection_spec()
         if spec is None:
@@ -4859,6 +4956,7 @@ class MainWindow(QMainWindow):
             self.current_path = None
             SETTINGS.update(DEFAULT_SETTINGS)
             self._apply_canvas()
+            self._reset_undo()
 
     # -- save / load -------------------------------------------------------------
     def _update_title(self):
@@ -5260,6 +5358,7 @@ class MainWindow(QMainWindow):
             return
         self.current_path = path
         self._update_title()
+        self._reset_undo()               # opened document is the new baseline
         self.status(f"Opened {path}")
 
     def save_plan(self):

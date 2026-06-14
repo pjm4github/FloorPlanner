@@ -533,6 +533,18 @@ TOOL_ICONS = {
         'stroke-width="1.7"/>',
         '<line x1="15" y1="15" x2="20.5" y2="20.5" stroke="#1f2937" '
         'stroke-width="2.2"/>'],
+    "undo": [
+        '<path d="M6 8 H14.5 A5.5 5.5 0 1 1 9 18.5" fill="none" '
+        'stroke="#1f2937" stroke-width="1.8" stroke-linecap="round"/>',
+        '<polyline points="9.5,4.5 6,8 9.5,11.5" fill="none" '
+        'stroke="#1f2937" stroke-width="1.8" stroke-linecap="round" '
+        'stroke-linejoin="round"/>'],
+    "redo": [
+        '<path d="M18 8 H9.5 A5.5 5.5 0 1 0 15 18.5" fill="none" '
+        'stroke="#1f2937" stroke-width="1.8" stroke-linecap="round"/>',
+        '<polyline points="14.5,4.5 18,8 14.5,11.5" fill="none" '
+        'stroke="#1f2937" stroke-width="1.8" stroke-linecap="round" '
+        'stroke-linejoin="round"/>'],
 }
 for name, body in TOOL_ICONS.items():
     (ICONS / f"{name}.svg").write_text(

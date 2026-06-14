@@ -178,6 +178,7 @@ win.furn_palette.setCurrentIndex(names.index("Framing"))
 # status bar explains it reverts to Select (Ctrl-pick to keep it)
 win.set_tool(FP.TOOL_ROOM)
 win._update_totals()                     # toolbar Totals: Cost / Sq. Feet
+win._commit_if_changed()                 # one undo step -> Undo button active
 
 # --- grab --------------------------------------------------------------------
 win.resize(1500, 950)
