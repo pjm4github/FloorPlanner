@@ -31,11 +31,13 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   the front. Ctrl-drag the name to nudge just the label; stretch an
   individual wall to reshape the room as before. A room wall's end-knobs
   are locked while it belongs to the room — right-click it and **Detach
-  wall from room** to free it (then drag its ends along the wall, or hold
-  Shift for any angle). Move a wall away and the edge it left becomes a
-  dashed **open wall** that keeps the room closed for area, drags like a
-  real wall, and disappears once a wall fills the gap again. Right-click a
-  room name for an **inventory** — its
+  wall from room** to unlock its corners (the wall stays part of the room).
+  Drag a corner along the wall (Shift for any angle) and where it pulls
+  away from its neighbour that side **opens**: a dashed **open wall**
+  bridges the gap, keeps the room closed for its area, drags like a real
+  wall, and disappears once a wall fills the gap again — so rooms no longer
+  need a wall on every side. Right-click a room name for an **inventory**
+  — its
   properties plus every furnishing and opening in the room, in an aligned
   table you can copy as TSV for Excel. Rooms can be copied and pasted
   elsewhere with their walls and openings.

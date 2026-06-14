@@ -1,7 +1,7 @@
-"""Phase 2 of the room/wall refactor: detach a wall from its room and the
-resulting dashed 'open wall' that keeps the room closed for area, is
-draggable like a wall, re-closes when a real wall fills the gap, and
-round-trips through save/load and undo."""
+"""Phase 2 of the room/wall refactor: 'Detach wall from room' unlocks a
+wall's corners (it stays part of the room); pulling a corner away from its
+neighbour opens just that side -- a dashed open wall bridges the gap, keeps
+the room closed for area, and disappears when the gap is filled again."""
 
 import json
 
@@ -24,121 +24,116 @@ def _room(fp, scene, x=0, y=0, w=120, h=120, name="A"):
     return room
 
 
+def _right_wall(fp, room):
+    return next(w for w in room.walls if not w.is_open
+                and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
+
+
 def _open_count(fp, scene):
     return sum(isinstance(w, fp.OpenWall) for w in scene.items())
 
 
-def test_detach_unlocks_wall_without_opening_yet(fp, scene):
-    # detaching alone makes the wall independent/editable but does NOT open
-    # the room (the wall still covers its edge) -- the gap appears on a move
-    room = _room(fp, scene)
-    area0 = room.area_sqft
-    wall = next(w for w in room.walls if not w.is_open)
-    fp.detach_wall_from_room(scene, wall)
-    assert wall.room is None and wall._detached
-    assert _open_count(fp, scene) == 0
-    assert room.area_sqft == pytest.approx(area0)
+def _shorten(fp, scene, wall, new_far=None):
+    """Pull the wall's far end inward (as a corner drag would)."""
+    new_far = new_far or QPointF(120, 60)
+    if abs(wall.p2.y() - 120) < 1:
+        wall.p2 = QPointF(new_far)
+    else:
+        wall.p1 = QPointF(new_far)
+    wall.rebuild()
+    fp.rebuild_all_walls(scene)
 
 
-def test_bound_wall_endpoints_locked_detached_unlocked(fp, scene):
+def test_detach_unlocks_corners_without_unbinding(fp, scene):
     room = _room(fp, scene)
-    wall = next(w for w in room.walls if not w.is_open)
+    wall = _right_wall(fp, room)
     assert wall._ends_editable() is False             # locked while in a room
     fp.detach_wall_from_room(scene, wall)
-    assert wall._ends_editable() is True              # editable once detached
-    # an open wall (after a move) is editable too
-    wall.p1, wall.p2 = QPointF(400, 0), QPointF(400, 120)
-    wall.rebuild()
-    fp.rebuild_all_walls(scene)
-    ow = next(w for w in room.walls if w.is_open)
-    assert ow._ends_editable() is True
+    assert wall.room is room                          # still part of the room
+    assert wall._corners_unlocked and wall._ends_editable()
+    assert _open_count(fp, scene) == 0                # nothing open yet
 
 
-def test_open_wall_preserves_shape_when_real_wall_moves_away(fp, scene):
+def test_pulling_a_corner_opens_that_side(fp, scene):
     room = _room(fp, scene)
-    wall = next(w for w in room.walls if abs(w.p1.x() - 120) < 1
-                and abs(w.p2.x() - 120) < 1)
+    area0 = room.area_sqft
+    wall = _right_wall(fp, room)
     fp.detach_wall_from_room(scene, wall)
-    wall.p1, wall.p2 = QPointF(300, 0), QPointF(300, 120)   # drag it away
-    wall.rebuild()
-    fp.rebuild_all_walls(scene)
+    _shorten(fp, scene, wall)                          # pull the far end to y=60
     assert _open_count(fp, scene) == 1
-    assert room.area_sqft == pytest.approx(100.0)
+    assert wall.room is room                          # the wall stays bound
+    assert room.area_sqft == pytest.approx(area0)     # loop stays closed
+    ow = next(w for w in scene.items() if isinstance(w, fp.OpenWall))
+    ys = sorted([ow.p1.y(), ow.p2.y()])
+    assert ys == pytest.approx([60, 120])             # gap is the vacated part
 
 
-def test_reclose_removes_the_open_wall(fp, scene):
+def test_filling_the_gap_recloses_the_room(fp, scene):
     room = _room(fp, scene)
-    wall = next(w for w in room.walls if abs(w.p1.x() - 120) < 1
-                and abs(w.p2.x() - 120) < 1)
+    wall = _right_wall(fp, room)
     fp.detach_wall_from_room(scene, wall)
-    wall.p1, wall.p2 = QPointF(300, 0), QPointF(300, 120)
-    wall.rebuild()
-    fp.rebuild_all_walls(scene)
+    _shorten(fp, scene, wall)
     assert _open_count(fp, scene) == 1
-    # drawing a real wall back on the edge re-closes the room
-    scene.addItem(fp.WallItem(QPointF(120, 0), QPointF(120, 120), "interior"))
+    # extend the wall back to the corner -> gap closes
+    if abs(wall.p2.y() - 60) < 1:
+        wall.p2 = QPointF(120, 120)
+    else:
+        wall.p1 = QPointF(120, 120)
+    wall.rebuild()
     fp.rebuild_all_walls(scene)
     assert _open_count(fp, scene) == 0
-    assert all(not w.is_open for w in room.walls)
 
 
-def test_dragging_open_wall_reshapes_room(fp, scene):
+def test_open_wall_is_editable(fp, scene):
     room = _room(fp, scene)
-    wall = next(w for w in room.walls if abs(w.p1.x() - 120) < 1
-                and abs(w.p2.x() - 120) < 1)
+    wall = _right_wall(fp, room)
     fp.detach_wall_from_room(scene, wall)
-    wall.p1, wall.p2 = QPointF(400, 0), QPointF(400, 120)
-    wall.rebuild()
-    fp.rebuild_all_walls(scene)
-    ow = next(w for w in room.walls if w.is_open)
-    # slide the open edge out to x=156 (its neighbours stretch with it)
-    ow.p1, ow.p2 = QPointF(156, 0), QPointF(156, 120)
-    ow.rebuild()
-    for w in room.walls:
-        if not w.is_open:
-            if abs(w.p1.x() - 120) < 1:
-                w.p1 = QPointF(156, w.p1.y())
-            if abs(w.p2.x() - 120) < 1:
-                w.p2 = QPointF(156, w.p2.y())
-            w.rebuild()
-    fp.rebuild_all_walls(scene)
-    assert room.area_sqft == pytest.approx(130.0)     # 120 x 156
+    _shorten(fp, scene, wall)
+    ow = next(w for w in scene.items() if isinstance(w, fp.OpenWall))
+    assert ow._ends_editable() is True
 
 
 def test_open_walls_not_serialized_but_room_reloads(fp, qapp, win):
     sc = win.scene
     room = _room(fp, sc)
-    wall = next(w for w in room.walls if abs(w.p1.x() - 120) < 1
-                and not w.is_open)
+    wall = _right_wall(fp, room)
     fp.detach_wall_from_room(sc, wall)
-    wall.p1, wall.p2 = QPointF(300, 0), QPointF(300, 120)
-    wall.rebuild()
-    fp.rebuild_all_walls(sc)
+    _shorten(fp, sc, wall)
     data = json.loads(json.dumps(win.serialize()))
-    assert all(not isinstance(w, dict) or "open" not in w
-               for w in data["walls"])               # open walls excluded
+    assert all("open" not in w for w in data["walls"])   # open walls excluded
     win.load_data(data)
+    assert _open_count(fp, sc) == 1                       # regenerated on load
     r = next(x for x in sc.items() if isinstance(x, fp.RoomItem))
-    assert sum(w.is_open for w in r.walls) == 1       # regenerated on load
     assert r.area_sqft == pytest.approx(100.0)
-    assert win.serialize() == data                    # idempotent
+    assert win.serialize() == data                       # idempotent
+
+
+@pytest.mark.gui
+def test_corner_drag_opens_side_via_mouse(fp, win, make_room, drag):
+    sc = win.scene
+    room = make_room(sc, 0, 0, 120, 120, "Den")
+    win.set_tool(fp.TOOL_SELECT)
+    win.show()
+    win.zoom_fit()
+    right = next(w for w in room.walls if not w.is_open
+                 and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
+    fp.detach_wall_from_room(sc, right)
+    # drag the (120,120) corner up 60 scene units -> opens the lower-right side
+    dy_px = int(-60 * win.view.transform().m11())
+    drag(win, QPointF(120, 120), 0, dy_px, steps=4)
+    assert sum(isinstance(w, fp.OpenWall) for w in sc.items()) == 1
 
 
 def test_undo_restores_closed_room(fp, qapp, win):
     sc = win.scene
     room = _room(fp, sc)
     win._commit_if_changed()
-    wall = next(w for w in room.walls if abs(w.p1.x() - 120) < 1
-                and not w.is_open)
+    wall = _right_wall(fp, room)
     fp.detach_wall_from_room(sc, wall)
-    wall.p1, wall.p2 = QPointF(300, 0), QPointF(300, 120)   # move -> opens
-    wall.rebuild()
-    fp.rebuild_all_walls(sc)
+    _shorten(fp, sc, wall)
     win._commit_if_changed()
     assert _open_count(fp, sc) == 1
     win.undo()
     assert _open_count(fp, sc) == 0
-    r = next(x for x in sc.items() if isinstance(x, fp.RoomItem))
-    assert all(not w.is_open for w in r.walls)
     win.redo()
     assert _open_count(fp, sc) == 1
