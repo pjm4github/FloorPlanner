@@ -161,9 +161,15 @@ g._apply_rotation(QPointF(gc.x() + 100 * math.cos(_ang),
 g._finish_rotation()
 g.setSelected(True)
 
-# show the new HVAC palette section
+# Framing: a full flight of stairs in the living room (steps + UP arrow are
+# drawn live from the room's ceiling height) and a residential elevator in
+# the garage
+sc.addItem(FP.make_furnishing("stairs", QPointF(250, 250), 0))
+sc.addItem(FP.make_furnishing("elevator", QPointF(650, 288), 0))
+
+# show the new Framing palette section
 names = [grp["name"] for grp in FP.furnishing_groups()]
-win.furn_palette.setCurrentIndex(names.index("HVAC"))
+win.furn_palette.setCurrentIndex(names.index("Framing"))
 
 # activate the one-shot Room Name tool: the toolbar highlights it and the
 # status bar explains it reverts to Select (Ctrl-pick to keep it)

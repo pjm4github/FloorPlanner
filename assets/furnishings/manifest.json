@@ -610,5 +610,23 @@
     "width_in": 30,
     "depth_in": 30,
     "price": 0.0
+  },
+  {
+    "id": "stairs",
+    "name": "Stairs (flight)",
+    "category": "Framing",
+    "file": "stairs.svg",
+    "width_in": 36,
+    "depth_in": 120,
+    "price": 0.0
+  },
+  {
+    "id": "elevator",
+    "name": "Residential Elevator",
+    "category": "Framing",
+    "file": "elevator.svg",
+    "width_in": 48,
+    "depth_in": 60,
+    "price": 0.0
   }
 ]

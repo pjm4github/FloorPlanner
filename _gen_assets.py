@@ -383,6 +383,21 @@ FURNISHINGS = [
       Ci(15, 15, 12.5, "none", 0.9), Ci(15, 15, 2.5, FILL, 0.7),
       L(15, 15, 15, 3.5, 0.7), L(15, 15, 25, 21, 0.7),
       L(15, 15, 5, 21, 0.7)]),                                  # fan
+
+    # -- Framing: structural elements.  The placed stair is drawn live by the
+    # app (step count from the room's ceiling height); this is the palette
+    # icon for a representative full flight.
+    ("stairs", "Stairs (flight)", "Framing", 36, 120,
+     [R(0.75, 0.75, 34.5, 118.5, 0, sw=1.2)]
+     + [L(0.75, i * 10.8 + 6.0, 35.25, i * 10.8 + 6.0, 0.6)
+        for i in range(10)]
+     + [L(18, 104, 18, 26, 1.1), Pth("M 12 36 L 18 24 L 24 36", sw=1.1)]),
+    ("elevator", "Residential Elevator", "Framing", 48, 60,
+     [R(0.75, 0.75, 46.5, 58.5, 0, sw=1.2),
+      R(4, 4, 40, 48, 0, "none", 0.6),
+      L(4, 4, 44, 52, 0.4), L(44, 4, 4, 52, 0.4),               # cab X
+      L(6, 56.5, 22, 56.5, 1.3), L(26, 56.5, 42, 56.5, 1.3),    # sliding doors
+      Ci(40, 30, 1.3, "none", 0.6)]),                           # call panel
 ]
 
 # Purchase prices are filled in at runtime by the app's AI ▸ Update
@@ -432,6 +447,7 @@ GROUPS = [
               "gas_water_heater", "electric_water_heater", "water_softener",
               "gas_tank", "oil_tank", "electric_panel", "car_charger",
               "battery_wall", "well_pump", "heat_exchanger"]),
+    ("Framing", ["stairs", "elevator"]),
 ]
 groups_out = [{"name": "All",
                "items": [f"{fid}.svg" for fid, *_ in FURNISHINGS]}]

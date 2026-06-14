@@ -69,7 +69,9 @@
       "car_charger.svg",
       "battery_wall.svg",
       "well_pump.svg",
-      "heat_exchanger.svg"
+      "heat_exchanger.svg",
+      "stairs.svg",
+      "elevator.svg"
     ]
   },
   {
@@ -206,6 +208,13 @@
       "battery_wall.svg",
       "well_pump.svg",
       "heat_exchanger.svg"
+    ]
+  },
+  {
+    "name": "Framing",
+    "items": [
+      "stairs.svg",
+      "elevator.svg"
     ]
   }
 ]

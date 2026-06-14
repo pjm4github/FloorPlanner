@@ -30,18 +30,26 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   properties plus every furnishing and opening in the room, in an aligned
   table you can copy as TSV for Excel. Rooms can be copied and pasted
   elsewhere with their walls and openings.
-- **Furnishings** — a bundled CC0 library of 68 top-view symbols across
+- **Furnishings** — a bundled CC0 library of 70 top-view symbols across
   Living, Dining, Kitchen, Bedroom, Bathroom, Laundry, Office, Garage
   (cars, boat + trailer, workbench, yard equipment), **Shop** (table saw,
   lathe, jointer, drill press, bandsaw, planer…), **Sunroom** (swim spa,
-  sauna, whirlpool, lounge chairs…) and **HVAC** (gas/electric/oil
+  sauna, whirlpool, lounge chairs…), **HVAC** (gas/electric/oil
   furnaces, water heaters, water softener, gas/oil tanks, electric panel,
-  car charger, battery wall, well pump, heat exchanger). Drag one from the
+  car charger, battery wall, well pump, heat exchanger) and **Framing**
+  (stairs, residential elevator). Drag one from the
   right-hand
   palette onto the plan and it lands at **true scale** (scene units are
   inches; a 16' SUV takes up 16'). The palette is organised in expandable
   room sections; placed items move with 1" snap and rotate via a grab
   handle (Ctrl = snap to the configured increment).
+- **Stairs** — the Framing **stairs** symbol draws the right number of
+  steps for the **ceiling height of the room it sits in** (standard ~7"
+  risers) and shows an **UP / DN** travel arrow. Right-click it to switch
+  between a **full flight** and a **half flight to a landing** that either
+  ends at half height or **turns left / right**, and to flip the arrow up
+  or down. Move it into a room with a different ceiling and the step count
+  re-computes.
 - **Groups & multi-select** — Ctrl+drag a rubber band to add items to a
   selection set, or Ctrl+click to toggle individual items. The rubber band
   only takes items it **fully encloses**, so you can lasso a single room

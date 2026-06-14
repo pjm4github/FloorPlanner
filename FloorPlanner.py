@@ -2826,6 +2826,241 @@ class FurnishingItem(QGraphicsItem):
             self.scene().removeItem(self)
         e.accept()
 
+    def extra_state(self) -> dict:
+        """Per-kind state to persist alongside kind/pos/rotation.  Plain
+        furnishings have none; subclasses (e.g. StairItem) override this."""
+        return {}
+
+
+# ----------------------------------------------------------------------------
+# Stairs — a dynamic "Framing" furnishing.  The step count comes from the
+# ceiling height of the room it sits in (standard ~7" risers); it can be a
+# full flight or a half flight to a landing that ends or turns left/right,
+# and shows an UP / DOWN arrow.
+# ----------------------------------------------------------------------------
+STAIR_WIDTH = 36.0            # standard residential stair width
+STAIR_TREAD = 10.5           # standard tread run
+STAIR_RISER = 7.0            # target riser height (drives the step count)
+DEFAULT_CEILING_IN = 96.0    # fallback when a stair is not inside a room
+
+
+class StairItem(FurnishingItem):
+    """A stair flight whose number of steps is computed from the ceiling
+    height of the room it is placed in.  `flight` is 'full' or 'half';
+    a half flight rises to a landing that either ends ('none') or turns
+    'left'/'right' for the remaining rise.  `direction` ('up'/'down')
+    flips the travel arrow."""
+
+    def __init__(self, pos: QPointF, rotation: float = 0.0, *,
+                 flight: str = "full", turn: str = "left",
+                 direction: str = "up"):
+        self.flight = flight if flight in ("full", "half") else "full"
+        self.turn = turn if turn in ("none", "left", "right") else "left"
+        self.direction = direction if direction in ("up", "down") else "up"
+        self.n_risers = 14
+        self._off = QPointF(0.0, 0.0)
+        self._geo = {"rects": [], "steps": [], "arrow": [], "label": ""}
+        super().__init__("stairs", pos, rotation)
+        self._recompute()
+
+    def extra_state(self) -> dict:
+        return {"flight": self.flight, "turn": self.turn,
+                "direction": self.direction}
+
+    # -- geometry ------------------------------------------------------------
+    def _ceiling_height(self) -> float:
+        sc = self.scene()
+        if sc is not None:
+            pt = self.scenePos()
+            for it in sc.items():
+                if isinstance(it, RoomItem) and it.path.contains(pt):
+                    return float(it.properties.get("ceiling_height_in",
+                                                   DEFAULT_CEILING_IN))
+        return DEFAULT_CEILING_IN
+
+    def _build(self) -> dict:
+        """Stair geometry in natural coords (first flight rising along +Y
+        from the origin): rectangles, interior step lines, the travel-arrow
+        polyline, and the floor-level label point."""
+        w, t = STAIR_WIDTH, STAIR_TREAD
+        treads = max(1, self.n_risers - 1)
+        rects, steps = [], []
+        if self.flight == "full":
+            run = treads * t
+            rects.append(QRectF(0, 0, w, run))
+            for i in range(1, treads):
+                steps.append((0, i * t, w, i * t))
+            line = [QPointF(w / 2, t * 0.5), QPointF(w / 2, run - t * 0.5)]
+            label_pt = QPointF(w / 2 + 1, t * 0.5)
+        else:
+            first = max(1, treads // 2)
+            second = treads - first
+            run1 = first * t
+            land = w
+            rects.append(QRectF(0, 0, w, run1))          # first flight
+            for i in range(1, first):
+                steps.append((0, i * t, w, i * t))
+            rects.append(QRectF(0, run1, w, land))       # landing
+            line = [QPointF(w / 2, t * 0.5),
+                    QPointF(w / 2, run1 + land / 2)]
+            label_pt = QPointF(w / 2 + 1, t * 0.5)
+            if self.turn in ("left", "right") and second > 0:
+                run2 = second * t
+                if self.turn == "left":
+                    rects.append(QRectF(-run2, run1, run2, w))
+                    for j in range(1, second):
+                        steps.append((-j * t, run1, -j * t, run1 + w))
+                    line.append(QPointF(-run2 + t * 0.5, run1 + w / 2))
+                else:
+                    rects.append(QRectF(w, run1, run2, w))
+                    for j in range(1, second):
+                        steps.append((w + j * t, run1, w + j * t, run1 + w))
+                    line.append(QPointF(w + run2 - t * 0.5, run1 + w / 2))
+            else:
+                line[-1] = QPointF(w / 2, run1 + land - t * 0.5)
+        return {"rects": rects, "steps": steps, "line": line,
+                "label_pt": label_pt}
+
+    def _recompute(self):
+        self.prepareGeometryChange()
+        self.n_risers = max(2, round(self._ceiling_height() / STAIR_RISER))
+        geo = self._build()
+        bbox = QRectF(geo["rects"][0])
+        for r in geo["rects"][1:]:
+            bbox = bbox.united(r)
+        self._geo = geo
+        self._bbox = bbox
+        self.w = bbox.width()
+        self.d = bbox.height()
+        self._off = QPointF(-bbox.center().x(), -bbox.center().y())
+        rise_ft = self.n_risers * STAIR_RISER / FOOT
+        kind = "full flight" if self.flight == "full" else \
+            ("half flight, ends at landing" if self.turn == "none"
+             else f"half flight, turns {self.turn}")
+        self.setToolTip(f"Stairs — {self.n_risers} risers ({kind}), "
+                        f"{self.direction.upper()}; rise ~{rise_ft:.1f} ft")
+        self.update()
+
+    def itemChange(self, change, value):
+        res = super().itemChange(change, value)
+        if change == QGraphicsItem.GraphicsItemChange.ItemSceneHasChanged:
+            self._recompute()
+        return res
+
+    def mouseReleaseEvent(self, e):
+        super().mouseReleaseEvent(e)
+        self._recompute()             # the room under the stair may differ
+
+    # -- painting ------------------------------------------------------------
+    def paint(self, painter, option, widget=None):
+        painter.save()
+        painter.translate(self._off)
+        ink = QColor(55, 65, 81)
+        painter.setPen(QPen(ink, 1.2))
+        painter.setBrush(QBrush(QColor(248, 250, 252)))
+        for r in self._geo["rects"]:
+            painter.drawRect(r)
+        painter.setPen(QPen(ink, 0.7))
+        for x1, y1, x2, y2 in self._geo["steps"]:
+            painter.drawLine(QPointF(x1, y1), QPointF(x2, y2))
+        self._paint_arrow(painter, ink)
+        painter.restore()
+        if self._handle_visible():
+            self._paint_selection(painter)
+
+    def _paint_arrow(self, painter, ink):
+        line = list(self._geo["line"])
+        if self.direction == "down":
+            line.reverse()
+        painter.setPen(QPen(ink, 1.4))
+        for a, b in zip(line[:-1], line[1:], strict=False):
+            painter.drawLine(a, b)
+        head, prev = line[-1], line[-2]
+        ang = math.atan2(head.y() - prev.y(), head.x() - prev.x())
+        for da in (math.radians(150), math.radians(-150)):
+            painter.drawLine(head, QPointF(head.x() + 7 * math.cos(ang + da),
+                                           head.y() + 7 * math.sin(ang + da)))
+        font = painter.font()
+        font.setPointSizeF(7.0)
+        font.setBold(True)
+        painter.setFont(font)
+        lp = self._geo["label_pt"]
+        painter.drawText(QRectF(lp.x(), lp.y() - 1, 24, 11),
+                         Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+                         "UP" if self.direction == "up" else "DN")
+
+    def _paint_selection(self, painter):
+        rect = QRectF(-self.w / 2, -self.d / 2, self.w, self.d)
+        blue = QColor(0, 110, 255)
+        painter.setPen(QPen(blue, 0, Qt.PenStyle.DashLine))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRect(rect.adjusted(-1, -1, 1, 1))
+        c, hr = self._handle()
+        painter.setPen(QPen(blue, 0))
+        painter.drawLine(QPointF(0.0, -self.d / 2), QPointF(c.x(), c.y() + hr))
+        painter.setBrush(QBrush(QColor(255, 255, 255)))
+        painter.drawEllipse(c, hr, hr)
+        painter.setBrush(QBrush(blue))
+        painter.drawEllipse(c, hr * 0.35, hr * 0.35)
+
+    def contextMenuEvent(self, e):
+        menu = QMenu()
+        m_flight = menu.addMenu("Flight")
+        for label, val in [("Full flight", "full"),
+                           ("Half flight (landing)", "half")]:
+            a = m_flight.addAction(label)
+            a.setCheckable(True)
+            a.setChecked(self.flight == val)
+            a.setData(("flight", val))
+        m_turn = menu.addMenu("Half-flight direction")
+        m_turn.setEnabled(self.flight == "half")
+        for label, val in [("Turn left", "left"), ("Turn right", "right"),
+                           ("End at landing", "none")]:
+            a = m_turn.addAction(label)
+            a.setCheckable(True)
+            a.setChecked(self.turn == val)
+            a.setData(("turn", val))
+        m_dir = menu.addMenu("Travel")
+        for label, val in [("Going up", "up"), ("Going down", "down")]:
+            a = m_dir.addAction(label)
+            a.setCheckable(True)
+            a.setChecked(self.direction == val)
+            a.setData(("direction", val))
+        menu.addSeparator()
+        a_cw = menu.addAction("Rotate 90° CW")
+        a_ccw = menu.addAction("Rotate 90° CCW")
+        menu.addSeparator()
+        a_del = menu.addAction("Delete stairs")
+        chosen = menu.exec(e.screenPos())
+        if chosen is None:
+            e.accept()
+            return
+        data = chosen.data()
+        if isinstance(data, tuple):
+            setattr(self, data[0], data[1])
+            self._recompute()
+        elif chosen is a_cw:
+            self.setRotation((self.rotation() + 90.0) % 360.0)
+        elif chosen is a_ccw:
+            self.setRotation((self.rotation() - 90.0) % 360.0)
+        elif chosen is a_del and self.scene() is not None:
+            self.scene().removeItem(self)
+        e.accept()
+
+
+def make_furnishing(kind: str, pos: QPointF, rotation: float = 0.0,
+                    state: dict = None):
+    """Create the right item for a catalog `kind`: a dynamic StairItem for
+    'stairs', otherwise a plain FurnishingItem.  `state` carries per-kind
+    extras (e.g. stair flight/turn/direction) from the plan/clipboard."""
+    state = state or {}
+    if kind == "stairs":
+        return StairItem(pos, rotation,
+                         flight=state.get("flight", "full"),
+                         turn=state.get("turn", "left"),
+                         direction=state.get("direction", "up"))
+    return FurnishingItem(kind, pos, rotation)
+
 
 class GroupItem(QGraphicsItemGroup):
     """A group of walls / furnishings that selects and moves as one
@@ -3770,7 +4005,7 @@ class PlanView(QGraphicsView):
         if e.mimeData().hasFormat(FURN_MIME):
             kind = bytes(e.mimeData().data(FURN_MIME)).decode("utf-8")
             sp = grid_snap(self.mapToScene(e.position().toPoint()))
-            item = FurnishingItem(kind, sp)
+            item = make_furnishing(kind, sp)
             self.scene().addItem(item)
             self.win.status(f"Placed {item.name} ({fmt_ftin(item.w)} × "
                             f"{fmt_ftin(item.d)}). Drag to move; select and "
@@ -4522,7 +4757,7 @@ class MainWindow(QMainWindow):
             else:
                 p = it.scenePos()
                 furns.append({"kind": it.kind, "pos": [p.x(), p.y()],
-                              "rotation": it.rotation()})
+                              "rotation": it.rotation(), **it.extra_state()})
                 xs.append(p.x())
                 ys.append(p.y())
         ref = [(min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2]
@@ -4587,9 +4822,9 @@ class MainWindow(QMainWindow):
             wall.rebuild()
             pasted.append(wall)
         for fd in spec["furnishings"]:
-            f = FurnishingItem(fd["kind"],
-                               QPointF(fd["pos"][0] + dx, fd["pos"][1] + dy),
-                               fd["rotation"])
+            f = make_furnishing(
+                fd["kind"], QPointF(fd["pos"][0] + dx, fd["pos"][1] + dy),
+                fd["rotation"], fd)
             self.scene.addItem(f)
             pasted.append(f)
         rebuild_all_walls(self.scene)
@@ -4644,6 +4879,7 @@ class MainWindow(QMainWindow):
                     "kind": it.kind,
                     "pos": [it.pos().x(), it.pos().y()],
                     "rotation": it.rotation(),
+                    **it.extra_state(),
                 })
             elif isinstance(it, WallItem):
                 walls.append({
@@ -4725,9 +4961,9 @@ class MainWindow(QMainWindow):
             if furnishing_spec(kind) is None:
                 unknown.append(kind or "?")
                 continue
-            self.scene.addItem(FurnishingItem(
+            self.scene.addItem(make_furnishing(
                 kind, QPointF(*fd.get("pos", [0.0, 0.0])),
-                float(fd.get("rotation", 0.0))))
+                float(fd.get("rotation", 0.0)), fd))
         notes = []
         if missing:
             notes.append("Could not re-detect room(s): " + ", ".join(missing)
