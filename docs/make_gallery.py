@@ -15,7 +15,7 @@ sys.path.insert(0, ROOT)
 os.chdir(ROOT)
 
 from PyQt6.QtCore import QPointF, QRectF, Qt
-from PyQt6.QtGui import QFont, QPixmap
+from PyQt6.QtGui import QFont, QPixmap, QTextCursor
 from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QVBoxLayout,
                              QWidget)
 
@@ -455,5 +455,24 @@ def macro_widget(macro, result, pm):
 _m_macro, _m_result, _m_pm = build_macro_demo()
 shot_widget(macro_widget(_m_macro, _m_result, _m_pm), "15-macro-driver",
             size=(1150, 560))
+
+# 16. macro recorder / debugger window (Macro ▸ Record / Debug…)
+rec = FP.MacroRecorderDialog(win)
+rec.edit.setPlainText(
+    "E DRAG 0 0 252 0\n"
+    "E DRAG 252 0 252 180\n"
+    "E DRAG 252 180 0 180\n"
+    "E DRAG 0 180 0 0\n"
+    "R ROOM Studio 126 90\n"
+    "W WINDOW 252 90 4848\n"
+    'PUP 252 90 DOWN ENTER BACKSPACE TYPE "4466" ENTER\n'
+    "PLACE bed_queen 66 66 90\n"
+    "PLACE sofa 168 150 0")
+rec.status_lbl.setText("Stopped.  Select macro text and Replay, or Save As….")
+# select the PUP line so the Replay button reads as enabled in the shot
+rec.edit.moveCursor(QTextCursor.MoveOperation.Start)
+rec.edit.find('PUP 252 90 DOWN ENTER BACKSPACE TYPE "4466" ENTER')
+rec._sync_buttons()
+shot_widget(rec, "16-macro-recorder", size=(600, 440))
 
 print("gallery complete")

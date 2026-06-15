@@ -99,3 +99,11 @@ come out — so a script or an AI can edit a plan and **see** the result. See
 [`docs/macro_language.md`](../macro_language.md).
 
 ![Macro driver](15-macro-driver.png)
+
+### Macro recorder / debugger
+The **Macro ▸ Record / Debug…** window records your clicks, keys, tool
+changes, context-menu choices and dialog text as editable macro tokens;
+select any portion and **Replay** it, or **Save As** a `.fpm` file to run
+later with `fp_macro.py`.
+
+![Macro recorder](16-macro-recorder.png)
