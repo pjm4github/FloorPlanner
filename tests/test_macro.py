@@ -231,6 +231,26 @@ def test_recorder_captures_modal_text_on_one_line(fp, win):
     assert "\n" not in text               # the whole interaction on one line
 
 
+def test_recorder_dedupes_doubled_key_delivery(fp, win):
+    # one physical key press can reach the event filter twice (propagation up
+    # the parent chain, or a re-dispatched popup/dialog key) with the SAME
+    # event object — it must be recorded only once
+    dlg = fp.MacroRecorderDialog(win)
+    dlg.start()
+    ev = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Left,
+                   Qt.KeyboardModifier.NoModifier)
+    dlg.eventFilter(win.view, ev)              # first delivery
+    dlg.eventFilter(win, ev)                   # duplicate (same object)
+    rel = QKeyEvent(QEvent.Type.KeyRelease, Qt.Key.Key_Left,
+                    Qt.KeyboardModifier.NoModifier)
+    dlg.eventFilter(win, rel)
+    ev2 = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Left,
+                    Qt.KeyboardModifier.NoModifier)
+    dlg.eventFilter(win.view, ev2)             # a genuine second press
+    dlg.stop()
+    assert dlg.edit.toPlainText().split() == ["LEFT", "LEFT"]
+
+
 def test_recorder_tool_dialog_not_double_captured(fp, win):
     # the door-tool click opens a size dialog; that typing must NOT be
     # recorded as modal keys — on_opening already records DOOR x y code

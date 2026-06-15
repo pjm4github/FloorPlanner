@@ -5981,7 +5981,7 @@ class MacroRunner:
                   "HOME": Qt.Key.Key_Home, "END": Qt.Key.Key_End,
                   "TAB": Qt.Key.Key_Tab, "BACKSPACE": Qt.Key.Key_Backspace,
                   "DELETE": Qt.Key.Key_Delete}
-    _MODAL_DELAY = 12          # ms between keys fed to a menu / modal dialog
+    _MODAL_DELAY = 20          # ms between keys fed to a menu / modal dialog
 
     def __init__(self, win):
         self.win = win
@@ -6342,17 +6342,25 @@ class MacroRunner:
         """Feed one queued action to the currently-active menu/dialog.  Runs
         from a timer so it threads through nested exec() loops; reschedules
         BEFORE sending (a key may open another modal that blocks here)."""
-        modal = (QApplication.activePopupWidget()
-                 or QApplication.activeModalWidget())
-        if modal is None:
+        popup = QApplication.activePopupWidget()
+        modal = QApplication.activeModalWidget()
+        if popup is None and modal is None:
             self._modal_queue = []                 # interaction ended
             return
         if not self._modal_queue:
-            modal.close()                          # nothing left -> cancel
+            (popup or modal).close()               # nothing left -> cancel
             return
         kind, val = self._modal_queue.pop(0)
         QTimer.singleShot(self._MODAL_DELAY, self._modal_step)
-        target = QApplication.focusWidget() or modal
+        # a popup MENU handles nav keys itself (it may not hold Qt focus, esp.
+        # on Windows), so target it directly; a modal DIALOG routes keys to its
+        # text field — find it directly since focus may not be set the instant
+        # the dialog opens
+        if popup is not None:
+            target = popup
+        else:
+            target = (modal.findChild(QLineEdit)
+                      or QApplication.focusWidget() or modal)
         if kind == "key":
             self._send_key(target, val)
         else:
@@ -6453,6 +6461,8 @@ class MacroRecorderDialog(QDialog):
         self._press_ctrl = False
         self._type_buffer = ""           # printable run while a modal is open
         self._modal_line = False         # a PUP + its menu/dialog keys, 1 line
+        self._last_key_ev = None         # de-dupe doubled key deliveries
+        self._last_key_sig = None        # (timestamp, key, mods) of last press
         self._replay_lines = []
         self._replay_idx = 0
 
@@ -6514,8 +6524,12 @@ class MacroRecorderDialog(QDialog):
         self._recording = True
         self._paused = False
         self._press_scene = None
+        self._last_key_ev = None
+        self._last_key_sig = None
         self.win._recorder = self
-        QApplication.instance().installEventFilter(self)
+        app = QApplication.instance()
+        app.removeEventFilter(self)        # ensure exactly one installation
+        app.installEventFilter(self)
         self.status_lbl.setText(
             "Recording…  Interact with the FloorPlanner window, then Stop.")
         self._sync_buttons()
@@ -6654,6 +6668,10 @@ class MacroRecorderDialog(QDialog):
 
     def _capture(self, obj, ev):
         et = ev.type()
+        if et == QEvent.Type.KeyRelease:
+            self._last_key_ev = None       # a press/release pair completed
+            self._last_key_sig = None
+            return
         if obj is self.win.view.viewport():
             if et == QEvent.Type.MouseButtonPress and \
                     ev.button() == Qt.MouseButton.LeftButton:
@@ -6682,6 +6700,17 @@ class MacroRecorderDialog(QDialog):
                 sp = self.win.view.mapToScene(ev.pos())
                 self.on_popup(sp)
         elif et == QEvent.Type.KeyPress:
+            # de-dupe: one physical key press can reach this filter more than
+            # once — Qt propagates an unaccepted key up the parent chain, and a
+            # popup/dialog re-dispatches it.  Skip a repeat of the same event
+            # object, or (for real events) the same (timestamp, key, mods); a
+            # KeyRelease resets this so genuine repeats still record.
+            ts = ev.timestamp()
+            sig = (ts, ev.key(), ev.modifiers())
+            if ev is self._last_key_ev or (ts and sig == self._last_key_sig):
+                return
+            self._last_key_ev = ev
+            self._last_key_sig = sig
             in_modal = (QApplication.activePopupWidget() is not None
                         or QApplication.activeModalWidget() is not None)
             # only capture modal keystrokes for a PUP-opened menu/dialog;
