@@ -145,6 +145,8 @@ def build():
          ("table_saw", (144, 240), 0), ("toolchest", (150, 318), 0),
          ("sofa", (320, 44), 0), ("coffee_table", (320, 102), 0),
          ("armchair", (236, 90), 75), ("tv_stand", (320, 160), 180),
+         ("large_tv", (320, 151), 0),            # flat screen above the console
+         ("gas_fireplace", (264, 10), 0),        # fireplace on the north wall
          ("dining_table", (404, 250), 90),
          ("dining_chair", (366, 228), 270), ("dining_chair", (366, 272), 270),
          ("dining_chair", (442, 228), 90), ("dining_chair", (442, 272), 90),

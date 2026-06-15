@@ -188,6 +188,20 @@ FURNISHINGS = [
     ("tv_stand", "TV Stand", "Living", 60, 16,
      [R(0.6, 0.6, 58.8, 14.8, 1), L(20, 0.6, 20, 15.4, 0.5),
       L(40, 0.6, 40, 15.4, 0.5)]),
+    ("large_tv", "Large Screen TV 75\"", "Living", 66, 4,
+     [R(0.5, 0.5, 65, 3, 0.4, sw=1.3),                          # flat panel
+      L(2, 3, 64, 3, 0.3),                                      # screen face
+      R(29, 0.5, 8, 1.2, 0.3, FILL, 0.7)]),                     # wall bracket
+    ("gas_fireplace", "Gas Fireplace 4'", "Living", 48, 20,
+     [R(0.75, 0.75, 46.5, 18.5, 1, sw=1.2),                     # surround
+      R(8, 3.5, 32, 13.5, 0.8, "none", 0.7),                    # glass firebox
+      R(13, 12.5, 22, 3, 1.5, FILL, 0.6),                       # gas logs
+      Pth("M19 7.5 c-2 2 -2 4 0 4.8 c2 -0.6 2 -2.8 0 -4.8 z",
+          "#ffffff", 0.6),
+      Pth("M24 6.3 c-2.2 2.2 -2.2 4.5 0 5.4 c2.2 -0.7 2.2 -3.2 0 -5.4 z",
+          "#ffffff", 0.7),
+      Pth("M29 7.5 c-2 2 -2 4 0 4.8 c2 -0.6 2 -2.8 0 -4.8 z",
+          "#ffffff", 0.6)]),
 
     ("dining_table", "Dining Table 6'", "Dining", 72, 36,
      [R(0.75, 0.75, 70.5, 34.5, 1.5, sw=1.2),
@@ -579,7 +593,8 @@ for fid, name, cat, w, d, body in FURNISHINGS:
 # and is the section the app opens by default.
 GROUPS = [
     ("Living Room", ["sofa", "loveseat", "armchair", "coffee_table",
-                     "side_table", "tv_stand", "bookshelf"]),
+                     "side_table", "tv_stand", "large_tv", "gas_fireplace",
+                     "bookshelf"]),
     ("Dining Room", ["dining_table", "dining_table_round", "dining_chair"]),
     ("Kitchen", ["refrigerator", "range", "dishwasher", "kitchen_sink",
                  "base_cab_24", "base_cab_36", "drawer_base_18",

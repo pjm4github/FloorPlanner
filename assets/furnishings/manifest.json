@@ -54,6 +54,24 @@
     "price": 0.0
   },
   {
+    "id": "large_tv",
+    "name": "Large Screen TV 75\"",
+    "category": "Living",
+    "file": "large_tv.svg",
+    "width_in": 66,
+    "depth_in": 4,
+    "price": 0.0
+  },
+  {
+    "id": "gas_fireplace",
+    "name": "Gas Fireplace 4'",
+    "category": "Living",
+    "file": "gas_fireplace.svg",
+    "width_in": 48,
+    "depth_in": 20,
+    "price": 0.0
+  },
+  {
     "id": "dining_table",
     "name": "Dining Table 6'",
     "category": "Dining",

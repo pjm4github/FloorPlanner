@@ -49,8 +49,10 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   properties plus every furnishing and opening in the room, in an aligned
   table you can copy as TSV for Excel. Rooms can be copied and pasted
   elsewhere with their walls and openings.
-- **Furnishings** — a bundled CC0 library of 85 top-view symbols across
-  Living, Dining, **Kitchen** (appliances, sink, standard **base
+- **Furnishings** — a bundled CC0 library of 89 top-view symbols across
+  **Living** (sofas, chairs, tables, TV stand, **large-screen TV**, **gas
+  fireplace**, bookshelf), Dining, **Kitchen** (appliances, sink, standard
+  **base
   cabinets** — 24"/36" door bases, drawer base, sink base, corner
   lazy-susan — 24"/30"/36" **wall cabinets** (drawn dashed, overhead),
   18"/24"/36" **pantry cabinets**, and **islands** (a 6' island and a 7'
