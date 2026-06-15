@@ -189,6 +189,33 @@
     "price": 0.0
   },
   {
+    "id": "wall_cab_24",
+    "name": "Wall Cabinet 24\"",
+    "category": "Kitchen",
+    "file": "wall_cab_24.svg",
+    "width_in": 24,
+    "depth_in": 12,
+    "price": 0.0
+  },
+  {
+    "id": "wall_cab_30",
+    "name": "Wall Cabinet 30\"",
+    "category": "Kitchen",
+    "file": "wall_cab_30.svg",
+    "width_in": 30,
+    "depth_in": 12,
+    "price": 0.0
+  },
+  {
+    "id": "wall_cab_36",
+    "name": "Wall Cabinet 36\"",
+    "category": "Kitchen",
+    "file": "wall_cab_36.svg",
+    "width_in": 36,
+    "depth_in": 12,
+    "price": 0.0
+  },
+  {
     "id": "bed_king",
     "name": "King Bed",
     "category": "Bedroom",

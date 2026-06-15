@@ -19,9 +19,10 @@ def svg(w, d, body):
             f'width="{w}" height="{d}">\n' + "\n".join(body) + "\n</svg>\n")
 
 
-def R(x, y, w, h, rx=0.0, fill=FILL, sw=1.0):
+def R(x, y, w, h, rx=0.0, fill=FILL, sw=1.0, dash=None):
+    extra = f' stroke-dasharray="{dash}"' if dash else ""
     return (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" '
-            f'fill="{fill}" stroke="{INK}" stroke-width="{sw}"/>')
+            f'fill="{fill}" stroke="{INK}" stroke-width="{sw}"{extra}/>')
 
 
 def L(x1, y1, x2, y2, sw=0.7, dash=None):
@@ -126,6 +127,19 @@ def vanity_unit(w, d, sinks):
     return parts
 
 
+def wall_unit(w, d, doors=2):
+    """Top view of a wall (upper) cabinet: a DASHED box -- it sits overhead,
+    above the plan cut -- with door dividers and knobs."""
+    parts = [R(0.75, 0.75, w - 1.5, d - 1.5, 0.6, sw=1.0, dash="3,2")]
+    fw = (w - 1.5) / doors
+    for i in range(1, doors):
+        parts.append(L(0.75 + fw * i, 0.75, 0.75 + fw * i, d - 0.75, 0.4,
+                       "3,2"))
+    for i in range(doors):
+        parts.append(Ci(0.75 + fw * (i + 0.5), d - 3, 0.7, "none", 0.5))
+    return parts
+
+
 def pantry_unit(w, d, doors=2):
     """Top view of a tall pantry / utility cabinet: box, dashed interior
     shelves, full-height door dividers and a knob on each door."""
@@ -192,6 +206,10 @@ FURNISHINGS = [
     ("pantry_18", "Pantry 18\"", "Kitchen", 18, 24, pantry_unit(18, 24, 1)),
     ("pantry_24", "Pantry 24\"", "Kitchen", 24, 24, pantry_unit(24, 24, 2)),
     ("pantry_36", "Pantry 36\"", "Kitchen", 36, 24, pantry_unit(36, 24, 2)),
+    # wall (upper) cabinets, drawn dashed; standard 12" deep
+    ("wall_cab_24", "Wall Cabinet 24\"", "Kitchen", 24, 12, wall_unit(24, 12)),
+    ("wall_cab_30", "Wall Cabinet 30\"", "Kitchen", 30, 12, wall_unit(30, 12)),
+    ("wall_cab_36", "Wall Cabinet 36\"", "Kitchen", 36, 12, wall_unit(36, 12)),
 
     ("bed_king", "King Bed", "Bedroom", 76, 80, bed(76, 80, 2)),
     ("bed_queen", "Queen Bed", "Bedroom", 60, 80, bed(60, 80, 2)),
@@ -539,7 +557,8 @@ GROUPS = [
     ("Dining Room", ["dining_table", "dining_table_round", "dining_chair"]),
     ("Kitchen", ["refrigerator", "range", "dishwasher", "kitchen_sink",
                  "base_cab_24", "base_cab_36", "drawer_base_18",
-                 "sink_base_36", "corner_base_36", "pantry_18", "pantry_24",
+                 "sink_base_36", "corner_base_36", "wall_cab_24",
+                 "wall_cab_30", "wall_cab_36", "pantry_18", "pantry_24",
                  "pantry_36", "dining_chair"]),
     ("Bedroom", ["bed_king", "bed_queen", "bed_full", "bed_twin",
                  "nightstand", "dresser", "wardrobe", "armchair",

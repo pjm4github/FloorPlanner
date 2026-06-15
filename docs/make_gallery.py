@@ -292,8 +292,10 @@ def build_kitchen():
     units = [("corner_base_36", (18, 18), 0),      # base run along the back
              ("base_cab_36", (54, 12), 0), ("sink_base_36", (90, 12), 0),
              ("drawer_base_18", (117, 12), 0), ("base_cab_24", (138, 12), 0),
-             ("pantry_18", (15, 60), 0),           # tall pantry row
-             ("pantry_24", (48, 60), 0), ("pantry_36", (93, 60), 0)]
+             ("wall_cab_36", (54, 6), 0),          # dashed wall cabinets above
+             ("wall_cab_30", (90, 6), 0), ("wall_cab_24", (138, 6), 0),
+             ("pantry_18", (15, 66), 0),           # tall pantry row
+             ("pantry_24", (48, 66), 0), ("pantry_36", (93, 66), 0)]
     for kind, pos, rot in units:
         sc.addItem(FP.FurnishingItem(kind, QPointF(*pos), rot))
     win._update_totals()
