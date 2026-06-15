@@ -69,8 +69,8 @@ lazy-susan, vanity bases) are in the Kitchen and Bathroom palette sections.
 ### Kitchen cabinets
 A run of standard **base cabinets** along the back wall — corner lazy-susan,
 door bases, a sink base and a drawer base — with **wall cabinets** drawn
-dashed (overhead) above them, plus a row of tall **pantry cabinets**, all at
-true scale.
+dashed (overhead) above them, a centre **island** with cabinets and a
+seating overhang, plus a row of tall **pantry cabinets**, all at true scale.
 
 ![Kitchen](11-kitchen.png)
 

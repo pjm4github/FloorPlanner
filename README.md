@@ -52,8 +52,9 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
 - **Furnishings** — a bundled CC0 library of 85 top-view symbols across
   Living, Dining, **Kitchen** (appliances, sink, standard **base
   cabinets** — 24"/36" door bases, drawer base, sink base, corner
-  lazy-susan — 24"/30"/36" **wall cabinets** (drawn dashed, overhead), and
-  18"/24"/36" **pantry cabinets**),
+  lazy-susan — 24"/30"/36" **wall cabinets** (drawn dashed, overhead),
+  18"/24"/36" **pantry cabinets**, and **islands** (a 6' island and a 7'
+  island with a sink, each with cabinets and a seating overhang),
   **Bedroom**, **Bathroom** (tub, shower, luxury walk-in shower, glass
   walk-in shower, toilet, and 24"/30"/36"/48" **vanity bases**), Laundry,
   **Office / Storage**, **Garage**

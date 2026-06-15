@@ -127,6 +127,27 @@ def vanity_unit(w, d, sinks):
     return parts
 
 
+def island(w, d, doors, cab=24, sink=False):
+    """Top view of a kitchen island: a countertop, a base-cabinet block along
+    the back (door fronts + knobs, optional sink) and a seating overhang at
+    the front with bar stools."""
+    parts = [R(0.75, 0.75, w - 1.5, d - 1.5, 1.5, sw=1.2),     # countertop
+             L(1.5, cab, w - 1.5, cab, 0.5)]                   # cabinet face
+    fw = (w - 1.5) / doors
+    for i in range(1, doors):
+        parts.append(L(0.75 + fw * i, 0.75, 0.75 + fw * i, cab, 0.45))
+    for i in range(doors):
+        parts.append(Ci(0.75 + fw * (i + 0.5), cab - 2.5, 0.7, "none", 0.5))
+    if sink:
+        bw, bh = w * 0.34, cab - 9
+        parts.append(R(w / 2 - bw / 2, 3, bw, bh, 1.5, "#ffffff", 0.7))
+        parts.append(Ci(w / 2, 2.2, 1.1, "none", 0.6))
+    for k in range(max(2, round(w / 28))):                     # bar stools
+        sx = w * (k + 0.5) / max(2, round(w / 28))
+        parts.append(Ci(sx, d - 6.5, 6, "none", 0.6))
+    return parts
+
+
 def wall_unit(w, d, doors=2):
     """Top view of a wall (upper) cabinet: a DASHED box -- it sits overhead,
     above the plan cut -- with door dividers and knobs."""
@@ -210,6 +231,11 @@ FURNISHINGS = [
     ("wall_cab_24", "Wall Cabinet 24\"", "Kitchen", 24, 12, wall_unit(24, 12)),
     ("wall_cab_30", "Wall Cabinet 30\"", "Kitchen", 30, 12, wall_unit(30, 12)),
     ("wall_cab_36", "Wall Cabinet 36\"", "Kitchen", 36, 12, wall_unit(36, 12)),
+    # kitchen islands: base cabinets + a seating overhang with stools
+    ("kitchen_island", "Kitchen Island 6'", "Kitchen", 72, 39,
+     island(72, 39, doors=3)),
+    ("island_sink", "Island w/ Sink 7'", "Kitchen", 84, 42,
+     island(84, 42, doors=4, sink=True)),
 
     ("bed_king", "King Bed", "Bedroom", 76, 80, bed(76, 80, 2)),
     ("bed_queen", "Queen Bed", "Bedroom", 60, 80, bed(60, 80, 2)),
@@ -558,8 +584,8 @@ GROUPS = [
     ("Kitchen", ["refrigerator", "range", "dishwasher", "kitchen_sink",
                  "base_cab_24", "base_cab_36", "drawer_base_18",
                  "sink_base_36", "corner_base_36", "wall_cab_24",
-                 "wall_cab_30", "wall_cab_36", "pantry_18", "pantry_24",
-                 "pantry_36", "dining_chair"]),
+                 "wall_cab_30", "wall_cab_36", "kitchen_island", "island_sink",
+                 "pantry_18", "pantry_24", "pantry_36", "dining_chair"]),
     ("Bedroom", ["bed_king", "bed_queen", "bed_full", "bed_twin",
                  "nightstand", "dresser", "wardrobe", "armchair",
                  "tv_stand", "desk", "office_chair", "bookshelf"]),

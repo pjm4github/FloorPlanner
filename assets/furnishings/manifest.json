@@ -216,6 +216,24 @@
     "price": 0.0
   },
   {
+    "id": "kitchen_island",
+    "name": "Kitchen Island 6'",
+    "category": "Kitchen",
+    "file": "kitchen_island.svg",
+    "width_in": 72,
+    "depth_in": 39,
+    "price": 0.0
+  },
+  {
+    "id": "island_sink",
+    "name": "Island w/ Sink 7'",
+    "category": "Kitchen",
+    "file": "island_sink.svg",
+    "width_in": 84,
+    "depth_in": 42,
+    "price": 0.0
+  },
+  {
     "id": "bed_king",
     "name": "King Bed",
     "category": "Bedroom",

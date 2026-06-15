@@ -274,19 +274,19 @@ def build_bathroom():
 
 def build_kitchen():
     """A kitchen with a run of standard base cabinets (door bases, sink base,
-    drawer base, corner lazy-susan) along the back wall and a row of tall
-    pantry cabinets, all at true scale."""
+    drawer base, corner lazy-susan), dashed wall cabinets above, a centre
+    island with cabinets, and tall pantry cabinets -- all at true scale."""
     win = FP.MainWindow()
     sc = win.scene
-    for a, b in [((0, 0), (168, 0)), ((168, 0), (168, 120)),
-                 ((168, 120), (0, 120)), ((0, 120), (0, 0))]:
+    for a, b in [((0, 0), (192, 0)), ((192, 0), (192, 156)),
+                 ((192, 156), (0, 156)), ((0, 156), (0, 0))]:
         sc.addItem(FP.WallItem(QPointF(*a), QPointF(*b), "interior"))
     FP.rebuild_all_walls(sc)
-    res = FP.detect_room(sc, QPointF(84, 60))
-    r = FP.RoomItem("Kitchen", QPointF(84, 60), res[0], res[1],
+    res = FP.detect_room(sc, QPointF(96, 78))
+    r = FP.RoomItem("Kitchen", QPointF(96, 78), res[0], res[1],
                     corners=res[2])
     r.properties["room_type"] = "Kitchen"
-    r.label_offset = QPointF(0, 40)
+    r.label_offset = QPointF(60, 56)
     sc.addItem(r)
     FP.bind_room_walls(sc, r)
     units = [("corner_base_36", (18, 18), 0),      # base run along the back
@@ -294,8 +294,9 @@ def build_kitchen():
              ("drawer_base_18", (117, 12), 0), ("base_cab_24", (138, 12), 0),
              ("wall_cab_36", (54, 6), 0),          # dashed wall cabinets above
              ("wall_cab_30", (90, 6), 0), ("wall_cab_24", (138, 6), 0),
-             ("pantry_18", (15, 66), 0),           # tall pantry row
-             ("pantry_24", (48, 66), 0), ("pantry_36", (93, 66), 0)]
+             ("kitchen_island", (96, 84), 0),      # centre island w/ cabinets
+             ("pantry_18", (15, 132), 0),          # tall pantry row
+             ("pantry_24", (48, 132), 0), ("pantry_36", (93, 132), 0)]
     for kind, pos, rot in units:
         sc.addItem(FP.FurnishingItem(kind, QPointF(*pos), rot))
     win._update_totals()
@@ -356,7 +357,7 @@ bath_win.close()
 
 # 11. kitchen cabinets: base cabinet run + tall pantry cabinets
 kit_win = build_kitchen()
-frame(kit_win, "11-kitchen", rect=(-24, -24, 216, 168), palette="Kitchen",
+frame(kit_win, "11-kitchen", rect=(-24, -24, 240, 204), palette="Kitchen",
       tool=FP.TOOL_SELECT, size=(1100, 850))
 kit_win.close()
 
