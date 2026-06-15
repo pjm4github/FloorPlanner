@@ -60,7 +60,9 @@ door, never two stacked on top of each other.
 ### Bathroom fixtures
 A master bath with both luxury walk-in showers — a floor-to-ceiling **glass
 walk-in shower** (5' × 4') and a tiled walk-in shower with a bench — plus a
-toilet and vanity, all at true scale.
+toilet and a **double-vanity base**, all at true scale. Standard kitchen and
+bath **base cabinets** (door bases, drawer base, sink base, corner
+lazy-susan, vanity bases) are in the Kitchen and Bathroom palette sections.
 
 ![Bathroom](10-bathroom.png)
 

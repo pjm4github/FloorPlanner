@@ -265,7 +265,8 @@ def build_bathroom():
     FP.bind_room_walls(sc, r)
     for kind, pos, rot in [("glass_shower", (40, 30), 0),
                            ("walk_in_shower", (128, 31), 0),
-                           ("toilet", (24, 92), 0), ("vanity", (122, 94), 0)]:
+                           ("toilet", (24, 92), 0),
+                           ("vanity_48", (108, 95), 0)]:   # double-vanity base
         sc.addItem(FP.FurnishingItem(kind, QPointF(*pos), rot))
     win._update_totals()
     return win

@@ -117,6 +117,51 @@
     "price": 0.0
   },
   {
+    "id": "base_cab_24",
+    "name": "Base Cabinet 24\"",
+    "category": "Kitchen",
+    "file": "base_cab_24.svg",
+    "width_in": 24,
+    "depth_in": 24,
+    "price": 0.0
+  },
+  {
+    "id": "base_cab_36",
+    "name": "Base Cabinet 36\"",
+    "category": "Kitchen",
+    "file": "base_cab_36.svg",
+    "width_in": 36,
+    "depth_in": 24,
+    "price": 0.0
+  },
+  {
+    "id": "drawer_base_18",
+    "name": "Drawer Base 18\"",
+    "category": "Kitchen",
+    "file": "drawer_base_18.svg",
+    "width_in": 18,
+    "depth_in": 24,
+    "price": 0.0
+  },
+  {
+    "id": "sink_base_36",
+    "name": "Sink Base 36\"",
+    "category": "Kitchen",
+    "file": "sink_base_36.svg",
+    "width_in": 36,
+    "depth_in": 24,
+    "price": 0.0
+  },
+  {
+    "id": "corner_base_36",
+    "name": "Corner Base 36\"",
+    "category": "Kitchen",
+    "file": "corner_base_36.svg",
+    "width_in": 36,
+    "depth_in": 36,
+    "price": 0.0
+  },
+  {
     "id": "bed_king",
     "name": "King Bed",
     "category": "Bedroom",
@@ -221,6 +266,33 @@
     "category": "Bathroom",
     "file": "vanity.svg",
     "width_in": 30,
+    "depth_in": 21,
+    "price": 0.0
+  },
+  {
+    "id": "vanity_24",
+    "name": "Vanity Base 24\"",
+    "category": "Bathroom",
+    "file": "vanity_24.svg",
+    "width_in": 24,
+    "depth_in": 21,
+    "price": 0.0
+  },
+  {
+    "id": "vanity_36",
+    "name": "Vanity Base 36\"",
+    "category": "Bathroom",
+    "file": "vanity_36.svg",
+    "width_in": 36,
+    "depth_in": 21,
+    "price": 0.0
+  },
+  {
+    "id": "vanity_48",
+    "name": "Double Vanity 48\"",
+    "category": "Bathroom",
+    "file": "vanity_48.svg",
+    "width_in": 48,
     "depth_in": 21,
     "price": 0.0
   },

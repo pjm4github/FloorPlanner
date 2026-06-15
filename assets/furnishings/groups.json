@@ -15,6 +15,11 @@
       "range.svg",
       "dishwasher.svg",
       "kitchen_sink.svg",
+      "base_cab_24.svg",
+      "base_cab_36.svg",
+      "drawer_base_18.svg",
+      "sink_base_36.svg",
+      "corner_base_36.svg",
       "bed_king.svg",
       "bed_queen.svg",
       "bed_full.svg",
@@ -27,6 +32,9 @@
       "glass_shower.svg",
       "toilet.svg",
       "vanity.svg",
+      "vanity_24.svg",
+      "vanity_36.svg",
+      "vanity_48.svg",
       "washer.svg",
       "dryer.svg",
       "suv.svg",
@@ -102,6 +110,11 @@
       "range.svg",
       "dishwasher.svg",
       "kitchen_sink.svg",
+      "base_cab_24.svg",
+      "base_cab_36.svg",
+      "drawer_base_18.svg",
+      "sink_base_36.svg",
+      "corner_base_36.svg",
       "dining_chair.svg"
     ]
   },
@@ -130,7 +143,10 @@
       "walk_in_shower.svg",
       "glass_shower.svg",
       "toilet.svg",
-      "vanity.svg"
+      "vanity.svg",
+      "vanity_24.svg",
+      "vanity_36.svg",
+      "vanity_48.svg"
     ]
   },
   {

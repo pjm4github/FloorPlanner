@@ -69,6 +69,63 @@ def seat(w, d, cushions, arm=7.0):
     return parts
 
 
+def base_unit(w, d, doors=2):
+    """Top view of a base cabinet: box, a counter-nosing line near the front
+    (bottom), vertical door dividers and a knob on each door."""
+    parts = [R(0.75, 0.75, w - 1.5, d - 1.5, 0.8, sw=1.1),
+             L(1.5, d - 3, w - 1.5, d - 3, 0.4)]            # counter nosing
+    fw = (w - 1.5) / doors
+    for i in range(1, doors):
+        parts.append(L(0.75 + fw * i, 0.75, 0.75 + fw * i, d - 0.75, 0.45))
+    for i in range(doors):
+        parts.append(Ci(0.75 + fw * (i + 0.5), d - 4.5, 0.8, "none", 0.55))
+    return parts
+
+
+def drawer_unit(w, d, n):
+    """Top view of a drawer base: box with n stacked drawer fronts + pulls."""
+    parts = [R(0.75, 0.75, w - 1.5, d - 1.5, 0.8, sw=1.1)]
+    for j in range(1, n):
+        y = 0.75 + (d - 1.5) * j / n
+        parts.append(L(0.75, y, w - 0.75, y, 0.45))
+    for j in range(n):
+        cy = 0.75 + (d - 1.5) * (j + 0.5) / n
+        parts.append(L(w / 2 - 4, cy, w / 2 + 4, cy, 0.8))    # drawer pull
+    return parts
+
+
+def sink_base(w, d):
+    """Kitchen sink base: box, a double-bowl basin near the back, faucet, and
+    two doors with knobs along the front."""
+    bw, bh = w - 11, d - 9
+    parts = [R(0.75, 0.75, w - 1.5, d - 1.5, 0.8, sw=1.1),
+             R(5.5, 2.5, bw, bh, 1.5, "#ffffff", 0.7),
+             L(w / 2, 2.5, w / 2, 2.5 + bh, 0.4),             # bowl divider
+             Ci(w / 2, 2.0, 1.1, "none", 0.6),                # faucet
+             L(w / 2, 2.5 + bh, w / 2, d - 0.75, 0.45),       # door divider
+             Ci(w / 4 + 1, d - 4, 0.8, "none", 0.55),
+             Ci(3 * w / 4 - 1, d - 4, 0.8, "none", 0.55)]
+    return parts
+
+
+def vanity_unit(w, d, sinks):
+    """Top view of a bathroom vanity base: box, oval basin(s) + faucet(s)
+    toward the back, and door dividers / knobs along the front."""
+    parts = [R(0.75, 0.75, w - 1.5, d - 1.5, 0.8, sw=1.1)]
+    for k in range(sinks):
+        cx = w * (k + 0.5) / sinks
+        parts.append(El(cx, d * 0.46, min(8.5, w / sinks * 0.34), 5.5,
+                        "#ffffff", 0.7))
+        parts.append(Ci(cx, 3.2, 1.1, "none", 0.6))           # faucet
+    doors = max(2, sinks * 2)
+    fw = (w - 1.5) / doors
+    for i in range(1, doors):
+        parts.append(L(0.75 + fw * i, d - 8, 0.75 + fw * i, d - 0.75, 0.4))
+    for i in range(doors):
+        parts.append(Ci(0.75 + fw * (i + 0.5), d - 3, 0.7, "none", 0.5))
+    return parts
+
+
 FURNISHINGS = [
     # (id, name, category, width", depth", body parts)
     ("sofa", "Sofa", "Living", 84, 36, seat(84, 36, 3)),
@@ -104,6 +161,18 @@ FURNISHINGS = [
      [R(0.75, 0.75, 31.5, 20.5, 1, sw=1.2),
       R(3, 4, 12, 14, 2.5, "#ffffff", 0.8),
       R(18, 4, 12, 14, 2.5, "#ffffff", 0.8), Ci(16.5, 2.2, 1, "none", 0.6)]),
+    # kitchen base cabinets (standard 24" deep)
+    ("base_cab_24", "Base Cabinet 24\"", "Kitchen", 24, 24,
+     base_unit(24, 24, 2)),
+    ("base_cab_36", "Base Cabinet 36\"", "Kitchen", 36, 24,
+     base_unit(36, 24, 2)),
+    ("drawer_base_18", "Drawer Base 18\"", "Kitchen", 18, 24,
+     drawer_unit(18, 24, 3)),
+    ("sink_base_36", "Sink Base 36\"", "Kitchen", 36, 24, sink_base(36, 24)),
+    ("corner_base_36", "Corner Base 36\"", "Kitchen", 36, 36,
+     [R(0.75, 0.75, 34.5, 34.5, 1, sw=1.1),
+      Ci(18, 18, 15, "none", 0.4), Ci(18, 18, 1.4, "none", 0.5),  # lazy susan
+      L(7.5, 28.5, 28.5, 7.5, 0.7)]),                             # diagonal door
 
     ("bed_king", "King Bed", "Bedroom", 76, 80, bed(76, 80, 2)),
     ("bed_queen", "Queen Bed", "Bedroom", 60, 80, bed(60, 80, 2)),
@@ -162,6 +231,11 @@ FURNISHINGS = [
     ("vanity", "Bath Vanity 30\"", "Bathroom", 30, 21,
      [R(0.75, 0.75, 28.5, 19.5, 1, sw=1.2), El(15, 11, 9, 6.5),
       Ci(15, 3.5, 1.2, "none", 0.6)]),
+    # bathroom vanity base cabinets (standard 21" deep)
+    ("vanity_24", "Vanity Base 24\"", "Bathroom", 24, 21, vanity_unit(24, 21, 1)),
+    ("vanity_36", "Vanity Base 36\"", "Bathroom", 36, 21, vanity_unit(36, 21, 1)),
+    ("vanity_48", "Double Vanity 48\"", "Bathroom", 48, 21,
+     vanity_unit(48, 21, 2)),
 
     ("washer", "Washer", "Laundry", 27, 30,
      [R(0.75, 0.75, 25.5, 28.5, 1, sw=1.2),
@@ -445,12 +519,13 @@ GROUPS = [
                      "side_table", "tv_stand", "bookshelf"]),
     ("Dining Room", ["dining_table", "dining_table_round", "dining_chair"]),
     ("Kitchen", ["refrigerator", "range", "dishwasher", "kitchen_sink",
-                 "dining_chair"]),
+                 "base_cab_24", "base_cab_36", "drawer_base_18",
+                 "sink_base_36", "corner_base_36", "dining_chair"]),
     ("Bedroom", ["bed_king", "bed_queen", "bed_full", "bed_twin",
                  "nightstand", "dresser", "wardrobe", "armchair",
                  "tv_stand", "desk", "office_chair", "bookshelf"]),
     ("Bathroom", ["bathtub", "shower", "walk_in_shower", "glass_shower",
-                  "toilet", "vanity"]),
+                  "toilet", "vanity", "vanity_24", "vanity_36", "vanity_48"]),
     ("Laundry", ["washer", "dryer"]),
     ("Garage", ["suv", "car", "motorcycle", "bicycle", "boat",
                 "boat_trailer", "workbench", "storage_shelves", "lawnmower",
