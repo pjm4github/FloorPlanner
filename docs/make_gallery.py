@@ -150,6 +150,8 @@ def build():
          ("dining_table", (404, 250), 90),
          ("dining_chair", (366, 228), 270), ("dining_chair", (366, 272), 270),
          ("dining_chair", (442, 228), 90), ("dining_chair", (442, 272), 90),
+         ("buffet", (404, 327), 180),            # sideboard on the south wall
+         ("hutch", (468, 250), 90),              # china hutch on the east wall
          ("refrigerator", (456, 60), 90),
          ("suv", (560, 200), 0), ("bicycle", (706, 110), 0),
          ("workbench", (620, 70), 0), ("trashcan", (718, 310), 0),

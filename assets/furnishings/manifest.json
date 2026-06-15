@@ -99,6 +99,24 @@
     "price": 0.0
   },
   {
+    "id": "buffet",
+    "name": "Buffet 5'",
+    "category": "Dining",
+    "file": "buffet.svg",
+    "width_in": 60,
+    "depth_in": 18,
+    "price": 0.0
+  },
+  {
+    "id": "hutch",
+    "name": "China Hutch 5'",
+    "category": "Dining",
+    "file": "hutch.svg",
+    "width_in": 60,
+    "depth_in": 20,
+    "price": 0.0
+  },
+  {
     "id": "refrigerator",
     "name": "Refrigerator",
     "category": "Kitchen",

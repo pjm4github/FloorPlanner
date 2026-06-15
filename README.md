@@ -51,7 +51,8 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   elsewhere with their walls and openings.
 - **Furnishings** — a bundled CC0 library of 89 top-view symbols across
   **Living** (sofas, chairs, tables, TV stand, **large-screen TV**, **gas
-  fireplace**, bookshelf), Dining, **Kitchen** (appliances, sink, standard
+  fireplace**, bookshelf), **Dining** (tables, chairs, **buffet**, **china
+  hutch**), **Kitchen** (appliances, sink, standard
   **base
   cabinets** — 24"/36" door bases, drawer base, sink base, corner
   lazy-susan — 24"/30"/36" **wall cabinets** (drawn dashed, overhead),

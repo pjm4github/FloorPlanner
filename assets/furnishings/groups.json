@@ -13,6 +13,8 @@
       "dining_table.svg",
       "dining_table_round.svg",
       "dining_chair.svg",
+      "buffet.svg",
+      "hutch.svg",
       "refrigerator.svg",
       "range.svg",
       "dishwasher.svg",
@@ -112,7 +114,9 @@
     "items": [
       "dining_table.svg",
       "dining_table_round.svg",
-      "dining_chair.svg"
+      "dining_chair.svg",
+      "buffet.svg",
+      "hutch.svg"
     ]
   },
   {

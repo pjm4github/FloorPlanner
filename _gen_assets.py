@@ -211,6 +211,22 @@ FURNISHINGS = [
     ("dining_chair", "Dining Chair", "Dining", 18, 18,
      [R(1, 0.75, 16, 2.8, 1.4, "#ffffff", 0.8),
       R(1.4, 3.8, 15.2, 13.4, 2.5)]),
+    ("buffet", "Buffet 5'", "Dining", 60, 18,
+     [R(0.75, 0.75, 58.5, 16.5, 1, sw=1.2),
+      L(2, 5, 58, 5, 0.45),                                 # top drawer band
+      L(13.5, 2.7, 16.5, 2.7, 0.6), L(28.5, 2.7, 31.5, 2.7, 0.6),
+      L(43.5, 2.7, 46.5, 2.7, 0.6),                         # drawer pulls
+      L(20, 5, 20, 17.25, 0.5), L(40, 5, 40, 17.25, 0.5),   # door dividers
+      Ci(10, 12, 0.8, "none", 0.5), Ci(30, 12, 0.8, "none", 0.5),
+      Ci(50, 12, 0.8, "none", 0.5)]),                       # door knobs
+    ("hutch", "China Hutch 5'", "Dining", 60, 20,
+     [R(0.75, 0.75, 58.5, 18.5, 1, sw=1.2),                 # buffet base
+      L(20, 0.75, 20, 19.25, 0.5), L(40, 0.75, 40, 19.25, 0.5),
+      Ci(10, 16, 0.8, "none", 0.5), Ci(30, 16, 0.8, "none", 0.5),
+      Ci(50, 16, 0.8, "none", 0.5),                         # base door knobs
+      R(2.5, 1.5, 55, 11, 0.5, "none", 0.7, dash="3,2"),    # upper display cabinet
+      L(2.5, 5, 57.5, 5, 0.4, "3,2"),
+      L(2.5, 9, 57.5, 9, 0.4, "3,2")]),                     # glass shelves
 
     ("refrigerator", "Refrigerator", "Kitchen", 36, 30,
      [R(0.75, 0.75, 34.5, 28.5, 1, sw=1.2), L(18, 1.5, 18, 28.5, 0.7)]),
@@ -595,7 +611,8 @@ GROUPS = [
     ("Living Room", ["sofa", "loveseat", "armchair", "coffee_table",
                      "side_table", "tv_stand", "large_tv", "gas_fireplace",
                      "bookshelf"]),
-    ("Dining Room", ["dining_table", "dining_table_round", "dining_chair"]),
+    ("Dining Room", ["dining_table", "dining_table_round", "dining_chair",
+                     "buffet", "hutch"]),
     ("Kitchen", ["refrigerator", "range", "dishwasher", "kitchen_sink",
                  "base_cab_24", "base_cab_36", "drawer_base_18",
                  "sink_base_36", "corner_base_36", "wall_cab_24",
