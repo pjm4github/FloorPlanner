@@ -223,6 +223,9 @@ run or skipped, e.g. `pytest -m "not gui"`.
 
 ## Licenses
 
+- Application code: MIT License — free to use, copy, modify, and
+  distribute; just keep the credit notice. Created by PJ Moran with Claude
+  (Anthropic). See `LICENSE`.
 - Furnishing symbols and toolbar icons: CC0 1.0 (drawn for this project,
   see `assets/furnishings/LICENSE`)
 - DejaVu fonts: see `assets/fonts/LICENSE`

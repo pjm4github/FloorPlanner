@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 PJ Moran and Claude (Anthropic). See LICENSE.
 """
 Floor Planner (PyQt6)
 =====================
 
 A 2D architectural floor-plan editor.
+
+Free to use, copy, and modify under the MIT License — created by PJ Moran
+with Claude (Anthropic); retain the credit notice in copies.  See LICENSE.
 
 Units
 -----
