@@ -126,6 +126,21 @@ def vanity_unit(w, d, sinks):
     return parts
 
 
+def pantry_unit(w, d, doors=2):
+    """Top view of a tall pantry / utility cabinet: box, dashed interior
+    shelves, full-height door dividers and a knob on each door."""
+    parts = [R(0.75, 0.75, w - 1.5, d - 1.5, 0.8, sw=1.1)]
+    for j in range(1, 4):                                 # dashed shelves
+        y = 0.75 + (d - 1.5) * j / 4
+        parts.append(L(2.5, y, w - 2.5, y, 0.4, "2,2"))
+    fw = (w - 1.5) / doors
+    for i in range(1, doors):
+        parts.append(L(0.75 + fw * i, 0.75, 0.75 + fw * i, d - 0.75, 0.5))
+    for i in range(doors):
+        parts.append(Ci(0.75 + fw * (i + 0.5), d - 3.5, 0.8, "none", 0.55))
+    return parts
+
+
 FURNISHINGS = [
     # (id, name, category, width", depth", body parts)
     ("sofa", "Sofa", "Living", 84, 36, seat(84, 36, 3)),
@@ -173,6 +188,10 @@ FURNISHINGS = [
      [R(0.75, 0.75, 34.5, 34.5, 1, sw=1.1),
       Ci(18, 18, 15, "none", 0.4), Ci(18, 18, 1.4, "none", 0.5),  # lazy susan
       L(7.5, 28.5, 28.5, 7.5, 0.7)]),                             # diagonal door
+    # tall pantry / utility cabinets (24" deep)
+    ("pantry_18", "Pantry 18\"", "Kitchen", 18, 24, pantry_unit(18, 24, 1)),
+    ("pantry_24", "Pantry 24\"", "Kitchen", 24, 24, pantry_unit(24, 24, 2)),
+    ("pantry_36", "Pantry 36\"", "Kitchen", 36, 24, pantry_unit(36, 24, 2)),
 
     ("bed_king", "King Bed", "Bedroom", 76, 80, bed(76, 80, 2)),
     ("bed_queen", "Queen Bed", "Bedroom", 60, 80, bed(60, 80, 2)),
@@ -520,7 +539,8 @@ GROUPS = [
     ("Dining Room", ["dining_table", "dining_table_round", "dining_chair"]),
     ("Kitchen", ["refrigerator", "range", "dishwasher", "kitchen_sink",
                  "base_cab_24", "base_cab_36", "drawer_base_18",
-                 "sink_base_36", "corner_base_36", "dining_chair"]),
+                 "sink_base_36", "corner_base_36", "pantry_18", "pantry_24",
+                 "pantry_36", "dining_chair"]),
     ("Bedroom", ["bed_king", "bed_queen", "bed_full", "bed_twin",
                  "nightstand", "dresser", "wardrobe", "armchair",
                  "tv_stand", "desk", "office_chair", "bookshelf"]),

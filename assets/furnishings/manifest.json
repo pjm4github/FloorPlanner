@@ -162,6 +162,33 @@
     "price": 0.0
   },
   {
+    "id": "pantry_18",
+    "name": "Pantry 18\"",
+    "category": "Kitchen",
+    "file": "pantry_18.svg",
+    "width_in": 18,
+    "depth_in": 24,
+    "price": 0.0
+  },
+  {
+    "id": "pantry_24",
+    "name": "Pantry 24\"",
+    "category": "Kitchen",
+    "file": "pantry_24.svg",
+    "width_in": 24,
+    "depth_in": 24,
+    "price": 0.0
+  },
+  {
+    "id": "pantry_36",
+    "name": "Pantry 36\"",
+    "category": "Kitchen",
+    "file": "pantry_36.svg",
+    "width_in": 36,
+    "depth_in": 24,
+    "price": 0.0
+  },
+  {
     "id": "bed_king",
     "name": "King Bed",
     "category": "Bedroom",
