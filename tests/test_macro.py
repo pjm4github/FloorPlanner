@@ -2,6 +2,9 @@
 SVG/PNG canvas-export hooks that the fp_macro.py driver relies on, and the
 non-modal MacroRecorderDialog (record / replay / save)."""
 import json
+import os
+import subprocess
+import sys
 
 import pytest
 from PyQt6.QtCore import QEvent, QPointF, Qt, QTimer
@@ -9,6 +12,8 @@ from PyQt6.QtGui import QContextMenuEvent, QKeyEvent, QMouseEvent
 from PyQt6.QtWidgets import QApplication
 
 pytestmark = pytest.mark.macro
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _counts(win):
@@ -351,6 +356,41 @@ def test_feet_inches_coordinates(fp, win):
     furn = next(it for it in win.scene.items()
                 if isinstance(it, fp.FurnishingItem))
     assert (furn.pos().x(), furn.pos().y()) == pytest.approx((120, 96))
+
+
+# --------------------------------------------------------------------------
+# End-to-end via the real fp_macro.py CLI (subprocess)
+# --------------------------------------------------------------------------
+@pytest.mark.slow
+def test_fp_macro_cli_pup_resize(tmp_path):
+    """Drive the actual fp_macro.py driver in a subprocess: draw a wall, place
+    a window, then resize it through its right-click menu with PUP + a TYPE'd
+    size.  Validates the whole offscreen pipeline (argparse, headless boot,
+    context-menu key injection) end to end, not just in-process run_macro."""
+    out = tmp_path / "plan.json"
+    macro = ("WALL 0 0 360 0 ext\n"
+             "WINDOW 180 0 3648\n"
+             'PUP 180 0 DOWN ENTER BACKSPACE TYPE "4466" ENTER')
+    env = {**os.environ, "QT_QPA_PLATFORM": "offscreen"}
+    proc = subprocess.run(
+        [sys.executable, "fp_macro.py", "--summary", "full",
+         "--macro", macro, "--out", str(out)],
+        cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
+        env=env, timeout=120)
+    assert proc.returncode == 0, proc.stderr
+    result = json.loads(proc.stdout)
+    assert result["ok"], result["errors"]
+
+    # the window was resized via the PUP context-menu interaction
+    codes = [op["code"] for w in result["scene"]["walls"]
+             for op in w["openings"]]
+    assert codes == ["4466"], result["scene"]["walls"]
+
+    # and the saved plan file reflects the resize
+    saved = json.loads(out.read_text(encoding="utf-8"))
+    saved_codes = [op["code"] for w in saved["walls"]
+                   for op in w["openings"]]
+    assert saved_codes == ["4466"]
 
 
 # --------------------------------------------------------------------------
