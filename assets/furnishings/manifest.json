@@ -6,7 +6,7 @@
     "file": "sofa.svg",
     "width_in": 84,
     "depth_in": 36,
-    "price": 0.0
+    "price": 650.0
   },
   {
     "id": "loveseat",
@@ -15,7 +15,7 @@
     "file": "loveseat.svg",
     "width_in": 58,
     "depth_in": 36,
-    "price": 0.0
+    "price": 480.0
   },
   {
     "id": "armchair",
@@ -24,7 +24,7 @@
     "file": "armchair.svg",
     "width_in": 33,
     "depth_in": 33,
-    "price": 0.0
+    "price": 300.0
   },
   {
     "id": "coffee_table",
@@ -33,7 +33,7 @@
     "file": "coffee_table.svg",
     "width_in": 48,
     "depth_in": 24,
-    "price": 0.0
+    "price": 120.0
   },
   {
     "id": "side_table",
@@ -42,7 +42,7 @@
     "file": "side_table.svg",
     "width_in": 20,
     "depth_in": 20,
-    "price": 0.0
+    "price": 80.0
   },
   {
     "id": "tv_stand",
@@ -51,7 +51,7 @@
     "file": "tv_stand.svg",
     "width_in": 60,
     "depth_in": 16,
-    "price": 0.0
+    "price": 180.0
   },
   {
     "id": "large_tv",
@@ -60,7 +60,7 @@
     "file": "large_tv.svg",
     "width_in": 66,
     "depth_in": 4,
-    "price": 0.0
+    "price": 300.0
   },
   {
     "id": "gas_fireplace",
@@ -69,7 +69,7 @@
     "file": "gas_fireplace.svg",
     "width_in": 48,
     "depth_in": 20,
-    "price": 0.0
+    "price": 2000.0
   },
   {
     "id": "dining_table",
@@ -78,7 +78,7 @@
     "file": "dining_table.svg",
     "width_in": 72,
     "depth_in": 36,
-    "price": 0.0
+    "price": 450.0
   },
   {
     "id": "dining_table_round",
@@ -87,7 +87,7 @@
     "file": "dining_table_round.svg",
     "width_in": 48,
     "depth_in": 48,
-    "price": 0.0
+    "price": 400.0
   },
   {
     "id": "dining_chair",
@@ -96,7 +96,7 @@
     "file": "dining_chair.svg",
     "width_in": 18,
     "depth_in": 18,
-    "price": 0.0
+    "price": 50.0
   },
   {
     "id": "buffet",
@@ -105,7 +105,7 @@
     "file": "buffet.svg",
     "width_in": 60,
     "depth_in": 18,
-    "price": 0.0
+    "price": 350.0
   },
   {
     "id": "hutch",
@@ -114,7 +114,7 @@
     "file": "hutch.svg",
     "width_in": 60,
     "depth_in": 20,
-    "price": 0.0
+    "price": 400.0
   },
   {
     "id": "refrigerator",
@@ -123,7 +123,7 @@
     "file": "refrigerator.svg",
     "width_in": 36,
     "depth_in": 30,
-    "price": 0.0
+    "price": 825.0
   },
   {
     "id": "range",
@@ -132,7 +132,7 @@
     "file": "range.svg",
     "width_in": 30,
     "depth_in": 26,
-    "price": 0.0
+    "price": 710.0
   },
   {
     "id": "dishwasher",
@@ -141,7 +141,7 @@
     "file": "dishwasher.svg",
     "width_in": 24,
     "depth_in": 24,
-    "price": 0.0
+    "price": 385.0
   },
   {
     "id": "kitchen_sink",
@@ -150,7 +150,7 @@
     "file": "kitchen_sink.svg",
     "width_in": 33,
     "depth_in": 22,
-    "price": 0.0
+    "price": 240.0
   },
   {
     "id": "base_cab_24",
@@ -159,7 +159,7 @@
     "file": "base_cab_24.svg",
     "width_in": 24,
     "depth_in": 24,
-    "price": 0.0
+    "price": 290.0
   },
   {
     "id": "base_cab_36",
@@ -168,7 +168,7 @@
     "file": "base_cab_36.svg",
     "width_in": 36,
     "depth_in": 24,
-    "price": 0.0
+    "price": 360.0
   },
   {
     "id": "drawer_base_18",
@@ -177,7 +177,7 @@
     "file": "drawer_base_18.svg",
     "width_in": 18,
     "depth_in": 24,
-    "price": 0.0
+    "price": 360.0
   },
   {
     "id": "sink_base_36",
@@ -186,7 +186,7 @@
     "file": "sink_base_36.svg",
     "width_in": 36,
     "depth_in": 24,
-    "price": 0.0
+    "price": 440.0
   },
   {
     "id": "corner_base_36",
@@ -195,7 +195,7 @@
     "file": "corner_base_36.svg",
     "width_in": 36,
     "depth_in": 36,
-    "price": 0.0
+    "price": 585.0
   },
   {
     "id": "pantry_18",
@@ -204,7 +204,7 @@
     "file": "pantry_18.svg",
     "width_in": 18,
     "depth_in": 24,
-    "price": 0.0
+    "price": 610.0
   },
   {
     "id": "pantry_24",
@@ -213,7 +213,7 @@
     "file": "pantry_24.svg",
     "width_in": 24,
     "depth_in": 24,
-    "price": 0.0
+    "price": 720.0
   },
   {
     "id": "pantry_36",
@@ -222,7 +222,7 @@
     "file": "pantry_36.svg",
     "width_in": 36,
     "depth_in": 24,
-    "price": 0.0
+    "price": 825.0
   },
   {
     "id": "wall_cab_24",
@@ -231,7 +231,7 @@
     "file": "wall_cab_24.svg",
     "width_in": 24,
     "depth_in": 12,
-    "price": 0.0
+    "price": 250.0
   },
   {
     "id": "wall_cab_30",
@@ -240,7 +240,7 @@
     "file": "wall_cab_30.svg",
     "width_in": 30,
     "depth_in": 12,
-    "price": 0.0
+    "price": 340.0
   },
   {
     "id": "wall_cab_36",
@@ -249,7 +249,7 @@
     "file": "wall_cab_36.svg",
     "width_in": 36,
     "depth_in": 12,
-    "price": 0.0
+    "price": 425.0
   },
   {
     "id": "kitchen_island",
@@ -258,7 +258,7 @@
     "file": "kitchen_island.svg",
     "width_in": 72,
     "depth_in": 39,
-    "price": 0.0
+    "price": 1450.0
   },
   {
     "id": "island_sink",
@@ -267,7 +267,7 @@
     "file": "island_sink.svg",
     "width_in": 84,
     "depth_in": 42,
-    "price": 0.0
+    "price": 2100.0
   },
   {
     "id": "bed_king",
@@ -276,7 +276,7 @@
     "file": "bed_king.svg",
     "width_in": 76,
     "depth_in": 80,
-    "price": 0.0
+    "price": 650.0
   },
   {
     "id": "bed_queen",
@@ -285,7 +285,7 @@
     "file": "bed_queen.svg",
     "width_in": 60,
     "depth_in": 80,
-    "price": 0.0
+    "price": 500.0
   },
   {
     "id": "bed_full",
@@ -294,7 +294,7 @@
     "file": "bed_full.svg",
     "width_in": 54,
     "depth_in": 75,
-    "price": 0.0
+    "price": 400.0
   },
   {
     "id": "bed_twin",
@@ -303,7 +303,7 @@
     "file": "bed_twin.svg",
     "width_in": 39,
     "depth_in": 75,
-    "price": 0.0
+    "price": 300.0
   },
   {
     "id": "nightstand",
@@ -312,7 +312,7 @@
     "file": "nightstand.svg",
     "width_in": 20,
     "depth_in": 16,
-    "price": 0.0
+    "price": 100.0
   },
   {
     "id": "dresser",
@@ -321,7 +321,7 @@
     "file": "dresser.svg",
     "width_in": 60,
     "depth_in": 18,
-    "price": 0.0
+    "price": 150.0
   },
   {
     "id": "bathtub",
@@ -330,7 +330,7 @@
     "file": "bathtub.svg",
     "width_in": 30,
     "depth_in": 60,
-    "price": 0.0
+    "price": 500.0
   },
   {
     "id": "shower",
@@ -339,7 +339,7 @@
     "file": "shower.svg",
     "width_in": 36,
     "depth_in": 36,
-    "price": 0.0
+    "price": 700.0
   },
   {
     "id": "walk_in_shower",
@@ -348,7 +348,7 @@
     "file": "walk_in_shower.svg",
     "width_in": 60,
     "depth_in": 42,
-    "price": 0.0
+    "price": 2500.0
   },
   {
     "id": "glass_shower",
@@ -357,7 +357,7 @@
     "file": "glass_shower.svg",
     "width_in": 60,
     "depth_in": 48,
-    "price": 0.0
+    "price": 3000.0
   },
   {
     "id": "toilet",
@@ -366,7 +366,7 @@
     "file": "toilet.svg",
     "width_in": 20,
     "depth_in": 28,
-    "price": 0.0
+    "price": 175.0
   },
   {
     "id": "vanity",
@@ -375,7 +375,7 @@
     "file": "vanity.svg",
     "width_in": 30,
     "depth_in": 21,
-    "price": 0.0
+    "price": 600.0
   },
   {
     "id": "vanity_24",
@@ -384,7 +384,7 @@
     "file": "vanity_24.svg",
     "width_in": 24,
     "depth_in": 21,
-    "price": 0.0
+    "price": 450.0
   },
   {
     "id": "vanity_36",
@@ -393,7 +393,7 @@
     "file": "vanity_36.svg",
     "width_in": 36,
     "depth_in": 21,
-    "price": 0.0
+    "price": 750.0
   },
   {
     "id": "vanity_48",
@@ -402,7 +402,7 @@
     "file": "vanity_48.svg",
     "width_in": 48,
     "depth_in": 21,
-    "price": 0.0
+    "price": 950.0
   },
   {
     "id": "washer",
@@ -411,7 +411,7 @@
     "file": "washer.svg",
     "width_in": 27,
     "depth_in": 30,
-    "price": 0.0
+    "price": 500.0
   },
   {
     "id": "dryer",
@@ -420,7 +420,7 @@
     "file": "dryer.svg",
     "width_in": 27,
     "depth_in": 30,
-    "price": 0.0
+    "price": 500.0
   },
   {
     "id": "suv",
@@ -429,7 +429,7 @@
     "file": "suv.svg",
     "width_in": 78,
     "depth_in": 192,
-    "price": 0.0
+    "price": 16000.0
   },
   {
     "id": "car",
@@ -438,7 +438,7 @@
     "file": "car.svg",
     "width_in": 72,
     "depth_in": 180,
-    "price": 0.0
+    "price": 12000.0
   },
   {
     "id": "motorcycle",
@@ -447,7 +447,7 @@
     "file": "motorcycle.svg",
     "width_in": 32,
     "depth_in": 84,
-    "price": 0.0
+    "price": 6000.0
   },
   {
     "id": "bicycle",
@@ -456,7 +456,7 @@
     "file": "bicycle.svg",
     "width_in": 24,
     "depth_in": 68,
-    "price": 0.0
+    "price": 250.0
   },
   {
     "id": "boat",
@@ -465,7 +465,7 @@
     "file": "boat.svg",
     "width_in": 68,
     "depth_in": 168,
-    "price": 0.0
+    "price": 4500.0
   },
   {
     "id": "workbench",
@@ -474,7 +474,7 @@
     "file": "workbench.svg",
     "width_in": 72,
     "depth_in": 24,
-    "price": 0.0
+    "price": 150.0
   },
   {
     "id": "storage_shelves",
@@ -483,7 +483,7 @@
     "file": "storage_shelves.svg",
     "width_in": 48,
     "depth_in": 18,
-    "price": 0.0
+    "price": 150.0
   },
   {
     "id": "lawnmower",
@@ -492,7 +492,7 @@
     "file": "lawnmower.svg",
     "width_in": 22,
     "depth_in": 62,
-    "price": 0.0
+    "price": 150.0
   },
   {
     "id": "garden_tractor",
@@ -501,7 +501,7 @@
     "file": "garden_tractor.svg",
     "width_in": 54,
     "depth_in": 120,
-    "price": 0.0
+    "price": 13000.0
   },
   {
     "id": "riding_mower_snow",
@@ -510,7 +510,7 @@
     "file": "riding_mower_snow.svg",
     "width_in": 46,
     "depth_in": 96,
-    "price": 0.0
+    "price": 1200.0
   },
   {
     "id": "boat_trailer",
@@ -519,7 +519,7 @@
     "file": "boat_trailer.svg",
     "width_in": 78,
     "depth_in": 216,
-    "price": 0.0
+    "price": 1100.0
   },
   {
     "id": "snowblower",
@@ -528,7 +528,7 @@
     "file": "snowblower.svg",
     "width_in": 28,
     "depth_in": 58,
-    "price": 0.0
+    "price": 500.0
   },
   {
     "id": "wheelbarrow",
@@ -537,7 +537,7 @@
     "file": "wheelbarrow.svg",
     "width_in": 27,
     "depth_in": 58,
-    "price": 0.0
+    "price": 70.0
   },
   {
     "id": "trashcan",
@@ -546,7 +546,7 @@
     "file": "trashcan.svg",
     "width_in": 24,
     "depth_in": 24,
-    "price": 0.0
+    "price": 35.0
   },
   {
     "id": "toolchest",
@@ -555,7 +555,7 @@
     "file": "toolchest.svg",
     "width_in": 41,
     "depth_in": 18,
-    "price": 0.0
+    "price": 300.0
   },
   {
     "id": "table_saw",
@@ -564,7 +564,7 @@
     "file": "table_saw.svg",
     "width_in": 40,
     "depth_in": 27,
-    "price": 0.0
+    "price": 500.0
   },
   {
     "id": "lathe",
@@ -573,7 +573,7 @@
     "file": "lathe.svg",
     "width_in": 60,
     "depth_in": 18,
-    "price": 0.0
+    "price": 2500.0
   },
   {
     "id": "jointer",
@@ -582,7 +582,7 @@
     "file": "jointer.svg",
     "width_in": 60,
     "depth_in": 20,
-    "price": 0.0
+    "price": 2000.0
   },
   {
     "id": "drill_press",
@@ -591,7 +591,7 @@
     "file": "drill_press.svg",
     "width_in": 20,
     "depth_in": 28,
-    "price": 0.0
+    "price": 200.0
   },
   {
     "id": "cutoff_saw",
@@ -600,7 +600,7 @@
     "file": "cutoff_saw.svg",
     "width_in": 40,
     "depth_in": 24,
-    "price": 0.0
+    "price": 1000.0
   },
   {
     "id": "bandsaw",
@@ -609,7 +609,7 @@
     "file": "bandsaw.svg",
     "width_in": 24,
     "depth_in": 30,
-    "price": 0.0
+    "price": 180.0
   },
   {
     "id": "planer",
@@ -618,7 +618,7 @@
     "file": "planer.svg",
     "width_in": 24,
     "depth_in": 24,
-    "price": 0.0
+    "price": 300.0
   },
   {
     "id": "lounge_chair",
@@ -627,7 +627,7 @@
     "file": "lounge_chair.svg",
     "width_in": 27,
     "depth_in": 78,
-    "price": 0.0
+    "price": 150.0
   },
   {
     "id": "sauna",
@@ -636,7 +636,7 @@
     "file": "sauna.svg",
     "width_in": 72,
     "depth_in": 72,
-    "price": 0.0
+    "price": 3500.0
   },
   {
     "id": "umbrella_table",
@@ -645,7 +645,7 @@
     "file": "umbrella_table.svg",
     "width_in": 96,
     "depth_in": 96,
-    "price": 0.0
+    "price": 1500.0
   },
   {
     "id": "swim_spa",
@@ -654,7 +654,7 @@
     "file": "swim_spa.svg",
     "width_in": 90,
     "depth_in": 180,
-    "price": 0.0
+    "price": 15000.0
   },
   {
     "id": "whirlpool",
@@ -663,7 +663,7 @@
     "file": "whirlpool.svg",
     "width_in": 84,
     "depth_in": 84,
-    "price": 0.0
+    "price": 6500.0
   },
   {
     "id": "desk",
@@ -672,7 +672,7 @@
     "file": "desk.svg",
     "width_in": 60,
     "depth_in": 30,
-    "price": 0.0
+    "price": 350.0
   },
   {
     "id": "office_chair",
@@ -681,7 +681,7 @@
     "file": "office_chair.svg",
     "width_in": 24,
     "depth_in": 24,
-    "price": 0.0
+    "price": 120.0
   },
   {
     "id": "office_set",
@@ -690,7 +690,7 @@
     "file": "office_set.svg",
     "width_in": 54,
     "depth_in": 36,
-    "price": 0.0
+    "price": 450.0
   },
   {
     "id": "corner_desk",
@@ -699,7 +699,7 @@
     "file": "corner_desk.svg",
     "width_in": 60,
     "depth_in": 60,
-    "price": 0.0
+    "price": 400.0
   },
   {
     "id": "bookshelf",
@@ -708,7 +708,7 @@
     "file": "bookshelf.svg",
     "width_in": 36,
     "depth_in": 12,
-    "price": 0.0
+    "price": 180.0
   },
   {
     "id": "wardrobe",
@@ -717,7 +717,7 @@
     "file": "wardrobe.svg",
     "width_in": 48,
     "depth_in": 24,
-    "price": 0.0
+    "price": 250.0
   },
   {
     "id": "gas_furnace",
@@ -726,7 +726,7 @@
     "file": "gas_furnace.svg",
     "width_in": 24,
     "depth_in": 30,
-    "price": 0.0
+    "price": 1200.0
   },
   {
     "id": "electric_furnace",
@@ -735,7 +735,7 @@
     "file": "electric_furnace.svg",
     "width_in": 21,
     "depth_in": 30,
-    "price": 0.0
+    "price": 1500.0
   },
   {
     "id": "oil_furnace",
@@ -744,7 +744,7 @@
     "file": "oil_furnace.svg",
     "width_in": 26,
     "depth_in": 34,
-    "price": 0.0
+    "price": 2400.0
   },
   {
     "id": "gas_water_heater",
@@ -753,7 +753,7 @@
     "file": "gas_water_heater.svg",
     "width_in": 22,
     "depth_in": 22,
-    "price": 0.0
+    "price": 700.0
   },
   {
     "id": "electric_water_heater",
@@ -762,7 +762,7 @@
     "file": "electric_water_heater.svg",
     "width_in": 22,
     "depth_in": 22,
-    "price": 0.0
+    "price": 600.0
   },
   {
     "id": "water_softener",
@@ -771,7 +771,7 @@
     "file": "water_softener.svg",
     "width_in": 24,
     "depth_in": 15,
-    "price": 0.0
+    "price": 700.0
   },
   {
     "id": "gas_tank",
@@ -780,7 +780,7 @@
     "file": "gas_tank.svg",
     "width_in": 120,
     "depth_in": 36,
-    "price": 0.0
+    "price": 1500.0
   },
   {
     "id": "oil_tank",
@@ -789,7 +789,7 @@
     "file": "oil_tank.svg",
     "width_in": 60,
     "depth_in": 27,
-    "price": 0.0
+    "price": 1200.0
   },
   {
     "id": "electric_panel",
@@ -798,7 +798,7 @@
     "file": "electric_panel.svg",
     "width_in": 16,
     "depth_in": 4,
-    "price": 0.0
+    "price": 500.0
   },
   {
     "id": "car_charger",
@@ -807,7 +807,7 @@
     "file": "car_charger.svg",
     "width_in": 8,
     "depth_in": 6,
-    "price": 0.0
+    "price": 550.0
   },
   {
     "id": "battery_wall",
@@ -816,7 +816,7 @@
     "file": "battery_wall.svg",
     "width_in": 45,
     "depth_in": 6,
-    "price": 0.0
+    "price": 9200.0
   },
   {
     "id": "well_pump",
@@ -825,7 +825,7 @@
     "file": "well_pump.svg",
     "width_in": 24,
     "depth_in": 24,
-    "price": 0.0
+    "price": 900.0
   },
   {
     "id": "heat_exchanger",
@@ -834,7 +834,7 @@
     "file": "heat_exchanger.svg",
     "width_in": 30,
     "depth_in": 30,
-    "price": 0.0
+    "price": 1200.0
   },
   {
     "id": "stairs",
@@ -843,7 +843,7 @@
     "file": "stairs.svg",
     "width_in": 36,
     "depth_in": 120,
-    "price": 0.0
+    "price": 3500.0
   },
   {
     "id": "elevator",
@@ -852,6 +852,6 @@
     "file": "elevator.svg",
     "width_in": 48,
     "depth_in": 60,
-    "price": 0.0
+    "price": 40000.0
   }
 ]

@@ -74,8 +74,14 @@ def test_total_rows_have_grand_total(fp, furnished_room):
     rows = fp.total_inventory_rows(scene)
     grand = [r for r in rows if r[0] == "Grand total"]
     assert grand, "missing grand-total row"
-    # 100 sq ft * $100 = $10,000 building (furnishings here are unpriced)
-    assert "$10,000" in grand[0][3]
+    # 100 sq ft * $100 = $10,000 building cost
+    building = [r for r in rows if r[1] == "Est. building cost"]
+    assert "$10,000" in building[0][3]
+    # grand total = building + interior + yard furnishing costs
+    interior, yard = fp.classify_furnishings(scene)
+    _, _, ic = fp.furnishing_inventory_rows(interior)
+    _, _, yc = fp.furnishing_inventory_rows(yard)
+    assert grand[0][3] == fp._money(10000.0 + ic + yc)
 
 
 def test_inventory_tsv_is_tab_separated(fp):

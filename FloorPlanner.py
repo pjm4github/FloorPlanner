@@ -608,6 +608,16 @@ def fmt_ftin(inches: float) -> str:
     return f"{sign}{ft}'-{rem_s}\""
 
 
+def fmt_in(inches: float) -> str:
+    """Format a length as whole/half inches, e.g. 84 -> 84\"  (30.5 -> 30 1/2\")."""
+    sign = "-" if inches < 0 else ""
+    v = round(abs(inches) * 2) / 2          # nearest half inch
+    whole = int(v)
+    frac = v - whole
+    s = str(whole) if frac == 0 else f"{whole} 1/2"
+    return f'{sign}{s}"'
+
+
 def parse_feet(text) -> float:
     """Parse a length given in feet into INCHES.
 
@@ -2911,7 +2921,7 @@ class FurnishingItem(QGraphicsItem):
         self.setZValue(3)                 # over walls, under room labels
         self.setPos(pos)                  # pos = symbol centre
         self.setRotation(rotation)        # rotates about the centre
-        tip = f"{self.name} — {fmt_ftin(self.w)} × {fmt_ftin(self.d)}"
+        tip = f"{self.name} — {fmt_in(self.w)} × {fmt_in(self.d)}"
         if self.price > 0:
             tip += f"  ·  ${self.price:,.0f}"
         self.setToolTip(tip)
@@ -3625,8 +3635,8 @@ class FurnishingList(QListWidget):
 
     @staticmethod
     def _tooltip(spec) -> str:
-        t = (f'{spec["name"]} — {fmt_ftin(spec["width_in"])} × '
-             f'{fmt_ftin(spec["depth_in"])}  ({spec["category"]})')
+        t = (f'{spec["name"]} — {fmt_in(spec["width_in"])} × '
+             f'{fmt_in(spec["depth_in"])}  ({spec["category"]})')
         price = float(spec.get("price", 0.0) or 0.0)
         if price > 0:
             t += f'  ·  ${price:,.0f}'
