@@ -57,19 +57,26 @@ door, never two stacked on top of each other.
 
 ![Coincident door](09-coincident-door.png)
 
+### Bathroom fixtures
+A master bath with both luxury walk-in showers — a floor-to-ceiling **glass
+walk-in shower** (5' × 4') and a tiled walk-in shower with a bench — plus a
+toilet and vanity, all at true scale.
+
+![Bathroom](10-bathroom.png)
+
 ### Inventories (Excel-ready)
 House / Interior / Yard / Total tables; **Copy to clipboard (TSV)** pastes
 straight into a spreadsheet.
 
-![Inventory](10-inventory.png)
+![Inventory](11-inventory.png)
 
 ### AI furnishing pricing
 The **AI** menu fetches current purchase prices for the whole catalog from a
 chosen AI system via an editable prompt.
 
-![AI pricing](11-ai-pricing.png)
+![AI pricing](12-ai-pricing.png)
 
 ### Help ▸ About
 Where the app keeps your designs and settings, using OS-standard locations.
 
-![About](12-about.png)
+![About](13-about.png)

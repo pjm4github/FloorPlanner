@@ -198,6 +198,15 @@
     "price": 0.0
   },
   {
+    "id": "glass_shower",
+    "name": "Luxury Glass Shower 5' x 4'",
+    "category": "Bathroom",
+    "file": "glass_shower.svg",
+    "width_in": 60,
+    "depth_in": 48,
+    "price": 0.0
+  },
+  {
     "id": "toilet",
     "name": "Toilet",
     "category": "Bathroom",

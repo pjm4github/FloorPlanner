@@ -138,6 +138,24 @@ FURNISHINGS = [
       R(53, 4, 3.5, 34, 0.4, "none", 0.6), L(54.75, 4, 54.75, 38, 0.4),
       # frameless glass screen on the front with a walk-in opening
       L(31, 39.8, 58.5, 39.8, 1.6), L(31, 39.8, 31, 33, 1.2)]),
+    ("glass_shower", "Luxury Glass Shower 5' x 4'", "Bathroom", 60, 48,
+     [# floor-to-ceiling glass enclosure: outer panels with a door gap, plus
+      # a faint inner line for the glass thickness
+      L(1, 1, 59, 1, 1.1), L(1, 1, 1, 47, 1.1), L(59, 1, 59, 47, 1.1),
+      L(1, 47, 11, 47, 1.1), L(34, 47, 59, 47, 1.1),
+      R(2.6, 2.6, 54.8, 43.0, 0, "none", 0.35),
+      # frameless glass door swinging in from the front opening
+      L(34, 47, 34, 24, 1.3),
+      Pth("M 11 47 A 23 23 0 0 1 34 24", "none", 0.6),
+      # ceiling rainfall head over the centre, with a tile grid in the head
+      R(28, 13, 18, 18, 1, "none", 0.7),
+      L(33, 13, 33, 31, 0.3), L(37, 13, 37, 31, 0.3), L(41, 13, 41, 31, 0.3),
+      L(28, 17.5, 46, 17.5, 0.3), L(28, 22, 46, 22, 0.3),
+      L(28, 26.5, 46, 26.5, 0.3),
+      # hand shower + valve trim on the back wall
+      Ci(12, 7, 1.7, "none", 0.6), Ci(17, 7, 1.1, "none", 0.6),
+      # linear drain along the back wall
+      R(28, 4, 24, 2.4, 0.3, "none", 0.5), L(40, 4, 40, 6.4, 0.3)]),
     ("toilet", "Toilet", "Bathroom", 20, 28,
      [R(2, 0.75, 16, 7, 1.5, FILL, 1),
       El(10, 17.5, 7.5, 9.5, "#ffffff", 1), El(10, 18, 5.5, 7, "none", 0.5)]),
@@ -431,7 +449,8 @@ GROUPS = [
     ("Bedroom", ["bed_king", "bed_queen", "bed_full", "bed_twin",
                  "nightstand", "dresser", "wardrobe", "armchair",
                  "tv_stand", "desk", "office_chair", "bookshelf"]),
-    ("Bathroom", ["bathtub", "shower", "walk_in_shower", "toilet", "vanity"]),
+    ("Bathroom", ["bathtub", "shower", "walk_in_shower", "glass_shower",
+                  "toilet", "vanity"]),
     ("Laundry", ["washer", "dryer"]),
     ("Garage", ["suv", "car", "motorcycle", "bicycle", "boat",
                 "boat_trailer", "workbench", "storage_shelves", "lawnmower",

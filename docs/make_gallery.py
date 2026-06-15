@@ -247,6 +247,30 @@ def build_coincident_door():
     return win
 
 
+def build_bathroom():
+    """A master bath laid out with the two luxury walk-in showers (glass and
+    tiled) plus a toilet and vanity, all at true scale."""
+    win = FP.MainWindow()
+    sc = win.scene
+    for a, b in [((0, 0), (168, 0)), ((168, 0), (168, 108)),
+                 ((168, 108), (0, 108)), ((0, 108), (0, 0))]:
+        sc.addItem(FP.WallItem(QPointF(*a), QPointF(*b), "interior"))
+    FP.rebuild_all_walls(sc)
+    res = FP.detect_room(sc, QPointF(84, 54))
+    r = FP.RoomItem("Master Bath", QPointF(84, 54), res[0], res[1],
+                    corners=res[2])
+    r.properties["room_type"] = "Bathroom"
+    r.label_offset = QPointF(0, 24)                # clear of the showers
+    sc.addItem(r)
+    FP.bind_room_walls(sc, r)
+    for kind, pos, rot in [("glass_shower", (40, 30), 0),
+                           ("walk_in_shower", (128, 31), 0),
+                           ("toilet", (24, 92), 0), ("vanity", (122, 94), 0)]:
+        sc.addItem(FP.FurnishingItem(kind, QPointF(*pos), rot))
+    win._update_totals()
+    return win
+
+
 # ---------------------------------------------------------------------------
 # Capture
 # ---------------------------------------------------------------------------
@@ -293,16 +317,22 @@ frame(cd_win, "09-coincident-door", rect=(-36, -36, 360, 192), palette="All",
       tool=FP.TOOL_SELECT, size=(1100, 800))
 cd_win.close()
 
+# 10. bathroom fixtures: the glass and tiled luxury walk-in showers
+bath_win = build_bathroom()
+frame(bath_win, "10-bathroom", rect=(-30, -30, 228, 168), palette="Bathroom",
+      tool=FP.TOOL_SELECT, size=(1100, 850))
+bath_win.close()
+
 # --- dialogs ----------------------------------------------------------------
-# 10. total inventory table (Excel-ready)
+# 11. total inventory table (Excel-ready)
 rows = FP.total_inventory_rows(win.scene)
 shot_widget(FP.InventoryDialog("Inventory — Total", FP.TOTAL_INV_HEADERS,
-                               rows), "10-inventory", size=(560, 360))
+                               rows), "11-inventory", size=(560, 360))
 
-# 11. AI furnishing-price dialog
-shot_widget(FP.AIPricingDialog(), "11-ai-pricing", size=(640, 560))
+# 12. AI furnishing-price dialog
+shot_widget(FP.AIPricingDialog(), "12-ai-pricing", size=(640, 560))
 
-# 12. Help → About (where files are stored)
-shot_widget(FP.AboutDialog(), "12-about", size=(520, 320))
+# 13. Help → About (where files are stored)
+shot_widget(FP.AboutDialog(), "13-about", size=(520, 320))
 
 print("gallery complete")
