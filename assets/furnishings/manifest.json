@@ -666,6 +666,24 @@
     "price": 0.0
   },
   {
+    "id": "office_set",
+    "name": "Office Desk & Chair",
+    "category": "Office / Storage",
+    "file": "office_set.svg",
+    "width_in": 54,
+    "depth_in": 36,
+    "price": 0.0
+  },
+  {
+    "id": "corner_desk",
+    "name": "Corner Desk 5'",
+    "category": "Office / Storage",
+    "file": "corner_desk.svg",
+    "width_in": 60,
+    "depth_in": 60,
+    "price": 0.0
+  },
+  {
     "id": "bookshelf",
     "name": "Bookshelf 3'",
     "category": "Office / Storage",

@@ -503,6 +503,18 @@ FURNISHINGS = [
     ("office_chair", "Office Chair", "Office / Storage", 24, 24,
      [R(4, 1, 16, 4, 2, "#ffffff", 0.8), Ci(12, 13, 8.5, FILL, 1),
       Ci(12, 13, 3, "none", 0.5)]),
+    ("office_set", "Office Desk & Chair", "Office / Storage", 54, 36,
+     [R(0.75, 0.75, 52.5, 23.5, 1, sw=1.2),                 # desk top
+      L(2, 4.5, 52, 4.5, 0.5),                              # back edge line
+      R(38, 5, 13, 17, 0.6, "none", 0.5),                   # drawer pedestal
+      L(38, 11, 51, 11, 0.4), L(38, 17, 51, 17, 0.4),       # drawers
+      R(19, 24.5, 16, 3.5, 2, "#ffffff", 0.8),              # chair back
+      Ci(27, 30, 5.5, FILL, 1), Ci(27, 30, 2.2, "none", 0.5)]),  # seat + post
+    ("corner_desk", "Corner Desk 5'", "Office / Storage", 60, 60,
+     [Pth("M0.75 0.75 H59.25 V23.25 H23.25 V59.25 H0.75 Z", FILL, 1.2),  # L top
+      L(44, 3, 44, 20.5, 0.5), L(3, 44, 20.5, 44, 0.5),     # drawer lines
+      Ci(36, 36, 6.5, FILL, 1), Ci(36, 36, 2.2, "none", 0.5),  # task chair
+      Pth("M41.5 30.5 a8 8 0 0 1 0 11", "none", 0.8)]),     # chair back arc
     ("bookshelf", "Bookshelf 3'", "Office / Storage", 36, 12,
      [R(0.6, 0.6, 34.8, 10.8, 0.5, sw=1),
       L(12, 0.6, 12, 11.4, 0.5), L(24, 0.6, 24, 11.4, 0.5)]),
@@ -632,8 +644,8 @@ GROUPS = [
               "storage_shelves"]),
     ("Sunroom", ["lounge_chair", "sauna", "umbrella_table", "swim_spa",
                  "whirlpool", "armchair", "side_table"]),
-    ("Office", ["desk", "office_chair", "bookshelf", "armchair",
-                "side_table"]),
+    ("Office", ["desk", "office_chair", "office_set", "corner_desk",
+                "bookshelf", "armchair", "side_table"]),
     ("HVAC", ["gas_furnace", "electric_furnace", "oil_furnace",
               "gas_water_heater", "electric_water_heater", "water_softener",
               "gas_tank", "oil_tank", "electric_panel", "car_charger",

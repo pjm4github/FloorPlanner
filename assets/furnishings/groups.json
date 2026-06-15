@@ -76,6 +76,8 @@
       "whirlpool.svg",
       "desk.svg",
       "office_chair.svg",
+      "office_set.svg",
+      "corner_desk.svg",
       "bookshelf.svg",
       "wardrobe.svg",
       "gas_furnace.svg",
@@ -229,6 +231,8 @@
     "items": [
       "desk.svg",
       "office_chair.svg",
+      "office_set.svg",
+      "corner_desk.svg",
       "bookshelf.svg",
       "armchair.svg",
       "side_table.svg"
