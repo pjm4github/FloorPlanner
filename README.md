@@ -224,8 +224,12 @@ run or skipped, e.g. `pytest -m "not gui"`.
 ## Licenses
 
 - Application code: MIT License — free to use, copy, modify, and
-  distribute; just keep the credit notice. Created by PJ Moran with Claude
-  (Anthropic). See `LICENSE`.
+  distribute; just keep the credit notice. Created by Patrick Moran with
+  Claude (Anthropic). See `LICENSE`.
 - Furnishing symbols and toolbar icons: CC0 1.0 (drawn for this project,
   see `assets/furnishings/LICENSE`)
 - DejaVu fonts: see `assets/fonts/LICENSE`
+- PyQt6 (the GUI toolkit this app depends on): dual-licensed under the
+  GPL v3 and a commercial license from Riverbank Computing. See
+  [PyQt6 licensing](https://www.riverbankcomputing.com/commercial/license-faq)
+  and the [GPL v3 text](https://www.gnu.org/licenses/gpl-3.0.html).
