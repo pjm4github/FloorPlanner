@@ -495,6 +495,15 @@
     "price": 0.0
   },
   {
+    "id": "garden_tractor",
+    "name": "Garden Tractor + Loader",
+    "category": "Garage",
+    "file": "garden_tractor.svg",
+    "width_in": 54,
+    "depth_in": 120,
+    "price": 0.0
+  },
+  {
     "id": "boat_trailer",
     "name": "Boat Trailer",
     "category": "Garage",

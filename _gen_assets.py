@@ -385,6 +385,19 @@ FURNISHINGS = [
       R(18.6, 18.5, 3, 6.5, 1.2, FILL, 0.8),
       L(6, 27, 8.5, 59, 1.1), L(16, 27, 13.5, 59, 1.1),
       L(8.5, 59, 13.5, 59, 1.4)]),                 # handle
+    ("garden_tractor", "Garden Tractor + Loader", "Garage", 54, 120,
+     [R(2.5, 1, 49, 8.5, 1.5, FILL, 1.3),                  # front loader bucket
+      L(2.5, 5.5, 51.5, 5.5, 0.5),                         # bucket lip
+      R(9, 9, 4.5, 32, 1, FILL, 1), R(40.5, 9, 4.5, 32, 1, FILL, 1),  # arms
+      R(13, 38, 28, 30, 3, FILL, 1.3),                     # hood / engine
+      L(13, 48, 41, 48, 0.5), L(13, 56, 41, 56, 0.5),      # hood louvers
+      R(11, 70, 32, 32, 2.5, FILL, 1.2),                   # operator platform
+      R(19, 76, 16, 15, 3, "#ffffff", 0.9),                # seat
+      L(13, 84, 41, 84, 1.4),                              # ROPS roll bar
+      R(21, 114, 12, 5, 1, FILL, 1),                       # rear 3-point hitch
+      R(1, 42, 7, 17, 2, FILL, 1), R(46, 42, 7, 17, 2, FILL, 1),  # front wheels
+      R(0.5, 90, 9, 25, 2.5, FILL, 1.1),                   # rear wheels (large)
+      R(44.5, 90, 9, 25, 2.5, FILL, 1.1)]),
     ("boat_trailer", "Boat Trailer", "Garage", 78, 216,
      [L(39, 6, 39, 62, 1.4),                       # tongue
       R(35.5, 1, 7, 7, 1.5, FILL, 1),              # coupler
@@ -637,8 +650,9 @@ GROUPS = [
                   "toilet", "vanity", "vanity_24", "vanity_36", "vanity_48"]),
     ("Laundry", ["washer", "dryer"]),
     ("Garage", ["suv", "car", "motorcycle", "bicycle", "boat",
-                "boat_trailer", "workbench", "storage_shelves", "lawnmower",
-                "snowblower", "wheelbarrow", "trashcan"]),
+                "boat_trailer", "garden_tractor", "workbench",
+                "storage_shelves", "lawnmower", "snowblower", "wheelbarrow",
+                "trashcan"]),
     ("Shop", ["toolchest", "table_saw", "lathe", "jointer", "drill_press",
               "cutoff_saw", "bandsaw", "planer", "workbench",
               "storage_shelves"]),

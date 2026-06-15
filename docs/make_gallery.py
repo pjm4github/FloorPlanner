@@ -154,6 +154,7 @@ def build():
          ("hutch", (468, 250), 90),              # china hutch on the east wall
          ("refrigerator", (456, 60), 90),
          ("suv", (560, 200), 0), ("bicycle", (706, 110), 0),
+         ("garden_tractor", (650, 215), 0),      # tractor parked by the car
          ("workbench", (620, 70), 0), ("trashcan", (718, 310), 0),
          ("whirlpool", (428, 522), 0), ("lounge_chair", (222, 480), 0),
          ("lounge_chair", (258, 480), 0),
