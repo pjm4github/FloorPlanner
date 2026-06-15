@@ -124,6 +124,26 @@ def test_drag_draws_a_wall_via_synthesized_mouse(fp, win):
     assert _counts(win)[0] == before + 1
 
 
+def test_combined_click_drag_draws_a_wall(fp, win):
+    # CLICK x1 y1 DRAG x2 y2 == one press-drag-release (the DRAG carries only
+    # the end point; the CLICK supplies the start)
+    win.prepare_headless()
+    before = _counts(win)[0]
+    win.run_macro("E  CLICK 24 24 DRAG 240 24")
+    assert _counts(win)[0] == before + 1
+
+
+def test_ctrl_click_toggles_selection(fp, win):
+    # ^CLICK rides the Ctrl modifier on the synthesized event, so the app
+    # treats it as an additive (toggle) click
+    win.prepare_headless()
+    win.run_macro("PLACE sofa 120 96 0  PLACE armchair 300 96 0")
+    win.run_macro("CLICK 120 96  ^CLICK 300 96")
+    kinds = sorted(it.kind for it in win.scene.selectedItems()
+                   if isinstance(it, fp.FurnishingItem))
+    assert kinds == ["armchair", "sofa"]
+
+
 def test_unknown_token_is_recorded_not_fatal(fp, win):
     res = win.run_macro("PLACE sofa 10 10  FLOOGLE  PLACE armchair 50 50")
     assert not res["ok"]
@@ -180,12 +200,14 @@ def test_feet_inches_coordinates(fp, win):
 # --------------------------------------------------------------------------
 # Macro recorder dialog
 # --------------------------------------------------------------------------
-def _send_mouse(win, etype, sx, sy, button, buttons):
+def _send_mouse(win, etype, sx, sy, button, buttons, ctrl=False):
     from PyQt6.QtWidgets import QApplication
     vp = win.view.viewport()
     pos = win.view.mapFromScene(QPointF(sx, sy))
+    mods = (Qt.KeyboardModifier.ControlModifier if ctrl
+            else Qt.KeyboardModifier.NoModifier)
     ev = QMouseEvent(etype, QPointF(pos), QPointF(vp.mapToGlobal(pos)),
-                     button, buttons, Qt.KeyboardModifier.NoModifier)
+                     button, buttons, mods)
     QApplication.sendEvent(vp, ev)
 
 
@@ -227,7 +249,39 @@ def test_recorder_captures_live_drag(fp, win):
     _send_mouse(win, QEvent.Type.MouseButtonRelease, 240, 24, left,
                 Qt.MouseButton.NoButton)
     dlg.stop()
-    assert "DRAG" in dlg.edit.toPlainText()
+    text = dlg.edit.toPlainText()
+    assert "CLICK" in text and "DRAG" in text       # combined click-drag form
+
+
+def test_recorder_ctrl_drag_emits_caret_click_drag(fp, win):
+    win.prepare_headless()
+    dlg = fp.MacroRecorderDialog(win)
+    dlg.start()
+    left, none = Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton
+    _send_mouse(win, QEvent.Type.MouseButtonPress, 60, 60, left, left,
+                ctrl=True)
+    _send_mouse(win, QEvent.Type.MouseMove, 150, 60, none, left, ctrl=True)
+    _send_mouse(win, QEvent.Type.MouseButtonRelease, 180, 60, left, none,
+                ctrl=True)
+    dlg.stop()
+    text = dlg.edit.toPlainText()
+    assert text.startswith("^CLICK")                # Ctrl captured
+    assert "DRAG" in text
+
+
+def test_recorder_ctrl_click_emits_caret_click(fp, win):
+    win.prepare_headless()
+    dlg = fp.MacroRecorderDialog(win)
+    dlg.start()
+    left, none = Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton
+    _send_mouse(win, QEvent.Type.MouseButtonPress, 90, 90, left, left,
+                ctrl=True)
+    _send_mouse(win, QEvent.Type.MouseButtonRelease, 90, 90, left, none,
+                ctrl=True)
+    dlg.stop()
+    text = dlg.edit.toPlainText().strip()
+    assert text.startswith("^CLICK")
+    assert "DRAG" not in text                        # no movement -> plain click
 
 
 def test_recorder_short_click_is_click_not_drag(fp, win):

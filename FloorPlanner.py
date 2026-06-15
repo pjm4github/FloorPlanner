@@ -5942,8 +5942,9 @@ class MacroRunner:
                                        ^+Z redo.
       Arrow nudge   LEFT RIGHT UP DOWN          (^ prefix = fine 1" step)
       Keys          ESC DEL ENTER
-      Mouse         CLICK x y | RCLICK x y | MOVE x y | PRESS x y |
-                    RELEASE x y | DRAG x1 y1 x2 y2
+      Mouse         CLICK x y | ^CLICK x y (Ctrl) | RCLICK x y | MOVE x y |
+                    CLICK x1 y1 DRAG x2 y2  (press-drag-release; ^CLICK for a
+                    Ctrl-drag) | DRAG x1 y1 x2 y2 | PRESS x y | RELEASE x y
       Place / edit  PLACE kind x y [rot] | WALL x1 y1 x2 y2 [ext|int] |
                     DOOR x y code | WINDOW x y code | ROOM name x y |
                     SELECT x y | SELECTALL | DESELECT | ROTATE deg |
@@ -6016,6 +6017,10 @@ class MacroRunner:
     # -- dispatch ------------------------------------------------------------
     def _dispatch(self, raw, toks, i):
         cmd = raw.upper()
+        if cmd == "CLICK":
+            return self._do_click(toks, i, ctrl=False)
+        if cmd == "^CLICK":
+            return self._do_click(toks, i, ctrl=True)
         if raw.startswith("^"):
             return self._caret(raw[1:], i)
         if len(cmd) == 1 and cmd in self._TOOL_CODES:
@@ -6069,18 +6074,32 @@ class MacroRunner:
     def _vpos(self, x, y):
         return self.win.view.mapFromScene(QPointF(x, y))
 
-    def _mouse(self, etype, x, y, button, buttons):
+    def _mouse(self, etype, x, y, button, buttons,
+               mods=Qt.KeyboardModifier.NoModifier):
         vp = self.win.view.viewport()
         pos = self._vpos(x, y)
         ev = QMouseEvent(etype, QPointF(pos), QPointF(vp.mapToGlobal(pos)),
-                         button, buttons, Qt.KeyboardModifier.NoModifier)
+                         button, buttons, mods)
         QApplication.sendEvent(vp, ev)
         QApplication.processEvents()
 
-    def _click(self, x, y, button=Qt.MouseButton.LeftButton):
-        self._mouse(QEvent.Type.MouseButtonPress, x, y, button, button)
+    def _click(self, x, y, button=Qt.MouseButton.LeftButton,
+               mods=Qt.KeyboardModifier.NoModifier):
+        self._mouse(QEvent.Type.MouseButtonPress, x, y, button, button, mods)
         self._mouse(QEvent.Type.MouseButtonRelease, x, y, button,
-                    Qt.MouseButton.NoButton)
+                    Qt.MouseButton.NoButton, mods)
+
+    def _drag(self, x1, y1, x2, y2, mods=Qt.KeyboardModifier.NoModifier):
+        # press at the start, move (so the app sees a drag), release at the
+        # end — the modifier rides every event so Ctrl-drags reproduce.
+        left = Qt.MouseButton.LeftButton
+        self._mouse(QEvent.Type.MouseButtonPress, x1, y1, left, left, mods)
+        self._mouse(QEvent.Type.MouseMove, (x1 + x2) / 2, (y1 + y2) / 2,
+                    Qt.MouseButton.NoButton, left, mods)
+        self._mouse(QEvent.Type.MouseMove, x2, y2,
+                    Qt.MouseButton.NoButton, left, mods)
+        self._mouse(QEvent.Type.MouseButtonRelease, x2, y2, left,
+                    Qt.MouseButton.NoButton, mods)
 
     def _key(self, key, mods=Qt.KeyboardModifier.NoModifier, text=""):
         view = self.win.view
@@ -6103,9 +6122,19 @@ class MacroRunner:
         self.win.set_tool(self._TOOL_NAMES[name.lower()])
         return i
 
-    def _cmd_click(self, toks, i):
+    def _do_click(self, toks, i, ctrl):
+        """CLICK / ^CLICK x y.  If the next token is DRAG, the click is the
+        START of a drag (press at the click point, drag to the DRAG point,
+        release) — so a Ctrl-drag reads ``^CLICK x1 y1 DRAG x2 y2``."""
         (x, y), i = self._take(toks, i, 2)
-        self._click(self._num(x), self._num(y))
+        x, y = self._num(x), self._num(y)
+        mods = (Qt.KeyboardModifier.ControlModifier if ctrl
+                else Qt.KeyboardModifier.NoModifier)
+        if i < len(toks) and toks[i].upper() == "DRAG":
+            (ex, ey), i = self._take(toks, i + 1, 2)   # DRAG end point only
+            self._drag(x, y, self._num(ex), self._num(ey), mods)
+        else:
+            self._click(x, y, mods=mods)
         return i
 
     def _cmd_rclick(self, toks, i):
@@ -6132,16 +6161,10 @@ class MacroRunner:
         return i
 
     def _cmd_drag(self, toks, i):
+        # standalone 4-arg DRAG x1 y1 x2 y2 (a following DRAG after CLICK is
+        # consumed by _do_click as a 2-arg continuation instead)
         (x1, y1, x2, y2), i = self._take(toks, i, 4)
-        x1, y1, x2, y2 = map(self._num, (x1, y1, x2, y2))
-        left = Qt.MouseButton.LeftButton
-        self._mouse(QEvent.Type.MouseButtonPress, x1, y1, left, left)
-        self._mouse(QEvent.Type.MouseMove, (x1 + x2) / 2, (y1 + y2) / 2,
-                    Qt.MouseButton.NoButton, left)
-        self._mouse(QEvent.Type.MouseMove, x2, y2,
-                    Qt.MouseButton.NoButton, left)
-        self._mouse(QEvent.Type.MouseButtonRelease, x2, y2, left,
-                    Qt.MouseButton.NoButton)
+        self._drag(*map(self._num, (x1, y1, x2, y2)))
         return i
 
     def _cmd_place(self, toks, i):
@@ -6329,6 +6352,7 @@ class MacroRecorderDialog(QDialog):
         self._press_scene = None
         self._press_moved = False
         self._press_tool = TOOL_SELECT
+        self._press_ctrl = False
         self._replay_lines = []
         self._replay_idx = 0
 
@@ -6524,6 +6548,8 @@ class MacroRecorderDialog(QDialog):
                     ev.position().toPoint())
                 self._press_moved = False
                 self._press_tool = self.win.tool       # tool at press time
+                self._press_ctrl = bool(ev.modifiers()
+                                        & Qt.KeyboardModifier.ControlModifier)
             elif et == QEvent.Type.MouseMove and self._press_scene is not None \
                     and (ev.buttons() & Qt.MouseButton.LeftButton):
                 self._press_moved = True
@@ -6534,18 +6560,23 @@ class MacroRecorderDialog(QDialog):
                 # door/window/room clicks are recorded by their dedicated
                 # hooks (with the dialog value), so skip the raw click here
                 if self._press_tool not in (TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM):
-                    self._emit_mouse(self._press_scene, end, self._press_moved)
+                    self._emit_mouse(self._press_scene, end,
+                                     self._press_moved, self._press_ctrl)
                 self._press_scene = None
         elif et == QEvent.Type.KeyPress and self._belongs_to_main(obj):
             self._emit_key(ev)
 
-    def _emit_mouse(self, p1, p2, moved):
+    def _emit_mouse(self, p1, p2, moved, ctrl):
+        # a click is "[^]CLICK x y"; a drag is the click START plus a DRAG end
+        # point on the same line: "[^]CLICK x1 y1 DRAG x2 y2".  The '^' marks
+        # the Ctrl modifier (e.g. Ctrl-drag a room name, or Ctrl+click toggle).
         x1, y1, x2, y2 = (round(p1.x()), round(p1.y()),
                           round(p2.x()), round(p2.y()))
+        pre = "^CLICK" if ctrl else "CLICK"
         if moved and QLineF(p1, p2).length() >= self.MOVE_THRESHOLD:
-            tok = f"DRAG {x1} {y1} {x2} {y2}"
+            tok = f"{pre} {x1} {y1} DRAG {x2} {y2}"
         else:
-            tok = f"CLICK {x2} {y2}"
+            tok = f"{pre} {x1} {y1}"
         self._append(tok, newline=self.nl_check.isChecked())
 
     def _emit_key(self, ev):

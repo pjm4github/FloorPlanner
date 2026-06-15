@@ -66,10 +66,13 @@ Spaces separate them, e.g. `^C ^V`. A `+` after the caret adds Shift.
 | Token | Action |
 |-------|--------|
 | `CLICK x y` | left click at a scene point |
+| `^CLICK x y` | **Ctrl**+click (e.g. toggle an item in/out of the selection) |
+| `CLICK x1 y1 DRAG x2 y2` | press at the click point, drag to the DRAG point, release — one click-drag operation. The `DRAG` carries only the **end** point; the start is the preceding `CLICK` |
+| `^CLICK x1 y1 DRAG x2 y2` | the same with **Ctrl** held (e.g. Ctrl-drag a room name to nudge just the label, or a Ctrl rubber-band additive select) |
 | `RCLICK x y` | right click |
 | `MOVE x y` | move the cursor (sets the paste target) |
 | `PRESS x y` / `RELEASE x y` | hold / release the left button |
-| `DRAG x1 y1 x2 y2` | press, move, release — e.g. draw a wall with the wall tool active |
+| `DRAG x1 y1 x2 y2` | a stand-alone drag with explicit start+end (no preceding `CLICK`) |
 
 ### High-level placement & editing (robust, dialog-free)
 
