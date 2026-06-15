@@ -66,19 +66,26 @@ lazy-susan, vanity bases) are in the Kitchen and Bathroom palette sections.
 
 ![Bathroom](10-bathroom.png)
 
+### Kitchen cabinets
+A run of standard **base cabinets** along the back wall — corner lazy-susan,
+door bases, a sink base and a drawer base — plus a row of tall **pantry
+cabinets**, all at true scale.
+
+![Kitchen](11-kitchen.png)
+
 ### Inventories (Excel-ready)
 House / Interior / Yard / Total tables; **Copy to clipboard (TSV)** pastes
 straight into a spreadsheet.
 
-![Inventory](11-inventory.png)
+![Inventory](12-inventory.png)
 
 ### AI furnishing pricing
 The **AI** menu fetches current purchase prices for the whole catalog from a
 chosen AI system via an editable prompt.
 
-![AI pricing](12-ai-pricing.png)
+![AI pricing](13-ai-pricing.png)
 
 ### Help ▸ About
 Where the app keeps your designs and settings, using OS-standard locations.
 
-![About](13-about.png)
+![About](14-about.png)
