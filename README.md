@@ -21,7 +21,10 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   (`3280` = 32" × 80"), they cut the opening and ride the wall when
   dragged. Door types: LH, RH, bifold, pocket, slider, French, doorway,
   and single / double **garage doors** (shown as the opening plus a
-  dashed overhead outline of the open door).
+  dashed overhead outline of the open door). When two rooms share a
+  boundary (coincident walls), a door or window belongs to one wall and
+  the wall next to it **opens** for it — a single clean opening, never two
+  stacked on top of each other.
 - **Rooms** — click inside any enclosed area to name it. The room traces
   its perimeter along the wall centrelines, computes the true interior
   area, can draw double-headed dimension arrows on every enclosing wall
@@ -47,7 +50,8 @@ file, `FloorPlanner.py`, plus bundled fonts and artwork.
   table you can copy as TSV for Excel. Rooms can be copied and pasted
   elsewhere with their walls and openings.
 - **Furnishings** — a bundled CC0 library of 70 top-view symbols across
-  Living, Dining, Kitchen, Bedroom, Bathroom, Laundry, Office, Garage
+  Living, Dining, Kitchen, **Bedroom**, **Bathroom** (tub, shower, luxury
+  walk-in shower, toilet, vanity), Laundry, **Office / Storage**, **Garage**
   (cars, boat + trailer, workbench, yard equipment), **Shop** (table saw,
   lathe, jointer, drill press, bandsaw, planer…), **Sunroom** (swim spa,
   sauna, whirlpool, lounge chairs…), **HVAC** (gas/electric/oil
