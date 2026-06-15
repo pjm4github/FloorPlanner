@@ -212,6 +212,41 @@ def build_open_wall():
     return win, bottom
 
 
+def build_coincident_door():
+    """Two adjacent rooms that each own their own wall on the shared boundary
+    (coincident party walls) with one door between them -- the plain wall
+    opens for it, so there's a single clean door, never two stacked."""
+    win = FP.MainWindow()
+    sc = win.scene
+    for a, b in [((0, 0), (144, 0)), ((144, 0), (144, 120)),
+                 ((144, 120), (0, 120)), ((0, 120), (0, 0))]:
+        sc.addItem(FP.WallItem(QPointF(*a), QPointF(*b), "interior"))
+    FP.rebuild_all_walls(sc)
+    res = FP.detect_room(sc, QPointF(72, 60))
+    kit = FP.RoomItem("Kitchen", QPointF(72, 60), res[0], res[1],
+                      corners=res[2])
+    kit.properties["room_type"] = "Kitchen"
+    sc.addItem(kit)
+    FP.bind_room_walls(sc, kit)
+    shared = next(w for w in kit.walls if not w.is_open
+                  and abs(w.p1.x() - 144) < 1 and abs(w.p2.x() - 144) < 1)
+    door = FP.OpeningItem(shared, "door", "3280", 60)
+    shared.openings.append(door)
+    FP.rebuild_all_walls(sc)
+    for a, b in [((144, 0), (288, 0)), ((288, 0), (288, 120)),
+                 ((288, 120), (144, 120))]:       # reuse the shared wall
+        sc.addItem(FP.WallItem(QPointF(*a), QPointF(*b), "interior"))
+    FP.rebuild_all_walls(sc)
+    res = FP.detect_room(sc, QPointF(216, 60))
+    din = FP.RoomItem("Dining", QPointF(216, 60), res[0], res[1],
+                      corners=res[2])
+    din.properties["room_type"] = "Dining Room"
+    sc.addItem(din)
+    FP.bind_room_walls(sc, din)                    # synthesizes its own copy
+    win._update_totals()
+    return win
+
+
 # ---------------------------------------------------------------------------
 # Capture
 # ---------------------------------------------------------------------------
@@ -252,16 +287,22 @@ frame(ow_win, "08-open-walls", rect=(-40, -40, 296, 248), palette="All",
       select=[ow_wall], size=(1100, 850))
 ow_win.close()
 
+# 9. coincident party wall opens for one door (no stacking)
+cd_win = build_coincident_door()
+frame(cd_win, "09-coincident-door", rect=(-36, -36, 360, 192), palette="All",
+      tool=FP.TOOL_SELECT, size=(1100, 800))
+cd_win.close()
+
 # --- dialogs ----------------------------------------------------------------
-# 9. total inventory table (Excel-ready)
+# 10. total inventory table (Excel-ready)
 rows = FP.total_inventory_rows(win.scene)
 shot_widget(FP.InventoryDialog("Inventory — Total", FP.TOTAL_INV_HEADERS,
-                               rows), "09-inventory", size=(560, 360))
+                               rows), "10-inventory", size=(560, 360))
 
-# 10. AI furnishing-price dialog
-shot_widget(FP.AIPricingDialog(), "10-ai-pricing", size=(640, 560))
+# 11. AI furnishing-price dialog
+shot_widget(FP.AIPricingDialog(), "11-ai-pricing", size=(640, 560))
 
-# 11. Help → About (where files are stored)
-shot_widget(FP.AboutDialog(), "11-about", size=(520, 320))
+# 12. Help → About (where files are stored)
+shot_widget(FP.AboutDialog(), "12-about", size=(520, 320))
 
 print("gallery complete")

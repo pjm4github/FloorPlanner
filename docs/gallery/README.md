@@ -50,19 +50,26 @@ Detach a wall to unlock its corners; pull a corner away and that side
 
 ![Open walls](08-open-walls.png)
 
+### A clean door between rooms
+Adjacent rooms each own their own wall on the shared boundary; a door
+belongs to one of them and the coincident wall **opens** for it — a single
+door, never two stacked on top of each other.
+
+![Coincident door](09-coincident-door.png)
+
 ### Inventories (Excel-ready)
 House / Interior / Yard / Total tables; **Copy to clipboard (TSV)** pastes
 straight into a spreadsheet.
 
-![Inventory](09-inventory.png)
+![Inventory](10-inventory.png)
 
 ### AI furnishing pricing
 The **AI** menu fetches current purchase prices for the whole catalog from a
 chosen AI system via an editable prompt.
 
-![AI pricing](10-ai-pricing.png)
+![AI pricing](11-ai-pricing.png)
 
 ### Help ▸ About
 Where the app keeps your designs and settings, using OS-standard locations.
 
-![About](11-about.png)
+![About](12-about.png)
