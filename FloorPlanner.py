@@ -156,8 +156,9 @@ from collections import deque
 from pathlib import Path
 
 from PyQt6 import sip
-from PyQt6.QtCore import (QLineF, QMimeData, QPoint, QPointF, QRect, QRectF,
-                          QSettings, QSize, QStandardPaths, Qt, QTimer, QUrl)
+from PyQt6.QtCore import (QEvent, QLineF, QMimeData, QPoint, QPointF, QRect,
+                          QRectF, QSettings, QSize, QStandardPaths, Qt, QTimer,
+                          QUrl)
 from PyQt6.QtGui import (
     QAction,
     QActionGroup,
@@ -169,7 +170,10 @@ from PyQt6.QtGui import (
     QFontDatabase,
     QFontMetricsF,
     QIcon,
+    QImage,
+    QKeyEvent,
     QKeySequence,
+    QMouseEvent,
     QPainter,
     QPainterPath,
     QPainterPathStroker,
@@ -213,9 +217,10 @@ from PyQt6.QtWidgets import (
 )
 
 try:
-    from PyQt6.QtSvg import QSvgRenderer
+    from PyQt6.QtSvg import QSvgGenerator, QSvgRenderer
 except ImportError:               # QtSvg missing: furnishings draw as boxes
     QSvgRenderer = None
+    QSvgGenerator = None
 
 # ----------------------------------------------------------------------------
 # Constants (all linear values are inches)
@@ -5773,6 +5778,476 @@ class MainWindow(QMainWindow):
         self.current_path = path
         self._update_title()
         self.status(f"Saved {path}")
+
+    # -- headless / macro hooks ----------------------------------------------
+    # These let an external driver (fp_macro.py) load, edit, snapshot and save
+    # a plan with no dialogs.  See docs/macro_language.md for the macro syntax.
+
+    def load_path(self, path: str):
+        """Non-interactive open (no dialogs).  Raises on failure."""
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        self.load_data(data)
+        self.current_path = path
+        self._update_title()
+        self._reset_undo()
+
+    def save_path(self, path: str):
+        """Non-interactive save (no dialogs).  Raises on failure."""
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(self.serialize(), f, indent=2)
+        self.current_path = path
+        self._update_title()
+
+    def clear_plan(self):
+        """Non-interactive New (no confirm dialog)."""
+        self.scene.clear()
+        self.current_path = None
+        SETTINGS.update(DEFAULT_SETTINGS)
+        self._apply_canvas()
+        self._reset_undo()
+
+    def prepare_headless(self, w: int = 1280, h: int = 860):
+        """Size the window/view and fit the canvas so scene<->viewport
+        mapping is valid for synthesized mouse events when running
+        offscreen.  Call once before driving a macro that uses CLICK/DRAG."""
+        self.resize(w, h)
+        self.view.resize(w, max(200, h - 120))
+        margin = 5 * FOOT
+        self.view.setSceneRect(canvas_rect().adjusted(
+            -margin, -margin, margin, margin))
+        self.view.fitInView(self.view.sceneRect(),
+                            Qt.AspectRatioMode.KeepAspectRatio)
+        QApplication.processEvents()
+
+    def _content_rect(self) -> QRectF:
+        """Bounding box of all walls/rooms/furnishings (or the canvas when
+        empty), with a 1' margin — the region a snapshot should frame."""
+        box = QRectF()
+        for it in self.scene.items():
+            if isinstance(it, (WallItem, RoomItem, FurnishingItem)):
+                box = box.united(it.sceneBoundingRect())
+        if box.isNull():
+            box = canvas_rect()
+        return box.adjusted(-FOOT, -FOOT, FOOT, FOOT)
+
+    def export_canvas(self, path: str, rect: QRectF = None,
+                      scale: float = 2.0) -> bool:
+        """Render the scene (items only, no editor grid) to a PNG or SVG file,
+        chosen by the path's extension.  `rect` defaults to the content box."""
+        rect = QRectF(rect) if rect is not None else self._content_rect()
+        if str(path).lower().endswith(".svg"):
+            return self._export_svg(path, rect)
+        return self._export_png(path, rect, scale)
+
+    def _export_png(self, path, rect, scale) -> bool:
+        img = QImage(max(1, int(rect.width() * scale)),
+                     max(1, int(rect.height() * scale)),
+                     QImage.Format.Format_ARGB32)
+        img.fill(Qt.GlobalColor.white)
+        p = QPainter(img)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        self.scene.render(p, QRectF(0, 0, img.width(), img.height()), rect)
+        p.end()
+        return bool(img.save(str(path)))
+
+    def _export_svg(self, path, rect) -> bool:
+        if QSvgGenerator is None:
+            raise RuntimeError("QtSvg is unavailable -- cannot write SVG.")
+        gen = QSvgGenerator()
+        gen.setFileName(str(path))
+        gen.setSize(QSize(max(1, int(rect.width())),
+                          max(1, int(rect.height()))))
+        gen.setViewBox(QRectF(0, 0, rect.width(), rect.height()))
+        gen.setTitle("FloorPlanner canvas")
+        gen.setDescription("Scene units are inches (1 unit = 1 inch). "
+                           "Origin at the framed region's top-left.")
+        p = QPainter(gen)
+        self.scene.render(p, QRectF(0, 0, rect.width(), rect.height()), rect)
+        p.end()
+        return True
+
+    def scene_summary(self) -> dict:
+        """A machine-readable description of the layout for an AI driver:
+        the full serialized model plus item counts."""
+        data = self.serialize()
+        data["counts"] = {
+            "walls": len(data["walls"]),
+            "rooms": len(data["rooms"]),
+            "furnishings": len(data["furnishings"]),
+        }
+        return data
+
+    def run_macro(self, text: str) -> dict:
+        """Execute a macro string against this window; returns a result dict
+        {ok, steps, log, errors}.  See MacroRunner for the token grammar."""
+        return MacroRunner(self).run(text)
+
+
+# ----------------------------------------------------------------------------
+# Macro language (Part 1 of the headless tool — the in-app hook).
+# ----------------------------------------------------------------------------
+class MacroRunner:
+    """Drives a MainWindow from a space/newline-delimited macro string so an
+    external program (or an AI) can edit a plan headlessly.
+
+    A macro is a flat list of whitespace-separated tokens; '#' starts a
+    line comment and double-quoted tokens may contain spaces (room names).
+    Positions are in SCENE INCHES (1 unit = 1 inch); a value may also be
+    written in feet like 10' or 10'6".
+
+    Tokens
+      Tool select   1 2 3 4 5 6        select / ext-wall / int-wall / door /
+                                       window / room   (also: TOOL <name>)
+      Shortcuts     ^N ^Z ^Y ^X ^C ^V ^G ^A ^S
+                                       new / undo / redo / cut / copy / paste /
+                                       group / select-all / save-to-current.
+                                       Prefix '+' adds Shift: ^+G ungroup,
+                                       ^+Z redo.
+      Arrow nudge   LEFT RIGHT UP DOWN          (^ prefix = fine 1" step)
+      Keys          ESC DEL ENTER
+      Mouse         CLICK x y | RCLICK x y | MOVE x y | PRESS x y |
+                    RELEASE x y | DRAG x1 y1 x2 y2
+      Place / edit  PLACE kind x y [rot] | WALL x1 y1 x2 y2 [ext|int] |
+                    DOOR x y code | WINDOW x y code | ROOM name x y |
+                    SELECT x y | SELECTALL | DESELECT | ROTATE deg |
+                    MOVETO x y | DELETE | ZOOMFIT
+      Files / shot  OPEN path | SAVE path | NEW | SHOT path | WAIT
+
+    `run()` returns {ok, steps, log, errors, counts}; a bad token is recorded
+    in `errors` and skipped, so one mistake doesn't abort the whole macro.
+    """
+
+    _DIGIT_TOOLS = [TOOL_SELECT, TOOL_WALL_EXT, TOOL_WALL_INT,
+                    TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM]
+    _TOOL_NAMES = {"select": TOOL_SELECT, "extwall": TOOL_WALL_EXT,
+                   "intwall": TOOL_WALL_INT, "door": TOOL_DOOR,
+                   "window": TOOL_WINDOW, "room": TOOL_ROOM}
+    _CARET_METHODS = {"Z": "undo", "Y": "redo", "+Z": "redo",
+                      "X": "cut_selected", "C": "copy_selected",
+                      "V": "paste_clipboard", "G": "group_selected",
+                      "+G": "ungroup_selected", "N": "clear_plan"}
+    _ARROWS = {"LEFT": (-1, 0), "RIGHT": (1, 0), "UP": (0, -1), "DOWN": (0, 1)}
+
+    def __init__(self, win):
+        self.win = win
+        self.log = []
+        self.errors = []
+        self.steps = 0
+
+    # -- public --------------------------------------------------------------
+    def run(self, text: str) -> dict:
+        toks = self._tokenize(text)
+        i = 0
+        while i < len(toks):
+            raw = toks[i]
+            i += 1
+            try:
+                i = self._dispatch(raw, toks, i)
+                self.steps += 1
+                self.log.append(f"ok  {raw}")
+            except Exception as ex:                       # noqa: BLE001
+                self.errors.append(f"{raw}: {ex}")
+                self.log.append(f"ERR {raw}: {ex}")
+            QApplication.processEvents()
+        return {"ok": not self.errors, "steps": self.steps,
+                "log": self.log, "errors": self.errors,
+                "counts": self.win.scene_summary()["counts"]}
+
+    # -- tokenizing / args ---------------------------------------------------
+    @staticmethod
+    def _tokenize(text: str):
+        out = []
+        for line in str(text).splitlines():
+            line = line.split("#", 1)[0]
+            for m in re.finditer(r'"([^"]*)"|(\S+)', line):
+                out.append(m.group(1) if m.group(1) is not None else m.group(2))
+        return out
+
+    @staticmethod
+    def _num(tok: str) -> float:
+        return parse_feet(tok) if ("'" in tok or '"' in tok) else float(tok)
+
+    def _take(self, toks, i, n):
+        if i + n > len(toks):
+            raise ValueError(f"expected {n} more argument(s)")
+        return toks[i:i + n], i + n
+
+    # -- dispatch ------------------------------------------------------------
+    def _dispatch(self, raw, toks, i):
+        cmd = raw.upper()
+        if raw.startswith("^"):
+            return self._caret(raw[1:], i)
+        if len(raw) == 1 and raw in "123456":
+            self.win.set_tool(self._DIGIT_TOOLS[int(raw) - 1])
+            return i
+        if cmd in self._ARROWS:                  # coarse nudge of the selection
+            dx, dy = self._ARROWS[cmd]
+            self.win.nudge_selected(dx, dy, fine=False)
+            return i
+        if cmd == "ESC":
+            self.win.view.cancel_temp()
+            return i
+        if cmd == "ENTER":
+            self._key(Qt.Key.Key_Return, text="\r")
+            return i
+        if cmd in ("DEL", "DELETE"):
+            self.win.delete_selected()
+            return i
+
+        handler = getattr(self, f"_cmd_{cmd.lower()}", None)
+        if handler is None:
+            raise ValueError("unknown command")
+        return handler(toks, i)
+
+    def _caret(self, key, i):
+        key = key.upper()
+        if key in self._ARROWS:                  # ^LEFT = fine (1") nudge
+            dx, dy = self._ARROWS[key]
+            self.win.nudge_selected(dx, dy, fine=True)
+            return i
+        if key == "S":
+            if not self.win.current_path:
+                raise ValueError("no current file — use 'SAVE path'")
+            self.win.save_path(self.win.current_path)
+            return i
+        if key == "O":
+            raise ValueError("use 'OPEN path' in a macro")
+        if key == "A":
+            self._select_all()
+            return i
+        meth = self._CARET_METHODS.get(key)
+        if meth is None:
+            raise ValueError("unknown shortcut")
+        getattr(self.win, meth)()
+        return i
+
+    # -- input synthesis -----------------------------------------------------
+    def _vpos(self, x, y):
+        return self.win.view.mapFromScene(QPointF(x, y))
+
+    def _mouse(self, etype, x, y, button, buttons):
+        vp = self.win.view.viewport()
+        pos = self._vpos(x, y)
+        ev = QMouseEvent(etype, QPointF(pos), QPointF(vp.mapToGlobal(pos)),
+                         button, buttons, Qt.KeyboardModifier.NoModifier)
+        QApplication.sendEvent(vp, ev)
+        QApplication.processEvents()
+
+    def _click(self, x, y, button=Qt.MouseButton.LeftButton):
+        self._mouse(QEvent.Type.MouseButtonPress, x, y, button, button)
+        self._mouse(QEvent.Type.MouseButtonRelease, x, y, button,
+                    Qt.MouseButton.NoButton)
+
+    def _key(self, key, mods=Qt.KeyboardModifier.NoModifier, text=""):
+        view = self.win.view
+        QApplication.sendEvent(
+            view, QKeyEvent(QEvent.Type.KeyPress, key, mods, text))
+        QApplication.sendEvent(
+            view, QKeyEvent(QEvent.Type.KeyRelease, key, mods, text))
+        QApplication.processEvents()
+
+    def _select_all(self):
+        self.win.scene.clearSelection()
+        for it in self.win.scene.items():
+            if isinstance(it, (WallItem, FurnishingItem, GroupItem)) \
+                    and it.group() is None:
+                it.setSelected(True)
+
+    # -- command handlers (one per token) ------------------------------------
+    def _cmd_tool(self, toks, i):
+        (name,), i = self._take(toks, i, 1)
+        self.win.set_tool(self._TOOL_NAMES[name.lower()])
+        return i
+
+    def _cmd_click(self, toks, i):
+        (x, y), i = self._take(toks, i, 2)
+        self._click(self._num(x), self._num(y))
+        return i
+
+    def _cmd_rclick(self, toks, i):
+        (x, y), i = self._take(toks, i, 2)
+        self._click(self._num(x), self._num(y), Qt.MouseButton.RightButton)
+        return i
+
+    def _cmd_move(self, toks, i):
+        (x, y), i = self._take(toks, i, 2)
+        self._mouse(QEvent.Type.MouseMove, self._num(x), self._num(y),
+                    Qt.MouseButton.NoButton, Qt.MouseButton.NoButton)
+        return i
+
+    def _cmd_press(self, toks, i):
+        (x, y), i = self._take(toks, i, 2)
+        self._mouse(QEvent.Type.MouseButtonPress, self._num(x), self._num(y),
+                    Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton)
+        return i
+
+    def _cmd_release(self, toks, i):
+        (x, y), i = self._take(toks, i, 2)
+        self._mouse(QEvent.Type.MouseButtonRelease, self._num(x), self._num(y),
+                    Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton)
+        return i
+
+    def _cmd_drag(self, toks, i):
+        (x1, y1, x2, y2), i = self._take(toks, i, 4)
+        x1, y1, x2, y2 = map(self._num, (x1, y1, x2, y2))
+        left = Qt.MouseButton.LeftButton
+        self._mouse(QEvent.Type.MouseButtonPress, x1, y1, left, left)
+        self._mouse(QEvent.Type.MouseMove, (x1 + x2) / 2, (y1 + y2) / 2,
+                    Qt.MouseButton.NoButton, left)
+        self._mouse(QEvent.Type.MouseMove, x2, y2,
+                    Qt.MouseButton.NoButton, left)
+        self._mouse(QEvent.Type.MouseButtonRelease, x2, y2, left,
+                    Qt.MouseButton.NoButton)
+        return i
+
+    def _cmd_place(self, toks, i):
+        kind = toks[i]
+        (x, y), j = self._take(toks, i + 1, 2)
+        i = j
+        rot = 0.0
+        if i < len(toks) and self._is_num(toks[i]):
+            rot = self._num(toks[i])
+            i += 1
+        if furnishing_spec(kind) is None:
+            raise ValueError(f"unknown furnishing '{kind}'")
+        item = make_furnishing(kind, grid_snap(QPointF(self._num(x),
+                                                       self._num(y))), rot)
+        self.win.scene.addItem(item)
+        return i
+
+    def _cmd_wall(self, toks, i):
+        (x1, y1, x2, y2), i = self._take(toks, i, 4)
+        wtype = "exterior"
+        if i < len(toks) and toks[i].lower() in (
+                "ext", "exterior", "int", "interior"):
+            wtype = "interior" if toks[i].lower().startswith("int") \
+                else "exterior"
+            i += 1
+        w = WallItem(QPointF(self._num(x1), self._num(y1)),
+                     QPointF(self._num(x2), self._num(y2)), wtype)
+        self.win.scene.addItem(w)
+        rebuild_all_walls(self.win.scene)
+        return i
+
+    def _cmd_door(self, toks, i):
+        return self._opening(toks, i, "door")
+
+    def _cmd_window(self, toks, i):
+        return self._opening(toks, i, "window")
+
+    def _opening(self, toks, i, kind):
+        (x, y, code), i = self._take(toks, i, 3)
+        pt = QPointF(self._num(x), self._num(y))
+        wall = next((it for it in self.win.scene.items(pt)
+                     if isinstance(it, WallItem)), None)
+        if wall is None:
+            raise ValueError(f"no wall at ({x}, {y})")
+        w, _h = parse_wwhh(code)
+        if w > wall.length():
+            raise ValueError(f"{kind} too wide for the wall")
+        s = min(max(round(wall.s_of(pt)), w / 2), wall.length() - w / 2)
+        op = OpeningItem(wall, kind, code, s)
+        wall.openings.append(op)
+        rebuild_all_walls(self.win.scene)
+        return i
+
+    def _cmd_room(self, toks, i):
+        (name, x, y), i = self._take(toks, i, 3)
+        res = detect_room(self.win.scene, QPointF(self._num(x), self._num(y)))
+        if res is None:
+            raise ValueError("no enclosed area at that point")
+        room = RoomItem(name, QPointF(self._num(x), self._num(y)),
+                        res[0], res[1], corners=res[2])
+        self.win.scene.addItem(room)
+        bind_room_walls(self.win.scene, room)
+        return i
+
+    def _cmd_select(self, toks, i):
+        (x, y), i = self._take(toks, i, 2)
+        hits = list(self.win.scene.items(QPointF(self._num(x), self._num(y))))
+        self.win.scene.clearSelection()
+        # prefer an editable item (furnishing / wall / group) over a room,
+        # whose label can sit on top of what you meant to grab
+        pick = next((it for it in hits
+                     if isinstance(it, (FurnishingItem, WallItem, GroupItem))),
+                    None)
+        if pick is None:
+            pick = next((it for it in hits if it.flags()
+                         & QGraphicsItem.GraphicsItemFlag.ItemIsSelectable),
+                        None)
+        if pick is not None:
+            pick.setSelected(True)
+        return i
+
+    def _cmd_selectall(self, toks, i):
+        self._select_all()
+        return i
+
+    def _cmd_deselect(self, toks, i):
+        self.win.scene.clearSelection()
+        return i
+
+    def _cmd_rotate(self, toks, i):
+        (deg,), i = self._take(toks, i, 1)
+        deg = self._num(deg)
+        for it in self.win.scene.selectedItems():
+            if isinstance(it, FurnishingItem):
+                it.setRotation((it.rotation() + deg) % 360.0)
+        return i
+
+    def _cmd_moveto(self, toks, i):
+        (x, y), i = self._take(toks, i, 2)
+        x, y = self._num(x), self._num(y)
+        sel = [it for it in self.win.scene.selectedItems()
+               if isinstance(it, (FurnishingItem, GroupItem))]
+        if not sel:
+            raise ValueError("nothing selected to move")
+        base = sel[0]
+        dx, dy = x - base.pos().x(), y - base.pos().y()
+        for it in sel:
+            it.setPos(it.pos().x() + dx, it.pos().y() + dy)
+            if isinstance(it, GroupItem):
+                it.bake()
+        return i
+
+    def _cmd_zoomfit(self, toks, i):
+        self.win.zoom_fit()
+        QApplication.processEvents()
+        return i
+
+    def _cmd_open(self, toks, i):
+        (path,), i = self._take(toks, i, 1)
+        self.win.load_path(path)
+        return i
+
+    def _cmd_save(self, toks, i):
+        (path,), i = self._take(toks, i, 1)
+        self.win.save_path(path)
+        return i
+
+    def _cmd_new(self, toks, i):
+        self.win.clear_plan()
+        return i
+
+    def _cmd_shot(self, toks, i):
+        (path,), i = self._take(toks, i, 1)
+        if not self.win.export_canvas(path):
+            raise ValueError("export failed")
+        return i
+
+    def _cmd_wait(self, toks, i):
+        for _ in range(3):
+            QApplication.processEvents()
+        return i
+
+    @staticmethod
+    def _is_num(tok: str) -> bool:
+        try:
+            MacroRunner._num(tok)
+            return True
+        except ValueError:
+            return False
 
 
 def main():

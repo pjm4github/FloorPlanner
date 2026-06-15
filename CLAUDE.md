@@ -4,8 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Architecture
 
-- The entire app is one file: `FloorPlanner.py` (PyQt6 QGraphicsScene editor). Run with `python FloorPlanner.py`.
+- The app is one file: `FloorPlanner.py` (PyQt6 QGraphicsScene editor). Run with `python FloorPlanner.py`.
 - Scene units are **inches** (1 scene unit = 1 inch). Canvas size comes from `SETTINGS` via `canvas_rect()`.
+- Headless macro tool (for AI/script-driven edits): the in-app hook is `MainWindow.run_macro()` / `MacroRunner` plus `export_canvas`/`load_path`/`save_path`/`scene_summary`; the driver is `fp_macro.py`. Token grammar is in `docs/macro_language.md`. Note: don't synthesize Ctrl-modified key events headlessly — it leaks `QApplication.keyboardModifiers()`; route shortcuts/arrows through app methods (as `MacroRunner` does).
 
 ## Generated assets — never hand-edit
 

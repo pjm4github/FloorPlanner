@@ -197,6 +197,35 @@ so no system fonts are needed.
 | Delete | Select + **Del** |
 | Zoom to fit | **F** |
 
+## Headless CLI / AI macro driver
+
+The app can be driven with **no GUI** so a script or an AI system can edit a
+plan, snapshot the canvas, and read back the result. It's a two-part tool:
+
+- **In-app hook** — `MainWindow.run_macro(text)` plus `export_canvas`,
+  `load_path`/`save_path` and `scene_summary` (the editor and the driver share
+  the same code paths).
+- **Driver** — `fp_macro.py`, a standalone CLI that boots the app offscreen,
+  runs a macro, writes SVG/PNG snapshots, saves the plan, and prints a JSON
+  summary of the layout.
+
+A macro is a line of space-delimited tokens: menu/shortcut chords like `^C`
+`^V` `^S`, distinct keyboard/mouse/arrow tokens (`CLICK x y`, `DRAG …`, `LEFT`,
+`^UP`), and high-level placement (`PLACE sofa 120 96`, `WALL …`, `DOOR …`,
+`ROOM "Living Room" 60 60`). Positions are in scene inches (1 unit = 1 inch).
+
+```bash
+python fp_macro.py --out den.json --svg den.svg --macro "
+  WALL 0 0 240 0 ext  WALL 240 0 240 180 ext
+  WALL 240 180 0 180 ext  WALL 0 180 0 0 ext
+  ROOM Den 120 90  DOOR 120 0 3680  PLACE sofa 120 140 0"
+```
+
+The SVG snapshot (vector, AI-parseable) plus `--summary full` (the complete
+`floorplanner-json` model) let a downstream AI *see* and *reason about* a change
+before issuing the next macro. Full token reference:
+[`docs/macro_language.md`](docs/macro_language.md).
+
 ## Asset pipeline
 
 All SVG artwork (toolbar icons, furnishing symbols, `manifest.json`,
