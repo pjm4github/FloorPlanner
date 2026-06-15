@@ -17,7 +17,7 @@ Scene units are INCHES (1 scene unit = 1").  The grid shows 1'-0" minor
 lines and 5'-0" major lines.  The "canvas" outline defaults to
 100'-0" x 70'-0" and can be resized in File > Settings….
 
-Tools (icon toolbar or keys 1-6)
+Tools (icon toolbar or keys S/E/I/D/W/R)
 --------------------------------
 1  Select      - click items, drag to move, drag wall ENDS to stretch
 2  Ext Wall    - click-drag to draw a 6" exterior wall (orthogonal from
@@ -180,6 +180,7 @@ from PyQt6.QtGui import (
     QPen,
     QPixmap,
     QPolygonF,
+    QTextCursor,
     QTransform,
 )
 from PyQt6.QtWidgets import (
@@ -197,6 +198,7 @@ from PyQt6.QtWidgets import (
     QGraphicsItemGroup,
     QGraphicsScene,
     QGraphicsView,
+    QHBoxLayout,
     QHeaderView,
     QInputDialog,
     QLabel,
@@ -207,6 +209,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPlainTextEdit,
+    QPushButton,
     QRubberBand,
     QSizePolicy,
     QTableWidget,
@@ -4151,6 +4154,9 @@ class PlanView(QGraphicsView):
         self.scene().addItem(room)
         bind_room_walls(self.scene(), room)   # fuse the enclosing walls in
         room.raise_to_front()
+        if self.win._recorder is not None:
+            # record the name the user typed so replay needs no dialog
+            self.win._recorder.on_room(name, room.anchor)
         if not self.win._room_sticky:
             self.win.set_tool(TOOL_SELECT)
         return room
@@ -4356,6 +4362,8 @@ class PlanView(QGraphicsView):
             sp = grid_snap(self.mapToScene(e.position().toPoint()))
             item = make_furnishing(kind, sp)
             self.scene().addItem(item)
+            if self.win._recorder is not None:
+                self.win._recorder.on_place(kind, sp)
             self.win.status(f"Placed {item.name} ({fmt_ftin(item.w)} × "
                             f"{fmt_ftin(item.d)}). Drag to move; select and "
                             f"drag the round handle to rotate (Ctrl = 15° "
@@ -4436,6 +4444,9 @@ class PlanView(QGraphicsView):
             self.win.last_door = code.strip()
         else:
             self.win.last_window = code.strip()
+        if self.win._recorder is not None:
+            # record the size the user typed so replay needs no dialog
+            self.win._recorder.on_opening(kind, sp, code.strip())
 
 
 # ----------------------------------------------------------------------------
@@ -4474,6 +4485,8 @@ class MainWindow(QMainWindow):
         self.current_path = None
         self.room_clipboard = None
         self.item_clipboard = None        # cut/copied walls + furnishings
+        self._recorder = None             # active MacroRecorderDialog (or None)
+        self._recorder_dialog = None      # the (reused) recorder window
         self._update_title()
 
         self.scene = QGraphicsScene(self)
@@ -4524,12 +4537,12 @@ class MainWindow(QMainWindow):
         self._tool_actions = {}
 
         defs = [
-            (TOOL_SELECT, "Select", "1", "select"),
-            (TOOL_WALL_EXT, "Exterior Wall", "2", "wall_ext"),
-            (TOOL_WALL_INT, "Interior Wall", "3", "wall_int"),
-            (TOOL_DOOR, "Door", "4", "door"),
-            (TOOL_WINDOW, "Window", "5", "window"),
-            (TOOL_ROOM, "Room Name", "6", "room"),
+            (TOOL_SELECT, "Select", "S", "select"),
+            (TOOL_WALL_EXT, "Exterior Wall", "E", "wall_ext"),
+            (TOOL_WALL_INT, "Interior Wall", "I", "wall_int"),
+            (TOOL_DOOR, "Door", "D", "door"),
+            (TOOL_WINDOW, "Window", "W", "window"),
+            (TOOL_ROOM, "Room Name", "R", "room"),
         ]
         for tool, label, key, icon in defs:
             a = QAction(tool_icon(icon), label, self)
@@ -4570,6 +4583,12 @@ class MainWindow(QMainWindow):
         self.a_redo.triggered.connect(self.redo)
         self.a_redo.setEnabled(False)
         tb.addAction(self.a_redo)
+
+        tb.addSeparator()
+        a_rec = QAction(tool_icon("record"), "Record macro", self)
+        a_rec.setToolTip("Record / debug a macro…")
+        a_rec.triggered.connect(self.open_macro_recorder)
+        tb.addAction(a_rec)
 
         spacer = QWidget()                       # push the totals to the right
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding,
@@ -4686,6 +4705,12 @@ class MainWindow(QMainWindow):
         a_prices = QAction("Update furnishing &prices…", self)
         a_prices.triggered.connect(self.update_furnishing_prices)
         m_ai.addAction(a_prices)
+
+        m_macro = self.menuBar().addMenu("&Macro")
+        a_record = QAction("&Record / Debug…", self)
+        a_record.setToolTip("Open the non-modal macro recorder")
+        a_record.triggered.connect(self.open_macro_recorder)
+        m_macro.addAction(a_record)
 
         m_help = self.menuBar().addMenu("&Help")
         a_about = QAction(f"&About {APP_NAME}…", self)
@@ -4807,6 +4832,16 @@ class MainWindow(QMainWindow):
             # otherwise it reverts to Select after one room is named
             self._room_sticky = bool(QApplication.keyboardModifiers()
                                      & Qt.KeyboardModifier.ControlModifier)
+        if self._recorder is not None:
+            self._recorder.on_tool(tool)
+
+    def open_macro_recorder(self):
+        """Open (or re-show) the non-modal macro recorder / debugger window."""
+        if self._recorder_dialog is None:
+            self._recorder_dialog = MacroRecorderDialog(self)
+        self._recorder_dialog.show()
+        self._recorder_dialog.raise_()
+        self._recorder_dialog.activateWindow()
 
     def status(self, msg):
         self.statusBar().showMessage(msg)
@@ -5897,8 +5932,9 @@ class MacroRunner:
     written in feet like 10' or 10'6".
 
     Tokens
-      Tool select   1 2 3 4 5 6        select / ext-wall / int-wall / door /
-                                       window / room   (also: TOOL <name>)
+      Tool select   S E I D W R        Select / Exterior-wall / Interior-wall /
+                                       Door / Window / Room  (also: TOOL <name>;
+                                       legacy digits 1-6 still work)
       Shortcuts     ^N ^Z ^Y ^X ^C ^V ^G ^A ^S
                                        new / undo / redo / cut / copy / paste /
                                        group / select-all / save-to-current.
@@ -5918,6 +5954,10 @@ class MacroRunner:
     in `errors` and skipped, so one mistake doesn't abort the whole macro.
     """
 
+    # single-char tool codes (mnemonic): Select Exterior Interior Door
+    # Window Room.  The legacy 1-6 digits are still accepted for old macros.
+    _TOOL_CODES = {"S": TOOL_SELECT, "E": TOOL_WALL_EXT, "I": TOOL_WALL_INT,
+                   "D": TOOL_DOOR, "W": TOOL_WINDOW, "R": TOOL_ROOM}
     _DIGIT_TOOLS = [TOOL_SELECT, TOOL_WALL_EXT, TOOL_WALL_INT,
                     TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM]
     _TOOL_NAMES = {"select": TOOL_SELECT, "extwall": TOOL_WALL_EXT,
@@ -5978,7 +6018,10 @@ class MacroRunner:
         cmd = raw.upper()
         if raw.startswith("^"):
             return self._caret(raw[1:], i)
-        if len(raw) == 1 and raw in "123456":
+        if len(cmd) == 1 and cmd in self._TOOL_CODES:
+            self.win.set_tool(self._TOOL_CODES[cmd])
+            return i
+        if len(raw) == 1 and raw in "123456":           # legacy digit tools
             self.win.set_tool(self._DIGIT_TOOLS[int(raw) - 1])
             return i
         if cmd in self._ARROWS:                  # coarse nudge of the selection
@@ -6248,6 +6291,298 @@ class MacroRunner:
             return True
         except ValueError:
             return False
+
+
+# ----------------------------------------------------------------------------
+# Macro recorder / debugger (non-modal): capture live interaction into macro
+# text, then replay a selected portion or save it.  Opened from the toolbar
+# Record button or the Macro menu.
+# ----------------------------------------------------------------------------
+class MacroRecorderDialog(QDialog):
+    """A non-modal window that records mouse/keyboard/tool actions performed
+    in the FloorPlanner window as macro tokens, lets you edit them, replay a
+    selected portion, and Save As a .fpm file.
+
+    Workflow: **Start**, switch to the plan window and interact (draw walls,
+    drop furnishings, copy/paste, nudge…), come back and **Stop**.  Select
+    any part of the recorded text and **Replay** to watch it run; **Save As…**
+    to keep it.  The grammar is the same as `MacroRunner` / `fp_macro.py`.
+    """
+
+    MOVE_THRESHOLD = 4.0          # scene inches; a shorter drag becomes a CLICK
+    _CARET_KEYS = {Qt.Key.Key_C: "C", Qt.Key.Key_V: "V", Qt.Key.Key_X: "X",
+                   Qt.Key.Key_Z: "Z", Qt.Key.Key_Y: "Y", Qt.Key.Key_G: "G",
+                   Qt.Key.Key_A: "A", Qt.Key.Key_N: "N", Qt.Key.Key_S: "S"}
+    _ARROW_KEYS = {Qt.Key.Key_Left: "LEFT", Qt.Key.Key_Right: "RIGHT",
+                   Qt.Key.Key_Up: "UP", Qt.Key.Key_Down: "DOWN"}
+    _TOOL_CODES = {TOOL_SELECT: "S", TOOL_WALL_EXT: "E", TOOL_WALL_INT: "I",
+                   TOOL_DOOR: "D", TOOL_WINDOW: "W", TOOL_ROOM: "R"}
+
+    def __init__(self, win):
+        super().__init__(win)
+        self.win = win
+        self.setWindowTitle("Macro Recorder / Debug")
+        self.setModal(False)
+        self.setWindowFlag(Qt.WindowType.Window, True)
+        self._recording = False
+        self._paused = False
+        self._press_scene = None
+        self._press_moved = False
+        self._press_tool = TOOL_SELECT
+        self._replay_lines = []
+        self._replay_idx = 0
+
+        self.edit = QPlainTextEdit()
+        self.edit.setFont(QFont("DejaVu Sans Mono", 10))
+        self.edit.setPlaceholderText(
+            "Recorded macro tokens appear here.  Edit freely; select a "
+            "portion and click Replay to run just that part.")
+
+        self.nl_check = QCheckBox("New line after each mouse action")
+        self.nl_check.setChecked(True)
+        self.status_lbl = QLabel("Idle.")
+
+        self.b_start = QPushButton("Start")
+        self.b_pause = QPushButton("Pause")
+        self.b_stop = QPushButton("Stop")
+        self.b_replay = QPushButton("Replay")
+        self.b_saveas = QPushButton("Save As…")
+        self.b_cancel = QPushButton("Cancel")
+        self.b_start.clicked.connect(self.start)
+        self.b_pause.clicked.connect(self.toggle_pause)
+        self.b_stop.clicked.connect(self.stop)
+        self.b_replay.clicked.connect(self.replay)
+        self.b_saveas.clicked.connect(self.save_as)
+        self.b_cancel.clicked.connect(self.cancel)
+        self.edit.selectionChanged.connect(self._sync_buttons)
+        self.edit.textChanged.connect(self._sync_buttons)
+
+        row = QHBoxLayout()
+        for b in (self.b_start, self.b_pause, self.b_stop, self.b_replay,
+                  self.b_saveas, self.b_cancel):
+            row.addWidget(b)
+        lay = QVBoxLayout(self)
+        lay.addWidget(self.edit)
+        lay.addWidget(self.nl_check)
+        lay.addLayout(row)
+        lay.addWidget(self.status_lbl)
+        self.resize(600, 440)
+
+        self._replay_timer = QTimer(self)
+        self._replay_timer.timeout.connect(self._replay_step)
+        self._sync_buttons()
+
+    # -- button state --------------------------------------------------------
+    def _sync_buttons(self):
+        rec, replaying = self._recording, self._replay_timer.isActive()
+        self.b_start.setEnabled(not rec and not replaying)
+        self.b_stop.setEnabled(rec)
+        self.b_pause.setEnabled(rec)
+        self.b_pause.setText("Resume" if self._paused else "Pause")
+        self.b_replay.setEnabled(self.edit.textCursor().hasSelection()
+                                 and not rec and not replaying)
+        self.b_saveas.setEnabled(bool(self.edit.toPlainText().strip()))
+
+    # -- record --------------------------------------------------------------
+    def start(self):
+        if self._recording:
+            return
+        self._recording = True
+        self._paused = False
+        self._press_scene = None
+        self.win._recorder = self
+        QApplication.instance().installEventFilter(self)
+        self.status_lbl.setText(
+            "Recording…  Interact with the FloorPlanner window, then Stop.")
+        self._sync_buttons()
+        self.win.raise_()
+        self.win.activateWindow()
+
+    def stop(self):
+        if not self._recording:
+            return
+        QApplication.instance().removeEventFilter(self)
+        self.win._recorder = None
+        self._recording = False
+        self._paused = False
+        self._press_scene = None
+        self.status_lbl.setText(
+            "Stopped.  Select macro text and Replay, or Save As….")
+        self.raise_()
+        self.activateWindow()
+        self._sync_buttons()
+
+    def toggle_pause(self):
+        if not self._recording:
+            return
+        self._paused = not self._paused
+        self.status_lbl.setText("Paused." if self._paused else "Recording…")
+        self._sync_buttons()
+
+    def cancel(self):
+        self.stop()
+        self._replay_timer.stop()
+        self.close()
+
+    def closeEvent(self, e):
+        self.stop()
+        self._replay_timer.stop()
+        super().closeEvent(e)
+
+    # -- replay --------------------------------------------------------------
+    def replay(self):
+        cur = self.edit.textCursor()
+        text = (cur.selection().toPlainText() if cur.hasSelection()
+                else self.edit.toPlainText())
+        # step one recorded line at a time so the canvas updates visibly
+        self._replay_lines = [ln for ln in text.splitlines() if ln.strip()]
+        self._replay_idx = 0
+        if not self._replay_lines:
+            return
+        self.status_lbl.setText("Replaying…")
+        self.win.raise_()
+        self._replay_timer.start(180)
+        self._sync_buttons()
+
+    def _replay_step(self):
+        if self._replay_idx >= len(self._replay_lines):
+            self._replay_timer.stop()
+            self.status_lbl.setText("Replay complete.")
+            self._sync_buttons()
+            return
+        line = self._replay_lines[self._replay_idx]
+        self._replay_idx += 1
+        res = self.win.run_macro(line)
+        if res["errors"]:
+            self.status_lbl.setText("Replay: " + "; ".join(res["errors"][:2]))
+
+    # -- save ----------------------------------------------------------------
+    def save_as(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save macro", str(designs_dir() / "macro.fpm"),
+            "Macro files (*.fpm *.txt);;All files (*)")
+        if not path:
+            return
+        try:
+            self._write_macro(path)
+        except OSError as ex:
+            QMessageBox.critical(self, "Save failed", str(ex))
+
+    def _write_macro(self, path: str):
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(self.edit.toPlainText())
+        self.status_lbl.setText(f"Saved {path}")
+
+    # -- hooks called by the instrumented app --------------------------------
+    def on_tool(self, tool):
+        if self._active():
+            code = self._TOOL_CODES.get(tool)
+            if code:
+                self._append(code)
+
+    def on_place(self, kind, scene_pt):
+        if self._active():
+            self._append(f"PLACE {kind} {round(scene_pt.x())} "
+                         f"{round(scene_pt.y())}",
+                         newline=self.nl_check.isChecked())
+
+    def on_opening(self, kind, scene_pt, code):
+        # door/window size came from a dialog, not keystrokes — capture the
+        # value into a self-contained DOOR/WINDOW token so replay needs no
+        # dialog (the raw click for this tool is suppressed in _capture).
+        if self._active():
+            tok = "DOOR" if kind == "door" else "WINDOW"
+            self._append(f"{tok} {round(scene_pt.x())} {round(scene_pt.y())} "
+                         f"{code}", newline=self.nl_check.isChecked())
+
+    def on_room(self, name, scene_pt):
+        # room name came from a dialog — capture it into a ROOM token.
+        if self._active():
+            tok = f'"{name}"' if " " in name else name
+            self._append(f"ROOM {tok} {round(scene_pt.x())} "
+                         f"{round(scene_pt.y())}",
+                         newline=self.nl_check.isChecked())
+
+    # -- live capture (application event filter) -----------------------------
+    def _active(self) -> bool:
+        return self._recording and not self._paused
+
+    def eventFilter(self, obj, ev):
+        if self._active():
+            try:
+                self._capture(obj, ev)
+            except Exception:                          # noqa: BLE001
+                pass                                   # capture never breaks UI
+        return False                                   # never consume events
+
+    def _capture(self, obj, ev):
+        et = ev.type()
+        if obj is self.win.view.viewport():
+            if et == QEvent.Type.MouseButtonPress and \
+                    ev.button() == Qt.MouseButton.LeftButton:
+                self._press_scene = self.win.view.mapToScene(
+                    ev.position().toPoint())
+                self._press_moved = False
+                self._press_tool = self.win.tool       # tool at press time
+            elif et == QEvent.Type.MouseMove and self._press_scene is not None \
+                    and (ev.buttons() & Qt.MouseButton.LeftButton):
+                self._press_moved = True
+            elif et == QEvent.Type.MouseButtonRelease and \
+                    ev.button() == Qt.MouseButton.LeftButton and \
+                    self._press_scene is not None:
+                end = self.win.view.mapToScene(ev.position().toPoint())
+                # door/window/room clicks are recorded by their dedicated
+                # hooks (with the dialog value), so skip the raw click here
+                if self._press_tool not in (TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM):
+                    self._emit_mouse(self._press_scene, end, self._press_moved)
+                self._press_scene = None
+        elif et == QEvent.Type.KeyPress and self._belongs_to_main(obj):
+            self._emit_key(ev)
+
+    def _emit_mouse(self, p1, p2, moved):
+        x1, y1, x2, y2 = (round(p1.x()), round(p1.y()),
+                          round(p2.x()), round(p2.y()))
+        if moved and QLineF(p1, p2).length() >= self.MOVE_THRESHOLD:
+            tok = f"DRAG {x1} {y1} {x2} {y2}"
+        else:
+            tok = f"CLICK {x2} {y2}"
+        self._append(tok, newline=self.nl_check.isChecked())
+
+    def _emit_key(self, ev):
+        key, mods = ev.key(), ev.modifiers()
+        ctrl = bool(mods & Qt.KeyboardModifier.ControlModifier)
+        shift = bool(mods & Qt.KeyboardModifier.ShiftModifier)
+        if key in self._ARROW_KEYS:
+            self._append(("^" if ctrl else "") + self._ARROW_KEYS[key])
+        elif key == Qt.Key.Key_Escape:
+            self._append("ESC")
+        elif key in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+            self._append("DEL")
+        elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self._append("ENTER")
+        elif ctrl and key in self._CARET_KEYS:
+            self._append("^" + ("+" if shift else "") + self._CARET_KEYS[key])
+
+    def _belongs_to_main(self, obj) -> bool:
+        """True if `obj` is the plan window or one of its children (not this
+        recorder dialog), so we record canvas keystrokes but not text edits."""
+        w = obj
+        while w is not None:
+            if w is self:
+                return False
+            if w is self.win:
+                return True
+            w = w.parent() if hasattr(w, "parent") else None
+        return False
+
+    def _append(self, token, newline=False):
+        cur = self.edit.textCursor()
+        cur.movePosition(QTextCursor.MoveOperation.End)
+        text = self.edit.toPlainText()
+        sep = "" if (not text or text.endswith(("\n", " "))) else " "
+        cur.insertText(sep + token + ("\n" if newline else ""))
+        self.edit.setTextCursor(cur)
+        self.edit.ensureCursorVisible()
 
 
 def main():

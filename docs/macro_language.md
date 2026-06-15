@@ -33,8 +33,10 @@ include spaces (e.g. a room name `"Living Room"`). A bad token is recorded in
 
 | Token | Action |
 |-------|--------|
-| `1` `2` `3` `4` `5` `6` | select / exterior-wall / interior-wall / door / window / room tool |
+| `S` `E` `I` `D` `W` `R` | **S**elect / **E**xterior-wall / **I**nterior-wall / **D**oor / **W**indow / **R**oom tool |
 | `TOOL <name>` | same, by name: `select extwall intwall door window room` |
+
+(The legacy digit codes `1`–`6` are still accepted for older macros.)
 
 ### Shortcuts (Ctrl chords, written `^X`)
 
@@ -159,6 +161,31 @@ python fp_macro.py --in den.json --repl
 {"ok": true, "steps": 1, "errors": [], "counts": {...}}
 > QUIT
 ```
+
+## Recording macros in the GUI
+
+Rather than writing tokens by hand, open the **Macro ▸ Record / Debug…** window
+(or the ● Record toolbar button). It's a non-modal recorder/debugger:
+
+- **Start** — begins capture; switch to the plan window and interact. Mouse
+  clicks/drags become `CLICK`/`DRAG`, tool changes become `1`–`6`, palette
+  drops become `PLACE kind x y`, and keys (arrows, `^C`/`^V`/…, `DEL`, `ESC`)
+  become their tokens. Actions whose parameters come from a **dialog** rather
+  than keystrokes are captured as self-contained tokens with the value baked
+  in — placing a door/window records `DOOR x y WWHH` / `WINDOW x y WWHH`, and
+  naming a room records `ROOM "name" x y` — so replay never needs the dialog.
+  With **New line after each mouse action** ticked, a `\n` is added after every
+  mouse/place action so the macro reads one action per line.
+- **Pause / Resume** — temporarily stop/continue capturing.
+- **Stop** — end capture. Now edit the text freely.
+- **Replay** — select a portion of the text (or all) and replay it one line at
+  a time so you can watch it run. Enabled only when text is selected.
+- **Save As…** — write the macro to a `.fpm` file for later use with
+  `fp_macro.py --file`.
+
+Typical debug loop: record an action, **Stop**, clear the canvas (`Ctrl+N`),
+select the recorded lines, **Replay**, and watch it rebuild — tweaking the text
+between runs.
 
 ## Why SVG + the JSON summary
 

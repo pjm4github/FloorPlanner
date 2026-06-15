@@ -776,6 +776,10 @@ TOOL_ICONS = {
         '<polyline points="14.5,4.5 18,8 14.5,11.5" fill="none" '
         'stroke="#1f2937" stroke-width="1.8" stroke-linecap="round" '
         'stroke-linejoin="round"/>'],
+    "record": [
+        # the universal red "record" dot
+        '<circle cx="12" cy="12" r="7" fill="#dc2626" stroke="#991b1b" '
+        'stroke-width="1.4"/>'],
 }
 for name, body in TOOL_ICONS.items():
     (ICONS / f"{name}.svg").write_text(

@@ -172,7 +172,7 @@ so no system fonts are needed.
 
 | Action | How |
 |---|---|
-| Choose a tool | Toolbar icons or keys **1**–**6** |
+| Choose a tool | Toolbar icons or keys **S** E I D W R (Select / Exterior / Interior / Door / Window / Room) |
 | Zoom / pan | Mouse wheel / drag empty space (middle-drag anywhere) |
 | Draw a wall | Click-drag (Shift = free angle, Esc = cancel) |
 | Stretch / slide a wall | Drag its end / body in Select mode |
@@ -196,6 +196,7 @@ so no system fonts are needed.
 | Import / export rooms (CSV) | File menu |
 | Delete | Select + **Del** |
 | Zoom to fit | **F** |
+| Record / replay a macro | **Macro** menu (or the ● Record toolbar button) |
 
 ## Headless CLI / AI macro driver
 
@@ -225,6 +226,12 @@ The SVG snapshot (vector, AI-parseable) plus `--summary full` (the complete
 `floorplanner-json` model) let a downstream AI *see* and *reason about* a change
 before issuing the next macro. Full token reference:
 [`docs/macro_language.md`](docs/macro_language.md).
+
+**Record macros in the GUI.** The **Macro** menu (or the ● Record toolbar
+button) opens a non-modal recorder: click **Start**, interact with the plan
+(draw walls, drop furnishings, copy/paste, nudge…), then **Stop**. Your
+actions are written as macro tokens you can edit; select any portion and
+**Replay** it, or **Save As…** a `.fpm` file to run later with `fp_macro.py`.
 
 ## Asset pipeline
 
