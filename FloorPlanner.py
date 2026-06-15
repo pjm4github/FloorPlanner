@@ -164,6 +164,7 @@ from PyQt6.QtGui import (
     QActionGroup,
     QBrush,
     QColor,
+    QContextMenuEvent,
     QDesktopServices,
     QDrag,
     QFont,
@@ -5949,6 +5950,10 @@ class MacroRunner:
                     DOOR x y code | WINDOW x y code | ROOM name x y |
                     SELECT x y | SELECTALL | DESELECT | ROTATE deg |
                     MOVETO x y | DELETE | ZOOMFIT
+      Context menu  PUP x y [UP DOWN LEFT RIGHT ENTER ESC HOME END TAB
+                    BACKSPACE DELETE | TYPE "..."]  pop up the right-click
+                    menu and drive it AND any dialog it opens; TYPE enters
+                    text into the dialog's field (ENTER selects/accepts)
       Files / shot  OPEN path | SAVE path | NEW | SHOT path | WAIT
 
     `run()` returns {ok, steps, log, errors, counts}; a bad token is recorded
@@ -5969,6 +5974,14 @@ class MacroRunner:
                       "V": "paste_clipboard", "G": "group_selected",
                       "+G": "ungroup_selected", "N": "clear_plan"}
     _ARROWS = {"LEFT": (-1, 0), "RIGHT": (1, 0), "UP": (0, -1), "DOWN": (0, 1)}
+    # keys that drive a popped-up menu / modal dialog after a PUP token
+    _MENU_KEYS = {"UP": Qt.Key.Key_Up, "DOWN": Qt.Key.Key_Down,
+                  "LEFT": Qt.Key.Key_Left, "RIGHT": Qt.Key.Key_Right,
+                  "ENTER": Qt.Key.Key_Return, "ESC": Qt.Key.Key_Escape,
+                  "HOME": Qt.Key.Key_Home, "END": Qt.Key.Key_End,
+                  "TAB": Qt.Key.Key_Tab, "BACKSPACE": Qt.Key.Key_Backspace,
+                  "DELETE": Qt.Key.Key_Delete}
+    _MODAL_DELAY = 12          # ms between keys fed to a menu / modal dialog
 
     def __init__(self, win):
         self.win = win
@@ -6282,6 +6295,91 @@ class MacroRunner:
         QApplication.processEvents()
         return i
 
+    def _cmd_pup(self, toks, i):
+        """PUP x y [nav/edit/TYPE...] — pop up the context (right-click) menu
+        at a scene point, then drive it (and any modal dialog it opens) with
+        the tokens that follow:
+
+          nav/edit keys  UP DOWN LEFT RIGHT ENTER ESC HOME END TAB
+                         BACKSPACE DELETE
+          text           TYPE "..."   (typed into the active line edit)
+
+        e.g. resize a door:  ``PUP 120 0 DOWN DOWN DOWN ENTER TYPE "2868" ENTER``
+        The tokens are consumed here (the menu/dialog is only open during this
+        step); ENTER selects/accepts, ESC cancels.  A bare PUP just opens and
+        cancels the menu."""
+        (x, y), i = self._take(toks, i, 2)
+        x, y = self._num(x), self._num(y)
+        actions = []
+        while i < len(toks):
+            t = toks[i].upper()
+            if t == "TYPE":
+                if i + 1 >= len(toks):
+                    break
+                actions.append(("text", toks[i + 1]))
+                i += 2
+            elif t in self._MENU_KEYS:
+                actions.append(("key", self._MENU_KEYS[t]))
+                i += 1
+            else:
+                break
+        self._popup(x, y, actions)
+        return i
+
+    def _popup(self, x, y, actions):
+        # arm the key pump to run inside the menu/dialog modal loop(s), then
+        # raise the context menu (which blocks in exec() until it all closes)
+        self._modal_queue = list(actions)
+        QTimer.singleShot(0, self._modal_step)
+        vp = self.win.view.viewport()
+        pos = self.win.view.mapFromScene(QPointF(x, y))
+        ev = QContextMenuEvent(QContextMenuEvent.Reason.Mouse, pos,
+                               vp.mapToGlobal(pos))
+        QApplication.sendEvent(vp, ev)
+        QApplication.processEvents()
+
+    def _modal_step(self):
+        """Feed one queued action to the currently-active menu/dialog.  Runs
+        from a timer so it threads through nested exec() loops; reschedules
+        BEFORE sending (a key may open another modal that blocks here)."""
+        modal = (QApplication.activePopupWidget()
+                 or QApplication.activeModalWidget())
+        if modal is None:
+            self._modal_queue = []                 # interaction ended
+            return
+        if not self._modal_queue:
+            modal.close()                          # nothing left -> cancel
+            return
+        kind, val = self._modal_queue.pop(0)
+        QTimer.singleShot(self._MODAL_DELAY, self._modal_step)
+        target = QApplication.focusWidget() or modal
+        if kind == "key":
+            self._send_key(target, val)
+        else:
+            for ch in val:
+                self._send_key(target, self._char_key(ch), ch)
+        QApplication.processEvents()
+
+    @staticmethod
+    def _char_key(ch):
+        seq = QKeySequence(ch)
+        return Qt.Key(seq[0].key()) if seq.count() else Qt.Key.Key_unknown
+
+    @staticmethod
+    def _send_key(widget, key, text=""):
+        for et in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease):
+            QApplication.sendEvent(widget, QKeyEvent(
+                et, key, Qt.KeyboardModifier.NoModifier, text))
+
+    def _cmd_type(self, toks, i):
+        # stand-alone TYPE "text" -> type into whatever currently has focus
+        (text,), i = self._take(toks, i, 1)
+        target = QApplication.focusWidget()
+        if target is not None:
+            for ch in text:
+                self._send_key(target, self._char_key(ch), ch)
+        return i
+
     def _cmd_open(self, toks, i):
         (path,), i = self._take(toks, i, 1)
         self.win.load_path(path)
@@ -6353,6 +6451,8 @@ class MacroRecorderDialog(QDialog):
         self._press_moved = False
         self._press_tool = TOOL_SELECT
         self._press_ctrl = False
+        self._type_buffer = ""           # printable run while a modal is open
+        self._modal_line = False         # a PUP + its menu/dialog keys, 1 line
         self._replay_lines = []
         self._replay_idx = 0
 
@@ -6425,6 +6525,7 @@ class MacroRecorderDialog(QDialog):
     def stop(self):
         if not self._recording:
             return
+        self._end_modal_line()             # close any open PUP line
         QApplication.instance().removeEventFilter(self)
         self.win._recorder = None
         self._recording = False
@@ -6500,21 +6601,32 @@ class MacroRecorderDialog(QDialog):
     # -- hooks called by the instrumented app --------------------------------
     def on_tool(self, tool):
         if self._active():
+            self._end_modal_line()
             code = self._TOOL_CODES.get(tool)
             if code:
                 self._append(code)
 
     def on_place(self, kind, scene_pt):
         if self._active():
+            self._end_modal_line()
             self._append(f"PLACE {kind} {round(scene_pt.x())} "
                          f"{round(scene_pt.y())}",
                          newline=self.nl_check.isChecked())
+
+    def on_popup(self, scene_pt):
+        # PUP keeps the menu's nav/text keys on the SAME line; the line is
+        # ended (newline) when the modal closes and the next action arrives
+        if self._active():
+            self._end_modal_line()
+            self._append(f"PUP {round(scene_pt.x())} {round(scene_pt.y())}")
+            self._modal_line = True
 
     def on_opening(self, kind, scene_pt, code):
         # door/window size came from a dialog, not keystrokes — capture the
         # value into a self-contained DOOR/WINDOW token so replay needs no
         # dialog (the raw click for this tool is suppressed in _capture).
         if self._active():
+            self._end_modal_line()
             tok = "DOOR" if kind == "door" else "WINDOW"
             self._append(f"{tok} {round(scene_pt.x())} {round(scene_pt.y())} "
                          f"{code}", newline=self.nl_check.isChecked())
@@ -6522,6 +6634,7 @@ class MacroRecorderDialog(QDialog):
     def on_room(self, name, scene_pt):
         # room name came from a dialog — capture it into a ROOM token.
         if self._active():
+            self._end_modal_line()
             tok = f'"{name}"' if " " in name else name
             self._append(f"ROOM {tok} {round(scene_pt.x())} "
                          f"{round(scene_pt.y())}",
@@ -6563,10 +6676,24 @@ class MacroRecorderDialog(QDialog):
                     self._emit_mouse(self._press_scene, end,
                                      self._press_moved, self._press_ctrl)
                 self._press_scene = None
-        elif et == QEvent.Type.KeyPress and self._belongs_to_main(obj):
-            self._emit_key(ev)
+            elif et == QEvent.Type.ContextMenu:
+                # a right-click context menu -> PUP x y (nav keys captured
+                # below while the menu is open)
+                sp = self.win.view.mapToScene(ev.pos())
+                self.on_popup(sp)
+        elif et == QEvent.Type.KeyPress:
+            in_modal = (QApplication.activePopupWidget() is not None
+                        or QApplication.activeModalWidget() is not None)
+            # only capture modal keystrokes for a PUP-opened menu/dialog;
+            # tool-driven dialogs (door/window size, room name) already record
+            # their value via on_opening/on_room, so don't double-capture them
+            if in_modal and self._modal_line:
+                self._emit_modal_key(ev)
+            elif not in_modal and self._belongs_to_main(obj):
+                self._emit_key(ev)
 
     def _emit_mouse(self, p1, p2, moved, ctrl):
+        self._end_modal_line()
         # a click is "[^]CLICK x y"; a drag is the click START plus a DRAG end
         # point on the same line: "[^]CLICK x1 y1 DRAG x2 y2".  The '^' marks
         # the Ctrl modifier (e.g. Ctrl-drag a room name, or Ctrl+click toggle).
@@ -6579,7 +6706,49 @@ class MacroRecorderDialog(QDialog):
             tok = f"{pre} {x1} {y1}"
         self._append(tok, newline=self.nl_check.isChecked())
 
+    _MENU_KEY_TOKENS = {Qt.Key.Key_Up: "UP", Qt.Key.Key_Down: "DOWN",
+                        Qt.Key.Key_Left: "LEFT", Qt.Key.Key_Right: "RIGHT",
+                        Qt.Key.Key_Return: "ENTER", Qt.Key.Key_Enter: "ENTER",
+                        Qt.Key.Key_Escape: "ESC", Qt.Key.Key_Home: "HOME",
+                        Qt.Key.Key_End: "END", Qt.Key.Key_Tab: "TAB",
+                        Qt.Key.Key_Backspace: "BACKSPACE",
+                        Qt.Key.Key_Delete: "DELETE"}
+
+    def _emit_modal_key(self, ev):
+        # keystrokes while a PUP menu / modal dialog is open: named keys pass
+        # through (no newline — stay on the PUP line); printable text is
+        # buffered into a TYPE "..." run.
+        tok = self._MENU_KEY_TOKENS.get(ev.key())
+        if tok:
+            self._flush_type()
+            self._append(tok)
+            return
+        text = ev.text()
+        if text and text.isprintable():
+            self._type_buffer += text
+
+    def _flush_type(self):
+        if self._type_buffer:
+            self._append(f'TYPE "{self._type_buffer}"')
+            self._type_buffer = ""
+
+    def _newline(self):
+        if self.edit.toPlainText() and not self.edit.toPlainText().endswith("\n"):
+            cur = self.edit.textCursor()
+            cur.movePosition(QTextCursor.MoveOperation.End)
+            cur.insertText("\n")
+            self.edit.setTextCursor(cur)
+            self.edit.ensureCursorVisible()
+
+    def _end_modal_line(self):
+        # close out a PUP line (flush any typed text, drop to a new line)
+        if self._modal_line:
+            self._flush_type()
+            self._newline()
+            self._modal_line = False
+
     def _emit_key(self, ev):
+        self._end_modal_line()             # a modal closed -> end its line
         key, mods = ev.key(), ev.modifiers()
         ctrl = bool(mods & Qt.KeyboardModifier.ControlModifier)
         shift = bool(mods & Qt.KeyboardModifier.ShiftModifier)

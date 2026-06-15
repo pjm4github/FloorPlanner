@@ -4,8 +4,9 @@ non-modal MacroRecorderDialog (record / replay / save)."""
 import json
 
 import pytest
-from PyQt6.QtCore import QEvent, QPointF, Qt
-from PyQt6.QtGui import QMouseEvent
+from PyQt6.QtCore import QEvent, QPointF, Qt, QTimer
+from PyQt6.QtGui import QContextMenuEvent, QKeyEvent, QMouseEvent
+from PyQt6.QtWidgets import QApplication
 
 pytestmark = pytest.mark.macro
 
@@ -142,6 +143,141 @@ def test_ctrl_click_toggles_selection(fp, win):
     kinds = sorted(it.kind for it in win.scene.selectedItems()
                    if isinstance(it, fp.FurnishingItem))
     assert kinds == ["armchair", "sofa"]
+
+
+def test_pup_drives_a_context_menu_action(fp, win):
+    # PUP pops the right-click menu and the following nav keys drive it; the
+    # furnishing menu's first item is "Rotate 90 CW", so DOWN ENTER rotates
+    win.prepare_headless()
+    win.run_macro("PLACE armchair 120 96 0")
+    furn = next(it for it in win.scene.items()
+                if isinstance(it, fp.FurnishingItem))
+    res = win.run_macro("PUP 120 96 DOWN ENTER")
+    assert res["ok"], res["errors"]
+    assert furn.rotation() == pytest.approx(90)
+
+
+def test_pup_esc_cancels_without_action(fp, win):
+    win.prepare_headless()
+    win.run_macro("PLACE armchair 120 96 0")
+    furn = next(it for it in win.scene.items()
+                if isinstance(it, fp.FurnishingItem))
+    win.run_macro("PUP 120 96 ESC")               # open then cancel
+    assert furn.rotation() == pytest.approx(0)
+
+
+def _drive_modal(seq):
+    """Feed a sequence of Qt keys / text strings to the active menu/dialog,
+    one per timer tick so it threads through nested exec() loops."""
+    digit = {c: getattr(Qt.Key, f"Key_{c}") for c in "0123456789"}
+    q = list(seq)
+
+    def step():
+        if not q:
+            w = (QApplication.activePopupWidget()
+                 or QApplication.activeModalWidget())
+            if w is not None:
+                w.close()
+            return
+        item = q.pop(0)
+        QTimer.singleShot(12, step)
+        t = (QApplication.focusWidget() or QApplication.activePopupWidget()
+             or QApplication.activeModalWidget())
+        if t is None:
+            return
+        chars = item if isinstance(item, str) else [item]
+        for c in chars:
+            key = digit[c] if isinstance(item, str) else item
+            txt = c if isinstance(item, str) else ""
+            for et in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease):
+                QApplication.sendEvent(t, QKeyEvent(
+                    et, key, Qt.KeyboardModifier.NoModifier, txt))
+        QApplication.processEvents()
+
+    QTimer.singleShot(0, step)
+
+
+def _send_context_menu(win, sx, sy):
+    vp = win.view.viewport()
+    pos = win.view.mapFromScene(QPointF(sx, sy))
+    QApplication.sendEvent(vp, QContextMenuEvent(
+        QContextMenuEvent.Reason.Mouse, pos, vp.mapToGlobal(pos)))
+
+
+def test_pup_type_resizes_a_door(fp, win):
+    # navigate the door menu to "Set size", type a new WWHH, accept — no
+    # dialog interaction needed beyond the macro tokens
+    win.prepare_headless()
+    win.run_macro("WALL 0 0 240 0 ext  DOOR 120 0 3680")
+    op = next(it for it in win.scene.items()
+              if isinstance(it, fp.WallItem)).openings[0]
+    res = win.run_macro('PUP 120 0 DOWN DOWN DOWN ENTER TYPE "2868" ENTER')
+    assert res["ok"], res["errors"]
+    assert op.code == "2868"
+
+
+def test_recorder_captures_modal_text_on_one_line(fp, win):
+    win.prepare_headless()
+    win.run_macro("WALL 0 0 240 0 ext  DOOR 120 0 3680")
+    dlg = fp.MacroRecorderDialog(win)
+    dlg.start()
+    _drive_modal([Qt.Key.Key_Down] * 3
+                 + [Qt.Key.Key_Return, "2868", Qt.Key.Key_Return])
+    _send_context_menu(win, 120, 0)
+    dlg.stop()
+    text = dlg.edit.toPlainText().strip()
+    assert text.startswith("PUP")
+    assert 'TYPE "2868"' in text
+    assert "\n" not in text               # the whole interaction on one line
+
+
+def test_recorder_tool_dialog_not_double_captured(fp, win):
+    # the door-tool click opens a size dialog; that typing must NOT be
+    # recorded as modal keys — on_opening already records DOOR x y code
+    win.prepare_headless()
+    win.run_macro("WALL 0 0 240 0 ext")
+    dlg = fp.MacroRecorderDialog(win)
+    dlg.start()
+    win.set_tool(fp.TOOL_DOOR)
+    _drive_modal(["3680", Qt.Key.Key_Return])
+    left = Qt.MouseButton.LeftButton
+    _send_mouse(win, QEvent.Type.MouseButtonPress, 120, 0, left, left)
+    _send_mouse(win, QEvent.Type.MouseButtonRelease, 120, 0, left,
+                Qt.MouseButton.NoButton)
+    dlg.stop()
+    text = dlg.edit.toPlainText()
+    assert "TYPE" not in text             # dialog text not double-captured
+    assert "DOOR" in text                 # the on_opening hook recorded it
+
+
+def test_recorder_captures_popup_and_nav(fp, win):
+    win.prepare_headless()
+    win.run_macro("PLACE sofa 120 96 0")
+    dlg = fp.MacroRecorderDialog(win)
+    dlg.start()
+
+    def drive():                                  # navigate the open menu
+        for k in (Qt.Key.Key_Down, Qt.Key.Key_Return):
+            w = QApplication.activePopupWidget()
+            if w is None:
+                break
+            for et in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease):
+                QApplication.sendEvent(w, QKeyEvent(
+                    et, k, Qt.KeyboardModifier.NoModifier))
+            QApplication.processEvents()
+        w = QApplication.activePopupWidget()
+        if w is not None:
+            w.close()
+
+    QTimer.singleShot(0, drive)
+    vp = win.view.viewport()
+    pos = win.view.mapFromScene(QPointF(120, 96))
+    QApplication.sendEvent(vp, QContextMenuEvent(
+        QContextMenuEvent.Reason.Mouse, pos, vp.mapToGlobal(pos)))
+    dlg.stop()
+    text = dlg.edit.toPlainText()
+    assert "PUP" in text
+    assert "DOWN" in text and "ENTER" in text
 
 
 def test_unknown_token_is_recorded_not_fatal(fp, win):

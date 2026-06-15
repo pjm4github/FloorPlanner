@@ -74,6 +74,29 @@ Spaces separate them, e.g. `^C ^V`. A `+` after the caret adds Shift.
 | `PRESS x y` / `RELEASE x y` | hold / release the left button |
 | `DRAG x1 y1 x2 y2` | a stand-alone drag with explicit start+end (no preceding `CLICK`) |
 
+### Context (right-click) menus & dialog text
+
+| Token | Action |
+|-------|--------|
+| `PUP x y [keys…]` | pop up the right-click menu at a scene point, then drive it — and any modal dialog it opens — with the keys that follow |
+| nav / edit keys | `UP` `DOWN` `LEFT` `RIGHT` (sub-menus) `HOME` `END` `TAB` `BACKSPACE` `DELETE`, ending with `ENTER` (select / accept) or `ESC` (cancel) |
+| `TYPE "text"` | type literal text into the active dialog's field (e.g. a new size code or room name) |
+
+All the keys after `PUP` are consumed by it (the menu/dialog is only open
+during that step). The menu is the app's real context menu, so its items
+depend on what's under the point (a wall, opening, room name, furnishing or
+stairs).
+
+Examples:
+
+```
+PUP 120 96 DOWN ENTER                          # rotate the furnishing 90 CW
+PUP 120 0 DOWN DOWN DOWN ENTER TYPE "2868" ENTER   # resize a door to 28x68
+```
+
+A `PUP` with no trailing `ENTER` just opens and cancels the menu. (Standalone,
+`TYPE "text"` types into whatever currently holds focus.)
+
 ### High-level placement & editing (robust, dialog-free)
 
 These build items directly — handy for an AI that knows *what* it wants, not
@@ -177,6 +200,12 @@ Rather than writing tokens by hand, open the **Macro ▸ Record / Debug…** win
   than keystrokes are captured as self-contained tokens with the value baked
   in — placing a door/window records `DOOR x y WWHH` / `WINDOW x y WWHH`, and
   naming a room records `ROOM "name" x y` — so replay never needs the dialog.
+  A right-click context menu records `PUP x y` followed by the keys you press
+  to drive it, all on one line — including any text you type into a dialog it
+  opens, captured as `TYPE "..."` (e.g.
+  `PUP 120 0 DOWN DOWN DOWN ENTER TYPE "2868" ENTER`). Inside an open menu or
+  dialog only keystrokes are recorded, not mouse clicks, so playback can push
+  them straight back to the modal.
   With **New line after each mouse action** ticked, a `\n` is added after every
   mouse/place action so the macro reads one action per line.
 - **Pause / Resume** — temporarily stop/continue capturing.
