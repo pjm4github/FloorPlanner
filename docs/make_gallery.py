@@ -4,6 +4,7 @@ docs/screenshot.png).
 Builds one demo plan and captures a framed window shot per feature, plus a
 few dialog shots.  Run with:  python docs/make_gallery.py
 """
+import html
 import math
 import os
 import sys
@@ -14,8 +15,9 @@ sys.path.insert(0, ROOT)
 os.chdir(ROOT)
 
 from PyQt6.QtCore import QPointF, QRectF, Qt
-from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtGui import QFont, QPixmap
+from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QVBoxLayout,
+                             QWidget)
 
 import FloorPlanner as FP
 
@@ -377,5 +379,81 @@ shot_widget(FP.AIPricingDialog(), "13-ai-pricing", size=(640, 560))
 
 # 14. Help → About (where files are stored)
 shot_widget(FP.AboutDialog(), "14-about", size=(520, 320))
+
+
+# 15. headless macro driver: a macro in, a rendered canvas snapshot out
+def build_macro_demo():
+    """Run a small macro through the in-app hook and render the result, the
+    same way the fp_macro.py driver does headlessly."""
+    macro = (
+        "WALL 0 0 252 0 ext   WALL 252 0 252 180 ext\n"
+        "WALL 252 180 0 180 ext   WALL 0 180 0 0 ext\n"
+        "ROOM Studio 126 90   DOOR 126 0 3280   WINDOW 252 90 4848\n"
+        "PLACE bed_queen 66 66 90   PLACE dresser 210 22 0\n"
+        "PLACE sofa 168 150 0   PLACE armchair 60 150 0"
+    )
+    mwin = FP.MainWindow()
+    mwin.prepare_headless()
+    result = mwin.run_macro(macro)
+    tmp = os.path.join(GALLERY, "_macro_tmp.png")
+    mwin.export_canvas(tmp, scale=2.5)
+    pm = QPixmap(tmp)
+    os.remove(tmp)
+    mwin.close()
+    return macro, result, pm
+
+
+def macro_widget(macro, result, pm):
+    """Compose a 'macro in -> visualization out' card for the gallery."""
+    c = result["counts"]
+    summary = (
+        '{ "ok": %s, "steps": %d,\n'
+        '  "counts": { "walls": %d, "rooms": %d,\n'
+        '              "furnishings": %d } }' % (
+            "true" if result["ok"] else "false", result["steps"],
+            c["walls"], c["rooms"], c["furnishings"]))
+    term_html = (
+        "<pre style=\"font-family:'DejaVu Sans Mono'; font-size:12px; "
+        "margin:0; color:#e6e6e6;\">"
+        "<span style='color:#8ae234;'>$ python fp_macro.py --svg studio.svg "
+        "--out studio.json \\<br>&nbsp;&nbsp;&nbsp;&nbsp;--macro \"</span>"
+        f"{html.escape(macro)}"
+        "<span style='color:#8ae234;'>\"</span><br><br>"
+        f"<span style='color:#aab2c0;'>{html.escape(summary)}</span>"
+        "</pre>"
+    )
+    w = QWidget()
+    w.setStyleSheet("background:#ffffff;")
+    outer = QVBoxLayout(w)
+    title = QLabel("Headless macro driver  ·  fp_macro.py")
+    title.setStyleSheet("font-size:18px; font-weight:bold; color:#1f2937;"
+                        " padding:6px 2px;")
+    outer.addWidget(title)
+    row = QHBoxLayout()
+    term = QLabel(term_html)
+    term.setStyleSheet("background:#1e1e2e; border-radius:8px; padding:14px;")
+    term.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+    term.setFixedWidth(548)
+    row.addWidget(term)
+    right = QVBoxLayout()
+    img = QLabel()
+    img.setPixmap(pm.scaledToWidth(
+        512, Qt.TransformationMode.SmoothTransformation))
+    img.setStyleSheet("background:#ffffff; border:1px solid #cbd2dc;"
+                      " border-radius:8px; padding:8px;")
+    img.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    cap = QLabel("Rendered canvas snapshot — studio.svg / .png")
+    cap.setStyleSheet("color:#6b7280; font-size:12px; padding-top:6px;")
+    cap.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    right.addWidget(img)
+    right.addWidget(cap)
+    row.addLayout(right)
+    outer.addLayout(row)
+    return w
+
+
+_m_macro, _m_result, _m_pm = build_macro_demo()
+shot_widget(macro_widget(_m_macro, _m_result, _m_pm), "15-macro-driver",
+            size=(1150, 560))
 
 print("gallery complete")

@@ -90,3 +90,12 @@ chosen AI system via an editable prompt.
 Where the app keeps your designs and settings, using OS-standard locations.
 
 ![About](14-about.png)
+
+### Headless macro driver
+`fp_macro.py` drives the app with no GUI: a line of macro tokens goes in
+(menu/shortcut chords, mouse/arrow keys, and high-level `PLACE`/`WALL`/`ROOM`
+commands), and a rendered SVG/PNG snapshot plus a JSON summary of the layout
+come out — so a script or an AI can edit a plan and **see** the result. See
+[`docs/macro_language.md`](../macro_language.md).
+
+![Macro driver](15-macro-driver.png)
