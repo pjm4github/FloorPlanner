@@ -398,6 +398,20 @@ FURNISHINGS = [
       R(1, 42, 7, 17, 2, FILL, 1), R(46, 42, 7, 17, 2, FILL, 1),  # front wheels
       R(0.5, 90, 9, 25, 2.5, FILL, 1.1),                   # rear wheels (large)
       R(44.5, 90, 9, 25, 2.5, FILL, 1.1)]),
+    ("riding_mower_snow", "Riding Mower + Snowblower", "Garage", 46, 96,
+     [R(2, 1, 42, 12, 1.5, FILL, 1.3),                     # front snowblower
+      L(12, 2, 12, 12, 0.5), L(23, 2, 23, 12, 0.5),
+      L(34, 2, 34, 12, 0.5),                               # auger flights
+      Ci(23, 7, 3.2, "#ffffff", 0.8),                      # discharge chute
+      R(18, 13, 10, 5, 1, FILL, 1),                        # mount linkage
+      R(9, 18, 28, 26, 3, FILL, 1.3),                      # hood / engine
+      L(9, 28, 37, 28, 0.5),                               # hood line
+      Ci(23, 50, 4.5, "none", 1),                          # steering wheel
+      R(14, 56, 18, 18, 3, "#ffffff", 0.9),                # operator seat
+      R(11, 74, 24, 12, 2, FILL, 1.1),                     # rear fender / body
+      R(0.5, 24, 6, 14, 2, FILL, 1), R(39.5, 24, 6, 14, 2, FILL, 1),  # front
+      R(0, 64, 8, 22, 2.5, FILL, 1.1),                     # rear wheels (large)
+      R(38, 64, 8, 22, 2.5, FILL, 1.1)]),
     ("boat_trailer", "Boat Trailer", "Garage", 78, 216,
      [L(39, 6, 39, 62, 1.4),                       # tongue
       R(35.5, 1, 7, 7, 1.5, FILL, 1),              # coupler
@@ -650,9 +664,9 @@ GROUPS = [
                   "toilet", "vanity", "vanity_24", "vanity_36", "vanity_48"]),
     ("Laundry", ["washer", "dryer"]),
     ("Garage", ["suv", "car", "motorcycle", "bicycle", "boat",
-                "boat_trailer", "garden_tractor", "workbench",
-                "storage_shelves", "lawnmower", "snowblower", "wheelbarrow",
-                "trashcan"]),
+                "boat_trailer", "garden_tractor", "riding_mower_snow",
+                "workbench", "storage_shelves", "lawnmower", "snowblower",
+                "wheelbarrow", "trashcan"]),
     ("Shop", ["toolchest", "table_saw", "lathe", "jointer", "drill_press",
               "cutoff_saw", "bandsaw", "planer", "workbench",
               "storage_shelves"]),

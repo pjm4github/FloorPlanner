@@ -504,6 +504,15 @@
     "price": 0.0
   },
   {
+    "id": "riding_mower_snow",
+    "name": "Riding Mower + Snowblower",
+    "category": "Garage",
+    "file": "riding_mower_snow.svg",
+    "width_in": 46,
+    "depth_in": 96,
+    "price": 0.0
+  },
+  {
     "id": "boat_trailer",
     "name": "Boat Trailer",
     "category": "Garage",
