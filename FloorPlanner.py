@@ -1784,15 +1784,16 @@ class WallItem(QGraphicsItem):
 
     def mouseReleaseEvent(self, e):
         if self._mode is not None:
-            # stretching an end (p1/p2) never re-joins or grows to meet another
-            # wall -- it sticks only to orthogonal projected lines while
-            # dragging and stops where released; only a body-slide auto-joins
+            # A wall is left exactly where the drag put it -- never snapped to
+            # another wall on release, so a body-slide can't yank an end over
+            # and tilt the wall.  Stretching an end (p1/p2) only sticks to an
+            # orthogonal projected line while dragging (and a free wall fuses
+            # if it now overlaps a same-type one); the angle changes only with
+            # Shift.
             endpoint_edit = self._mode in ("p1", "p2")
             corner_drag = endpoint_edit and self.room is not None
-            if not endpoint_edit:
-                self.join_endpoints()
-            elif self.room is None:          # stretched a free wall: fuse if it
-                fuse_free_walls(self.scene(), self)   # now overlaps a same-type
+            if endpoint_edit and self.room is None:    # stretched a free wall:
+                fuse_free_walls(self.scene(), self)     # fuse if it now overlaps
             rebuild_all_walls(self.scene())
             # dragging a corner back so the room is fully walled again fuses
             # the wall back in: re-lock its corners (right-click to detach

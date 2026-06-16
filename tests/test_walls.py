@@ -260,3 +260,26 @@ def test_fuse_carries_openings_across(fp, scene):
     walls = [it for it in scene.items() if isinstance(it, fp.WallItem)]
     assert len(walls) == 1
     assert len(walls[0].openings) == 1 and walls[0].openings[0].kind == "door"
+
+
+@pytest.mark.gui
+def test_body_slide_never_snaps_an_end_to_another_wall(fp, win, drag):
+    # sliding a wall's BODY must leave it parallel -- it must NOT yank an end
+    # onto a nearby wall (which would tilt it)
+    sc = win.scene
+    a = fp.WallItem(QPointF(0, 100), QPointF(200, 100), "interior")
+    b = fp.WallItem(QPointF(200, 106), QPointF(200, 260), "interior")
+    sc.addItem(a)
+    sc.addItem(b)
+    fp.rebuild_all_walls(sc)
+    win.set_tool(fp.TOOL_SELECT)
+    win.resize(1100, 900)
+    win.show()
+    win.zoom_fit()
+    a.setSelected(True)
+    m = win.view.transform().m11()
+    # slide A down ~12"; its right end then sits ~6" from B's end (within the
+    # old join tolerance) -- it must still be horizontal afterwards
+    drag(win, QPointF(100, 100), 0, int(12 * m), steps=4)
+    assert a.p1.y() == pytest.approx(a.p2.y())     # parallel: no snap-tilt
+    assert a.p1.y() > 100                           # it did move
