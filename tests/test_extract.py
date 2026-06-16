@@ -105,6 +105,66 @@ def test_gui_import_ghost_overlay_shows_and_clears(fp, win, tmp_path):
                 if isinstance(it, QGraphicsPathItem)]
 
 
+def test_start_image_import_places_backdrop(fp, win, tmp_path):
+    png = _make_plan_png(tmp_path / "plan.png")
+    item = win.start_image_import(str(png))
+    assert isinstance(item, fp.ReferenceImageItem)
+    assert item.scene() is win.scene
+    assert item.inches_per_pixel() > 0
+
+
+def test_reference_image_calibrate_sets_scale(fp, win, tmp_path):
+    from PyQt6.QtCore import QPointF
+    # the synthetic plan's outer box spans image px x=40..560 (520 px wide)
+    item = win.start_image_import(str(_make_plan_png(tmp_path / "plan.png")))
+    ipp0 = item.inches_per_pixel()
+    p1 = item.mapToScene(QPointF(40 * ipp0, 200 * ipp0))
+    p2 = item.mapToScene(QPointF(560 * ipp0, 200 * ipp0))
+    item.calibrate(p1, p2, 360.0)                 # tell it 520 px == 30 ft
+    assert item.inches_per_pixel() == pytest.approx(360.0 / 520.0, abs=1e-4)
+
+
+def test_reference_image_corner_scale(fp, win, tmp_path):
+    item = win.start_image_import(str(_make_plan_png(tmp_path / "plan.png")))
+    w0, _ = item._size_in()
+    item.set_inches_per_pixel(item.inches_per_pixel() * 2)
+    w1, _ = item._size_in()
+    assert w1 == pytest.approx(2 * w0)
+
+
+def test_extract_from_reference_adds_walls(fp, win, tmp_path):
+    from PyQt6.QtCore import QPointF
+    item = win.start_image_import(str(_make_plan_png(tmp_path / "plan.png")))
+    ipp0 = item.inches_per_pixel()
+    item.calibrate(item.mapToScene(QPointF(40 * ipp0, 200 * ipp0)),
+                   item.mapToScene(QPointF(560 * ipp0, 200 * ipp0)), 360.0)
+    n = win.extract_from_reference(item, interactive=False)
+    assert n == 5
+    walls = [it for it in win.scene.items() if isinstance(it, fp.WallItem)]
+    assert len(walls) == 5
+
+
+def test_extracted_walls_snap_to_6in_grid(fp, win, tmp_path):
+    item = win.start_image_import(str(_make_plan_png(tmp_path / "plan.png")))
+    step = fp.SETTINGS["wall_snap_in"]             # 6"
+    segs = item.wall_segments()
+    assert segs
+    for x0, y0, x1, y1 in segs:
+        for c in (x0, y0, x1, y1):
+            assert c == pytest.approx(round(c / step) * step)
+
+
+def test_reference_image_crop_reduces_walls(fp, win, tmp_path):
+    from PyQt6.QtCore import QPointF, QRectF
+    item = win.start_image_import(str(_make_plan_png(tmp_path / "plan.png")))
+    before = len(item.wall_segments())
+    ipp = item.inches_per_pixel()
+    crop = QRectF(item.mapToScene(QPointF(35 * ipp, 35 * ipp)),
+                  item.mapToScene(QPointF(305 * ipp, 365 * ipp)))
+    assert item.crop_to_scene_rect(crop)          # keep the left half
+    assert len(item.wall_segments()) < before
+
+
 @pytest.mark.slow
 def test_fp_extract_cli_end_to_end(qapp, tmp_path):
     png = _make_plan_png(tmp_path / "plan.png")

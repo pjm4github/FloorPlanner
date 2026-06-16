@@ -188,3 +188,31 @@ def test_garage_keeps_size_when_wall_too_short(fp, scene):
     w.rebuild()
     op.set_door_type("GARAGE-2")                  # 16' won't fit -> keep 28"
     assert op.width == pytest.approx(28)
+
+
+# -- stretching an end: stick to an orthogonal wall's line, never fuse --------
+def _stretch(fp, scene, drag_x):
+    a = fp.WallItem(QPointF(0, 0), QPointF(90, 0), "interior")
+    scene.addItem(a)
+    a._anchor, a._axis = QPointF(0, 0), QPointF(1, 0)   # as set when grabbing p2
+    return a._endpoint_target(QPointF(drag_x, 0), NOMOD)
+
+
+def test_stretch_sticks_to_orthogonal_projected_line(fp, scene):
+    scene.addItem(fp.WallItem(QPointF(100, 12), QPointF(100, 100), "interior"))
+    t = _stretch(fp, scene, 98)                    # drag the end near x=100
+    assert (t.x(), t.y()) == pytest.approx((100, 0))   # stuck to that line
+
+
+def test_stretch_grid_only_when_far_from_walls(fp, scene):
+    scene.addItem(fp.WallItem(QPointF(100, 12), QPointF(100, 100), "interior"))
+    t = _stretch(fp, scene, 70)                    # too far to stick
+    assert t.x() == pytest.approx(72)              # grid (6") only, not 100
+
+
+def test_stretch_does_not_fuse_to_a_parallel_endpoint(fp, scene):
+    # a collinear wall whose endpoint sits at a non-grid x=95 must NOT pull the
+    # dragged end onto it -- only orthogonal projected lines stick
+    scene.addItem(fp.WallItem(QPointF(95, 0), QPointF(150, 0), "interior"))
+    t = _stretch(fp, scene, 95)
+    assert t.x() == pytest.approx(96)              # grid-snapped, not fused

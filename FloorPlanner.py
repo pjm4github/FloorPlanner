@@ -255,6 +255,8 @@ DEFAULT_SETTINGS = {
 SETTINGS = dict(DEFAULT_SETTINGS)
 JOIN_TOL = 9.0            # endpoints within 9" join together
 MIN_WALL_LEN = 6.0
+WALL_PROJECT_STICK = 9.0  # stretch sticks within 9" of an orthogonal wall line
+WALL_PROJECT_NEAR = 48.0  # ...only when that wall actually passes within 4'
 
 
 def canvas_rect() -> QRectF:
@@ -732,6 +734,28 @@ def nearest_wall_body(scene, p: QPointF, tol: float, exclude=None):
 def nearest_wall_body_point(scene, p: QPointF, tol: float, exclude=None):
     hit = nearest_wall_body(scene, p, tol, exclude)
     return hit[1] if hit is not None else None
+
+
+def line_intersection(p: QPointF, u: QPointF, q: QPointF, v: QPointF):
+    """Intersection of the line through `p` with direction `u` and the line
+    through `q` with direction `v`; None when parallel."""
+    den = u.x() * v.y() - u.y() * v.x()
+    if abs(den) < 1e-9:
+        return None
+    wx, wy = q.x() - p.x(), q.y() - p.y()
+    s = (wx * v.y() - wy * v.x()) / den
+    return QPointF(p.x() + u.x() * s, p.y() + u.y() * s)
+
+
+def dist_point_segment(p: QPointF, a: QPointF, b: QPointF) -> float:
+    """Shortest distance from point `p` to segment `a`-`b`."""
+    abx, aby = b.x() - a.x(), b.y() - a.y()
+    L2 = abx * abx + aby * aby
+    if L2 < 1e-9:
+        return QLineF(p, a).length()
+    t = ((p.x() - a.x()) * abx + (p.y() - a.y()) * aby) / L2
+    t = max(0.0, min(1.0, t))
+    return QLineF(p, QPointF(a.x() + abx * t, a.y() + aby * t)).length()
 
 
 def axis_wall_intersection(target, anchor: QPointF, through: QPointF):
@@ -1372,40 +1396,61 @@ class WallItem(QGraphicsItem):
         e.accept()
 
     def _endpoint_target(self, sp: QPointF, mods) -> QPointF:
-        """Snap priority: other endpoint > axis > other wall body (fuse) > grid."""
-        q = nearest_wall_endpoint(self.scene(), sp, JOIN_TOL * 1.5, exclude=self)
-        if q is not None:
-            return q
+        """Lengthen / shorten this wall.  The end rides the wall's own axis,
+        grid-snapped, and STICKS to the projected line of a close orthogonal
+        wall when it lines up (so you can pull an end into a corner) -- it
+        never fuses to another wall's endpoint or body.  Shift = free re-angle.
+        """
         if mods & Qt.KeyboardModifier.ShiftModifier:
-            pt = wall_snap(QPointF(sp))            # free re-angle
-        else:                                      # pure lengthen / shorten
-            o, u = self._anchor, self._axis
-            s = (sp.x() - o.x()) * u.x() + (sp.y() - o.y()) * u.y()
-            s = wall_snap_len(s)                   # snapped length, but the
-            pt = QPointF(o.x() + u.x() * s, o.y() + u.y() * s)   # axis holds
-        hit = nearest_wall_body(self.scene(), pt, JOIN_TOL, exclude=self)
-        if hit is not None:
-            target, q = hit
-            ip = axis_wall_intersection(target, self._anchor, pt)
-            if ip is not None and QLineF(ip, pt).length() <= JOIN_TOL * 2:
-                return ip                  # fuse without changing our angle
-            return q
-        if QLineF(pt, self._anchor).length() < MIN_WALL_LEN:
-            o, u = self._anchor, self._axis
-            pt = QPointF(o.x() + u.x() * MIN_WALL_LEN, o.y() + u.y() * MIN_WALL_LEN)
-        return pt
+            return wall_snap(QPointF(sp))          # free re-angle, grid only
+        return self._axis_target(sp)
+
+    def _axis_target(self, sp: QPointF) -> QPointF:
+        o, u = self._anchor, self._axis
+        s = (sp.x() - o.x()) * u.x() + (sp.y() - o.y()) * u.y()
+        proj = self._project_to_orthogonal(o, u, s)
+        s = proj if proj is not None else wall_snap_len(s)
+        if s < MIN_WALL_LEN:                        # never collapse the wall
+            s = MIN_WALL_LEN
+        return QPointF(o.x() + u.x() * s, o.y() + u.y() * s)
+
+    def _project_to_orthogonal(self, o: QPointF, u: QPointF, s: float):
+        """The exact axis distance at which this wall's axis crosses the
+        projected line of a NEARBY ORTHOGONAL wall, when the drag is within the
+        stick tolerance of it -- else None (so it falls back to the grid).
+        Snaps only to such lines, never to endpoints or bodies."""
+        sc = self.scene()
+        if sc is None:
+            return None
+        stick = max(WALL_PROJECT_STICK, 16.0 / max(self._view_scale(), 1e-6))
+        best_s, best_d = None, stick
+        for w in sc.items():
+            if (not isinstance(w, WallItem) or w is self or w.is_open
+                    or w.length() < 1e-6):
+                continue
+            v = w.unit()
+            if abs(u.x() * v.x() + u.y() * v.y()) > 0.12:      # not orthogonal
+                continue
+            p = line_intersection(o, u, w.p1, v)
+            if p is None:
+                continue
+            sp_ = (p.x() - o.x()) * u.x() + (p.y() - o.y()) * u.y()
+            if sp_ <= MIN_WALL_LEN:                 # behind / at the anchor
+                continue
+            d = abs(sp_ - s)                         # drag distance to the line
+            if d <= best_d and \
+                    dist_point_segment(p, w.p1, w.p2) <= WALL_PROJECT_NEAR:
+                best_s, best_d = sp_, d
+        return best_s
 
     def _corner_target(self, sp: QPointF, mods) -> QPointF:
         """Endpoint target for a room wall whose corners were unlocked: move
-        the end along the wall (Shift = any direction), grid-snapped, WITHOUT
-        fusing to neighbours -- so the corner can be pulled away to open a
-        side."""
+        the end along the wall (Shift = any direction), grid-snapped and
+        sticking to an orthogonal wall's projected line, WITHOUT fusing to
+        neighbours -- so the corner can be pulled away to open a side."""
         if mods & Qt.KeyboardModifier.ShiftModifier:
             return wall_snap(QPointF(sp))
-        o, u = self._anchor, self._axis
-        t = (sp.x() - o.x()) * u.x() + (sp.y() - o.y()) * u.y()
-        t = max(MIN_WALL_LEN, wall_snap_len(t))
-        return QPointF(o.x() + u.x() * t, o.y() + u.y() * t)
+        return self._axis_target(sp)
 
     def _collinear_run(self):
         """The full room 'side' this wall lies on: every wall of the same room
@@ -1479,10 +1524,12 @@ class WallItem(QGraphicsItem):
 
     def mouseReleaseEvent(self, e):
         if self._mode is not None:
-            # pulling a room wall's corner must NOT re-join/grow back to its
-            # neighbour, or the gap could never open
-            corner_drag = self._mode in ("p1", "p2") and self.room is not None
-            if not corner_drag:
+            # stretching an end (p1/p2) never re-joins or grows to meet another
+            # wall -- it sticks only to orthogonal projected lines while
+            # dragging and stops where released; only a body-slide auto-joins
+            endpoint_edit = self._mode in ("p1", "p2")
+            corner_drag = endpoint_edit and self.room is not None
+            if not endpoint_edit:
                 self.join_endpoints()
             rebuild_all_walls(self.scene())
             # dragging a corner back so the room is fully walled again fuses
@@ -4089,6 +4136,28 @@ class PlanView(QGraphicsView):
         self._last_scene = None           # last mouse position (paste target)
         self._rubber = None               # Ctrl+drag selection rubber band
         self._rubber_origin = None
+        self._img_mode = None             # None | "calibrate" | "crop"
+        self._img_ref = None              # the ReferenceImageItem being edited
+        self._calib_pts = []              # collected calibration points
+        self._crop_start = None           # crop rubber-band start (scene)
+
+    # -- reference-image (PNG import) modes ----------------------------------
+    def start_image_calibrate(self, item):
+        self._img_mode, self._img_ref, self._calib_pts = "calibrate", item, []
+        self.win.status("Calibrate: click two points a known distance apart "
+                        "on the image (Esc to cancel).")
+
+    def start_image_crop(self, item):
+        self._img_mode, self._img_ref = "crop", item
+        self._crop_start = None
+        self.win.status("Crop: drag a rectangle over the area to keep "
+                        "(Esc to cancel).")
+
+    def _end_image_mode(self):
+        self._img_mode = self._img_ref = self._crop_start = None
+        self._calib_pts = []
+        if self._rubber is not None:
+            self._rubber.hide()
 
     # -- zoom ------------------------------------------------------------------
     def wheelEvent(self, e):
@@ -4215,6 +4284,21 @@ class PlanView(QGraphicsView):
         sp = self.mapToScene(pos)
         tool = self.win.tool
 
+        if self._img_mode is not None \
+                and e.button() == Qt.MouseButton.LeftButton:
+            if self._img_mode == "calibrate":
+                self._calib_pts.append(QPointF(sp))
+                if len(self._calib_pts) == 2:
+                    self.win._finish_calibrate(
+                        self._img_ref, self._calib_pts)
+                    self._end_image_mode()
+                e.accept()
+                return
+            if self._img_mode == "crop":
+                self._crop_start = QPointF(sp)
+                e.accept()
+                return
+
         if e.button() == Qt.MouseButton.MiddleButton:
             self._panning, self._pan_last = True, pos
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
@@ -4279,6 +4363,16 @@ class PlanView(QGraphicsView):
         sp = self.mapToScene(pos)
         self._last_scene = QPointF(sp)
         self.win.show_coords(sp)
+
+        if self._img_mode == "crop" and self._crop_start is not None:
+            origin = self.mapFromScene(self._crop_start)
+            if self._rubber is None:
+                self._rubber = QRubberBand(QRubberBand.Shape.Rectangle,
+                                           self.viewport())
+            self._rubber.setGeometry(QRect(origin, pos).normalized())
+            self._rubber.show()
+            e.accept()
+            return
 
         if self._rubber_origin is not None:
             self._rubber.setGeometry(
@@ -4346,6 +4440,18 @@ class PlanView(QGraphicsView):
             rebuild_all_walls(scene)
 
     def mouseReleaseEvent(self, e):
+        if (self._img_mode == "crop" and self._crop_start is not None
+                and e.button() == Qt.MouseButton.LeftButton):
+            rect = QRectF(self._crop_start,
+                          self.mapToScene(e.position().toPoint())).normalized()
+            ref = self._img_ref
+            self._end_image_mode()
+            if ref is not None and rect.width() > 1 and rect.height() > 1:
+                ref.crop_to_scene_rect(rect)
+                self.win.status("Cropped the image.")
+            e.accept()
+            return
+
         if (self._rubber_origin is not None
                 and e.button() == Qt.MouseButton.LeftButton):
             rect = QRect(self._rubber_origin,
@@ -4422,6 +4528,10 @@ class PlanView(QGraphicsView):
 
     def keyPressEvent(self, e):
         if e.key() == Qt.Key.Key_Escape:
+            if self._img_mode is not None:
+                self._end_image_mode()
+                self.win.status("Cancelled.")
+                return
             self.cancel_temp()
             super().keyPressEvent(e)
             return
@@ -4495,6 +4605,183 @@ class PlanView(QGraphicsView):
         if self.win._recorder is not None:
             # record the size the user typed so replay needs no dialog
             self.win._recorder.on_opening(kind, sp, code.strip())
+
+
+# ----------------------------------------------------------------------------
+# Reference image backdrop (for importing a plan from a PNG)
+# ----------------------------------------------------------------------------
+class ReferenceImageItem(QGraphicsItem):
+    """A raster floor-plan image dropped on the canvas as a movable, scalable,
+    croppable, translucent backdrop for tracing / wall extraction.  `ipp` is
+    inches-per-image-pixel (the scale): drag the body to move, drag a corner
+    to rescale, right-click to calibrate / crop / extract / remove."""
+
+    Z = -100.0
+    HANDLE_PX = 9.0           # corner handle half-size, in view pixels
+    MIN_IPP = 0.05
+
+    def __init__(self, image, ipp: float, threshold: int = 128, merge: int = 3):
+        super().__init__()
+        self._img = image                       # QImage (RGB/whatever)
+        self._ipp = float(ipp)
+        self.threshold = int(threshold)
+        self.merge = int(merge)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges,
+                     True)
+        self.setZValue(self.Z)
+        self._scaling = None                    # corner index while scaling
+
+    # -- scale / geometry ----------------------------------------------------
+    def inches_per_pixel(self) -> float:
+        return self._ipp
+
+    def set_inches_per_pixel(self, ipp: float):
+        self.prepareGeometryChange()
+        self._ipp = max(float(ipp), self.MIN_IPP)
+        self.update()
+
+    def _size_in(self):
+        return (self._img.width() * self._ipp, self._img.height() * self._ipp)
+
+    def _corner_local(self, i: int) -> QPointF:
+        w, h = self._size_in()
+        return [QPointF(0, 0), QPointF(w, 0), QPointF(w, h),
+                QPointF(0, h)][i]
+
+    def _view_scale(self) -> float:
+        sc = self.scene()
+        if sc and sc.views():
+            return max(sc.views()[0].transform().m11(), 1e-6)
+        return 1.0
+
+    def _handle_in(self) -> float:
+        return self.HANDLE_PX / self._view_scale()
+
+    def boundingRect(self) -> QRectF:
+        w, h = self._size_in()
+        m = self._handle_in() + 1
+        return QRectF(-m, -m, w + 2 * m, h + 2 * m)
+
+    def paint(self, painter, option, widget=None):
+        w, h = self._size_in()
+        rect = QRectF(0, 0, w, h)
+        painter.setOpacity(0.7)
+        painter.drawImage(rect, self._img)
+        painter.setOpacity(1.0)
+        pen = QPen(QColor(37, 99, 235), 0)
+        pen.setStyle(Qt.PenStyle.DashLine)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRect(rect)
+        if self.isSelected():
+            hs = self._handle_in()
+            painter.setBrush(QColor(37, 99, 235))
+            painter.setPen(Qt.PenStyle.NoPen)
+            for i in range(4):
+                c = self._corner_local(i)
+                painter.drawRect(QRectF(c.x() - hs, c.y() - hs, 2 * hs, 2 * hs))
+
+    # -- corner-drag scaling -------------------------------------------------
+    def _corner_at(self, local_pt: QPointF):
+        hs = self._handle_in() * 1.6
+        for i in range(4):
+            if (self._corner_local(i) - local_pt).manhattanLength() <= 2 * hs:
+                return i
+        return None
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.MouseButton.LeftButton:
+            self._scaling = self._corner_at(e.pos())
+            if self._scaling is not None:
+                e.accept()
+                return
+        super().mousePressEvent(e)
+
+    def mouseMoveEvent(self, e):
+        if self._scaling is not None:
+            opp = (self._scaling + 2) % 4
+            anchor = self.mapToScene(self._corner_local(opp))   # stays fixed
+            new_w = abs(e.scenePos().x() - anchor.x())
+            self.set_inches_per_pixel(new_w / max(self._img.width(), 1))
+            self.setPos(anchor - self._corner_local(opp))       # re-anchor
+            e.accept()
+            return
+        super().mouseMoveEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        if self._scaling is not None:
+            self._scaling = None
+            e.accept()
+            return
+        super().mouseReleaseEvent(e)
+
+    # -- calibrate / crop / extract (testable model methods) -----------------
+    def calibrate(self, scene_p1: QPointF, scene_p2: QPointF, real_in: float):
+        """Set the scale so the two scene points are `real_in` inches apart."""
+        a, b = self.mapFromScene(scene_p1), self.mapFromScene(scene_p2)
+        d_px = QLineF(a, b).length() / max(self._ipp, 1e-9)     # image pixels
+        if d_px > 1e-6 and real_in > 0:
+            self.set_inches_per_pixel(real_in / d_px)
+
+    def crop_to_scene_rect(self, scene_rect: QRectF) -> bool:
+        w, h = self._size_in()
+        local = self.mapRectFromScene(scene_rect).intersected(
+            QRectF(0, 0, w, h))
+        if local.width() < self._ipp or local.height() < self._ipp:
+            return False
+        px = QRect(round(local.x() / self._ipp), round(local.y() / self._ipp),
+                   round(local.width() / self._ipp),
+                   round(local.height() / self._ipp)).intersected(
+                       self._img.rect())
+        if px.width() < 1 or px.height() < 1:
+            return False
+        shift = QPointF(px.x() * self._ipp, px.y() * self._ipp)
+        self.prepareGeometryChange()
+        self._img = self._img.copy(px)
+        self.setPos(self.pos() + shift)
+        self.update()
+        return True
+
+    def wall_segments(self, min_wall_in: float = 12.0):
+        """Detected walls as (x0, y0, x1, y1) scene-inch tuples at the current
+        scale/position."""
+        import fp_extract
+        gray = fp_extract.gray_from_qimage(self._img)
+        out = []
+        for x0, y0, x1, y1 in fp_extract.detect_walls(
+                gray, self.threshold, 24, self.merge, 40):
+            a = self.mapToScene(QPointF(x0 * self._ipp, y0 * self._ipp))
+            b = self.mapToScene(QPointF(x1 * self._ipp, y1 * self._ipp))
+            a = grid_snap(a, SETTINGS["wall_snap_in"])
+            b = grid_snap(b, SETTINGS["wall_snap_in"])
+            if (a - b).manhattanLength() >= min_wall_in:
+                out.append((a.x(), a.y(), b.x(), b.y()))
+        return out
+
+    def _view(self):
+        sc = self.scene()
+        return sc.views()[0] if sc and sc.views() else None
+
+    def contextMenuEvent(self, e):
+        menu = QMenu()
+        a_cal = menu.addAction("Calibrate scale (2 points)…")
+        a_crop = menu.addAction("Crop to region")
+        a_ext = menu.addAction("Extract walls")
+        menu.addSeparator()
+        a_rem = menu.addAction("Remove image")
+        chosen = menu.exec(e.screenPos())
+        view = self._view()
+        if chosen is a_cal and view is not None:
+            view.start_image_calibrate(self)
+        elif chosen is a_crop and view is not None:
+            view.start_image_crop(self)
+        elif chosen is a_ext and view is not None:
+            view.win.extract_from_reference(self)
+        elif chosen is a_rem and self.scene() is not None:
+            self.scene().removeItem(self)
+        e.accept()
 
 
 # ----------------------------------------------------------------------------
@@ -4680,7 +4967,7 @@ class MainWindow(QMainWindow):
         a_imp.triggered.connect(self.import_rooms_csv)
         m_file.addAction(a_imp)
         a_img = QAction("Import from i&mage (PNG)…", self)
-        a_img.triggered.connect(lambda: self.import_from_image())
+        a_img.triggered.connect(lambda: self.start_image_import())
         m_file.addAction(a_img)
         a_exp = QAction("&Export rooms to CSV…", self)
         a_exp.triggered.connect(self.export_rooms_csv)
@@ -5712,6 +5999,77 @@ class MainWindow(QMainWindow):
             if item.scene() is not None:
                 self.scene.removeItem(item)
             self._wall_ghost = None
+
+    # -- interactive image backdrop: place, calibrate, extract ---------------
+    def start_image_import(self, path=None):
+        """File > Import from image: drop the PNG on the canvas as a backdrop
+        to move / scale / crop / calibrate, then Extract walls."""
+        if path is None:
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Import plan from image", "",
+                "Images (*.png *.jpg *.jpeg *.bmp);;All files (*)")
+            if not path:
+                return None
+        img = QImage(path)
+        if img.isNull():
+            QMessageBox.critical(self, "Import failed",
+                                 f"Could not read image:\n{path}")
+            return None
+        ipp = canvas_rect().width() * 0.7 / max(img.width(), 1)
+        item = ReferenceImageItem(img, ipp)
+        item.setPos(QPointF(canvas_rect().width() * 0.1,
+                            canvas_rect().height() * 0.1))
+        self.scene.addItem(item)
+        self.scene.clearSelection()
+        item.setSelected(True)
+        self.view.fitInView(item.sceneBoundingRect().adjusted(-48, -48, 48, 48),
+                            Qt.AspectRatioMode.KeepAspectRatio)
+        self.status("Image placed — drag to move, drag a corner to scale, "
+                    "right-click for Calibrate / Crop / Extract walls / "
+                    "Remove.")
+        return item
+
+    def _finish_calibrate(self, item, pts):
+        val, ok = QInputDialog.getDouble(
+            self, "Calibrate scale",
+            "Real distance between the two clicked points (feet):",
+            10.0, 0.01, 100000.0, 2)
+        if not ok or item is None:
+            return
+        item.calibrate(pts[0], pts[1], val * FOOT)
+        self.status(f"Calibrated — that span is now {fmt_ftin(val * FOOT)}.")
+
+    def extract_from_reference(self, item, interactive=True):
+        """Detect walls in the (scaled/cropped) backdrop and add them, with a
+        blue ghost preview when interactive."""
+        segs = item.wall_segments()
+        if not segs:
+            if interactive:
+                QMessageBox.information(
+                    self, "Extract walls",
+                    "No walls detected.  Calibrate/crop closer or adjust the "
+                    "image, then try again.")
+            return None
+        self._show_wall_ghost(segs)
+        if interactive:
+            ok = QMessageBox.question(
+                self, "Extract walls",
+                f"Detected {len(segs)} wall(s), shown in blue.  Add them to "
+                "the plan?") == QMessageBox.StandardButton.Yes
+            self._clear_wall_ghost()
+            if not ok:
+                return None
+        else:
+            self._clear_wall_ghost()
+        for x0, y0, x1, y1 in segs:
+            self.scene.addItem(
+                WallItem(QPointF(x0, y0), QPointF(x1, y1), "exterior"))
+        rebuild_all_walls(self.scene)
+        self._update_totals()
+        self._commit_if_changed()
+        self.status(f"Added {len(segs)} wall(s) — right-click the image to "
+                    "remove it, then name rooms with the Room tool.")
+        return len(segs)
 
     def _import_rooms(self, path: str, interactive: bool = True):
         """Create walled rooms from a CSV with the columns

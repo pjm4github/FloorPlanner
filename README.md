@@ -175,7 +175,7 @@ so no system fonts are needed.
 | Choose a tool | Toolbar icons or keys **S** E I D W R (Select / Exterior / Interior / Door / Window / Room) |
 | Zoom / pan | Mouse wheel / drag empty space (middle-drag anywhere) |
 | Draw a wall | Click-drag (Shift = free angle, Esc = cancel) |
-| Stretch / slide a wall | Drag its end / body in Select mode |
+| Stretch / slide a wall | Drag its end / body in Select mode. A dragged end sticks to the projected line of a nearby orthogonal wall (so you can close a corner), grid-snaps otherwise, and never fuses to other walls |
 | Place a door or window | Tool 4 / 5, click a wall, enter WWHH size |
 | Name a room | Tool 6, click an enclosed area (one-shot; Ctrl-pick the tool to keep it) |
 | Move a room (with its walls) | Drag the room name (Ctrl-drag = nudge the label only) |
@@ -239,10 +239,16 @@ FloorPlanner can vectorise a raster floor-plan image into walls. It reads the
 PNG (via `QImage`), detects the horizontal/vertical **wall** lines with numpy,
 and scales pixels to inches — no OpenCV/Pillow needed.
 
-**In the app:** **File ▸ Import from image (PNG)…** asks for the drawing's real
-width, detects the walls and shows them as a **blue ghost overlay** on the
-canvas; click **Yes** to add them or **No** to discard — a preview-before-commit
-step, since detection quality tracks input quality.
+**In the app:** **File ▸ Import from image (PNG)…** drops the picture on the
+canvas as a translucent **backdrop** you can fit to the plan before extracting:
+- **drag the body** to move it, **drag a corner** to scale it roughly;
+- **right-click ▸ Calibrate scale…** then click two points a known distance
+  apart and type that distance — the image auto-scales to match (the precise
+  way to set scale);
+- **right-click ▸ Crop to region** to drag-select just the area you want;
+- **right-click ▸ Extract walls** detects the walls and shows them as a **blue
+  ghost overlay** — click **Yes** to add them, **No** to discard. Then
+  **right-click ▸ Remove image**.
 
 **From the command line:** `fp_extract.py` writes a `floorplanner-json` file
 (and an optional preview PNG):

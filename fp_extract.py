@@ -39,12 +39,10 @@ _APP = None        # keep the QApplication alive for the process lifetime
 # ---------------------------------------------------------------------------
 # Image -> grayscale numpy array (via QImage, so no Pillow dependency)
 # ---------------------------------------------------------------------------
-def load_gray(path: str) -> np.ndarray:
+def gray_from_qimage(img) -> np.ndarray:
+    """A QImage -> (H, W) uint8 grayscale numpy array that owns its data."""
     from PyQt6.QtGui import QImage
 
-    img = QImage(path)
-    if img.isNull():
-        raise ValueError(f"could not read image: {path}")
     img = img.convertToFormat(QImage.Format.Format_Grayscale8)
     w, h = img.width(), img.height()
     bpl = img.bytesPerLine()                       # rows are padded to 4 bytes
@@ -52,6 +50,15 @@ def load_gray(path: str) -> np.ndarray:
     ptr.setsize(img.sizeInBytes())
     arr = np.frombuffer(ptr, dtype=np.uint8).reshape(h, bpl)
     return arr[:, :w].copy()           # own the data; QImage buffer is freed
+
+
+def load_gray(path: str) -> np.ndarray:
+    from PyQt6.QtGui import QImage
+
+    img = QImage(path)
+    if img.isNull():
+        raise ValueError(f"could not read image: {path}")
+    return gray_from_qimage(img)
 
 
 # ---------------------------------------------------------------------------
