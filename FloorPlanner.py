@@ -758,6 +758,46 @@ def dist_point_segment(p: QPointF, a: QPointF, b: QPointF) -> float:
     return QLineF(p, QPointF(a.x() + abx * t, a.y() + aby * t)).length()
 
 
+# ----------------------------------------------------------------------------
+# Stacking order: "Bring to front" / "Send to back" for any item's menu
+# ----------------------------------------------------------------------------
+def bring_to_front(item):
+    """Stack `item` above every other scene item (transient -- z is not saved)."""
+    sc = item.scene()
+    if sc is None:
+        return
+    top = max((it.zValue() for it in sc.items() if it is not item),
+              default=0.0)
+    item.setZValue(top + 1.0)
+
+
+def send_to_back(item):
+    """Stack `item` below every other scene item."""
+    sc = item.scene()
+    if sc is None:
+        return
+    bot = min((it.zValue() for it in sc.items() if it is not item),
+              default=0.0)
+    item.setZValue(bot - 1.0)
+
+
+def add_front_back_actions(menu):
+    """Append the stacking actions to a context menu; returns (front, back)."""
+    menu.addSeparator()
+    return (menu.addAction("Bring to front"), menu.addAction("Send to back"))
+
+
+def handle_front_back(item, chosen, a_front, a_back) -> bool:
+    """Apply a chosen stacking action; True if it was one of them."""
+    if chosen is a_front:
+        bring_to_front(item)
+        return True
+    if chosen is a_back:
+        send_to_back(item)
+        return True
+    return False
+
+
 def axis_wall_intersection(target, anchor: QPointF, through: QPointF):
     """Where the ray anchor->through crosses `target`'s centreline
     (clamped to the segment), or None when parallel or degenerate.
@@ -1677,7 +1717,11 @@ class WallItem(QGraphicsItem):
             a_detach = menu.addAction("Detach wall from room")
         menu.addSeparator()
         a_del = menu.addAction("Delete wall")
+        a_front, a_back = add_front_back_actions(menu)
         chosen = menu.exec(e.screenPos())
+        if handle_front_back(self, chosen, a_front, a_back):
+            e.accept()
+            return
         sc = self.scene()
         if chosen is a_ext:
             self.wall_type = "exterior"
@@ -1979,8 +2023,12 @@ class OpeningItem(QGraphicsItem):
         a_size = menu.addAction("Set size (WWHH)\u2026")
         menu.addSeparator()
         a_del = menu.addAction(f"Delete {self.kind}")
+        a_front, a_back = add_front_back_actions(menu)
 
         chosen = menu.exec(e.screenPos())
+        if handle_front_back(self, chosen, a_front, a_back):
+            e.accept()
+            return
         if chosen in type_actions:
             self.set_door_type(type_actions[chosen])
         elif chosen is a_flip and a_flip is not None:
@@ -2508,7 +2556,11 @@ class RoomItem(QGraphicsItem):
         a_copy = menu.addAction("Copy room")
         menu.addSeparator()
         a_del = menu.addAction("Delete room")
+        a_front, a_back = add_front_back_actions(menu)
         chosen = menu.exec(e.screenPos())
+        if handle_front_back(self, chosen, a_front, a_back):
+            e.accept()
+            return
         if chosen is a_dims:
             self.show_dims = not self.show_dims
             self.update()
@@ -3257,7 +3309,11 @@ class FurnishingItem(QGraphicsItem):
         a_ccw = menu.addAction("Rotate 90° CCW")
         menu.addSeparator()
         a_del = menu.addAction(f"Delete {self.name}")
+        a_front, a_back = add_front_back_actions(menu)
         chosen = menu.exec(e.screenPos())
+        if handle_front_back(self, chosen, a_front, a_back):
+            e.accept()
+            return
         if chosen is a_cw:
             self.setRotation((self.rotation() + 90.0) % 360.0)
         elif chosen is a_ccw:
@@ -3471,8 +3527,12 @@ class StairItem(FurnishingItem):
         a_ccw = menu.addAction("Rotate 90° CCW")
         menu.addSeparator()
         a_del = menu.addAction("Delete stairs")
+        a_front, a_back = add_front_back_actions(menu)
         chosen = menu.exec(e.screenPos())
         if chosen is None:
+            e.accept()
+            return
+        if handle_front_back(self, chosen, a_front, a_back):
             e.accept()
             return
         data = chosen.data()
@@ -3808,7 +3868,11 @@ class GroupItem(QGraphicsItemGroup):
         a_copy = menu.addAction("Copy group")
         menu.addSeparator()
         a_del = menu.addAction("Delete group")
+        a_front, a_back = add_front_back_actions(menu)
         chosen = menu.exec(e.screenPos())
+        if handle_front_back(self, chosen, a_front, a_back):
+            e.accept()
+            return
         if win is not None and chosen in (a_un, a_cut, a_del):
             sc.clearSelection()
             self.setSelected(True)
@@ -4873,7 +4937,11 @@ class ReferenceImageItem(QGraphicsItem):
         a_ext = menu.addAction("Extract walls")
         menu.addSeparator()
         a_rem = menu.addAction("Remove image")
+        a_front, a_back = add_front_back_actions(menu)
         chosen = menu.exec(e.screenPos())
+        if handle_front_back(self, chosen, a_front, a_back):
+            e.accept()
+            return
         view = self._view()
         if chosen is a_cal and view is not None:
             view.start_image_calibrate(self)
