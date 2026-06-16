@@ -465,3 +465,29 @@ def test_region_follows_wall_move(fp, scene, make_room):
     fp.rebuild_all_walls(scene)
     after = room.path.boundingRect().x()
     assert after - before == pytest.approx(60, abs=6)
+
+
+# -- memoized refresh: room re-detected only when its walls change ------------
+def test_room_signature_tracks_relevant_walls(fp, scene, make_room):
+    room = make_room(scene, 0, 0, 120, 120, "Den")
+    sig0 = fp.room_signature(scene, room)
+    assert sig0 is not None
+    # a wall far from the room must NOT change its signature (so it's skipped)
+    scene.addItem(fp.WallItem(QPointF(600, 600), QPointF(700, 600), "interior"))
+    assert fp.room_signature(scene, room) == sig0
+    # moving one of the room's own walls MUST change it (so it re-detects)
+    w = room.walls[0]
+    w.p1 = QPointF(w.p1.x(), w.p1.y() + 6)
+    w.p2 = QPointF(w.p2.x(), w.p2.y() + 6)
+    w.rebuild()
+    assert fp.room_signature(scene, room) != sig0
+
+
+def test_refresh_skips_when_nothing_changed(fp, scene, make_room):
+    room = make_room(scene, 0, 0, 120, 120, "Den")
+    fp.rebuild_all_walls(scene)                 # sets the room's signature
+    assert room._detect_sig is not None
+    area0 = room.area_sqft
+    # a no-op refresh keeps the room exactly as is
+    fp.refresh_rooms(scene)
+    assert room.area_sqft == area0

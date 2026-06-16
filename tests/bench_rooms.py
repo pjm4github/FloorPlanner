@@ -49,7 +49,7 @@ def build_grid(n, cell=120, off=120):
 
 
 def main():
-    print("grid  rooms  walls   rebuild_all_walls   per-room")
+    print("grid  rooms  walls   1st rebuild (all)   per-room")
     for n in (2, 3, 4, 5, 6):
         sc = build_grid(n)
         rooms = sum(1 for it in sc.items() if isinstance(it, FP.RoomItem))
@@ -59,6 +59,21 @@ def main():
         dt = (time.perf_counter() - t) * 1000
         print(f"{n}x{n}  {rooms:4d}  {walls:4d}   {dt:8.1f} ms       "
               f"{dt / max(rooms, 1):.2f} ms")
+
+    # memoized incremental refresh -- the realistic per-edit case
+    sc = build_grid(6)
+    FP.rebuild_all_walls(sc)                   # warm the per-room signatures
+    t = time.perf_counter()
+    FP.rebuild_all_walls(sc)
+    noop = (time.perf_counter() - t) * 1000
+    w = next(it for it in sc.items() if isinstance(it, FP.WallItem))
+    w.p1 = QPointF(w.p1.x() + 6, w.p1.y())     # nudge one wall
+    w.p2 = QPointF(w.p2.x() + 6, w.p2.y())
+    t = time.perf_counter()
+    FP.rebuild_all_walls(sc)
+    edit = (time.perf_counter() - t) * 1000
+    print(f"\n6x6 memoized:  no-op rebuild {noop:.1f} ms   "
+          f"after moving 1 wall {edit:.1f} ms")
 
     if "--profile" in sys.argv:
         import cProfile

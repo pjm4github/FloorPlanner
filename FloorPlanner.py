@@ -257,6 +257,7 @@ JOIN_TOL = 9.0            # endpoints within 9" join together
 MIN_WALL_LEN = 6.0
 WALL_PROJECT_STICK = 9.0  # stretch sticks within 9" of an orthogonal wall line
 WALL_PROJECT_NEAR = 48.0  # ...only when that wall actually passes within 4'
+ROOM_SIG_MARGIN = 18.0    # walls within 18" of a room's bbox can affect it
 
 
 def canvas_rect() -> QRectF:
@@ -1195,22 +1196,58 @@ def unique_room_name(scene, base: str, exclude=None) -> str:
     return f"{base} {n}"
 
 
-def refresh_rooms(scene):
-    """Re-detect every room's region + perimeter after walls change.
+def room_signature(scene, room):
+    """A hash of the walls that can affect `room`: every wall whose bbox is
+    within ROOM_SIG_MARGIN of the room's region bbox, with its geometry, type
+    and open-state.  Two equal signatures mean the room's detection is
+    unchanged, so it can be skipped.  Returns None for an open/undetected room
+    (whose flood escapes through a gap and so depends on far walls) -- those
+    are always re-detected."""
+    if any(w.is_open for w in room.walls):
+        return None
+    br = room.path.boundingRect()
+    if br.isNull():
+        return None
+    box = br.adjusted(-ROOM_SIG_MARGIN, -ROOM_SIG_MARGIN,
+                      ROOM_SIG_MARGIN, ROOM_SIG_MARGIN)
+    sig = []
+    for w in scene.items():
+        if not isinstance(w, WallItem):
+            continue
+        t = w.t
+        wb = QRectF(QPointF(min(w.p1.x(), w.p2.x()), min(w.p1.y(), w.p2.y())),
+                    QPointF(max(w.p1.x(), w.p2.x()), max(w.p1.y(), w.p2.y()))
+                    ).adjusted(-t, -t, t, t)
+        if wb.intersects(box):
+            sig.append((round(w.p1.x()), round(w.p1.y()),
+                        round(w.p2.x()), round(w.p2.y()),
+                        w.wall_type, w.is_open))
+    return tuple(sorted(sig))
 
-    When the stored anchor no longer falls inside the room (its walls
-    were moved or resized past it), probe points across the room's last
-    known region for its new extent and move the anchor (and label)
-    there — skipping any region that already belongs to another room."""
+
+def refresh_rooms(scene):
+    """Re-detect rooms after walls change -- but ONLY those whose defining
+    walls actually changed (memoized by room_signature), and skip the whole
+    grid/graph build when nothing is dirty.  An edit then recomputes just the
+    one or two rooms it touched, not every room on the canvas.
+
+    When a re-detected room's anchor no longer falls inside it, probe points
+    across the room's last known region for its new extent and move the anchor
+    there -- skipping any region that already belongs to another room."""
     if scene is None:
         return
     rooms = [it for it in scene.items() if isinstance(it, RoomItem)]
     if not rooms:
         return
-    # build the wall grid + planar graph ONCE and reuse them for every room
-    # (and probe point), instead of rebuilding both per room
-    grid, graph = _RoomGrid(scene), _WallGraph(scene)
+    dirty = []
     for it in rooms:
+        sig = room_signature(scene, it)
+        if sig is None or sig != it._detect_sig:
+            dirty.append(it)
+    if not dirty:
+        return                              # nothing relevant changed
+    grid, graph = _RoomGrid(scene), _WallGraph(scene)
+    for it in dirty:
         res = _detect_room(grid, graph, it.anchor)
         if res is None:
             others = [r for r in rooms if r is not it]
@@ -1233,6 +1270,7 @@ def refresh_rooms(scene):
             # re-affirm wall ownership against the new perimeter; settle=False
             # so we don't recurse back into rebuild_all_walls/refresh_rooms
             bind_room_walls(scene, it, settle=False)
+        it._detect_sig = room_signature(scene, it)   # remember for next time
 
 
 def _room_probe_points(room) -> list:
@@ -2067,6 +2105,7 @@ class RoomItem(QGraphicsItem):
         self.area_sqft = float(area_sqft)
         self.corners = [QPointF(c) for c in corners] if corners else None
         self.walls = []                  # WallItems this room owns (edge loop)
+        self._detect_sig = None          # memoize: walls that defined this room
         self._moving_room = False        # drag-the-name moves the whole room
         self._room_grab = QPointF(0.0, 0.0)
         self.show_dims = False
