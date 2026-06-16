@@ -174,7 +174,7 @@ so no system fonts are needed.
 |---|---|
 | Choose a tool | Toolbar icons or keys **S** E I D W R (Select / Exterior / Interior / Door / Window / Room) |
 | Zoom / pan | Mouse wheel / drag empty space (middle-drag anywhere) |
-| Draw a wall | Click-drag (Shift = free angle, Esc = cancel) |
+| Draw a wall | Click-drag (Shift = free angle, Esc = cancel). Drawing over a free same-type wall fuses them into one; room-owned walls are never fused |
 | Stretch / slide a wall | Drag its end / body in Select mode. A dragged end sticks to the projected line of a nearby orthogonal wall (so you can close a corner), grid-snaps otherwise, and never fuses to other walls |
 | Place a door or window | Tool 4 / 5, click a wall, enter WWHH size |
 | Name a room | Tool 6, click an enclosed area (one-shot; Ctrl-pick the tool to keep it) |

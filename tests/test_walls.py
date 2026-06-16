@@ -216,3 +216,47 @@ def test_stretch_does_not_fuse_to_a_parallel_endpoint(fp, scene):
     scene.addItem(fp.WallItem(QPointF(95, 0), QPointF(150, 0), "interior"))
     t = _stretch(fp, scene, 95)
     assert t.x() == pytest.approx(96)              # grid-snapped, not fused
+
+
+# -- wall fusion: collinear, coincident, overlapping, same type, both free ----
+def test_fuse_overlapping_same_type_free_walls(fp, scene):
+    a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    b = fp.WallItem(QPointF(60, 0), QPointF(200, 0), "interior")
+    scene.addItem(a)
+    scene.addItem(b)
+    fp.fuse_free_walls(scene, a)
+    walls = [it for it in scene.items() if isinstance(it, fp.WallItem)]
+    assert len(walls) == 1
+    assert (walls[0].p1.x(), walls[0].p2.x()) == pytest.approx((0, 200))
+
+
+def test_no_fuse_different_wall_types(fp, scene):
+    a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    scene.addItem(a)
+    scene.addItem(fp.WallItem(QPointF(60, 0), QPointF(200, 0), "exterior"))
+    fp.fuse_free_walls(scene, a)
+    assert len([it for it in scene.items()
+                if isinstance(it, fp.WallItem)]) == 2
+
+
+def test_no_fuse_room_owned_walls(fp, scene, make_room):
+    # a room's (party) wall must never be fused away -- so a copied room keeps
+    # its own duplicate boundary
+    room = make_room(scene, 0, 0, 120, 120, "Den")
+    rw = room.walls[0]
+    free = fp.WallItem(QPointF(rw.p1), QPointF(rw.p2), rw.wall_type)
+    scene.addItem(free)
+    fp.fuse_free_walls(scene, free)
+    assert rw in room.walls and rw.scene() is not None
+
+
+def test_fuse_carries_openings_across(fp, scene):
+    a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    b = fp.WallItem(QPointF(60, 0), QPointF(240, 0), "interior")
+    scene.addItem(a)
+    scene.addItem(b)
+    b.openings.append(fp.OpeningItem(b, "door", "3280", 150))
+    fp.fuse_free_walls(scene, a)
+    walls = [it for it in scene.items() if isinstance(it, fp.WallItem)]
+    assert len(walls) == 1
+    assert len(walls[0].openings) == 1 and walls[0].openings[0].kind == "door"

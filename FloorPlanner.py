@@ -909,6 +909,52 @@ def coincident_walls(scene, wall, index=None):
     return out
 
 
+def fuse_free_walls(scene, wall):
+    """Fuse `wall` with any collinear, coincident, overlapping walls of the
+    SAME type into one, growing it to the union span and carrying their
+    openings across.  Only fuses FREE walls (room is None): room-owned party
+    walls are never fused, so a copied room keeps its own duplicate boundary
+    and different-type walls stay separate.  Returns `wall`."""
+    if (scene is None or wall.scene() is None or wall.is_open
+            or wall.room is not None or wall.length() < 1e-6):
+        return wall
+    absorbed = [w for w in coincident_walls(scene, wall)
+                if w.room is None and not w.is_open
+                and w.wall_type == wall.wall_type and w.length() > 1e-6]
+    if not absorbed:
+        return wall
+    origin, u = QPointF(wall.p1), wall.unit()
+    ux, uy = u.x(), u.y()
+
+    def s_of(p):
+        return (p.x() - origin.x()) * ux + (p.y() - origin.y()) * uy
+
+    ss = [0.0, s_of(wall.p2)]
+    moved_ops = []                       # (kind, code, scene_pt, door_type, swing)
+    for w in absorbed:
+        ss += [s_of(w.p1), s_of(w.p2)]
+        for op in w.openings:
+            moved_ops.append((op.kind, op.code, w.point_at(op.s),
+                              op.door_type, op.swing))
+        scene.removeItem(w)
+    smin, smax = min(ss), max(ss)
+    wall.p1 = QPointF(origin.x() + ux * smin, origin.y() + uy * smin)
+    wall.p2 = QPointF(origin.x() + ux * smax, origin.y() + uy * smax)
+    for op in wall.openings:             # own openings ride the new p1
+        op.s -= smin
+    np1 = wall.p1
+    for kind, code, pt, dtype, swing in moved_ops:
+        s = (pt.x() - np1.x()) * ux + (pt.y() - np1.y()) * uy
+        try:
+            op = OpeningItem(wall, kind, code, s)
+        except ValueError:
+            continue
+        op.door_type, op.swing = dtype, swing
+        wall.openings.append(op)
+    wall.rebuild()
+    return wall
+
+
 def wall_endpoint_open(scene, p: QPointF, ignore=()) -> bool:
     """True when `p` is a free, dangling wall end: no other (non-open) wall has
     an endpoint within JOIN_TOL of it.  Walls in `ignore` are skipped (the
@@ -1711,6 +1757,8 @@ class WallItem(QGraphicsItem):
             corner_drag = endpoint_edit and self.room is not None
             if not endpoint_edit:
                 self.join_endpoints()
+            elif self.room is None:          # stretched a free wall: fuse if it
+                fuse_free_walls(self.scene(), self)   # now overlaps a same-type
             rebuild_all_walls(self.scene())
             # dragging a corner back so the room is fully walled again fuses
             # the wall back in: re-lock its corners (right-click to detach
@@ -4681,9 +4729,10 @@ class PlanView(QGraphicsView):
             if w.length() < MIN_WALL_LEN:
                 self.scene().removeItem(w)
             else:
-                # the drawn endpoint is already aligned to the nearest
-                # orthogonal wall; do NOT fuse or grow walls to meet -- any
-                # gap is left for the user to extend to manually
+                # the drawn ENDPOINT is left where it is (aligned to the
+                # nearest orthogonal wall's line; gaps are closed by hand) --
+                # but a wall that OVERLAPS a free same-type wall fuses into one
+                fuse_free_walls(self.scene(), w)
                 rebuild_all_walls(self.scene())
             e.accept()
             return
