@@ -779,7 +779,64 @@ def axis_wall_intersection(target, anchor: QPointF, through: QPointF):
     return QPointF(target.p1.x() + wx * s, target.p1.y() + wy * s)
 
 
-def coincident_walls(scene, wall):
+class _WallIndex:
+    """Per-rebuild spatial cache so each wall's rebuild() is O(local) instead
+    of O(all walls): an endpoint hash (joined corners) + per-line buckets
+    (coincident party walls).  Built once by rebuild_all_walls and passed to
+    every wall; the exact predicates are unchanged, the index just narrows the
+    candidate set to a guaranteed superset."""
+
+    EP = 4.0          # endpoint hash cell (>> the 0.6" join tolerance)
+    OFF = 3.0         # line-offset bucket (>> the 1.5" coincidence tolerance)
+
+    def __init__(self, scene):
+        self.eps = {}            # (i, j) -> [(wall, x, y)]
+        self.hb = {}             # round(y/OFF) -> [horizontal walls]
+        self.vb = {}             # round(x/OFF) -> [vertical walls]
+        self.diag = []           # non-axis-aligned real walls (rare)
+        for w in (scene.items() if scene is not None else []):
+            if not isinstance(w, WallItem):
+                continue
+            for p in (w.p1, w.p2):
+                self.eps.setdefault((round(p.x() / self.EP),
+                                     round(p.y() / self.EP)), []).append(
+                    (w, p.x(), p.y()))
+            if w.is_open or w.length() < 1e-6:
+                continue
+            u = w.unit()
+            if abs(u.y()) < 1e-4:
+                self.hb.setdefault(round(w.p1.y() / self.OFF), []).append(w)
+            elif abs(u.x()) < 1e-4:
+                self.vb.setdefault(round(w.p1.x() / self.OFF), []).append(w)
+            else:
+                self.diag.append(w)
+
+    def joined_at(self, p, exclude) -> bool:
+        px, py = p.x(), p.y()
+        ki, kj = round(px / self.EP), round(py / self.EP)
+        for di in (-1, 0, 1):
+            for dj in (-1, 0, 1):
+                for w, qx, qy in self.eps.get((ki + di, kj + dj), ()):
+                    if w is not exclude and (qx - px) ** 2 + (qy - py) ** 2 \
+                            < 0.36:
+                        return True
+        return False
+
+    def coincident_candidates(self, wall):
+        u = wall.unit()
+        if abs(u.y()) < 1e-4:                          # horizontal query
+            b = round(wall.p1.y() / self.OFF)
+            return [w for d in (-1, 0, 1) for w in self.hb.get(b + d, ())] \
+                + self.diag
+        if abs(u.x()) < 1e-4:                          # vertical query
+            b = round(wall.p1.x() / self.OFF)
+            return [w for d in (-1, 0, 1) for w in self.vb.get(b + d, ())] \
+                + self.diag
+        return ([w for ws in self.hb.values() for w in ws]   # diagonal: rare
+                + [w for ws in self.vb.values() for w in ws] + self.diag)
+
+
+def coincident_walls(scene, wall, index=None):
     """Real walls that lie on the same line as `wall` and overlap its span --
     the duplicate party walls created when adjacent rooms each own their own
     wall on a shared boundary.  Used so a plain wall opens for the door or
@@ -789,7 +846,9 @@ def coincident_walls(scene, wall):
     u = wall.unit()
     length = wall.length()
     out = []
-    for w in scene.items():
+    cands = (index.coincident_candidates(wall) if index is not None
+             else scene.items())
+    for w in cands:
         if not isinstance(w, WallItem) or w is wall or w.is_open \
                 or w.length() < 1e-6:
             continue
@@ -1158,9 +1217,10 @@ def _room_probe_points(room) -> list:
 def rebuild_all_walls(scene):
     if scene is None:
         return
-    for it in list(scene.items()):
+    index = _WallIndex(scene)                # shared: rebuild is O(local), not
+    for it in list(scene.items()):           # O(all walls) per wall
         if isinstance(it, WallItem):
-            it.rebuild(cascade=False)        # every wall is rebuilt anyway
+            it.rebuild(cascade=False, index=index)
     refresh_rooms(scene)
 
 
@@ -1232,8 +1292,10 @@ class WallItem(QGraphicsItem):
         return max(0.0, min(self.length(), s))
 
     # -- geometry cache ------------------------------------------------------
-    def _joined_at(self, p: QPointF) -> bool:
+    def _joined_at(self, p: QPointF, index=None) -> bool:
         """True when another wall shares (within 1/2") this endpoint."""
+        if index is not None:
+            return index.joined_at(p, self)
         sc = self.scene()
         if sc is None:
             return False
@@ -1244,7 +1306,7 @@ class WallItem(QGraphicsItem):
                     return True
         return False
 
-    def rebuild(self, cascade=True):
+    def rebuild(self, cascade=True, index=None):
         """Recompute the painted path (with openings cut out) and hit shape.
 
         When `cascade`, also rebuild any coincident party walls so they reopen
@@ -1254,8 +1316,8 @@ class WallItem(QGraphicsItem):
         length, t, ang = self.length(), self.t, self.angle_rad()
 
         # extend joined ends by half a thickness so corners fill in solid
-        ext1 = t * 0.5 if self._joined_at(self.p1) else 0.0
-        ext2 = t * 0.5 if self._joined_at(self.p2) else 0.0
+        ext1 = t * 0.5 if self._joined_at(self.p1, index) else 0.0
+        ext2 = t * 0.5 if self._joined_at(self.p2, index) else 0.0
 
         body = QPainterPath()
         body.addRect(QRectF(-ext1, -t / 2, length + ext1 + ext2, t))
@@ -1268,7 +1330,7 @@ class WallItem(QGraphicsItem):
         # plain party wall doesn't cover the opening on the wall next to it
         if not self.is_open:
             u = self.unit()
-            for w in coincident_walls(self.scene(), self):
+            for w in coincident_walls(self.scene(), self, index):
                 for op in w.openings:
                     p = w.point_at(op.s)
                     sl = ((p.x() - self.p1.x()) * u.x()
