@@ -197,6 +197,7 @@ from PyQt6.QtWidgets import (
     QFormLayout,
     QGraphicsItem,
     QGraphicsItemGroup,
+    QGraphicsPathItem,
     QGraphicsScene,
     QGraphicsView,
     QHBoxLayout,
@@ -2819,6 +2820,52 @@ class SettingsDialog(QDialog):
         SETTINGS["cost_per_sqft"] = float(self.sp_cost.value())
 
 
+class ImageImportDialog(QDialog):
+    """File > Import from image…: scale + detection settings for turning a
+    raster floor-plan PNG into walls."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Import plan from image")
+        form = QFormLayout(self)
+
+        self.sp_width = QDoubleSpinBox()
+        self.sp_width.setRange(1.0, 2000.0)
+        self.sp_width.setDecimals(1)
+        self.sp_width.setSuffix(" ft")
+        self.sp_width.setValue(40.0)
+        form.addRow("Real width of the drawing", self.sp_width)
+
+        self.sp_merge = QDoubleSpinBox()
+        self.sp_merge.setRange(1.0, 200.0)
+        self.sp_merge.setDecimals(0)
+        self.sp_merge.setSuffix(" px")
+        self.sp_merge.setValue(3.0)
+        form.addRow("Merge double-line walls within", self.sp_merge)
+
+        self.sp_thresh = QDoubleSpinBox()
+        self.sp_thresh.setRange(1.0, 254.0)
+        self.sp_thresh.setDecimals(0)
+        self.sp_thresh.setValue(128.0)
+        form.addRow("Wall darkness threshold (0–255)", self.sp_thresh)
+
+        note = QLabel("Best on clean, axis-aligned plans (dark walls on a "
+                      "light background).\nThe detected walls preview in blue "
+                      "before you add them.")
+        note.setStyleSheet("color: #666;")
+        form.addRow(note)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        form.addRow(buttons)
+
+    def values(self):
+        return (float(self.sp_width.value()), int(self.sp_merge.value()),
+                int(self.sp_thresh.value()))
+
+
 class AIPricingDialog(QDialog):
     """AI ▸ Update furnishing prices…: choose an AI system, edit the prompt,
     and fetch up-to-date purchase prices for the whole furnishing catalog.
@@ -4632,6 +4679,9 @@ class MainWindow(QMainWindow):
         a_imp = QAction("&Import rooms from CSV…", self)
         a_imp.triggered.connect(self.import_rooms_csv)
         m_file.addAction(a_imp)
+        a_img = QAction("Import from i&mage (PNG)…", self)
+        a_img.triggered.connect(lambda: self.import_from_image())
+        m_file.addAction(a_img)
         a_exp = QAction("&Export rooms to CSV…", self)
         a_exp.triggered.connect(self.export_rooms_csv)
         m_file.addAction(a_exp)
@@ -5580,6 +5630,88 @@ class MainWindow(QMainWindow):
             "CSV files (*.csv);;All files (*)")
         if path:
             self._import_rooms(path)
+
+    # -- import a plan from a PNG image (preview -> accept) -------------------
+    def import_from_image(self, path=None, *, width_ft=40.0, merge=3,
+                          threshold=128, wall_type="exterior",
+                          interactive=True):
+        """File > Import from image: detect walls in a raster floor plan, show
+        them as a blue ghost overlay, and add them on accept.  Pass
+        interactive=False (with explicit params) to run headlessly."""
+        if interactive and path is None:
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Import plan from image", "",
+                "Images (*.png *.jpg *.jpeg *.bmp);;All files (*)")
+            if not path:
+                return None
+            dlg = ImageImportDialog(self)
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return None
+            width_ft, merge, threshold = dlg.values()
+        try:
+            import fp_extract
+            gray = fp_extract.load_gray(path)
+            h, w = gray.shape
+            walls_px = fp_extract.detect_walls(gray, threshold, 24, merge, 40)
+            segs = fp_extract.scene_segments(walls_px, w, h, width_ft=width_ft)
+        except Exception as ex:                       # noqa: BLE001
+            if interactive:
+                QMessageBox.critical(self, "Import failed", str(ex))
+            return None
+        if not segs:
+            if interactive:
+                QMessageBox.information(
+                    self, "Import from image",
+                    "No walls detected.  Try a cleaner image or adjust the "
+                    "threshold / merge settings.")
+            return None
+
+        self._show_wall_ghost(segs)
+        if interactive:
+            ok = QMessageBox.question(
+                self, "Import from image",
+                f"Detected {len(segs)} wall(s), shown in blue on the canvas.\n"
+                "Add them to the plan?") == QMessageBox.StandardButton.Yes
+            self._clear_wall_ghost()
+            if not ok:
+                return None
+        else:
+            self._clear_wall_ghost()
+
+        for x0, y0, x1, y1 in segs:
+            self.scene.addItem(
+                WallItem(QPointF(x0, y0), QPointF(x1, y1), wall_type))
+        rebuild_all_walls(self.scene)
+        self._update_totals()
+        self._commit_if_changed()
+        self.status(f"Imported {len(segs)} wall(s) from {os.path.basename(path)}"
+                    " — click an enclosed area with the Room tool to name it.")
+        return len(segs)
+
+    def _show_wall_ghost(self, segs):
+        """Draw the candidate walls as a translucent blue overlay and fit the
+        view to them so the user can preview before accepting."""
+        self._clear_wall_ghost()
+        path = QPainterPath()
+        for x0, y0, x1, y1 in segs:
+            path.moveTo(QPointF(x0, y0))
+            path.lineTo(QPointF(x1, y1))
+        item = QGraphicsPathItem(path)
+        pen = QPen(QColor(37, 99, 235, 170), 6.0)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        item.setPen(pen)
+        item.setZValue(1_000_000)                     # above everything
+        self.scene.addItem(item)
+        self._wall_ghost = item
+        self.view.fitInView(item.boundingRect().adjusted(-24, -24, 24, 24),
+                            Qt.AspectRatioMode.KeepAspectRatio)
+
+    def _clear_wall_ghost(self):
+        item = getattr(self, "_wall_ghost", None)
+        if item is not None:
+            if item.scene() is not None:
+                self.scene.removeItem(item)
+            self._wall_ghost = None
 
     def _import_rooms(self, path: str, interactive: bool = True):
         """Create walled rooms from a CSV with the columns

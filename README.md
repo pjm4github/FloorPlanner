@@ -233,6 +233,30 @@ button) opens a non-modal recorder: click **Start**, interact with the plan
 actions are written as macro tokens you can edit; select any portion and
 **Replay** it, or **Save As…** a `.fpm` file to run later with `fp_macro.py`.
 
+## Import a plan from a PNG
+
+FloorPlanner can vectorise a raster floor-plan image into walls. It reads the
+PNG (via `QImage`), detects the horizontal/vertical **wall** lines with numpy,
+and scales pixels to inches — no OpenCV/Pillow needed.
+
+**In the app:** **File ▸ Import from image (PNG)…** asks for the drawing's real
+width, detects the walls and shows them as a **blue ghost overlay** on the
+canvas; click **Yes** to add them or **No** to discard — a preview-before-commit
+step, since detection quality tracks input quality.
+
+**From the command line:** `fp_extract.py` writes a `floorplanner-json` file
+(and an optional preview PNG):
+
+```bash
+python fp_extract.py --in plan.png --out plan.json --width-ft 40 --png out.png
+```
+
+Both target **clean, axis-aligned** line drawings (CAD exports, app
+screenshots): dark walls on a light background. After importing, name rooms
+(the app detects enclosed areas) and add doors/windows/furniture. Scale comes
+from the real width (or `--px-per-ft`); double-line walls collapse with
+`--merge <px>`. Diagonal walls and photos/scans are out of scope.
+
 ## Asset pipeline
 
 All SVG artwork (toolbar icons, furnishing symbols, `manifest.json`,
