@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Performance
 
-- Room detection is the editor hot path: `rebuild_all_walls` → `refresh_rooms` re-detects every room after any wall edit. Build the shared `_RoomGrid` (wall rasterization) and `_WallGraph` (centreline planar graph) **once per pass** and reuse them for all rooms — never per room (that was O(rooms × walls²)). `tests/bench_rooms.py` measures it (`python tests/bench_rooms.py --profile`).
+- Room detection is the editor hot path: `rebuild_all_walls` → `refresh_rooms`. Three layers keep it fast (≈50–100× vs the original, cost scaling with the edit not the plan): (1) build the shared `_RoomGrid` + `_WallGraph` **once per pass**, not per room; (2) `rebuild` takes a shared `_WallIndex` so `coincident_walls`/`_joined_at` are O(local); (3) `refresh_rooms` is **memoized** — `room_signature()` (via a `_WallBBoxIndex`) re-detects only rooms whose nearby walls changed, skipping the grid/graph build when nothing is dirty. Don't memoize the wall *path* build — profiled as already cheap; the cost is the neighbour queries. `tests/bench_rooms.py` measures it.
 
 ## Linting
 

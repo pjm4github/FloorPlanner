@@ -1242,7 +1242,47 @@ def unique_room_name(scene, base: str, exclude=None) -> str:
     return f"{base} {n}"
 
 
-def room_signature(scene, room):
+def wall_bbox(w) -> QRectF:
+    """A wall's scene bbox padded by its thickness."""
+    t = w.t
+    return QRectF(QPointF(min(w.p1.x(), w.p2.x()), min(w.p1.y(), w.p2.y())),
+                  QPointF(max(w.p1.x(), w.p2.x()), max(w.p1.y(), w.p2.y()))
+                  ).adjusted(-t, -t, t, t)
+
+
+class _WallBBoxIndex:
+    """Walls hashed by bbox cells so 'which walls are near this box' is
+    O(local) -- used by the memoized room dirty-check instead of scanning every
+    wall per room."""
+
+    CELL = 60.0          # 5 ft cells
+
+    def __init__(self, scene):
+        self.cells = {}
+        for w in (scene.items() if scene is not None else []):
+            if not isinstance(w, WallItem):
+                continue
+            wb = wall_bbox(w)
+            for i in range(int(wb.left() / self.CELL),
+                           int(wb.right() / self.CELL) + 1):
+                for j in range(int(wb.top() / self.CELL),
+                               int(wb.bottom() / self.CELL) + 1):
+                    self.cells.setdefault((i, j), []).append((w, wb))
+
+    def near(self, box):
+        seen, out = set(), []
+        for i in range(int(box.left() / self.CELL),
+                       int(box.right() / self.CELL) + 1):
+            for j in range(int(box.top() / self.CELL),
+                           int(box.bottom() / self.CELL) + 1):
+                for w, wb in self.cells.get((i, j), ()):
+                    if id(w) not in seen and wb.intersects(box):
+                        seen.add(id(w))
+                        out.append(w)
+        return out
+
+
+def room_signature(scene, room, wall_index=None):
     """A hash of the walls that can affect `room`: every wall whose bbox is
     within ROOM_SIG_MARGIN of the room's region bbox, with its geometry, type
     and open-state.  Two equal signatures mean the room's detection is
@@ -1256,18 +1296,11 @@ def room_signature(scene, room):
         return None
     box = br.adjusted(-ROOM_SIG_MARGIN, -ROOM_SIG_MARGIN,
                       ROOM_SIG_MARGIN, ROOM_SIG_MARGIN)
-    sig = []
-    for w in scene.items():
-        if not isinstance(w, WallItem):
-            continue
-        t = w.t
-        wb = QRectF(QPointF(min(w.p1.x(), w.p2.x()), min(w.p1.y(), w.p2.y())),
-                    QPointF(max(w.p1.x(), w.p2.x()), max(w.p1.y(), w.p2.y()))
-                    ).adjusted(-t, -t, t, t)
-        if wb.intersects(box):
-            sig.append((round(w.p1.x()), round(w.p1.y()),
-                        round(w.p2.x()), round(w.p2.y()),
-                        w.wall_type, w.is_open))
+    near = (wall_index.near(box) if wall_index is not None
+            else [w for w in scene.items() if isinstance(w, WallItem)
+                  and wall_bbox(w).intersects(box)])
+    sig = [(round(w.p1.x()), round(w.p1.y()), round(w.p2.x()), round(w.p2.y()),
+            w.wall_type, w.is_open) for w in near]
     return tuple(sorted(sig))
 
 
@@ -1285,9 +1318,10 @@ def refresh_rooms(scene):
     rooms = [it for it in scene.items() if isinstance(it, RoomItem)]
     if not rooms:
         return
+    wall_index = _WallBBoxIndex(scene)      # O(local) 'walls near this room'
     dirty = []
     for it in rooms:
-        sig = room_signature(scene, it)
+        sig = room_signature(scene, it, wall_index)
         if sig is None or sig != it._detect_sig:
             dirty.append(it)
     if not dirty:

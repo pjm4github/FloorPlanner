@@ -491,3 +491,10 @@ def test_refresh_skips_when_nothing_changed(fp, scene, make_room):
     # a no-op refresh keeps the room exactly as is
     fp.refresh_rooms(scene)
     assert room.area_sqft == area0
+
+
+def test_room_signature_index_matches_full_scan(fp, scene, make_room):
+    room = make_room(scene, 0, 0, 120, 120, "Den")
+    scene.addItem(fp.WallItem(QPointF(400, 0), QPointF(500, 0), "interior"))
+    idx = fp._WallBBoxIndex(scene)
+    assert fp.room_signature(scene, room, idx) == fp.room_signature(scene, room)
