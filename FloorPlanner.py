@@ -824,82 +824,97 @@ def wall_endpoint_open(scene, p: QPointF, ignore=()) -> bool:
     return True
 
 
-def detect_room_region(scene, p: QPointF):
-    """Flood-fill the empty space around `p`, bounded by wall bodies.
+class _RoomGrid:
+    """All non-open walls rasterised (solid, openings ignored) onto a flood-
+    fill grid over the canvas.  Built ONCE so many room regions can be located
+    against the same grid -- refresh_rooms re-detects every room from one grid
+    instead of rebuilding it per room (the old O(rooms x walls) cost)."""
 
-    Walls are rasterised (solid, ignoring door/window openings) onto a
-    ROOM_CELL grid covering the canvas.  Returns (QPainterPath, area_sqft)
-    in scene coords, or None when `p` is not inside an enclosed region
-    (the fill escapes to the canvas edge) or sits on a wall."""
-    canvas = canvas_rect()
-    if scene is None or not canvas.contains(p):
-        return None
-    walls = [it for it in scene.items()
-             if isinstance(it, WallItem) and not it.is_open]
-    if not walls:
-        return None
-
-    cell = ROOM_CELL
-    x0, y0 = canvas.left(), canvas.top()
-    nx, ny = int(canvas.width() / cell), int(canvas.height() / cell)
-    blocked = bytearray(nx * ny)
-    for w in walls:
-        length = w.length()
-        if length < 1e-6:
-            continue
-        u = w.unit()
-        half = w.t * 0.5 + cell * 0.5
-        i0 = max(0, int((min(w.p1.x(), w.p2.x()) - half - x0) / cell))
-        i1 = min(nx - 1, int((max(w.p1.x(), w.p2.x()) + half - x0) / cell))
-        j0 = max(0, int((min(w.p1.y(), w.p2.y()) - half - y0) / cell))
-        j1 = min(ny - 1, int((max(w.p1.y(), w.p2.y()) + half - y0) / cell))
-        for j in range(j0, j1 + 1):
-            cy = y0 + (j + 0.5) * cell
-            for i in range(i0, i1 + 1):
-                cx = x0 + (i + 0.5) * cell
-                dx, dy = cx - w.p1.x(), cy - w.p1.y()
-                s = dx * u.x() + dy * u.y()
-                if -half <= s <= length + half:
-                    if abs(dy * u.x() - dx * u.y()) <= half:
-                        blocked[j * nx + i] = 1
-
-    si, sj = int((p.x() - x0) / cell), int((p.y() - y0) / cell)
-    if not (0 <= si < nx and 0 <= sj < ny) or blocked[sj * nx + si]:
-        return None
-
-    seen = bytearray(nx * ny)
-    seen[sj * nx + si] = 1
-    queue = deque([(si, sj)])
-    cells = []
-    while queue:
-        i, j = queue.popleft()
-        if i == 0 or j == 0 or i == nx - 1 or j == ny - 1:
-            return None                     # leaked out -> not enclosed
-        cells.append((i, j))
-        for a, b in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
-            k = b * nx + a
-            if not seen[k] and not blocked[k]:
-                seen[k] = 1
-                queue.append((a, b))
-
-    # merge filled cells into per-row rect runs, then into a clean outline
-    rows = {}
-    for i, j in cells:
-        rows.setdefault(j, []).append(i)
-    path = QPainterPath()
-    for j, cols in rows.items():
-        cols.sort()
-        start = prev = cols[0]
-        for i in cols[1:] + [None]:
-            if i is not None and i == prev + 1:
-                prev = i
+    def __init__(self, scene):
+        canvas = canvas_rect()
+        self.canvas = canvas
+        self.cell = cell = ROOM_CELL
+        self.x0, self.y0 = x0, y0 = canvas.left(), canvas.top()
+        self.nx = nx = int(canvas.width() / cell)
+        self.ny = ny = int(canvas.height() / cell)
+        self.blocked = blocked = bytearray(nx * ny)
+        self.has_walls = False
+        if scene is None:
+            return
+        for w in scene.items():
+            if not isinstance(w, WallItem) or w.is_open:
                 continue
-            path.addRect(QRectF(x0 + start * cell, y0 + j * cell,
-                                (prev - start + 1) * cell, cell))
-            if i is not None:
-                start = prev = i
-    area_sqft = len(cells) * cell * cell / 144.0
-    return path.simplified(), area_sqft
+            length = w.length()
+            if length < 1e-6:
+                continue
+            self.has_walls = True
+            u = w.unit()
+            ux, uy = u.x(), u.y()
+            p1x, p1y = w.p1.x(), w.p1.y()
+            p2x, p2y = w.p2.x(), w.p2.y()
+            half = w.t * 0.5 + cell * 0.5
+            i0 = max(0, int((min(p1x, p2x) - half - x0) / cell))
+            i1 = min(nx - 1, int((max(p1x, p2x) + half - x0) / cell))
+            j0 = max(0, int((min(p1y, p2y) - half - y0) / cell))
+            j1 = min(ny - 1, int((max(p1y, p2y) + half - y0) / cell))
+            for j in range(j0, j1 + 1):
+                cy = y0 + (j + 0.5) * cell
+                row = j * nx
+                for i in range(i0, i1 + 1):
+                    cx = x0 + (i + 0.5) * cell
+                    dx, dy = cx - p1x, cy - p1y
+                    s = dx * ux + dy * uy
+                    if -half <= s <= length + half \
+                            and abs(dy * ux - dx * uy) <= half:
+                        blocked[row + i] = 1
+
+    def region(self, p: QPointF):
+        """(QPainterPath, area_sqft) for the enclosed region containing `p`, or
+        None when it leaks to the canvas edge or `p` sits on a wall."""
+        if not self.has_walls or not self.canvas.contains(p):
+            return None
+        cell, x0, y0 = self.cell, self.x0, self.y0
+        nx, ny, blocked = self.nx, self.ny, self.blocked
+        si, sj = int((p.x() - x0) / cell), int((p.y() - y0) / cell)
+        if not (0 <= si < nx and 0 <= sj < ny) or blocked[sj * nx + si]:
+            return None
+        seen = bytearray(nx * ny)
+        seen[sj * nx + si] = 1
+        queue = deque([(si, sj)])
+        cells = []
+        while queue:
+            i, j = queue.popleft()
+            if i == 0 or j == 0 or i == nx - 1 or j == ny - 1:
+                return None                 # leaked out -> not enclosed
+            cells.append((i, j))
+            for a, b in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
+                k = b * nx + a
+                if not seen[k] and not blocked[k]:
+                    seen[k] = 1
+                    queue.append((a, b))
+        rows = {}
+        for i, j in cells:
+            rows.setdefault(j, []).append(i)
+        path = QPainterPath()
+        for j, cols in rows.items():
+            cols.sort()
+            start = prev = cols[0]
+            for i in cols[1:] + [None]:
+                if i is not None and i == prev + 1:
+                    prev = i
+                    continue
+                path.addRect(QRectF(x0 + start * cell, y0 + j * cell,
+                                    (prev - start + 1) * cell, cell))
+                if i is not None:
+                    start = prev = i
+        area_sqft = len(cells) * cell * cell / 144.0
+        return path.simplified(), area_sqft
+
+
+def detect_room_region(scene, p: QPointF):
+    """Flood-fill the empty space around `p`, bounded by wall bodies.  Returns
+    (QPainterPath, area_sqft) in scene coords, or None.  See _RoomGrid."""
+    return _RoomGrid(scene).region(p)
 
 
 def poly_area_sqft(corners) -> float:
@@ -912,125 +927,152 @@ def poly_area_sqft(corners) -> float:
     return abs(a2) / 2.0 / 144.0
 
 
-def trace_room_perimeter(scene, anchor: QPointF):
-    """Polygon of wall-CENTRELINE corners enclosing `anchor`.
+class _WallGraph:
+    """Planar graph of wall centrelines, split where walls join (corner/T) or
+    cross.  Built ONCE so the enclosing face around many anchors can be walked
+    against the same graph (refresh_rooms traces every room from one graph).
 
-    Every centreline is split where other walls join it (corner or T) or
-    cross it, giving a planar graph.  Starting from the edge a +x ray from
-    `anchor` hits first, the graph is walked keeping the room on the left,
-    which extracts the enclosing face.  Returns the corner QPointFs in
-    order (pass-through T-nodes on straight runs dropped) or None when no
-    closed loop surrounds the anchor."""
-    if scene is None:
-        return None
-    walls = [it for it in scene.items()
-             if isinstance(it, WallItem) and not it.is_open
-             and it.length() > 1e-6]
-    if not walls:
-        return None
+    The O(walls^2) split-finding caches endpoints as floats to avoid millions
+    of QPointF.x()/.y() calls."""
 
-    nodes = []
+    def __init__(self, scene):
+        self.nodes = []           # QPointF per node
+        self.edges = set()
+        self.adj = {}
+        walls = [it for it in (scene.items() if scene is not None else [])
+                 if isinstance(it, WallItem) and not it.is_open
+                 and it.length() > 1e-6]
+        if not walls:
+            return
+        segs = []                 # (length, ux, uy, p1x, p1y, p2x, p2y)
+        for w in walls:
+            length, u = w.length(), w.unit()
+            segs.append((length, u.x(), u.y(),
+                         w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()))
+        nc = []                   # node coords (x, y) parallel to self.nodes
+        nodes, edges = self.nodes, self.edges
 
-    def node_id(p: QPointF) -> int:
-        for k, q in enumerate(nodes):
-            if abs(q.x() - p.x()) <= 0.6 and abs(q.y() - p.y()) <= 0.6:
-                return k
-        nodes.append(QPointF(p))
-        return len(nodes) - 1
+        def node_id(px, py):
+            for k, (qx, qy) in enumerate(nc):
+                if abs(qx - px) <= 0.6 and abs(qy - py) <= 0.6:
+                    return k
+            nc.append((px, py))
+            nodes.append(QPointF(px, py))
+            return len(nc) - 1
 
-    edges = set()
-    for i, w in enumerate(walls):
-        length, u = w.length(), w.unit()
-        splits = {0.0, length}
-        d1x, d1y = w.p2.x() - w.p1.x(), w.p2.y() - w.p1.y()
-        for j, w2 in enumerate(walls):
-            if i == j:
-                continue
-            for q in (w2.p1, w2.p2):      # T: endpoint fused onto our body
-                vx, vy = q.x() - w.p1.x(), q.y() - w.p1.y()
-                s = vx * u.x() + vy * u.y()
-                if 0.5 < s < length - 0.5 and abs(vy * u.x() - vx * u.y()) <= 0.75:
-                    splits.add(s)
-            d2x, d2y = w2.p2.x() - w2.p1.x(), w2.p2.y() - w2.p1.y()
-            den = d1x * d2y - d1y * d2x   # X: true segment crossing
-            if abs(den) > 1e-9:
-                ex, ey = w2.p1.x() - w.p1.x(), w2.p1.y() - w.p1.y()
-                t1 = (ex * d2y - ey * d2x) / den
-                t2 = (ex * d1y - ey * d1x) / den
-                if 0.0 <= t1 <= 1.0 and 0.0 <= t2 <= 1.0:
-                    s = t1 * length
-                    if 0.5 < s < length - 0.5:
+        for i, (length, ux, uy, p1x, p1y, p2x, p2y) in enumerate(segs):
+            splits = {0.0, length}
+            d1x, d1y = p2x - p1x, p2y - p1y
+            for j, (_l2, _u2x, _u2y, q1x, q1y, q2x, q2y) in enumerate(segs):
+                if i == j:
+                    continue
+                for qx, qy in ((q1x, q1y), (q2x, q2y)):   # T: endpoint on body
+                    vx, vy = qx - p1x, qy - p1y
+                    s = vx * ux + vy * uy
+                    if 0.5 < s < length - 0.5 \
+                            and abs(vy * ux - vx * uy) <= 0.75:
                         splits.add(s)
-        ss = sorted(splits)
-        for a, b in zip(ss, ss[1:], strict=False):
-            if b - a < 0.5:
+                d2x, d2y = q2x - q1x, q2y - q1y           # X: true crossing
+                den = d1x * d2y - d1y * d2x
+                if abs(den) > 1e-9:
+                    ex, ey = q1x - p1x, q1y - p1y
+                    t1 = (ex * d2y - ey * d2x) / den
+                    t2 = (ex * d1y - ey * d1x) / den
+                    if 0.0 <= t1 <= 1.0 and 0.0 <= t2 <= 1.0:
+                        s = t1 * length
+                        if 0.5 < s < length - 0.5:
+                            splits.add(s)
+            ss = sorted(splits)
+            for a, b in zip(ss, ss[1:], strict=False):
+                if b - a < 0.5:
+                    continue
+                na = node_id(p1x + a * ux, p1y + a * uy)
+                nb = node_id(p1x + b * ux, p1y + b * uy)
+                if na != nb:
+                    edges.add((min(na, nb), max(na, nb)))
+        for a, b in edges:
+            self.adj.setdefault(a, []).append(b)
+            self.adj.setdefault(b, []).append(a)
+
+    def face(self, anchor: QPointF):
+        """Corner QPointFs of the enclosing face around `anchor`, or None."""
+        nodes, edges, adj = self.nodes, self.edges, self.adj
+        if not edges:
+            return None
+        # +x ray from the anchor: the nearest crossing edge, oriented with the
+        # anchor on its left, starts the face walk
+        ax, ay = anchor.x(), anchor.y()
+        start, best_x = None, None
+        for a, b in edges:
+            pa, pb = nodes[a], nodes[b]
+            if (pa.y() > ay) == (pb.y() > ay):
                 continue
-            na, nb = node_id(w.point_at(a)), node_id(w.point_at(b))
-            if na != nb:
-                edges.add((min(na, nb), max(na, nb)))
-    if not edges:
-        return None
-    adj = {}
-    for a, b in edges:
-        adj.setdefault(a, []).append(b)
-        adj.setdefault(b, []).append(a)
+            x_at = pa.x() + (ay - pa.y()) * (pb.x() - pa.x()) / (pb.y() - pa.y())
+            if x_at <= ax or (best_x is not None and x_at >= best_x):
+                continue
+            cross = ((pb.x() - pa.x()) * (ay - pa.y())
+                     - (pb.y() - pa.y()) * (ax - pa.x()))
+            start, best_x = ((a, b) if cross > 0 else (b, a)), x_at
+        if start is None:
+            return None
+        # at each node take the next edge clockwise from the reversed incoming
+        # direction; this keeps the enclosed face on the left
+        poly = [start[0]]
+        cur = start
+        for _ in range(2 * len(edges) + 8):
+            u_, v_ = cur
+            pv = nodes[v_]
+            th_rev = math.atan2(nodes[u_].y() - pv.y(), nodes[u_].x() - pv.x())
+            nxt, best_d = None, None
+            for wn in adj[v_]:
+                th = math.atan2(nodes[wn].y() - pv.y(), nodes[wn].x() - pv.x())
+                delta = (th_rev - th) % (2.0 * math.pi)
+                if delta < 1e-9:
+                    delta = 2.0 * math.pi     # U-turn only as a last resort
+                if best_d is None or delta < best_d:
+                    best_d, nxt = delta, wn
+            cur = (v_, nxt)
+            if cur == start:
+                break
+            poly.append(v_)
+        else:
+            return None                       # never closed -> give up
+        if len(poly) < 3:
+            return None
+        pts = [nodes[k] for k in poly]
+        n = len(pts)
+        if sum(pts[i].x() * pts[(i + 1) % n].y()
+               - pts[(i + 1) % n].x() * pts[i].y() for i in range(n)) <= 0:
+            return None                       # walked the unbounded outer face
+        corners = []
+        for i in range(n):                    # drop straight pass-through nodes
+            p0, p1, p2 = pts[i - 1], pts[i], pts[(i + 1) % n]
+            ax1, ay1 = p1.x() - p0.x(), p1.y() - p0.y()
+            bx1, by1 = p2.x() - p1.x(), p2.y() - p1.y()
+            cross = ax1 * by1 - ay1 * bx1
+            dot = ax1 * bx1 + ay1 * by1
+            if dot < 0.0 or abs(cross) > \
+                    0.05 * math.hypot(ax1, ay1) * math.hypot(bx1, by1):
+                corners.append(QPointF(p1))
+        return corners if len(corners) >= 3 else None
 
-    # +x ray from the anchor: the nearest crossing edge, oriented with the
-    # anchor on its left, starts the face walk
-    ax, ay = anchor.x(), anchor.y()
-    start, best_x = None, None
-    for a, b in edges:
-        pa, pb = nodes[a], nodes[b]
-        if (pa.y() > ay) == (pb.y() > ay):
-            continue
-        x_at = pa.x() + (ay - pa.y()) * (pb.x() - pa.x()) / (pb.y() - pa.y())
-        if x_at <= ax or (best_x is not None and x_at >= best_x):
-            continue
-        cross = ((pb.x() - pa.x()) * (ay - pa.y())
-                 - (pb.y() - pa.y()) * (ax - pa.x()))
-        start, best_x = ((a, b) if cross > 0 else (b, a)), x_at
-    if start is None:
-        return None
 
-    # at each node take the next edge clockwise from the reversed incoming
-    # direction; this keeps the enclosed face on the left
-    poly = [start[0]]
-    cur = start
-    for _ in range(2 * len(edges) + 8):
-        u_, v_ = cur
-        pv = nodes[v_]
-        th_rev = math.atan2(nodes[u_].y() - pv.y(), nodes[u_].x() - pv.x())
-        nxt, best_d = None, None
-        for wn in adj[v_]:
-            th = math.atan2(nodes[wn].y() - pv.y(), nodes[wn].x() - pv.x())
-            delta = (th_rev - th) % (2.0 * math.pi)
-            if delta < 1e-9:
-                delta = 2.0 * math.pi     # U-turn only as a last resort
-            if best_d is None or delta < best_d:
-                best_d, nxt = delta, wn
-        cur = (v_, nxt)
-        if cur == start:
-            break
-        poly.append(v_)
-    else:
-        return None                       # never closed -> give up
-    if len(poly) < 3:
+def trace_room_perimeter(scene, anchor: QPointF):
+    """Polygon of wall-CENTRELINE corners enclosing `anchor`, or None.  See
+    _WallGraph."""
+    return _WallGraph(scene).face(anchor)
+
+
+def _detect_room(grid, graph, anchor):
+    """Detect the room at `anchor` against a prebuilt grid + graph."""
+    res = grid.region(anchor)
+    if res is None:
         return None
-    pts = [nodes[k] for k in poly]
-    n = len(pts)
-    if sum(pts[i].x() * pts[(i + 1) % n].y()
-           - pts[(i + 1) % n].x() * pts[i].y() for i in range(n)) <= 0:
-        return None                       # walked the unbounded outer face
-    corners = []
-    for i in range(n):                    # drop straight pass-through nodes
-        p0, p1, p2 = pts[i - 1], pts[i], pts[(i + 1) % n]
-        ax1, ay1 = p1.x() - p0.x(), p1.y() - p0.y()
-        bx1, by1 = p2.x() - p1.x(), p2.y() - p1.y()
-        cross = ax1 * by1 - ay1 * bx1
-        dot = ax1 * bx1 + ay1 * by1
-        if dot < 0.0 or abs(cross) > 0.05 * math.hypot(ax1, ay1) * math.hypot(bx1, by1):
-            corners.append(QPointF(p1))
-    return corners if len(corners) >= 3 else None
+    path, area = res
+    corners = graph.face(anchor)
+    if corners:
+        area = poly_area_sqft(corners)
+    return path, area, corners
 
 
 def detect_room(scene, anchor: QPointF):
@@ -1039,14 +1081,7 @@ def detect_room(scene, anchor: QPointF):
     Returns (path, area_sqft, corners) or None.  When the perimeter trace
     succeeds, the area is the area inside the perimeter polygon; otherwise
     the flood-fill area is the fallback and corners is None."""
-    res = detect_room_region(scene, anchor)
-    if res is None:
-        return None
-    path, area = res
-    corners = trace_room_perimeter(scene, anchor)
-    if corners:
-        area = poly_area_sqft(corners)
-    return path, area, corners
+    return _detect_room(_RoomGrid(scene), _WallGraph(scene), anchor)
 
 
 def unique_room_name(scene, base: str, exclude=None) -> str:
@@ -1071,12 +1106,17 @@ def refresh_rooms(scene):
     if scene is None:
         return
     rooms = [it for it in scene.items() if isinstance(it, RoomItem)]
+    if not rooms:
+        return
+    # build the wall grid + planar graph ONCE and reuse them for every room
+    # (and probe point), instead of rebuilding both per room
+    grid, graph = _RoomGrid(scene), _WallGraph(scene)
     for it in rooms:
-        res = detect_room(scene, it.anchor)
+        res = _detect_room(grid, graph, it.anchor)
         if res is None:
             others = [r for r in rooms if r is not it]
             for p in _room_probe_points(it):
-                cand = detect_room(scene, p)
+                cand = _detect_room(grid, graph, p)
                 if cand is None or any(cand[0].contains(o.anchor)
                                        for o in others):
                     continue
