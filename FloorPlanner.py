@@ -1548,7 +1548,7 @@ class WallItem(QGraphicsItem):
             painter.setPen(QPen(QColor(0, 122, 255), 0))
             painter.drawPath(self._path)
             if self._ends_editable():       # endpoint knobs only when active
-                hs = 9.0 / lod
+                hs = 13.0 / lod             # bigger knob -> easier to aim at
                 painter.setPen(QPen(QColor(40, 40, 40), 0))
                 painter.setBrush(QBrush(QColor(255, 200, 0)))
                 for q in (self.p1, self.p2):
@@ -1606,7 +1606,9 @@ class WallItem(QGraphicsItem):
             self.room.raise_to_front()
 
         sp = e.scenePos()
-        tol = max(8.0, 12.0 / self._view_scale())
+        # generous endpoint catch radius (~20 px on screen, larger when zoomed
+        # in) so the little end-knob is easy to grab without missing
+        tol = max(12.0, 20.0 / self._view_scale())
         ends = self._ends_editable()       # endpoints locked while in a room
         if ends and QLineF(sp, self.p1).length() <= tol:
             self._mode = "p1"
