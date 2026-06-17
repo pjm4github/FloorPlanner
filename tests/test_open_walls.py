@@ -49,7 +49,7 @@ def test_detach_unlocks_corners_without_unbinding(fp, scene):
     wall = _right_wall(fp, room)
     assert wall._ends_editable() is False             # locked while in a room
     fp.detach_wall_from_room(scene, wall)
-    assert wall.room is room                          # still part of the room
+    assert room in wall.rooms                          # still part of the room
     assert wall._corners_unlocked and wall._ends_editable()
     assert _open_count(fp, scene) == 0                # nothing open yet
 
@@ -61,7 +61,7 @@ def test_pulling_a_corner_opens_that_side(fp, scene):
     fp.detach_wall_from_room(scene, wall)
     _shorten(fp, scene, wall)                          # pull the far end to y=60
     assert _open_count(fp, scene) == 1
-    assert wall.room is room                          # the wall stays bound
+    assert room in wall.rooms                          # the wall stays bound
     assert room.area_sqft == pytest.approx(area0)     # loop stays closed
     ow = next(w for w in scene.items() if isinstance(w, fp.OpenWall))
     ys = sorted([ow.p1.y(), ow.p2.y()])

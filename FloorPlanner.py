@@ -251,6 +251,7 @@ DEFAULT_SETTINGS = {
     "canvas_w_in": CANVAS_W_DEFAULT,
     "canvas_h_in": CANVAS_H_DEFAULT,
     "cost_per_sqft": 150.0,           # building cost estimate, $/sq ft
+    "auto_coalesce": True,            # fuse overlapping same-type walls on edit
 }
 SETTINGS = dict(DEFAULT_SETTINGS)
 JOIN_TOL = 9.0            # endpoints within 9" join together
@@ -307,7 +308,7 @@ DEFAULT_ROOM_PROPS = {
 }
 
 FILE_FORMAT = "floorplanner-json"
-FILE_VERSION = 2          # v2: walls carry an owning-room tag (rooms own walls)
+FILE_VERSION = 3          # v3: walls carry a list of owning rooms (shared walls)
 
 APP_NAME = "FloorPlanner"
 APP_VERSION = "1.0"
@@ -863,35 +864,40 @@ class _WallIndex:
                         return True
         return False
 
-    def coincident_candidates(self, wall):
+    def coincident_candidates(self, wall, reach=1):
         u = wall.unit()
+        rng = range(-reach, reach + 1)                  # widen for a bigger tol
         if abs(u.y()) < 1e-4:                          # horizontal query
             b = round(wall.p1.y() / self.OFF)
-            return [w for d in (-1, 0, 1) for w in self.hb.get(b + d, ())] \
+            return [w for d in rng for w in self.hb.get(b + d, ())] \
                 + self.diag
         if abs(u.x()) < 1e-4:                          # vertical query
             b = round(wall.p1.x() / self.OFF)
-            return [w for d in (-1, 0, 1) for w in self.vb.get(b + d, ())] \
+            return [w for d in rng for w in self.vb.get(b + d, ())] \
                 + self.diag
         return ([w for ws in self.hb.values() for w in ws]   # diagonal: rare
                 + [w for ws in self.vb.values() for w in ws] + self.diag)
 
 
-def coincident_walls(scene, wall, index=None):
-    """Real walls that lie on the same line as `wall` and overlap its span --
-    the duplicate party walls created when adjacent rooms each own their own
-    wall on a shared boundary.  Used so a plain wall opens for the door or
-    window carried by the wall coincident with it."""
+def coincident_walls(scene, wall, index=None, perp_tol=1.5):
+    """Real walls that lie on (within `perp_tol` of) the same line as `wall` and
+    overlap its span.  At the default 1.5" this finds the duplicate party walls
+    on a shared boundary (so a plain wall opens for a coincident wall's door);
+    coalescing passes the wider wall-snap grid so near-parallel walls merge.
+    With perp_tol > the index buckets, pass index=None for a full scan."""
     if scene is None or wall.length() < 1e-6:
         return []
     u = wall.unit()
     length = wall.length()
     out = []
-    cands = (index.coincident_candidates(wall) if index is not None
-             else scene.items())
+    if index is not None:
+        reach = int(perp_tol / _WallIndex.OFF) + 1
+        cands = index.coincident_candidates(wall, reach)
+    else:
+        cands = scene.items()
     for w in cands:
         if not isinstance(w, WallItem) or w is wall or w.is_open \
-                or w.length() < 1e-6:
+                or w.length() < 1e-6 or w.scene() is None:
             continue
         wu = w.unit()
         if abs(wu.x() * u.y() - wu.y() * u.x()) > 0.02:        # not parallel
@@ -900,7 +906,7 @@ def coincident_walls(scene, wall, index=None):
                  - (w.p1.y() - wall.p1.y()) * u.x())
         d2 = abs((w.p2.x() - wall.p1.x()) * u.y()
                  - (w.p2.y() - wall.p1.y()) * u.x())
-        if d1 > 1.5 or d2 > 1.5:
+        if d1 > perp_tol or d2 > perp_tol:
             continue
         s1 = (w.p1.x() - wall.p1.x()) * u.x() + (w.p1.y() - wall.p1.y()) * u.y()
         s2 = (w.p2.x() - wall.p1.x()) * u.x() + (w.p2.y() - wall.p1.y()) * u.y()
@@ -909,17 +915,21 @@ def coincident_walls(scene, wall, index=None):
     return out
 
 
-def fuse_free_walls(scene, wall):
-    """Fuse `wall` with any collinear, coincident, overlapping walls of the
-    SAME type into one, growing it to the union span and carrying their
-    openings across.  Only fuses FREE walls (room is None): room-owned party
-    walls are never fused, so a copied room keeps its own duplicate boundary
-    and different-type walls stay separate.  Returns `wall`."""
+def _coalesce_wall_impl(scene, wall, index=None, rebuild=True):
+    """Merge `wall` with every parallel, SAME-type wall whose body overlaps its
+    span and lies within the on-centre grid (perpendicular).  The survivor is
+    `wall`, grown to the union span (snapped to grid) and carrying every merged
+    wall's openings; its `rooms` become the union of all merged walls' rooms (a
+    coalesced party wall borders several rooms -- the shared-wall model).
+    Grouped and open walls are never merged.  Returns `wall`.  Pass
+    rebuild=False in a bulk sweep where a single rebuild_all_walls follows."""
     if (scene is None or wall.scene() is None or wall.is_open
-            or wall.room is not None or wall.length() < 1e-6):
+            or wall.group() is not None or wall.length() < 1e-6):
         return wall
-    absorbed = [w for w in coincident_walls(scene, wall)
-                if w.room is None and not w.is_open
+    perp = SETTINGS.get("wall_snap_in", WALL_SNAP_DEFAULT)
+    absorbed = [w for w in coincident_walls(scene, wall, index=index,
+                                            perp_tol=perp)
+                if not w.is_open and w.group() is None
                 and w.wall_type == wall.wall_type and w.length() > 1e-6]
     if not absorbed:
         return wall
@@ -931,28 +941,150 @@ def fuse_free_walls(scene, wall):
 
     ss = [0.0, s_of(wall.p2)]
     moved_ops = []                       # (kind, code, scene_pt, door_type, swing)
+    new_rooms = list(wall.rooms)
     for w in absorbed:
         ss += [s_of(w.p1), s_of(w.p2)]
         for op in w.openings:
             moved_ops.append((op.kind, op.code, w.point_at(op.s),
                               op.door_type, op.swing))
+        for r in w.rooms:
+            if r not in new_rooms:
+                new_rooms.append(r)
+        for r in list(w.rooms):          # detach the absorbed wall from its
+            r.unbind_wall(w)             # rooms (leaves survivor to carry them)
         scene.removeItem(w)
     smin, smax = min(ss), max(ss)
-    wall.p1 = QPointF(origin.x() + ux * smin, origin.y() + uy * smin)
-    wall.p2 = QPointF(origin.x() + ux * smax, origin.y() + uy * smax)
+    wall.p1 = wall_snap(QPointF(origin.x() + ux * smin, origin.y() + uy * smin))
+    wall.p2 = wall_snap(QPointF(origin.x() + ux * smax, origin.y() + uy * smax))
     for op in wall.openings:             # own openings ride the new p1
         op.s -= smin
-    np1 = wall.p1
+    np1, nu = wall.p1, wall.unit()
     for kind, code, pt, dtype, swing in moved_ops:
-        s = (pt.x() - np1.x()) * ux + (pt.y() - np1.y()) * uy
+        s = (pt.x() - np1.x()) * nu.x() + (pt.y() - np1.y()) * nu.y()
         try:
             op = OpeningItem(wall, kind, code, s)
         except ValueError:
             continue
         op.door_type, op.swing = dtype, swing
         wall.openings.append(op)
-    wall.rebuild()
+    for r in new_rooms:                  # survivor now borders every merged room
+        r.bind_wall(wall)
+    if rebuild:
+        wall.rebuild()
     return wall
+
+
+def coalesce_wall(scene, wall, index=None):
+    """Auto-coalesce entry: a no-op when the user has switched auto-coalesce
+    off (the manual 'Coalesce all walls now' action calls the _impl directly)."""
+    if not SETTINGS.get("auto_coalesce", True):
+        return wall
+    return _coalesce_wall_impl(scene, wall, index)
+
+
+def _wall_count(scene):
+    return sum(1 for w in scene.items()
+               if isinstance(w, WallItem) and not w.is_open)
+
+
+def _coalesce_all_impl(scene):
+    """Sweep the whole plan, merging every overlapping same-type wall pair to a
+    fixed point.  Heavy (O(walls^2)); used by load/import and the manual sweep
+    action.  Returns the number of walls absorbed."""
+    if scene is None:
+        return 0
+    start = _wall_count(scene)
+    changed = True
+    while changed:
+        changed = False
+        index = _WallIndex(scene)            # one local index per pass
+        walls = sorted((w for w in scene.items()
+                        if isinstance(w, WallItem) and not w.is_open
+                        and w.group() is None),
+                       key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y(),
+                                      w.wall_type))
+        before = _wall_count(scene)
+        for w in walls:
+            if w.scene() is None:                # already absorbed this pass
+                continue
+            _coalesce_wall_impl(scene, w, index, rebuild=False)
+        if _wall_count(scene) < before:
+            changed = True
+    return start - _wall_count(scene)
+
+
+def coalesce_all(scene):
+    """Auto-coalesce sweep (load/import); a no-op when auto-coalesce is off."""
+    if not SETTINGS.get("auto_coalesce", True):
+        return 0
+    return _coalesce_all_impl(scene)
+
+
+def _merge_intervals(intervals):
+    """Merge (lo, hi) ranges into disjoint, ascending intervals."""
+    out = []
+    for lo, hi in sorted(intervals):
+        if out and lo <= out[-1][1] + 1e-6:
+            out[-1] = (out[-1][0], max(out[-1][1], hi))
+        else:
+            out.append((lo, hi))
+    return out
+
+
+def fracture_delete_wall(scene, wall, settle=True):
+    """Delete `wall`, but FRACTURE it at room perimeters: every stretch that
+    runs along a bordering room's edge is kept (as a segment still bound to
+    that room) so deleting the wall never breaks a room open; the stretches no
+    room needs are removed.  A wall that borders no room is deleted whole."""
+    if scene is None or wall.scene() is None:
+        return
+    if wall.is_open or not wall.rooms:
+        for r in list(wall.rooms):
+            r.unbind_wall(wall)
+        scene.removeItem(wall)
+        if settle:
+            rebuild_all_walls(scene)
+        return
+    room_spans = []                          # (room, (s0, s1)) along the wall
+    for r in list(wall.rooms):
+        span = r._perimeter_span(wall)
+        if span is not None:
+            room_spans.append((r, span))
+    if not room_spans:                       # touches rooms but is no edge
+        for r in list(wall.rooms):
+            r.unbind_wall(wall)
+        scene.removeItem(wall)
+        if settle:
+            rebuild_all_walls(scene)
+        return
+    keep = _merge_intervals([s for _, s in room_spans])
+    u, p1 = wall.unit(), QPointF(wall.p1)
+    ops = [(op.kind, op.code, op.s, op.door_type, op.swing)
+           for op in wall.openings]
+    for s0, s1 in keep:
+        if s1 - s0 < MIN_WALL_LEN:
+            continue
+        a = QPointF(p1.x() + u.x() * s0, p1.y() + u.y() * s0)
+        b = QPointF(p1.x() + u.x() * s1, p1.y() + u.y() * s1)
+        seg = WallItem(a, b, wall.wall_type)
+        scene.addItem(seg)
+        for kind, code, s, dtype, swing in ops:
+            if s0 <= s <= s1:
+                try:
+                    op = OpeningItem(seg, kind, code, s - s0)
+                except ValueError:
+                    continue
+                op.door_type, op.swing = dtype, swing
+                seg.openings.append(op)
+        for r, (a0, a1) in room_spans:       # bind to the rooms it still serves
+            if a0 < s1 - 1e-6 and a1 > s0 + 1e-6:
+                r.bind_wall(seg)
+        seg.rebuild()
+    for r in list(wall.rooms):
+        r.unbind_wall(wall)
+    scene.removeItem(wall)
+    if settle:
+        rebuild_all_walls(scene)
 
 
 def wall_endpoint_open(scene, p: QPointF, ignore=()) -> bool:
@@ -1401,7 +1533,7 @@ class WallItem(QGraphicsItem):
         self.p1 = QPointF(p1)
         self.p2 = QPointF(p2)
         self.openings = []            # OpeningItem children
-        self.room = None              # owning RoomItem (None = unbound)
+        self.rooms = []               # RoomItems this wall borders ([] = free)
         self._corners_unlocked = False  # endpoints draggable while in a room
         self._drawing = False         # True while being rubber-banded
         self._mode = None             # None | 'p1' | 'p2' | 'move'
@@ -1412,13 +1544,19 @@ class WallItem(QGraphicsItem):
         self.setZValue(0)
         self.rebuild()
 
+    @property
+    def primary_room(self):
+        """A representative owning room (the first), or None when free."""
+        return self.rooms[0] if self.rooms else None
+
     def itemChange(self, change, value):
-        # when removed from the scene, release the room that owns this wall so
-        # RoomItem.walls never keeps a reference to a deleted item
+        # when removed from the scene, release every room that borders this wall
+        # so no RoomItem.walls keeps a reference to a deleted item
         if (change == QGraphicsItem.GraphicsItemChange.ItemSceneChange
-                and value is None and self.room is not None
-                and not sip.isdeleted(self.room)):
-            self.room.unbind_wall(self)
+                and value is None and self.rooms):
+            for r in list(self.rooms):
+                if not sip.isdeleted(r):
+                    r.unbind_wall(self)
         return super().itemChange(change, value)
 
     # -- basic geometry ------------------------------------------------------
@@ -1579,7 +1717,7 @@ class WallItem(QGraphicsItem):
         """Endpoint knobs are active when the wall is not part of a room, when
         it is an open wall, or once its corners have been unlocked via
         'Detach wall from room' -- moving a corner away opens that side."""
-        return self.room is None or self.is_open or self._corners_unlocked
+        return not self.rooms or self.is_open or self._corners_unlocked
 
     def mousePressEvent(self, e):
         if self.group() is not None:
@@ -1602,8 +1740,8 @@ class WallItem(QGraphicsItem):
         if not self.isSelected():
             self.scene().clearSelection()
         self.setSelected(True)
-        if self.room is not None:          # bring the owning room to the front
-            self.room.raise_to_front()
+        if self.rooms:                     # bring an owning room to the front
+            self.primary_room.raise_to_front()
 
         sp = e.scenePos()
         # generous endpoint catch radius (~20 px on screen, larger when zoomed
@@ -1719,11 +1857,14 @@ class WallItem(QGraphicsItem):
         (real and dashed open walls) that is collinear with it.  Body-sliding
         the wall moves the whole side -- including the open-wall gap -- as one,
         so the dashed segment travels with the wall."""
-        if self.room is None or self.length() < 1e-6:
+        if not self.rooms or self.length() < 1e-6:
             return [self]
         u = self.unit()
         run = []
-        for w in self.room.walls:
+        side = {self}
+        for r in self.rooms:
+            side.update(r.walls)
+        for w in side:
             if w is self:
                 run.append(w)
                 continue
@@ -1742,7 +1883,7 @@ class WallItem(QGraphicsItem):
         if self._mode is None:
             return
         sp = e.scenePos()
-        target = (self._corner_target if self.room is not None
+        target = (self._corner_target if self.rooms
                   else self._endpoint_target)
         if self._mode == "p1":
             self.p1 = target(sp, e.modifiers())
@@ -1793,17 +1934,17 @@ class WallItem(QGraphicsItem):
             # if it now overlaps a same-type one); the angle changes only with
             # Shift.
             endpoint_edit = self._mode in ("p1", "p2")
-            corner_drag = endpoint_edit and self.room is not None
-            if endpoint_edit and self.room is None:    # stretched a free wall:
-                fuse_free_walls(self.scene(), self)     # fuse if it now overlaps
+            corner_drag = endpoint_edit and bool(self.rooms)
+            coalesce_wall(self.scene(), self)       # fuse if it now overlaps
             rebuild_all_walls(self.scene())
             # dragging a corner back so the room is fully walled again fuses
             # the wall back in: re-lock its corners (right-click to detach
             # again)
             if (corner_drag and self._corners_unlocked
-                    and not any(w.is_open for w in self.room.walls)):
+                    and not any(w.is_open for r in self.rooms
+                                for w in r.walls)):
                 self._corners_unlocked = False
-                self.room.raise_to_front()       # normalise z back to siblings
+                self.primary_room.raise_to_front()   # normalise z to siblings
         self._mode = None
         e.accept()
 
@@ -1835,7 +1976,7 @@ class WallItem(QGraphicsItem):
         a_int.setCheckable(True)
         a_int.setChecked(self.wall_type == "interior")
         a_detach = None
-        if self.room is not None:
+        if self.rooms:
             menu.addSeparator()
             a_detach = menu.addAction("Detach wall from room")
         menu.addSeparator()
@@ -1856,8 +1997,7 @@ class WallItem(QGraphicsItem):
             self.setSelected(True)
             detach_wall_from_room(sc, self)   # opens the vacated edge
         elif chosen is a_del and sc is not None:
-            sc.removeItem(self)
-            rebuild_all_walls(sc)
+            fracture_delete_wall(sc, self)   # keep room-edge stretches intact
         e.accept()
 
 
@@ -1874,7 +2014,7 @@ class OpenWall(WallItem):
 
     def __init__(self, p1: QPointF, p2: QPointF, room=None):
         super().__init__(p1, p2, "interior")
-        self.room = room
+        self.rooms = [room] if room is not None else []
         self.setZValue(0)
 
     def paint(self, painter, option, widget=None):
@@ -2095,8 +2235,8 @@ class OpeningItem(QGraphicsItem):
         if not self.isSelected():
             self.scene().clearSelection()
         self.setSelected(True)
-        if self.wall is not None and self.wall.room is not None:
-            self.wall.room.raise_to_front()
+        if self.wall is not None and self.wall.rooms:
+            self.wall.primary_room.raise_to_front()
         e.accept()
 
     def mouseMoveEvent(self, e):
@@ -2308,23 +2448,33 @@ class RoomItem(QGraphicsItem):
         return [it for it in sc.items()
                 if isinstance(it, WallItem) and it._hit.intersects(band)]
 
+    def interior_walls(self):
+        """Real walls that lie wholly inside this room (partitions etc.) -- not
+        part of its perimeter band."""
+        sc = self.scene()
+        if sc is None or self.path.isEmpty():
+            return []
+        band = self._boundary_band()
+        return [it for it in sc.items()
+                if isinstance(it, WallItem) and not it.is_open
+                and not it._hit.intersects(band)
+                and self.path.contains(it.p1) and self.path.contains(it.p2)]
+
     # -- owned walls (the room's edge loop) ----------------------------------
     def bind_wall(self, w):
-        """Make this room the owner of wall `w` (stealing it from any prior
-        owner).  A wall belongs to at most one room."""
-        if w.room is self:
-            if w not in self.walls:
-                self.walls.append(w)
-            return
-        if w.room is not None:
-            w.room.unbind_wall(w)
-        w.room = self
+        """Add this room to wall `w`'s set of bordering rooms.  A wall may be
+        SHARED by several rooms (a coalesced party wall borders both), so this
+        does not steal `w` from anyone -- it just adds the association."""
+        if self not in w.rooms:
+            w.rooms.append(self)
         if w not in self.walls:
             self.walls.append(w)
 
     def unbind_wall(self, w):
-        if w.room is self:
-            w.room = None
+        """Detach this room from wall `w`.  Leaves `w` in the scene -- a shared
+        wall survives for the other rooms that still border it."""
+        if self in w.rooms:
+            w.rooms.remove(self)
         if w in self.walls:
             self.walls.remove(w)
 
@@ -2591,6 +2741,34 @@ class RoomItem(QGraphicsItem):
                                          exclude=self)
             self.update()
 
+    def _privatize_shared_walls(self):
+        """Before a move, swap every wall shared with another room for a private
+        copy of just this room's edge (carrying in-span openings), so moving the
+        room never drags the neighbour.  Dropped walls re-coalesce on release."""
+        sc = self.scene()
+        if sc is None:
+            return
+        for w in list(self.walls):
+            if w.is_open or len(w.rooms) <= 1:
+                continue
+            span = self._perimeter_span(w)
+            if span is None:
+                continue
+            s0, s1 = span
+            c = WallItem(w.point_at(s0), w.point_at(s1), w.wall_type)
+            sc.addItem(c)
+            for op in w.openings:             # carry this edge's doors/windows
+                if s0 - 1e-6 <= op.s <= s1 + 1e-6:
+                    try:
+                        nop = OpeningItem(c, op.kind, op.code, op.s - s0)
+                    except ValueError:
+                        continue
+                    nop.door_type, nop.swing = op.door_type, op.swing
+                    c.openings.append(nop)
+            self.unbind_wall(w)               # this room drops the shared wall
+            self.bind_wall(c)                 # and takes its private copy
+            c.rebuild()
+
     def _translate(self, dx: float, dy: float):
         """Rigidly shift the room's owned walls, openings and region."""
         if not dx and not dy:
@@ -2620,6 +2798,7 @@ class RoomItem(QGraphicsItem):
             self._dragging_label = True
             if self.walls and not ctrl:
                 self._moving_room = True
+                self._privatize_shared_walls()   # don't drag neighbours' walls
                 self._room_grab = QPointF(e.scenePos())
             else:
                 self._moving_room = False
@@ -2659,6 +2838,7 @@ class RoomItem(QGraphicsItem):
             if moved:
                 sc = self.scene()
                 if sc is not None:
+                    coalesce_all(sc)          # dropped adjacent -> re-merge
                     rebuild_all_walls(sc)     # re-detect region + re-bind walls
                 self.raise_to_front()
             e.accept()
@@ -3125,6 +3305,11 @@ class SettingsDialog(QDialog):
         self.sp_cost.setValue(float(SETTINGS.get("cost_per_sqft", 0.0)))
         form.addRow("Building cost", self.sp_cost)
 
+        self.ck_coalesce = QCheckBox(
+            "Merge overlapping walls automatically as you edit")
+        self.ck_coalesce.setChecked(bool(SETTINGS.get("auto_coalesce", True)))
+        form.addRow("Auto-coalesce walls", self.ck_coalesce)
+
         note = QLabel("Defaults: 6\" wall snap, 15° rotation snap, "
                       "100' × 70' canvas, $150 / sq ft.\n"
                       "Settings are saved with the plan.")
@@ -3143,6 +3328,7 @@ class SettingsDialog(QDialog):
         SETTINGS["canvas_w_in"] = float(self.sp_cw.value()) * FOOT
         SETTINGS["canvas_h_in"] = float(self.sp_ch.value()) * FOOT
         SETTINGS["cost_per_sqft"] = float(self.sp_cost.value())
+        SETTINGS["auto_coalesce"] = bool(self.ck_coalesce.isChecked())
 
 
 class ImageImportDialog(QDialog):
@@ -4147,12 +4333,15 @@ def _wall_spans_segment(w, a: QPointF, b: QPointF) -> bool:
 
 def _wall_along_segment(scene, a: QPointF, b: QPointF):
     """The wall whose body runs along (and spans) the segment a->b -- i.e.
-    the longer wall that carries a room edge.  None if there isn't one."""
-    for w in scene.items():
-        if (isinstance(w, WallItem) and not w.is_open
-                and _wall_spans_segment(w, a, b)):
-            return w
-    return None
+    the longer wall that carries a room edge.  None if there isn't one.  When
+    several walls span it, the geometrically smallest is chosen so the pick is
+    deterministic (scene.items() order is not) and save/load round-trips."""
+    cands = [w for w in scene.items()
+             if isinstance(w, WallItem) and not w.is_open
+             and _wall_spans_segment(w, a, b)]
+    if not cands:
+        return None
+    return min(cands, key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()))
 
 
 def walls_cover_room(walls, room) -> bool:
@@ -4167,6 +4356,22 @@ def walls_cover_room(walls, room) -> bool:
         if not any(_wall_spans_segment(w, a, b) for w in walls):
             return False
     return True
+
+
+def duplicate_wall(scene, w):
+    """A standalone copy of wall `w` (same type + openings), added to the scene
+    and bound to no room.  Used when grouping a room duplicates its walls."""
+    nw = WallItem(QPointF(w.p1), QPointF(w.p2), w.wall_type)
+    scene.addItem(nw)
+    for op in w.openings:
+        try:
+            nop = OpeningItem(nw, op.kind, op.code, op.s)
+        except ValueError:
+            continue
+        nop.door_type, nop.swing = op.door_type, op.swing
+        nw.openings.append(nop)
+    nw.rebuild()
+    return nw
 
 
 def synthesize_room_edge(scene, a: QPointF, b: QPointF):
@@ -4204,23 +4409,29 @@ def bind_room_walls(scene, room, settle=True):
     room.clear_walls()
     corners = room.corners
     n = len(corners)
-    band_walls = room.bounding_walls()
+    # sort candidates by geometry so the per-edge pick is deterministic
+    # (scene.items() order is not), which keeps save/load + undo round-trips
+    # byte-stable
+    band_walls = sorted(room.bounding_walls(),
+                        key=lambda w: (w.p1.x(), w.p1.y(),
+                                       w.p2.x(), w.p2.y(), w.wall_type))
     reused_open = set()
     for i in range(n):
         a, b = corners[i], corners[(i + 1) % n]
         if QLineF(a, b).length() < MIN_WALL_LEN:
             continue
         match = next((w for w in band_walls
-                      if not w.is_open
-                      and (w.room is None or w.room is room)
+                      if not w.is_open and w.group() is None
                       and _wall_endpoints_match(w, a, b)), None)
-        if match is not None:                            # 1. own this wall
+        if match is not None:                            # 1. share this wall
             room.bind_wall(match)
             continue
-        if _wall_along_segment(scene, a, b) is not None:  # 2. party / neighbour
-            nw = synthesize_room_edge(scene, a, b)
-            room.bind_wall(nw)
-            band_walls.append(nw)
+        span = _wall_along_segment(scene, a, b)           # 2. share party wall
+        if span is not None and span.group() is None:
+            # a longer/neighbour-owned wall runs along this edge -- SHARE it
+            # (the shared-wall model: one wall borders several rooms) rather
+            # than synthesizing a private duplicate.
+            room.bind_wall(span)
             continue
         ow = next((w for w in old_open if w not in reused_open    # 3. open edge
                    and _wall_endpoints_match(w, a, b)), None)
@@ -4231,7 +4442,7 @@ def bind_room_walls(scene, room, settle=True):
             reused_open.add(ow)
         room.bind_wall(ow)
     for w in old_open:                       # drop open edges that closed up
-        if w not in reused_open and w.room is None and w.scene() is not None:
+        if w not in reused_open and not w.rooms and w.scene() is not None:
             scene.removeItem(w)
     if settle:
         rebuild_all_walls(scene)
@@ -4289,7 +4500,7 @@ def detach_wall_from_room(scene, wall):
     """Unlock `wall`'s corners so the user can drag its endpoints.  The wall
     stays part of the room; pulling a corner away from the neighbouring wall
     opens that side (a dashed OpenWall bridges the gap)."""
-    if wall.room is None:
+    if not wall.rooms:
         return
     wall._corners_unlocked = True
     wall.setZValue(wall.zValue() + 1)    # above locked neighbours at corners
@@ -4788,8 +4999,8 @@ class PlanView(QGraphicsView):
             else:
                 # the drawn ENDPOINT is left where it is (aligned to the
                 # nearest orthogonal wall's line; gaps are closed by hand) --
-                # but a wall that OVERLAPS a free same-type wall fuses into one
-                fuse_free_walls(self.scene(), w)
+                # but a wall that OVERLAPS a same-type wall coalesces into one
+                coalesce_wall(self.scene(), w)
                 rebuild_all_walls(self.scene())
             e.accept()
             return
@@ -5318,6 +5529,10 @@ class MainWindow(QMainWindow):
         self.a_ungroup.setShortcut(QKeySequence("Ctrl+Shift+G"))
         self.a_ungroup.triggered.connect(self.ungroup_selected)
         m_edit.addAction(self.a_ungroup)
+        m_edit.addSeparator()
+        a_coalesce = QAction("Coalesce all walls now", self)
+        a_coalesce.triggered.connect(self.coalesce_all_now)
+        m_edit.addAction(a_coalesce)
 
         m_rooms = self.menuBar().addMenu("&Rooms")
         self._room_op_actions = []
@@ -5514,8 +5729,11 @@ class MainWindow(QMainWindow):
                 self.scene.removeItem(it)
                 if wall.scene() is not None:
                     wall.rebuild()
-            elif isinstance(it, (WallItem, RoomItem, FurnishingItem,
-                                 GroupItem)):
+            elif isinstance(it, WallItem):
+                # fracture at room perimeters so deleting a shared/through wall
+                # never breaks an adjacent room open
+                fracture_delete_wall(self.scene, it, settle=False)
+            elif isinstance(it, (RoomItem, FurnishingItem, GroupItem)):
                 self.scene.removeItem(it)
         rebuild_all_walls(self.scene)
 
@@ -5774,13 +5992,23 @@ class MainWindow(QMainWindow):
         self.status(f"{op.title()}: {name1} + {name2} -> {created} room(s).")
 
     def group_selected(self):
-        """Group the selected walls/furnishings (existing groups merge)."""
+        """Group the selected walls/furnishings (existing groups merge).  When a
+        room is selected, its surrounding + interior walls are DUPLICATED into
+        the group (the originals stay put) so the group is a movable/copyable
+        copy of the room."""
         members, old_groups = [], []
         for it in list(self.scene.selectedItems()):
             if isinstance(it, GroupItem):
                 old_groups.append(it)
             elif isinstance(it, (WallItem, FurnishingItem)):
                 members.append(it)
+            elif isinstance(it, RoomItem):
+                seen = set()
+                for w in it.bounding_walls() + it.interior_walls():
+                    if not isinstance(w, WallItem) or w.is_open or id(w) in seen:
+                        continue
+                    seen.add(id(w))
+                    members.append(duplicate_wall(self.scene, w))
         for g in old_groups:
             g.bake()
             members += g.dissolve()
@@ -5807,8 +6035,17 @@ class MainWindow(QMainWindow):
             g.bake()                      # members keep their moved spot
             for c in g.dissolve():
                 c.setSelected(True)
+        coalesce_all(self.scene)          # now-free walls may merge with the plan
         rebuild_all_walls(self.scene)     # rooms re-detect region/outline
         self.status("Ungrouped — items left in place.")
+
+    def coalesce_all_now(self):
+        """Edit ▸ Coalesce all walls now: force the full-plan merge sweep even
+        when auto-coalesce is switched off."""
+        n = _coalesce_all_impl(self.scene)
+        rebuild_all_walls(self.scene)
+        self.status(f"Coalesced {n} overlapping wall(s) into shared walls."
+                    if n else "No overlapping walls to coalesce.")
 
     def _selection_spec(self):
         """Selected walls/furnishings (groups expand to their members)
@@ -6044,7 +6281,7 @@ class MainWindow(QMainWindow):
                     "type": it.wall_type,
                     "p1": [it.p1.x(), it.p1.y()],
                     "p2": [it.p2.x(), it.p2.y()],
-                    "room": it.room.name if it.room is not None else None,
+                    "rooms": sorted(r.name for r in it.rooms),
                     "openings": [{
                         "kind": op.kind,
                         "code": op.code,
@@ -6062,7 +6299,7 @@ class MainWindow(QMainWindow):
                     "properties": it.properties,
                 })
         walls.sort(key=lambda w: (w["p1"], w["p2"], w["type"],
-                                  w["room"] or ""))
+                                  tuple(w["rooms"])))
         rooms.sort(key=lambda r: r["name"])
         furnishings.sort(key=lambda f: (f["pos"], f["kind"], f["rotation"]))
         return {
@@ -6080,6 +6317,9 @@ class MainWindow(QMainWindow):
             raise ValueError("Not a Floor Planner JSON file.")
         loaded = data.get("settings", {})
         for key, default in DEFAULT_SETTINGS.items():
+            if isinstance(default, bool):    # keep flags as bool (not 1.0/0.0)
+                SETTINGS[key] = bool(loaded.get(key, default))
+                continue
             try:
                 SETTINGS[key] = float(loaded.get(key, default))
             except (TypeError, ValueError):
@@ -6101,7 +6341,12 @@ class MainWindow(QMainWindow):
                 op.door_type = od.get("door_type", "LH")
                 op.swing = -1 if float(od.get("swing", -1)) < 0 else 1
                 wall.openings.append(op)
-            wall.rebuild()
+            # no per-wall rebuild here: rebuild_all_walls below rebuilds every
+            # wall once with a shared index (a per-wall rebuild is O(n) with
+            # cascade, so on a big/duplicated plan the loop alone took minutes)
+        # merge overlapping/duplicate walls (e.g. legacy v1/v2 party-wall pairs)
+        # into single shared walls FIRST, so the rebuild runs on the reduced set
+        coalesce_all(self.scene)
         rebuild_all_walls(self.scene)
         missing = []
         for rd in data.get("rooms", []):

@@ -218,48 +218,81 @@ def test_stretch_does_not_fuse_to_a_parallel_endpoint(fp, scene):
     assert t.x() == pytest.approx(96)              # grid-snapped, not fused
 
 
-# -- wall fusion: collinear, coincident, overlapping, same type, both free ----
-def test_fuse_overlapping_same_type_free_walls(fp, scene):
+# -- wall coalescing: collinear, overlapping, same type, within the grid -------
+def test_coalesce_overlapping_same_type_walls(fp, scene):
     a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
-    b = fp.WallItem(QPointF(60, 0), QPointF(200, 0), "interior")
+    b = fp.WallItem(QPointF(60, 0), QPointF(204, 0), "interior")   # on 6" grid
     scene.addItem(a)
     scene.addItem(b)
-    fp.fuse_free_walls(scene, a)
+    fp._coalesce_wall_impl(scene, a)
     walls = [it for it in scene.items() if isinstance(it, fp.WallItem)]
     assert len(walls) == 1
-    assert (walls[0].p1.x(), walls[0].p2.x()) == pytest.approx((0, 200))
+    assert (walls[0].p1.x(), walls[0].p2.x()) == pytest.approx((0, 204))
 
 
-def test_no_fuse_different_wall_types(fp, scene):
+def test_no_coalesce_different_wall_types(fp, scene):
     a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
     scene.addItem(a)
     scene.addItem(fp.WallItem(QPointF(60, 0), QPointF(200, 0), "exterior"))
-    fp.fuse_free_walls(scene, a)
+    fp._coalesce_wall_impl(scene, a)
     assert len([it for it in scene.items()
                 if isinstance(it, fp.WallItem)]) == 2
 
 
-def test_no_fuse_room_owned_walls(fp, scene, make_room):
-    # a room's (party) wall must never be fused away -- so a copied room keeps
-    # its own duplicate boundary
+def test_coalesce_merges_free_wall_into_room_wall(fp, scene, make_room):
+    # a free wall laid on a room's wall coalesces into ONE shared wall that the
+    # room still owns (shared-wall model -- room walls coalesce too)
     room = make_room(scene, 0, 0, 120, 120, "Den")
     rw = room.walls[0]
     free = fp.WallItem(QPointF(rw.p1), QPointF(rw.p2), rw.wall_type)
     scene.addItem(free)
-    fp.fuse_free_walls(scene, free)
-    assert rw in room.walls and rw.scene() is not None
+    survivor = fp._coalesce_wall_impl(scene, free)
+    assert rw.scene() is None                     # rw was absorbed
+    assert len(room.walls) == 4                   # still one wall per edge
+    assert survivor in room.walls and room in survivor.rooms
 
 
-def test_fuse_carries_openings_across(fp, scene):
+def test_coalesce_carries_openings_across(fp, scene):
     a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
     b = fp.WallItem(QPointF(60, 0), QPointF(240, 0), "interior")
     scene.addItem(a)
     scene.addItem(b)
     b.openings.append(fp.OpeningItem(b, "door", "3280", 150))
-    fp.fuse_free_walls(scene, a)
+    fp._coalesce_wall_impl(scene, a)
     walls = [it for it in scene.items() if isinstance(it, fp.WallItem)]
     assert len(walls) == 1
     assert len(walls[0].openings) == 1 and walls[0].openings[0].kind == "door"
+
+
+# -- fracture-on-delete: keep room-edge stretches, drop the rest ---------------
+def test_fracture_delete_free_wall_removes_whole(fp, scene):
+    w = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    scene.addItem(w)
+    fp.rebuild_all_walls(scene)
+    fp.fracture_delete_wall(scene, w)
+    assert w.scene() is None
+    assert not [x for x in scene.items() if isinstance(x, fp.WallItem)]
+
+
+def test_fracture_delete_keeps_room_edge_drops_overhang(fp, scene, make_room):
+    room = make_room(scene, 0, 0, 120, 120, "Den")
+    top = next(w for w in room.walls
+               if abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1)
+    # extend the top wall 60" past the room's right corner -> an overhang
+    if top.p2.x() > top.p1.x():
+        top.p2 = QPointF(180, 0)
+    else:
+        top.p1 = QPointF(180, 0)
+    top.rebuild()
+    fp.rebuild_all_walls(scene)
+    edge = next(w for w in room.walls
+                if abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1)
+    fp.fracture_delete_wall(scene, edge)
+    assert room.area_sqft == pytest.approx(100.0, rel=0.05)   # 120x120 in sq ft
+    kept = next(w for w in scene.items() if isinstance(w, fp.WallItem)
+                and not w.is_open and abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1)
+    assert max(kept.p1.x(), kept.p2.x()) == pytest.approx(120, abs=1)  # no over
+    assert room in kept.rooms
 
 
 @pytest.mark.gui

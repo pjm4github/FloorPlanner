@@ -61,6 +61,26 @@ def test_ungrouped_walls_survive_gc(fp, win, make_room, first_furnishing,
     assert counts(sc) == before
 
 
+def test_grouping_a_room_duplicates_its_walls(fp, win, make_room, counts):
+    # selecting a ROOM and grouping duplicates its walls into the group; the
+    # original room keeps its own walls (the group is a movable copy)
+    sc = win.scene
+    room = make_room(sc, 0, 0, 144, 120, "Den")
+    n_walls_before = sum(isinstance(i, fp.WallItem) for i in sc.items())
+    orig_walls = list(room.walls)
+    sc.clearSelection()
+    room.setSelected(True)
+    win.group_selected()
+    g = next(i for i in sc.items() if isinstance(i, fp.GroupItem))
+    grouped = [c for c in g.childItems() if isinstance(c, fp.WallItem)]
+    assert len(grouped) >= 4                       # the room's 4 walls copied
+    # walls doubled (originals + grouped copies); originals still owned by room
+    assert sum(isinstance(i, fp.WallItem) for i in sc.items()) >= \
+        n_walls_before + 4
+    assert all(w in room.walls for w in orig_walls)
+    assert all(w.group() is None for w in orig_walls)
+
+
 def test_bake_translates_room_region(fp, win, make_room):
     sc = win.scene
     room = make_room(sc, 0, 0, 144, 120, "Den")
