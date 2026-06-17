@@ -47,7 +47,7 @@ def _shorten(fp, scene, wall, new_far=None):
 def test_detach_unlocks_corners_without_unbinding(fp, scene):
     room = _room(fp, scene)
     wall = _right_wall(fp, room)
-    assert wall._ends_editable() is False             # locked while in a room
+    assert wall._ends_editable() is True              # shared walls are editable
     fp.detach_wall_from_room(scene, wall)
     assert room in wall.rooms                          # still part of the room
     assert wall._corners_unlocked and wall._ends_editable()

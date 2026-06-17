@@ -1714,10 +1714,11 @@ class WallItem(QGraphicsItem):
         return 1.0
 
     def _ends_editable(self) -> bool:
-        """Endpoint knobs are active when the wall is not part of a room, when
-        it is an open wall, or once its corners have been unlocked via
-        'Detach wall from room' -- moving a corner away opens that side."""
-        return not self.rooms or self.is_open or self._corners_unlocked
+        """Every wall's endpoints are draggable.  In the shared-wall model a
+        wall IS the room boundary (not a hidden copy), so the user edits it
+        directly: a free wall re-angles/projects, a room wall moves its end
+        along the wall axis (pulling a corner away opens that side)."""
+        return True
 
     def mousePressEvent(self, e):
         if self.group() is not None:
