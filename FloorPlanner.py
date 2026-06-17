@@ -4428,6 +4428,14 @@ class PlanView(QGraphicsView):
         self._img_ref = None              # the ReferenceImageItem being edited
         self._calib_pts = []              # collected calibration points
         self._crop_start = None           # crop rubber-band start (scene)
+        # coalesce a wheel burst into one zoom/repaint -- high-res wheels and
+        # trackpads emit dozens of wheelEvents per physical notch; with a full
+        # viewport repaint per event a large plan stalls for seconds.
+        self._zoom_accum = 0
+        self._zoom_timer = QTimer(self)
+        self._zoom_timer.setSingleShot(True)
+        self._zoom_timer.setInterval(16)  # ~one 60 Hz frame
+        self._zoom_timer.timeout.connect(self._apply_zoom)
 
     # -- reference-image (PNG import) modes ----------------------------------
     def start_image_calibrate(self, item):
@@ -4452,11 +4460,23 @@ class PlanView(QGraphicsView):
         delta = e.angleDelta().y()
         if delta == 0:
             return
+        # accumulate; apply once on the next frame so a burst of events is a
+        # single scale() + repaint instead of one full repaint per event.
+        self._zoom_accum += delta
+        if not self._zoom_timer.isActive():
+            self._zoom_timer.start()
+        e.accept()
+
+    def _apply_zoom(self):
+        delta, self._zoom_accum = self._zoom_accum, 0
+        if delta == 0:
+            return
         factor = 1.0015 ** delta
         cur = self.transform().m11()
         target = max(0.03, min(40.0, cur * factor))
+        if target == cur:
+            return
         self.scale(target / cur, target / cur)
-        e.accept()
 
     # -- background grid --------------------------------------------------------
     def drawBackground(self, painter, rect):
