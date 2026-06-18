@@ -176,6 +176,7 @@ so no system fonts are needed.
 | Zoom / pan | Mouse wheel / drag empty space (middle-drag anywhere) |
 | Draw a wall | Click-drag (Shift = free angle, Esc = cancel). Overlapping same-type walls within the snap grid **coalesce** into one shared wall (a boundary between two rooms is a single wall, not a duplicate) |
 | Stretch / slide a wall | Drag its end / body in Select mode. A dragged end sticks to the projected line of a nearby orthogonal wall (so you can close a corner) and grid-snaps otherwise; overlapping same-type walls coalesce on release |
+| Re-angle a wall end | Drag the end with **Shift** = free angle, or **Ctrl** = snap to 15° increments around the anchored end (build 45° and other off-axis walls) |
 | Delete a wall | Right-click → *Delete wall* (or select + Delete). A wall on a room perimeter **fractures**: the room-edge stretch is kept, only the rest is removed; a wall bordering no room is deleted whole |
 | Coalesce walls on demand | **Edit ▸ Coalesce all walls now** (toggle auto-coalesce in File ▸ Settings) |
 | Place a door or window | Tool 4 / 5, click a wall, enter WWHH size |

@@ -1735,13 +1735,22 @@ class WallItem(QGraphicsItem):
         if e.button() != Qt.MouseButton.LeftButton:
             super().mousePressEvent(e)
             return
-        if e.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            # Ctrl+click toggles membership of the selection set
+        sp = e.scenePos()
+        # generous endpoint catch radius (~20 px on screen, larger when zoomed
+        # in) so the little end-knob is easy to grab without missing
+        tol = max(12.0, 20.0 / self._view_scale())
+        ends = self._ends_editable()       # endpoints locked while in a room
+        near_p1 = ends and QLineF(sp, self.p1).length() <= tol
+        near_p2 = ends and QLineF(sp, self.p2).length() <= tol
+        ctrl = bool(e.modifiers() & Qt.KeyboardModifier.ControlModifier)
+        if ctrl and not (near_p1 or near_p2):
+            # Ctrl+click on the body toggles selection-set membership; Ctrl on
+            # an endpoint instead starts an angle-snapped drag (handled below)
             self.setSelected(not self.isSelected())
             self._mode = None
             e.accept()
             return
-        if not self.isSelected():
+        if not self.isSelected() and not ctrl:
             self.scene().clearSelection()
         self.setSelected(True)
         if self.rooms:                     # bring an owning room to the front
@@ -1750,15 +1759,10 @@ class WallItem(QGraphicsItem):
         # want never buries it behind a coincident/crossing room wall
         bring_to_front(self)
 
-        sp = e.scenePos()
-        # generous endpoint catch radius (~20 px on screen, larger when zoomed
-        # in) so the little end-knob is easy to grab without missing
-        tol = max(12.0, 20.0 / self._view_scale())
-        ends = self._ends_editable()       # endpoints locked while in a room
-        if ends and QLineF(sp, self.p1).length() <= tol:
+        if near_p1:
             self._mode = "p1"
             self._anchor = QPointF(self.p2)
-        elif ends and QLineF(sp, self.p2).length() <= tol:
+        elif near_p2:
             self._mode = "p2"
             self._anchor = QPointF(self.p1)
         else:
@@ -1806,11 +1810,28 @@ class WallItem(QGraphicsItem):
         """Lengthen / shorten this wall.  The end rides the wall's own axis,
         grid-snapped, and STICKS to the projected line of a close orthogonal
         wall when it lines up (so you can pull an end into a corner) -- it
-        never fuses to another wall's endpoint or body.  Shift = free re-angle.
-        """
+        never fuses to another wall's endpoint or body.  Shift = free re-angle;
+        Ctrl = re-angle in fixed increments (45 deg etc.)."""
         if mods & Qt.KeyboardModifier.ShiftModifier:
             return wall_snap(QPointF(sp))          # free re-angle, grid only
+        if mods & Qt.KeyboardModifier.ControlModifier:
+            return self._angle_snapped_target(sp)
         return self._axis_target(sp)
+
+    def _angle_snapped_target(self, sp: QPointF) -> QPointF:
+        """Ctrl-drag: swing the dragged end around the anchored end in fixed
+        angular increments (SETTINGS['rotate_snap_deg'], default 15 deg), with a
+        grid-snapped length -- so the user can build 45 deg and other off-axis
+        walls, not just lengthen along the existing axis."""
+        o = self._anchor
+        dx, dy = sp.x() - o.x(), sp.y() - o.y()
+        if math.hypot(dx, dy) < 1e-6:
+            dx, dy = self._axis.x(), self._axis.y()
+        step = math.radians(max(1.0, SETTINGS.get("rotate_snap_deg", 15.0)))
+        ang = round(math.atan2(dy, dx) / step) * step
+        length = max(MIN_WALL_LEN, wall_snap_len(math.hypot(dx, dy)))
+        return QPointF(o.x() + math.cos(ang) * length,
+                       o.y() + math.sin(ang) * length)
 
     def _axis_target(self, sp: QPointF) -> QPointF:
         o, u = self._anchor, self._axis
@@ -1851,12 +1872,14 @@ class WallItem(QGraphicsItem):
         return best_s
 
     def _corner_target(self, sp: QPointF, mods) -> QPointF:
-        """Endpoint target for a room wall whose corners were unlocked: move
-        the end along the wall (Shift = any direction), grid-snapped and
-        sticking to an orthogonal wall's projected line, WITHOUT fusing to
+        """Endpoint target for a room wall: move the end along the wall
+        (Shift = any direction, Ctrl = fixed 15 deg increments), grid-snapped
+        and sticking to an orthogonal wall's projected line, WITHOUT fusing to
         neighbours -- so the corner can be pulled away to open a side."""
         if mods & Qt.KeyboardModifier.ShiftModifier:
             return wall_snap(QPointF(sp))
+        if mods & Qt.KeyboardModifier.ControlModifier:
+            return self._angle_snapped_target(sp)
         return self._axis_target(sp)
 
     def _collinear_run(self):

@@ -218,6 +218,45 @@ def test_stretch_does_not_fuse_to_a_parallel_endpoint(fp, scene):
     assert t.x() == pytest.approx(96)              # grid-snapped, not fused
 
 
+# -- Ctrl-drag: re-angle in fixed (15 deg) increments around the anchor --------
+import math  # noqa: E402
+
+CTRL = Qt.KeyboardModifier.ControlModifier
+
+
+def _angle_drag(fp, scene, to, anchor=(0, 0)):
+    a = fp.WallItem(QPointF(*anchor), QPointF(120, 0), "interior")
+    scene.addItem(a)
+    a._anchor, a._axis = QPointF(*anchor), QPointF(1, 0)   # grabbing p2
+    return a, a._endpoint_target(QPointF(*to), CTRL)
+
+
+def test_ctrl_drag_snaps_to_45_degrees(fp, scene):
+    _, t = _angle_drag(fp, scene, (100, 100))
+    assert round(math.degrees(math.atan2(t.y(), t.x()))) == 45
+
+
+def test_ctrl_drag_snaps_to_nearest_15(fp, scene):
+    _, t = _angle_drag(fp, scene, (100, 20))        # ~11.3 deg -> 15
+    assert round(math.degrees(math.atan2(t.y(), t.x()))) == 15
+
+
+def test_ctrl_drag_grid_snaps_length(fp, scene):
+    _, t = _angle_drag(fp, scene, (100, 100))
+    step = fp.SETTINGS["wall_snap_in"]
+    length = math.hypot(t.x(), t.y())
+    assert abs(length / step - round(length / step)) < 1e-6
+    assert length >= fp.MIN_WALL_LEN
+
+
+def test_shift_still_free_angles(fp, scene):
+    a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    scene.addItem(a)
+    a._anchor, a._axis = QPointF(0, 0), QPointF(1, 0)
+    t = a._endpoint_target(QPointF(95, 41), Qt.KeyboardModifier.ShiftModifier)
+    assert (t.x(), t.y()) == pytest.approx((96, 42))   # free, grid-only
+
+
 # -- wall coalescing: collinear, overlapping, same type, within the grid -------
 def test_coalesce_overlapping_same_type_walls(fp, scene):
     a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
