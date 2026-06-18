@@ -322,6 +322,20 @@ def test_join_endpoints_leaves_a_far_end_alone(fp, scene):
     assert stem.p1.y() == pytest.approx(130)             # too far -> not welded
 
 
+def test_junction_outline_is_clipped_so_walls_read_solid(fp, scene):
+    # crossing walls get an outline clip (their inner seams are hidden), an
+    # isolated wall does not
+    lone = fp.WallItem(QPointF(0, 400), QPointF(120, 400), "interior")
+    scene.addItem(lone)
+    scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100), "interior"))
+    scene.addItem(fp.WallItem(QPointF(100, 0), QPointF(100, 200), "interior"))
+    fp.rebuild_all_walls(scene)
+    crossing = [w for w in scene.items() if isinstance(w, fp.WallItem)
+                and w is not lone]
+    assert all(w._outline_clip is not None for w in crossing)  # seams hidden
+    assert lone._outline_clip is None                          # nothing to clip
+
+
 def test_weld_all_closes_near_miss_junctions_and_is_idempotent(fp, scene):
     scene.addItem(fp.WallItem(QPointF(0, 0), QPointF(300, 0), "interior"))
     scene.addItem(fp.WallItem(QPointF(150, 7), QPointF(150, 120), "interior"))

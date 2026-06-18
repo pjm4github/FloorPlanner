@@ -1534,10 +1534,43 @@ def rebuild_all_walls(scene):
     if scene is None:
         return
     index = _WallIndex(scene)                # shared: rebuild is O(local), not
-    for it in list(scene.items()):           # O(all walls) per wall
-        if isinstance(it, WallItem):
-            it.rebuild(cascade=False, index=index)
+    walls = [it for it in scene.items() if isinstance(it, WallItem)]
+    for it in walls:                         # O(all walls) per wall
+        it.rebuild(cascade=False, index=index)
+    _compute_wall_junctions(scene, walls)
     refresh_rooms(scene)
+
+
+def _compute_wall_junctions(scene, walls=None):
+    """For each wall, cache an outline clip = its bounds minus the bodies of the
+    walls it overlaps, so the dark outline is drawn only on the OUTER boundary
+    of the wall network -- T/cross/L joints read as one solid piece, not a seam.
+    Runs once after every wall's footprint (`_solid`) is up to date."""
+    if walls is None:
+        walls = [it for it in scene.items() if isinstance(it, WallItem)]
+    bbi = _WallBBoxIndex(scene)
+    for w in walls:
+        if w.is_open:                        # dashed placeholders don't merge
+            w._outline_clip = None
+            continue
+        wb = w._solid.boundingRect()
+        union = QPainterPath()
+        found = False
+        for other in bbi.near(wb):
+            if (other is w or not isinstance(other, WallItem)
+                    or other.is_open or other._solid.isEmpty()):
+                continue
+            if (other._solid.boundingRect().intersects(wb)
+                    and other._solid.intersects(w._solid)):
+                union = union.united(other._solid)
+                found = True
+        if found:
+            clip = QPainterPath()
+            clip.addRect(wb.adjusted(-2, -2, 2, 2))
+            w._outline_clip = clip.subtracted(union)
+        else:
+            w._outline_clip = None
+        w.update()
 
 
 # ----------------------------------------------------------------------------
@@ -1564,6 +1597,8 @@ class WallItem(QGraphicsItem):
         self._drawing = False         # True while being rubber-banded
         self._mode = None             # None | 'p1' | 'p2' | 'move'
         self._path = QPainterPath()
+        self._solid = QPainterPath()     # body footprint, no opening holes
+        self._outline_clip = None        # outline-clip so junctions read solid
         self._hit = QPainterPath()
         self._bounds = QRectF()
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
@@ -1643,6 +1678,7 @@ class WallItem(QGraphicsItem):
 
         body = QPainterPath()
         body.addRect(QRectF(-ext1, -t / 2, length + ext1 + ext2, t))
+        solid_local = QPainterPath(body)   # footprint before openings are cut
         holes = QPainterPath()
         for op in self.openings:
             half = op.width / 2
@@ -1668,6 +1704,10 @@ class WallItem(QGraphicsItem):
         tr.translate(self.p1.x(), self.p1.y())
         tr.rotateRadians(ang)
         self._path = tr.map(body)
+        self._solid = tr.map(solid_local)
+        # cleared here; rebuild_all_walls' junction pass recomputes the clip so
+        # neighbouring wall bodies hide this wall's inner seams (T/cross joints)
+        self._outline_clip = None
 
         # hit shape: stroked centreline (no holes -> easy to click)
         line = QPainterPath()
@@ -1700,9 +1740,19 @@ class WallItem(QGraphicsItem):
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         fill = QColor(60, 62, 68) if self.wall_type == "exterior" else QColor(150, 152, 158)
-        painter.setPen(QPen(QColor(25, 25, 25), 0))
+        # fill the body with NO outline so overlapping walls read as one solid
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(fill))
         painter.drawPath(self._path)
+        # dark outline, clipped to the wall-network's outer boundary so the
+        # seams INSIDE a T/cross/L junction don't show (one solid wall)
+        painter.save()
+        if self._outline_clip is not None:
+            painter.setClipPath(self._outline_clip)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(QColor(25, 25, 25), 0))
+        painter.drawPath(self._path)
+        painter.restore()
 
         lod = option.levelOfDetailFromTransform(painter.worldTransform())
         lod = max(lod, 1e-6)
