@@ -1023,6 +1023,29 @@ def coalesce_all(scene):
     return _coalesce_all_impl(scene)
 
 
+def weld_all(scene, max_passes=6):
+    """Weld every wall's free endpoints onto the walls they meet (T/L joints),
+    so a drawn-or-loaded plan reads as one connected structure.  Iterated to a
+    fixed point (a welded plan does not move on a further pass), which keeps
+    save/load round-trips stable.  Grouped walls are left alone."""
+    if scene is None:
+        return
+    for _ in range(max_passes):
+        walls = sorted((w for w in scene.items()
+                        if isinstance(w, WallItem) and not w.is_open
+                        and w.group() is None),
+                       key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()))
+        moved = False
+        for w in walls:
+            b1, b2 = QPointF(w.p1), QPointF(w.p2)
+            w.join_endpoints(rebuild=False)
+            if (QLineF(b1, w.p1).length() > 1e-6
+                    or QLineF(b2, w.p2).length() > 1e-6):
+                moved = True
+        if not moved:
+            break
+
+
 def _merge_intervals(intervals):
     """Merge (lo, hi) ranges into disjoint, ascending intervals."""
     out = []
@@ -1978,11 +2001,12 @@ class WallItem(QGraphicsItem):
         self._mode = None
         e.accept()
 
-    def join_endpoints(self):
-        """Snap each endpoint onto a nearby endpoint of another wall, or fuse
-        it onto the body of a wall it stops on (T-junction), within JOIN_TOL.
-        Never grows a wall toward a far one -- if it doesn't reach, the gap is
-        left for the user to close by hand."""
+    def join_endpoints(self, rebuild=True):
+        """Weld each endpoint onto a nearby endpoint of another wall, or onto
+        the body of a wall it stops on (T-junction), within JOIN_TOL.  Never
+        grows a wall toward a far one -- if it doesn't reach, the gap is left
+        for the user to close by hand.  Pass rebuild=False in a bulk weld where
+        a single rebuild_all_walls follows."""
         for attr, other in (("p1", "p2"), ("p2", "p1")):
             p = getattr(self, attr)
             q = nearest_wall_endpoint(self.scene(), p, JOIN_TOL, exclude=self)
@@ -1995,7 +2019,8 @@ class WallItem(QGraphicsItem):
                         q = ip
             if q is not None:
                 setattr(self, attr, q)
-        self.rebuild()
+        if rebuild:
+            self.rebuild()
 
     def contextMenuEvent(self, e):
         menu = QMenu()
@@ -5030,10 +5055,12 @@ class PlanView(QGraphicsView):
             if w.length() < MIN_WALL_LEN:
                 self.scene().removeItem(w)
             else:
-                # the drawn ENDPOINT is left where it is (aligned to the
-                # nearest orthogonal wall's line; gaps are closed by hand) --
-                # but a wall that OVERLAPS a same-type wall coalesces into one
+                # an overlapping same-type wall coalesces into one; then the
+                # drawn end welds onto whatever wall it lands on (T/L joint) so
+                # it reads as one connected structure, not a loose segment
                 coalesce_wall(self.scene(), w)
+                if w.scene() is not None:
+                    w.join_endpoints(rebuild=False)
                 rebuild_all_walls(self.scene())
             e.accept()
             return
@@ -6073,12 +6100,13 @@ class MainWindow(QMainWindow):
         self.status("Ungrouped — items left in place.")
 
     def coalesce_all_now(self):
-        """Edit ▸ Coalesce all walls now: force the full-plan merge sweep even
-        when auto-coalesce is switched off."""
+        """Edit ▸ Coalesce all walls now: force the full-plan merge + weld sweep
+        even when auto-coalesce is switched off."""
         n = _coalesce_all_impl(self.scene)
+        weld_all(self.scene)                 # close T/L joints across the plan
         rebuild_all_walls(self.scene)
-        self.status(f"Coalesced {n} overlapping wall(s) into shared walls."
-                    if n else "No overlapping walls to coalesce.")
+        self.status(f"Coalesced {n} overlapping wall(s) and welded junctions."
+                    if n else "Welded wall junctions.")
 
     def _selection_spec(self):
         """Selected walls/furnishings (groups expand to their members)
@@ -6379,6 +6407,9 @@ class MainWindow(QMainWindow):
             # cascade, so on a big/duplicated plan the loop alone took minutes)
         # merge overlapping/duplicate walls (e.g. legacy v1/v2 party-wall pairs)
         # into single shared walls FIRST, so the rebuild runs on the reduced set
+        # (welding is NOT done here: load_data is also the undo-restore path and
+        # welding does not fully converge at messy junctions -> geometry would
+        # drift on every undo.  Junctions weld on draw and via the manual sweep.)
         coalesce_all(self.scene)
         rebuild_all_walls(self.scene)
         missing = []

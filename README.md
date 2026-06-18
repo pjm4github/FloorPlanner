@@ -174,11 +174,11 @@ so no system fonts are needed.
 |---|---|
 | Choose a tool | Toolbar icons or keys **S** E I D W R (Select / Exterior / Interior / Door / Window / Room) |
 | Zoom / pan | Mouse wheel / drag empty space (middle-drag anywhere) |
-| Draw a wall | Click-drag (Shift = free angle, Esc = cancel). Overlapping same-type walls within the snap grid **coalesce** into one shared wall (a boundary between two rooms is a single wall, not a duplicate) |
+| Draw a wall | Click-drag (Shift = free angle, Esc = cancel). Overlapping same-type walls within the snap grid **coalesce** into one shared wall (a boundary between two rooms is a single wall, not a duplicate); the drawn end **welds** onto a wall it lands on, forming a clean T/L joint |
 | Stretch / slide a wall | Drag its end / body in Select mode. A dragged end sticks to the projected line of a nearby orthogonal wall (so you can close a corner) and grid-snaps otherwise; overlapping same-type walls coalesce on release |
 | Re-angle a wall end | Drag the end with **Shift** = free angle, or **Ctrl** = snap to 15° increments around the anchored end (build 45° and other off-axis walls) |
 | Delete a wall | Right-click → *Delete wall* (or select + Delete). A wall on a room perimeter **fractures**: the room-edge stretch is kept, only the rest is removed; a wall bordering no room is deleted whole |
-| Coalesce walls on demand | **Edit ▸ Coalesce all walls now** (toggle auto-coalesce in File ▸ Settings) |
+| Coalesce + weld on demand | **Edit ▸ Coalesce all walls now** merges overlaps and welds every T/L junction across the plan (toggle auto-coalesce in File ▸ Settings) |
 | Place a door or window | Tool 4 / 5, click a wall, enter WWHH size |
 | Name a room | Tool 6, click an enclosed area (one-shot; Ctrl-pick the tool to keep it) |
 | Move a room (with its walls) | Drag the room name (Ctrl-drag = nudge the label only) |

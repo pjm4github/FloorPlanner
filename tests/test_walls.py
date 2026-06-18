@@ -303,6 +303,38 @@ def test_coalesce_carries_openings_across(fp, scene):
     assert len(walls[0].openings) == 1 and walls[0].openings[0].kind == "door"
 
 
+# -- welding: a drawn end fuses onto the wall it meets (T/L joint) -------------
+def test_join_endpoints_welds_onto_a_through_wall(fp, scene):
+    scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100), "interior"))
+    stem = fp.WallItem(QPointF(100, 108), QPointF(100, 200), "interior")  # 8" gap
+    scene.addItem(stem)
+    fp.rebuild_all_walls(scene)
+    stem.join_endpoints()
+    assert stem.p1.y() == pytest.approx(100, abs=0.01)   # welded onto the wall
+
+
+def test_join_endpoints_leaves_a_far_end_alone(fp, scene):
+    scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100), "interior"))
+    stem = fp.WallItem(QPointF(100, 130), QPointF(100, 260), "interior")  # 30" gap
+    scene.addItem(stem)
+    fp.rebuild_all_walls(scene)
+    stem.join_endpoints()
+    assert stem.p1.y() == pytest.approx(130)             # too far -> not welded
+
+
+def test_weld_all_closes_near_miss_junctions_and_is_idempotent(fp, scene):
+    scene.addItem(fp.WallItem(QPointF(0, 0), QPointF(300, 0), "interior"))
+    scene.addItem(fp.WallItem(QPointF(150, 7), QPointF(150, 120), "interior"))
+    fp.rebuild_all_walls(scene)
+    fp.weld_all(scene)
+    stem = next(w for w in scene.items() if isinstance(w, fp.WallItem)
+                and abs(w.p1.x() - 150) < 1 and abs(w.p2.x() - 150) < 1)
+    assert min(stem.p1.y(), stem.p2.y()) == pytest.approx(0)   # gap closed
+    before = (QPointF(stem.p1), QPointF(stem.p2))
+    fp.weld_all(scene)                                   # second sweep: no move
+    assert stem.p1 == before[0] and stem.p2 == before[1]
+
+
 # -- fracture-on-delete: keep room-edge stretches, drop the rest ---------------
 def test_fracture_delete_free_wall_removes_whole(fp, scene):
     w = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
