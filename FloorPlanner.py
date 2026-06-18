@@ -259,6 +259,9 @@ MIN_WALL_LEN = 6.0
 WALL_PROJECT_STICK = 9.0  # stretch sticks within 9" of an orthogonal wall line
 WALL_PROJECT_NEAR = 48.0  # ...only when that wall actually passes within 4'
 ROOM_SIG_MARGIN = 18.0    # walls within 18" of a room's bbox can affect it
+# default stacking: furnishing (3) < translucent room fill/label (4) < wall < opening
+WALL_Z = 5.0              # walls sit above the room fill so they stay crisp
+OPENING_Z = 6.0           # doors/windows sit above their wall
 
 
 def canvas_rect() -> QRectF:
@@ -1541,7 +1544,7 @@ class WallItem(QGraphicsItem):
         self._hit = QPainterPath()
         self._bounds = QRectF()
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
-        self.setZValue(0)
+        self.setZValue(WALL_Z)           # above the translucent room fill (3)
         self.rebuild()
 
     @property
@@ -1743,6 +1746,9 @@ class WallItem(QGraphicsItem):
         self.setSelected(True)
         if self.rooms:                     # bring an owning room to the front
             self.primary_room.raise_to_front()
+        # ...then lift THIS wall above its siblings so clicking the wall you
+        # want never buries it behind a coincident/crossing room wall
+        bring_to_front(self)
 
         sp = e.scenePos()
         # generous endpoint catch radius (~20 px on screen, larger when zoomed
@@ -2016,7 +2022,7 @@ class OpenWall(WallItem):
     def __init__(self, p1: QPointF, p2: QPointF, room=None):
         super().__init__(p1, p2, "interior")
         self.rooms = [room] if room is not None else []
-        self.setZValue(0)
+        self.setZValue(WALL_Z)
 
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -2052,7 +2058,7 @@ class OpeningItem(QGraphicsItem):
         self.swing = -1                   # -1 / +1 : which face it swings to
         self.s = s
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
-        self.setZValue(2)
+        self.setZValue(OPENING_Z)
         self.set_code(code, rebuild=False)
         self.sync()
 
@@ -2497,13 +2503,16 @@ class RoomItem(QGraphicsItem):
             return
         win._z_top += 1
         base = win._z_top * 10
+        # the translucent fill + label sit at `base` (above OTHER rooms); the
+        # walls/openings sit ABOVE the fill so a wall is never hidden under its
+        # own room tint and a 'Bring to front' is not undone on the next click
+        self.setZValue(base)
         for w in self.walls:
             # an unlocked wall sits just above its siblings so corner clicks
             # at a shared corner grab IT (to edit) rather than a locked neighbour
-            w.setZValue(base + 1 if w._corners_unlocked else base)
+            w.setZValue(base + 5 if w._corners_unlocked else base + 4)
         for op in self.room_openings():
-            op.setZValue(base + 2)
-        self.setZValue(base + 4)
+            op.setZValue(base + 6)
 
     def opening_stats(self):
         """(window count, window glazing sq ft, door count) on this
@@ -3492,7 +3501,7 @@ class FurnishingItem(QGraphicsItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges,
                      True)
         self.setAcceptHoverEvents(True)
-        self.setZValue(3)                 # over walls, under room labels
+        self.setZValue(3)                 # under the room fill/label and walls
         self.setPos(pos)                  # pos = symbol centre
         self.setRotation(rotation)        # rotates about the centre
         tip = f"{self.name} — {fmt_in(self.w)} × {fmt_in(self.d)}"
