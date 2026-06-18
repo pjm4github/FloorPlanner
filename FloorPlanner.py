@@ -5486,6 +5486,7 @@ class MainWindow(QMainWindow):
         self._redo_stack = []
         self._restoring = False
         self._committed_state = self.serialize()
+        self._saved_state = self._committed_state   # last on-disk/new baseline
         self._dirty_timer = QTimer(self)
         self._dirty_timer.setSingleShot(True)
         self._dirty_timer.setInterval(180)
@@ -6237,6 +6238,7 @@ class MainWindow(QMainWindow):
         self._undo_stack.clear()
         self._redo_stack.clear()
         self._committed_state = self.serialize()
+        self._saved_state = self._committed_state    # fresh New/Open is clean
         self._update_undo_actions()
 
     def undo(self):
@@ -6349,15 +6351,44 @@ class MainWindow(QMainWindow):
             rect = QRectF(-2 * FOOT, -2 * FOOT, 60 * FOOT, 44 * FOOT)
         self.view.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
 
+    def _is_dirty(self) -> bool:
+        """True when the plan has edits not yet written to its file."""
+        return self.serialize() != self._saved_state
+
+    def _confirm_discard_changes(self, title: str = "Unsaved changes") -> bool:
+        """If there are unsaved edits, ask Save / Discard / Cancel.  Returns True
+        when it's OK to proceed (saved or discarded), False to cancel."""
+        if not self._is_dirty():
+            return True
+        btn = QMessageBox.warning(
+            self, title,
+            "This design has unsaved changes.\nSave them before continuing?",
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save)
+        if btn == QMessageBox.StandardButton.Save:
+            self.save_plan()
+            return not self._is_dirty()      # False if the Save dialog was cancelled
+        return btn == QMessageBox.StandardButton.Discard
+
+    def closeEvent(self, e):
+        # no prompt when there is no interactive UI (headless/offscreen tests),
+        # otherwise the modal save dialog would block on close
+        headless = QApplication.platformName() == "offscreen"
+        if headless or self._confirm_discard_changes("Quit Floor Planner"):
+            e.accept()
+        else:
+            e.ignore()
+
     def new_plan(self):
-        if QMessageBox.question(
-                self, "New plan", "Clear everything and start over?"
-        ) == QMessageBox.StandardButton.Yes:
-            self.scene.clear()
-            self.current_path = None
-            SETTINGS.update(DEFAULT_SETTINGS)
-            self._apply_canvas()
-            self._reset_undo()
+        if not self._confirm_discard_changes("New plan"):
+            return
+        self.scene.clear()
+        self.current_path = None
+        SETTINGS.update(DEFAULT_SETTINGS)
+        self._apply_canvas()
+        self._reset_undo()
 
     # -- save / load -------------------------------------------------------------
     def _update_title(self):
@@ -6935,6 +6966,8 @@ class MainWindow(QMainWindow):
         self.status(f"Exported {len(rooms)} room(s) to {path}")
 
     def open_plan(self):
+        if not self._confirm_discard_changes("Open plan"):
+            return
         start = self.current_path or str(designs_dir())
         path, _ = QFileDialog.getOpenFileName(
             self, "Open plan", start,
@@ -6969,13 +7002,15 @@ class MainWindow(QMainWindow):
         self._write_plan(path)
 
     def _write_plan(self, path: str):
+        state = self.serialize()
         try:
             with open(path, "w", encoding="utf-8") as f:
-                json.dump(self.serialize(), f, indent=2)
+                json.dump(state, f, indent=2)
         except OSError as ex:
             QMessageBox.critical(self, "Save failed", str(ex))
             return
         self.current_path = path
+        self._saved_state = state            # plan now matches what's on disk
         self._update_title()
         self.status(f"Saved {path}")
 
@@ -6994,9 +7029,11 @@ class MainWindow(QMainWindow):
 
     def save_path(self, path: str):
         """Non-interactive save (no dialogs).  Raises on failure."""
+        state = self.serialize()
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(self.serialize(), f, indent=2)
+            json.dump(state, f, indent=2)
         self.current_path = path
+        self._saved_state = state
         self._update_title()
 
     def clear_plan(self):

@@ -7,6 +7,28 @@ from PyQt6.QtCore import QPointF
 pytestmark = pytest.mark.io
 
 
+def test_dirty_tracking_for_unsaved_changes(fp, win, tmp_path):
+    sc = win.scene
+    assert win._is_dirty() is False              # fresh blank plan is clean
+    sc.addItem(fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior"))
+    fp.rebuild_all_walls(sc)
+    assert win._is_dirty() is True               # an edit makes it dirty
+    win.save_path(str(tmp_path / "p.json"))
+    assert win._is_dirty() is False              # saving clears it
+    sc.addItem(fp.WallItem(QPointF(0, 60), QPointF(120, 60), "interior"))
+    fp.rebuild_all_walls(sc)
+    assert win._is_dirty() is True               # a further edit -> dirty again
+    win.clear_plan()
+    assert win._is_dirty() is False              # New resets the clean baseline
+
+
+def test_unchanged_scene_is_not_falsely_dirty(fp, win, make_room):
+    # serialize() of a static scene is stable, so no false "unsaved" prompt
+    make_room(win.scene, 0, 0, 144, 120, "Den")
+    win._saved_state = win.serialize()
+    assert win._is_dirty() is False
+
+
 def test_json_roundtrip(fp, win, make_room, first_furnishing, counts):
     sc = win.scene
     make_room(sc, 0, 0, 144, 120, "Den")
