@@ -1810,11 +1810,14 @@ class WallItem(QGraphicsItem):
             return
         sp = e.scenePos()
         # generous endpoint catch radius (~20 px on screen, larger when zoomed
-        # in) so the little end-knob is easy to grab without missing
+        # in) so the little end-knob is easy to grab without missing -- but
+        # never more than a third of the wall, so a SHORT wall keeps a grabbable
+        # middle to body-slide perpendicular (else the end zones cover it all)
         tol = max(12.0, 20.0 / self._view_scale())
+        ep_tol = min(tol, self.length() / 3.0)
         ends = self._ends_editable()       # endpoints locked while in a room
-        near_p1 = ends and QLineF(sp, self.p1).length() <= tol
-        near_p2 = ends and QLineF(sp, self.p2).length() <= tol
+        near_p1 = ends and QLineF(sp, self.p1).length() <= ep_tol
+        near_p2 = ends and QLineF(sp, self.p2).length() <= ep_tol
         ctrl = bool(e.modifiers() & Qt.KeyboardModifier.ControlModifier)
         if ctrl and not (near_p1 or near_p2):
             # Ctrl+click on the body toggles selection-set membership; Ctrl on
@@ -5258,12 +5261,21 @@ class ReferenceImageItem(QGraphicsItem):
         self._ipp = float(ipp)
         self.threshold = int(threshold)
         self.merge = int(merge)
+        self.locked = False                     # lock: no move/scale/crop/remove
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges,
                      True)
         self.setZValue(self.Z)
         self._scaling = None                    # corner index while scaling
+
+    def set_locked(self, locked: bool):
+        """Lock/unlock the backdrop: locked images can't be moved, rescaled,
+        cropped or removed (a small padlock badge shows the state)."""
+        self.locked = bool(locked)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable,
+                     not self.locked)
+        self.update()
 
     # -- scale / geometry ----------------------------------------------------
     def inches_per_pixel(self) -> float:
@@ -5302,18 +5314,36 @@ class ReferenceImageItem(QGraphicsItem):
         painter.setOpacity(0.7)
         painter.drawImage(rect, self._img)
         painter.setOpacity(1.0)
-        pen = QPen(QColor(37, 99, 235), 0)
-        pen.setStyle(Qt.PenStyle.DashLine)
+        if self.locked:
+            pen = QPen(QColor(202, 138, 4), 0)         # amber solid = locked
+            pen.setStyle(Qt.PenStyle.SolidLine)
+        else:
+            pen = QPen(QColor(37, 99, 235), 0)
+            pen.setStyle(Qt.PenStyle.DashLine)
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawRect(rect)
-        if self.isSelected():
+        if self.isSelected() and not self.locked:      # no resize knobs when locked
             hs = self._handle_in()
             painter.setBrush(QColor(37, 99, 235))
             painter.setPen(Qt.PenStyle.NoPen)
             for i in range(4):
                 c = self._corner_local(i)
                 painter.drawRect(QRectF(c.x() - hs, c.y() - hs, 2 * hs, 2 * hs))
+        if self.locked:
+            self._paint_lock_badge(painter)
+
+    def _paint_lock_badge(self, painter):
+        """A small padlock at the top-left so the locked state is obvious."""
+        s = 16.0 / self._view_scale()              # ~constant 16 px badge
+        x, y = s * 0.4, s * 0.4
+        painter.setPen(QPen(QColor(120, 80, 4), 0))
+        painter.setBrush(QColor(250, 204, 21))      # body
+        painter.drawRoundedRect(QRectF(x, y + s * 0.55, s, s * 0.75),
+                                s * 0.16, s * 0.16)
+        painter.setBrush(Qt.BrushStyle.NoBrush)     # shackle
+        painter.setPen(QPen(QColor(120, 80, 4), max(0.8, s * 0.16)))
+        painter.drawArc(QRectF(x + s * 0.2, y, s * 0.6, s * 0.9), 0, 180 * 16)
 
     # -- corner-drag scaling -------------------------------------------------
     def _corner_at(self, local_pt: QPointF):
@@ -5324,12 +5354,12 @@ class ReferenceImageItem(QGraphicsItem):
         return None
 
     def mousePressEvent(self, e):
-        if e.button() == Qt.MouseButton.LeftButton:
+        if not self.locked and e.button() == Qt.MouseButton.LeftButton:
             self._scaling = self._corner_at(e.pos())
             if self._scaling is not None:
                 e.accept()
                 return
-        super().mousePressEvent(e)
+        super().mousePressEvent(e)          # locked: select only (no move/scale)
 
     def mouseMoveEvent(self, e):
         if self._scaling is not None:
@@ -5398,18 +5428,24 @@ class ReferenceImageItem(QGraphicsItem):
 
     def contextMenuEvent(self, e):
         menu = QMenu()
+        a_lock = menu.addAction("Unlock image" if self.locked else "Lock image")
+        menu.addSeparator()
         a_cal = menu.addAction("Calibrate scale (2 points)…")
         a_crop = menu.addAction("Crop to region")
         a_ext = menu.addAction("Extract walls")
         menu.addSeparator()
         a_rem = menu.addAction("Remove image")
+        for a in (a_cal, a_crop, a_rem):     # locked: no scale/crop/delete
+            a.setEnabled(not self.locked)
         a_front, a_back = add_front_back_actions(menu)
         chosen = menu.exec(e.screenPos())
         if handle_front_back(self, chosen, a_front, a_back):
             e.accept()
             return
         view = self._view()
-        if chosen is a_cal and view is not None:
+        if chosen is a_lock:
+            self.set_locked(not self.locked)
+        elif chosen is a_cal and view is not None:
             view.start_image_calibrate(self)
         elif chosen is a_crop and view is not None:
             view.start_image_crop(self)
@@ -6224,7 +6260,7 @@ class MainWindow(QMainWindow):
         self._dirty_timer.stop()
         self._restoring = True
         try:
-            self.load_data(state)
+            self.load_data(state, keep_backdrop=True)   # undo keeps the backdrop
         finally:
             self._restoring = False
         self._committed_state = self.serialize()
@@ -6454,7 +6490,7 @@ class MainWindow(QMainWindow):
             "furnishings": furnishings,
         }
 
-    def load_data(self, data: dict):
+    def load_data(self, data: dict, keep_backdrop: bool = False):
         if data.get("format") != FILE_FORMAT:
             raise ValueError("Not a Floor Planner JSON file.")
         loaded = data.get("settings", {})
@@ -6467,7 +6503,18 @@ class MainWindow(QMainWindow):
             except (TypeError, ValueError):
                 SETTINGS[key] = default
         self._apply_canvas()
+        # the reference image is a tracing backdrop, not plan data -- on undo
+        # (keep_backdrop) detach it so scene.clear() doesn't delete it, then
+        # re-add it afterwards.  New/Open clear it like everything else.
+        backdrops = []
+        if keep_backdrop:
+            backdrops = [it for it in self.scene.items()
+                         if isinstance(it, ReferenceImageItem)]
+            for b in backdrops:
+                self.scene.removeItem(b)
         self.scene.clear()
+        for b in backdrops:
+            self.scene.addItem(b)
         self._z_top = 0                  # bring-to-front counter resets per doc
         for wd in data.get("walls", []):
             wall = WallItem(QPointF(*wd["p1"]), QPointF(*wd["p2"]),

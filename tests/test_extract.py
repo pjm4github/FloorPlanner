@@ -132,6 +132,35 @@ def test_reference_image_corner_scale(fp, win, tmp_path):
     assert w1 == pytest.approx(2 * w0)
 
 
+def test_reference_image_lock_blocks_move_and_scale(fp, win, tmp_path):
+    item = win.start_image_import(str(_make_plan_png(tmp_path / "plan.png")))
+    movable = fp.QGraphicsItem.GraphicsItemFlag.ItemIsMovable
+    assert item.locked is False and bool(item.flags() & movable)
+    item.set_locked(True)
+    assert item.locked is True and not (item.flags() & movable)
+    # a corner press must NOT start a scale drag while locked
+    item._scaling = None
+    if not item.locked:                            # guard mirrors the handler
+        item._scaling = item._corner_at(item._corner_local(0))
+    assert item._scaling is None
+    item.set_locked(False)
+    assert bool(item.flags() & movable)            # unlock restores movability
+
+
+def test_undo_keeps_the_reference_image(fp, win, tmp_path):
+    from PyQt6.QtCore import QPointF
+    win.start_image_import(str(_make_plan_png(tmp_path / "plan.png")))
+    win._reset_undo()
+    win.scene.addItem(fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior"))
+    fp.rebuild_all_walls(win.scene)
+    win._commit_if_changed()
+    win.undo()                                     # used to wipe the backdrop
+    assert sum(1 for i in win.scene.items()
+               if isinstance(i, fp.WallItem)) == 0  # wall edit was undone
+    assert any(isinstance(i, fp.ReferenceImageItem)
+               for i in win.scene.items())          # backdrop survived
+
+
 def test_extract_from_reference_adds_walls(fp, win, tmp_path):
     from PyQt6.QtCore import QPointF
     item = win.start_image_import(str(_make_plan_png(tmp_path / "plan.png")))

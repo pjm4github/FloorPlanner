@@ -175,7 +175,7 @@ so no system fonts are needed.
 | Choose a tool | Toolbar icons or keys **S** E I D W R (Select / Exterior / Interior / Door / Window / Room) |
 | Zoom / pan | Mouse wheel / drag empty space (middle-drag anywhere) |
 | Draw a wall | Click-drag (Shift = free angle, Esc = cancel). Overlapping same-type walls within the snap grid **coalesce** into one shared wall (a boundary between two rooms is a single wall, not a duplicate); the drawn end **welds** onto a wall it lands on, forming a clean T/L joint |
-| Stretch / slide a wall | Drag its end / body in Select mode. A dragged end sticks to the projected line of a nearby orthogonal wall (so you can close a corner) and grid-snaps otherwise; overlapping same-type walls coalesce on release |
+| Stretch / slide a wall | Drag its end / body in Select mode. A dragged end sticks to the projected line of a nearby orthogonal wall (so you can close a corner) and grid-snaps otherwise; overlapping same-type walls coalesce on release. The end-grab zone is capped at a third of the wall, so even a short wall keeps a grabbable middle to slide perpendicular |
 | Re-angle a wall end | Drag the end with **Shift** = free angle, or **Ctrl** = snap to 15° increments around the anchored end (build 45° and other off-axis walls) |
 | Delete a wall | Right-click → *Delete wall* (or select + Delete). A wall on a room perimeter **fractures**: the room-edge stretch is kept, only the rest is removed; a wall bordering no room is deleted whole |
 | Coalesce + weld on demand | **Edit ▸ Coalesce all walls now** merges overlaps and welds every T/L junction across the plan (toggle auto-coalesce in File ▸ Settings) |
@@ -183,6 +183,7 @@ so no system fonts are needed.
 | Name a room | Tool 6, click an enclosed area (one-shot; Ctrl-pick the tool to keep it) |
 | Move a room (with its walls) | Drag the room name (Ctrl-drag = nudge the label only) |
 | Detach a wall from its room | Right-click the wall → *Detach wall from room* |
+| Lock the imported PNG backdrop | Right-click the image → *Lock image* (a padlock badge shows; locked images can't be moved, rescaled, cropped or removed — right-click → *Unlock image* to release) |
 | Room dimensions / properties / inventory | Right-click the room name |
 | Place furniture | Drag from the right palette onto the plan |
 | Rotate furniture | Select it, drag the round handle (Ctrl = snapped) |

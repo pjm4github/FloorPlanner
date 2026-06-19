@@ -218,6 +218,39 @@ def test_stretch_does_not_fuse_to_a_parallel_endpoint(fp, scene):
     assert t.x() == pytest.approx(96)              # grid-snapped, not fused
 
 
+# -- a SHORT wall must keep a grabbable middle for the perpendicular slide -----
+class _Press:
+    def __init__(self, pt, mods=Qt.KeyboardModifier.NoModifier):
+        self._pt, self._mods = QPointF(*pt), mods
+
+    def button(self):
+        return Qt.MouseButton.LeftButton
+
+    def modifiers(self):
+        return self._mods
+
+    def scenePos(self):
+        return self._pt
+
+    def accept(self):
+        pass
+
+    def ignore(self):
+        pass
+
+
+def test_short_wall_middle_click_body_slides(fp, scene):
+    w = fp.WallItem(QPointF(100, 100), QPointF(118, 100), "interior")  # 18"
+    scene.addItem(w)
+    fp.rebuild_all_walls(scene)
+    w._mode = None
+    w.mousePressEvent(_Press((109, 100)))     # the middle of the short wall
+    assert w._mode == "move"                  # body slide, not an end grab
+    w._mode = None
+    w.mousePressEvent(_Press((100.5, 100)))   # right at the end
+    assert w._mode in ("p1", "p2")            # end still grabbable
+
+
 # -- Ctrl-drag: re-angle in fixed (15 deg) increments around the anchor --------
 import math  # noqa: E402
 
