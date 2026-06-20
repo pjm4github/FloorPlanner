@@ -17,7 +17,8 @@ def manifest_guard(fp):
     original = path.read_text(encoding="utf-8")
     yield path
     path.write_text(original, encoding="utf-8")
-    fp._FURN_CATALOG = None          # force a clean reload of the catalog
+    from floorplanner import catalog
+    catalog._FURN_CATALOG = None     # force a clean reload of the catalog
 
 
 def test_catalog_carries_price_field(fp):

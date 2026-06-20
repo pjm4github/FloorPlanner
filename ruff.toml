@@ -10,6 +10,8 @@ ignore = ["E501"]
 # the floorplanner package aggregates submodules via star re-export; the
 # top-level FloorPlanner.py is a compatibility shim over the package
 "floorplanner/__init__.py" = ["F403", "F405", "E402"]
+# scene modules pull Qt + lower-layer helpers via star import
+"floorplanner/*.py" = ["F403", "F405"]
 "FloorPlanner.py" = ["F403", "F405"]
 # generator script defines big literal tables
 "_gen_assets.py" = ["E501"]
