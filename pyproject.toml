@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "floorplanner"
+version = "1.0"                       # source of truth: APP_VERSION in floorplanner/config.py
+description = "A 2D architectural floor-plan editor written in Python with PyQt6."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Patrick Moran" }]
+dependencies = [
+    "PyQt6==6.11.0",
+    "PyQt6-sip==13.11.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/pjm4github/FloorPlanner"
+
+[project.scripts]
+floorplanner = "floorplanner.app:main"
+
+[tool.setuptools]
+# the app package, plus the top-level shim and headless tools as modules
+packages = ["floorplanner"]
+py-modules = ["FloorPlanner", "fp_macro", "fp_extract"]
+
+[tool.setuptools.package-data]
+# bundled fonts + artwork live under assets/ at the repo root; an editable
+# install (pip install -e .) keeps the layout so config.py resolves them.
+floorplanner = []

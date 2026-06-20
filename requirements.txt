@@ -1,2 +1,2 @@
-pyqt6-sip
-PyQt6
+PyQt6==6.11.0
+PyQt6-sip==13.11.1

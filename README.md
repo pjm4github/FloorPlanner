@@ -5,8 +5,9 @@
 `APP_VERSION` when shipping; planning docs (`CODE_REVIEW.md`, `REFACTOR_PLAN.md`,
 `TODO.md`) are tagged with the baseline version they target.
 
-A 2D architectural floor-plan editor written in Python with PyQt6 — a single
-file, `FloorPlanner.py`, plus bundled fonts and artwork.
+A 2D architectural floor-plan editor written in Python with PyQt6 — the
+`floorplanner/` package (run `python FloorPlanner.py` or the `floorplanner`
+console script), plus bundled fonts and artwork.
 
 ![Floor Planner screenshot](docs/screenshot.png)
 
