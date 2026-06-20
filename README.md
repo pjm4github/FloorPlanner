@@ -1,5 +1,10 @@
 # Floor Planner
 
+**Version 1.0** — single source of truth: `APP_VERSION` in `FloorPlanner.py`
+(also the JSON `FILE_VERSION`, currently 3, for the on-disk plan format). Bump
+`APP_VERSION` when shipping; planning docs (`CODE_REVIEW.md`, `REFACTOR_PLAN.md`,
+`TODO.md`) are tagged with the baseline version they target.
+
 A 2D architectural floor-plan editor written in Python with PyQt6 — a single
 file, `FloorPlanner.py`, plus bundled fonts and artwork.
 
