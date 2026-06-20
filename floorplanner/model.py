@@ -11,11 +11,12 @@ The live editor still edits `QGraphicsItem`s in a scene; `MainWindow` bridges
 the two (`project_from_scene` / `apply_project_to_scene`).  Coordinates here are
 plain `(x, y)` float tuples, converted to/from `QPointF` only at that bridge.
 
-Forward-compat for multi-floor plans (REFACTOR_PLAN.md / TODO.md): every item
-carries a `floor` and `Project` carries `floors` + `active_floor`, defaulting to
-a single "default" floor.  These fields are NOT yet serialized — `to_dict()`
-still emits the v3 shape exactly — so the Floors feature owns the v4 bump and
-the per-item `floor` emission.  Reading them here is harmless on v3 files.
+Multi-floor plans (v4): every item carries a `floor` and `Project` carries
+`floors` + `active_floor`, defaulting to a single "default" floor.  `to_dict()`
+emits `floors` and each item's `floor`; `active_floor` is view state and is NOT
+emitted (so switching floors doesn't dirty the snapshot).  `from_dict()` migrates
+v1–v3 files (no `floors`/`floor`) to one "default" floor with every item tagged
+"default".
 """
 from __future__ import annotations
 
@@ -28,7 +29,7 @@ __all__ = [
 ]
 
 FILE_FORMAT = "floorplanner-json"
-FILE_VERSION = 3          # v3: walls carry a list of owning rooms (shared walls)
+FILE_VERSION = 4          # v4: every item carries a "floor"; top-level "floors" list
 DEFAULT_FLOOR = "default"
 
 Coord = tuple[float, float]
@@ -98,6 +99,7 @@ class Wall:
             "rooms": sorted(self.rooms),
             "openings": [o.to_dict()
                          for o in sorted(self.openings, key=lambda o: o.s)],
+            "floor": self.floor,
         }
 
 
@@ -128,6 +130,7 @@ class Room:
             "label_offset": [self.label_offset[0], self.label_offset[1]],
             "show_dimensions": self.show_dimensions,
             "properties": self.properties,
+            "floor": self.floor,
         }
 
 
@@ -153,7 +156,7 @@ class Furnishing:
 
     def to_dict(self) -> dict:
         return {"kind": self.kind, "pos": [self.pos[0], self.pos[1]],
-                "rotation": self.rotation, **self.extra}
+                "rotation": self.rotation, "floor": self.floor, **self.extra}
 
 
 @dataclass
@@ -205,22 +208,27 @@ class Project:
         )
 
     def to_dict(self) -> dict:
-        """Emit the documented v3 JSON.  Arrays are sorted z-independently
-        (by geometry, exactly as the legacy serialize() did) so bring-to-front
-        z changes never alter the snapshot — keeping undo/redo comparison
-        correct.  `floors`/`active_floor` are intentionally NOT emitted yet."""
+        """Emit the documented JSON.  Arrays are sorted z-independently (by
+        geometry, exactly as the legacy serialize() did) so bring-to-front z
+        changes never alter the snapshot — keeping undo/redo comparison correct.
+
+        `floors` and each item's `floor` ARE emitted (v4); `active_floor` is NOT
+        — it's view state, so switching the active floor must not change the
+        snapshot (no spurious undo step / false "unsaved")."""
         walls = [w.to_dict() for w in self.walls]
         rooms = [r.to_dict() for r in self.rooms]
         furnishings = [f.to_dict() for f in self.furnishings]
         walls.sort(key=lambda w: (w["p1"], w["p2"], w["type"],
-                                  tuple(w["rooms"])))
-        rooms.sort(key=lambda r: r["name"])
-        furnishings.sort(key=lambda f: (f["pos"], f["kind"], f["rotation"]))
+                                  tuple(w["rooms"]), w["floor"]))
+        rooms.sort(key=lambda r: (r["name"], r["floor"]))
+        furnishings.sort(key=lambda f: (f["pos"], f["kind"], f["rotation"],
+                                        f["floor"]))
         return {
             "format": FILE_FORMAT,
             "version": self.version,
             "units": self.units,
             "settings": dict(self.settings),
+            "floors": [f.to_dict() for f in self.floors],
             "walls": walls,
             "rooms": rooms,
             "furnishings": furnishings,

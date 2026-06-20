@@ -90,10 +90,63 @@ The editor is a single canvas, and `serialize()` is flat (`format`, `version`, `
 
 ---
 
-## Suggested sequencing
+## Status (updated 2026-06-20)
 
-1. **Module split (#1)** — mechanical, low-risk, unblocks everything else. *(Next session.)*
-2. **Model layer (#2)** — introduce dataclasses, move serialization onto the model first.
-3. **Multifloor (#6)** — build on the model layer while it's still small.
-4. **Command-based undo (#3)** — once the model exists.
-5. **Settings object (#4)** and **packaging/pinning (#5)** — independent, can land anytime.
+- **#1 Module split — ✅ DONE.** `FloorPlanner.py` is a 163-line shim over the `floorplanner/` package.
+- **#2 Model layer — ✅ DONE.** Qt-free `model.py` (`Project`/`Wall`/…); `serialize`/`load_data` bridge through it.
+- **#3 Command-based undo — ⛔ STILL HOLDS** (unchanged). Plan below.
+- **#4 Global mutable `SETTINGS` — ⚠️ PARTIALLY MITIGATED.** Centralized in `config.py` as one shared object; still a process-wide mutable singleton. Plan below.
+- **#5 Packaging/pinning — ✅ DONE.** `pyproject.toml` + console entry point; pinned `PyQt6`/`PyQt6-sip`.
+- **#6 Multifloor — ✅ DONE (Phase 1).** Built on the model layer per `TODO.md`: per-item `floor`, floor-scoped detection/coalesce/weld/junctions, gray rendering + visibility, a Floors menu + status-bar indicator, FILE_VERSION 4 with v1–v3 migration. (Phase 2 = duplicate-floor / move-between-floors / stacking view.)
+
+## Fix plan — #4 Settings object (low risk, recommended first)
+
+The mutable dict is read in ~50 sites across `config`/`geometry`/`walls`/`rooms`/
+`items`/`dialogs`/`mainwindow`, many in free functions (`wall_snap`,
+`canvas_rect`, coalesce tolerances) that have no window handle — so threading a
+config object through every signature is high churn for a single-window app.
+Encapsulate the global instead:
+
+1. Add a small `Settings` wrapper in `config.py` (typed accessors over the dict
+   + `load(dict)`/`as_dict()`), and a module-level `active_settings()` accessor
+   backed by one current instance (default = `DEFAULT_SETTINGS`).
+2. Repoint the free functions to read `active_settings()[…]` (or keep the name
+   `SETTINGS` as a property that returns the active instance's dict — minimal
+   diff).
+3. `MainWindow` owns its `Settings`; on construction/load/new it sets the active
+   instance. `load_data`/`SettingsDialog` mutate that instance, not a global.
+4. Tests reset via `active_settings()` instead of the `SETTINGS.update(...)`
+   save/restore dance in `conftest`.
+
+Outcome: state is encapsulated and explicitly owned, test isolation is clean,
+and a second window could swap the active settings on focus. (Full
+threading-everywhere de-globalization is intentionally out of scope — modest ROI
+for this app.) Module-level *constants* (`EXTERIOR_T`, `WALL_Z`, …) stay as-is.
+
+## Fix plan — #3 Command-based undo (large, higher risk — defer)
+
+Replace whole-document snapshots with `QUndoStack` + `QUndoCommand` subclasses so
+cost scales with the edit, not the plan:
+
+1. Add `QUndoStack` to `MainWindow`; wire `undo`/`redo`/enable-state to it.
+2. One command per edit family: `AddItems`, `DeleteItems`, `MoveItems`,
+   `EditWallEnds`, `EditRoomProps`, `EditOpening`, `Group`/`Ungroup`,
+   `ChangeSettings` (and the floor ops once #6 lands). Each captures the minimal
+   undo data (serialized form + positions of *affected* items), mutates the
+   scene, and on undo/redo restores only those items, re-running a localized
+   `rebuild_all_walls`/`refresh_rooms`.
+3. Migrate edit paths incrementally — route each mutation through a command,
+   keeping the snapshot stack as a fallback until every path is converted, then
+   remove it. Pairs with the model layer (a command can mutate model + scene).
+
+**Caveats:** undo correctness is currently bulletproof and this touches every
+edit path (high regression risk); the review itself calls snapshot undo "a
+scaling ceiling, not a bug." Recommend deferring until after #6, and profiling
+the large plan first to confirm the snapshot cost is a felt pain before paying
+the migration cost.
+
+## Suggested sequencing (revised)
+
+1. ~~Module split (#1)~~ ✅ · ~~Model layer (#2)~~ ✅ · ~~Packaging (#5)~~ ✅ · ~~Multifloor (#6, Phase 1)~~ ✅
+2. **Settings object (#4)** — small, low-risk, improves test isolation. Anytime.
+3. **Command-based undo (#3)** — large/risky scaling optimization; defer, profile first.

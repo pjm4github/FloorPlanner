@@ -8,7 +8,9 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import QRectF, QSettings, QStandardPaths
-from PyQt6.QtGui import QFontDatabase, QIcon
+from PyQt6.QtGui import QColor, QFontDatabase, QIcon
+
+from floorplanner.model import DEFAULT_FLOOR  # schema constant (single source)
 
 __all__ = [
     "FOOT", "EXTERIOR_T", "INTERIOR_T", "GRID_MINOR", "GRID_MAJOR",
@@ -24,6 +26,8 @@ __all__ = [
     "config_dir", "settings_file", "designs_dir", "app_settings",
     "FONT_DIR", "FONT_FAMILY", "load_fonts",
     "ICON_DIR", "FURN_DIR", "FURN_MIME", "tool_icon",
+    "DEFAULT_FLOOR", "FLOOR_GHOST", "active_floor", "set_floor_state",
+    "floor_display_mode", "apply_floor_visibility",
 ]
 
 # repo root (this file lives in floorplanner/, assets/ sits one level up)
@@ -114,7 +118,7 @@ DEFAULT_ROOM_PROPS = {
 }
 
 APP_NAME = "FloorPlanner"
-APP_VERSION = "1.0"
+APP_VERSION = "1.2"
 APP_URL = "https://github.com/pjm4github/FloorPlanner"
 
 
@@ -185,3 +189,63 @@ FURN_MIME = "application/x-floorplanner-furnishing"
 def tool_icon(name: str) -> QIcon:
     p = ICON_DIR / f"{name}.svg"
     return QIcon(str(p)) if p.is_file() else QIcon()
+
+
+# ----------------------------------------------------------------------------
+# Floors — runtime view state read by paint() and the geometry hot paths
+# without a window handle.  Authoritative roster lives on MainWindow
+# (self.floors / self.active_floor); _sync_floor_state mirrors it here.
+#
+# Backed by a MUTABLE dict + accessor FUNCTIONS (not bare module globals): the
+# scene modules pull these via star import, so a rebindable string global would
+# be a stale snapshot in each module.  Functions reading one shared dict — like
+# SETTINGS — stay live across the whole package.
+# ----------------------------------------------------------------------------
+FLOOR_GHOST = QColor(176, 176, 176)     # flat gray for non-active floors
+
+_FLOOR_STATE = {
+    "active": DEFAULT_FLOOR,             # the one editable floor
+    "reference": set(),                  # floors shown as a gray backdrop
+    "show_others": False,                # ghost the rest in gray (else hidden)
+}
+
+
+def active_floor() -> str:
+    return _FLOOR_STATE["active"]
+
+
+def set_floor_state(active=None, reference=None, show_others=None):
+    """Update the runtime floor cache (called by MainWindow._sync_floor_state)."""
+    if active is not None:
+        _FLOOR_STATE["active"] = active
+    if reference is not None:
+        _FLOOR_STATE["reference"] = set(reference)
+    if show_others is not None:
+        _FLOOR_STATE["show_others"] = bool(show_others)
+
+
+def floor_display_mode(floor) -> str:
+    """'active' | 'reference' | 'ghost' | 'hidden' for a floor name."""
+    if floor == _FLOOR_STATE["active"]:
+        return "active"
+    if floor in _FLOOR_STATE["reference"]:
+        return "reference"
+    return "ghost" if _FLOOR_STATE["show_others"] else "hidden"
+
+
+def apply_floor_visibility(scene):
+    """Show/enable top-level items by their floor's display mode: only the
+    active floor is editable; reference floors are visible but disabled;
+    others are hidden (or ghosted when 'show others' is on).  Items without a
+    `floor` (e.g. the PNG backdrop) are left untouched."""
+    if scene is None:
+        return
+    for it in scene.items():
+        if it.parentItem() is not None:          # top-level items only
+            continue
+        floor = getattr(it, "floor", None)
+        if floor is None:
+            continue
+        mode = floor_display_mode(floor)
+        it.setVisible(mode != "hidden")
+        it.setEnabled(mode == "active")

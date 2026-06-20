@@ -21,8 +21,10 @@ def nearest_wall_endpoint(scene, p: QPointF, tol: float, exclude=None):
     best, best_d = None, tol
     if scene is None:
         return None
+    active = active_floor()
     for it in scene.items():
-        if isinstance(it, WallItem) and it is not exclude:
+        if (isinstance(it, WallItem) and it is not exclude
+                and it.floor == active):         # weld only to active-floor walls
             for q in (it.p1, it.p2):
                 d = QLineF(p, q).length()
                 if d < best_d:
@@ -39,8 +41,10 @@ def nearest_wall_body(scene, p: QPointF, tol: float, exclude=None):
     best, best_d = None, float("inf")
     if scene is None:
         return None
+    active = active_floor()
     for it in scene.items():
-        if isinstance(it, WallItem) and it is not exclude:
+        if (isinstance(it, WallItem) and it is not exclude
+                and it.floor == active):         # weld only to active-floor walls
             length = it.length()
             if length < 1e-6:
                 continue
@@ -135,7 +139,8 @@ def coincident_walls(scene, wall, index=None, perp_tol=1.5):
         cands = scene.items()
     for w in cands:
         if not isinstance(w, WallItem) or w is wall or w.is_open \
-                or w.length() < 1e-6 or w.scene() is None:
+                or w.length() < 1e-6 or w.scene() is None \
+                or w.floor != wall.floor:        # coalesce stays on one floor
             continue
         wu = w.unit()
         if abs(wu.x() * u.y() - wu.y() * u.x()) > 0.02:        # not parallel
@@ -328,6 +333,7 @@ def fracture_delete_wall(scene, wall, settle=True):
         a = QPointF(p1.x() + u.x() * s0, p1.y() + u.y() * s0)
         b = QPointF(p1.x() + u.x() * s1, p1.y() + u.y() * s1)
         seg = WallItem(a, b, wall.wall_type)
+        seg.floor = wall.floor               # kept stretch stays on the wall's floor
         scene.addItem(seg)
         for kind, code, s, dtype, swing in ops:
             if s0 <= s <= s1:
@@ -378,10 +384,14 @@ class _WallBBoxIndex:
 
     CELL = 60.0          # 5 ft cells
 
-    def __init__(self, scene):
+    def __init__(self, scene, floor=None):
+        # floor=None indexes every wall; pass a floor to index only that floor's
+        # walls (room detection scopes the dirty-check to the active floor).
         self.cells = {}
         for w in (scene.items() if scene is not None else []):
             if not isinstance(w, WallItem):
+                continue
+            if floor is not None and w.floor != floor:
                 continue
             wb = wall_bbox(w)
             for i in range(int(wb.left() / self.CELL),
@@ -432,7 +442,8 @@ def _compute_wall_junctions(scene, walls=None):
         found = False
         for other in bbi.near(wb):
             if (other is w or not isinstance(other, WallItem)
-                    or other.is_open or other._solid.isEmpty()):
+                    or other.is_open or other._solid.isEmpty()
+                    or other.floor != w.floor):   # junctions don't cross floors
                 continue
             if (other._solid.boundingRect().intersects(wb)
                     and other._solid.intersects(w._solid)):
@@ -462,6 +473,7 @@ class WallItem(QGraphicsItem):
         self.wall_type = wall_type
         self.p1 = QPointF(p1)
         self.p2 = QPointF(p2)
+        self.floor = active_floor()   # tagged with the active floor (load overrides)
         self.openings = []            # OpeningItem children
         self.rooms = []               # RoomItems this wall borders ([] = free)
         self._corners_unlocked = False  # endpoints draggable while in a room
@@ -610,7 +622,13 @@ class WallItem(QGraphicsItem):
 
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        fill = QColor(60, 62, 68) if self.wall_type == "exterior" else QColor(150, 152, 158)
+        ghost = floor_display_mode(self.floor) != "active"
+        if ghost:                            # non-active floor: flat gray, no UI
+            fill, outline = FLOOR_GHOST, FLOOR_GHOST
+        elif self.wall_type == "exterior":
+            fill, outline = QColor(60, 62, 68), QColor(25, 25, 25)
+        else:
+            fill, outline = QColor(150, 152, 158), QColor(25, 25, 25)
         # fill the body with NO outline so overlapping walls read as one solid
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(fill))
@@ -621,9 +639,11 @@ class WallItem(QGraphicsItem):
         if self._outline_clip is not None:
             painter.setClipPath(self._outline_clip)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(QColor(25, 25, 25), 0))
+        painter.setPen(QPen(outline, 0))
         painter.drawPath(self._path)
         painter.restore()
+        if ghost:                            # skip selection knobs + length label
+            return
 
         lod = option.levelOfDetailFromTransform(painter.worldTransform())
         lod = max(lod, 1e-6)
@@ -1001,11 +1021,14 @@ class OpenWall(WallItem):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         lod = max(option.levelOfDetailFromTransform(painter.worldTransform()),
                   1e-6)
-        pen = QPen(QColor(90, 120, 170), max(1.2, 1.6 / lod),
-                   Qt.PenStyle.DashLine)
+        ghost = floor_display_mode(self.floor) != "active"
+        col = FLOOR_GHOST if ghost else QColor(90, 120, 170)
+        pen = QPen(col, max(1.2, 1.6 / lod), Qt.PenStyle.DashLine)
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
         painter.drawLine(self.p1, self.p2)
+        if ghost:
+            return
         if self.isSelected():
             hs = 9.0 / lod
             painter.setPen(QPen(QColor(40, 40, 40), 0))
@@ -1098,13 +1121,16 @@ class OpeningItem(QGraphicsItem):
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         w, t = self.width, self.wall.t
-        ink = QPen(QColor(20, 20, 20), 0)
+        ghost = floor_display_mode(self.wall.floor) != "active"
+        ink = QPen(FLOOR_GHOST if ghost else QColor(20, 20, 20), 0)
         painter.setPen(ink)
         painter.setBrush(Qt.BrushStyle.NoBrush)
 
         # jambs (the cut ends of the wall)
         painter.drawLine(QPointF(-w / 2, -t / 2), QPointF(-w / 2, t / 2))
         painter.drawLine(QPointF(w / 2, -t / 2), QPointF(w / 2, t / 2))
+        if ghost:                            # gray jambs only on non-active floors
+            return
 
         if self.kind == "window":
             painter.setBrush(QBrush(QColor(255, 255, 255)))

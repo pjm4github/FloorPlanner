@@ -40,6 +40,7 @@ class FurnishingItem(QGraphicsItem):
         spec = furnishing_spec(kind) or {
             "name": kind, "width_in": 24.0, "depth_in": 24.0}
         self.kind = kind
+        self.floor = active_floor()      # active floor (load overrides)
         self.name = spec["name"]
         self.w = float(spec["width_in"])
         self.d = float(spec["depth_in"])
@@ -105,6 +106,13 @@ class FurnishingItem(QGraphicsItem):
 
     def paint(self, painter, option, widget=None):
         rect = QRectF(-self.w / 2, -self.d / 2, self.w, self.d)
+        if floor_display_mode(self.floor) != "active":
+            # non-active floor: a flat gray footprint (the SVG keeps its own
+            # colors, so show the outline/extent instead) and no handle.
+            painter.setPen(QPen(FLOOR_GHOST, 0))
+            painter.setBrush(QBrush(QColor(176, 176, 176, 40)))
+            painter.drawRect(rect)
+            return
         r = furnishing_renderer(self.kind)
         if r is not None:
             r.render(painter, rect)
@@ -307,11 +315,13 @@ class StairItem(FurnishingItem):
 
     # -- painting ------------------------------------------------------------
     def paint(self, painter, option, widget=None):
+        ghost = floor_display_mode(self.floor) != "active"
         painter.save()
         painter.translate(self._off)
-        ink = QColor(55, 65, 81)
+        ink = FLOOR_GHOST if ghost else QColor(55, 65, 81)
+        fill = QColor(176, 176, 176, 40) if ghost else QColor(248, 250, 252)
         painter.setPen(QPen(ink, 1.2))
-        painter.setBrush(QBrush(QColor(248, 250, 252)))
+        painter.setBrush(QBrush(fill))
         for r in self._geo["rects"]:
             painter.drawRect(r)
         painter.setPen(QPen(ink, 0.7))
@@ -319,7 +329,7 @@ class StairItem(FurnishingItem):
             painter.drawLine(QPointF(x1, y1), QPointF(x2, y2))
         self._paint_arrow(painter, ink)
         painter.restore()
-        if self._handle_visible():
+        if not ghost and self._handle_visible():
             self._paint_selection(painter)
 
     def _paint_arrow(self, painter, ink):
@@ -432,6 +442,7 @@ class GroupItem(QGraphicsItemGroup):
 
     def __init__(self):
         super().__init__()
+        self.floor = active_floor()       # active floor (set on grouping)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges,

@@ -60,10 +60,15 @@ def fp():
 
 @pytest.fixture(autouse=True)
 def _reset_settings():
-    """Isolate tests that mutate global SETTINGS (snap / canvas size)."""
-    _fp.SETTINGS.update(_fp.DEFAULT_SETTINGS)
+    """Isolate tests that mutate global SETTINGS (snap / canvas size) or the
+    runtime floor cache (active/reference/show-others)."""
+    def _reset():
+        _fp.SETTINGS.update(_fp.DEFAULT_SETTINGS)
+        _fp.set_floor_state(active=_fp.DEFAULT_FLOOR, reference=set(),
+                            show_others=False)
+    _reset()
     yield
-    _fp.SETTINGS.update(_fp.DEFAULT_SETTINGS)
+    _reset()
 
 
 @pytest.fixture

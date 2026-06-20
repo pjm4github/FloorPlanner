@@ -36,8 +36,11 @@ class _RoomGrid:
         self.has_walls = False
         if scene is None:
             return
+        active = active_floor()
         for w in scene.items():
             if not isinstance(w, WallItem) or w.is_open:
+                continue
+            if w.floor != active:            # detect only on the active floor
                 continue
             length = w.length()
             if length < 1e-6:
@@ -134,9 +137,10 @@ class _WallGraph:
         self.nodes = []           # QPointF per node
         self.edges = set()
         self.adj = {}
+        active = active_floor()
         walls = [it for it in (scene.items() if scene is not None else [])
                  if isinstance(it, WallItem) and not it.is_open
-                 and it.length() > 1e-6]
+                 and it.length() > 1e-6 and it.floor == active]
         if not walls:
             return
         segs = []                 # (length, ux, uy, p1x, p1y, p2x, p2y)
@@ -309,7 +313,8 @@ def room_signature(scene, room, wall_index=None):
             else [w for w in scene.items() if isinstance(w, WallItem)
                   and wall_bbox(w).intersects(box)])
     sig = [(round(w.p1.x()), round(w.p1.y()), round(w.p2.x()), round(w.p2.y()),
-            w.wall_type, w.is_open) for w in near]
+            w.wall_type, w.is_open)
+           for w in near if w.floor == room.floor]   # same-floor walls only
     return tuple(sorted(sig))
 
 
@@ -324,10 +329,14 @@ def refresh_rooms(scene):
     there -- skipping any region that already belongs to another room."""
     if scene is None:
         return
-    rooms = [it for it in scene.items() if isinstance(it, RoomItem)]
+    active = active_floor()
+    # only the active floor's rooms re-detect (grid/graph below are active-only);
+    # rooms on other floors keep their frozen geometry.
+    rooms = [it for it in scene.items()
+             if isinstance(it, RoomItem) and it.floor == active]
     if not rooms:
         return
-    wall_index = _WallBBoxIndex(scene)      # O(local) 'walls near this room'
+    wall_index = _WallBBoxIndex(scene, active)   # O(local) 'walls near this room'
     dirty = []
     for it in rooms:
         sig = room_signature(scene, it, wall_index)
@@ -393,6 +402,7 @@ class RoomItem(QGraphicsItem):
                  area_sqft: float, properties=None, corners=None):
         super().__init__()
         self.name = name
+        self.floor = active_floor()             # active floor (load overrides)
         self.anchor = QPointF(anchor)
         self.label_offset = QPointF(0.0, 0.0)   # label drag, relative to anchor
         self._dragging_label = False
@@ -685,7 +695,17 @@ class RoomItem(QGraphicsItem):
 
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        ghost = floor_display_mode(self.floor) != "active"
         painter.setPen(Qt.PenStyle.NoPen)
+        if ghost:                            # non-active floor: faint gray fill,
+            painter.setBrush(QBrush(QColor(176, 176, 176, 18)))   # gray label
+            painter.drawPath(self.path)
+            r = self._label_rect()
+            painter.setFont(self._font)
+            painter.setPen(QPen(FLOOR_GHOST, 0))
+            painter.drawText(r, Qt.AlignmentFlag.AlignHCenter
+                             | Qt.AlignmentFlag.AlignTop, self.name)
+            return
         painter.setBrush(QBrush(QColor(120, 170, 255, 26)))
         painter.drawPath(self.path)
         if self.isSelected():
@@ -830,6 +850,7 @@ class RoomItem(QGraphicsItem):
                 continue
             s0, s1 = span
             c = WallItem(w.point_at(s0), w.point_at(s1), w.wall_type)
+            c.floor = w.floor                 # private copy stays on the wall's floor
             sc.addItem(c)
             for op in w.openings:             # carry this edge's doors/windows
                 if s0 - 1e-6 <= op.s <= s1 + 1e-6:
@@ -991,13 +1012,15 @@ def _wall_spans_segment(w, a: QPointF, b: QPointF) -> bool:
     return True
 
 
-def _wall_along_segment(scene, a: QPointF, b: QPointF):
+def _wall_along_segment(scene, a: QPointF, b: QPointF, floor=None):
     """The wall whose body runs along (and spans) the segment a->b -- i.e.
     the longer wall that carries a room edge.  None if there isn't one.  When
     several walls span it, the geometrically smallest is chosen so the pick is
-    deterministic (scene.items() order is not) and save/load round-trips."""
+    deterministic (scene.items() order is not) and save/load round-trips.
+    Pass `floor` to restrict the search to one floor's walls."""
     cands = [w for w in scene.items()
              if isinstance(w, WallItem) and not w.is_open
+             and (floor is None or w.floor == floor)
              and _wall_spans_segment(w, a, b)]
     if not cands:
         return None
@@ -1022,6 +1045,7 @@ def duplicate_wall(scene, w):
     """A standalone copy of wall `w` (same type + openings), added to the scene
     and bound to no room.  Used when grouping a room duplicates its walls."""
     nw = WallItem(QPointF(w.p1), QPointF(w.p2), w.wall_type)
+    nw.floor = w.floor                          # inherit the source wall's floor
     scene.addItem(nw)
     for op in w.openings:
         try:
@@ -1042,6 +1066,8 @@ def synthesize_room_edge(scene, a: QPointF, b: QPointF):
     src = _wall_along_segment(scene, a, b)
     nw = WallItem(QPointF(a), QPointF(b),
                   src.wall_type if src is not None else "interior")
+    if src is not None:
+        nw.floor = src.floor                    # inherit the carrier's floor
     scene.addItem(nw)
     nw.rebuild()
     return nw
@@ -1072,7 +1098,8 @@ def bind_room_walls(scene, room, settle=True):
     # sort candidates by geometry so the per-edge pick is deterministic
     # (scene.items() order is not), which keeps save/load + undo round-trips
     # byte-stable
-    band_walls = sorted(room.bounding_walls(),
+    band_walls = sorted((w for w in room.bounding_walls()
+                         if w.floor == room.floor),     # bind only same-floor walls
                         key=lambda w: (w.p1.x(), w.p1.y(),
                                        w.p2.x(), w.p2.y(), w.wall_type))
     reused_open = set()
@@ -1086,7 +1113,7 @@ def bind_room_walls(scene, room, settle=True):
         if match is not None:                            # 1. share this wall
             room.bind_wall(match)
             continue
-        span = _wall_along_segment(scene, a, b)           # 2. share party wall
+        span = _wall_along_segment(scene, a, b, room.floor)  # 2. share party wall
         if span is not None and span.group() is None:
             # a longer/neighbour-owned wall runs along this edge -- SHARE it
             # (the shared-wall model: one wall borders several rooms) rather

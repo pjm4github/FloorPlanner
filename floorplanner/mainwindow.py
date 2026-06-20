@@ -22,8 +22,8 @@ from floorplanner.walls import _coalesce_all_impl  # star skips underscores
 from floorplanner.rooms import *  # noqa: F401
 from floorplanner.items import *  # noqa: F401
 from floorplanner.model import (  # serialization bridge (aliased)
-    FILE_VERSION, Furnishing, Opening as OpeningModel, Project,
-    Room as RoomModel, Wall as WallModel,
+    DEFAULT_FLOOR, FILE_VERSION, Floor, Furnishing, Opening as OpeningModel,
+    Project, Room as RoomModel, Wall as WallModel,
 )
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
@@ -65,6 +65,13 @@ class MainWindow(QMainWindow):
         self.item_clipboard = None        # cut/copied walls + furnishings
         self._recorder = None             # active MacroRecorderDialog (or None)
         self._recorder_dialog = None      # the (reused) recorder window
+        # floors: the authoritative roster (model Floor dataclasses) lives here;
+        # config's runtime cache mirrors it via _sync_floor_state.  active_floor
+        # and show_other_floors are VIEW state (kept out of serialize/undo).
+        # Set before _build_menus so the Floors menu can build from it.
+        self.floors = [Floor(DEFAULT_FLOOR)]
+        self.active_floor = DEFAULT_FLOOR
+        self.show_other_floors = False
         self._update_title()
 
         self.scene = QGraphicsScene(self)
@@ -79,6 +86,12 @@ class MainWindow(QMainWindow):
 
         self.coord_label = QLabel("")
         self.statusBar().addPermanentWidget(self.coord_label)
+        # active-floor indicator: click to pop a quick floor-switch menu
+        self.floor_label = QLabel("Floor: default")
+        self.floor_label.setToolTip("Active floor — click to switch")
+        self.floor_label.setStyleSheet("QLabel { padding: 0 6px; }")
+        self.floor_label.mousePressEvent = lambda e: self._popup_floor_menu()
+        self.statusBar().addPermanentWidget(self.floor_label)
         self.status(self.HINTS[TOOL_SELECT])
 
         # keep the toolbar totals current as rooms are added/resized/removed
@@ -86,6 +99,7 @@ class MainWindow(QMainWindow):
         self._update_totals()
 
         self._z_top = 0                  # running max-z for bring-to-front
+        self._sync_floor_state()         # populate the Floors menu + status label
 
         # undo / redo: full-document snapshots captured after each change
         # settles (debounced), so every canvas operation is reversible
@@ -297,6 +311,9 @@ class MainWindow(QMainWindow):
         a_record.setToolTip("Open the non-modal macro recorder")
         a_record.triggered.connect(self.open_macro_recorder)
         m_macro.addAction(a_record)
+
+        self.m_floors = self.menuBar().addMenu("&Floors")
+        self._rebuild_floor_menu()
 
         m_help = self.menuBar().addMenu("&Help")
         a_about = QAction(f"&About {APP_NAME}…", self)
@@ -962,6 +979,10 @@ class MainWindow(QMainWindow):
         """True when the plan has edits not yet written to its file."""
         return self.serialize() != self._saved_state
 
+    def _headless(self) -> bool:
+        """True under the offscreen Qt platform (tests): skip modal dialogs."""
+        return QApplication.platformName() == "offscreen"
+
     def _confirm_discard_changes(self, title: str = "Unsaved changes") -> bool:
         """If there are unsaved edits, ask Save / Discard / Cancel.  Returns True
         when it's OK to proceed (saved or discarded), False to cancel."""
@@ -995,6 +1016,9 @@ class MainWindow(QMainWindow):
         self.current_path = None
         SETTINGS.update(DEFAULT_SETTINGS)
         self._apply_canvas()
+        self.floors = [Floor(DEFAULT_FLOOR)]    # back to a single default floor
+        self.active_floor = DEFAULT_FLOOR
+        self._sync_floor_state()
         self._reset_undo()
 
     # -- save / load -------------------------------------------------------------
@@ -1020,6 +1044,7 @@ class MainWindow(QMainWindow):
                     pos=(it.pos().x(), it.pos().y()),
                     rotation=it.rotation(),
                     extra=dict(it.extra_state()),
+                    floor=getattr(it, "floor", DEFAULT_FLOOR),
                 ))
             elif isinstance(it, WallItem) and not it.is_open:
                 walls.append(WallModel(
@@ -1030,6 +1055,7 @@ class MainWindow(QMainWindow):
                     openings=[OpeningModel(op.kind, op.code, op.s,
                                            op.door_type, op.swing)
                               for op in it.openings],
+                    floor=getattr(it, "floor", DEFAULT_FLOOR),
                 ))
             elif isinstance(it, RoomItem):
                 rooms.append(RoomModel(
@@ -1038,10 +1064,15 @@ class MainWindow(QMainWindow):
                     label_offset=(it.label_offset.x(), it.label_offset.y()),
                     show_dimensions=it.show_dims,
                     properties=it.properties,
+                    floor=getattr(it, "floor", DEFAULT_FLOOR),
                 ))
+        # the roster MUST come from self.floors (an empty floor has no items to
+        # derive it from); active_floor rides along but is dropped by to_dict.
         return Project(version=FILE_VERSION, units="inches",
                        settings=dict(SETTINGS), walls=walls, rooms=rooms,
-                       furnishings=furnishings)
+                       furnishings=furnishings,
+                       floors=[Floor(f.name, f.reference) for f in self.floors],
+                       active_floor=self.active_floor)
 
     def serialize(self) -> dict:
         """Plan -> plain dict matching the documented JSON format.
@@ -1051,6 +1082,171 @@ class MainWindow(QMainWindow):
         changes never alter the snapshot — keeping undo/redo comparison
         correct."""
         return self.project_from_scene().to_dict()
+
+    def _sync_floor_state(self):
+        """Mirror the authoritative roster (self.floors / active_floor /
+        show_other_floors) into config's runtime cache, then re-apply
+        visibility and repaint.  Cheap; called on init, load, and floor ops."""
+        set_floor_state(
+            active=self.active_floor,
+            reference={f.name for f in self.floors if f.reference},
+            show_others=self.show_other_floors,
+        )
+        apply_floor_visibility(self.scene)
+        self.scene.update()
+        if hasattr(self, "floor_label"):
+            self.floor_label.setText(f"Floor: {self.active_floor}")
+        if hasattr(self, "m_floors"):
+            self._rebuild_floor_menu()
+
+    # -- floor operations -----------------------------------------------------
+    def _floor(self, name):
+        return next((f for f in self.floors if f.name == name), None)
+
+    def _rebuild_floor_menu(self):
+        """Repopulate &Floors: New floor, a submenu per floor (edit/rename/
+        reference/delete), then the Show-other-floors toggle."""
+        m = self.m_floors
+        m.clear()
+        a_new = m.addAction("&New floor…")
+        a_new.triggered.connect(self.new_floor)
+        m.addSeparator()
+        grp = QActionGroup(self)
+        grp.setExclusive(True)
+        for f in self.floors:
+            tag = f"{f.name}{'  (R)' if f.reference else ''}" \
+                  f"{'  ●' if f.name == self.active_floor else ''}"
+            sub = m.addMenu(tag)
+            a_edit = sub.addAction("Edit this floor")
+            a_edit.setCheckable(True)
+            a_edit.setChecked(f.name == self.active_floor)
+            grp.addAction(a_edit)
+            a_edit.triggered.connect(lambda _=False, n=f.name: self.switch_floor(n))
+            a_ren = sub.addAction("Rename…")
+            a_ren.triggered.connect(lambda _=False, n=f.name: self.rename_floor(n))
+            a_ref = sub.addAction("Reference floor")
+            a_ref.setCheckable(True)
+            a_ref.setChecked(f.reference)
+            a_ref.triggered.connect(
+                lambda _=False, n=f.name: self.toggle_reference_floor(n))
+            a_del = sub.addAction("Delete floor")
+            a_del.setEnabled(len(self.floors) > 1)
+            a_del.triggered.connect(lambda _=False, n=f.name: self.delete_floor(n))
+        m.addSeparator()
+        a_show = m.addAction("Show other floors (ghosted)")
+        a_show.setCheckable(True)
+        a_show.setChecked(self.show_other_floors)
+        a_show.triggered.connect(self.toggle_show_others)
+
+    def _popup_floor_menu(self):
+        """Quick floor switch from the status-bar label."""
+        menu = QMenu(self)
+        for f in self.floors:
+            a = menu.addAction(f"{f.name}{'  ●' if f.name == self.active_floor else ''}")
+            a.triggered.connect(lambda _=False, n=f.name: self.switch_floor(n))
+        menu.exec(self.floor_label.mapToGlobal(self.floor_label.rect().topLeft()))
+
+    def switch_floor(self, name):
+        """Make `name` the active (editable) floor.  View state only — no undo
+        step, no dirty (serialize() is unchanged across a switch)."""
+        if self._floor(name) is None or name == self.active_floor:
+            return
+        self.active_floor = name
+        self._sync_floor_state()
+        self.status(f"Editing floor '{name}'.")
+
+    def new_floor(self):
+        name, ok = QInputDialog.getText(self, "New floor", "Floor name:")
+        name = name.strip()
+        if not ok or not name:
+            return
+        if self._floor(name) is not None:
+            QMessageBox.warning(self, "New floor",
+                                f"A floor named '{name}' already exists.")
+            return
+        self.new_floor_named(name)
+
+    def new_floor_named(self, name):
+        """Add an EMPTY floor (Phase 1) and switch to it.  Non-interactive core
+        of new_floor (also used by tests)."""
+        if self._floor(name) is not None:
+            return
+        self.floors.append(Floor(name))
+        self.active_floor = name               # switch to it
+        self._sync_floor_state()
+        self._commit_floor_change()
+        self.status(f"Added floor '{name}'.")
+
+    def rename_floor(self, name):
+        f = self._floor(name)
+        if f is None:
+            return
+        new, ok = QInputDialog.getText(self, "Rename floor",
+                                       "New name:", text=name)
+        new = new.strip()
+        if not ok or not new or new == name:
+            return
+        if self._floor(new) is not None:
+            QMessageBox.warning(self, "Rename floor",
+                                f"A floor named '{new}' already exists.")
+            return
+        for it in self.scene.items():          # retag this floor's items
+            if getattr(it, "floor", None) == name:
+                it.floor = new
+        f.name = new
+        if self.active_floor == name:
+            self.active_floor = new
+        self._sync_floor_state()
+        self._commit_floor_change()
+
+    def toggle_reference_floor(self, name):
+        f = self._floor(name)
+        if f is None:
+            return
+        f.reference = not f.reference
+        self._sync_floor_state()
+        self._commit_floor_change()
+
+    def toggle_show_others(self, checked):
+        self.show_other_floors = bool(checked)
+        self._sync_floor_state()             # view state only — not undoable
+
+    def delete_floor(self, name):
+        if len(self.floors) <= 1:            # never delete the last floor
+            return
+        f = self._floor(name)
+        if f is None:
+            return
+        n_items = sum(1 for it in self.scene.items()
+                      if getattr(it, "floor", None) == name)
+        if self._confirm_floor_delete(name, n_items) is False:
+            return
+        for it in list(self.scene.items()):  # remove this floor's items
+            if getattr(it, "floor", None) == name and it.parentItem() is None:
+                self.scene.removeItem(it)
+        self.floors = [g for g in self.floors if g.name != name]
+        if self.active_floor == name:        # land on a surviving floor
+            self.active_floor = self.floors[0].name
+        rebuild_all_walls(self.scene)
+        self._sync_floor_state()
+        self._commit_floor_change()
+        self.status(f"Deleted floor '{name}'.")
+
+    def _confirm_floor_delete(self, name, n_items) -> bool:
+        if self._headless():
+            return True
+        msg = (f"Delete floor '{name}' and its {n_items} item(s)?"
+               if n_items else f"Delete the empty floor '{name}'?")
+        return QMessageBox.question(
+            self, "Delete floor", msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        ) == QMessageBox.StandardButton.Yes
+
+    def _commit_floor_change(self):
+        """Roster edits (add/rename/delete/reference) DO change serialize(), so
+        capture an undo step + mark dirty — unlike a plain active-floor switch."""
+        self._rebuild_floor_menu()
+        self._commit_if_changed()
 
     def load_data(self, data: dict, keep_backdrop: bool = False):
         """Rebuild the scene from a plan dict, via the Qt-free model.
@@ -1083,9 +1279,16 @@ class MainWindow(QMainWindow):
         self.scene.clear()
         for b in backdrops:
             self.scene.addItem(b)
+        # restore the floor roster + active floor from the model, and prime the
+        # runtime cache NOW so items created during this load default to the
+        # right active floor (each item's floor is then overridden from the file).
+        self.floors = [Floor(f.name, f.reference) for f in project.floors]
+        self.active_floor = project.active_floor
+        set_floor_state(active=self.active_floor)
         self._z_top = 0                  # bring-to-front counter resets per doc
         for wm in project.walls:
             wall = WallItem(QPointF(*wm.p1), QPointF(*wm.p2), wm.wall_type)
+            wall.floor = wm.floor                 # load overrides the default tag
             self.scene.addItem(wall)
             for om in wm.openings:
                 try:
@@ -1127,19 +1330,26 @@ class MainWindow(QMainWindow):
             name = unique_room_name(self.scene, rm.name)
             room = RoomItem(name, anchor, res[0], res[1],
                             rm.properties, res[2])
+            room.floor = rm.floor                 # load overrides the default tag
             room.show_dims = rm.show_dimensions
             room.label_offset = QPointF(*rm.label_offset)
             self.scene.addItem(room)
             # bind this room's walls by geometry (works for both v2 plans,
             # which store coincident party walls, and legacy v1 plans)
             bind_room_walls(self.scene, room, settle=False)
+            for w in room.walls:                  # a room's walls share its floor
+                w.floor = room.floor              # (fixes synthesized/open edges)
         unknown = []
         for fm in project.furnishings:
             if furnishing_spec(fm.kind) is None:
                 unknown.append(fm.kind or "?")
                 continue
-            self.scene.addItem(make_furnishing(
-                fm.kind, QPointF(*fm.pos), fm.rotation, fm.extra))
+            item = make_furnishing(fm.kind, QPointF(*fm.pos), fm.rotation,
+                                   fm.extra)
+            item.floor = fm.floor                 # load overrides the default tag
+            self.scene.addItem(item)
+        # roster + active floor are restored; sync the runtime cache + visibility
+        self._sync_floor_state()
         notes = []
         if missing:
             notes.append("Could not re-detect room(s): " + ", ".join(missing)
@@ -1613,9 +1823,12 @@ class MainWindow(QMainWindow):
 
     def _write_plan(self, path: str):
         state = self.serialize()
+        # the file remembers the active floor, but _saved_state must NOT (it's
+        # view state) or the dirty check would flag a clean plan after a switch.
+        on_disk = {**state, "active_floor": self.active_floor}
         try:
             with open(path, "w", encoding="utf-8") as f:
-                json.dump(state, f, indent=2)
+                json.dump(on_disk, f, indent=2)
         except OSError as ex:
             QMessageBox.critical(self, "Save failed", str(ex))
             return
@@ -1640,8 +1853,9 @@ class MainWindow(QMainWindow):
     def save_path(self, path: str):
         """Non-interactive save (no dialogs).  Raises on failure."""
         state = self.serialize()
+        on_disk = {**state, "active_floor": self.active_floor}
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2)
+            json.dump(on_disk, f, indent=2)
         self.current_path = path
         self._saved_state = state
         self._update_title()
@@ -1652,6 +1866,9 @@ class MainWindow(QMainWindow):
         self.current_path = None
         SETTINGS.update(DEFAULT_SETTINGS)
         self._apply_canvas()
+        self.floors = [Floor(DEFAULT_FLOOR)]    # back to a single default floor
+        self.active_floor = DEFAULT_FLOOR
+        self._sync_floor_state()
         self._reset_undo()
 
     def prepare_headless(self, w: int = 1280, h: int = 860):
