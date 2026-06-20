@@ -7,6 +7,10 @@ select = ["E", "F", "W", "B"]
 ignore = ["E501"]
 
 [lint.per-file-ignores]
+# the floorplanner package aggregates submodules via star re-export; the
+# top-level FloorPlanner.py is a compatibility shim over the package
+"floorplanner/__init__.py" = ["F403", "F405", "E402"]
+"FloorPlanner.py" = ["F403", "F405"]
 # generator script defines big literal tables
 "_gen_assets.py" = ["E501"]
 # headless scripts must set QT_QPA_PLATFORM before importing PyQt6

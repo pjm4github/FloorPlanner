@@ -7,9 +7,9 @@ import copy
 
 import pytest
 
-import model
-from model import (DEFAULT_FLOOR, FILE_FORMAT, FILE_VERSION, Floor, Furnishing,
-                   Opening, Project, Wall)
+from floorplanner import model
+from floorplanner.model import (DEFAULT_FLOOR, FILE_FORMAT, FILE_VERSION, Floor,
+                                Furnishing, Opening, Project, Wall)
 
 pytestmark = pytest.mark.io
 

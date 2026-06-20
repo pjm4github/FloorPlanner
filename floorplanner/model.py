@@ -22,6 +22,11 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
+__all__ = [
+    "FILE_FORMAT", "FILE_VERSION", "DEFAULT_FLOOR",
+    "Opening", "Wall", "Room", "Furnishing", "Floor", "Project",
+]
+
 FILE_FORMAT = "floorplanner-json"
 FILE_VERSION = 3          # v3: walls carry a list of owning rooms (shared walls)
 DEFAULT_FLOOR = "default"
