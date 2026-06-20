@@ -227,6 +227,18 @@ except ImportError:               # QtSvg missing: furnishings draw as boxes
     QSvgRenderer = None
     QSvgGenerator = None
 
+# Qt-free domain model: the single definition of the JSON schema (model.py).
+# serialize()/load_data() bridge the scene to/from these dataclasses.
+from model import (  # noqa: E402,F401  (re-exported: tests use fp.FILE_FORMAT)
+    FILE_FORMAT,
+    FILE_VERSION,
+    Furnishing,
+    Opening as OpeningModel,
+    Project,
+    Room as RoomModel,
+    Wall as WallModel,
+)
+
 # ----------------------------------------------------------------------------
 # Constants (all linear values are inches)
 # ----------------------------------------------------------------------------
@@ -310,8 +322,8 @@ DEFAULT_ROOM_PROPS = {
     "notes": "",
 }
 
-FILE_FORMAT = "floorplanner-json"
-FILE_VERSION = 3          # v3: walls carry a list of owning rooms (shared walls)
+# FILE_FORMAT / FILE_VERSION are defined in model.py (the schema's home) and
+# imported above, so the format constant lives in one place.
 
 APP_NAME = "FloorPlanner"
 APP_VERSION = "1.0"
@@ -6436,70 +6448,67 @@ class MainWindow(QMainWindow):
                                 f"{fmt_ftin(c.width())} × "
                                 f"{fmt_ftin(c.height())}")
 
-    def serialize(self) -> dict:
-        """Plan -> plain dict matching the documented JSON format.
+    def project_from_scene(self) -> Project:
+        """Walk the scene into the Qt-free domain model (model.Project).
 
-        The walls/rooms/furnishings arrays are emitted in a stable,
-        z-independent order (sorted by geometry) so that bring-to-front
-        z changes never alter the serialized document — keeping the
-        undo/redo snapshot comparison correct."""
+        Open walls are skipped — they're regenerated from a room's open
+        edges on load, not stored."""
         walls, rooms, furnishings = [], [], []
         for it in self.scene.items():
             if isinstance(it, FurnishingItem):
-                furnishings.append({
-                    "kind": it.kind,
-                    "pos": [it.pos().x(), it.pos().y()],
-                    "rotation": it.rotation(),
-                    **it.extra_state(),
-                })
+                furnishings.append(Furnishing(
+                    kind=it.kind,
+                    pos=(it.pos().x(), it.pos().y()),
+                    rotation=it.rotation(),
+                    extra=dict(it.extra_state()),
+                ))
             elif isinstance(it, WallItem) and not it.is_open:
-                # open walls are derived from a room's open edges, so they are
-                # regenerated on load rather than stored
-                walls.append({
-                    "type": it.wall_type,
-                    "p1": [it.p1.x(), it.p1.y()],
-                    "p2": [it.p2.x(), it.p2.y()],
-                    "rooms": sorted(r.name for r in it.rooms),
-                    "openings": [{
-                        "kind": op.kind,
-                        "code": op.code,
-                        "s": op.s,
-                        "door_type": op.door_type,
-                        "swing": op.swing,
-                    } for op in sorted(it.openings, key=lambda o: o.s)],
-                })
+                walls.append(WallModel(
+                    wall_type=it.wall_type,
+                    p1=(it.p1.x(), it.p1.y()),
+                    p2=(it.p2.x(), it.p2.y()),
+                    rooms=[r.name for r in it.rooms],
+                    openings=[OpeningModel(op.kind, op.code, op.s,
+                                           op.door_type, op.swing)
+                              for op in it.openings],
+                ))
             elif isinstance(it, RoomItem):
-                rooms.append({
-                    "name": it.name,
-                    "anchor": [it.anchor.x(), it.anchor.y()],
-                    "label_offset": [it.label_offset.x(), it.label_offset.y()],
-                    "show_dimensions": it.show_dims,
-                    "properties": it.properties,
-                })
-        walls.sort(key=lambda w: (w["p1"], w["p2"], w["type"],
-                                  tuple(w["rooms"])))
-        rooms.sort(key=lambda r: r["name"])
-        furnishings.sort(key=lambda f: (f["pos"], f["kind"], f["rotation"]))
-        return {
-            "format": FILE_FORMAT,
-            "version": FILE_VERSION,
-            "units": "inches",
-            "settings": dict(SETTINGS),
-            "walls": walls,
-            "rooms": rooms,
-            "furnishings": furnishings,
-        }
+                rooms.append(RoomModel(
+                    name=it.name,
+                    anchor=(it.anchor.x(), it.anchor.y()),
+                    label_offset=(it.label_offset.x(), it.label_offset.y()),
+                    show_dimensions=it.show_dims,
+                    properties=it.properties,
+                ))
+        return Project(version=FILE_VERSION, units="inches",
+                       settings=dict(SETTINGS), walls=walls, rooms=rooms,
+                       furnishings=furnishings)
+
+    def serialize(self) -> dict:
+        """Plan -> plain dict matching the documented JSON format.
+
+        Goes through the Qt-free model; Project.to_dict emits the arrays in a
+        stable, z-independent order (sorted by geometry) so bring-to-front z
+        changes never alter the snapshot — keeping undo/redo comparison
+        correct."""
+        return self.project_from_scene().to_dict()
 
     def load_data(self, data: dict, keep_backdrop: bool = False):
-        if data.get("format") != FILE_FORMAT:
-            raise ValueError("Not a Floor Planner JSON file.")
-        loaded = data.get("settings", {})
+        """Rebuild the scene from a plan dict, via the Qt-free model.
+
+        Parsing/migration (format check, defaults, version) live in
+        Project.from_dict; this bridge turns the model into scene items."""
+        self.apply_project_to_scene(Project.from_dict(data), keep_backdrop)
+
+    def apply_project_to_scene(self, project: Project,
+                               keep_backdrop: bool = False):
         for key, default in DEFAULT_SETTINGS.items():
+            val = project.settings.get(key, default)
             if isinstance(default, bool):    # keep flags as bool (not 1.0/0.0)
-                SETTINGS[key] = bool(loaded.get(key, default))
+                SETTINGS[key] = bool(val)
                 continue
             try:
-                SETTINGS[key] = float(loaded.get(key, default))
+                SETTINGS[key] = float(val)
             except (TypeError, ValueError):
                 SETTINGS[key] = default
         self._apply_canvas()
@@ -6516,38 +6525,35 @@ class MainWindow(QMainWindow):
         for b in backdrops:
             self.scene.addItem(b)
         self._z_top = 0                  # bring-to-front counter resets per doc
-        for wd in data.get("walls", []):
-            wall = WallItem(QPointF(*wd["p1"]), QPointF(*wd["p2"]),
-                            wd.get("type", "interior"))
+        for wm in project.walls:
+            wall = WallItem(QPointF(*wm.p1), QPointF(*wm.p2), wm.wall_type)
             self.scene.addItem(wall)
-            for od in wd.get("openings", []):
+            for om in wm.openings:
                 try:
-                    op = OpeningItem(wall, od.get("kind", "door"),
-                                     str(od.get("code", "3280")),
-                                     float(od.get("s", wall.length() / 2)))
+                    op = OpeningItem(wall, om.kind, om.code, om.s)
                 except ValueError:
                     continue              # e.g. opening wider than the wall
-                op.door_type = od.get("door_type", "LH")
-                op.swing = -1 if float(od.get("swing", -1)) < 0 else 1
+                op.door_type = om.door_type
+                op.swing = om.swing
                 wall.openings.append(op)
             # no per-wall rebuild here: rebuild_all_walls below rebuilds every
             # wall once with a shared index (a per-wall rebuild is O(n) with
             # cascade, so on a big/duplicated plan the loop alone took minutes)
         # merge overlapping/duplicate walls (e.g. legacy v1/v2 party-wall pairs)
         # into single shared walls FIRST, so the rebuild runs on the reduced set
-        # (welding is NOT done here: load_data is also the undo-restore path and
+        # (welding is NOT done here: load is also the undo-restore path and
         # welding does not fully converge at messy junctions -> geometry would
         # drift on every undo.  Junctions weld on draw and via the manual sweep.)
         coalesce_all(self.scene)
         rebuild_all_walls(self.scene)
         missing = []
-        for rd in data.get("rooms", []):
-            anchor = QPointF(*rd.get("anchor", [0, 0]))
+        for rm in project.rooms:
+            anchor = QPointF(*rm.anchor)
             res = detect_room(self.scene, anchor)
             if res is None:
                 # an open room (a wall was detached/moved away) won't flood-fill
                 # -> rebuild it from the saved perimeter corners
-                saved = (rd.get("properties") or {}).get("perimeter_corners")
+                saved = (rm.properties or {}).get("perimeter_corners")
                 if saved and len(saved) >= 3:
                     corners = [QPointF(c[0], c[1]) for c in saved]
                     res = (room_path_from_corners(corners),
@@ -6558,25 +6564,23 @@ class MainWindow(QMainWindow):
                     path.addRect(QRectF(anchor.x() - 12, anchor.y() - 12,
                                         24, 24))
                     res = (path, 0.0, None)
-                    missing.append(rd.get("name", "?"))
-            name = unique_room_name(self.scene, rd.get("name", "Room"))
+                    missing.append(rm.name)
+            name = unique_room_name(self.scene, rm.name)
             room = RoomItem(name, anchor, res[0], res[1],
-                            rd.get("properties"), res[2])
-            room.show_dims = bool(rd.get("show_dimensions", False))
-            room.label_offset = QPointF(*rd.get("label_offset", [0.0, 0.0]))
+                            rm.properties, res[2])
+            room.show_dims = rm.show_dimensions
+            room.label_offset = QPointF(*rm.label_offset)
             self.scene.addItem(room)
             # bind this room's walls by geometry (works for both v2 plans,
             # which store coincident party walls, and legacy v1 plans)
             bind_room_walls(self.scene, room, settle=False)
         unknown = []
-        for fd in data.get("furnishings", []):
-            kind = str(fd.get("kind", ""))
-            if furnishing_spec(kind) is None:
-                unknown.append(kind or "?")
+        for fm in project.furnishings:
+            if furnishing_spec(fm.kind) is None:
+                unknown.append(fm.kind or "?")
                 continue
             self.scene.addItem(make_furnishing(
-                kind, QPointF(*fd.get("pos", [0.0, 0.0])),
-                float(fd.get("rotation", 0.0)), fd))
+                fm.kind, QPointF(*fm.pos), fm.rotation, fm.extra))
         notes = []
         if missing:
             notes.append("Could not re-detect room(s): " + ", ".join(missing)
