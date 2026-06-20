@@ -924,8 +924,8 @@ class RoomItem(QGraphicsItem):
         e.accept()
 
     def contextMenuEvent(self, e):
-        # dialogs still live in the FloorPlanner shim (move to dialogs.py later)
-        from FloorPlanner import RoomInventoryDialog, RoomPropertiesDialog  # noqa: F401
+        from floorplanner.dialogs import (  # late: dialogs imports rooms at top
+            RoomInventoryDialog, RoomPropertiesDialog)  # noqa: F401
         menu = QMenu()
         a_dims = menu.addAction("Show dimensions")
         a_dims.setCheckable(True)

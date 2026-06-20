@@ -80,7 +80,10 @@ def test_dialog_has_provider_model_and_prefilled_prompt(fp, qapp):
 def test_dialog_fetch_applies_without_network(fp, qapp, monkeypatch,
                                               manifest_guard):
     ids = [s["id"] for s in fp.furnishing_catalog()[:1]]
-    monkeypatch.setattr(fp, "anthropic_fetch_prices",
+    # AIPricingDialog._fetch resolves the name in the dialogs module, so patch
+    # it there (where it is used), not on the FloorPlanner shim.
+    from floorplanner import dialogs
+    monkeypatch.setattr(dialogs, "anthropic_fetch_prices",
                         lambda *a, **k: {ids[0]: 42.0})
     dlg = fp.AIPricingDialog()
     dlg.ed_key.setText("sk-ant-test")
