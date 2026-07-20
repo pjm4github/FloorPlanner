@@ -13,6 +13,7 @@ authors = [{ name = "Patrick Moran" }]
 dependencies = [
     "PyQt6==6.11.0",
     "PyQt6-sip==13.11.1",
+    "numpy>=1.24",                    # fp_extract.py + Import-from-image
 ]
 
 [project.urls]

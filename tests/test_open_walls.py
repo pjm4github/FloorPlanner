@@ -154,7 +154,16 @@ def test_closing_gap_refuses_and_relocks(fp, win, make_room, drag):
     win.set_tool(fp.TOOL_SELECT)
     win.resize(1100, 900)
     win.show()
-    win.zoom_fit()
+    # Pin an exact integer zoom rather than zoom_fit(): this test drags the
+    # wall end up and then straight back down, so the two drags must be exact
+    # inverses. zoom_fit() yields a fractional m that depends on the actual
+    # viewport size (which differs per platform), and int(+-60*m) then
+    # truncates asymmetrically -- the end lands a fraction short of the corner
+    # and refuses to fuse. At an integer scale the scene<->pixel mapping is
+    # exact, so the round trip closes the gap on any viewport.
+    win.view.resetTransform()
+    win.view.scale(2.0, 2.0)
+    win.view.centerOn(QPointF(60, 60))
     right = next(w for w in room.walls if not w.is_open
                  and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
     fp.detach_wall_from_room(sc, right)

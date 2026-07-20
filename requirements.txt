@@ -1,2 +1,5 @@
 PyQt6==6.11.0
 PyQt6-sip==13.11.1
+# fp_extract.py (PNG -> plan) and the Import-from-image feature in
+# mainwindow/items; not pinned exactly so the 3.10 floor stays installable
+numpy>=1.24
