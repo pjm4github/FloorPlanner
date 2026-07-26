@@ -63,4 +63,6 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run tests
-        run: python -m pytest -ra
+        # exclude perf: timing-ratio scaling tests flap on shared runners; they
+        # are a local gate (P0.6, P3.8). Deterministic slow tests still run.
+        run: python -m pytest -ra -m "not perf"

@@ -20,7 +20,9 @@ from PyQt6.QtCore import QPointF
 
 import FloorPlanner as fp
 
-pytestmark = pytest.mark.slow
+# slow: --quick skips it. perf: CI skips it (-m "not perf") -- timing-ratio
+# assertions flap on shared runners; the harness is a local gate (P0.6, P3.8).
+pytestmark = [pytest.mark.slow, pytest.mark.perf]
 
 N = 4                       # small grid is N x N; large grid is 2N x 2N
 CELL = 120                  # 10 ft square rooms, sharing edge walls
