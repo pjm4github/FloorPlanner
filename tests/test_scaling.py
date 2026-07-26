@@ -185,9 +185,12 @@ def test_rebuild_scales_subquadratically(scaling):
 # quadratic): each setSelected fired _selected_room_shapes(), O(R^2 * W) path
 # booleans. P0.6 item 1 fixed it two ways; the two user paths are measured apart.
 # select_burst: Ctrl+A / rubber-band / macro. The debounce coalesces the burst,
-# so the harness (no event pump) measures the deferral -- near-zero.
-def test_select_burst_scales_subquadratically(scaling):
-    assert scaling["ratios"]["select_burst"] < 8
+# so the harness (no event pump) measures the deferral -- ~1 ms at 64 rooms.
+# ASSERT THE ABSOLUTE, NOT THE RATIO: the numbers here (0.2 ms -> 1.1 ms) sit at
+# the perf_counter floor, so a ratio built on them is timer noise wearing a
+# threshold's clothing. The absolute is the meaningful guard.
+def test_select_burst_is_cheap(scaling):
+    assert scaling["large"]["select_burst"] < 5.0    # ms, 64 rooms
 
 
 # select_interactive: a human ctrl-clicking, one _apply_edit_actions per click.
@@ -210,9 +213,13 @@ def test_bake_scales_subquadratically(scaling):
     assert scaling["ratios"]["bake"] < 8
 
 
-# ungroup_selected is marginally super-linear today (ratio ~8.5): coalesce_all +
-# rebuild over the whole plan on release. Same fix and gate as group -> P3.8.
-# strict=False because the ratio hovers near the threshold run to run.
-@pytest.mark.xfail(strict=False, reason="ungroup is ~quadratic until P3.8")
+# ungroup_selected calls coalesce_all on release, which is O(walls^2) BY
+# CONSTRUCTION -> ungroup is genuinely super-linear. It dips under 8 at n=8 after
+# P0.6 item 2 (the _oriented_box cache cut its boundingRect cost, ~8.5 -> ~5.6),
+# but that pass is INCIDENTAL at this grid size and reasserts at larger n.
+# Kept xfail(strict=False) -> P3.8 (topology ops replace coalesce_all): promoting
+# it would encode "ungroup is fine", which is false -- only "less bad at n=8".
+@pytest.mark.xfail(strict=False, reason="ungroup calls O(walls^2) coalesce_all "
+                                        "until P3.8; sub-8 at n=8 is incidental")
 def test_ungroup_scales_subquadratically(scaling):
     assert scaling["ratios"]["ungroup"] < 8

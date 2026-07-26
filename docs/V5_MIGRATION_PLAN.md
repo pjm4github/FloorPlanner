@@ -599,11 +599,11 @@ BEFORE -> AFTER ratios (t(2n)/t(n), n=4->8; before = P0.6 start):
              select_interactive        3.63 / 6.6ms   HARD PASS (cheap-count)
            group       12.37         10.92        (still xfail -> P3.8)
            bake         4.53          4.69
-           ungroup      8.56          5.62         (xpass this run; item 2's
-                                                    _oriented_box cache cut its
-                                                    boundingRect cost. Still
-                                                    xfail(strict=False)->P3.8:
-                                                    it flaps 5.6-8.2 run to run.)
+           ungroup      8.56          5.62         (item 2's _oriented_box cache
+                                                    cut its boundingRect cost.
+                                                    Kept xfail(strict=False)->P3.8
+                                                    -- see below: the sub-8 is
+                                                    incidental, not a real fix.)
 ITEM 1 (the headline): selecting all 64 rooms 75.5ms -> select_interactive 6.6ms
          (~11x on the honest per-click model; ~44x on the coalesced single pass).
          Split per the amendment: select_burst (no pump; debounce does the work)
@@ -615,8 +615,15 @@ ITEM 6: measured NoIndex vs BspTreeIndex on the 64-room grid -- NoIndex wins
 notes:   Items 2-5 are paint-time wins the headless harness barely reflects
          (no repaint), so rebuild/bake/group ratios move within noise; they are
          behaviour-preserving (full suite green, no test changed except the
-         harness split). Caveat for the record: select_burst's ratio is
-         noise-dominated (0.2ms vs 1.1ms at the timer-resolution floor) -- the
-         meaningful guard there is its ~1ms absolute, not the ratio. If it ever
-         flaps >8, switch it to an absolute assertion.
+         harness split).
+       * select_burst: CONVERTED to an absolute assertion (large < 5 ms), ratio
+         assertion dropped for that op only. 0.2 ms -> 1.1 ms is timer-floor
+         noise; a ratio on it is noise wearing a threshold's clothing. Fixed now
+         rather than waiting for it to flap.
+       * ungroup: kept xfail(strict=False) -> P3.8 deliberately, NOT promoted.
+         ungroup_selected calls coalesce_all on release, which is O(walls^2) by
+         construction, so ungroup is genuinely super-linear. The sub-8 at n=8 is
+         incidental (item 2 cut the boundingRect constant) and reasserts at
+         larger n. Promoting would encode "ungroup is fine" -- false; only "less
+         bad at n=8". P3.8's topology ops replace coalesce_all.
 ```
