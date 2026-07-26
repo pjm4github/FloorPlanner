@@ -587,8 +587,12 @@ class MainWindow(QMainWindow):
         were moved away), then re-detect the survivors."""
         sc = self.scene
         removed = 0
+        # only the active floor: room_walled tests against active-floor walls, so
+        # a room parked on another floor would look unwalled and be wrongly
+        # deleted (defect 2). refresh_rooms is already active-floor scoped.
         for it in list(sc.items()):
-            if isinstance(it, RoomItem) and not room_walled(sc, it):
+            if (isinstance(it, RoomItem) and it.floor == self.active_floor
+                    and not room_walled(sc, it)):
                 sc.removeItem(it)
                 removed += 1
         refresh_rooms(sc)                 # re-detect the survivors' regions

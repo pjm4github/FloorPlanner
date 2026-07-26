@@ -161,3 +161,17 @@ def test_v3_file_loads_as_single_default_floor(fp, win):
     assert win.active_floor == fp.DEFAULT_FLOOR
     walls = [w for w in win.scene.items() if isinstance(w, fp.WallItem)]
     assert walls and all(w.floor == fp.DEFAULT_FLOOR for w in walls)
+
+
+def test_refresh_rooms_cmd_spares_inactive_floor_rooms(fp, win, make_room):
+    # defect 2 (P0.5): refresh_rooms_cmd tests room_walled against the ACTIVE
+    # floor's walls, so a room parked on another floor looked unwalled and was
+    # deleted. It must only consider active-floor rooms.
+    den = make_room(win.scene, 0, 0, 120, 96, "Den")     # on default (active)
+    assert den.floor == fp.DEFAULT_FLOOR
+    win.new_floor_named("Upper")                          # switch active -> Upper
+    assert win.active_floor == "Upper"
+    win.refresh_rooms_cmd()
+    rooms = [r for r in win.scene.items() if isinstance(r, fp.RoomItem)]
+    assert any(r.name == "Den" and r.floor == fp.DEFAULT_FLOOR for r in rooms), \
+        "refresh_rooms_cmd deleted an inactive-floor room"
