@@ -7,6 +7,7 @@ LATE imports to avoid an import cycle."""
 import math
 from collections import deque
 
+from PyQt6 import sip
 from PyQt6.QtCore import *  # noqa: F401
 from PyQt6.QtGui import *  # noqa: F401
 from PyQt6.QtWidgets import *  # noqa: F401
@@ -671,6 +672,17 @@ class RoomItem(QGraphicsItem):
         return "\n".join(f"{a}\t{b}" for a, b in self.inventory_rows())
 
     # -- QGraphicsItem -----------------------------------------------------------
+    def itemChange(self, change, value):
+        # when removed from the scene, release every wall this room borders so
+        # no WallItem.rooms keeps a reference to a deleted room (mirrors
+        # WallItem.itemChange, walls.py:496-504, with the same sip.isdeleted guard)
+        if (change == QGraphicsItem.GraphicsItemChange.ItemSceneChange
+                and value is None and self.walls):
+            for w in list(self.walls):
+                if not sip.isdeleted(w):
+                    self.unbind_wall(w)
+        return super().itemChange(change, value)
+
     def _label_centre(self) -> QPointF:
         return QPointF(self.anchor.x() + self.label_offset.x(),
                        self.anchor.y() + self.label_offset.y())

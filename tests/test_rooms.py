@@ -505,3 +505,14 @@ def test_room_signature_index_matches_full_scan(fp, scene, make_room):
     scene.addItem(fp.WallItem(QPointF(400, 0), QPointF(500, 0), "interior"))
     idx = _WallBBoxIndex(scene)
     assert fp.room_signature(scene, room, idx) == fp.room_signature(scene, room)
+
+
+def test_removing_room_unbinds_its_walls(fp, scene, make_room):
+    # defect 5 (P0.5): a RoomItem removed from the scene must release its walls,
+    # so no WallItem.rooms keeps a dangling reference to the deleted room.
+    room = make_room(scene, 0, 0, 120, 120, "Den")
+    walls = list(room.walls)
+    assert walls and all(room in w.rooms for w in walls)
+    scene.removeItem(room)
+    assert all(room not in w.rooms for w in walls), \
+        "walls still reference the removed room"
