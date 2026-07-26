@@ -66,3 +66,11 @@ jobs:
         # exclude perf: timing-ratio scaling tests flap on shared runners; they
         # are a local gate (P0.6, P3.8). Deterministic slow tests still run.
         run: python -m pytest -ra -m "not perf"
+
+      - name: Validate v5 design corpus
+        # independent of the suite: the schema + invariant validator must accept
+        # every clean floorplanner-design example (planc1.v5.json is the
+        # intentionally-corrupt fixture, so it is not validated here)
+        run: |
+          python tools/validate_design.py examples/symmetricP1.json
+          python tools/validate_design.py examples/site_demo.json

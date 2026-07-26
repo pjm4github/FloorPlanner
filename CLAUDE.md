@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - PNG → plan extractor: `fp_extract.py` (numpy + `QImage`, no OpenCV/Pillow). Detects rectilinear walls and writes `floorplanner-json`. Gotchas: a `QApplication` must exist before `QImage` decodes a PNG (image plugins); keep the `QApplication` alive in a module global (a local gets GC'd and crashes `MainWindow`); copy QImage buffers into numpy (`arr.copy()`) — a view into the freed `QImage` segfaults. Its `setup_app()` sets the app font, so in-process tests use the conftest app/module (the `fp` fixture), not `setup_app()`.
 
 ## v5 migration (in progress)
-The file format and domain model are moving to `docs/design-schema.v5.json`.
+The file format and domain model are moving to `floorplanner/design/design-schema.v5.json` (vendored at P0.7; pointer at `docs/design-schema.v5.md`).
 Read `docs/V5_MIGRATION_PLAN.md` before changing walls/rooms/items/mainwindow —
 it says which code is being deleted and in which phase. Do not add new callers of
 `detect_room`, `refresh_rooms`, `bind_room_walls`, `coalesce_*`, `weld_all` or

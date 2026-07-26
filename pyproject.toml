@@ -23,11 +23,13 @@ Homepage = "https://github.com/pjm4github/FloorPlanner"
 floorplanner = "floorplanner.app:main"
 
 [tool.setuptools]
-# the app package, plus the top-level shim and headless tools as modules
-packages = ["floorplanner"]
+# the app package (+ the design subpackage), plus the top-level shim and
+# headless tools as modules
+packages = ["floorplanner", "floorplanner.design"]
 py-modules = ["FloorPlanner", "fp_macro", "fp_extract"]
 
 [tool.setuptools.package-data]
 # bundled fonts + artwork live under assets/ at the repo root; an editable
 # install (pip install -e .) keeps the layout so config.py resolves them.
 floorplanner = []
+"floorplanner.design" = ["design-schema.v5.json"]   # packaged v5 JSON Schema

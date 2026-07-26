@@ -92,6 +92,6 @@ Anything in A, or a "was" behaviour still present in B, is a real finding — th
 - [ ] Room areas elsewhere should be **unchanged** — only rooms named in the report should move
 - [ ] The document should open **dirty**. Closing without saving must leave the original file untouched on disk — verify with `git status` or a file timestamp
 - [ ] **Save As to a new filename** (not over the original). Reopen it: opens clean, not dirty, no conversion report
-- [ ] `python tools/validate_design.py <yourfile> docs/design-schema.v5.json` → Schema PASS, Invariants PASS
+- [ ] `python tools/validate_design.py <yourfile>` → Schema PASS, Invariants PASS (schema defaults to the packaged `floorplanner/design/design-schema.v5.json`)
 
 If a room's area changes and it *isn't* in the conversion report, stop and report it. That would mean the weld moved geometry it shouldn't have.

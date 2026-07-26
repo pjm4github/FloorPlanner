@@ -212,7 +212,7 @@ House total: 4,474.5 sf — 2,367.0 conditioned, 2,107.6 unconditioned (Garage, 
 
 | File | Role |
 |---|---|
-| `docs/design-schema.v5.json` | The design-file JSON Schema (2020-12). `format: "floorplanner-design"`, `version: 5`. |
+| `floorplanner/design/design-schema.v5.json` | The design-file JSON Schema (2020-12). `format: "floorplanner-design"`, `version: 5`. Vendored into the package at P0.7 (pointer: `docs/design-schema.v5.md`). |
 | `docs/DESIGN_MODEL_v5.md` | This document. |
 | `tools/migrate_to_design_v5.py` | v1–v4 → v5. Default = faithful; `--clean` = weld, re-trace outlines, repair. |
 | `tools/validate_design.py` | Schema + all thirteen invariants + a derived area/perimeter/accounting report. |

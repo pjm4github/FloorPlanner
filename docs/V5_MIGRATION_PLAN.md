@@ -1,6 +1,6 @@
 # v5 migration plan — staged, gated, executable
 
-**Target:** `docs/design-schema.v5.json` · **Review:** `docs/CODE_REVIEW_v2.md` · **Model rationale:** `docs/DESIGN_MODEL_v5.md`
+**Target:** `floorplanner/design/design-schema.v5.json` (vendored at P0.7; pointer at `docs/design-schema.v5.md`) · **Review:** `docs/CODE_REVIEW_v2.md` · **Model rationale:** `docs/DESIGN_MODEL_v5.md`
 
 Seven phases. Every task is small enough to finish and verify in one sitting, and **every task ends on a green gate**: `python -m ruff check .` then `python -m pytest -ra`, both clean, before the next task starts. `main` stays shippable throughout except during Phase 3, which runs on a branch.
 
@@ -96,7 +96,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P0.4** Characterization tests (xfail where broken) | ruff + pytest |
 | ☑ | **P0.5** Five free bug fixes | ruff + pytest |
 | ☑ | **P0.6** Cheap render wins | + P0.3 ratios |
-| ☐ | **P0.7** Vendor schema + validator; CI validates `examples/` | ruff + pytest |
+| ☑ | **P0.7** Vendor schema + validator; CI validates `examples/` | ruff + pytest |
 | ☐ | **P1.1** `design/model.py` — dataclasses | ruff + pytest |
 | ☐ | **P1.2** `design/validate.py` — I1–I14 | ruff + pytest |
 | ☐ | **P1.3** `design/topology.py` — weld/planarize/trace | ruff + pytest |
@@ -139,7 +139,7 @@ channel that has destroyed work in this project is closed.
 
 ```markdown
 ## v5 migration (in progress)
-The file format and domain model are moving to `docs/design-schema.v5.json`.
+The file format and domain model are moving to `floorplanner/design/design-schema.v5.json` (vendored at P0.7; pointer at `docs/design-schema.v5.md`).
 Read `docs/V5_MIGRATION_PLAN.md` before changing walls/rooms/items/mainwindow —
 it says which code is being deleted and in which phase. Do not add new callers of
 `detect_room`, `refresh_rooms`, `bind_room_walls`, `coalesce_*`, `weld_all` or
@@ -626,4 +626,33 @@ notes:   Items 2-5 are paint-time wins the headless harness barely reflects
          incidental (item 2 cut the boundingRect constant) and reasserts at
          larger n. Promoting would encode "ungroup is fine" -- false; only "less
          bad at n=8". P3.8's topology ops replace coalesce_all.
+
+P0.7  done
+ruff:    clean
+pytest:  304 passed, 4 xfailed, 1 xpassed; pytest -m io = 38 passed (corpus)
+files:   floorplanner/design/ (new pkg: __init__.py, validate.py, and the
+         schema moved in via git mv from docs/); tools/validate_design.py (now a
+         thin CLI over the package); tests/test_schema.py (new); requirements-
+         dev.txt (+jsonschema); .github/workflows/ci.yml (+corpus-validate step);
+         pyproject.toml (packages += floorplanner.design; package-data += the
+         schema); docs/design-schema.v5.md (pointer); path refs updated in
+         CLAUDE.md, DESIGN_MODEL_v5.md, SANITY_CHECK.md, and this plan's header
+         + P0.0 block.
+notes:   check(doc)->list[str] ported VERBATIM (pure Python, no third-party
+         import) so it is safe to call from the app; JSON-Schema validation is a
+         separate schema_errors() that LAZY-imports jsonschema -- a dev/test dep
+         (requirements-dev.txt), never shipped, so importing floorplanner.design
+         never requires it. Corpus results: symmetricP1 + site_demo schema PASS /
+         invariants PASS; planc1.v5 schema PASS but 23 invariant errors incl I6
+         -- test_corrupt_fixture_passes_schema_but_fails_I6 pins that (the "does
+         not launder its input" guard). test_corpus_discovered guards against a
+         rename silently emptying the parametrized corpus.
+         The schema MOVED (git mv, not copied) into the package as packaged data;
+         docs/ keeps design-schema.v5.md as the pointer. The CLI now defaults its
+         schema to the packaged one and inserts the repo root on sys.path so it
+         runs from any cwd (the package is not pip-installed; tests reach it via
+         conftest). Ran only P0.7 as specified -- the actions/checkout@v5 +
+         setup-python@v6 bump is deliberately held for a standalone commit at the
+         top of Phase 1 (changing the CI environment is a different risk class
+         from adding a step, and CI runs once per push).
 ```
