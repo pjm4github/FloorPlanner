@@ -103,6 +103,18 @@ def _measure(n):
 
     t["rebuild"] = _time(lambda: fp.rebuild_all_walls(sc))
 
+    # select the rooms one at a time -- exactly what ctrl-clicking each room does.
+    # Each setSelected fires scene.selectionChanged -> _update_edit_actions ->
+    # _selected_room_shapes(), which calls bounding_walls() for every
+    # already-selected room, so this is O(R^2 * W) path booleans before Ctrl+G.
+    rooms = [it for it in sc.items() if isinstance(it, fp.RoomItem)]
+    sc.clearSelection()
+
+    def _select_rooms_one_at_a_time():
+        for room in rooms:
+            room.setSelected(True)
+    t["select"] = _time(_select_rooms_one_at_a_time)
+
     sc.clearSelection()
     for it in sc.items():
         if isinstance(it, (fp.WallItem, fp.RoomItem, fp.FurnishingItem)):
@@ -122,7 +134,7 @@ def _measure(n):
     return t
 
 
-OPS = ("rebuild", "group", "bake", "ungroup")
+OPS = ("rebuild", "select", "group", "bake", "ungroup")
 
 
 @pytest.fixture(scope="module")
@@ -137,6 +149,8 @@ def scaling():
     for op in OPS:
         lines.append(f"[scaling]   {op:8s}  {small[op]:8.1f} ms -> "
                      f"{large[op]:9.1f} ms   ratio {ratios[op]:5.2f}")
+    lines.append(f"[scaling] absolute: selecting all {4 * N * N} rooms one at a "
+                 f"time = {large['select']:.1f} ms")
     report = "\n".join(lines)
     print("\n" + report)
     warnings.warn(UserWarning("\n" + report), stacklevel=1)   # visible in -ra
@@ -145,6 +159,19 @@ def scaling():
 
 def test_rebuild_scales_subquadratically(scaling):
     assert scaling["ratios"]["rebuild"] < 8
+
+
+# Building the selection is the worst-scaling op (ratio ~27 at P0.3b baseline --
+# beyond quadratic). Each ctrl-click fires _update_edit_actions ->
+# _selected_room_shapes(), which recomputes bounding_walls() for EVERY already-
+# selected room, so selecting R rooms is O(R^2 * W) path booleans. P3.5 makes
+# bounding_walls trivial (stored outlines, no per-call boolean union), which
+# drops the per-room constant; P3.8 is the gate that must show the ratio under 8.
+# strict=False -- see the log note: the O(R^2) recompute pattern itself lives in
+# _selected_room_shapes and may not fully clear until that is rewritten (P4.5).
+@pytest.mark.xfail(strict=False, reason="selection build is >quadratic until P3.8")
+def test_select_scales_subquadratically(scaling):
+    assert scaling["ratios"]["select"] < 8
 
 
 # group_selected is near-quadratic today (ratio ~13.7 at P0.3 baseline): a room's

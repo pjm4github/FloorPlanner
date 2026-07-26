@@ -57,7 +57,8 @@ So: the gate stands as written, and the 23 findings were **fixed at source** (me
 | ☑ | **P0.0** Point `CLAUDE.md` at this plan | ruff |
 | ☑ | **P0.1** Record the green baseline | ruff + pytest |
 | ☑ | **P0.2** Decouple tests from private names | ruff + pytest |
-| ☐ | **P0.3** Scaling harness | + `pytest -m slow` |
+| ☑ | **P0.3** Scaling harness | + `pytest -m slow` |
+| ☐ | **P0.3b** Add selection-building to the harness | + `pytest -m slow` |
 | ☐ | **P0.4** Characterization tests (xfail where broken) | ruff + pytest |
 | ☐ | **P0.5** Five free bug fixes | ruff + pytest |
 | ☐ | **P0.6** Cheap render wins | + P0.3 ratios |
@@ -128,6 +129,26 @@ it says which code is being deleted and in which phase. Do not add new callers o
 **Do.** Build an *n*×*n* grid of walled, named rooms with a door and a window per room and two furnishings, at *n* and 2*n* (start n=4 → 8, i.e. 16 → 64 rooms). Time four operations: `group_selected`, group drag + `bake`, `ungroup_selected`, `rebuild_all_walls`. Mark `@pytest.mark.slow`. Assert each ratio `t(2n)/t(n) < 8` (sub-quadratic in room count; quadratic would be ~16). Print the raw milliseconds so the numbers are visible in `-ra` output.
 **Acceptance.** Test runs and prints. **Record the current ratios in the log even if they fail the assertion** — if grouping is already quadratic, mark that test `xfail(strict=False)` with a comment pointing at P3.8 rather than weakening the threshold.
 **Why.** This is the only number that will prove Phase 3 worked.
+
+> **How to read the ratios.** The grid is *n*×*n*, so `n → 2n` multiplies the **room count by 4**, not 2. Therefore: **4 ≈ linear in rooms, 16 ≈ quadratic, and the threshold of 8 sits at rooms^1.5.** Anything under 4 is sub-linear.
+
+**Result (2026‑07‑26, n=4 → n=8, i.e. 16 → 64 rooms):**
+
+| op | n=4 | n=8 | ratio | reading |
+|---|---|---|---|---|
+| `rebuild_all_walls` | 1.2 ms | 3.2 ms | **2.7** | **sub-linear** — the memoized `refresh_rooms` genuinely works |
+| `group_selected` | 22.5 ms | 262.6 ms | **11.7–13.7** | near-quadratic → xfail, P3.8 |
+| `bake` | 29.8 ms | 143.0 ms | 4.4–4.8 | ~linear, passes |
+| `ungroup_selected` | 53.1 ms | 436.2 ms | **8.2–8.5** | rooms^1.5 → xfail, P3.8 |
+
+**`rebuild` at 2.7 is the surprise, and it is a constraint on Phase 3, not just good news.** The `_RoomGrid`/`_WallGraph`/`room_signature` machinery that P3.5 deletes is currently performing *better than linear*. Stored outlines should beat it outright — there is no detection left to do — but P3.8 must confirm that rather than assume it. If P3.8 shows `rebuild` regressing, that is a real finding, not noise.
+
+### P0.3b — Add selection-building to the harness
+**Why.** P0.3 measures `group_selected` *after* the selection exists. It does not measure **building** the selection, which is where the user's reported stall most likely lives: `scene.selectionChanged` → `_update_edit_actions` (`mainwindow.py:323`) → `_selected_room_shapes()` (`:598‑629`) calls `bounding_walls()` **per already-selected room**, so ctrl-clicking room *k* re-runs O(k·W) `QPainterPath` booleans. Selecting R rooms is therefore O(R²·W) path booleans *before Ctrl+G is ever pressed*. Nothing measures this.
+**Touches.** `tests/test_scaling.py`.
+**Do.** Add a fifth timed operation: select the rooms **one at a time** (`setSelected(True)` per room, which is what a ctrl-click does), measuring cumulative wall-clock. Same `n` / `2n` grid, same ratio assertion, same `xfail(strict=False)` → P3.8 if it fails.
+**Acceptance.** Ratio recorded. Also record the **absolute** time to select all 64 rooms — that number is the one to compare against the felt symptom.
+**Note.** The harness runs headless offscreen, so it measures none of the repaint cost (`FullViewportUpdate`, no `setCacheMode`). Real-world stalls will be worse than these numbers, not better.
 
 ### P0.4 — Characterization tests
 **Touches.** `tests/test_characterization.py` (new).
@@ -391,29 +412,43 @@ notes:   NO assertion changed — import source + comments only.
          accumulator value of 400) but that is a test-quality nit, not a
          migration hazard.
 
-P0.3  done
+P0.3  done   (commit 12024f1; b00af84..12024f1 = four rollback points, unpushed)
 ruff:    clean
-pytest:  289 passed, 2 xfailed, 0 failed in 8.72s (full -ra)
-         --quick: 276 passed, 15 skipped in 5.46s (all 4 scaling tests skipped)
+pytest:  289 passed, 2 xfailed, 0 failed in 8.72s
+         --quick: 276 passed, 15 skipped in 5.46s (harness behind `slow`, as intended)
 files:   tests/test_scaling.py (new)
-notes:   No existing test touched. New harness builds n x n shared-wall grids of
-         named rooms (door + window + 2 furnishings each) at n=4 (16 rooms) and
-         n=8 (64 rooms), times four ops, asserts each t(2n)/t(n) < 8. All 4 tests
-         @pytest.mark.slow, so --quick skips them. Numbers surface in `-ra` via a
-         warnings-summary line (print alone is captured on passing tests).
-         BASELINE RATIOS (vary ~10% run to run; two representative runs):
+notes:   No existing test touched. Ratios recorded WITHOUT weakening the
+         threshold, per acceptance — group and ungroup are xfail(strict=False)
+         -> P3.8; rebuild and bake assert hard.
+         Numbers surfaced via warnings.warn (visible under plain -ra) rather
+         than print (captured and hidden unless -s). Adopted as the convention.
+         FINDING: room detection is clipped to canvas_rect() (rooms.py:29), so
+         the n=8 grid (960") overflowed the default 840" canvas and edge rooms
+         went undetected until the canvas was enlarged. Logged as defect 16.
+
+P0.3b  done   (commit <this>; five rollback points on the branch, unpushed)
+ruff:    clean
+pytest:  289 passed, 3 xfailed, 0 failed in 9.19s
+         --quick: 276 passed, 16 skipped in 5.98s (all 5 scaling tests skipped)
+files:   tests/test_scaling.py (added a fifth timed op; no other test touched)
+notes:   Selection-building is the WORST-scaling op measured so far, and it is
+         the one nothing else was timing.
                        n=4 ms     n=8 ms     ratio
-           rebuild      1.2         3.2       2.69 / 2.71   PASS  (sub-quadratic)
-           group       22.5       262.6      11.67 / 13.65  XFAIL (near-quadratic)
-           bake        29.8       143.0       4.80 / 4.41   PASS
-           ungroup     53.1       436.2       8.22 / 8.46   XFAIL (just over 8)
-         Per acceptance: real ratios recorded, threshold NOT weakened. group and
-         ungroup are xfail(strict=False) pointing at P3.8 (the fix is vertices
-         owning geometry: no duplicate_wall, no coalesce_all/full re-detect on
-         group/ungroup). strict=False so they may pass early (P0.6) without a
-         strict-xpass failure, and so ungroup's ~8.2 does not flap the suite.
-         rebuild and bake are already sub-quadratic and keep asserting hard.
-         Aside: the grid needed the canvas enlarged (SETTINGS canvas_*_in) before
-         building — room detection floods a grid clipped to canvas_rect
-         (rooms.py:29), and n=8 (960") overflowed the default 840" height.
+           select        2.7        71.8      27.07   XFAIL  (> quadratic!)
+         For reference (same run): rebuild 2.61, group 11.65, bake 4.60,
+         ungroup 8.35. select's 27 is ABOVE the quadratic reference of 16 --
+         confirming O(R^2 * W): each setSelected fires _update_edit_actions ->
+         _selected_room_shapes(), which reruns bounding_walls() (QPainterPath
+         booleans) for every already-selected room. Ctrl-clicking room k costs
+         O(k*W); selecting all R is O(R^2*W).
+         ABSOLUTE (the number to hold against the felt symptom): selecting all
+         64 rooms one at a time = 71.8 ms HEADLESS. The harness is offscreen, so
+         this excludes ALL repaint cost (FullViewportUpdate, no setCacheMode);
+         the real stall is this plus a full-scene repaint per click, i.e. worse.
+         xfail(strict=False) -> P3.8 per the task. Nuance for the record: P3.5's
+         stored outlines make bounding_walls trivial and cut the per-room W
+         constant hard, but the O(R^2) STRUCTURE (recomputing all selected shapes
+         on every selectionChanged) lives in _selected_room_shapes and may not
+         fully clear until that is rewritten with group semantics at P4.5. If the
+         ratio is still >8 after P3.8, that is the reason, not a P3.8 regression.
 ```
