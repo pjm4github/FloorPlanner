@@ -1,11 +1,17 @@
-"""One-shot legacy-import geometry helpers (P1.3).
+"""Pre-vertex geometry helpers (P1.3).
 
-`weld_endpoints` is the odd one out among the topology functions: it runs at
-v1-v4 import time, on RAW wall dicts (`p1`/`p2`/`floor`), BEFORE a `Design`
-exists -- so it lives here, not in `topology.py`, and takes dicts, not
-dataclasses. Its lifetime ends once every legacy file has been converted; the
-`topology.py` ops (`split_edge`, `merge_collinear`, `trace_faces`) are forever.
-Keep them clearly distinct: these are not peers.
+`weld_endpoints` operates on RAW wall dicts (`p1`/`p2`/`floor`) -- geometry that
+has coordinates but no vertex table yet. That makes it distinct from
+`topology.py`, whose ops take/return a vertex-based `Design`; keep them separate,
+they are not peers.
+
+NOT purely import-only. Two callers, both pre-vertex:
+  * the v1-v4 importer (P2.1), where no `Design` exists yet; and
+  * `design_from_scene` (P1.4), because the live scene is still `p1`/`p2`-based
+    and needs the same weld-and-planarise pass before it can become a `Design`.
+Its lifetime ends at **P3.1**, when the scene becomes vertex-native and the
+weld/planarise happens on the vertex table directly. The `topology.py` ops
+(`split_edge`, `merge_collinear`, `trace_faces`) are forever.
 
 Ported verbatim from `tools/migrate_to_design_v5.py`. Stdlib only, no Qt.
 """

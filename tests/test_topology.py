@@ -119,6 +119,19 @@ def test_split_edge_adds_one_wall_and_preserves_faces():
     assert len(topology.trace_faces(d2)) == len(topology.trace_faces(d))
 
 
+def test_split_edge_raises_on_a_wall_with_openings():
+    # the landmine guard: splitting a wall that carries a door/window needs the
+    # P3.3 redistribution rule, so split_edge must FAIL LOUD rather than quietly
+    # leaving the opening on one segment
+    d = _design("symmetricP1.json")
+    pos = _pos(d)
+    w = next(w for w in d.walls if isinstance(w.openings, list) and w.openings)
+    a, b = pos[w.v1], pos[w.v2]
+    mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+    with pytest.raises(NotImplementedError, match="P3.3"):
+        topology.split_edge(d, w.id, mid[0], mid[1])
+
+
 def test_merge_collinear_preserves_faces_and_reduces_walls():
     d = _design("symmetricP1.json")
     d2 = topology.merge_collinear(d)

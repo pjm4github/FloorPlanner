@@ -176,8 +176,19 @@ def _next_id(design, prefix):
 def split_edge(design, wall_id, x, y):
     """Return a copy of `design` with wall `wall_id` split at the point (x, y)
     on its span into two collinear walls sharing a (welded) vertex. A no-op if
-    the point is at either endpoint. Openings are left on the FIRST segment
-    (full opening redistribution across a split is P3.3's split rule)."""
+    the point is at either endpoint.
+
+    RAISES on a wall that carries openings: redistributing a door/window across
+    a split (which segment owns it, at what offset) is P3.3's split rule, not
+    yet built. Failing loud here means the missing redistribution surfaces at
+    the call site, not three tasks later as a misplaced opening. P3.3 removes
+    this guard as part of implementing redistribution."""
+    src = next((w for w in design.walls if w.id == wall_id), None)
+    if src is not None and isinstance(src.openings, list) and src.openings:
+        raise NotImplementedError(
+            f"split_edge on wall {wall_id} carrying {len(src.openings)} "
+            "opening(s): opening redistribution across a split is P3.3 (the "
+            "wall-move split rule). Remove this guard when implementing it.")
     d = copy.deepcopy(design)
     pos = _positions(d)
     w = next((w for w in d.walls if w.id == wall_id), None)

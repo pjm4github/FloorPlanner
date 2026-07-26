@@ -276,8 +276,8 @@ Port from `tools/migrate_to_design_v5.py`: `weld_endpoints`, `planarize`, `split
 **Acceptance.** `trace_faces` on `symmetricP1` returns 19 faces whose areas match the stored room areas. `weld_endpoints` on the legacy `planc1.json` geometry welds exactly 31 ends.
 
 ### P1.4 — `design_from_scene()`
-Walk the live scene into a `Design`. **This is where the ten unfiltered floor queries get fixed** — the walk is level-scoped by construction.
-**Acceptance.** For every `examples/*.json`: load into a scene the old way, `design_from_scene()`, `check()` returns `[]` (except the known-corrupt fixture). Room areas match `project_from_scene()`'s to 0.1 sf.
+Walk the live scene into a `Design`. **This is where the ten unfiltered floor queries get fixed** — the walk is level-scoped **by construction** (iterate levels outer, items inner, so cross-level contamination is impossible, not merely filtered out). Build room outlines from the scene's own `RoomItem.corners`, **not** from `trace_faces`: `design_from_scene` must report what the scene *believes*, not what the geometry *should* be. Repairing while reading would make P1.6's shadow comparison diverge from the live scene; repair belongs at P2.1's import, once, and nowhere else. The scene is still `p1`/`p2`-based (pre-P3.1), so the walk uses `legacy.py`'s weld/planarise to reach a vertex table.
+**Acceptance.** Corpus is **legacy files only** — `examples/planc1.json`, `examples/sample_plan.json`, and scenes built by the test fixtures — because `symmetricP1.json`/`site_demo.json` are v5 and have no loader until P2.1. For each: load into a scene the old way, `design_from_scene()`, then room areas match `project_from_scene()`'s to 0.1 sf. `check(deep=True)` returns `[]` on the clean scenes (planc1 may carry the same referential faults as its v5 fixture — assert what it actually reports, don't force `[]`).
 
 ### P1.5 — `apply_design_to_scene()`
 Build the scene from a `Design`.
@@ -768,4 +768,36 @@ notes:   BOTH concrete acceptances hit exactly: trace_faces on symmetricP1
          only floorplanner imports are floorplanner.design.*), since importing
          them via the package would pull Qt through floorplanner/__init__.
          Not pushed -- Phase 1 pushes at its end.
+
+P1.3-followup  done   (responding to the two P1.3 flags)
+ruff:    clean
+pytest:  324 passed, 4 xfailed, 1 xpassed (+1: split_edge raises-on-openings)
+files:   design/topology.py (split_edge guard), design/legacy.py (docstring),
+         tests/test_topology.py (raises test), docs/CODE_REVIEW_v2.md (defect 18),
+         docs/V5_MIGRATION_PLAN.md (P1.4 acceptance amended).
+notes:   FLAG 1 (landmine) fixed: split_edge no longer leaves openings on the
+         first segment -- it RAISES NotImplementedError naming P3.3 on any wall
+         carrying openings. P3.3 removes the guard as it builds redistribution.
+         pytest.raises(match="P3.3") pins it. Same principle as deep=True: the
+         failure mode is loud, at the call site, not a rendering oddity three
+         tasks later.
+         FLAG 2 (probe the unmatched face): I checked, and it is TWO findings,
+         not the benign "no" branch.
+         - The unmatched 60.6 sf face's centroid is inside NO room (Garage
+           included) -- a genuinely unclaimed wall-bounded region in symmetricP1.
+           Not an M-Bath-class outline/wall disagreement; a corpus observation.
+         - Digging further: the Garage (868.5 sf) IS a valid raw traced face
+           (9 edges) -- it is not unenclosed. _inner_faces DROPS it because its
+           "drop the largest inner face as the outer boundary" heuristic is
+           unsound: the true outer boundary (4535 sf) is opposite-wound and
+           already excluded by the majority-sign filter, so inner[1:] discards
+           the biggest ROOM. The migrator masks this (per-room enclosing_face
+           recovers the room); standalone trace_faces loses it. Logged as
+           DEFECT 18 -> P3.5 (identify the boundary by winding, not area).
+         So the P1.3 "19 not 20" is really: Garage wrongly dropped by the
+         heuristic + a separate 60.6 unclaimed region. The unmatched=={Garage}
+         test still holds and still cannot pass for the wrong reason.
+         Also corrected legacy.py's docstring: it is PRE-VERTEX geometry (raw
+         p1/p2), used by BOTH the v4 importer (P2.1) AND design_from_scene (P1.4,
+         scene still p1/p2 until P3.1) -- not purely import-only. Retired at P3.1.
 ```
