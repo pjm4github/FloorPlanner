@@ -14,7 +14,7 @@ from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import WallItem, rebuild_all_walls
-from floorplanner.rooms import RoomItem, walls_cover_room
+from floorplanner.rooms import RoomItem, room_owns_walls, walls_cover_room
 
 # Stairs — a dynamic "Framing" furnishing: step count from the room's ceiling
 # height (standard ~7" risers); full or half flight to a landing.
@@ -586,7 +586,7 @@ class GroupItem(QGraphicsItemGroup):
         sc = self.scene()
         if sc is not None and group_walls:
             for it in sc.items():
-                if isinstance(it, RoomItem) and walls_cover_room(group_walls, it):
+                if isinstance(it, RoomItem) and room_owns_walls(group_walls, it):
                     self._snap_rooms.append(
                         (it, [QPointF(c) for c in (it.corners or [])],
                          QPointF(it.anchor), QPainterPath(it.path)))
@@ -675,7 +675,7 @@ class GroupItem(QGraphicsItemGroup):
                        if isinstance(ch, WallItem)}
         if sc is not None and group_walls:
             for it in sc.items():
-                if isinstance(it, RoomItem) and walls_cover_room(group_walls, it):
+                if isinstance(it, RoomItem) and room_owns_walls(group_walls, it):
                     moved_rooms.append(it)
         self.prepareGeometryChange()
         for ch in self.childItems():

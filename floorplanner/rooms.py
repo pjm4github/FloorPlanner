@@ -1027,23 +1027,36 @@ def _wall_along_segment(scene, a: QPointF, b: QPointF, floor=None):
     return min(cands, key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()))
 
 
-def walls_cover_room(walls, room) -> bool:
-    """True when `walls` move the whole room, so a rigid translation of them
-    carries the room's region/label rigidly too.
+def room_owns_walls(walls, room) -> bool:
+    """True when every built wall the room currently owns is in `walls`, so a
+    rigid move of `walls` moves the room's own perimeter and its region/label
+    must ride along.
 
-    Two ways to qualify:
-      1. `walls` form a complete loop along every traced perimeter edge (even
-         if extra coincident walls also touch the boundary); or
-      2. every built wall the room currently owns is in `walls` -- the room's
-         own perimeter is exactly what is moving.  This path needs no traced
-         corners, so it also covers grid-detected / imported / non-rectilinear
-         rooms (room.corners is None), which case 1 cannot evaluate."""
-    moving = set(walls)
+    This is the criterion for MOVING/ROTATING a room with a group (bake/
+    rotation): it is deliberately stricter than walls_cover_room() -- a group
+    of coincident COPIES (as made when a room-only selection is grouped) does
+    NOT own the room's walls, so it must not drag the original room off them.
+    Needs no traced corners, so it also covers grid-detected / imported /
+    non-rectilinear rooms (room.corners is None)."""
     own = [w for w in room.walls if isinstance(w, WallItem) and not w.is_open]
-    if own and all(w in moving for w in own):
+    moving = set(walls)
+    return bool(own) and all(w in moving for w in own)
+
+
+def walls_cover_room(walls, room) -> bool:
+    """True when `walls` correspond to `room` -- either they are the room's own
+    perimeter (room_owns_walls) or they form a complete loop along every traced
+    perimeter edge (even if extra coincident walls also touch the boundary).
+
+    This is the looser ASSOCIATION test (which room does this group enclose?),
+    used by group_room() to pick up a grouped/extracted room by its walls even
+    when the group holds copies rather than the room's bound walls.  For moving
+    a room use room_owns_walls()."""
+    if room_owns_walls(walls, room):
         return True
     if not room.corners:
         return False
+    moving = set(walls)
     n = len(room.corners)
     for i in range(n):
         a, b = room.corners[i], room.corners[(i + 1) % n]

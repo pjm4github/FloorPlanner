@@ -731,8 +731,14 @@ class MainWindow(QMainWindow):
         room is selected, its surrounding + interior walls are DUPLICATED into
         the group (the originals stay put) so the group is a movable/copyable
         copy of the room."""
+        selected = list(self.scene.selectedItems())
+        # walls the user selected directly ride into the group as themselves;
+        # a room's walls are duplicated EXCEPT any already selected this way, so
+        # selecting a room together with its walls doesn't make a coincident
+        # copy of every edge (which bloated the wall count until ungroup).
+        direct_walls = {it for it in selected if isinstance(it, WallItem)}
         members, old_groups = [], []
-        for it in list(self.scene.selectedItems()):
+        for it in selected:
             if isinstance(it, GroupItem):
                 old_groups.append(it)
             elif isinstance(it, (WallItem, FurnishingItem)):
@@ -743,6 +749,8 @@ class MainWindow(QMainWindow):
                     if not isinstance(w, WallItem) or w.is_open or id(w) in seen:
                         continue
                     seen.add(id(w))
+                    if w in direct_walls:
+                        continue          # already a member; don't copy it
                     members.append(duplicate_wall(self.scene, w))
         for g in old_groups:
             g.bake()

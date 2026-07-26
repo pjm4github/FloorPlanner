@@ -126,6 +126,59 @@ def test_bake_carries_room_without_traced_corners(fp, win, make_room):
     assert all(w.p1.x() >= 180 and w.p1.y() >= 80 for w in room.walls)
 
 
+def _built_walls(fp, sc):
+    return sum(isinstance(w, fp.WallItem) and not w.is_open for w in sc.items())
+
+
+def test_grouping_room_with_its_walls_makes_no_coincident_copies(fp, win,
+                                                                 make_room):
+    # regression (wall leak): selecting a room together with its own walls used
+    # to duplicate EVERY edge -- the group carried the 4 originals AND 4
+    # coincident copies (8 walls), which only merged away on ungroup. The room's
+    # own selected walls must ride in as themselves, so the count stays 4.
+    sc = win.scene
+    room = make_room(sc, 0, 0, 144, 120, "Den")
+    assert _built_walls(fp, sc) == 4
+    sc.clearSelection()
+    room.setSelected(True)
+    for w in list(room.walls):
+        w.setSelected(True)
+    win.group_selected()
+    assert _built_walls(fp, sc) == 4          # no coincident duplicates
+    g = next(i for i in sc.items() if isinstance(i, fp.GroupItem))
+    g.setPos(120, 0)
+    g.bake()
+    assert _built_walls(fp, sc) == 4          # still 4 after the move
+    assert room.path.boundingRect().x() == pytest.approx(123, abs=6)  # room rode
+
+
+def test_group_move_room_only_does_not_orphan_walls(fp, win, make_room):
+    # regression (wall leak): grouping a room ALONE makes a movable copy (the
+    # original stays). bake() used to move the ORIGINAL room onto the coincident
+    # copies via walls_cover_room's loop-coverage path, abandoning the room's
+    # own walls -- so orphans piled up every group/move/ungroup cycle
+    # (4 -> 6 -> 7 -> 8...). Now the original stays put and only the copy moves,
+    # so repeated cycles are stable.
+    sc = win.scene
+    make_room(sc, 0, 0, 144, 120, "Den")
+    counts = []
+    for _ in range(4):
+        room = next(r for r in sc.items() if isinstance(r, fp.RoomItem))
+        sc.clearSelection()
+        room.setSelected(True)               # room ONLY -> walls duplicated
+        win.group_selected()
+        g = next(it for it in sc.items() if isinstance(it, fp.GroupItem))
+        g.setPos(0, 300)                     # move the copy clear of the original
+        g.bake()
+        sc.clearSelection()
+        g.setSelected(True)
+        win.ungroup_selected()
+        counts.append(_built_walls(fp, sc))
+    # stable across cycles (original 4 + one persistent copy) -- not compounding
+    assert counts[1:] == counts[:-1], counts
+    assert sum(isinstance(r, fp.RoomItem) for r in sc.items()) == 1
+
+
 def test_extracted_room_region_follows_move(fp, win):
     # extract a room whose right edge is a longer party wall, then move the
     # group clear of that wall: the grey region/outline must follow (baked
