@@ -1,0 +1,390 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/pjmoran42/FloorPlanner/schema/design-v5.json",
+  "title": "FloorPlanner design document (v5)",
+
+  "description": "A floor/site design. The durable unit is the ROOM: it owns an ordered outline of vertices, its furnishings, and its schedule properties. Walls are OPTIONAL bindings onto outline edges — a wall can be deleted, and the room keeps its shape, name, area and contents; the edge simply becomes open. A room whose walls are bound only to itself is `floating` (a concept room, or one extracted from the plan) and can be moved, rotated and duplicated as a unit without touching the rest of the design. All coordinates are plan inches, x right, y down (Qt scene convention); there is no nested coordinate system anywhere in this document. Vertices are the only place coordinates live, so two walls meeting at a corner reference ONE vertex and cannot drift apart.",
+
+  "type": "object",
+  "required": ["format", "version", "units", "levels", "vertices", "walls", "rooms"],
+  "additionalProperties": false,
+
+  "properties": {
+    "format":  { "const": "floorplanner-design" },
+    "version": { "const": 5 },
+    "units":   { "enum": ["inches"] },
+
+    "settings": { "$ref": "#/$defs/settings" },
+
+    "levels": {
+      "description": "Ordered storeys / site layers, lowest first. Replaces v4 `floors` — renamed so it never reads as floor *finish*.",
+      "type": "array", "minItems": 1,
+      "items": { "$ref": "#/$defs/level" }
+    },
+
+    "vertices": {
+      "description": "THE ONLY COORDINATES IN THE DOCUMENT. Every wall end and every room corner is one of these. Sharing a vertex is what makes a corner a corner; nothing else needs a weld tolerance at rest.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/vertex" }
+    },
+
+    "walls": {
+      "description": "Built fabric. A wall spans exactly one room-outline edge on each side it serves (walls are split at every vertex any outline uses), so `left`/`right` are single-valued. Identified by its (level, v1, v2) pair — duplicates are invalid, which makes coincident-copy explosions unrepresentable.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/wall" }
+    },
+
+    "rooms": {
+      "description": "The durable unit. Survives the deletion of every wall around it.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/room" }
+    },
+
+    "furnishings": { "type": "array", "items": { "$ref": "#/$defs/furnishing" } },
+    "groups":      { "type": "array", "items": { "$ref": "#/$defs/group" } },
+    "reference_images": { "type": "array", "items": { "$ref": "#/$defs/reference_image" } },
+    "annotations": { "type": "array", "items": { "$ref": "#/$defs/annotation" } },
+
+    "provenance": {
+      "description": "How this document came to be, written ONCE at import and never mutated afterwards. Present only on documents converted from a legacy v1-v4 file, where the load-time weld changed real coordinates: it is the audit trail answering 'why is this room a different size than it was in v4?'. Stable, so it is safe to include in the dict equality used for the dirty flag.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "migrated_from": {
+          "type": "object", "additionalProperties": false,
+          "properties": { "format": { "type": "string" }, "version": { "type": "integer" },
+                          "path": { "type": "string" } }
+        },
+        "tool":              { "type": "string" },
+        "mode":              { "enum": ["faithful", "clean"] },
+        "endpoints_welded":  { "description": "Wall ends moved onto a neighbour by the load-time weld. Non-zero means geometry changed and the document opened dirty.", "type": "integer", "minimum": 0 },
+        "openings_deduped":  { "type": "integer", "minimum": 0 },
+        "notes":             { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+
+  "$defs": {
+
+    "id":      { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$" },
+    "id_null": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+    "point":   { "type": "array", "prefixItems": [{ "type": "number" }, { "type": "number" }], "minItems": 2, "maxItems": 2 },
+    "size_code": {
+      "description": "WWHH / WWWHH / WWWHHH inch size code — \"3680\" = 36\" x 80\".",
+      "type": "string", "pattern": "^[0-9]{4,6}$"
+    },
+
+    "settings": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "wall_snap_in":    { "type": "number", "exclusiveMinimum": 0 },
+        "rotate_snap_deg": { "type": "number", "exclusiveMinimum": 0 },
+        "canvas_w_in":     { "type": "number", "exclusiveMinimum": 0 },
+        "canvas_h_in":     { "type": "number", "exclusiveMinimum": 0 },
+        "cost_per_sqft":   { "type": "number", "minimum": 0 },
+        "vertex_weld_in": {
+          "description": "MODELLING PRECISION. Two coordinates this close ARE one vertex; a document in which they are not is malformed (invariant I14). Replaces the 0.6/0.75/1.0/1.5/0.02 tolerances scattered through walls.py and rooms.py. Deliberately tiny -- it is a statement about representation, not about the user's aim.",
+          "type": "number", "exclusiveMinimum": 0, "default": 0.6
+        },
+        "join_tol_in": {
+          "description": "GESTURE TOLERANCE. How close the user must get before the editor OFFERS to weld a dragged end onto a neighbour, and the radius used by the one-time weld when importing a legacy v1-v4 file (config.JOIN_TOL). Never an invariant: a wall deliberately stopping 6\" short of another is a legitimate design (a reveal, a pilaster gap), and nothing may silently close it.",
+          "type": "number", "exclusiveMinimum": 0, "default": 9.0
+        },
+        "area_basis": {
+          "description": "`centerline` reproduces v4. `inside_face` offsets each bound outline edge inward by half its wall's thickness — the number that belongs in a room schedule.",
+          "enum": ["centerline", "inside_face"], "default": "inside_face"
+        },
+        "editing": { "$ref": "#/$defs/editing_modes" }
+      }
+    },
+
+    "editing_modes": {
+      "description": "Persisted editing behaviour. SHUFFLE MODE is `shuffle: true`, which implies auto_coalesce/auto_weld/auto_bind all off: floating rooms can be dragged past and through each other without their walls merging into the plan or welding to neighbours. Turning shuffle off re-enables the joining passes, and rooms are joined explicitly, not silently.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "shuffle":        { "type": "boolean", "default": false },
+        "auto_coalesce":  { "description": "Merge collinear same-type walls that meet at a degree-2 vertex.", "type": "boolean", "default": true },
+        "auto_weld":      { "description": "Snap a drawn endpoint onto a nearby existing vertex.", "type": "boolean", "default": true },
+        "auto_bind":      { "description": "Bind a room outline edge to a coincident wall automatically.", "type": "boolean", "default": true }
+      }
+    },
+
+    "level": {
+      "type": "object",
+      "required": ["id", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "id":           { "$ref": "#/$defs/id" },
+        "name":         { "type": "string", "minLength": 1 },
+        "elevation_in": { "type": "number", "default": 0 },
+        "height_in":    { "type": "number", "exclusiveMinimum": 0, "default": 96 },
+        "kind": {
+          "description": "`site` levels hold landscape work — beds, patios, fences, hedges — and are excluded from conditioned-area totals.",
+          "enum": ["storey", "site"], "default": "storey"
+        },
+        "reference":    { "type": "boolean", "default": false }
+      }
+    },
+
+    "vertex": {
+      "type": "object",
+      "required": ["id", "level", "x", "y"],
+      "additionalProperties": false,
+      "properties": {
+        "id":    { "$ref": "#/$defs/id" },
+        "level": { "$ref": "#/$defs/id" },
+        "x":     { "type": "number" },
+        "y":     { "type": "number" },
+        "locked": { "description": "Pinned by the user; snapping, welding and cleanup must not move it.", "type": "boolean", "default": false }
+      }
+    },
+
+    "wall": {
+      "type": "object",
+      "required": ["id", "level", "v1", "v2", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id":    { "$ref": "#/$defs/id" },
+        "level": { "$ref": "#/$defs/id" },
+        "v1":    { "$ref": "#/$defs/id" },
+        "v2":    { "$ref": "#/$defs/id" },
+
+        "type": {
+          "description": "There is deliberately no `open` type: an outline edge with no wall IS the open edge. Landscape types carry no openings and no finishes.",
+          "enum": ["exterior", "interior", "partition", "railing", "fence", "hedge", "retaining"]
+        },
+        "thickness_in": { "description": "Override; omitted = the standard for `type`.", "type": "number", "minimum": 0 },
+
+        "left": {
+          "description": "Room on the LEFT of the v1->v2 direction — with x right and y down, the (dy, -dx) side, i.e. the side on your left walking v1 to v2 on screen. null = no room that side (outdoors, or a free-standing wall). MAINTAINED INDEX: must agree exactly with which rooms name this wall in their outline (invariant I6).",
+          "$ref": "#/$defs/id_null"
+        },
+        "right": { "$ref": "#/$defs/id_null" },
+
+        "finish_left":  { "description": "Per-side finish. A shared wall can be tile on the bath side and paint on the bedroom side — v4 could not express this because wall_finish lived on the room.", "type": "string" },
+        "finish_right": { "type": "string" },
+
+        "openings": { "type": "array", "items": { "$ref": "#/$defs/opening" } }
+      },
+
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "enum": ["fence", "hedge", "railing", "retaining"] } }, "required": ["type"] },
+          "then": {
+            "properties": {
+              "openings": { "items": { "properties": { "kind": { "const": "gate" } } } },
+              "finish_left":  false,
+              "finish_right": false
+            }
+          }
+        }
+      ]
+    },
+
+    "opening": {
+      "type": "object",
+      "required": ["id", "kind", "code", "anchor"],
+      "additionalProperties": false,
+      "properties": {
+        "id":   { "$ref": "#/$defs/id" },
+        "kind": {
+          "description": "`gate` is the landscape counterpart of a door: it is the ONLY opening kind permitted in a fence, hedge, railing or retaining wall (enforced on the wall, below).",
+          "enum": ["door", "window", "cased", "pass_through", "gate"]
+        },
+        "code": { "$ref": "#/$defs/size_code" },
+
+        "anchor": {
+          "description": "Dimensioned the way a drawing dimensions it: an offset from a NAMED END, not an absolute distance from p1. Survives the wall being stretched, split at a new vertex, or reversed — absolute `s` survives none of those.",
+          "type": "object",
+          "required": ["from", "offset_in"],
+          "additionalProperties": false,
+          "properties": {
+            "from": { "description": "`v1`/`v2`: offset from that vertex to the opening's near edge. `center`: offset of the opening centre from the wall midpoint.", "enum": ["v1", "v2", "center"] },
+            "offset_in": { "type": "number" }
+          }
+        },
+
+        "sill_in":   { "description": "Sill height above the level. Windows only.", "type": "number", "minimum": 0 },
+        "head_in":   { "type": "number", "minimum": 0 },
+        "door_type": { "description": "Catalog leaf type; meaningful only when kind == \"door\".", "type": "string" },
+        "hinge":     { "description": "Hinged end, named by vertex so handedness is unambiguous under wall reversal (v4's LH/RH was not).", "enum": ["v1", "v2", "none"] },
+        "swings_toward": { "description": "Side the leaf opens into, relative to v1->v2. Replaces the bare swing: -1|1.", "enum": ["left", "right", "none"] }
+      }
+    },
+
+    "outline_edge": {
+      "description": "One step around a room's outline: the corner vertex, plus the wall (if any) running from this vertex to the NEXT vertex in the loop. `wall: null` is an OPEN edge — the room's shape is unchanged, there is simply no built fabric there. Deleting a wall nulls this field; it never deletes the room.",
+      "type": "object",
+      "required": ["v"],
+      "additionalProperties": false,
+      "properties": {
+        "v":    { "description": "Corner vertex, in this room's level.", "$ref": "#/$defs/id" },
+        "wall": { "description": "Wall spanning v -> next.v. Its endpoints must be exactly {v, next.v}; traversal direction is derived, never stored.", "$ref": "#/$defs/id_null" }
+      }
+    },
+
+    "room": {
+      "type": "object",
+      "required": ["id", "level", "name", "outline", "placement"],
+      "additionalProperties": false,
+      "properties": {
+        "id":    { "$ref": "#/$defs/id" },
+        "level": { "$ref": "#/$defs/id" },
+        "name":  { "type": "string", "minLength": 1 },
+
+        "category": {
+          "description": "`site` rooms ARE rooms: a planting bed, lawn zone, patio or gravel court gets an area, a schedule (surface / plant_palette / irrigation / edging), and the same movable-unit behaviour as any interior room. `exterior` covers roofed-but-unconditioned space -- porches, decks, carports. `concept` rooms are sketch units never intended to join the plan and are always `floating`. Overlap (invariant I11) is checked WITHIN a class only: interior+exterior form one class (a porch may not overlap a bedroom), `site` is its own (a lawn zone may pass under a deck), `concept` is exempt.",
+          "enum": ["interior", "exterior", "site", "concept"], "default": "interior"
+        },
+
+        "outline": {
+          "description": "The room's shape: a closed, ordered loop of corner vertices, each optionally carrying the wall on the edge that leaves it. THIS IS THE ROOM'S GEOMETRY AND IT IS INDEPENDENT OF THE WALLS. Area = shoelace of the corners, perimeter = sum of edge lengths, corners = the vertices. Nothing is flood-filled and nothing is cached in `properties`.",
+          "type": "array", "minItems": 3,
+          "items": { "$ref": "#/$defs/outline_edge" }
+        },
+
+        "holes": {
+          "description": "Inner loops (a courtyard, a chase, a planting bed inside a patio), wound opposite to the outline.",
+          "type": "array",
+          "items": { "type": "array", "minItems": 3, "items": { "$ref": "#/$defs/outline_edge" } }
+        },
+
+        "placement": {
+          "description": "Whether this room participates in the shared wall network. DECLARED INTENT, and checked: a `floating` room must be genuinely independent — no wall on its outline may serve a second room, and no vertex it uses may be touched by a wall outside its outline (invariant I12). That is what makes it safe to drag, rotate and duplicate as a unit.",
+          "type": "object",
+          "required": ["state"],
+          "additionalProperties": false,
+          "properties": {
+            "state": { "enum": ["placed", "floating"] },
+            "rotation": { "description": "Cumulative rotation applied to this room since it was created, for display and for un-rotating a template. Purely informational: the outline vertices already carry the rotated coordinates.", "type": "number", "default": 0 },
+            "extracted_from": { "description": "If this room was EXTRACTED from the plan, the level it came from. Lets `rejoin` offer the original context.", "$ref": "#/$defs/id_null" }
+          }
+        },
+
+        "area_accounting": {
+          "description": "Which total this room rolls up into. Omitted = derived from `category`: interior -> conditioned, exterior -> unconditioned, site -> site, concept -> excluded. Set explicitly for the exceptions (an unheated sunroom, a garage counted separately).",
+          "enum": ["conditioned", "unconditioned", "site", "excluded"]
+        },
+
+        "nominal_size": {
+          "description": "Optional design intent for a room typed in by dimension (\"12 x 14 bedroom\") rather than drawn. Never authoritative — the outline is. Useful for room templates and for reporting drawn-vs-intended.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width_in", "depth_in"],
+          "properties": {
+            "width_in": { "type": "number", "exclusiveMinimum": 0 },
+            "depth_in": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+
+        "label": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "offset": { "description": "Relative to the outline centroid, so the label follows the room automatically — v4 stored an absolute anchor that had to be translated by hand at every move site.", "$ref": "#/$defs/point" },
+            "show_dimensions": { "type": "boolean", "default": false },
+            "show_area":       { "type": "boolean", "default": true }
+          }
+        },
+
+        "properties": { "$ref": "#/$defs/room_properties" }
+      }
+    },
+
+    "room_properties": {
+      "description": "Schedule data only. NO geometry: v4 shadowed the corner list in here as `perimeter_corners`; corners now come from `outline` and storing them here is a schema error.",
+      "type": "object",
+      "additionalProperties": true,
+      "not": { "required": ["perimeter_corners"] },
+      "properties": {
+        "room_type":         { "type": "string" },
+        "include_sqft":      { "type": "boolean", "default": true },
+        "ceiling_height_in": { "type": "number", "exclusiveMinimum": 0 },
+        "ceiling_type":      { "type": "string" },
+        "floor_finish":      { "type": "string" },
+        "wall_finish":       { "description": "Default for bound walls; a wall's own finish_left/finish_right wins.", "type": "string" },
+        "baseboard":         { "type": "string" },
+        "crown_molding":     { "type": "boolean" },
+        "hvac":              { "type": "string" },
+        "electrical":        { "type": "string" },
+        "notes":             { "type": "string" },
+
+        "surface":       { "description": "Site rooms: lawn, mulch, gravel, pavers, decomposed granite, water, planting soil.", "type": "string" },
+        "plant_palette": { "description": "Site rooms: species / cultivar list for a bed.", "type": "array", "items": { "type": "string" } },
+        "irrigation":    { "description": "Site rooms: none, drip, spray, rotor, hand.", "type": "string" },
+        "sun_exposure":  { "enum": ["full-sun", "part-sun", "part-shade", "full-shade"] },
+        "slope_pct":     { "type": "number" },
+        "drainage":      { "type": "string" },
+        "edging":        { "description": "Site rooms: the landscape analogue of baseboard -- steel, stone, bender board, none.", "type": "string" }
+      }
+    },
+
+    "furnishing": {
+      "type": "object",
+      "required": ["id", "level", "kind", "pos"],
+      "additionalProperties": false,
+      "properties": {
+        "id":    { "$ref": "#/$defs/id" },
+        "level": { "$ref": "#/$defs/id" },
+        "kind":  { "type": "string", "minLength": 1 },
+
+        "room": {
+          "description": "Owning room, or null for site items (a car, a mower, a tree outside any zone). ASSIGNED when placed, never re-derived — v4 answered this by point-in-polygon in two different places that disagreed (RoomItem used pos(), the inventory dialog used scenePos()). Ownership is what makes a room a movable unit: moving or extracting a room carries exactly the furnishings that name it, including any that a wall deletion would otherwise have stranded.",
+          "$ref": "#/$defs/id_null"
+        },
+
+        "pos":      { "description": "Plan coordinates of the symbol centre.", "$ref": "#/$defs/point" },
+        "rotation": { "type": "number", "default": 0 },
+        "state":    { "description": "Per-kind extra state (stair flight/turn/direction, plant species, …). v4 spread these across the object; nesting keeps the base shape closed.", "type": "object", "additionalProperties": true }
+      }
+    },
+
+    "group": {
+      "description": "A transient named selection set of rooms / walls / furnishings. A group NEVER copies anything: moving it translates the vertices its members reference plus its member furnishings. Rooms are the durable unit; groups are for ad-hoc multi-room moves.",
+      "type": "object",
+      "required": ["id", "level", "members"],
+      "additionalProperties": false,
+      "properties": {
+        "id":       { "$ref": "#/$defs/id" },
+        "level":    { "$ref": "#/$defs/id" },
+        "name":     { "type": "string" },
+        "members":  { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/id" } },
+        "rotation": { "type": "number", "default": 0 }
+      }
+    },
+
+    "reference_image": {
+      "type": "object",
+      "required": ["id", "path", "origin", "inches_per_pixel"],
+      "additionalProperties": false,
+      "properties": {
+        "id":               { "$ref": "#/$defs/id" },
+        "level":            { "$ref": "#/$defs/id_null" },
+        "path":             { "type": "string" },
+        "origin":           { "$ref": "#/$defs/point" },
+        "inches_per_pixel": { "type": "number", "exclusiveMinimum": 0 },
+        "rotation":         { "type": "number", "default": 0 },
+        "opacity":          { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5 },
+        "locked":           { "type": "boolean", "default": false },
+        "crop":             { "type": "array", "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number" }, { "type": "number" }], "minItems": 4, "maxItems": 4 }
+      }
+    },
+
+    "annotation": {
+      "type": "object",
+      "required": ["id", "level", "kind", "pos"],
+      "additionalProperties": false,
+      "properties": {
+        "id":       { "$ref": "#/$defs/id" },
+        "level":    { "$ref": "#/$defs/id" },
+        "kind":     { "enum": ["text", "dimension", "leader"] },
+        "pos":      { "$ref": "#/$defs/point" },
+        "text":     { "type": "string" },
+        "rotation": { "type": "number", "default": 0 },
+        "refs":     { "type": "array", "items": { "$ref": "#/$defs/id" } }
+      }
+    }
+  }
+}
