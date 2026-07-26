@@ -1028,15 +1028,26 @@ def _wall_along_segment(scene, a: QPointF, b: QPointF, floor=None):
 
 
 def walls_cover_room(walls, room) -> bool:
-    """True when `walls` form a complete loop along every edge of the
-    room's perimeter -- so moving exactly those walls moves the whole
-    room, even if extra (coincident) walls also touch the boundary."""
+    """True when `walls` move the whole room, so a rigid translation of them
+    carries the room's region/label rigidly too.
+
+    Two ways to qualify:
+      1. `walls` form a complete loop along every traced perimeter edge (even
+         if extra coincident walls also touch the boundary); or
+      2. every built wall the room currently owns is in `walls` -- the room's
+         own perimeter is exactly what is moving.  This path needs no traced
+         corners, so it also covers grid-detected / imported / non-rectilinear
+         rooms (room.corners is None), which case 1 cannot evaluate."""
+    moving = set(walls)
+    own = [w for w in room.walls if isinstance(w, WallItem) and not w.is_open]
+    if own and all(w in moving for w in own):
+        return True
     if not room.corners:
         return False
     n = len(room.corners)
     for i in range(n):
         a, b = room.corners[i], room.corners[(i + 1) % n]
-        if not any(_wall_spans_segment(w, a, b) for w in walls):
+        if not any(_wall_spans_segment(w, a, b) for w in moving):
             return False
     return True
 

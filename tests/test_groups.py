@@ -96,6 +96,36 @@ def test_bake_translates_room_region(fp, win, make_room):
     assert after - before == pytest.approx(72, abs=6)
 
 
+def test_bake_carries_room_without_traced_corners(fp, win, make_room):
+    # regression: a room with no perimeter corners (grid-detected / imported /
+    # non-rectilinear) used to be left behind by bake() -- walls_cover_room
+    # bailed out on corners is None -- so its region, label anchor and area
+    # stayed put while its own walls moved with the group. Group the room AND
+    # its walls, drop the corners, then move: the room must ride along and
+    # re-detect at the new spot.
+    sc = win.scene
+    room = make_room(sc, 0, 0, 144, 120, "Den")
+    room.corners = None                       # simulate a corner-less room
+    room._sync_corner_props()
+    room._detect_sig = None
+    sc.clearSelection()
+    room.setSelected(True)
+    for w in list(room.walls):
+        w.setSelected(True)                   # walls + room grouped together
+    win.group_selected()
+    g = next(i for i in sc.items() if isinstance(i, fp.GroupItem))
+    g.setPos(200, 100)
+    g.bake()
+    br = room.path.boundingRect()
+    assert br.x() == pytest.approx(203, abs=6)          # region followed +200
+    assert br.y() == pytest.approx(103, abs=6)          # region followed +100
+    assert room.anchor.x() == pytest.approx(272, abs=6)  # label anchor moved
+    assert room.anchor.y() == pytest.approx(160, abs=6)
+    assert room.area_sqft == pytest.approx(120.0, abs=1)  # area re-detected
+    # every wall the room now owns sits at the moved location, not the old one
+    assert all(w.p1.x() >= 180 and w.p1.y() >= 80 for w in room.walls)
+
+
 def test_extracted_room_region_follows_move(fp, win):
     # extract a room whose right edge is a longer party wall, then move the
     # group clear of that wall: the grey region/outline must follow (baked
