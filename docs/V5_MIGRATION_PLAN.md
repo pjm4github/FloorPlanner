@@ -99,7 +99,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P0.7** Vendor schema + validator; CI validates `examples/` | ruff + pytest |
 | ☑ | **P1.1** `design/model.py` — dataclasses | ruff + pytest |
 | ☑ | **P1.2** `design/validate.py` — I1–I14 | ruff + pytest |
-| ☐ | **P1.3** `design/topology.py` — weld/planarize/trace | ruff + pytest |
+| ☑ | **P1.3** `design/topology.py` — weld/planarize/trace | ruff + pytest |
 | ☐ | **P1.4** `design_from_scene()` | ruff + pytest |
 | ☐ | **P1.5** `apply_design_to_scene()` | ruff + pytest |
 | ☐ | **P1.6** `--verify-design` shadow mode; suite runs with it on | ruff + pytest ×2 |
@@ -729,4 +729,43 @@ notes:   COUNT CORRECTED (my error, was propagating): 15 named checks, not 14 --
          (three fixtures now). And recorded that _MISSING is a P2.1 dependency
          (see the P1.1 entry above) with a matching line added to P2.1's
          acceptance -- "opening a v5 file must not dirty it".
+
+P1.3  done
+ruff:    clean
+pytest:  323 passed, 4 xfailed, 1 xpassed (+11 from test_topology.py)
+files:   floorplanner/design/topology.py (new), floorplanner/design/legacy.py
+         (new), floorplanner/design/__init__.py (+exports), tests/
+         test_topology.py (new).
+notes:   BOTH concrete acceptances hit exactly: trace_faces on symmetricP1
+         recovers 19 room areas; weld_endpoints on legacy planc1.json welds 31.
+         Per the three structural notes:
+         (1) Ported to Design, not dicts: topology functions take and return
+         P1.1 dataclasses; adjacency/pos are built from design.walls/vertices.
+         (2) The one-shot legacy path is SEPARATE: weld_endpoints lives in
+         design/legacy.py, on raw p1/p2 wall dicts (it runs at v1-v4 import,
+         before a Design exists). Its lifetime ends when files are converted;
+         split_edge/merge_collinear/trace_faces are forever. Not peers, so not
+         in the same module.
+         (3) Winding pinned by its own test: left = the (dy,-dx) side, verified
+         79/79 walls-with-left on symmetricP1 (you said 61/61 -- the convention
+         holds 100%, the count is 79). A second test ties trace_faces' winding
+         to the stored `left`: the (dy,-dx) probe of a shared wall lands in a
+         face whose area is the left room's. Without this, a flipped winding
+         swaps every left/right and I6 still passes.
+         The 19-vs-20: trace_faces returns 20 inner faces; exactly 19 match a
+         stored room area. The sole unmatched room is the Garage (largest,
+         boundary-touching) -- its face IS the outer boundary that _inner_faces
+         drops. A test asserts unmatched == {Garage}, not just the count.
+         Forward-looking ops (split_edge, merge_collinear, planarize) are pure
+         Design->Design and tested for the invariant that matters -- they
+         preserve trace_faces (rooms unchanged); planarize is idempotent on the
+         already-planar corpus. DEFERRED with a note in the code: opening
+         redistribution across a split, and crossing-point insertion, land at
+         P3.3/P3.4 where the wall-move split rule is built -- split_edge leaves
+         openings on the first segment for now.
+         Zero Qt: model.py proven by isolated exec (P1.1); topology.py and
+         legacy.py asserted Qt-free at the source level (no PyQt import; their
+         only floorplanner imports are floorplanner.design.*), since importing
+         them via the package would pull Qt through floorplanner/__init__.
+         Not pushed -- Phase 1 pushes at its end.
 ```

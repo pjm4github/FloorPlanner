@@ -9,6 +9,9 @@ from floorplanner.design.model import (  # noqa: F401
     Design, Furnishing, Group, Level, Opening, OutlineEdge, Provenance, Room,
     Vertex, Wall,
 )
+from floorplanner.design.topology import (  # noqa: F401
+    Face, enclosing_face, merge_collinear, planarize, split_edge, trace_faces,
+)
 from floorplanner.design.validate import (  # noqa: F401
     SCHEMA_PATH, check, load_schema, report, schema_errors,
 )
