@@ -320,8 +320,15 @@ class MainWindow(QMainWindow):
         a_about.triggered.connect(self.show_about)
         m_help.addAction(a_about)
 
+        # coalesce action enable/disable: a burst of selection changes (rubber-
+        # band, select-all before Ctrl+G) fires selectionChanged many times;
+        # apply once on the next event loop, like wheelEvent -> _apply_zoom.
+        self._edit_actions_timer = QTimer(self)
+        self._edit_actions_timer.setSingleShot(True)
+        self._edit_actions_timer.setInterval(0)
+        self._edit_actions_timer.timeout.connect(self._apply_edit_actions)
         self.scene.selectionChanged.connect(self._update_edit_actions)
-        self._update_edit_actions()
+        self._apply_edit_actions()            # initial state, synchronously
 
         m_file.addSeparator()
         a_set = QAction("Se&ttings…", self)
@@ -474,9 +481,11 @@ class MainWindow(QMainWindow):
 
     # -- group / ungroup / cut / copy / paste -------------------------------------
     def _update_edit_actions(self):
-        """Group is enabled once the selection set holds 2+ groupable
-        items; Ungroup once it holds a group; room ops once exactly two
-        rooms are selected.  Also tracks click order for subtract."""
+        """On every selection change: keep the click-order list for subtract
+        (cheap, so it stays synchronous and accurate) and schedule the action
+        enable/disable pass. A burst of N selection changes coalesces into one
+        _apply_edit_actions instead of N (was the biggest measured cost in the
+        group workflow -- P0.3b select ratio 27, O(R^2*W) path booleans)."""
         sel = self.scene.selectedItems()
         selset = set(sel)
         order = getattr(self, "_sel_order", [])
@@ -485,20 +494,36 @@ class MainWindow(QMainWindow):
             if it not in order:
                 order.append(it)
         self._sel_order = order
+        if not self._edit_actions_timer.isActive():
+            self._edit_actions_timer.start()
+
+    def _apply_edit_actions(self):
+        """Enable/disable Group / Ungroup / room-op / align / distribute from a
+        cheap COUNT over the selection -- never by building shape specs. Group
+        needs 2+ groupables; Ungroup a group; room ops exactly two shapes.
+
+        A "shape" is a directly-selected room (with corners) or a selected group
+        (which may enclose a room or be a wall-loop). Counting groups without
+        resolving them can over-enable a room op when a selected group encloses
+        nothing -- harmless, because every room op re-validates via
+        _selected_room_shapes() when it actually fires and no-ops on a bad count.
+        This replaces a per-change len(self._selected_room_shapes()) that ran
+        bounding_walls() per room and group_room() per group just to take a length."""
+        sel = self.scene.selectedItems()
         n = sum(1 for it in sel
                 if isinstance(it, (WallItem, FurnishingItem, GroupItem)))
         self.a_group.setEnabled(n >= 2)
         self.a_ungroup.setEnabled(
             any(isinstance(it, GroupItem) for it in sel))
-        # room ops act on two rooms/wall-loops, selected directly or grouped;
-        # align works on one or more
-        nshapes = len(self._selected_room_shapes())
+        n_shapes = sum(1 for it in sel
+                       if (isinstance(it, RoomItem) and it.corners)
+                       or isinstance(it, GroupItem))
         for a in getattr(self, "_room_op_actions", []):
-            a.setEnabled(nshapes == 2)
+            a.setEnabled(n_shapes == 2)
         if hasattr(self, "a_align"):
-            self.a_align.setEnabled(nshapes >= 1)
+            self.a_align.setEnabled(n_shapes >= 1)
         for a in getattr(self, "_distribute_actions", []):
-            a.setEnabled(nshapes >= 3)
+            a.setEnabled(n_shapes >= 3)
 
     def nudge_selected(self, dx: int, dy: int, fine: bool = False) -> bool:
         """Arrow-key nudge of selected groups / ungrouped furnishings by one
