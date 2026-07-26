@@ -5,7 +5,7 @@ the Anthropic Messages API (standard library only) to refresh purchase prices.
 """
 import json
 
-from floorplanner.config import FURN_DIR, app_settings
+from floorplanner.config import FURN_DIR, app_settings, config_dir
 from floorplanner.geometry import fmt_ftin
 
 try:
@@ -53,7 +53,35 @@ def furnishing_catalog() -> list:
                 continue
             if (FURN_DIR / spec["file"]).is_file():
                 _FURN_CATALOG.append(spec)
+        # user price overrides (config dir) win over the bundled manifest price,
+        # so AI-updated prices persist without hand-editing a generated asset
+        overrides = _load_price_overrides()
+        if overrides:
+            for spec in _FURN_CATALOG:
+                if spec["id"] in overrides:
+                    spec["price"] = overrides[spec["id"]]
     return _FURN_CATALOG
+
+
+def _price_overrides_path():
+    """The per-user furnishing price overrides file ({id: price} JSON)."""
+    return config_dir() / "furnishing_prices.json"
+
+
+def _load_price_overrides() -> dict:
+    try:
+        data = json.loads(_price_overrides_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out = {}
+    for k, v in data.items():
+        try:
+            out[str(k)] = float(v)
+        except (TypeError, ValueError):
+            continue
+    return out
 
 
 def furnishing_spec(kind: str):
@@ -212,19 +240,20 @@ def anthropic_fetch_prices(api_key: str, model: str, prompt: str,
 
 
 def apply_furnishing_prices(prices: dict) -> int:
-    """Write {id: price} into manifest.json and the live catalog in place.
-    Returns the number of catalog items whose price was set."""
-    path = FURN_DIR / "manifest.json"
+    """Persist {id: price} to the per-user config dir (NOT the bundled
+    assets/furnishings/manifest.json, a generated asset) and update the live
+    catalog in place. Returns the number of catalog items whose price was set."""
+    overrides = _load_price_overrides()
+    for k, v in prices.items():
+        try:
+            overrides[str(k)] = float(v)
+        except (TypeError, ValueError):
+            continue
     try:
-        entries = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        entries = []
-    if isinstance(entries, list):
-        for ent in entries:
-            if isinstance(ent, dict) and str(ent.get("id")) in prices:
-                ent["price"] = float(prices[str(ent["id"])])
-        path.write_text(json.dumps(entries, indent=2) + "\n",
-                        encoding="utf-8")
+        _price_overrides_path().write_text(
+            json.dumps(overrides, indent=2) + "\n", encoding="utf-8")
+    except OSError:
+        pass
     n = 0
     for spec in furnishing_catalog():
         if spec["id"] in prices:

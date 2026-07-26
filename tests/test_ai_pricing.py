@@ -10,15 +10,19 @@ pytestmark = pytest.mark.furnishings
 
 
 @pytest.fixture
-def manifest_guard(fp):
-    """Back up manifest.json and restore it (and the cached catalog) after a
-    test mutates prices, so the repo file is never left dirty."""
-    path = fp.FURN_DIR / "manifest.json"
-    original = path.read_text(encoding="utf-8")
-    yield path
-    path.write_text(original, encoding="utf-8")
+def price_sandbox(fp, tmp_path, monkeypatch):
+    """Redirect the user price-overrides file to a tmp path (P0.5 fix 5:
+    apply_furnishing_prices now writes there, never the bundled manifest) and
+    reset the cached catalog. Yields (override_path, manifest_path,
+    manifest_bytes_before) so tests can assert the manifest stays untouched."""
     from floorplanner import catalog
-    catalog._FURN_CATALOG = None     # force a clean reload of the catalog
+    override = tmp_path / "furnishing_prices.json"
+    monkeypatch.setattr(catalog, "_price_overrides_path", lambda: override)
+    catalog._FURN_CATALOG = None         # reload so overrides are applied
+    manifest = fp.FURN_DIR / "manifest.json"
+    before = manifest.read_text(encoding="utf-8")
+    yield override, manifest, before
+    catalog._FURN_CATALOG = None         # clean reload for later tests
 
 
 def test_catalog_carries_price_field(fp):
@@ -51,17 +55,32 @@ def test_parse_price_json_rejects_garbage(fp):
         fp.parse_price_json('{"a": "not-a-number"}')
 
 
-def test_apply_prices_updates_manifest_and_catalog(fp, manifest_guard):
+def test_apply_prices_writes_config_not_manifest(fp, price_sandbox):
+    # REWRITTEN at P0.5 fix 5 (review §1): previously asserted the DEFECT -- that
+    # apply_furnishing_prices writes into assets/furnishings/manifest.json, a
+    # generated asset. It must persist to the per-user config dir and leave the
+    # manifest byte-for-byte unchanged.
+    override, manifest, before = price_sandbox
     ids = [s["id"] for s in fp.furnishing_catalog()[:2]]
     n = fp.apply_furnishing_prices({ids[0]: 100.0, ids[1]: 250.0})
     assert n == 2
-    assert fp.furnishing_spec(ids[0])["price"] == 100.0
-    man = json.loads(manifest_guard.read_text(encoding="utf-8"))
-    by_id = {e["id"]: e for e in man}
-    assert by_id[ids[1]]["price"] == 250.0
+    assert fp.furnishing_spec(ids[0])["price"] == 100.0        # live catalog set
+    assert manifest.read_text(encoding="utf-8") == before      # manifest untouched
+    saved = json.loads(override.read_text(encoding="utf-8"))   # persisted to config
+    assert saved[ids[1]] == 250.0
 
 
-def test_placed_item_picks_up_price(fp, scene, manifest_guard):
+def test_price_override_reloads_from_config(fp, price_sandbox):
+    # a fresh catalog load merges the config overrides over the manifest price
+    override, _manifest, _before = price_sandbox
+    ids = [s["id"] for s in fp.furnishing_catalog()[:1]]
+    fp.apply_furnishing_prices({ids[0]: 321.0})
+    from floorplanner import catalog
+    catalog._FURN_CATALOG = None                               # force a reload
+    assert fp.furnishing_spec(ids[0])["price"] == 321.0
+
+
+def test_placed_item_picks_up_price(fp, scene, price_sandbox):
     ids = [s["id"] for s in fp.furnishing_catalog()[:1]]
     fp.apply_furnishing_prices({ids[0]: 555.0})
     from PyQt6.QtCore import QPointF
@@ -78,7 +97,7 @@ def test_dialog_has_provider_model_and_prefilled_prompt(fp, qapp):
 
 
 def test_dialog_fetch_applies_without_network(fp, qapp, monkeypatch,
-                                              manifest_guard):
+                                              price_sandbox):
     ids = [s["id"] for s in fp.furnishing_catalog()[:1]]
     # AIPricingDialog._fetch resolves the name in the dialogs module, so patch
     # it there (where it is used), not on the FloorPlanner shim.
