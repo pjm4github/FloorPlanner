@@ -275,6 +275,8 @@ def test_group_box_orients_with_rotation(fp, win, make_room, first_furnishing):
                               c.y() + 100 * math.sin(ang)), False)
     g._finish_rotation()
 
+    # g._angle is GroupItem's oriented-box rotation state, retired when group
+    # semantics are rewritten in v5 P4.5 (V5_MIGRATION_PLAN); assertion kept.
     assert g._angle == pytest.approx(30, abs=1)
     local, _ = g._oriented_box()
     aabb = g.childrenBoundingRect()

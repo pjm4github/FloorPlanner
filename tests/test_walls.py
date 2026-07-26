@@ -2,6 +2,8 @@
 import pytest
 from PyQt6.QtCore import QPointF, Qt
 
+from floorplanner.walls import _coalesce_wall_impl
+
 pytestmark = pytest.mark.walls
 
 NOMOD = Qt.KeyboardModifier.NoModifier
@@ -296,7 +298,7 @@ def test_coalesce_overlapping_same_type_walls(fp, scene):
     b = fp.WallItem(QPointF(60, 0), QPointF(204, 0), "interior")   # on 6" grid
     scene.addItem(a)
     scene.addItem(b)
-    fp._coalesce_wall_impl(scene, a)
+    _coalesce_wall_impl(scene, a)
     walls = [it for it in scene.items() if isinstance(it, fp.WallItem)]
     assert len(walls) == 1
     assert (walls[0].p1.x(), walls[0].p2.x()) == pytest.approx((0, 204))
@@ -306,7 +308,7 @@ def test_no_coalesce_different_wall_types(fp, scene):
     a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
     scene.addItem(a)
     scene.addItem(fp.WallItem(QPointF(60, 0), QPointF(200, 0), "exterior"))
-    fp._coalesce_wall_impl(scene, a)
+    _coalesce_wall_impl(scene, a)
     assert len([it for it in scene.items()
                 if isinstance(it, fp.WallItem)]) == 2
 
@@ -318,7 +320,7 @@ def test_coalesce_merges_free_wall_into_room_wall(fp, scene, make_room):
     rw = room.walls[0]
     free = fp.WallItem(QPointF(rw.p1), QPointF(rw.p2), rw.wall_type)
     scene.addItem(free)
-    survivor = fp._coalesce_wall_impl(scene, free)
+    survivor = _coalesce_wall_impl(scene, free)
     assert rw.scene() is None                     # rw was absorbed
     assert len(room.walls) == 4                   # still one wall per edge
     assert survivor in room.walls and room in survivor.rooms
@@ -330,7 +332,7 @@ def test_coalesce_carries_openings_across(fp, scene):
     scene.addItem(a)
     scene.addItem(b)
     b.openings.append(fp.OpeningItem(b, "door", "3280", 150))
-    fp._coalesce_wall_impl(scene, a)
+    _coalesce_wall_impl(scene, a)
     walls = [it for it in scene.items() if isinstance(it, fp.WallItem)]
     assert len(walls) == 1
     assert len(walls[0].openings) == 1 and walls[0].openings[0].kind == "door"

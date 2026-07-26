@@ -14,3 +14,7 @@ _*.png
 floorplan*.json
 layout_*.csv
 CLAUDE.local.md
+
+# transfer buffer for staging files for deletion — always meant to be empty,
+# so it is not part of the project (keeps it out of the tree and the ruff gate)
+_to_delete/

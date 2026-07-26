@@ -30,6 +30,9 @@ def test_wheel_burst_is_deferred_then_coalesced(win):
     for _ in range(10):
         _wheel(view, 40)
     assert view.transform().m11() == start      # nothing applied synchronously
+    # view._zoom_accum: not scheduled for removal — wheel coalescing is deliberate
+    # (CLAUDE.md, view.py:159-179). Asserting the exact accumulator value is a bit
+    # brittle, but that is a test-quality nit, not a migration hazard.
     assert view._zoom_accum == 400
     assert view._zoom_timer.isActive()
 

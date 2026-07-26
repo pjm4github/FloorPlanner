@@ -103,4 +103,6 @@ def test_duplicated_edge_does_not_stack_the_door(fp, win):
                and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
     assert len(dup.openings) == 0             # no duplicate door symbol
     # but the duplicate's body is opened where the party wall's door is
+    # (this `dup` wall is synthesized by select_in_rect -> synthesize_room_edge,
+    # which v5 P0.5 fix 4 removes — after that there is no dup to assert on.)
     assert not dup._path.contains(QPointF(120, 72))

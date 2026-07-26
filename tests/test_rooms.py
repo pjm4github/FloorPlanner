@@ -4,6 +4,8 @@ import json
 import pytest
 from PyQt6.QtCore import QPointF
 
+from floorplanner.walls import _WallBBoxIndex
+
 pytestmark = pytest.mark.rooms
 
 
@@ -87,6 +89,9 @@ def _overlapping_rooms(fp, win):
 
     r1 = mk(0, 0, 120, 96, "Room 1")
     r2 = mk(72, 48, 120, 96, "Room 2")
+    # win._sel_order (the selection order feeding room_boolean) is retired when
+    # room_boolean is rewritten as a polygon op in v5 P3.5 (V5_MIGRATION_PLAN);
+    # left as-is here and at the other _sel_order call sites in this file.
     win._sel_order = [r1, r2]
     return r1, r2
 
@@ -486,6 +491,8 @@ def test_room_signature_tracks_relevant_walls(fp, scene, make_room):
 def test_refresh_skips_when_nothing_changed(fp, scene, make_room):
     room = make_room(scene, 0, 0, 120, 120, "Den")
     fp.rebuild_all_walls(scene)                 # sets the room's signature
+    # room._detect_sig is the refresh_rooms memoization signature, deleted with
+    # the detection engine in v5 P3.5 (V5_MIGRATION_PLAN); assertion kept as-is.
     assert room._detect_sig is not None
     area0 = room.area_sqft
     # a no-op refresh keeps the room exactly as is
@@ -496,5 +503,5 @@ def test_refresh_skips_when_nothing_changed(fp, scene, make_room):
 def test_room_signature_index_matches_full_scan(fp, scene, make_room):
     room = make_room(scene, 0, 0, 120, 120, "Den")
     scene.addItem(fp.WallItem(QPointF(400, 0), QPointF(500, 0), "interior"))
-    idx = fp._WallBBoxIndex(scene)
+    idx = _WallBBoxIndex(scene)
     assert fp.room_signature(scene, room, idx) == fp.room_signature(scene, room)

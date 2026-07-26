@@ -4,6 +4,8 @@ classification, CSV export, and the InventoryDialog widget."""
 import pytest
 from PyQt6.QtCore import QPointF
 
+from floorplanner.dialogs import _money
+
 pytestmark = pytest.mark.furnishings
 
 
@@ -81,7 +83,7 @@ def test_total_rows_have_grand_total(fp, furnished_room):
     interior, yard = fp.classify_furnishings(scene)
     _, _, ic = fp.furnishing_inventory_rows(interior)
     _, _, yc = fp.furnishing_inventory_rows(yard)
-    assert grand[0][3] == fp._money(10000.0 + ic + yc)
+    assert grand[0][3] == _money(10000.0 + ic + yc)
 
 
 def test_inventory_tsv_is_tab_separated(fp):

@@ -151,13 +151,6 @@ Run:  pip install PyQt6    then    python floor_planner.py
 # ``python FloorPlanner.py`` keep working.
 from floorplanner import *  # noqa: F401,F403
 from floorplanner.app import main  # noqa: F401
-# underscore internals that star-import skips but tests still reference as fp.*
-from floorplanner.dialogs import _money  # noqa: F401
-from floorplanner.walls import (  # noqa: F401
-    _WallBBoxIndex,
-    _coalesce_all_impl,
-    _coalesce_wall_impl,
-)
 
 if __name__ == "__main__":
     main()
