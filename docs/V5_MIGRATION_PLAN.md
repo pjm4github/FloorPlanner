@@ -390,4 +390,30 @@ notes:   NO assertion changed — import source + comments only.
          copies to drags. Nothing deletes it. The assertion is brittle (an exact
          accumulator value of 400) but that is a test-quality nit, not a
          migration hazard.
+
+P0.3  done
+ruff:    clean
+pytest:  289 passed, 2 xfailed, 0 failed in 8.72s (full -ra)
+         --quick: 276 passed, 15 skipped in 5.46s (all 4 scaling tests skipped)
+files:   tests/test_scaling.py (new)
+notes:   No existing test touched. New harness builds n x n shared-wall grids of
+         named rooms (door + window + 2 furnishings each) at n=4 (16 rooms) and
+         n=8 (64 rooms), times four ops, asserts each t(2n)/t(n) < 8. All 4 tests
+         @pytest.mark.slow, so --quick skips them. Numbers surface in `-ra` via a
+         warnings-summary line (print alone is captured on passing tests).
+         BASELINE RATIOS (vary ~10% run to run; two representative runs):
+                       n=4 ms     n=8 ms     ratio
+           rebuild      1.2         3.2       2.69 / 2.71   PASS  (sub-quadratic)
+           group       22.5       262.6      11.67 / 13.65  XFAIL (near-quadratic)
+           bake        29.8       143.0       4.80 / 4.41   PASS
+           ungroup     53.1       436.2       8.22 / 8.46   XFAIL (just over 8)
+         Per acceptance: real ratios recorded, threshold NOT weakened. group and
+         ungroup are xfail(strict=False) pointing at P3.8 (the fix is vertices
+         owning geometry: no duplicate_wall, no coalesce_all/full re-detect on
+         group/ungroup). strict=False so they may pass early (P0.6) without a
+         strict-xpass failure, and so ungroup's ~8.2 does not flap the suite.
+         rebuild and bake are already sub-quadratic and keep asserting hard.
+         Aside: the grid needed the canvas enlarged (SETTINGS canvas_*_in) before
+         building — room detection floods a grid clipped to canvas_rect
+         (rooms.py:29), and n=8 (960") overflowed the default 840" height.
 ```
