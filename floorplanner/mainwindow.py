@@ -1071,8 +1071,8 @@ class MainWindow(QMainWindow):
                     anchor=(it.anchor.x(), it.anchor.y()),
                     label_offset=(it.label_offset.x(), it.label_offset.y()),
                     show_dimensions=it.show_dims,
-                    properties=it.properties,
-                    floor=getattr(it, "floor", DEFAULT_FLOOR),
+                    properties=dict(it.properties),   # copy: model must not
+                    floor=getattr(it, "floor", DEFAULT_FLOOR),  # alias the live dict
                 ))
         # the roster MUST come from self.floors (an empty floor has no items to
         # derive it from); active_floor rides along but is dropped by to_dict.

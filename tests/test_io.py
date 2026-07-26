@@ -132,3 +132,16 @@ def test_csv_roundtrip(fp, win, tmp_path):
         assert n_out == n_in == 2
     finally:
         w2.close()
+
+
+def test_project_from_scene_copies_room_properties(fp, win, make_room):
+    # defect 4 (P0.5): the serialized RoomModel must not alias the room's live
+    # properties dict, or mutating the room later corrupts an already-built model
+    # (and undo snapshots taken from it).
+    room = make_room(win.scene, 0, 0, 120, 96, "Den")
+    room.properties["include_sqft"] = True
+    proj = win.project_from_scene()
+    rm = next(r for r in proj.rooms if r.name == "Den")
+    assert rm.properties is not room.properties          # a distinct dict
+    room.properties["include_sqft"] = False              # mutate the live room
+    assert rm.properties["include_sqft"] is True         # model is unaffected
