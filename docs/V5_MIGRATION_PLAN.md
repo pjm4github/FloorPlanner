@@ -44,6 +44,8 @@ So: the gate stands as written, and the 23 findings were **fixed at source** (me
 
 **Commit at every green gate.** One commit per task, message `P0.x — <task title>`. A 40-task migration with no commits has no rollback points; with one per task, every gate is a place to return to. Nothing is pushed unless asked.
 
+**In a multi-part task, run the FULL gate before each commit, not just at the end.** Found at P0.5: fix 4 was committed after running only `test_selection.py` and turned out to break a test in a different file. Five sub-fixes means five full-suite runs. A targeted run tells you the fix works; only the full suite tells you what else it touched.
+
 **`Touches` lists are hints, not contracts.** P0.2's list named `test_io.py` (which references none of the removed names) and missed `test_inventory.py` and `test_walls.py` (which do). Follow the code, do the task, and report the divergence in the log — that is what happened, and it is the correct behaviour. I write these lists from static analysis; the compiler is a better authority than I am.
 
 **Annotating a doomed assertion means naming the *specific* task**, not "Phase 3". If no task actually retires it, say so rather than inventing one.
@@ -187,13 +189,25 @@ The harness stays a **local gate**, invoked explicitly at P0.6 and P3.8 — the 
 ### P0.5 — Five free bug fixes
 **Do.** One commit each, each with a regression test.
 
-> **Expected test breakage — authorised in advance.** Fix 4 (making `select_in_rect` read-only) removes the wall synthesis that `tests/test_selection.py:53, 83, 106` currently assert. Those three tests assert the *defect*: that a rubber-band selection duplicates a party-wall edge. Rewrite them to assert the corrected behaviour — selection creates nothing — and say so explicitly in the log. This and P3.4 / P4.5 are the only places in Phase 0–4 where changing an existing assertion is expected rather than suspicious.
+> **Expected test breakage — authorised in advance.** Fix 4 (making `select_in_rect` read-only) removes the wall synthesis that `tests/test_selection.py:53, 83, 106` currently assert.
+>
+> **Blast radius was wider than that — resolved at P0.5.** It also breaks `test_groups.py::test_extracted_room_region_follows_move`, which is not a defect-asserting test. Root cause: the old `select_in_rect` synthesised a *private copy* of a longer party-wall edge, and the following `rebuild_all_walls` rebound the room to that copy — so the room **owned** the edge and `bake()`'s strict `room_owns_walls` check would carry the region. Read-only selection removes that accidental privatisation, the room stays bound to the shared wall, and `bake()` correctly declines to move it.
+>
+> **Decision: mark it `xfail` → P4.2**, and record it in Known regressions below. Rationale: selection silently mutating the document is the worse defect, the workflow it protected is exactly what P4.2 rebuilds as a real `extract` operation, and dragging a room by its label still works today (`_privatize_shared_walls`, `rooms.py:838‑865`), so no workflow is lost outright — only the rubber-band-then-group route to it. Those three tests assert the *defect*: that a rubber-band selection duplicates a party-wall edge. Rewrite them to assert the corrected behaviour — selection creates nothing — and say so explicitly in the log. This and P3.4 / P4.5 are the only places in Phase 0–4 where changing an existing assertion is expected rather than suspicious.
 1. `RoomItem.itemChange` on `ItemSceneChange` unbinds its walls, mirroring `walls.py:496‑504` including the `sip.isdeleted` guard. *(defect 5)*
 2. `mainwindow.py:1074` → `properties=dict(it.properties)`. *(defect 4)*
 3. `refresh_rooms_cmd` (`mainwindow.py:589‑593`) iterates only active-floor rooms. *(defect 2)*
 4. `view.py:445` — `select_in_rect` must not call `synthesize_room_edge`; selection is read-only. *(defect 10)*
 5. `catalog.apply_furnishing_prices` writes to the user config dir, not `assets/furnishings/manifest.json`. *(review §1)*
 **Acceptance.** Five tests added; suite green; #3's test creates two floors and asserts the inactive floor's rooms survive.
+
+### Known regressions carried during the migration
+
+Behaviour that is deliberately worse between the task that broke it and the task that restores it. Kept visible rather than buried in a log, because "main stays shippable" has to mean something.
+
+| Broken at | Behaviour | Workaround today | Restored at |
+|---|---|---|---|
+| **P0.5** (fix 4) | Rubber-band-select a room whose edge is a longer party wall, then group + move it — the region no longer follows. The walls captured by the band move; the room does not. | Drag the room by its **label** instead: `_privatize_shared_walls` handles the party wall correctly on that path. | **P4.2** (`extract` replaces the accidental privatisation with a real operation) |
 
 ### P0.6 — Cheap render wins
 **Touches.** `items.py`, `rooms.py`, `mainwindow.py`, `view.py`.
@@ -315,6 +329,7 @@ Re-run P0.3 and compare against the P0.6 numbers.
 ### P4.2 — Extract / join
 Per §4 of `DESIGN_MODEL_v5.md`. Extract privatizes walls and vertices, sets `state: floating`, `extracted_from`. Join welds, merges coincident walls, splits, rebinds, sets `state: placed`, and coalesces only the touched degree-2 vertices.
 **Acceptance.** Extract → move 500″ → join at a new location → `check()` clean at every step; furnishings and openings intact; I12 holds while floating.
+**Also required:** flip `test_groups.py::test_extracted_room_region_follows_move` back from `xfail` to a hard pass — via a real `extract`, not via selection-time synthesis. That test is the receipt for the P0.5 regression in Known regressions above.
 
 ### P4.3 — Shuffle mode
 `settings.editing.{shuffle,auto_coalesce,auto_weld,auto_bind}` + a toolbar toggle. Leaving shuffle joins nothing automatically.
@@ -494,4 +509,46 @@ notes:   6 behaviours pinned; no existing test modified. Passes: opening-s under
          the change. Split per the amended plan into 2a (invariant, asserts hard,
          must never regress) and 2b (wall actually gone: 3 built + 1 open edge,
          xfail->P4.1). Refused deletion with no message = defect 17.
+
+P0.5  done   (5 fix commits 947ae4f..76c32ee + 1 gate-resolution commit)
+ruff:    clean
+pytest:  298 passed, 6 xfailed, 0 failed, 0 xpassed in 9.14s
+files (source): rooms.py (fix1 RoomItem.itemChange + sip import),
+         mainwindow.py (fix2 dict(it.properties); fix3 refresh_rooms_cmd active-
+         floor scope), view.py (fix4 select_in_rect read-only),
+         catalog.py (fix5 price overrides -> config_dir, merged on load).
+TESTS ADDED (one per fix): test_rooms::test_removing_room_unbinds_its_walls;
+         test_io::test_project_from_scene_copies_room_properties;
+         test_floors::test_refresh_rooms_cmd_spares_inactive_floor_rooms (two
+         floors, inactive-floor room survives -- per acceptance);
+         test_ai_pricing::test_apply_prices_writes_config_not_manifest +
+         test_price_override_reloads_from_config.
+TESTS CHANGED (each a red flag, named per the working agreement):
+       * fix 4 (authorised): test_selection.py's two defect-asserting tests
+         rewritten to assert selection creates nothing --
+         test_room_edge_on_party_wall_is_not_duplicated,
+         test_party_wall_edge_selection_leaves_the_door_intact; module docstring
+         updated; the P0.2 dup._path assertion retired here as scheduled.
+       * fix 5 (necessary consequence): test_apply_prices_updates_manifest_and_
+         catalog asserted the defect (a manifest write) -> replaced with
+         test_apply_prices_writes_config_not_manifest; manifest_guard fixture
+         (existed only to restore the mutated asset) -> price_sandbox (redirects
+         override path to tmp); test_placed_item_picks_up_price and
+         test_dialog_fetch_applies_without_network switched to it.
+       * gate fallout from fix 4 (NOT anticipated in the 3 named tests):
+         test_groups::test_extracted_room_region_follows_move failed -- its
+         "extract via rubber-band" workflow stood on the synthesis fix 4 removed.
+         Root cause: old select_in_rect synthesised the party edge AND the
+         following rebuild rebound the room to that private copy, so bake's strict
+         room_owns_walls could carry it. Decision (a): xfail -> P4.2, logged in
+         Known regressions; label-drag (_privatize_shared_walls) is the workaround.
+       * XPASS resolved: test_characterization::test_group_move_undo_restores
+         (was xfail->P4.5) PROMOTED to a hard pass -- fix 2 closed it (snapshot no
+         longer aliases live properties). Verified first that test 3
+         (group_survives_roundtrip) is STILL xfail, so P4.5's remaining half is
+         still held; comment points at test 3 as the holder.
+notes:   PROCESS: after this, run the FULL gate before each commit in a multi-part
+         task, not just at the end -- fix 4 committed green on test_selection.py
+         alone but red on the full suite (the extracted-room test). A targeted run
+         proves the fix; only the full suite shows what else it touched.
 ```

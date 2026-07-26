@@ -153,9 +153,14 @@ def test_group_survives_roundtrip(win, make_room, first_furnishing):
 
 
 # --------------------------------------------------------------------------
-# 4. group + move, then undo, returns to the pre-group state  (P4.5)
+# 4. group + move, then undo, returns to the pre-group state
+# Promoted to a HARD PASS at P0.5: fix 2 (project_from_scene copies room
+# properties) closed this -- the pre-group serialize() snapshot no longer
+# aliases the live properties dict, so group+move can't corrupt it and undo
+# compares equal. This is a durable invariant (the plan must revert) and must
+# not regress. P4.5's other half -- the group itself surviving save/load/redo --
+# is still held by test 3 (test_group_survives_roundtrip), which stays xfail.
 # --------------------------------------------------------------------------
-@pytest.mark.xfail(reason="group/move undo not clean until P4.5", strict=False)
 def test_group_move_undo_restores(win, make_room, first_furnishing):
     room, ops, furns = _furnished_room(win, make_room, first_furnishing)
     win._reset_undo()

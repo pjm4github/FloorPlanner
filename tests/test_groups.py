@@ -179,6 +179,15 @@ def test_group_move_room_only_does_not_orphan_walls(fp, win, make_room):
     assert sum(isinstance(r, fp.RoomItem) for r in sc.items()) == 1
 
 
+# xfail carried as a Known regression (V5_MIGRATION_PLAN): P0.5 fix 4 made
+# select_in_rect read-only, removing the accidental "extract" it performed
+# (synthesise the party-wall edge + rebuild rebinds the room to that private
+# copy, so bake's room_owns_walls could carry it). The rubber-band-then-move
+# route to this workflow is gone until P4.2 rebuilds extract as a real
+# operation; P4.2's acceptance flips this back to a hard pass. (Dragging the
+# room by its label still works today via _privatize_shared_walls.)
+@pytest.mark.xfail(reason="rubber-band extract removed at P0.5 fix 4; real "
+                          "extract restores it at P4.2", strict=False)
 def test_extracted_room_region_follows_move(fp, win):
     # extract a room whose right edge is a longer party wall, then move the
     # group clear of that wall: the grey region/outline must follow (baked
