@@ -97,7 +97,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P0.5** Five free bug fixes | ruff + pytest |
 | ☑ | **P0.6** Cheap render wins | + P0.3 ratios |
 | ☑ | **P0.7** Vendor schema + validator; CI validates `examples/` | ruff + pytest |
-| ☐ | **P1.1** `design/model.py` — dataclasses | ruff + pytest |
+| ☑ | **P1.1** `design/model.py` — dataclasses | ruff + pytest |
 | ☐ | **P1.2** `design/validate.py` — I1–I14 | ruff + pytest |
 | ☐ | **P1.3** `design/topology.py` — weld/planarize/trace | ruff + pytest |
 | ☐ | **P1.4** `design_from_scene()` | ruff + pytest |
@@ -666,4 +666,32 @@ result:  regression sweep clean; five P0.5 fixes verified; known regression
 meaning: the Phase 0 safety net is validated three ways — 304-test suite, CI on
          two Python versions, and a human using the application. Phase 1 may
          proceed. Next manual gate is Gate 2, after P2.2.
+
+CI-bump  done   (commit 58590a2, pushed alone)
+         actions/checkout@v5 + setup-python@v6. Shipped alone at the top of
+         Phase 1; CI green on py3.10 + py3.13, Node-20 deprecation warning gone.
+
+P1.1  done
+ruff:    clean
+pytest:  308 passed, 4 xfailed, 1 xpassed (+4 from test_design_model.py)
+files:   floorplanner/design/model.py (new); floorplanner/design/__init__.py
+         (+model exports); tests/test_design_model.py (new).
+notes:   Qt-free dataclasses (Level, Vertex, Wall, Opening, Room, OutlineEdge,
+         Furnishing, Group, Provenance, Design) over the v5 schema. from_dict/
+         to_dict driven by a per-class FIELDS table; sub-structures the schema
+         gives no object type (settings, anchor, placement, label, properties,
+         pos, provenance fields) ride as RAW values.
+         BYTE-IDENTICAL round-trip verified for symmetricP1.json AND site_demo.json
+         -- both dict== and json.dumps== (not just the required symmetricP1). The
+         crux is a _MISSING sentinel via d.get(k, _MISSING): a present-with-null
+         field (free wall left: null) is kept null; an absent field (a room with
+         no area_accounting) stays absent, never emitted as null. A dedicated test
+         pins that distinction.
+         ZERO Qt: model.py imports only the stdlib. test_model_imports_zero_qt
+         execs the file in ISOLATION (bypassing floorplanner/__init__, which star-
+         imports the Qt scene layer) and asserts no PyQt6 module was pulled in --
+         so it catches a stray Qt or floorplanner import, not just a direct one.
+         No behaviour, no callers yet (the scene<->design bridge is P1.4/P1.5).
+         Not pushed -- Phase 1 pushes at its end (or on the v5-topology branch for
+         Phase 3), per the push policy.
 ```
