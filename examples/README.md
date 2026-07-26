@@ -35,3 +35,11 @@ into Living Room / Kitchen / Bedroom, with a French door, a window, and
 furnishings placed at true scale. This is the format the app reads and writes.
 
 ![sample_plan](sample_plan.png)
+
+[`planc1.json`](planc1.json) is a large, realistic single-story house — 20
+rooms (garage, porches, master suite, kitchen, etc.), 50 walls with many shared
+edges, doors, windows and openings, and 50 true-scale furnishings. It exercises
+the shared-wall model, room detection and coalescing far harder than
+`sample_plan.json`, so it doubles as a stress/regression fixture.
+
+![planc1](planc1.png)
