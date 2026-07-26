@@ -63,7 +63,7 @@ Ranked by blast radius; each mapped to the phase that closes it.
 |---|---|---|---|
 | 1 | Welded coordinates never saved → silent room merges | `mainwindow.py` save path | **P2.1** |
 | 2 | `refresh_rooms_cmd` deletes every room on non-active floors | `mainwindow.py:589‑593` | **P0.5** |
-| 3 | Groups not serialized; grouping isn't undoable; undo dissolves groups | `mainwindow.py:1042‑1083` | **P4.5** |
+| 3 | Groups not serialized; grouping isn't undoable; undo dissolves groups | `mainwindow.py:1042‑1083` | **P4.5** — *partly closed early: defect 4's fix made group→move→undo restore the plan correctly. The remaining half (the group itself surviving save/load and redo) is still open and is held by characterization test 3.* |
 | 4 | Undo snapshots alias the live `properties` dict | `mainwindow.py:1074` + `rooms.py:439` | **P0.5** |
 | 5 | `RoomItem` has no `itemChange` → dangling `WallItem.rooms` at 5 sites | `rooms.py`, `mainwindow.py:472,592,677,1234,1287` | **P0.5** |
 | 6 | 13 `except ValueError: continue` silently delete an opening, incl. on load | `walls.py:209,342,1079`; `mainwindow.py:1304` … | **P3.6** |
