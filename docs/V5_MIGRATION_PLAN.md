@@ -70,6 +70,18 @@ Two rules:
 
 **Verify the status table on disk, not from a summary — including your own.** `grep '☐\|☑' docs/V5_MIGRATION_PLAN.md` before claiming a task is ticked. A summary (yours or mine) is not the file. And if a Progress-log entry goes missing after a hand-back, that is a regeneration bug on my side — say so rather than committing the lossy version.
 
+**Root cause of the three doc-loss incidents — identified at P0.6, and it is Cowork's.**
+`device_stage_files` reports the device's true file size but can serve a *stale*
+container-side copy from an earlier stage. Measured: the tool reported 46,942 bytes
+while the copy it produced was 38,760 — a version several commits old. Editing that
+stale copy and writing it back overwrites newer work with older content, which is
+exactly the damage seen at P0.4, P0.5 and P0.6.
+
+**Consequence: Cowork no longer edits this file, or CODE_REVIEW_v2.md.** Plan and
+review changes are handed to Claude Code as explicit edit instructions; Claude Code
+applies them, commits, and grep-verifies on disk. One extra round-trip, and the only
+channel that has destroyed work in this project is closed.
+
 ---
 
 ## Status
