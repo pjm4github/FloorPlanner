@@ -48,6 +48,16 @@ So: the gate stands as written, and the 23 findings were **fixed at source** (me
 
 **Annotating a doomed assertion means naming the *specific* task**, not "Phase 3". If no task actually retires it, say so rather than inventing one.
 
+### Push policy — settled at P0.3
+
+**Commit per task; push per phase.** With one exception: **push once now, at the end of Phase 0's safety net.**
+
+The reason is that `.github/workflows/ci.yml` triggers on push and PR only, so **nothing in this migration has ever been validated by CI.** Local runs are py3.13 on Windows; CI is py3.10 *and* py3.13 on `ubuntu-latest`. Those differ in ways that matter — Qt offscreen font metrics, path handling, and py3.10 syntax support. Discovering a py3.10 break at P1.4 means bisecting a stack of commits instead of reading one failure.
+
+Pushing per *task* is the wrong granularity: 40 pushes is noise, and a phase boundary is the natural "coherent, shippable state". Pushing per *phase* after this first one is the rule. Phase 3 runs on `v5-topology` and pushes there.
+
+**Before the first push, the timing tests need a marker of their own** — see P0.3b step 3. Ratio assertions on shared CI runners flap; that is a well-known false-positive source and it would poison the signal we just built.
+
 ---
 
 ## Status
@@ -150,16 +160,29 @@ it says which code is being deleted and in which phase. Do not add new callers o
 **Acceptance.** Ratio recorded. Also record the **absolute** time to select all 64 rooms — that number is the one to compare against the felt symptom.
 **Note.** The harness runs headless offscreen, so it measures none of the repaint cost (`FullViewportUpdate`, no `setCacheMode`). Real-world stalls will be worse than these numbers, not better.
 
+**Step 3 — give the timing tests their own marker, before the first push.**
+Register a `perf` marker in `pytest.ini` and tag every test in `tests/test_scaling.py` with it (keep `slow` too, so `--quick` behaviour is unchanged). Then change the CI test step to `python -m pytest -ra -m "not perf"`.
+
+Deliberately `perf` and **not** `slow`: excluding `slow` from CI would also drop `test_fp_extract_cli_end_to_end` and the macro CLI subprocess test, which are slow but *deterministic* and worth running there. Only the timing-ratio assertions are unsafe on shared runners.
+
+The harness stays a **local gate**, invoked explicitly at P0.6 and P3.8 — the two moments its numbers decide something. A timing gate that flaps in CI gets muted within a week and then protects nothing.
+
 ### P0.4 — Characterization tests
 **Touches.** `tests/test_characterization.py` (new).
 **Do.** Write these against *current* behaviour, marking `xfail` the ones that fail today:
 1. Group a named room with a door, a window and two furnishings; move it; assert every opening's `s` relative to its wall is unchanged. Repeat for a 90° group rotation.
-2. Delete one wall of a 4-wall named room; assert the room still exists with its name, area and furnishings. *(expected xfail — P4.1)*
+2. Delete one wall of a 4-wall named room. **Split into two tests — the single test cannot distinguish today's behaviour from P4.1's.**
+   - **2a `test_delete_wall_keeps_room`** — the room still exists with its name, area and furnishings. **Passes today** (verified at P0.4), and must never regress. Assert hard.
+   - **2b `test_delete_wall_actually_removes_the_wall`** — after the delete, the room has **3 built walls and 1 open edge**, not 4 built walls. *(xfail — P4.1)*
+   
+   Why the split: the room survives today **because the wall is not actually deleted**. `fracture_delete_wall` (`walls.py:300‑354`) keeps every stretch that runs along a room perimeter and rebinds it, so deleting a room's own perimeter wall is silently a **no-op** — 4 walls in, 4 walls out, 0 open edges (measured at P0.4). Under P4.1 the wall genuinely goes and the edge becomes `wall: null`. A test that only asserts "the room survived" passes in both worlds and therefore proves nothing about the change. 2b is the assertion that actually holds P4.1 to its promise.
 3. Group two rooms, `serialize()`, `load_data()`, assert the group survives. *(expected xfail — P4.5)*
 4. Group, move, `undo()`; assert the plan returns to its pre-group state. *(expected xfail — P4.5)*
 5. Assert grouped walls are exempt from `coalesce_all` (guards the `group() is None` gate that nothing currently covers).
 6. Group a room, ungroup, repeat 4×; assert wall and opening counts reach a fixed point. *(This is the deleted `test_zzleak.py`, promoted.)*
 **Acceptance.** Each test either passes or is `xfail` with a comment naming the phase that flips it. **No existing test modified.**
+
+> **An xfail prediction that turns out wrong is a finding, not an error.** Record what actually happens and *why*, then decide whether the test needs splitting (as test 2 did) — an unexpected pass usually means the test is measuring something coarser than the behaviour under change.
 
 ### P0.5 — Five free bug fixes
 **Do.** One commit each, each with a regression test.
@@ -426,29 +449,49 @@ notes:   No existing test touched. Ratios recorded WITHOUT weakening the
          the n=8 grid (960") overflowed the default 840" canvas and edge rooms
          went undetected until the canvas was enlarged. Logged as defect 16.
 
-P0.3b  done   (commit <this>; five rollback points on the branch, unpushed)
+P0.3b  done   (commit 43e838b; step 3 landed separately, see below)
 ruff:    clean
-pytest:  289 passed, 3 xfailed, 0 failed in 9.19s
-         --quick: 276 passed, 16 skipped in 5.98s (all 5 scaling tests skipped)
-files:   tests/test_scaling.py (added a fifth timed op; no other test touched)
-notes:   Selection-building is the WORST-scaling op measured so far, and it is
-         the one nothing else was timing.
-                       n=4 ms     n=8 ms     ratio
-           select        2.7        71.8      27.07   XFAIL  (> quadratic!)
-         For reference (same run): rebuild 2.61, group 11.65, bake 4.60,
-         ungroup 8.35. select's 27 is ABOVE the quadratic reference of 16 --
-         confirming O(R^2 * W): each setSelected fires _update_edit_actions ->
-         _selected_room_shapes(), which reruns bounding_walls() (QPainterPath
-         booleans) for every already-selected room. Ctrl-clicking room k costs
-         O(k*W); selecting all R is O(R^2*W).
-         ABSOLUTE (the number to hold against the felt symptom): selecting all
-         64 rooms one at a time = 71.8 ms HEADLESS. The harness is offscreen, so
-         this excludes ALL repaint cost (FullViewportUpdate, no setCacheMode);
-         the real stall is this plus a full-scene repaint per click, i.e. worse.
-         xfail(strict=False) -> P3.8 per the task. Nuance for the record: P3.5's
-         stored outlines make bounding_walls trivial and cut the per-room W
-         constant hard, but the O(R^2) STRUCTURE (recomputing all selected shapes
-         on every selectionChanged) lives in _selected_room_shapes and may not
-         fully clear until that is rewritten with group semantics at P4.5. If the
-         ratio is still >8 after P3.8, that is the reason, not a P3.8 regression.
+pytest:  289 passed, 3 xfailed in 9.19s
+         --quick: 276 passed, 16 skipped (all 5 scaling tests skipped)
+files:   tests/test_scaling.py (fifth timed op; no other test touched)
+notes:   Selection-building is the worst-scaling op measured, and the one
+         nothing was timing before Ctrl+G.
+           select   2.7 ms (16 rooms) -> 71.8 ms (64 rooms)   ratio 27.07  XFAIL
+         27 is ABOVE the quadratic reference of 16 -> confirmed O(R^2 * W): each
+         setSelected fires _update_edit_actions -> _selected_room_shapes(), which
+         reruns bounding_walls() (QPainterPath booleans) for every already-
+         selected room. ACCEPTANCE FIGURE: selecting all 64 rooms one at a time =
+         71.8 ms HEADLESS -- excludes ALL repaint cost (FullViewportUpdate, no
+         setCacheMode), so the felt stall is this PLUS a full-scene repaint per
+         click, i.e. strictly worse. xfail(strict=False) -> P3.8. Nuance: P3.5's
+         stored outlines cut the per-room W constant, but the O(R^2) recompute
+         STRUCTURE lives in _selected_room_shapes and may not clear until P4.5.
+
+P0.3b-step3  done
+ruff:    clean
+files:   pytest.ini (register `perf` marker); tests/test_scaling.py (tag every
+         test perf + slow); .github/workflows/ci.yml (test step -> -m "not perf")
+notes:   Precondition for the first push. `perf` and NOT `slow`, deliberately:
+         excluding `slow` from CI would also drop the deterministic slow tests
+         (fp_extract CLI, macro CLI subprocess) worth running there. Only the
+         timing-ratio assertions are unsafe on shared runners. --quick behaviour
+         unchanged (scaling tests keep `slow`).
+
+P0.4  done
+ruff:    clean
+pytest:  294 passed, 6 xfailed in 10.42s
+files:   tests/test_characterization.py (new)
+notes:   6 behaviours pinned; no existing test modified. Passes: opening-s under
+         group move AND rotate; delete-wall keeps the room (2a); grouped walls
+         exempt from coalesce_all; group/ungroup 4x fixed point. xfail: 2b
+         delete-actually-removes-the-wall (P4.1), group survives roundtrip
+         (P4.5), group+move+undo restores (P4.5).
+         FINDING that reshaped the task: test 2 was predicted xfail->P4.1 but
+         PASSED. Diagnosed: the room survives because the wall is never deleted
+         -- fracture_delete_wall keeps the perimeter stretch and rebinds it
+         (measured 4 walls in, 4 out, 0 open edges). A single "room survived"
+         test passes in both today's and P4.1's world, so it proves nothing about
+         the change. Split per the amended plan into 2a (invariant, asserts hard,
+         must never regress) and 2b (wall actually gone: 3 built + 1 open edge,
+         xfail->P4.1). Refused deletion with no message = defect 17.
 ```
