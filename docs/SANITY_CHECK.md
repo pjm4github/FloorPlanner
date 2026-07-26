@@ -13,6 +13,8 @@ Phase 1 is a shadow model with no user-visible effect; P0.7 is tooling. Phase 3 
 
 # Gate 1 — end of Phase 0
 
+**Status: PASSED** — user-run 2026-07-26 against Phase 0 complete. Next: Gate 2, after P2.2.
+
 ```
 python FloorPlanner.py
 ```

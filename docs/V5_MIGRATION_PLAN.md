@@ -265,9 +265,11 @@ Behaviour that is deliberately worse between the task that broke it and the task
 Qt-free dataclasses for `Level`, `Vertex`, `Wall`, `Opening`, `Room`, `OutlineEdge`, `Furnishing`, `Group`, `Provenance`, `Design`, with `to_dict`/`from_dict` and stable emit order. No behaviour, no callers yet.
 **Acceptance.** `Design.from_dict(load("symmetricP1.json")).to_dict() == load("symmetricP1.json")` byte-identical. Zero Qt imports (assert it in the test).
 
-### P1.2 — `design/validate.py`
-Port all fourteen invariants from `tools/validate_design.py`. Keep the O(n²) ones (I5b, I11, I14) behind a `deep=True` flag so a per-command check can run the cheap ten.
-**Acceptance.** `check()` returns `[]` for `symmetricP1.json` and `site_demo.json`, and non-empty for `planc1.v5.json`. Negative tests: nudge a shared vertex 0.3″ → I14 fires; point a wall's `left` at a room that doesn't name it → I6 fires.
+### P1.2 — `design/validate.py` (deep flag + negative tests)
+**Most of this landed early at P0.7.** `check(doc) -> list[str]` already ports all fourteen invariants (pure Python, in `floorplanner/design/validate.py`), and the corpus acceptance below already holds (`test_schema.py`). What actually **remains** of P1.2:
+- Split the three O(n²) invariants (`I5b`, `I11`, `I14`) behind a `deep=True` flag, so a per-command check can run the cheap **eleven** and skip the quadratic three.
+- Two negative unit tests: nudge a shared vertex 0.3″ → `I14` fires; point a wall's `left` at a room that doesn't name it → `I6` fires.
+**Acceptance.** `check(doc)` runs the cheap eleven by default and all fourteen under `deep=True`; both negative tests pass. (The corpus acceptance — `[]` for `symmetricP1.json` and `site_demo.json`, non-empty for `planc1.v5.json` — already holds from P0.7.)
 
 ### P1.3 — `design/topology.py`
 Port from `tools/migrate_to_design_v5.py`: `weld_endpoints`, `planarize`, `split_edge`, `merge_collinear`, `trace_faces`, `enclosing_face`. Pure functions over the `Design`; no Qt.
@@ -655,4 +657,13 @@ notes:   check(doc)->list[str] ported VERBATIM (pure Python, no third-party
          setup-python@v6 bump is deliberately held for a standalone commit at the
          top of Phase 1 (changing the CI environment is a different risk class
          from adding a step, and CI runs once per push).
+
+GATE 1  manual sanity check — PASSED (user-run, 2026-07-26)
+scope:   Phase 0 complete, format unchanged, CI green py3.10 + py3.13
+result:  regression sweep clean; five P0.5 fixes verified; known regression
+         (party-wall room via rubber-band) confirmed as expected; selection
+         responsiveness confirmed improved.
+meaning: the Phase 0 safety net is validated three ways — 304-test suite, CI on
+         two Python versions, and a human using the application. Phase 1 may
+         proceed. Next manual gate is Gate 2, after P2.2.
 ```
