@@ -17,6 +17,7 @@ import warnings
 import pytest
 
 from PyQt6.QtCore import QPointF
+from PyQt6.QtWidgets import QApplication
 
 import FloorPlanner as fp
 
@@ -105,17 +106,32 @@ def _measure(n):
 
     t["rebuild"] = _time(lambda: fp.rebuild_all_walls(sc))
 
-    # select the rooms one at a time -- exactly what ctrl-clicking each room does.
-    # Each setSelected fires scene.selectionChanged -> _update_edit_actions ->
-    # _selected_room_shapes(), which calls bounding_walls() for every
-    # already-selected room, so this is O(R^2 * W) path booleans before Ctrl+G.
+    # Two selection paths with genuinely different costs (P0.6 amendment):
     rooms = [it for it in sc.items() if isinstance(it, fp.RoomItem)]
+    app = QApplication.instance()
+
+    # select_burst: select all rooms one at a time WITHOUT pumping the event loop
+    # -- Ctrl+A, rubber-band, the macro runner. The selectionChanged burst arrives
+    # faster than the debounce, so the enable/disable pass runs once, later. The
+    # DEBOUNCE (P0.6 item 1 fix a) is what makes this cheap.
     sc.clearSelection()
 
-    def _select_rooms_one_at_a_time():
+    def _select_burst():
         for room in rooms:
             room.setSelected(True)
-    t["select"] = _time(_select_rooms_one_at_a_time)
+    t["select_burst"] = _time(_select_burst)
+
+    # select_interactive: processEvents after EACH setSelected -- a human ctrl-
+    # clicking, far slower than the timer, so _apply_edit_actions fires once per
+    # click and the debounce buys nothing. The CHEAP-COUNT fix (P0.6 item 1 fix b)
+    # is what makes this cheap; it is the honest model of the reported stall.
+    sc.clearSelection()
+
+    def _select_interactive():
+        for room in rooms:
+            room.setSelected(True)
+            app.processEvents()
+    t["select_interactive"] = _time(_select_interactive)
 
     sc.clearSelection()
     for it in sc.items():
@@ -136,7 +152,8 @@ def _measure(n):
     return t
 
 
-OPS = ("rebuild", "select", "group", "bake", "ungroup")
+OPS = ("rebuild", "select_burst", "select_interactive", "group", "bake",
+       "ungroup")
 
 
 @pytest.fixture(scope="module")
@@ -149,10 +166,11 @@ def scaling():
     lines = [f"[scaling] n={N} ({N * N} rooms) -> 2n={2 * N} ({4 * N * N} rooms), "
              f"ratio threshold < 8 (quadratic ~= 16)"]
     for op in OPS:
-        lines.append(f"[scaling]   {op:8s}  {small[op]:8.1f} ms -> "
+        lines.append(f"[scaling]   {op:18s}  {small[op]:8.1f} ms -> "
                      f"{large[op]:9.1f} ms   ratio {ratios[op]:5.2f}")
-    lines.append(f"[scaling] absolute: selecting all {4 * N * N} rooms one at a "
-                 f"time = {large['select']:.1f} ms")
+    lines.append(f"[scaling] absolute (all {4 * N * N} rooms one at a time): "
+                 f"burst {large['select_burst']:.1f} ms, "
+                 f"interactive {large['select_interactive']:.1f} ms")
     report = "\n".join(lines)
     print("\n" + report)
     warnings.warn(UserWarning("\n" + report), stacklevel=1)   # visible in -ra
@@ -163,17 +181,20 @@ def test_rebuild_scales_subquadratically(scaling):
     assert scaling["ratios"]["rebuild"] < 8
 
 
-# Building the selection is the worst-scaling op (ratio ~27 at P0.3b baseline --
-# beyond quadratic). Each ctrl-click fires _update_edit_actions ->
-# _selected_room_shapes(), which recomputes bounding_walls() for EVERY already-
-# selected room, so selecting R rooms is O(R^2 * W) path booleans. P3.5 makes
-# bounding_walls trivial (stored outlines, no per-call boolean union), which
-# drops the per-room constant; P3.8 is the gate that must show the ratio under 8.
-# strict=False -- see the log note: the O(R^2) recompute pattern itself lives in
-# _selected_room_shapes and may not fully clear until that is rewritten (P4.5).
-@pytest.mark.xfail(strict=False, reason="selection build is >quadratic until P3.8")
-def test_select_scales_subquadratically(scaling):
-    assert scaling["ratios"]["select"] < 8
+# Selection-building was the worst-scaling op (ratio ~27 at P0.3b -- beyond
+# quadratic): each setSelected fired _selected_room_shapes(), O(R^2 * W) path
+# booleans. P0.6 item 1 fixed it two ways; the two user paths are measured apart.
+# select_burst: Ctrl+A / rubber-band / macro. The debounce coalesces the burst,
+# so the harness (no event pump) measures the deferral -- near-zero.
+def test_select_burst_scales_subquadratically(scaling):
+    assert scaling["ratios"]["select_burst"] < 8
+
+
+# select_interactive: a human ctrl-clicking, one _apply_edit_actions per click.
+# This is the honest model of the reported stall; the cheap-count fix carries it.
+# Promoted to a HARD PASS at P0.6 -- it clears the threshold (see the log).
+def test_select_interactive_scales_subquadratically(scaling):
+    assert scaling["ratios"]["select_interactive"] < 8
 
 
 # group_selected is near-quadratic today (ratio ~13.7 at P0.3 baseline): a room's

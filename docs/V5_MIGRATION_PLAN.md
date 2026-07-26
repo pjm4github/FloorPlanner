@@ -95,7 +95,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P0.3b** Add selection-building to the harness | + `pytest -m slow` |
 | ☑ | **P0.4** Characterization tests (xfail where broken) | ruff + pytest |
 | ☑ | **P0.5** Five free bug fixes | ruff + pytest |
-| ☐ | **P0.6** Cheap render wins | + P0.3 ratios |
+| ☑ | **P0.6** Cheap render wins | + P0.3 ratios |
 | ☐ | **P0.7** Vendor schema + validator; CI validates `examples/` | ruff + pytest |
 | ☐ | **P1.1** `design/model.py` — dataclasses | ruff + pytest |
 | ☐ | **P1.2** `design/validate.py` — I1–I14 | ruff + pytest |
@@ -582,4 +582,41 @@ notes:   PROCESS: after this, run the FULL gate before each commit in a multi-pa
          task, not just at the end -- fix 4 committed green on test_selection.py
          alone but red on the full suite (the extracted-room test). A targeted run
          proves the fix; only the full suite shows what else it touched.
+
+P0.6  done   (item 1 commit c9451a5 + items 2-6/harness-split commit)
+ruff:    clean
+pytest:  300 passed, 4 xfailed, 1 xpassed in 8.44s
+files:   mainwindow.py (item 1 debounce+cheap-count selection actions; item 3
+         _update_totals off scene.changed onto the 180ms dirty timer),
+         items.py (item 2 GroupItem._oriented_box cache; item 5 FurnishingItem
+         DeviceCoordinateCache), rooms.py (item 4 cache QFontMetricsF x2 +
+         boundary stroker), tests/test_scaling.py (split select op).
+BEFORE -> AFTER ratios (t(2n)/t(n), n=4->8; before = P0.6 start):
+                       before        after
+           rebuild     2.48          2.84         (paint items don't touch it)
+           select      25.90/75.5ms  -> SPLIT:
+             select_burst              5.56 / 1.1ms   HARD PASS (debounce)
+             select_interactive        3.63 / 6.6ms   HARD PASS (cheap-count)
+           group       12.37         10.92        (still xfail -> P3.8)
+           bake         4.53          4.69
+           ungroup      8.56          5.62         (xpass this run; item 2's
+                                                    _oriented_box cache cut its
+                                                    boundingRect cost. Still
+                                                    xfail(strict=False)->P3.8:
+                                                    it flaps 5.6-8.2 run to run.)
+ITEM 1 (the headline): selecting all 64 rooms 75.5ms -> select_interactive 6.6ms
+         (~11x on the honest per-click model; ~44x on the coalesced single pass).
+         Split per the amendment: select_burst (no pump; debounce does the work)
+         and select_interactive (processEvents per click; cheap-count does it).
+         Both clear the threshold, so both are HARD PASSES (was one xfail).
+ITEM 6: measured NoIndex vs BspTreeIndex on the 64-room grid -- NoIndex wins
+         every op (rebuild 3.4 vs 3.6, group 138.6 vs 148.1, bake 136.9 vs 162.6,
+         ungroup 197.5 vs 229.6 ms). Default UNCHANGED, per "only if BSP wins".
+notes:   Items 2-5 are paint-time wins the headless harness barely reflects
+         (no repaint), so rebuild/bake/group ratios move within noise; they are
+         behaviour-preserving (full suite green, no test changed except the
+         harness split). Caveat for the record: select_burst's ratio is
+         noise-dominated (0.2ms vs 1.1ms at the timer-resolution floor) -- the
+         meaningful guard there is its ~1ms absolute, not the ratio. If it ever
+         flaps >8, switch it to an absolute assertion.
 ```

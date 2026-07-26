@@ -94,8 +94,10 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self.floor_label)
         self.status(self.HINTS[TOOL_SELECT])
 
-        # keep the toolbar totals current as rooms are added/resized/removed
-        self.scene.changed.connect(self._update_totals)
+        # keep the toolbar totals current -- debounced behind the 180 ms dirty
+        # timer (set up below), not fired on every scene.changed (defect 15:
+        # scene.changed emits per repaint region, so a drag ran _update_totals'
+        # full room scan dozens of times a second)
         self._update_totals()
 
         self._z_top = 0                  # running max-z for bring-to-front
@@ -112,6 +114,7 @@ class MainWindow(QMainWindow):
         self._dirty_timer.setSingleShot(True)
         self._dirty_timer.setInterval(180)
         self._dirty_timer.timeout.connect(self._commit_if_changed)
+        self._dirty_timer.timeout.connect(self._update_totals)   # debounced
         self.scene.changed.connect(self._mark_dirty)
         self._update_undo_actions()
 

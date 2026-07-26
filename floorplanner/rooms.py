@@ -423,6 +423,12 @@ class RoomItem(QGraphicsItem):
         self._font.setPixelSize(14)       # 14" tall text reads well at plan scale
         self._sub_font = QFont(FONT_FAMILY)
         self._sub_font.setPixelSize(9)
+        # cache per-paint helpers: fonts are fixed, so their metrics and the
+        # fixed-width boundary stroker never need rebuilding each paint (P0.6)
+        self._font_metrics = QFontMetricsF(self._font)
+        self._sub_font_metrics = QFontMetricsF(self._sub_font)
+        self._boundary_stroker = QPainterPathStroker()
+        self._boundary_stroker.setWidth(3.0 * EXTERIOR_T)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         # above the walls: the fill only covers floor space (it stops at
         # the wall faces) and the perimeter dashes must paint OVER the walls
@@ -516,9 +522,7 @@ class RoomItem(QGraphicsItem):
         # wide enough to safely contain the wall centrelines: the flood
         # region edge sits up to t/2 + one raster cell from a centreline,
         # and a point exactly on the stroke edge tests as outside
-        stroker = QPainterPathStroker()
-        stroker.setWidth(3.0 * EXTERIOR_T)
-        return stroker.createStroke(self.path)
+        return self._boundary_stroker.createStroke(self.path)
 
     def bounding_walls(self):
         """Walls whose body touches this room's boundary."""
@@ -688,7 +692,7 @@ class RoomItem(QGraphicsItem):
                        self.anchor.y() + self.label_offset.y())
 
     def _label_rect(self) -> QRectF:
-        fm = QFontMetricsF(self._font)
+        fm = self._font_metrics
         w = max(fm.horizontalAdvance(self.name), 48.0) + 10.0
         h = fm.height() + 13.0
         c = self._label_centre()
@@ -751,7 +755,7 @@ class RoomItem(QGraphicsItem):
         painter.setPen(QPen(col, 0))
         painter.setBrush(QBrush(col))
         painter.setFont(self._sub_font)
-        fm = QFontMetricsF(self._sub_font)
+        fm = self._sub_font_metrics
 
         if self.corners:
             n = len(self.corners)

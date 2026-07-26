@@ -59,6 +59,9 @@ class FurnishingItem(QGraphicsItem):
         if self.price > 0:
             tip += f"  ·  ${self.price:,.0f}"
         self.setToolTip(tip)
+        # cache the rendered SVG symbol at device resolution: it only re-rasters
+        # on zoom/selection, not on every full-viewport repaint of the plan (P0.6)
+        self.setCacheMode(QGraphicsItem.CacheMode.DeviceCoordinateCache)
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
@@ -451,9 +454,15 @@ class GroupItem(QGraphicsItemGroup):
         self.setZValue(1)
         self._rotating = False
         self._angle = 0.0                 # current orientation of the box
+        self._obox = None                 # cached _oriented_box(); see there
+
+    def _invalidate_box(self):
+        """Drop the cached oriented box after any geometry change."""
+        self._obox = None
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
+            self._obox = None             # moved -> furnishing content pts stale
             return grid_snap(value)
         return super().itemChange(change, value)
 
@@ -490,11 +499,18 @@ class GroupItem(QGraphicsItemGroup):
         """(localRect, centre): an axis-aligned rectangle in the frame
         rotated by -self._angle that tightly contains the content.  Drawn
         back through +self._angle it becomes an oriented box hugging the
-        members at the group's current orientation."""
+        members at the group's current orientation.
+
+        Cached per geometry change (defect 14): boundingRect(), _handle() and
+        paint() each call this, so it ran ~3x per repaint. The cache is dropped
+        by _invalidate_box() on move/rotate/adopt/dissolve/bake."""
+        if self._obox is not None:
+            return self._obox
         pts = self._content_points()
         if not pts:
             b = self.childrenBoundingRect()
-            return b, b.center()
+            self._obox = (b, b.center())
+            return self._obox
         cx = sum(p.x() for p in pts) / len(pts)
         cy = sum(p.y() for p in pts) / len(pts)
         center = QPointF(cx, cy)
@@ -504,7 +520,8 @@ class GroupItem(QGraphicsItemGroup):
         m = EXTERIOR_T                    # margin for wall half-thickness
         rect = QRectF(min(xs) - m, min(ys) - m,
                       max(xs) - min(xs) + 2 * m, max(ys) - min(ys) + 2 * m)
-        return rect, center
+        self._obox = (rect, center)
+        return self._obox
 
     def _handle(self) -> tuple:
         """(centre, radius) of the rotator handle in scene coords; floats
@@ -603,6 +620,7 @@ class GroupItem(QGraphicsItemGroup):
         tr.rotate(theta)
         tr.translate(-c.x(), -c.y())
         self.prepareGeometryChange()
+        self._obox = None                     # angle + children changed
         for w, p1_0, p2_0 in self._snap_walls:
             w.p1, w.p2 = tr.map(p1_0), tr.map(p2_0)
             w.rebuild()                       # re-syncs its openings too
@@ -622,6 +640,7 @@ class GroupItem(QGraphicsItemGroup):
     def _finish_rotation(self):
         self._snap_walls = self._snap_furn = self._snap_rooms = []
         self.prepareGeometryChange()
+        self._obox = None
         self.update()
 
     def adopt(self, item):
@@ -638,6 +657,7 @@ class GroupItem(QGraphicsItemGroup):
         else:
             item.setPos(sp)
         item.setRotation(rot)
+        self._obox = None                 # membership changed
 
     def dissolve(self) -> list:
         """Remove the group, leaving its members in the scene exactly
@@ -678,6 +698,7 @@ class GroupItem(QGraphicsItemGroup):
                 if isinstance(it, RoomItem) and room_owns_walls(group_walls, it):
                     moved_rooms.append(it)
         self.prepareGeometryChange()
+        self._obox = None                 # child coords change below
         for ch in self.childItems():
             if isinstance(ch, WallItem):
                 ch.p1 = QPointF(ch.p1.x() + d.x(), ch.p1.y() + d.y())
