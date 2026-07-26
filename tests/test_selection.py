@@ -1,7 +1,8 @@
-"""Rubber-band selection: only fully-enclosed items are picked, and a
-room enclosed by the band gets a complete loop of selected walls -- any
-edge carried by a longer party wall is duplicated rather than dragging
-that shared wall into the selection."""
+"""Rubber-band selection: only fully-enclosed items are picked, and a room
+enclosed by the band gets its own edge walls selected. Selection is READ-ONLY
+(P0.5 fix 4 / defect 10): an edge backed only by a longer party wall is left
+unselected -- it is NOT duplicated into a new wall. The two tests below that
+once asserted that duplication now assert that selection creates nothing."""
 import pytest
 from PyQt6.QtCore import QPointF, QRectF
 
@@ -50,7 +51,10 @@ def test_standalone_room_selects_four_walls_no_synthesis(fp, win, make_room):
     assert len(sel) == 4
 
 
-def test_room_edge_on_party_wall_is_duplicated(fp, win):
+def test_room_edge_on_party_wall_is_not_duplicated(fp, win):
+    # REWRITTEN at P0.5 fix 4 (defect 10): this test used to assert the defect --
+    # that selecting a room duplicated its party-wall edge into a new wall
+    # (n0 + 1). Selection is now read-only, so it must create nothing.
     sc = win.scene
     # a vertical party wall taller than the room on its left
     party = fp.WallItem(QPointF(120, 0), QPointF(120, 300), "interior")
@@ -69,20 +73,20 @@ def test_room_edge_on_party_wall_is_duplicated(fp, win):
     win.view.select_in_rect(QRectF(-12, -12, 150, 174))
 
     n1 = sum(isinstance(i, fp.WallItem) for i in sc.items())
-    assert n1 == n0 + 1                       # the shared edge was duplicated
-    assert not party.isSelected()             # the long wall is left alone
+    assert n1 == n0                           # selection created nothing
     assert room.isSelected()
+    assert not party.isSelected()             # the long wall is left alone
     dup = [w for w in sc.items()
            if isinstance(w, fp.WallItem) and w is not party
            and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1]
-    assert len(dup) == 1
-    assert dup[0].isSelected()
-    assert dup[0].length() == pytest.approx(144, abs=2)
+    assert dup == []                          # no synthesized duplicate edge
 
 
-def test_duplicated_edge_does_not_stack_the_door(fp, win):
-    # the duplicated party wall stays plain (the door belongs to ONE wall);
-    # it just opens its body so the door shows through -- never two on top
+def test_party_wall_edge_selection_leaves_the_door_intact(fp, win):
+    # REWRITTEN at P0.5 fix 4: previously asserted that the *synthesized*
+    # duplicate did not stack the party wall's door. With no synthesis, assert
+    # instead that selection creates nothing and the party wall + its single
+    # door are untouched.
     sc = win.scene
     party = fp.WallItem(QPointF(120, 0), QPointF(120, 300), "interior")
     door = fp.OpeningItem(party, "door", "3280", 72)   # within the room edge
@@ -95,14 +99,15 @@ def test_duplicated_edge_does_not_stack_the_door(fp, win):
     res = fp.detect_room(sc, QPointF(60, 72))
     room = fp.RoomItem("Den", QPointF(60, 72), res[0], res[1], corners=res[2])
     sc.addItem(room)
+    n0 = sum(isinstance(i, fp.WallItem) for i in sc.items())
 
     win.view.select_in_rect(QRectF(-12, -12, 150, 174))
 
-    dup = next(w for w in sc.items()
-               if isinstance(w, fp.WallItem) and w is not party
-               and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
-    assert len(dup.openings) == 0             # no duplicate door symbol
-    # but the duplicate's body is opened where the party wall's door is
-    # (this `dup` wall is synthesized by select_in_rect -> synthesize_room_edge,
-    # which v5 P0.5 fix 4 removes — after that there is no dup to assert on.)
-    assert not dup._path.contains(QPointF(120, 72))
+    n1 = sum(isinstance(i, fp.WallItem) for i in sc.items())
+    assert n1 == n0                           # nothing synthesized
+    assert room.isSelected()
+    assert len(party.openings) == 1           # the door is untouched
+    dup = [w for w in sc.items()
+           if isinstance(w, fp.WallItem) and w is not party
+           and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1]
+    assert dup == []

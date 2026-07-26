@@ -428,7 +428,6 @@ class PlanView(QGraphicsView):
         # rooms whose perimeter is enclosed: select the room and make sure
         # every edge is a selected wall (duplicating shared/longer walls)
         rooms = [it for it in scene.items() if isinstance(it, RoomItem)]
-        made_edges = False
         for room in rooms:
             if not room.corners or not item_fully_inside(room, area):
                 continue
@@ -441,11 +440,9 @@ class PlanView(QGraphicsView):
                           and _wall_endpoints_match(x, a, b)), None)
                 if w is not None:
                     w.setSelected(True)      # the room's own edge wall
-                else:
-                    synthesize_room_edge(scene, a, b).setSelected(True)
-                    made_edges = True
-        if made_edges:
-            rebuild_all_walls(scene)
+                # selection is READ-ONLY (defect 10): an edge backed only by a
+                # longer/party wall is left unselected, not duplicated. Nothing
+                # is created, so no rebuild is needed.
 
     def mouseReleaseEvent(self, e):
         if (self._img_mode == "crop" and self._crop_start is not None
