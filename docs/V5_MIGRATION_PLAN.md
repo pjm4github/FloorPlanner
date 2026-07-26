@@ -70,9 +70,9 @@ Pushing per *task* is the wrong granularity: 40 pushes is noise, and a phase bou
 | ☑ | **P0.1** Record the green baseline | ruff + pytest |
 | ☑ | **P0.2** Decouple tests from private names | ruff + pytest |
 | ☑ | **P0.3** Scaling harness | + `pytest -m slow` |
-| ☐ | **P0.3b** Add selection-building to the harness | + `pytest -m slow` |
-| ☐ | **P0.4** Characterization tests (xfail where broken) | ruff + pytest |
-| ☐ | **P0.5** Five free bug fixes | ruff + pytest |
+| ☑ | **P0.3b** Add selection-building to the harness | + `pytest -m slow` |
+| ☑ | **P0.4** Characterization tests (xfail where broken) | ruff + pytest |
+| ☑ | **P0.5** Five free bug fixes | ruff + pytest |
 | ☐ | **P0.6** Cheap render wins | + P0.3 ratios |
 | ☐ | **P0.7** Vendor schema + validator; CI validates `examples/` | ruff + pytest |
 | ☐ | **P1.1** `design/model.py` — dataclasses | ruff + pytest |
