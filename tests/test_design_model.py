@@ -13,7 +13,11 @@ pytestmark = pytest.mark.io
 
 ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = ROOT / "examples"
-DESIGN_FIXTURES = ["symmetricP1.json", "site_demo.json"]
+# planc1.v5.json is schema-valid (pinned at P0.7) and exercises shapes the other
+# two don't -- the faithful migration, with wall: null open outline edges and a
+# provenance block. Its referential invariants fail on purpose; that is a check()
+# concern, not a round-trip one -- from_dict/to_dict must reproduce it verbatim.
+DESIGN_FIXTURES = ["symmetricP1.json", "site_demo.json", "planc1.v5.json"]
 
 
 @pytest.mark.parametrize("name", DESIGN_FIXTURES)

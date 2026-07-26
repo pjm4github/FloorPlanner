@@ -98,7 +98,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P0.6** Cheap render wins | + P0.3 ratios |
 | ☑ | **P0.7** Vendor schema + validator; CI validates `examples/` | ruff + pytest |
 | ☑ | **P1.1** `design/model.py` — dataclasses | ruff + pytest |
-| ☐ | **P1.2** `design/validate.py` — I1–I14 | ruff + pytest |
+| ☑ | **P1.2** `design/validate.py` — I1–I14 | ruff + pytest |
 | ☐ | **P1.3** `design/topology.py` — weld/planarize/trace | ruff + pytest |
 | ☐ | **P1.4** `design_from_scene()` | ruff + pytest |
 | ☐ | **P1.5** `apply_design_to_scene()` | ruff + pytest |
@@ -266,10 +266,10 @@ Qt-free dataclasses for `Level`, `Vertex`, `Wall`, `Opening`, `Room`, `OutlineEd
 **Acceptance.** `Design.from_dict(load("symmetricP1.json")).to_dict() == load("symmetricP1.json")` byte-identical. Zero Qt imports (assert it in the test).
 
 ### P1.2 — `design/validate.py` (deep flag + negative tests)
-**Most of this landed early at P0.7.** `check(doc) -> list[str]` already ports all fourteen invariants (pure Python, in `floorplanner/design/validate.py`), and the corpus acceptance below already holds (`test_schema.py`). What actually **remains** of P1.2:
-- Split the three O(n²) invariants (`I5b`, `I11`, `I14`) behind a `deep=True` flag, so a per-command check can run the cheap **eleven** and skip the quadratic three.
-- Two negative unit tests: nudge a shared vertex 0.3″ → `I14` fires; point a wall's `left` at a room that doesn't name it → `I6` fires.
-**Acceptance.** `check(doc)` runs the cheap eleven by default and all fourteen under `deep=True`; both negative tests pass. (The corpus acceptance — `[]` for `symmetricP1.json` and `site_demo.json`, non-empty for `planc1.v5.json` — already holds from P0.7.)
+**Most of this landed early at P0.7.** `check(doc) -> list[str]` already ports all **15** named checks (I1–I14 plus I5b; pure Python, in `floorplanner/design/validate.py`), and the corpus acceptance below already holds (`test_schema.py`). What actually **remains** of P1.2:
+- Split the three O(n²) invariants behind a `deep` flag: **deep-only (3)** `I5b` (outline self-intersection, O(edges²)/room), `I11` (room-vs-room overlap, O(rooms²)), `I14` (weld closure, O(walls²) — ~6,700 pairs on 82 walls); **always-on (12)** I1 I2 I3 I4 I5 I6 I7 I8 I9 I10 I12 I13. The docstring must state the call sites, since they are the reason for the split: the cheap twelve run **per mutation** under P1.6's `--verify-design` (an O(n²) sweep per edit would make the app unusable); the deep three run on **save, load and import** (paid once, stakes highest — I11 and I14 are the two that caught the real corruption in `planc1.json`).
+- Two negative unit tests, each of which must **fail the check** (not merely not-crash): nudge a shared vertex 0.3″ → `I14` fires (and does *not* fire under `deep=False`); point a wall's `left` at a room that doesn't name it → `I6` fires.
+**Acceptance.** `check(doc, deep=True)` (the default) runs all 15; `deep=False` runs only the 12 always-on and skips I5b/I11/I14; both negative tests pass. **`deep=True` is the default deliberately**: forgetting `deep=False` on the hot path is a loud slowdown, but forgetting `deep=True` on load/import is *silent* corruption — the failure mode should be loud. (The corpus acceptance — `[]` for `symmetricP1.json` and `site_demo.json`, non-empty for `planc1.v5.json` — already holds from P0.7.)
 
 ### P1.3 — `design/topology.py`
 Port from `tools/migrate_to_design_v5.py`: `weld_endpoints`, `planarize`, `split_edge`, `merge_collinear`, `trace_faces`, `enclosing_face`. Pure functions over the `Design`; no Qt.
@@ -295,7 +295,7 @@ A debug flag (env var or `--verify-design`) that rebuilds the `Design` and runs 
 
 ### P2.1 — Load path
 v1–v4 `floorplanner-json`: parse → weld at `join_tol_in` → planarize → trace outlines → convert openings → assign furnishing owners → write `provenance` → **mark dirty** → show the conversion report (§7a of `DESIGN_MODEL_v5.md`). v5 `floorplanner-design`: load, validate, **never dirty**; a file failing I14 is reported as malformed, not silently re-welded.
-**Acceptance.** Opening `examples/planc1.json` yields M Bath 182.0 sf, Hall 61.5 sf, 31 welds in `provenance`, and a dirty document. Opening `examples/symmetricP1.json` is clean and not dirty. The legacy file on disk is never modified.
+**Acceptance.** Opening `examples/planc1.json` yields M Bath 182.0 sf, Hall 61.5 sf, 31 welds in `provenance`, and a dirty document. Opening `examples/symmetricP1.json` is clean and not dirty. The legacy file on disk is never modified. **Opening a v5 file must not dirty it** — this depends on P1.1 round-trip fidelity (`Design.from_dict(x).to_dict() == x`); if a v5 file opens dirty, suspect a model normalisation that broke byte-identity, not the load path.
 
 ### P2.2 — Save writes v5
 Plus **File ▸ Export legacy v4…** for one release, so nobody is stranded.
@@ -687,6 +687,12 @@ notes:   Qt-free dataclasses (Level, Vertex, Wall, Opening, Room, OutlineEdge,
          field (free wall left: null) is kept null; an absent field (a room with
          no area_accounting) stays absent, never emitted as null. A dedicated test
          pins that distinction.
+         WHY _MISSING IS LOAD-BEARING BEYOND P1.1: P2.1's "a v5 file never opens
+         dirty" promise rests ENTIRELY on Design.from_dict(x).to_dict() == x. Had
+         the model normalised absent -> null, every v5 file would round-trip
+         structurally different from what was written and open dirty on every
+         load -- and that bug would surface in Phase 2, months after the real
+         cause. So this fidelity is a P2.1 dependency, not a P1.1 nicety.
          ZERO Qt: model.py imports only the stdlib. test_model_imports_zero_qt
          execs the file in ISOLATION (bypassing floorplanner/__init__, which star-
          imports the Qt scene layer) and asserts no PyQt6 module was pulled in --
@@ -694,4 +700,33 @@ notes:   Qt-free dataclasses (Level, Vertex, Wall, Opening, Room, OutlineEdge,
          No behaviour, no callers yet (the scene<->design bridge is P1.4/P1.5).
          Not pushed -- Phase 1 pushes at its end (or on the v5-topology branch for
          Phase 3), per the push policy.
+
+P1.2  done
+ruff:    clean
+pytest:  312 passed, 4 xfailed, 1 xpassed
+files:   floorplanner/design/validate.py (deep split + docstring); tests/
+         test_schema.py (deep-gating + two negative tests); tests/
+         test_design_model.py (planc1.v5.json added to the round-trip set).
+notes:   COUNT CORRECTED (my error, was propagating): 15 named checks, not 14 --
+         I1-I14 plus I5b. Split: deep-only 3 = I5b, I11, I14 (the O(n^2) ones);
+         always-on 12 = I1 I2 I3 I4 I5 I6 I7 I8 I9 I10 I12 I13. Verified on the
+         corpus: planc1.v5 trips I11 (deep) + I6 (always-on); deep=False drops
+         I11 but still reports I6.
+         DEFAULT = deep=True, and this FLIPS the "cheap by default" wording in my
+         earlier P1.2 amendment (a894221) -- called out here because a changed
+         decision is a red flag too. Rationale: forgetting deep=False on the hot
+         path is a loud slowdown; forgetting deep=True on load/import is SILENT
+         corruption (exactly where I11/I14 matter most). Loud failure wins. The
+         per-command path (P1.6 --verify-design) opts out with deep=False; the
+         CLI and corpus tests keep the default and validate fully -- no caller
+         change needed.
+         Negative tests each FAIL the check (not just not-crash): I14 fires on a
+         welded corner split into two vertices 0.3" apart AND does not fire under
+         deep=False (proves the gate); I6 fires on a wall side that disagrees with
+         the room outlines.
+         Also (riding with P1.2): planc1.v5.json added to the P1.1 round-trip --
+         byte-identical, exercising wall: null open edges + a provenance block
+         (three fixtures now). And recorded that _MISSING is a P2.1 dependency
+         (see the P1.1 entry above) with a matching line added to P2.1's
+         acceptance -- "opening a v5 file must not dirty it".
 ```

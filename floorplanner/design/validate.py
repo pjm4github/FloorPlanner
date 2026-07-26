@@ -70,7 +70,21 @@ def _seg_cross(a, b, c, d, tol=1e-4):
             and sgn(o(c, d, a)) * sgn(o(c, d, b)) < 0)
 
 
-def check(d):
+def check(d, deep=True):
+    """Referential-invariant errors for a v5 design, as a list of strings ([] is
+    valid). There are 15 named checks; three are O(n^2) and gated behind `deep`:
+
+      deep-only (3): I5b room-outline self-intersection (O(edges^2) per room),
+        I11 room-vs-room overlap (O(rooms^2)), I14 weld closure (O(walls^2) --
+        ~6,700 pairs on an 82-wall plan). I11 and I14 are the two that caught the
+        real M Bath / Hall corruption in planc1.json.
+      always-on (12): I1 I2 I3 I4 I5 I6 I7 I8 I9 I10 I12 I13.
+
+    Call sites drive the split: the cheap twelve run per mutation under P1.6's
+    `--verify-design`, where an O(n^2) sweep after every edit would make the app
+    unusable; the deep three run on save, load and import -- paid once, where the
+    stakes are highest. `deep=True` (the default) runs all fifteen; pass
+    `deep=False` for the per-command path."""
     E = []
     V = {v["id"]: v for v in d["vertices"]}
     W = {w["id"]: w for w in d["walls"]}
@@ -138,19 +152,20 @@ def check(d):
                 elif {w["v1"], w["v2"]} != {e["v"], nv}:
                     E.append(f"I5  room {r['id']} edge {i}: wall {w['id']} does "
                              f"not span {e['v']}->{nv}")
-        # I5b simple polygon (non-self-intersecting)
-        p = poly(r)
-        for i in range(n):
-            for j in range(i + 2, n):
-                if i == 0 and j == n - 1:
+        # I5b simple polygon (non-self-intersecting) -- O(edges^2), deep only
+        if deep:
+            p = poly(r)
+            for i in range(n):
+                for j in range(i + 2, n):
+                    if i == 0 and j == n - 1:
+                        continue
+                    if _seg_cross(p[i], p[(i + 1) % n], p[j], p[(j + 1) % n]):
+                        E.append(f"I5b room {r['id']} ({r['name']}) outline "
+                                 f"self-intersects at edges {i}/{j}")
+                        break
+                else:
                     continue
-                if _seg_cross(p[i], p[(i + 1) % n], p[j], p[(j + 1) % n]):
-                    E.append(f"I5b room {r['id']} ({r['name']}) outline "
-                             f"self-intersects at edges {i}/{j}")
-                    break
-            else:
-                continue
-            break
+                break
 
     # I6 wall.left/right agree with the room outlines that name it
     used = {}
@@ -230,23 +245,24 @@ def check(d):
         c = r.get("category", "interior")
         return "site" if c == "site" else ("concept" if c == "concept" else "building")
 
-    rl = {}
-    for r in d["rooms"]:
-        if r["placement"]["state"] != "placed" or oclass(r) == "concept":
-            continue
-        rl.setdefault((r["level"], oclass(r)), []).append(r)
-    for _key, rs in rl.items():
-        for i in range(len(rs)):
-            for j in range(i + 1, len(rs)):
-                a, b = rs[i], rs[j]
-                pa, pb = poly(a), poly(b)
-                ca = (sum(p[0] for p in pa) / len(pa), sum(p[1] for p in pa) / len(pa))
-                cb = (sum(p[0] for p in pb) / len(pb), sum(p[1] for p in pb) / len(pb))
-                cross = any(_seg_cross(pa[i], pa[(i+1)%len(pa)],
-                                       pb[j], pb[(j+1)%len(pb)])
-                            for i in range(len(pa)) for j in range(len(pb)))
-                if _pip(cb, pa) or _pip(ca, pb) or cross:
-                    E.append(f"I11 rooms '{a['name']}' and '{b['name']}' overlap")
+    if deep:                              # O(rooms^2), deep only
+        rl = {}
+        for r in d["rooms"]:
+            if r["placement"]["state"] != "placed" or oclass(r) == "concept":
+                continue
+            rl.setdefault((r["level"], oclass(r)), []).append(r)
+        for _key, rs in rl.items():
+            for i in range(len(rs)):
+                for j in range(i + 1, len(rs)):
+                    a, b = rs[i], rs[j]
+                    pa, pb = poly(a), poly(b)
+                    ca = (sum(p[0] for p in pa) / len(pa), sum(p[1] for p in pa) / len(pa))
+                    cb = (sum(p[0] for p in pb) / len(pb), sum(p[1] for p in pb) / len(pb))
+                    cross = any(_seg_cross(pa[i], pa[(i+1)%len(pa)],
+                                           pb[j], pb[(j+1)%len(pb)])
+                                for i in range(len(pa)) for j in range(len(pb)))
+                    if _pip(cb, pa) or _pip(ca, pb) or cross:
+                        E.append(f"I11 rooms '{a['name']}' and '{b['name']}' overlap")
 
     # I12 a `floating` room really is independent
     for r in d["rooms"]:
@@ -271,30 +287,31 @@ def check(d):
     #     is the tight modelling one (0.6"), NOT the 9" gesture tolerance: a
     #     wall deliberately stopping short of another stays where the user put it.
     tol = float((d.get("settings") or {}).get("vertex_weld_in", 0.6))
-    for w in d["walls"]:
-        a, b = xy(w["v1"]), xy(w["v2"])
-        for o in d["walls"]:
-            if o["id"] == w["id"] or o["level"] != w["level"]:
-                continue
-            c, e2 = xy(o["v1"]), xy(o["v2"])
-            L = math.dist(c, e2)
-            if L < 1e-6:
-                continue
-            ux, uy = (e2[0] - c[0]) / L, (e2[1] - c[1]) / L
-            for vid, p in ((w["v1"], a), (w["v2"], b)):
-                if vid in (o["v1"], o["v2"]):
-                    continue                     # already the shared vertex
-                dx, dy = p[0] - c[0], p[1] - c[1]
-                s_ = dx * ux + dy * uy
-                perp = abs(dy * ux - dx * uy)
-                if perp <= tol and tol < s_ < L - tol:
-                    E.append(f"I14 wall {w['id']} end {vid} lies on wall "
-                             f"{o['id']} but is not a vertex of it (unwelded T)")
-                for q, qid in ((c, o["v1"]), (e2, o["v2"])):
-                    if math.dist(p, q) <= tol and vid != qid:
-                        lo, hi = sorted((vid, qid))     # one message per pair
-                        E.append(f"I14 vertices {lo} and {hi} are within "
-                                 f"{tol}\" but are not the same vertex")
+    if deep:                              # O(walls^2), deep only
+        for w in d["walls"]:
+            a, b = xy(w["v1"]), xy(w["v2"])
+            for o in d["walls"]:
+                if o["id"] == w["id"] or o["level"] != w["level"]:
+                    continue
+                c, e2 = xy(o["v1"]), xy(o["v2"])
+                L = math.dist(c, e2)
+                if L < 1e-6:
+                    continue
+                ux, uy = (e2[0] - c[0]) / L, (e2[1] - c[1]) / L
+                for vid, p in ((w["v1"], a), (w["v2"], b)):
+                    if vid in (o["v1"], o["v2"]):
+                        continue                 # already the shared vertex
+                    dx, dy = p[0] - c[0], p[1] - c[1]
+                    s_ = dx * ux + dy * uy
+                    perp = abs(dy * ux - dx * uy)
+                    if perp <= tol and tol < s_ < L - tol:
+                        E.append(f"I14 wall {w['id']} end {vid} lies on wall "
+                                 f"{o['id']} but is not a vertex of it (unwelded T)")
+                    for q, qid in ((c, o["v1"]), (e2, o["v2"])):
+                        if math.dist(p, q) <= tol and vid != qid:
+                            lo, hi = sorted((vid, qid))     # one per pair
+                            E.append(f"I14 vertices {lo} and {hi} are within "
+                                     f"{tol}\" but are not the same vertex")
 
     for r in d["rooms"]:
         if r.get("category") == "concept" and r["placement"]["state"] != "floating":
