@@ -1,0 +1,622 @@
+{
+ "format": "floorplanner-design",
+ "version": 5,
+ "units": "inches",
+ "settings": {
+  "name": "Site demo",
+  "canvas_w_in": 1000,
+  "canvas_h_in": 560,
+  "vertex_weld_in": 0.6,
+  "area_basis": "centerline",
+  "editing": {
+   "shuffle": true,
+   "auto_coalesce": false,
+   "auto_weld": false,
+   "auto_bind": false
+  }
+ },
+ "levels": [
+  {
+   "id": "LS",
+   "name": "Site",
+   "elevation_in": 0.0,
+   "height_in": 96.0,
+   "kind": "site",
+   "reference": false
+  }
+ ],
+ "vertices": [
+  {
+   "id": "A",
+   "level": "LS",
+   "x": 0.0,
+   "y": 0.0
+  },
+  {
+   "id": "P1",
+   "level": "LS",
+   "x": 288.0,
+   "y": 0.0
+  },
+  {
+   "id": "B",
+   "level": "LS",
+   "x": 720.0,
+   "y": 0.0
+  },
+  {
+   "id": "P2",
+   "level": "LS",
+   "x": 720.0,
+   "y": 96.0
+  },
+  {
+   "id": "J1",
+   "level": "LS",
+   "x": 288.0,
+   "y": 96.0
+  },
+  {
+   "id": "J2",
+   "level": "LS",
+   "x": 288.0,
+   "y": 192.0
+  },
+  {
+   "id": "P3",
+   "level": "LS",
+   "x": 0.0,
+   "y": 192.0
+  },
+  {
+   "id": "C",
+   "level": "LS",
+   "x": 720.0,
+   "y": 480.0
+  },
+  {
+   "id": "P4",
+   "level": "LS",
+   "x": 288.0,
+   "y": 480.0
+  },
+  {
+   "id": "D",
+   "level": "LS",
+   "x": 0.0,
+   "y": 480.0
+  },
+  {
+   "id": "c1",
+   "level": "LS",
+   "x": 792.0,
+   "y": 0.0
+  },
+  {
+   "id": "c2",
+   "level": "LS",
+   "x": 888.0,
+   "y": 0.0
+  },
+  {
+   "id": "c3",
+   "level": "LS",
+   "x": 888.0,
+   "y": 48.0
+  },
+  {
+   "id": "c4",
+   "level": "LS",
+   "x": 792.0,
+   "y": 48.0
+  }
+ ],
+ "walls": [
+  {
+   "id": "wf1",
+   "level": "LS",
+   "v1": "A",
+   "v2": "P1",
+   "type": "fence",
+   "left": null,
+   "right": "rPatio",
+   "openings": []
+  },
+  {
+   "id": "wf2",
+   "level": "LS",
+   "v1": "P1",
+   "v2": "B",
+   "type": "fence",
+   "left": null,
+   "right": "rRose",
+   "openings": []
+  },
+  {
+   "id": "wf3",
+   "level": "LS",
+   "v1": "B",
+   "v2": "P2",
+   "type": "fence",
+   "left": null,
+   "right": "rRose",
+   "openings": []
+  },
+  {
+   "id": "wf4",
+   "level": "LS",
+   "v1": "P2",
+   "v2": "C",
+   "type": "fence",
+   "left": null,
+   "right": "rLawn",
+   "openings": []
+  },
+  {
+   "id": "wf5",
+   "level": "LS",
+   "v1": "C",
+   "v2": "P4",
+   "type": "fence",
+   "left": null,
+   "right": "rLawn",
+   "openings": []
+  },
+  {
+   "id": "wf6",
+   "level": "LS",
+   "v1": "P4",
+   "v2": "D",
+   "type": "fence",
+   "left": null,
+   "right": "rVeg",
+   "openings": [
+    {
+     "id": "g1",
+     "kind": "gate",
+     "code": "4872",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 60.0
+     },
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "wf7",
+   "level": "LS",
+   "v1": "D",
+   "v2": "P3",
+   "type": "fence",
+   "left": null,
+   "right": "rVeg",
+   "openings": []
+  },
+  {
+   "id": "wf8",
+   "level": "LS",
+   "v1": "P3",
+   "v2": "A",
+   "type": "fence",
+   "left": null,
+   "right": "rPatio",
+   "openings": []
+  },
+  {
+   "id": "rw1",
+   "level": "LS",
+   "v1": "J1",
+   "v2": "P2",
+   "type": "retaining",
+   "left": "rRose",
+   "right": "rLawn",
+   "openings": [],
+   "thickness_in": 8.0
+  },
+  {
+   "id": "hg1",
+   "level": "LS",
+   "v1": "J2",
+   "v2": "P4",
+   "type": "hedge",
+   "left": "rLawn",
+   "right": "rVeg",
+   "openings": [],
+   "thickness_in": 24.0
+  },
+  {
+   "id": "cw1",
+   "level": "LS",
+   "v1": "c1",
+   "v2": "c2",
+   "type": "retaining",
+   "left": null,
+   "right": "rTrial",
+   "openings": [],
+   "thickness_in": 6.0
+  },
+  {
+   "id": "cw2",
+   "level": "LS",
+   "v1": "c2",
+   "v2": "c3",
+   "type": "retaining",
+   "left": null,
+   "right": "rTrial",
+   "openings": [],
+   "thickness_in": 6.0
+  },
+  {
+   "id": "cw3",
+   "level": "LS",
+   "v1": "c3",
+   "v2": "c4",
+   "type": "retaining",
+   "left": null,
+   "right": "rTrial",
+   "openings": [],
+   "thickness_in": 6.0
+  },
+  {
+   "id": "cw4",
+   "level": "LS",
+   "v1": "c4",
+   "v2": "c1",
+   "type": "retaining",
+   "left": null,
+   "right": "rTrial",
+   "openings": [],
+   "thickness_in": 6.0
+  }
+ ],
+ "rooms": [
+  {
+   "id": "rPatio",
+   "level": "LS",
+   "name": "Patio",
+   "category": "site",
+   "outline": [
+    {
+     "v": "A",
+     "wall": "wf1"
+    },
+    {
+     "v": "P1",
+     "wall": null
+    },
+    {
+     "v": "J1",
+     "wall": null
+    },
+    {
+     "v": "J2",
+     "wall": null
+    },
+    {
+     "v": "P3",
+     "wall": "wf8"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     0,
+     0
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "surface": "Bluestone pavers",
+    "edging": "Steel",
+    "drainage": "Sheet to lawn",
+    "sun_exposure": "part-shade",
+    "notes": "Dining terrace off the great room"
+   }
+  },
+  {
+   "id": "rRose",
+   "level": "LS",
+   "name": "Rose Bed",
+   "category": "site",
+   "outline": [
+    {
+     "v": "P1",
+     "wall": "wf2"
+    },
+    {
+     "v": "B",
+     "wall": "wf3"
+    },
+    {
+     "v": "P2",
+     "wall": "rw1"
+    },
+    {
+     "v": "J1",
+     "wall": null
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     0,
+     0
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "surface": "Planting soil",
+    "irrigation": "Drip",
+    "edging": "Steel",
+    "sun_exposure": "full-sun",
+    "slope_pct": 2.0,
+    "plant_palette": [
+     "Rosa 'New Dawn'",
+     "Nepeta racemosa",
+     "Salvia nemorosa"
+    ]
+   }
+  },
+  {
+   "id": "rLawn",
+   "level": "LS",
+   "name": "Lawn",
+   "category": "site",
+   "outline": [
+    {
+     "v": "J1",
+     "wall": "rw1"
+    },
+    {
+     "v": "P2",
+     "wall": "wf4"
+    },
+    {
+     "v": "C",
+     "wall": "wf5"
+    },
+    {
+     "v": "P4",
+     "wall": "hg1"
+    },
+    {
+     "v": "J2",
+     "wall": null
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     0,
+     0
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "surface": "Turf - tall fescue",
+    "irrigation": "Rotor",
+    "sun_exposure": "full-sun",
+    "slope_pct": 1.5,
+    "drainage": "Swale at east fence"
+   }
+  },
+  {
+   "id": "rVeg",
+   "level": "LS",
+   "name": "Veg Beds",
+   "category": "site",
+   "outline": [
+    {
+     "v": "P3",
+     "wall": null
+    },
+    {
+     "v": "J2",
+     "wall": "hg1"
+    },
+    {
+     "v": "P4",
+     "wall": "wf6"
+    },
+    {
+     "v": "D",
+     "wall": "wf7"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     0,
+     0
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "surface": "Raised beds - cedar",
+    "irrigation": "Drip",
+    "sun_exposure": "full-sun",
+    "plant_palette": [
+     "Tomato",
+     "Basil",
+     "Rhubarb",
+     "Espalier apple"
+    ]
+   }
+  },
+  {
+   "id": "rTrial",
+   "level": "LS",
+   "name": "Trial Bed",
+   "category": "concept",
+   "outline": [
+    {
+     "v": "c1",
+     "wall": "cw1"
+    },
+    {
+     "v": "c2",
+     "wall": "cw2"
+    },
+    {
+     "v": "c3",
+     "wall": "cw3"
+    },
+    {
+     "v": "c4",
+     "wall": "cw4"
+    }
+   ],
+   "placement": {
+    "state": "floating",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     0,
+     0
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "surface": "Planting soil",
+    "sun_exposure": "full-sun",
+    "notes": "8x4 raised bed - shuffling for the best spot"
+   },
+   "nominal_size": {
+    "width_in": 96,
+    "depth_in": 48
+   }
+  }
+ ],
+ "furnishings": [
+  {
+   "id": "fu1",
+   "level": "LS",
+   "kind": "shrub",
+   "room": "rRose",
+   "pos": [
+    360.0,
+    48.0
+   ],
+   "rotation": 0.0,
+   "state": {
+    "species": "TBD",
+    "spread_in": 48
+   }
+  },
+  {
+   "id": "fu2",
+   "level": "LS",
+   "kind": "shrub",
+   "room": "rRose",
+   "pos": [
+    470.0,
+    48.0
+   ],
+   "rotation": 0.0,
+   "state": {
+    "species": "TBD",
+    "spread_in": 48
+   }
+  },
+  {
+   "id": "fu3",
+   "level": "LS",
+   "kind": "tree",
+   "room": "rLawn",
+   "pos": [
+    600.0,
+    300.0
+   ],
+   "rotation": 0.0,
+   "state": {
+    "species": "TBD",
+    "spread_in": 48
+   }
+  },
+  {
+   "id": "fu4",
+   "level": "LS",
+   "kind": "bench",
+   "room": "rPatio",
+   "pos": [
+    140.0,
+    96.0
+   ],
+   "rotation": 0.0,
+   "state": {
+    "species": "TBD",
+    "spread_in": 48
+   }
+  },
+  {
+   "id": "fu5",
+   "level": "LS",
+   "kind": "planter",
+   "room": "rPatio",
+   "pos": [
+    240.0,
+    150.0
+   ],
+   "rotation": 0.0,
+   "state": {
+    "species": "TBD",
+    "spread_in": 48
+   }
+  },
+  {
+   "id": "fu6",
+   "level": "LS",
+   "kind": "shrub",
+   "room": "rVeg",
+   "pos": [
+    100.0,
+    300.0
+   ],
+   "rotation": 0.0,
+   "state": {
+    "species": "TBD",
+    "spread_in": 48
+   }
+  },
+  {
+   "id": "fu7",
+   "level": "LS",
+   "kind": "shrub",
+   "room": "rTrial",
+   "pos": [
+    840.0,
+    24.0
+   ],
+   "rotation": 0.0,
+   "state": {
+    "species": "TBD",
+    "spread_in": 48
+   }
+  }
+ ],
+ "groups": []
+}
