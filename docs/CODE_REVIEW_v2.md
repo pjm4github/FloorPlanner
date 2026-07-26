@@ -76,6 +76,8 @@ Ranked by blast radius; each mapped to the phase that closes it.
 | 13 | Detection result depends on view zoom (from the deleted `test_zzprobe`) | `detach_wall_from_room` path | **P3.5** |
 | 14 | `GroupItem.boundingRect` recomputes the oriented box 3× per paint | `items.py:509‑528` | **P0.6** |
 | 15 | `_update_totals` full-scans on every `scene.changed` | `mainwindow.py:98,342` | **P0.6** |
+| 17 | **Deleting a room's own perimeter wall is silently a no-op.** `fracture_delete_wall` keeps every stretch running along a room perimeter and rebinds it, so the user presses Delete and nothing happens — no wall removed, no message. Measured at P0.4: 4 walls in, 4 walls out, 0 open edges. | `walls.py:300‑354` | **P4.1** |
+| 16 | **Room detection is silently clipped to `canvas_rect()`** — a plan larger than the canvas loses its edge rooms with no warning. Found by the P0.3 harness, not by any test. | `rooms.py:29` (`_RoomGrid`) | **P3.5** |
 
 ---
 
