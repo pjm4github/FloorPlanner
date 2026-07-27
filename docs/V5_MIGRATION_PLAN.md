@@ -105,7 +105,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P1.5** `apply_design_to_scene()` | ruff + pytest |
 | ☑ | **P1.6** `--verify-design` shadow mode; suite runs with it on | ruff + pytest ×2 |
 | ☑ | **P2.1** Load path: v1–v4 migrate + dirty + report; v5 direct | ruff + pytest |
-| ☐ | **P2.2** Save writes v5; legacy export | ruff + pytest |
+| ☑ | **P2.2** Save writes v5; legacy export | ruff + pytest |
 | ☐ | **P2.3** Undo snapshots the v5 dict | ruff + pytest |
 | ☐ | **P2.4** Convert the corpus and the tooling | ruff + pytest |
 | ☐ | **P2.5** Split `MainWindow` IO/CSV/image/floors out | ruff + pytest |
@@ -1173,4 +1173,89 @@ notes:   NO EXISTING TEST TOUCHED.
          0.6" floor is the principled one (it is the schema's own definition of
          "one vertex"). Aligning the bridge would change two P1.4/P1.6 test
          assertions, so I have NOT done it unasked -- flagging instead.
+
+weld-floor  done   (commit e2a97b3; authorized follow-up to the P2.1 flag)
+ruff:    clean
+pytest:  377 passed, 4 xfailed, 1 xpassed (both flag OFF and ON)
+files:   design/bridge.py (_weld_delta -> WELD_TOL), tests/test_design_bridge.py
+notes:   One question, one floor. The bridge's telemetry counted movement above
+         1e-9; the importer's ends_moved counts above 0.6". Now both use 0.6",
+         the schema's own definition of "one vertex". The two NAMES stay
+         distinct -- unwelded_ends is telemetry, ends_moved is a user report.
+         ASSERTION CHANGED (authorized): test_weld_is_a_check_not_an_edit,
+         planc1 unwelded_ends 5 -> 4. The dropped fifth is a 0.001" float nudge;
+         the four real 1.5" divider gaps are unaffected, which is the point of a
+         floor this small. The extract fixture stays at 0 (defect 19's weld at
+         P2.1 already closed its 2 gaps, and they were far above 0.6" -- a floor
+         this small does not launder a real gap). test_apply_design_rebases
+         unaffected.
+         ALSO CONFIRMED, in answer to the P2.1 report's omission: defect 19's
+         in-app arm DID land at P2.1 (commit ad62e66) -- weld_all in
+         extract_from_reference at mainwindow.py:1730 plus
+         test_extracted_walls_are_welded. Only my summary dropped it; the
+         register ticks correctly.
+
+P2.2  done   (commit 6a7e5d4)
+ruff:    clean
+pytest:  OFF  386 passed, 4 xfailed, 1 xpassed in 13.35s
+         ON   386 passed, 4 xfailed, 1 xpassed in 14.99s
+         DEEP 382 passed, 3 xfailed, 6 deselected in 14.02s  (-m "not perf")
+files:   floorplanner/design/canonical.py (new), design/bridge.py, design/
+         importer.py, floorplanner/mainwindow.py (design_document, v5 save,
+         legacy export), fp_extract.py, tests/test_load_path.py (+9),
+         tests/test_floors.py (the authorized assertion), examples/
+         symmetricP1.json + planc1.v5.json (regenerated)
+notes:   ACCEPTANCE: save -> reopen -> check(deep=True) == [] and NOT dirty;
+         legacy export round-trips through the old loader (asserted by loading
+         it into a second window via load_data, the v4 path, and comparing room
+         areas). Also pinned: save -> reopen -> save is a FIXED POINT, and
+         opening a file the project wrote reproduces it exactly.
+         THE ROTATION QUESTION, ANSWERED WITH A TEST rather than an assumption.
+         It does NOT bite on save-reopen: apply builds RoomItem.corners in
+         document order and the walk reads them back in that order, so rotation
+         is carried, not regenerated (measured: Garage starts at (900.0, 12.0)
+         both ways). The rotation delta was an artefact of REGENERATING the
+         fixture, not of the save cycle. Per the ruling it is now moot anyway --
+         canonical form DEFINES rotation.
+         CANONICAL FORM MADE TOTAL. canonicalize() moved to design/canonical.py
+         (Qt-free, so the importer can call it; it lived in bridge.py, which
+         imports Qt) and now normalises outline rotation as well as ids: each
+         loop restarts at its lexicographically-least (x, y) corner, orientation
+         UNTOUCHED -- winding carries meaning, so reversing a loop would swap
+         every wall's sides. Two tests pin it: outlines start at their least
+         corner and canonicalize is a fixed point; and rotating every outline in
+         the input produces byte-identical canonical output.
+         FIXTURES REGENERATED, every delta class measured and named:
+           symmetricP1.json  52/62 vertex ids renumbered; 0/20 room ids and
+                             0/50 furnishing ids moved; 7/20 loops rotated
+           planc1.v5.json    56/65 vertex ids; 0/20 and 0/50; 20/20 rotated
+           BOTH: walls-as-coordinate-pairs IDENTICAL, vertex coordinate set
+           IDENTICAL, room polygons identical as sets -- NO GEOMETRY MOVED.
+           provenance identical, settings identical (area_basis and name carry
+           over). planc1.v5.json still fails 23 invariants (I6 + I11), so the
+           "does not launder its input" guard holds.
+         THREE DATA LOSSES FOUND BY MEASUREMENT, not by a test failing. The
+         P2.2 probe compared open(symmetricP1) -> design_from_scene against the
+         file: vertices/walls/furnishings identical, but
+           * rooms differed on exactly ONE field -- the Garage's
+             area_accounting: "unconditioned" -- because the scene has no home
+             for it. Fixed generally: v5 room/wall fields the scene cannot model
+             are stashed on the item at apply and re-emitted by the walk, so
+             category/placement/holes/nominal_size/thickness_in/finish_* survive
+             a load-save too, not just the one field that showed up.
+           * settings.name ("Symmetric P1") evaporated -- only DEFAULT_SETTINGS
+             keys reach the global SETTINGS. Retained on the window.
+           * provenance was dropped entirely. Now re-attached on EVERY save.
+         ASSERTION CHANGED (authorized in advance; the third of the migration,
+         and all three were declared before the fact): test_floors::
+         test_serialize_round_trip_two_floors -- the file's remembered active
+         floor moved from the top level to settings.active_floor, because the
+         v5 root is a closed schema and settings is the designated open bag.
+         Still absent from serialize(), so a floor switch still cannot dirty.
+         fp_extract.py now calls export_legacy_v4_path, not save_path.
+         Converting that writer is P2.4's, with the gallery/examples/macro
+         tokens; save_path going v5 would have converted it early and out of
+         step. Its output is not stranded -- opening a v4 file converts and
+         welds it, which is defect 19's file arm.
+         Not pushed -- Phase 2 pushes at its end.
 ```
