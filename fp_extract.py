@@ -273,7 +273,12 @@ def main(argv=None) -> int:
         result.update(info)
         result["image_size_px"] = [w, h]
         if args.outfile:
-            win.save_path(args.outfile)
+            # still v4: converting this writer is P2.4's job, together with the
+            # gallery, the examples and the macro tokens. `save_path` became v5
+            # at P2.2, so calling it here would convert this tool early and out
+            # of step with the rest. A v4 file is not stranded -- opening it
+            # converts and welds it (P2.1), which is defect 19's file arm.
+            win.export_legacy_v4_path(args.outfile)
             result["saved"] = args.outfile
         if args.png:
             win.export_canvas(args.png)

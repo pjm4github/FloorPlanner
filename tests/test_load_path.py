@@ -249,3 +249,133 @@ def test_extracted_walls_are_welded(fp, win, tmp_path):
     rep = {}
     design_from_scene(win, report=rep)
     assert rep["unwelded_ends"] == 0, "extracted walls were left unwelded"
+
+
+# ============================================================ P2.2: save v5
+def _saved(win, tmp_path, name="out.json"):
+    p = tmp_path / name
+    win.save_path(str(p))
+    return p, json.loads(p.read_text(encoding="utf-8"))
+
+
+def test_save_writes_v5(fp, win, tmp_path, make_room):
+    make_room(win.scene, 0, 0, 240, 120, name="Hall")
+    _p, doc = _saved(win, tmp_path)
+    assert doc["format"] == "floorplanner-design" and doc["version"] == 5
+    assert check(doc, deep=True) == []
+
+
+def test_save_reopen_is_clean_and_not_dirty(fp, win, tmp_path, make_room):
+    """THE acceptance. Rests on P1.5's round-trip guarantees, since the save
+    path IS design_from_scene."""
+    make_room(win.scene, 0, 0, 240, 120, name="Hall")
+    make_room(win.scene, 360, 0, 180, 120, name="Study")
+    p, doc = _saved(win, tmp_path)
+    assert check(doc, deep=True) == []
+
+    win.load_path(str(p))
+    assert win._conversion is None, "a v5 file must not be converted on open"
+    assert not win._is_dirty(), "reopening our own save came up dirty"
+
+    _p2, again = _saved(win, tmp_path, "out2.json")
+    assert again == doc, "save -> reopen -> save is not a fixed point"
+
+
+def test_converted_plan_saves_and_reopens_clean(fp, win, tmp_path):
+    """The full user journey: open a corrupt legacy plan, accept the
+    conversion with a Save, reopen -- clean, and no longer dirty."""
+    win.load_path(str(EXAMPLES / "planc1.json"))
+    assert win._is_dirty()
+    p, doc = _saved(win, tmp_path)
+    assert check(doc, deep=True) == []
+
+    win.load_path(str(p))
+    assert not win._is_dirty()
+    areas = _areas(fp, win)
+    assert areas["M Bath"] == pytest.approx(182.0, abs=0.1)
+    assert areas["Hall"] == pytest.approx(61.5, abs=0.1)
+
+
+def test_provenance_survives_every_save(fp, win, tmp_path):
+    """The audit trail's whole value is surviving the FIRST save -- the one the
+    conversion report explicitly asks the user to make -- and every one after."""
+    win.load_path(str(EXAMPLES / "planc1.json"))
+    p, doc = _saved(win, tmp_path)
+    assert doc["provenance"]["endpoints_welded"] == 4
+    assert doc["provenance"]["migrated_from"]["format"] == "floorplanner-json"
+
+    win.load_path(str(p))                       # reopen the v5 file...
+    _p2, again = _saved(win, tmp_path, "again.json")
+    assert again["provenance"] == doc["provenance"], "audit trail lost on re-save"
+
+
+def test_unmodelled_fields_survive_a_round_trip(fp, win, tmp_path):
+    """The scene cannot model everything the schema allows. Anything it has no
+    home for is stashed on the item and re-emitted, or a save silently drops it
+    -- measured on symmetricP1's Garage, which carries
+    area_accounting: 'unconditioned'."""
+    win.load_path(str(EXAMPLES / "symmetricP1.json"))
+    _p, doc = _saved(win, tmp_path)
+    garage = next(r for r in doc["rooms"] if r["name"] == "Garage")
+    assert garage["area_accounting"] == "unconditioned"
+    assert doc["settings"]["name"] == "Symmetric P1"
+
+
+def test_opening_a_v5_file_reproduces_it_exactly(fp, win, tmp_path):
+    """Canonical form is TOTAL: same ids AND same outline rotation, so a file
+    the project wrote is reproduced byte-for-byte by opening and saving it.
+    Without this a plan churns on every save cycle."""
+    orig = _load("symmetricP1.json")
+    win.load_path(str(EXAMPLES / "symmetricP1.json"))
+    _p, doc = _saved(win, tmp_path)
+    for key in ("levels", "vertices", "walls", "rooms", "furnishings"):
+        assert doc[key] == orig[key], f"{key} churned on open->save"
+
+
+def test_outline_rotation_is_canonical(fp):
+    """Each outline starts at its lexicographically-least corner, orientation
+    untouched. A cycle has no natural first element, so without this two
+    producers emit the same loop from different corners -- identical polygon,
+    unequal document."""
+    from floorplanner.design.canonical import canonicalize
+    doc = _load("symmetricP1.json")
+    pos = {v["id"]: (v["x"], v["y"]) for v in doc["vertices"]}
+    for r in doc["rooms"]:
+        loop = [pos[e["v"]] for e in r["outline"]]
+        assert loop[0] == min(loop), f"{r['name']} does not start at its least"
+    assert canonicalize(json.loads(json.dumps(doc))) == doc, "not a fixed point"
+
+
+def test_canonical_form_is_rotation_insensitive(fp):
+    """Rotating an outline in the input must not change canonical output --
+    the guard that makes save-reopen a fixed point."""
+    from floorplanner.design.canonical import canonicalize
+    doc = _load("symmetricP1.json")
+    spun = json.loads(json.dumps(doc))
+    for r in spun["rooms"]:
+        r["outline"] = r["outline"][1:] + r["outline"][:1]
+    assert canonicalize(spun) == doc
+
+
+# ------------------------------------------------------------ legacy export
+def test_legacy_export_round_trips_through_the_old_loader(fp, win, tmp_path,
+                                                          make_room):
+    """File > Export legacy v4 keeps anyone from being stranded by the cutover:
+    the export must load through the v4 path and come back the same plan."""
+    make_room(win.scene, 0, 0, 240, 120, name="Hall")
+    before = {r.name: round(r.area_sqft, 2) for r in win.scene.items()
+              if isinstance(r, fp.RoomItem)}
+    p = tmp_path / "legacy.json"
+    win.export_legacy_v4_path(str(p))
+
+    doc = json.loads(p.read_text(encoding="utf-8"))
+    assert doc["format"] == "floorplanner-json" and doc["version"] == 4
+
+    win2 = fp.MainWindow()
+    try:
+        win2.load_data(doc)                      # the OLD loader, no migration
+        after = {r.name: round(r.area_sqft, 2) for r in win2.scene.items()
+                 if isinstance(r, fp.RoomItem)}
+        assert after == before
+    finally:
+        win2.close()

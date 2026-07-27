@@ -58,6 +58,7 @@ from PyQt6.QtWidgets import QGraphicsScene
 from floorplanner.config import (
     DEFAULT_FLOOR, DEFAULT_SETTINGS, JOIN_TOL, SETTINGS, set_floor_state,
 )
+from floorplanner.design.canonical import canonicalize
 from floorplanner.design.legacy import (
     MIN_SPAN, ON_SEG_TOL, WELD_TOL, VertexTable, split_params, weld_endpoints,
 )
@@ -76,6 +77,18 @@ from floorplanner.walls import OpeningItem, WallItem, rebuild_all_walls
 # area_accounting: the scene already states that, per room, in
 # properties["include_sqft"].
 EXTERIOR_NAMES = ("porch", "deck", "patio", "terrace", "lanai")
+
+# what the SCENE actually models. Everything else in a v5 wall/room is stashed
+# on the item at apply and re-emitted by the walk, so a load->save round trip
+# cannot quietly drop a field the editor has no widget for yet.
+_WALL_MODELLED = frozenset(("id", "level", "v1", "v2", "type", "left", "right",
+                            "openings"))
+_ROOM_MODELLED = frozenset(("id", "level", "name", "outline", "label",
+                            "properties"))
+# settings keys the walk re-emits itself; anything else in a document's
+# settings (e.g. `name`) is likewise retained rather than lost
+WALK_SETTINGS = frozenset(DEFAULT_SETTINGS) | {"vertex_weld_in", "join_tol_in",
+                                               "area_basis", "editing"}
 
 
 # ------------------------------------------------------------------ small math
@@ -230,7 +243,8 @@ def _walls_of(items, lid, nid, vt, rep):
                 [{"kind": o.kind, "code": o.code, "s": float(o.s),
                   "width": float(o.width), "door_type": o.door_type,
                   "swing": float(o.swing)} for o in w.openings],
-                key=lambda o: o["s"])}
+                key=lambda o: o["s"]),
+            "extra": getattr(w, "_v5_extra", None) or {}}
            for w in w_items]
     rep["unwelded_ends"] += _weld_delta(raw)
 
@@ -293,6 +307,7 @@ def _walls_of(items, lid, nid, vt, rep):
             rec = {"id": nid("w"), "level": lid, "v1": v1, "v2": v2,
                    "type": w["type"], "left": None, "right": None,
                    "openings": seg_ops}
+            rec.update(w["extra"])         # thickness_in / finish_*: unmodelled
             walls.append(rec)
             by_pair[key] = rec
     return walls
@@ -347,7 +362,7 @@ def _rooms_of(items, lid, nid, vt, walls, rep):
         # the scene side too)
         props.pop("perimeter_corners", None)
         low = r.name.lower()
-        rooms.append({
+        rec = {
             "id": nid("r"), "level": lid, "name": r.name,
             "category": ("exterior" if any(k in low for k in EXTERIOR_NAMES)
                          else "interior"),
@@ -359,7 +374,14 @@ def _rooms_of(items, lid, nid, vt, walls, rep):
                       "show_dimensions": bool(r.show_dims),
                       "show_area": True},
             "properties": props,
-        })
+        }
+        # v5 fields the SCENE has no home for (category, placement,
+        # area_accounting, holes, nominal_size) ride back out verbatim, or a
+        # save would quietly drop them -- measured: symmetricP1's Garage lost
+        # area_accounting: "unconditioned". The derived defaults above stand
+        # for a scene that was never loaded from a v5 document.
+        rec.update(getattr(r, "_v5_extra", None) or {})
+        rooms.append(rec)
     return rooms
 
 
@@ -412,65 +434,6 @@ def _furnishings_of(items, lid, nid, rooms, poly):
     return out
 
 
-# ------------------------------------------------------------------ canonical
-def _canonicalize(levels, vertices, walls, rooms, furnishings):
-    """Renumber every id in a GEOMETRIC order, in place.
-
-    Ids are minted during the walk, so without this they encode the order the
-    items happened to be emitted in -- which is the order the SOURCE walls were
-    visited. Rebuilding the scene from a `Design` turns each split segment into
-    its own wall, so the second walk visits them in a different order and mints
-    different ids for the same geometry: the documents come out isomorphic but
-    unequal, which is exactly what P1.5's `scene -> Design -> scene -> Design`
-    identity forbids.
-
-    Ordering by geometry instead makes the document canonical -- one plan has
-    one representation, whatever built it. Same reasoning as `Project.to_dict`
-    sorting the v4 snapshot (`model.py:211-224`), and P2.3's undo comparison
-    will want it for the same reason."""
-    lorder = {lv["id"]: i for i, lv in enumerate(levels)}
-    vpos = {v["id"]: (v["x"], v["y"]) for v in vertices}
-
-    vertices.sort(key=lambda v: (lorder[v["level"]], v["x"], v["y"]))
-    vid = {v["id"]: f"v{i}" for i, v in enumerate(vertices, 1)}
-
-    walls.sort(key=lambda w: (lorder[w["level"]], vpos[w["v1"]], vpos[w["v2"]],
-                              w["type"]))
-    wid = {w["id"]: f"w{i}" for i, w in enumerate(walls, 1)}
-
-    def centroid(outline):
-        pts = [vpos[e["v"]] for e in outline]
-        return (sum(p[0] for p in pts) / len(pts),
-                sum(p[1] for p in pts) / len(pts))
-
-    rooms.sort(key=lambda r: (lorder[r["level"]], r["name"],
-                              *centroid(r["outline"])))
-    rid = {r["id"]: f"r{i}" for i, r in enumerate(rooms, 1)}
-
-    furnishings.sort(key=lambda f: (lorder[f["level"]], f["pos"][0],
-                                    f["pos"][1], f["kind"], f["rotation"]))
-
-    for v in vertices:
-        v["id"] = vid[v["id"]]
-    n_op = 0
-    for w in walls:
-        w["id"] = wid[w["id"]]
-        w["v1"], w["v2"] = vid[w["v1"]], vid[w["v2"]]
-        w["left"] = rid[w["left"]] if w["left"] else None
-        w["right"] = rid[w["right"]] if w["right"] else None
-        for op in w["openings"]:              # already in along-the-wall order
-            n_op += 1
-            op["id"] = f"o{n_op}"
-    for r in rooms:
-        r["id"] = rid[r["id"]]
-        for e in r["outline"]:
-            e["v"] = vid[e["v"]]
-            e["wall"] = wid[e["wall"]] if e["wall"] else None
-    for i, f in enumerate(furnishings, 1):
-        f["id"] = f"f{i}"
-        f["room"] = rid[f["room"]] if f["room"] else None
-
-
 # ------------------------------------------------------------------ public API
 def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
     """Walk the live scene into a v5 `Design`.
@@ -512,8 +475,6 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         rooms += lr
         furnishings += lf
 
-    _canonicalize(levels, vertices, walls, rooms, furnishings)
-
     if rep["unwelded_ends"]:
         msg = (f"design_from_scene: {rep['unwelded_ends']} wall end(s) sit "
                f"within the {JOIN_TOL}\" join tolerance of a neighbour without "
@@ -535,7 +496,7 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
     settings["editing"] = {"shuffle": False, "auto_coalesce": auto,
                            "auto_weld": True, "auto_bind": True}
 
-    return Design.from_dict({
+    return Design.from_dict(canonicalize({
         "format": "floorplanner-design", "version": 5, "units": "inches",
         "settings": settings, "levels": levels, "vertices": vertices,
         "walls": walls, "rooms": rooms, "furnishings": furnishings,
@@ -545,7 +506,7 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         # xfail; emitting a guess now would make that test pass for the wrong
         # reason.
         "groups": [],
-    })
+    }))
 
 
 # ------------------------------------------------------- Design -> scene (P1.5)
@@ -611,6 +572,11 @@ def apply_design_to_scene(target, design, report=None, strict=False):
             SETTINGS[key] = float(val)
         except (TypeError, ValueError):
             SETTINGS[key] = default
+    if win is not None:
+        # settings the walk does not re-emit (a document `name`, anything a
+        # later phase adds) would otherwise evaporate on the first save
+        win._doc_settings = {k: v for k, v in settings.items()
+                             if k not in WALK_SETTINGS and k != "active_floor"}
 
     scene.clear()
     levels = doc.get("levels") or [{"id": "L1", "name": DEFAULT_FLOOR}]
@@ -620,9 +586,16 @@ def apply_design_to_scene(target, design, report=None, strict=False):
                             bool(lv.get("reference", False))) for lv in levels]
         # active_floor is view state and is not carried by the document; keep
         # the current one when the new roster still has it
+        # active_floor is VIEW state. The v5 root is a closed schema, so a saved
+        # document carries it inside `settings` (the designated open bag) -- the
+        # same in-on-load / out-on-save arrangement v4 has via `_write_plan`.
+        # It is stripped here and NEVER re-emitted by the walk, so switching
+        # floors still cannot dirty the document.
         names = [f.name for f in win.floors]
-        win.active_floor = (win.active_floor if win.active_floor in names
-                            else names[0])
+        want = settings.get("active_floor")
+        if want not in names:
+            want = win.active_floor if win.active_floor in names else names[0]
+        win.active_floor = want
         set_floor_state(active=win.active_floor)
 
     pos = {v["id"]: QPointF(v["x"], v["y"]) for v in doc.get("vertices", [])}
@@ -631,6 +604,7 @@ def apply_design_to_scene(target, design, report=None, strict=False):
     for wd in doc.get("walls", []):
         wall = WallItem(pos[wd["v1"]], pos[wd["v2"]], wd.get("type", "interior"))
         wall.floor = lname.get(wd["level"], DEFAULT_FLOOR)   # never the global
+        wall._v5_extra = {k: v for k, v in wd.items() if k not in _WALL_MODELLED}
         scene.addItem(wall)
         wmap[wd["id"]] = wall
         rep["walls"] += 1
@@ -668,6 +642,7 @@ def apply_design_to_scene(target, design, report=None, strict=False):
                         poly_area_sqft(corners),
                         rd.get("properties") or {}, corners)
         room.floor = lname.get(rd["level"], DEFAULT_FLOOR)   # never the global
+        room._v5_extra = {k: v for k, v in rd.items() if k not in _ROOM_MODELLED}
         room.show_dims = bool((rd.get("label") or {}).get("show_dimensions",
                                                           False))
         room.label_offset = QPointF(0.0, 0.0)

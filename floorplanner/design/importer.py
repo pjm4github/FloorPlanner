@@ -36,6 +36,7 @@ its own visible moment.
 import math
 from collections import defaultdict
 
+from floorplanner.design.canonical import canonicalize
 from floorplanner.design.legacy import (
     JOIN_TOL, MIN_SPAN, ON_SEG_TOL, WELD_TOL, VertexTable, split_params,
     weld_endpoints_counted,
@@ -304,7 +305,8 @@ def import_legacy(src, tool="floorplanner.design.importer", design_name=None,
         notes.append(f"{rep['openings_deduped']} stacked duplicate opening(s) "
                      f"removed")
 
-    doc = {"format": "floorplanner-design", "version": 5, "units": "inches",
+    doc = canonicalize({
+           "format": "floorplanner-design", "version": 5, "units": "inches",
            "settings": settings, "levels": levels, "vertices": vertices,
            "walls": walls, "rooms": rooms, "furnishings": furnishings,
            "groups": [],
@@ -316,7 +318,7 @@ def import_legacy(src, tool="floorplanner.design.importer", design_name=None,
                # ends_moved, NOT weld_ops -- the field is "wall ends MOVED"
                "endpoints_welded": ends_moved,
                "openings_deduped": rep["openings_deduped"],
-               "notes": notes}}
+               "notes": notes}})
     return Design.from_dict(doc), rep
 
 

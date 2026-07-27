@@ -104,7 +104,12 @@ def test_serialize_round_trip_two_floors(fp, win, tmp_path):
     p = tmp_path / "two.json"
     win.save_path(str(p))
     saved = json.loads(p.read_text())
-    assert saved["active_floor"] == "Upper"            # the FILE remembers it
+    # P2.2: the file is v5 now, and the v5 ROOT is a closed schema, so the
+    # remembered active floor moved from the top level into `settings` -- the
+    # designated open bag. Same in-on-load / out-on-save arrangement as v4;
+    # only its address changed, and it is still absent from serialize() above.
+    assert saved["format"] == "floorplanner-design"
+    assert saved["settings"]["active_floor"] == "Upper"   # the FILE remembers it
     win2 = fp.MainWindow()
     try:
         win2.load_path(str(p))

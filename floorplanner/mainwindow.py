@@ -25,8 +25,8 @@ from floorplanner.model import (  # serialization bridge (aliased)
     DEFAULT_FLOOR, FILE_VERSION, Floor, Furnishing, Opening as OpeningModel,
     Project, Room as RoomModel, Wall as WallModel,
 )
-from floorplanner.design.bridge import (          # P1.5 scene <- design
-    apply_design_to_scene,
+from floorplanner.design.bridge import (          # P1.4/P1.5 scene <-> design
+    apply_design_to_scene, design_from_scene,
 )
 from floorplanner.design.importer import (       # P2.1 legacy -> v5
     conversion_report, import_legacy,
@@ -121,6 +121,7 @@ class MainWindow(QMainWindow):
         self._saved_state = self._committed_state   # last on-disk/new baseline
         self._conversion = None      # P2.1 report, set when a legacy file was
         self._provenance = None      # converted; provenance rides to P2.2's save
+        self._doc_settings = {}      # document settings the walk does not model
         self._dirty_timer = QTimer(self)
         self._dirty_timer.setSingleShot(True)
         self._dirty_timer.setInterval(180)
@@ -253,6 +254,9 @@ class MainWindow(QMainWindow):
         a_saveas.setShortcut(QKeySequence.StandardKey.SaveAs)
         a_saveas.triggered.connect(self.save_plan_as)
         m_file.addAction(a_saveas)
+        a_v4 = QAction("Export legacy v4…", self)     # one release, so nobody
+        a_v4.triggered.connect(self.export_legacy_v4)  # is stranded on v5
+        m_file.addAction(a_v4)
         m_edit = self.menuBar().addMenu("&Edit")
         m_edit.addAction(self.a_undo)    # same actions as the toolbar buttons
         m_edit.addAction(self.a_redo)
@@ -1076,6 +1080,7 @@ class MainWindow(QMainWindow):
         self._sync_floor_state()
         self._conversion = None          # a new plan was converted from nothing
         self._provenance = None
+        self._doc_settings = {}
         self._reset_undo()
 
     # -- save / load -------------------------------------------------------------
@@ -1130,6 +1135,26 @@ class MainWindow(QMainWindow):
                        furnishings=furnishings,
                        floors=[Floor(f.name, f.reference) for f in self.floors],
                        active_floor=self.active_floor)
+
+    def design_document(self) -> dict:
+        """The v5 document to WRITE (P2.2).
+
+        `design_from_scene` reports what the scene holds; this adds back the
+        three things the scene cannot hold but the file must carry:
+        `provenance` (the conversion audit trail -- re-attached on EVERY save,
+        because its whole value is surviving the save the conversion report
+        asks the user to make), any document `settings` the walk does not model,
+        and `active_floor`, which rides inside `settings` because the v5 root is
+        a closed schema."""
+        doc = design_from_scene(self).to_dict()
+        if self._doc_settings:
+            merged = dict(self._doc_settings)
+            merged.update(doc["settings"])       # the walk's values win
+            doc["settings"] = merged
+        doc["settings"]["active_floor"] = self.active_floor
+        if self._provenance:
+            doc["provenance"] = self._provenance
+        return doc
 
     def serialize(self) -> dict:
         """Plan -> plain dict matching the documented JSON format.
@@ -1964,12 +1989,10 @@ class MainWindow(QMainWindow):
     def _write_plan(self, path: str):
         verify(self, "save", deep=True)      # P1.6: all fifteen before writing
         state = self.serialize()
-        # the file remembers the active floor, but _saved_state must NOT (it's
-        # view state) or the dirty check would flag a clean plan after a switch.
-        on_disk = {**state, "active_floor": self.active_floor}
+        on_disk = self.design_document()     # P2.2: the FILE is v5 now
         try:
             with open(path, "w", encoding="utf-8") as f:
-                json.dump(on_disk, f, indent=2)
+                json.dump(on_disk, f, indent=1)
         except OSError as ex:
             QMessageBox.critical(self, "Save failed", str(ex))
             return
@@ -1981,6 +2004,26 @@ class MainWindow(QMainWindow):
     # -- headless / macro hooks ----------------------------------------------
     # These let an external driver (fp_macro.py) load, edit, snapshot and save
     # a plan with no dialogs.  See docs/macro_language.md for the macro syntax.
+
+    def export_legacy_v4(self):
+        """File ▸ Export legacy v4… -- kept for ONE release so nobody is
+        stranded by the v5 cutover."""
+        start = self.current_path or str(designs_dir() / "floorplan-v4.json")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export legacy v4", start,
+            "Floor plan JSON (*.json);;All files (*)")
+        if path:
+            self.export_legacy_v4_path(path)
+
+    def export_legacy_v4_path(self, path: str):
+        """Non-interactive legacy export. Writes what the OLD loader reads --
+        `serialize()` is still the v4 walk, so this stays a straight dump plus
+        the top-level `active_floor` v4 files carry."""
+        state = self.serialize()
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({**state, "active_floor": self.active_floor}, f, indent=2)
+        self.status(f"Exported legacy v4 plan to {path}")
+        return path
 
     def load_path(self, path: str):
         """Non-interactive open (no dialogs).  Raises on failure.
@@ -1999,9 +2042,9 @@ class MainWindow(QMainWindow):
         """Non-interactive save (no dialogs).  Raises on failure."""
         verify(self, "save", deep=True)      # P1.6: all fifteen before writing
         state = self.serialize()
-        on_disk = {**state, "active_floor": self.active_floor}
+        on_disk = self.design_document()     # P2.2: the FILE is v5 now
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(on_disk, f, indent=2)
+            json.dump(on_disk, f, indent=1)
         self.current_path = path
         self._saved_state = state
         self._update_title()
@@ -2017,6 +2060,7 @@ class MainWindow(QMainWindow):
         self._sync_floor_state()
         self._conversion = None          # a new plan was converted from nothing
         self._provenance = None
+        self._doc_settings = {}
         self._reset_undo()
 
     def prepare_headless(self, w: int = 1280, h: int = 860):
