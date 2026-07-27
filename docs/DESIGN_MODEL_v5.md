@@ -305,7 +305,7 @@ Because the load-time weld moves real coordinates, the converted document record
   "migrated_from": { "format": "floorplanner-json", "version": 3 },
   "tool": "migrate_to_design_v5.py",
   "mode": "clean",
-  "endpoints_welded": 31,
+  "endpoints_welded": 4,
   "openings_deduped": 2,
   "notes": [
     "Hall: stored 243.5 sf -> traced 61.5 sf",
@@ -314,6 +314,8 @@ Because the load-time weld moves real coordinates, the converted document record
   ]
 }
 ```
+
+`endpoints_welded` is **`ends_moved`, not `weld_ops`** — the 4 ends the weld displaced by more than `vertex_weld_in`, not the 31 junctions it examined. The field's own description says "wall ends *moved*". This example previously showed 31 and was the likeliest place for the wrong number to be copied from.
 
 Six months from now, "why is M Bath 182 sf when the old file said 591?" has an answer inside the file.
 
