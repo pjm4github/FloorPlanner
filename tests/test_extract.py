@@ -212,9 +212,12 @@ def test_fp_extract_cli_end_to_end(qapp, tmp_path):
     data = json.loads(out.read_text(encoding="utf-8"))
     # P2.4 flipped fp_extract back to save_path, so it writes v5 like every
     # other writer (deferred here from P2.2 to convert with the rest of the
-    # tooling). The wall COUNT is deliberately not re-asserted: v5 walls are
-    # edge-granular, so the extractor's 5 detected runs become however many
-    # graph edges they planarise to -- a presentation detail, not a document
-    # one. `result["counts"]["walls"] == 5` above still pins what was detected.
+    # tooling). Two numbers, tied together deliberately: the extractor DETECTS
+    # 5 wall runs (asserted above), and planarising them at their junctions
+    # yields 9 graph edges over 8 vertices for this fixture. Both are exact --
+    # the fixture is deterministic and, in v5, edge-granular walls are document
+    # state. A `>=` bound here would let a planarisation bug that exploded 5
+    # runs into 500 spurious segments sail straight through.
     assert data["format"] == "floorplanner-design" and data["version"] == 5
-    assert len(data["walls"]) >= 5
+    assert len(data["walls"]) == 9, "5 detected runs -> 9 graph edges"
+    assert len(data["vertices"]) == 8

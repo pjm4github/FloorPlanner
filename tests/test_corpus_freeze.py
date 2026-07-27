@@ -13,6 +13,8 @@ import json
 from pathlib import Path
 
 import pytest
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QApplication
 
 pytestmark = pytest.mark.io
 
@@ -54,14 +56,33 @@ def test_the_importer_still_has_real_legacy_input():
 # It must collect and report, never raise a modal -- a QMessageBox in a macro
 # or a test hangs forever headless.
 # --------------------------------------------------------------------------
+def _modal_failsafe(ms=2000):
+    """Dismiss any modal that appears, and record it, so a regression here is a
+    red X rather than a CI job running to its timeout.
+
+    A modal `exec()` blocks the caller forever headless -- nothing can click OK
+    -- so without this the test's failure mode is a HANG. Timers still fire
+    inside a nested exec loop, which is exactly how `macro._modal_step` drives
+    dialogs; the same mechanism dismisses one here. Returns a list that stays
+    empty when the path is correctly non-modal."""
+    seen = []
+
+    def check():
+        m = QApplication.activeModalWidget() or QApplication.activePopupWidget()
+        if m is not None:
+            seen.append(type(m).__name__)
+            m.close()
+    QTimer.singleShot(ms, check)
+    return seen
+
+
 def test_macro_open_of_a_legacy_plan_converts_without_a_modal(fp, win):
     """P2.1 built the non-modal path (`load_path` -> `open_document(
     interactive=False)`); this is the test that says so, rather than the claim.
-
-    If a modal ever creeps back in, this test HANGS rather than fails -- which
-    is itself the signal, and why the assertion is cheap but the coverage
-    matters."""
+    A QMessageBox here would hang every macro and every CI run."""
+    modals = _modal_failsafe()
     res = win.run_macro(f'open "{EXAMPLES / "planc1.json"}"')
+    assert modals == [], f"a modal opened during a macro: {modals}"
     assert res.get("errors") in (None, [], ()), res
 
     # converted: the report was COLLECTED (the _import_errors shape), not shown
