@@ -116,6 +116,30 @@ def weld_endpoints(walls, join_tol=JOIN_TOL, end_tol=END_TOL):
     return n
 
 
+def weld_endpoints_counted(walls, join_tol=JOIN_TOL, end_tol=END_TOL,
+                           noise_floor=WELD_TOL):
+    """`weld_endpoints`, returning BOTH counters as `(weld_ops, ends_moved)`.
+
+    `weld_ops` is operations performed -- what `weld_endpoints` returns, and the
+    number for cross-checks (31 on `planc1.json`). `ends_moved` counts only ends
+    whose coordinate moved by MORE than `noise_floor`, and is the only one a
+    user ever sees: the schema defines `vertex_weld_in` (0.6") as the distance
+    at which two coordinates ARE one vertex, so a smaller displacement is not a
+    geometry change by the document's own definition.
+
+    They differ by a lot. On `planc1.json`: 31 operations, of which 26 are
+    no-ops on junctions that were already exact, one moves 0.001" (float noise,
+    below the floor), and **4** move 1.529" -- the real divider gaps. Reporting
+    31 as "wall ends welded" overstates the damage by ~6x."""
+    before = [(tuple(w["p1"]), tuple(w["p2"])) for w in walls]
+    ops = weld_endpoints(walls, join_tol=join_tol, end_tol=end_tol)
+    moved = 0
+    for (b1, b2), w in zip(before, walls, strict=False):
+        moved += sum(_d(b, tuple(w[k])) > noise_floor
+                     for b, k in ((b1, "p1"), (b2, "p2")))
+    return ops, moved
+
+
 class VertexTable(object):
     """Weld-on-insert coordinate -> vertex-id table for ONE level.
 

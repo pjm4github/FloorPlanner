@@ -25,6 +25,14 @@ from floorplanner.model import (  # serialization bridge (aliased)
     DEFAULT_FLOOR, FILE_VERSION, Floor, Furnishing, Opening as OpeningModel,
     Project, Room as RoomModel, Wall as WallModel,
 )
+from floorplanner.design.bridge import (          # P1.5 scene <- design
+    apply_design_to_scene,
+)
+from floorplanner.design.importer import (       # P2.1 legacy -> v5
+    conversion_report, import_legacy,
+)
+from floorplanner.design.model import Design
+from floorplanner.design.validate import check
 from floorplanner.design.verify import rebase, verify  # P1.6 shadow mode
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
@@ -111,6 +119,8 @@ class MainWindow(QMainWindow):
         self._restoring = False
         self._committed_state = self.serialize()
         self._saved_state = self._committed_state   # last on-disk/new baseline
+        self._conversion = None      # P2.1 report, set when a legacy file was
+        self._provenance = None      # converted; provenance rides to P2.2's save
         self._dirty_timer = QTimer(self)
         self._dirty_timer.setSingleShot(True)
         self._dirty_timer.setInterval(180)
@@ -1064,6 +1074,8 @@ class MainWindow(QMainWindow):
         self.floors = [Floor(DEFAULT_FLOOR)]    # back to a single default floor
         self.active_floor = DEFAULT_FLOOR
         self._sync_floor_state()
+        self._conversion = None          # a new plan was converted from nothing
+        self._provenance = None
         self._reset_undo()
 
     # -- save / load -------------------------------------------------------------
@@ -1294,11 +1306,81 @@ class MainWindow(QMainWindow):
         self._commit_if_changed()
 
     def load_data(self, data: dict, keep_backdrop: bool = False):
-        """Rebuild the scene from a plan dict, via the Qt-free model.
+        """APPLY a document to the scene, exactly as given. Never migrates.
 
-        Parsing/migration (format check, defaults, version) live in
-        Project.from_dict; this bridge turns the model into scene items."""
+        This is the undo-restore path (`_restore_state`) as well as the plain
+        "put this dict on the canvas" helper, so it must stay a faithful apply:
+        routing it through P2.1's importer would make **every undo weld the
+        geometry and re-trace every room**, which is a repair, not a restore.
+        Opening a FILE is `open_document` -- that is where migration, the dirty
+        flag and the conversion report live."""
+        if data.get("format") == "floorplanner-design":
+            apply_design_to_scene(self, Design.from_dict(data))
+            return
         self.apply_project_to_scene(Project.from_dict(data), keep_backdrop)
+
+    def open_document(self, data: dict, interactive: bool = True):
+        """THE OPEN PATH (P2.1). Returns the conversion report, or None for a
+        document that needed no conversion.
+
+        Legacy v1-v4 `floorplanner-json` is welded, planarised and re-traced by
+        `design.importer` -- the first time the app has ever moved a user's wall
+        ends on open -- then marked dirty and reported. v5
+        `floorplanner-design` is validated and applied as-is: no weld pass ever,
+        and never dirty. A v5 file failing I14 is reported as MALFORMED rather
+        than silently re-welded; that asymmetry is the point of promoting
+        'welded' from a hopeful post-condition to a checked invariant."""
+        self._conversion = None
+        if data.get("format") == "floorplanner-design":
+            design = Design.from_dict(data)
+            apply_design_to_scene(self, design)
+            # provenance is written ONCE at import and never mutated; a v5 file
+            # that carries one keeps it across a re-save (P2.2)
+            self._provenance = data.get("provenance")
+            errs = check(data, deep=True)
+            if errs:
+                bad = [e for e in errs if e.startswith("I14")]
+                head = ("This v5 file is malformed: it is not welded at "
+                        f"vertex_weld_in ({len(bad)} unwelded junction(s)). "
+                        "It has been opened unchanged -- re-welding silently "
+                        "is exactly what the invariant exists to prevent."
+                        if bad else
+                        f"This v5 file reports {len(errs)} invariant "
+                        f"violation(s); it has been opened unchanged.")
+                self._report(head + "  " + "; ".join(errs[:3]), interactive,
+                             "Malformed design file")
+            return None
+        design, rep = import_legacy(data)
+        apply_design_to_scene(self, design)
+        # active_floor is VIEW state: the v4 file carries it, the v5 Design
+        # deliberately does not (keeping it out is what stops a floor switch
+        # dirtying the document). Carry it across by hand or the conversion
+        # silently forgets which floor the user was editing.
+        want = data.get("active_floor")
+        if want and any(f.name == want for f in self.floors):
+            self.active_floor = want
+            self._sync_floor_state()
+        self._conversion = rep
+        self._provenance = design.to_dict().get("provenance")
+        self._report(conversion_report(rep, int(data.get("version", 0))),
+                     interactive, "Converted to the v5 format")
+        return rep
+
+    def _report(self, text, interactive, title):
+        """Tell the user. A modal hangs headless, so scripted/test callers pass
+        interactive=False and read the status line (the `_import_rooms`
+        convention)."""
+        if interactive:
+            QMessageBox.information(self, title, text)
+        self.status(text)
+
+    def _finish_open(self):
+        """After `_reset_undo` has declared the loaded plan the clean baseline,
+        re-dirty it if it was CONVERTED. The conversion only exists in memory --
+        the legacy file on disk is untouched -- so the document must read as
+        unsaved until the user accepts it with a Save."""
+        if getattr(self, "_conversion", None):
+            self._saved_state = None             # nothing on disk matches this
 
     def apply_project_to_scene(self, project: Project,
                                keep_backdrop: bool = False):
@@ -1639,6 +1721,13 @@ class MainWindow(QMainWindow):
         for x0, y0, x1, y1 in segs:
             self.scene.addItem(
                 WallItem(QPointF(x0, y0), QPointF(x1, y1), "exterior"))
+        # DEFECT 19, in-app arm.  Pixel-detected ends land near each other but
+        # rarely on each other, and this path injects walls straight into the
+        # live scene -- it never passes through a load, so P2.1's weld-on-open
+        # never sees them, and per the corrected F5 nothing else welds either.
+        # Without this every extracted plan is born with open junctions, which
+        # is exactly what leaks room detection between spaces.
+        weld_all(self.scene)
         rebuild_all_walls(self.scene)
         self._update_totals()
         self._commit_if_changed()
@@ -1847,13 +1936,14 @@ class MainWindow(QMainWindow):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            self.load_data(data)
+            self.open_document(data)     # migrates a legacy file; reports
         except (OSError, ValueError, KeyError, TypeError) as ex:
             QMessageBox.critical(self, "Open failed", str(ex))
             return
         self.current_path = path
-        self._update_title()
         self._reset_undo()               # opened document is the new baseline
+        self._finish_open()              # ...unless it was CONVERTED -> dirty
+        self._update_title()
         self.status(f"Opened {path}")
 
     def save_plan(self):
@@ -1893,13 +1983,17 @@ class MainWindow(QMainWindow):
     # a plan with no dialogs.  See docs/macro_language.md for the macro syntax.
 
     def load_path(self, path: str):
-        """Non-interactive open (no dialogs).  Raises on failure."""
+        """Non-interactive open (no dialogs).  Raises on failure.
+
+        Same conversion as File > Open, minus the modal: a converted legacy
+        plan lands dirty and its report goes to the status line."""
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        self.load_data(data)
+        self.open_document(data, interactive=False)
         self.current_path = path
-        self._update_title()
         self._reset_undo()
+        self._finish_open()
+        self._update_title()
 
     def save_path(self, path: str):
         """Non-interactive save (no dialogs).  Raises on failure."""
@@ -1921,6 +2015,8 @@ class MainWindow(QMainWindow):
         self.floors = [Floor(DEFAULT_FLOOR)]    # back to a single default floor
         self.active_floor = DEFAULT_FLOOR
         self._sync_floor_state()
+        self._conversion = None          # a new plan was converted from nothing
+        self._provenance = None
         self._reset_undo()
 
     def prepare_headless(self, w: int = 1280, h: int = 860):

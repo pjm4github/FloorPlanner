@@ -10,7 +10,7 @@
   "cost_per_sqft": 250.0,
   "vertex_weld_in": 0.6,
   "join_tol_in": 9.0,
-  "area_basis": "inside_face",
+  "area_basis": "centerline",
   "editing": {
    "shuffle": false,
    "auto_coalesce": true,
@@ -3521,7 +3521,7 @@
   },
   "tool": "migrate_to_design_v5.py",
   "mode": "clean",
-  "endpoints_welded": 31,
+  "endpoints_welded": 4,
   "openings_deduped": 2,
   "notes": [
    "Hall: stored 243.5 sf -> traced 61.5 sf",
