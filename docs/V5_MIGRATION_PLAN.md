@@ -82,6 +82,25 @@ review changes are handed to Claude Code as explicit edit instructions; Claude C
 applies them, commits, and grep-verifies on disk. One extra round-trip, and the only
 channel that has destroyed work in this project is closed.
 
+### A checkpoint is not complete until its handoff spec is committed — settled at P3.3
+
+**Session-end summaries and hand-off prompts are chat, and chat is not the record.**
+The P3.3 boundary proved it: the "five settled points" that fully specified the task
+existed **only in conversation**. The commit that was supposed to carry them
+(`3d6d32e`) changed exactly two lines — the defect 12a row and the P2.3 regression
+row — and the Progress log still ended at P3.2. Only the read-back verification
+caught it.
+
+**So: before ending a session mid-task, commit the spec** — into the Progress log or
+the task text — **then summarize.** The summary describes what was committed; it is
+never the thing itself.
+
+And the read-back is the check that makes the rule enforceable, so it stays: **quote
+what disk supports, name what it doesn't, proceed on the verified subset.** A number
+that cannot be found on disk is not quoted back as though it were — at P3.3 the
+"72 splits" figure appeared nowhere in the repo, and saying so is what surfaced the
+gap rather than papering over it.
+
 ---
 
 ## Status
@@ -352,6 +371,7 @@ Dragging a wall moves its two vertices. Implement the split rule: a collinear co
 
 ### P3.4 — Topology ops replace coalesce/weld/fracture
 `coalesce_wall`, `coalesce_all`, `_coalesce_*_impl`, `weld_all`, `join_endpoints`, `fracture_delete_wall`, `_WallIndex`, `_WallBBoxIndex`, `_compute_wall_junctions` → `merge_collinear`, `split_edge`, vertex adjacency. **Defect 9 closes here** (merge dedups openings).
+**Inherits the split rule's second half from P3.3: a vertex landing on another wall's body splits that wall.** P3.3 built only the first half (a collinear continuation past an endpoint splits first, so it can never be sheared); the body-landing half is `split_edge` applied scene-side, which is exactly this task, and building it twice would have meant building it wrong once. Until it lands, a body-landing has no vertex to be: P3.3 leaves those attachments on the old coordinate path (`kind == "tee"` in `WallItem.mousePressEvent`) with a comment naming this task. **Also remove `split_edge`'s `NotImplementedError` guard on walls carrying openings** (`design/topology.py`, added at P1.3-followup and pinned by `pytest.raises(match="P3.3")`) as the redistribution it names is built — the guard's message points at P3.3, so retarget or retire it rather than leaving it lying about which task owns the work.
 **Acceptance.** `test_coalesce.py` and the coalesce half of `test_walls.py` rewritten against the new ops — **and this is the biggest "changed test" risk in the plan, so every rewritten assertion must be justified in the log.** ~330 lines deleted from `walls.py`.
 
 ### P3.5 — Delete the detection engine
@@ -392,6 +412,7 @@ Create a room by typed dimension; duplicate a room as a floating unit; save/load
 
 ### P4.5 — Group semantics + z-order
 Groups move the real items — no `duplicate_wall`, no `coalesce_all` on ungroup. Groups serialize (`Design.groups`). Collapse the four z schemes into one that is serialized. **Defects 3 and 11 close here.**
+**Retire or re-justify P3.3's `kind == "rigid"` carve-out here, explicitly.** A wall drag promotes coincident ends into shared vertices, but *excludes grouped neighbours* — they keep the old coordinate path, following the drag without becoming topology. The reason is this task's premise: grouping **duplicates** a room's walls onto the originals, so a grouped coincident end is the common case and not an exotic one, and sharing one would wire a group member to an outside wall permanently while what a group *is* topologically is still undefined. Exactly the reasoning behind the `group() is None` gate that keeps grouped walls out of coalesce — deliberately not topology. **When groups stop copying walls, that reason evaporates**, and a carve-out whose justification has gone is how a workaround becomes folklore. Decide it here: delete it, or write down the new reason.
 **Acceptance.** P0.4 tests 3, 4 and 6 flip to pass. `test_groups.py` rewritten — the three tests encoding duplicate-on-group semantics (`:64`, `:133`, `:155`) are *intentionally* replaced; say so in the log.
 
 ---
@@ -1695,6 +1716,17 @@ THE HEADLINE NUMBER, measured both ways on the same 4x4 grid: 12 wall drags
          continuation's end at y=12 instead of y=0 -- it really was being
          dragged and sheared, so this is a behaviour FIX, not just a
          representation change.
+         THE FIRST EARNED BEHAVIOUR CHANGE OF PHASE 3, and the label is the
+         standard rather than a flourish. Phase 3's contract is that P3.1 and
+         P3.2 are compat shims -- representation moves, behaviour does not, and
+         "suite green with no test changes" is the receipt. A behaviour change
+         inside that contract has to earn its place, which means all three of:
+         DECLARED in advance (the split rule was in the task text), TESTED IN
+         BOTH DIRECTIONS (it fails on reverted code, at a named coordinate, so
+         the bug is exhibited and not merely described), and BRACKETED BY A
+         MEASUREMENT (148 -> 2 splits over the same 12 drags, so the size of
+         the change is known and not guessed). A behaviour change with fewer
+         than three is a regression that has not been noticed yet.
          The rule also has to BREAK sharing that already exists, not merely
          decline to create it (a corner welded by an earlier operation is
          exactly what P3.4's weld produces). Own test.
