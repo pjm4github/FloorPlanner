@@ -22,9 +22,18 @@ explicitly (this split). SHARED MOVEMENT ARRIVES AT P3.3, as the wall-move
 operation, never as a side effect of assignment: representation changes first,
 behaviour second, each observable separately.
 
-Every split is counted (`split_count`) so `--verify-design` can report implicit
-splits per operation -- that count is exactly the data P3.3 needs to decide
-which call sites should become real vertex moves.
+Every split is counted (`split_count`) and ATTRIBUTED TO ITS CALL SITE
+(`split_sites`), so `--verify-design` can report not just how many implicit
+splits an operation caused but WHERE. The bare count told us the drag path
+splits; it could not say which line, and "which call sites should become real
+vertex moves" is a question about lines. P3.3 promotes the first of them --
+the wall-move drag -- and the attribution is how the rest are found.
+
+**A MOVE IS NOT A SPLIT** (P3.3). `moved_to` mints a new identity for one
+wall's end; `relocated_to` carries this vertex's identity to a new position, so
+every end rebound to it is still the same corner. The wall-move operation uses
+the latter, which is what lets a promoted neighbour follow a drag because it IS
+the corner rather than because a scan remembered to drag it.
 
 **A vertex is never mutated in place**, which is what makes the two performance
 decisions below safe. `point()` returns the SAME `QPointF` rather than a copy,
@@ -38,17 +47,51 @@ mutates a `p1`/`p2` in place -- every access is `.x()` / `.y()` or a whole-objec
 read.)
 """
 import itertools
+import sys
 
 from PyQt6.QtCore import QPointF
 
 _UIDS = itertools.count(1)
 _SPLITS = [0]
+_SITES = {}                      # (file, function, line) -> splits caused there
+
+_THIS_FILE = __file__
 
 
 def split_count() -> int:
     """Total split-on-writes since start. Callers record a delta across an
     operation rather than reading it absolutely."""
     return _SPLITS[0]
+
+
+def split_sites() -> dict:
+    """`{(file, function, line): count}` -- cumulative, same convention as
+    `split_count`: callers diff it across an operation.
+
+    Returned as a copy so a caller can keep it as a mark without it moving
+    underneath them."""
+    return dict(_SITES)
+
+
+def _blame() -> tuple:
+    """The call site that caused a split: the first frame outside this module
+    that is not a `p1`/`p2` property setter.
+
+    Skipping the setters is the whole point -- every split arrives through them,
+    so blaming `walls.py: p1` would attribute all of them to one line and answer
+    nothing. Uses `sys._getframe` rather than `traceback`: this runs on genuine
+    coordinate moves (never on a READ, which is the hot path P3.1 had to fix),
+    but a drag still moves several vertices per mouse event."""
+    try:
+        f = sys._getframe(2)
+    except ValueError:                                  # pragma: no cover
+        return ("<unknown>", "<unknown>", 0)
+    while f is not None and (f.f_code.co_filename == _THIS_FILE
+                             or f.f_code.co_name in ("p1", "p2")):
+        f = f.f_back
+    if f is None:                                       # pragma: no cover
+        return ("<unknown>", "<unknown>", 0)
+    return (f.f_code.co_filename, f.f_code.co_name, f.f_lineno)
 
 
 class Vertex:
@@ -101,7 +144,34 @@ class Vertex:
         if x == mine.x() and y == mine.y():
             return self
         _SPLITS[0] += 1
+        site = _blame()
+        _SITES[site] = _SITES.get(site, 0) + 1
         return Vertex(x, y)
+
+    def relocated_to(self, p) -> "Vertex":
+        """MOVE THIS CORNER (P3.3). Returns a vertex at `p` carrying THIS one's
+        identity, so every wall end rebound to it is the same corner in a new
+        place -- not a new corner.
+
+        The difference from `moved_to` is the whole of P3.1-vs-P3.3. A split
+        answers "this wall's end moved, and anything sharing it did not"; a
+        relocation answers "the corner moved, and everything on it came along".
+        Only the explicit wall-move operation may relocate: `p1`/`p2` assignment
+        still splits, because a bare assignment does not know whether the caller
+        meant the end or the corner. Not counted as a split, because it is not
+        one.
+
+        `self` when the position is unchanged, for the same reason `moved_to`
+        does it: the drag re-applies the same delta on every mouse event that
+        does not actually move."""
+        mine = self._pt
+        if isinstance(p, QPointF):
+            x, y = p.x(), p.y()
+        else:
+            x, y = p[0], p[1]
+        if x == mine.x() and y == mine.y():
+            return self
+        return Vertex(x, y, uid=self._uid)
 
     def __repr__(self):
         return f"Vertex({self._uid or '<unnamed>'} @ {self.x:.3f}, {self.y:.3f})"

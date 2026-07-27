@@ -17,6 +17,33 @@ from floorplanner.geometry import *  # noqa: F401
 from floorplanner.vertex import Vertex
 
 
+SHARE_TOL = 0.6        # two ends this close ARE one corner (== vertex_weld_in)
+
+
+class _DragVertex:
+    """One corner being moved by a drag (P3.3): the vertex, where it started,
+    and every wall end that references it.
+
+    `ends` is resolved ONCE, at drag start, so the per-event cost is the size of
+    the corner and not the size of the plan -- the view repaints everything on
+    every change, so anything per-event that scales with the scene is the thing
+    that stalls a big plan."""
+
+    __slots__ = ("v", "orig", "ends")
+
+    def __init__(self, vertex):
+        self.v = vertex
+        self.orig = QPointF(vertex.point())
+        self.ends = []
+
+    def apply(self, dx, dy):
+        """Move the corner. Every end follows because it IS the corner."""
+        self.v = self.v.relocated_to(QPointF(self.orig.x() + dx,
+                                             self.orig.y() + dy))
+        for w, attr in self.ends:
+            w.set_end_vertex(attr, self.v)
+
+
 def nearest_wall_endpoint(scene, p: QPointF, tol: float, exclude=None):
     """Closest endpoint of any wall (other than `exclude`) within `tol`."""
     best, best_d = None, tol
@@ -483,6 +510,7 @@ class WallItem(QGraphicsItem):
         self._corners_unlocked = False  # endpoints draggable while in a room
         self._drawing = False         # True while being rubber-banded
         self._mode = None             # None | 'p1' | 'p2' | 'move'
+        self._vmoves = []             # P3.3: the corners a body-drag moves
         self._path = QPainterPath()
         self._solid = QPainterPath()     # body footprint, no opening holes
         self._outline_clip = None        # outline-clip so junctions read solid
@@ -523,6 +551,24 @@ class WallItem(QGraphicsItem):
     def p2(self, value):
         v = getattr(self, "_v2", None)
         self._v2 = v.moved_to(value) if v is not None else Vertex.at(value)
+
+    def end_vertex(self, attr: str) -> Vertex:
+        """The Vertex object behind `p1` or `p2` -- the corner's IDENTITY, not
+        its position. Two ends are the same corner iff this returns the same
+        object for both (`is`, never `==`)."""
+        return self._v1 if attr == "p1" else self._v2
+
+    def set_end_vertex(self, attr: str, vertex: Vertex):
+        """Point this end AT `vertex`, sharing it.
+
+        The deliberate counterpart to assigning `p1`/`p2`, which splits on write
+        and therefore cannot express sharing at all. P3.3's wall move is the
+        first caller: it shares the corners it is about to move, then moves the
+        vertex once for every end on it."""
+        if attr == "p1":
+            self._v1 = vertex
+        else:
+            self._v2 = vertex
 
     @property
     def primary_room(self):
@@ -778,27 +824,51 @@ class WallItem(QGraphicsItem):
             # stretch -- corner joints fully, T-joints sideways only
             self._slide_u = self.unit()
             self._run = self._collinear_run()
-            self._run_orig = [(w, QPointF(w.p1), QPointF(w.p2))
-                              for w in self._run]
             run_ids = {id(w) for w in self._run}
-            run_pts = [p for w in self._run for p in (w.p1, w.p2)]
+            run_ends = [(w, a) for w in self._run for a in ("p1", "p2")]
+            run_pts = [getattr(w, a) for w, a in run_ends]
             self._attached = []
+            self._continuations = []      # collinear -- split, never dragged
             sc, length = self.scene(), self.length()
             ux, uy = self._slide_u.x(), self._slide_u.y()
             if sc is not None:
                 for w in sc.items():
-                    if not isinstance(w, WallItem) or id(w) in run_ids:
+                    # SAME LEVEL ONLY (defect 12a). This scan was one of defect
+                    # 12's unfiltered paths, and the promotion below raises the
+                    # stakes: a cross-floor coincident end used to be a
+                    # TRANSIENT mis-drag that ended with the mouse-up, but a
+                    # shared vertex carries exactly one level, so sharing across
+                    # floors would violate I2 outright or silently rewrite a
+                    # wall's level, permanently. Filtered at the loop head, so
+                    # cross-level sharing is impossible by construction rather
+                    # than avoided by luck.
+                    if (not isinstance(w, WallItem) or id(w) in run_ids
+                            or w.floor != self.floor):
                         continue
                     for attr in ("p1", "p2"):
                         q = getattr(w, attr)
-                        if any(QLineF(q, rp).length() < 0.6 for rp in run_pts):
-                            self._attached.append((w, attr, QPointF(q), True))
+                        if any(QLineF(q, rp).length() < SHARE_TOL
+                               for rp in run_pts):
+                            if self._is_continuation(w):
+                                self._continuations.append((w, attr))
+                            else:
+                                # a GROUPED neighbour still follows, but on the
+                                # old coordinate path -- grouping duplicates a
+                                # room's walls onto the originals, so promoting
+                                # one would wire a group member to an outside
+                                # wall permanently, and what a group even IS
+                                # topologically is P4.5's question. Same
+                                # instinct as the `group() is None` gate that
+                                # keeps grouped walls out of coalesce.
+                                kind = "corner" if w.group() is None else "rigid"
+                                self._attached.append((w, attr, QPointF(q), kind))
                         else:
                             vx, vy = q.x() - self.p1.x(), q.y() - self.p1.y()
                             s = vx * ux + vy * uy
                             if (0.0 < s < length
                                     and abs(vy * ux - vx * uy) <= 0.75):
-                                self._attached.append((w, attr, QPointF(q), False))
+                                self._attached.append((w, attr, QPointF(q), "tee"))
+            self._plan_vertex_moves(run_ends)
 
         if self._mode in ("p1", "p2"):
             moving = self.p1 if self._mode == "p1" else self.p2
@@ -912,6 +982,71 @@ class WallItem(QGraphicsItem):
                 run.append(w)
         return run
 
+    def _is_continuation(self, w) -> bool:
+        """True when `w` runs along the SAME LINE as the slide -- a collinear
+        continuation past one of the run's endpoints.
+
+        Same parallel tolerance as `_collinear_run`, because it is the same
+        question asked of a wall that answered no to being in the run (it
+        belongs to another room, or to none)."""
+        if w.length() < 1e-6:
+            return False
+        wu, u = w.unit(), self._slide_u
+        return abs(wu.x() * u.y() - wu.y() * u.x()) <= 0.02
+
+    def _plan_vertex_moves(self, run_ends):
+        """Turn the 0.6" coincidence discovery into REAL VERTEX SHARING, once,
+        at drag start -- P3.3's whole content.
+
+        Until now the drag *scanned* for coincident ends and moved each one by
+        hand, which is split-on-write: the corner came apart and was rebuilt
+        from coordinates on every mouse event. After this pass the ends that ARE
+        one corner reference ONE `Vertex`, and the drag moves the vertex -- so a
+        neighbour follows because it is the same corner, not because a loop
+        remembered to drag it. That is the difference between geometry that
+        happens to agree and topology.
+
+        THE SPLIT RULE COMES FIRST, and it is a rule about what must NOT be
+        shared. A wall collinear with the slide that continues past an endpoint
+        cannot ride the corner: the slide is perpendicular, so moving the shared
+        end would swing the continuation's far end and SHEAR it. So the corner
+        is split -- the continuation gets its own vertex and stays exactly where
+        it is -- before any sharing is created. Split first, shear never.
+
+        Tee attachments are deliberately NOT promoted: they land on the dragged
+        wall's BODY, not on a corner, so there is no vertex to share. They keep
+        the sideways-only stretch, and become real topology at P3.4, where
+        `split_edge` gives a body-landing a vertex to be."""
+        # 1. split off the collinear continuations, before anything is shared
+        for w, attr in self._continuations:
+            v = w.end_vertex(attr)
+            if any(rw.end_vertex(ra) is v for rw, ra in run_ends):
+                w.set_end_vertex(attr, Vertex.at(v.point()))
+
+        # 2. the run's own ends are the corners this drag moves
+        moves, by_id = [], {}
+        for w, attr in run_ends:
+            v = w.end_vertex(attr)
+            dv = by_id.get(id(v))
+            if dv is None:
+                dv = by_id[id(v)] = _DragVertex(v)
+                moves.append(dv)
+            dv.ends.append((w, attr))
+
+        # 3. promote each coincident neighbour end onto the corner it sits on
+        self._promoted = 0
+        for w, attr, orig, kind in self._attached:
+            if kind != "corner":
+                continue
+            host = min(((rw, ra) for rw, ra in run_ends),
+                       key=lambda t: QLineF(orig, getattr(t[0], t[1])).length())
+            v = host[0].end_vertex(host[1])
+            if w.end_vertex(attr) is not v:
+                w.set_end_vertex(attr, v)
+                self._promoted += 1
+            by_id[id(v)].ends.append((w, attr))
+        self._vmoves = moves
+
     def mouseMoveEvent(self, e):
         if self._mode is None:
             return
@@ -937,22 +1072,28 @@ class WallItem(QGraphicsItem):
                 nx_, ny_ = -uy, ux
                 s = wall_snap_len(delta.x() * nx_ + delta.y() * ny_)
                 dx, dy = nx_ * s, ny_ * s
-            # translate the whole collinear side (self + open-wall gap + any
-            # collinear neighbours) by the same delta
-            for w, o1, o2 in self._run_orig:
-                w.p1 = QPointF(o1.x() + dx, o1.y() + dy)
-                w.p2 = QPointF(o2.x() + dx, o2.y() + dy)
+            # P3.3: MOVE THE VERTICES. One move per corner carries the whole
+            # collinear side (self + the open-wall gap + any collinear
+            # neighbour) AND every promoted corner joint, because they are all
+            # ends of the same vertices now -- there is nothing left to keep in
+            # step by hand.
+            for dv in self._vmoves:
+                dv.apply(dx, dy)
+            for w in self._run:
                 if w is not self:
                     w.rebuild()
-            # corner joints follow fully; T-joints follow only the sideways
-            # part of the slide so they stretch instead of tilting
+            # what could not be promoted still moves by coordinate. T-joints
+            # follow only the sideways part of the slide so they stretch
+            # instead of tilting -- a body-landing has no vertex to share until
+            # P3.4 makes one; a `rigid` corner is a grouped wall, held back
+            # from sharing by the group guard, not by geometry.
             ux, uy = self._slide_u.x(), self._slide_u.y()
             along = dx * ux + dy * uy
             px, py = dx - along * ux, dy - along * uy
-            for w, attr, orig, is_corner in self._attached:
-                if is_corner:
+            for w, attr, orig, kind in self._attached:
+                if kind == "rigid":
                     setattr(w, attr, QPointF(orig.x() + dx, orig.y() + dy))
-                else:
+                elif kind == "tee":
                     setattr(w, attr, QPointF(orig.x() + px, orig.y() + py))
                 w.rebuild()
         self.rebuild()
