@@ -260,12 +260,13 @@ def inner_faces(faces, pos):
         out.append((abs(a2) / 2.0, f, pts, a2))
     if not out:
         return []
-    sign = 1 if sum(1 for a, _, _, s in out if s > 0) * 2 > len(out) else -1
-    inner = [(a, f, pts) for a, f, pts, s in out if (s > 0) == (sign > 0)]
-    if inner:
-        inner.sort(key=lambda t: -t[0])
-        inner = inner[1:]                     # drop the outer boundary face
-    return inner
+    # interior faces share the MAJORITY winding; each connected component's outer
+    # boundary is wound the other way -- drop ALL opposite-wound faces, not the
+    # single largest (defect 18: dropping-by-size discarded the Garage, the
+    # largest real room, whenever the true boundary was opposite-wound).
+    positive = sum(1 for t in out if t[3] > 0)
+    sign = 1 if positive * 2 > len(out) else -1
+    return [(a, f, pts) for a, f, pts, s in out if (s > 0) == (sign > 0)]
 
 
 # ------------------------------------------------------------------ migration

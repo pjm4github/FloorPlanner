@@ -100,6 +100,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P1.1** `design/model.py` — dataclasses | ruff + pytest |
 | ☑ | **P1.2** `design/validate.py` — I1–I14 | ruff + pytest |
 | ☑ | **P1.3** `design/topology.py` — weld/planarize/trace | ruff + pytest |
+| ☑ | **P1.3b** Fix defect 18 (`_inner_faces` winding) + corpus diff | ruff + pytest |
 | ☐ | **P1.4** `design_from_scene()` | ruff + pytest |
 | ☐ | **P1.5** `apply_design_to_scene()` | ruff + pytest |
 | ☐ | **P1.6** `--verify-design` shadow mode; suite runs with it on | ruff + pytest ×2 |
@@ -273,7 +274,7 @@ Qt-free dataclasses for `Level`, `Vertex`, `Wall`, `Opening`, `Room`, `OutlineEd
 
 ### P1.3 — `design/topology.py`
 Port from `tools/migrate_to_design_v5.py`: `weld_endpoints`, `planarize`, `split_edge`, `merge_collinear`, `trace_faces`, `enclosing_face`. Pure functions over the `Design`; no Qt.
-**Acceptance.** `trace_faces` on `symmetricP1` returns 19 faces whose areas match the stored room areas. `weld_endpoints` on the legacy `planc1.json` geometry welds exactly 31 ends.
+**Acceptance.** `trace_faces` on `symmetricP1` recovers every stored room area (**20**, after the P1.3b `_inner_faces` fix; it was 19 while defect 18 dropped the Garage), plus one extra face for a genuinely unclaimed region. `weld_endpoints` on the legacy `planc1.json` geometry welds exactly 31 ends.
 
 ### P1.4 — `design_from_scene()`
 Walk the live scene into a `Design`. **This is where the ten unfiltered floor queries get fixed** — the walk is level-scoped **by construction** (iterate levels outer, items inner, so cross-level contamination is impossible, not merely filtered out). Build room outlines from the scene's own `RoomItem.corners`, **not** from `trace_faces`: `design_from_scene` must report what the scene *believes*, not what the geometry *should* be. Repairing while reading would make P1.6's shadow comparison diverge from the live scene; repair belongs at P2.1's import, once, and nowhere else. The scene is still `p1`/`p2`-based (pre-P3.1), so the walk uses `legacy.py`'s weld/planarise to reach a vertex table.
@@ -800,4 +801,33 @@ notes:   FLAG 1 (landmine) fixed: split_edge no longer leaves openings on the
          Also corrected legacy.py's docstring: it is PRE-VERTEX geometry (raw
          p1/p2), used by BOTH the v4 importer (P2.1) AND design_from_scene (P1.4,
          scene still p1/p2 until P3.1) -- not purely import-only. Retired at P3.1.
+
+P1.3b  done   (defect 18 fix + corpus diff, before P1.4)
+ruff:    clean
+pytest:  324 passed, 4 xfailed, 1 xpassed
+files:   design/topology.py + tools/migrate_to_design_v5.py (_inner_faces /
+         inner_faces fix), tests/test_topology.py (test updated to the fixed
+         behaviour), docs/CODE_REVIEW_v2.md (defect 18 -> fixed), this plan
+         (P1.3 acceptance 19->20).
+notes:   FIX: _inner_faces now keeps the majority winding and drops ALL
+         opposite-wound faces (one outer boundary per connected component --
+         a detached garage or a Phase-4 floating room each has its own), never
+         by size. Retargeted defect 18 P3.5 -> P1.3b and fixed NOW: P2.1's
+         import traces outlines, so the old heuristic would have silently fallen
+         back to stored corners for the largest room of every imported plan --
+         user-facing, four tasks out. Fixed in BOTH topology.py and the migrator.
+         Result: trace_faces on symmetricP1 now recovers all 20 rooms (Garage
+         included), plus one extra face for the 60.6 sf unclaimed region.
+         CORPUS DIFF (the required check): regenerated symmetricP1 with the fixed
+         migrator (migrate(planc1.json, --clean --name "Symmetric P1"), the
+         command that produced the committed file) and diffed. Result: GEOMETRY
+         IDENTICAL -- Garage 868.5 sf both ways, same 9 edges, same cycle; the
+         only file change is the Garage outline's start vertex rotating (the
+         migrator now TRACES the Garage, rooms_traced 19->20, instead of the
+         stored-corners fallback). So the Garage's stored outline AGREES with
+         its traced face -- NOT an M-Bath-class disagreement. Per the decision
+         tree that is the "identical" branch: the fixture STANDS, not
+         regenerated (a cosmetic loop-rotation is not worth churning a fixture
+         that P1.1/P1.4/P1.5/P1.6 pin). Had they disagreed, that would have been
+         a corruption baked in by luck (the buggy fallback) -- they don't.
 ```

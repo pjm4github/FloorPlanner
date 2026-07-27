@@ -37,19 +37,28 @@ def _room_area(d, room):
 # --------------------------------------------------------------------------
 # Acceptance 1: trace_faces on symmetricP1 recovers 19 room areas
 # --------------------------------------------------------------------------
-def test_trace_faces_recovers_19_room_areas():
+def test_trace_faces_recovers_every_room_area():
+    # P1.3b: after the _inner_faces winding fix, ALL 20 rooms are recovered --
+    # the Garage (largest, was wrongly dropped by defect 18) included. One extra
+    # traced face (a ~60.6 sf wall-bounded region) matches no room; it is inside
+    # no room (a genuinely unclaimed void in symmetricP1, not an outline fault).
     d = _design("symmetricP1.json")
     faces = topology.trace_faces(d)
     face_areas = Counter(round(f.area_in2, 1) for f in faces)
     room_areas = Counter(round(_room_area(d, r), 1) for r in d.rooms)
     matched = sum(min(face_areas[a], room_areas[a]) for a in face_areas)
-    assert matched == 19
-    # the one room without a matching face is the Garage: largest, boundary-
-    # touching, so its face IS the outer boundary that _inner_faces drops
+    assert matched == len(d.rooms) == 20             # every room recovered
     unmatched = [r.name for r in d.rooms
                  if room_areas[round(_room_area(d, r), 1)]
                  > face_areas[round(_room_area(d, r), 1)]]
-    assert set(unmatched) == {"Garage"}
+    assert unmatched == []                           # no room lost (Garage back)
+    pos = _pos(d)
+    extra = [f for f in faces
+             if face_areas[round(f.area_in2, 1)] > room_areas[round(f.area_in2, 1)]]
+    assert len(extra) == 1                           # the one unclaimed region
+    epts = [pos[v] for v in extra[0].vertices]
+    ecen = (sum(p[0] for p in epts) / len(epts), sum(p[1] for p in epts) / len(epts))
+    assert not any(topology._pip(ecen, _poly(d, r)) for r in d.rooms)  # unclaimed
 
 
 # --------------------------------------------------------------------------

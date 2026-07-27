@@ -111,8 +111,17 @@ def _trace_faces_raw(adj, pos):
 
 def _inner_faces(faces, pos):
     """From the raw faces, the room-candidate inner faces: drop sub-2 sf slivers,
-    keep the majority orientation, and drop the single largest (the outer
-    boundary). Returns [(area_in2, edge_loop, pts)]."""
+    then keep the MAJORITY-winding faces and drop every opposite-wound one.
+
+    Interior faces all share one winding; each connected component's outer
+    (unbounded) boundary is wound the other way. Dropping ALL opposite-wound
+    faces removes every boundary -- a plan with a detached garage, or Phase-4
+    floating/concept rooms, has one boundary per component, not one total.
+    Do NOT drop by size: the largest interior face can be a real room (defect 18
+    -- symmetricP1's Garage). Returns [(area_in2, edge_loop, pts)].
+
+    (A single-face-per-component plan -- e.g. one lone room -- ties the majority
+    vote; that edge case is revisited with concept-room templates at P4.4.)"""
     out = []
     for f in faces:
         pts = [pos[u] for u, _ in f]
@@ -124,12 +133,9 @@ def _inner_faces(faces, pos):
         out.append((abs(a2) / 2.0, f, pts, a2))
     if not out:
         return []
-    sign = 1 if sum(1 for _a, _f, _p, s in out if s > 0) * 2 > len(out) else -1
-    inner = [(a, f, pts) for a, f, pts, s in out if (s > 0) == (sign > 0)]
-    if inner:
-        inner.sort(key=lambda t: -t[0])
-        inner = inner[1:]                     # drop the outer boundary face
-    return inner
+    positive = sum(1 for t in out if t[3] > 0)
+    sign = 1 if positive * 2 > len(out) else -1
+    return [(a, f, pts) for a, f, pts, s in out if (s > 0) == (sign > 0)]
 
 
 def trace_faces(design, level=None):
