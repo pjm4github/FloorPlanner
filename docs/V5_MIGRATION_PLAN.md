@@ -308,7 +308,8 @@ Plus **File ▸ Export legacy v4…** for one release, so nobody is stranded.
 
 ### P2.3 — Undo snapshots the v5 dict
 Still whole-document; only the payload changes. Groups now serialize, so **defect 3 partially closes here**.
-**Acceptance.** `test_undo.py` green. New test: group, undo, redo — the group survives.
+**Also here: backdrop / reference-image retention.** `apply_project_to_scene`'s `keep_backdrop` flag exists because undo must not delete the tracing image; `apply_design_to_scene` (P1.5) deliberately does **not** implement it, since it belongs with the undo-restore path rather than the bridge. Wire it here, or undo silently drops the backdrop.
+**Acceptance.** `test_undo.py` green. New test: group, undo, redo — the group survives. Undo with a reference image loaded keeps the image.
 
 ### P2.4 — Convert the corpus and the tooling
 `examples/*.json`, `docs/make_gallery.py`, `examples/make_examples.py`, `tests/bench_rooms.py`, `fp_extract.py`'s writer, and the macro `open`/`save` tokens.
@@ -327,6 +328,7 @@ Extract `io.py` (open/save/export), `csvio.py` (`_import_rooms`/`_export_rooms`,
 
 ### P3.1 — Vertex table live
 `Design.vertices` becomes the live store. `WallItem` gains `v1`/`v2` ids; `p1`/`p2` become read-through properties resolving against the table, so **every existing caller keeps working**. Assignment to `p1`/`p2` moves the vertex and is logged under `--verify-design`.
+**Decide id policy here.** Items should carry **persistent uids, minted once** — stable across edits, and therefore macro-addressable — with `_canonicalize` (P1.5, `design/bridge.py`) applied only at **snapshot/serialization time**, for equality. Content-derived ids recomputed per walk are almost certainly the wrong thing to *persist*: P1.5's canonical ids sort by geometry, so moving one wall renumbers its neighbours. That is harmless for round-trip and undo comparison, which is all it was built for, but P3.1 makes scene items id-carrying and **P4.5 serializes groups by member id** — a group whose members are renumbered by an unrelated wall move is a live bug. Settle it at this task rather than discovering it at P4.5.
 **Acceptance.** Suite green with no test changes. The `--verify-design` run stays green.
 
 ### P3.2 — `RoomItem.outline`
