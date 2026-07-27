@@ -379,3 +379,66 @@ def test_legacy_export_round_trips_through_the_old_loader(fp, win, tmp_path,
         assert after == before
     finally:
         win2.close()
+
+
+# ================================ Gate 2: the app's own output needs no repair
+def test_legacy_export_reopens_without_repair(fp, win, tmp_path):
+    """GATE 2 FINDING (2026-07-27). Open planc1 -> save v5 -> export legacy v4
+    -> reopen the export through the CONVERTING path. The reopen must report
+    ZERO ends moved: the application's own output must never need repair.
+
+    It reported 5. Cause: the importer welded the divider ends from y=655.529
+    to y=654.0, but `split_params` then cut those same walls at the STORED,
+    PRE-WELD room corners -- still recording 655.529 -- injecting a degree-2
+    vertex 1.53" from the freshly welded end and leaving a 1.53" SLIVER wall,
+    the exact ghost of the gap the weld had just closed. Nothing caught it:
+    1.53 clears MIN_SPAN and clears vertex_weld_in, so I14 stayed silent and
+    every area was right.
+
+    P2.2 round-tripped only via `load_data` -- the faithful apply, which never
+    welds -- so the export path was never taken through the converter. That is
+    why this escaped, and why the test drives the FULL journey."""
+    win.load_path(str(EXAMPLES / "planc1.json"))
+    before = _areas(fp, win)
+    win.save_path(str(tmp_path / "converted.v5.json"))
+
+    v4 = tmp_path / "export.v4.json"
+    win.export_legacy_v4_path(str(v4))
+    assert json.loads(v4.read_text(encoding="utf-8"))["format"] == "floorplanner-json"
+
+    win.load_path(str(v4))                      # the CONVERTING path
+    assert win._conversion["ends_moved"] == 0, \
+        "the app's own export needed repair on reopen"
+    assert win._conversion["weld_ops"] == 0, "...and the weld found work to do"
+    after = _areas(fp, win)
+    assert set(after) == set(before)
+    for name, sf in before.items():
+        assert after[name] == pytest.approx(sf, abs=0.1), f"{name} changed"
+
+
+def test_stored_corners_are_welded_with_the_walls(fp):
+    """The fix, at its own level. Stored `perimeter_corners` are PRE-WELD data;
+    leaving them stale is what produced the slivers above."""
+    from floorplanner.design.importer import weld_room_corners
+    walls = [{"p1": [0.0, 0.0], "p2": [100.0, 0.0]}]
+    rooms = [{"properties": {"perimeter_corners": [
+        [0.0, 1.53],          # 1.53" from a welded end -> snaps
+        [50.0, 40.0],         # nowhere near an end -> left alone
+    ]}}]
+    assert weld_room_corners(walls, rooms) == 1
+    pc = rooms[0]["properties"]["perimeter_corners"]
+    assert pc[0] == [0.0, 0.0]
+    assert pc[1] == [50.0, 40.0]
+
+
+def test_no_sliver_walls_in_the_converted_document(fp):
+    """No wall shorter than the gesture tolerance survives the conversion --
+    a sub-2" wall on a converted plan is a weld artefact, not architecture."""
+    import math
+    design, _rep = import_legacy(_load("planc1.json"))
+    doc = design.to_dict()
+    v = {x["id"]: (x["x"], x["y"]) for x in doc["vertices"]}
+    slivers = [(w["id"], round(math.dist(v[w["v1"]], v[w["v2"]]), 3))
+               for w in doc["walls"]
+               if math.dist(v[w["v1"]], v[w["v2"]]) < 2.0]
+    assert slivers == [], f"weld-ghost slivers survived: {slivers}"

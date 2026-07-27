@@ -33,13 +33,14 @@ reconciling the conversion report should not face two overlapping explanations
 for why numbers moved. `inside_face` becomes an explicit opt-in at Phase 5, with
 its own visible moment.
 """
+import copy
 import math
 from collections import defaultdict
 
 from floorplanner.design.canonical import canonicalize
 from floorplanner.design.legacy import (
-    JOIN_TOL, MIN_SPAN, ON_SEG_TOL, WELD_TOL, VertexTable, split_params,
-    weld_endpoints_counted,
+    END_TOL, JOIN_TOL, MIN_SPAN, ON_SEG_TOL, WELD_TOL, VertexTable,
+    split_params, weld_endpoints_counted,
 )
 from floorplanner.design.model import Design
 from floorplanner.design.topology import trace_faces
@@ -90,6 +91,39 @@ def parse_wwhh(code):
         return (32.0, 80.0)
     k = 2 if len(code) == 4 else 3
     return (float(code[:k]), float(code[k:]))
+
+
+def weld_room_corners(walls, rooms, end_tol=END_TOL):
+    """Snap stored `perimeter_corners` onto the WELDED wall ends. Returns the
+    number moved.
+
+    Stored corners are PRE-WELD data, and leaving them stale corrupts the
+    repaired document (Gate 2, 2026-07-27). The weld pulls a divider's end from
+    y=655.529 to y=654.0; the stale corner still says 655.529; `split_params`
+    then cuts the freshly repaired wall there, 1.53" from its own end. The
+    result is a degree-2 vertex and a 1.53" SLIVER wall -- the exact ghost of
+    the gap the weld just closed -- baked into the output.
+
+    Nothing catches it: 1.53 clears `MIN_SPAN`, and it clears `vertex_weld_in`
+    too, so I14 is silent and the areas stay right. It surfaces only when the
+    document is exported and reopened, where the 2" end-to-end gesture weld sees
+    two ends 1.53" apart and fuses them -- so the app reported that its OWN
+    output needed repair.
+
+    The corners are welded with the same `END_TOL` the wall weld uses, because
+    they are describing the same corners."""
+    ends = [tuple(p) for w in walls for p in (w["p1"], w["p2"])]
+    if not ends:
+        return 0
+    moved = 0
+    for r in rooms:
+        for c in (r.get("properties") or {}).get("perimeter_corners") or []:
+            q = (float(c[0]), float(c[1]))
+            best = min(ends, key=lambda e: _d(q, e))
+            if 1e-9 < _d(q, best) <= end_tol:
+                c[0], c[1] = best[0], best[1]
+                moved += 1
+    return moved
 
 
 def _walk(va, vb, level, edge, adj, vt, max_hops=10):
@@ -158,14 +192,18 @@ def import_legacy(src, tool="floorplanner.design.importer", design_name=None,
 
     src_walls = [dict(w, p1=list(w["p1"]), p2=list(w["p2"]))
                  for w in src.get("walls", [])]
-    src_rooms = list(src.get("rooms", []))
+    # deep-copied: the corner weld below mutates them, and the source document
+    # must survive the conversion untouched
+    src_rooms = copy.deepcopy(list(src.get("rooms", [])))
     weld_ops, ends_moved = (weld_endpoints_counted(src_walls) if clean
                             else (0, 0))
+    corners_welded = weld_room_corners(src_walls, src_rooms) if clean else 0
 
     rep = {"src_walls": len(src_walls), "segments": 0, "merged": 0,
            "openings_src": 0, "openings_dropped": 0, "openings_deduped": 0,
            "rooms_traced": 0, "rooms_from_stored_corners": 0, "open_edges": 0,
            "weld_ops": weld_ops, "ends_moved": ends_moved,
+           "corners_welded": corners_welded,
            "repaired": [], "concept_rooms": [], "face_conflicts": []}
 
     vertices, walls, rooms, furnishings = [], [], [], []
