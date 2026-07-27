@@ -102,7 +102,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P1.3** `design/topology.py` — weld/planarize/trace | ruff + pytest |
 | ☑ | **P1.3b** Fix defect 18 (`_inner_faces` winding) + corpus diff | ruff + pytest |
 | ☑ | **P1.4** `design_from_scene()` | ruff + pytest |
-| ☐ | **P1.5** `apply_design_to_scene()` | ruff + pytest |
+| ☑ | **P1.5** `apply_design_to_scene()` | ruff + pytest |
 | ☐ | **P1.6** `--verify-design` shadow mode; suite runs with it on | ruff + pytest ×2 |
 | ☐ | **P2.1** Load path: v1–v4 migrate + dirty + report; v5 direct | ruff + pytest |
 | ☐ | **P2.2** Save writes v5; legacy export | ruff + pytest |
@@ -955,4 +955,62 @@ notes:   FINDING 1 SETTLED -- two counters, with the threshold taken from the
          591.6/24 corners). The scene's belief about a corrupt file is STRICTLY
          WORSE than the file. test_planc1_reports_its_real_faults pins the shared
          vertex set and is named in the plan as the guard.
+
+P1.5  done   (commit 2678ff5)
+ruff:    clean
+pytest:  347 passed, 4 xfailed, 1 xpassed in 12.27s (+10; 337 -> 347)
+files:   floorplanner/design/bridge.py (+apply_design_to_scene, +_canonicalize,
+         +geometric ordering in the walk), tests/test_design_bridge.py (+10)
+notes:   NO EXISTING TEST TOUCHED -- git status showed exactly two modified
+         files, both mine. Existing IO and undo tests green unchanged.
+         ACCEPTANCE MET on sample_plan.json AND planc1.json: scene -> Design ->
+         scene -> Design is dict-identical at the second Design. planc1 is in
+         the round-trip set deliberately -- a corrupt plan must round-trip as
+         faithfully as a clean one; had apply quietly repaired the Hall/M Bath
+         collision the second Design would be "better" and the bridge would be
+         lying about what it holds.
+         THE FINDING THAT SHAPED THE TASK -- ids were not canonical. The first
+         round trip came back ISOMORPHIC BUT UNEQUAL: identical counts
+         (8/8 vertices, 10/10 walls, 3/3 rooms on sample_plan; 61/80/20 on
+         planc1) with different ids. Cause: P1.4 minted ids in EMISSION order,
+         which is source-wall order, but apply turns each split segment into its
+         own WallItem, so the second walk visits the same geometry in a
+         different order. Fixed with _canonicalize: vertices sorted by
+         (level, x, y), walls by (level, v1 pos, v2 pos, type), rooms by
+         (level, name, centroid), furnishings by (level, pos, kind, rotation),
+         openings renumbered along the wall -- then ids assigned and every
+         reference rewritten. The walk's per-level item lists are sorted
+         geometrically too, so the vertex-table weld order is deterministic.
+         This is the same z-independence Project.to_dict already gives the v4
+         snapshot (model.py:211-224) and for the same stated reason; P2.3's undo
+         comparison needs it as well. A test pins it directly: bring a wall to
+         the front, re-walk, document unchanged.
+         The four mirror notes, as built:
+         (1) NO coalesce/weld/detection in apply. Pinned by an OFF-GRID plan
+         (205x101 at (7,3), no corner on the 6" wall-snap grid): a coalesce pass
+         would re-snap the endpoints and the test asserts the exact
+         coordinates survive.
+         (2) Rooms READ, never re-detected. Ordering does the work --
+         rebuild_all_walls runs BEFORE any RoomItem exists, so refresh_rooms
+         returns at `if not rooms: return` and no flood-fill can overwrite a
+         stored outline. Each room's _detect_sig is then primed via the public
+         room_signature(scene, room) so a LATER rebuild also leaves it alone;
+         the test asserts d1 == d2 across an explicit rebuild_all_walls.
+         (3) Openings invert exactly. _opening_s is the algebraic inverse of the
+         s -> anchor conversion, and the test compares openings wall-by-wall
+         across planc1's 20+ openings (with a guard that the corpus has not
+         silently got weaker), not just a count.
+         (4) floor assigned from the level explicitly on every wall, room and
+         furnishing. The test sets active_floor to the WRONG floor before
+         applying, so anything trusting the active_floor() global lands
+         visibly wrong.
+         TWO SMALL CALLS: apply collapses the scene's anchor + label_offset into
+         the anchor (v5 stores ONE label offset, relative to the centroid --
+         the schema's stated intent), which round-trips exactly; and
+         keep_backdrop / reference-image retention is deliberately NOT handled
+         here, it belongs with the undo-restore path at P2.3.
+         Opening failures are COLLECTED and surfaced (report["openings_failed"]
+         + warning, strict=True raises), not dropped by the v4 path's silent
+         `except ValueError: continue` -- pre-figures P3.6.
+         Not pushed -- Phase 1 pushes at its end, after P1.6.
 ```
