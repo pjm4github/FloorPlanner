@@ -106,7 +106,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P1.6** `--verify-design` shadow mode; suite runs with it on | ruff + pytest ×2 |
 | ☑ | **P2.1** Load path: v1–v4 migrate + dirty + report; v5 direct | ruff + pytest |
 | ☑ | **P2.2** Save writes v5; legacy export | ruff + pytest |
-| ☐ | **P2.3** Undo snapshots the v5 dict | ruff + pytest |
+| ☑ | **P2.3** Undo snapshots the v5 dict | ruff + pytest |
 | ☐ | **P2.4** Convert the corpus and the tooling | ruff + pytest |
 | ☐ | **P2.5** Split `MainWindow` IO/CSV/image/floors out | ruff + pytest |
 | ☐ | **P3.1** Vertex table live; `WallItem` holds `v1`/`v2` | branch, ruff + pytest |
@@ -1269,5 +1269,72 @@ notes:   ACCEPTANCE: save -> reopen -> check(deep=True) == [] and NOT dirty;
          editor yet; P4/P5 model them properly (placement/nominal_size at
          P4.2-P4.4, area_accounting and finishes at P5.1-P5.3) and the stash
          retires then. Written down so it is a known limit, not a mystery.
+         Not pushed -- Phase 2 pushes at its end.
+
+P2.3  done   (commit bbe592c)
+ruff:    clean
+pytest:  OFF  393 passed, 4 xfailed, 1 xpassed in 15.33s
+         ON   393 passed, 4 xfailed, 1 xpassed in 17.30s
+         DEEP 388 passed, 3 xfailed, 7 deselected in 15.19s  (-m "not perf")
+files:   floorplanner/mainwindow.py (snapshot, restore, dirty, serialize
+         demoted), design/bridge.py (keep_backdrop, OpenWall rebuild, door_type),
+         design/verify.py (reuse a caller's walk), tests/test_undo.py (+6),
+         tests/test_scaling.py (snapshot + undo timings), tests/
+         test_characterization.py + tests/test_io.py (the two assertions below)
+notes:   snapshot() = canonicalize(design_from_scene().to_dict()), and undo,
+         redo and the dirty flag are all defined on it. _restore_state applies
+         through apply_design_to_scene with keep_backdrop (the retention
+         deferred from P1.5). _is_dirty canonicalizes BOTH sides.
+         ONE WALK per settled edit: _commit_if_changed builds the snapshot and
+         passes it to verify(doc=..., walk_report=...) rather than walking the
+         scene twice at the same quiescent point -- which also makes the latency
+         number below honest instead of inflated by my own duplication.
+         serialize() DEMOTED to the legacy exporter, with a comment naming its
+         sole remaining caller and the release it dies with.
+         GROUPS DO NOT CLOSE HERE, per the corrected task text. The bridge emits
+         groups: [] until P4.5, so undo keeps dissolving groups exactly as
+         today; I did NOT write the group-survives test. What is asserted is the
+         narrower promise: undo after grouping restores the plan.
+         WHY EDGE-GRANULAR RESTORE IS SAFE -- the canonical Design is
+         GRANULARITY-INVARIANT. Whether the scene holds one long wall or three
+         segments split at junctions, design_from_scene planarises to the same
+         canonical document, so scene wall-count is PRESENTATION state, not
+         document state. Pinned directly by
+         test_undo::test_snapshot_is_granularity_invariant, which builds the
+         same plan two ways and asserts one document. Consequences: (a) a test
+         asserting scene wall counts across an undo is asserting presentation;
+         (b) if coalesce re-merges collinear segments after a later edit, the
+         document, dirty flag and undo comparison correctly do not notice.
+         TWO REAL BUGS, found only because the restore now goes through the v5
+         bridge:
+           * OPEN WALLS were dropped. The v4 loader regenerated them via
+             bind_room_walls -- which is DETECTION, and apply must not run it --
+             so nothing rebuilt them. Undo silently ate every archway edge. apply
+             now builds an OpenWall per `wall: null` outline edge; P3.7 retires
+             the branch when null edges render dashed directly.
+           * a WINDOW's door_type was clobbered to "". v5 carries door_type for
+             DOORS only ("meaningful only when kind == door"), so absent means
+             "not applicable", not "empty"; applying now leaves the scene's
+             default alone. Caught by test_group_move_undo_restores, which was
+             comparing v4 dicts.
+         ASSERTIONS CHANGED (2, both presentation-vs-document, authorized in
+         advance): test_group_move_undo_restores now compares snapshot() rather
+         than serialize() -- v4 reported perimeter_corners ROTATED after an undo
+         (same polygon, different first element) because canonical form
+         normalises rotation; the polygon itself is now asserted separately so a
+         REAL geometry change still fails. And test_unchanged_scene_is_not_
+         falsely_dirty sets its baseline with snapshot(), as a save does.
+         LATENCY BASELINE for P6.1, P0.3 grid, 16 -> 64 rooms:
+           snapshot  2.1 ms -> 10.8 ms   ratio 5.10
+           undo     22.0 ms -> 155.8 ms  ratio 7.09
+         Guarded with ABSOLUTE bounds (undo < 500 ms, snapshot < 100 ms), not
+         ratios: undo sits close enough to the threshold of 8 that a ratio
+         assertion would flap -- the same call P0.6 made for select_burst. P6.1
+         must make this independent of plan size; today it is not.
+         KNOWN REGRESSION recorded in the table: after the first undo, a wall
+         crossing a junction comes back split (measured by hand: one 480" wall
+         with a mid-span T returns as two 240" walls), so body-dragging it moves
+         half and leaves the neighbour. Checked deliberately rather than left
+         for a user to find. Restored at P3.3/P3.4.
          Not pushed -- Phase 2 pushes at its end.
 ```
