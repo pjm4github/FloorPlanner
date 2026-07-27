@@ -75,6 +75,7 @@ Ranked by blast radius; each mapped to the phase that closes it.
 | 10 | Rubber-band selection creates walls | `view.py:445` | **P0.5** |
 | 11 | Four competing z-order systems, two of which run on every wall click | `walls.py:723‑727` + 14 sites | **P4.5** |
 | 12 | 10 query paths ignore the floor filter | `walls.py:81,266`; `rooms.py:522,531` … | **P1.4** |
+| 12a | **`WallItem._attached` (`walls.py:785‑801`) is one of defect 12's unfiltered paths, and P3.3 raises its stakes.** Today a cross-floor coincident end wrongly dragged by the scan is a *transient* bug that ends with the drag. P3.3 promotes that discovery into real vertex sharing — and a vertex carries exactly one level, so unfiltered promotion would either violate **I2** outright or silently rewrite a wall's level, permanently. The promotion pass therefore shares **only between same-level walls**, moving one more of defect 12's scene-side paths from "filtered by luck" to filtered by construction. | `walls.py:785‑801` | **P3.3** |
 | 13 | Detection result depends on view zoom (from the deleted `test_zzprobe`) | `detach_wall_from_room` path | **P3.5** |
 | 14 | `GroupItem.boundingRect` recomputes the oriented box 3× per paint | `items.py:509‑528` | **P0.6** |
 | 15 | `_update_totals` full-scans on every `scene.changed` | `mainwindow.py:98,342` | **P0.6** |
