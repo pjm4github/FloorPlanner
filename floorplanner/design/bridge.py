@@ -52,17 +52,23 @@ import math
 import warnings
 from collections import defaultdict
 
+from PyQt6.QtCore import QPointF
 from PyQt6.QtWidgets import QGraphicsScene
 
-from floorplanner.config import DEFAULT_FLOOR, JOIN_TOL, SETTINGS
+from floorplanner.config import (
+    DEFAULT_FLOOR, DEFAULT_SETTINGS, JOIN_TOL, SETTINGS, set_floor_state,
+)
 from floorplanner.design.legacy import (
     MIN_SPAN, ON_SEG_TOL, WELD_TOL, VertexTable, split_params, weld_endpoints,
 )
 from floorplanner.design.model import Design
-from floorplanner.items import FurnishingItem
+from floorplanner.geometry import parse_wwhh
+from floorplanner.items import FurnishingItem, furnishing_spec, make_furnishing
 from floorplanner.model import Floor
-from floorplanner.rooms import RoomItem
-from floorplanner.walls import WallItem
+from floorplanner.rooms import (
+    RoomItem, poly_area_sqft, room_path_from_corners, room_signature,
+)
+from floorplanner.walls import OpeningItem, WallItem, rebuild_all_walls
 
 # names that make a room exterior rather than interior.  Kept identical to
 # tools/migrate_to_design_v5.py so a plan walked from the scene and the same
@@ -134,6 +140,30 @@ def _by_floor(scene):
     return out
 
 
+def _ordered(items, kind, key):
+    """This level's items of one type, in a GEOMETRIC order.
+
+    `scene.items()` returns items in stacking order, so without this the ids the
+    walk mints would depend on z -- and "Bring to front" would rewrite the whole
+    document. Sorting by geometry instead is the same z-independence
+    `Project.to_dict` already gives the v4 snapshot (`model.py:221-224`), and
+    P1.5's round-trip identity rests on it: rebuilding a scene from a `Design`
+    reverses insertion order, so unsorted ids would not survive one apply."""
+    return sorted((it for it in items if isinstance(it, kind)), key=key)
+
+
+def _wall_key(w):
+    return (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y(), w.wall_type)
+
+
+def _room_key(r):
+    return (r.name, r.anchor.x(), r.anchor.y())
+
+
+def _furn_key(f):
+    return (f.pos().x(), f.pos().y(), f.kind, f.rotation())
+
+
 # ------------------------------------------------------------------ weld check
 def _weld_delta(raw):
     """How many wall ends `weld_endpoints` WOULD move on this level's geometry,
@@ -183,9 +213,9 @@ def _walls_of(items, lid, nid, vt, rep):
     """This level's walls, split at every junction and room corner, as v5 wall
     dicts.  Openings are re-anchored from absolute `s` to {from, offset_in} on
     the segment that carries them."""
-    w_items = [it for it in items
-               if isinstance(it, WallItem) and not it.is_open]
-    r_items = [it for it in items if isinstance(it, RoomItem)]
+    w_items = [it for it in _ordered(items, WallItem, _wall_key)
+               if not it.is_open]
+    r_items = _ordered(items, RoomItem, _room_key)
     raw = [{"p1": [w.p1.x(), w.p1.y()], "p2": [w.p2.x(), w.p2.y()],
             "type": w.wall_type,
             "openings": sorted(
@@ -277,7 +307,7 @@ def _rooms_of(items, lid, nid, vt, walls, rep):
         adj[wr["v2"]].append(wr["v1"])
 
     rooms = []
-    for r in [it for it in items if isinstance(it, RoomItem)]:
+    for r in _ordered(items, RoomItem, _room_key):
         if not r.corners or len(r.corners) < 3:
             rep["rooms_without_outline"] += 1     # flood-fill only, no perimeter
             continue
@@ -356,7 +386,7 @@ def _furnishings_of(items, lid, nid, rooms, poly):
     """This level's furnishings, each owned by the SMALLEST room containing it
     (a closet inside a bedroom belongs to the closet)."""
     out = []
-    for it in [x for x in items if isinstance(x, FurnishingItem)]:
+    for it in _ordered(items, FurnishingItem, _furn_key):
         p = (it.pos().x(), it.pos().y())
         owner, best = None, None
         for rm in rooms:
@@ -372,6 +402,65 @@ def _furnishings_of(items, lid, nid, rooms, poly):
             rec["state"] = state
         out.append(rec)
     return out
+
+
+# ------------------------------------------------------------------ canonical
+def _canonicalize(levels, vertices, walls, rooms, furnishings):
+    """Renumber every id in a GEOMETRIC order, in place.
+
+    Ids are minted during the walk, so without this they encode the order the
+    items happened to be emitted in -- which is the order the SOURCE walls were
+    visited. Rebuilding the scene from a `Design` turns each split segment into
+    its own wall, so the second walk visits them in a different order and mints
+    different ids for the same geometry: the documents come out isomorphic but
+    unequal, which is exactly what P1.5's `scene -> Design -> scene -> Design`
+    identity forbids.
+
+    Ordering by geometry instead makes the document canonical -- one plan has
+    one representation, whatever built it. Same reasoning as `Project.to_dict`
+    sorting the v4 snapshot (`model.py:211-224`), and P2.3's undo comparison
+    will want it for the same reason."""
+    lorder = {lv["id"]: i for i, lv in enumerate(levels)}
+    vpos = {v["id"]: (v["x"], v["y"]) for v in vertices}
+
+    vertices.sort(key=lambda v: (lorder[v["level"]], v["x"], v["y"]))
+    vid = {v["id"]: f"v{i}" for i, v in enumerate(vertices, 1)}
+
+    walls.sort(key=lambda w: (lorder[w["level"]], vpos[w["v1"]], vpos[w["v2"]],
+                              w["type"]))
+    wid = {w["id"]: f"w{i}" for i, w in enumerate(walls, 1)}
+
+    def centroid(outline):
+        pts = [vpos[e["v"]] for e in outline]
+        return (sum(p[0] for p in pts) / len(pts),
+                sum(p[1] for p in pts) / len(pts))
+
+    rooms.sort(key=lambda r: (lorder[r["level"]], r["name"],
+                              *centroid(r["outline"])))
+    rid = {r["id"]: f"r{i}" for i, r in enumerate(rooms, 1)}
+
+    furnishings.sort(key=lambda f: (lorder[f["level"]], f["pos"][0],
+                                    f["pos"][1], f["kind"], f["rotation"]))
+
+    for v in vertices:
+        v["id"] = vid[v["id"]]
+    n_op = 0
+    for w in walls:
+        w["id"] = wid[w["id"]]
+        w["v1"], w["v2"] = vid[w["v1"]], vid[w["v2"]]
+        w["left"] = rid[w["left"]] if w["left"] else None
+        w["right"] = rid[w["right"]] if w["right"] else None
+        for op in w["openings"]:              # already in along-the-wall order
+            n_op += 1
+            op["id"] = f"o{n_op}"
+    for r in rooms:
+        r["id"] = rid[r["id"]]
+        for e in r["outline"]:
+            e["v"] = vid[e["v"]]
+            e["wall"] = wid[e["wall"]] if e["wall"] else None
+    for i, f in enumerate(furnishings, 1):
+        f["id"] = f"f{i}"
+        f["room"] = rid[f["room"]] if f["room"] else None
 
 
 # ------------------------------------------------------------------ public API
@@ -415,6 +504,8 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         rooms += lr
         furnishings += lf
 
+    _canonicalize(levels, vertices, walls, rooms, furnishings)
+
     if rep["unwelded_ends"]:
         msg = (f"design_from_scene: {rep['unwelded_ends']} wall end(s) sit "
                f"within the {JOIN_TOL}\" join tolerance of a neighbour without "
@@ -447,3 +538,158 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         # reason.
         "groups": [],
     })
+
+
+# ------------------------------------------------------- Design -> scene (P1.5)
+def _opening_s(frm, off, ow, L):
+    """Distance of an opening's CENTRE from the wall's v1 -- the exact inverse
+    of the s -> anchor conversion in `_walls_of`.
+
+    v4's absolute `s` is not stored; `{from, offset_in}` is an offset from a
+    NAMED end to the opening's near edge, so recovering `s` means adding back
+    half the width on the correct side. Getting this wrong by half a width is
+    the failure that would look like a door sliding on every save/load cycle."""
+    if frm == "v1":
+        return off + ow / 2.0
+    if frm == "v2":
+        return L - off - ow / 2.0
+    return L / 2.0 + off                       # "center": offset of the centre
+
+
+def apply_design_to_scene(target, design, report=None, strict=False):
+    """Build the scene from a v5 `Design`.  The mirror of `design_from_scene`,
+    and held to `scene -> Design -> scene -> Design` identity at the second
+    `Design`.
+
+    `target` is a `MainWindow` or a bare `QGraphicsScene`.  Four rules, all of
+    them in service of that identity:
+
+    **No coalesce, no weld, no detection.**  `apply_project_to_scene` runs
+    `coalesce_all`; this must not.  Coalesce MOVES geometry -- it re-snaps the
+    surviving wall's endpoints onto the 6" grid (`walls.py:200-201`, the
+    corrected F5 mechanism) -- so a single pass would make the second `Design`
+    differ from the first through no fault of the bridge.  Walls are built, then
+    `rebuild_all_walls` runs once for rendering only.
+
+    **Rooms are read, never re-detected.**  Each `RoomItem` takes its corners,
+    path and area straight from the stored outline.  The rebuild happens BEFORE
+    any room exists, so `refresh_rooms` returns at its empty-list guard and
+    cannot overwrite an outline with a flood-fill; each room's detection memo is
+    then primed so a later rebuild leaves it alone too.
+
+    **Openings invert exactly.**  See `_opening_s`.
+
+    **Every item's `floor` is assigned from its level explicitly**, never left
+    to the `active_floor()` global that constructors read -- that global lies
+    during a load, which is why `mainwindow.py:1348` needs its band-aid.
+
+    Reference-image/backdrop retention is deliberately NOT handled here; it
+    belongs with the undo-restore path at P2.3."""
+    scene, win = ((target, None) if isinstance(target, QGraphicsScene)
+                  else (target.scene, target))
+    doc = design.to_dict() if isinstance(design, Design) else design
+    rep = report if report is not None else {}
+    rep.update({"walls": 0, "rooms": 0, "furnishings": 0,
+                "openings_failed": [], "unknown_furnishings": []})
+
+    settings = doc.get("settings") or {}
+    editing = settings.get("editing") or {}
+    for key, default in DEFAULT_SETTINGS.items():
+        val = editing.get(key, settings.get(key, default))
+        if isinstance(default, bool):
+            SETTINGS[key] = bool(val)
+            continue
+        try:
+            SETTINGS[key] = float(val)
+        except (TypeError, ValueError):
+            SETTINGS[key] = default
+
+    scene.clear()
+    levels = doc.get("levels") or [{"id": "L1", "name": DEFAULT_FLOOR}]
+    lname = {lv["id"]: lv.get("name", DEFAULT_FLOOR) for lv in levels}
+    if win is not None:
+        win.floors = [Floor(lv.get("name", DEFAULT_FLOOR),
+                            bool(lv.get("reference", False))) for lv in levels]
+        # active_floor is view state and is not carried by the document; keep
+        # the current one when the new roster still has it
+        names = [f.name for f in win.floors]
+        win.active_floor = (win.active_floor if win.active_floor in names
+                            else names[0])
+        set_floor_state(active=win.active_floor)
+
+    pos = {v["id"]: QPointF(v["x"], v["y"]) for v in doc.get("vertices", [])}
+
+    wmap = {}
+    for wd in doc.get("walls", []):
+        wall = WallItem(pos[wd["v1"]], pos[wd["v2"]], wd.get("type", "interior"))
+        wall.floor = lname.get(wd["level"], DEFAULT_FLOOR)   # never the global
+        scene.addItem(wall)
+        wmap[wd["id"]] = wall
+        rep["walls"] += 1
+        L = wall.length()
+        for od in wd.get("openings") or []:
+            a = od["anchor"]
+            ow = parse_wwhh(od["code"])[0]
+            s = _opening_s(a["from"], float(a["offset_in"]), ow, L)
+            try:
+                op = OpeningItem(wall, od["kind"], od["code"], s)
+            except ValueError as exc:
+                # NOT the silent `except ValueError: continue` of the v4 path
+                # (13 sites, replaced by a reported list at P3.6) -- collected,
+                # surfaced, and escalated under strict
+                rep["openings_failed"].append(f"{od['id']}: {exc}")
+                continue
+            op.door_type = od.get("door_type", "")
+            op.swing = -1 if od.get("swings_toward", "left") == "left" else 1
+            wall.openings.append(op)
+
+    # rendering only, and deliberately BEFORE any RoomItem exists: refresh_rooms
+    # returns at `if not rooms` so no flood-fill can overwrite a stored outline
+    rebuild_all_walls(scene)
+
+    for rd in doc.get("rooms", []):
+        corners = [pos[e["v"]] for e in rd["outline"]]
+        cx = sum(c.x() for c in corners) / len(corners)
+        cy = sum(c.y() for c in corners) / len(corners)
+        off = (rd.get("label") or {}).get("offset") or [0.0, 0.0]
+        # v5 stores ONE label offset, relative to the centroid; the scene splits
+        # the same information across anchor + label_offset. Folding it all into
+        # the anchor round-trips exactly (the walk re-derives centroid + offset).
+        room = RoomItem(rd["name"], QPointF(cx + off[0], cy + off[1]),
+                        room_path_from_corners(corners),
+                        poly_area_sqft(corners),
+                        rd.get("properties") or {}, corners)
+        room.floor = lname.get(rd["level"], DEFAULT_FLOOR)   # never the global
+        room.show_dims = bool((rd.get("label") or {}).get("show_dimensions",
+                                                          False))
+        room.label_offset = QPointF(0.0, 0.0)
+        scene.addItem(room)
+        for e in rd["outline"]:                # the outline IS the binding --
+            if e.get("wall") and e["wall"] in wmap:   # read, not detected
+                room.bind_wall(wmap[e["wall"]])
+        # prime the detection memo so a later rebuild_all_walls treats this room
+        # as current instead of re-detecting over the stored outline
+        room._detect_sig = room_signature(scene, room)
+        rep["rooms"] += 1
+
+    for fd in doc.get("furnishings", []):
+        if furnishing_spec(fd["kind"]) is None:
+            rep["unknown_furnishings"].append(fd["kind"] or "?")
+            continue
+        item = make_furnishing(fd["kind"], QPointF(*fd["pos"]),
+                               float(fd.get("rotation", 0.0)),
+                               fd.get("state") or {})
+        item.floor = lname.get(fd["level"], DEFAULT_FLOOR)   # never the global
+        scene.addItem(item)
+        rep["furnishings"] += 1
+
+    if win is not None:
+        win._sync_floor_state()
+
+    if rep["openings_failed"]:
+        msg = ("apply_design_to_scene: %d opening(s) could not be placed: %s"
+               % (len(rep["openings_failed"]), "; ".join(rep["openings_failed"])))
+        if strict:
+            raise ValueError(msg)
+        warnings.warn(msg, stacklevel=2)
+    return scene

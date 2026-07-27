@@ -1,12 +1,17 @@
-"""P1.4 -- `design_from_scene()`: the live scene walked into a v5 `Design`.
+"""P1.4 `design_from_scene()` and P1.5 `apply_design_to_scene()` -- the scene
+<-> v5 `Design` bridge.
 
 Corpus is LEGACY FILES ONLY (`examples/planc1.json`, `examples/sample_plan.json`
 and fixture-built scenes), because `symmetricP1.json` / `site_demo.json` are v5
 and have no loader until P2.1.
 
-Three properties are pinned here, matching the three rules the walk is built on:
-areas agree with `project_from_scene()`; the walk is level-scoped BY
-CONSTRUCTION; and the 9" weld is a check that never edits the emitted geometry.
+P1.4 pins three properties, matching the three rules the walk is built on: areas
+agree with `project_from_scene()`; the walk is level-scoped BY CONSTRUCTION; and
+the 9" weld is a check that never edits the emitted geometry.
+
+P1.5 pins the mirror: `scene -> Design -> scene -> Design` is identical at the
+second `Design`, and the things that would break it -- coalesce moving geometry,
+rooms being re-detected, openings not inverting exactly.
 """
 import json
 import math
@@ -16,7 +21,7 @@ from pathlib import Path
 import pytest
 from PyQt6.QtCore import QPointF
 
-from floorplanner.design.bridge import design_from_scene
+from floorplanner.design.bridge import apply_design_to_scene, design_from_scene
 from floorplanner.design.validate import check
 
 pytestmark = [pytest.mark.io, pytest.mark.rooms]
@@ -263,3 +268,174 @@ def test_document_is_schema_valid(fp, win):
     _load(fp, win, "sample_plan.json")
     doc, _rep = _walk(win)
     assert schema_errors(doc) == []
+
+
+def test_ids_are_canonical_not_stacking_order(fp, scene, make_room):
+    """Ids are minted in geometric order, so z-order cannot rewrite the
+    document. Without this, `Bring to front` would change every id -- and the
+    P1.5 round trip below could not hold, since rebuilding turns each split
+    segment into its own item and reorders the walk."""
+    make_room(scene, 0, 0, 240, 120, name="Hall")
+    before, _ = _walk(scene)
+    walls = [w for w in scene.items() if isinstance(w, fp.WallItem)]
+    walls[0].setZValue(walls[0].zValue() + 50)     # bring one wall to the front
+    after, _ = _walk(scene)
+    assert before == after
+
+
+# =============================================================== P1.5: apply
+def _apply(target, doc, **kw):
+    rep = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        apply_design_to_scene(target, doc, report=rep, **kw)
+    return rep
+
+
+@pytest.mark.parametrize("name", ["sample_plan.json", "planc1.json"])
+def test_round_trip_is_identical_at_the_second_design(fp, win, name):
+    """THE P1.5 acceptance: scene -> Design -> scene -> Design, identical.
+
+    planc1 is included deliberately. A corrupt plan must round-trip as
+    faithfully as a clean one -- if apply quietly repaired the Hall/M Bath
+    collision, the second Design would be 'better' and the bridge would be
+    lying about what it holds."""
+    _load(fp, win, name)
+    d1, _ = _walk(win)
+    _apply(win, d1)
+    d2, _ = _walk(win)
+    assert d1 == d2
+
+
+def test_apply_does_not_coalesce(fp, win):
+    """`apply_project_to_scene` runs `coalesce_all`; this must not.
+
+    Coalesce MOVES geometry -- it re-snaps the survivor's endpoints onto the 6"
+    on-centre grid independently of their neighbours (walls.py:200-201, the
+    corrected F5 mechanism). One pass and the second Design diverges from the
+    first through no fault of the bridge. Pinned with an off-grid plan, where a
+    re-snap would be unmissable."""
+    win.floors = [fp.Floor("default")]
+    win.active_floor = "default"
+    win._sync_floor_state()
+    # 205 x 101 at (7, 3): no corner sits on the 6" wall-snap grid
+    for a, b in [((7, 3), (212, 3)), ((212, 3), (212, 104)),
+                 ((212, 104), (7, 104)), ((7, 104), (7, 3))]:
+        win.scene.addItem(fp.WallItem(QPointF(*a), QPointF(*b), "interior"))
+    fp.rebuild_all_walls(win.scene)
+    d1, _ = _walk(win)
+    _apply(win, d1)
+
+    xs = {round(v["x"], 4) for v in _walk(win)[0]["vertices"]}
+    ys = {round(v["y"], 4) for v in _walk(win)[0]["vertices"]}
+    assert xs == {7.0, 212.0} and ys == {3.0, 104.0}, \
+        "apply moved off-grid geometry -- coalesce (or a weld) ran"
+
+
+def test_apply_does_not_redetect_rooms(fp, win):
+    """Rooms take their corners, path and area from the stored outline.
+
+    The guard has to survive a later rebuild too, not just apply itself: the
+    room's detection memo is primed, so `rebuild_all_walls` leaves the stored
+    outline alone instead of flood-filling over it."""
+    _load(fp, win, "planc1.json")
+    d1, _ = _walk(win)
+    _apply(win, d1)
+
+    rooms = {r.name: r for r in win.scene.items() if isinstance(r, fp.RoomItem)}
+    # Hall and M Bath share one region in this plan; re-detection would give
+    # them a different (and different-sized) outline than the document holds
+    doc_rooms = {r["name"]: r for r in d1["rooms"]}
+    for name, room in rooms.items():
+        assert len(room.corners) == len(doc_rooms[name]["outline"])
+
+    fp.rebuild_all_walls(win.scene)            # must not overwrite the outlines
+    d2, _ = _walk(win)
+    assert d1 == d2
+
+
+def test_openings_invert_exactly(fp, win):
+    """anchor -> s must exactly invert s -> anchor, on every opening in the
+    corpus. An off-by-half-width would show up as a door sliding ~1" per
+    save/load cycle once P2.2 makes this the save path."""
+    _load(fp, win, "planc1.json")
+    d1, _ = _walk(win)
+    n = sum(len(w["openings"]) for w in d1["walls"])
+    assert n >= 20, f"corpus got weaker: only {n} openings"
+
+    rep = _apply(win, d1)
+    assert rep["openings_failed"] == []
+    d2, _ = _walk(win)
+    for w1, w2 in zip(d1["walls"], d2["walls"], strict=True):
+        assert w1["openings"] == w2["openings"]
+
+
+def test_apply_sets_floor_from_the_level_not_the_global(fp, win, make_room):
+    """Every item's `floor` is assigned from its level explicitly.
+
+    The `active_floor()` global that constructors read lies during a load --
+    that is why `mainwindow.py:1348` needs its band-aid. Here the active floor
+    is deliberately set to the WRONG one before applying, so anything trusting
+    the global lands on the wrong floor."""
+    _two_floor_scene(fp, win, make_room)
+    d1, _ = _walk(win)
+
+    win.active_floor = "upper"                 # the global now disagrees with
+    win._sync_floor_state()                    # every ground-floor item
+    _apply(win, d1)
+
+    lname = {lv["id"]: lv["name"] for lv in d1["levels"]}
+    want = {r["name"]: lname[r["level"]] for r in d1["rooms"]}
+    for r in win.scene.items():
+        if isinstance(r, fp.RoomItem):
+            assert r.floor == want[r.name]
+    # and the walls/furnishings landed on their own levels too
+    d2, _ = _walk(win)
+    assert d1 == d2
+
+
+def test_apply_reports_an_opening_it_cannot_place(fp, scene, make_room):
+    """An opening that will not fit is collected and surfaced, not dropped by a
+    silent `except ValueError: continue` (the v4 path's 13 sites, replaced at
+    P3.6). `strict=True` escalates it, as on the walk side."""
+    make_room(scene, 0, 0, 240, 120, name="Hall")
+    doc, _ = _walk(scene)
+    v = {x["id"]: (x["x"], x["y"]) for x in doc["vertices"]}
+    wall = max(doc["walls"],                   # the 240" run, unambiguously
+               key=lambda w: math.dist(v[w["v1"]], v[w["v2"]]))
+    wall["openings"] = [{"id": "o1", "kind": "door", "code": "9980",
+                         "anchor": {"from": "v1", "offset_in": 0.0}}]
+
+    rep = _apply(scene, doc)                   # 99" door in a 240" wall: fits
+    assert rep["openings_failed"] == []
+    assert sum(len(w.openings) for w in scene.items()
+               if isinstance(w, fp.WallItem)) == 1
+
+    wall["openings"][0]["code"] = "99980"      # 999" door fits nowhere
+    rep = _apply(scene, doc)
+    assert len(rep["openings_failed"]) == 1 and "o1" in rep["openings_failed"][0]
+    with pytest.raises(ValueError, match="o1"):
+        apply_design_to_scene(scene, doc, strict=True)
+
+
+def test_apply_from_a_bare_scene_round_trips(fp, scene, make_room,
+                                             first_furnishing):
+    """The bare-QGraphicsScene path (no MainWindow, no floor roster)."""
+    make_room(scene, 60, 60, 144, 120, name="Study")
+    scene.addItem(fp.FurnishingItem(first_furnishing, QPointF(120, 110)))
+    fp.rebuild_all_walls(scene)
+    d1, _ = _walk(scene)
+    _apply(scene, d1)
+    d2, _ = _walk(scene)
+    assert d1 == d2
+    assert check(d2, deep=True) == []
+
+
+def test_apply_accepts_a_design_object(fp, win):
+    """`apply_design_to_scene` takes a `Design` as well as a plain dict, so P2.1
+    can hand it the parsed document without a to_dict() detour."""
+    from floorplanner.design.model import Design
+    _load(fp, win, "sample_plan.json")
+    d1, _ = _walk(win)
+    _apply(win, Design.from_dict(d1))
+    assert _walk(win)[0] == d1
