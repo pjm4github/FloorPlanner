@@ -310,6 +310,7 @@ Plus **File ▸ Export legacy v4…** for one release, so nobody is stranded.
 
 ### P2.3 — Undo snapshots the v5 dict
 Still whole-document; only the payload changes. Groups now serialize, so **defect 3 partially closes here**.
+**Compare canonical form, not raw bytes.** The dirty check and the undo comparison must both run `design.canonical.canonicalize` over each side before comparing. With the importer canonicalized (P2.2) this is belt-and-braces — but defining equality on canonical form is what survives any future producer that forgets to canonicalize, **including whichever way P3.1's uid decision goes**. Two documents describing the same plan must compare equal even when they were built by different code paths.
 **Also here: backdrop / reference-image retention.** `apply_project_to_scene`'s `keep_backdrop` flag exists because undo must not delete the tracing image; `apply_design_to_scene` (P1.5) deliberately does **not** implement it, since it belongs with the undo-restore path rather than the bridge. Wire it here, or undo silently drops the backdrop.
 **Acceptance.** `test_undo.py` green. New test: group, undo, redo — the group survives. Undo with a reference image loaded keeps the image.
 
