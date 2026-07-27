@@ -109,7 +109,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P2.3** Undo snapshots the v5 dict | ruff + pytest |
 | ☑ | **P2.4** Convert the corpus and the tooling | ruff + pytest |
 | ☑ | **P2.5** Split `MainWindow` IO/CSV/image/floors out | ruff + pytest |
-| ☐ | **P3.1** Vertex table live; `WallItem` holds `v1`/`v2` | branch, ruff + pytest |
+| ☑ | **P3.1** Vertex table live; `WallItem` holds `v1`/`v2` | branch, ruff + pytest |
 | ☐ | **P3.2** `RoomItem.outline`; drop `perimeter_corners` | ruff + pytest |
 | ☐ | **P3.3** Wall move = move vertices + split rule | ruff + pytest |
 | ☐ | **P3.4** Topology ops replace coalesce/weld/fracture | ruff + pytest |
@@ -1517,4 +1517,55 @@ result:  GATE 2 -- PASSED, one finding found and fixed (d665e06). Patrick's two
          trailing checks (original file untouched on disk, undo feel) ride as
          optional confirmations, not blockers.
 meaning: Phase 2's acceptance is complete. P3.1 may proceed.
+
+P3.1  done   (commit f0990d4, on branch v5-topology)
+ruff:    clean
+pytest:  OFF  415 passed, 4 xfailed, 1 xpassed in 16.69s
+         ON   415 passed, 4 xfailed, 1 xpassed in 20.20s
+         DEEP 410 passed, 3 xfailed, 7 deselected in 18.22s
+files:   floorplanner/vertex.py (new), floorplanner/walls.py (read-through
+         p1/p2 + v1/v2), floorplanner/design/verify.py (split logging),
+         tests/test_vertices.py (new, 12)
+ACCEPTANCE: suite green with NO TEST CHANGES -- `git status tests/` shows only
+         the new file -- and the --verify-design run stays green.
+notes:   A Vertex is a shared, identity-bearing point; two wall ends holding the
+         SAME Vertex object are the same corner. No registry: the "table" is the
+         set of vertices reachable from the walls, exactly as Design.vertices is.
+         SPLIT-ON-WRITE, per the ruling. Assigning a moved position mints a
+         fresh vertex and leaves any sharer put; a NO-OP assignment returns the
+         same vertex, so identity and sharing survive the many places that
+         re-set the same coordinates. Pinned by a test that shares a corner
+         explicitly, moves one end, and asserts the other did not follow.
+         SPLIT LOGGING: verify() records the per-operation delta in
+         win._vertex_split_log. It LOGS rather than warns -- a drag legitimately
+         splits, so a warning per drag would be noise, not signal.
+         A PERFORMANCE REGRESSION I INTRODUCED AND FIXED, recorded because the
+         HARNESS caught it and review would not have: the first version
+         allocated a QPointF on every p1/p2 READ and a uid string on every
+         write. p1/p2 are read on every rebuild, paint and hit-test, so rebuild
+         slowed ~50% and bake nearly doubled -- test_bake flapped at 8.54
+         against a threshold of 8. Fixed by storing the QPointF once and
+         returning it SHARED, and minting uids lazily. Both are safe only
+         because a vertex is never mutated in place: a move produces a NEW
+         vertex, so a caller holding an old p1 still sees the old position --
+         identical to the previous behaviour, where assignment rebound the
+         attribute to a fresh QPointF. Verified before relying on it (nothing in
+         the codebase mutates a p1/p2 in place; every access is .x()/.y()) and
+         pinned by test_vertex_is_never_mutated_in_place. bake now 43.7 -> 297
+         ms ratio 6.83 vs P2.3's recorded 40.8 -> 278.7 ratio 6.83 -- restored,
+         not merely under the threshold. This is the second time P0.3's harness
+         has paid for itself on a change that looked free.
+         FINDING -- WHY P3.1 STOPS AT THE REPRESENTATION. design_from_scene
+         still builds its own vertex table by welding COORDINATES at 0.6"; it
+         does not yet consume the live uids. It cannot: nothing creates sharing
+         yet, so today every coincident wall end is a DISTINCT vertex, and
+         emitting live uids would put two vertices 0" apart in the document and
+         trip I14 across the whole corpus. Consuming the live table therefore
+         has to wait until weld/join create shared vertices explicitly, at
+         P3.3/P3.4. That ordering is not a shortcut -- it is the same
+         representation-then-behaviour discipline the split-on-write ruling
+         encodes.
+         COMPOSITION GATE (the Gate 2 lesson): round trips asserted through BOTH
+         apply paths -- load_data (faithful) and open_document (converting,
+         composed all the way out to a legacy export and back).
 ```
