@@ -49,9 +49,12 @@ import warnings
 
 from floorplanner.design.bridge import design_from_scene
 from floorplanner.design.validate import check
+from floorplanner.vertex import split_count
 
 ENV_VAR = "FP_VERIFY_DESIGN"
 BASELINE_ATTR = "_design_baseline"
+SPLIT_LOG_ATTR = "_vertex_split_log"      # [(operation, splits), ...]
+_SPLIT_MARK = "_vertex_splits_at"
 
 # keys carried in the profile for visibility but never raised on
 REPORT_ONLY = ("unwelded_ends",)
@@ -125,6 +128,30 @@ def rebase(target, deep=True) -> dict:
     return prof
 
 
+def note_vertex_splits(target, where) -> int:
+    """Record how many SPLIT-ON-WRITES happened during the operation just
+    finished, and return the count (P3.1).
+
+    Assigning `wall.p1` mints a fresh vertex and leaves any sharer behind, so
+    every implicit split is a place where the code moved a coordinate when it
+    may have meant to move a CORNER. The per-operation counts are exactly what
+    P3.3 needs to decide which call sites become real vertex moves -- so this
+    logs rather than warns: a drag legitimately splits, and a warning per drag
+    would be noise, not signal."""
+    now = split_count()
+    prev = getattr(target, _SPLIT_MARK, None)
+    setattr(target, _SPLIT_MARK, now)
+    if prev is None or now <= prev:
+        return 0
+    log = getattr(target, SPLIT_LOG_ATTR, None)
+    if log is None:
+        log = []
+        setattr(target, SPLIT_LOG_ATTR, log)
+    log.append((where, now - prev))
+    del log[:-200]                         # a ring: P3.3 wants the shape, not
+    return now - prev                      # every drag since launch
+
+
 def verify(target, where, deep=False, doc=None, walk_report=None):
     """Raise `DesignVerificationError` if `target` has MORE faults of any class
     than its baseline. A no-op unless shadow mode is on.
@@ -137,6 +164,7 @@ def verify(target, where, deep=False, doc=None, walk_report=None):
     regression against `{}`."""
     if not verify_enabled():
         return None
+    note_vertex_splits(target, where)
     base = getattr(target, BASELINE_ATTR, None)
     prof = fault_profile(target, deep=deep or verify_deep(), doc=doc,
                          walk_report=walk_report)

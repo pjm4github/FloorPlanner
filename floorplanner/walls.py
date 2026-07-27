@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import *  # noqa: F401
 
 from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
+from floorplanner.vertex import Vertex
 
 
 def nearest_wall_endpoint(scene, p: QPointF, tol: float, exclude=None):
@@ -471,8 +472,11 @@ class WallItem(QGraphicsItem):
     def __init__(self, p1: QPointF, p2: QPointF, wall_type: str = "exterior"):
         super().__init__()
         self.wall_type = wall_type
-        self.p1 = QPointF(p1)
-        self.p2 = QPointF(p2)
+        # P3.1: the geometry lives in VERTICES now. p1/p2 are read-through
+        # properties over them, so every existing caller keeps working; two
+        # wall ends referencing the SAME Vertex object are the same corner.
+        self._v1 = Vertex.at(p1)
+        self._v2 = Vertex.at(p2)
         self.floor = active_floor()   # tagged with the active floor (load overrides)
         self.openings = []            # OpeningItem children
         self.rooms = []               # RoomItems this wall borders ([] = free)
@@ -487,6 +491,38 @@ class WallItem(QGraphicsItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setZValue(WALL_Z)           # above the translucent room fill (3)
         self.rebuild()
+
+    # -- vertices (P3.1) -----------------------------------------------------
+    # p1/p2 read through to the vertex table; ASSIGNMENT IS SPLIT-ON-WRITE --
+    # it mints a fresh vertex for this end and leaves any sharer where it was,
+    # preserving today's independent-ends semantics exactly. Shared movement is
+    # P3.3's wall-move operation, never a side effect of assignment.
+    @property
+    def v1(self) -> str:
+        """Stable uid of the start vertex (persistent across edits)."""
+        return self._v1.uid
+
+    @property
+    def v2(self) -> str:
+        return self._v2.uid
+
+    @property
+    def p1(self) -> QPointF:
+        return self._v1.point()
+
+    @p1.setter
+    def p1(self, value):
+        v = getattr(self, "_v1", None)
+        self._v1 = v.moved_to(value) if v is not None else Vertex.at(value)
+
+    @property
+    def p2(self) -> QPointF:
+        return self._v2.point()
+
+    @p2.setter
+    def p2(self, value):
+        v = getattr(self, "_v2", None)
+        self._v2 = v.moved_to(value) if v is not None else Vertex.at(value)
 
     @property
     def primary_room(self):
