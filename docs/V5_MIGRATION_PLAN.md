@@ -104,7 +104,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P1.4** `design_from_scene()` | ruff + pytest |
 | ☑ | **P1.5** `apply_design_to_scene()` | ruff + pytest |
 | ☑ | **P1.6** `--verify-design` shadow mode; suite runs with it on | ruff + pytest ×2 |
-| ☐ | **P2.1** Load path: v1–v4 migrate + dirty + report; v5 direct | ruff + pytest |
+| ☑ | **P2.1** Load path: v1–v4 migrate + dirty + report; v5 direct | ruff + pytest |
 | ☐ | **P2.2** Save writes v5; legacy export | ruff + pytest |
 | ☐ | **P2.3** Undo snapshots the v5 dict | ruff + pytest |
 | ☐ | **P2.4** Convert the corpus and the tooling | ruff + pytest |
@@ -1088,4 +1088,88 @@ notes:   Hooks at quiescent points only, never scene.changed (mid-operation the
          FP_VERIFY_DESIGN=1. --verify-design on the CLI just sets the env var,
          so there is one switch however it is thrown.
          PHASE 1 COMPLETE. Ready to push (P1.1..P1.6 + the doc commits).
+
+PHASE 1 PUSHED  (58590a2..52bd72e, 14 commits) -- CI GREEN on py3.10 + py3.13.
+         Doubled suite: "Run tests" 14s / 15s, "Run tests with --verify-design"
+         14s / 15s -- a clean doubling of the pytest step and nothing else
+         (job total ~45s -> ~60s; the ~30s apt/pip setup is now amortised over
+         two runs). NO cross-Python divergence with the flag on, which was a
+         real risk worth measuring: P1.5's canonical sort keys are raw floats
+         off QPointF, so a tie-break difference would have renumbered the
+         document and broken the round-trip on one Python only. It did not.
+
+P2.1  done   (commit ad62e66)
+ruff:    clean
+pytest:  OFF  377 passed, 4 xfailed, 1 xpassed in 12.51s
+         ON   377 passed, 4 xfailed, 1 xpassed in 13.61s
+         DEEP 373 passed, 3 xfailed, 6 deselected in 12.51s  (-m "not perf")
+files:   floorplanner/design/importer.py (new), design/legacy.py
+         (+weld_endpoints_counted), floorplanner/mainwindow.py (open_document,
+         load_data split, _finish_open, defect 19), tools/migrate_to_design_v5.py
+         (now a thin CLI), tests/test_load_path.py (new, 13),
+         examples/symmetricP1.json + planc1.v5.json (surgical, see below)
+notes:   NO EXISTING TEST TOUCHED.
+         ACCEPTANCE HIT EXACTLY: planc1 opens at M Bath 182.0 sf / Hall 61.5 sf,
+         provenance.endpoints_welded = 4, dirty; symmetricP1 opens clean and NOT
+         dirty; the legacy file on disk is byte-identical afterwards (asserted).
+         check(deep=True) on the converted document = 0 errors.
+         FINDING 1 -- `load_data` was OVERLOADED, and migrating in it would have
+         broken undo. It is the undo-restore path (mainwindow.py:896) AND a
+         plain "apply this dict" helper used by a dozen round-trip tests. Had
+         P2.1's migration gone there, EVERY UNDO would weld the geometry and
+         re-trace every room -- a repair, not a restore, and silent. Split:
+         `load_data` applies faithfully and never migrates (it now also accepts
+         a v5 dict, routing to apply_design_to_scene); `open_document` is the
+         file-open path that migrates, dirties and reports. load_path/open_plan
+         call the latter. A test pins it with a divider stopping 1.5" short --
+         geometry a weld WOULD move -- and asserts the gap survives an undo.
+         The plan's task text says "Load path" as if it were one thing; it is
+         two, and only one of them may repair.
+         FINDING 2 -- a regression I introduced and caught: `active_floor` is
+         VIEW state that the v4 FILE carries but the v5 Design deliberately does
+         not (keeping it out is what stops a floor switch dirtying the
+         document). Routing v4 opens through the importer silently forgot which
+         floor the user was editing; test_floors::test_serialize_round_trip_two_
+         floors caught it. Carried across by hand in open_document.
+         FIXTURES: SURGICAL EDIT, NOT REGENERATION -- and the measurement is the
+         reason. Regenerating symmetricP1.json produces TWENTY deltas: the two
+         named (provenance.endpoints_welded 31->4, settings.area_basis
+         inside_face->centerline) plus EIGHTEEN in rooms[5] -- the Garage
+         outline's start vertex rotating, which is exactly the change P1.3b
+         examined and deliberately declined to bake in ("the fixture STANDS,
+         not regenerated"). A full regeneration would have silently reversed
+         that decision. So the two fields were edited in place and the diff
+         verified line-by-line: 3 changed lines across both fixtures, nothing
+         else.
+         THIRD FIXTURE DELTA, DECLARED: examples/planc1.v5.json also moves
+         area_basis inside_face -> centerline. Not named in the brief, but it is
+         the direct consequence of the approved importer decision, and leaving
+         the corrupt fixture on inside_face would make the corpus disagree with
+         the tool for no reason. Its corruption (I6 + I11) is untouched.
+         FAITHFUL MODE PRESERVED. The importer keeps `clean=False`: it is what
+         generates planc1.v5.json, the "does not launder its input" fixture from
+         P0.7. Dropping it to serve only the load path would have orphaned that
+         fixture. The CLI keeps naming ITSELF in provenance.tool, so
+         symmetricP1's tool field did not move either.
+         PROVENANCE IS RETAINED on the window (`_provenance`) rather than
+         discarded after apply -- P2.2 needs it to write the audit trail into
+         the saved file, and a v5 file that arrives with one keeps it.
+         DEFECT 19 in-app arm closed: extract_from_reference now welds the walls
+         it injects. Test asserts unwelded_ends == 0 after an extraction; it was
+         2 before.
+         CONCEPT-ROOM FIXTURE built as asked, because planc1 no longer exercises
+         that path -- the weld closes its 1.5" gap, so M Bath and Hall now get a
+         face each. The fixture is a single 20'x8' enclosure with TWO room
+         labels and a chair in each half (the shape v4 produces because it never
+         serialised open/archway edges). Pins: both rooms survive, the contest
+         loser is category=concept + floating + extracted_from set, its outline
+         edges are all wall:null, it is sized AROUND the furnishing it carried
+         (asserted, not just counted), and check(deep=True) == [].
+         FLAG for routing -- TWO THRESHOLDS FOR ONE IDEA. P1.6's bridge counts
+         `unwelded_ends` at >1e-9 (reports 5 on planc1); this task's importer
+         counts `ends_moved` at >0.6" (reports 4). Same underlying question,
+         two numbers, which is the exact trap the 31-vs-4 episode was about. The
+         0.6" floor is the principled one (it is the schema's own definition of
+         "one vertex"). Aligning the bridge would change two P1.4/P1.6 test
+         assertions, so I have NOT done it unasked -- flagging instead.
 ```
