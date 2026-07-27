@@ -1505,5 +1505,12 @@ FIXTURE: symmetricP1.json regenerated, every delta class measured:
          Acceptance unchanged: M Bath 182.0, Hall 61.5, 4 ends moved, check
          clean. Side effect worth noting: suite warnings dropped 17 -> 2,
          because converted scenes no longer carry unwelded ends.
+LESSON, recorded in one line because it generalises: both paths were covered;
+         their composition was not -- COVERED-PATHS != COVERED-COMPOSITIONS.
+         Every future gate should ask which pairs of covered paths have never
+         been run back-to-back.
+result:  GATE 2 -- PASSED, one finding found and fixed (d665e06). Patrick's two
+         trailing checks (original file untouched on disk, undo feel) ride as
+         optional confirmations, not blockers.
 meaning: Phase 2's acceptance is complete. P3.1 may proceed.
 ```

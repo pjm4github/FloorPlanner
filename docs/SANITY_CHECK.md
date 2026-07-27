@@ -7,6 +7,8 @@ Two moments in this migration are worth checking by hand. Everything else is eit
 | **Gate 1** | End of Phase 0 (**now** — after P0.6) | Phase 0 is behaviour-preserving *except* five deliberate fixes and one deliberate regression. Anything else you notice is a real bug, and the signal is clean because nothing structural has moved yet. | None — file format unchanged |
 | **Gate 2** | After **P2.2** (save writes v5) | The file format changes. This is the only point in the migration that can touch your real plans. | **Back up your plan files first** |
 
+**Gate 1 — PASSED** (2026‑07‑26). **Gate 2 — PASSED** (2026‑07‑27), with **one finding, found and fixed** before Phase 3 branched: commit `d665e06`.
+
 Phase 1 is a shadow model with no user-visible effect; P0.7 is tooling. Phase 3 runs on a branch, so `main` stays checkable throughout.
 
 ---
@@ -85,6 +87,14 @@ Anything in A, or a "was" behaviour still present in B, is a real finding — th
 ---
 
 # Gate 2 — after P2.2 (the format cutover)
+
+> **RESULT: PASSED, one finding — fixed on `main` at `d665e06` before branching.**
+>
+> Reopening the app's own legacy-v4 export of a converted plan reported *"5 wall ends moved"*. It should always be **0** — the application's own output must never need repair. Cause: the importer welded the wall ends but left the **stored room corners** at their pre-weld positions, so the planarise cut each repaired wall 1.53″ from its own new end and left a sliver — the ghost of the gap the weld had just closed. Fixed by welding the corners with the walls.
+>
+> **The lesson, in one line: both paths were covered; their composition was not — covered-paths ≠ covered-compositions.** P2.2 round-tripped only through `load_data` (the faithful apply, which never welds), so the export was never taken back through the *converter*. The regression test now drives the whole journey rather than either half.
+>
+> Note the expected conversion numbers below were written before that fix and before the two-counter correction; the current report for `planc1.json` reads **4 wall ends moved (31 junctions checked)**, M Bath 591.6 → 182.0 sf, Hall 243.5 → 61.5 sf, 2 duplicate doors removed.
 
 **Back up your real plan files before this one.** Save now writes v5, and opening a v1–v4 file converts it and marks the document dirty.
 
