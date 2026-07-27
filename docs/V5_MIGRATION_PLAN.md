@@ -101,7 +101,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P1.2** `design/validate.py` — I1–I14 | ruff + pytest |
 | ☑ | **P1.3** `design/topology.py` — weld/planarize/trace | ruff + pytest |
 | ☑ | **P1.3b** Fix defect 18 (`_inner_faces` winding) + corpus diff | ruff + pytest |
-| ☐ | **P1.4** `design_from_scene()` | ruff + pytest |
+| ☑ | **P1.4** `design_from_scene()` | ruff + pytest |
 | ☐ | **P1.5** `apply_design_to_scene()` | ruff + pytest |
 | ☐ | **P1.6** `--verify-design` shadow mode; suite runs with it on | ruff + pytest ×2 |
 | ☐ | **P2.1** Load path: v1–v4 migrate + dirty + report; v5 direct | ruff + pytest |
@@ -830,4 +830,96 @@ notes:   FIX: _inner_faces now keeps the majority winding and drops ALL
          regenerated (a cosmetic loop-rotation is not worth churning a fixture
          that P1.1/P1.4/P1.5/P1.6 pin). Had they disagreed, that would have been
          a corruption baked in by luck (the buggy fallback) -- they don't.
+
+F5-correction  done   (doc-only commit e613b5d, taken BEFORE the P1.4 code)
+ruff:    n/a (doc only)
+pytest:  n/a
+files:   docs/CODE_REVIEW_v2.md (F5 rewritten + a correction note),
+         docs/DESIGN_MODEL_v5.md (section 6 sentence; a note at the head of 7a)
+notes:   F5 and section 6 both said the editor welds "on every draw release and
+         on load". The "on load" half is FALSE: apply_project_to_scene
+         (mainwindow.py:1298) runs coalesce_all + rebuild_all_walls and no
+         weld_all. Welds happen only at draw release (view.py:489) and via
+         Edit > Coalesce all walls now (mainwindow.py:821).
+         Corrected mechanism, verified in the source: coalesce is itself a gap
+         SOURCE -- _coalesce_wall_impl (walls.py:200-201) re-snaps the survivor's
+         p1/p2 onto the 6" on-centre grid independently of whatever neighbour an
+         end was welded to, so it can pull a previously-welded end off its
+         partner. Gaps are created and accumulated by the app's own pipeline and
+         survive every round-trip, rather than merely failing to persist a weld
+         the app already performed.
+         CONSEQUENCE FOR P2.1, recorded in 7a: weld-on-load is NEW, deliberate
+         repair behaviour the app has never applied to a user's file -- not
+         persistence of something it already did. That strengthens the
+         conversion report and the dirty flag rather than weakening them.
+
+P1.4  done   (commit c78cb5e)
+ruff:    clean
+pytest:  337 passed, 4 xfailed, 1 xpassed in 10.16s (+13 from
+         test_design_bridge.py; 324 -> 337, no other count moved)
+files:   floorplanner/design/bridge.py (new), floorplanner/design/legacy.py
+         (+VertexTable, +split_params -- PURELY ADDITIVE, weld_endpoints is
+         byte-identical), floorplanner/design/__init__.py (docstring only),
+         tests/test_design_bridge.py (new, 13 tests)
+notes:   NO EXISTING TEST TOUCHED -- `git status` showed two modified source
+         files and two new files, nothing else.
+         The three notes, as built:
+         (a) LEVEL-SCOPED BY CONSTRUCTION, not by filter. _by_floor() buckets the
+         scene once; each level's walk receives ONLY its bucket, and the vertex
+         table, wall graph and room polygons are per level. There is no global
+         query left to forget to filter -- defect 12 closes structurally.
+         test_walk_is_level_scoped builds two GEOMETRICALLY IDENTICAL rooms on
+         two floors (coincident coordinates are precisely what a leaking walk
+         would fuse) and asserts the levels share no vertex.
+         (b) Outlines from RoomItem.corners, never trace_faces.
+         (c) legacy.py grew the two pre-vertex helpers the walk needs:
+         VertexTable (weld-on-insert at WELD_TOL 0.6") and split_params (cut at
+         junctions + every room corner, so one wall spans one outline edge).
+         THE WELD DECISION, resolved explicitly before any code: weld_endpoints
+         is a CHECK, never an edit. It runs on a deepcopy to count what it WOULD
+         move; the emitted geometry is always the scene's own. Non-zero ->
+         report["unwelded_ends"] + a warning, and strict=True raises (the P1.6
+         --verify-design hook). Rationale: silently welding would have made
+         P2.2's Save move a user's walls up to 9", and would have made P1.6's
+         shadow comparison diverge from the scene it shadows. Only the 0.6"
+         weld-on-insert runs for real, and at that tolerance two points ARE one
+         vertex -- representation, not repair.
+         ACCEPTANCE: room areas match project_from_scene() EXACTLY (not merely
+         within 0.1 sf) on planc1.json, sample_plan.json and fixture scenes.
+         sample_plan walks fully clean: check(deep=True) == [], 0 unwelded ends,
+         0 open edges, and schema_errors() == [] too. planc1 reports 17x I6 +
+         1x I11 -- asserted as measured, per the acceptance, not forced to [].
+         Same fault classes as its v5 fixture (I6 + I11), as predicted.
+         FINDING 1 -- the 31 is a count of ATTEMPTS, not of damage. My checker
+         reports 5 unwelded ends on planc1, not 31. Cross-checked: weld_endpoints
+         returns 31 on the FILE geometry and 31 on the SCENE geometry -- identical,
+         so the scene->raw-walls extraction is faithful and load's coalesce
+         changed nothing here (46 walls in, 46 out). The 31/5 gap is the counting
+         method: 31 counts weld OPERATIONS, and 26 of them are no-ops on
+         junctions that are already exact. Measured displacements: 4 ends move
+         1.529" (the documented divider gaps, y 655.529 -> 654.0) and 1 moves
+         0.001" (float noise). So "31 wall ends were welded" in section 6 and in
+         7a's user-facing conversion message overstates the geometry actually
+         changed by ~6x. The P1.3 acceptance pinning 31 is still correct (it
+         pins the function's return) and its test is untouched -- but 7a's
+         message to the user should probably say "4 wall ends moved", not "31
+         welded". FLAGGING, not editing: that is user-facing copy.
+         FINDING 2 -- the SCENE's planc1 corruption is worse than the FILE's.
+         On disk Hall and M Bath differ (243.5 sf / 18 corners vs 591.6 sf /
+         24 corners). Load re-detects rooms, the 1.5" gap leaks the flood-fill,
+         and BOTH label anchors resolve to the same merged region: they come out
+         as the SAME 21-vertex loop at 243.5 sf each. I11 is firing on an exact
+         coincidence, not a partial overlap. The test asserts the shared vertex
+         set, so it cannot pass for the wrong reason. P2.1's repair has to fix
+         a worse input than the file suggests.
+         THREE CALLS the task text did not specify (all endorsed before coding):
+         bridge.py is the home, and is deliberately NOT re-exported from
+         design/__init__.py so model/topology/legacy/validate stay importable
+         without the Qt scene layer; groups emit [] (defect 3 -- a grouped wall
+         has no single id here, it splits into segments; emitting a guess would
+         make characterization test 3 pass for the wrong reason, and both close
+         at P4.5); settings.area_basis is "centerline", NOT the migrator's
+         "inside_face", because the scene's areas ARE centreline areas and
+         declaring the better basis would itself be a repair.
+         Not pushed -- Phase 1 pushes at its end, per the push policy.
 ```
