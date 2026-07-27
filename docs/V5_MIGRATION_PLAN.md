@@ -107,7 +107,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P2.1** Load path: v1–v4 migrate + dirty + report; v5 direct | ruff + pytest |
 | ☑ | **P2.2** Save writes v5; legacy export | ruff + pytest |
 | ☑ | **P2.3** Undo snapshots the v5 dict | ruff + pytest |
-| ☐ | **P2.4** Convert the corpus and the tooling | ruff + pytest |
+| ☑ | **P2.4** Convert the corpus and the tooling | ruff + pytest |
 | ☐ | **P2.5** Split `MainWindow` IO/CSV/image/floors out | ruff + pytest |
 | ☐ | **P3.1** Vertex table live; `WallItem` holds `v1`/`v2` | branch, ruff + pytest |
 | ☐ | **P3.2** `RoomItem.outline`; drop `perimeter_corners` | ruff + pytest |
@@ -1337,4 +1337,56 @@ notes:   snapshot() = canonicalize(design_from_scene().to_dict()), and undo,
          half and leaves the neighbour. Checked deliberately rather than left
          for a user to find. Restored at P3.3/P3.4.
          Not pushed -- Phase 2 pushes at its end.
+
+P2.4  done   (commit c085b8a)
+ruff:    clean
+pytest:  OFF  400 passed, 4 xfailed, 1 xpassed in 16.20s
+         ON   400 passed, 4 xfailed, 1 xpassed in 17.78s
+         DEEP 395 passed, 3 xfailed, 7 deselected in 18.35s  (-m "not perf")
+files:   fp_extract.py (save_path), examples/make_examples.py, examples/
+         README.md, examples/sample_plan.v5.json (new), tests/
+         test_corpus_freeze.py (new, 6), tests/test_extract.py + tests/
+         test_schema.py (the two assertions), gallery + example PNGs
+ACCEPTANCE: `python docs/make_gallery.py` and `python examples/make_examples.py`
+         both run; gallery images regenerated. `python tests/bench_rooms.py`
+         also re-run (6x6: rebuild 59.1 ms, memoized no-op 1.9 ms).
+notes:   THE FREEZE IS THE TASK. examples/planc1.json (v3) and
+         examples/sample_plan.json (v1) are NOT converted and never will be:
+         planc1 is the corruption fixture AND the importer's acceptance input;
+         sample_plan is the clean legacy input the bridge tests run against, and
+         the ONLY v1 file in the repo, so it exercises a migration path nothing
+         else does. Converting either leaves the importer with no real v1-v4
+         document to prove itself against.
+         Made MECHANICAL rather than remembered: tests/test_corpus_freeze.py
+         pins both files' format AND version and asserts the legacy corpus never
+         drops below two files. Its failure message says what to do instead --
+         write the v5 rendering ALONGSIDE, the planc1.json / planc1.v5.json
+         pairing that already existed here, which is now what make_examples does
+         for sample_plan. examples/README.md documents the freeze in a table.
+         Chose that pairing over moving the legacy corpus to tests/fixtures/:
+         planc1.json is referenced by path throughout CODE_REVIEW_v2.md,
+         DESIGN_MODEL_v5.md, this plan and the migrator's CLI docs, and it has
+         to stay in examples/ regardless -- splitting the pair across two
+         directories would be worse than keeping both.
+         VERIFIED, NOT ASSUMED: make_gallery.py and bench_rooms.py needed no
+         format work (both build their scenes programmatically, neither reads
+         the corpus), and the macro open/save tokens were already v5 via
+         load_path/save_path.
+         MACRO MODAL PATH TESTED, not claimed. `open` on a legacy plan through
+         the macro runner converts, COLLECTS the report on win._conversion,
+         writes it to the status line and leaves the document dirty -- with no
+         QMessageBox. A modal there hangs a macro or a test forever, so the
+         coverage matters more than the assertion (the test HANGS rather than
+         fails if one returns, which is itself the signal). The v5 half is
+         pinned too: not converted, not reported, not dirty.
+         ASSERTIONS CHANGED (2, both declared in advance):
+           * test_fp_extract_cli_end_to_end -- output is floorplanner-design
+             now. The wall COUNT is deliberately relaxed to >= 5: v5 walls are
+             edge-granular, so 5 detected runs planarise to however many graph
+             edges they span. result["counts"]["walls"] == 5 still pins what was
+             DETECTED, which is what that test is actually about.
+           * test_corpus_discovered -- the pinned set grew by sample_plan.v5.json.
+             It joined the validated sweep automatically the moment it existed
+             (discovery works), and validates clean: schema 0, invariants 0 deep.
+         Not pushed -- Phase 2 pushes after P2.5.
 ```
