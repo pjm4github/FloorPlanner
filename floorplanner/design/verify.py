@@ -87,17 +87,25 @@ def verify_deep() -> bool:
     return _flag() in ("deep", "2", "all")
 
 
-def fault_profile(target, deep=False) -> dict:
+def fault_profile(target, deep=False, doc=None, walk_report=None) -> dict:
     """`{invariant class: count}` for the scene behind `target`, plus the
     report-only `unwelded_ends`. `{}` means a clean document.
+
+    Pass `doc` (and its `walk_report`) to reuse a walk the caller has ALREADY
+    done -- P2.3's `_commit_if_changed` builds the undo snapshot and verifies it
+    at the same quiescent point, and walking the scene twice there would double
+    the per-edit cost for nothing. Canonicalisation does not affect any
+    invariant, so a canonical doc checks the same as a raw one.
 
     The walk's own weld warning is swallowed here: at a quiescent point it would
     fire on every check and drown the signal. `verify` re-raises it once, when
     the count actually moves."""
-    rep = {}
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        doc = design_from_scene(target, report=rep).to_dict()
+    rep = walk_report if walk_report is not None else {}
+    if doc is None:
+        rep = {}
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            doc = design_from_scene(target, report=rep).to_dict()
     prof = {}
     for err in check(doc, deep=deep):
         cls = err.split()[0]                  # "I6", "I5b", "I14", ...
@@ -117,7 +125,7 @@ def rebase(target, deep=True) -> dict:
     return prof
 
 
-def verify(target, where, deep=False):
+def verify(target, where, deep=False, doc=None, walk_report=None):
     """Raise `DesignVerificationError` if `target` has MORE faults of any class
     than its baseline. A no-op unless shadow mode is on.
 
@@ -130,7 +138,8 @@ def verify(target, where, deep=False):
     if not verify_enabled():
         return None
     base = getattr(target, BASELINE_ATTR, None)
-    prof = fault_profile(target, deep=deep or verify_deep())
+    prof = fault_profile(target, deep=deep or verify_deep(), doc=doc,
+                         walk_report=walk_report)
     if base is None:
         setattr(target, BASELINE_ATTR, prof)
         return prof

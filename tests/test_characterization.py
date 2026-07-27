@@ -162,14 +162,28 @@ def test_group_survives_roundtrip(win, make_room, first_furnishing):
 # is still held by test 3 (test_group_survives_roundtrip), which stays xfail.
 # --------------------------------------------------------------------------
 def test_group_move_undo_restores(win, make_room, first_furnishing):
+    # P2.3 moved the yardstick from serialize() to snapshot(). serialize() is
+    # now only the legacy v4 exporter, and it reports PRESENTATION detail the
+    # canonical document deliberately quotients away: after an undo this room's
+    # perimeter_corners come back rotated to start at the least corner -- the
+    # same polygon, a different first element. Comparing v4 dicts would fail on
+    # that and prove nothing. The plan is the canonical document, so compare it,
+    # and assert the polygon separately so a REAL geometry change still fails.
     room, ops, furns = _furnished_room(win, make_room, first_furnishing)
     win._reset_undo()
-    before = win.serialize()
+    before = win.snapshot()
+    before_poly = {r.name: {(round(c.x(), 3), round(c.y(), 3))
+                            for c in (r.corners or [])}
+                   for r in win.scene.items() if isinstance(r, fp.RoomItem)}
     g = _group(win, [room, *room.walls, *furns])
     g.setPos(180, 120)
     g.bake()
     win.undo()
-    assert win.serialize() == before, "undo did not restore the pre-group plan"
+    assert win.snapshot() == before, "undo did not restore the pre-group plan"
+    after_poly = {r.name: {(round(c.x(), 3), round(c.y(), 3))
+                           for c in (r.corners or [])}
+                  for r in win.scene.items() if isinstance(r, fp.RoomItem)}
+    assert after_poly == before_poly, "the room polygon itself changed"
 
 
 # --------------------------------------------------------------------------

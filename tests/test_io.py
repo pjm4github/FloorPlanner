@@ -23,9 +23,11 @@ def test_dirty_tracking_for_unsaved_changes(fp, win, tmp_path):
 
 
 def test_unchanged_scene_is_not_falsely_dirty(fp, win, make_room):
-    # serialize() of a static scene is stable, so no false "unsaved" prompt
+    # the snapshot of a static scene is stable, so no false "unsaved" prompt.
+    # P2.3 moved the dirty baseline from serialize() (v4) to snapshot() (the
+    # canonical v5 document); this line sets the baseline the way a save does.
     make_room(win.scene, 0, 0, 144, 120, "Den")
-    win._saved_state = win.serialize()
+    win._saved_state = win.snapshot()
     assert win._is_dirty() is False
 
 

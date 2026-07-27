@@ -1,5 +1,6 @@
 """The application main window: menus, toolbars, the scene<->model
 serialization bridge, IO, and all edit orchestration."""
+import copy
 import csv
 import json
 import os
@@ -28,6 +29,7 @@ from floorplanner.model import (  # serialization bridge (aliased)
 from floorplanner.design.bridge import (          # P1.4/P1.5 scene <-> design
     apply_design_to_scene, design_from_scene,
 )
+from floorplanner.design.canonical import canonicalize
 from floorplanner.design.importer import (       # P2.1 legacy -> v5
     conversion_report, import_legacy,
 )
@@ -117,7 +119,7 @@ class MainWindow(QMainWindow):
         self._undo_stack = []
         self._redo_stack = []
         self._restoring = False
-        self._committed_state = self.serialize()
+        self._committed_state = self.snapshot()
         self._saved_state = self._committed_state   # last on-disk/new baseline
         self._conversion = None      # P2.1 report, set when a legacy file was
         self._provenance = None      # converted; provenance rides to P2.2's save
@@ -889,11 +891,15 @@ class MainWindow(QMainWindow):
         committed state."""
         if self._restoring:
             return
+        # ONE walk, shared: the snapshot and the shadow-mode check happen at
+        # the same quiescent point, and walking the scene twice here would
+        # double the per-edit cost for nothing.
+        rep = {}
+        state = self.snapshot(report=rep)
         # P1.6 shadow mode: a settled operation is exactly where the document
         # must be consistent, so this is the per-mutation hook.  Cheap twelve
         # only -- an O(n^2) sweep per edit would make the app unusable.
-        verify(self, "operation")
-        state = self.serialize()
+        verify(self, "operation", doc=state, walk_report=rep)
         if state == self._committed_state:
             return
         self._undo_stack.append(self._committed_state)
@@ -910,7 +916,7 @@ class MainWindow(QMainWindow):
             self.load_data(state, keep_backdrop=True)   # undo keeps the backdrop
         finally:
             self._restoring = False
-        self._committed_state = self.serialize()
+        self._committed_state = self.snapshot()
         self._update_undo_actions()
 
     def _reset_undo(self):
@@ -920,7 +926,7 @@ class MainWindow(QMainWindow):
         self._z_top = 0
         self._undo_stack.clear()
         self._redo_stack.clear()
-        self._committed_state = self.serialize()
+        self._committed_state = self.snapshot()
         self._saved_state = self._committed_state    # fresh New/Open is clean
         self._update_undo_actions()
 
@@ -1035,8 +1041,17 @@ class MainWindow(QMainWindow):
         self.view.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
 
     def _is_dirty(self) -> bool:
-        """True when the plan has edits not yet written to its file."""
-        return self.serialize() != self._saved_state
+        """True when the plan has edits not yet written to its file.
+
+        Both sides are canonicalised before comparing. `snapshot()` already
+        returns canonical form, so this is belt-and-braces today -- but defining
+        equality ON canonical form is what survives any future producer that
+        forgets to normalise, including whichever way P3.1's uid decision goes.
+        Two documents describing the same plan must compare equal even when
+        different code paths built them."""
+        if self._saved_state is None:
+            return True                  # converted-but-never-saved (P2.1)
+        return self.snapshot() != canonicalize(copy.deepcopy(self._saved_state))
 
     def _headless(self) -> bool:
         """True under the offscreen Qt platform (tests): skip modal dialogs."""
@@ -1136,6 +1151,22 @@ class MainWindow(QMainWindow):
                        floors=[Floor(f.name, f.reference) for f in self.floors],
                        active_floor=self.active_floor)
 
+    def snapshot(self, report=None) -> dict:
+        """The CANONICAL v5 document, and the payload undo and the dirty flag
+        are both defined on (P2.3).
+
+        Deliberately NOT `design_document()`: `provenance`, unmodelled document
+        settings and `active_floor` are window state, not scene state. Keeping
+        `active_floor` out is what stops a floor switch from becoming an undo
+        step -- the same reasoning that kept it out of `serialize()`.
+
+        Canonical, so equality means "the same plan" rather than "the same
+        bytes". That also makes the comparison granularity-invariant: whether
+        the scene holds one long wall or three segments split at junctions, the
+        walk planarises to the same document, so scene wall-count is
+        PRESENTATION state and cannot spuriously dirty the plan."""
+        return canonicalize(design_from_scene(self, report=report).to_dict())
+
     def design_document(self) -> dict:
         """The v5 document to WRITE (P2.2).
 
@@ -1157,7 +1188,14 @@ class MainWindow(QMainWindow):
         return doc
 
     def serialize(self) -> dict:
-        """Plan -> plain dict matching the documented JSON format.
+        """Plan -> the LEGACY v4 dict (`floorplanner-json`).
+
+        DEMOTED AT P2.3 and on its way out. Its sole remaining caller is
+        `export_legacy_v4_path` (File > Export legacy v4...), kept for ONE
+        release so the v5 cutover strands nobody, and it dies with that menu
+        item. Save writes v5 via `design_document()`; undo and the dirty flag
+        are defined on `snapshot()`. **A new caller of this method is a bug** --
+        an alive-but-orphaned serializer is how a format forks.
 
         Goes through the Qt-free model; Project.to_dict emits the arrays in a
         stable, z-independent order (sorted by geometry) so bring-to-front z
@@ -1340,7 +1378,8 @@ class MainWindow(QMainWindow):
         Opening a FILE is `open_document` -- that is where migration, the dirty
         flag and the conversion report live."""
         if data.get("format") == "floorplanner-design":
-            apply_design_to_scene(self, Design.from_dict(data))
+            apply_design_to_scene(self, Design.from_dict(data),
+                                  keep_backdrop=keep_backdrop)
             return
         self.apply_project_to_scene(Project.from_dict(data), keep_backdrop)
 
@@ -1988,7 +2027,7 @@ class MainWindow(QMainWindow):
 
     def _write_plan(self, path: str):
         verify(self, "save", deep=True)      # P1.6: all fifteen before writing
-        state = self.serialize()
+        state = self.snapshot()
         on_disk = self.design_document()     # P2.2: the FILE is v5 now
         try:
             with open(path, "w", encoding="utf-8") as f:
@@ -2041,7 +2080,7 @@ class MainWindow(QMainWindow):
     def save_path(self, path: str):
         """Non-interactive save (no dialogs).  Raises on failure."""
         verify(self, "save", deep=True)      # P1.6: all fifteen before writing
-        state = self.serialize()
+        state = self.snapshot()
         on_disk = self.design_document()     # P2.2: the FILE is v5 now
         with open(path, "w", encoding="utf-8") as f:
             json.dump(on_disk, f, indent=1)

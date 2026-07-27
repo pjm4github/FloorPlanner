@@ -240,6 +240,7 @@ Behaviour that is deliberately worse between the task that broke it and the task
 | Broken at | Behaviour | Workaround today | Restored at |
 |---|---|---|---|
 | **P0.5** (fix 4) | Rubber-band-select a room whose edge is a longer party wall, then group + move it — the region no longer follows. The walls captured by the band move; the room does not. | Drag the room by its **label** instead: `_privatize_shared_walls` handles the party wall correctly on that path. | **P4.2** (`extract` replaces the accidental privatisation with a real operation) |
+| **P2.3** | **After the first undo, a wall that crosses a junction comes back split.** Undo now restores through `apply_design_to_scene`, which rebuilds walls edge-granularly. Measured: one 480″ wall with a T-junction at its midpoint returns as two 240″ walls. Body-dragging what looked like one wall now moves half of it and leaves the neighbour. | Drag the two halves together (rubber-band or shift-click), or re-draw the wall in one stroke — `coalesce` merges same-type overlaps on release. Nothing is lost: the **document is unchanged**, because `design_from_scene` planarises to the same canonical form either way, so the dirty flag and undo comparison correctly do not notice. | **P3.3 / P3.4** (vertex-native drag makes granularity moot — a wall move moves vertices, so how the run is subdivided stops mattering) |
 
 ### P0.6 — Cheap render wins
 **Touches.** `items.py`, `rooms.py`, `mainwindow.py`, `view.py`.

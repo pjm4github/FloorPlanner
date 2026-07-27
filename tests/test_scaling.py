@@ -106,6 +106,22 @@ def _measure(n):
 
     t["rebuild"] = _time(lambda: fp.rebuild_all_walls(sc))
 
+    # P2.3: the undo snapshot is now the canonical v5 document, so a settled
+    # edit walks the whole scene. Measured here so P6.1 -- "undo cost is
+    # independent of plan size" -- has a baseline to be measured against, and so
+    # a regression in the walk shows up as an undo stall rather than a mystery.
+    win._reset_undo()
+    t["snapshot"] = _time(win.snapshot)
+    fp.rebuild_all_walls(sc)
+    win._commit_if_changed()                     # one undoable step to revert
+    rooms0 = sum(1 for it in sc.items() if isinstance(it, fp.RoomItem))
+    it0 = next(it for it in sc.items() if isinstance(it, fp.FurnishingItem))
+    it0.setPos(it0.pos() + QPointF(6, 6))
+    win._commit_if_changed()
+    t["undo"] = _time(win.undo)
+    assert sum(1 for it in sc.items()
+               if isinstance(it, fp.RoomItem)) == rooms0,         "undo lost rooms on the grid"
+
     # Two selection paths with genuinely different costs (P0.6 amendment):
     rooms = [it for it in sc.items() if isinstance(it, fp.RoomItem)]
     app = QApplication.instance()
@@ -152,8 +168,8 @@ def _measure(n):
     return t
 
 
-OPS = ("rebuild", "select_burst", "select_interactive", "group", "bake",
-       "ungroup")
+OPS = ("rebuild", "snapshot", "undo", "select_burst", "select_interactive",
+       "group", "bake", "ungroup")
 
 
 @pytest.fixture(scope="module")
@@ -204,6 +220,18 @@ def test_select_interactive_scales_subquadratically(scaling):
 # walls are duplicated and the whole detection engine reruns. P3.8 (vertices own
 # geometry; no duplicate_wall/coalesce on group) is where this ratio drops under
 # 8. strict=False so it is free to pass early (e.g. after P0.6) without flapping.
+def test_undo_latency_is_bounded(scaling):
+    """P2.3 baseline for P6.1's "undo cost is independent of plan size".
+
+    An ABSOLUTE bound, not a ratio: undo now walks the scene into the canonical
+    document, and a ratio assertion this close to the threshold would flap (the
+    P0.6 precedent, where select_burst was converted for the same reason).
+    Generous on purpose -- this catches an order-of-magnitude regression, and
+    P6.1 is where the number has to stop growing with the plan at all."""
+    assert scaling["large"]["undo"] < 500.0
+    assert scaling["large"]["snapshot"] < 100.0
+
+
 @pytest.mark.xfail(strict=False, reason="group is ~quadratic until P3.8")
 def test_group_scales_subquadratically(scaling):
     assert scaling["ratios"]["group"] < 8

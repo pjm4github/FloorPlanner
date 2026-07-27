@@ -64,12 +64,16 @@ from floorplanner.design.legacy import (
 )
 from floorplanner.design.model import Design
 from floorplanner.geometry import parse_wwhh
-from floorplanner.items import FurnishingItem, furnishing_spec, make_furnishing
+from floorplanner.items import (
+    FurnishingItem, ReferenceImageItem, furnishing_spec, make_furnishing,
+)
 from floorplanner.model import Floor
 from floorplanner.rooms import (
     RoomItem, poly_area_sqft, room_path_from_corners, room_signature,
 )
-from floorplanner.walls import OpeningItem, WallItem, rebuild_all_walls
+from floorplanner.walls import (
+    OpeningItem, OpenWall, WallItem, rebuild_all_walls,
+)
 
 # names that make a room exterior rather than interior.  Kept identical to
 # tools/migrate_to_design_v5.py so a plan walked from the scene and the same
@@ -533,7 +537,8 @@ def _opening_s(frm, off, ow, L):
     return L / 2.0 + off                       # "center": offset of the centre
 
 
-def apply_design_to_scene(target, design, report=None, strict=False):
+def apply_design_to_scene(target, design, report=None, strict=False,
+                          keep_backdrop=False):
     """Build the scene from a v5 `Design`.  The mirror of `design_from_scene`,
     and held to `scene -> Design -> scene -> Design` identity at the second
     `Design`.
@@ -560,8 +565,10 @@ def apply_design_to_scene(target, design, report=None, strict=False):
     to the `active_floor()` global that constructors read -- that global lies
     during a load, which is why `mainwindow.py:1348` needs its band-aid.
 
-    Reference-image/backdrop retention is deliberately NOT handled here; it
-    belongs with the undo-restore path at P2.3."""
+    `keep_backdrop` detaches the tracing image across the rebuild instead of
+    letting `scene.clear()` delete it -- undo must not throw away the backdrop
+    the user is tracing over (wired at P2.3, which is what made undo go through
+    this function)."""
     scene, win = ((target, None) if isinstance(target, QGraphicsScene)
                   else (target.scene, target))
     doc = design.to_dict() if isinstance(design, Design) else design
@@ -586,7 +593,15 @@ def apply_design_to_scene(target, design, report=None, strict=False):
         win._doc_settings = {k: v for k, v in settings.items()
                              if k not in WALK_SETTINGS and k != "active_floor"}
 
+    backdrops = []
+    if keep_backdrop:
+        backdrops = [it for it in scene.items()
+                     if isinstance(it, ReferenceImageItem)]
+        for b in backdrops:
+            scene.removeItem(b)
     scene.clear()
+    for b in backdrops:
+        scene.addItem(b)
     levels = doc.get("levels") or [{"id": "L1", "name": DEFAULT_FLOOR}]
     lname = {lv["id"]: lv.get("name", DEFAULT_FLOOR) for lv in levels}
     if win is not None:
@@ -629,7 +644,11 @@ def apply_design_to_scene(target, design, report=None, strict=False):
                 # surfaced, and escalated under strict
                 rep["openings_failed"].append(f"{od['id']}: {exc}")
                 continue
-            op.door_type = od.get("door_type", "")
+            # v5 carries door_type for DOORS only ("meaningful only when
+            # kind == door"), so absent means "not applicable", not "empty" --
+            # clobbering it would rewrite a window's harmless default and make
+            # a round trip look like an edit.
+            op.door_type = od.get("door_type", op.door_type)
             op.swing = -1 if od.get("swings_toward", "left") == "left" else 1
             wall.openings.append(op)
 
@@ -655,9 +674,22 @@ def apply_design_to_scene(target, design, report=None, strict=False):
                                                           False))
         room.label_offset = QPointF(0.0, 0.0)
         scene.addItem(room)
-        for e in rd["outline"]:                # the outline IS the binding --
-            if e.get("wall") and e["wall"] in wmap:   # read, not detected
+        n = len(rd["outline"])
+        for i, e in enumerate(rd["outline"]):   # the outline IS the binding --
+            if e.get("wall") and e["wall"] in wmap:      # read, not detected
                 room.bind_wall(wmap[e["wall"]])
+            elif not e.get("wall"):
+                # An OPEN edge (`wall: null`) -- an archway or a detached side.
+                # The v4 loader regenerated these via bind_room_walls; that path
+                # is detection, which apply must not run, so build the dashed
+                # placeholder straight from the edge the document records.
+                # Without this, undo (which now restores through here, P2.3)
+                # would silently drop every archway. P3.7 deletes OpenWall and
+                # renders `wall: null` dashed directly, retiring this branch.
+                ow = OpenWall(corners[i], corners[(i + 1) % n], room)
+                ow.floor = room.floor
+                scene.addItem(ow)
+                room.bind_wall(ow)
         # prime the detection memo so a later rebuild_all_walls treats this room
         # as current instead of re-detecting over the stored outline
         room._detect_sig = room_signature(scene, room)
