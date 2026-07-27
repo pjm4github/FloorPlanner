@@ -1448,4 +1448,62 @@ notes:   MIXINS, NOT DELEGATING WRAPPERS. The suite calls these directly --
              is rewritten as a polygon op at P3.5, so moving it now would churn
              a file that task rewrites.
          PHASE 2 COMPLETE. Ready to push.
+
+PHASE 2 PUSHED  (52bd72e..3c2fbcf, 13 commits) -- CI GREEN on py3.10 + py3.13.
+         Doubled suite: 16s/18s on py3.13, 17s/20s on py3.10; job total 1m13s.
+         Still a clean doubling, still no cross-Python divergence.
+
+GATE 2  manual sanity check -- FINDING, fixed on main before branching
+         (commit d665e06)
+ruff:    clean
+pytest:  OFF  403 passed, 4 xfailed, 1 xpassed in 15.78s
+         ON   403 passed, 4 xfailed, 1 xpassed in 18.43s
+         DEEP 398 passed, 3 xfailed, 7 deselected in 15.84s
+files:   floorplanner/design/importer.py (weld_room_corners),
+         tests/test_load_path.py (+3), examples/symmetricP1.json (regenerated)
+THE FINDING: reopening the app's OWN legacy-v4 export of a converted plan
+         reported "5 wall ends moved (5 junctions checked)". Expected 0 -- the
+         app's own output must never need repair. NO EXISTING TEST TOUCHED.
+DIAGNOSIS -- (a), but UPSTREAM of the export. The export was faithful and the
+         report honest (weld_ops == ends_moved == 5, nothing conflated). The
+         IMPORTER baked a pre-repair artefact into the repaired document:
+           1. the weld pulls the four divider ends 655.529 -> 654.0 (the fix);
+           2. split_params then cuts those same walls at the STORED room
+              corners, which are PRE-WELD data and still say 655.529;
+           3. that injects a degree-2 vertex 1.53" from the freshly welded end
+              and a 1.53" SLIVER wall -- the exact ghost of the gap just closed.
+         The tell was the DIRECTION: displacements ran from 654.0 OUT to 655.53,
+         away from the repair, not toward it.
+         WHY NOTHING CAUGHT IT: 1.53 clears MIN_SPAN (1.0) so the sliver
+         survives, and clears vertex_weld_in (0.6) so I14 stays silent; all 20
+         room areas were correct. It is invisible until the document is exported
+         and reopened, where the 2" end-to-end gesture weld fuses the pair.
+FIX:     weld_room_corners() snaps stored perimeter_corners onto the welded wall
+         ends using the same END_TOL the wall weld uses -- they describe the
+         same corners. 66 corners welded on planc1; reopen now reports 0/0.
+         It also removes a SECOND, quieter error: stored corners are rounded to
+         2dp by _sync_corner_props, so using them verbatim seeded the vertex
+         table with up to 0.005" of drift. Six symmetricP1 vertices gain
+         precision (104.42 -> 104.4228, 280.24 -> 280.2416, ...).
+WHY IT ESCAPED, and the missing test: P2.2 round-tripped only via load_data --
+         the FAITHFUL apply, which never welds -- so the export was never taken
+         back through the CONVERTER. The two paths were each covered and their
+         composition was not. test_legacy_export_reopens_without_repair now
+         drives the full journey (open -> save v5 -> export v4 -> reopen
+         converting) and asserts ends_moved == 0 with areas identical, plus a
+         unit test for the corner weld and a guard that no sub-2" sliver
+         survives a conversion.
+FIXTURE: symmetricP1.json regenerated, every delta class measured:
+           2 sliver vertices REMOVED (the bug) -> 82 walls to 80; Hall 9->7,
+             Great Room 11->10, M Bath 11->10 outline edges
+           6 vertices gain precision (2dp stored corner -> exact wall endpoint)
+           47/62 vertex ids renumbered, 11/20 loops rotated (consequences)
+           0 OF 20 ROOM AREAS CHANGED -- the geometry is preserved
+           provenance and settings identical
+         planc1.v5.json BYTE-IDENTICAL: faithful mode never welds, so it never
+         had the artefact -- which is itself a check on the diagnosis.
+         Acceptance unchanged: M Bath 182.0, Hall 61.5, 4 ends moved, check
+         clean. Side effect worth noting: suite warnings dropped 17 -> 2,
+         because converted scenes no longer carry unwelded ends.
+meaning: Phase 2's acceptance is complete. P3.1 may proceed.
 ```
