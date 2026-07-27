@@ -67,6 +67,14 @@ jobs:
         # are a local gate (P0.6, P3.8). Deterministic slow tests still run.
         run: python -m pytest -ra -m "not perf"
 
+      - name: Run tests with --verify-design (P1.6 shadow mode)
+        # THE Phase 1 gate: the same suite, with the v5 Design rebuilt and
+        # checked against the invariants at every quiescent point. Anything that
+        # fires here is a real bug in the current code, not a bridge artefact.
+        env:
+          FP_VERIFY_DESIGN: "1"
+        run: python -m pytest -ra -m "not perf"
+
       - name: Validate v5 design corpus
         # independent of the suite: the schema + invariant validator must accept
         # every clean floorplanner-design example (planc1.v5.json is the

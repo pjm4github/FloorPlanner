@@ -89,6 +89,14 @@ def _overlapping_rooms(fp, win):
 
     r1 = mk(0, 0, 120, 96, "Room 1")
     r2 = mk(72, 48, 120, 96, "Room 2")
+    # The overlap is this helper's POINT -- it is the input room_boolean exists
+    # to resolve -- so declare it as the accepted baseline for P1.6's shadow
+    # mode (FP_VERIFY_DESIGN=deep).  Without this the scene trips I11 "two
+    # placed rooms overlap" at teardown, which would be true but useless: the
+    # overlap was constructed here, not introduced by the operation under test.
+    # Same mechanism a corrupt legacy file uses when it is loaded.
+    from floorplanner.design.verify import rebase
+    rebase(win)
     # win._sel_order (the selection order feeding room_boolean) is retired when
     # room_boolean is rewritten as a polygon op in v5 P3.5 (V5_MIGRATION_PLAN);
     # left as-is here and at the other _sel_order call sites in this file.

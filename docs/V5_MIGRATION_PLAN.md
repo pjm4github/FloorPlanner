@@ -103,7 +103,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P1.3b** Fix defect 18 (`_inner_faces` winding) + corpus diff | ruff + pytest |
 | ☑ | **P1.4** `design_from_scene()` | ruff + pytest |
 | ☑ | **P1.5** `apply_design_to_scene()` | ruff + pytest |
-| ☐ | **P1.6** `--verify-design` shadow mode; suite runs with it on | ruff + pytest ×2 |
+| ☑ | **P1.6** `--verify-design` shadow mode; suite runs with it on | ruff + pytest ×2 |
 | ☐ | **P2.1** Load path: v1–v4 migrate + dirty + report; v5 direct | ruff + pytest |
 | ☐ | **P2.2** Save writes v5; legacy export | ruff + pytest |
 | ☐ | **P2.3** Undo snapshots the v5 dict | ruff + pytest |
@@ -1015,4 +1015,75 @@ notes:   NO EXISTING TEST TOUCHED -- git status showed exactly two modified
          + warning, strict=True raises), not dropped by the v4 path's silent
          `except ValueError: continue` -- pre-figures P3.6.
          Not pushed -- Phase 1 pushes at its end, after P1.6.
+
+P1.6  done
+ruff:    clean
+pytest:  OFF  364 passed, 4 xfailed, 1 xpassed in 11.84s
+         ON   364 passed, 4 xfailed, 1 xpassed in 12.50s   <- THE ACCEPTANCE
+         DEEP 360 passed, 3 xfailed, 6 deselected in 11.23s  (-m "not perf")
+files:   floorplanner/design/verify.py (new), floorplanner/mainwindow.py (3
+         hooks + import), floorplanner/app.py (--verify-design -> env var),
+         floorplanner/design/bridge.py (rebase at the end of apply),
+         tests/conftest.py (fixture rebase + teardown verify),
+         tests/test_verify_design.py (new, 17), .github/workflows/ci.yml
+         (second suite run with the flag on), docs/CODE_REVIEW_v2.md (defect 19)
+TEST CHANGED (declaring it, per the working agreement): tests/test_rooms.py
+         `_overlapping_rooms` gained a `rebase(win)` call. NO assertion changed
+         -- it declares that the helper's overlapping rooms are the deliberate
+         INPUT to room_boolean, the same "this state is accepted" mechanism a
+         corrupt legacy file uses at load. See finding 2.
+notes:   Hooks at quiescent points only, never scene.changed (mid-operation the
+         scene is legitimately inconsistent): _commit_if_changed before the
+         snapshot (cheap twelve), save (deep), load (deep + REBASE), and the
+         conftest fixture teardown -- that last one because the 180 ms dirty
+         timer NEVER FIRES HEADLESS, so without it the suite would verify
+         almost nothing.
+         FINDING 1 -- unwelded_ends must NOT raise, and this contradicts the
+         spec I was given ("same treatment as an invariant class"). Two
+         independent reasons, both measured:
+         (a) THE SCHEMA FORBIDS IT. join_tol_in is documented as "GESTURE
+         TOLERANCE ... Never an invariant: a wall deliberately stopping 6"
+         short of another is a legitimate design (a reveal, a pilaster gap),
+         and nothing may silently close it." Raising would fail a user for
+         drawing a reveal.
+         (b) IT IS NOT A DOCUMENT PROPERTY. apply_design_to_scene rebuilds
+         planc1 from a BYTE-IDENTICAL Design and the count goes 5 -> 15,
+         because Design walls are edge-granular and a wall split at its
+         junctions has more ends to be near things with. A metric that moves
+         while the document is provably unchanged cannot be a document
+         invariant. Resolution: REPORT_ONLY -- carried in the profile, warned
+         once when it rises, never raised on. The real weld invariant is I14 at
+         the 0.6" modelling tolerance, and that stays in the raising set.
+         A test pins REPORT_ONLY's contents so adding to it can't silently
+         disarm an invariant.
+         FINDING 2 -- one I11 fired, and it is NOT a defect. Under the deep
+         sweep, test_rooms::test_room_op_needs_two_rooms tripped "I11 two placed
+         rooms overlap". Diagnosed rather than suppressed: the overlap is built
+         by the `_overlapping_rooms` helper as the deliberate input to
+         room_boolean, and the operation under test is a no-op by design, so
+         nothing INTRODUCED it. Declared with a rebase in the helper.
+         FINDING 3 -- defect 19, a real one. extract_from_reference writes
+         detected walls into the scene and commits with no weld pass; per the
+         corrected F5 nothing welds them later either. Every extracted plan is
+         born with open junctions -- the exact condition that leaks room
+         detection between spaces. Measured: 2 unwelded ends on the test_extract
+         fixture. Logged -> P2.1. Note it is NOT caught by the gate (it is an
+         unwelded_ends rise, which is report-only per finding 1), so it needs
+         fixing on purpose.
+         ON THE INVARIANT SCORE, honestly: ZERO invariant classes fired from
+         app operations. Given this migration's hit rate I did not expect that,
+         so I checked rather than celebrated -- which is what FP_VERIFY_DESIGN=
+         deep is for. It promotes every quiescent point to all fifteen, so the
+         sweep covers I5b/I11/I14 (the two that caught the real planc1
+         corruption) across the whole suite, not just at save/load. Result after
+         findings 2 and 3: still zero. Two honest caveats on that number -- the
+         suite's scenes are small and mostly clean, and deep mode cannot run
+         over the 64-room perf grid (O(rooms^2) + O(walls^2) per quiescent point
+         is exactly what P1.2 split the invariants to avoid), so `-m "not perf"`.
+         The acceptance run is the cheap twelve, as specced; deep is a
+         diagnostic.
+         CI now runs the suite TWICE per Python version, the second with
+         FP_VERIFY_DESIGN=1. --verify-design on the CLI just sets the env var,
+         so there is one switch however it is thrown.
+         PHASE 1 COMPLETE. Ready to push (P1.1..P1.6 + the doc commits).
 ```

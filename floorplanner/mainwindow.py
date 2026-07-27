@@ -25,6 +25,7 @@ from floorplanner.model import (  # serialization bridge (aliased)
     DEFAULT_FLOOR, FILE_VERSION, Floor, Furnishing, Opening as OpeningModel,
     Project, Room as RoomModel, Wall as WallModel,
 )
+from floorplanner.design.verify import rebase, verify  # P1.6 shadow mode
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
 from floorplanner.macro import *  # noqa: F401
@@ -874,6 +875,10 @@ class MainWindow(QMainWindow):
         committed state."""
         if self._restoring:
             return
+        # P1.6 shadow mode: a settled operation is exactly where the document
+        # must be consistent, so this is the per-mutation hook.  Cheap twelve
+        # only -- an O(n^2) sweep per edit would make the app unusable.
+        verify(self, "operation")
         state = self.serialize()
         if state == self._committed_state:
             return
@@ -1399,6 +1404,11 @@ class MainWindow(QMainWindow):
                          + ", ".join(unknown) + ".")
         if notes:
             self.status("  ".join(notes))
+        # P1.6: load DEFINES the baseline.  A plan opened from a corrupt legacy
+        # file has faults at rest (planc1: 17x I6 + 1x I11) and shadow mode must
+        # not fire on those -- only on corruption introduced afterwards.  Undo's
+        # restore comes through here too, reinstating an already-verified state.
+        rebase(self)
 
     def paste_room(self, sp: QPointF):
         """Recreate the copied room (walls, openings, properties) with its
@@ -1862,6 +1872,7 @@ class MainWindow(QMainWindow):
         self._write_plan(path)
 
     def _write_plan(self, path: str):
+        verify(self, "save", deep=True)      # P1.6: all fifteen before writing
         state = self.serialize()
         # the file remembers the active floor, but _saved_state must NOT (it's
         # view state) or the dirty check would flag a clean plan after a switch.
@@ -1892,6 +1903,7 @@ class MainWindow(QMainWindow):
 
     def save_path(self, path: str):
         """Non-interactive save (no dialogs).  Raises on failure."""
+        verify(self, "save", deep=True)      # P1.6: all fifteen before writing
         state = self.serialize()
         on_disk = {**state, "active_floor": self.active_floor}
         with open(path, "w", encoding="utf-8") as f:

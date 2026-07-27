@@ -78,7 +78,9 @@ def scene(qapp):
     Faster than a full MainWindow; use `win` only when you need the menus,
     the view, or import/export/group helpers."""
     s = QGraphicsScene()
+    _verify_rebase(s)
     yield s
+    _verify_teardown(s, "scene fixture teardown")
     s.clear()
 
 
@@ -87,8 +89,34 @@ def win(qapp):
     """A fresh MainWindow (full UI) -- for io / group / gui tests."""
     w = _fp.MainWindow()
     w.resize(1200, 800)
+    _verify_rebase(w)
     yield w
+    _verify_teardown(w, "win fixture teardown")
     w.close()
+
+
+# --------------------------------------------------------------------------
+# P1.6 shadow mode (FP_VERIFY_DESIGN=1): verify every test's final scene.
+#
+# The app's own per-operation hook hangs off the 180 ms dirty timer, which
+# NEVER FIRES headless -- so without this the suite could mutate scenes all day
+# and verify nothing.  Each fixture starts with an empty baseline, so any fault
+# a test introduces is a regression against `{}`; tests that load a corrupt
+# legacy file rebase at load, via MainWindow.apply_project_to_scene.
+#
+# Both helpers are no-ops with the flag off, so the suite runs unmodified.
+# --------------------------------------------------------------------------
+def _verify_rebase(target):
+    from floorplanner.design.verify import rebase, verify_enabled
+    if verify_enabled():
+        rebase(target)
+
+
+def _verify_teardown(target, where):
+    from floorplanner.design.verify import verify, verify_enabled
+    if not verify_enabled():
+        return
+    verify(target, where)                    # cheap twelve, per the P1.2 split
 
 
 # --------------------------------------------------------------------------

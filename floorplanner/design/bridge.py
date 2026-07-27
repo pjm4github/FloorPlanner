@@ -685,6 +685,14 @@ def apply_design_to_scene(target, design, report=None, strict=False):
 
     if win is not None:
         win._sync_floor_state()
+    # P1.6: apply is a LOAD -- it replaces the whole document, so its faults are
+    # the new document's, not ones an operation introduced. Rebase, exactly as
+    # apply_project_to_scene does. (Also stops the wall-decomposition change
+    # from reading as a regression: Design walls are edge-granular, so a plan
+    # rebuilt from an identical Design has more, shorter walls than it started
+    # with.)
+    from floorplanner.design.verify import rebase   # late: verify imports this
+    rebase(target)
 
     if rep["openings_failed"]:
         msg = ("apply_design_to_scene: %d opening(s) could not be placed: %s"
