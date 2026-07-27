@@ -7,6 +7,20 @@ everything with:
 python examples/make_examples.py
 ```
 
+## Frozen legacy inputs — do not convert
+
+Two files here are deliberately **not** v5 and must stay that way:
+
+| File | Format | Why it is frozen |
+|------|--------|------------------|
+| `planc1.json` | `floorplanner-json` v3 | The corruption fixture **and** the importer's acceptance input (M Bath 182.0 sf, Hall 61.5 sf, 4 wall ends moved). |
+| `sample_plan.json` | `floorplanner-json` v1 | The clean legacy input the scene↔design bridge tests run against — and the only **v1** file in the repo, so it exercises a migration path nothing else does. |
+
+The v5 rendering of each is written **alongside** it (`planc1.v5.json`,
+`sample_plan.v5.json`), never over it. Converting either would leave the
+importer with no real legacy file to prove itself against, so
+`tests/test_corpus_freeze.py` fails if their format ever changes.
+
 ## Room CSV import (`File > Import rooms from CSV…`)
 
 Columns: `Name,Type,X_ft,Y_ft,X_loc_ft,Y_loc_ft,Notes`

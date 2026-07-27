@@ -36,9 +36,12 @@ CLEAN_FILES = [p for p in DESIGN_FILES if p.name != CORRUPT]
 
 def test_corpus_discovered():
     # guard: the glob actually found the fixtures, so a rename can't silently
-    # empty the corpus and make the parametrized tests vacuously pass
+    # empty the corpus and make the parametrized tests vacuously pass.
+    # sample_plan.v5.json joined at P2.4, when make_examples.py started writing
+    # the v5 rendering alongside the frozen legacy sample_plan.json.
     names = {p.name for p in DESIGN_FILES}
-    assert {"symmetricP1.json", "site_demo.json", CORRUPT} <= names
+    assert {"symmetricP1.json", "site_demo.json", "sample_plan.v5.json",
+            CORRUPT} <= names
 
 
 @pytest.mark.parametrize("path", CLEAN_FILES, ids=lambda p: p.name)

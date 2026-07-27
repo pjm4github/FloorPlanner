@@ -210,5 +210,11 @@ def test_fp_extract_cli_end_to_end(qapp, tmp_path):
     assert result["counts"]["walls"] == 5
 
     data = json.loads(out.read_text(encoding="utf-8"))
-    assert data["format"] == "floorplanner-json"
-    assert len(data["walls"]) == 5
+    # P2.4 flipped fp_extract back to save_path, so it writes v5 like every
+    # other writer (deferred here from P2.2 to convert with the rest of the
+    # tooling). The wall COUNT is deliberately not re-asserted: v5 walls are
+    # edge-granular, so the extractor's 5 detected runs become however many
+    # graph edges they planarise to -- a presentation detail, not a document
+    # one. `result["counts"]["walls"] == 5` above still pins what was detected.
+    assert data["format"] == "floorplanner-design" and data["version"] == 5
+    assert len(data["walls"]) >= 5

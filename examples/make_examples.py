@@ -9,7 +9,6 @@ Produces, in this directory:
 The PNGs are clean scene renders (no app chrome), so they double as a quick
 visual reference for the file formats.
 """
-import json
 import os
 import sys
 
@@ -151,9 +150,17 @@ for kind, pos, rot in [("sofa", (108, 150), 0), ("coffee_table", (108, 196), 0),
                        ("nightstand", (390, 250), 0)]:
     sc.addItem(FP.FurnishingItem(kind, QPointF(*pos), rot))
 
-plan_json = os.path.join(HERE, "sample_plan.json")
-with open(plan_json, "w", encoding="utf-8") as f:
-    json.dump(win.serialize(), f, indent=2)
+# sample_plan.json is NOT regenerated: it is a FROZEN legacy artifact.
+#
+# It is the clean v1 `floorplanner-json` input that the P1.4 bridge tests and
+# the P2.1 importer tests prove themselves against -- and the only v1 file in
+# the repo, so it exercises a migration path nothing else does. Overwriting it
+# with a v5 document would leave the importer with no real legacy file to
+# convert, which is why tests/test_corpus_freeze.py fails if it ever changes
+# format. The v5 rendering of the same plan is written ALONGSIDE it, following
+# the planc1.json / planc1.v5.json pairing already used here.
+plan_json = os.path.join(HERE, "sample_plan.v5.json")
+win.save_path(plan_json)                 # v5 since P2.2
 print("wrote", os.path.relpath(plan_json, ROOT))
 render(win, os.path.join(HERE, "sample_plan.png"))
 win.close()
