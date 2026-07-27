@@ -1,9 +1,5 @@
 """The application main window: menus, toolbars, the scene<->model
 serialization bridge, IO, and all edit orchestration."""
-import copy
-import csv
-import json
-import os
 
 from PyQt6 import sip  # noqa: F401
 from PyQt6.QtCore import *  # noqa: F401
@@ -23,25 +19,20 @@ from floorplanner.walls import _coalesce_all_impl  # star skips underscores
 from floorplanner.rooms import *  # noqa: F401
 from floorplanner.items import *  # noqa: F401
 from floorplanner.model import (  # serialization bridge (aliased)
-    DEFAULT_FLOOR, FILE_VERSION, Floor, Furnishing, Opening as OpeningModel,
-    Project, Room as RoomModel, Wall as WallModel,
+    DEFAULT_FLOOR, Floor,
 )
-from floorplanner.design.bridge import (          # P1.4/P1.5 scene <-> design
-    apply_design_to_scene, design_from_scene,
-)
-from floorplanner.design.canonical import canonicalize
-from floorplanner.design.importer import (       # P2.1 legacy -> v5
-    conversion_report, import_legacy,
-)
-from floorplanner.design.model import Design
-from floorplanner.design.validate import check
-from floorplanner.design.verify import rebase, verify  # P1.6 shadow mode
+from floorplanner.design.verify import verify  # P1.6 shadow mode
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
 from floorplanner.macro import *  # noqa: F401
+from floorplanner.csvio import CsvIOMixin
+from floorplanner.imageio import ImageIOMixin
+from floorplanner.levels import LevelsMixin
+from floorplanner.planio import PlanIOMixin
 
 
-class MainWindow(QMainWindow):
+class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
+                 ImageIOMixin, LevelsMixin):
     HINTS = {
         TOOL_SELECT: ("Select: drag wall BODY to slide it sideways (Ctrl = "
                       "free move) \u2022 drag wall ENDS to lengthen/shorten "
@@ -1040,39 +1031,11 @@ class MainWindow(QMainWindow):
             rect = QRectF(-2 * FOOT, -2 * FOOT, 60 * FOOT, 44 * FOOT)
         self.view.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
 
-    def _is_dirty(self) -> bool:
-        """True when the plan has edits not yet written to its file.
-
-        Both sides are canonicalised before comparing. `snapshot()` already
-        returns canonical form, so this is belt-and-braces today -- but defining
-        equality ON canonical form is what survives any future producer that
-        forgets to normalise, including whichever way P3.1's uid decision goes.
-        Two documents describing the same plan must compare equal even when
-        different code paths built them."""
-        if self._saved_state is None:
-            return True                  # converted-but-never-saved (P2.1)
-        return self.snapshot() != canonicalize(copy.deepcopy(self._saved_state))
 
     def _headless(self) -> bool:
         """True under the offscreen Qt platform (tests): skip modal dialogs."""
         return QApplication.platformName() == "offscreen"
 
-    def _confirm_discard_changes(self, title: str = "Unsaved changes") -> bool:
-        """If there are unsaved edits, ask Save / Discard / Cancel.  Returns True
-        when it's OK to proceed (saved or discarded), False to cancel."""
-        if not self._is_dirty():
-            return True
-        btn = QMessageBox.warning(
-            self, title,
-            "This design has unsaved changes.\nSave them before continuing?",
-            QMessageBox.StandardButton.Save
-            | QMessageBox.StandardButton.Discard
-            | QMessageBox.StandardButton.Cancel,
-            QMessageBox.StandardButton.Save)
-        if btn == QMessageBox.StandardButton.Save:
-            self.save_plan()
-            return not self._is_dirty()      # False if the Save dialog was cancelled
-        return btn == QMessageBox.StandardButton.Discard
 
     def closeEvent(self, e):
         # no prompt when there is no interactive UI (headless/offscreen tests),
@@ -1083,478 +1046,31 @@ class MainWindow(QMainWindow):
         else:
             e.ignore()
 
-    def new_plan(self):
-        if not self._confirm_discard_changes("New plan"):
-            return
-        self.scene.clear()
-        self.current_path = None
-        SETTINGS.update(DEFAULT_SETTINGS)
-        self._apply_canvas()
-        self.floors = [Floor(DEFAULT_FLOOR)]    # back to a single default floor
-        self.active_floor = DEFAULT_FLOOR
-        self._sync_floor_state()
-        self._conversion = None          # a new plan was converted from nothing
-        self._provenance = None
-        self._doc_settings = {}
-        self._reset_undo()
 
     # -- save / load -------------------------------------------------------------
-    def _update_title(self):
-        if self.current_path:
-            self.setWindowTitle(f"Floor Planner — {self.current_path}")
-        else:
-            c = canvas_rect()
-            self.setWindowTitle(f"Floor Planner — canvas "
-                                f"{fmt_ftin(c.width())} × "
-                                f"{fmt_ftin(c.height())}")
 
-    def project_from_scene(self) -> Project:
-        """Walk the scene into the Qt-free domain model (model.Project).
 
-        Open walls are skipped — they're regenerated from a room's open
-        edges on load, not stored."""
-        walls, rooms, furnishings = [], [], []
-        for it in self.scene.items():
-            if isinstance(it, FurnishingItem):
-                furnishings.append(Furnishing(
-                    kind=it.kind,
-                    pos=(it.pos().x(), it.pos().y()),
-                    rotation=it.rotation(),
-                    extra=dict(it.extra_state()),
-                    floor=getattr(it, "floor", DEFAULT_FLOOR),
-                ))
-            elif isinstance(it, WallItem) and not it.is_open:
-                walls.append(WallModel(
-                    wall_type=it.wall_type,
-                    p1=(it.p1.x(), it.p1.y()),
-                    p2=(it.p2.x(), it.p2.y()),
-                    rooms=[r.name for r in it.rooms],
-                    openings=[OpeningModel(op.kind, op.code, op.s,
-                                           op.door_type, op.swing)
-                              for op in it.openings],
-                    floor=getattr(it, "floor", DEFAULT_FLOOR),
-                ))
-            elif isinstance(it, RoomItem):
-                rooms.append(RoomModel(
-                    name=it.name,
-                    anchor=(it.anchor.x(), it.anchor.y()),
-                    label_offset=(it.label_offset.x(), it.label_offset.y()),
-                    show_dimensions=it.show_dims,
-                    properties=dict(it.properties),   # copy: model must not
-                    floor=getattr(it, "floor", DEFAULT_FLOOR),  # alias the live dict
-                ))
-        # the roster MUST come from self.floors (an empty floor has no items to
-        # derive it from); active_floor rides along but is dropped by to_dict.
-        return Project(version=FILE_VERSION, units="inches",
-                       settings=dict(SETTINGS), walls=walls, rooms=rooms,
-                       furnishings=furnishings,
-                       floors=[Floor(f.name, f.reference) for f in self.floors],
-                       active_floor=self.active_floor)
 
-    def snapshot(self, report=None) -> dict:
-        """The CANONICAL v5 document, and the payload undo and the dirty flag
-        are both defined on (P2.3).
 
-        Deliberately NOT `design_document()`: `provenance`, unmodelled document
-        settings and `active_floor` are window state, not scene state. Keeping
-        `active_floor` out is what stops a floor switch from becoming an undo
-        step -- the same reasoning that kept it out of `serialize()`.
 
-        Canonical, so equality means "the same plan" rather than "the same
-        bytes". That also makes the comparison granularity-invariant: whether
-        the scene holds one long wall or three segments split at junctions, the
-        walk planarises to the same document, so scene wall-count is
-        PRESENTATION state and cannot spuriously dirty the plan."""
-        return canonicalize(design_from_scene(self, report=report).to_dict())
-
-    def design_document(self) -> dict:
-        """The v5 document to WRITE (P2.2).
-
-        `design_from_scene` reports what the scene holds; this adds back the
-        three things the scene cannot hold but the file must carry:
-        `provenance` (the conversion audit trail -- re-attached on EVERY save,
-        because its whole value is surviving the save the conversion report
-        asks the user to make), any document `settings` the walk does not model,
-        and `active_floor`, which rides inside `settings` because the v5 root is
-        a closed schema."""
-        doc = design_from_scene(self).to_dict()
-        if self._doc_settings:
-            merged = dict(self._doc_settings)
-            merged.update(doc["settings"])       # the walk's values win
-            doc["settings"] = merged
-        doc["settings"]["active_floor"] = self.active_floor
-        if self._provenance:
-            doc["provenance"] = self._provenance
-        return doc
-
-    def serialize(self) -> dict:
-        """Plan -> the LEGACY v4 dict (`floorplanner-json`).
-
-        DEMOTED AT P2.3 and on its way out. Its sole remaining caller is
-        `export_legacy_v4_path` (File > Export legacy v4...), kept for ONE
-        release so the v5 cutover strands nobody, and it dies with that menu
-        item. Save writes v5 via `design_document()`; undo and the dirty flag
-        are defined on `snapshot()`. **A new caller of this method is a bug** --
-        an alive-but-orphaned serializer is how a format forks.
-
-        Goes through the Qt-free model; Project.to_dict emits the arrays in a
-        stable, z-independent order (sorted by geometry) so bring-to-front z
-        changes never alter the snapshot — keeping undo/redo comparison
-        correct."""
-        return self.project_from_scene().to_dict()
-
-    def _sync_floor_state(self):
-        """Mirror the authoritative roster (self.floors / active_floor /
-        show_other_floors) into config's runtime cache, then re-apply
-        visibility and repaint.  Cheap; called on init, load, and floor ops."""
-        set_floor_state(
-            active=self.active_floor,
-            reference={f.name for f in self.floors if f.reference},
-            show_others=self.show_other_floors,
-        )
-        apply_floor_visibility(self.scene)
-        self.scene.update()
-        if hasattr(self, "floor_label"):
-            self.floor_label.setText(f"Floor: {self.active_floor}")
-        if hasattr(self, "m_floors"):
-            self._rebuild_floor_menu()
 
     # -- floor operations -----------------------------------------------------
-    def _floor(self, name):
-        return next((f for f in self.floors if f.name == name), None)
 
-    def _rebuild_floor_menu(self):
-        """Repopulate &Floors: New floor, a submenu per floor (edit/rename/
-        reference/delete), then the Show-other-floors toggle."""
-        m = self.m_floors
-        m.clear()
-        a_new = m.addAction("&New floor…")
-        a_new.triggered.connect(self.new_floor)
-        m.addSeparator()
-        grp = QActionGroup(self)
-        grp.setExclusive(True)
-        for f in self.floors:
-            tag = f"{f.name}{'  (R)' if f.reference else ''}" \
-                  f"{'  ●' if f.name == self.active_floor else ''}"
-            sub = m.addMenu(tag)
-            a_edit = sub.addAction("Edit this floor")
-            a_edit.setCheckable(True)
-            a_edit.setChecked(f.name == self.active_floor)
-            grp.addAction(a_edit)
-            a_edit.triggered.connect(lambda _=False, n=f.name: self.switch_floor(n))
-            a_ren = sub.addAction("Rename…")
-            a_ren.triggered.connect(lambda _=False, n=f.name: self.rename_floor(n))
-            a_ref = sub.addAction("Reference floor")
-            a_ref.setCheckable(True)
-            a_ref.setChecked(f.reference)
-            a_ref.triggered.connect(
-                lambda _=False, n=f.name: self.toggle_reference_floor(n))
-            a_del = sub.addAction("Delete floor")
-            a_del.setEnabled(len(self.floors) > 1)
-            a_del.triggered.connect(lambda _=False, n=f.name: self.delete_floor(n))
-        m.addSeparator()
-        a_show = m.addAction("Show other floors (ghosted)")
-        a_show.setCheckable(True)
-        a_show.setChecked(self.show_other_floors)
-        a_show.triggered.connect(self.toggle_show_others)
 
-    def _popup_floor_menu(self):
-        """Quick floor switch from the status-bar label."""
-        menu = QMenu(self)
-        for f in self.floors:
-            a = menu.addAction(f"{f.name}{'  ●' if f.name == self.active_floor else ''}")
-            a.triggered.connect(lambda _=False, n=f.name: self.switch_floor(n))
-        menu.exec(self.floor_label.mapToGlobal(self.floor_label.rect().topLeft()))
 
-    def switch_floor(self, name):
-        """Make `name` the active (editable) floor.  View state only — no undo
-        step, no dirty (serialize() is unchanged across a switch)."""
-        if self._floor(name) is None or name == self.active_floor:
-            return
-        self.active_floor = name
-        self._sync_floor_state()
-        self.status(f"Editing floor '{name}'.")
 
-    def new_floor(self):
-        name, ok = QInputDialog.getText(self, "New floor", "Floor name:")
-        name = name.strip()
-        if not ok or not name:
-            return
-        if self._floor(name) is not None:
-            QMessageBox.warning(self, "New floor",
-                                f"A floor named '{name}' already exists.")
-            return
-        self.new_floor_named(name)
 
-    def new_floor_named(self, name):
-        """Add an EMPTY floor (Phase 1) and switch to it.  Non-interactive core
-        of new_floor (also used by tests)."""
-        if self._floor(name) is not None:
-            return
-        self.floors.append(Floor(name))
-        self.active_floor = name               # switch to it
-        self._sync_floor_state()
-        self._commit_floor_change()
-        self.status(f"Added floor '{name}'.")
 
-    def rename_floor(self, name):
-        f = self._floor(name)
-        if f is None:
-            return
-        new, ok = QInputDialog.getText(self, "Rename floor",
-                                       "New name:", text=name)
-        new = new.strip()
-        if not ok or not new or new == name:
-            return
-        if self._floor(new) is not None:
-            QMessageBox.warning(self, "Rename floor",
-                                f"A floor named '{new}' already exists.")
-            return
-        for it in self.scene.items():          # retag this floor's items
-            if getattr(it, "floor", None) == name:
-                it.floor = new
-        f.name = new
-        if self.active_floor == name:
-            self.active_floor = new
-        self._sync_floor_state()
-        self._commit_floor_change()
 
-    def toggle_reference_floor(self, name):
-        f = self._floor(name)
-        if f is None:
-            return
-        f.reference = not f.reference
-        self._sync_floor_state()
-        self._commit_floor_change()
 
-    def toggle_show_others(self, checked):
-        self.show_other_floors = bool(checked)
-        self._sync_floor_state()             # view state only — not undoable
 
-    def delete_floor(self, name):
-        if len(self.floors) <= 1:            # never delete the last floor
-            return
-        f = self._floor(name)
-        if f is None:
-            return
-        n_items = sum(1 for it in self.scene.items()
-                      if getattr(it, "floor", None) == name)
-        if self._confirm_floor_delete(name, n_items) is False:
-            return
-        for it in list(self.scene.items()):  # remove this floor's items
-            if getattr(it, "floor", None) == name and it.parentItem() is None:
-                self.scene.removeItem(it)
-        self.floors = [g for g in self.floors if g.name != name]
-        if self.active_floor == name:        # land on a surviving floor
-            self.active_floor = self.floors[0].name
-        rebuild_all_walls(self.scene)
-        self._sync_floor_state()
-        self._commit_floor_change()
-        self.status(f"Deleted floor '{name}'.")
 
-    def _confirm_floor_delete(self, name, n_items) -> bool:
-        if self._headless():
-            return True
-        msg = (f"Delete floor '{name}' and its {n_items} item(s)?"
-               if n_items else f"Delete the empty floor '{name}'?")
-        return QMessageBox.question(
-            self, "Delete floor", msg,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        ) == QMessageBox.StandardButton.Yes
 
-    def _commit_floor_change(self):
-        """Roster edits (add/rename/delete/reference) DO change serialize(), so
-        capture an undo step + mark dirty — unlike a plain active-floor switch."""
-        self._rebuild_floor_menu()
-        self._commit_if_changed()
 
-    def load_data(self, data: dict, keep_backdrop: bool = False):
-        """APPLY a document to the scene, exactly as given. Never migrates.
 
-        This is the undo-restore path (`_restore_state`) as well as the plain
-        "put this dict on the canvas" helper, so it must stay a faithful apply:
-        routing it through P2.1's importer would make **every undo weld the
-        geometry and re-trace every room**, which is a repair, not a restore.
-        Opening a FILE is `open_document` -- that is where migration, the dirty
-        flag and the conversion report live."""
-        if data.get("format") == "floorplanner-design":
-            apply_design_to_scene(self, Design.from_dict(data),
-                                  keep_backdrop=keep_backdrop)
-            return
-        self.apply_project_to_scene(Project.from_dict(data), keep_backdrop)
 
-    def open_document(self, data: dict, interactive: bool = True):
-        """THE OPEN PATH (P2.1). Returns the conversion report, or None for a
-        document that needed no conversion.
 
-        Legacy v1-v4 `floorplanner-json` is welded, planarised and re-traced by
-        `design.importer` -- the first time the app has ever moved a user's wall
-        ends on open -- then marked dirty and reported. v5
-        `floorplanner-design` is validated and applied as-is: no weld pass ever,
-        and never dirty. A v5 file failing I14 is reported as MALFORMED rather
-        than silently re-welded; that asymmetry is the point of promoting
-        'welded' from a hopeful post-condition to a checked invariant."""
-        self._conversion = None
-        if data.get("format") == "floorplanner-design":
-            design = Design.from_dict(data)
-            apply_design_to_scene(self, design)
-            # provenance is written ONCE at import and never mutated; a v5 file
-            # that carries one keeps it across a re-save (P2.2)
-            self._provenance = data.get("provenance")
-            errs = check(data, deep=True)
-            if errs:
-                bad = [e for e in errs if e.startswith("I14")]
-                head = ("This v5 file is malformed: it is not welded at "
-                        f"vertex_weld_in ({len(bad)} unwelded junction(s)). "
-                        "It has been opened unchanged -- re-welding silently "
-                        "is exactly what the invariant exists to prevent."
-                        if bad else
-                        f"This v5 file reports {len(errs)} invariant "
-                        f"violation(s); it has been opened unchanged.")
-                self._report(head + "  " + "; ".join(errs[:3]), interactive,
-                             "Malformed design file")
-            return None
-        design, rep = import_legacy(data)
-        apply_design_to_scene(self, design)
-        # active_floor is VIEW state: the v4 file carries it, the v5 Design
-        # deliberately does not (keeping it out is what stops a floor switch
-        # dirtying the document). Carry it across by hand or the conversion
-        # silently forgets which floor the user was editing.
-        want = data.get("active_floor")
-        if want and any(f.name == want for f in self.floors):
-            self.active_floor = want
-            self._sync_floor_state()
-        self._conversion = rep
-        self._provenance = design.to_dict().get("provenance")
-        self._report(conversion_report(rep, int(data.get("version", 0))),
-                     interactive, "Converted to the v5 format")
-        return rep
 
-    def _report(self, text, interactive, title):
-        """Tell the user. A modal hangs headless, so scripted/test callers pass
-        interactive=False and read the status line (the `_import_rooms`
-        convention)."""
-        if interactive:
-            QMessageBox.information(self, title, text)
-        self.status(text)
-
-    def _finish_open(self):
-        """After `_reset_undo` has declared the loaded plan the clean baseline,
-        re-dirty it if it was CONVERTED. The conversion only exists in memory --
-        the legacy file on disk is untouched -- so the document must read as
-        unsaved until the user accepts it with a Save."""
-        if getattr(self, "_conversion", None):
-            self._saved_state = None             # nothing on disk matches this
-
-    def apply_project_to_scene(self, project: Project,
-                               keep_backdrop: bool = False):
-        for key, default in DEFAULT_SETTINGS.items():
-            val = project.settings.get(key, default)
-            if isinstance(default, bool):    # keep flags as bool (not 1.0/0.0)
-                SETTINGS[key] = bool(val)
-                continue
-            try:
-                SETTINGS[key] = float(val)
-            except (TypeError, ValueError):
-                SETTINGS[key] = default
-        self._apply_canvas()
-        # the reference image is a tracing backdrop, not plan data -- on undo
-        # (keep_backdrop) detach it so scene.clear() doesn't delete it, then
-        # re-add it afterwards.  New/Open clear it like everything else.
-        backdrops = []
-        if keep_backdrop:
-            backdrops = [it for it in self.scene.items()
-                         if isinstance(it, ReferenceImageItem)]
-            for b in backdrops:
-                self.scene.removeItem(b)
-        self.scene.clear()
-        for b in backdrops:
-            self.scene.addItem(b)
-        # restore the floor roster + active floor from the model, and prime the
-        # runtime cache NOW so items created during this load default to the
-        # right active floor (each item's floor is then overridden from the file).
-        self.floors = [Floor(f.name, f.reference) for f in project.floors]
-        self.active_floor = project.active_floor
-        set_floor_state(active=self.active_floor)
-        self._z_top = 0                  # bring-to-front counter resets per doc
-        for wm in project.walls:
-            wall = WallItem(QPointF(*wm.p1), QPointF(*wm.p2), wm.wall_type)
-            wall.floor = wm.floor                 # load overrides the default tag
-            self.scene.addItem(wall)
-            for om in wm.openings:
-                try:
-                    op = OpeningItem(wall, om.kind, om.code, om.s)
-                except ValueError:
-                    continue              # e.g. opening wider than the wall
-                op.door_type = om.door_type
-                op.swing = om.swing
-                wall.openings.append(op)
-            # no per-wall rebuild here: rebuild_all_walls below rebuilds every
-            # wall once with a shared index (a per-wall rebuild is O(n) with
-            # cascade, so on a big/duplicated plan the loop alone took minutes)
-        # merge overlapping/duplicate walls (e.g. legacy v1/v2 party-wall pairs)
-        # into single shared walls FIRST, so the rebuild runs on the reduced set
-        # (welding is NOT done here: load is also the undo-restore path and
-        # welding does not fully converge at messy junctions -> geometry would
-        # drift on every undo.  Junctions weld on draw and via the manual sweep.)
-        coalesce_all(self.scene)
-        rebuild_all_walls(self.scene)
-        missing = []
-        for rm in project.rooms:
-            anchor = QPointF(*rm.anchor)
-            res = detect_room(self.scene, anchor)
-            if res is None:
-                # an open room (a wall was detached/moved away) won't flood-fill
-                # -> rebuild it from the saved perimeter corners
-                saved = (rm.properties or {}).get("perimeter_corners")
-                if saved and len(saved) >= 3:
-                    corners = [QPointF(c[0], c[1]) for c in saved]
-                    res = (room_path_from_corners(corners),
-                           poly_area_sqft(corners), corners)
-                else:
-                    # keep the room (so it survives a re-save); placeholder
-                    path = QPainterPath()
-                    path.addRect(QRectF(anchor.x() - 12, anchor.y() - 12,
-                                        24, 24))
-                    res = (path, 0.0, None)
-                    missing.append(rm.name)
-            name = unique_room_name(self.scene, rm.name)
-            room = RoomItem(name, anchor, res[0], res[1],
-                            rm.properties, res[2])
-            room.floor = rm.floor                 # load overrides the default tag
-            room.show_dims = rm.show_dimensions
-            room.label_offset = QPointF(*rm.label_offset)
-            self.scene.addItem(room)
-            # bind this room's walls by geometry (works for both v2 plans,
-            # which store coincident party walls, and legacy v1 plans)
-            bind_room_walls(self.scene, room, settle=False)
-            for w in room.walls:                  # a room's walls share its floor
-                w.floor = room.floor              # (fixes synthesized/open edges)
-        unknown = []
-        for fm in project.furnishings:
-            if furnishing_spec(fm.kind) is None:
-                unknown.append(fm.kind or "?")
-                continue
-            item = make_furnishing(fm.kind, QPointF(*fm.pos), fm.rotation,
-                                   fm.extra)
-            item.floor = fm.floor                 # load overrides the default tag
-            self.scene.addItem(item)
-        # roster + active floor are restored; sync the runtime cache + visibility
-        self._sync_floor_state()
-        notes = []
-        if missing:
-            notes.append("Could not re-detect room(s): " + ", ".join(missing)
-                         + " — check the walls around them.")
-        if unknown:
-            notes.append("Skipped unknown furnishing kind(s): "
-                         + ", ".join(unknown) + ".")
-        if notes:
-            self.status("  ".join(notes))
-        # P1.6: load DEFINES the baseline.  A plan opened from a corrupt legacy
-        # file has faults at rest (planc1: 17x I6 + 1x I11) and shadow mode must
-        # not fire on those -- only on corruption introduced afterwards.  Undo's
-        # restore comes through here too, reinstating an already-verified state.
-        rebase(self)
 
     def paste_room(self, sp: QPointF):
         """Recreate the copied room (walls, openings, properties) with its
@@ -1596,511 +1112,32 @@ class MainWindow(QMainWindow):
         self.status(f"Pasted room '{name}'.")
 
     # -- CSV room import ----------------------------------------------------------
-    def _wall_exists(self, p1: QPointF, p2: QPointF) -> bool:
-        for it in self.scene.items():
-            if isinstance(it, WallItem) and (
-                    (QLineF(it.p1, p1).length() < 0.6
-                     and QLineF(it.p2, p2).length() < 0.6)
-                    or (QLineF(it.p1, p2).length() < 0.6
-                        and QLineF(it.p2, p1).length() < 0.6)):
-                return True
-        return False
 
-    def _free_spot(self, w_in: float, h_in: float):
-        """Top-left corner (snapped) of a canvas spot where a w x h room
-        won't touch existing walls or rooms (24" clearance)."""
-        margin = 24.0
-        canvas = canvas_rect()
-        occupied = []
-        for it in self.scene.items():
-            if isinstance(it, WallItem):
-                occupied.append(it.boundingRect())
-            elif isinstance(it, RoomItem):
-                occupied.append(it.path.boundingRect())
-        step = max(SETTINGS["wall_snap_in"], 12.0)
-        y = canvas.top() + margin
-        while y + h_in + margin <= canvas.bottom():
-            x = canvas.left() + margin
-            while x + w_in + margin <= canvas.right():
-                cand = QRectF(x - margin / 2, y - margin / 2,
-                              w_in + margin, h_in + margin)
-                if not any(cand.intersects(r) for r in occupied):
-                    return x, y
-                x += step
-            y += step
-        # canvas full: park it to the right of everything
-        right = max([r.right() for r in occupied], default=canvas.left())
-        return wall_snap_len(right + margin), canvas.top() + margin
 
-    def import_rooms_csv(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Import rooms from CSV", "",
-            "CSV files (*.csv);;All files (*)")
-        if path:
-            self._import_rooms(path)
 
     # -- import a plan from a PNG image (preview -> accept) -------------------
-    def import_from_image(self, path=None, *, width_ft=40.0, merge=3,
-                          threshold=128, wall_type="exterior",
-                          interactive=True):
-        """File > Import from image: detect walls in a raster floor plan, show
-        them as a blue ghost overlay, and add them on accept.  Pass
-        interactive=False (with explicit params) to run headlessly."""
-        if interactive and path is None:
-            path, _ = QFileDialog.getOpenFileName(
-                self, "Import plan from image", "",
-                "Images (*.png *.jpg *.jpeg *.bmp);;All files (*)")
-            if not path:
-                return None
-            dlg = ImageImportDialog(self)
-            if dlg.exec() != QDialog.DialogCode.Accepted:
-                return None
-            width_ft, merge, threshold = dlg.values()
-        try:
-            import fp_extract
-            gray = fp_extract.load_gray(path)
-            h, w = gray.shape
-            walls_px = fp_extract.detect_walls(gray, threshold, 24, merge, 40)
-            segs = fp_extract.scene_segments(walls_px, w, h, width_ft=width_ft)
-        except Exception as ex:                       # noqa: BLE001
-            if interactive:
-                QMessageBox.critical(self, "Import failed", str(ex))
-            return None
-        if not segs:
-            if interactive:
-                QMessageBox.information(
-                    self, "Import from image",
-                    "No walls detected.  Try a cleaner image or adjust the "
-                    "threshold / merge settings.")
-            return None
 
-        self._show_wall_ghost(segs)
-        if interactive:
-            ok = QMessageBox.question(
-                self, "Import from image",
-                f"Detected {len(segs)} wall(s), shown in blue on the canvas.\n"
-                "Add them to the plan?") == QMessageBox.StandardButton.Yes
-            self._clear_wall_ghost()
-            if not ok:
-                return None
-        else:
-            self._clear_wall_ghost()
 
-        for x0, y0, x1, y1 in segs:
-            self.scene.addItem(
-                WallItem(QPointF(x0, y0), QPointF(x1, y1), wall_type))
-        rebuild_all_walls(self.scene)
-        self._update_totals()
-        self._commit_if_changed()
-        self.status(f"Imported {len(segs)} wall(s) from {os.path.basename(path)}"
-                    " — click an enclosed area with the Room tool to name it.")
-        return len(segs)
-
-    def _show_wall_ghost(self, segs):
-        """Draw the candidate walls as a translucent blue overlay and fit the
-        view to them so the user can preview before accepting."""
-        self._clear_wall_ghost()
-        path = QPainterPath()
-        for x0, y0, x1, y1 in segs:
-            path.moveTo(QPointF(x0, y0))
-            path.lineTo(QPointF(x1, y1))
-        item = QGraphicsPathItem(path)
-        pen = QPen(QColor(37, 99, 235, 170), 6.0)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        item.setPen(pen)
-        item.setZValue(1_000_000)                     # above everything
-        self.scene.addItem(item)
-        self._wall_ghost = item
-        self.view.fitInView(item.boundingRect().adjusted(-24, -24, 24, 24),
-                            Qt.AspectRatioMode.KeepAspectRatio)
-
-    def _clear_wall_ghost(self):
-        item = getattr(self, "_wall_ghost", None)
-        if item is not None:
-            if item.scene() is not None:
-                self.scene.removeItem(item)
-            self._wall_ghost = None
 
     # -- interactive image backdrop: place, calibrate, extract ---------------
-    def start_image_import(self, path=None):
-        """File > Import from image: drop the PNG on the canvas as a backdrop
-        to move / scale / crop / calibrate, then Extract walls."""
-        if path is None:
-            path, _ = QFileDialog.getOpenFileName(
-                self, "Import plan from image", "",
-                "Images (*.png *.jpg *.jpeg *.bmp);;All files (*)")
-            if not path:
-                return None
-        img = QImage(path)
-        if img.isNull():
-            QMessageBox.critical(self, "Import failed",
-                                 f"Could not read image:\n{path}")
-            return None
-        ipp = canvas_rect().width() * 0.7 / max(img.width(), 1)
-        item = ReferenceImageItem(img, ipp)
-        item.setPos(QPointF(canvas_rect().width() * 0.1,
-                            canvas_rect().height() * 0.1))
-        self.scene.addItem(item)
-        self.scene.clearSelection()
-        item.setSelected(True)
-        self.view.fitInView(item.sceneBoundingRect().adjusted(-48, -48, 48, 48),
-                            Qt.AspectRatioMode.KeepAspectRatio)
-        self.status("Image placed — drag to move, drag a corner to scale, "
-                    "right-click for Calibrate / Crop / Extract walls / "
-                    "Remove.")
-        return item
 
-    def _finish_calibrate(self, item, pts):
-        val, ok = QInputDialog.getDouble(
-            self, "Calibrate scale",
-            "Real distance between the two clicked points (feet):",
-            10.0, 0.01, 100000.0, 2)
-        if not ok or item is None:
-            return
-        item.calibrate(pts[0], pts[1], val * FOOT)
-        self.status(f"Calibrated — that span is now {fmt_ftin(val * FOOT)}.")
 
-    def extract_from_reference(self, item, interactive=True):
-        """Detect walls in the (scaled/cropped) backdrop and add them, with a
-        blue ghost preview when interactive."""
-        segs = item.wall_segments()
-        if not segs:
-            if interactive:
-                QMessageBox.information(
-                    self, "Extract walls",
-                    "No walls detected.  Calibrate/crop closer or adjust the "
-                    "image, then try again.")
-            return None
-        self._show_wall_ghost(segs)
-        if interactive:
-            ok = QMessageBox.question(
-                self, "Extract walls",
-                f"Detected {len(segs)} wall(s), shown in blue.  Add them to "
-                "the plan?") == QMessageBox.StandardButton.Yes
-            self._clear_wall_ghost()
-            if not ok:
-                return None
-        else:
-            self._clear_wall_ghost()
-        for x0, y0, x1, y1 in segs:
-            self.scene.addItem(
-                WallItem(QPointF(x0, y0), QPointF(x1, y1), "exterior"))
-        # DEFECT 19, in-app arm.  Pixel-detected ends land near each other but
-        # rarely on each other, and this path injects walls straight into the
-        # live scene -- it never passes through a load, so P2.1's weld-on-open
-        # never sees them, and per the corrected F5 nothing else welds either.
-        # Without this every extracted plan is born with open junctions, which
-        # is exactly what leaks room detection between spaces.
-        weld_all(self.scene)
-        rebuild_all_walls(self.scene)
-        self._update_totals()
-        self._commit_if_changed()
-        self.status(f"Added {len(segs)} wall(s) — right-click the image to "
-                    "remove it, then name rooms with the Room tool.")
-        return len(segs)
 
-    def _import_rooms(self, path: str, interactive: bool = True):
-        """Create walled rooms from a CSV with the columns
-        Name,Type,X_ft,Y_ft,X_loc_ft,Y_loc_ft,Notes (Type, locations and
-        Notes optional).  X_ft/Y_ft are the room's perimeter width and
-        length; X_loc/Y_loc place its BOTTOM-LEFT corner, measured in
-        feet from the canvas's bottom-left corner.  Rooms without a
-        location go to the first clear spot on the canvas.
 
-        The canvas grows (never shrinks) so every room fits, up to
-        MAX_CANVAS_IN; a room whose size/location needs more than that is
-        rejected as a likely typo."""
-        try:
-            with open(path, "r", encoding="utf-8-sig", newline="") as f:
-                reader = csv.DictReader(f)
-                if reader.fieldnames is None:
-                    raise ValueError("Empty CSV file.")
-                rows = [{(k or "").strip().lower(): (v or "").strip()
-                         for k, v in row.items()} for row in reader]
-        except (OSError, csv.Error, ValueError) as ex:
-            if interactive:
-                QMessageBox.critical(self, "Import failed", str(ex))
-            self.status(f"Import failed: {ex}")
-            return
-        margin = 2.0 * FOOT
-        max_in = MAX_CANVAS_IN
 
-        # -- pass 1: parse + validate every row (no placement yet) --------
-        specs, errors = [], []
-        for i, row in enumerate(rows, start=2):     # 1 = header line
-            name = row.get("name", "")
-            try:
-                if not name:
-                    raise ValueError("missing Name")
-                w_in = parse_feet(row["x_ft"])
-                h_in = parse_feet(row["y_ft"])
-                if w_in < 36.0 or h_in < 36.0:
-                    raise ValueError("rooms must be at least 3' x 3'")
-                xl, yl = row.get("x_loc_ft", ""), row.get("y_loc_ft", "")
-                if xl and yl:
-                    xl_in, yl_in, located = parse_feet(xl), parse_feet(yl), True
-                elif xl or yl:
-                    raise ValueError("give both X_loc_ft and Y_loc_ft, "
-                                     "or neither")
-                else:
-                    xl_in = yl_in = None
-                    located = False
-                far_w = (xl_in + w_in) if located else w_in
-                far_h = (yl_in + h_in) if located else h_in
-                if far_w > max_in or far_h > max_in:
-                    raise ValueError(
-                        f"exceeds the {max_in / FOOT:g}' canvas limit "
-                        "(check for a typo)")
-            except (KeyError, ValueError) as ex:
-                errors.append(f"line {i} ({name or '?'}): {ex}")
-                continue
-            specs.append({"name": name, "w": w_in, "h": h_in,
-                          "located": located, "xl": xl_in, "yl": yl_in,
-                          "type": row.get("type", ""),
-                          "notes": row.get("notes", "")})
 
-        # -- grow the canvas so every room fits (grow only, capped) -------
-        # located rooms drive both dimensions; auto-placed rooms only need
-        # the height to be tall enough to hold them (width grows afterwards)
-        req_w = max([s["xl"] + s["w"] + margin
-                     for s in specs if s["located"]], default=0.0)
-        req_h = max([s["yl"] + s["h"] + margin
-                     for s in specs if s["located"]]
-                    + [s["h"] + 2 * margin
-                       for s in specs if not s["located"]], default=0.0)
-        new_w = min(max(SETTINGS["canvas_w_in"], req_w), max_in)
-        new_h = min(max(SETTINGS["canvas_h_in"], req_h), max_in)
-        resized = (new_w > SETTINGS["canvas_w_in"]
-                   or new_h > SETTINGS["canvas_h_in"])
-        if resized:
-            SETTINGS["canvas_w_in"], SETTINGS["canvas_h_in"] = new_w, new_h
-            self._apply_canvas()
 
-        # -- pass 2: build the rooms (canvas height is now final) ---------
-        canvas = canvas_rect()
-        imported = 0
-        for s in specs:
-            w_in, h_in = s["w"], s["h"]
-            if s["located"]:
-                left = wall_snap_len(s["xl"])
-                top = wall_snap_len(canvas.bottom() - s["yl"] - h_in)
-            else:
-                left, top = self._free_spot(w_in, h_in)
-            corners = [QPointF(left, top), QPointF(left + w_in, top),
-                       QPointF(left + w_in, top + h_in),
-                       QPointF(left, top + h_in)]
-            for j in range(4):
-                p1, p2 = corners[j], corners[(j + 1) % 4]
-                if not self._wall_exists(p1, p2):
-                    self.scene.addItem(WallItem(QPointF(p1), QPointF(p2),
-                                                "interior"))
-            rebuild_all_walls(self.scene)
-            centre = QPointF(left + w_in / 2, top + h_in / 2)
-            res = detect_room(self.scene, centre)
-            if res is None:
-                errors.append(f"{s['name']}: no enclosed area detected "
-                              "(overlapping another room?)")
-                continue
-            room = RoomItem(unique_room_name(self.scene, s["name"]), centre,
-                            res[0], res[1], corners=res[2])
-            if s["type"]:
-                room.properties["room_type"] = next(
-                    (t for t in ROOM_TYPES if t.lower() == s["type"].lower()),
-                    s["type"])
-            if s["notes"]:
-                room.properties["notes"] = s["notes"]
-            self.scene.addItem(room)
-            bind_room_walls(self.scene, room)
-            imported += 1
 
-        # -- grow width for any auto-placed room parked past the edge -----
-        walls = [it for it in self.scene.items() if isinstance(it, WallItem)]
-        right = max([p.x() for it in walls for p in (it.p1, it.p2)],
-                    default=0.0)
-        if right + margin > canvas.right():
-            grow_w = min(right + margin, max_in)
-            if grow_w > SETTINGS["canvas_w_in"]:
-                SETTINGS["canvas_w_in"] = grow_w
-                self._apply_canvas()
-                resized = True
 
-        note = ""
-        if resized:
-            c = canvas_rect()
-            note = (f" Canvas resized to {c.width() / FOOT:g}' × "
-                    f"{c.height() / FOOT:g}'.")
-        self.status(f"Imported {imported} room(s) from {path}"
-                    + (f" — {len(errors)} row(s) skipped." if errors else ".")
-                    + note)
-        self._import_errors = errors      # inspectable (and testable)
-        if errors and interactive:
-            QMessageBox.warning(self, "Import finished with problems",
-                                "\n".join(errors[:20]))
-
-    def export_rooms_csv(self):
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Export rooms to CSV", "rooms.csv",
-            "CSV files (*.csv);;All files (*)")
-        if path:
-            self._export_rooms(path)
-
-    def _export_rooms(self, path: str, interactive: bool = True):
-        """Write every room as a CSV row in the same format the importer
-        reads (Name,Type,X_ft,Y_ft,X_loc_ft,Y_loc_ft,Notes), so a plan's
-        rooms round-trip.  Sizes/locations come from the room perimeter
-        (wall centrelines); locations are the bottom-left corner in feet
-        from the canvas's bottom-left corner, lengths in decimal feet."""
-
-        def ft(v: float) -> str:
-            return f"{v / 12.0:g}"
-
-        canvas = canvas_rect()
-        rooms = sorted((it for it in self.scene.items()
-                        if isinstance(it, RoomItem)),
-                       key=lambda r: r.name.lower())
-        try:
-            with open(path, "w", encoding="utf-8", newline="") as f:
-                wr = csv.writer(f)
-                wr.writerow(["Name", "Type", "X_ft", "Y_ft",
-                             "X_loc_ft", "Y_loc_ft", "Notes"])
-                for r in rooms:
-                    if r.corners:
-                        xs = [c.x() for c in r.corners]
-                        ys = [c.y() for c in r.corners]
-                    else:                   # no traced perimeter: use the
-                        rect = r.interior_rect()      # flood region box
-                        xs = [rect.left(), rect.right()]
-                        ys = [rect.top(), rect.bottom()]
-                    wr.writerow([
-                        r.name,
-                        r.properties.get("room_type", ""),
-                        ft(max(xs) - min(xs)),
-                        ft(max(ys) - min(ys)),
-                        ft(min(xs)),
-                        ft(canvas.bottom() - max(ys)),
-                        " ".join(str(r.properties.get("notes", ""))
-                                 .split()),
-                    ])
-        except OSError as ex:
-            if interactive:
-                QMessageBox.critical(self, "Export failed", str(ex))
-            self.status(f"Export failed: {ex}")
-            return
-        self.status(f"Exported {len(rooms)} room(s) to {path}")
-
-    def open_plan(self):
-        if not self._confirm_discard_changes("Open plan"):
-            return
-        start = self.current_path or str(designs_dir())
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Open plan", start,
-            "Floor plan JSON (*.json);;All files (*)")
-        if not path:
-            return
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            self.open_document(data)     # migrates a legacy file; reports
-        except (OSError, ValueError, KeyError, TypeError) as ex:
-            QMessageBox.critical(self, "Open failed", str(ex))
-            return
-        self.current_path = path
-        self._reset_undo()               # opened document is the new baseline
-        self._finish_open()              # ...unless it was CONVERTED -> dirty
-        self._update_title()
-        self.status(f"Opened {path}")
-
-    def save_plan(self):
-        if not self.current_path:
-            self.save_plan_as()
-            return
-        self._write_plan(self.current_path)
-
-    def save_plan_as(self):
-        start = self.current_path or str(designs_dir() / "floorplan.json")
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Save plan", start,
-            "Floor plan JSON (*.json);;All files (*)")
-        if not path:
-            return
-        self._write_plan(path)
-
-    def _write_plan(self, path: str):
-        verify(self, "save", deep=True)      # P1.6: all fifteen before writing
-        state = self.snapshot()
-        on_disk = self.design_document()     # P2.2: the FILE is v5 now
-        try:
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(on_disk, f, indent=1)
-        except OSError as ex:
-            QMessageBox.critical(self, "Save failed", str(ex))
-            return
-        self.current_path = path
-        self._saved_state = state            # plan now matches what's on disk
-        self._update_title()
-        self.status(f"Saved {path}")
 
     # -- headless / macro hooks ----------------------------------------------
     # These let an external driver (fp_macro.py) load, edit, snapshot and save
     # a plan with no dialogs.  See docs/macro_language.md for the macro syntax.
 
-    def export_legacy_v4(self):
-        """File ▸ Export legacy v4… -- kept for ONE release so nobody is
-        stranded by the v5 cutover."""
-        start = self.current_path or str(designs_dir() / "floorplan-v4.json")
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Export legacy v4", start,
-            "Floor plan JSON (*.json);;All files (*)")
-        if path:
-            self.export_legacy_v4_path(path)
 
-    def export_legacy_v4_path(self, path: str):
-        """Non-interactive legacy export. Writes what the OLD loader reads --
-        `serialize()` is still the v4 walk, so this stays a straight dump plus
-        the top-level `active_floor` v4 files carry."""
-        state = self.serialize()
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump({**state, "active_floor": self.active_floor}, f, indent=2)
-        self.status(f"Exported legacy v4 plan to {path}")
-        return path
 
-    def load_path(self, path: str):
-        """Non-interactive open (no dialogs).  Raises on failure.
 
-        Same conversion as File > Open, minus the modal: a converted legacy
-        plan lands dirty and its report goes to the status line."""
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        self.open_document(data, interactive=False)
-        self.current_path = path
-        self._reset_undo()
-        self._finish_open()
-        self._update_title()
 
-    def save_path(self, path: str):
-        """Non-interactive save (no dialogs).  Raises on failure."""
-        verify(self, "save", deep=True)      # P1.6: all fifteen before writing
-        state = self.snapshot()
-        on_disk = self.design_document()     # P2.2: the FILE is v5 now
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(on_disk, f, indent=1)
-        self.current_path = path
-        self._saved_state = state
-        self._update_title()
-
-    def clear_plan(self):
-        """Non-interactive New (no confirm dialog)."""
-        self.scene.clear()
-        self.current_path = None
-        SETTINGS.update(DEFAULT_SETTINGS)
-        self._apply_canvas()
-        self.floors = [Floor(DEFAULT_FLOOR)]    # back to a single default floor
-        self.active_floor = DEFAULT_FLOOR
-        self._sync_floor_state()
-        self._conversion = None          # a new plan was converted from nothing
-        self._provenance = None
-        self._doc_settings = {}
-        self._reset_undo()
 
     def prepare_headless(self, w: int = 1280, h: int = 860):
         """Size the window/view and fit the canvas so scene<->viewport
@@ -2115,52 +1152,9 @@ class MainWindow(QMainWindow):
                             Qt.AspectRatioMode.KeepAspectRatio)
         QApplication.processEvents()
 
-    def _content_rect(self) -> QRectF:
-        """Bounding box of all walls/rooms/furnishings (or the canvas when
-        empty), with a 1' margin — the region a snapshot should frame."""
-        box = QRectF()
-        for it in self.scene.items():
-            if isinstance(it, (WallItem, RoomItem, FurnishingItem)):
-                box = box.united(it.sceneBoundingRect())
-        if box.isNull():
-            box = canvas_rect()
-        return box.adjusted(-FOOT, -FOOT, FOOT, FOOT)
 
-    def export_canvas(self, path: str, rect: QRectF = None,
-                      scale: float = 2.0) -> bool:
-        """Render the scene (items only, no editor grid) to a PNG or SVG file,
-        chosen by the path's extension.  `rect` defaults to the content box."""
-        rect = QRectF(rect) if rect is not None else self._content_rect()
-        if str(path).lower().endswith(".svg"):
-            return self._export_svg(path, rect)
-        return self._export_png(path, rect, scale)
 
-    def _export_png(self, path, rect, scale) -> bool:
-        img = QImage(max(1, int(rect.width() * scale)),
-                     max(1, int(rect.height() * scale)),
-                     QImage.Format.Format_ARGB32)
-        img.fill(Qt.GlobalColor.white)
-        p = QPainter(img)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        self.scene.render(p, QRectF(0, 0, img.width(), img.height()), rect)
-        p.end()
-        return bool(img.save(str(path)))
 
-    def _export_svg(self, path, rect) -> bool:
-        if QSvgGenerator is None:
-            raise RuntimeError("QtSvg is unavailable -- cannot write SVG.")
-        gen = QSvgGenerator()
-        gen.setFileName(str(path))
-        gen.setSize(QSize(max(1, int(rect.width())),
-                          max(1, int(rect.height()))))
-        gen.setViewBox(QRectF(0, 0, rect.width(), rect.height()))
-        gen.setTitle("FloorPlanner canvas")
-        gen.setDescription("Scene units are inches (1 unit = 1 inch). "
-                           "Origin at the framed region's top-left.")
-        p = QPainter(gen)
-        self.scene.render(p, QRectF(0, 0, rect.width(), rect.height()), rect)
-        p.end()
-        return True
 
     def scene_summary(self) -> dict:
         """A machine-readable description of the layout for an AI driver:
