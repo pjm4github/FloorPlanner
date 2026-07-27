@@ -111,7 +111,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P2.5** Split `MainWindow` IO/CSV/image/floors out | ruff + pytest |
 | ☑ | **P3.1** Vertex table live; `WallItem` holds `v1`/`v2` | branch, ruff + pytest |
 | ☑ | **P3.2** `RoomItem.outline`; drop `perimeter_corners` | ruff + pytest |
-| ☐ | **P3.3** Wall move = move vertices + split rule | ruff + pytest |
+| ☑ | **P3.3** Wall move = move vertices + split rule | ruff + pytest |
 | ☐ | **P3.4** Topology ops replace coalesce/weld/fracture | ruff + pytest |
 | ☐ | **P3.5** Delete the detection engine | ruff + pytest |
 | ☐ | **P3.6** Opening anchors | ruff + pytest |
@@ -1636,4 +1636,136 @@ notes:   INTERIM REPRESENTATION, stated not implied: an outline edge holds a
          class). The change I PREDICTED to test_design_bridge's _project_areas
          did NOT materialise: because the export re-derives the key rather than
          dropping it, that helper reads it unchanged.
+
+P3.3  done   (branch v5-topology)
+ruff:    clean
+pytest:  OFF  447 passed, 4 xfailed, 1 xpassed in 18.04s
+         ON   447 passed, 4 xfailed, 1 xpassed in 19.61s
+         DEEP 442 passed, 3 xfailed, 7 deselected in 17.69s
+files:   floorplanner/vertex.py (relocated_to + call-site attribution),
+         floorplanner/walls.py (_DragVertex, end_vertex/set_end_vertex,
+         _is_continuation, _plan_vertex_moves, the drag rewritten),
+         floorplanner/design/verify.py (SITE_LOG_ATTR),
+         tests/test_wall_move.py (new, 19)
+ACCEPTANCE: suite green with NO TEST CHANGES -- `git status tests/` shows only
+         the new file, all three ways.
+THE LOG ENTRY FOR THIS TASK WAS NOT ON DISK. The brief said the five settled
+         points were in this Progress log; they were not, and 3d6d32e touched
+         only two lines (defect 12a, and the P2.3 regression row). Reported
+         rather than reconstructed, per the P0.6 rule. Two of the five WERE on
+         disk and are quoted here: the same-level constraint (defect 12a,
+         `_attached`) and `_collinear_run` at walls.py:888 gathering 2 of 2. The
+         "72 splits" figure appears nowhere in the repo (a grep for it over
+         docs/*.md is empty), so it is not quoted; the measured figure for this
+         task's scenario is below. The 0.6" tolerance was verified in the CODE
+         (walls.py, `QLineF(q, rp).length() < 0.6`), which matches
+         vertex_weld_in / WELD_TOL -- the schema's own definition of one vertex,
+         and now named SHARE_TOL rather than repeated as a literal.
+THE HEADLINE NUMBER, measured both ways on the same 4x4 grid: 12 wall drags
+         caused 148 SPLIT-ON-WRITES before this task and 2 after. The two that
+         remain are the branches deliberately NOT promoted (see below), so the
+         drag path is converted, not merely quieter.
+(1) PROMOTION. The 0.6" scan used to discover coincident ends and then push each
+         one by hand on every mouse event, which is split-on-write: the corner
+         came apart and was rebuilt from coordinates 60 times a second. Now the
+         scan runs ONCE at press and REBINDS those ends to one Vertex object
+         (`set_end_vertex`), and the drag moves the vertex (`relocated_to`) --
+         so a neighbour follows because it IS the corner. Asserted with `is`,
+         never `==`: equal coordinates are exactly what the old code already
+         produced and would not distinguish the two worlds.
+         `relocated_to` CARRIES THE UID. A moved corner is the same corner, so
+         renaming it would be wrong on its own terms and would also break P4.5,
+         which serializes groups by member id. It is not counted as a split,
+         because it is not one -- otherwise P3.3's own conversion would show up
+         in the very telemetry that exists to find the call sites still needing
+         it. A test pins that the count does not move across a drag.
+         SAME LEVEL ONLY (defect 12a, now closed). Filtered at the LOOP HEAD, so
+         cross-level sharing is impossible by construction. Note the filter
+         covers the whole scan, not just the promotion: leaving the tee branch
+         unfiltered would have left half of defect 12a alive for no benefit, and
+         the transient cross-floor mis-drag is a real bug too. Declared because
+         it is one line wider than "promotion is same-level".
+(2) THE SPLIT RULE, and what it is really a rule about: what must NOT be shared.
+         A wall collinear with the slide that continues past an endpoint cannot
+         ride the corner -- the slide is perpendicular, so moving the shared end
+         would swing its far end and SHEAR it. So the continuation is split off
+         FIRST (its own vertex, and it stays put), before any sharing is made.
+         Verified in both directions rather than asserted: with P3.3 reverted,
+         test_a_collinear_continuation_is_never_sheared FAILS with the
+         continuation's end at y=12 instead of y=0 -- it really was being
+         dragged and sheared, so this is a behaviour FIX, not just a
+         representation change.
+         The rule also has to BREAK sharing that already exists, not merely
+         decline to create it (a corner welded by an earlier operation is
+         exactly what P3.4's weld produces). Own test.
+(3) DETECTION STAYS AUTHORITATIVE. Nothing here reads outlines off vertices;
+         room areas after a drag are what refresh_rooms arrives at, and the
+         scene test asserts that. P3.5 flips it.
+(4) CALL-SITE ATTRIBUTION, and the data it immediately produced. P3.1's counter
+         said an operation splits; it could not say WHERE, and "which call sites
+         should become real vertex moves" is a question about lines. `_blame()`
+         walks past this module and past the p1/p2 setters -- blaming the
+         setters would put every split on two lines and answer nothing.
+         MEASURED, over coalesce + weld + group + bake + ungroup + 12 drags = 82
+         splits:
+             40  items.py:703 in bake()
+             40  items.py:704 in bake()
+              2  walls.py     in mouseMoveEvent()
+         So 80 of 82 are GroupItem.bake, on two adjacent lines, and that is
+         P4.5's ("groups move the real items -- no duplicate_wall"). The 2 are
+         the tee and grouped branches this task deliberately left on the
+         coordinate path. The drag's own corner moves contribute ZERO.
+         TWO LOGS, not a wider tuple: SPLIT_LOG_ATTR keeps its (operation,
+         splits) shape and SITE_LOG_ATTR carries the blame, so the P3.1 reader
+         (and its test) is not broken to add data it did not ask for.
+         COST measured, per the P3.1 lesson: 622 ns per split for the
+         sys._getframe walk. Never on a READ -- reads are the hot path P3.1 had
+         to fix -- and at 82 splits per heavy session it is under noise. The
+         harness confirms: bake ratio 6.57 / 6.90 / 7.78 over three runs
+         (absolute 303-332 ms) against P3.1's recorded 6.83 / 297 ms. The 7.78
+         sample is variance, not a regression -- checked by re-running rather
+         than by assuming, because the first run alone looked like one.
+A HAZARD FOUND WHILE REVIEWING MY OWN DIFF, and it is not a corner case:
+         GROUPING DUPLICATES A ROOM'S WALLS ONTO THE ORIGINALS, so a grouped end
+         coincident with a dragged wall is the COMMON case. Promoting it would
+         wire a group member to an outside wall permanently, and what a group is
+         topologically is P4.5's open question. Grouped neighbours therefore
+         keep the OLD coordinate path (`kind == "rigid"`) -- they still follow
+         the drag exactly as today, they just do not become topology. Same
+         instinct as the `group() is None` gate that keeps grouped walls out of
+         coalesce, applied one task before the semantics that need it.
+COMPOSITION GATE (the standing additions): both apply paths after a real drag --
+         load_data (faithful) and open_document (converting, composed out to a
+         legacy v4 export and back, ends_moved == 0) -- plus a corpus test that
+         presses EVERY wall of sample_plan and planc1 without dragging and
+         asserts the whole document is unchanged and zero splits occurred. That
+         last one is the new risk this task introduces and nothing else would
+         catch: the press rewrites which vertex a neighbour points at, on every
+         wall the user so much as clicks. Areas would survive a promotion that
+         re-pointed an end at the WRONG corner; the document would not, so the
+         document is what is asserted. Measured on planc1: 80 walls pressed,
+         document byte-identical, 0 splits.
+DEFERRED, DECLARED, NOT DONE -- and it needs a ruling. The plan's P3.3 task text
+         has a second half of the split rule: "a vertex landing on another
+         wall's body splits that wall." It is NOT among the five settled points
+         (which specify the promotion, detection authority, attribution, the
+         four tests, and the gate), and it is P3.4's shape of work: splitting a
+         WallItem at a landing point is `split_edge` scene-side, in the same
+         task that replaces coalesce/weld/fracture. Doing it here would
+         duplicate that and would add an automatic wall-splitting side effect to
+         every drag release -- a wide blast radius for something no acceptance
+         test asks for. The tee branch is left on the coordinate path with a
+         comment naming P3.4. Flagging rather than quietly widening or
+         narrowing the task: say the word and it lands here instead.
+DEMO PORT: `w24` no longer exists as that wall. The demo named it, but ids are
+         canonical and the Gate 2 regeneration (82 walls -> 80, 47/62 vertex ids
+         renumbered) moved every id in symmetricP1.json -- w24 is now a Master
+         Suite / Rear Porch wall, and pre-Gate-2 it was Hall / Lounge. The
+         BEHAVIOURAL pin holds exactly on today's fixture: the Lounge / Front
+         Porch party wall (currently w18, 210" at y=864), +12 y, Lounge +17.5 sf
+         and Front Porch -17.5 sf, TOTAL UNCHANGED to 0.0, check(deep=True) ==
+         []. The test picks the wall by rooms and axis, never by id, so it fails
+         for a regression rather than for a renumbering. A second test pins that
+         the chosen wall really has no collinear continuation -- the demo's own
+         precondition -- so the first cannot pass by luck.
 ```
