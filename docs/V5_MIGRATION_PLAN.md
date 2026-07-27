@@ -110,7 +110,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P2.4** Convert the corpus and the tooling | ruff + pytest |
 | ☑ | **P2.5** Split `MainWindow` IO/CSV/image/floors out | ruff + pytest |
 | ☑ | **P3.1** Vertex table live; `WallItem` holds `v1`/`v2` | branch, ruff + pytest |
-| ☐ | **P3.2** `RoomItem.outline`; drop `perimeter_corners` | ruff + pytest |
+| ☑ | **P3.2** `RoomItem.outline`; drop `perimeter_corners` | ruff + pytest |
 | ☐ | **P3.3** Wall move = move vertices + split rule | ruff + pytest |
 | ☐ | **P3.4** Topology ops replace coalesce/weld/fracture | ruff + pytest |
 | ☐ | **P3.5** Delete the detection engine | ruff + pytest |
@@ -1568,4 +1568,72 @@ notes:   A Vertex is a shared, identity-bearing point; two wall ends holding the
          COMPOSITION GATE (the Gate 2 lesson): round trips asserted through BOTH
          apply paths -- load_data (faithful) and open_document (converting,
          composed all the way out to a legacy export and back).
+
+CI-ON-BRANCH  done   (draft PR #1)
+notes:   Pushing v5-topology ran NO CI -- ci.yml triggers on push-to-main and
+         pull_request only, so the whole geometry rewrite would have gone
+         unvalidated until the merge: exactly the situation P0.3 called out.
+         Fixed with a DRAFT PR (v5-topology -> main) rather than editing
+         ci.yml's push list: the pull_request trigger then covers every push,
+         and it costs no config change on main that we would later revert. The
+         PR also gives a running diff of the phase and is the merge vehicle at
+         P3.8. First run green: ruff, py3.10 and py3.13, both suite runs.
+
+P3.2  done   (commit 77bc91a, branch v5-topology)
+ruff:    clean
+pytest:  OFF  428 passed, 4 xfailed, 1 xpassed in 16.69s
+         ON   428 passed, 4 xfailed, 1 xpassed in 18.64s
+         DEEP 423 passed, 3 xfailed, 7 deselected in 16.80s
+files:   floorplanner/rooms.py (OutlineEdge, derived corners, mirror deleted,
+         edge->wall in bind_room_walls, clipboard fix), floorplanner/planio.py
+         (export re-derives, load strips), floorplanner/items.py +
+         mainwindow.py (mirror call sites), tests/test_outline.py (new, 13),
+         tests/test_groups.py (one deleted-method call)
+ACCEPTANCE: room areas unchanged across the corpus (asserted on sample_plan and
+         planc1 through the faithful apply, with the document identical after);
+         _sync_corner_props and its six call sites deleted.
+notes:   INTERIM REPRESENTATION, stated not implied: an outline edge holds a
+         COORDINATE, not a vertex identity. P3.1's split-on-write world has no
+         shared corner vertex to name -- at every corner each wall owns a
+         distinct Vertex. Borrowing one wall's end picks arbitrarily between
+         two (and two rooms meeting there could pick differently); minting a
+         room-owned vertex adds a third object no wall references. Both encode
+         an authority that does not exist yet; a coordinate states exactly what
+         is known. THE TEST FOR CHOOSING AN INTERIM REPRESENTATION IS WHICH ONE
+         DOES NOT LIE.
+         Two guards pin the gap: outline corner and wall end have equal
+         coordinates but are distinct objects, and a corner is still two
+         distinct wall vertices. Both say in their docstrings that FAILING is
+         the signal P3.4 closed the gap, not that something broke.
+         The edge->wall mapping is the real content of the task -- before it a
+         room had corners and an unordered walls list with no correspondence.
+         SHIPPED POPULATED (bind_room_walls already computed it to place
+         OpenWall placeholders), so the fallback rider does not apply and P3.4
+         inherits nothing.
+         THREE FATES, all three exercised by tests: the live mirror DELETED;
+         the legacy v4 export KEPT byte-compatibly via
+         RoomItem.export_properties() re-deriving at serialization time at the
+         same 2dp rounding (the v4 loader needs it for OPEN rooms, whose
+         detection fails); the importer reading legacy FILES untouched forever.
+         Plus "ignored on load" -- read for the fallback, then stripped.
+         AUDIT FINDING -- THE MIRROR WAS MASKING A LATENT BUG, and only the
+         grep-everything instruction found it. _copy_spec carried
+         dict(self.properties) -- including the SOURCE room's perimeter_corners
+         -- into the clipboard; paste_room passed it to the new RoomItem, where
+         _sync_corner_props overwrote it. Deleting the mirror naively would have
+         shipped the source room's geometry into every pasted room, in a corner
+         the suite does not reach. Fixed by keeping geometry out of the
+         clipboard, with a test. All 20 tree-wide hits reconcile: 6 importer
+         (4 live + 2 docstrings), 2 mirror body, 1 legacy-load fallback, 1
+         bridge pop, 1 tool docstring, 8 tests, 1 schema (which FORBIDS the key,
+         confirming the plan's parenthetical).
+         The room-properties dialog and the inventory paths were checked too:
+         the dialog updates an explicit key list, inventory reads include_sqft
+         only. Neither touches geometry.
+         TEST CHANGED (1): tests/test_groups.py called room._sync_corner_props()
+         directly -- a SEVENTH call site, in tests rather than production.
+         Removed; a call to a deleted private method, not an assertion (the P0.2
+         class). The change I PREDICTED to test_design_bridge's _project_areas
+         did NOT materialise: because the export re-derives the key rather than
+         dropping it, that helper reads it unchanged.
 ```
