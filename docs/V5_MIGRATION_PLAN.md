@@ -108,7 +108,7 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P2.2** Save writes v5; legacy export | ruff + pytest |
 | ☑ | **P2.3** Undo snapshots the v5 dict | ruff + pytest |
 | ☑ | **P2.4** Convert the corpus and the tooling | ruff + pytest |
-| ☐ | **P2.5** Split `MainWindow` IO/CSV/image/floors out | ruff + pytest |
+| ☑ | **P2.5** Split `MainWindow` IO/CSV/image/floors out | ruff + pytest |
 | ☐ | **P3.1** Vertex table live; `WallItem` holds `v1`/`v2` | branch, ruff + pytest |
 | ☐ | **P3.2** `RoomItem.outline`; drop `perimeter_corners` | ruff + pytest |
 | ☐ | **P3.3** Wall move = move vertices + split rule | ruff + pytest |
@@ -1389,4 +1389,63 @@ notes:   THE FREEZE IS THE TASK. examples/planc1.json (v3) and
              It joined the validated sweep automatically the moment it existed
              (discovery works), and validates clean: schema 0, invariants 0 deep.
          Not pushed -- Phase 2 pushes after P2.5.
+
+P2.4-followup  done   (commit 33e457d)
+ruff:    clean · pytest: 400 passed, 4 xfailed, 1 xpassed
+notes:   The `>= 5` wall bound was the WRONG SHAPE of guard -- a lower bound
+         passes if planarisation ever explodes, so a bug splitting 5 detected
+         runs into 500 spurious segments would sail through. Measured and
+         hard-coded: 5 detected runs -> 9 graph edges over 8 vertices for that
+         fixture, both exact (the fixture is deterministic and edge-granular
+         walls are document state in v5). EIGHTH declared assertion change.
+         Took the optional hardening too: the macro-modal test's failure mode
+         was a HANG (a modal exec() blocks forever headless), which in CI means
+         the job runs to its timeout. _modal_failsafe schedules a single-shot
+         timer that dismisses any modal and records it, so the test goes RED
+         instead. Timers fire inside nested exec loops -- the same mechanism
+         macro._modal_step uses to drive dialogs, opposite purpose.
+
+P2.5  done   (commit d274d21)
+ruff:    clean
+pytest:  OFF  400 passed, 4 xfailed, 1 xpassed in 14.89s
+         ON   400 passed, 4 xfailed, 1 xpassed in 16.98s
+         DEEP 395 passed, 3 xfailed, 7 deselected in 14.79s
+files:   floorplanner/planio.py, csvio.py, imageio.py, levels.py (all new),
+         floorplanner/mainwindow.py, CLAUDE.md
+ACCEPTANCE: suite green with ZERO TEST CHANGES -- `git status tests/` empty --
+         all three ways. MainWindow 100 methods / 2179 lines -> 49 / 1173,
+         under the review's ~55 target.
+INVENTORY (methods / lines):
+         mainwindow.py  MainWindow    49  1173   UI wiring + edit orchestration
+         planio.py      PlanIOMixin   26   544   open/save/export + bridges
+         levels.py      LevelsMixin   13   198   the floor roster
+         csvio.py       CsvIOMixin     6   260   room CSV import/export
+         imageio.py     ImageIOMixin   6   186   reference image + extraction
+notes:   MIXINS, NOT DELEGATING WRAPPERS. The suite calls these directly --
+         win.serialize(), win.snapshot(), win.load_data(), win._import_rooms(),
+         win._is_dirty(), win.switch_floor() -- and a mixin resolves every one
+         unchanged with zero delegation boilerplate. A delegate-per-method split
+         would ALSO have left MainWindow at 100 methods, missing the point of
+         the target. The split is internal structure, invisible at the API.
+         MOVER'S DISCIPLINE VERIFIED MECHANICALLY, not asserted: a script
+         ast.unparse()s every method before and after the split and diffs them.
+         100 before, 100 after, 0 missing, 0 CHANGED. Nothing improved in
+         flight.
+         BOTH KNOWN HAZARDS CHECKED rather than assumed: SETTINGS is ONE shared
+         object (id() compared across config/planio/csvio/imageio/levels/
+         mainwindow -- all identical; no module re-binds it), and serialize()
+         travelled with its guard comment intact.
+         The 84 unused imports left by copying mainwindow's header into each
+         module were removed by `ruff --fix`; star imports keep their noqa.
+         CLAUDE.md's module layout updated -- it described a layout that no
+         longer existed and would have misdirected the next reader.
+         NOTED FOR LATER, NOT DONE (the itches, per mover's discipline):
+           * `import_from_image` (55 lines) and `_import_rooms` (137 lines) are
+             both long enough to want splitting; neither is in P2.5's scope.
+           * `apply_project_to_scene` (109 lines) is the v4 loader and is on a
+             deletion path once the legacy export retires -- do not invest.
+           * `room_boolean` (97 lines) stayed in mainwindow.py deliberately: it
+             is rewritten as a polygon op at P3.5, so moving it now would churn
+             a file that task rewrites.
+         PHASE 2 COMPLETE. Ready to push.
 ```
