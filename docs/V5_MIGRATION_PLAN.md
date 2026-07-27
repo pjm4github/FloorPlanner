@@ -296,6 +296,10 @@ A debug flag (env var or `--verify-design`) that rebuilds the `Design` and runs 
 
 ### P2.1 — Load path
 v1–v4 `floorplanner-json`: parse → weld at `join_tol_in` → planarize → trace outlines → convert openings → assign furnishing owners → write `provenance` → **mark dirty** → show the conversion report (§7a of `DESIGN_MODEL_v5.md`). v5 `floorplanner-design`: load, validate, **never dirty**; a file failing I14 is reported as malformed, not silently re-welded.
+
+**Two weld counters, with a 0.6″ noise floor** *(added after P1.4 measured them)*. Track both: `weld_ops`, operations performed (31 on `planc1.json`), and `ends_moved`, operations that displaced a coordinate by **more than `settings.vertex_weld_in` (0.6″)** — **4**. Only `ends_moved` reaches the user or `provenance.endpoints_welded`, whose schema description already says "wall ends *moved*"; `weld_ops` is for cross-checks. Anything at or below 0.6″ is not a geometry change by the document's own definition, so it must not be counted as one. **Regenerate `examples/symmetricP1.json`'s `provenance.endpoints_welded` (31 → the measured `ends_moved`) as part of this task**, once the real importer exists — not before, since P1.1/P1.4/P1.5/P1.6 all pin that fixture and a mid-phase regeneration is churn for a semantics fix this task implements properly anyway.
+
+**Outlines come from the welded FILE geometry, never from the scene's re-detection.** P1.4 measured why: loading `planc1.json` collapses Hall and M Bath into **one identical 21-vertex region** (both 243.5 sf, same vertex set), where the file at least keeps them distinct (Hall 243.5 sf/18 corners, M Bath 591.6 sf/24 corners). The scene's belief about a corrupt file is **strictly worse than the file itself**, so importing through the scene would bake in damage the file does not contain. `tests/test_design_bridge.py::test_planc1_reports_its_real_faults` pins the shared vertex set and is the guard for this.
 **Acceptance.** Opening `examples/planc1.json` yields M Bath 182.0 sf, Hall 61.5 sf, 31 welds in `provenance`, and a dirty document. Opening `examples/symmetricP1.json` is clean and not dirty. The legacy file on disk is never modified. **Opening a v5 file must not dirty it** — this depends on P1.1 round-trip fidelity (`Design.from_dict(x).to_dict() == x`); if a v5 file opens dirty, suspect a model normalisation that broke byte-identity, not the load path.
 
 ### P2.2 — Save writes v5
@@ -922,4 +926,33 @@ notes:   NO EXISTING TEST TOUCHED -- `git status` showed two modified source
          "inside_face", because the scene's areas ARE centreline areas and
          declaring the better basis would itself be a repair.
          Not pushed -- Phase 1 pushes at its end, per the push policy.
+
+P1.4-followup  done   (doc-only; responding to the two P1.4 findings)
+ruff:    n/a (doc only)
+pytest:  n/a
+files:   docs/DESIGN_MODEL_v5.md (7a message + the two-counter rule),
+         docs/V5_MIGRATION_PLAN.md (P2.1 task text; this entry)
+notes:   FINDING 1 SETTLED -- two counters, with the threshold taken from the
+         document's own semantics rather than picked: the schema defines
+         vertex_weld_in = 0.6" as the distance at which two coordinates ARE one
+         vertex, so a displacement at or below it is not a geometry change BY
+         DEFINITION. weld_ops = operations performed (31); ends_moved =
+         displacement > 0.6" (4). Only ends_moved is ever shown to a user or
+         written to provenance.endpoints_welded -- whose schema description
+         already reads "Wall ends MOVED onto a neighbour", so the corrected
+         reading is what the schema always meant and the fixture's stored 31
+         contradicts its own field. 7a's example message now reads "4 wall ends
+         moved to close gaps (31 junctions checked)".
+         symmetricP1.json's provenance is NOT regenerated now -- deliberately.
+         P1.1/P1.4/P1.5/P1.6 all pin that fixture; regenerating mid-phase is
+         churn for a semantics fix P2.1 implements properly. Folded into P2.1's
+         task text instead.
+         FINDING 2 MADE BINDING -- P2.1's task text now REQUIRES the importer to
+         derive outlines from the welded FILE geometry, never from the scene's
+         re-detection, and cites the measurement: loading planc1 collapses Hall
+         and M Bath into one identical 21-vertex region (both 243.5 sf, same
+         vertex set), where the file keeps them distinct (243.5/18 corners vs
+         591.6/24 corners). The scene's belief about a corrupt file is STRICTLY
+         WORSE than the file. test_planc1_reports_its_real_faults pins the shared
+         vertex set and is named in the plan as the guard.
 ```

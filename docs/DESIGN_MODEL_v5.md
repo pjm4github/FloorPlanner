@@ -286,7 +286,9 @@ Confirmed. The spec:
 7. Write `provenance` (§7b) and **mark the document dirty**.
 8. Tell the user plainly — not a silent repair. Something like:
 
-   > *Converted from the v3 format. 31 wall ends were welded to close gaps the old format could not store. 2 rooms changed size as a result: M Bath 591.6 → 182.0 sf, Hall 243.5 → 61.5 sf. 2 duplicate doors removed. Save to keep these corrections.*
+   > *Converted from the v3 format. 4 wall ends moved to close gaps the old format could not store (31 junctions checked). 2 rooms changed size as a result: M Bath 591.6 → 182.0 sf, Hall 243.5 → 61.5 sf. 2 duplicate doors removed. Save to keep these corrections.*
+
+   > **Two counters, and only one of them is a user-facing number** *(settled 2026‑07‑26, measured at P1.4)*. `weld_ops` is operations *performed* — 31 on `planc1.json`. `ends_moved` is operations that displaced a coordinate by **more than `vertex_weld_in` (0.6″)** — **4**. The threshold is the document's own semantics, not a fudge: the schema defines 0.6″ as the distance at which two coordinates *are* one vertex, so a smaller displacement is not a geometry change by definition (planc1 has one such case, a 0.001″ float nudge). Of the 31, twenty-six are no-ops on junctions that were already exact. **Report `ends_moved`; keep `weld_ops` for cross-checks.** The old wording overstated the damage by ~6×, and `provenance.endpoints_welded` already agrees with the corrected reading — its schema description is "Wall ends *moved* onto a neighbour."
 
 The user can then Save (accept), Save As (keep the original), or close without saving (nothing on disk changes — the legacy file is never modified in place).
 
