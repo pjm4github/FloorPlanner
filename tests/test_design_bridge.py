@@ -130,7 +130,11 @@ def test_weld_is_a_check_not_an_edit(fp, win):
     them -- welding here would silently move a user's walls at P2.2's save."""
     _load(fp, win, "planc1.json")
     doc, rep = _walk(win)
-    assert rep["unwelded_ends"] == 5          # 4 x 1.5" gaps + 1 x 0.001" nudge
+    # 4, not 5: the count moved to the 0.6" floor the importer's `ends_moved`
+    # uses, so planc1's fifth "move" -- a 0.001" float nudge -- is no longer a
+    # gap by the schema's own definition of one vertex. The four real 1.5"
+    # divider gaps are unaffected, which is the point of a floor this small.
+    assert rep["unwelded_ends"] == 4
 
     # y = 655.528 is the short end; 654.0 is where a weld would put it
     ys = {round(v["y"], 3) for v in doc["vertices"]}

@@ -168,13 +168,21 @@ def _furn_key(f):
 def _weld_delta(raw):
     """How many wall ends `weld_endpoints` WOULD move on this level's geometry,
     run against a copy so nothing here is mutated.  0 on a scene that agrees
-    with itself; non-zero is a finding, reported by the caller."""
+    with itself; non-zero is a finding, reported by the caller.
+
+    Movement is counted above `WELD_TOL` (0.6"), the SAME floor the importer's
+    `ends_moved` uses -- two coordinates that close ARE one vertex by the
+    schema's own definition, so a smaller displacement is not a gap. One
+    question deserves one floor: before this, telemetry counted planc1 at 5 and
+    the conversion report at 4, which is the 31-vs-4 trap in miniature. The two
+    NAMES stay distinct (`unwelded_ends` is telemetry, `ends_moved` is a user
+    report) because they serve different masters."""
     probe = copy.deepcopy(raw)
     weld_endpoints(probe)
     moved = 0
     for before, after in zip(raw, probe, strict=False):
         for k in ("p1", "p2"):
-            if math.dist(tuple(before[k]), tuple(after[k])) > 1e-9:
+            if math.dist(tuple(before[k]), tuple(after[k])) > WELD_TOL:
                 moved += 1
     return moved
 
