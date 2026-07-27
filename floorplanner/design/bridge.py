@@ -81,6 +81,14 @@ EXTERIOR_NAMES = ("porch", "deck", "patio", "terrace", "lanai")
 # what the SCENE actually models. Everything else in a v5 wall/room is stashed
 # on the item at apply and re-emitted by the walk, so a load->save round trip
 # cannot quietly drop a field the editor has no widget for yet.
+#
+# LIFETIME, accepted rather than engineered around: the stash lives ON THE ITEM,
+# so it survives ordinary edits but DIES WITH THE ITEM. A wall carrying
+# thickness_in that gets coalesced away, or a room deleted and re-detected,
+# silently loses its stash. That is acceptable only because these fields have no
+# editor yet -- P4/P5 model them properly (placement/nominal_size at P4.2-P4.4,
+# area_accounting and the finishes at P5.1-P5.3) and the stash retires then.
+# Written down here so it is a known limit, not a mystery discovered later.
 _WALL_MODELLED = frozenset(("id", "level", "v1", "v2", "type", "left", "right",
                             "openings"))
 _ROOM_MODELLED = frozenset(("id", "level", "name", "outline", "label",

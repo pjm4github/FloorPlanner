@@ -309,13 +309,16 @@ Plus **File ▸ Export legacy v4…** for one release, so nobody is stranded.
 **Acceptance.** Save → reopen → `check()` clean, not dirty. Legacy export round-trips through the old loader.
 
 ### P2.3 — Undo snapshots the v5 dict
-Still whole-document; only the payload changes. Groups now serialize, so **defect 3 partially closes here**.
+Still whole-document; only the payload changes.
+
+> **Correction (2026‑07‑27): groups do NOT close here.** This task originally read "Groups now serialize, so defect 3 partially closes here", with an acceptance test "group, undo, redo — the group survives". That was written before P1.4 decided — correctly — that the bridge emits `groups: []` until **P4.5**: mapping a grouped wall onto its split segments is undefined while grouping still *copies* walls. So group survival stays at P4.5, held by characterization test 3 exactly as it is now, and **the group-survives test must not be written here** — it would pass for the wrong reason or fail for a reason P2.3 cannot fix. The behaviour P2.3 *must* preserve is narrower and already works: **undo after grouping restores the plan correctly** (via the P0.5 aliasing fix) even though the group itself dissolves.
 **Compare canonical form, not raw bytes.** The dirty check and the undo comparison must both run `design.canonical.canonicalize` over each side before comparing. With the importer canonicalized (P2.2) this is belt-and-braces — but defining equality on canonical form is what survives any future producer that forgets to canonicalize, **including whichever way P3.1's uid decision goes**. Two documents describing the same plan must compare equal even when they were built by different code paths.
 **Also here: backdrop / reference-image retention.** `apply_project_to_scene`'s `keep_backdrop` flag exists because undo must not delete the tracing image; `apply_design_to_scene` (P1.5) deliberately does **not** implement it, since it belongs with the undo-restore path rather than the bridge. Wire it here, or undo silently drops the backdrop.
-**Acceptance.** `test_undo.py` green. New test: group, undo, redo — the group survives. Undo with a reference image loaded keeps the image.
+**Acceptance.** `test_undo.py` green. Undo after grouping restores the plan (the group dissolving is expected until P4.5). Undo with a reference image loaded keeps the image. **Record undo latency on the P0.3 64-room grid** — the canonical walk now runs per settled edit, so P6.1's "undo cost is independent of plan size" needs a baseline to be measured against.
 
 ### P2.4 — Convert the corpus and the tooling
 `examples/*.json`, `docs/make_gallery.py`, `examples/make_examples.py`, `tests/bench_rooms.py`, `fp_extract.py`'s writer, and the macro `open`/`save` tokens.
+**Includes flipping `fp_extract.py` from `export_legacy_v4_path` back to `save_path` (v5)** — deferred here from P2.2, where `save_path` going v5 would have converted that one writer early and out of step with the rest of the tooling.
 **Acceptance.** `python docs/make_gallery.py` and `python examples/make_examples.py` both run; gallery images regenerate.
 
 ### P2.5 — Split `MainWindow`
@@ -1257,5 +1260,13 @@ notes:   ACCEPTANCE: save -> reopen -> check(deep=True) == [] and NOT dirty;
          tokens; save_path going v5 would have converted it early and out of
          step. Its output is not stranded -- opening a v4 file converts and
          welds it, which is defect 19's file arm.
+         THE STASH'S LIFETIME, accepted rather than engineered around (recorded
+         at review, and now a comment in bridge.py): the stash lives ON THE ITEM,
+         so it survives ordinary edits but DIES WITH THE ITEM. A wall carrying
+         thickness_in that is coalesced away, or a room deleted and re-detected,
+         silently loses its stash. Acceptable only because these fields have no
+         editor yet; P4/P5 model them properly (placement/nominal_size at
+         P4.2-P4.4, area_accounting and finishes at P5.1-P5.3) and the stash
+         retires then. Written down so it is a known limit, not a mystery.
          Not pushed -- Phase 2 pushes at its end.
 ```
