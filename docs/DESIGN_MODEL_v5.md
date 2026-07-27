@@ -189,7 +189,7 @@ The faithful migration is the regression fixture: it proves the converter does n
 
 `--clean` now runs a **weld pass** reproducing `WallItem.join_endpoints` (`walls.py:948`) as a one-time operation: an endpoint within 2″ of another endpoint snaps onto it, and an endpoint within `JOIN_TOL = 9.0″` of another wall's *body* is extended along its own axis to meet it, forming a real T-junction.
 
-Your file is full of divider walls that stop at y = 655.5 instead of reaching the corridor wall at y = 654 — a **1.5″ gap**. The editor welds those on every draw release and on load, but the welded coordinates are never written to the file. So the saved centreline graph stays open, the flood-fill leaks between spaces, and room detection produces garbage.
+Your file is full of divider walls that stop at y = 655.5 instead of reaching the corridor wall at y = 654 — a **1.5″ gap**. The editor welds an end only when *that* wall is drawn (`view.py:489`) or when you invoke Edit ▸ Coalesce all walls now; **load never welds** (`apply_project_to_scene`, `mainwindow.py:1298`, runs `coalesce_all` and `rebuild_all_walls` only). And coalesce independently re-snaps the surviving wall's endpoints onto the 6″ on-centre grid (`walls.py:200‑201`) with no reference to the neighbour an end was welded to, so it can *open* a gap that was previously closed. The gaps are made by the pipeline, never re-closed by it, and written to the file as they stand — so the saved centreline graph stays open, the flood-fill leaks between spaces, and room detection produces garbage.
 
 **31 endpoints welded.** The results:
 
@@ -272,6 +272,8 @@ def test_delete_wall_keeps_room():
 ## 7a. DECIDED — the weld runs on load, and legacy files open dirty
 
 Confirmed. The spec:
+
+> **The weld-on-load is NEW behaviour, not persistence of an existing pass** *(corrected 2026‑07‑26, during P1.4)*. Today's load path does **not** weld — see the corrected F5 in `CODE_REVIEW_v2.md` and §6 above. So step 2 below is the first time the application will ever move the user's wall ends on open. Steps 7 and 8 are therefore load-bearing, not courtesies: without the report and the dirty flag this is a silent rewrite of the user's geometry by a version they just upgraded to.
 
 **Opening a legacy v1–v4 `floorplanner-json` file:**
 
