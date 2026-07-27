@@ -391,6 +391,39 @@ def _room_probe_points(room) -> list:
     return pts
 
 
+class OutlineEdge:
+    """One edge of a room's perimeter: the corner it starts at, and the wall
+    that covers it (`None` = an OPEN edge, the v5 `wall: null`).
+
+    **The corner is a COORDINATE, not a vertex identity, and that is deliberate
+    (P3.2).** In the target model a corner is the vertex two walls share -- but
+    P3.1's split-on-write world has no shared corner vertex to name: at any
+    corner each wall owns its own distinct `Vertex`. Borrowing one wall's end
+    would pick arbitrarily between two, and two rooms meeting there could pick
+    differently; minting a room-owned vertex would add a third object at every
+    corner that no wall references. Both encode a claim of authority that is
+    false. A coordinate states exactly what is known.
+
+    The gap closes at **P3.4**, where topology ops replace detection and
+    outlines are rebuilt from the document's traced faces -- walls and outlines
+    receiving the same vertices at the same moment. `tests/test_outline.py`
+    pins the gap where it is (equal coordinates, distinct objects) so P3.4 has
+    to close it consciously rather than inherit a silent disagreement.
+
+    The `wall` reference is the real content of this task: before it, a room had
+    corners and an unordered `walls` list with no edge->wall mapping at all."""
+
+    __slots__ = ("p", "wall")
+
+    def __init__(self, p, wall=None):
+        self.p = QPointF(p)
+        self.wall = wall
+
+    def __repr__(self):
+        w = self.wall.wall_type if self.wall is not None else "open"
+        return f"OutlineEdge(({self.p.x():.1f}, {self.p.y():.1f}), {w})"
+
+
 class RoomItem(QGraphicsItem):
     """A named room: the wall-enclosed region around an anchor point.
 
@@ -409,7 +442,8 @@ class RoomItem(QGraphicsItem):
         self._dragging_label = False
         self.path = QPainterPath(path)
         self.area_sqft = float(area_sqft)
-        self.corners = [QPointF(c) for c in corners] if corners else None
+        self.outline = []                # list[OutlineEdge]; corners derives
+        self.corners = corners
         self.walls = []                  # WallItems this room owns (edge loop)
         self._detect_sig = None          # memoize: walls that defined this room
         self._moving_room = False        # drag-the-name moves the whole room
@@ -418,7 +452,10 @@ class RoomItem(QGraphicsItem):
         self.properties = dict(DEFAULT_ROOM_PROPS)
         if properties:
             self.properties.update(properties)
-        self._sync_corner_props()
+        # geometry never lives in `properties` (P3.2): the schema calls that bag
+        # "Schedule data only. NO geometry" and explicitly forbids the key. It is
+        # re-derived from the outline for the legacy v4 export, and nowhere else.
+        self.properties.pop("perimeter_corners", None)
         self._font = QFont(FONT_FAMILY)
         self._font.setPixelSize(14)       # 14" tall text reads well at plan scale
         self._sub_font = QFont(FONT_FAMILY)
@@ -439,17 +476,44 @@ class RoomItem(QGraphicsItem):
         self.prepareGeometryChange()
         self.path = QPainterPath(path)
         self.area_sqft = float(area_sqft)
-        self.corners = [QPointF(c) for c in corners] if corners else None
-        self._sync_corner_props()
+        self.corners = corners
         self.update()
 
-    def _sync_corner_props(self):
-        """Mirror the perimeter corner coordinates into the properties."""
-        if self.corners:
-            self.properties["perimeter_corners"] = [
-                [round(c.x(), 2), round(c.y(), 2)] for c in self.corners]
-        else:
-            self.properties.pop("perimeter_corners", None)
+    # -- outline (P3.2) --------------------------------------------------------
+    @property
+    def corners(self):
+        """The perimeter corners, DERIVED from the outline. `None` (not `[]`)
+        when there is no outline, because the whole codebase tests `if
+        room.corners:` and distinguishes the two."""
+        return [e.p for e in self.outline] if self.outline else None
+
+    @corners.setter
+    def corners(self, pts):
+        """Rebuild the outline from a corner loop. Wall references survive a
+        same-length replacement -- a group move or a nudge translates every
+        corner but keeps the same edges -- and are dropped when the loop
+        changes shape, for `bind_room_walls` to repopulate."""
+        if not pts:
+            self.outline = []
+            return
+        old = self.outline
+        keep = len(old) == len(pts)
+        self.outline = [OutlineEdge(c, old[i].wall if keep else None)
+                        for i, c in enumerate(pts)]
+
+    def export_properties(self) -> dict:
+        """`properties` as the LEGACY v4 export wants them: the schedule data
+        plus `perimeter_corners` re-derived from the outline, at the same 2dp
+        rounding the old live mirror used, so the export stays byte-compatible.
+
+        The mirror is gone (P3.2) -- this is the one place the key is produced,
+        at serialization time, rather than shadowed on every geometry change."""
+        out = dict(self.properties)
+        out.pop("perimeter_corners", None)
+        if self.outline:
+            out["perimeter_corners"] = [[round(e.p.x(), 2), round(e.p.y(), 2)]
+                                        for e in self.outline]
+        return out
 
     def interior_rect(self) -> QRectF:
         return self.path.boundingRect()
@@ -514,7 +578,12 @@ class RoomItem(QGraphicsItem):
             "name": self.name,
             "anchor": [self.anchor.x(), self.anchor.y()],
             "show_dimensions": self.show_dims,
-            "properties": dict(self.properties),
+                # geometry stays OUT of the clipboard: paste re-detects its own
+            # corners, and carrying the source room's would silently ship them
+            # into the pasted room (the live mirror used to overwrite them,
+            # which is exactly the kind of masking P3.2 removes)
+            "properties": {k: v for k, v in self.properties.items()
+                           if k != "perimeter_corners"},
             "walls": walls,
         }
 
@@ -894,7 +963,6 @@ class RoomItem(QGraphicsItem):
             self.corners = [QPointF(c.x() + dx, c.y() + dy)
                             for c in self.corners]
         self.anchor = QPointF(self.anchor.x() + dx, self.anchor.y() + dy)
-        self._sync_corner_props()
         self.update()
 
     def mousePressEvent(self, e):
@@ -1152,6 +1220,7 @@ def bind_room_walls(scene, room, settle=True):
                       and _wall_endpoints_match(w, a, b)), None)
         if match is not None:                            # 1. share this wall
             room.bind_wall(match)
+            room.outline[i].wall = match                 # P3.2: edge -> wall
             continue
         span = _wall_along_segment(scene, a, b, room.floor)  # 2. share party wall
         if span is not None and span.group() is None:
@@ -1159,6 +1228,7 @@ def bind_room_walls(scene, room, settle=True):
             # (the shared-wall model: one wall borders several rooms) rather
             # than synthesizing a private duplicate.
             room.bind_wall(span)
+            room.outline[i].wall = span                  # P3.2: edge -> wall
             continue
         ow = next((w for w in old_open if w not in reused_open    # 3. open edge
                    and _wall_endpoints_match(w, a, b)), None)
@@ -1168,6 +1238,7 @@ def bind_room_walls(scene, room, settle=True):
         else:
             reused_open.add(ow)
         room.bind_wall(ow)
+        room.outline[i].wall = None      # P3.2: an OPEN edge (v5 `wall: null`)
     for w in old_open:                       # drop open edges that closed up
         if w not in reused_open and not w.rooms and w.scene() is not None:
             scene.removeItem(w)

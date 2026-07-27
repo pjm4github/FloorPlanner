@@ -633,7 +633,6 @@ class GroupItem(QGraphicsItemGroup):
                 room.corners = [tr.map(p) for p in corners_0]
             room.anchor = tr.map(anchor_0)
             room.path = tr.map(path_0)
-            room._sync_corner_props()
             room.update()
         self.update()
 
@@ -716,7 +715,6 @@ class GroupItem(QGraphicsItemGroup):
             if r.corners:
                 r.corners = [QPointF(c.x() + d.x(), c.y() + d.y())
                              for c in r.corners]
-            r._sync_corner_props()
         self.setPos(0.0, 0.0)
         rebuild_all_walls(sc)             # re-detects rooms at new anchors
 

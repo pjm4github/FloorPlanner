@@ -200,8 +200,13 @@ class PlanIOMixin:
                     res = (path, 0.0, None)
                     missing.append(rm.name)
             name = unique_room_name(self.scene, rm.name)
-            room = RoomItem(name, anchor, res[0], res[1],
-                            rm.properties, res[2])
+            # perimeter_corners is READ above (the open-room fallback) and then
+            # dropped: the live scene derives corners from the outline, so a
+            # copy left in `properties` would be stale data nothing maintains --
+            # exactly the class of bug this migration exists to kill.
+            props = {k: v for k, v in (rm.properties or {}).items()
+                     if k != "perimeter_corners"}
+            room = RoomItem(name, anchor, res[0], res[1], props, res[2])
             room.floor = rm.floor                 # load overrides the default tag
             room.show_dims = rm.show_dimensions
             room.label_offset = QPointF(*rm.label_offset)
@@ -269,7 +274,11 @@ class PlanIOMixin:
                     anchor=(it.anchor.x(), it.anchor.y()),
                     label_offset=(it.label_offset.x(), it.label_offset.y()),
                     show_dimensions=it.show_dims,
-                    properties=dict(it.properties),   # copy: model must not
+                    # P3.2: perimeter_corners is re-DERIVED here from the
+                    # outline (same 2dp rounding the old live mirror used), so
+                    # the legacy export stays byte-compatible. It is produced
+                    # at serialization time and nowhere else.
+                    properties=it.export_properties(),
                     floor=getattr(it, "floor", DEFAULT_FLOOR),  # alias the live dict
                 ))
         # the roster MUST come from self.floors (an empty floor has no items to

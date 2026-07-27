@@ -585,7 +585,6 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             r.path = QTransform.fromTranslate(dx, dy).map(r.path)
             if r.corners:
                 r.corners = [QPointF(c.x() + dx, c.y() + dy) for c in r.corners]
-            r._sync_corner_props()
 
     def distribute_rooms(self, horizontal: bool):
         """Space the selected rooms so the gaps between them are equal,

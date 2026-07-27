@@ -106,7 +106,8 @@ def test_bake_carries_room_without_traced_corners(fp, win, make_room):
     sc = win.scene
     room = make_room(sc, 0, 0, 144, 120, "Den")
     room.corners = None                       # simulate a corner-less room
-    room._sync_corner_props()
+    # (P3.2 deleted _sync_corner_props: clearing corners now clears the outline,
+    # so there is no mirror left to re-sync)
     room._detect_sig = None
     sc.clearSelection()
     room.setSelected(True)
