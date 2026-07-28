@@ -362,3 +362,164 @@ def test_drag_group_by_wall_preserves_items(fp, win, make_room,
         win.ungroup_selected()
 
     assert counts(sc) == before
+
+
+# --------------------------------------------------------------------------
+# DEFECT 22 -- whole-plan group + move, at a scale the rest of this file never
+# reaches. Every group test above tops out at ~5 members and none of them ever
+# looked at the document's debris counter, which is exactly why 497 passing
+# tests missed a bug a single manual drag surfaced.
+# --------------------------------------------------------------------------
+def _v5_plan(fp, win, name="symmetricP1.json"):
+    import json
+    import pathlib
+    ex = pathlib.Path(__file__).resolve().parent.parent / "examples" / name
+    win.open_document(json.loads(ex.read_text("utf-8")), interactive=False)
+    return win
+
+
+def _unwelded(win):
+    import warnings
+    from floorplanner.design.bridge import design_from_scene
+    rep = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        design_from_scene(win, report=rep)
+    return rep["unwelded_ends"]
+
+
+def _corner_sharing(fp, win):
+    """(corners holding one of their own walls' vertices, total corners)."""
+    same = total = 0
+    for r in win.scene.items():
+        if not isinstance(r, fp.RoomItem):
+            continue
+        ends = {id(w.end_vertex(a)) for w in r.walls
+                if isinstance(w, fp.WallItem) for a in ("p1", "p2")}
+        for e in r.outline:
+            total += 1
+            same += id(e.v) in ends
+    return same, total
+
+
+def _group_everything(fp, win):
+    win.scene.clearSelection()
+    for it in win.scene.items():
+        if isinstance(it, (fp.WallItem, fp.FurnishingItem)) \
+                and it.group() is None:
+            it.setSelected(True)
+    win.group_selected()
+    return [it for it in win.scene.items() if isinstance(it, fp.GroupItem)]
+
+
+def test_whole_plan_group_move_carries_every_room(fp, win):
+    """DEFECT 22. A group move used to assign new COORDINATES to every member
+    wall end (split-on-write) and rebuild each carried room's corner list
+    beside it, so the two agreed numerically and shared nothing. Until P3.5
+    `refresh_rooms` re-bound and re-shared afterwards; with it gone, the rooms'
+    outlines were orphaned from the walls they name.
+
+    Measured before the fix on this plan: 0 of 140 corners still held a wall's
+    vertex, and a party-wall drag then moved zero rooms."""
+    _v5_plan(fp, win)
+    dx, dy = 60.0, 36.0
+    before = {r.name: [(round(e.p.x(), 3), round(e.p.y(), 3))
+                       for e in r.outline]
+              for r in win.scene.items() if isinstance(r, fp.RoomItem)}
+    assert len(before) == 20
+    assert _unwelded(win) == 0, "the fixture did not open clean"
+
+    for g in _group_everything(fp, win):
+        g.setPos(dx, dy)
+        g.bake()
+
+    after = {r.name: [(round(e.p.x(), 3), round(e.p.y(), 3))
+                      for e in r.outline]
+             for r in win.scene.items() if isinstance(r, fp.RoomItem)}
+    assert set(after) == set(before), "a room went missing"
+    for name, out0 in before.items():
+        moved = {(round(b[0] - a[0], 3), round(b[1] - a[1], 3))
+                 for a, b in zip(out0, after[name], strict=True)}
+        assert moved == {(dx, dy)}, f"{name} did not track the move: {moved}"
+    assert _unwelded(win) == 0, "the move tore the wall network"
+
+
+def test_a_group_move_leaves_the_outlines_still_holding_their_corners(fp, win):
+    """The property the move must PRESERVE, asserted directly rather than
+    through its symptom: after a bake a room's outline still holds the very
+    vertices its walls hold, so the next wall drag moves the room. The symptom
+    -- rooms frozen under a later drag -- is asserted below it."""
+    _v5_plan(fp, win)
+    assert _corner_sharing(fp, win) == (140, 140)
+    for g in _group_everything(fp, win):
+        g.setPos(48.0, 0.0)
+        g.bake()
+        g.dissolve()
+    fp.rebuild_all_walls(win.scene)
+    assert _corner_sharing(fp, win) == (140, 140)
+
+    party = next(w for w in win.scene.items()
+                 if isinstance(w, fp.WallItem) and len(w.rooms) == 2
+                 and w.group() is None)
+    a, b = party.rooms[0], party.rooms[1]
+    a0, b0 = a.area_sqft, b.area_sqft
+    v = party.end_vertex("p1")
+    moved = v.relocated_to(QPointF(v.x + 12, v.y + 12))
+    for w in win.scene.items():                    # move that corner for real
+        if isinstance(w, fp.WallItem):
+            for at in ("p1", "p2"):
+                if w.end_vertex(at) is v:
+                    w.set_end_vertex(at, moved)
+    for r in (a, b):
+        for e in r.outline:
+            if e.v is v:
+                e.v = moved
+    assert (a.area_sqft, b.area_sqft) != (a0, b0), \
+        "the rooms did not follow the corner -- the outlines were orphaned"
+
+
+def test_a_group_rotation_also_keeps_the_corners(fp, win):
+    """The rotation half of defect 22: `_apply_rotation` re-maps every member
+    from a start-of-gesture snapshot on each mouse event, which was the same
+    coordinate path with the same result (measured 140/140 -> 0/140). Both
+    paths now move the same corner records."""
+    _v5_plan(fp, win)
+    groups = _group_everything(fp, win)
+    g = groups[0]
+    c = g.sceneBoundingRect().center()
+    g._begin_rotation(QPointF(c.x() + 100, c.y()))
+    g._apply_rotation(QPointF(c.x(), c.y() + 100), False)      # 90 degrees
+    g._finish_rotation()
+    fp.rebuild_all_walls(win.scene)
+    assert _corner_sharing(fp, win) == (140, 140)
+    assert _unwelded(win) == 0
+
+
+def test_a_group_move_never_drags_a_wall_outside_it(fp, win, make_room):
+    """The carve-out the vertex move has to respect: a corner a NON-member wall
+    also holds is SPLIT before the move, so the group goes and the outsider
+    stays. Relocating it wholesale would wire a member to an outside wall --
+    exactly what the `group() is None` guards exist to prevent."""
+    sc = win.scene
+    room = make_room(sc, 0, 0, 120, 120, "A")
+    stub = fp.WallItem(QPointF(120, 120), QPointF(240, 120), "interior")
+    sc.addItem(stub)                       # meets the room's corner, not a member
+    fp.rebuild_all_walls(sc)
+    for w in room.walls:                   # weld the stub onto the room corner
+        for at in ("p1", "p2"):
+            if abs(getattr(w, at).x() - 120) < 1e-9 \
+                    and abs(getattr(w, at).y() - 120) < 1e-9:
+                stub.set_end_vertex("p1", w.end_vertex(at))
+    before = (stub.p1.x(), stub.p1.y(), stub.p2.x(), stub.p2.y())
+
+    sc.clearSelection()
+    for w in room.walls:
+        w.setSelected(True)
+    win.group_selected()
+    for g in [it for it in sc.items() if isinstance(it, fp.GroupItem)]:
+        g.setPos(36.0, 0.0)
+        g.bake()
+
+    assert (stub.p1.x(), stub.p1.y(), stub.p2.x(), stub.p2.y()) == before, \
+        "the group dragged a wall that was not in it"
+    assert room.corners[0].x() != 0 or room.corners[1].x() != 0

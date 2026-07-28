@@ -162,6 +162,58 @@ def test_unwelded_ends_warns_and_strict_raises(fp, win):
         design_from_scene(win, strict=True)
 
 
+def test_the_warning_names_the_cause_and_says_it_once(fp, win):
+    """DEFECT 22, the ergonomics half. The message used to say one thing for
+    every case -- "expected on a plan loaded from a legacy file" -- which is
+    true of the ends a file ARRIVES with and false of the ends an edit tears
+    open. And it fired on every debounced snapshot, so a plan that opened clean
+    produced a stream of warnings with a moving count, all blaming the file.
+
+    A correct warning that misattributes is worse than none: it teaches people
+    to ignore the channel that will one day be right."""
+    import json
+    import pathlib
+    ex = pathlib.Path(__file__).resolve().parent.parent / "examples"
+    win.open_document(json.loads((ex / "symmetricP1.json").read_text("utf-8")),
+                      interactive=False)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")        # opened clean -> silent
+        design_from_scene(win)
+
+    # tear one corner open exactly as planc1's dividers are torn: pull a wall
+    # 1.5" back ALONG ITS OWN AXIS off a shared corner, so its end now stops
+    # short of the neighbour's body. That is inside the 9" join tolerance and
+    # more than the 0.6" noise floor, which is what the counter counts.
+    at = {}
+    for it in win.scene.items():
+        if isinstance(it, fp.WallItem):
+            for a in ("p1", "p2"):
+                at.setdefault((round(getattr(it, a).x(), 3),
+                               round(getattr(it, a).y(), 3)), []).append((it, a))
+    (w, a) = next(v[0] for v in at.values() if len(v) >= 2)
+    u, p = w.unit(), getattr(w, a)
+    back = 1.5 if a == "p1" else -1.5
+    setattr(w, a, QPointF(p.x() + u.x() * back, p.y() + u.y() * back))
+
+    with pytest.warns(UserWarning, match="NEW") as rec:
+        design_from_scene(win)
+    assert "not the legacy-load case" in str(rec[0].message),         "an edit-induced tear was blamed on the file"
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")        # same state -> not repeated
+        design_from_scene(win)
+
+
+def test_a_legacy_plan_is_blamed_on_the_file_not_on_an_edit(fp, win):
+    """The other side of the same split: what planc1 arrives with is the
+    file's, and the message must go on saying so."""
+    _load(fp, win, "planc1.json")
+    with pytest.warns(UserWarning, match="OPENED with") as rec:
+        design_from_scene(win)
+    assert "legacy" in str(rec[0].message)
+
+
 def test_clean_scene_neither_warns_nor_raises(fp, win):
     """strict=True is silent on a scene that agrees with itself, so P1.6 can
     leave it on for the whole suite."""

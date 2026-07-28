@@ -243,6 +243,64 @@ def _walk(va, vb, edge, adj, vt, max_hops=10):
     return chain if cur == vb else None
 
 
+# ------------------------------------------------- the unwelded-ends warning
+_BASELINE_ATTR = "_fp_unwelded_baseline"
+_WARNED_ATTR = "_fp_unwelded_warned"
+
+
+def rebase_weld_baseline(scene):
+    """Forget what the scene's weld state was, so the next walk re-reads it.
+
+    Called by both load paths. A load REPLACES the document, so whatever it
+    arrives with is its baseline -- not a tear some edit made."""
+    for a in (_BASELINE_ATTR, _WARNED_ATTR):
+        if hasattr(scene, a):
+            delattr(scene, a)
+
+
+def _warn_unwelded(scene, n):
+    """Report unwelded ends BY CAUSE, and at most once per distinct state.
+
+    The old message said one thing for every case: "expected on a plan loaded
+    from a legacy file". That is true of the ends a legacy file arrives with and
+    false of the ends an EDIT tears open, and it fired on every debounced
+    snapshot -- so a user watching a plan that opened clean got a stream of
+    warnings, with a count that moved as they worked, all blaming the file. A
+    correct warning that misattributes is worse than none: it teaches people to
+    ignore the channel that will one day be right.
+
+    So: the first walk after a load sets the BASELINE, and only a walk that
+    finds MORE than the baseline warns -- naming the split between what the plan
+    arrived with and what has appeared since. Equal or better is silent."""
+    base = getattr(scene, _BASELINE_ATTR, None)
+    if base is None:
+        setattr(scene, _BASELINE_ATTR, n)
+        base = n
+        if n:
+            msg = (f"design_from_scene: this plan OPENED with {n} wall end(s) "
+                   f"sitting within the {JOIN_TOL}\" join tolerance of a "
+                   f"neighbour without being welded to it -- the scene "
+                   f"disagrees with itself as it arrived, and the Design "
+                   f"reports its coordinates unchanged. Expected of a plan "
+                   f"loaded from a legacy file: load never welds (see F5 in "
+                   f"docs/CODE_REVIEW_v2.md). Edit > Coalesce all walls now "
+                   f"closes them.")
+        else:
+            return
+    elif n > base:
+        msg = (f"design_from_scene: {n} wall end(s) now sit within the "
+               f"{JOIN_TOL}\" join tolerance of a neighbour without being "
+               f"welded to it -- {base} of them since the plan was opened and "
+               f"{n - base} NEW. An edit has torn the wall network; this is not "
+               f"the legacy-load case.")
+    else:
+        return                       # unchanged, or repaired -- nothing to say
+    if getattr(scene, _WARNED_ATTR, None) == n:
+        return                       # same state, already reported
+    setattr(scene, _WARNED_ATTR, n)
+    warnings.warn(msg, stacklevel=3)
+
+
 # ------------------------------------------------------------------ level walk
 def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
     """This level's walls, split at every junction and room corner, as v5 wall
@@ -499,16 +557,14 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         rooms += lr
         furnishings += lf
 
-    if rep["unwelded_ends"]:
-        msg = (f"design_from_scene: {rep['unwelded_ends']} wall end(s) sit "
-               f"within the {JOIN_TOL}\" join tolerance of a neighbour without "
-               f"being welded to it. The scene disagrees with itself; the "
-               f"Design reports the scene's own coordinates unchanged. "
-               f"Expected on a plan loaded from a legacy file -- load never "
-               f"welds (see F5 in docs/CODE_REVIEW_v2.md).")
-        if strict:
-            raise ValueError(msg)
-        warnings.warn(msg, stacklevel=2)
+    n = rep["unwelded_ends"]
+    if n and strict:
+        raise ValueError(
+            f"design_from_scene: {n} wall end(s) sit within the {JOIN_TOL}\" "
+            f"join tolerance of a neighbour without being welded to it. The "
+            f"scene disagrees with itself; the Design reports the scene's own "
+            f"coordinates unchanged.")
+    _warn_unwelded(scene, n)
 
     settings = dict(SETTINGS)
     auto = bool(settings.pop("auto_coalesce", True))
@@ -845,6 +901,7 @@ def apply_design_to_scene(target, design, report=None, strict=False,
     # with.)
     from floorplanner.design.verify import rebase   # late: verify imports this
     rebase(target)
+    rebase_weld_baseline(scene)        # ...and the weld counter, for the same reason
 
     if rep["openings_failed"]:
         msg = ("apply_design_to_scene: %d opening(s) could not be placed: %s"

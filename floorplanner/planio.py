@@ -42,6 +42,7 @@ from floorplanner.design.importer import (       # P2.1 legacy -> v5
 )
 from floorplanner.design.model import Design
 from floorplanner.design.validate import check
+from floorplanner.design.bridge import rebase_weld_baseline
 from floorplanner.design.verify import rebase, verify  # P1.6 shadow mode
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
@@ -241,6 +242,9 @@ class PlanIOMixin:
         # not fire on those -- only on corruption introduced afterwards.  Undo's
         # restore comes through here too, reinstating an already-verified state.
         rebase(self)
+        # ...and the unwelded-ends baseline: whatever a legacy file arrives with
+        # is the plan's arrival state, not a tear an edit made (defect 22)
+        rebase_weld_baseline(self.scene)
 
     def project_from_scene(self) -> Project:
         """Walk the scene into the Qt-free domain model (model.Project).
