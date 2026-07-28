@@ -372,7 +372,42 @@ Dragging a wall moves its two vertices. Implement the split rule: a collinear co
 ### P3.4 — Topology ops replace coalesce/weld/fracture
 `coalesce_wall`, `coalesce_all`, `_coalesce_*_impl`, `weld_all`, `join_endpoints`, `fracture_delete_wall`, `_WallIndex`, `_WallBBoxIndex`, `_compute_wall_junctions` → `merge_collinear`, `split_edge`, vertex adjacency. **Defect 9 closes here** (merge dedups openings).
 **Inherits the split rule's second half from P3.3: a vertex landing on another wall's body splits that wall.** P3.3 built only the first half (a collinear continuation past an endpoint splits first, so it can never be sheared); the body-landing half is `split_edge` applied scene-side, which is exactly this task, and building it twice would have meant building it wrong once. Until it lands, a body-landing has no vertex to be: P3.3 leaves those attachments on the old coordinate path (`kind == "tee"` in `WallItem.mousePressEvent`) with a comment naming this task. **Also remove `split_edge`'s `NotImplementedError` guard on walls carrying openings** (`design/topology.py`, added at P1.3-followup and pinned by `pytest.raises(match="P3.3")`) as the redistribution it names is built — the guard's message points at P3.3, so retarget or retire it rather than leaving it lying about which task owns the work.
-**Acceptance.** `test_coalesce.py` and the coalesce half of `test_walls.py` rewritten against the new ops — **and this is the biggest "changed test" risk in the plan, so every rewritten assertion must be justified in the log.** ~330 lines deleted from `walls.py`.
+**Settled before implementation** *(2026‑07‑27 — seven points; committed to this file first, per the handoff-spec rule above, so the implementing session reads them from disk rather than from a summary).*
+
+**1. The crux — one pure planner, two thin appliers.** The ops in `design/topology.py` are pure `Design → Design`; this task needs them acting on a live scene of `WallItem`s carrying `OpeningItem` children, room bindings, groups, z-order and floors. Two obvious routes were considered and **both are rejected**:
+
+- **(a) Lift the scene to a `Design`, run the pure op, apply back.** Disqualified *on measurement*, not on taste: it makes every wall edit a **full-plan rebuild**, which destroys item identity — selection, in-flight drag state, group membership, and the whole point of P3.1's persistent uids — and would regress precisely the numbers **P3.8** exists to improve.
+- **(b) Scene-side siblings that share only the algorithm.** This is **F2's disease**: one concept, two implementations, drifting apart from the day they are written.
+
+**The third way: the decision logic runs ONCE, pure; only the mutation is dual.** `plan_merge_collinear(...)` / `plan_split_edge(...)` compute a **delta** — which vertices merge, which walls die, which openings land where and with what anchors — and two **thin** appliers execute it: the `Design` applier (essentially what `topology.py` already is) and a new **scene** applier that touches **only the items named in the delta**. No full rebuild; the algorithm single-sourced.
+
+**The drift risk that makes dual appliers frightening is already policed.** `--verify-design` re-derives the `Design` from the scene at every quiescent point, so **if the two appliers ever disagree, the shadow gate fires**. P1.6 was built for exactly this moment; this is the task that collects on it.
+
+*Bonus, and it is not incidental:* **a delta plus an applier is a command in all but name.** **P6.1** (`QUndoStack` + `MoveVertices`/`EditOpening`/…) inherits this shape for free rather than inventing it later.
+
+**2. The three unlisted helpers — let the call-site census decide, not the list.** The rule is: **a line dies when its last caller dies. Anything deleted must be uncalled; anything still called migrates.**
+
+- `_merge_intervals` is `fracture_delete_wall`'s alone → **falls with it**.
+- `coincident_walls` and `wall_endpoint_open` have callers in the **drawing / snap paths that survive Phase 3** → **they do not fall.** They are **reimplemented as thin queries over vertex adjacency** — a vertex's degree and its incident walls — which is precisely what the task line's "vertex adjacency" clause means. Census taken at P3.3, and it is **wider than "view.py"**: `wall_endpoint_open` at `view.py:248` (draw-release snapping); `coincident_walls` at `view.py:597` **and at `walls.py:656` and `walls.py:695`, inside `WallItem.rebuild` and `paint`** — those two are the party-wall opening cascade and the render path, neither of which Phase 3 removes. Only the `walls.py:201` caller (inside `_coalesce_wall_impl`) dies. Migrate on the census, not on the module a helper happens to live in.
+
+**3. Junction rendering — the inputs change, the output must not.** `_compute_wall_junctions` found neighbours by **bbox search**; adjacency hands them over **by lookup** (the walls sharing a vertex). The `_outline_clip` cache is recomputed from adjacency. **Seam-free is an OUTPUT contract: if the junction test needs touching, the replacement is wrong.**
+
+> **Correction, made at the read-back rather than discovered mid-task: the existing guard is NOT a pixel test.** `tests/test_walls.py:360` `test_junction_outline_is_clipped_so_walls_read_solid` asserts `w._outline_clip is not None` for crossing walls and `is None` for a lone one — **structural, not rendered**. It would pass against a replacement that populates the cache with the *wrong* clip, which is exactly the failure a bbox→adjacency swap can produce. So point 3 has two halves: keep that test green **unchanged** (it pins the cache's shape), **and add the pixel assertion it never had** — render a cross junction and assert no light seam pixel at the crossing. Per `CLAUDE.md`, antialiased 1-px assertions need a lenient threshold (`< 190`, not `< 100`). This is an **addition**, not a rewrite, so it does not count against the changed-test budget point 4 governs.
+
+**4. Rewritten tests get one line each: old op → new op → why the assertion moved.** For **defect 9**, the closing test is **live-editing shaped**: merge two collinear walls carrying identical openings → one survivor, openings deduped. (`planc1`'s three stacked doors were cleaned at import; this guards **the path that created them**, which is the one still open.)
+
+**5. Telemetry expectations, stated in advance so the numbers are predictions and not rationalisations.** The tee branch's **2** split-on-writes → **0** when the split rule's second half lands. `GroupItem.bake`'s **80 remain**: they are **P4.5's**, and the counter staying nonzero until then is **correct, not unfinished**. The split-on-write shim stays until its counter is owned entirely by P4.5's rebuild.
+
+**6. Sub-commits, each at a FULL green gate** (the P0.5 per-fix precedent — and this task is the size that earns it: one task, several rollback points):
+
+  1. planner/applier factoring + the scene applier for `merge_collinear`;
+  2. `split_edge` scene-side + the split rule's second half + the guard retarget (with its **pre-authorized** `match=` change, named in the log rather than slipped through);
+  3. call-site migration, **family by family**;
+  4. deletion of the dead ~375 and the junction swap.
+
+**7. On exit.** Re-check the **P2.3 Known-regressions row by hand** — the 480″ body-drag moving as one run again — and **flip it only if it genuinely closes**. Report the **measured** deletion count against the estimated 375.
+
+**Acceptance.** `test_coalesce.py` and the coalesce half of `test_walls.py` rewritten against the new ops — **and this is the biggest "changed test" risk in the plan, so every rewritten assertion must be justified in the log.** ~330 lines deleted from `walls.py` — **measured at P3.3 as 375 across 13 functions (25% of the file), including the three helpers point 2 adjudicates**; report the real figure on exit.
 
 ### P3.5 — Delete the detection engine
 `_RoomGrid`, `_WallGraph`, `detect_room`, `_detect_room`, `room_signature`, `refresh_rooms` memoization, `bind_room_walls`, `_wall_along_segment`, `_perimeter_span`, `room_owns_walls`, `walls_cover_room`, `duplicate_wall`, `_privatize_shared_walls`, `synthesize_room_edge`, `reloop_open_room`. "Detect room here" becomes `topology.enclosing_face`. **Defects 8 and 13 close here.**
