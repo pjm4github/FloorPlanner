@@ -290,9 +290,9 @@ def _warn_unwelded(scene, n):
     elif n > base:
         msg = (f"design_from_scene: {n} wall end(s) now sit within the "
                f"{JOIN_TOL}\" join tolerance of a neighbour without being "
-               f"welded to it -- {base} of them since the plan was opened and "
-               f"{n - base} NEW. An edit has torn the wall network; this is not "
-               f"the legacy-load case.")
+               f"welded to it -- {base} were there when the plan opened and "
+               f"{n - base} are NEW. An edit has torn the wall network; this is "
+               f"not the legacy-load case.")
     else:
         return                       # unchanged, or repaired -- nothing to say
     if getattr(scene, _WARNED_ATTR, None) == n:
