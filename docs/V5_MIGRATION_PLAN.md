@@ -1892,10 +1892,78 @@ A NARROWER CLAIM THAN IT LOOKS, stated so (iii) does not inherit a
          is weld's job, and weld is still on this task's deletion list. What is
          true today is that both ops resolve the same corner to the same
          representative `Vertex`, so they converge rather than fight.
-NOT DONE: (ii) split_edge scene-side + the split rule's second half + the
-         guard retarget (the pre-authorized `match="P3.3"` change); (iii)
-         call-site migration family by family; (iv) deletion of the dead ~375
-         and the junction swap. Census re-verified on disk before starting:
+(ii) done  commit 340816c -- split_edge scene-side, the split rule's second
+         half, the guard retarget.
+ruff:    clean
+pytest:  OFF  482 passed, 4 xfailed, 1 xpassed in 18.4s
+         ON   482 passed, 4 xfailed, 1 xpassed in 21.8s
+         DEEP 477 passed, 3 xfailed, 7 deselected in 20.7s
+files:   design/topology.py (Split, plan_split_edge, apply_split_plan;
+         split_edge becomes their composition), walls.py
+         (apply_split_plan_to_scene, split_wall_at, WallItem.
+         _split_body_landings + _run_wall_under), tests/test_wall_move.py
+         (+7, ADDITIONS ONLY -- 0 deletions), tests/test_topology_ops.py (+7),
+         tests/test_topology.py (the one rewrite, below)
+THE SPLIT RULE IS NOW WHOLE. P3.3 built the first half and left the second
+         declared-but-not-done, tee branch on the coordinate path with a
+         comment naming this task. A body-landing now SPLITS the wall it lands
+         on -- which MAKES the vertex it never had -- and is then promoted onto
+         it exactly as a corner attachment is. The new segment joins the run,
+         so the user still slides the whole wall they grabbed (own test; that
+         is the way this could have silently gone wrong).
+TEST CHANGED (1), the pre-authorized one, named per the working agreement:
+         tests/test_topology.py::test_split_edge_raises_on_a_wall_with_openings
+         asserted `pytest.raises(NotImplementedError, match="P3.3")`. OLD OP:
+         split_edge refused any wall carrying an opening. NEW OP: it
+         redistributes them. WHY THE ASSERTION MOVED: that message was a
+         placeholder for unbuilt work and said so; the work is built here, so
+         the assertion pinning its absence has nothing left to pin. Rewritten
+         as TWO tests -- redistribution works, and the guard SURVIVES narrowed
+         to the case redistribution genuinely cannot answer. Hence the
+         pre-authorized string change, `match="P3.3"` -> `match="P3.6"`.
+THE GUARD IS RETARGETED, NOT RETIRED, and the distinction is the content of the
+         ruling. Redistribution answers "which segment owns the door". It
+         cannot answer "which segment owns a door the cut runs THROUGH",
+         because neither does -- that is an opening which no longer fits where
+         it lands, and reporting one instead of silently sliding it is P3.6's
+         line in this plan. So the guard keeps its P1.3-followup discipline
+         (fail loud AT the call site) on a strictly smaller domain.
+TWO POLICIES, ONE DECISION -- declared, because it is the closest this task
+         comes to the applier drift point 1 forbids, and it is not that.
+         `topology.split_edge` RAISES on a straddling split; the scene op
+         DECLINES it. Same planner, same delta, same `straddled` flag. What
+         differs is what each CALLER does with a flagged delta, because one is
+         a document repair and the other is a mouse gesture that must not
+         crash mid-drag. The decision is single-sourced; only the policy is
+         local, and a declined split leaves P3.3's exact behaviour behind.
+TELEMETRY -- point 5's prediction, measured BOTH ways rather than asserted:
+         * dedicated tee scenario, 12 drags: 12 split-on-writes BEFORE
+           (measured by disabling the new pass), 0 AFTER. The branch is silent,
+           which is the claim point 5 makes.
+         * composite (coalesce + weld + group + bake + ungroup + 12 drags):
+           mouseMoveEvent splits 4 -> 1.
+         * AND THE RESIDUE IS NOT THE TEE BRANCH FAILING. Two landings were
+           DECLINED because the split point falls inside an opening -- and
+           those openings turn out to be 15 IDENTICAL 96" windows stacked at
+           one `s`, produced by the old `_coalesce_wall_impl` on the
+           bake/ungroup path. That is DEFECT 9 in the wild, inside the code
+           (iii)/(iv) delete. PREDICTION FOR (iii), recorded now so it is a
+           prediction and not a rationalisation: retiring coalesce removes the
+           stacks and those two landings then split.
+         * a call site P3.3's scenario never triggered: 8 splits at
+           walls.py:233 in `_coalesce_wall_impl`. Also (iii)/(iv)'s.
+THE CORPUS GUARD HAS GONE VACUOUS, and saying so is the point. P3.3's
+         press-every-wall test still passes -- but neither corpus plan has an
+         unwelded body-landing, so pressing every wall of sample_plan and
+         planc1 now makes exactly 0 splits (measured). It no longer exercises
+         the risk it was written for. Added the case that DOES split, asserting
+         the document is unchanged across it: the scene walk already cuts walls
+         at junctions (`split_params`), so a press-time split only makes the
+         scene agree with what the document always said. Verified rather than
+         assumed -- 2 scene walls -> 3, document byte-identical, 3 document
+         walls before and after.
+NOT DONE: (iii) call-site migration family by family; (iv) deletion of the dead
+         ~375 and the junction swap. Census re-verified on disk before starting:
          `coincident_walls` at walls.py:656 and :695 and view.py:597,
          `wall_endpoint_open` at view.py:248, and the dying caller at
          walls.py:201 inside `_coalesce_wall_impl`. ONE CORRECTION to the
