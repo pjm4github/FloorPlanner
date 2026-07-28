@@ -215,44 +215,280 @@ def split_edge(design, wall_id, x, y):
     return d
 
 
-def merge_collinear(design):
-    """Return a copy of `design` with runs of collinear, same-type walls that
-    meet at a degree-2 vertex (no other wall, no opening straddling the join)
-    merged into one wall. The inverse of split_edge; closes the degree-2 spurs a
-    split leaves behind."""
+# --------------------------------------------------------- planner / applier
+# THE PLANNER / APPLIER SPLIT (P3.4, settled point 1).
+#
+# Everything above is pure `Design -> Design`. P3.4 needs the SAME operations on
+# a live scene of `WallItem`s carrying `OpeningItem` children, room bindings,
+# groups, z-order and floors. Two obvious routes were rejected: lifting the
+# scene to a `Design` and applying back makes every wall edit a full-plan
+# rebuild (it destroys item identity -- selection, in-flight drag state, group
+# membership, P3.1's persistent uids -- and regresses exactly the numbers P3.8
+# exists to improve); scene-side siblings sharing only the algorithm are one
+# concept with two implementations, drifting from the day they are written.
+#
+# So the DECISION LOGIC RUNS ONCE, PURE, over a neutral `GraphView`, and returns
+# a DELTA. Two THIN appliers execute it, touching only the objects the delta
+# names: `apply_merge_plan` here, and `apply_merge_plan_to_scene` in
+# `floorplanner.walls`. `--verify-design` re-derives the `Design` from the scene
+# at every quiescent point, so if the two appliers ever disagree the shadow gate
+# fires -- P1.6 was built for this moment.
+#
+# A delta plus an applier is a command in all but name, so P6.1's `QUndoStack`
+# inherits the shape rather than inventing it.
+#
+# The delta names TOPOLOGY -- which corners merge, which walls die, where the
+# openings land. It deliberately does NOT name room binding: a `Design` records
+# that as `wall.left`/`right`, the scene as `WallItem.rooms`, and each applier
+# maintains its own from `Merge.absorbed`. That is not applier drift; it is the
+# one thing the two targets genuinely represent differently.
+
+# The planner's neutral input. `key` and `anchor` values are the CALLER's own
+# handles (a wall id / vertex id for a `Design`; a `WallItem` / `Vertex` object
+# for a scene) -- the planner only ever compares and passes them back.
+GraphView = namedtuple("GraphView", "walls pos anchor")
+WallView = namedtuple("WallView", "key level v1 v2 type openings")
+OpeningView = namedtuple("OpeningView", "index s width ident")
+
+# The delta. `v1`/`v2` are the corner anchors the survivor adopts, or None when
+# the merge lands somewhere no existing corner sits (then `p1`/`p2` are used).
+Merge = namedtuple("Merge", "survivor absorbed v1 v2 p1 p2 dropped_vertices "
+                            "openings dropped_openings")
+PlannedOpening = namedtuple("PlannedOpening", "wall index s")
+
+ANGLE_TOL = 0.02        # |sin| between units to still call two walls parallel
+DEDUP_TOL = 1.0         # two same-code openings this close are ONE (defect 9)
+
+
+def _find(parent, i):
+    while parent[i] != i:
+        parent[i] = parent[parent[i]]
+        i = parent[i]
+    return i
+
+
+def _union(parent, a, b):
+    ra, rb = _find(parent, a), _find(parent, b)
+    if ra != rb:
+        parent[max(ra, rb)] = min(ra, rb)
+
+
+def _same_line(a, b, pos, perp_tol, angle_tol):
+    """`b` lies on `a`'s line: parallel, and both its ends within `perp_tol`.
+    Deliberately the predicate `walls.coincident_walls` already uses, so the
+    scene keeps the merge candidates it has always had."""
+    a1 = pos[a.v1]
+    u = _unit(a1, pos[a.v2])
+    ub = _unit(pos[b.v1], pos[b.v2])
+    if abs(ub[0] * u[1] - ub[1] * u[0]) > angle_tol:
+        return False
+    return all(abs((p[0] - a1[0]) * u[1] - (p[1] - a1[1]) * u[0]) <= perp_tol
+               for p in (pos[b.v1], pos[b.v2]))
+
+
+def _spans_overlap(a, b, pos):
+    """`b`'s span overlaps `a`'s along `a`'s axis -- the duplicate party wall
+    case the editor's coalesce exists to clean up."""
+    a1 = pos[a.v1]
+    u = _unit(a1, pos[a.v2])
+    length = math.dist(a1, pos[a.v2])
+    s = [(p[0] - a1[0]) * u[0] + (p[1] - a1[1]) * u[1]
+         for p in (pos[b.v1], pos[b.v2])]
+    return max(s) > 0.5 and min(s) < length - 0.5
+
+
+def _abut_at_degree_2(a, b, degree):
+    """`a` and `b` meet end to end at a corner NOTHING ELSE attaches to. The
+    degree test is what keeps a real T-junction a vertex: a third wall there
+    makes the corner load-bearing for the planar subdivision."""
+    for ka in (a.v1, a.v2):
+        for kb in (b.v1, b.v2):
+            if ka != kb or degree[(a.level, ka)] != 2:
+                continue
+            far_a = a.v2 if ka == a.v1 else a.v1
+            far_b = b.v2 if kb == b.v1 else b.v1
+            if far_a != far_b:                 # not a degenerate two-wall loop
+                return True
+    return False
+
+
+def _plan_one_merge(run, pos, anchor, degree):
+    """One run of mergeable walls -> one `Merge`. `run[0]` survives, and the
+    merged wall keeps the SURVIVOR'S DIRECTION -- every other end projects onto
+    its axis, so `left`/`right` stay on the sides they were on."""
+    surv = run[0]
+    a = pos[surv.v1]
+    u = _unit(a, pos[surv.v2])
+    ends = [((p[0] - a[0]) * u[0] + (p[1] - a[1]) * u[1], k)
+            for w in run for k, p in ((w.v1, pos[w.v1]), (w.v2, pos[w.v2]))]
+    smin, kmin = min(ends, key=lambda t: t[0])
+    smax, kmax = max(ends, key=lambda t: t[0])
+    p1 = (a[0] + u[0] * smin, a[1] + u[1] * smin)
+    p2 = (a[0] + u[0] * smax, a[1] + u[1] * smax)
+    # adopt the real corner when the merged end lands ON it; a wall absorbed
+    # from up to perp_tol off the line lands on the PROJECTION instead, which is
+    # a new position and so honestly a new corner
+    v1 = anchor.get(kmin) if math.dist(pos[kmin], p1) <= WELD_TOL else None
+    v2 = anchor.get(kmax) if math.dist(pos[kmax], p2) <= WELD_TOL else None
+
+    kept, planned, dropped_ops = [], [], []
+    for w in run:                              # run order: the survivor first
+        wa = pos[w.v1]
+        wu = _unit(wa, pos[w.v2])
+        for ov in w.openings:
+            px = (wa[0] + wu[0] * ov.s, wa[1] + wu[1] * ov.s)
+            s = (px[0] - p1[0]) * u[0] + (px[1] - p1[1]) * u[1]
+            dup = next((k for k in kept if k[0] == ov.ident and abs(k[1] - s)
+                        <= max(DEDUP_TOL, min(k[2], ov.width) / 2)), None)
+            if dup is not None:                # defect 9: no stacked doors
+                dropped_ops.append(PlannedOpening(w.key, ov.index, s))
+                continue
+            kept.append((ov.ident, s, ov.width))
+            planned.append(PlannedOpening(w.key, ov.index, s))
+    planned.sort(key=lambda po: po.s)
+
+    used = defaultdict(int)                    # corners this run consumes whole
+    for w in run:
+        used[w.v1] += 1
+        used[w.v2] += 1
+    gone = tuple(anchor[k] for k in sorted(used, key=str)
+                 if k not in (kmin, kmax) and k in anchor
+                 and degree[(surv.level, k)] == used[k])
+    return Merge(surv.key, tuple(w.key for w in run[1:]), v1, v2, p1, p2,
+                 gone, tuple(planned), tuple(dropped_ops))
+
+
+def plan_merge_collinear(view, perp_tol=WELD_TOL, angle_tol=ANGLE_TOL):
+    """Plan every collinear merge in `view` -- the ONE place the decision is
+    made, for a `Design` and for a live scene alike.
+
+    Two walls join a run when they are on the same line (same level, same type)
+    and either their spans OVERLAP or they ABUT at a degree-2 corner. Runs are
+    maximal, so one pass replaces the old merge-one-and-restart loop; the
+    survivor is the run's first wall in the caller's own order, which is what
+    makes the plan deterministic."""
+    pos = view.pos
+    walls = [w for w in view.walls if math.dist(pos[w.v1], pos[w.v2]) > 1e-6]
+    degree = defaultdict(int)
+    for w in walls:
+        degree[(w.level, w.v1)] += 1
+        degree[(w.level, w.v2)] += 1
+
+    parent = list(range(len(walls)))
+    lines = defaultdict(list)
+    for i, w in enumerate(walls):
+        lines[(w.level, w.type)].append(i)
+    for idxs in lines.values():
+        for n, ia in enumerate(idxs):
+            for ib in idxs[n + 1:]:
+                if _find(parent, ia) == _find(parent, ib):
+                    continue
+                a, b = walls[ia], walls[ib]
+                if _same_line(a, b, pos, perp_tol, angle_tol) and (
+                        _spans_overlap(a, b, pos)
+                        or _abut_at_degree_2(a, b, degree)):
+                    _union(parent, ia, ib)
+
+    runs = defaultdict(list)
+    for i in range(len(walls)):
+        runs[_find(parent, i)].append(i)
+    return [_plan_one_merge([walls[i] for i in sorted(idxs)], pos, view.anchor,
+                            degree)
+            for _root, idxs in sorted(runs.items()) if len(idxs) > 1]
+
+
+def graph_from_design(design, level=None):
+    """A `GraphView` of `design` -- wall ids and vertex ids as the handles."""
+    pos = _positions(design)
+    walls = []
+    for w in design.walls:
+        if level is not None and w.level != level:
+            continue
+        if w.v1 not in pos or w.v2 not in pos:
+            continue
+        length = math.dist(pos[w.v1], pos[w.v2])
+        ops = []
+        for i, o in enumerate(w.openings if isinstance(w.openings, list)
+                              else ()):
+            anc = o.anchor if isinstance(o.anchor, dict) else {}
+            off = anc.get("offset_in", 0.0)
+            s = off if anc.get("from") != "v2" else length - off
+            ops.append(OpeningView(i, s, 0.0, (o.kind, o.code)))
+        walls.append(WallView(w.id, w.level, w.v1, w.v2, w.type, tuple(ops)))
+    return GraphView(walls, pos, {vid: vid for vid in pos})
+
+
+def _adopt_vertex(d, anchor, xy, level):
+    """The vertex id the merged end should carry: the adopted corner when the
+    plan named one, else the welded-or-fresh vertex at the planned point."""
+    if anchor is not None and any(v.id == anchor for v in d.vertices):
+        return anchor
+    vid = _vertex_at(d, xy[0], xy[1], level)
+    if vid is None:
+        vid = _next_id(d, "v")
+        d.vertices.append(Vertex.from_dict(
+            {"id": vid, "level": level,
+             "x": round(xy[0], 4), "y": round(xy[1], 4)}))
+    return vid
+
+
+def apply_merge_plan(design, plan):
+    """The `Design` applier: execute a merge delta, touching only what it names.
+
+    Openings are re-anchored to the NEAREST end of the merged wall -- the same
+    convention `importer`/`bridge` already emit -- because the merge moved both
+    ends and an offset from the old `v1` would name nothing."""
     d = copy.deepcopy(design)
-    changed = True
-    while changed:
-        changed = False
-        pos = _positions(d)
-        incident = defaultdict(list)
-        for w in d.walls:
-            incident[(w.level, w.v1)].append(w)
-            incident[(w.level, w.v2)].append(w)
-        for (level, vid), ws in incident.items():
-            if len(ws) != 2:
-                continue
-            w1, w2 = ws
-            if w1 is w2 or w1.type != w2.type:
-                continue
-            if (w1.openings or w2.openings):
-                continue
-            # the two far endpoints and the shared vertex must be collinear
-            far1 = w1.v1 if w1.v2 == vid else w1.v2
-            far2 = w2.v1 if w2.v2 == vid else w2.v2
-            if far1 == far2:
-                continue
-            u1 = _unit(pos[far1], pos[vid])
-            u2 = _unit(pos[vid], pos[far2])
-            if abs(u1[0] * u2[1] - u1[1] * u2[0]) > 1e-3:   # not collinear
-                continue
-            w1.v1, w1.v2 = far1, far2          # w1 absorbs the run
-            d.walls.remove(w2)
-            d.vertices = [v for v in d.vertices
-                          if not (v.id == vid and v.level == level)]
-            changed = True
-            break
+    by_id = {w.id: w for w in d.walls}
+    dead = set()
+    for m in plan:
+        surv = by_id.get(m.survivor)
+        if surv is None:
+            continue
+        ops = []                               # read off the PRE-merge geometry
+        for po in m.openings:
+            src = by_id.get(po.wall)
+            src_ops = src.openings if src is not None and isinstance(
+                src.openings, list) else []
+            if po.index < len(src_ops):
+                ops.append((src_ops[po.index], po.s))
+        surv.v1 = _adopt_vertex(d, m.v1, m.p1, surv.level)
+        surv.v2 = _adopt_vertex(d, m.v2, m.p2, surv.level)
+        length = math.dist(m.p1, m.p2)
+        merged = []
+        for o, s in ops:
+            near1 = s <= length / 2
+            o.anchor = {"from": "v1" if near1 else "v2",
+                        "offset_in": round(s if near1 else length - s, 4)}
+            merged.append(o)
+        surv.openings = merged
+        dead.update(m.absorbed)
+    if dead:
+        d.walls = [w for w in d.walls if w.id not in dead]
+        live = {w.v1 for w in d.walls} | {w.v2 for w in d.walls}
+        d.vertices = [v for v in d.vertices if v.id in live]
     return d
+
+
+def merge_collinear(design):
+    """Return a copy of `design` with runs of collinear, same-type walls merged
+    into one wall -- the inverse of `split_edge`, closing the degree-2 spurs a
+    split leaves behind.
+
+    P3.4 rebuilt this as `plan_merge_collinear` + `apply_merge_plan` so the
+    scene shares the decision logic; the composition here is what every existing
+    caller still sees. Two behaviours changed with the rebuild and both are
+    fixes: a wall carrying openings is no longer refused (they are redistributed
+    onto the merged span and deduplicated), and the survivor keeps its own
+    direction, so `left`/`right` can no longer silently swap when the run
+    extends behind its `v1`."""
+    d = design
+    for _ in range(8):                         # runs are maximal; 8 is a fuse
+        plan = plan_merge_collinear(graph_from_design(d))
+        if not plan:
+            break
+        d = apply_merge_plan(d, plan)
+    return d if d is not design else copy.deepcopy(design)
 
 
 def planarize(design):

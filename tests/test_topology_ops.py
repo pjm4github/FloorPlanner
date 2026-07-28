@@ -1,0 +1,302 @@
+"""P3.4 sub-commit (i): the planner/applier split, and the scene applier for
+`merge_collinear`.
+
+The point of the split is that ONE pure planner decides, and two thin appliers
+mutate -- so these tests come in pairs wherever they can: the same decision,
+checked once on a `Design` and once on the live scene. The scene half is the
+new code; the `Design` half is the guard that the rebuild did not change what
+the pure op means.
+"""
+import pytest
+from PyQt6.QtCore import QPointF
+
+from floorplanner import vertex
+from floorplanner.design import topology
+from floorplanner.design.bridge import design_from_scene
+from floorplanner.design.model import Design
+from floorplanner.walls import (
+    _coalesce_all_impl, apply_merge_plan_to_scene, graph_from_scene,
+    merge_collinear_scene, plan_merge_collinear,
+)
+
+pytestmark = pytest.mark.walls
+
+
+# --------------------------------------------------------------------------
+# helpers
+# --------------------------------------------------------------------------
+def _design(verts, walls, level="L1"):
+    """A minimal Design: verts is {id: (x, y)}, walls a list of wall dicts."""
+    return Design.from_dict({
+        "levels": [{"id": level, "name": "Level", "elevation_in": 0}],
+        "vertices": [{"id": k, "level": level, "x": x, "y": y}
+                     for k, (x, y) in verts.items()],
+        "walls": [dict({"level": level, "type": "interior"}, **w)
+                  for w in walls],
+        "rooms": [], "furnishings": [], "groups": [],
+    })
+
+
+def _pos(d):
+    return {v.id: (v.x, v.y) for v in d.vertices}
+
+
+def _walls(scene, fp):
+    return [w for w in scene.items()
+            if isinstance(w, fp.WallItem) and not w.is_open]
+
+
+def _add(scene, fp, x1, y1, x2, y2, wall_type="interior"):
+    w = fp.WallItem(QPointF(x1, y1), QPointF(x2, y2), wall_type)
+    scene.addItem(w)
+    return w
+
+
+def _door(fp, wall, s, code="3280"):
+    op = fp.OpeningItem(wall, "door", code, s)
+    wall.openings.append(op)
+    wall.rebuild()
+    return op
+
+
+# --------------------------------------------------------------------------
+# The pure planner: what it decides, on a Design
+# --------------------------------------------------------------------------
+def test_two_collinear_walls_at_a_degree_2_corner_plan_one_merge():
+    d = _design({"a": (0, 0), "m": (100, 0), "b": (200, 0)},
+                [{"id": "w1", "v1": "a", "v2": "m"},
+                 {"id": "w2", "v1": "m", "v2": "b"}])
+    plan = topology.plan_merge_collinear(topology.graph_from_design(d))
+    assert len(plan) == 1
+    assert plan[0].survivor == "w1" and plan[0].absorbed == ("w2",)
+    assert plan[0].dropped_vertices == ("m",)      # the corner is consumed
+
+
+def test_a_third_wall_at_the_corner_blocks_the_merge():
+    # a real T-junction is load-bearing for the planar subdivision: the corner
+    # has degree 3, so the run must NOT be merged through it
+    d = _design({"a": (0, 0), "m": (100, 0), "b": (200, 0), "t": (100, 100)},
+                [{"id": "w1", "v1": "a", "v2": "m"},
+                 {"id": "w2", "v1": "m", "v2": "b"},
+                 {"id": "w3", "v1": "m", "v2": "t"}])
+    assert topology.plan_merge_collinear(topology.graph_from_design(d)) == []
+
+
+def test_different_types_never_merge():
+    d = _design({"a": (0, 0), "m": (100, 0), "b": (200, 0)},
+                [{"id": "w1", "v1": "a", "v2": "m", "type": "interior"},
+                 {"id": "w2", "v1": "m", "v2": "b", "type": "exterior"}])
+    assert topology.plan_merge_collinear(topology.graph_from_design(d)) == []
+
+
+def test_the_survivor_keeps_its_own_direction():
+    # THE FIX FOUND BY SINGLE-SOURCING. The old merge_collinear wrote
+    # `w1.v1, w1.v2 = far1, far2`, which REVERSES the survivor when the run
+    # extends behind its v1 -- and it did not swap `left`/`right` to match, so
+    # every side on that wall silently flipped. The survivor now keeps its own
+    # direction, so left/right stay on the sides they were on.
+    d = _design({"a": (0, 0), "m": (100, 0), "b": (200, 0)},
+                [{"id": "w1", "v1": "m", "v2": "b", "left": "r1",
+                  "right": "r2"},
+                 {"id": "w2", "v1": "a", "v2": "m"}])
+    merged = topology.merge_collinear(d)
+    assert len(merged.walls) == 1
+    w = merged.walls[0]
+    pos = _pos(merged)
+    assert pos[w.v1] == (0.0, 0.0) and pos[w.v2] == (200.0, 0.0)
+    assert (w.left, w.right) == ("r1", "r2")
+
+
+def test_merge_redistributes_an_opening_onto_the_merged_span():
+    # merge_collinear used to REFUSE any wall carrying an opening. It now
+    # redistributes: the door stays where it is in space, re-anchored to the
+    # nearest end of the merged wall.
+    d = _design({"a": (0, 0), "m": (100, 0), "b": (200, 0)},
+                [{"id": "w1", "v1": "a", "v2": "m"},
+                 {"id": "w2", "v1": "m", "v2": "b",
+                  "openings": [{"id": "o1", "kind": "door", "code": "3280",
+                                "anchor": {"from": "v1", "offset_in": 50.0}}]}])
+    merged = topology.merge_collinear(d)
+    assert len(merged.walls) == 1
+    ops = merged.walls[0].openings
+    assert len(ops) == 1
+    # absolute position was (150, 0); on the 200" merged wall that is 50" from
+    # v2, which is the nearer end
+    assert ops[0].anchor == {"from": "v2", "offset_in": 50.0}
+
+
+def test_merge_collinear_still_preserves_the_corpus_faces():
+    # the delegation guard: the rebuilt op must still mean what P1.3's did
+    import json
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    d = Design.from_dict(json.loads(
+        (root / "examples" / "symmetricP1.json").read_text("utf-8")))
+    d2 = topology.merge_collinear(d)
+    assert len(d2.walls) <= len(d.walls)
+    assert len(topology.trace_faces(d2)) == len(topology.trace_faces(d))
+
+
+# --------------------------------------------------------------------------
+# The scene applier: the same decisions, on live items
+# --------------------------------------------------------------------------
+def test_scene_merges_two_collinear_walls_end_to_end(fp, scene):
+    _add(scene, fp, 0, 0, 100, 0)
+    _add(scene, fp, 100, 0, 200, 0)
+    assert merge_collinear_scene(scene) == 1
+    walls = _walls(scene, fp)
+    assert len(walls) == 1
+    assert (walls[0].p1.x(), walls[0].p2.x()) == (0.0, 200.0)
+
+
+def test_scene_leaves_a_real_t_junction_alone(fp, scene):
+    _add(scene, fp, 0, 0, 100, 0)
+    _add(scene, fp, 100, 0, 200, 0)
+    _add(scene, fp, 100, 0, 100, 100)
+    assert merge_collinear_scene(scene) == 0
+    assert len(_walls(scene, fp)) == 3
+
+
+def test_scene_merges_overlapping_duplicates_like_coalesce_did(fp, scene):
+    # parity with tests/test_coalesce.py: two parallel walls 6" apart (within
+    # the wall-snap grid) with overlapping spans are one wall
+    _add(scene, fp, 0, 0, 120, 0)
+    _add(scene, fp, 60, 6, 180, 6)
+    merge_collinear_scene(scene)
+    assert len(_walls(scene, fp)) == 1
+
+
+def test_scene_does_not_merge_walls_off_the_grid(fp, scene):
+    _add(scene, fp, 0, 0, 120, 0)
+    _add(scene, fp, 0, 18, 120, 18)               # 18" apart, > the 6" grid
+    assert merge_collinear_scene(scene) == 0
+    assert len(_walls(scene, fp)) == 2
+
+
+def test_scene_merge_is_idempotent(fp, scene):
+    for i in range(5):                            # a chain of overlaps
+        _add(scene, fp, i * 30, 0, i * 30 + 90, 0)
+    merge_collinear_scene(scene)
+    assert len(_walls(scene, fp)) == 1
+    assert merge_collinear_scene(scene) == 0      # nothing left to do
+    assert len(_walls(scene, fp)) == 1
+
+
+def test_scene_merge_unions_the_rooms_the_walls_border(fp, scene, make_room):
+    room = make_room(scene, 0, 0, 120, 120, "Den")
+    edge = next(w for w in room.walls if w.length() > 1)
+    free = _add(scene, fp, edge.p1.x(), edge.p1.y(), edge.p2.x(), edge.p2.y(),
+                edge.wall_type)
+    merge_collinear_scene(scene)
+    survivor = next(w for w in _walls(scene, fp)
+                    if w.length() > 1 and room in w.rooms
+                    and abs(w.p1.y() - edge.p1.y()) < 1)
+    assert room in survivor.rooms and survivor in room.walls
+    assert free not in _walls(scene, fp) or free is survivor
+
+
+# --------------------------------------------------------------------------
+# Defect 9 -- merge dedups openings. Live-editing shaped, per the task text:
+# planc1's three stacked doors were cleaned at IMPORT; this guards the path
+# that created them, which is the one still open.
+# --------------------------------------------------------------------------
+def _two_walls_one_door_each(fp, scene):
+    a = _add(scene, fp, 0, 0, 120, 0)
+    b = _add(scene, fp, 0, 0, 120, 0)
+    _door(fp, a, 60.0)
+    _door(fp, b, 60.0)
+    return a, b
+
+
+def test_defect_9_merge_dedups_identical_openings(fp, scene):
+    _two_walls_one_door_each(fp, scene)
+    merge_collinear_scene(scene)
+    walls = _walls(scene, fp)
+    assert len(walls) == 1
+    assert len(walls[0].openings) == 1            # not two stacked doors
+
+
+def test_defect_9_is_the_behaviour_coalesce_got_wrong(fp, scene):
+    # the same input through the OLD op, so the closure is legible rather than
+    # asserted: coalesce stacks the duplicate door on top of the original
+    _two_walls_one_door_each(fp, scene)
+    _coalesce_all_impl(scene)
+    walls = _walls(scene, fp)
+    assert len(walls) == 1
+    assert len(walls[0].openings) == 2            # defect 9, still present here
+
+
+def test_merge_keeps_openings_that_are_genuinely_different(fp, scene):
+    a = _add(scene, fp, 0, 0, 240, 0)
+    b = _add(scene, fp, 0, 0, 240, 0)
+    _door(fp, a, 60.0)
+    _door(fp, b, 180.0)                           # far apart: both are real
+    merge_collinear_scene(scene)
+    walls = _walls(scene, fp)
+    assert len(walls) == 1
+    assert sorted(round(op.s) for op in walls[0].openings) == [60, 180]
+
+
+def test_merged_opening_stays_where_it_was_in_space(fp, scene):
+    _add(scene, fp, 0, 0, 100, 0)
+    b = _add(scene, fp, 100, 0, 200, 0)
+    _door(fp, b, 50.0)                            # absolute (150, 0)
+    merge_collinear_scene(scene)
+    wall = _walls(scene, fp)[0]
+    assert len(wall.openings) == 1
+    p = wall.point_at(wall.openings[0].s)
+    assert abs(p.x() - 150.0) < 0.01 and abs(p.y()) < 0.01
+
+
+# --------------------------------------------------------------------------
+# The properties that made the planner/applier split worth the trouble
+# --------------------------------------------------------------------------
+def test_an_end_to_end_merge_adopts_the_corner_instead_of_splitting(fp, scene):
+    # coalesce assigned p1/p2, which is SPLIT-ON-WRITE: the corner came apart
+    # and was rebuilt from coordinates. The merge re-points the end AT the
+    # corner's vertex, so an exact merge causes no split at all.
+    _add(scene, fp, 0, 0, 100, 0)
+    _add(scene, fp, 100, 0, 200, 0)
+    before = vertex.split_count()
+    merge_collinear_scene(scene)
+    assert vertex.split_count() == before
+
+
+def test_the_applier_touches_only_the_items_the_delta_names(fp, scene):
+    _add(scene, fp, 0, 0, 100, 0)
+    _add(scene, fp, 100, 0, 200, 0)
+    bystander = _add(scene, fp, 0, 400, 100, 400)
+    v1, v2 = bystander.end_vertex("p1"), bystander.end_vertex("p2")
+    merge_collinear_scene(scene)
+    assert bystander.scene() is scene
+    assert bystander.end_vertex("p1") is v1 and bystander.end_vertex("p2") is v2
+
+
+def test_the_plan_is_a_delta_the_scene_can_be_asked_for_first(fp, scene):
+    # planning does not mutate: a caller can look at the delta and decline
+    _add(scene, fp, 0, 0, 100, 0)
+    _add(scene, fp, 100, 0, 200, 0)
+    plan = plan_merge_collinear(graph_from_scene(scene), perp_tol=6.0)
+    assert len(plan) == 1 and len(_walls(scene, fp)) == 2
+    apply_merge_plan_to_scene(scene, plan)
+    assert len(_walls(scene, fp)) == 1
+
+
+def test_floors_are_planned_apart(fp, scene):
+    a = _add(scene, fp, 0, 0, 100, 0)
+    b = _add(scene, fp, 100, 0, 200, 0)
+    b.floor = "upper"
+    assert merge_collinear_scene(scene) == 0
+    assert len(_walls(scene, fp)) == 2
+    assert a.floor != b.floor
+
+
+def test_the_scene_applier_leaves_the_design_applier_nothing_to_do(fp, scene):
+    # THE DRIFT GATE IN MINIATURE. If the two appliers disagreed, the pure op
+    # would still find a merge in the document the scene walk produces.
+    _add(scene, fp, 0, 0, 100, 0)
+    _add(scene, fp, 100, 0, 200, 0)
+    _add(scene, fp, 200, 0, 200, 100)
+    merge_collinear_scene(scene)
+    d = design_from_scene(scene)
+    assert topology.plan_merge_collinear(topology.graph_from_design(d)) == []

@@ -13,6 +13,9 @@ from PyQt6.QtGui import *  # noqa: F401
 from PyQt6.QtWidgets import *  # noqa: F401
 
 from floorplanner.config import *  # noqa: F401
+from floorplanner.design.topology import (
+    GraphView, OpeningView, WallView, plan_merge_collinear,
+)
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.vertex import Vertex
 
@@ -289,6 +292,167 @@ def coalesce_all(scene):
     if not SETTINGS.get("auto_coalesce", True):
         return 0
     return _coalesce_all_impl(scene)
+
+
+# ------------------------------------------------------ topology ops (P3.4)
+# The SCENE half of the planner/applier split. The decision logic lives once,
+# pure, in `design.topology`; everything here either feeds it a view of the live
+# scene or executes the delta it returns. See that module's header for why this
+# is neither "lift the scene to a Design" nor a scene-side reimplementation.
+
+def _corner_at(pos, cells, cell, x, y, floor):
+    """The existing corner key within SHARE_TOL of (x, y) on `floor`, or None."""
+    ci, cj = round(x / cell), round(y / cell)
+    best, best_d = None, SHARE_TOL
+    for di in (-1, 0, 1):
+        for dj in (-1, 0, 1):
+            for k in cells.get((floor, ci + di, cj + dj), ()):
+                d = math.hypot(pos[k][0] - x, pos[k][1] - y)
+                if d <= best_d:
+                    best, best_d = k, d
+    return best
+
+
+def graph_from_scene(scene, floor=None):
+    """A `GraphView` of the live wall network for `design.topology`'s planners.
+
+    THE CORNERS ARE THE VERTEX ADJACENCY the task line calls for: two ends
+    holding the same `Vertex` object are one corner, and ends within SHARE_TOL
+    of one another are folded into one corner for planning. The fold is not a
+    concession -- P3.1 is split-on-write and P3.3 shares only the corners a drag
+    touches, so most coincident ends in a loaded plan are still distinct
+    objects. Folding by position is what lets the planner see the corner that is
+    physically there; the applier then makes it real, by adopting one `Vertex`.
+
+    `floor=None` views every floor at once. Level is part of the planner's
+    grouping key, so floors stay apart there rather than by one pass per floor.
+    Open (dashed) and grouped walls are excluded, exactly as coalesce excluded
+    them."""
+    if scene is None:
+        return GraphView([], {}, {})
+    walls = sorted((w for w in scene.items()
+                    if isinstance(w, WallItem) and not w.is_open
+                    and w.group() is None and w.length() > 1e-6
+                    and (floor is None or w.floor == floor)),
+                   key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y(),
+                                  w.wall_type))
+    cell = max(SHARE_TOL, 1e-6)
+    pos, anchor, cells, seen, ends = {}, {}, {}, {}, {}
+    for w in walls:
+        for attr in ("p1", "p2"):
+            v = w.end_vertex(attr)
+            key = seen.get(id(v))
+            if key is None:
+                p = v.point()
+                key = _corner_at(pos, cells, cell, p.x(), p.y(), w.floor)
+                if key is None:
+                    key = len(pos)
+                    pos[key] = (p.x(), p.y())
+                    anchor[key] = v
+                    cells.setdefault((w.floor, round(p.x() / cell),
+                                      round(p.y() / cell)), []).append(key)
+                seen[id(v)] = key
+            ends[(id(w), attr)] = key
+    views = [WallView(w, w.floor, ends[(id(w), "p1")], ends[(id(w), "p2")],
+                      w.wall_type,
+                      tuple(OpeningView(i, op.s, op.width, (op.kind, op.code))
+                            for i, op in enumerate(w.openings)))
+             for w in walls]
+    return GraphView(views, pos, anchor)
+
+
+def _adopt_end(wall, attr, vertex, xy):
+    """Put a merged end on the corner the plan named -- REAL SHARING, which is
+    what coalesce never created -- or, when the plan named none, move it to the
+    planned coordinate. The second case splits on write, correctly: that end is
+    landing where no corner was."""
+    if vertex is not None:
+        if wall.end_vertex(attr) is not vertex:
+            wall.set_end_vertex(attr, vertex)
+        return
+    setattr(wall, attr, QPointF(xy[0], xy[1]))
+
+
+def apply_merge_plan_to_scene(scene, plan, rebuild=True):
+    """Execute a merge delta on the live items, touching ONLY what it names.
+
+    No full-plan rebuild, so selection, in-flight drag state, group membership
+    and the P3.1 uids all survive -- the property that disqualified
+    lift-to-Design-and-apply-back. Returns the surviving walls."""
+    survivors = []
+    for m in plan:
+        surv = m.survivor
+        if sip.isdeleted(surv) or surv.scene() is not scene:
+            continue
+        # openings are read off the PRE-merge geometry, before anything moves
+        specs = []
+        for po in m.openings:
+            src = po.wall
+            if sip.isdeleted(src) or po.index >= len(src.openings):
+                continue
+            op = src.openings[po.index]
+            specs.append((op if src is surv else None, op.kind, op.code,
+                          po.s, op.door_type, op.swing))
+        rooms = list(surv.rooms)               # the survivor borders them all
+        for w in m.absorbed:
+            if sip.isdeleted(w):
+                continue
+            for r in w.rooms:
+                if r not in rooms:
+                    rooms.append(r)
+            for r in list(w.rooms):
+                r.unbind_wall(w)
+            if w.scene() is not None:
+                scene.removeItem(w)
+        _adopt_end(surv, "p1", m.v1, m.p1)
+        _adopt_end(surv, "p2", m.v2, m.p2)
+        keep = []
+        for op, kind, code, s, door_type, swing in specs:
+            if op is not None:                 # the survivor's own: it rides on
+                op.s = s
+                keep.append(op)
+                continue
+            try:
+                new = OpeningItem(surv, kind, code, s)
+            except ValueError:                 # wider than the merged wall
+                continue
+            new.door_type, new.swing = door_type, swing
+            keep.append(new)
+        for op in surv.openings:               # deduped away (defect 9)
+            if op not in keep and not sip.isdeleted(op):
+                op.setParentItem(None)
+                if op.scene() is not None:
+                    scene.removeItem(op)
+        surv.openings = keep
+        for r in rooms:
+            r.bind_wall(surv)
+        survivors.append(surv)
+        if rebuild:
+            surv.rebuild()
+    return survivors
+
+
+def merge_collinear_scene(scene, floor=None, perp_tol=None, max_passes=6):
+    """Merge every collinear run in the scene -- P3.4's replacement for
+    coalesce, and the same planner `design.topology.merge_collinear` runs, so a
+    scene and its document merge identically by construction.
+
+    `perp_tol` defaults to the wall-snap grid, which is the tolerance coalesce
+    used and therefore exactly the set of duplicates the editor has always
+    cleaned up. Returns the number of walls absorbed."""
+    if scene is None:
+        return 0
+    if perp_tol is None:
+        perp_tol = SETTINGS.get("wall_snap_in", WALL_SNAP_DEFAULT)
+    absorbed = 0
+    for _ in range(max_passes):                # runs are maximal; a fuse only
+        plan = plan_merge_collinear(graph_from_scene(scene, floor),
+                                    perp_tol=perp_tol)
+        if not plan:
+            break
+        apply_merge_plan_to_scene(scene, plan)
+        absorbed += sum(len(m.absorbed) for m in plan)
+    return absorbed
 
 
 def weld_all(scene, max_passes=6):
