@@ -412,21 +412,59 @@ def _group_everything(fp, win):
     return [it for it in win.scene.items() if isinstance(it, fp.GroupItem)]
 
 
-def test_whole_plan_group_move_carries_every_room(fp, win):
-    """A whole-plan group move keeps every room and tears no junction.
+def _columns(fp, win, dx, dy, before):
+    """Per room: (walls that moved by exactly (dx,dy), walls total, corners
+    that moved, corners total, corners still holding one of their own walls'
+    vertex objects).
 
-    NOT the defect-22 receipt, and saying so is the point: VERIFIED to pass
-    against the pre-fix code too. The old bake translated each carried room's
-    corner list explicitly, so the rooms tracked POSITIONALLY; what it broke was
-    identity, which the two tests below are the receipts for. This one guards
-    the property at a scale the rest of this file never reaches -- 20 rooms and
-    80 walls against ~5 members elsewhere -- and it is the first group test to
-    look at the document's debris counter at all."""
+    The four columns the P3.5-followup diagnosis reported, as an assertion.
+    Walls-moved vs outline-moved is the COHERENCE question (does the room agree
+    with its own walls about where it is); identity is the by-construction
+    question underneath it, which no positional column can see."""
+    out = {}
+    for r in win.scene.items():
+        if not isinstance(r, fp.RoomItem) or r.name not in before:
+            continue
+        w0, c0 = before[r.name]
+        walls = {id(w): (round(w.p1.x(), 3), round(w.p1.y(), 3))
+                 for w in fp.room_walls(r)}
+        wm = sum(1 for k, v in walls.items() if k in w0
+                 and abs(v[0] - w0[k][0] - dx) < 1e-3
+                 and abs(v[1] - w0[k][1] - dy) < 1e-3)
+        corners = [(round(e.p.x(), 3), round(e.p.y(), 3)) for e in r.outline]
+        cm = sum(1 for a, b in zip(c0, corners, strict=False)
+                 if abs(b[0] - a[0] - dx) < 1e-3 and abs(b[1] - a[1] - dy) < 1e-3)
+        ends = {id(w.end_vertex(a)) for w in fp.room_walls(r)
+                for a in ("p1", "p2")}
+        ident = sum(1 for e in r.outline if id(e.v) in ends)
+        out[r.name] = (wm, len(w0), cm, len(c0), ident)
+    return out
+
+
+def _snapshot(fp, win):
+    return {r.name: ({id(w): (round(w.p1.x(), 3), round(w.p1.y(), 3))
+                      for w in fp.room_walls(r)},
+                     [(round(e.p.x(), 3), round(e.p.y(), 3))
+                      for e in r.outline])
+            for r in win.scene.items() if isinstance(r, fp.RoomItem)}
+
+
+def test_whole_plan_group_move_carries_every_room(fp, win):
+    """A whole-plan group move: EVERY room agrees with its own walls about
+    where it ended up, and no junction is torn.
+
+    Asserts the four columns the followup diagnosis reported, per room --
+    walls-moved, outline-moved, identity, and the debris counter -- because the
+    first three can disagree in ways that look identical on screen. The
+    positional half of this passes against the pre-fix code too (the old bake
+    translated each carried room's corner list explicitly, so rooms tracked
+    POSITIONALLY); the identity column is the half that does not, and it is
+    asserted here rather than only in the receipts below so this test cannot go
+    vacuous. Scale is the other point: 20 rooms and 80 walls against the ~5
+    members every other group test in this file uses."""
     _v5_plan(fp, win)
     dx, dy = 60.0, 36.0
-    before = {r.name: [(round(e.p.x(), 3), round(e.p.y(), 3))
-                       for e in r.outline]
-              for r in win.scene.items() if isinstance(r, fp.RoomItem)}
+    before = _snapshot(fp, win)
     assert len(before) == 20
     assert _unwelded(win) == 0, "the fixture did not open clean"
 
@@ -434,15 +472,57 @@ def test_whole_plan_group_move_carries_every_room(fp, win):
         g.setPos(dx, dy)
         g.bake()
 
-    after = {r.name: [(round(e.p.x(), 3), round(e.p.y(), 3))
-                      for e in r.outline]
-             for r in win.scene.items() if isinstance(r, fp.RoomItem)}
-    assert set(after) == set(before), "a room went missing"
-    for name, out0 in before.items():
-        moved = {(round(b[0] - a[0], 3), round(b[1] - a[1], 3))
-                 for a, b in zip(out0, after[name], strict=True)}
-        assert moved == {(dx, dy)}, f"{name} did not track the move: {moved}"
+    cols = _columns(fp, win, dx, dy, before)
+    assert set(cols) == set(before), "a room went missing"
+    for name, (wm, wt, cm, ct, ident) in sorted(cols.items()):
+        assert (wm, cm, ident) == (wt, ct, ct), (
+            f"{name}: walls {wm}/{wt} moved, corners {cm}/{ct} moved, "
+            f"identity {ident}/{ct} -- the room disagrees with its own walls")
     assert _unwelded(win) == 0, "the move tore the wall network"
+
+
+@pytest.mark.xfail(strict=False,
+                   reason="defect 23: a band that clips a room's wall set "
+                          "strands that room; the semantics are P4.5's")
+def test_a_clipped_band_leaves_every_room_coherent(fp, win):
+    """DEFECT 23, characterized against the invariant BOTH candidate semantics
+    satisfy, so it flips whichever way P4.5 rules.
+
+    A rubber band takes only items FULLY inside it, so a wall poking out is left
+    behind and `group_selected` duplicates the rest of that room's walls --
+    `room_owns_walls` is then correctly false and the room is not carried. Its
+    walls walk out from under a region that stays put. Measured: 3 of 20 rooms,
+    Garage at 6/9 walls moved against 0/9 corners.
+
+    PER-ROOM COHERENCE is what both readings agree on. Under deform-to-follow a
+    clipped room's 6 moved walls carry 6 of its corners; under stay-put the
+    grouping would have to take the whole room or none of it, so 0 and 0. Either
+    way the two columns AGREE, and today they do not. Deliberately NOT asserting
+    which -- that is the decision P4.5 owns.
+
+    This predates P3.5 and the branch measurably improves it (148.3" of drift
+    before, 46.65" now), so it is a characterization, not a gate."""
+    _v5_plan(fp, win)
+    dx, dy = 60.0, 36.0
+    walls = [it for it in win.scene.items() if isinstance(it, fp.WallItem)]
+    xs = [p.x() for w in walls for p in (w.p1, w.p2)]
+    ys = [p.y() for w in walls for p in (w.p1, w.p2)]
+    win.view.select_in_rect(QRectF(min(xs) - 24, min(ys) - 24,
+                                   (max(xs) - min(xs)) * 0.92 + 24,
+                                   max(ys) - min(ys) + 48))
+    before = _snapshot(fp, win)
+    win.group_selected()
+    for g in [it for it in win.scene.items() if isinstance(it, fp.GroupItem)]:
+        g.setPos(dx, dy)
+        g.bake()
+
+    incoherent = {n: (wm, wt, cm, ct)
+                  for n, (wm, wt, cm, ct, _i) in
+                  _columns(fp, win, dx, dy, before).items() if wm != cm}
+    assert not incoherent, (
+        "rooms whose walls and outline disagree about the move: "
+        + "; ".join(f"{n} walls {a}/{b} vs corners {c}/{d}"
+                    for n, (a, b, c, d) in sorted(incoherent.items())))
 
 
 def test_a_group_move_leaves_the_outlines_still_holding_their_corners(fp, win):
