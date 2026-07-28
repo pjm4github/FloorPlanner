@@ -1962,8 +1962,112 @@ THE CORPUS GUARD HAS GONE VACUOUS, and saying so is the point. P3.3's
          scene agree with what the document always said. Verified rather than
          assumed -- 2 scene walls -> 3, document byte-identical, 3 document
          walls before and after.
-NOT DONE: (iii) call-site migration family by family; (iv) deletion of the dead
-         ~375 and the junction swap. Census re-verified on disk before starting:
+(iii) done  commits a4a3336 (family 1), 457105e (family 2), e49c07f (family 3).
+ruff:    clean
+pytest:  OFF  491 passed, 4 xfailed, 1 xpassed in 16.7s
+         ON   491 passed, 4 xfailed, 1 xpassed in 19.3s
+         DEEP 486 passed, 3 xfailed, 7 deselected in 17.4s
+NO EXISTING TEST CHANGED across all three families. The changed-test budget
+         point 4 governs is still spent only on (ii)'s one pre-authorized
+         rewrite, going into (iv).
+FAMILY 1 -- COALESCE (5 sites): view.py:487 and walls.py:1385 (draw / drag
+         release) -> `merge_wall`; planio.py:181 (load), rooms.py:1020 (room
+         label drop), mainwindow.py:820 (ungroup) -> `merge_all`.
+         `merge_wall` forces the passed wall to be the run's SURVIVOR -- the
+         caller has just drawn or dragged that item, holds a reference to it,
+         and it carries the selection; the planner takes the run's first wall
+         in the caller's order, so the whole of "this one survives" is a sort
+         key. UNGROUP IS WIRED, NOT MIGRATED, per the ruling, with the comment
+         at the site: under P4.5 nothing is duplicated so nothing needs merging
+         on ungroup, making that call P4.5's to DELETE rather than this task's
+         to port.
+         Behaviour change, small and a fix: the merged wall lands on the union
+         span exactly, where `_coalesce_wall_impl` re-snapped both ends to the
+         6" grid. bridge.py:550 already flags that snap in its own words
+         ("Coalesce MOVES geometry"). No test depended on it.
+         PERF: the planner gained `_candidate_groups`, `_WallIndex`'s line
+         bucketing moved to where the merge decision now lives -- without it a
+         per-wall merge scans every wall on every draw-release, trading
+         coalesce's O(local) for O(plan), the direction P3.8 must not go.
+FAMILY 2 -- WELD (3 sites): view.py:489 `join_endpoints` -> `weld_wall_ends`;
+         imageio.py:180 `weld_all` -> `weld_scene`; mainwindow.py:827 ->
+         `normalize_walls`. After this the whole coalesce+weld set is a
+         CALLERLESS ISLAND.
+         THE COMMAND OUTLIVES ITS IMPLEMENTATION, per the ruling. Edit ▸
+         Coalesce all walls now is the explicit plan-wide normalization: merge
+         every collinear run, then weld -- close the gaps, fold coincident ends
+         onto one vertex, split a wall where another's end lands on its body.
+         Same menu item, same intent, new machinery, still ungated.
+         Welding now has a TOPOLOGY half. `weld_all` left a welded corner as
+         two coordinates that happened to agree, which is exactly what P3.3's
+         drag then had to rediscover by scanning at every press. The geometry
+         snap is kept verbatim: closing a 9" gap is a repair, not topology, and
+         it is the only way a drawn or extracted plan closes junctions at all.
+         ONE RULE, FOUND BY A FAILING TEST. The first cut had `weld_scene`
+         split body landings too, and test_extract_from_reference_adds_walls
+         went 5 walls -> 7. The split is CORRECT topology -- but shipping it
+         inside a call-site migration is a behaviour change smuggled under a
+         rename, and it edits a wall the user never touched. So splitting
+         belongs to the EXPLICIT pass and nowhere else: `weld_wall_ends`
+         doesn't, `weld_scene` doesn't, `normalize_walls` does. Applying the
+         rule uniformly made the test change unnecessary, which is the tell
+         that the rule was right and not a dodge. P3.5 will want plan-wide
+         planarity for `enclosing_face`; that is P3.5's to ask for, through the
+         pass built for it.
+FAMILY 3 -- THE QUERY HELPERS: one migrated, one policed, two divergences.
+         `_joined_at` MIGRATED: a 0.6" coordinate search becomes a DEGREE
+         lookup on a `_CornerIndex`, and `_WallIndex`'s endpoint hash is gone.
+         Zero behaviour change, and the replacement carries its own oracle --
+         `_joined_at`'s un-indexed fallback still runs the old search, so the
+         test compares the two directly on every end rather than trusting the
+         reasoning. `_CornerIndex` is now the SINGLE definition of "these ends
+         are one corner"; both halves earn their place, since identity is the
+         real question but load deliberately does not weld, so in a loaded plan
+         only position can see the corner.
+         `coincident_walls` POLICED, NOT MERGED, and that is a decision. It is
+         on the hottest path in the app (`WallItem.rebuild`, once per wall per
+         pass) and routing it through the planner would allocate a view per
+         candidate to prove a predicate that is already a transcription. A
+         drift gate pins the two equal across overlapping / off-grid /
+         abutting / perpendicular / diagonal pairs instead -- the same move
+         `--verify-design` makes for the two appliers.
+TWO CENSUS DIVERGENCES, reported rather than forced (Touches lists are hints):
+         * `_WallBBoxIndex` CANNOT die at P3.4. The task line lists it, but its
+           last caller is rooms.py:340, the memoized room dirty-check -- and
+           "refresh_rooms memoization" is on P3.5's list BY NAME. A line dies
+           when its last caller dies, and this one's last caller is P3.5's.
+         * `wall_endpoint_open` NOT migrated to degree, deliberately. Its
+           tolerance is JOIN_TOL (9"), not SHARE_TOL: the 9" scan was a PROXY
+           for a question the pre-vertex code could not ask. Degree is the
+           truer question, but swapping them changes which ends the draw-snap
+           offers to align with on unwelded geometry -- a behaviour change
+           needing this task's own three-part earning, and it buys no deletion
+           since the helper survives Phase 3 either way. Recommended as its own
+           change or as P3.5's.
+         Consequence: `_WallIndex` SHRINKS rather than dies. Its line buckets
+         are a spatial index, not detection machinery, and the planner needed
+         the identical bucketing badly enough that `_candidate_groups` is a
+         copy of them. The honest end-state is one index, not zero.
+NOT DONE: (iv) deletion of the dead ~375 and the junction swap.
+(iv) EXIT CHECKS, fixed now so they are checks and not a summary:
+         1. the measured deletion count against the estimated 375 across 13
+            functions, with `_WallIndex`/`_WallBBoxIndex` surviving named;
+         2. the P2.3 Known-regressions row re-checked BY HAND (the 480"
+            body-drag moving as one run) and flipped ONLY if it genuinely
+            closes;
+         3. (ii)'s recorded prediction, promoted to an exit check by ruling:
+            retiring coalesce removes the defect-9 stacks, so the two tee
+            landings that DECLINED in the composite telemetry should then
+            split. Falsifiable, cheap, and if it holds it is the cleanest
+            demonstration yet that the old machinery was manufacturing the
+            conditions that defeated the new one;
+         4. the junction contract's two halves: `test_junction_outline_is_
+            clipped_so_walls_read_solid` green UNCHANGED, plus the new pixel
+            assertion at the `< 190` threshold;
+         5. tests/test_scaling.py's ungroup xfail reason still says "calls
+            O(walls^2) coalesce_all" -- stale from family 1, true again only as
+            history. Fix it with the deletion, where the claim actually changes.
+Census re-verified on disk before starting:
          `coincident_walls` at walls.py:656 and :695 and view.py:597,
          `wall_endpoint_open` at view.py:248, and the dying caller at
          walls.py:201 inside `_coalesce_wall_impl`. ONE CORRECTION to the
