@@ -445,8 +445,32 @@ Dragging a wall moves its two vertices. Implement the split rule: a collinear co
 **4. Census divergences, approved as tabled.** Realistic deletion **~470 from `rooms.py` + 34 from `walls.py`** against the ~550 estimate, with four names owned elsewhere: `_perimeter_span` (24) falls with `fracture_delete_wall` at **P4.1**; `duplicate_wall` (15) at **P4.5**; `room_owns_walls` (14) and `walls_cover_room` (20) are **rewritten as outline predicates, not deleted** (last caller is `GroupItem.bake`). `_privatize_shared_walls` (28) is assessed **in-task**, with the outlines already flipped, rather than guessed now. `synthesize_room_edge` (13) is already callerless — a free deletion. **`test_rooms.py` / `test_room_walls.py` rewrites are this task's authorized zone**, same discipline as P3.4: one line per rewritten assertion, old mechanism → stored outline → why.
 
 ### P3.6 — Opening anchors
-`s` → `{from, offset_in}`. Delete the silent clamp in `WallItem.rebuild` (`walls.py:568`) — an out-of-range opening is an error surfaced to the user, not a slid door. Replace the 13 `except ValueError: continue` sites with a collected, reported error list. **Defects 6 and 7 close here.**
-**Acceptance.** P0.4 test 1 passes without xfail. Loading a plan whose door no longer fits reports it instead of dropping it.
+`s` → `{from, offset_in}`. Delete the silent clamp in `WallItem.rebuild` (**`walls.py:1004`**, not `:568` — the line moved through P3.3–P3.5) — an out-of-range opening is an error surfaced to the user, not a slid door. Replace the **8 verified** `except ValueError: continue` sites that silently drop an opening with a collected, reported error list. **Defects 6 and 7 close here.**
+
+**Read-back corrections, settled 2026‑07‑28** *(the numbers in the line above were quoted from the review and did not survive being checked; recorded here rather than carried).*
+
+- **"13" was never the count of opening drops.** Measured at the migration baseline `841264e`: **13 is the count of *every* `except ValueError` in `floorplanner/`**, of which **7** wrapped an `OpeningItem(…)`. Today: 17 total, 9 wrapping `OpeningItem`, of which **8 are still silent** (`bridge.py` was converted to a reported list at P1.5 and its comment forecast this task). The other four at baseline are catalog price parsing ×2, `macro._is_num`, and dialog handlers that already report — feeding those into an opening-error list would be wrong. **The 8:** `planio.py:169` (the v4 load — defect 6's "incl. on load"), `mainwindow.py:1082` and `:1177` (paste), `rooms.py:749` (privatize), `rooms.py:1046` (`duplicate_wall`), `walls.py:333` (merge), `:587` (split), `:675` (fracture).
+- **"P0.4 test 1 passes without xfail" pinned nothing** — it was never xfail. P0.4's own log says *"Passes: opening-s under group move AND rotate"*, and both still pass. Replaced by R1 below.
+- **Defect 7's four cited sites are stale.** The *condition* is verified intact — nothing anywhere re-bases `op.s` — and that condition, not the site list, is what the anchor closes.
+
+**Rulings, settled 2026‑07‑28 (R1–R5).**
+
+**R1 — Acceptance.** The schema's own rationale, as three tests plus the report:
+  (a) an opening anchored `from: "v2"` keeps its `offset_in` exactly when the wall is stretched **at v2** — *the discriminating case*, since absolute `s` holds position relative to v1 instead;
+  (b) reversing a wall leaves the opening's physical position unchanged;
+  (c) the split of R2;
+  (d) loading a plan whose door no longer fits **reports** it.
+  **Receipt standard:** (a) and (b) must be shown failing against `s`-based code in a worktree before the anchor lands.
+
+**R2 — Straddle: the primitive becomes TOTAL, and both pins flip.** P3.4(ii)'s decline was a placeholder pending representability, and `match="P3.6"` was that test naming its own executioner. **Load-time planarize cannot decline** — a crossing that exists in the data has to split, and refusing there aborts or corrupts a load. Semantics: the opening anchors to the segment containing its **anchored end**; if its extent no longer fits that segment, it joins the collected report. **The scene op's decline dies with it** — a gesture that silently does nothing is defect 17's disease and we do not keep a second case on purpose. Both flipped assertions carry a one-line justification citing this ruling.
+
+**R3 — The drag clamp LIVES,** and is annotated so a later census does not kill it as a survivor of this task. `rebuild`'s clamp silently repairs *stored data* (dies); `OpeningItem.mouseMoveEvent`'s (**`walls.py:1821`**) bounds a *gesture* (lives) — the same distinction that keeps `wall_endpoint_open` and `_WallBBoxIndex` in the "rightly spatial, permanently" category.
+
+**R4 — `center`: consume, never produce.** Emitting `center` requires knowing the user *meant* centred, and inferring that from coordinates that happen to be the midpoint is detection-from-geometry — the disease v5 exists to kill. P3.6 emits `v1`/`v2` only, **nearer end, ties broken toward `v1`**, so canonicalization round-trips deterministically. **Production of `center` is deferred until a UI expresses the intent.**
+
+**R5 — One vocabulary, two surfaces.** All 8 sites feed the `rep["openings_failed"]` structure, entries naming wall, opening type and anchor. Surfaced by context: **load-path** entries (`planio.py:169` included — that is defect 6's "incl. on load" closing, and it ends the v4-silent / v5-reported asymmetry) join the open/conversion report per P2.1; **edit-path** entries (paste ×2, merge, split, fracture, privatize, `duplicate_wall`) surface as a status-bar line naming the edit, **said once** — the `06c2145` wording standard applies.
+
+**Also in scope, found during the read-back: defect 24.** `topology.graph_from_design` and `_reanchor` read and write `offset_in` as a **centre** distance where the schema, `bridge._walls_of` and `bridge._opening_s` all define it as a **near-edge** distance. This is the anchor arithmetic, so it is this task's; and R2's straddle test (`ov.s - half < s < ov.s + half`) rests on the value being right.
 
 ### P3.7 — Delete `OpenWall`
 An outline edge with `wall: null` renders dashed.
@@ -2355,6 +2379,9 @@ ONE UNEXPLAINED OBSERVATION, recorded rather than dismissed: a single `E`
          explicit ERROR grep over a full `-ra` run finds nothing. Most likely a
          cut-off pipe rather than a real error, but it is written down here so
          that if it recurs at P3.6 it is the second sighting, not the first.
+         STANDING INSTRUCTION, carried into P3.6 by ruling: a recurrence during
+         P3.6 is a SECOND SIGHTING and is investigated on the spot -- not
+         re-filed as a first.
 
 P3.4  done   (branch v5-topology; four sub-commits + two riders)
 ruff:    clean
