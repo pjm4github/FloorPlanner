@@ -729,14 +729,33 @@ def wall_bbox(w) -> QRectF:
 
 class _WallBBoxIndex:
     """Walls hashed by bbox cells so 'which walls are near this box' is
-    O(local) -- used by the memoized room dirty-check instead of scanning every
-    wall per room."""
+    O(local) instead of a scan.
+
+    RIGHTLY SPATIAL, PERMANENTLY -- the third of three, and the reason it is
+    worth naming as a category. P3.4 (iii) reframed `wall_endpoint_open` this
+    way (its tolerance is JOIN_TOL, the GESTURE tolerance, and "is there
+    something near enough to snap to?" is inherently a question about distance,
+    which degree cannot answer even in principle). P3.4 (iv) then REFUSED the
+    adjacency swap in `_compute_wall_junctions` for the same kind of reason: two
+    walls can cross mid-span sharing no corner at all, so adjacency finds
+    nothing where the bodies genuinely overlap.
+
+    This index is what that refusal runs on. P3.4 (iv) forecast it as P3.5's on
+    the grounds that the memoized room dirty-check was its last caller; P3.5
+    deleted that check and the index stayed, because the same sub-commit's
+    junction ruling had already created the caller that outlives it. A line dies
+    when its LAST caller dies -- and here one correct decision invalidated
+    another's forecast, which is what per-task ledgers are for.
+
+    None of the three is a survivor of the old world. They are the queries whose
+    question is about SPACE rather than about topology, and vertex adjacency was
+    never the right instrument for any of them."""
 
     CELL = 60.0          # 5 ft cells
 
     def __init__(self, scene, floor=None):
         # floor=None indexes every wall; pass a floor to index only that floor's
-        # walls (room detection scopes the dirty-check to the active floor).
+        # walls (the junction pass scopes neighbours to the wall's own floor).
         self.cells = {}
         for w in (scene.items() if scene is not None else []):
             if not isinstance(w, WallItem):

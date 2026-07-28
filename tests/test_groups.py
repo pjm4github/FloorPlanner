@@ -413,14 +413,15 @@ def _group_everything(fp, win):
 
 
 def test_whole_plan_group_move_carries_every_room(fp, win):
-    """DEFECT 22. A group move used to assign new COORDINATES to every member
-    wall end (split-on-write) and rebuild each carried room's corner list
-    beside it, so the two agreed numerically and shared nothing. Until P3.5
-    `refresh_rooms` re-bound and re-shared afterwards; with it gone, the rooms'
-    outlines were orphaned from the walls they name.
+    """A whole-plan group move keeps every room and tears no junction.
 
-    Measured before the fix on this plan: 0 of 140 corners still held a wall's
-    vertex, and a party-wall drag then moved zero rooms."""
+    NOT the defect-22 receipt, and saying so is the point: VERIFIED to pass
+    against the pre-fix code too. The old bake translated each carried room's
+    corner list explicitly, so the rooms tracked POSITIONALLY; what it broke was
+    identity, which the two tests below are the receipts for. This one guards
+    the property at a scale the rest of this file never reaches -- 20 rooms and
+    80 walls against ~5 members elsewhere -- and it is the first group test to
+    look at the document's debris counter at all."""
     _v5_plan(fp, win)
     dx, dy = 60.0, 36.0
     before = {r.name: [(round(e.p.x(), 3), round(e.p.y(), 3))
@@ -445,10 +446,11 @@ def test_whole_plan_group_move_carries_every_room(fp, win):
 
 
 def test_a_group_move_leaves_the_outlines_still_holding_their_corners(fp, win):
-    """The property the move must PRESERVE, asserted directly rather than
-    through its symptom: after a bake a room's outline still holds the very
-    vertices its walls hold, so the next wall drag moves the room. The symptom
-    -- rooms frozen under a later drag -- is asserted below it."""
+    """DEFECT 22's receipt. The property the move must PRESERVE, asserted
+    directly and then through its symptom: after a bake a room's outline still
+    holds the very vertices its walls hold, so the next wall drag moves the
+    room. Measured before the fix: 140/140 shared corners -> 0/140, and a
+    party-wall drag then resized nothing."""
     _v5_plan(fp, win)
     assert _corner_sharing(fp, win) == (140, 140)
     for g in _group_everything(fp, win):

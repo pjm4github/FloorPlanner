@@ -82,6 +82,25 @@ review changes are handed to Claude Code as explicit edit instructions; Claude C
 applies them, commits, and grep-verifies on disk. One extra round-trip, and the only
 channel that has destroyed work in this project is closed.
 
+### Destructive experiments run in a worktree, or after a WIP commit — settled at P3.5
+
+**Never against uncommitted work.** `git checkout <file>` has no undo. At P3.5 it
+was used to revert a deliberate break-it-to-prove-the-test experiment (making
+the two defect-8 regressions fail on purpose, to confirm they catch what they
+name — which is the right thing to do) and it took that file's *uncommitted*
+work with it.
+
+The solution was already in use in the same task: the P3.5 perf comparison ran
+the old code in a `git worktree`, which cannot touch the working tree at all.
+So: **`git worktree add --detach <path> <ref>` for anything that needs the code
+in another state, or commit first and experiment on top.** The P3.5-followup
+verified its five new tests against pre-fix code exactly that way, and found
+that one of them passes on both sides — which is a finding the experiment only
+surfaces if it is safe enough to run.
+
+The doc-edit rule below is the same rule for a different asset. Stated once
+here so it does not have to be re-learned per file type.
+
 ### A checkpoint is not complete until its handoff spec is committed — settled at P3.3
 
 **Session-end summaries and hand-off prompts are chat, and chat is not the record.**
@@ -1853,6 +1872,19 @@ pytest:  OFF  497 passed, 5 xfailed in 13.7s
          ON   497 passed, 5 xfailed in 16.0s
          DEEP 492 passed, 3 xfailed, 7 deselected in 15.4s
          (baseline in: P3.4's 491/4/1.)
+THE XFAIL/XPASS DELTA, named because a census delta is how a quiet promotion or
+         a quiet regression slips through. THE MARKED SET IS UNCHANGED: the
+         same five tests carry an xfail marker before and after, and P3.5 added
+         none and retired none. What moved is which side of its threshold
+         `test_scaling::test_ungroup_scales_subquadratically` landed on --
+         `xfail(strict=False)`, ratio threshold 8, and it MEASURED 7.85 / 8.29 /
+         8.54 / 8.82 on successive runs of the same build. So "4 xfailed +
+         1 xpassed" and "5 xfailed" are the same set with that one test
+         flapping. Its ABSOLUTE improved sharply (300.7 ms -> ~106 ms at n=8,
+         from the deleted re-detection), which is why it now sits ON the
+         threshold instead of well above it. P3.8 owns the reading; the flap
+         itself is worth its attention, since a test that alternates every run
+         reports nothing either way.
 commits: ac9ad45 (0) . 600fdef (1) . 02eff1e (2) . 733d7d6 (3) . f07dbdb (4)
          Logged sub-commit by sub-commit per the handoff-spec rule, so a
          successor reads the state from here plus the four riders at lines
@@ -2120,6 +2152,99 @@ PROCESS NOTE, since the working agreement is explicit about the mechanism: a
          uncommitted work along with it. Reapplied and re-verified. The rule is
          written for handed-back DOC edits; it applies to uncommitted code just
          as literally, and the safe move is to make the experiment in a copy.
+         RULED at the P3.5 close and now a working-agreement entry of its own
+         ("Destructive experiments run in a worktree, or after a WIP commit"):
+         the solution was already in use in this same task, since the perf
+         comparison ran the old code in a `git worktree`. The followup below
+         used exactly that to verify its new tests against pre-fix code.
+
+P3.5-followup  done   commit d0ab89d -- DEFECT 22: a group move is a vertex move.
+ruff:    clean
+pytest:  OFF  503 passed, 5 xfailed in 16.5s
+         ON   503 passed, 5 xfailed in 19.4s
+         DEEP 498 passed, 3 xfailed, 7 deselected in 19.1s
+FOUND BY A SMOKE TEST, not by the suite, and the gap is the finding as much as
+         the bug. Symptoms on a v5 plan: some rooms did not track a whole-design
+         group move; later individual room moves worked; and `unwelded_ends`
+         warnings fired repeatedly with a moving count on a file that opened at
+         zero.
+REPRODUCED HEADLESSLY BEFORE ANY FIX, per the standard:
+         * 140 of 140 room outline corners held one of their own walls'
+           vertices before the bake -- 0 of 140 after. A party-wall drag then
+           resized NOTHING: M Bath -18.20 sf / WIC +9.50 sf before, +0.00 /
+           +0.00 after.
+         * `unwelded_ends` 0 -> 133 grouping every ROOM; 0 -> 1 on a rubber
+           band; 0 -> 0 grouping every WALL.
+         * split telemetry during the bake: 160, all at items.py:703/704 --
+           the exact residue P3.4 (iv) attributed to `bake()` and assigned to
+           P4.5.
+THE HYPOTHESIS WAS CONFIRMED FOR THE LOAD-BEARING HALF AND REFUTED FOR THE
+         VISIBLE ONE, which is worth separating. CONFIRMED: `bake` assigned new
+         COORDINATES to every member wall end (split-on-write) and rebuilt each
+         carried room's corner list beside it, so the two agreed numerically and
+         shared nothing -- orphaning the outlines P3.5 made authoritative.
+         `refresh_rooms` re-bound and re-shared after every bake, so deferring
+         bake's conversion to P4.5 was safe exactly as long as detection
+         existed; P3.5 changed the deferral's premise, which is why this is a
+         P3.5-followup and not P4.5's. REFUTED as the cause of "some rooms don't
+         track": that is duplicate-on-group (defect 3, P4.5). A rubber band
+         needs an item FULLY inside, so a wall poking out is left behind, its
+         room's walls are DUPLICATED into the group, and `room_owns_walls` is
+         then correctly false -- 17 of 20 tracked, and the 3 that did not were
+         right not to. P3.5 only removed the re-detection that used to hide it.
+THE FIX IS THE PLAN'S OWN `move_vertices`, and it is smaller than what it
+         replaces. `_corner_records` resolves every corner the group's geometry
+         holds together with the wall ends and outline edges on it;
+         `_apply_corner_records` relocates each once. Walls and outlines follow
+         because they hold those corners -- a bake is now the same operation as
+         a wall drag.
+THE CARVE-OUT IS RESPECTED BY SPLITTING, not by an exclusion list. A corner a
+         NON-member wall also holds is split off before anything moves, so the
+         group goes and the outsider stays -- today's behaviour exactly.
+         Relocating it wholesale would wire a member to an outside wall, which
+         is what the `group() is None` guards exist to prevent. Own test.
+ROTATION HAD THE IDENTICAL DEFECT (140/140 -> 0/140) and now moves through the
+         same records, resolved once at `_begin_rotation` and re-applied from
+         the START point each event -- drift-free AND identity-preserving, where
+         before it was split-on-write per mouse move. THE FIRST ATTEMPT WAS
+         WRONG AND SAID SO: re-welding at `_finish_rotation` CONVERGED rather
+         than closed (0/140 -> 138/140, then 139/140 on a second pass), which is
+         how a positional instrument fails where an identity one is needed.
+THE WARNING'S ERGONOMICS, because a correct warning that misattributes teaches
+         people to ignore the channel that will one day be right. It said
+         "expected on a plan loaded from a legacy file" for EVERY case -- true
+         of what a file arrives with, false of what an edit tears -- and fired
+         on every debounced snapshot, so a plan that opened clean produced a
+         stream of them with a moving count. Now the first walk after a load
+         sets the BASELINE, only a walk finding MORE warns, the message names
+         the split (opened-with vs NEW), and a repeat of the same state is
+         silent. `strict=True` is untouched: two tests pin it.
+PERF HELD, and the harness earned its keep twice. bake 6.5 -> 28.6 ms
+         (n=4 -> n=8), ratio 4.39, against P3.5's 6.9 -> 28.0 / 4.03. The FIRST
+         cut rebuilt each member wall inside the loop -- redundant with the
+         `rebuild_all_walls` that follows, and cascading -- and cost 9x
+         (25.9 -> 251.3 ms, ratio 9.70). Caught by `test_bake_scales_
+         subquadratically` on the first full run.
+TESTS ADDED (5), and one of them is NOT the receipt -- verified by running all
+         five against pre-fix code in a worktree:
+         * whole-plan group + move carries every room, unwelded_ends still 0.
+           PASSES ON BOTH SIDES: the old bake translated each carried room's
+           corner list explicitly, so the rooms tracked POSITIONALLY. It guards
+           the property at a scale the rest of test_groups.py never reaches (20
+           rooms / 80 walls vs ~5 members) and is the first group test to look
+           at the debris counter at all. Annotated as such in its own docstring
+           so it is not mistaken for the receipt later.
+         * the outlines still hold their corners after a bake, and a corner move
+           still resizes the rooms -- THE RECEIPT, fails pre-fix.
+         * the rotation half -- fails pre-fix.
+         * a group move never drags a wall outside it -- the carve-out guard;
+           passes on both sides by design, since it pins what must NOT change.
+         * the warning names its cause and says it once (plus its mirror, that a
+           legacy plan is still blamed on the file) -- both fail pre-fix.
+WHY 503 GREEN TESTS MISSED IT: every group test in the suite tops out at ~5
+         members, and not one had ever asserted on `unwelded_ends`. The bug
+         needed a plan big enough to have party walls and a check nobody was
+         making. Both gaps are closed here.
 
 P3.4  done   (branch v5-topology; four sub-commits + two riders)
 ruff:    clean
