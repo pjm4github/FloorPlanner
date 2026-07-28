@@ -1835,4 +1835,73 @@ DEMO PORT: `w24` no longer exists as that wall. The demo named it, but ids are
          for a regression rather than for a renumbering. A second test pins that
          the chosen wall really has no collinear continuation -- the demo's own
          precondition -- so the first cannot pass by luck.
+
+P3.4  IN PROGRESS  (branch v5-topology) -- sub-commit (i) of four landed.
+         Logged mid-task per the handoff-spec rule: a successor session reads
+         the state from here plus the seven settled points at lines 375-408,
+         not from a chat summary.
+(i) done   commit ea54413 -- planner/applier factoring + the scene applier for
+         merge_collinear.
+ruff:    clean
+pytest:  OFF  468 passed, 4 xfailed, 1 xpassed in 18.4s
+         ON   468 passed, 4 xfailed, 1 xpassed in 21.9s
+         DEEP 463 passed, 3 xfailed, 7 deselected in 18.5s
+files:   floorplanner/design/topology.py (GraphView/WallView/OpeningView,
+         Merge/PlannedOpening, plan_merge_collinear, apply_merge_plan,
+         graph_from_design; merge_collinear becomes their composition),
+         floorplanner/walls.py (graph_from_scene, apply_merge_plan_to_scene,
+         merge_collinear_scene), tests/test_topology_ops.py (new, 21)
+NO EXISTING TEST CHANGED -- `git status tests/` shows only the new file, all
+         three ways. The changed-test budget point 4 governs is still untouched
+         going into (iii).
+THE SHAPE, since it is the crux and the thing (ii)-(iv) all lean on: the
+         decision runs ONCE, pure, over a neutral `GraphView` whose keys and
+         anchors are the CALLER's own handles -- wall ids and vertex ids for a
+         Design, `WallItem`s and `Vertex` objects for a scene. It returns a
+         `Merge` delta (survivor, absorbed, the corner anchors the ends adopt,
+         the planned opening offsets, the corners consumed). Two thin appliers
+         execute it, touching only what it names. The delta deliberately does
+         NOT name room binding: a Design records that as wall.left/right, the
+         scene as WallItem.rooms, and each applier derives its own from
+         `Merge.absorbed`. That is the one thing the two targets genuinely
+         represent differently, and saying so is cheaper than pretending
+         otherwise.
+TWO BEHAVIOUR CHANGES IN THE PURE OP, both found BY single-sourcing rather
+         than in spite of it, and both fixes:
+         * merge no longer REFUSES a wall carrying openings. They are
+           redistributed onto the merged span and deduped -- DEFECT 9, closed
+           on the live-editing path the task text names. Guarded both ways: the
+           new op yields one door, and `_coalesce_all_impl` on the identical
+           input still yields two, so the closure is legible rather than
+           asserted.
+         * the survivor keeps its OWN DIRECTION. The old code wrote
+           `w1.v1, w1.v2 = far1, far2`, which REVERSES the survivor whenever the
+           run extends behind its v1 -- and did not swap left/right to match, so
+           every side on that wall silently flipped. Latent, unpinned, and
+           invisible until the same code had to serve a scene that renders
+           sides. Own test.
+TELEMETRY, ahead of point 5's ledger: an exact end-to-end merge causes ZERO
+         split-on-writes -- the merged end is re-pointed AT the corner's vertex
+         (`set_end_vertex`), not assigned a coordinate as coalesce did. A merge
+         absorbing a wall from up to perp_tol off the line still splits, and
+         that is correct: that end lands where no corner was, so it is a new
+         corner and should say so.
+A NARROWER CLAIM THAN IT LOOKS, stated so (iii) does not inherit a
+         misconception: the merge shares the SURVIVOR's end with the corner
+         anchor. It does not rebind OTHER walls sitting at that corner -- that
+         is weld's job, and weld is still on this task's deletion list. What is
+         true today is that both ops resolve the same corner to the same
+         representative `Vertex`, so they converge rather than fight.
+NOT DONE: (ii) split_edge scene-side + the split rule's second half + the
+         guard retarget (the pre-authorized `match="P3.3"` change); (iii)
+         call-site migration family by family; (iv) deletion of the dead ~375
+         and the junction swap. Census re-verified on disk before starting:
+         `coincident_walls` at walls.py:656 and :695 and view.py:597,
+         `wall_endpoint_open` at view.py:248, and the dying caller at
+         walls.py:201 inside `_coalesce_wall_impl`. ONE CORRECTION to the
+         census's wording, not its content: BOTH walls.py hits are inside
+         `WallItem.rebuild` (:656 is the party-wall opening cascade, :695 the
+         neighbour-rebuild tail), not "rebuild and paint" -- `paint` reads the
+         already-built `_path`. The adjudication is unaffected; both survive
+         Phase 3 and both migrate.
 ```
