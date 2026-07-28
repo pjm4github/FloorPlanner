@@ -233,6 +233,14 @@ class _CornerIndex:
         where `_WallIndex` ran a 3x3 cell search per call."""
         return len(self.walls_at.get(self.of.get((id(wall), attr)), ())) > 1
 
+    def vertex_at(self, p, floor):
+        """The corner `Vertex` at scene point `p` on `floor`, or None -- the
+        point-keyed lookup a room outline needs to adopt the corner its walls
+        already meet at (P3.5)."""
+        key = _corner_at(self.pos, self._cells, max(SHARE_TOL, 1e-6),
+                         p.x(), p.y(), floor)
+        return self.anchor.get(key) if key is not None else None
+
 
 def graph_from_scene(scene, floor=None):
     """A `GraphView` of the live wall network for `design.topology`'s planners.

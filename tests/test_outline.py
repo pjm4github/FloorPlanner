@@ -64,56 +64,74 @@ def test_wall_refs_survive_a_translation_but_not_a_reshape(fp, scene,
     assert [e.wall for e in room.outline] == [None, None, None]
 
 
-# ------------------------------------------- THE GAP: coordinates, not identity
-def test_outline_holds_coordinates_not_vertex_identity(fp, scene, make_room):
-    """P3.2's interim representation, asserted so P3.5 must close it knowingly.
-
-    In the target model a corner IS the vertex two walls share. P3.1's
-    split-on-write world has no such vertex: at every corner each wall owns a
-    distinct `Vertex`. So an outline edge holds a COORDINATE -- equal to the
-    wall's end, and deliberately not the same object. Borrowing one wall's
-    vertex would pick arbitrarily between two; minting a room-owned one would
-    add a third. Both would encode an authority that does not exist yet.
-
-    P3.5 rebuilds outlines from the document's traced faces, giving walls and
-    outlines the same vertices at the same moment. When it does, this test
-    should be REPLACED by one asserting identity -- its failure is the signal
-    that the gap closed, not that something broke."""
+# ---------------------------------------- THE FLIP: identity, not coordinates
+# The two guards that stood here from P3.2 -- test_outline_holds_coordinates_
+# not_vertex_identity and test_a_corner_is_still_two_distinct_wall_vertices --
+# were REPLACED at P3.5, exactly as their own docstrings prescribed ("its
+# failure is the signal that the gap closed, not that something broke"). They
+# flipped together and alone: the whole rest of the suite stayed green through
+# the change, which is what makes the red unambiguous. They are two faces of
+# one fact, so their successors are too -- an outline can only NAME a vertex
+# once the corner IS one vertex.
+def test_the_outline_holds_the_very_vertex_its_walls_hold(fp, scene, make_room):
+    """OLD: the outline corner is at a wall end and deliberately NOT the same
+    object (P3.2's honest interim, since there was no shared vertex to name).
+    NEW: it IS the same object. WHY THE ASSERTION MOVED: P3.5 welds the room's
+    corners and points the outline at them, so `is not` became false by
+    construction -- which is the flip, not a break."""
     room = make_room(scene, 0, 0, 144, 120, "Den")
     edge = room.outline[0]
     wall = edge.wall
-    ends = (wall.p1, wall.p2)
-
-    same_coords = [p for p in ends
-                   if abs(p.x() - edge.p.x()) < 1e-9
-                   and abs(p.y() - edge.p.y()) < 1e-9]
-    assert same_coords, "the outline corner is not at either wall end"
-    assert all(p is not edge.p for p in ends), \
-        "outline and wall now SHARE a point object -- if P3.5 did this, " \
-        "replace this test with an identity assertion"
+    assert edge.v in (wall.end_vertex("p1"), wall.end_vertex("p2")),         "the outline corner is not one of its wall's vertices"
+    assert edge.p is edge.v.point()        # read-through, not a copy
 
 
-def test_a_corner_is_still_two_distinct_wall_vertices(fp, scene, make_room):
-    """Why the outline cannot name a vertex yet: the corner itself is two
-    objects. This is what P3.5 unifies.
-
-    TWO WAYS THIS CAN GO RED, and they are different findings. The DESIGNED one
-    is P3.5's outline flip, which gives walls and outlines the same vertices at
-    once. The OTHER is a weld reaching the room-creation path -- P3.4 built
-    `share_coincident_ends`, and `make_room` simply never calls it. So this
-    doubles as a tripwire on that, and P3.5's sub-commits are sequenced
-    (retarget -> flip -> path changes) to keep the two apart: red during the
-    flip is the flip; red at any other point is a finding."""
+def test_a_corner_is_one_vertex(fp, scene, make_room):
+    """OLD: the two walls at a corner hold DISTINCT vertices (and this doubled
+    as a tripwire on a weld reaching the room-creation path). NEW: they hold
+    one. WHY THE ASSERTION MOVED: the weld IS the flip's first step -- there is
+    no way to give the outline a vertex to name without making the corner one
+    vertex first, so the tripwire's two causes turned out to be the same cause
+    here, and it fired during the flip as designed."""
     room = make_room(scene, 0, 0, 144, 120, "Den")
     corner = room.outline[0].p
-    at = [w for w in room.walls
-          for p in (w.p1, w.p2)
-          if abs(p.x() - corner.x()) < 1e-9 and abs(p.y() - corner.y()) < 1e-9]
-    assert len(at) == 2, "expected two walls meeting at this corner"
-    assert at[0].v1 != at[1].v1 and at[0].v2 != at[1].v2
-    uids = {at[0]._v1.uid, at[0]._v2.uid} & {at[1]._v1.uid, at[1]._v2.uid}
-    assert not uids, ("the walls already share a vertex -- the P3.5 flip, or "
-                      "a weld reached the room-creation path?")
+    at = [(w, a) for w in room.walls for a in ("p1", "p2")
+          if abs(getattr(w, a).x() - corner.x()) < 1e-9
+          and abs(getattr(w, a).y() - corner.y()) < 1e-9]
+    assert len(at) == 2, "expected two wall ends meeting at this corner"
+    (w1, a1), (w2, a2) = at
+    assert w1.end_vertex(a1) is w2.end_vertex(a2),         "the corner is still two objects"
+    assert w1.end_vertex(a1) is room.outline[0].v
+
+
+def test_moving_a_corner_updates_the_outline_by_construction(fp, scene,
+                                                             make_room):
+    """RIDER 1 -- the acceptance's essence, at the smallest scale that can
+    show it.
+
+    Nothing recomputes. `relocated_to` moves the corner, every wall end on it
+    comes along, and the outline moves too -- because the outline is holding
+    that corner, not a copy of where it used to be. No refresh_rooms, no
+    detection, no re-derivation of any kind between the move and the
+    assertion."""
+    room = make_room(scene, 0, 0, 144, 120, "Den")
+    edge = room.outline[0]
+    v = edge.v
+    walls = [(w, a) for w in room.walls for a in ("p1", "p2")
+             if w.end_vertex(a) is v]
+    assert walls, "the corner is not shared with any wall"
+
+    was = (v.x, v.y)
+    moved = v.relocated_to(QPointF(v.x + 24, v.y + 24))
+    for w, a in walls:
+        w.set_end_vertex(a, moved)
+    edge.v = moved                       # the corner, not a recomputation
+
+    assert (edge.p.x(), edge.p.y()) == (was[0] + 24, was[1] + 24)
+    for w, a in walls:
+        assert getattr(w, a) is edge.p, "wall and outline drifted apart"
+    assert moved.uid == v.uid, "a moved corner is the same corner"
+
 
 
 # ------------------------------- perimeter_corners: three consumers, three fates

@@ -14,8 +14,9 @@ from PyQt6.QtWidgets import *  # noqa: F401
 
 from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
+from floorplanner.vertex import Vertex
 from floorplanner.walls import (
-    OpenWall, OpeningItem, WallItem, _WallBBoxIndex, merge_all,
+    OpenWall, OpeningItem, WallItem, _CornerIndex, _WallBBoxIndex, merge_all,
     rebuild_all_walls, wall_bbox,
 )
 
@@ -395,35 +396,85 @@ class OutlineEdge:
     """One edge of a room's perimeter: the corner it starts at, and the wall
     that covers it (`None` = an OPEN edge, the v5 `wall: null`).
 
-    **The corner is a COORDINATE, not a vertex identity, and that is deliberate
-    (P3.2).** In the target model a corner is the vertex two walls share -- but
-    P3.1's split-on-write world has no shared corner vertex to name: at any
-    corner each wall owns its own distinct `Vertex`. Borrowing one wall's end
-    would pick arbitrarily between two, and two rooms meeting there could pick
-    differently; minting a room-owned vertex would add a third object at every
-    corner that no wall references. Both encode a claim of authority that is
-    false. A coordinate states exactly what is known.
+    **The corner IS a vertex identity (P3.5).** It holds the very `Vertex`
+    object the walls meeting there hold, so moving that corner moves the wall
+    and the outline together -- not because anything recomputes, but because
+    there is only one corner to move. This is the flip the whole phase is for.
 
-    The gap closes at **P3.5** (retargeted from P3.4, which replaced the
-    coalesce/weld/fracture ops but never touched outlines), where detection is
-    deleted and outlines are rebuilt from the document's traced faces -- walls
-    and outlines receiving the same vertices at the same moment.
-    `tests/test_outline.py` pins the gap where it is (equal coordinates,
-    distinct objects) so that task has to close it consciously rather than
-    inherit a silent disagreement.
+    It was a bare COORDINATE from P3.2 until here, and deliberately so: P3.1's
+    split-on-write world had no shared corner vertex to name, since at every
+    corner each wall owned a distinct `Vertex`. Borrowing one wall's end would
+    have picked arbitrarily between two; minting a room-owned one would have
+    added a third object no wall referenced. Both encode an authority that did
+    not exist yet, and a coordinate stated exactly what was known.
+    `tests/test_outline.py` pinned that gap where it was, and its two guards
+    flip here -- together, because they are two faces of one fact: an outline
+    can only NAME a vertex once the corner IS one vertex.
 
-    The `wall` reference is the real content of this task: before it, a room had
-    corners and an unordered `walls` list with no edge->wall mapping at all."""
+    `p` stays a read-through property, so every existing caller keeps working
+    -- the compat-shim discipline P3.1 used for `WallItem.p1`/`p2`. The
+    representation moves; the callers do not.
 
-    __slots__ = ("p", "wall")
+    The `wall` reference came from P3.2: before it, a room had corners and an
+    unordered `walls` list with no edge->wall mapping at all."""
+
+    __slots__ = ("v", "wall")
 
     def __init__(self, p, wall=None):
-        self.p = QPointF(p)
+        self.v = p if isinstance(p, Vertex) else Vertex.at(p)
         self.wall = wall
+
+    @property
+    def p(self) -> QPointF:
+        """The corner's position -- read through to the vertex, shared not
+        copied (see `vertex.Vertex.point`; a vertex is never mutated in
+        place)."""
+        return self.v.point()
 
     def __repr__(self):
         w = self.wall.wall_type if self.wall is not None else "open"
         return f"OutlineEdge(({self.p.x():.1f}, {self.p.y():.1f}), {w})"
+
+
+def share_outline_vertices(room):
+    """Make `room`'s outline reference the SAME `Vertex` objects its walls do.
+
+    THIS IS P3.5's FLIP, and the reason the phase exists. Afterwards a wall
+    move updates the room outline BY CONSTRUCTION -- not because anything
+    re-detects, but because there is only one corner to move and both the wall
+    and the outline are holding it. `relocated_to` moves the corner; everything
+    on it comes along.
+
+    Two steps, and the first is why the outline could not do this before:
+      1. WELD THE ROOM'S OWN CORNERS. At each corner two of the room's walls
+         meet, and until now each owned a distinct `Vertex` -- so there was no
+         single vertex for the outline to name (exactly what
+         `test_a_corner_is_still_two_distinct_wall_vertices` pinned). Both ends
+         are pointed at one anchor, using the same `_CornerIndex` fold that
+         decides what one corner is everywhere else.
+      2. POINT THE OUTLINE AT IT. Each edge adopts the corner vertex sitting
+         at its coordinate.
+
+    An edge whose coordinate matches no wall corner keeps the vertex it has --
+    an OPEN edge (`wall is None`) spans a gap with no wall end to share, and
+    inventing a share there would be the same false authority P3.2 refused."""
+    walls = [w for w in room.walls
+             if isinstance(w, WallItem) and not w.is_open]
+    if not walls or not room.outline:
+        return 0
+    idx = _CornerIndex(walls)
+    for w in walls:                                   # 1. weld the corners
+        for attr in ("p1", "p2"):
+            anchor = idx.anchor.get(idx.of.get((id(w), attr)))
+            if anchor is not None and w.end_vertex(attr) is not anchor:
+                w.set_end_vertex(attr, anchor)
+    shared = 0
+    for e in room.outline:                            # 2. adopt them
+        anchor = idx.vertex_at(e.p, room.floor)
+        if anchor is not None and e.v is not anchor:
+            e.v = anchor
+            shared += 1
+    return shared
 
 
 class RoomItem(QGraphicsItem):
@@ -1244,6 +1295,11 @@ def bind_room_walls(scene, room, settle=True):
     for w in old_open:                       # drop open edges that closed up
         if w not in reused_open and not w.rooms and w.scene() is not None:
             scene.removeItem(w)
+    # P3.5: now that every edge knows its wall, make the corners ONE vertex and
+    # point the outline at them. Here because this is the one place the
+    # edge -> wall mapping is established, so it is the one place that knows
+    # which walls meet at which corner.
+    share_outline_vertices(room)
     if settle:
         rebuild_all_walls(scene)
 

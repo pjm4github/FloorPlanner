@@ -163,7 +163,17 @@ class Vertex:
 
         `self` when the position is unchanged, for the same reason `moved_to`
         does it: the drag re-applies the same delta on every mouse event that
-        does not actually move."""
+        does not actually move.
+
+        THE MINT HERE IS FORCED, and it has to be (defect 21, found by P3.5's
+        by-construction test). Reading `self._uid` instead of `self.uid` looked
+        like harmless laziness, but a vertex that had never been NAMED carried
+        `None` across the move -- so the "same corner" got a fresh identity the
+        first time anyone asked, silently. Nothing observably broke while only
+        the document walk read uids, and it would have become a live bug at
+        P4.5, which serializes groups by member id. This is not the per-READ
+        allocation P3.1 removed: a relocation is a genuine move, orders of
+        magnitude rarer than the reads on the paint path."""
         mine = self._pt
         if isinstance(p, QPointF):
             x, y = p.x(), p.y()
@@ -171,7 +181,7 @@ class Vertex:
             x, y = p[0], p[1]
         if x == mine.x() and y == mine.y():
             return self
-        return Vertex(x, y, uid=self._uid)
+        return Vertex(x, y, uid=self.uid)
 
     def __repr__(self):
         return f"Vertex({self._uid or '<unnamed>'} @ {self.x:.3f}, {self.y:.3f})"

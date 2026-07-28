@@ -507,6 +507,20 @@ def test_relocation_carries_the_vertex_identity():
     assert v.relocated_to((1.0, 2.0)) is v
 
 
+def test_relocation_carries_identity_even_when_never_named():
+    """DEFECT 21, found by P3.5's by-construction test and fixed at P3.5.
+
+    The test above passes for a reason it does not state: it reads `v.uid`
+    BEFORE relocating, which forces the lazy mint. `relocated_to` used to copy
+    `self._uid` -- still None on a vertex nobody had named -- so a move gave the
+    "same corner" a fresh identity as soon as anyone asked. Invisible while only
+    the document walk read uids; a live bug at P4.5, which serializes groups by
+    member id. This asserts the case the other one cannot see."""
+    v = Vertex(1.0, 2.0)                       # never named: _uid is still None
+    moved = v.relocated_to(QPointF(3.0, 4.0))
+    assert moved.uid == v.uid, "a moved corner was silently renamed"
+
+
 # ------------------------------------------------------ the COMPOSITION gate
 # The standing additions, per P3.1: both apply paths, not just the one the new
 # code happens to touch, plus the corpus. The Gate 2 lesson is that covering two
