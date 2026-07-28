@@ -133,6 +133,45 @@ def test_moving_a_corner_updates_the_outline_by_construction(fp, scene,
     assert moved.uid == v.uid, "a moved corner is the same corner"
 
 
+def test_the_region_derives_from_the_outline_too(fp, scene, make_room):
+    """RIDER 1, one step further out: the corner carries the REGION with it.
+
+    `corners` deriving from the outline (P3.2) is not enough on its own -- the
+    area and the filled path were stored floats/paths that only `refresh_rooms`
+    ever refreshed, so an outline that moved by construction still reported a
+    stale number until a detection pass caught up. P3.5 derives both, which is
+    what makes deleting that pass possible rather than merely tempting."""
+    room = make_room(scene, 0, 0, 144, 120, "Den")
+    assert room.area_sqft == pytest.approx(120.0)          # 144" x 120"
+    top_left = min(room.outline, key=lambda e: (e.p.x(), e.p.y()))
+
+    v = top_left.v
+    holders = [(w, a) for w in room.walls for a in ("p1", "p2")
+               if w.end_vertex(a) is v]
+    moved = v.relocated_to(QPointF(v.x - 144, v.y))    # pull one corner out
+    for w, a in holders:
+        w.set_end_vertex(a, moved)
+    top_left.v = moved
+
+    # a trapezoid now: parallel sides 288" and 144", height 120" -> 180 sf
+    assert room.area_sqft == pytest.approx(180.0), "the area did not follow"
+    assert room.path.boundingRect().width() == pytest.approx(288.0)
+    assert room.interior_rect().left() == pytest.approx(-144.0)
+
+
+def test_the_derived_region_is_memoized_on_the_coordinates(fp, scene,
+                                                           make_room):
+    """`path` is read on every paint, hit-test and boundary band, so it is
+    memoized -- keyed on the corner COORDINATES, because `relocated_to` returns
+    a NEW vertex object and an identity-keyed memo would go stale in exactly
+    the case that matters."""
+    room = make_room(scene, 0, 0, 144, 120, "Den")
+    assert room.path is room.path                       # same object, not rebuilt
+    e = room.outline[0]
+    e.v = e.v.relocated_to(QPointF(e.v.x + 12, e.v.y + 12))
+    assert room.path is not None
+    assert room.corners[0].x() == pytest.approx(e.v.x)
+
 
 # ------------------------------- perimeter_corners: three consumers, three fates
 def test_the_live_mirror_is_gone(fp, scene, make_room):

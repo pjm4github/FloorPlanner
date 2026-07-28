@@ -493,8 +493,12 @@ class RoomItem(QGraphicsItem):
         self.anchor = QPointF(anchor)
         self.label_offset = QPointF(0.0, 0.0)   # label drag, relative to anchor
         self._dragging_label = False
-        self.path = QPainterPath(path)
-        self.area_sqft = float(area_sqft)
+        # geometry FALLBACKS, used only by a room with no outline (a legacy
+        # import whose corners never traced).  A room that HAS an outline
+        # derives both -- see the `path` / `area_sqft` properties.
+        self._path = QPainterPath(path)
+        self._area_sqft = float(area_sqft)
+        self._derived = None             # (corner key, path, area) memo
         self.outline = []                # list[OutlineEdge]; corners derives
         self.corners = corners
         self.walls = []                  # WallItems this room owns (edge loop)
@@ -526,11 +530,48 @@ class RoomItem(QGraphicsItem):
 
     # -- data ------------------------------------------------------------------
     def set_region(self, path: QPainterPath, area_sqft: float, corners=None):
+        """Replace the room's geometry.  `path`/`area_sqft` are kept only as
+        the no-outline fallback: with an outline present both DERIVE from it."""
         self.prepareGeometryChange()
-        self.path = QPainterPath(path)
-        self.area_sqft = float(area_sqft)
+        self._path = QPainterPath(path)
+        self._area_sqft = float(area_sqft)
         self.corners = corners
         self.update()
+
+    # -- derived geometry (P3.5) -----------------------------------------------
+    def _derive(self):
+        """(path, area) off the outline, memoized on the corner COORDINATES.
+
+        Keyed on coordinates and not on vertex identity: `relocated_to` returns
+        a NEW `Vertex` for a moved corner, so an id-keyed memo would be stale in
+        exactly the case that matters, and a vertex is never mutated in place so
+        equal coordinates really do mean equal geometry."""
+        pts = [e.v.point() for e in self.outline]
+        key = tuple((p.x(), p.y()) for p in pts)
+        memo = self._derived
+        if memo is None or memo[0] != key:
+            memo = self._derived = (key, room_path_from_corners(pts),
+                                    poly_area_sqft(pts))
+        return memo
+
+    @property
+    def path(self) -> QPainterPath:
+        """The room's region, DERIVED from the outline (P3.5).
+
+        A wall move relocates the corner vertices the outline holds, so the
+        region follows with nothing to recompute it -- which is what let
+        `refresh_rooms` go. `_path` survives as the fallback for an outline-less
+        room (a legacy import whose corners never traced) and for nothing
+        else."""
+        return self._derive()[1] if self.outline else self._path
+
+    @property
+    def area_sqft(self) -> float:
+        """Area inside the outline, on the same centreline basis the stored
+        document uses (`settings.area_basis`).  Derived for the same reason
+        `path` is: the number a wall move changes must not need a re-detection
+        pass to notice."""
+        return self._derive()[2] if self.outline else self._area_sqft
 
     # -- outline (P3.2) --------------------------------------------------------
     @property
@@ -1003,18 +1044,33 @@ class RoomItem(QGraphicsItem):
             c.rebuild()
 
     def _translate(self, dx: float, dy: float):
-        """Rigidly shift the room's owned walls, openings and region."""
+        """Rigidly shift the room's owned walls, openings and region.
+
+        RELOCATES the corners rather than assigning coordinates (P3.5): each
+        distinct `Vertex` moves once and every wall end and outline edge holding
+        it comes along, so the region follows by construction instead of being
+        translated alongside and hoping the two agree. A coordinate assignment
+        here would split-on-write -- minting a fresh vertex per wall end and
+        leaving the outline behind on the old ones."""
         if not dx and not dy:
             return
         self.prepareGeometryChange()
+        holders = [(w, a) for w in self.walls for a in ("p1", "p2")]
+        # `old` keeps every vertex alive for the whole pass: the map is keyed by
+        # id(), and an id freed mid-pass could be handed back to a new vertex
+        old = [w.end_vertex(a) for w, a in holders] + [e.v for e in self.outline]
+        moved = {}                            # id(old vertex) -> new vertex
+        for v in old:
+            if id(v) not in moved:
+                moved[id(v)] = v.relocated_to(QPointF(v.x + dx, v.y + dy))
+        for w, a in holders:
+            w.set_end_vertex(a, moved[id(w.end_vertex(a))])
+        for e in self.outline:
+            e.v = moved[id(e.v)]
         for w in self.walls:
-            w.p1 = QPointF(w.p1.x() + dx, w.p1.y() + dy)
-            w.p2 = QPointF(w.p2.x() + dx, w.p2.y() + dy)
             w.rebuild()                       # repositions its openings too
-        self.path = QTransform.fromTranslate(dx, dy).map(self.path)
-        if self.corners:
-            self.corners = [QPointF(c.x() + dx, c.y() + dy)
-                            for c in self.corners]
+        if not self.outline:                  # no outline -> the fallback moves
+            self._path = QTransform.fromTranslate(dx, dy).map(self._path)
         self.anchor = QPointF(self.anchor.x() + dx, self.anchor.y() + dy)
         self.update()
 

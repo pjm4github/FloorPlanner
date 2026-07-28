@@ -628,12 +628,12 @@ class GroupItem(QGraphicsItemGroup):
             f.setPos(tr.map(pos_0))
             f.setRotation((rot_0 + theta) % 360.0)
         for room, corners_0, anchor_0, path_0 in self._snap_rooms:
-            room.prepareGeometryChange()
-            if corners_0:
-                room.corners = [tr.map(p) for p in corners_0]
             room.anchor = tr.map(anchor_0)
-            room.path = tr.map(path_0)
-            room.update()
+            # the region DERIVES from the outline (P3.5), so rotating the
+            # corners rotates it; the mapped path is only the fallback a room
+            # without an outline still needs
+            room.set_region(tr.map(path_0), room.area_sqft,
+                            [tr.map(p) for p in corners_0] or None)
         self.update()
 
     def _finish_rotation(self):
@@ -706,15 +706,13 @@ class GroupItem(QGraphicsItemGroup):
                 ch.setPos(ch.pos().x() + d.x(), ch.pos().y() + d.y())
         tr = QTransform.fromTranslate(d.x(), d.y())
         for r in moved_rooms:
-            r.prepareGeometryChange()
             r.anchor = QPointF(r.anchor.x() + d.x(), r.anchor.y() + d.y())
             # carry the region itself: a rigid translation of the walls
-            # translates the room rigidly, so the fill/outline stay put
-            # even before (and in case) re-detection runs
-            r.path = tr.map(r.path)
-            if r.corners:
-                r.corners = [QPointF(c.x() + d.x(), c.y() + d.y())
-                             for c in r.corners]
+            # translates the room rigidly.  With an outline that is the corner
+            # list; the mapped path is the outline-less fallback.
+            r.set_region(tr.map(r.path), r.area_sqft,
+                         [QPointF(c.x() + d.x(), c.y() + d.y())
+                          for c in r.corners] if r.corners else None)
         self.setPos(0.0, 0.0)
         rebuild_all_walls(sc)             # re-detects rooms at new anchors
 

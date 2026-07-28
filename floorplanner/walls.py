@@ -33,12 +33,13 @@ class _DragVertex:
     every change, so anything per-event that scales with the scene is the thing
     that stalls a big plan."""
 
-    __slots__ = ("v", "orig", "ends")
+    __slots__ = ("v", "orig", "ends", "edges")
 
     def __init__(self, vertex):
         self.v = vertex
         self.orig = QPointF(vertex.point())
         self.ends = []
+        self.edges = []       # room OutlineEdges holding this same corner (P3.5)
 
     def apply(self, dx, dy):
         """Move the corner. Every end follows because it IS the corner."""
@@ -46,6 +47,8 @@ class _DragVertex:
                                              self.orig.y() + dy))
         for w, attr in self.ends:
             w.set_end_vertex(attr, self.v)
+        for e in self.edges:
+            e.v = self.v
 
 
 def nearest_wall_endpoint(scene, p: QPointF, tol: float, exclude=None):
@@ -1416,6 +1419,16 @@ class WallItem(QGraphicsItem):
                 w.set_end_vertex(attr, v)
                 self._promoted += 1
             by_id[id(v)].ends.append((w, attr))
+
+        # 4. the room outlines holding these corners ride along (P3.5). A room
+        # region is DERIVED from its outline, so this is the whole of "the rooms
+        # either side resize when a party wall slides" -- there is no detection
+        # pass left to do it, and there does not need to be.
+        for room in {id(r): r for w in self._run for r in w.rooms}.values():
+            for e in getattr(room, "outline", ()):
+                dv = by_id.get(id(e.v))
+                if dv is not None:
+                    dv.edges.append(e)
         self._vmoves = moves
 
     def mouseMoveEvent(self, e):

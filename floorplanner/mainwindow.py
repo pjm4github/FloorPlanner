@@ -579,11 +579,13 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             w.p2 = QPointF(w.p2.x() + dx, w.p2.y() + dy)
         r = shape["room"]
         if r is not None:
-            r.prepareGeometryChange()
             r.anchor = QPointF(r.anchor.x() + dx, r.anchor.y() + dy)
-            r.path = QTransform.fromTranslate(dx, dy).map(r.path)
-            if r.corners:
-                r.corners = [QPointF(c.x() + dx, c.y() + dy) for c in r.corners]
+            # region derives from the outline (P3.5): shifting the corners
+            # shifts it. The mapped path is only the outline-less fallback.
+            r.set_region(QTransform.fromTranslate(dx, dy).map(r.path),
+                         r.area_sqft,
+                         [QPointF(c.x() + dx, c.y() + dy) for c in r.corners]
+                         if r.corners else None)
 
     def distribute_rooms(self, horizontal: bool):
         """Space the selected rooms so the gaps between them are equal,
