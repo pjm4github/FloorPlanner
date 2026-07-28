@@ -97,26 +97,28 @@ def nearest_wall_body_point(scene, p: QPointF, tol: float, exclude=None):
 
 class _WallIndex:
     """Per-rebuild spatial cache so each wall's rebuild() is O(local) instead
-    of O(all walls): an endpoint hash (joined corners) + per-line buckets
+    of O(all walls): the corner fold (joined ends) + per-line buckets
     (coincident party walls).  Built once by rebuild_all_walls and passed to
     every wall; the exact predicates are unchanged, the index just narrows the
-    candidate set to a guaranteed superset."""
+    candidate set to a guaranteed superset.
 
-    EP = 4.0          # endpoint hash cell (>> the 0.6" join tolerance)
+    P3.4 (iii) took the endpoint hash out: `joined_at` reads a `_CornerIndex`,
+    so "is this end joined" is a DEGREE lookup rather than a 3x3 cell search,
+    and it answers from the same fold that decides what one corner is
+    everywhere else in this module. The LINE buckets stay, and stay here --
+    they are a spatial index, not detection machinery, and the topology planner
+    needs the identical bucketing (`topology._candidate_groups`)."""
+
     OFF = 3.0         # line-offset bucket (>> the 1.5" coincidence tolerance)
 
     def __init__(self, scene):
-        self.eps = {}            # (i, j) -> [(wall, x, y)]
+        items = [w for w in (scene.items() if scene is not None else [])
+                 if isinstance(w, WallItem)]
+        self.corners = _CornerIndex(items)   # every wall, open and grouped too
         self.hb = {}             # round(y/OFF) -> [horizontal walls]
         self.vb = {}             # round(x/OFF) -> [vertical walls]
         self.diag = []           # non-axis-aligned real walls (rare)
-        for w in (scene.items() if scene is not None else []):
-            if not isinstance(w, WallItem):
-                continue
-            for p in (w.p1, w.p2):
-                self.eps.setdefault((round(p.x() / self.EP),
-                                     round(p.y() / self.EP)), []).append(
-                    (w, p.x(), p.y()))
+        for w in items:
             if w.is_open or w.length() < 1e-6:
                 continue
             u = w.unit()
@@ -127,16 +129,8 @@ class _WallIndex:
             else:
                 self.diag.append(w)
 
-    def joined_at(self, p, exclude) -> bool:
-        px, py = p.x(), p.y()
-        ki, kj = round(px / self.EP), round(py / self.EP)
-        for di in (-1, 0, 1):
-            for dj in (-1, 0, 1):
-                for w, qx, qy in self.eps.get((ki + di, kj + dj), ()):
-                    if w is not exclude and (qx - px) ** 2 + (qy - py) ** 2 \
-                            < 0.36:
-                        return True
-        return False
+    def joined_at(self, wall, attr) -> bool:
+        return self.corners.joined(wall, attr)
 
     def coincident_candidates(self, wall, reach=1):
         u = wall.unit()
@@ -314,6 +308,47 @@ def _corner_at(pos, cells, cell, x, y, floor):
     return best
 
 
+class _CornerIndex:
+    """Wall ends folded into CORNERS -- the vertex adjacency the task line asks
+    for, and the single definition of "these ends are the same corner".
+
+    Two ends are one corner when they hold the same `Vertex` OR sit within
+    SHARE_TOL of each other. Both halves are needed and neither is redundant:
+    identity is the real answer, but P3.1 is split-on-write and load
+    deliberately does not weld, so most coincident ends in a loaded plan are
+    still distinct objects and only position can see the corner. That second
+    half is also, exactly, the 0.6" endpoint hash `_WallIndex` used to keep --
+    which is why `joined_at` can move onto this without changing a pixel."""
+
+    def __init__(self, walls):
+        self.pos, self.anchor, self.of, self.walls_at = {}, {}, {}, {}
+        self._cells, self._seen = {}, {}
+        cell = max(SHARE_TOL, 1e-6)
+        for w in walls:
+            for attr in ("p1", "p2"):
+                v = w.end_vertex(attr)
+                key = self._seen.get(id(v))
+                if key is None:
+                    p = v.point()
+                    key = _corner_at(self.pos, self._cells, cell,
+                                     p.x(), p.y(), w.floor)
+                    if key is None:
+                        key = len(self.pos)
+                        self.pos[key] = (p.x(), p.y())
+                        self.anchor[key] = v
+                        self._cells.setdefault(
+                            (w.floor, round(p.x() / cell),
+                             round(p.y() / cell)), []).append(key)
+                    self._seen[id(v)] = key
+                self.of[(id(w), attr)] = key
+                self.walls_at.setdefault(key, []).append(w)
+
+    def joined(self, wall, attr) -> bool:
+        """True when another wall meets `wall` at this end -- a degree query,
+        where `_WallIndex` ran a 3x3 cell search per call."""
+        return len(self.walls_at.get(self.of.get((id(wall), attr)), ())) > 1
+
+
 def graph_from_scene(scene, floor=None):
     """A `GraphView` of the live wall network for `design.topology`'s planners.
 
@@ -337,29 +372,13 @@ def graph_from_scene(scene, floor=None):
                     and (floor is None or w.floor == floor)),
                    key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y(),
                                   w.wall_type))
-    cell = max(SHARE_TOL, 1e-6)
-    pos, anchor, cells, seen, ends = {}, {}, {}, {}, {}
-    for w in walls:
-        for attr in ("p1", "p2"):
-            v = w.end_vertex(attr)
-            key = seen.get(id(v))
-            if key is None:
-                p = v.point()
-                key = _corner_at(pos, cells, cell, p.x(), p.y(), w.floor)
-                if key is None:
-                    key = len(pos)
-                    pos[key] = (p.x(), p.y())
-                    anchor[key] = v
-                    cells.setdefault((w.floor, round(p.x() / cell),
-                                      round(p.y() / cell)), []).append(key)
-                seen[id(v)] = key
-            ends[(id(w), attr)] = key
-    views = [WallView(w, w.floor, ends[(id(w), "p1")], ends[(id(w), "p2")],
-                      w.wall_type,
+    corners = _CornerIndex(walls)
+    views = [WallView(w, w.floor, corners.of[(id(w), "p1")],
+                      corners.of[(id(w), "p2")], w.wall_type,
                       tuple(OpeningView(i, op.s, op.width, (op.kind, op.code))
                             for i, op in enumerate(w.openings)))
              for w in walls]
-    return GraphView(views, pos, anchor)
+    return GraphView(views, corners.pos, corners.anchor)
 
 
 def _adopt_end(wall, attr, vertex, xy):
@@ -1027,13 +1046,20 @@ class WallItem(QGraphicsItem):
         return max(0.0, min(self.length(), s))
 
     # -- geometry cache ------------------------------------------------------
-    def _joined_at(self, p: QPointF, index=None) -> bool:
-        """True when another wall shares (within 1/2") this endpoint."""
+    def _joined_at(self, attr: str, index=None) -> bool:
+        """True when another wall meets this wall at `attr` ("p1" / "p2").
+
+        A VERTEX-DEGREE question (P3.4 (iii)), where it used to be a 0.6"
+        coordinate search. The corner fold behind it treats same-`Vertex` and
+        within-0.6" ends alike, so the answer is unchanged on a plan that was
+        never welded -- and on one that was, it is now the real question rather
+        than a proximity proxy for it."""
         if index is not None:
-            return index.joined_at(p, self)
+            return index.joined_at(self, attr)
         sc = self.scene()
         if sc is None:
             return False
+        p = getattr(self, attr)
         for it in sc.items():
             if isinstance(it, WallItem) and it is not self:
                 if (QLineF(p, it.p1).length() < 0.6
@@ -1051,8 +1077,8 @@ class WallItem(QGraphicsItem):
         length, t, ang = self.length(), self.t, self.angle_rad()
 
         # extend joined ends by half a thickness so corners fill in solid
-        ext1 = t * 0.5 if self._joined_at(self.p1, index) else 0.0
-        ext2 = t * 0.5 if self._joined_at(self.p2, index) else 0.0
+        ext1 = t * 0.5 if self._joined_at("p1", index) else 0.0
+        ext2 = t * 0.5 if self._joined_at("p2", index) else 0.0
 
         body = QPainterPath()
         body.addRect(QRectF(-ext1, -t / 2, length + ext1 + ext2, t))

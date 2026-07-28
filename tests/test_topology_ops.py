@@ -450,6 +450,61 @@ def test_the_menu_command_still_tidies_the_plan(fp, win):
     assert len(verts) == 1, "the welded corner is still three coordinates"
 
 
+# --------------------------------------------------------------------------
+# The query helpers -- migrated to vertex adjacency, or pinned against it
+# --------------------------------------------------------------------------
+def test_joined_at_is_a_degree_query_that_matches_the_search_it_replaced(
+        fp, scene):
+    """`_joined_at` was a 0.6" coordinate search; it is now a degree lookup on
+    the corner fold. Its own un-indexed fallback still runs the old search, so
+    the two are compared directly -- the replacement carries its own oracle."""
+    _add(scene, fp, 0, 0, 120, 0)
+    _add(scene, fp, 120, 0, 120, 120)             # joined at (120, 0)
+    _add(scene, fp, 300, 0, 420, 0)               # joined to nothing
+    _add(scene, fp, 0, 300, 120, 300)
+    _add(scene, fp, 120, 300.4, 120, 420)         # 0.4" apart: still ONE corner
+    index = fp.walls._WallIndex(scene)
+    for w in _walls(scene, fp):
+        for attr in ("p1", "p2"):
+            assert w._joined_at(attr, index) == w._joined_at(attr), (
+                f"indexed and un-indexed disagree on {attr}")
+    by_p1 = {(w.p1.x(), w.p1.y()): w for w in _walls(scene, fp)}
+    assert by_p1[(0.0, 0.0)]._joined_at("p2", index) is True    # the corner
+    assert by_p1[(0.0, 0.0)]._joined_at("p1", index) is False   # free end
+    assert by_p1[(300.0, 0.0)]._joined_at("p1", index) is False
+    assert by_p1[(0.0, 300.0)]._joined_at("p2", index) is True  # 0.4" apart
+
+
+def test_coincidence_agrees_with_the_planners_own_predicate(fp, scene):
+    """THE DRIFT GATE for the one predicate that is stated twice.
+
+    `coincident_walls` stays a hand-rolled scan because it sits on the app's
+    hottest path (`WallItem.rebuild`, once per wall per pass) and routing it
+    through the planner would allocate a view per candidate. The planner's
+    `_same_line` + `_spans_overlap` are transcriptions of it. Two statements of
+    one rule is exactly the F2 disease this task exists to avoid, so they are
+    policed instead of merged -- the same move `--verify-design` makes for the
+    two appliers."""
+    pairs = [((0, 0, 120, 0), (60, 0, 180, 0)),        # overlapping duplicates
+             ((0, 0, 120, 0), (60, 6, 180, 6)),        # 6" off the line
+             ((0, 0, 120, 0), (0, 18, 120, 18)),       # 18" off: not coincident
+             ((0, 0, 120, 0), (120, 0, 240, 0)),       # abutting, no overlap
+             ((0, 0, 120, 0), (0, 0, 0, 120)),         # perpendicular
+             ((0, 0, 120, 120), (60, 60, 180, 180))]   # diagonal pair
+    for i, (pa, pb) in enumerate(pairs):
+        sc = type(scene)()
+        a = _add(sc, fp, *pa)
+        b = _add(sc, fp, *pb)
+        got = b in fp.coincident_walls(sc, a, perp_tol=6.0)
+        view = graph_from_scene(sc)
+        va = next(v for v in view.walls if v.key is a)
+        vb = next(v for v in view.walls if v.key is b)
+        want = (topology._same_line(va, vb, view.pos, 6.0, topology.ANGLE_TOL)
+                and topology._spans_overlap(va, vb, view.pos))
+        assert got == want, f"pair {i} {pa} / {pb}: scan {got}, planner {want}"
+        sc.clear()
+
+
 def test_the_scene_applier_leaves_the_design_applier_nothing_to_do(fp, scene):
     # THE DRIFT GATE IN MINIATURE. If the two appliers disagreed, the pure op
     # would still find a merge in the document the scene walk produces.
