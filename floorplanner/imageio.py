@@ -177,7 +177,7 @@ class ImageIOMixin:
         # never sees them, and per the corrected F5 nothing else welds either.
         # Without this every extracted plan is born with open junctions, which
         # is exactly what leaks room detection between spaces.
-        weld_all(self.scene)
+        weld_scene(self.scene)
         rebuild_all_walls(self.scene)
         self._update_totals()
         self._commit_if_changed()

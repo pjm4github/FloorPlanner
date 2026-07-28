@@ -15,7 +15,6 @@ from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
-from floorplanner.walls import _coalesce_all_impl  # star skips underscores
 from floorplanner.rooms import *  # noqa: F401
 from floorplanner.items import *  # noqa: F401
 from floorplanner.model import (  # serialization bridge (aliased)
@@ -825,13 +824,19 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self.status("Ungrouped — items left in place.")
 
     def coalesce_all_now(self):
-        """Edit ▸ Coalesce all walls now: force the full-plan merge + weld sweep
-        even when auto-coalesce is switched off."""
-        n = _coalesce_all_impl(self.scene)
-        weld_all(self.scene)                 # close T/L joints across the plan
+        """Edit ▸ Coalesce all walls now: the explicit plan-wide normalization.
+
+        The COMMAND outlives the implementation it was named after (P3.4 (iii)).
+        Same menu item, same user intent -- tidy my walls -- new machinery:
+        merge every collinear run, then weld the junctions into shared
+        vertices. Still forced even when auto-coalesce is switched off."""
+        merged, _moved, _shared, split = normalize_walls(self.scene)
         rebuild_all_walls(self.scene)
-        self.status(f"Coalesced {n} overlapping wall(s) and welded junctions."
-                    if n else "Welded wall junctions.")
+        msg = (f"Coalesced {merged} overlapping wall(s) and welded junctions."
+               if merged else "Welded wall junctions.")
+        if split:
+            msg += f" Split {split} wall(s) at junctions."
+        self.status(msg)
 
     def _selection_spec(self):
         """Selected walls/furnishings (groups expand to their members)

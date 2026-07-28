@@ -16,7 +16,8 @@ from floorplanner.design.bridge import design_from_scene
 from floorplanner.design.model import Design
 from floorplanner.walls import (
     _coalesce_all_impl, apply_merge_plan_to_scene, graph_from_scene,
-    merge_collinear_scene, plan_merge_collinear, split_wall_at,
+    merge_all, merge_collinear_scene, normalize_walls, plan_merge_collinear,
+    split_wall_at, weld_scene,
 )
 
 pytestmark = pytest.mark.walls
@@ -360,6 +361,93 @@ def test_split_then_merge_returns_the_wall_it_started_with(fp, scene):
     assert len(walls) == 1
     assert (walls[0].p1.x(), walls[0].p2.x()) == (0.0, 240.0)
     assert [round(op.s) for op in walls[0].openings] == [40]
+
+
+# --------------------------------------------------------------------------
+# The weld family, and the command that outlives its implementation
+# --------------------------------------------------------------------------
+def test_the_weld_snap_still_closes_a_gap(fp, scene):
+    # the GEOMETRY half, preserved verbatim from weld_all/join_endpoints: a
+    # free end within JOIN_TOL (9") of another wall's end moves onto it. It is
+    # the only way a drawn or pixel-extracted plan closes its junctions.
+    a = _add(scene, fp, 0, 0, 120, 0)
+    b = _add(scene, fp, 124, 0, 124, 120)         # 4" short of a's end
+    moved, _shared = weld_scene(scene)
+    assert moved >= 1
+    assert b.p1.x() == pytest.approx(a.p2.x(), abs=0.6)
+
+
+def test_welding_makes_a_corner_topology_not_just_coordinates(fp, scene):
+    # the half weld_all never had. Asserted with `is`, never `==`: equal
+    # coordinates are exactly what weld_all already produced.
+    a = _add(scene, fp, 0, 0, 120, 0)
+    b = _add(scene, fp, 124, 0, 124, 120)
+    assert a.end_vertex("p2") is not b.end_vertex("p1")
+    weld_scene(scene)
+    assert a.end_vertex("p2") is b.end_vertex("p1")
+
+
+def test_weld_scene_does_not_split_a_body_landing(fp, scene):
+    # THE RULE, pinned: splitting edits a wall the user did not touch, so it
+    # belongs to the explicit pass and nowhere else. Without this, migrating
+    # imageio's weld_all would silently turn a 5-wall extracted plan into 7.
+    _add(scene, fp, 0, 0, 240, 0)
+    _add(scene, fp, 120, 0, 120, 120)
+    weld_scene(scene)
+    assert len(_walls(scene, fp)) == 2
+
+
+def test_normalize_walls_does_split_a_body_landing(fp, scene):
+    _add(scene, fp, 0, 0, 240, 0)
+    _add(scene, fp, 120, 0, 120, 120)
+    merged, _moved, _shared, split = normalize_walls(scene)
+    assert (merged, split) == (0, 1)
+    assert len(_walls(scene, fp)) == 3
+
+
+def test_normalize_walls_merges_and_welds_in_one_pass(fp, scene):
+    _add(scene, fp, 0, 0, 120, 0)                 # two collinear runs...
+    _add(scene, fp, 120, 0, 240, 0)
+    _add(scene, fp, 244, 0, 244, 120)             # ...and a 4" gap to close
+    merged, moved, _shared, _split = normalize_walls(scene)
+    assert merged == 1 and moved >= 1
+    assert len(_walls(scene, fp)) == 2
+
+
+def test_normalize_walls_ignores_the_auto_coalesce_switch(fp, scene):
+    # "Coalesce all walls now" is the user asking explicitly, so the automatic
+    # gate does not apply -- exactly as _coalesce_all_impl was called directly
+    fp.SETTINGS["auto_coalesce"] = False
+    try:
+        _add(scene, fp, 0, 0, 120, 0)
+        _add(scene, fp, 60, 0, 180, 0)
+        assert merge_all(scene) == 0              # the gated entry declines
+        assert normalize_walls(scene)[0] == 1     # the explicit one does not
+        assert len(_walls(scene, fp)) == 1
+    finally:
+        fp.SETTINGS["auto_coalesce"] = True
+
+
+def test_the_menu_command_still_tidies_the_plan(fp, win):
+    # the command outlives its implementation: same menu item, new machinery
+    for p, q in (((0, 0), (120, 0)), ((120, 0), (240, 0)),
+                 ((120, 0), (120, 120))):
+        win.scene.addItem(fp.WallItem(QPointF(*p), QPointF(*q), "interior"))
+    fp.rebuild_all_walls(win.scene)
+    win.coalesce_all_now()
+    walls = [w for w in win.scene.items()
+             if isinstance(w, fp.WallItem) and not w.is_open]
+    # the T-junction is load-bearing, so the run does NOT merge through it;
+    # what the pass achieves is that the corner is now one shared vertex
+    assert len(walls) == 3
+    at_tee = [w for w in walls
+              if any(abs(getattr(w, a).x() - 120) < 0.1
+                     and abs(getattr(w, a).y()) < 0.1 for a in ("p1", "p2"))]
+    assert len(at_tee) == 3
+    verts = {id(w.end_vertex(a)) for w in at_tee for a in ("p1", "p2")
+             if abs(getattr(w, a).x() - 120) < 0.1
+             and abs(getattr(w, a).y()) < 0.1}
+    assert len(verts) == 1, "the welded corner is still three coordinates"
 
 
 def test_the_scene_applier_leaves_the_design_applier_nothing_to_do(fp, scene):

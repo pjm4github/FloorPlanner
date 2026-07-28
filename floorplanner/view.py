@@ -486,7 +486,7 @@ class PlanView(QGraphicsView):
                 # it reads as one connected structure, not a loose segment
                 merge_wall(self.scene(), w)
                 if w.scene() is not None:
-                    w.join_endpoints(rebuild=False)
+                    weld_wall_ends(self.scene(), w, rebuild=False)
                 rebuild_all_walls(self.scene())
             e.accept()
             return

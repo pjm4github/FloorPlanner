@@ -456,6 +456,158 @@ def merge_collinear_scene(scene, floor=None, perp_tol=None, max_passes=6):
     return absorbed
 
 
+def share_coincident_ends(scene, floor=None):
+    """Fold wall ends that already sit at the same point onto ONE `Vertex`.
+
+    THE HALF `weld_all` NEVER HAD. A welded corner used to be two coordinates
+    that happened to agree -- which is exactly what P3.3's drag then had to
+    rediscover by scanning, at every press. "What counts as one corner" is
+    decided by `graph_from_scene`'s fold, so this module has one definition of
+    it and not two.
+
+    Adopting a corner can move an end by up to SHARE_TOL (0.6"). That is the
+    schema's own `vertex_weld_in`: at or below it two points ARE one vertex, so
+    by the document's own definition nothing moved (P2.1's noise-floor rule).
+    Returns the number of ends rebound."""
+    view = graph_from_scene(scene, floor)
+    rebound = 0
+    for wv in view.walls:
+        for attr, key in (("p1", wv.v1), ("p2", wv.v2)):
+            anchor = view.anchor.get(key)
+            if anchor is not None and wv.key.end_vertex(attr) is not anchor:
+                wv.key.set_end_vertex(attr, anchor)
+                rebound += 1
+    return rebound
+
+
+def split_body_landings(scene, floor=None, max_passes=6):
+    """Split every wall on which another wall's END lands -- the split rule's
+    second half, applied plan-wide rather than at one drag's press.
+
+    A pass splits each wall at most once, so it iterates. A landing inside a
+    doorway is declined by `split_wall_at` (P3.6's case) and stays unsplit.
+    Returns the number of splits made."""
+    made = 0
+    for _ in range(max_passes):
+        view = graph_from_scene(scene, floor)
+        plans, done = [], set()
+        for wv in view.walls:
+            if id(wv.key) in done:
+                continue
+            for key, p in view.pos.items():
+                if key in (wv.v1, wv.v2):
+                    continue
+                sp = plan_split_edge(view, wv.key, p[0], p[1])
+                if sp is not None and not sp.straddled:
+                    plans.append(sp)
+                    done.add(id(wv.key))
+                    break
+        if not plans:
+            break
+        for sp in plans:
+            if apply_split_plan_to_scene(scene, sp) is not None:
+                made += 1
+    return made
+
+
+def _snap_wall_ends(scene, wall):
+    """Move each free end of `wall` onto a nearby wall's end, or onto the body
+    of a wall it stops on (T-junction), within JOIN_TOL. Never grows a wall
+    toward a far one -- if it doesn't reach, the gap is left for the user.
+
+    Lifted from `WallItem.join_endpoints` (P3.4 (iii)) so that method can be
+    retired. It stays a COORDINATE snap on purpose: closing a 9" gap is a
+    geometry repair, not topology, and it is the only way a drawn or
+    pixel-extracted plan closes its junctions at all. The topology follows in
+    `share_coincident_ends`, once the ends actually coincide."""
+    moved = 0
+    for attr, other in (("p1", "p2"), ("p2", "p1")):
+        p = getattr(wall, attr)
+        q = nearest_wall_endpoint(scene, p, JOIN_TOL, exclude=wall)
+        if q is None:
+            hit = nearest_wall_body(scene, p, JOIN_TOL, exclude=wall)
+            if hit is not None:
+                target, q = hit
+                ip = axis_wall_intersection(target, getattr(wall, other), p)
+                if ip is not None and QLineF(ip, p).length() <= JOIN_TOL * 2:
+                    q = ip
+        if q is not None:
+            if QLineF(q, p).length() > 1e-9:
+                moved += 1
+            setattr(wall, attr, q)
+    return moved
+
+
+def weld_wall_ends(scene, wall, rebuild=True):
+    """Weld ONE wall's ends -- P3.4 (iii)'s replacement for
+    `WallItem.join_endpoints`, called on draw release.
+
+    Snap, then SHARE: once the geometry lands, the ends that are now coincident
+    are folded onto one `Vertex`, so a drawn corner is topology from the moment
+    it is drawn rather than two coordinates a later drag must rediscover.
+
+    Deliberately does NOT split a wall whose body this end landed on, though
+    the machinery is right here. That is a real edit to a wall the user did not
+    touch, and making it silently on every draw is a wider blast radius than a
+    call-site migration should have. It belongs to the EXPLICIT pass
+    (`normalize_walls`) -- and a drag makes it at press anyway (P3.4 (ii))."""
+    if scene is None or wall is None or wall.scene() is None:
+        return
+    _snap_wall_ends(scene, wall)
+    share_coincident_ends(scene, wall.floor)
+    if rebuild:
+        wall.rebuild()
+
+
+def weld_scene(scene, max_passes=6):
+    """Weld the whole plan -- P3.4 (iii)'s replacement for `weld_all`.
+
+    Two stages, deliberately different kinds of thing: the GEOMETRY snap that
+    closes gaps (iterated to a fixed point, as `weld_all` was, so a welded plan
+    doesn't move on a further pass), then the TOPOLOGY `weld_all` had no way to
+    do -- folding the now-coincident ends onto one vertex.
+
+    IT DOES NOT SPLIT BODY LANDINGS, and that is the same rule `weld_wall_ends`
+    follows: splitting is an edit to a wall the user did not touch, so it
+    belongs to the EXPLICIT pass (`normalize_walls`) and nowhere else. Applied
+    here it would silently turn a 5-wall extracted plan into a 7-wall one --
+    correct topology, but a behaviour change smuggled in under a call-site
+    migration. P3.5 will want plan-wide planarity for `enclosing_face`; that is
+    P3.5's to ask for, through the pass that exists for it.
+
+    Returns `(moved, shared)`."""
+    if scene is None:
+        return (0, 0)
+    moved = 0
+    for _ in range(max_passes):
+        walls = sorted((w for w in scene.items()
+                        if isinstance(w, WallItem) and not w.is_open
+                        and w.group() is None),
+                       key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()))
+        step = sum(_snap_wall_ends(scene, w) for w in walls)
+        moved += step
+        if not step:
+            break
+    return moved, share_coincident_ends(scene)
+
+
+def normalize_walls(scene):
+    """THE EXPLICIT PLAN-WIDE NORMALIZATION -- Edit ▸ Coalesce all walls now.
+
+    The menu item outlives the implementation it was named after. Same command,
+    same user intent ("tidy my walls"), new machinery: merge every collinear
+    run, then weld -- close the gaps, fold coincident ends onto one vertex, and
+    split a wall wherever another's end lands on its body. Ungated by
+    `auto_coalesce`, because the user asked for it explicitly.
+
+    Returns `(merged, moved, shared, split)`."""
+    if scene is None:
+        return (0, 0, 0, 0)
+    merged = merge_collinear_scene(scene)
+    moved, shared = weld_scene(scene)
+    return merged, moved, shared, split_body_landings(scene)
+
+
 def merge_wall(scene, wall, perp_tol=None):
     """Merge just the run `wall` sits in -- P3.4 (iii)'s replacement for
     `coalesce_wall`, and gated by the same `auto_coalesce` setting.
