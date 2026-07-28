@@ -14,8 +14,8 @@ from PyQt6.QtWidgets import *  # noqa: F401
 
 from floorplanner.config import *  # noqa: F401
 from floorplanner.design.topology import (
-    ON_SEG_TOL, GraphView, OpeningView, WallView, plan_merge_collinear,
-    plan_split_edge,
+    ON_SEG_TOL, GraphView, OpeningView, WallView, bucket_reach, line_bucket,
+    plan_merge_collinear, plan_split_edge,
 )
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.vertex import Vertex
@@ -106,45 +106,35 @@ class _WallIndex:
     so "is this end joined" is a DEGREE lookup rather than a 3x3 cell search,
     and it answers from the same fold that decides what one corner is
     everywhere else in this module. The LINE buckets stay, and stay here --
-    they are a spatial index, not detection machinery, and the topology planner
-    needs the identical bucketing (`topology._candidate_groups`)."""
-
-    OFF = 3.0         # line-offset bucket (>> the 1.5" coincidence tolerance)
+    they are a spatial index, not detection machinery -- but the bucketing
+    POLICY does not: `topology.line_bucket` owns it, so this and the planner
+    narrow candidates by one definition rather than two transcriptions."""
 
     def __init__(self, scene):
         items = [w for w in (scene.items() if scene is not None else [])
                  if isinstance(w, WallItem)]
         self.corners = _CornerIndex(items)   # every wall, open and grouped too
-        self.hb = {}             # round(y/OFF) -> [horizontal walls]
-        self.vb = {}             # round(x/OFF) -> [vertical walls]
+        self.lines = {}          # ("h"|"v", n) -> [walls on that line offset]
         self.diag = []           # non-axis-aligned real walls (rare)
         for w in items:
             if w.is_open or w.length() < 1e-6:
                 continue
-            u = w.unit()
-            if abs(u.y()) < 1e-4:
-                self.hb.setdefault(round(w.p1.y() / self.OFF), []).append(w)
-            elif abs(u.x()) < 1e-4:
-                self.vb.setdefault(round(w.p1.x() / self.OFF), []).append(w)
-            else:
+            b = line_bucket((w.p1.x(), w.p1.y()), (w.p2.x(), w.p2.y()))
+            if b is None:
                 self.diag.append(w)
+            else:
+                self.lines.setdefault(b, []).append(w)
 
     def joined_at(self, wall, attr) -> bool:
         return self.corners.joined(wall, attr)
 
     def coincident_candidates(self, wall, reach=1):
-        u = wall.unit()
-        rng = range(-reach, reach + 1)                  # widen for a bigger tol
-        if abs(u.y()) < 1e-4:                          # horizontal query
-            b = round(wall.p1.y() / self.OFF)
-            return [w for d in rng for w in self.hb.get(b + d, ())] \
-                + self.diag
-        if abs(u.x()) < 1e-4:                          # vertical query
-            b = round(wall.p1.x() / self.OFF)
-            return [w for d in rng for w in self.vb.get(b + d, ())] \
-                + self.diag
-        return ([w for ws in self.hb.values() for w in ws]   # diagonal: rare
-                + [w for ws in self.vb.values() for w in ws] + self.diag)
+        b = line_bucket((wall.p1.x(), wall.p1.y()), (wall.p2.x(), wall.p2.y()))
+        if b is None:                                  # diagonal query: rare
+            return [w for ws in self.lines.values() for w in ws] + self.diag
+        axis, n = b
+        return [w for d in range(-reach, reach + 1)
+                for w in self.lines.get((axis, n + d), ())] + self.diag
 
 
 def coincident_walls(scene, wall, index=None, perp_tol=1.5):
@@ -159,7 +149,7 @@ def coincident_walls(scene, wall, index=None, perp_tol=1.5):
     length = wall.length()
     out = []
     if index is not None:
-        reach = int(perp_tol / _WallIndex.OFF) + 1
+        reach = bucket_reach(perp_tol)
         cands = index.coincident_candidates(wall, reach)
     else:
         cands = scene.items()
@@ -817,7 +807,24 @@ def fracture_delete_wall(scene, wall, settle=True):
 def wall_endpoint_open(scene, p: QPointF, ignore=()) -> bool:
     """True when `p` is a free, dangling wall end: no other (non-open) wall has
     an endpoint within JOIN_TOL of it.  Walls in `ignore` are skipped (the
-    endpoint's own wall, and the wall being drawn)."""
+    endpoint's own wall, and the wall being drawn).
+
+    THIS IS RIGHTLY SPATIAL, AND IT STAYS THAT WAY -- it is not a survivor of
+    the pre-vertex world awaiting migration to vertex degree, so please do not
+    "finish the job" by converting it.
+
+    The tolerance is JOIN_TOL, the GESTURE tolerance, and gesture questions are
+    inherently spatial. Degree answers the MODELLING question ("are these ends
+    one corner?"); this answers the AIMING question ("is there something near
+    enough to snap to?"), and those are different questions with different
+    right answers. Degree cannot serve here even in principle, because the ends
+    worth offering the user are precisely the ones NOT yet welded -- a degree
+    query would report every one of them as free and the snap would have
+    nothing to aim at.
+
+    (`WallItem._joined_at` is the one that did migrate, at P3.4 (iii): its
+    tolerance was SHARE_TOL, it asked the modelling question, and vertex
+    adjacency answers it exactly.)"""
     if scene is None:
         return False
     for w in scene.items():

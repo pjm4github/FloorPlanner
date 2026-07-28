@@ -361,26 +361,43 @@ def _plan_one_merge(run, pos, anchor, degree):
                  gone, tuple(planned), tuple(dropped_ops))
 
 
+def line_bucket(a, b):
+    """The line-offset bucket for a wall running `a` -> `b`: `("h"|"v", n)` for
+    an axis-aligned wall, None for a diagonal (which no offset bucket narrows).
+
+    THE ONE DEFINITION, imported by both users -- this module's
+    `_candidate_groups` and `walls._WallIndex`. It was briefly two
+    transcriptions of one policy, which is precisely the F2 disease this task
+    exists to remove; and since the policy is pure coordinates it belongs on
+    this side of the Qt fence, with the scene importing it rather than the
+    reverse. The bucket is the lever that made coalesce survivable on a
+    1492-wall plan, so wherever a merge or coincidence query is decided, it has
+    to be the same lever."""
+    u = _unit(a, b)
+    if abs(u[1]) < 1e-4:
+        return ("h", round(a[1] / LINE_BUCKET))
+    if abs(u[0]) < 1e-4:
+        return ("v", round(a[0] / LINE_BUCKET))
+    return None
+
+
+def bucket_reach(perp_tol):
+    """How many neighbouring buckets a query at `perp_tol` must sweep."""
+    return int(perp_tol / LINE_BUCKET) + 1
+
+
 def _candidate_groups(walls, pos, perp_tol):
     """Yield `(primary, near)` index lists: walls that could possibly merge --
-    same level, same type, and on a nearby parallel line.
-
-    This is `walls._WallIndex`'s line bucketing, moved into the planner. It is
-    the same lever that made coalesce survivable on a 1492-wall plan, and it
-    has to live wherever the merge decision lives: a per-wall merge that had to
-    scan every wall would trade coalesce's O(local) for O(plan) on every
-    draw-release, which is the direction P3.8 must not go."""
-    reach = int(perp_tol / LINE_BUCKET) + 1
+    same level, same type, and on a nearby parallel line."""
+    reach = bucket_reach(perp_tol)
     buckets, diag = defaultdict(list), defaultdict(list)
     for i, w in enumerate(walls):
-        u = _unit(pos[w.v1], pos[w.v2])
         grp = (w.level, w.type)
-        if abs(u[1]) < 1e-4:
-            buckets[(grp, "h", round(pos[w.v1][1] / LINE_BUCKET))].append(i)
-        elif abs(u[0]) < 1e-4:
-            buckets[(grp, "v", round(pos[w.v1][0] / LINE_BUCKET))].append(i)
-        else:
+        b = line_bucket(pos[w.v1], pos[w.v2])
+        if b is None:
             diag[grp].append(i)                # non-axis-aligned: rare
+        else:
+            buckets[(grp, *b)].append(i)
     for (grp, axis, b), idxs in buckets.items():
         near = list(idxs) + diag.get(grp, [])
         for d in range(1, reach + 1):
