@@ -128,17 +128,57 @@ def test_split_edge_adds_one_wall_and_preserves_faces():
     assert len(topology.trace_faces(d2)) == len(topology.trace_faces(d))
 
 
-def test_split_edge_raises_on_a_wall_with_openings():
-    # the landmine guard: splitting a wall that carries a door/window needs the
-    # P3.3 redistribution rule, so split_edge must FAIL LOUD rather than quietly
-    # leaving the opening on one segment
+def _opening_centre(d, w):
+    """(s, scene point) of `w`'s single opening, along `w`."""
+    pos = _pos(d)
+    a, b = pos[w.v1], pos[w.v2]
+    length = math.dist(a, b)
+    u = ((b[0] - a[0]) / length, (b[1] - a[1]) / length)
+    anc = w.openings[0].anchor
+    s = (anc["offset_in"] if anc["from"] == "v1"
+         else length - anc["offset_in"])
+    return s, length, (a[0] + u[0] * s, a[1] + u[1] * s)
+
+
+def test_split_edge_redistributes_the_openings_it_used_to_refuse():
+    """REWRITTEN AT P3.4(ii) -- old op: split_edge REFUSED any wall carrying an
+    opening, and this test asserted the refusal. New op: it redistributes, so
+    the assertion moves from "raises" to "the door lands on the segment that
+    holds it and none is lost". The refusal was a placeholder for unbuilt work
+    (its own message said so, naming P3.3); the work is built here, so the
+    assertion that pinned its absence has nothing left to pin."""
     d = _design("symmetricP1.json")
     pos = _pos(d)
     w = next(w for w in d.walls if isinstance(w.openings, list) and w.openings)
     a, b = pos[w.v1], pos[w.v2]
     mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
-    with pytest.raises(NotImplementedError, match="P3.3"):
-        topology.split_edge(d, w.id, mid[0], mid[1])
+    before = sum(len(x.openings or ()) for x in d.walls)
+    d2 = topology.split_edge(d, w.id, mid[0], mid[1])
+    assert len(d2.walls) == len(d.walls) + 1
+    assert sum(len(x.openings or ()) for x in d2.walls) == before
+    assert len(topology.trace_faces(d2)) == len(topology.trace_faces(d))
+
+
+def test_split_edge_still_raises_when_the_cut_runs_through_an_opening():
+    """THE GUARD, NARROWED AND RETARGETED -- the pre-authorized `match="P3.3"`
+    -> `match="P3.6"` change, named rather than slipped through.
+
+    Redistribution answers "which segment owns the door". It cannot answer
+    "which segment owns a door the cut runs through", because neither does.
+    That is an opening which no longer fits where it lands, and reporting one
+    instead of silently sliding it is P3.6 -- so the message names P3.6, and the
+    P1.3-followup discipline (fail loud AT the call site) is unchanged."""
+    d = _design("symmetricP1.json")
+    for w in d.walls:
+        if not (isinstance(w.openings, list) and len(w.openings) == 1):
+            continue
+        s, length, cut = _opening_centre(d, w)
+        if topology.WELD_TOL * 2 < s < length - topology.WELD_TOL * 2:
+            break
+    else:                                              # pragma: no cover
+        pytest.skip("no mid-span single-opening wall in the fixture")
+    with pytest.raises(NotImplementedError, match="P3.6"):
+        topology.split_edge(d, w.id, cut[0], cut[1])
 
 
 def test_merge_collinear_preserves_faces_and_reduces_walls():

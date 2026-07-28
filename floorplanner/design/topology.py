@@ -182,37 +182,35 @@ def _next_id(design, prefix):
 def split_edge(design, wall_id, x, y):
     """Return a copy of `design` with wall `wall_id` split at the point (x, y)
     on its span into two collinear walls sharing a (welded) vertex. A no-op if
-    the point is at either endpoint.
+    the point is at either endpoint or off the centreline.
 
-    RAISES on a wall that carries openings: redistributing a door/window across
-    a split (which segment owns it, at what offset) is P3.3's split rule, not
-    yet built. Failing loud here means the missing redistribution surfaces at
-    the call site, not three tasks later as a misplaced opening. P3.3 removes
-    this guard as part of implementing redistribution."""
-    src = next((w for w in design.walls if w.id == wall_id), None)
-    if src is not None and isinstance(src.openings, list) and src.openings:
+    Openings are REDISTRIBUTED onto whichever segment holds them (P3.4 (ii)) --
+    the thing this used to refuse to do.
+
+    THE GUARD SURVIVES, NARROWED AND RETARGETED. It was added at P1.3-followup
+    naming P3.3, because "which segment owns the door, at what offset" was
+    unbuilt. That is now built, so what remains is the case redistribution
+    genuinely cannot answer: a split point falling INSIDE an opening's span,
+    where neither segment can hold it and the honest answer is that the plan is
+    wrong. An opening that does not fit where it lands being an error surfaced
+    to the user rather than a silently slid door is **P3.6**, so the message
+    names P3.6. Failing loud keeps the P1.3-followup discipline: the gap shows
+    up at the call site, not three tasks later as a misplaced door.
+
+    (Interactive callers must not raise mid-drag, so the scene op DECLINES a
+    straddling split instead. The decision is identical -- `Split.straddled`
+    off the one planner -- and only the policy on a flagged delta differs:
+    document repair fails loud, a live gesture leaves the wall alone.)"""
+    plan = plan_split_edge(graph_from_design(design), wall_id, x, y)
+    if plan is None:
+        return copy.deepcopy(design)
+    if plan.straddled:
         raise NotImplementedError(
-            f"split_edge on wall {wall_id} carrying {len(src.openings)} "
-            "opening(s): opening redistribution across a split is P3.3 (the "
-            "wall-move split rule). Remove this guard when implementing it.")
-    d = copy.deepcopy(design)
-    pos = _positions(d)
-    w = next((w for w in d.walls if w.id == wall_id), None)
-    if w is None:
-        return d
-    a, b = pos[w.v1], pos[w.v2]
-    if math.dist(a, (x, y)) <= WELD_TOL or math.dist(b, (x, y)) <= WELD_TOL:
-        return d                              # at an endpoint -> nothing to split
-    vid = _vertex_at(d, x, y, w.level) or _next_id(d, "v")
-    if vid not in {v.id for v in d.vertices}:
-        d.vertices.append(Vertex.from_dict(
-            {"id": vid, "level": w.level, "x": round(x, 4), "y": round(y, 4)}))
-    v2_old = w.v2
-    w.v2 = vid                                # first half keeps w.id + openings
-    d.walls.append(Wall.from_dict({
-        "id": _next_id(d, "w"), "level": w.level, "v1": vid, "v2": v2_old,
-        "type": w.type, "left": w.left, "right": w.right, "openings": []}))
-    return d
+            f"split_edge on wall {wall_id} at ({x:.3f}, {y:.3f}): the point "
+            f"falls inside {len(plan.straddled)} opening(s), which neither "
+            "segment can hold. Reporting an opening that no longer fits, "
+            "instead of silently sliding it, is P3.6 (opening anchors).")
+    return apply_split_plan(design, plan)
 
 
 # --------------------------------------------------------- planner / applier
@@ -250,10 +248,14 @@ GraphView = namedtuple("GraphView", "walls pos anchor")
 WallView = namedtuple("WallView", "key level v1 v2 type openings")
 OpeningView = namedtuple("OpeningView", "index s width ident")
 
-# The delta. `v1`/`v2` are the corner anchors the survivor adopts, or None when
-# the merge lands somewhere no existing corner sits (then `p1`/`p2` are used).
+# The deltas. On a `Merge`, `v1`/`v2` are the corner anchors the survivor
+# adopts, or None when the merge lands somewhere no existing corner sits (then
+# `p1`/`p2` are used). On a `Split`, `v` is the corner anchor already sitting at
+# the split point, or None when one must be made; `straddled` names the openings
+# the split point falls inside, which neither segment can hold.
 Merge = namedtuple("Merge", "survivor absorbed v1 v2 p1 p2 dropped_vertices "
                             "openings dropped_openings")
+Split = namedtuple("Split", "wall v at keep_openings move_openings straddled")
 PlannedOpening = namedtuple("PlannedOpening", "wall index s")
 
 ANGLE_TOL = 0.02        # |sin| between units to still call two walls parallel
@@ -397,6 +399,19 @@ def plan_merge_collinear(view, perp_tol=WELD_TOL, angle_tol=ANGLE_TOL):
             for _root, idxs in sorted(runs.items()) if len(idxs) > 1]
 
 
+def _code_width(code):
+    """Nominal opening width from a WWHH / WWWHH size code ("3280" -> 32").
+
+    Parsed locally rather than shared with `geometry.parse_wwhh`, which lives on
+    the Qt side of the fence this module may not cross. Deliberately lenient:
+    the width is used only to decide whether a split falls INSIDE an opening,
+    and a code this cannot read should not make a split raise."""
+    code = str(code).strip()
+    if not code.isdigit() or len(code) not in (4, 5, 6):
+        return 0.0
+    return float(int(code[:2 if len(code) == 4 else 3]))
+
+
 def graph_from_design(design, level=None):
     """A `GraphView` of `design` -- wall ids and vertex ids as the handles."""
     pos = _positions(design)
@@ -413,7 +428,7 @@ def graph_from_design(design, level=None):
             anc = o.anchor if isinstance(o.anchor, dict) else {}
             off = anc.get("offset_in", 0.0)
             s = off if anc.get("from") != "v2" else length - off
-            ops.append(OpeningView(i, s, 0.0, (o.kind, o.code)))
+            ops.append(OpeningView(i, s, _code_width(o.code), (o.kind, o.code)))
         walls.append(WallView(w.id, w.level, w.v1, w.v2, w.type, tuple(ops)))
     return GraphView(walls, pos, {vid: vid for vid in pos})
 
@@ -467,6 +482,88 @@ def apply_merge_plan(design, plan):
         d.walls = [w for w in d.walls if w.id not in dead]
         live = {w.v1 for w in d.walls} | {w.v2 for w in d.walls}
         d.vertices = [v for v in d.vertices if v.id in live]
+    return d
+
+
+def plan_split_edge(view, wall_key, x, y, on_seg_tol=ON_SEG_TOL):
+    """Plan the split of `wall_key` at (x, y) -- the OTHER half of the split
+    rule, and the one op both a document repair and a live drag need.
+
+    Returns a `Split`, or None when there is nothing to split: unknown wall,
+    degenerate span, a point off the centreline, or a point already at an
+    endpoint (which is a corner, not a split). Openings are assigned to
+    whichever segment holds them; one the split point falls INSIDE is reported
+    in `straddled` and left on the first segment, for the caller to refuse or
+    raise on -- the planner itself never raises, because one of its two callers
+    is a mouse drag."""
+    w = next((ww for ww in view.walls if ww.key == wall_key), None)
+    if w is None:
+        return None
+    pos = view.pos
+    a, b = pos[w.v1], pos[w.v2]
+    length = math.dist(a, b)
+    if length < MIN_SPAN:
+        return None
+    u = _unit(a, b)
+    s = (x - a[0]) * u[0] + (y - a[1]) * u[1]
+    if abs((y - a[1]) * u[0] - (x - a[0]) * u[1]) > on_seg_tol:
+        return None                            # not on this wall's centreline
+    at = (a[0] + u[0] * s, a[1] + u[1] * s)
+    if not (0.0 < s < length) or min(s, length - s) <= WELD_TOL:
+        return None                            # at an end -> nothing to split
+    on_level = {k for ww in view.walls if ww.level == w.level
+                for k in (ww.v1, ww.v2)}
+    near = [k for k in on_level if math.dist(pos[k], at) <= WELD_TOL]
+    vkey = min(near, key=lambda k: math.dist(pos[k], at)) if near else None
+    keep, move, straddled = [], [], []
+    for ov in w.openings:
+        half = ov.width / 2
+        if ov.s - half < s < ov.s + half:
+            straddled.append(PlannedOpening(w.key, ov.index, ov.s))
+        if ov.s <= s:
+            keep.append(PlannedOpening(w.key, ov.index, ov.s))
+        else:
+            move.append(PlannedOpening(w.key, ov.index, ov.s - s))
+    return Split(w.key, view.anchor.get(vkey), at, tuple(keep), tuple(move),
+                 tuple(straddled))
+
+
+def _reanchor(opening, s, length):
+    """Dimension an opening from the NEARER end of its (new) wall -- the
+    convention `importer`/`bridge` already emit."""
+    near1 = s <= length / 2
+    opening.anchor = {"from": "v1" if near1 else "v2",
+                      "offset_in": round(s if near1 else length - s, 4)}
+    return opening
+
+
+def apply_split_plan(design, split):
+    """The `Design` applier for a split delta. The first segment keeps the
+    wall's id (and so its identity in the document); the second is minted."""
+    d = copy.deepcopy(design)
+    if split is None:
+        return d
+    w = next((ww for ww in d.walls if ww.id == split.wall), None)
+    if w is None:
+        return d
+    src_ops = w.openings if isinstance(w.openings, list) else []
+    keep = [(src_ops[po.index], po.s) for po in split.keep_openings
+            if po.index < len(src_ops)]
+    move = [(src_ops[po.index], po.s) for po in split.move_openings
+            if po.index < len(src_ops)]
+    pos = _positions(d)
+    a, b = pos[w.v1], pos[w.v2]
+    vid = _adopt_vertex(d, split.v, split.at, w.level)
+    v2_old = w.v2
+    w.v2 = vid                                 # first half keeps w.id
+    first_len = math.dist(a, split.at)
+    second_len = math.dist(split.at, b)
+    w.openings = [_reanchor(o, s, first_len) for o, s in keep]
+    d.walls.append(Wall.from_dict({
+        "id": _next_id(d, "w"), "level": w.level, "v1": vid, "v2": v2_old,
+        "type": w.type, "left": w.left, "right": w.right,
+        "openings": []}))
+    d.walls[-1].openings = [_reanchor(o, s, second_len) for o, s in move]
     return d
 
 

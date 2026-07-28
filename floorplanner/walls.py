@@ -14,7 +14,8 @@ from PyQt6.QtWidgets import *  # noqa: F401
 
 from floorplanner.config import *  # noqa: F401
 from floorplanner.design.topology import (
-    GraphView, OpeningView, WallView, plan_merge_collinear,
+    ON_SEG_TOL, GraphView, OpeningView, WallView, plan_merge_collinear,
+    plan_split_edge,
 )
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.vertex import Vertex
@@ -453,6 +454,69 @@ def merge_collinear_scene(scene, floor=None, perp_tol=None, max_passes=6):
         apply_merge_plan_to_scene(scene, plan)
         absorbed += sum(len(m.absorbed) for m in plan)
     return absorbed
+
+
+def apply_split_plan_to_scene(scene, split, rebuild=True):
+    """Execute a split delta on the live items. The source wall keeps its
+    identity and becomes the FIRST segment; a new `WallItem` takes the second.
+
+    Vertex-native throughout: the split corner and the far corner are both
+    handed over with `set_end_vertex`, so a split costs ZERO split-on-writes and
+    whatever sharing the far end already had survives it."""
+    src = split.wall
+    if sip.isdeleted(src) or src.scene() is not scene:
+        return None
+    at = QPointF(split.at[0], split.at[1])
+    vsplit = split.v if split.v is not None else Vertex.at(at)
+    far = src.end_vertex("p2")
+    moved = [(src.openings[po.index], po.s) for po in split.move_openings
+             if po.index < len(src.openings)]
+    kept = [src.openings[po.index] for po in split.keep_openings
+            if po.index < len(src.openings)]
+
+    seg = WallItem(at, QPointF(far.point()), src.wall_type)
+    seg.floor = src.floor
+    seg.set_end_vertex("p1", vsplit)
+    seg.set_end_vertex("p2", far)
+    scene.addItem(seg)
+    src.set_end_vertex("p2", vsplit)
+
+    for op, s in moved:
+        try:
+            new = OpeningItem(seg, op.kind, op.code, s)
+        except ValueError:                     # wider than the second segment
+            continue
+        new.door_type, new.swing = op.door_type, op.swing
+        seg.openings.append(new)
+        op.setParentItem(None)
+        if op.scene() is not None:
+            scene.removeItem(op)
+    src.openings = kept
+    for r in list(src.rooms):                  # both halves run the same edges
+        r.bind_wall(seg)
+    if rebuild:
+        src.rebuild()
+        seg.rebuild()
+    return seg
+
+
+def split_wall_at(scene, wall, p, on_seg_tol=ON_SEG_TOL):
+    """Split `wall` at the scene point `p` -- THE SPLIT RULE'S SECOND HALF:
+    a vertex landing on another wall's body splits that wall. Returns the new
+    segment, or None when there is nothing to split.
+
+    A split whose point falls inside an opening is DECLINED here rather than
+    raised on, which is the one place this and `topology.split_edge` differ.
+    Same planner, same delta, same `straddled` flag -- but the caller is a mouse
+    gesture, and refusing to cut a doorway in half is right for a gesture where
+    failing loud is right for a document repair."""
+    if scene is None or wall is None:
+        return None
+    split = plan_split_edge(graph_from_scene(scene, wall.floor), wall,
+                            p.x(), p.y(), on_seg_tol=on_seg_tol)
+    if split is None or split.straddled:
+        return None
+    return apply_split_plan_to_scene(scene, split)
 
 
 def weld_all(scene, max_passes=6):
@@ -1032,6 +1096,7 @@ class WallItem(QGraphicsItem):
                             if (0.0 < s < length
                                     and abs(vy * ux - vx * uy) <= 0.75):
                                 self._attached.append((w, attr, QPointF(q), "tee"))
+            run_ends = self._split_body_landings(run_ends)
             self._plan_vertex_moves(run_ends)
 
         if self._mode in ("p1", "p2"):
@@ -1157,6 +1222,50 @@ class WallItem(QGraphicsItem):
             return False
         wu, u = w.unit(), self._slide_u
         return abs(wu.x() * u.y() - wu.y() * u.x()) <= 0.02
+
+    def _run_wall_under(self, p: QPointF, tol=0.75):
+        """The run wall whose BODY (not its ends) the point `p` lands on."""
+        for w in self._run:
+            if w.is_open or w.length() < MIN_WALL_LEN:
+                continue
+            u = w.unit()
+            vx, vy = p.x() - w.p1.x(), p.y() - w.p1.y()
+            s = vx * u.x() + vy * u.y()
+            if (SHARE_TOL < s < w.length() - SHARE_TOL
+                    and abs(vy * u.x() - vx * u.y()) <= tol):
+                return w
+        return None
+
+    def _split_body_landings(self, run_ends):
+        """THE SPLIT RULE'S SECOND HALF (P3.4 (ii)). A neighbour's end resting
+        on the run's BODY has, until now, had no vertex to be: P3.3 could only
+        stretch it sideways from coordinates, which is a split-on-write per
+        mouse event. Cutting the run wall at the landing point MAKES the vertex,
+        and the landing is then promoted exactly as a corner is -- a T-junction
+        stops being a coincidence the drag has to remember and becomes topology.
+
+        Declines quietly wherever it cannot cut: a landing inside a doorway
+        (P3.6's case, which `split_wall_at` refuses), or a wall too short to
+        halve. Those stay `tee` on P3.3's coordinate path, so the worst case is
+        the previous behaviour rather than a broken drag.
+
+        Returns the run_ends, extended with each new segment's two ends."""
+        if not any(kind == "tee" for *_rest, kind in self._attached):
+            return run_ends
+        sc = self.scene()
+        for i, (w, attr, orig, kind) in enumerate(self._attached):
+            if kind != "tee":
+                continue
+            host = self._run_wall_under(orig)
+            if host is None:
+                continue
+            seg = split_wall_at(sc, host, orig, on_seg_tol=0.75)
+            if seg is None:
+                continue
+            self._run.append(seg)
+            run_ends = run_ends + [(seg, "p1"), (seg, "p2")]
+            self._attached[i] = (w, attr, orig, "corner")
+        return run_ends
 
     def _plan_vertex_moves(self, run_ends):
         """Turn the 0.6" coincidence discovery into REAL VERTEX SHARING, once,

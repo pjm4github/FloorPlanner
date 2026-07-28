@@ -16,7 +16,7 @@ from floorplanner.design.bridge import design_from_scene
 from floorplanner.design.model import Design
 from floorplanner.walls import (
     _coalesce_all_impl, apply_merge_plan_to_scene, graph_from_scene,
-    merge_collinear_scene, plan_merge_collinear,
+    merge_collinear_scene, plan_merge_collinear, split_wall_at,
 )
 
 pytestmark = pytest.mark.walls
@@ -289,6 +289,77 @@ def test_floors_are_planned_apart(fp, scene):
     assert merge_collinear_scene(scene) == 0
     assert len(_walls(scene, fp)) == 2
     assert a.floor != b.floor
+
+
+# --------------------------------------------------------------------------
+# split_edge scene-side -- the other half of the op pair
+# --------------------------------------------------------------------------
+def test_scene_split_cuts_the_wall_and_shares_the_new_corner(fp, scene):
+    a = _add(scene, fp, 0, 0, 240, 0)
+    seg = split_wall_at(scene, a, QPointF(120, 0))
+    assert seg is not None
+    assert (a.p1.x(), a.p2.x()) == (0.0, 120.0)
+    assert (seg.p1.x(), seg.p2.x()) == (120.0, 240.0)
+    assert a.end_vertex("p2") is seg.end_vertex("p1"), (
+        "the split corner must be ONE vertex, not two at the same place")
+
+
+def test_scene_split_costs_no_split_on_writes(fp, scene):
+    # vertex-native: both new ends are handed over with set_end_vertex, so the
+    # op never assigns a coordinate and never mints an anonymous corner
+    a = _add(scene, fp, 0, 0, 240, 0)
+    before = vertex.split_count()
+    split_wall_at(scene, a, QPointF(120, 0))
+    assert vertex.split_count() == before
+
+
+def test_scene_split_keeps_the_far_ends_existing_sharing(fp, scene):
+    a = _add(scene, fp, 0, 0, 240, 0)
+    b = _add(scene, fp, 240, 0, 240, 120)
+    b.set_end_vertex("p1", a.end_vertex("p2"))    # weld the far corner by hand
+    seg = split_wall_at(scene, a, QPointF(120, 0))
+    assert seg.end_vertex("p2") is b.end_vertex("p1"), "the far corner broke"
+
+
+def test_scene_split_moves_openings_onto_the_segment_that_holds_them(fp, scene):
+    a = _add(scene, fp, 0, 0, 240, 0)
+    _door(fp, a, 40.0)                            # first segment
+    _door(fp, a, 200.0)                           # second segment
+    seg = split_wall_at(scene, a, QPointF(120, 0))
+    assert [round(op.s) for op in a.openings] == [40]
+    assert [round(op.s) for op in seg.openings] == [80]      # 200 - 120
+    assert round(seg.point_at(seg.openings[0].s).x()) == 200  # same place
+
+
+def test_scene_split_declines_to_cut_through_a_doorway(fp, scene):
+    # P3.6's case. The planner flags it (`straddled`); topology.split_edge
+    # RAISES on the flag, a live gesture DECLINES on it -- same delta, two
+    # policies, because one caller is a repair and the other is a mouse.
+    a = _add(scene, fp, 0, 0, 240, 0)
+    _door(fp, a, 120.0)                           # 32" wide: spans 104..136
+    assert split_wall_at(scene, a, QPointF(120, 0)) is None
+    assert len(_walls(scene, fp)) == 1
+
+
+def test_scene_split_declines_at_an_endpoint(fp, scene):
+    a = _add(scene, fp, 0, 0, 240, 0)
+    assert split_wall_at(scene, a, QPointF(0, 0)) is None
+    assert split_wall_at(scene, a, QPointF(240, 0)) is None
+    assert len(_walls(scene, fp)) == 1
+
+
+def test_split_then_merge_returns_the_wall_it_started_with(fp, scene):
+    # the two ops are inverses, and running them back to back on a scene is the
+    # cheapest possible statement of that
+    a = _add(scene, fp, 0, 0, 240, 0)
+    _door(fp, a, 40.0)
+    split_wall_at(scene, a, QPointF(120, 0))
+    assert len(_walls(scene, fp)) == 2
+    merge_collinear_scene(scene)
+    walls = _walls(scene, fp)
+    assert len(walls) == 1
+    assert (walls[0].p1.x(), walls[0].p2.x()) == (0.0, 240.0)
+    assert [round(op.s) for op in walls[0].openings] == [40]
 
 
 def test_the_scene_applier_leaves_the_design_applier_nothing_to_do(fp, scene):

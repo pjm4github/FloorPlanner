@@ -260,6 +260,111 @@ def test_an_already_shared_continuation_is_split_at_drag_start(fp, scene):
     assert b.p1.y() == pytest.approx(0), "the continuation followed anyway"
 
 
+# ----------------------------------- the split rule: the second half (P3.4 ii)
+def _body_tee_scene(fp, scene):
+    """A long wall with a perpendicular wall landing on its BODY, not its end.
+
+        A -------------+-------------
+                       |
+                       C
+
+    P3.3 could only stretch C sideways from coordinates -- a body-landing had
+    no vertex to be. P3.4 (ii) cuts A at the landing, which MAKES one."""
+    a = _wall(fp, scene, 0, 0, 240, 0)
+    c = _wall(fp, scene, 120, 0, 120, 120)
+    fp.rebuild_all_walls(scene)
+    return a, c
+
+
+def _wall_count(fp, scene):
+    return sum(1 for w in scene.items()
+               if isinstance(w, fp.WallItem) and not w.is_open)
+
+
+def test_a_body_landing_splits_the_wall_it_lands_on(fp, scene):
+    a, c = _body_tee_scene(fp, scene)
+    a._mode = None
+    a.mousePressEvent(_Ev((60, 0)))
+
+    assert _wall_count(fp, scene) == 3, "the host wall was not split"
+    assert (a.p1.x(), a.p2.x()) == (0.0, 120.0)
+    assert a.end_vertex("p2") is c.end_vertex("p1"), (
+        "the landing did not become a shared corner")
+    assert all(kind != "tee" for *_r, kind in a._attached), (
+        "the attachment should have been reclassified as a corner")
+
+
+def test_the_split_landing_follows_the_drag_as_a_corner(fp, scene):
+    a, c = _body_tee_scene(fp, scene)
+    _body_drag(a, 0, 12)
+
+    assert a.p2.y() == pytest.approx(12)
+    assert c.p1.y() == pytest.approx(12), "the landing did not carry"
+    assert c.p2.y() == pytest.approx(120), "the far end must not move"
+    assert a.end_vertex("p2") is c.end_vertex("p1"), "sharing broke mid-drag"
+
+
+def test_the_whole_original_span_still_slides_as_one(fp, scene):
+    """Splitting the dragged wall must not leave half of it behind: the new
+    segment joins the run, so the user still slides the wall they grabbed."""
+    a, _c = _body_tee_scene(fp, scene)
+    _body_drag(a, 0, 12)
+    ys = sorted(round(w.p1.y(), 3) for w in scene.items()
+                if isinstance(w, fp.WallItem) and abs(w.p1.y() - w.p2.y()) < 1)
+    assert ys == [12.0, 12.0], f"the span came apart: {ys}"
+
+
+def test_a_body_landing_costs_no_split_on_writes(fp, scene):
+    """The telemetry point 5 predicted. The tee branch moved its end by
+    coordinate on EVERY mouse event; now the corner is real and the branch is
+    silent."""
+    a, _c = _body_tee_scene(fp, scene)
+    before = split_count()
+    for _k in range(12):
+        a._mode = None
+        a.mousePressEvent(_Ev((60, a.p1.y())))
+        a.mouseMoveEvent(_Ev((60, a.p1.y() + 6)))
+        a.mouseReleaseEvent(_Ev((60, a.p1.y() + 6)))
+    assert split_count() == before
+
+
+def test_a_landing_inside_a_doorway_is_declined_not_forced(fp, scene):
+    """The one place the scene op and the pure op differ, and only in policy:
+    `topology.split_edge` raises naming P3.6, a drag declines. Neither invents
+    an answer to "which segment owns a door the cut runs through"."""
+    a = _wall(fp, scene, 0, 0, 240, 0)
+    op = fp.OpeningItem(a, "door", "3280", 120.0)     # spans 104..136
+    a.openings.append(op)
+    _wall(fp, scene, 120, 0, 120, 120)
+    fp.rebuild_all_walls(scene)
+    a._mode = None
+    a.mousePressEvent(_Ev((60, 0)))
+
+    assert _wall_count(fp, scene) == 2, "the doorway was cut in half"
+    assert any(kind == "tee" for *_r, kind in a._attached), (
+        "the declined landing must stay on P3.3's coordinate path")
+
+
+def test_a_press_that_splits_leaves_the_document_unchanged(fp, win):
+    """The corpus guard's missing half. P3.3's press-every-wall test still
+    passes -- but it passes VACUOUSLY now, because neither corpus plan has an
+    unwelded body-landing, so nothing splits (measured: 0 splits on both).
+    This is the case that does split, and the document must not notice: the
+    scene walk already cuts walls at junctions (`split_params`), so the split
+    only makes the scene agree with what the document always said."""
+    from floorplanner.design.bridge import design_from_scene
+    a, _c = _body_tee_scene(fp, win.scene)
+    before = design_from_scene(win).to_dict()
+
+    a._mode = None
+    a.mousePressEvent(_Ev((60, 0)))
+    a._mode = None                                    # released without a drag
+    fp.rebuild_all_walls(win.scene)
+
+    assert _wall_count(fp, win.scene) == 3, "the press did not split"
+    assert design_from_scene(win).to_dict() == before
+
+
 # --------------------------------------------------------- same level only
 def test_a_drag_never_shares_across_floors(fp, scene):
     """Defect 12a. The `_attached` scan was one of defect 12's unfiltered
