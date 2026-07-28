@@ -889,6 +889,7 @@ class WallItem(QGraphicsItem):
     def p1(self, value):
         v = getattr(self, "_v1", None)
         self._v1 = v.moved_to(value) if v is not None else Vertex.at(value)
+        self._carry_anchors(v, self._v1)
 
     @property
     def p2(self) -> QPointF:
@@ -898,6 +899,43 @@ class WallItem(QGraphicsItem):
     def p2(self, value):
         v = getattr(self, "_v2", None)
         self._v2 = v.moved_to(value) if v is not None else Vertex.at(value)
+        self._carry_anchors(v, self._v2)
+
+    def _carry_anchors(self, old, new):
+        """Keep every opening dimensioned off `old` dimensioned off `new`.
+
+        THE END DID NOT CHANGE -- its coordinate did. Assigning `p1`/`p2` is
+        split-on-write, so the same corner comes away on a fresh `Vertex` with a
+        fresh uid, and an anchor still naming the old object is orphaned. An
+        orphaned anchor re-seats on `p1`, which for an opening dimensioned off
+        `p2` MIRRORS it down the wall. Measured on `planc1` before this existed:
+        12 of 41 openings changed position on load.
+
+        Deliberately NOT what `set_end_vertex` does for a vertex somewhere else
+        -- that is a swap or an explicit share, where the anchor must go on
+        naming the corner it names. See `_fuse_anchors`."""
+        if old is None or old is new:
+            return
+        for op in getattr(self, "openings", ()):
+            if op.anchor_v is old:
+                op.anchor_v = new
+
+    def _fuse_anchors(self, old, new):
+        """The WELD case: two ends at one corner fuse onto a single `Vertex`.
+        Same physical corner, so an anchor on the absorbed vertex follows it --
+        but only when the replacement really is in the same place. A
+        `set_end_vertex` to a vertex ELSEWHERE is a swap or a deliberate share,
+        and there the anchor must stay put or reversing a wall would move its
+        openings (R1(b)). A RELOCATION lands here too and is left alone on
+        purpose: it carries its uid, so `_anchor_attr` re-seats it for free."""
+        if old is None or old is new:
+            return
+        a, b = old.point(), new.point()
+        if abs(a.x() - b.x()) > SHARE_TOL or abs(a.y() - b.y()) > SHARE_TOL:
+            return
+        for op in getattr(self, "openings", ()):
+            if op.anchor_v is old:
+                op.anchor_v = new
 
     def end_vertex(self, attr: str) -> Vertex:
         """The Vertex object behind `p1` or `p2` -- the corner's IDENTITY, not
@@ -912,10 +950,12 @@ class WallItem(QGraphicsItem):
         and therefore cannot express sharing at all. P3.3's wall move is the
         first caller: it shares the corners it is about to move, then moves the
         vertex once for every end on it."""
+        old = self._v1 if attr == "p1" else self._v2
         if attr == "p1":
             self._v1 = vertex
         else:
             self._v2 = vertex
+        self._fuse_anchors(old, vertex)
 
     @property
     def primary_room(self):
@@ -1000,8 +1040,13 @@ class WallItem(QGraphicsItem):
         solid_local = QPainterPath(body)   # footprint before openings are cut
         holes = QPainterPath()
         for op in self.openings:
+            # NO CLAMP (P3.6). This used to read
+            #     op.s = min(max(op.s, half), max(half, length - half))
+            # which silently SLID a door back onto a wall that had shrunk under
+            # it -- repairing stored data on the render path, where nobody could
+            # see it happen. An opening that no longer fits is a fact about the
+            # plan (`op.fits()`), reported, not corrected in passing.
             half = op.width / 2
-            op.s = min(max(op.s, half), max(half, length - half))
             holes.addRect(QRectF(op.s - half, -t / 2 - 0.5, op.width, t + 1.0))
         # open the body where a coincident wall carries a door/window, so a
         # plain party wall doesn't cover the opening on the wall next to it
@@ -1608,7 +1653,26 @@ class OpenWall(WallItem):
 
 class OpeningItem(QGraphicsItem):
     """A door or window.  Child of its wall; local x runs along the wall,
-    local y across the thickness.  `s` = distance of centre from wall.p1."""
+    local y across the thickness.
+
+    **ANCHORED TO A NAMED END (P3.6), not measured from `p1`.** The opening
+    holds the `Vertex` it is dimensioned off and `offset_in`, the distance from
+    that corner to its NEAR EDGE -- which is how a drawing dimensions a door,
+    and what the v5 schema stores. `s` (the centre's distance from `p1`) stays
+    as a read-through property so every existing caller keeps working: the
+    compat-shim discipline P3.1 used for `p1`/`p2` and P3.2 for `corners`.
+
+    The anchor is a VERTEX and not the string "v1"/"v2", which is what makes
+    the schema's three claims true rather than approximately true:
+      * STRETCHED at the far end -- the offset is from the corner that did not
+        move, so nothing slides;
+      * REVERSED -- swapping which end is `p1` renames the ends and moves no
+        geometry, and an opening anchored to a corner does not care what that
+        corner is currently called;
+      * SPLIT -- the opening goes with the segment its anchor corner is on,
+        which is R2's rule stated literally rather than reconstructed from
+        coordinates.
+    Absolute `s` survives none of the three, which is the whole of defect 7."""
 
     def __init__(self, wall: WallItem, kind: str, code: str, s: float):
         super().__init__(wall)
@@ -1618,11 +1682,75 @@ class OpeningItem(QGraphicsItem):
         self.width, self.height = 32.0, 80.0
         self.door_type = "LH"
         self.swing = -1                   # -1 / +1 : which face it swings to
-        self.s = s
+        self.anchor_v = None              # the Vertex this is dimensioned off
+        self.offset_in = 0.0              # ...to the opening's NEAR EDGE
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setZValue(OPENING_Z)
-        self.set_code(code, rebuild=False)
+        self.set_code(code, rebuild=False)      # sets width, which s needs
+        # NEARER END, ties toward v1 (R4) -- the same rule `bridge._walls_of`
+        # already emits with, so the scene and the document agree on which end
+        # a given opening is dimensioned off and canonical form round-trips.
+        length = wall.length()
+        self.anchor_v = wall.end_vertex("p1" if s <= length / 2.0 else "p2")
+        self.s = s
         self.sync()
+
+    # -- the anchor -----------------------------------------------------------
+    def _anchor_attr(self) -> str:
+        """"p1" / "p2" -- which end this opening is dimensioned off, resolved by
+        IDENTITY and SELF-HEALING.
+
+        Object identity first, because it holds in the common case and costs
+        nothing. When it fails the corner has been RELOCATED (P3.3 mints a new
+        `Vertex` carrying the same uid), so the uid still matches and the anchor
+        is re-pointed at the new object -- once per move, not once per read.
+        That matters: `s` is read on every rebuild and every paint, and forcing
+        a uid mint per read is exactly the allocation P3.1 had to remove."""
+        w = self.wall
+        v1, v2 = w.end_vertex("p1"), w.end_vertex("p2")
+        if self.anchor_v is v1:
+            return "p1"
+        if self.anchor_v is v2:
+            return "p2"
+        if self.anchor_v is not None:
+            uid = self.anchor_v._uid          # no mint: None means never named
+            if uid is not None:
+                if v1._uid == uid:
+                    self.anchor_v = v1
+                    return "p1"
+                if v2._uid == uid:
+                    self.anchor_v = v2
+                    return "p2"
+        self.anchor_v = v1                    # orphaned -> re-seat on v1
+        return "p1"
+
+    def anchor_from(self, wall=None) -> str:
+        """"v1" / "v2" -- the anchor as the DOCUMENT names it."""
+        return "v1" if self._anchor_attr() == "p1" else "v2"
+
+    @property
+    def s(self) -> float:
+        """Distance of the opening's CENTRE from `wall.p1` -- derived from the
+        anchor, so it moves when the anchored corner does and not otherwise."""
+        if self._anchor_attr() == "p2":
+            return self.wall.length() - self.offset_in - self.width / 2.0
+        return self.offset_in + self.width / 2.0
+
+    @s.setter
+    def s(self, value: float):
+        """Place the centre at `value` from `p1`, re-expressed against the end
+        this opening is dimensioned off. The drag writes through here."""
+        if self._anchor_attr() == "p2":
+            self.offset_in = (self.wall.length() - float(value)
+                              - self.width / 2.0)
+        else:
+            self.offset_in = float(value) - self.width / 2.0
+
+    def fits(self) -> bool:
+        """False when the opening no longer lies within its wall -- the
+        condition `rebuild`'s clamp used to hide by sliding the door (P3.6)."""
+        half = self.width / 2.0
+        return -1e-6 <= self.s - half and self.s + half <= self.wall.length() + 1e-6
 
     # -- data -----------------------------------------------------------------
     def set_code(self, code: str, rebuild: bool = True):
@@ -1815,7 +1943,13 @@ class OpeningItem(QGraphicsItem):
         if self.wall is not None and self.wall.group() is not None:
             e.ignore()
             return
-        # slide along the wall, snapping to the nearest inch
+        # slide along the wall, snapping to the nearest inch.
+        # THIS CLAMP LIVES, DELIBERATELY (P3.6 / R3), and it is not the one that
+        # died in `rebuild`. That one silently repaired STORED DATA on the
+        # render path; this one BOUNDS A GESTURE -- it stops the user dragging a
+        # door off the end of its wall, which is the drag's job. Same
+        # distinction that keeps `wall_endpoint_open` and `_WallBBoxIndex`:
+        # rightly spatial, permanently. Do not remove it as a leftover of P3.6.
         s = round(self.wall.s_of(e.scenePos()))
         half = self.width / 2
         self.s = min(max(s, half), max(half, self.wall.length() - half))
