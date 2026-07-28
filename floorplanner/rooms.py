@@ -404,11 +404,13 @@ class OutlineEdge:
     corner that no wall references. Both encode a claim of authority that is
     false. A coordinate states exactly what is known.
 
-    The gap closes at **P3.4**, where topology ops replace detection and
-    outlines are rebuilt from the document's traced faces -- walls and outlines
-    receiving the same vertices at the same moment. `tests/test_outline.py`
-    pins the gap where it is (equal coordinates, distinct objects) so P3.4 has
-    to close it consciously rather than inherit a silent disagreement.
+    The gap closes at **P3.5** (retargeted from P3.4, which replaced the
+    coalesce/weld/fracture ops but never touched outlines), where detection is
+    deleted and outlines are rebuilt from the document's traced faces -- walls
+    and outlines receiving the same vertices at the same moment.
+    `tests/test_outline.py` pins the gap where it is (equal coordinates,
+    distinct objects) so that task has to close it consciously rather than
+    inherit a silent disagreement.
 
     The `wall` reference is the real content of this task: before it, a room had
     corners and an unordered `walls` list with no edge->wall mapping at all."""

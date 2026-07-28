@@ -5,7 +5,12 @@ Two things are pinned here, and the second is the more important:
   * the outline exists, `corners` derives from it, and every edge knows which
     wall covers it (`None` = an OPEN edge, the v5 `wall: null`);
   * the outline holds COORDINATES, not vertex identity -- and that gap is
-    asserted where it is, so P3.4 has to close it consciously.
+    asserted where it is, so the task that closes it has to do so consciously.
+
+RETARGETED P3.4 -> P3.5 (doc only, committed before any P3.5 code). P3.4
+replaced the coalesce/weld/fracture ops but never touched outlines, so the two
+guards below stayed green straight through it. The task that rebuilds outlines
+from traced faces -- and therefore the task they are addressed to -- is P3.5.
 """
 import json
 from pathlib import Path
@@ -61,7 +66,7 @@ def test_wall_refs_survive_a_translation_but_not_a_reshape(fp, scene,
 
 # ------------------------------------------- THE GAP: coordinates, not identity
 def test_outline_holds_coordinates_not_vertex_identity(fp, scene, make_room):
-    """P3.2's interim representation, asserted so P3.4 must close it knowingly.
+    """P3.2's interim representation, asserted so P3.5 must close it knowingly.
 
     In the target model a corner IS the vertex two walls share. P3.1's
     split-on-write world has no such vertex: at every corner each wall owns a
@@ -70,7 +75,7 @@ def test_outline_holds_coordinates_not_vertex_identity(fp, scene, make_room):
     vertex would pick arbitrarily between two; minting a room-owned one would
     add a third. Both would encode an authority that does not exist yet.
 
-    P3.4 rebuilds outlines from the document's traced faces, giving walls and
+    P3.5 rebuilds outlines from the document's traced faces, giving walls and
     outlines the same vertices at the same moment. When it does, this test
     should be REPLACED by one asserting identity -- its failure is the signal
     that the gap closed, not that something broke."""
@@ -84,13 +89,21 @@ def test_outline_holds_coordinates_not_vertex_identity(fp, scene, make_room):
                    and abs(p.y() - edge.p.y()) < 1e-9]
     assert same_coords, "the outline corner is not at either wall end"
     assert all(p is not edge.p for p in ends), \
-        "outline and wall now SHARE a point object -- if P3.4 did this, " \
+        "outline and wall now SHARE a point object -- if P3.5 did this, " \
         "replace this test with an identity assertion"
 
 
 def test_a_corner_is_still_two_distinct_wall_vertices(fp, scene, make_room):
     """Why the outline cannot name a vertex yet: the corner itself is two
-    objects. This is what P3.3/P3.4 unify."""
+    objects. This is what P3.5 unifies.
+
+    TWO WAYS THIS CAN GO RED, and they are different findings. The DESIGNED one
+    is P3.5's outline flip, which gives walls and outlines the same vertices at
+    once. The OTHER is a weld reaching the room-creation path -- P3.4 built
+    `share_coincident_ends`, and `make_room` simply never calls it. So this
+    doubles as a tripwire on that, and P3.5's sub-commits are sequenced
+    (retarget -> flip -> path changes) to keep the two apart: red during the
+    flip is the flip; red at any other point is a finding."""
     room = make_room(scene, 0, 0, 144, 120, "Den")
     corner = room.outline[0].p
     at = [w for w in room.walls
@@ -99,7 +112,8 @@ def test_a_corner_is_still_two_distinct_wall_vertices(fp, scene, make_room):
     assert len(at) == 2, "expected two walls meeting at this corner"
     assert at[0].v1 != at[1].v1 and at[0].v2 != at[1].v2
     uids = {at[0]._v1.uid, at[0]._v2.uid} & {at[1]._v1.uid, at[1]._v2.uid}
-    assert not uids, "the walls already share a vertex -- P3.3/P3.4 landed?"
+    assert not uids, ("the walls already share a vertex -- the P3.5 flip, or "
+                      "a weld reached the room-creation path?")
 
 
 # ------------------------------- perimeter_corners: three consumers, three fates
