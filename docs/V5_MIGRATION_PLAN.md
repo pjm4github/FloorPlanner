@@ -131,7 +131,7 @@ gap rather than papering over it.
 | ☑ | **P3.1** Vertex table live; `WallItem` holds `v1`/`v2` | branch, ruff + pytest |
 | ☑ | **P3.2** `RoomItem.outline`; drop `perimeter_corners` | ruff + pytest |
 | ☑ | **P3.3** Wall move = move vertices + split rule | ruff + pytest |
-| ☐ | **P3.4** Topology ops replace coalesce/weld/fracture | ruff + pytest |
+| ☑ | **P3.4** Topology ops replace coalesce/weld/fracture | ruff + pytest |
 | ☐ | **P3.5** Delete the detection engine | ruff + pytest |
 | ☐ | **P3.6** Opening anchors | ruff + pytest |
 | ☐ | **P3.7** Delete `OpenWall` | ruff + pytest |
@@ -259,7 +259,7 @@ Behaviour that is deliberately worse between the task that broke it and the task
 | Broken at | Behaviour | Workaround today | Restored at |
 |---|---|---|---|
 | **P0.5** (fix 4) | Rubber-band-select a room whose edge is a longer party wall, then group + move it — the region no longer follows. The walls captured by the band move; the room does not. | Drag the room by its **label** instead: `_privatize_shared_walls` handles the party wall correctly on that path. | **P4.2** (`extract` replaces the accidental privatisation with a real operation) |
-| **P2.3** | **After the first undo, a wall that crosses a junction comes back split** — and if it borders NO room, body-dragging it moves only that segment. Measured at P3.3: one 480″ wall with a mid-span T returns as two 240″ walls. **Narrower than first recorded**: `_collinear_run()` (`walls.py:888`) gathers the whole room *side*, so for a wall on a room perimeter — the common case, and the one a user would notice — both halves still move as one. Verified with a room: `_collinear_run()` gathers 2 of 2. The row applies only to room-less walls, where `self.rooms` is empty and the run short-circuits to `[self]`. | Bind the wall to a room, or drag the halves together. Nothing is lost either way: the **document is unchanged**, since `design_from_scene` planarises to the same canonical form. | **P3.4** (`merge_collinear` re-merges the run, so the split stops being observable at all) |
+| **P2.3** | **After the first undo, a wall that crosses a junction comes back split** — and if it borders NO room, body-dragging it moves only that segment. Measured at P3.3: one 480″ wall with a mid-span T returns as two 240″ walls. **Narrower than first recorded**: `_collinear_run()` (`walls.py:888`) gathers the whole room *side*, so for a wall on a room perimeter — the common case, and the one a user would notice — both halves still move as one. Verified with a room: `_collinear_run()` gathers 2 of 2. The row applies only to room-less walls, where `self.rooms` is empty and the run short-circuits to `[self]`. | Bind the wall to a room, or drag the halves together. Nothing is lost either way: the **document is unchanged**, since `design_from_scene` planarises to the same canonical form. | ~~P3.4~~ → **retargeted at P3.4 (iv), and the predicted fix was wrong on its own terms.** Re-checked by hand: the 480″ wall still returns as two 240″ segments, `merge_all` does **not** re-merge them, and the body-drag still moves one segment. It must not — the mid-span T is a **degree-3 vertex**, load-bearing for the planar subdivision, and merging through it would destroy planarity. `merge_collinear` refuses for exactly the right reason, so this row was never merge's to close. The fix belongs in the **drag's run-gathering**: `_collinear_run()` (`walls.py`) short-circuits to `[self]` when the wall borders no room, which is precisely the case the row describes. Gathering the run over **vertex adjacency** instead would carry both segments. Unassigned rather than invented — it is one small change, and the honest place is whichever task next touches the drag (**P4.2** extract/join is the nearest) |
 
 ### P0.6 — Cheap render wins
 **Touches.** `items.py`, `rooms.py`, `mainwindow.py`, `view.py`.
@@ -1836,10 +1836,18 @@ DEMO PORT: `w24` no longer exists as that wall. The demo named it, but ids are
          the chosen wall really has no collinear continuation -- the demo's own
          precondition -- so the first cannot pass by luck.
 
-P3.4  IN PROGRESS  (branch v5-topology) -- sub-commit (i) of four landed.
-         Logged mid-task per the handoff-spec rule: a successor session reads
-         the state from here plus the seven settled points at lines 375-408,
-         not from a chat summary.
+P3.4  done   (branch v5-topology; four sub-commits + two riders)
+ruff:    clean
+pytest:  OFF  491 passed, 4 xfailed, 1 xpassed in 19.2s
+         ON   491 passed, 4 xfailed, 1 xpassed in 24.6s
+         DEEP 486 passed, 3 xfailed, 7 deselected in 22.2s
+         (baseline in: P3.3's 447/4/1. +44 tests, one deleted -- see (iv).)
+commits: ea54413 (i) · 340816c (ii) · a4a3336 457105e e49c07f (iii, three
+         families) · 670fded (rider: the two divergence rulings) · 89f3d8b (iv)
+         · cf7f850 (defect 20) · plus the per-sub-commit doc entries below.
+         Logged sub-commit by sub-commit per the handoff-spec rule, so a
+         successor session reads the state from here plus the seven settled
+         points at lines 375-408 rather than from a chat summary.
 (i) done   commit ea54413 -- planner/applier factoring + the scene applier for
          merge_collinear.
 ruff:    clean
@@ -2048,8 +2056,119 @@ TWO CENSUS DIVERGENCES, reported rather than forced (Touches lists are hints):
          are a spatial index, not detection machinery, and the planner needed
          the identical bucketing badly enough that `_candidate_groups` is a
          copy of them. The honest end-state is one index, not zero.
-NOT DONE: (iv) deletion of the dead ~375 and the junction swap.
-(iv) EXIT CHECKS, fixed now so they are checks and not a summary:
+RIDER (commit 670fded) -- the two (iii) divergences, ruled:
+         * `wall_endpoint_open` REFRAMED PERMANENTLY, in its own docstring, so
+           no future task "migrates" it out of a misplaced sense of
+           completeness. It is not a survivor of the old world; it is a correct
+           citizen of the new one. Its tolerance is JOIN_TOL, the GESTURE
+           tolerance, and gesture questions are inherently spatial. Degree
+           answers the MODELLING question ("are these ends one corner?"); this
+           answers the AIMING question ("is there something near enough to snap
+           to?"). Degree cannot serve here even in principle -- the ends worth
+           offering the user are precisely the ones NOT yet welded, so a degree
+           query calls every one of them free and the snap has nothing to aim
+           at. The docstring names `_joined_at` as the one that DID migrate.
+         * THE BUCKETING DUPLICATION UNIFIED, not pinned. `topology.line_bucket`
+           + `bucket_reach` are the one definition; `_candidate_groups` and
+           `_WallIndex` both call them and `_WallIndex.OFF` is gone.
+           Unification beat a second drift gate because the policy is pure
+           coordinates, so it belongs on the Qt-free side with the scene
+           importing it -- the dependency flows the right way, which is not
+           true of most things one might want to share across that fence.
+
+(iv) done   commit 89f3d8b -- the deletion, the junction contract, the checks.
+DELETED, 149 lines across 7 functions, all callerless after (iii):
+         `_coalesce_wall_impl` (59), `coalesce_wall` (8), `_wall_count` (5),
+         `_coalesce_all_impl` (26), `coalesce_all` (7), `weld_all` (23),
+         `WallItem.join_endpoints` (21) -- plus `_WallIndex`'s endpoint hash,
+         folded into `_CornerIndex` at (iii): 50 lines -> 40.
+EXIT CHECK 1 -- MEASURED DELETION vs THE ESTIMATE. Estimated 375 across 13
+         functions; MEASURED 149 across 7. The gap is three survivors with
+         named reasons, not shortfall, and 169 lines of the census live on:
+         * `fracture_delete_wall` (55) + `_merge_intervals` (9) -> P4.1. Two
+           live callers, not migrated at (iii), and retiring them IS P4.1's
+           deliverable -- its acceptance is literally "P0.4 test 2 flips to
+           pass". AND THE MEASUREMENT IS THE FINDING: a plain delete now KEEPS
+           the room (1 room, 100.0 sf, 3 built walls + 1 open edge -- exactly
+           test 2b's assertion), because P3.2 gave RoomItem a stored outline.
+           P4.1's blocker is already gone and P4.1 is now a small change;
+           doing it here would be landing another task's deliverable under this
+           one's name.
+         * `_WallBBoxIndex` (34) -> P3.5, as reported at (iii).
+         * `_compute_wall_junctions` (31) STAYS -- next paragraph.
+         * `_WallIndex` (40) shrank rather than died.
+EXIT CHECK 4 -- THE JUNCTION CONTRACT, AND THE SWAP IT REFUSED. Point 3 said
+         "if the junction test needs touching, the replacement is wrong."
+         IT NEEDS TOUCHING, so the replacement is not made. Measured on the
+         structural guard's own scene -- a horizontal and a vertical wall
+         crossing mid-span -- the two share ZERO corners (all four ends degree
+         1) while their `_solid`s genuinely intersect and the bbox pass
+         correctly clips both. Adjacency-only neighbours find nothing, set both
+         clips to None, and fail the guard. An unwelded crossing is a legal
+         scene state (crossing-point insertion is not built), so bbox search is
+         not legacy machinery here -- it is the only thing that answers the
+         question. The contract worked exactly as designed: it was written to
+         catch a wrong replacement, and it caught one.
+         THE PIXEL ASSERTION LANDED ANYWAY, an ADDITION, because it is what
+         makes any future attempt safe. POLARITY MEASURED, NOT ASSUMED, and it
+         is the INVERSE of the spec's wording: the wall body is grey (150) and
+         a seam is a DARK line across the junction (56), so "no LIGHT seam
+         pixel" names the wrong failure. Seam-free asserts the interior stays
+         body-grey; the `< 190` threshold is used where it genuinely belongs --
+         the negative half, clip cleared, where an antialiased 1-px dark line
+         must read under 190 and nowhere near 100. Both halves in one test, so
+         the positive assertion cannot go vacuous. The structural pin is green
+         and UNCHANGED.
+EXIT CHECK 2 -- THE P2.3 KNOWN-REGRESSIONS ROW DOES NOT CLOSE, and the row's
+         predicted fix was wrong on its own terms. Checked by hand: the 480"
+         wall still returns as two 240" segments after the undo restore,
+         `merge_all` does NOT re-merge them, and the body-drag still moves one
+         segment (p1.y 12 and 0). It MUST not -- the mid-span T is a degree-3
+         vertex, load-bearing for the planar subdivision, and merging through
+         it would destroy planarity. So this was never merge's row to close.
+         NOT FLIPPED; retargeted in place with the real fix named: the drag's
+         run-gathering, where `_collinear_run()` short-circuits to `[self]` for
+         a room-less wall. Left unassigned rather than invented, with P4.2 as
+         the nearest task that touches the drag.
+EXIT CHECK 3 -- THE DEFECT-9 PREDICTION, GRADED HALF-RIGHT AND PRECISELY.
+         FIRST HALF CONFIRMED: retiring coalesce removed the stacks -- 16
+         openings on one wall became 1. SECOND HALF FALSIFIED: the two tee
+         landings still decline. But the residual cause is now legitimate
+         rather than debris -- the harness puts a 96" window at the centre of a
+         240" wall and the neighbouring grid line lands at s=120, dead inside
+         it (measured: openings [(120.0, 96.0)], straddled 1). A genuine
+         straddle, correctly declined, P3.6's case. The count coinciding at 2
+         is coincidence; the mechanism the prediction named was real and is
+         gone. Recording the falsified half is the point of having predicted.
+EXIT CHECK 5 -- TELEMETRY RESIDUE, 137 splits on the composite scenario:
+         64 + 64  items.py:703/704 in bake()   -- P4.5's, correct that they stay
+          8       walls.py in _adopt_end()     -- MOVED, not new
+          1       walls.py in mouseMoveEvent() -- the grouped/rigid branch, P4.5
+         The 8 were `_coalesce_wall_impl`'s at (ii); they are the merge
+         applier splitting on write when an absorbed end lands where no corner
+         was -- declared at (i) as correct for that case. Same count, honest
+         new home.
+TESTS REWRITTEN -- the plan's biggest changed-test risk, one line each:
+         * test_coalesce.py (whole file): `_coalesce_*_impl` -> `merge_all` /
+           `merge_wall`. THE ASSERTIONS DID NOT MOVE -- they are the behaviour
+           contract, not the implementation, and every line still says exactly
+           what it said. Only the call changed.
+         * test_walls.py: `join_endpoints` -> `weld_wall_ends`, `weld_all` ->
+           `weld_scene`, `_coalesce_wall_impl` -> `merge_wall`. Assertions
+           unchanged: the geometry snap they pin was lifted verbatim into
+           `_snap_wall_ends`. Plus the pixel test, an addition.
+         * test_characterization.py 5 and test_floors.py: `coalesce_all` ->
+           `merge_all`; the group-exemption and cross-floor assertions
+           unchanged.
+         * test_topology_ops.py: the defect-9 OLD-op comparison DELETED with
+           the op it exercised. Once the defect's implementation is gone there
+           is no old behaviour left to exhibit and the test would be asserting
+           against a museum piece. It did its job at (i) and (ii); a claim
+           about code that no longer exists belongs in this log, and a comment
+           at the site says so.
+         * test_scaling.py, test_design_bridge.py: stale `coalesce_all` wording
+           only, no assertion touched.
+(iv) EXIT CHECKS as fixed before the work (all five answered above):
          1. the measured deletion count against the estimated 375 across 13
             functions, with `_WallIndex`/`_WallBBoxIndex` surviving named;
          2. the P2.3 Known-regressions row re-checked BY HAND (the 480"
