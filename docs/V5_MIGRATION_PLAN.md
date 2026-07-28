@@ -1846,6 +1846,58 @@ DEMO PORT: `w24` no longer exists as that wall. The demo named it, but ids are
          the chosen wall really has no collinear continuation -- the demo's own
          precondition -- so the first cannot pass by luck.
 
+P3.5  IN PROGRESS  (branch v5-topology) -- the flip has landed; the deletion
+         has not. Logged mid-task per the handoff-spec rule: a successor reads
+         the state from here plus the four riders in the P3.5 task text.
+(0) done   commit ac9ad45 -- doc-only, committed BEFORE any code per rider 2.
+         THE RETARGET WAS ITSELF A FINDING: both P3.2 guards' docstrings named
+         P3.4 as the task that would close the coordinates-vs-identity gap.
+         P3.4 replaced the coalesce/weld/fracture ops and never touched
+         outlines, so both stayed green straight through it -- they were
+         addressed to the wrong task. Retargeted in tests/test_outline.py
+         (module + both docstrings + both failure messages) and rooms.py's
+         OutlineEdge note, and the second guard's message now names BOTH ways
+         it can fire so a red says which.
+(1) done   commit 600fdef -- the flip.
+ruff:    clean
+pytest:  OFF  493 passed, 4 xfailed, 1 xpassed in 18.4s
+         ON   493 passed, 4 xfailed, 1 xpassed in 20.3s
+         DEEP 488 passed, 3 xfailed, 7 deselected in 18.5s
+files:   rooms.py (OutlineEdge holds a Vertex, `p` read-through;
+         share_outline_vertices; the bind_room_walls hook), walls.py
+         (_CornerIndex.vertex_at), vertex.py (defect 21),
+         tests/test_outline.py (the two guards replaced + rider 1's test),
+         tests/test_wall_move.py (+1, the defect-21 case)
+THE GUARDS FLIPPED, AND ONLY THE GUARDS -- both P3.2 tests went red at this
+         change and the whole rest of the suite stayed green through it. That
+         is exactly what rider 2's sequencing was for: the red is the flip,
+         not a weld that wandered in. Their two causes turned out to BE one
+         cause: the weld is the flip's first step, because an outline can only
+         NAME a vertex once the corner IS one vertex.
+DEFECT 21 -- FOUND BY RIDER 1's OWN TEST, and it is the best kind of find.
+         `relocated_to` copied `self._uid`, and uids mint LAZILY on first
+         read, so a corner nobody had named carried None across a move and got
+         a FRESH identity the moment anything asked. Invisible while only the
+         document walk read uids -- which is how it survived P3.1, P3.3 and
+         P3.4 -- and a live bug at P4.5, which serializes groups by member id.
+         THE NEAR-MISS IS THE LESSON: P3.3's
+         test_relocation_carries_the_vertex_identity has pinned this exact
+         rule since P3.3 and PASSES FOR A REASON IT DOES NOT STATE -- it reads
+         `v.uid` before relocating, which forces the mint. A test that
+         establishes the precondition it means to test cannot see the bug.
+         Fixed, and pinned by a test that constructs the unnamed case.
+PERF, checked not assumed (the P3.1 lesson): test_bake flagged 8.83 against a
+         threshold of 8 on the first full run. Re-ran three times -- 6.31 /
+         6.89 / 7.17, absolutes 307-310 ms against P3.3's recorded 297-332 --
+         so variance, not the new property read. Same call as P3.3's 7.78.
+NOT DONE: the deletion itself (the ~470 + 34), `enclosing_face` replacing
+         "detect room here" via the lift-to-Design at the six one-shot call
+         sites, the `room_boolean` rewrite (defect 8), defects 13 and 16, the
+         test_rooms.py / test_room_walls.py rewrites, and the headline check --
+         P3.3's Lounge / Front Porch demo (+/-17.5 sf) passing with
+         `refresh_rooms` DELETED, which is rider 1's real proof and can only be
+         run once the deletion lands.
+
 P3.4  done   (branch v5-topology; four sub-commits + two riders)
 ruff:    clean
 pytest:  OFF  491 passed, 4 xfailed, 1 xpassed in 19.2s
