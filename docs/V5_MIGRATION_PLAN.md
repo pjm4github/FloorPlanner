@@ -278,6 +278,7 @@ Behaviour that is deliberately worse between the task that broke it and the task
 | Broken at | Behaviour | Workaround today | Restored at |
 |---|---|---|---|
 | **P0.5** (fix 4) | Rubber-band-select a room whose edge is a longer party wall, then group + move it — the region no longer follows. The walls captured by the band move; the room does not. | Drag the room by its **label** instead: `_privatize_shared_walls` handles the party wall correctly on that path. | **P4.2** (`extract` replaces the accidental privatisation with a real operation) |
+| **pre-dates the branch** (surfaced at P3.5, defect 23) | **A rubber band that clips a room's wall set strands that room.** The band takes only items fully inside it, so a wall poking out is left behind, that room's remaining walls are duplicated into the group, and the group moves those while the room's region stays where it was — it reads as a detached dashed outline at the original position. 3 of 20 rooms on a band covering 92% of `symmetricP1`. | **Band whole rooms** — include every wall of any room you mean to take — **or move the room individually** by dragging its label, which carries its walls and openings correctly. | **P4.5**, where "what a group is" is decided. Listed here rather than as a Phase-3 regression because the branch measurably IMPROVES it (148.3" of drift before P3.5, 46.65" now) — the Phase-3 gate is no-worse, not all-better. |
 | **P3.5** | **An open side of a room is not drawn.** Detach a wall from its room and pull a corner away and the side opens — the room keeps its shape and area, and the document says `wall: null` exactly as before — but the vacated stretch renders as nothing rather than as a dashed line. The producer of the dashed `OpenWall` placeholder was `refresh_rooms` → `reloop_open_room` → `bind_room_walls`, all deleted here; the fact itself moved onto the outline (`RoomItem.open_edges()`), which is where the document had always kept it. | None needed for correctness — nothing is lost but the on-screen cue. The room's area, outline and saved file are unaffected. | **P3.7** (`OpenWall` is deleted and a `wall: null` edge renders dashed from the outline, which is the same cue drawn from the one representation instead of a second one) |
 | **P2.3** | **After the first undo, a wall that crosses a junction comes back split** — and if it borders NO room, body-dragging it moves only that segment. Measured at P3.3: one 480″ wall with a mid-span T returns as two 240″ walls. **Narrower than first recorded**: `_collinear_run()` (`walls.py:888`) gathers the whole room *side*, so for a wall on a room perimeter — the common case, and the one a user would notice — both halves still move as one. Verified with a room: `_collinear_run()` gathers 2 of 2. The row applies only to room-less walls, where `self.rooms` is empty and the run short-circuits to `[self]`. | Bind the wall to a room, or drag the halves together. Nothing is lost either way: the **document is unchanged**, since `design_from_scene` planarises to the same canonical form. | ~~P3.4~~ → **retargeted at P3.4 (iv), and the predicted fix was wrong on its own terms.** Re-checked by hand: the 480″ wall still returns as two 240″ segments, `merge_all` does **not** re-merge them, and the body-drag still moves one segment. It must not — the mid-span T is a **degree-3 vertex**, load-bearing for the planar subdivision, and merging through it would destroy planarity. `merge_collinear` refuses for exactly the right reason, so this row was never merge's to close. The fix belongs in the **drag's run-gathering**: `_collinear_run()` (`walls.py`) short-circuits to `[self]` when the wall borders no room, which is precisely the case the row describes. Gathering the run over **vertex adjacency** instead would carry both segments. Unassigned rather than invented — it is one small change, and the honest place is whichever task next touches the drag (**P4.2** extract/join is the nearest) |
 
@@ -1872,19 +1873,31 @@ pytest:  OFF  497 passed, 5 xfailed in 13.7s
          ON   497 passed, 5 xfailed in 16.0s
          DEEP 492 passed, 3 xfailed, 7 deselected in 15.4s
          (baseline in: P3.4's 491/4/1.)
-THE XFAIL/XPASS DELTA, named because a census delta is how a quiet promotion or
-         a quiet regression slips through. THE MARKED SET IS UNCHANGED: the
-         same five tests carry an xfail marker before and after, and P3.5 added
-         none and retired none. What moved is which side of its threshold
-         `test_scaling::test_ungroup_scales_subquadratically` landed on --
-         `xfail(strict=False)`, ratio threshold 8, and it MEASURED 7.85 / 8.29 /
-         8.54 / 8.82 on successive runs of the same build. So "4 xfailed +
-         1 xpassed" and "5 xfailed" are the same set with that one test
-         flapping. Its ABSOLUTE improved sharply (300.7 ms -> ~106 ms at n=8,
-         from the deleted re-detection), which is why it now sits ON the
-         threshold instead of well above it. P3.8 owns the reading; the flap
-         itself is worth its attention, since a test that alternates every run
-         reports nothing either way.
+THE XFAIL/XPASS DELTA -- ASKED TWICE, ANSWERED FROM DISK. Both ends were run
+         in worktrees and the marker lists diffed, rather than reasoned about:
+
+           c133205 (P3.5 in)   493 passed, 4 xfailed, 1 xpassed
+           f738437 (P3.5 out)  497 passed, 5 xfailed
+
+         THERE IS NO "+1 XFAIL". The marked set is BYTE-IDENTICAL at both ends
+         -- the same five tests, same order, same reason strings:
+           test_characterization::test_delete_wall_actually_removes_the_wall  P4.1
+           test_characterization::test_group_survives_roundtrip               P4.5
+           test_groups::test_extracted_room_region_follows_move               P4.2
+           test_scaling::test_group_scales_subquadratically                   P3.8
+           test_scaling::test_ungroup_scales_subquadratically                 P3.8
+         P3.5 added no marker and retired none.
+
+         THE VANISHED XPASS IS THE LAST OF THEM, `test_ungroup_scales_
+         subquadratically` -- same test, same `xfail(strict=False)` marker,
+         reporting XPASS at c133205 and XFAIL at f738437 because its ratio
+         crossed the threshold of 8. MEASURED 7.85 / 8.29 / 8.54 / 8.82 on
+         successive runs of one build: it straddles. Its ABSOLUTE improved
+         sharply (300.7 ms -> ~106 ms at n=8, from the deleted re-detection),
+         which is exactly why it now sits ON the threshold instead of well
+         above it. P3.8 owns the reading, and the FLAP deserves its attention
+         independently: a test that alternates every run reports nothing either
+         way, whichever side it lands on.
 commits: ac9ad45 (0) . 600fdef (1) . 02eff1e (2) . 733d7d6 (3) . f07dbdb (4)
          Logged sub-commit by sub-commit per the handoff-spec rule, so a
          successor reads the state from here plus the four riders at lines
@@ -2285,6 +2298,63 @@ P3.5-followup, PER-ROOM DIAGNOSIS -- asked for after the fix landed, to explain
          corner legitimately sat mid-wall; "corner matches no wall endpoint"
          only became a defect once one edge meant one wall end to end. The
          cross-boundary comparison is the drift number, which is basis-free.
+
+P3.5-followup, ACCEPTANCE ITEMS -- four, answered in order.
+
+COMMIT NAMING, and the rule was NOT honoured on the first pass. The fix, its
+         telemetry and its tests went in as ONE commit, d0ab89d, not three. The
+         full gate (ruff + OFF/ON/DEEP) was run immediately before it, so the
+         green is real; what is missing is the ROLLBACK POINTS the sub-commit
+         rule exists to create. Recorded rather than rewritten -- history
+         surgery to make a log entry look tidier is the wrong trade. The
+         remainder was split properly: 06c2145 (a) the warning wording,
+         408adf7 (b) the tests, plus this doc commit, each at a full gate.
+
+THE +6, named from a collect-only diff of f738437 against HEAD (502 -> 508
+         collected; nothing removed):
+           test_groups::test_whole_plan_group_move_carries_every_room
+           test_groups::test_a_group_move_leaves_the_outlines_still_holding_
+             their_corners
+           test_groups::test_a_group_rotation_also_keeps_the_corners
+           test_groups::test_a_group_move_never_drags_a_wall_outside_it
+           test_design_bridge::test_the_warning_names_the_cause_and_says_it_once
+           test_design_bridge::test_a_legacy_plan_is_blamed_on_the_file_not_on_
+             an_edit
+         Plus, at (b), a SEVENTH that is an xfail rather than a pass:
+         test_groups::test_a_clipped_band_leaves_every_room_coherent -> P4.5.
+         So the census is now 503 passed / 6 xfailed, and the sixth marker is
+         that one -- named here so the next delta starts from a known set.
+
+STEP 4 WAS HALF-DONE AND IS NOW WHOLE. The whole-plan test asserted only that
+         each room's outline LANDED in the right place, which is why it passed
+         against the pre-fix code. It now asserts all four per-room columns --
+         walls-moved, outline-moved, identity, unwelded_ends -- on a 100%
+         selection with no clipped rooms, and FAILS pre-fix (identity 0 where 4
+         is required, verified in a worktree). The diagnosis's columns and the
+         guard's columns are now the same columns.
+
+STEP 5 WAS DONE AT d0ab89d, and the specific question is answered by
+         measurement on the defect-23 repro POST-FIX: the duplicated walls left
+         behind by a clipped band DO register as unwelded ends under a live
+         gesture, so the rewording belongs to this task exactly as reasoned.
+         Same 10-walk sequence (open, idle, group, bake, four debounced
+         snapshots, a second move, one more snapshot):
+           BEFORE  8 warnings, one per snapshot, every one of them saying
+                   "expected on a plan loaded from a legacy file"
+           AFTER   2 warnings, one per DISTINCT state (1 end, then 8), both
+                   reading "... are NEW ... this is not the legacy-load case"
+         The idle and post-open walks are silent in both, and the legacy case
+         still says legacy (`test_a_legacy_plan_is_blamed_on_the_file_not_on_an_
+         edit`). Reading the message the repro actually printed also caught the
+         copy saying it backwards -- "0 of them since the plan was opened and 1
+         NEW" -- fixed at 06c2145.
+
+ONE UNEXPLAINED OBSERVATION, recorded rather than dismissed: a single `E`
+         appeared in one DEEP run's truncated progress output. Not reproduced in
+         five subsequent full DEEP runs under different random seeds, and an
+         explicit ERROR grep over a full `-ra` run finds nothing. Most likely a
+         cut-off pipe rather than a real error, but it is written down here so
+         that if it recurs at P3.6 it is the second sighting, not the first.
 
 P3.4  done   (branch v5-topology; four sub-commits + two riders)
 ruff:    clean
