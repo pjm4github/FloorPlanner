@@ -174,111 +174,6 @@ def coincident_walls(scene, wall, index=None, perp_tol=1.5):
     return out
 
 
-def _coalesce_wall_impl(scene, wall, index=None, rebuild=True):
-    """Merge `wall` with every parallel, SAME-type wall whose body overlaps its
-    span and lies within the on-centre grid (perpendicular).  The survivor is
-    `wall`, grown to the union span (snapped to grid) and carrying every merged
-    wall's openings; its `rooms` become the union of all merged walls' rooms (a
-    coalesced party wall borders several rooms -- the shared-wall model).
-    Grouped and open walls are never merged.  Returns `wall`.  Pass
-    rebuild=False in a bulk sweep where a single rebuild_all_walls follows."""
-    if (scene is None or wall.scene() is None or wall.is_open
-            or wall.group() is not None or wall.length() < 1e-6):
-        return wall
-    perp = SETTINGS.get("wall_snap_in", WALL_SNAP_DEFAULT)
-    absorbed = [w for w in coincident_walls(scene, wall, index=index,
-                                            perp_tol=perp)
-                if not w.is_open and w.group() is None
-                and w.wall_type == wall.wall_type and w.length() > 1e-6]
-    if not absorbed:
-        return wall
-    origin, u = QPointF(wall.p1), wall.unit()
-    ux, uy = u.x(), u.y()
-
-    def s_of(p):
-        return (p.x() - origin.x()) * ux + (p.y() - origin.y()) * uy
-
-    ss = [0.0, s_of(wall.p2)]
-    moved_ops = []                       # (kind, code, scene_pt, door_type, swing)
-    new_rooms = list(wall.rooms)
-    for w in absorbed:
-        ss += [s_of(w.p1), s_of(w.p2)]
-        for op in w.openings:
-            moved_ops.append((op.kind, op.code, w.point_at(op.s),
-                              op.door_type, op.swing))
-        for r in w.rooms:
-            if r not in new_rooms:
-                new_rooms.append(r)
-        for r in list(w.rooms):          # detach the absorbed wall from its
-            r.unbind_wall(w)             # rooms (leaves survivor to carry them)
-        scene.removeItem(w)
-    smin, smax = min(ss), max(ss)
-    wall.p1 = wall_snap(QPointF(origin.x() + ux * smin, origin.y() + uy * smin))
-    wall.p2 = wall_snap(QPointF(origin.x() + ux * smax, origin.y() + uy * smax))
-    for op in wall.openings:             # own openings ride the new p1
-        op.s -= smin
-    np1, nu = wall.p1, wall.unit()
-    for kind, code, pt, dtype, swing in moved_ops:
-        s = (pt.x() - np1.x()) * nu.x() + (pt.y() - np1.y()) * nu.y()
-        try:
-            op = OpeningItem(wall, kind, code, s)
-        except ValueError:
-            continue
-        op.door_type, op.swing = dtype, swing
-        wall.openings.append(op)
-    for r in new_rooms:                  # survivor now borders every merged room
-        r.bind_wall(wall)
-    if rebuild:
-        wall.rebuild()
-    return wall
-
-
-def coalesce_wall(scene, wall, index=None):
-    """Auto-coalesce entry: a no-op when the user has switched auto-coalesce
-    off (the manual 'Coalesce all walls now' action calls the _impl directly)."""
-    if not SETTINGS.get("auto_coalesce", True):
-        return wall
-    return _coalesce_wall_impl(scene, wall, index)
-
-
-def _wall_count(scene):
-    return sum(1 for w in scene.items()
-               if isinstance(w, WallItem) and not w.is_open)
-
-
-def _coalesce_all_impl(scene):
-    """Sweep the whole plan, merging every overlapping same-type wall pair to a
-    fixed point.  Heavy (O(walls^2)); used by load/import and the manual sweep
-    action.  Returns the number of walls absorbed."""
-    if scene is None:
-        return 0
-    start = _wall_count(scene)
-    changed = True
-    while changed:
-        changed = False
-        index = _WallIndex(scene)            # one local index per pass
-        walls = sorted((w for w in scene.items()
-                        if isinstance(w, WallItem) and not w.is_open
-                        and w.group() is None),
-                       key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y(),
-                                      w.wall_type))
-        before = _wall_count(scene)
-        for w in walls:
-            if w.scene() is None:                # already absorbed this pass
-                continue
-            _coalesce_wall_impl(scene, w, index, rebuild=False)
-        if _wall_count(scene) < before:
-            changed = True
-    return start - _wall_count(scene)
-
-
-def coalesce_all(scene):
-    """Auto-coalesce sweep (load/import); a no-op when auto-coalesce is off."""
-    if not SETTINGS.get("auto_coalesce", True):
-        return 0
-    return _coalesce_all_impl(scene)
-
-
 # ------------------------------------------------------ topology ops (P3.4)
 # The SCENE half of the planner/applier split. The decision logic lives once,
 # pure, in `design.topology`; everything here either feeds it a view of the live
@@ -711,29 +606,6 @@ def split_wall_at(scene, wall, p, on_seg_tol=ON_SEG_TOL):
     if split is None or split.straddled:
         return None
     return apply_split_plan_to_scene(scene, split)
-
-
-def weld_all(scene, max_passes=6):
-    """Weld every wall's free endpoints onto the walls they meet (T/L joints),
-    so a drawn-or-loaded plan reads as one connected structure.  Iterated to a
-    fixed point (a welded plan does not move on a further pass), which keeps
-    save/load round-trips stable.  Grouped walls are left alone."""
-    if scene is None:
-        return
-    for _ in range(max_passes):
-        walls = sorted((w for w in scene.items()
-                        if isinstance(w, WallItem) and not w.is_open
-                        and w.group() is None),
-                       key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()))
-        moved = False
-        for w in walls:
-            b1, b2 = QPointF(w.p1), QPointF(w.p2)
-            w.join_endpoints(rebuild=False)
-            if (QLineF(b1, w.p1).length() > 1e-6
-                    or QLineF(b2, w.p2).length() > 1e-6):
-                moved = True
-        if not moved:
-            break
 
 
 def _merge_intervals(intervals):
@@ -1612,27 +1484,6 @@ class WallItem(QGraphicsItem):
                 self.primary_room.raise_to_front()   # normalise z to siblings
         self._mode = None
         e.accept()
-
-    def join_endpoints(self, rebuild=True):
-        """Weld each endpoint onto a nearby endpoint of another wall, or onto
-        the body of a wall it stops on (T-junction), within JOIN_TOL.  Never
-        grows a wall toward a far one -- if it doesn't reach, the gap is left
-        for the user to close by hand.  Pass rebuild=False in a bulk weld where
-        a single rebuild_all_walls follows."""
-        for attr, other in (("p1", "p2"), ("p2", "p1")):
-            p = getattr(self, attr)
-            q = nearest_wall_endpoint(self.scene(), p, JOIN_TOL, exclude=self)
-            if q is None:
-                hit = nearest_wall_body(self.scene(), p, JOIN_TOL, exclude=self)
-                if hit is not None:
-                    target, q = hit
-                    ip = axis_wall_intersection(target, getattr(self, other), p)
-                    if ip is not None and QLineF(ip, p).length() <= JOIN_TOL * 2:
-                        q = ip
-            if q is not None:
-                setattr(self, attr, q)
-        if rebuild:
-            self.rebuild()
 
     def contextMenuEvent(self, e):
         from floorplanner.rooms import detach_wall_from_room  # late (cycle)

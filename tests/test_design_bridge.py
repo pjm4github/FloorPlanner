@@ -312,7 +312,7 @@ def test_round_trip_is_identical_at_the_second_design(fp, win, name):
 
 
 def test_apply_does_not_coalesce(fp, win):
-    """`apply_project_to_scene` runs `coalesce_all`; this must not.
+    """`apply_project_to_scene` runs the merge sweep; this must not.
 
     Coalesce MOVES geometry -- it re-snaps the survivor's endpoints onto the 6"
     on-centre grid independently of their neighbours (walls.py:200-201, the

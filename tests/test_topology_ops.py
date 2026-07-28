@@ -15,8 +15,8 @@ from floorplanner.design import topology
 from floorplanner.design.bridge import design_from_scene
 from floorplanner.design.model import Design
 from floorplanner.walls import (
-    _coalesce_all_impl, apply_merge_plan_to_scene, graph_from_scene,
-    merge_all, merge_collinear_scene, normalize_walls, plan_merge_collinear,
+    apply_merge_plan_to_scene, graph_from_scene, merge_all,
+    merge_collinear_scene, normalize_walls, plan_merge_collinear,
     split_wall_at, weld_scene,
 )
 
@@ -217,14 +217,14 @@ def test_defect_9_merge_dedups_identical_openings(fp, scene):
     assert len(walls[0].openings) == 1            # not two stacked doors
 
 
-def test_defect_9_is_the_behaviour_coalesce_got_wrong(fp, scene):
-    # the same input through the OLD op, so the closure is legible rather than
-    # asserted: coalesce stacks the duplicate door on top of the original
-    _two_walls_one_door_each(fp, scene)
-    _coalesce_all_impl(scene)
-    walls = _walls(scene, fp)
-    assert len(walls) == 1
-    assert len(walls[0].openings) == 2            # defect 9, still present here
+# The companion to the test above ran the SAME input through
+# `_coalesce_all_impl` and asserted it produced two stacked doors, so the
+# closure was legible rather than merely claimed. It was deleted at P3.4 (iv)
+# with the op it exercised: once the defect's implementation is gone there is
+# no old behaviour left to exhibit, and a test that constructs one would be
+# asserting against a museum piece. It did its job at (i) and (ii) -- the
+# measured evidence is in the Progress log, which is where a claim about code
+# that no longer exists belongs.
 
 
 def test_merge_keeps_openings_that_are_genuinely_different(fp, scene):
@@ -416,7 +416,7 @@ def test_normalize_walls_merges_and_welds_in_one_pass(fp, scene):
 
 def test_normalize_walls_ignores_the_auto_coalesce_switch(fp, scene):
     # "Coalesce all walls now" is the user asking explicitly, so the automatic
-    # gate does not apply -- exactly as _coalesce_all_impl was called directly
+    # gate does not apply -- as the old command called the _impl directly
     fp.SETTINGS["auto_coalesce"] = False
     try:
         _add(scene, fp, 0, 0, 120, 0)

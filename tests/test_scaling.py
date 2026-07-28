@@ -241,13 +241,13 @@ def test_bake_scales_subquadratically(scaling):
     assert scaling["ratios"]["bake"] < 8
 
 
-# ungroup_selected calls coalesce_all on release, which is O(walls^2) BY
+# ungroup_selected still runs a plan-wide merge on release, which is O(walls^2) BY
 # CONSTRUCTION -> ungroup is genuinely super-linear. It dips under 8 at n=8 after
 # P0.6 item 2 (the _oriented_box cache cut its boundingRect cost, ~8.5 -> ~5.6),
 # but that pass is INCIDENTAL at this grid size and reasserts at larger n.
-# Kept xfail(strict=False) -> P3.8 (topology ops replace coalesce_all): promoting
+# Kept xfail(strict=False) -> P3.8 (P4.5 removes the call entirely): promoting
 # it would encode "ungroup is fine", which is false -- only "less bad at n=8".
-@pytest.mark.xfail(strict=False, reason="ungroup calls O(walls^2) coalesce_all "
+@pytest.mark.xfail(strict=False, reason="ungroup runs an O(walls^2) merge sweep "
                                         "until P3.8; sub-8 at n=8 is incidental")
 def test_ungroup_scales_subquadratically(scaling):
     assert scaling["ratios"]["ungroup"] < 8

@@ -187,7 +187,7 @@ def test_group_move_undo_restores(win, make_room, first_furnishing):
 
 
 # --------------------------------------------------------------------------
-# 5. grouped walls are exempt from coalesce_all (the group() is None gate)
+# 5. grouped walls are exempt from the merge sweep (the group() is None gate)
 # --------------------------------------------------------------------------
 def test_grouped_walls_exempt_from_coalesce(win, make_room, first_furnishing):
     sc = win.scene
@@ -199,9 +199,9 @@ def test_grouped_walls_exempt_from_coalesce(win, make_room, first_furnishing):
     gw = grouped[0]
     free = fp.WallItem(QPointF(gw.p1), QPointF(gw.p2), gw.wall_type)
     sc.addItem(free)
-    fp.coalesce_all(sc)
+    fp.merge_all(sc)
     still_grouped = [w for w in g.childItems() if isinstance(w, fp.WallItem)]
-    assert len(still_grouped) == n_grouped, "coalesce_all ate a grouped wall"
+    assert len(still_grouped) == n_grouped, "the merge sweep ate a grouped wall"
     assert all(w.group() is g for w in still_grouped)
 
 
