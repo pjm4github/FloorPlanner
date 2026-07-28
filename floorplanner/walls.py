@@ -456,6 +456,39 @@ def merge_collinear_scene(scene, floor=None, perp_tol=None, max_passes=6):
     return absorbed
 
 
+def merge_wall(scene, wall, perp_tol=None):
+    """Merge just the run `wall` sits in -- P3.4 (iii)'s replacement for
+    `coalesce_wall`, and gated by the same `auto_coalesce` setting.
+
+    `wall` is forced to be the run's SURVIVOR, which is not a detail: the
+    caller has just drawn or dragged that item and holds a reference to it,
+    and it carries the selection. The planner takes the run's first wall in the
+    caller's own order, so putting `wall` first is all it takes to say so."""
+    if not SETTINGS.get("auto_coalesce", True):
+        return wall
+    if (scene is None or wall is None or wall.scene() is None or wall.is_open
+            or wall.group() is not None or wall.length() < 1e-6):
+        return wall
+    if perp_tol is None:
+        perp_tol = SETTINGS.get("wall_snap_in", WALL_SNAP_DEFAULT)
+    view = graph_from_scene(scene, wall.floor)
+    view = view._replace(walls=sorted(view.walls, key=lambda v: v.key is not wall))
+    plan = [m for m in plan_merge_collinear(view, perp_tol=perp_tol)
+            if m.survivor is wall]
+    if plan:
+        apply_merge_plan_to_scene(scene, plan)
+    return wall
+
+
+def merge_all(scene):
+    """Plan-wide auto-merge (load, import, ungroup) -- P3.4 (iii)'s replacement
+    for `coalesce_all`, gated by `auto_coalesce` exactly as that was. Returns
+    the number of walls absorbed."""
+    if not SETTINGS.get("auto_coalesce", True):
+        return 0
+    return merge_collinear_scene(scene)
+
+
 def apply_split_plan_to_scene(scene, split, rebuild=True):
     """Execute a split delta on the live items. The source wall keeps its
     identity and becomes the FIRST segment; a new `WallItem` takes the second.
@@ -1382,7 +1415,7 @@ class WallItem(QGraphicsItem):
             # Shift.
             endpoint_edit = self._mode in ("p1", "p2")
             corner_drag = endpoint_edit and bool(self.rooms)
-            coalesce_wall(self.scene(), self)       # fuse if it now overlaps
+            merge_wall(self.scene(), self)          # fuse if it now overlaps
             rebuild_all_walls(self.scene())
             # dragging a corner back so the room is fully walled again fuses
             # the wall back in: re-lock its corners (right-click to detach

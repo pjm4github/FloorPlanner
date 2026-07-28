@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import *  # noqa: F401
 from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.walls import (
-    OpenWall, OpeningItem, WallItem, _WallBBoxIndex, coalesce_all,
+    OpenWall, OpeningItem, WallItem, _WallBBoxIndex, merge_all,
     rebuild_all_walls, wall_bbox,
 )
 
@@ -1017,7 +1017,7 @@ class RoomItem(QGraphicsItem):
             if moved:
                 sc = self.scene()
                 if sc is not None:
-                    coalesce_all(sc)          # dropped adjacent -> re-merge
+                    merge_all(sc)             # dropped adjacent -> re-merge
                     rebuild_all_walls(sc)     # re-detect region + re-bind walls
                 self.raise_to_front()
             e.accept()

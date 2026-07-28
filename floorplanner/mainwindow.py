@@ -817,7 +817,10 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             g.bake()                      # members keep their moved spot
             for c in g.dissolve():
                 c.setSelected(True)
-        coalesce_all(self.scene)          # now-free walls may merge with the plan
+        # P4.5's to REMOVE, not (iii)'s to migrate: once groups move the real
+        # items nothing is duplicated, so nothing needs merging on ungroup.
+        # Wired to the new pass meanwhile so behaviour is unchanged.
+        merge_all(self.scene)             # now-free walls may merge with the plan
         rebuild_all_walls(self.scene)     # rooms re-detect region/outline
         self.status("Ungrouped — items left in place.")
 

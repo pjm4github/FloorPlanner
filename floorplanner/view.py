@@ -484,7 +484,7 @@ class PlanView(QGraphicsView):
                 # an overlapping same-type wall coalesces into one; then the
                 # drawn end welds onto whatever wall it lands on (T/L joint) so
                 # it reads as one connected structure, not a loose segment
-                coalesce_wall(self.scene(), w)
+                merge_wall(self.scene(), w)
                 if w.scene() is not None:
                     w.join_endpoints(rebuild=False)
                 rebuild_all_walls(self.scene())

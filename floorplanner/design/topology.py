@@ -260,6 +260,7 @@ PlannedOpening = namedtuple("PlannedOpening", "wall index s")
 
 ANGLE_TOL = 0.02        # |sin| between units to still call two walls parallel
 DEDUP_TOL = 1.0         # two same-code openings this close are ONE (defect 9)
+LINE_BUCKET = 3.0       # line-offset bucket for the candidate index (>> tols)
 
 
 def _find(parent, i):
@@ -360,6 +361,36 @@ def _plan_one_merge(run, pos, anchor, degree):
                  gone, tuple(planned), tuple(dropped_ops))
 
 
+def _candidate_groups(walls, pos, perp_tol):
+    """Yield `(primary, near)` index lists: walls that could possibly merge --
+    same level, same type, and on a nearby parallel line.
+
+    This is `walls._WallIndex`'s line bucketing, moved into the planner. It is
+    the same lever that made coalesce survivable on a 1492-wall plan, and it
+    has to live wherever the merge decision lives: a per-wall merge that had to
+    scan every wall would trade coalesce's O(local) for O(plan) on every
+    draw-release, which is the direction P3.8 must not go."""
+    reach = int(perp_tol / LINE_BUCKET) + 1
+    buckets, diag = defaultdict(list), defaultdict(list)
+    for i, w in enumerate(walls):
+        u = _unit(pos[w.v1], pos[w.v2])
+        grp = (w.level, w.type)
+        if abs(u[1]) < 1e-4:
+            buckets[(grp, "h", round(pos[w.v1][1] / LINE_BUCKET))].append(i)
+        elif abs(u[0]) < 1e-4:
+            buckets[(grp, "v", round(pos[w.v1][0] / LINE_BUCKET))].append(i)
+        else:
+            diag[grp].append(i)                # non-axis-aligned: rare
+    for (grp, axis, b), idxs in buckets.items():
+        near = list(idxs) + diag.get(grp, [])
+        for d in range(1, reach + 1):
+            near += buckets.get((grp, axis, b + d), [])
+            near += buckets.get((grp, axis, b - d), [])
+        yield idxs, near
+    for idxs in diag.values():
+        yield idxs, idxs
+
+
 def plan_merge_collinear(view, perp_tol=WELD_TOL, angle_tol=ANGLE_TOL):
     """Plan every collinear merge in `view` -- the ONE place the decision is
     made, for a `Design` and for a live scene alike.
@@ -377,13 +408,10 @@ def plan_merge_collinear(view, perp_tol=WELD_TOL, angle_tol=ANGLE_TOL):
         degree[(w.level, w.v2)] += 1
 
     parent = list(range(len(walls)))
-    lines = defaultdict(list)
-    for i, w in enumerate(walls):
-        lines[(w.level, w.type)].append(i)
-    for idxs in lines.values():
-        for n, ia in enumerate(idxs):
-            for ib in idxs[n + 1:]:
-                if _find(parent, ia) == _find(parent, ib):
+    for primary, near in _candidate_groups(walls, pos, perp_tol):
+        for ia in primary:
+            for ib in near:
+                if ia == ib or _find(parent, ia) == _find(parent, ib):
                     continue
                 a, b = walls[ia], walls[ib]
                 if _same_line(a, b, pos, perp_tol, angle_tol) and (

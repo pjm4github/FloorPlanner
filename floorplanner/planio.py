@@ -178,7 +178,7 @@ class PlanIOMixin:
         # (welding is NOT done here: load is also the undo-restore path and
         # welding does not fully converge at messy junctions -> geometry would
         # drift on every undo.  Junctions weld on draw and via the manual sweep.)
-        coalesce_all(self.scene)
+        merge_all(self.scene)
         rebuild_all_walls(self.scene)
         missing = []
         for rm in project.rooms:
