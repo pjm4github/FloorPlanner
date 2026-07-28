@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Micro-benchmark for room re-detection cost (the main editor hot path).
+"""Micro-benchmark for `rebuild_all_walls` (the main editor hot path).
 
-`rebuild_all_walls` -> `refresh_rooms` re-detects every room after any wall
-edit.  This builds grids of rooms of growing size and times one
-`rebuild_all_walls`, so we can track the cost as plans get larger.
+It used to end in `refresh_rooms`, re-detecting every room whose nearby walls
+had changed after any wall edit; P3.5 deleted that -- a room's region derives
+from its outline, and the outline holds the walls' own corner vertices, so
+there is nothing to re-detect.  What this now times is the wall rebuild and the
+junction pass alone.  Still worth tracking: it builds grids of rooms of growing
+size and times one `rebuild_all_walls`, so the cost is visible as plans grow.
 
 Run:  python tests/bench_rooms.py [--profile]
 """
@@ -60,9 +63,11 @@ def main():
         print(f"{n}x{n}  {rooms:4d}  {walls:4d}   {dt:8.1f} ms       "
               f"{dt / max(rooms, 1):.2f} ms")
 
-    # memoized incremental refresh -- the realistic per-edit case
+    # the realistic per-edit case.  Before P3.5 this measured the room-detection
+    # MEMO (a no-op rebuild skipped the grid/graph build entirely); it now
+    # measures the wall rebuild itself, which no memo stands in front of.
     sc = build_grid(6)
-    FP.rebuild_all_walls(sc)                   # warm the per-room signatures
+    FP.rebuild_all_walls(sc)                   # warm any caches
     t = time.perf_counter()
     FP.rebuild_all_walls(sc)
     noop = (time.perf_counter() - t) * 1000
@@ -72,7 +77,7 @@ def main():
     t = time.perf_counter()
     FP.rebuild_all_walls(sc)
     edit = (time.perf_counter() - t) * 1000
-    print(f"\n6x6 memoized:  no-op rebuild {noop:.1f} ms   "
+    print(f"\n6x6 incremental:  no-op rebuild {noop:.1f} ms   "
           f"after moving 1 wall {edit:.1f} ms")
 
     if "--profile" in sys.argv:

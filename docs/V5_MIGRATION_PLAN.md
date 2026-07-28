@@ -132,7 +132,7 @@ gap rather than papering over it.
 | ☑ | **P3.2** `RoomItem.outline`; drop `perimeter_corners` | ruff + pytest |
 | ☑ | **P3.3** Wall move = move vertices + split rule | ruff + pytest |
 | ☑ | **P3.4** Topology ops replace coalesce/weld/fracture | ruff + pytest |
-| ☐ | **P3.5** Delete the detection engine | ruff + pytest |
+| ☑ | **P3.5** Delete the detection engine | ruff + pytest |
 | ☐ | **P3.6** Opening anchors | ruff + pytest |
 | ☐ | **P3.7** Delete `OpenWall` | ruff + pytest |
 | ☐ | **P3.8** Perf verification vs P0.3 | ratios recorded |
@@ -259,6 +259,7 @@ Behaviour that is deliberately worse between the task that broke it and the task
 | Broken at | Behaviour | Workaround today | Restored at |
 |---|---|---|---|
 | **P0.5** (fix 4) | Rubber-band-select a room whose edge is a longer party wall, then group + move it — the region no longer follows. The walls captured by the band move; the room does not. | Drag the room by its **label** instead: `_privatize_shared_walls` handles the party wall correctly on that path. | **P4.2** (`extract` replaces the accidental privatisation with a real operation) |
+| **P3.5** | **An open side of a room is not drawn.** Detach a wall from its room and pull a corner away and the side opens — the room keeps its shape and area, and the document says `wall: null` exactly as before — but the vacated stretch renders as nothing rather than as a dashed line. The producer of the dashed `OpenWall` placeholder was `refresh_rooms` → `reloop_open_room` → `bind_room_walls`, all deleted here; the fact itself moved onto the outline (`RoomItem.open_edges()`), which is where the document had always kept it. | None needed for correctness — nothing is lost but the on-screen cue. The room's area, outline and saved file are unaffected. | **P3.7** (`OpenWall` is deleted and a `wall: null` edge renders dashed from the outline, which is the same cue drawn from the one representation instead of a second one) |
 | **P2.3** | **After the first undo, a wall that crosses a junction comes back split** — and if it borders NO room, body-dragging it moves only that segment. Measured at P3.3: one 480″ wall with a mid-span T returns as two 240″ walls. **Narrower than first recorded**: `_collinear_run()` (`walls.py:888`) gathers the whole room *side*, so for a wall on a room perimeter — the common case, and the one a user would notice — both halves still move as one. Verified with a room: `_collinear_run()` gathers 2 of 2. The row applies only to room-less walls, where `self.rooms` is empty and the run short-circuits to `[self]`. | Bind the wall to a room, or drag the halves together. Nothing is lost either way: the **document is unchanged**, since `design_from_scene` planarises to the same canonical form. | ~~P3.4~~ → **retargeted at P3.4 (iv), and the predicted fix was wrong on its own terms.** Re-checked by hand: the 480″ wall still returns as two 240″ segments, `merge_all` does **not** re-merge them, and the body-drag still moves one segment. It must not — the mid-span T is a **degree-3 vertex**, load-bearing for the planar subdivision, and merging through it would destroy planarity. `merge_collinear` refuses for exactly the right reason, so this row was never merge's to close. The fix belongs in the **drag's run-gathering**: `_collinear_run()` (`walls.py`) short-circuits to `[self]` when the wall borders no room, which is precisely the case the row describes. Gathering the run over **vertex adjacency** instead would carry both segments. Unassigned rather than invented — it is one small change, and the honest place is whichever task next touches the drag (**P4.2** extract/join is the nearest) |
 
 ### P0.6 — Cheap render wins
@@ -1846,9 +1847,16 @@ DEMO PORT: `w24` no longer exists as that wall. The demo named it, but ids are
          the chosen wall really has no collinear continuation -- the demo's own
          precondition -- so the first cannot pass by luck.
 
-P3.5  IN PROGRESS  (branch v5-topology) -- the flip has landed; the deletion
-         has not. Logged mid-task per the handoff-spec rule: a successor reads
-         the state from here plus the four riders in the P3.5 task text.
+P3.5  done   (branch v5-topology; five sub-commits)
+ruff:    clean
+pytest:  OFF  497 passed, 5 xfailed in 13.7s
+         ON   497 passed, 5 xfailed in 16.0s
+         DEEP 492 passed, 3 xfailed, 7 deselected in 15.4s
+         (baseline in: P3.4's 491/4/1.)
+commits: ac9ad45 (0) . 600fdef (1) . 02eff1e (2) . 733d7d6 (3) . f07dbdb (4)
+         Logged sub-commit by sub-commit per the handoff-spec rule, so a
+         successor reads the state from here plus the four riders at lines
+         416-424 rather than from a chat summary.
 (0) done   commit ac9ad45 -- doc-only, committed BEFORE any code per rider 2.
          THE RETARGET WAS ITSELF A FINDING: both P3.2 guards' docstrings named
          P3.4 as the task that would close the coordinates-vs-identity gap.
@@ -1890,13 +1898,228 @@ PERF, checked not assumed (the P3.1 lesson): test_bake flagged 8.83 against a
          threshold of 8 on the first full run. Re-ran three times -- 6.31 /
          6.89 / 7.17, absolutes 307-310 ms against P3.3's recorded 297-332 --
          so variance, not the new property read. Same call as P3.3's 7.78.
-NOT DONE: the deletion itself (the ~470 + 34), `enclosing_face` replacing
-         "detect room here" via the lift-to-Design at the six one-shot call
-         sites, the `room_boolean` rewrite (defect 8), defects 13 and 16, the
-         test_rooms.py / test_room_walls.py rewrites, and the headline check --
-         P3.3's Lounge / Front Porch demo (+/-17.5 sf) passing with
-         `refresh_rooms` DELETED, which is rider 1's real proof and can only be
-         run once the deletion lands.
+(2) done   commit 02eff1e -- the region derives from the outline.
+ruff:    clean
+pytest:  OFF  495 passed, 4 xfailed, 1 xpassed / ON same / DEEP 490, 3 xfailed
+files:   rooms.py (path + area_sqft become properties; _translate relocates),
+         walls.py (_DragVertex carries outline edges), items.py + mainwindow.py
+         (three rigid-move sites go through set_region),
+         tests/test_outline.py (+2)
+THE STEP P3.2 AND (1) DID NOT TAKE, and without it the deletion is impossible
+         rather than merely risky. `corners` derived from the outline at P3.2
+         and the corners became real vertex identities at (1) -- but `path` and
+         `area_sqft` were still a stored QPainterPath and a stored float that
+         ONLY `refresh_rooms` refreshed. So an outline that moved by
+         construction still reported a stale area until a detection pass caught
+         up, and deleting that pass would have frozen every number a user reads.
+         Both derive now, memoized on the corner COORDINATES -- not identity,
+         because `relocated_to` returns a NEW vertex for a moved corner and an
+         id-keyed memo would be stale in exactly the case that matters.
+NO EXISTING TEST CHANGED.
+
+(3) done   commit 733d7d6 -- the deletion, and the lift.
+ruff:    clean
+pytest:  OFF  495 passed, 5 xfailed / ON 495/4/1xpassed / DEEP 490, 3 xfailed
+DELETED, 418 lines across 11 top-level definitions, all callerless:
+         `_RoomGrid` (90) + `_WallGraph` (131) -- the two engines, a raster
+         flood-fill and a hand-rolled planar face walk; `_detect_room` (12),
+         `detect_room_region` (6), `trace_room_perimeter` (6); the memo,
+         `room_signature` (23) + `refresh_rooms` (53) + `_room_probe_points`
+         (19); `reloop_open_room` (48); `synthesize_room_edge` (15) and
+         `_wall_along_segment` (15). Plus `bind_room_walls` 70 -> 38.
+         rooms.py 1425 -> 1162 lines.
+`detect_room` SURVIVES AS A NAME, and this is the census's one real divergence
+         on the rooms.py side. The task line lists it among the dead; it has
+         ~40 call sites across the app, the tooling, the fixtures and eleven
+         test modules, and this task's authorized rewrite zone is two test
+         files. Deleting the NAME would have been a rewrite of the suite
+         wearing a deletion's clothes. What the line MEANS is delivered in
+         full: the editor no longer has its own answer to "what is a face". It
+         asks the document's, through `bridge.face_at` -> `enclosing_face`.
+THE LIFT, and why it is allowed where P3.4 point 1 forbade it. That ruling
+         rejected lift-to-Design for EDIT ops, on measurement: an edit runs per
+         mouse event and a full-plan rebuild destroys item identity. "Detect
+         room here" is a ONE-SHOT gesture -- the six call sites (csvio, macro,
+         mainwindow x2, planio, view) each fire once per user action -- so the
+         walk costs no more than the `_RoomGrid` + `_WallGraph` pair it
+         replaces, both of which were also rebuilt per call and one of which
+         was O(walls^2). Single-sourced instead of duplicated.
+THREE THINGS CAME FREE, and they are why the swap is worth making rather than
+         merely equivalent:
+         * DEFECT 16 closes STRUCTURALLY. The grid was sized by `canvas_rect()`
+           and any flood reaching its edge counted as unenclosed, so a plan
+           larger than the canvas silently lost its edge rooms. A graph walk has
+           no canvas in it. Closed by deletion, which is the only kind of fix
+           that cannot regress. Pinned.
+         * every returned edge NAMES the wall covering it, so `bind_room_walls`
+           stopped SEARCHING for a room's own walls and now only attaches them.
+           A room binds its outline as a fact the detection reports.
+         * a wall split at a T yields one edge per SEGMENT -- invariant I5
+           ("every outline edge maps to exactly one wall") holding by
+           construction, where the old tracer dropped pass-through corners and
+           could leave an edge no single wall covered.
+DEFECT 13 -- REPRODUCED BEFORE THE SUBSTRATE WENT, which rider 3 asked for and
+         which is the reason the verdict is worth anything. At zooms 0.25x-4x
+         on the `detach_wall_from_room` path, measured on the code as it stood:
+         * DETECTION was already IDENTICAL at every zoom -- same area, same
+           corners, 5/5. It never read the view.
+         * THE DRAG was not. The same scene-space gesture gave 0 open sides at
+           0.25x and 1 at 0.5x-4x, leaving the wall's far end at y=120 vs y=60.
+         So the defect is real and its mechanism is the drag's zoom terms
+         (`20.0 / _view_scale()` catch radius, `16.0 / view_scale` stick),
+         exactly as rider 3 predicted. Detection half CLOSED and now structural;
+         drag half RETARGETED and left UNASSIGNED, the same disposition the P2.3
+         row got, with P4.2 as the nearest task that touches the drag. NOT
+         "repro substrate removed" -- the substrate was still there and the
+         measurement was taken.
+TWO CORRECTIONS THE LIFT NEEDED, both found by a failing test rather than by
+         reasoning, and both are findings about `trace_faces` as much as about
+         this task:
+         * SPUR PRUNING. A dangling wall stub is IN the wall graph, so the face
+           walk enters it and comes straight back out. Free for a FACE (the
+           excursion encloses no area) and wrong for an OUTLINE: the room grows
+           a corner at the stub's free end, and every consumer that asks "is
+           this room inside the rubber band" answers from it. Caught by
+           test_selection, which is not in the authorized zone and was right not
+           to be changed. `bridge._prune_spurs`.
+         * CANONICAL WINDING. `_inner_faces` picks the inner sign by MAJORITY,
+           decisive from two rooms on but a TIE at exactly one -- a lone wall
+           loop traces two faces of equal area and opposite winding. So a
+           one-room plan came back wound whichever way the rest of the plan
+           happened to vote, and the outline ORDER is serialized. Caught by
+           test_room_walls' idempotent round-trip. Fixed at the one-shot entry
+           to the sign the document already uses (positive shoelace, verified
+           against every face of symmetricP1).
+THE APPLY PATH NOW CARRIES THE DOCUMENT'S VERTEX IDENTITY, one live `Vertex`
+         per document vertex, shared by every wall end and outline edge naming
+         it. The first attempt reconstructed it by WELDING
+         (`share_outline_vertices`) and `test_malformed_v5_is_reported_not_
+         rewelded` caught it within the minute: apply must not repair, and a
+         corner that has drifted 0.3" is a malformed file to be REPORTED, not
+         quietly closed up. The document already knows the identities; reading
+         them is exact where welding is a guess.
+
+(4) done   commit f07dbdb -- defect 8, the predicates, the privatize ruling.
+ruff:    clean
+pytest:  OFF  497 passed, 5 xfailed / ON 497/5 / DEEP 492, 3 xfailed
+DEFECT 8, and it was TWO faults with ONE cause -- `room_boolean` worked from a
+         re-traced boundary rather than from what the rooms said they were made
+         of. (a) It DELETED WALLS THAT WERE NOT ITS OWN: inputs came from
+         `bounding_walls()`, a proximity query with no floor filter, and the op
+         removes everything handed to it -- so a combine took the wall a third
+         room shared with an input, breaking that room open, and any wall of any
+         other FLOOR whose body touched the band. (b) It FORCED every result
+         wall to "interior", downgrading 6" exterior walls to 4 1/2" ones.
+         Both fixed at the source: inputs come from the room's OUTLINE
+         (`room_walls`), a wall still bordering a non-input room is kept, and
+         each result edge inherits type and floor from whichever input wall runs
+         along it. TWO REGRESSION TESTS, both CONFIRMED FAILING against the old
+         code before being kept -- and the first fixture was rebuilt on the
+         shared-wall model, because two `make_room` calls leave a coincident
+         PAIR at the boundary and a duplicate wall is a different problem.
+THE TWO PREDICATES, rewritten and not deleted, exactly as rider 4 tabled.
+         `room_owns_walls` and `walls_cover_room` keep their criteria and read
+         the outline through a new `room_walls(room)` -- one answer to "which
+         walls are this room's?" -- instead of the parallel bound-wall list the
+         deleted binder maintained.
+`_privatize_shared_walls` ASSESSED IN-TASK: KEEP. Its reason is untouched -- a
+         party wall is one wall, so a room moving off it must stop owning it.
+         It needed one repair to stay honest: it swapped the room's BOUND wall
+         for a private copy and left the OUTLINE naming the shared one, and the
+         outline is now the authority, so `room_walls` went on handing bake and
+         room_boolean a wall the room had just given up.
+         AND IT WORKS FOR A REASON WORTH WRITING DOWN: `_translate` RELOCATES
+         corners, and a relocation mints a new `Vertex` that only the ends
+         REBOUND to it follow -- so a wall the room no longer owns simply stays
+         on the old corner, with nothing holding it back. P4.2's real `extract`
+         still replaces the shape of it; `_perimeter_span` still falls with
+         `fracture_delete_wall` at P4.1.
+
+EXIT 1 -- MEASURED DELETION vs THE CENSUS. Rider 4 tabled ~470 from rooms.py
+         + 34 from walls.py. MEASURED: 418 in whole definitions plus 32 from
+         `bind_room_walls`' shrink = 450 of the ~470, and 0 from walls.py.
+         Two divergences, both reported rather than forced:
+         * `_wall_along_segment` (15) is REPLACED, not deleted, by `_edge_wall`
+           (48) -- LARGER, because it absorbed the job the deleted three-priority
+           search was doing: find the wall behind an outline edge that came from
+           a FILE and names none. It also had to accept PARTIAL cover, or a v4
+           reload stops agreeing with the live scene about a side whose corner
+           was dragged away, and the round-trip stops being idempotent.
+         * `_WallBBoxIndex` (34) CANNOT DIE, and P3.4 (iv) is why. That
+           sub-commit reported it as P3.5's on the grounds that `refresh_rooms`
+           was its last caller -- but the SAME sub-commit refused the adjacency
+           swap in `_compute_wall_junctions` and said so at length: an unwelded
+           crossing shares no corner, so bbox search is the only thing that can
+           answer there. `_compute_wall_junctions` stays, so its index stays. A
+           line dies when its LAST caller dies, and P3.4 (iv)'s own ruling
+           created the caller that outlives this task.
+EXIT 2 -- RIDER 1'S HEADLINE CHECK, PASSING, AND THE ASSERTIONS DID NOT MOVE.
+         `test_a_dragged_wall_resizes_the_rooms_it_borders` -- the editor half
+         of the Lounge / Front Porch demo -- still asserts equal and opposite
+         resizing with the total unchanged, now with `refresh_rooms` DELETED.
+         Written at P3.3 the numbers came from detection; they now arrive
+         because the rooms' outlines hold the very vertices the divider holds.
+         A `not hasattr(fp, "refresh_rooms")` guard makes the claim explicit
+         rather than implied, so the test cannot quietly stop proving it.
+EXIT 3 -- PERF, MEASURED NOT ASSUMED: the same harness on the same machine at
+         c133205 (pre-P3.5) vs HEAD. P0.3 warned that `rebuild` at 2.7 was
+         ALREADY sub-linear and that a regression there would be a real
+         finding. It improved.
+                        before (n=4 -> n=8)      after
+           rebuild      1.2 -> 3.7   r 3.05     1.0 -> 2.4    r 2.31
+           bake        44.8 -> 299.1 r 6.68     6.9 -> 28.0   r 4.03  <- 10.7x
+           ungroup     45.9 -> 300.7 r 6.55    13.5 -> 106.1  r 7.85  <- 2.8x
+           undo        21.3 -> 157.7 r 7.40    20.9 -> 123.5  r 5.92
+           group       27.7 -> 360.1 r 12.99   33.3 -> 370.1  r 11.10 (P3.8's)
+         `bake` is the headline and the mechanism is exactly the deletion: a
+         group move ended in `rebuild_all_walls` -> `refresh_rooms`, which
+         re-detected every room the move touched. Nothing re-detects now. The
+         ungroup RATIO worsened while its absolute fell 2.8x -- it is
+         xfail(strict=False) -> P3.8 either way, and P3.8 owns the reading.
+EXIT 4 -- TOOLING. `python docs/make_gallery.py` and
+         `python examples/make_examples.py` both run; images regenerated.
+         `08-open-walls.png` legitimately changed and README's open-wall
+         paragraph was corrected to match -- see the new Known-regressions row.
+
+CHANGED-TEST LEDGER, one line each, since this is the second-biggest such risk
+         in the plan after P3.4:
+         * test_rooms.py [AUTHORIZED]: test_region_follows_wall_move rewritten
+           -- coordinate assignment -> corner relocation, because a bare
+           `w.p1 = ...` is SPLIT-ON-WRITE by P3.1's ruling, so the old test
+           replaced wall ends and asked detection to notice. Three
+           room_signature / refresh-memo tests DELETED with the memo they
+           measured. +4: defect 13 (view-independence), defect 16 (no canvas
+           clip), and the two defect-8 regressions.
+         * test_room_walls.py [AUTHORIZED]: test_wall_stretch_keeps_binding
+           rewritten, same one-line reason. +2 assertions in the privatize test.
+         * test_open_walls.py [DIVERGENCE -- the whole file]: this is P3.7's
+           rewrite arriving early, because P3.5 deletes the PRODUCER. An open
+           side was an ITEM (a dashed `OpenWall`, regenerated by
+           `reloop_open_room` + `bind_room_walls`); it is now a fact about the
+           outline, reported by the new `RoomItem.open_edges()` -- which is
+           where `bridge._rooms_of` has emitted it since P1.4. The scene was
+           carrying a second, item-shaped representation of something the
+           document already said. `test_open_wall_is_editable` DELETED: it
+           asserted drag controls on a placeholder nothing constructs. The
+           CLASS still dies at P3.7, as planned.
+         * test_design_bridge.py + test_verify_design.py [OUTSIDE THE ZONE, and
+           named as such]: planc1's I6 characterization 17 -> 13. planc1's four
+           divider walls stop 1.5" short, so each is a dangling STUB; the old
+           tracer carried those out-and-back excursions into the outline (which
+           is how Hall and M Bath each held 21 corners, several at the free end
+           of a wall nowhere near the room). Spur pruning drops them, so four
+           walls only a spur ever touched stop being claimed. Same fault
+           classes, same Hall/M Bath collapse, same areas -- all three verified.
+         * test_wall_move.py: docstrings + the `refresh_rooms`-is-gone guard.
+           The ASSERTIONS DID NOT MOVE; that is exit check 2.
+         * test_outline.py: +3 (the region derives; the memo is keyed on
+           coordinates; plus (1)'s pair).
+PROCESS NOTE, since the working agreement is explicit about the mechanism: a
+         `git checkout floorplanner/mainwindow.py`, used to undo a deliberate
+         break-it-to-prove-the-test experiment, discarded that file's
+         uncommitted work along with it. Reapplied and re-verified. The rule is
+         written for handed-back DOC edits; it applies to uncommitted code just
+         as literally, and the safe move is to make the experiment in a copy.
 
 P3.4  done   (branch v5-topology; four sub-commits + two riders)
 ruff:    clean
