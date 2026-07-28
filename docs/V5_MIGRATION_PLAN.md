@@ -2246,6 +2246,46 @@ WHY 503 GREEN TESTS MISSED IT: every group test in the suite tops out at ~5
          needed a plan big enough to have party walls and a check nobody was
          making. Both gaps are closed here.
 
+P3.5-followup, PER-ROOM DIAGNOSIS -- asked for after the fix landed, to explain
+         the TWO presentations in the reported screenshot (one room fully
+         detached with its dashed outline at the original position, another
+         offset but coherent). Measured per room on a rubber-band selection over
+         92% of symmetricP1, reporting (a) outline vertices matching no endpoint
+         of any wall the room names, (b) whether walls moved, outline moved,
+         both or neither, and the identity count underneath both.
+         THE TWO PRESENTATIONS ARE TWO DIFFERENT DEFECTS, and the prediction
+         that they collapse to one cause is REFUTED. Recording that is the
+         point of having predicted:
+         * OFFSET BUT COHERENT -- 17 of 20 rooms. walls 13/13 moved, outline
+           13/13 moved, (a) = 0. Nothing visible is wrong. IDENTITY 0/13: every
+           corner is a different object from its wall's vertex, because the old
+           bake computed the room's new corner list SEPARATELY from the walls'
+           new coordinates and the two agreed only numerically. This is DEFECT
+           22, it is invisible in any screenshot, and it is fixed -- the same
+           run post-fix reads 13/13 identity with every other column unchanged.
+         * FULLY DETACHED -- 3 of 20 (Garage, PKT Off, Util). walls 6/9 moved,
+           outline 0/9, (a) = 5 stranded corners, identity 4/9 -- the four
+           corners it shares with the walls that did NOT move. The room was not
+           carried at all (`room_owns_walls` false), because the band clipped
+           one of its walls and `group_selected` duplicated the rest.
+           BYTE-IDENTICAL BEFORE AND AFTER THE DEFECT-22 FIX: 46.65" / 39.98" /
+           23.32" of region-to-walls drift either way. The vertex translation
+           cannot touch it, because the room is not in the set being moved.
+         AND THE "P3.5 UNMASKED IT" CLAIM IS WITHDRAWN, having been asserted
+         before it was measured. The same drift measurement on the pre-P3.5
+         tree strands Garage by 148.3" against 46.65" now -- re-detection was
+         not hiding the detachment, it was landing the room somewhere worse.
+         The detached presentation predates P3.5 and is REGISTERED AS DEFECT 23
+         against P4.5, because what to do about it is a semantics decision (does
+         a room whose walls partly moved DEFORM to follow the corners that
+         moved, as a party-wall drag already makes both its rooms do -- or stay
+         put?) and that question is what a group IS.
+         METHOD NOTE: metric (a) is NOT comparable across the P3.5 boundary.
+         Before P3.5 an outline edge could be spanned by a LONGER wall, so a
+         corner legitimately sat mid-wall; "corner matches no wall endpoint"
+         only became a defect once one edge meant one wall end to end. The
+         cross-boundary comparison is the drift number, which is basis-free.
+
 P3.4  done   (branch v5-topology; four sub-commits + two riders)
 ruff:    clean
 pytest:  OFF  491 passed, 4 xfailed, 1 xpassed in 19.2s
