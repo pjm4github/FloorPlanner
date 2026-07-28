@@ -655,9 +655,14 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         for it in getattr(self, "_sel_order", []):
             shape = None
             if isinstance(it, RoomItem) and it.corners:
+                # the room's OWN walls, off its outline -- not every wall
+                # whose body touches its boundary band. `bounding_walls()` is a
+                # proximity query with no floor filter, so it picks up the
+                # neighbour's walls and other floors' walls too, and
+                # `room_boolean` DELETES what it is handed (defect 8).
                 shape = {"corners": [QPointF(c) for c in it.corners],
                          "name": it.name, "props": dict(it.properties),
-                         "walls": list(it.bounding_walls()),
+                         "walls": room_walls(it),
                          "room": it, "group": None, "key": id(it)}
             elif isinstance(it, GroupItem):
                 gw = [c for c in it.childItems() if isinstance(c, WallItem)]
@@ -678,14 +683,61 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                 shapes.append(shape)
         return shapes
 
+    @staticmethod
+    def _source_edge(a, b, sources, default_floor):
+        """(wall_type, floor) for a result edge a->b, from whichever input wall
+        runs along it -- exterior wins a tie, so a combine cannot downgrade an
+        exterior wall to an interior one. `("interior", default_floor)` for an
+        edge no input covers, which for a boolean result is a genuinely new
+        edge and not a lost one."""
+        L = QLineF(a, b).length()
+        if L < 1e-6:
+            return "interior", default_floor
+        ux, uy = (b.x() - a.x()) / L, (b.y() - a.y()) / L
+        best = None
+        for p1, p2, kind, fl in sources:
+            ss = []
+            for p in (p1, p2):
+                vx, vy = p.x() - a.x(), p.y() - a.y()
+                if abs(vy * ux - vx * uy) > 1.5:
+                    break
+                ss.append(vx * ux + vy * uy)
+            if len(ss) != 2:
+                continue
+            lo, hi = max(0.0, min(ss)), min(L, max(ss))
+            if hi - lo < 1.0:
+                continue
+            key = (kind != "exterior", -(hi - lo))
+            if best is None or key < best[0]:
+                best = (key, kind, fl)
+        return (best[1], best[2]) if best else ("interior", default_floor)
+
     def room_boolean(self, op: str):
-        """Boolean op on the two selected rooms' perimeter polygons.
+        """Boolean op on the two selected rooms' OUTLINE polygons.
 
         combine = union, intersect = overlap only, subtract = first room
         minus second (selection order), fragment = the three pieces
         (first-only, second-only, overlap).  The two rooms may be selected
         directly, via their groups, or as grouped wall-loops.  The inputs
-        and their walls are replaced by freshly walled result rooms."""
+        and their walls are replaced by freshly walled result rooms.
+
+        DEFECT 8, closed at P3.5, and it was two faults in one operation:
+
+          * IT DELETED WALLS THAT WERE NOT ITS OWN. The inputs' walls came from
+            `bounding_walls()`, a proximity query over the whole scene with no
+            floor filter -- so a neighbouring room's shared wall, and any wall
+            of any other floor whose body happened to touch the band, was
+            removed along with the inputs. They now come from each room's
+            outline (`room_walls`), which is the definition of "this room's
+            walls", and a wall still bordering another room is kept.
+          * IT FORCED EVERY RESULT WALL TO `"interior"`. An exterior wall came
+            back as a 4.5" interior one after a combine. Each result edge now
+            inherits the type (and floor) of whichever input wall runs along it,
+            falling back to interior only for an edge no input wall covers --
+            which, for a boolean, is a genuinely new edge.
+
+        Both were possible because the operation worked from a re-traced
+        boundary rather than from what the rooms said they were made of."""
         shapes = self._selected_room_shapes()
         if len(shapes) != 2:
             self.status("Select two rooms or grouped wall-loops first.")
@@ -720,13 +772,25 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         else:
             return
 
+        # remember what the inputs were made of BEFORE removing them, so the
+        # result walls can inherit type and floor per edge instead of being
+        # forced to interior (defect 8, second half)
+        sources = [(QPointF(w.p1), QPointF(w.p2), w.wall_type, w.floor)
+                   for w in list(s1["walls"]) + list(s2["walls"])]
+        src_room = s1["room"] or s2["room"]
+        floor = src_room.floor if src_room is not None else self.active_floor
+
         # drop the input rooms and the walls that defined them
         old_walls = set(s1["walls"]) | set(s2["walls"])
         for s in (s1, s2):
             if s["room"] is not None and s["room"].scene() is not None:
                 sc.removeItem(s["room"])
         for w in old_walls:
-            if w.scene() is not None:
+            # a wall still bordering a room that is NOT an input is that room's
+            # too; deleting it would break a bystander open (defect 8)
+            keep = [r for r in w.rooms
+                    if r is not s1["room"] and r is not s2["room"]]
+            if w.scene() is not None and not keep:
                 sc.removeItem(w)
 
         # gather result sub-polygons
@@ -745,7 +809,9 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             for j in range(n):
                 a, b = corners[j], corners[(j + 1) % n]
                 if QLineF(a, b).length() >= MIN_WALL_LEN:
-                    w = WallItem(QPointF(a), QPointF(b), "interior")
+                    kind, fl = self._source_edge(a, b, sources, floor)
+                    w = WallItem(QPointF(a), QPointF(b), kind)
+                    w.floor = fl
                     sc.addItem(w)
                     ws.append(w)
             region_walls.append(ws)

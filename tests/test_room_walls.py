@@ -97,8 +97,14 @@ def test_moving_a_room_does_not_distort_its_neighbour(fp, scene):
     b = _make(fp, scene, 120, 0, 120, 120, "B",
               skip=[(QPointF(120, 0), QPointF(120, 120))])
     area_a, area_b = a.area_sqft, b.area_sqft
+    shared = next(w for w in a.walls if len(w.rooms) == 2)
     a._moving_room = True
     a._privatize_shared_walls()          # what mousePress does on move start
+    # the OUTLINE is what says which walls are the room's (P3.5), so the
+    # privatised edge must name the copy -- otherwise `room_walls` still hands
+    # the shared wall to bake / room_boolean and the swap only half happened
+    assert shared not in fp.room_walls(a)
+    assert shared in fp.room_walls(b)
     a._translate(0, 300)                 # drop into empty space below
     fp.rebuild_all_walls(scene)
     assert b.area_sqft == pytest.approx(area_b)   # neighbour untouched

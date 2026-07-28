@@ -140,6 +140,76 @@ def test_room_fragment_makes_three(fp, win):
     assert sorted(round(r.area_sqft) for r in rooms) == [16, 64, 64]
 
 
+def _row_of_rooms(fp, sc, n, w=120, h=120):
+    """`n` rooms in a row on the SHARED-WALL model -- one wall on each
+    boundary, not a coincident pair. `make_room` twice would build duplicates,
+    and a duplicate is a different problem from the one under test here."""
+    xs = [i * w for i in range(n + 1)]
+    for x in xs:                                    # verticals, incl. the party
+        sc.addItem(fp.WallItem(QPointF(x, 0), QPointF(x, h), "interior"))
+    for y in (0, h):                                # one long wall top + bottom
+        sc.addItem(fp.WallItem(QPointF(xs[0], y), QPointF(xs[-1], y), "interior"))
+    fp.rebuild_all_walls(sc)
+    rooms = []
+    for i in range(n):
+        c = QPointF(xs[i] + w / 2, h / 2)
+        res = fp.detect_room(sc, c)
+        assert res is not None, f"room {i} not detected"
+        r = fp.RoomItem(chr(ord("A") + i), c, res[0], res[1], corners=res[2])
+        sc.addItem(r)
+        fp.bind_room_walls(sc, r)
+        rooms.append(r)
+    return rooms
+
+
+def test_boolean_spares_a_bystander_room_and_other_floors(fp, win):
+    """DEFECT 8, first half. The op took its inputs' walls from
+    `bounding_walls()` -- a proximity query with no floor filter -- and then
+    DELETED everything it was handed. So combining two rooms removed the wall
+    a third room shared with one of them (breaking that room open) and any
+    wall of any other floor whose body happened to touch the band."""
+    sc = win.scene
+    a, b, c = _row_of_rooms(fp, sc, 3)
+    upstairs = fp.WallItem(QPointF(118, 0), QPointF(118, 120), "interior")
+    upstairs.floor = "Upper"                       # another floor, same place
+    sc.addItem(upstairs)
+    fp.rebuild_all_walls(sc)
+    c_walls = set(fp.room_walls(c))
+
+    from floorplanner.design.verify import rebase
+    rebase(win)
+    win._sel_order = [a, b]
+    win.room_boolean("combine")
+
+    assert c.scene() is not None and not c.open_edges(), "C was broken open"
+    assert all(w.scene() is not None for w in c_walls), "a bystander wall went"
+    assert upstairs.scene() is not None, "another floor's wall was deleted"
+
+
+def test_boolean_keeps_exterior_walls_exterior(fp, win):
+    """DEFECT 8, second half: every result wall was built as `"interior"`, so a
+    combine silently downgraded 6" exterior walls to 4 1/2" interior ones. Each
+    result edge now inherits from whichever input wall runs along it, exterior
+    winning a tie -- an edge no input covers is genuinely new, and interior is
+    the right default only there."""
+    sc = win.scene
+    a, b = _row_of_rooms(fp, sc, 2)
+    for w in fp.room_walls(a) + fp.room_walls(b):
+        w.wall_type = "exterior"
+        w.rebuild()
+    fp.rebuild_all_walls(sc)
+
+    from floorplanner.design.verify import rebase
+    rebase(win)
+    win._sel_order = [a, b]
+    win.room_boolean("combine")
+
+    (room,) = _rooms(fp, win)
+    assert room.area_sqft == pytest.approx(200.0)       # 240" x 120"
+    kinds = {w.wall_type for w in fp.room_walls(room)}
+    assert kinds == {"exterior"}, f"result walls downgraded: {kinds}"
+
+
 def test_fragment_groups_each_piece_with_its_own_walls(fp, win):
     _overlapping_rooms(fp, win)
     win.room_boolean("fragment")

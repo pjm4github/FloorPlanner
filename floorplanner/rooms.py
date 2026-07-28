@@ -715,7 +715,20 @@ class RoomItem(QGraphicsItem):
     def _privatize_shared_walls(self):
         """Before a move, swap every wall shared with another room for a private
         copy of just this room's edge (carrying in-span openings), so moving the
-        room never drags the neighbour.  Dropped walls re-coalesce on release."""
+        room never drags the neighbour.  Dropped walls re-merge on release.
+
+        ASSESSED AND KEPT AT P3.5 (rider 4 left the call open until the outlines
+        had flipped). It survives because its reason is untouched: a party wall
+        is ONE wall, so a room that moves off one must stop owning it or the
+        neighbour is reshaped. What P3.5 changes is only how that works --
+        `_translate` relocates corners, and a relocation produces a new `Vertex`
+        that only the ends REBOUND to it follow, so a wall this room no longer
+        owns simply stays on the old corner. Nothing has to hold it back.
+
+        It is still the wrong SHAPE for the job, and the plan already says where
+        that is fixed: P4.2 replaces this silent duplicate-on-drag with a real
+        `extract` operation, and `_perimeter_span` (its one remaining private
+        dependency) falls with `fracture_delete_wall` at P4.1."""
         sc = self.scene()
         if sc is None:
             return
@@ -739,6 +752,9 @@ class RoomItem(QGraphicsItem):
                     c.openings.append(nop)
             self.unbind_wall(w)               # this room drops the shared wall
             self.bind_wall(c)                 # and takes its private copy
+            for e in self.outline:            # ...and its outline says so: the
+                if e.wall is w:               # outline is the authority on
+                    e.wall = c                # which walls are this room's
             c.rebuild()
 
     def _translate(self, dx: float, dy: float):
@@ -951,8 +967,29 @@ def _edge_wall(scene, a: QPointF, b: QPointF, floor=None):
     return best
 
 
+def room_walls(room) -> list:
+    """The built walls this room's OUTLINE names, in edge order.
+
+    The single answer to "which walls are this room's?" (P3.5). It used to be
+    the parallel `room.walls` list, maintained alongside the outline by the
+    binder; the outline's own `wall` references are the authority now, and
+    `room.walls` is the association list walls read back (`WallItem.rooms`).
+    Falls back to `room.walls` for a room with no outline at all -- a legacy
+    import whose corners never traced."""
+    seen, out = set(), []
+    for e in room.outline:
+        w = e.wall
+        if (w is not None and not w.is_open and id(w) not in seen):
+            seen.add(id(w))
+            out.append(w)
+    if not out:
+        out = [w for w in room.walls
+               if isinstance(w, WallItem) and not w.is_open]
+    return out
+
+
 def room_owns_walls(walls, room) -> bool:
-    """True when every built wall the room currently owns is in `walls`, so a
+    """True when every built wall the room's outline names is in `walls`, so a
     rigid move of `walls` moves the room's own perimeter and its region/label
     must ride along.
 
@@ -960,30 +997,38 @@ def room_owns_walls(walls, room) -> bool:
     rotation): it is deliberately stricter than walls_cover_room() -- a group
     of coincident COPIES (as made when a room-only selection is grouped) does
     NOT own the room's walls, so it must not drag the original room off them.
-    Needs no traced corners, so it also covers grid-detected / imported /
-    non-rectilinear rooms (room.corners is None)."""
-    own = [w for w in room.walls if isinstance(w, WallItem) and not w.is_open]
+
+    REWRITTEN AS AN OUTLINE PREDICATE AT P3.5 rather than deleted: its last
+    caller is `GroupItem.bake`, so it lives on, but it now reads the outline
+    (via `room_walls`) instead of the parallel bound-wall list the deleted
+    binder maintained. Same criterion, one source."""
+    own = room_walls(room)
     moving = set(walls)
     return bool(own) and all(w in moving for w in own)
 
 
 def walls_cover_room(walls, room) -> bool:
     """True when `walls` correspond to `room` -- either they are the room's own
-    perimeter (room_owns_walls) or they form a complete loop along every traced
-    perimeter edge (even if extra coincident walls also touch the boundary).
+    perimeter (room_owns_walls) or they run along every outline edge (even if
+    extra coincident walls also touch the boundary).
 
     This is the looser ASSOCIATION test (which room does this group enclose?),
     used by group_room() to pick up a grouped/extracted room by its walls even
     when the group holds copies rather than the room's bound walls.  For moving
-    a room use room_owns_walls()."""
+    a room use room_owns_walls().
+
+    REWRITTEN AS AN OUTLINE PREDICATE AT P3.5, same reasoning as above: the
+    loop it walks is `room.outline`, which is the stored perimeter, not a
+    freshly traced one that could disagree with it."""
     if room_owns_walls(walls, room):
         return True
-    if not room.corners:
+    if not room.outline:
         return False
     moving = set(walls)
-    n = len(room.corners)
+    corners = room.corners
+    n = len(corners)
     for i in range(n):
-        a, b = room.corners[i], room.corners[(i + 1) % n]
+        a, b = corners[i], corners[(i + 1) % n]
         if not any(_wall_spans_segment(w, a, b) for w in moving):
             return False
     return True
