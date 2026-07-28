@@ -620,18 +620,28 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
     def refresh_rooms_cmd(self):
         """Re-scan the canvas: delete any room whose region is no longer
         enclosed by walls (e.g. a gray area left behind after its walls
-        were moved away), then re-detect the survivors."""
+        were moved away), then re-attach the survivors to their walls.
+
+        P3.5: the second half used to be a re-detection sweep (`refresh_rooms`)
+        that this command merely triggered on demand. Regions now derive from
+        their outlines, so there is nothing to re-detect -- what a user still
+        wants from this menu item is the ORPHAN SWEEP above plus a re-bind, and
+        that is what it does."""
         sc = self.scene
         removed = 0
         # only the active floor: room_walled tests against active-floor walls, so
         # a room parked on another floor would look unwalled and be wrongly
-        # deleted (defect 2). refresh_rooms is already active-floor scoped.
-        for it in list(sc.items()):
-            if (isinstance(it, RoomItem) and it.floor == self.active_floor
-                    and not room_walled(sc, it)):
+        # deleted (defect 2).
+        rooms = [it for it in sc.items()
+                 if isinstance(it, RoomItem) and it.floor == self.active_floor]
+        for it in rooms:
+            if not room_walled(sc, it):
                 sc.removeItem(it)
                 removed += 1
-        refresh_rooms(sc)                 # re-detect the survivors' regions
+        for it in rooms:
+            if it.scene() is not None:
+                bind_room_walls(sc, it, settle=False)
+        rebuild_all_walls(sc)
         self.status(f"Rooms refreshed — removed {removed} orphaned room(s)."
                     if removed else "Rooms refreshed — all rooms are walled.")
 

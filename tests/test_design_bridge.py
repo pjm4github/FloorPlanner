@@ -96,24 +96,35 @@ def test_planc1_reports_its_real_faults(fp, win):
     walk must REPORT them rather than repair them on the way past.
 
     Asserted as what it actually reports (per the P1.4 acceptance), not forced
-    to []: 17 walls are claimed by an outline whose sides disagree (I6), and
-    Hall and M Bath overlap (I11)."""
+    to []: walls claimed by an outline whose sides disagree (I6), and Hall and
+    M Bath overlapping (I11).
+
+    17 -> 13 AT P3.5, and the four that went were never real claims. planc1's
+    four divider walls stop 1.5" short of the corridor wall, so each is a
+    DANGLING STUB, and the face walk enters a stub and comes straight back out.
+    The old tracer kept those excursions in the outline -- which is how Hall and
+    M Bath each carried 21 corners, several of them at the free end of a wall
+    nowhere near the room. `bridge._prune_spurs` drops them, so the walls only a
+    spur ever touched are no longer claimed by a room that does not name them.
+    Same fault classes, same collapse, same areas; four fewer bogus claims."""
     _load(fp, win, "planc1.json")
     doc, _rep = _walk(win)
     errs = check(doc, deep=True)
 
     kinds = {e.split()[0] for e in errs}
     assert kinds == {"I6", "I11"}, f"unexpected fault classes: {sorted(kinds)}"
-    assert sum(e.startswith("I6") for e in errs) == 17
+    assert sum(e.startswith("I6") for e in errs) == 13
     assert [e for e in errs if e.startswith("I11")] == \
         ["I11 rooms 'Hall' and 'M Bath' overlap"]
 
     # The corruption carried here is the SCENE's, and it is worse than the
     # file's. On disk the two rooms at least differ (Hall 243.5 sf / 18 corners,
     # M Bath 591.6 sf / 24 corners). Load re-detects rooms, the 1.5" divider gap
-    # leaks the flood-fill, and BOTH anchors resolve to the one merged region --
-    # so they come out as the same 21-vertex loop. I11 is firing on an exact
-    # coincidence, not a partial overlap. Repairing that belongs at P2.1.
+    # means neither anchor is separately enclosed, and BOTH resolve to the one
+    # merged region -- so they come out as the same loop (21 vertices before
+    # P3.5's spur pruning, 13 after; identical either way, which is the fault).
+    # I11 is firing on an exact coincidence, not a partial overlap. Repairing
+    # that belongs at P2.1.
     loops = {r["name"]: [e["v"] for e in r["outline"]] for r in doc["rooms"]}
     assert set(loops["Hall"]) == set(loops["M Bath"])
     areas = _room_areas(doc)

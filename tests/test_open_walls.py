@@ -1,7 +1,36 @@
-"""Phase 2 of the room/wall refactor: 'Detach wall from room' unlocks a
-wall's corners (it stays part of the room); pulling a corner away from its
-neighbour opens just that side -- a dashed open wall bridges the gap, keeps
-the room closed for area, and disappears when the gap is filled again."""
+"""'Detach wall from room' unlocks a wall's corners (it stays part of the
+room); pulling a corner away from its neighbour opens just that side, and the
+side closes again when the gap is filled.
+
+REWRITTEN AT P3.5, and the whole file's mechanism moved at once, so the
+justification is stated here rather than repeated per test.
+
+OLD: an open side was an ITEM. `refresh_rooms` re-detected the room, failed
+(flood-fill escapes through the gap), fell back to `reloop_open_room` to
+rebuild the corner loop from the room's own walls, and `bind_room_walls`
+interposed a dashed `OpenWall` across each vacated stretch. Every assertion
+below therefore counted `OpenWall`s in the scene.
+
+NEW: an open side is a FACT ABOUT THE OUTLINE. The outline is stored and holds
+the walls' own corner vertices, so pulling a corner away leaves the room's shape
+and area exactly as they were -- which is what the old machinery was working to
+achieve -- and the side that lost its wall is simply an edge no wall spans.
+`RoomItem.open_edges()` reports them; it is the scene-side twin of what
+`design.bridge._rooms_of` has always emitted for the document (`wall: null`,
+counted as `open_edges`).
+
+WHAT THIS COSTS, until P3.7: the vacated stretch no longer RENDERS as a dashed
+line, because nothing creates the item that drew it. The document is unchanged
+(it said `wall: null` before and says it now) and so is the room's geometry --
+only the on-screen cue is missing. P3.7 deletes `OpenWall` and renders a
+`wall: null` edge dashed directly, which is the same cue drawn from the outline
+instead of from a placeholder. Logged in Known regressions.
+
+`test_open_wall_is_editable` is DELETED rather than rewritten: it asserted that
+the dashed placeholder carried the same drag controls as a wall, and there is no
+placeholder to carry them. A claim about an object nothing constructs belongs in
+the log, not in a test.
+"""
 
 import json
 
@@ -30,7 +59,9 @@ def _right_wall(fp, room):
 
 
 def _open_count(fp, scene):
-    return sum(isinstance(w, fp.OpenWall) for w in scene.items())
+    """Open SIDES of every room -- the successor to counting OpenWall items."""
+    return sum(len(r.open_edges()) for r in scene.items()
+               if isinstance(r, fp.RoomItem))
 
 
 def _shorten(fp, scene, wall, new_far=None):
@@ -63,9 +94,27 @@ def test_pulling_a_corner_opens_that_side(fp, scene):
     assert _open_count(fp, scene) == 1
     assert room in wall.rooms                          # the wall stays bound
     assert room.area_sqft == pytest.approx(area0)     # loop stays closed
-    ow = next(w for w in scene.items() if isinstance(w, fp.OpenWall))
-    ys = sorted([ow.p1.y(), ow.p2.y()])
-    assert ys == pytest.approx([60, 120])             # gap is the vacated part
+    # the open side is the RIGHT one, and it is the edge the shortened wall no
+    # longer spans -- not a new item interposed across the vacated stretch
+    (edge,) = room.open_edges()
+    assert edge.wall is wall
+    assert edge.p.x() == pytest.approx(120)
+
+
+def test_the_outline_does_not_move_when_a_wall_pulls_away(fp, scene):
+    """The claim `reloop_open_room` existed to deliver, now free.
+
+    It rebuilt the corner loop from the room's walls whenever detection failed,
+    inserting corners wherever consecutive walls no longer met. The room's shape
+    therefore depended on a repair running at the right moment. A stored outline
+    is simply not disturbed by a wall that walks away from it."""
+    room = _room(fp, scene)
+    before = [(e.p.x(), e.p.y()) for e in room.outline]
+    wall = _right_wall(fp, room)
+    fp.detach_wall_from_room(scene, wall)
+    _shorten(fp, scene, wall)
+    assert [(e.p.x(), e.p.y()) for e in room.outline] == before
+    assert len(room.outline) == 4                      # no corner inserted
 
 
 def test_filling_the_gap_recloses_the_room(fp, scene):
@@ -84,28 +133,42 @@ def test_filling_the_gap_recloses_the_room(fp, scene):
     assert _open_count(fp, scene) == 0
 
 
-def test_open_wall_is_editable(fp, scene):
-    room = _room(fp, scene)
+def test_the_document_calls_the_vacated_edge_open(fp, win):
+    """The scene's `open_edges()` and the document's `wall: null` are one fact.
+
+    This is why the placeholder could go: the v5 walk has reported an
+    uncovered outline edge as open since P1.4, entirely without reference to
+    `OpenWall`. The scene was carrying a second, item-shaped representation of
+    something the document already said."""
+    from floorplanner.design.bridge import design_from_scene
+
+    sc = win.scene
+    room = _room(fp, sc)
     wall = _right_wall(fp, room)
-    fp.detach_wall_from_room(scene, wall)
-    _shorten(fp, scene, wall)
-    ow = next(w for w in scene.items() if isinstance(w, fp.OpenWall))
-    assert ow._ends_editable() is True
+    fp.detach_wall_from_room(sc, wall)
+    _shorten(fp, sc, wall)
+
+    rep = {}
+    doc = design_from_scene(win, report=rep).to_dict()
+    assert rep["open_edges"] == 1
+    (rm,) = doc["rooms"]
+    assert sum(1 for e in rm["outline"] if e["wall"] is None) == 1
+    assert len(room.open_edges()) == 1
 
 
-def test_open_walls_not_serialized_but_room_reloads(fp, qapp, win):
+def test_open_room_survives_save_load(fp, qapp, win):
     sc = win.scene
     room = _room(fp, sc)
     wall = _right_wall(fp, room)
     fp.detach_wall_from_room(sc, wall)
     _shorten(fp, sc, wall)
     data = json.loads(json.dumps(win.serialize()))
-    assert all("open" not in w for w in data["walls"])   # open walls excluded
+    assert all("open" not in w for w in data["walls"])   # nothing dashed is stored
     win.load_data(data)
-    assert _open_count(fp, sc) == 1                       # regenerated on load
     r = next(x for x in sc.items() if isinstance(x, fp.RoomItem))
     assert r.area_sqft == pytest.approx(100.0)
-    assert win.serialize() == data                       # idempotent
+    assert len(r.open_edges()) == 1                       # still one open side
+    assert win.serialize() == data                        # idempotent
 
 
 @pytest.mark.gui
@@ -121,11 +184,15 @@ def test_corner_drag_opens_side_via_mouse(fp, win, make_room, drag):
     # drag the (120,120) corner up 60 scene units -> opens the lower-right side
     dy_px = int(-60 * win.view.transform().m11())
     drag(win, QPointF(120, 120), 0, dy_px, steps=4)
-    assert sum(isinstance(w, fp.OpenWall) for w in sc.items()) == 1
+    assert len(room.open_edges()) == 1
 
 
 @pytest.mark.gui
-def test_body_slide_carries_open_segment(fp, win, make_room, drag):
+def test_body_slide_carries_the_open_side(fp, win, make_room, drag):
+    """The old assertion was about the dashed segment translating rather than
+    shearing. The segment is gone, so the claim is asserted where it now lives:
+    the room's own corner, which the slide carries because the outline holds
+    it."""
     sc = win.scene
     room = make_room(sc, 0, 0, 120, 120, "Den")
     win.set_tool(fp.TOOL_SELECT)
@@ -137,13 +204,12 @@ def test_body_slide_carries_open_segment(fp, win, make_room, drag):
     fp.detach_wall_from_room(sc, right)
     m = win.view.transform().m11()
     drag(win, QPointF(120, 120), 0, int(-60 * m), steps=4)   # open lower-right
-    assert _open_count(fp, sc) == 1
+    assert len(room.open_edges()) == 1
     drag(win, QPointF(120, 30), int(36 * m), 0, steps=4)     # body-slide to x156
-    ow = next(w for w in sc.items() if isinstance(w, fp.OpenWall))
-    assert ow.p1.x() == pytest.approx(156, abs=3)            # translated, not
-    assert ow.p2.x() == pytest.approx(156, abs=3)            # sheared
+    assert right.p1.x() == pytest.approx(156, abs=3)         # translated, not
+    assert right.p2.x() == pytest.approx(156, abs=3)         # sheared
     top = next(w for w in sc.items() if isinstance(w, fp.WallItem)
-               and not w.is_open and abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1)
+               and abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1)
     assert max(top.p1.x(), top.p2.x()) == pytest.approx(156, abs=3)  # stretched
 
 
@@ -169,9 +235,9 @@ def test_closing_gap_refuses_and_relocks(fp, win, make_room, drag):
     fp.detach_wall_from_room(sc, right)
     m = win.view.transform().m11()
     drag(win, QPointF(120, 120), 0, int(-60 * m), steps=4)   # open
-    assert _open_count(fp, sc) == 1 and right._corners_unlocked
+    assert len(room.open_edges()) == 1 and right._corners_unlocked
     drag(win, QPointF(120, 60), 0, int(60 * m), steps=4)     # drag end back down
-    assert _open_count(fp, sc) == 0                          # gap closed
+    assert len(room.open_edges()) == 0                       # gap closed
     assert right._corners_unlocked is False                  # fused, re-locked
 
 

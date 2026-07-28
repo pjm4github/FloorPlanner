@@ -5,7 +5,6 @@ Imports wall items + a few wall algorithms from floorplanner.walls at module
 level (walls loads first).  FurnishingItem and the room dialogs are reached via
 LATE imports to avoid an import cycle."""
 import math
-from collections import deque
 
 from PyQt6 import sip
 from PyQt6.QtCore import *  # noqa: F401
@@ -16,105 +15,8 @@ from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.vertex import Vertex
 from floorplanner.walls import (
-    OpenWall, OpeningItem, WallItem, _CornerIndex, _WallBBoxIndex, merge_all,
-    rebuild_all_walls, wall_bbox,
+    OpeningItem, WallItem, _CornerIndex, merge_all, rebuild_all_walls,
 )
-
-
-class _RoomGrid:
-    """All non-open walls rasterised (solid, openings ignored) onto a flood-
-    fill grid over the canvas.  Built ONCE so many room regions can be located
-    against the same grid -- refresh_rooms re-detects every room from one grid
-    instead of rebuilding it per room (the old O(rooms x walls) cost)."""
-
-    def __init__(self, scene):
-        canvas = canvas_rect()
-        self.canvas = canvas
-        self.cell = cell = ROOM_CELL
-        self.x0, self.y0 = x0, y0 = canvas.left(), canvas.top()
-        self.nx = nx = int(canvas.width() / cell)
-        self.ny = ny = int(canvas.height() / cell)
-        self.blocked = blocked = bytearray(nx * ny)
-        self.has_walls = False
-        if scene is None:
-            return
-        active = active_floor()
-        for w in scene.items():
-            if not isinstance(w, WallItem) or w.is_open:
-                continue
-            if w.floor != active:            # detect only on the active floor
-                continue
-            length = w.length()
-            if length < 1e-6:
-                continue
-            self.has_walls = True
-            u = w.unit()
-            ux, uy = u.x(), u.y()
-            p1x, p1y = w.p1.x(), w.p1.y()
-            p2x, p2y = w.p2.x(), w.p2.y()
-            half = w.t * 0.5 + cell * 0.5
-            i0 = max(0, int((min(p1x, p2x) - half - x0) / cell))
-            i1 = min(nx - 1, int((max(p1x, p2x) + half - x0) / cell))
-            j0 = max(0, int((min(p1y, p2y) - half - y0) / cell))
-            j1 = min(ny - 1, int((max(p1y, p2y) + half - y0) / cell))
-            for j in range(j0, j1 + 1):
-                cy = y0 + (j + 0.5) * cell
-                row = j * nx
-                for i in range(i0, i1 + 1):
-                    cx = x0 + (i + 0.5) * cell
-                    dx, dy = cx - p1x, cy - p1y
-                    s = dx * ux + dy * uy
-                    if -half <= s <= length + half \
-                            and abs(dy * ux - dx * uy) <= half:
-                        blocked[row + i] = 1
-
-    def region(self, p: QPointF):
-        """(QPainterPath, area_sqft) for the enclosed region containing `p`, or
-        None when it leaks to the canvas edge or `p` sits on a wall."""
-        if not self.has_walls or not self.canvas.contains(p):
-            return None
-        cell, x0, y0 = self.cell, self.x0, self.y0
-        nx, ny, blocked = self.nx, self.ny, self.blocked
-        si, sj = int((p.x() - x0) / cell), int((p.y() - y0) / cell)
-        if not (0 <= si < nx and 0 <= sj < ny) or blocked[sj * nx + si]:
-            return None
-        seen = bytearray(nx * ny)
-        seen[sj * nx + si] = 1
-        queue = deque([(si, sj)])
-        cells = []
-        while queue:
-            i, j = queue.popleft()
-            if i == 0 or j == 0 or i == nx - 1 or j == ny - 1:
-                return None                 # leaked out -> not enclosed
-            cells.append((i, j))
-            for a, b in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
-                k = b * nx + a
-                if not seen[k] and not blocked[k]:
-                    seen[k] = 1
-                    queue.append((a, b))
-        rows = {}
-        for i, j in cells:
-            rows.setdefault(j, []).append(i)
-        path = QPainterPath()
-        for j, cols in rows.items():
-            cols.sort()
-            start = prev = cols[0]
-            for i in cols[1:] + [None]:
-                if i is not None and i == prev + 1:
-                    prev = i
-                    continue
-                path.addRect(QRectF(x0 + start * cell, y0 + j * cell,
-                                    (prev - start + 1) * cell, cell))
-                if i is not None:
-                    start = prev = i
-        area_sqft = len(cells) * cell * cell / 144.0
-        return path.simplified(), area_sqft
-
-
-def detect_room_region(scene, p: QPointF):
-    """Flood-fill the empty space around `p`, bounded by wall bodies.  Returns
-    (QPainterPath, area_sqft) in scene coords, or None.  See _RoomGrid."""
-    return _RoomGrid(scene).region(p)
 
 
 def poly_area_sqft(corners) -> float:
@@ -127,162 +29,28 @@ def poly_area_sqft(corners) -> float:
     return abs(a2) / 2.0 / 144.0
 
 
-class _WallGraph:
-    """Planar graph of wall centrelines, split where walls join (corner/T) or
-    cross.  Built ONCE so the enclosing face around many anchors can be walked
-    against the same graph (refresh_rooms traces every room from one graph).
+def detect_room(scene, anchor: QPointF, floor=None):
+    """The room at `anchor`: the enclosing FACE of the wall graph.
 
-    The O(walls^2) split-finding caches endpoints as floats to avoid millions
-    of QPointF.x()/.y() calls."""
+    Returns `(path, area_sqft, outline)` or None, where `outline` is a list of
+    `OutlineEdge` -- so the caller's `RoomItem(..., corners=res[2])` gets an
+    outline whose every edge already NAMES the wall covering it. Binding is
+    then a fact the detection reports rather than a search that follows it,
+    and `share_outline_vertices` (via `bind_room_walls`) turns those named
+    walls into the shared corner identities of P3.5 (1).
 
-    def __init__(self, scene):
-        self.nodes = []           # QPointF per node
-        self.edges = set()
-        self.adj = {}
-        active = active_floor()
-        walls = [it for it in (scene.items() if scene is not None else [])
-                 if isinstance(it, WallItem) and not it.is_open
-                 and it.length() > 1e-6 and it.floor == active]
-        if not walls:
-            return
-        segs = []                 # (length, ux, uy, p1x, p1y, p2x, p2y)
-        for w in walls:
-            length, u = w.length(), w.unit()
-            segs.append((length, u.x(), u.y(),
-                         w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()))
-        nc = []                   # node coords (x, y) parallel to self.nodes
-        nodes, edges = self.nodes, self.edges
-
-        def node_id(px, py):
-            for k, (qx, qy) in enumerate(nc):
-                if abs(qx - px) <= 0.6 and abs(qy - py) <= 0.6:
-                    return k
-            nc.append((px, py))
-            nodes.append(QPointF(px, py))
-            return len(nc) - 1
-
-        for i, (length, ux, uy, p1x, p1y, p2x, p2y) in enumerate(segs):
-            splits = {0.0, length}
-            d1x, d1y = p2x - p1x, p2y - p1y
-            for j, (_l2, _u2x, _u2y, q1x, q1y, q2x, q2y) in enumerate(segs):
-                if i == j:
-                    continue
-                for qx, qy in ((q1x, q1y), (q2x, q2y)):   # T: endpoint on body
-                    vx, vy = qx - p1x, qy - p1y
-                    s = vx * ux + vy * uy
-                    if 0.5 < s < length - 0.5 \
-                            and abs(vy * ux - vx * uy) <= 0.75:
-                        splits.add(s)
-                d2x, d2y = q2x - q1x, q2y - q1y           # X: true crossing
-                den = d1x * d2y - d1y * d2x
-                if abs(den) > 1e-9:
-                    ex, ey = q1x - p1x, q1y - p1y
-                    t1 = (ex * d2y - ey * d2x) / den
-                    t2 = (ex * d1y - ey * d1x) / den
-                    if 0.0 <= t1 <= 1.0 and 0.0 <= t2 <= 1.0:
-                        s = t1 * length
-                        if 0.5 < s < length - 0.5:
-                            splits.add(s)
-            ss = sorted(splits)
-            for a, b in zip(ss, ss[1:], strict=False):
-                if b - a < 0.5:
-                    continue
-                na = node_id(p1x + a * ux, p1y + a * uy)
-                nb = node_id(p1x + b * ux, p1y + b * uy)
-                if na != nb:
-                    edges.add((min(na, nb), max(na, nb)))
-        for a, b in edges:
-            self.adj.setdefault(a, []).append(b)
-            self.adj.setdefault(b, []).append(a)
-
-    def face(self, anchor: QPointF):
-        """Corner QPointFs of the enclosing face around `anchor`, or None."""
-        nodes, edges, adj = self.nodes, self.edges, self.adj
-        if not edges:
-            return None
-        # +x ray from the anchor: the nearest crossing edge, oriented with the
-        # anchor on its left, starts the face walk
-        ax, ay = anchor.x(), anchor.y()
-        start, best_x = None, None
-        for a, b in edges:
-            pa, pb = nodes[a], nodes[b]
-            if (pa.y() > ay) == (pb.y() > ay):
-                continue
-            x_at = pa.x() + (ay - pa.y()) * (pb.x() - pa.x()) / (pb.y() - pa.y())
-            if x_at <= ax or (best_x is not None and x_at >= best_x):
-                continue
-            cross = ((pb.x() - pa.x()) * (ay - pa.y())
-                     - (pb.y() - pa.y()) * (ax - pa.x()))
-            start, best_x = ((a, b) if cross > 0 else (b, a)), x_at
-        if start is None:
-            return None
-        # at each node take the next edge clockwise from the reversed incoming
-        # direction; this keeps the enclosed face on the left
-        poly = [start[0]]
-        cur = start
-        for _ in range(2 * len(edges) + 8):
-            u_, v_ = cur
-            pv = nodes[v_]
-            th_rev = math.atan2(nodes[u_].y() - pv.y(), nodes[u_].x() - pv.x())
-            nxt, best_d = None, None
-            for wn in adj[v_]:
-                th = math.atan2(nodes[wn].y() - pv.y(), nodes[wn].x() - pv.x())
-                delta = (th_rev - th) % (2.0 * math.pi)
-                if delta < 1e-9:
-                    delta = 2.0 * math.pi     # U-turn only as a last resort
-                if best_d is None or delta < best_d:
-                    best_d, nxt = delta, wn
-            cur = (v_, nxt)
-            if cur == start:
-                break
-            poly.append(v_)
-        else:
-            return None                       # never closed -> give up
-        if len(poly) < 3:
-            return None
-        pts = [nodes[k] for k in poly]
-        n = len(pts)
-        if sum(pts[i].x() * pts[(i + 1) % n].y()
-               - pts[(i + 1) % n].x() * pts[i].y() for i in range(n)) <= 0:
-            return None                       # walked the unbounded outer face
-        corners = []
-        for i in range(n):                    # drop straight pass-through nodes
-            p0, p1, p2 = pts[i - 1], pts[i], pts[(i + 1) % n]
-            ax1, ay1 = p1.x() - p0.x(), p1.y() - p0.y()
-            bx1, by1 = p2.x() - p1.x(), p2.y() - p1.y()
-            cross = ax1 * by1 - ay1 * bx1
-            dot = ax1 * bx1 + ay1 * by1
-            if dot < 0.0 or abs(cross) > \
-                    0.05 * math.hypot(ax1, ay1) * math.hypot(bx1, by1):
-                corners.append(QPointF(p1))
-        return corners if len(corners) >= 3 else None
-
-
-def trace_room_perimeter(scene, anchor: QPointF):
-    """Polygon of wall-CENTRELINE corners enclosing `anchor`, or None.  See
-    _WallGraph."""
-    return _WallGraph(scene).face(anchor)
-
-
-def _detect_room(grid, graph, anchor):
-    """Detect the room at `anchor` against a prebuilt grid + graph."""
-    res = grid.region(anchor)
-    if res is None:
+    P3.5: this used to be a raster flood-fill (`_RoomGrid`) crossed with a
+    hand-rolled planar face walk (`_WallGraph`), 220 lines of editor-side
+    topology. It is now `topology.enclosing_face` over a one-shot lift of the
+    scene (`design.bridge.face_at`) -- one definition of what a face is,
+    shared with the document, instead of two that could disagree."""
+    from floorplanner.design.bridge import face_at   # late: bridge imports rooms
+    edges = face_at(scene, anchor, floor)
+    if not edges:
         return None
-    path, area = res
-    corners = graph.face(anchor)
-    if corners:
-        area = poly_area_sqft(corners)
-    return path, area, corners
-
-
-def detect_room(scene, anchor: QPointF):
-    """Full room detection: flood-fill region + centreline perimeter.
-
-    Returns (path, area_sqft, corners) or None.  When the perimeter trace
-    succeeds, the area is the area inside the perimeter polygon; otherwise
-    the flood-fill area is the fallback and corners is None."""
-    return _detect_room(_RoomGrid(scene), _WallGraph(scene), anchor)
+    pts = [p for p, _w in edges]
+    outline = [OutlineEdge(p, w) for p, w in edges]
+    return room_path_from_corners(pts), poly_area_sqft(pts), outline
 
 
 def unique_room_name(scene, base: str, exclude=None) -> str:
@@ -295,101 +63,6 @@ def unique_room_name(scene, base: str, exclude=None) -> str:
     while f"{base} {n}" in names:
         n += 1
     return f"{base} {n}"
-
-
-def room_signature(scene, room, wall_index=None):
-    """A hash of the walls that can affect `room`: every wall whose bbox is
-    within ROOM_SIG_MARGIN of the room's region bbox, with its geometry, type
-    and open-state.  Two equal signatures mean the room's detection is
-    unchanged, so it can be skipped.  Returns None for an open/undetected room
-    (whose flood escapes through a gap and so depends on far walls) -- those
-    are always re-detected."""
-    if any(w.is_open for w in room.walls):
-        return None
-    br = room.path.boundingRect()
-    if br.isNull():
-        return None
-    box = br.adjusted(-ROOM_SIG_MARGIN, -ROOM_SIG_MARGIN,
-                      ROOM_SIG_MARGIN, ROOM_SIG_MARGIN)
-    near = (wall_index.near(box) if wall_index is not None
-            else [w for w in scene.items() if isinstance(w, WallItem)
-                  and wall_bbox(w).intersects(box)])
-    sig = [(round(w.p1.x()), round(w.p1.y()), round(w.p2.x()), round(w.p2.y()),
-            w.wall_type, w.is_open)
-           for w in near if w.floor == room.floor]   # same-floor walls only
-    return tuple(sorted(sig))
-
-
-def refresh_rooms(scene):
-    """Re-detect rooms after walls change -- but ONLY those whose defining
-    walls actually changed (memoized by room_signature), and skip the whole
-    grid/graph build when nothing is dirty.  An edit then recomputes just the
-    one or two rooms it touched, not every room on the canvas.
-
-    When a re-detected room's anchor no longer falls inside it, probe points
-    across the room's last known region for its new extent and move the anchor
-    there -- skipping any region that already belongs to another room."""
-    if scene is None:
-        return
-    active = active_floor()
-    # only the active floor's rooms re-detect (grid/graph below are active-only);
-    # rooms on other floors keep their frozen geometry.
-    rooms = [it for it in scene.items()
-             if isinstance(it, RoomItem) and it.floor == active]
-    if not rooms:
-        return
-    wall_index = _WallBBoxIndex(scene, active)   # O(local) 'walls near this room'
-    dirty = []
-    for it in rooms:
-        sig = room_signature(scene, it, wall_index)
-        if sig is None or sig != it._detect_sig:
-            dirty.append(it)
-    if not dirty:
-        return                              # nothing relevant changed
-    grid, graph = _RoomGrid(scene), _WallGraph(scene)
-    for it in dirty:
-        res = _detect_room(grid, graph, it.anchor)
-        if res is None:
-            others = [r for r in rooms if r is not it]
-            for p in _room_probe_points(it):
-                cand = _detect_room(grid, graph, p)
-                if cand is None or any(cand[0].contains(o.anchor)
-                                       for o in others):
-                    continue
-                res = cand
-                it.prepareGeometryChange()
-                it.anchor = QPointF(p)
-                break
-        if res is None and it.corners:
-            # the room is open (a corner was pulled away) so flood-fill escapes:
-            # rebuild the loop from the room's own walls, inserting corners and
-            # dashed open segments wherever consecutive walls no longer meet
-            res = reloop_open_room(it)
-        if res is not None:
-            it.set_region(*res)
-            # re-affirm wall ownership against the new perimeter; settle=False
-            # so we don't recurse back into rebuild_all_walls/refresh_rooms
-            bind_room_walls(scene, it, settle=False)
-        it._detect_sig = room_signature(scene, it)   # remember for next time
-
-
-def _room_probe_points(room) -> list:
-    """Candidate interior points for re-finding a room whose anchor was
-    left outside: the old perimeter's centroid, then a grid sample of
-    the old region."""
-    pts = []
-    if room.corners:
-        n = len(room.corners)
-        pts.append(QPointF(sum(p.x() for p in room.corners) / n,
-                           sum(p.y() for p in room.corners) / n))
-    br = room.path.boundingRect()
-    for iy in range(1, 6):
-        for ix in range(1, 6):
-            p = QPointF(br.left() + br.width() * ix / 6.0,
-                        br.top() + br.height() * iy / 6.0)
-            if room.path.contains(p):
-                pts.append(p)
-    return pts
 
 
 class OutlineEdge:
@@ -502,7 +175,6 @@ class RoomItem(QGraphicsItem):
         self.outline = []                # list[OutlineEdge]; corners derives
         self.corners = corners
         self.walls = []                  # WallItems this room owns (edge loop)
-        self._detect_sig = None          # memoize: walls that defined this room
         self._moving_room = False        # drag-the-name moves the whole room
         self._room_grab = QPointF(0.0, 0.0)
         self.show_dims = False
@@ -586,9 +258,17 @@ class RoomItem(QGraphicsItem):
         """Rebuild the outline from a corner loop. Wall references survive a
         same-length replacement -- a group move or a nudge translates every
         corner but keeps the same edges -- and are dropped when the loop
-        changes shape, for `bind_room_walls` to repopulate."""
+        changes shape, for `bind_room_walls` to repopulate.
+
+        A list of `OutlineEdge`s is ADOPTED WHOLE (P3.5): `detect_room` now
+        returns edges that already know their wall, and rebuilding points out
+        of them only to look the same walls up again would throw away the one
+        thing the face walk knows that a search has to guess."""
         if not pts:
             self.outline = []
+            return
+        if isinstance(pts[0], OutlineEdge):
+            self.outline = list(pts)
             return
         old = self.outline
         keep = len(old) == len(pts)
@@ -729,6 +409,24 @@ class RoomItem(QGraphicsItem):
     def clear_walls(self):
         for w in list(self.walls):
             self.unbind_wall(w)
+
+    def open_edges(self):
+        """Outline edges no built wall actually covers.
+
+        Two ways an edge is open, and P3.5 unified them: it names no wall at
+        all (the v5 `wall: null`), or it names one that no longer SPANS it --
+        a corner dragged away leaves the wall short of the edge it backs.
+        Before P3.5 the second case was represented by interposing a dashed
+        `OpenWall` item, so "is this side open?" was answered by looking for a
+        placeholder object; it is now answered from the outline, which is where
+        the document has always answered it (`bridge._rooms_of` emits exactly
+        these as open edges). `OpenWall` itself goes at P3.7."""
+        corners = self.corners or []
+        n = len(corners)
+        return [e for i, e in enumerate(self.outline)
+                if e.wall is None or e.wall.scene() is None
+                or not _wall_spans_segment(e.wall, corners[i],
+                                           corners[(i + 1) % n])]
 
     def room_openings(self):
         return [op for w in self.walls for op in w.openings]
@@ -1205,19 +903,52 @@ def _wall_spans_segment(w, a: QPointF, b: QPointF) -> bool:
     return True
 
 
-def _wall_along_segment(scene, a: QPointF, b: QPointF, floor=None):
-    """The wall whose body runs along (and spans) the segment a->b -- i.e.
-    the longer wall that carries a room edge.  None if there isn't one.  When
-    several walls span it, the geometrically smallest is chosen so the pick is
-    deterministic (scene.items() order is not) and save/load round-trips.
-    Pass `floor` to restrict the search to one floor's walls."""
-    cands = [w for w in scene.items()
-             if isinstance(w, WallItem) and not w.is_open
-             and (floor is None or w.floor == floor)
-             and _wall_spans_segment(w, a, b)]
-    if not cands:
+def _edge_wall(scene, a: QPointF, b: QPointF, floor=None):
+    """The wall covering the room edge a->b, or None.
+
+    P3.5: the last survivor of `bind_room_walls`'s three-priority search, kept
+    for the ONE case the face walk cannot answer -- an outline that came from a
+    file rather than from detection, whose edges name no wall. Everything else
+    is told which wall covers it by `detect_room`.
+
+    A wall whose ENDS match the edge wins over a longer one that merely runs
+    along it (the room's own edge before the party wall carrying it); after
+    that the one covering MORE of the edge wins; and among equals the
+    geometrically smallest is chosen so the pick is deterministic -- scene item
+    order is not, and save/load round-trips depend on it.
+
+    PARTIAL cover counts, which is what makes a reload agree with the live
+    scene. A side whose corner was dragged away is backed by a wall that no
+    longer spans its edge; the live outline goes on naming that wall (it is
+    still that side's wall -- `open_edges` is what reports the shortfall), so a
+    binder that demanded full cover would drop it on the way back in and a v4
+    round-trip would stop being idempotent."""
+    line = QLineF(a, b)
+    L = line.length()
+    if L < 1e-6:
         return None
-    return min(cands, key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()))
+    ux, uy = (b.x() - a.x()) / L, (b.y() - a.y()) / L
+    best, best_key = None, None
+    for w in scene.items():
+        if (not isinstance(w, WallItem) or w.is_open or w.group() is not None
+                or (floor is not None and w.floor != floor)):
+            continue
+        ss = []
+        for p in (w.p1, w.p2):
+            vx, vy = p.x() - a.x(), p.y() - a.y()
+            if abs(vy * ux - vx * uy) > 1.5:      # not collinear with the edge
+                break
+            ss.append(vx * ux + vy * uy)
+        if len(ss) != 2:
+            continue
+        lo, hi = max(0.0, min(ss)), min(L, max(ss))
+        if hi - lo < min(MIN_WALL_LEN, L):        # touches, but backs nothing
+            continue
+        key = (not _wall_endpoints_match(w, a, b), -(hi - lo),
+               w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y())
+        if best_key is None or key < best_key:
+            best, best_key = w, key
+    return best
 
 
 def room_owns_walls(walls, room) -> bool:
@@ -1275,137 +1006,42 @@ def duplicate_wall(scene, w):
     return nw
 
 
-def synthesize_room_edge(scene, a: QPointF, b: QPointF):
-    """Create a new wall along a->b for a room's own copy of a shared/party
-    wall.  It takes the carrier's type but NOT its openings -- a door/window
-    belongs to one wall only; this plain copy opens its body for it instead
-    (so there are never two doors or windows on top of each other)."""
-    src = _wall_along_segment(scene, a, b)
-    nw = WallItem(QPointF(a), QPointF(b),
-                  src.wall_type if src is not None else "interior")
-    if src is not None:
-        nw.floor = src.floor                    # inherit the carrier's floor
-    scene.addItem(nw)
-    nw.rebuild()
-    return nw
-
-
 def bind_room_walls(scene, room, settle=True):
-    """Bind `room`'s edge loop, backing every perimeter edge with exactly one
-    item, in priority order:
+    """Bind `room` to the wall behind every edge of its STORED outline.
 
-      1. a real ownable wall whose endpoints match the edge (bound directly);
-      2. else, if a neighbour-owned exact wall or a longer/party wall spans
-         the edge, a room-owned copy is synthesized (keeps adjacent rooms
-         decoupled);
-      3. else an OpenWall -- a dashed gap that keeps the loop closed but is
-         not a built wall.
+    P3.5 -- AND THE NAME NOW MEANS SOMETHING NARROWER THAN IT DID. This used to
+    REBUILD the room's edge loop, and it did so by editing the plan: a
+    three-priority search that could synthesize a private duplicate of a party
+    wall (`synthesize_room_edge`) or interpose an `OpenWall` for a gap. Asking
+    which walls a room owned therefore changed the document, and it ran on
+    every `rebuild_all_walls` via `refresh_rooms`.
 
-    Corner geometry (including the extra corners created when a wall's end is
-    pulled away, opening a side) comes from reloop_open_room via refresh; this
-    just attaches a wall/open-wall to each edge.  Idempotent: a previously
-    synthesized copy or OpenWall is reused, so the count does not grow; open
-    walls that closed up are removed.  Pass settle=False from refresh_rooms."""
-    if not room.corners:
+    It now only ATTACHES. `detect_room` hands each outline edge the wall
+    covering it, straight off the face walk, so there is nothing left to search
+    for -- except on the one path that has an outline but no wall references: a
+    plan loaded from a legacy file, whose corners come from the file and whose
+    edges name nothing. `_edge_wall` answers for those, and for nothing else.
+
+    Nothing is created, nothing is deleted, and no coordinate moves. An edge no
+    wall covers keeps `wall = None` -- the v5 `wall: null`, which P3.7 renders
+    dashed once `OpenWall` is gone."""
+    if not room.outline:
         return
-    old_open = [w for w in room.walls if w.is_open]
-    room.clear_walls()
     corners = room.corners
     n = len(corners)
-    # sort candidates by geometry so the per-edge pick is deterministic
-    # (scene.items() order is not), which keeps save/load + undo round-trips
-    # byte-stable
-    band_walls = sorted((w for w in room.bounding_walls()
-                         if w.floor == room.floor),     # bind only same-floor walls
-                        key=lambda w: (w.p1.x(), w.p1.y(),
-                                       w.p2.x(), w.p2.y(), w.wall_type))
-    reused_open = set()
-    for i in range(n):
-        a, b = corners[i], corners[(i + 1) % n]
-        if QLineF(a, b).length() < MIN_WALL_LEN:
-            continue
-        match = next((w for w in band_walls
-                      if not w.is_open and w.group() is None
-                      and _wall_endpoints_match(w, a, b)), None)
-        if match is not None:                            # 1. share this wall
-            room.bind_wall(match)
-            room.outline[i].wall = match                 # P3.2: edge -> wall
-            continue
-        span = _wall_along_segment(scene, a, b, room.floor)  # 2. share party wall
-        if span is not None and span.group() is None:
-            # a longer/neighbour-owned wall runs along this edge -- SHARE it
-            # (the shared-wall model: one wall borders several rooms) rather
-            # than synthesizing a private duplicate.
-            room.bind_wall(span)
-            room.outline[i].wall = span                  # P3.2: edge -> wall
-            continue
-        ow = next((w for w in old_open if w not in reused_open    # 3. open edge
-                   and _wall_endpoints_match(w, a, b)), None)
-        if ow is None:
-            ow = OpenWall(QPointF(a), QPointF(b), room)
-            scene.addItem(ow)
-        else:
-            reused_open.add(ow)
-        room.bind_wall(ow)
-        room.outline[i].wall = None      # P3.2: an OPEN edge (v5 `wall: null`)
-    for w in old_open:                       # drop open edges that closed up
-        if w not in reused_open and not w.rooms and w.scene() is not None:
-            scene.removeItem(w)
-    # P3.5: now that every edge knows its wall, make the corners ONE vertex and
-    # point the outline at them. Here because this is the one place the
-    # edge -> wall mapping is established, so it is the one place that knows
-    # which walls meet at which corner.
+    room.clear_walls()
+    for i, e in enumerate(room.outline):
+        if e.wall is None or e.wall.scene() is None:
+            a, b = corners[i], corners[(i + 1) % n]
+            e.wall = (None if QLineF(a, b).length() < MIN_WALL_LEN
+                      else _edge_wall(scene, a, b, room.floor))
+        if e.wall is not None:
+            room.bind_wall(e.wall)
+    # now that every edge knows its wall, make the corners ONE vertex and point
+    # the outline at them -- the one place that knows which walls meet where
     share_outline_vertices(room)
     if settle:
         rebuild_all_walls(scene)
-
-
-def reloop_open_room(room):
-    """Rebuild an OPEN room's corner loop from its bound real walls when
-    flood-fill can't enclose it.  Each real wall is matched (using the last
-    known corners for order) to a perimeter edge; the loop is then the walls'
-    current endpoints in order, with extra corners + dashed open segments
-    inserted wherever consecutive walls no longer meet.  Returns
-    (path, area, corners) or None."""
-    prev = room.corners
-    # include open walls: a body-slid side carries its dashed gap, so the open
-    # edge must follow the open wall's CURRENT position, not the stale corners
-    walls = [w for w in room.walls if w.length() > 1e-6]
-    if not prev or not walls:
-        return None
-    n = len(prev)
-    used, segs = set(), []
-    for i in range(n):
-        a, b = prev[i], prev[(i + 1) % n]
-        best, best_d, orient = None, 1e18, None
-        for w in walls:
-            if id(w) in used:
-                continue
-            d1 = QLineF(w.p1, a).length() + QLineF(w.p2, b).length()
-            d2 = QLineF(w.p2, a).length() + QLineF(w.p1, b).length()
-            d, o = (d1, (w.p1, w.p2)) if d1 <= d2 else (d2, (w.p2, w.p1))
-            if d < best_d:
-                best_d, best, orient = d, w, o
-        if best is not None and best_d <= QLineF(a, b).length() + 2 * JOIN_TOL:
-            used.add(id(best))
-            segs.append((QPointF(orient[0]), QPointF(orient[1])))   # wall ends
-        else:
-            segs.append(None)                                       # open edge
-    pts = []
-    for i in range(n):
-        a, b = prev[i], prev[(i + 1) % n]
-        s, e = segs[i] if segs[i] is not None else (a, b)
-        if not pts or QLineF(pts[-1], s).length() > 0.6:
-            pts.append(s)
-        if QLineF(s, e).length() > 0.6:
-            pts.append(e)
-    if len(pts) > 1 and QLineF(pts[0], pts[-1]).length() <= 0.6:
-        pts.pop()
-    # keep collinear gap corners (a shortened wall leaves a collinear open
-    # segment); only exact near-duplicates were already dropped above
-    if len(pts) < 3:
-        return None
-    return (room_path_from_corners(pts), poly_area_sqft(pts), pts)
 
 
 def detach_wall_from_room(scene, wall):

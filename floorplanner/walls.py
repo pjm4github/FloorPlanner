@@ -764,7 +764,14 @@ class _WallBBoxIndex:
 
 
 def rebuild_all_walls(scene):
-    from floorplanner.rooms import refresh_rooms  # late: breaks the walls<->rooms cycle
+    """Rebuild every wall's geometry and the junction clips.
+
+    IT NO LONGER TOUCHES ROOMS (P3.5). This used to end in `refresh_rooms`,
+    which re-detected every room whose nearby walls had changed -- the editor's
+    hot path, and the reason a wall edit cost a raster flood-fill plus a planar
+    face walk. A room's region now DERIVES from its outline, and the outline
+    holds the very vertices the walls hold, so a wall edit updates the rooms it
+    borders before this function is even called."""
     if scene is None:
         return
     index = _WallIndex(scene)                # shared: rebuild is O(local), not
@@ -772,7 +779,6 @@ def rebuild_all_walls(scene):
     for it in walls:                         # O(all walls) per wall
         it.rebuild(cascade=False, index=index)
     _compute_wall_junctions(scene, walls)
-    refresh_rooms(scene)
 
 
 def _compute_wall_junctions(scene, walls=None):
@@ -1498,9 +1504,13 @@ class WallItem(QGraphicsItem):
             # dragging a corner back so the room is fully walled again fuses
             # the wall back in: re-lock its corners (right-click to detach
             # again)
+            # P3.5: "fully walled again" is a question about the room's OUTLINE
+            # (does a wall span every edge?), not about whether a dashed
+            # OpenWall placeholder happens to exist. Nothing creates those any
+            # more, so `any(w.is_open ...)` would be permanently False and the
+            # wall would re-lock on the very drag that opened the side.
             if (corner_drag and self._corners_unlocked
-                    and not any(w.is_open for r in self.rooms
-                                for w in r.walls)):
+                    and not any(r.open_edges() for r in self.rooms)):
                 self._corners_unlocked = False
                 self.primary_room.raise_to_front()   # normalise z to siblings
         self._mode = None

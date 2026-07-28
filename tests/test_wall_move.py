@@ -13,9 +13,12 @@ hand. The observable difference is sharing. A neighbour follows because it is
 the same corner, not because a loop remembered it -- and the split rule says
 which neighbours may become the same corner in the first place.
 
-Outlines are still produced by DETECTION here, not read off the vertices; P3.5
-flips that. So the scene tests assert the areas detection arrives at, which is
-the honest thing to assert while detection is the authority.
+Outlines were still produced by DETECTION when this file was written, so the
+scene tests asserted the areas detection arrived at -- the honest thing to
+assert while detection was the authority. P3.5 flipped that and then deleted
+the detector, so `test_a_dragged_wall_resizes_the_rooms_it_borders` now asserts
+the same numbers for a different reason. That test surviving the deletion
+unchanged is P3.5's headline check (rider 1), and it is annotated as such below.
 """
 import json
 import pathlib
@@ -436,10 +439,19 @@ def test_a_dragged_wall_resizes_the_rooms_it_borders(fp, scene):
     """The editor half of the demo: slide a party wall and the two rooms either
     side resize by equal and opposite amounts, total unchanged.
 
-    The areas come from DETECTION, which stays authoritative until P3.5 flips
-    outlines onto the stored geometry. So this asserts what detection arrives
-    at -- and its arriving at the right answer is the point: the vertex move
-    gives detection correct walls to find."""
+    P3.5's HEADLINE CHECK (rider 1), and the assertions did not move -- which is
+    the whole point. Written at P3.3, the areas came from DETECTION: the vertex
+    move gave the flood-fill correct walls to find, and a re-detection pass
+    inside `rebuild_all_walls` then rebuilt both regions from scratch. That pass
+    no longer exists. The same numbers now arrive because the rooms' outlines
+    hold the very vertices the divider holds, so moving the divider IS moving
+    two corners of each room and their areas derive from those.
+
+    A test that survives the deletion of the machinery that used to make it pass
+    is the cleanest statement of the phase there is. The `refresh_rooms` guard
+    below makes the claim explicit rather than implied."""
+    assert not hasattr(fp, "refresh_rooms"), \
+        "the detection engine is back; this test proves nothing"
     left, right, divider = _two_rooms_one_divider(fp, scene)
     before = (left.area_sqft, right.area_sqft)
     assert divider.rooms and len(divider.rooms) == 2, "not a shared wall"

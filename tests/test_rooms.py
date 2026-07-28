@@ -4,7 +4,6 @@ import json
 import pytest
 from PyQt6.QtCore import QPointF
 
-from floorplanner.walls import _WallBBoxIndex
 
 pytestmark = pytest.mark.rooms
 
@@ -469,50 +468,80 @@ def test_inventory_counts_furnishings(fp, scene, make_room, first_furnishing):
 
 
 def test_region_follows_wall_move(fp, scene, make_room):
+    """REWRITTEN AT P3.5. Old mechanism: assign new coordinates to every wall,
+    then `rebuild_all_walls` re-detected the room and `set_region` replaced its
+    stored path. New: the region derives from the outline, and the outline holds
+    the walls' own corner vertices, so RELOCATING those corners moves the room
+    -- nothing re-detects and nothing is re-assigned.
+
+    Why the assertion moved to `relocated_to`: a bare `w.p1 = ...` is
+    SPLIT-ON-WRITE by the P3.1 ruling (it mints a fresh vertex for that one wall
+    end and leaves every sharer behind), so the old test was not moving walls so
+    much as replacing their ends and asking detection to notice. The claim under
+    test -- the region follows a wall move -- is the same; the mechanism it
+    exercises is now the one the editor actually uses."""
     room = make_room(scene, 0, 0, 144, 120, "Den")
     before = room.path.boundingRect().x()
-    for w in [i for i in scene.items() if isinstance(i, fp.WallItem)]:
-        w.p1 = QPointF(w.p1.x() + 60, w.p1.y() + 48)
-        w.p2 = QPointF(w.p2.x() + 60, w.p2.y() + 48)
+    seen, moves = set(), []
+    for w in room.walls:
+        for a in ("p1", "p2"):
+            v = w.end_vertex(a)
+            if id(v) not in seen:
+                seen.add(id(v))
+                moves.append((v, v.relocated_to(QPointF(v.x + 60, v.y + 48))))
+    for old, new in moves:
+        for w in room.walls:
+            for a in ("p1", "p2"):
+                if w.end_vertex(a) is old:
+                    w.set_end_vertex(a, new)
+        for e in room.outline:
+            if e.v is old:
+                e.v = new
     room.anchor = QPointF(room.anchor.x() + 60, room.anchor.y() + 48)
     fp.rebuild_all_walls(scene)
     after = room.path.boundingRect().x()
     assert after - before == pytest.approx(60, abs=6)
 
 
-# -- memoized refresh: room re-detected only when its walls change ------------
-def test_room_signature_tracks_relevant_walls(fp, scene, make_room):
-    room = make_room(scene, 0, 0, 120, 120, "Den")
-    sig0 = fp.room_signature(scene, room)
-    assert sig0 is not None
-    # a wall far from the room must NOT change its signature (so it's skipped)
-    scene.addItem(fp.WallItem(QPointF(600, 600), QPointF(700, 600), "interior"))
-    assert fp.room_signature(scene, room) == sig0
-    # moving one of the room's own walls MUST change it (so it re-detects)
-    w = room.walls[0]
-    w.p1 = QPointF(w.p1.x(), w.p1.y() + 6)
-    w.p2 = QPointF(w.p2.x(), w.p2.y() + 6)
-    w.rebuild()
-    assert fp.room_signature(scene, room) != sig0
+def test_detection_does_not_depend_on_the_view(fp, win, make_room):
+    """DEFECT 13, half of it, closed and pinned.
+
+    The defect said "detection result depends on view zoom". Measured at P3.5
+    before the deletion, at zooms 0.25x - 4x: detection was already identical
+    at every zoom, and what actually varied was the DRAG (the endpoint catch
+    radius is `20.0 / _view_scale()`), which produced a different wall geometry
+    for the same scene-space gesture and therefore a different room.
+
+    This pins the half P3.5 owns, and it now holds structurally rather than by
+    luck: `topology.enclosing_face` is a question about the wall graph, and
+    there is no longer any pixel, cell or canvas rectangle anywhere in the
+    answer. The drag half is retargeted -- see the P3.5 Progress log entry."""
+    room = make_room(win.scene, 0, 0, 144, 120, "Den")
+    seen = set()
+    for z in (0.25, 0.5, 1.0, 2.0, 4.0):
+        win.view.resetTransform()
+        win.view.scale(z, z)
+        res = fp.detect_room(win.scene, room.anchor)
+        assert res is not None, f"not detected at zoom {z}"
+        seen.add((round(res[1], 6),
+                  tuple((round(e.p.x(), 6), round(e.p.y(), 6))
+                        for e in res[2])))
+    assert len(seen) == 1, f"detection differed across zooms: {seen}"
 
 
-def test_refresh_skips_when_nothing_changed(fp, scene, make_room):
-    room = make_room(scene, 0, 0, 120, 120, "Den")
-    fp.rebuild_all_walls(scene)                 # sets the room's signature
-    # room._detect_sig is the refresh_rooms memoization signature, deleted with
-    # the detection engine in v5 P3.5 (V5_MIGRATION_PLAN); assertion kept as-is.
-    assert room._detect_sig is not None
-    area0 = room.area_sqft
-    # a no-op refresh keeps the room exactly as is
-    fp.refresh_rooms(scene)
-    assert room.area_sqft == area0
+def test_detection_is_not_clipped_to_the_canvas(fp, scene, make_room):
+    """DEFECT 16, closed structurally.
 
-
-def test_room_signature_index_matches_full_scan(fp, scene, make_room):
-    room = make_room(scene, 0, 0, 120, 120, "Den")
-    scene.addItem(fp.WallItem(QPointF(400, 0), QPointF(500, 0), "interior"))
-    idx = _WallBBoxIndex(scene)
-    assert fp.room_signature(scene, room, idx) == fp.room_signature(scene, room)
+    Room detection used to rasterise onto a grid sized by `canvas_rect()` and
+    treat anything reaching the grid's edge as unenclosed -- so a plan larger
+    than the canvas silently lost its edge rooms, with no warning. Found by the
+    P0.3 harness rather than by any test. The face walk has no canvas in it at
+    all, which is why this closes by deletion rather than by a bounds check."""
+    canvas = fp.canvas_rect()
+    x = canvas.right() + 240                    # well past the canvas edge
+    room = make_room(scene, x, 0, 144, 120, "Outer")
+    assert room.area_sqft == pytest.approx(120.0)
+    assert fp.detect_room(scene, QPointF(x + 72, 60)) is not None
 
 
 def test_removing_room_unbinds_its_walls(fp, scene, make_room):

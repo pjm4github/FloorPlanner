@@ -56,7 +56,8 @@ from PyQt6.QtCore import QPointF
 from PyQt6.QtWidgets import QGraphicsScene
 
 from floorplanner.config import (
-    DEFAULT_FLOOR, DEFAULT_SETTINGS, JOIN_TOL, SETTINGS, set_floor_state,
+    DEFAULT_FLOOR, DEFAULT_SETTINGS, JOIN_TOL, SETTINGS, active_floor,
+    set_floor_state,
 )
 from floorplanner.design.canonical import canonicalize
 from floorplanner.design.legacy import (
@@ -68,11 +69,12 @@ from floorplanner.items import (
     FurnishingItem, ReferenceImageItem, furnishing_spec, make_furnishing,
 )
 from floorplanner.model import Floor
+from floorplanner.vertex import Vertex
 from floorplanner.rooms import (
-    RoomItem, poly_area_sqft, room_path_from_corners, room_signature,
+    OutlineEdge, RoomItem, poly_area_sqft, room_path_from_corners,
 )
 from floorplanner.walls import (
-    OpeningItem, OpenWall, WallItem, rebuild_all_walls,
+    OpeningItem, WallItem, rebuild_all_walls,
 )
 
 # names that make a room exterior rather than interior.  Kept identical to
@@ -242,10 +244,17 @@ def _walk(va, vb, edge, adj, vt, max_hops=10):
 
 
 # ------------------------------------------------------------------ level walk
-def _walls_of(items, lid, nid, vt, rep):
+def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
     """This level's walls, split at every junction and room corner, as v5 wall
     dicts.  Openings are re-anchored from absolute `s` to {from, offset_in} on
-    the segment that carries them."""
+    the segment that carries them.
+
+    Pass `src` (a dict) to receive `{(v1, v2) sorted: WallItem}` -- which scene
+    wall each emitted segment came from.  `face_at` needs it and nothing else
+    does, so it is an out-param rather than a field on the wall dicts: the
+    Design is a document and a `QGraphicsItem` has no business in one.
+    `weld_check=False` skips the O(n^2) disagreement count, which only exists to
+    warn a human and has no reader on the detection path."""
     w_items = [it for it in _ordered(items, WallItem, _wall_key)
                if not it.is_open]
     r_items = _ordered(items, RoomItem, _room_key)
@@ -258,7 +267,8 @@ def _walls_of(items, lid, nid, vt, rep):
                 key=lambda o: o["s"]),
             "extra": getattr(w, "_v5_extra", None) or {}}
            for w in w_items]
-    rep["unwelded_ends"] += _weld_delta(raw)
+    if weld_check:
+        rep["unwelded_ends"] += _weld_delta(raw)
 
     loops = [[(c.x(), c.y()) for c in r.corners] for r in r_items if r.corners]
     prep, cuts = split_params(raw, loops)
@@ -305,6 +315,8 @@ def _walls_of(items, lid, nid, vt, rep):
                 seg_ops.append(rec)
 
             key = (*sorted((v1, v2)),)
+            if src is not None:
+                src.setdefault(key, w_items[i])    # which scene wall covers it
             if key in by_pair:                     # invariant I4 enforced here
                 ex = by_pair[key]
                 rep["merged"] += 1
@@ -521,6 +533,115 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
     }))
 
 
+# -------------------------------------------------- "detect room here" (P3.5)
+def _prune_spurs(ids):
+    """Drop out-and-back excursions from a traced face loop.
+
+    A wall that dangles into (or off) a room -- a stub with a degree-1 end --
+    is part of the wall graph and therefore part of the face walk, which enters
+    it and comes straight back out. That is correct for a FACE (the excursion
+    encloses no area, so it costs nothing) and wrong for a room OUTLINE: the
+    room would carry a corner at the stub's free end, miles off its boundary,
+    and every consumer that asks "is this room inside the rubber band" or "how
+    long is its perimeter" would answer from it.
+
+    A tip is a vertex whose predecessor and successor in the loop are the same
+    vertex. Removing it and one of the two visits to that neighbour leaves a
+    loop whose consecutive pairs are still graph edges, so the edge -> wall
+    mapping survives. Repeated, because a stub can hang off a stub."""
+    out = list(ids)
+    guard = 0
+    while len(out) > 3 and guard < 4 * len(ids) + 8:
+        guard += 1
+        n = len(out)
+        tip = next((i for i in range(n)
+                    if out[(i - 1) % n] == out[(i + 1) % n]), None)
+        if tip is None:
+            break
+        for k in sorted((tip, (tip + 1) % n), reverse=True):
+            del out[k]
+    return out
+
+
+def face_at(scene, point, floor=None):
+    """The wall-graph face enclosing `point`, as `[(QPointF corner, WallItem
+    covering the edge that STARTS there), ...]`, or None.
+
+    THE ONE-SHOT LIFT. This is P3.5's replacement for the flood-fill room
+    detector: the scene's walls are lifted to a `Design` and
+    `topology.enclosing_face` answers on it -- the room a click falls in is the
+    face around it, which is a question about the wall graph and was never a
+    question about pixels.
+
+    Lifting a whole level per call is exactly what P3.4's point 1 rejected for
+    edit ops, and the distinction is the reason this is allowed: an edit happens
+    per mouse event and must touch only what it names, but "detect room here" is
+    a ONE-SHOT gesture -- six call sites, each once per user action. Paying a
+    plan walk there costs no more than the `_RoomGrid` + `_WallGraph` pair it
+    replaces (both were rebuilt per call too, and the graph's split-finding was
+    O(walls^2)), and it single-sources the topology instead of keeping a second
+    implementation of it in the editor.
+
+    THREE THINGS COME FOR FREE, and they are the reason the swap is worth making
+    rather than merely equivalent:
+      * the walk is unbounded, so DEFECT 16 closes structurally -- the raster
+        grid was clipped to `canvas_rect()` and silently lost the edge rooms of
+        any plan larger than the canvas;
+      * every returned edge names the wall covering it, so a room binds its
+        outline at creation instead of searching for its own walls afterwards;
+      * a wall split at a T-junction yields one edge per SEGMENT, which is
+        invariant I5 ("every outline edge maps to exactly one wall") holding by
+        construction. The old tracer dropped those pass-through corners, so a
+        room could carry an edge no single wall covered.
+    """
+    from floorplanner.design import topology as T
+
+    lid = "L1"
+    items = _by_floor(scene).get(floor or active_floor(), [])
+    seq = defaultdict(int)
+
+    def nid(prefix):
+        seq[prefix] += 1
+        return f"{prefix}{seq[prefix]}"
+
+    vt = VertexTable(lambda: nid("v"))
+    src = {}
+    walls = _walls_of(items, lid, nid, vt, defaultdict(int), src,
+                      weld_check=False)
+    if not walls:
+        return None
+    used = {v for w in walls for v in (w["v1"], w["v2"])}
+    design = Design.from_dict({
+        "levels": [{"id": lid, "name": "detect", "elevation_in": 0.0,
+                    "height_in": 96.0, "kind": "storey"}],
+        "vertices": [r for r in vt.rows if r["id"] in used],
+        "walls": walls, "rooms": [], "furnishings": [],
+    })
+    face = T.enclosing_face(design, (point.x(), point.y()), lid)
+    if face is None:
+        return None
+    ids = _prune_spurs(face.vertices)
+    if len(ids) < 3:
+        return None
+    # CANONICAL WINDING, and it is not cosmetic. `_inner_faces` picks the inner
+    # sign by MAJORITY, which is decisive from two rooms on but a tie at one:
+    # a lone wall loop traces two faces of equal area and opposite winding, so
+    # which one comes back depends on the rest of the plan. The vertex set is
+    # the same either way, but the outline's ORDER is not -- and that order is
+    # serialized, so the same room round-tripped through save/load came back
+    # wound the other way. Fixed here at the one-shot entry, to the sign the
+    # document already uses for inner faces (positive shoelace, interior on the
+    # `left` side of each edge -- verified against every face of symmetricP1).
+    if _area2([vt.xy(v) for v in ids]) < 0:
+        ids = ids[:1] + ids[:0:-1]             # reverse, keeping the start
+    out = []
+    for i, vid in enumerate(ids):
+        x, y = vt.xy(vid)
+        nxt = ids[(i + 1) % len(ids)]
+        out.append((QPointF(x, y), src.get((*sorted((vid, nxt)),))))
+    return out
+
+
 # ------------------------------------------------------- Design -> scene (P1.5)
 def _opening_s(frm, off, ow, L):
     """Distance of an opening's CENTRE from the wall's v1 -- the exact inverse
@@ -553,11 +674,13 @@ def apply_design_to_scene(target, design, report=None, strict=False,
     differ from the first through no fault of the bridge.  Walls are built, then
     `rebuild_all_walls` runs once for rendering only.
 
-    **Rooms are read, never re-detected.**  Each `RoomItem` takes its corners,
-    path and area straight from the stored outline.  The rebuild happens BEFORE
-    any room exists, so `refresh_rooms` returns at its empty-list guard and
-    cannot overwrite an outline with a flood-fill; each room's detection memo is
-    then primed so a later rebuild leaves it alone too.
+    **Rooms are read, never re-detected.**  Each `RoomItem` takes its corners
+    straight from the stored outline, and its region derives from those.  This
+    used to need two defences -- rebuilding before any room existed, so
+    `refresh_rooms` hit its empty-list guard, and then priming each room's
+    detection memo so a later rebuild left it alone.  P3.5 deleted the pass both
+    were guarding against, so the rule now holds because there is nothing that
+    could break it.
 
     **Openings invert exactly.**  See `_opening_s`.
 
@@ -622,10 +745,24 @@ def apply_design_to_scene(target, design, report=None, strict=False,
         set_floor_state(active=win.active_floor)
 
     pos = {v["id"]: QPointF(v["x"], v["y"]) for v in doc.get("vertices", [])}
+    # THE DOCUMENT'S VERTEX IDENTITY, CARRIED INTO THE SCENE (P3.5). One live
+    # `Vertex` per document vertex, handed to every wall end and every outline
+    # edge that names it -- so a corner two walls share in the file is one
+    # corner in the scene, and a room's outline is holding the very object its
+    # walls hold. Reconstructing that by WELDING here would be a repair, and
+    # apply must not repair: a file whose corner has drifted 0.3" is malformed
+    # and is reported as such, not quietly closed up
+    # (`test_malformed_v5_is_reported_not_rewelded`).
+    # fresh uids, NOT the document's ids: those are canonical (renumbered by
+    # geometry at every save), and a live uid is persistent. P3.1 settled that
+    # the two id spaces stay separate and `canonicalize` bridges them.
+    vmap = {vid: Vertex(p.x(), p.y()) for vid, p in pos.items()}
 
     wmap = {}
     for wd in doc.get("walls", []):
         wall = WallItem(pos[wd["v1"]], pos[wd["v2"]], wd.get("type", "interior"))
+        wall.set_end_vertex("p1", vmap[wd["v1"]])
+        wall.set_end_vertex("p2", vmap[wd["v2"]])
         wall.floor = lname.get(wd["level"], DEFAULT_FLOOR)   # never the global
         wall._v5_extra = {k: v for k, v in wd.items() if k not in _WALL_MODELLED}
         scene.addItem(wall)
@@ -667,32 +804,24 @@ def apply_design_to_scene(target, design, report=None, strict=False,
         room = RoomItem(rd["name"], QPointF(cx + off[0], cy + off[1]),
                         room_path_from_corners(corners),
                         poly_area_sqft(corners),
-                        rd.get("properties") or {}, corners)
+                        rd.get("properties") or {},
+                        [OutlineEdge(vmap[e["v"]], wmap.get(e.get("wall")))
+                         for e in rd["outline"]])
         room.floor = lname.get(rd["level"], DEFAULT_FLOOR)   # never the global
         room._v5_extra = {k: v for k, v in rd.items() if k not in _ROOM_MODELLED}
         room.show_dims = bool((rd.get("label") or {}).get("show_dimensions",
                                                           False))
         room.label_offset = QPointF(0.0, 0.0)
         scene.addItem(room)
-        n = len(rd["outline"])
-        for i, e in enumerate(rd["outline"]):   # the outline IS the binding --
-            if e.get("wall") and e["wall"] in wmap:      # read, not detected
-                room.bind_wall(wmap[e["wall"]])
-            elif not e.get("wall"):
-                # An OPEN edge (`wall: null`) -- an archway or a detached side.
-                # The v4 loader regenerated these via bind_room_walls; that path
-                # is detection, which apply must not run, so build the dashed
-                # placeholder straight from the edge the document records.
-                # Without this, undo (which now restores through here, P2.3)
-                # would silently drop every archway. P3.7 deletes OpenWall and
-                # renders `wall: null` dashed directly, retiring this branch.
-                ow = OpenWall(corners[i], corners[(i + 1) % n], room)
-                ow.floor = room.floor
-                scene.addItem(ow)
-                room.bind_wall(ow)
-        # prime the detection memo so a later rebuild_all_walls treats this room
-        # as current instead of re-detecting over the stored outline
-        room._detect_sig = room_signature(scene, room)
+        for e in room.outline:                  # the outline IS the binding --
+            if e.wall is not None:                       # read, not detected
+                room.bind_wall(e.wall)
+            # An edge with `wall: null` -- an archway or a detached side --
+            # stays null. Until P3.5 this branch built a dashed `OpenWall`
+            # placeholder so undo would not silently drop an archway; the
+            # outline now carries that fact itself (`RoomItem.open_edges`), so
+            # the placeholder was the second representation of it and went with
+            # the rest of them. P3.7 renders a null edge dashed directly.
         rep["rooms"] += 1
 
     for fd in doc.get("furnishings", []):

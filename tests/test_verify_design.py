@@ -69,13 +69,19 @@ def test_flag_parsing(monkeypatch, val, enabled, deep):
 
 # -------------------------------------------------------------- baseline rules
 def test_corrupt_at_rest_does_not_fire(fp, win, on):
-    """planc1 opens with 17x I6 + 1x I11 and shadow mode must tolerate it.
+    """planc1 opens with 13x I6 + 1x I11 and shadow mode must tolerate it.
 
     This is the rule that makes shadow mode usable at all: it reports what an
-    operation BROKE, not what the file arrived broken."""
+    operation BROKE, not what the file arrived broken.
+
+    (17 -> 13 at P3.5: four of the I6 claims came from outline corners on the
+    free ends of planc1's short divider stubs, which the face walk no longer
+    carries. See `test_design_bridge.py::test_planc1_reports_its_real_faults`
+    -- the count is a characterization of the fixture, and the fixture's real
+    faults are unchanged.)"""
     win.load_data(json.loads((EXAMPLES / "planc1.json").read_text("utf-8")))
     base = getattr(win, V.BASELINE_ATTR)
-    assert base["I6"] == 17 and base["I11"] == 1
+    assert base["I6"] == 13 and base["I11"] == 1
     V.verify(win, "no-op")                       # must not raise
     win._commit_if_changed()                     # nor the real per-op hook
 
