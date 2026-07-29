@@ -170,7 +170,7 @@ gap rather than papering over it.
 | ☑ | **P3.3** Wall move = move vertices + split rule | ruff + pytest |
 | ☑ | **P3.4** Topology ops replace coalesce/weld/fracture | ruff + pytest |
 | ☑ | **P3.5** Delete the detection engine | ruff + pytest |
-| ☐ | **P3.6** Opening anchors — *code complete; tick blocked. Defect 26 (the crash) is FIXED; DEEP is now red ~2/10 on **defect 28**, a real I11 the crash was hiding. Ticks when DEEP runs green 10/10 under the machine trailer.* | ruff + pytest |
+| ☐ | **P3.6** Opening anchors — *code complete; tick blocked on **defect 28 → resolution pending corpse table + re-certification**. Defect 26 (the crash) is FIXED. Ticks when DEEP runs green 10/10 under the machine trailer.* | ruff + pytest |
 | ☐ | **P3.7** Delete `OpenWall` | ruff + pytest |
 | ☐ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** | ratios recorded |
 | ☐ | **P4.1** Delete-wall keeps the room | ruff + pytest |
@@ -2231,6 +2231,50 @@ PROCESS NOTE, since the working agreement is explicit about the mechanism: a
          the solution was already in use in this same task, since the perf
          comparison ran the old code in a `git worktree`. The followup below
          used exactly that to verify its new tests against pre-fix code.
+
+DEFECT 28 -- RULINGS AT THE SESSION BOUNDARY (2026-07-29). Committed here
+         before stopping, per the handoff-spec rule: a fresh session reads the
+         state from this block and needs nothing from chat.
+
+  1. TWO DEFECTS, NOT ONE. The leak has a test half and an app half and they
+     are fixed separately.
+       * THE FIXTURE LEAK -- `tests/conftest.py`'s `win` fixture ends with
+         `w.close()`, which hides a window and neither destroys it nor stops
+         its 180 ms dirty timer. Registered under DEFECT 28.
+       * DEFECT 29 -- the APP half: `MainWindow.close()` leaves a timer running
+         that walks the whole document. A user closing one plan window while
+         another is open pays that cost invisibly, so this is a real behaviour
+         defect and NOT to be slipped in under a test-isolation fix.
+
+  2. LEAK GUARD AS ACCEPTANCE, WITH A FAIL-FIRST RECEIPT. The fix is accepted
+     by a guard that asserts no stale `MainWindow` keeps an active dirty timer
+     (equivalently: `live_mainwindows` stays bounded across the suite). The
+     guard MUST be shown FAILING against the current tree before the fix
+     lands -- the receipt standard, unchanged.
+
+  3. THE CORPSE-TABLE STANDARD: NO BLANK ROWS. Every corpse is attributed to
+     the test whose scene it actually holds, not the test that was running.
+     A corpse with no owner is listed AS unowned rather than dropped.
+     Currently unowned: **'Kitchen' / 'Pan' on symmetricP1** -- no test has yet
+     been shown to leave that overlap, and until one is, defect 28 is NOT
+     dissolved into "leaked windows misreport". `'A'`/`'B'` IS owned:
+     `test_save_verifies_deep`'s own deliberate fixture, working as designed.
+
+  4. RE-CERTIFICATION: DEEP GREEN 10/10 under the machine-written trailer
+     (`tools/gate.py`). Not 1 clean run, not "it looks fixed" -- ten.
+
+  5. THE HISTORICAL CLAIM IS BOUNDED. What is established: a leaked window CAN
+     misreport an earlier test's state, and did, five times on two harvests.
+     What is NOT established, and must not be asserted: that DEEP's green/red
+     has been meaningless for its whole existence. The mechanism has existed as
+     long as the timer has; the OBSERVED instances are all from P3.6, when the
+     first tests loading a twenty-room plan into `win` arrived. Anything wider
+     needs its own measurement.
+
+  6. DEFECT 26's `E` SIGHTINGS, one line: they are the same mechanism -- a
+     stale window's timer firing inside a later test -- so the four sightings
+     and the "suppressing" interventions are all explained by it, and no
+     separate cause is outstanding.
 
 P3.6  CODE COMPLETE, NOT TICKED -- blocked by defect 28 (branch v5-topology)
          DEFECT 26 IS FIXED and the diagnosis is worth carrying forward as the
