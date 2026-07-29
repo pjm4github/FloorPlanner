@@ -1765,6 +1765,14 @@ class OpeningItem(QGraphicsItem):
         That matters: `s` is read on every rebuild and every paint, and forcing
         a uid mint per read is exactly the allocation P3.1 had to remove."""
         w = self.wall
+        # A DELETED WALL IS A HARD CRASH, not an exception (P3.6). `s` became a
+        # property here, so it now touches `self.wall` on every read -- and an
+        # `OpeningItem` outlives its wall's C++ object often enough to matter
+        # (teardown, undo restore, a fractured wall's discarded segments). The
+        # old stored float never dereferenced anything. Same `sip.isdeleted`
+        # guard `WallItem.itemChange` and `RoomItem.itemChange` already carry.
+        if w is None or sip.isdeleted(w):
+            return "p1"
         v1, v2 = w.end_vertex("p1"), w.end_vertex("p2")
         if self.anchor_v is v1:
             return "p1"
@@ -1790,6 +1798,8 @@ class OpeningItem(QGraphicsItem):
     def s(self) -> float:
         """Distance of the opening's CENTRE from `wall.p1` -- derived from the
         anchor, so it moves when the anchored corner does and not otherwise."""
+        if self.wall is None or sip.isdeleted(self.wall):
+            return self.offset_in + self.width / 2.0
         if self._anchor_attr() == "p2":
             return self.wall.length() - self.offset_in - self.width / 2.0
         return self.offset_in + self.width / 2.0

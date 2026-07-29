@@ -170,7 +170,7 @@ gap rather than papering over it.
 | ☑ | **P3.3** Wall move = move vertices + split rule | ruff + pytest |
 | ☑ | **P3.4** Topology ops replace coalesce/weld/fracture | ruff + pytest |
 | ☑ | **P3.5** Delete the detection engine | ruff + pytest |
-| ☑ | **P3.6** Opening anchors | ruff + pytest |
+| ☐ | **P3.6** Opening anchors — *code complete; tick BLOCKED by defect 26* | ruff + pytest |
 | ☐ | **P3.7** Delete `OpenWall` | ruff + pytest |
 | ☐ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** | ratios recorded |
 | ☐ | **P4.1** Delete-wall keeps the room | ruff + pytest |
@@ -2232,7 +2232,16 @@ PROCESS NOTE, since the working agreement is explicit about the mechanism: a
          comparison ran the old code in a `git worktree`. The followup below
          used exactly that to verify its new tests against pre-fix code.
 
-P3.6  done   (branch v5-topology; seven sub-commits)
+P3.6  CODE COMPLETE, NOT TICKED -- blocked by defect 26 (branch v5-topology)
+         Every acceptance property is green and every ruling is implemented,
+         and the tick is still withheld, because the gate ruled at this task
+         is what found the reason. `tools/gate.py` runs the three gates with
+         their output CAPTURED, and under `FP_VERIFY_DESIGN=deep` the suite
+         then ABORTS about 40% of the time -- rc 0xC0000409, a hard process
+         crash, not a failing test. Bisected to P3.6: 0 of 4 at `e3fabb6`,
+         the commit immediately before this task's first. A phase whose gate
+         cannot be relied on to run is not a phase that has passed its gate,
+         whatever the counts say when it does complete.
 ruff:    clean
 pytest:  OFF  512 passed, 6 xfailed in 15.9s
          ON   512 passed, 6 xfailed in 19.8s
