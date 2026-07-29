@@ -170,7 +170,7 @@ gap rather than papering over it.
 | ☑ | **P3.3** Wall move = move vertices + split rule | ruff + pytest |
 | ☑ | **P3.4** Topology ops replace coalesce/weld/fracture | ruff + pytest |
 | ☑ | **P3.5** Delete the detection engine | ruff + pytest |
-| ☐ | **P3.6** Opening anchors — *code complete; tick BLOCKED by defect 26* | ruff + pytest |
+| ☐ | **P3.6** Opening anchors — *code complete; tick blocked. Defect 26 (the crash) is FIXED; DEEP is now red ~2/10 on **defect 28**, a real I11 the crash was hiding. Ticks when DEEP runs green 10/10 under the machine trailer.* | ruff + pytest |
 | ☐ | **P3.7** Delete `OpenWall` | ruff + pytest |
 | ☐ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** | ratios recorded |
 | ☐ | **P4.1** Delete-wall keeps the room | ruff + pytest |
@@ -2232,7 +2232,18 @@ PROCESS NOTE, since the working agreement is explicit about the mechanism: a
          comparison ran the old code in a `git worktree`. The followup below
          used exactly that to verify its new tests against pre-fix code.
 
-P3.6  CODE COMPLETE, NOT TICKED -- blocked by defect 26 (branch v5-topology)
+P3.6  CODE COMPLETE, NOT TICKED -- blocked by defect 28 (branch v5-topology)
+         DEFECT 26 IS FIXED and the diagnosis is worth carrying forward as the
+         standard for what "root cause" means here: a stack, then an
+         explanation for every property the bug had, then a narrow fix. It was
+         never memory corruption -- `verify()` raised inside a QTimer callback,
+         and PyQt turns an exception escaping a C++ -> Python callback into
+         `qFatal()` -> `abort()`. The guard is narrow (that exception type only,
+         at the 7 callback paths reaching the 3 call sites) and the acceptance
+         was 0/10 crashes against ~4/20 before.
+         WHAT REMAINS IS DEFECT 28, which the crash was hiding: a group rotation
+         genuinely produces overlapping placed rooms (I11), ~2/10 deep runs. The
+         tick waits on it, because DEEP green-and-reliable is the condition.
          Every acceptance property is green and every ruling is implemented,
          and the tick is still withheld, because the gate ruled at this task
          is what found the reason. `tools/gate.py` runs the three gates with
