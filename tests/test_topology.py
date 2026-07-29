@@ -149,7 +149,20 @@ def test_split_edge_redistributes_the_openings_it_used_to_refuse():
     assertion that pinned its absence has nothing left to pin."""
     d = _design("symmetricP1.json")
     pos = _pos(d)
-    w = next(w for w in d.walls if isinstance(w.openings, list) and w.openings)
+    # a wall whose midpoint is CLEAR of its openings -- this test is about
+    # redistribution, and a cut through a door is the straddle case next door.
+    # It used to take the first wall with any opening and split at the middle,
+    # which passed only because defect 24 put the planner's idea of every
+    # opening half a door away from its real place: on `w6` (49.8" long, 36"
+    # door) the midpoint genuinely falls INSIDE the door and always did.
+    def _clear(w):
+        a, b = pos[w.v1], pos[w.v2]
+        L = math.dist(a, b)
+        return all(abs(topology._opening_centre(o, L) - L / 2)
+                   > topology._code_width(o.code) / 2 + 1.0
+                   for o in w.openings)
+    w = next(w for w in d.walls
+             if isinstance(w.openings, list) and w.openings and _clear(w))
     a, b = pos[w.v1], pos[w.v2]
     mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
     before = sum(len(x.openings or ()) for x in d.walls)

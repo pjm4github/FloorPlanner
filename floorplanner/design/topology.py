@@ -472,8 +472,22 @@ def graph_from_design(design, level=None):
                               else ()):
             anc = o.anchor if isinstance(o.anchor, dict) else {}
             off = anc.get("offset_in", 0.0)
-            s = off if anc.get("from") != "v2" else length - off
-            ops.append(OpeningView(i, s, _code_width(o.code), (o.kind, o.code)))
+            ow = _code_width(o.code)
+            # DEFECT 24: `offset_in` is the distance from the named end to the
+            # opening's NEAR EDGE -- the schema says so and `bridge._walls_of` /
+            # `_opening_s` both emit and invert it that way. This read used to
+            # omit the half-width, putting the planner's idea of the opening
+            # half a door away from everyone else's (measured 18.00" on a 36"
+            # door). It self-cancelled against `_reanchor`'s matching omission
+            # for a v1 anchor on the kept segment, which is why it survived.
+            frm = anc.get("from")
+            if frm == "v2":
+                s = length - off - ow / 2.0
+            elif frm == "center":
+                s = length / 2.0 + off        # consume only (R4); never emitted
+            else:
+                s = off + ow / 2.0
+            ops.append(OpeningView(i, s, ow, (o.kind, o.code)))
         walls.append(WallView(w.id, w.level, w.v1, w.v2, w.type, tuple(ops)))
     return GraphView(walls, pos, {vid: vid for vid in pos})
 
@@ -515,12 +529,11 @@ def apply_merge_plan(design, plan):
         surv.v1 = _adopt_vertex(d, m.v1, m.p1, surv.level)
         surv.v2 = _adopt_vertex(d, m.v2, m.p2, surv.level)
         length = math.dist(m.p1, m.p2)
-        merged = []
-        for o, s in ops:
-            near1 = s <= length / 2
-            o.anchor = {"from": "v1" if near1 else "v2",
-                        "offset_in": round(s if near1 else length - s, 4)}
-            merged.append(o)
+        # THE THIRD SITE OF DEFECT 24, and the reason it is a defect and not a
+        # typo: this was a fourth hand-written copy of the s <-> anchor
+        # arithmetic, inline, with the same missing half-width. Routed through
+        # `_reanchor` so the conversion exists once.
+        merged = [_reanchor(o, s, length) for o, s in ops]
         surv.openings = merged
         dead.update(m.absorbed)
     if dead:
@@ -573,12 +586,37 @@ def plan_split_edge(view, wall_key, x, y, on_seg_tol=ON_SEG_TOL):
                  tuple(straddled))
 
 
-def _reanchor(opening, s, length):
-    """Dimension an opening from the NEARER end of its (new) wall -- the
-    convention `importer`/`bridge` already emit."""
-    near1 = s <= length / 2
-    opening.anchor = {"from": "v1" if near1 else "v2",
-                      "offset_in": round(s if near1 else length - s, 4)}
+def _opening_centre(opening, length):
+    """The opening's CENTRE along a wall of `length`, from its stored anchor --
+    the one place that conversion is written for a `Design` opening (defect
+    24). `bridge._opening_s` is the identical arithmetic for a raw dict."""
+    anc = opening.anchor if isinstance(opening.anchor, dict) else {}
+    off, ow = anc.get("offset_in", 0.0), _code_width(opening.code)
+    frm = anc.get("from")
+    if frm == "v2":
+        return length - off - ow / 2.0
+    if frm == "center":
+        return length / 2.0 + off
+    return off + ow / 2.0
+
+
+def _reanchor(opening, s, length, width=None, frm=None):
+    """Re-dimension an opening whose wall changed, `s` being its CENTRE on the
+    new wall.
+
+    `offset_in` is to the NEAR EDGE, so the half-width comes off -- omitting it
+    was defect 24, and it is the same half-width `bridge._opening_s` adds back.
+
+    `frm` forces the end to dimension from, which R2b requires: an opening that
+    lands on the segment NOT holding its anchor re-seats to the SAME-SIDE end of
+    its new segment -- the split vertex -- rather than to the nearer one, so its
+    position is preserved exactly and only the description changes. Left None it
+    mints against the nearer end, ties to v1 (R4)."""
+    ow = _code_width(opening.code) if width is None else width
+    if frm is None:
+        frm = "v1" if s <= length / 2 else "v2"
+    off = (s - ow / 2.0) if frm == "v1" else (length - s - ow / 2.0)
+    opening.anchor = {"from": frm, "offset_in": round(off, 4)}
     return opening
 
 

@@ -121,9 +121,15 @@ def test_merge_redistributes_an_opening_onto_the_merged_span():
     assert len(merged.walls) == 1
     ops = merged.walls[0].openings
     assert len(ops) == 1
-    # absolute position was (150, 0); on the 200" merged wall that is 50" from
-    # v2, which is the nearer end
-    assert ops[0].anchor == {"from": "v2", "offset_in": 50.0}
+    # 50.0 -> 18.0 AT P3.6 (defect 24): `offset_in` is to the opening's NEAR
+    # EDGE, so this test's old expectation was reading it as a centre distance
+    # -- the same half-width the merge applier was dropping. The DOOR HAS NOT
+    # MOVED: its centre is at x=166 before and after, which is now what the
+    # test asserts, with the anchor value second.
+    from floorplanner.design.bridge import _opening_s
+    assert _opening_s(ops[0].anchor["from"], ops[0].anchor["offset_in"],
+                      32.0, 200.0) == pytest.approx(166.0)
+    assert ops[0].anchor == {"from": "v2", "offset_in": 18.0}
 
 
 def test_merge_collinear_still_preserves_the_corpus_faces():
