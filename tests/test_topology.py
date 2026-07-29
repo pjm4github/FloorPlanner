@@ -172,15 +172,15 @@ def test_split_edge_redistributes_the_openings_it_used_to_refuse():
     assert len(topology.trace_faces(d2)) == len(topology.trace_faces(d))
 
 
-def test_split_edge_still_raises_when_the_cut_runs_through_an_opening():
-    """THE GUARD, NARROWED AND RETARGETED -- the pre-authorized `match="P3.3"`
-    -> `match="P3.6"` change, named rather than slipped through.
-
-    Redistribution answers "which segment owns the door". It cannot answer
-    "which segment owns a door the cut runs through", because neither does.
-    That is an opening which no longer fits where it lands, and reporting one
-    instead of silently sliding it is P3.6 -- so the message names P3.6, and the
-    P1.3-followup discipline (fail loud AT the call site) is unchanged."""
+def test_split_edge_is_total_and_reports_the_cut_it_runs_through():
+    """FLIPPED AT R2c -- old: `pytest.raises(NotImplementedError, match="P3.6")`;
+    new: it splits, and files the opening. WHY THE ASSERTION MOVED: the guard
+    was a placeholder pending representability from the day it was written --
+    `match="P3.6"` was this test naming its own executioner -- and it cannot
+    survive for a reason that is not taste. LOAD-TIME PLANARIZE CANNOT DECLINE.
+    A crossing that exists in the data has to split; refusing there aborts or
+    corrupts a load. So the primitive is TOTAL: the opening lands on the segment
+    holding its anchor (R2b) and the caller is told (R2c/R5)."""
     d = _design("symmetricP1.json")
     for w in d.walls:
         if not (isinstance(w.openings, list) and len(w.openings) == 1):
@@ -190,8 +190,14 @@ def test_split_edge_still_raises_when_the_cut_runs_through_an_opening():
             break
     else:                                              # pragma: no cover
         pytest.skip("no mid-span single-opening wall in the fixture")
-    with pytest.raises(NotImplementedError, match="P3.6"):
-        topology.split_edge(d, w.id, cut[0], cut[1])
+
+    before = sum(len(x.openings or ()) for x in d.walls)
+    report = []
+    d2 = topology.split_edge(d, w.id, cut[0], cut[1], report=report)
+
+    assert len(d2.walls) == len(d.walls) + 1, "the cut was refused"
+    assert sum(len(x.openings or ()) for x in d2.walls) == before, "a door was lost"
+    assert len(report) == 1 and "runs through it" in report[0]
 
 
 def test_merge_collinear_preserves_faces_and_reduces_walls():

@@ -191,3 +191,37 @@ def test_a_reported_I7_is_expected_but_an_unreported_one_is_not(fp, scene):
     assert "I7" not in fault_profile(scene, doc=doc, walk_report=rep)
     # ... but the SAME document with nothing filed is a regression
     assert fault_profile(scene, doc=doc, walk_report={}).get("I7") == 1
+
+
+def test_a_split_clear_of_a_door_leaves_it_exactly_where_it_was(fp, scene):
+    """R1(c) -- the third of the schema's three claims, and it had no test.
+
+    R1 lists "(c) the split of R2" as acceptance; the split coverage was the two
+    pins, and both asserted REFUSAL. Refusal is not a property of the anchor --
+    it was the absence of one. This is the property: a cut elsewhere on the wall
+    does not move a door, and when the cut takes the door's anchored end away
+    the anchor RE-SEATS to the SAME-SIDE end of its new segment (R2b), so the
+    description changes and the geometry does not."""
+    from floorplanner.walls import split_wall_at
+
+    w = fp.WallItem(QPointF(0, 0), QPointF(240, 0), "interior")
+    scene.addItem(w)
+    op = fp.OpeningItem(w, "door", "3280", 200.0)   # anchored v2, spans 184..216
+    w.openings.append(op)
+    fp.rebuild_all_walls(scene)
+    assert op.anchor_from() == "v2"
+    before = QPointF(w.point_at(op.s))
+
+    seg = split_wall_at(scene, w, QPointF(60, 0))   # well clear of the door
+    assert seg is not None
+
+    # the door rode to whichever segment holds it; find it and check the place
+    host = next(x for x in scene.items()
+                if isinstance(x, fp.WallItem) and x.openings)
+    (moved,) = host.openings
+    after = host.point_at(moved.s)
+    assert after.x() == pytest.approx(before.x()), "the split moved the door"
+    assert after.y() == pytest.approx(before.y())
+    # SAME SIDE: it was dimensioned off the high end and still is
+    assert moved.anchor_from() == "v2"
+    assert moved.fits()

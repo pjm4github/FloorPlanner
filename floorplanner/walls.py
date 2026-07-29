@@ -271,7 +271,8 @@ def graph_from_scene(scene, floor=None):
     corners = _CornerIndex(walls)
     views = [WallView(w, w.floor, corners.of[(id(w), "p1")],
                       corners.of[(id(w), "p2")], w.wall_type,
-                      tuple(OpeningView(i, op.s, op.width, (op.kind, op.code))
+                      tuple(OpeningView(i, op.s, op.width, (op.kind, op.code),
+                                        op.anchor_from())
                             for i, op in enumerate(w.openings)))
              for w in walls]
     return GraphView(views, corners.pos, corners.anchor)
@@ -600,22 +601,37 @@ def apply_split_plan_to_scene(scene, split, rebuild=True):
     return seg
 
 
-def split_wall_at(scene, wall, p, on_seg_tol=ON_SEG_TOL):
+def split_wall_at(scene, wall, p, on_seg_tol=ON_SEG_TOL, report=None):
     """Split `wall` at the scene point `p` -- THE SPLIT RULE'S SECOND HALF:
     a vertex landing on another wall's body splits that wall. Returns the new
     segment, or None when there is nothing to split.
 
-    A split whose point falls inside an opening is DECLINED here rather than
-    raised on, which is the one place this and `topology.split_edge` differ.
-    Same planner, same delta, same `straddled` flag -- but the caller is a mouse
-    gesture, and refusing to cut a doorway in half is right for a gesture where
-    failing loud is right for a document repair."""
+    **THE DECLINE IS GONE (R2c).** A split whose point falls inside an opening
+    used to return None here while `topology.split_edge` raised -- one planner,
+    two policies. Both are retired for the same reason, and it is defect 17's:
+    a gesture that silently does nothing is the worst of the three options, and
+    keeping a second case of it on purpose is how folklore starts. The split now
+    happens; the opening lands on the segment holding its anchor (R2b) and is
+    appended to `report` if the caller passes one.
+
+    The remaining asymmetry is not one: `topology.split_edge` and this take the
+    same delta from the same planner and now do the same thing with it. What
+    differs is only where each one's report is surfaced -- the conversion report
+    for a load, a status line for an edit (R5)."""
     if scene is None or wall is None:
         return None
     split = plan_split_edge(graph_from_scene(scene, wall.floor), wall,
                             p.x(), p.y(), on_seg_tol=on_seg_tol)
-    if split is None or split.straddled:
+    if split is None:
         return None
+    if split.straddled and report is not None:
+        for po in split.straddled:
+            op = wall.openings[po.index] if po.index < len(wall.openings) else None
+            report.append(
+                f"{op.kind if op else 'opening'} "
+                f"{op.code if op else po.index} on a wall at "
+                f"({wall.p1.x():.0f}, {wall.p1.y():.0f}): a junction lands "
+                f"inside it, so it no longer fits the segment it sits on")
     return apply_split_plan_to_scene(scene, split)
 
 

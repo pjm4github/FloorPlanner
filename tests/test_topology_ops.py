@@ -338,14 +338,20 @@ def test_scene_split_moves_openings_onto_the_segment_that_holds_them(fp, scene):
     assert round(seg.point_at(seg.openings[0].s).x()) == 200  # same place
 
 
-def test_scene_split_declines_to_cut_through_a_doorway(fp, scene):
-    # P3.6's case. The planner flags it (`straddled`); topology.split_edge
-    # RAISES on the flag, a live gesture DECLINES on it -- same delta, two
-    # policies, because one caller is a repair and the other is a mouse.
+def test_scene_split_through_a_doorway_happens_and_is_reported(fp, scene):
+    """FLIPPED AT R2c -- old: `assert split_wall_at(...) is None`, the gesture
+    declining. WHY THE ASSERTION MOVED: it is defect 17's lesson. A gesture that
+    silently does nothing is the worst of the three options, and we were keeping
+    a second case of it on purpose. The two policies on one delta are gone: the
+    primitive and the scene op now do the same thing and differ only in where
+    each surfaces its report."""
     a = _add(scene, fp, 0, 0, 240, 0)
     _door(fp, a, 120.0)                           # 32" wide: spans 104..136
-    assert split_wall_at(scene, a, QPointF(120, 0)) is None
-    assert len(_walls(scene, fp)) == 1
+    report = []
+    seg = split_wall_at(scene, a, QPointF(120, 0), report=report)
+    assert seg is not None, "the gesture silently did nothing"
+    assert len(_walls(scene, fp)) == 2
+    assert len(report) == 1 and "no longer fits" in report[0]
 
 
 def test_scene_split_declines_at_an_endpoint(fp, scene):

@@ -179,37 +179,39 @@ def _next_id(design, prefix):
     return f"{prefix}{i}"
 
 
-def split_edge(design, wall_id, x, y):
+def split_edge(design, wall_id, x, y, report=None):
     """Return a copy of `design` with wall `wall_id` split at the point (x, y)
     on its span into two collinear walls sharing a (welded) vertex. A no-op if
     the point is at either endpoint or off the centreline.
 
-    Openings are REDISTRIBUTED onto whichever segment holds them (P3.4 (ii)) --
-    the thing this used to refuse to do.
+    Openings are REDISTRIBUTED by EXTENT (R2b): one wholly inside a segment
+    lands there whichever end it is dimensioned off.
 
-    THE GUARD SURVIVES, NARROWED AND RETARGETED. It was added at P1.3-followup
-    naming P3.3, because "which segment owns the door, at what offset" was
-    unbuilt. That is now built, so what remains is the case redistribution
-    genuinely cannot answer: a split point falling INSIDE an opening's span,
-    where neither segment can hold it and the honest answer is that the plan is
-    wrong. An opening that does not fit where it lands being an error surfaced
-    to the user rather than a silently slid door is **P3.6**, so the message
-    names P3.6. Failing loud keeps the P1.3-followup discipline: the gap shows
-    up at the call site, not three tasks later as a misplaced door.
+    **THE GUARD IS GONE AND THE PRIMITIVE IS TOTAL (R2c).** It was added at
+    P1.3-followup naming P3.3, retargeted to P3.6 at P3.4(ii), and it was a
+    placeholder pending representability the whole time -- `match="P3.6"` was
+    that test naming its own executioner. The reason it cannot survive is not
+    taste: **load-time planarize cannot decline.** A crossing that exists in the
+    data has to split, and refusing there aborts or corrupts a load.
 
-    (Interactive callers must not raise mid-drag, so the scene op DECLINES a
-    straddling split instead. The decision is identical -- `Split.straddled`
-    off the one planner -- and only the policy on a flagged delta differs:
-    document repair fails loud, a live gesture leaves the wall alone.)"""
+    So a TRUE STRADDLE -- the cut running through an opening, where neither
+    segment can hold it -- is no longer refused. The opening lands on the
+    segment holding its ANCHOR (R2b's tiebreak) and is appended to `report` if
+    one is passed. Nothing is dropped, nothing is slid, and the fault is
+    carried in the one vocabulary R5 defines rather than thrown.
+
+    The scene op no longer declines either, for defect 17's reason: a gesture
+    that silently does nothing is the worst of the three options, and we do not
+    keep a second case of it on purpose."""
     plan = plan_split_edge(graph_from_design(design), wall_id, x, y)
     if plan is None:
         return copy.deepcopy(design)
-    if plan.straddled:
-        raise NotImplementedError(
-            f"split_edge on wall {wall_id} at ({x:.3f}, {y:.3f}): the point "
-            f"falls inside {len(plan.straddled)} opening(s), which neither "
-            "segment can hold. Reporting an opening that no longer fits, "
-            "instead of silently sliding it, is P3.6 (opening anchors).")
+    if plan.straddled and report is not None:
+        for po in plan.straddled:
+            report.append(
+                f"opening {po.index} on wall {wall_id}: the split at "
+                f"({x:.3f}, {y:.3f}) runs through it, so it lands on the "
+                f"segment holding its anchor and no longer fits there")
     return apply_split_plan(design, plan)
 
 
@@ -246,7 +248,9 @@ def split_edge(design, wall_id, x, y):
 # for a scene) -- the planner only ever compares and passes them back.
 GraphView = namedtuple("GraphView", "walls pos anchor")
 WallView = namedtuple("WallView", "key level v1 v2 type openings")
-OpeningView = namedtuple("OpeningView", "index s width ident")
+# `frm` is the END the opening is dimensioned off ("v1"/"v2"), which R2b
+# needs as the tiebreak when a cut runs through it.
+OpeningView = namedtuple("OpeningView", "index s width ident frm")
 
 # The deltas. On a `Merge`, `v1`/`v2` are the corner anchors the survivor
 # adopts, or None when the merge lands somewhere no existing corner sits (then
@@ -487,7 +491,8 @@ def graph_from_design(design, level=None):
                 s = length / 2.0 + off        # consume only (R4); never emitted
             else:
                 s = off + ow / 2.0
-            ops.append(OpeningView(i, s, ow, (o.kind, o.code)))
+            ops.append(OpeningView(i, s, ow, (o.kind, o.code),
+                                   "v2" if frm == "v2" else "v1"))
         walls.append(WallView(w.id, w.level, w.v1, w.v2, w.type, tuple(ops)))
     return GraphView(walls, pos, {vid: vid for vid in pos})
 

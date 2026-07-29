@@ -331,10 +331,18 @@ def test_a_body_landing_costs_no_split_on_writes(fp, scene):
     assert split_count() == before
 
 
-def test_a_landing_inside_a_doorway_is_declined_not_forced(fp, scene):
-    """The one place the scene op and the pure op differ, and only in policy:
-    `topology.split_edge` raises naming P3.6, a drag declines. Neither invents
-    an answer to "which segment owns a door the cut runs through"."""
+def test_a_landing_inside_a_doorway_now_splits_instead_of_declining(fp, scene):
+    """FLIPPED AT R2c, the drag side of the same ruling. OLD: the press left the
+    wall alone and the landing stayed on P3.3's coordinate path, because
+    cutting a doorway in half was refused. WHY THE ASSERTION MOVED: refusing was
+    defect 17's silent decline -- nothing happened and nothing said so -- and
+    the primitive had to become total anyway, since a load cannot decline. The
+    doorway IS cut now; the door lands on the segment holding its anchor and the
+    fault is reported rather than hidden by the gesture doing nothing.
+
+    That the scene can reach this state at all is DEFECT 25: the edit that
+    creates it should say so at the time. This test pins the mechanism; the
+    gesture-level report is P4.1's."""
     a = _wall(fp, scene, 0, 0, 240, 0)
     op = fp.OpeningItem(a, "door", "3280", 120.0)     # spans 104..136
     a.openings.append(op)
@@ -343,9 +351,9 @@ def test_a_landing_inside_a_doorway_is_declined_not_forced(fp, scene):
     a._mode = None
     a.mousePressEvent(_Ev((60, 0)))
 
-    assert _wall_count(fp, scene) == 2, "the doorway was cut in half"
-    assert any(kind == "tee" for *_r, kind in a._attached), (
-        "the declined landing must stay on P3.3's coordinate path")
+    assert _wall_count(fp, scene) == 3, "the landing was silently declined"
+    assert sum(len(w.openings) for w in scene.items()
+               if isinstance(w, fp.WallItem)) == 1, "the door was lost"
 
 
 def test_a_press_that_splits_leaves_the_document_unchanged(fp, win):
