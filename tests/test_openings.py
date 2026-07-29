@@ -90,3 +90,47 @@ def test_a_weld_carries_an_anchor_but_a_share_does_not(fp, scene):
     elsewhere = fp.Vertex(90.0, 0.0)
     w.set_end_vertex("p2", elsewhere)
     assert op.anchor_v is twin, "a share dragged the anchor off its corner"
+
+
+def test_a_far_end_anchor_survives_a_round_trip(fp, win):
+    """R4b. An anchor that already exists round-trips VERBATIM; the
+    nearer-end rule applies only when MINTING.
+
+    Hand-authored: a door on a 240" wall dimensioned 30" from v2, so its centre
+    sits at 194" -- past the midpoint, which means the nearer end is v2 and this
+    anchor is ALSO the nearer one. So the door is deliberately placed at 40"
+    from v1 instead, where nearer-end canonicalization WOULD rewrite it, and
+    the test asserts it does not. Re-basing here would be a silent loss of
+    intent: the anchor end decides which way the opening travels when the wall
+    is stretched."""
+    import json
+
+    from floorplanner.design.bridge import design_from_scene
+
+    doc = {
+        "format": "floorplanner-design", "version": 5, "units": "inches",
+        "settings": {}, "furnishings": [], "groups": [], "rooms": [],
+        "levels": [{"id": "L1", "name": "default", "elevation_in": 0.0,
+                    "height_in": 96.0, "kind": "storey"}],
+        "vertices": [{"id": "a", "level": "L1", "x": 0.0, "y": 0.0},
+                     {"id": "b", "level": "L1", "x": 240.0, "y": 0.0}],
+        "walls": [{"id": "w1", "level": "L1", "v1": "a", "v2": "b",
+                   "type": "interior", "left": None, "right": None,
+                   "openings": [{"id": "o1", "kind": "door", "code": "3280",
+                                 # centre at 40" -- v1 is the NEARER end, so a
+                                 # canonicalizing emit would rewrite this to v1
+                                 "anchor": {"from": "v2", "offset_in": 184.0}}]}],
+    }
+    win.open_document(json.loads(json.dumps(doc)), interactive=False)
+
+    wall = next(it for it in win.scene.items() if isinstance(it, fp.WallItem))
+    (op,) = wall.openings
+    assert op.anchor_from() == "v2", "the load re-based the anchor"
+    assert op.offset_in == pytest.approx(184.0)
+    assert op.s == pytest.approx(40.0)            # 240 - 184 - 16
+
+    out = design_from_scene(win).to_dict()
+    (w_out,) = out["walls"]
+    (o_out,) = w_out["openings"]
+    assert o_out["anchor"] == {"from": "v2", "offset_in": 184.0}, \
+        "the save re-based the anchor onto the nearer end"

@@ -321,7 +321,12 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
             "openings": sorted(
                 [{"kind": o.kind, "code": o.code, "s": float(o.s),
                   "width": float(o.width), "door_type": o.door_type,
-                  "swing": float(o.swing)} for o in w.openings],
+                  "swing": float(o.swing),
+                  # R4b: the end this opening is ACTUALLY dimensioned off, and
+                  # its stored offset -- carried so the emit can honour them
+                  # rather than recompute a nearer-end anchor over the top
+                  "from": o.anchor_from(), "offset_in": float(o.offset_in)}
+                 for o in w.openings],
                 key=lambda o: o["s"]),
             "extra": getattr(w, "_v5_extra", None) or {}}
            for w in w_items]
@@ -355,11 +360,37 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
                     rep["openings_dropped"] += 1
                     continue
                 loc = s - s0
-                near1 = loc <= seg_len / 2.0
-                off = (loc if near1 else seg_len - loc) - ow / 2.0
+                # R4b -- FIDELITY WHERE THE ANCHORED END SURVIVES, re-seat where
+                # it does not, and mint nowhere here.
+                #
+                # A wall is emitted as one or more SEGMENTS. If the end this
+                # opening is dimensioned off is still an end of the segment it
+                # lands on -- `p1` and the segment starts at 0, or `p2` and the
+                # segment ends at the wall's far end -- the stored anchor is
+                # carried VERBATIM, offset and all. Recomputing a nearer-end
+                # anchor over the top is what R4b overrules: the anchor end
+                # decides which way the opening moves when the wall is
+                # stretched, so rewriting it on save is a silent loss of intent.
+                #
+                # When a split has cut the anchored end off this segment, the
+                # anchor RE-SEATS to the same-side end of the segment (R2b) --
+                # low end for a `v1` anchor, high end for a `v2` one -- which
+                # preserves the opening's position exactly and changes only its
+                # description. Never the NEARER end: that would flip the anchor
+                # for openings that happen to sit past the midpoint.
+                held = o.get("from")
+                at_v1 = held != "v2" and s0 <= 1e-6
+                at_v2 = held == "v2" and s1 >= L - 1e-6
+                if at_v1 or at_v2:
+                    frm = held
+                    off = float(o.get("offset_in", 0.0))
+                else:
+                    frm = "v2" if held == "v2" else "v1"      # SAME side
+                    off = ((loc if frm == "v1" else seg_len - loc) - ow / 2.0)
                 rec = {"id": nid("o"), "kind": o["kind"], "code": o["code"],
-                       "anchor": {"from": "v1" if near1 else "v2",
+                       "anchor": {"from": frm,
                                   "offset_in": round(max(0.0, off), 3)}}
+                near1 = frm != "v2"
                 if o["kind"] == "door":
                     dt = o["door_type"]
                     rec["door_type"] = dt
@@ -837,6 +868,14 @@ def apply_design_to_scene(target, design, report=None, strict=False,
                 # surfaced, and escalated under strict
                 rep["openings_failed"].append(f"{od['id']}: {exc}")
                 continue
+            # R4b -- FIDELITY: the document's anchor is adopted VERBATIM, not
+            # re-derived. `OpeningItem.__init__` mints against the nearer end,
+            # which is right for an opening that has never had an anchor and
+            # wrong for one that arrived with a deliberate far-end dimension.
+            # Re-basing it here would lose that intent on every load, silently
+            # -- the same category as the clamp this task deletes.
+            op.anchor_v = wall.end_vertex("p1" if a["from"] != "v2" else "p2")
+            op.offset_in = float(a["offset_in"])
             # v5 carries door_type for DOORS only ("meaningful only when
             # kind == door"), so absent means "not applicable", not "empty" --
             # clobbering it would rewrite a window's harmless default and make
