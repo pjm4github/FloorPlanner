@@ -92,6 +92,17 @@ def verify_deep() -> bool:
     return _flag() in ("deep", "2", "all")
 
 
+def _i7_reported(err: str, exempt: set) -> bool:
+    """True when this I7 is the one the walk already filed for that opening.
+
+    Only the RUNS-OFF form is exemptible -- "I7 opening o12 runs off wall w3".
+    An OVERLAP ("I7 openings o1/o2 overlap on w3") is never exempt: two doors on
+    top of each other is a different fault from one the geometry forced, and
+    defect 9 exists because it went unnoticed once already."""
+    parts = err.split()
+    return len(parts) > 2 and parts[1] == "opening" and parts[2] in exempt
+
+
 def fault_profile(target, deep=False, doc=None, walk_report=None) -> dict:
     """`{invariant class: count}` for the scene behind `target`, plus the
     report-only `unwelded_ends`. `{}` means a clean document.
@@ -111,9 +122,19 @@ def fault_profile(target, deep=False, doc=None, walk_report=None) -> dict:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             doc = design_from_scene(target, report=rep).to_dict()
+    # R2c -- THE NARROW EXEMPTION, and narrow is the point. The walk is total:
+    # an opening a junction cuts in half is EMITTED and FILED, so the document
+    # legitimately carries an I7 for it. Exempting the CLASS would blind shadow
+    # mode to every other way an opening can run off a wall, so the exemption is
+    # keyed PER OPENING: an I7 is expected iff that opening id was filed. An
+    # unreported I7 is still a full regression. Same shape as `unwelded_ends`
+    # being report-only, one level finer.
+    exempt = set(rep.get("openings_failed_ids") or ())
     prof = {}
     for err in check(doc, deep=deep):
         cls = err.split()[0]                  # "I6", "I5b", "I14", ...
+        if cls == "I7" and exempt and _i7_reported(err, exempt):
+            continue
         prof[cls] = prof.get(cls, 0) + 1
     if rep.get("unwelded_ends"):
         prof["unwelded_ends"] = rep["unwelded_ends"]

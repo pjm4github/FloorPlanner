@@ -341,6 +341,27 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
         a, _b, u, L = prep[i]
         stops = sorted({0.0, L} |
                        {c for c in cuts[i] if MIN_SPAN < c < L - MIN_SPAN})
+        # WHICH SEGMENT OWNS EACH OPENING, decided ONCE per opening rather than
+        # re-derived per segment (R2b). Extent decides: an opening wholly inside
+        # one segment lands there. A STRADDLER -- one the cuts run through --
+        # goes to the segment on the same side as its anchor: the lowest it
+        # overlaps for a `v1` anchor, the highest for a `v2` one. Deciding this
+        # per segment, as a centre-containment test used to, put a door whose
+        # centre sat exactly ON a cut into BOTH segments.
+        owner = {}
+        for oi, o in enumerate(w["openings"]):
+            lo = o["s"] - o["width"] / 2.0
+            hi = o["s"] + o["width"] / 2.0
+            over = [k for k in range(len(stops) - 1)
+                    if stops[k] - 1e-6 < hi and lo < stops[k + 1] + 1e-6]
+            if not over:
+                continue
+            whole = [k for k in over
+                     if stops[k] - 1e-6 <= lo and hi <= stops[k + 1] + 1e-6]
+            if whole:
+                owner[oi] = whole[0]
+            else:
+                owner[oi] = over[-1] if o.get("from") == "v2" else over[0]
         for k in range(len(stops) - 1):
             s0, s1 = stops[k], stops[k + 1]
             if s1 - s0 < MIN_SPAN:
@@ -351,9 +372,9 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
                 continue
             rep["segments"] += 1
             seg_ops, seg_len = [], s1 - s0
-            for o in w["openings"]:
+            for oi, o in enumerate(w["openings"]):
                 s = o["s"]
-                if not (s0 - 1e-6 <= s <= s1 + 1e-6):
+                if owner.get(oi) != k:
                     continue
                 ow = o["width"]
                 if ow > seg_len + 1e-6:
@@ -381,32 +402,34 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
                 held = o.get("from")
                 at_v1 = held != "v2" and s0 <= 1e-6
                 at_v2 = held == "v2" and s1 >= L - 1e-6
-                # SCOPE FENCE. Fidelity applies to an anchor that CAN be
-                # honoured. When the opening straddles this segment's end its
-                # stored offset describes a door hanging off the wall, and the
-                # old path's `max(0.0, off)` quietly slid it back on -- another
-                # silent repair of the kind this task deletes, living in the
-                # walk rather than in `rebuild`. Removing it is R2b/R5's (report
-                # the opening that no longer fits); R4b does not smuggle a
-                # behaviour change in under a fidelity fix, so a straddler keeps
-                # the previous path until then.
+                # R2c -- THE WALK IS TOTAL: it reports and emits, it never
+                # slides. `max(0.0, off)` used to pull a straddling opening back
+                # onto the segment, which is the same silent repair the charter
+                # deletes from `rebuild`, hiding in a different room. A door the
+                # document must cut in half is a real fault; it is emitted where
+                # R2b puts it and FILED, and `verify` learns to expect an I7
+                # for exactly the openings that were filed.
                 straddles = not (s0 - 1e-6 <= s - ow / 2.0
                                  and s + ow / 2.0 <= s1 + 1e-6)
-                if straddles:
-                    at_v1 = at_v2 = False
                 if at_v1 or at_v2:
                     frm = held
                     off = float(o.get("offset_in", 0.0))
-                elif straddles:
-                    near1 = loc <= seg_len / 2.0             # R2b replaces this
-                    frm = "v1" if near1 else "v2"
-                    off = ((loc if near1 else seg_len - loc) - ow / 2.0)
                 else:
-                    frm = "v2" if held == "v2" else "v1"      # SAME side
+                    # SAME SIDE (R2b), for a re-seat and for a straddler alike:
+                    # low end for a v1 anchor, high end for a v2 one. Position
+                    # is preserved exactly; only the description changes.
+                    frm = "v2" if held == "v2" else "v1"
                     off = ((loc if frm == "v1" else seg_len - loc) - ow / 2.0)
-                rec = {"id": nid("o"), "kind": o["kind"], "code": o["code"],
-                       "anchor": {"from": frm,
-                                  "offset_in": round(max(0.0, off), 3)}}
+                oid = nid("o")
+                rec = {"id": oid, "kind": o["kind"], "code": o["code"],
+                       "anchor": {"from": frm, "offset_in": round(off, 3)}}
+                if straddles:
+                    rep["openings_failed"].append(
+                        f"{oid}: {o['kind']} {o['code']} on the wall at "
+                        f"{tuple(round(v, 1) for v in a)} is cut by a junction "
+                        f"-- anchored {round(off, 1)}\" from {frm}, and no "
+                        f"segment can hold it")
+                    rep["openings_failed_ids"].add(oid)
                 near1 = frm != "v2"
                 if o["kind"] == "door":
                     dt = o["door_type"]
@@ -582,7 +605,11 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
     rep = report if report is not None else {}
     rep.update({"levels": len(roster), "segments": 0, "merged": 0,
                 "open_edges": 0, "openings_dropped": 0, "openings_deduped": 0,
-                "rooms_without_outline": 0, "unwelded_ends": 0})
+                "rooms_without_outline": 0, "unwelded_ends": 0,
+                # R5's one vocabulary. Strings for a human; ids for `verify`,
+                # which exempts an I7 only for openings that were actually
+                # filed -- an unreported I7 stays a full regression.
+                "openings_failed": [], "openings_failed_ids": set()})
 
     buckets = _by_floor(scene)
     levels, vertices, walls, rooms, furnishings = [], [], [], [], []

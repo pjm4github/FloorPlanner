@@ -134,3 +134,60 @@ def test_a_far_end_anchor_survives_a_round_trip(fp, win):
     (o_out,) = w_out["openings"]
     assert o_out["anchor"] == {"from": "v2", "offset_in": 184.0}, \
         "the save re-based the anchor onto the nearer end"
+
+
+def _tee_through_a_doorway(fp, scene):
+    """A door with a wall T-ing into the middle of it -- a scene state a gesture
+    can reach today, and one the document can only represent by cutting the
+    wall in half through the door."""
+    a = fp.WallItem(QPointF(0, 0), QPointF(240, 0), "interior")
+    scene.addItem(a)
+    op = fp.OpeningItem(a, "door", "3280", 120.0)      # spans 104..136
+    a.openings.append(op)
+    scene.addItem(fp.WallItem(QPointF(120, 0), QPointF(120, 120), "interior"))
+    fp.rebuild_all_walls(scene)
+    return a, op
+
+
+def test_the_walk_reports_the_opening_it_cannot_place_and_emits_it_anyway(
+        fp, scene):
+    """R2c. The walk is TOTAL: a load cannot decline, so it emits the straddling
+    opening where R2b puts it and FILES it. The `max(0.0, off)` that used to
+    slide it quietly back onto the segment is gone -- that was the charter's
+    silent repair, hiding in the walk rather than in `rebuild`."""
+    from floorplanner.design.bridge import design_from_scene
+
+    _tee_through_a_doorway(fp, scene)
+    rep = {}
+    doc = design_from_scene(scene, report=rep).to_dict()
+
+    assert len(rep["openings_failed"]) == 1, rep["openings_failed"]
+    (msg,) = rep["openings_failed"]
+    assert "cut by a junction" in msg and "door 3280" in msg
+    (oid,) = rep["openings_failed_ids"]
+
+    # EMITTED, not dropped, and not slid: it is still on a wall and still 32"
+    emitted = [o for w in doc["walls"] for o in w["openings"]]
+    assert len(emitted) == 1 and emitted[0]["id"] == oid
+    assert emitted[0]["code"] == "3280"
+
+
+def test_a_reported_I7_is_expected_but_an_unreported_one_is_not(fp, scene):
+    """The exemption is keyed PER OPENING, which is what keeps shadow mode's
+    teeth. Exempting the CLASS would blind it to every other way an opening can
+    run off a wall."""
+    from floorplanner.design.bridge import design_from_scene
+    from floorplanner.design.validate import check
+    from floorplanner.design.verify import fault_profile
+
+    _tee_through_a_doorway(fp, scene)
+    rep = {}
+    doc = design_from_scene(scene, report=rep).to_dict()
+
+    # the document really does carry the fault ...
+    i7 = [e for e in check(doc) if e.startswith("I7")]
+    assert len(i7) == 1 and "runs off" in i7[0]
+    # ... and it is expected, because the walk filed it
+    assert "I7" not in fault_profile(scene, doc=doc, walk_report=rep)
+    # ... but the SAME document with nothing filed is a regression
+    assert fault_profile(scene, doc=doc, walk_report={}).get("I7") == 1
