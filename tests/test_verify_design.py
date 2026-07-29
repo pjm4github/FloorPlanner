@@ -178,11 +178,20 @@ def test_apply_design_rebases(fp, win, on):
 
 
 def test_save_verifies_deep(fp, win, on, tmp_path):
-    """Save runs all fifteen before writing -- paid once, stakes highest."""
+    """Save runs all fifteen before writing -- paid once, stakes highest.
+
+    ASSERTION CHANGED AT DEFECT 26: `pytest.raises` -> the violation is
+    REPORTED and the write still refused. The raise was fatal, not strict: save
+    is reached from a menu QAction, and since PyQt 5.5 an exception escaping a
+    Qt callback calls qFatal() -> abort(), so this check killed the process
+    rather than declining. THE REFUSAL IS UNCHANGED -- "don't write a corrupt
+    plan" is the decision this test was written to protect, and it still holds;
+    only the way the user hears about it moved from a crash to a message."""
     V.rebase(win)
     _rect(fp, win.scene, 0, 0, 120, 96, "A")
     _rect(fp, win.scene, 60, 48, 120, 96, "B")
-    with pytest.raises(V.DesignVerificationError, match="I11"):
-        win.save_path(str(tmp_path / "p.json"))
+    win.save_path(str(tmp_path / "p.json"))
     assert not (tmp_path / "p.json").exists(), "a corrupt plan was written"
+    msg = win.statusBar().currentMessage()
+    assert "Not saved" in msg, f"the refusal was silent: {msg!r}"
     V.rebase(win)                                # ends corrupt on purpose

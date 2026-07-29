@@ -43,7 +43,7 @@ from floorplanner.design.importer import (       # P2.1 legacy -> v5
 from floorplanner.design.model import Design
 from floorplanner.design.validate import check
 from floorplanner.design.bridge import rebase_weld_baseline
-from floorplanner.design.verify import rebase, verify  # P1.6 shadow mode
+from floorplanner.design.verify import rebase  # P1.6 shadow mode
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
 from floorplanner.macro import *  # noqa: F401
@@ -400,7 +400,15 @@ class PlanIOMixin:
         self._write_plan(path)
 
     def _write_plan(self, path: str):
-        verify(self, "save", deep=True)      # P1.6: all fifteen before writing
+        # guarded: reached from the Save menu action, a Qt callback, where a
+        # raise becomes abort() (defect 26). The REFUSAL TO WRITE IS UNCHANGED
+        # -- "don't write a corrupt plan" is a deliberate decision this fix has
+        # no business overruling. Only the fatality was the bug, and a refusal
+        # the user can SEE was always the intent (defect 17's lesson).
+        if not self._verify_or_report("save", deep=True):   # all fifteen
+            self.status("Not saved: the plan has invariant violations "
+                        "(see the message above).")
+            return
         state = self.snapshot()
         on_disk = self.design_document()     # P2.2: the FILE is v5 now
         try:
@@ -449,7 +457,15 @@ class PlanIOMixin:
 
     def save_path(self, path: str):
         """Non-interactive save (no dialogs).  Raises on failure."""
-        verify(self, "save", deep=True)      # P1.6: all fifteen before writing
+        # guarded: reached from the Save menu action, a Qt callback, where a
+        # raise becomes abort() (defect 26). The REFUSAL TO WRITE IS UNCHANGED
+        # -- "don't write a corrupt plan" is a deliberate decision this fix has
+        # no business overruling. Only the fatality was the bug, and a refusal
+        # the user can SEE was always the intent (defect 17's lesson).
+        if not self._verify_or_report("save", deep=True):   # all fifteen
+            self.status("Not saved: the plan has invariant violations "
+                        "(see the message above).")
+            return
         state = self.snapshot()
         on_disk = self.design_document()     # P2.2: the FILE is v5 now
         with open(path, "w", encoding="utf-8") as f:

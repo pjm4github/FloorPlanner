@@ -20,7 +20,9 @@ from floorplanner.items import *  # noqa: F401
 from floorplanner.model import (  # serialization bridge (aliased)
     DEFAULT_FLOOR, Floor,
 )
-from floorplanner.design.verify import verify  # P1.6 shadow mode
+from floorplanner.design.verify import (  # P1.6 shadow mode
+    DesignVerificationError, verify,
+)
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
 from floorplanner.macro import *  # noqa: F401
@@ -962,6 +964,42 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         if not self._restoring:
             self._dirty_timer.start()
 
+    def _verify_or_report(self, where, **kw):
+        """Run shadow mode, and REPORT a violation instead of dying of it.
+
+        DEFECT 26. `verify()` raises by design, and that is right -- a genuine
+        invariant violation must not pass silently. What is wrong is WHERE the
+        raise lands: every one of this app's three `verify()` call sites is
+        reachable from a Qt callback (the dirty timer, menu actions for
+        undo/redo, image import, floor ops and save), and since PyQt 5.5 an
+        exception escaping a C++ -> Python callback goes to `sys.excepthook` and
+        then `qFatal()`, which calls `abort()`. So a violation found at a
+        quiescent point KILLED THE PROCESS -- on Windows, in a GUI session, the
+        user loses their work.
+
+        The catch is deliberately narrow: `DesignVerificationError` ONLY. A
+        blanket `except Exception` here would be the `except ValueError:
+        continue` disease at application scale, hiding real faults behind the
+        thing that was meant to surface them. Anything else still propagates.
+
+        Said once, per the R5 wording standard: shadow mode fires at every
+        quiescent point, so an unchanged message would repeat on every timer
+        tick.
+
+        Returns True when clean. The caller decides what a violation MEANS --
+        the edit path carries on (the edit already happened), the save path
+        still refuses to write. Only the fatality was the bug; the refusal is a
+        deliberate data-integrity decision that predates this fix."""
+        try:
+            verify(self, where, **kw)
+            return True
+        except DesignVerificationError as exc:
+            msg = f"Shadow mode: {exc}"
+            if msg != getattr(self, "_last_verify_report", None):
+                self._last_verify_report = msg
+                self.status(msg)
+            return False
+
     def _commit_if_changed(self):
         """Snapshot the plan as one undo step if it differs from the last
         committed state."""
@@ -986,7 +1024,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         # P1.6 shadow mode: a settled operation is exactly where the document
         # must be consistent, so this is the per-mutation hook.  Cheap twelve
         # only -- an O(n^2) sweep per edit would make the app unusable.
-        verify(self, "operation", doc=state, walk_report=rep)
+        self._verify_or_report("operation", doc=state, walk_report=rep)
         if state == self._committed_state:
             return
         self._undo_stack.append(self._committed_state)
