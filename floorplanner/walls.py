@@ -331,7 +331,9 @@ def apply_merge_plan_to_scene(scene, plan, rebuild=True):
                 continue
             try:
                 new = OpeningItem(surv, kind, code, s)
-            except ValueError:                 # wider than the merged wall
+            except ValueError as exc:          # wider than the merged wall
+                report_opening_failure(surv.scene(), surv, kind, code, s,
+                                       f"{exc} (merging collinear walls)")
                 continue
             new.door_type, new.swing = door_type, swing
             keep.append(new)
@@ -585,7 +587,9 @@ def apply_split_plan_to_scene(scene, split, rebuild=True):
     for op, s in moved:
         try:
             new = OpeningItem(seg, op.kind, op.code, s)
-        except ValueError:                     # wider than the second segment
+        except ValueError as exc:              # wider than the second segment
+            report_opening_failure(seg.scene(), seg, op.kind, op.code, s,
+                                   f"{exc} (splitting a wall)")
             continue
         new.door_type, new.swing = op.door_type, op.swing
         seg.openings.append(new)
@@ -688,7 +692,9 @@ def fracture_delete_wall(scene, wall, settle=True):
             if s0 <= s <= s1:
                 try:
                     op = OpeningItem(seg, kind, code, s - s0)
-                except ValueError:
+                except ValueError as exc:
+                    report_opening_failure(scene, seg, kind, code, s - s0,
+                                           f"{exc} (deleting part of a wall)")
                     continue
                 op.door_type, op.swing = dtype, swing
                 seg.openings.append(op)
@@ -796,6 +802,42 @@ class _WallBBoxIndex:
                         seen.add(id(w))
                         out.append(w)
         return out
+
+
+# --------------------------------------------------- R5: one vocabulary
+def describe_opening(wall, kind, code, s, why) -> str:
+    """One entry in the `openings_failed` vocabulary (P3.6 / R5): what the
+    opening was, which wall it was going on, where it was aimed, and why it
+    could not be placed. The same sentence shape the walk files, so a load
+    report and an edit report read alike."""
+    where = (f"({wall.p1.x():.0f}, {wall.p1.y():.0f})"
+             if wall is not None else "an unknown wall")
+    at = f" at {s:.0f}\"" if s is not None else ""
+    return f"{kind} {code} on the wall at {where}{at}: {why}"
+
+
+def report_opening_failure(scene, wall, kind, code, s, why):
+    """File an opening that could not be placed, on the SCENE.
+
+    P3.6 replaces eight `except ValueError: continue` sites that dropped an
+    opening in silence -- including on load, which is defect 6's "incl. on
+    load". Scene-scoped rather than global for the same reason the weld
+    baseline is: two windows must not share a report. `MainWindow` drains it at
+    the debounce point and says it once."""
+    if scene is None:
+        return
+    if not hasattr(scene, "_fp_opening_failures"):
+        scene._fp_opening_failures = []
+    scene._fp_opening_failures.append(
+        describe_opening(wall, kind, code, s, why))
+
+
+def drain_opening_failures(scene) -> list:
+    """Take and clear whatever has been filed since the last drain."""
+    out = list(getattr(scene, "_fp_opening_failures", ()) or ())
+    if out:
+        scene._fp_opening_failures = []
+    return out
 
 
 def rebuild_all_walls(scene):

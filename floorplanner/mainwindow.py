@@ -967,6 +967,17 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         committed state."""
         if self._restoring:
             return
+        # R5, EDIT SURFACE: an opening an edit could not place is reported at
+        # the quiescent point, naming the edit that dropped it, and SAID ONCE --
+        # the 06c2145 wording standard. Eight sites used to swallow these with
+        # `except ValueError: continue` (defect 6); they now file into one
+        # vocabulary and this is where the edit half of it reaches a human.
+        failed = drain_opening_failures(self.scene)
+        if failed and failed != getattr(self, "_last_opening_report", None):
+            self._last_opening_report = failed
+            head = failed[0]
+            more = f" (+{len(failed) - 1} more)" if len(failed) > 1 else ""
+            self.status(f"Could not place {head}{more}")
         # ONE walk, shared: the snapshot and the shadow-mode check happen at
         # the same quiescent point, and walking the scene twice here would
         # double the per-edit cost for nothing.
@@ -1079,7 +1090,10 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             for od in wd["openings"]:
                 try:
                     op = OpeningItem(wall, od["kind"], od["code"], od["s"])
-                except ValueError:
+                except ValueError as exc:
+                    report_opening_failure(self.scene, wall, od["kind"],
+                                           od["code"], od["s"],
+                                           f"{exc} (pasting)")
                     continue
                 op.door_type = od["door_type"]
                 op.swing = od["swing"]
@@ -1174,7 +1188,10 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             for od in wd["openings"]:
                 try:
                     op = OpeningItem(wall, od["kind"], od["code"], od["s"])
-                except ValueError:
+                except ValueError as exc:
+                    report_opening_failure(self.scene, wall, od["kind"],
+                                           od["code"], od["s"],
+                                           f"{exc} (pasting)")
                     continue
                 op.door_type = od["door_type"]
                 op.swing = od["swing"]

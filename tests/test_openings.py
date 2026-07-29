@@ -225,3 +225,54 @@ def test_a_split_clear_of_a_door_leaves_it_exactly_where_it_was(fp, scene):
     # SAME SIDE: it was dimensioned off the high end and still is
     assert moved.anchor_from() == "v2"
     assert moved.fits()
+
+
+def test_an_opening_that_cannot_be_placed_is_reported_not_dropped(fp, win):
+    """DEFECT 6, and the v4 LOAD site specifically -- "incl. on load" is what
+    the defect text singles out, and it was the one that mattered: a v5 load
+    reported a dropped opening (P1.5) while a v4 load said nothing at all.
+
+    Eight sites swallowed `ValueError` with a bare `continue`. They now file
+    into one vocabulary, and the two surfaces differ only in where it lands:
+    a load's entries join the open report, an edit's reach the status bar."""
+    data = {
+        "format": "floorplanner-json",
+        "version": 4, "settings": {}, "rooms": [], "furnishings": [],
+        "floors": [{"name": "default", "reference": False}],
+        "walls": [{"p1": [0, 0], "p2": [40, 0], "type": "interior",
+                   "floor": "default",
+                   # a 96" garage door on a 40" wall: it cannot go on
+                   "openings": [{"kind": "door", "code": "9680", "s": 20.0,
+                                 "door_type": "LH", "swing": -1}]}],
+    }
+    win.load_data(data)
+
+    walls = [it for it in win.scene.items() if isinstance(it, fp.WallItem)]
+    assert len(walls) == 1
+    assert walls[0].openings == [], "the impossible opening was placed anyway"
+    msg = win.statusBar().currentMessage()
+    assert "could not be placed" in msg, f"the load said nothing: {msg!r}"
+    assert "door 9680" in msg, f"the report does not name the opening: {msg!r}"
+
+
+def test_the_edit_surface_names_the_edit_and_says_it_once(fp, win):
+    """The other surface. An edit that cannot carry an opening says so at the
+    quiescent point, names which edit dropped it, and does not repeat itself --
+    the wording standard set when the unwelded-ends warning was de-spammed."""
+    from floorplanner.walls import (drain_opening_failures,
+                                    report_opening_failure)
+
+    sc = win.scene
+    w = fp.WallItem(QPointF(0, 0), QPointF(40, 0), "interior")
+    sc.addItem(w)
+    report_opening_failure(sc, w, "door", "9680", 20.0,
+                           "Opening is wider than the wall. (pasting)")
+    win._commit_if_changed()
+    first = win.statusBar().currentMessage()
+    assert "Could not place" in first and "pasting" in first
+
+    win.status("something else entirely")
+    win._commit_if_changed()                    # nothing new filed
+    assert win.statusBar().currentMessage() == "something else entirely", \
+        "the report repeated itself with nothing new to say"
+    assert drain_opening_failures(sc) == []

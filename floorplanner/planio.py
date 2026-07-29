@@ -166,8 +166,15 @@ class PlanIOMixin:
             for om in wm.openings:
                 try:
                     op = OpeningItem(wall, om.kind, om.code, om.s)
-                except ValueError:
-                    continue              # e.g. opening wider than the wall
+                except ValueError as exc:
+                    # DEFECT 6's "incl. on load" -- this is the v4 site, and it
+                    # silently dropped the opening. It now files into the same
+                    # vocabulary the v5 apply path has used since P1.5, which
+                    # ends the asymmetry where a v5 load reported and a v4 load
+                    # did not.
+                    report_opening_failure(self.scene, wall, om.kind, om.code,
+                                           om.s, f"{exc} (opening the plan)")
+                    continue
                 op.door_type = om.door_type
                 op.swing = om.swing
                 wall.openings.append(op)
@@ -235,6 +242,16 @@ class PlanIOMixin:
         if unknown:
             notes.append("Skipped unknown furnishing kind(s): "
                          + ", ".join(unknown) + ".")
+        # R5, LOAD SURFACE: openings that could not be placed join the
+        # open/conversion report rather than vanishing. Drained here so the
+        # edit-path drain never picks up a load's entries and reports them as
+        # something the user just did.
+        failed = drain_opening_failures(self.scene)
+        if failed:
+            notes.append(f"{len(failed)} opening(s) could not be placed: "
+                         + "; ".join(failed[:3])
+                         + (f" (+{len(failed) - 3} more)" if len(failed) > 3
+                            else ""))
         if notes:
             self.status("  ".join(notes))
         # P1.6: load DEFINES the baseline.  A plan opened from a corrupt legacy

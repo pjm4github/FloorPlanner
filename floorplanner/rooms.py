@@ -16,6 +16,7 @@ from floorplanner.geometry import *  # noqa: F401
 from floorplanner.vertex import Vertex
 from floorplanner.walls import (
     OpeningItem, WallItem, _CornerIndex, merge_all, rebuild_all_walls,
+    report_opening_failure,
 )
 
 
@@ -746,7 +747,11 @@ class RoomItem(QGraphicsItem):
                 if s0 - 1e-6 <= op.s <= s1 + 1e-6:
                     try:
                         nop = OpeningItem(c, op.kind, op.code, op.s - s0)
-                    except ValueError:
+                    except ValueError as exc:
+                        report_opening_failure(sc, c, op.kind, op.code,
+                                               op.s - s0,
+                                               f"{exc} (moving a room off a "
+                                               f"wall it shares)")
                         continue
                     nop.door_type, nop.swing = op.door_type, op.swing
                     c.openings.append(nop)
@@ -1043,7 +1048,9 @@ def duplicate_wall(scene, w):
     for op in w.openings:
         try:
             nop = OpeningItem(nw, op.kind, op.code, op.s)
-        except ValueError:
+        except ValueError as exc:
+            report_opening_failure(scene, nw, op.kind, op.code, op.s,
+                                   f"{exc} (copying a wall into a group)")
             continue
         nop.door_type, nop.swing = op.door_type, op.swing
         nw.openings.append(nop)
