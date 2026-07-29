@@ -2501,7 +2501,10 @@ STEP 5 WAS DONE AT d0ab89d, and the specific question is answered by
 
 ONE UNEXPLAINED OBSERVATION, recorded rather than dismissed: a single `E`
          appeared in one DEEP run's truncated progress output. Not reproduced in
-         five subsequent full DEEP runs under different random seeds, and an
+         five subsequent full DEEP runs (NOT "under different random seeds" --
+         that phrase is withdrawn at defect 26 round 2: pytest-randomly is not
+         installed, so every run in this project has always been in the same
+         order), and an
          explicit ERROR grep over a full `-ra` run finds nothing. Most likely a
          cut-off pipe rather than a real error, but it is written down here so
          that if it recurs at P3.6 it is the second sighting, not the first.
