@@ -154,7 +154,7 @@ gap rather than papering over it.
 | ☑ | **P3.5** Delete the detection engine | ruff + pytest |
 | ☐ | **P3.6** Opening anchors | ruff + pytest |
 | ☐ | **P3.7** Delete `OpenWall` | ruff + pytest |
-| ☐ | **P3.8** Perf verification vs P0.3 | ratios recorded |
+| ☐ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** | ratios recorded |
 | ☐ | **P4.1** Delete-wall keeps the room | ruff + pytest |
 | ☐ | **P4.2** Extract / join | ruff + pytest |
 | ☐ | **P4.3** Shuffle mode | ruff + pytest |
@@ -470,6 +470,10 @@ Dragging a wall moves its two vertices. Implement the split rule: a collinear co
 
 **R5 — One vocabulary, two surfaces.** All 8 sites feed the `rep["openings_failed"]` structure, entries naming wall, opening type and anchor. Surfaced by context: **load-path** entries (`planio.py:169` included — that is defect 6's "incl. on load" closing, and it ends the v4-silent / v5-reported asymmetry) join the open/conversion report per P2.1; **edit-path** entries (paste ×2, merge, split, fracture, privatize, `duplicate_wall`) surface as a status-bar line naming the edit, **said once** — the `06c2145` wording standard applies.
 
+**R4b — anchors: FIDELITY on round-trip, canonical at MINT only** *(settled 2026‑07‑28; overrules the canonicalize-on-emit shipped at P3.6(1))*. An anchor that already exists — loaded from a v5 file, or held by the live item — round-trips **verbatim**. The nearer-end / tie-to-`v1` rule of R4 applies **only when minting**: a legacy import, or an opening that has never had an anchor. *Why:* the anchor end changes behaviour under stretch, so re-basing it on save is **silent loss of intent — the same category as the clamp P3.6 deletes.** `_walls_of` reads the stored anchor when present and mints only when absent. Pinned by a round-trip test: a hand-authored FAR-end anchor survives load → save unchanged.
+
+**R2b — the straddle rule, confirmed as read.** **Extent decides:** an opening wholly inside one segment lands there regardless of which end it is anchored to. The anchored-end rule is the tiebreak for the **true straddle only** — where the opening necessarily overhangs and is necessarily reported. When an opening lands on the segment that does *not* contain its anchor vertex, it **re-seats to the same-side end of its new segment** (the split vertex), exact position preserved, offset recomputed — **same-side, not nearer-end**, consistent with R4b.
+
 **Also in scope, found during the read-back: defect 24.** `topology.graph_from_design` and `_reanchor` read and write `offset_in` as a **centre** distance where the schema, `bridge._walls_of` and `bridge._opening_s` all define it as a **near-edge** distance. This is the anchor arithmetic, so it is this task's; and R2's straddle test (`ov.s - half < s < ov.s + half`) rests on the value being right.
 
 ### P3.7 — Delete `OpenWall`
@@ -479,6 +483,8 @@ An outline edge with `wall: null` renders dashed.
 ### P3.8 — Perf verification
 Re-run P0.3 and compare against the P0.6 numbers.
 **Acceptance.** Ratios recorded in the log. Grouping 20 rooms creates **0** new walls — assert it.
+
+**Also: the SPLIT-ON-WRITE EXIT SURVEY** *(added 2026‑07‑28)*. Assigning `p1`/`p2` mints a fresh vertex for that end, and three separate defects have now come from something downstream being left on the old one: the P3.1 shim's own telemetry, **defect 22** (bake orphaning room outlines) and **the anchor orphaning** found at P3.6(1) (12 of 41 openings mirrored on loading `planc1`). Three members is a pattern, not a coincidence. **Census at P3.6: 9 direct coordinate-assignment sites remain** — `mainwindow.py:568,569` (align to grid), `:578,579` (`_translate_shape`), `view.py:402` (the rubber-band wall being drawn), `walls.py:1511,1513` (the endpoint drag), `walls.py:1549,1551` (the `rigid` and `tee` branches, both P4.5's / P3.3's by ruling). P3.8 re-runs this grep, records the count, and for each survivor states what carries the things attached to that end — or names the task that will.
 
 ---
 
@@ -2382,6 +2388,18 @@ ONE UNEXPLAINED OBSERVATION, recorded rather than dismissed: a single `E`
          STANDING INSTRUCTION, carried into P3.6 by ruling: a recurrence during
          P3.6 is a SECOND SIGHTING and is investigated on the spot -- not
          re-filed as a first.
+         >> RESOLVED AT P3.6, and the guess above was wrong in both halves: not
+         a cut-off pipe, and not a timing flap. It is
+         `test_a_clipped_band_leaves_every_room_coherent`, added at 408adf7 --
+         the defect-23 characterization. It deliberately leaves the scene
+         corrupt (stranded rooms are its subject) and never declared that state
+         as a baseline, so under FP_VERIFY_DESIGN=deep the `win` fixture's
+         teardown verify fires and pytest reports the test TWICE: an `E` in the
+         progress line, a second XFAIL in the summary. Fixed with `rebase(win)`,
+         the move `_overlapping_rooms` has always made for its deliberate
+         overlap. THE SAME DOUBLE-REPORT WAS THE OFF-vs-DEEP CENSUS DISCREPANCY
+         -- one cause, two symptoms. Recorded as a closed sighting; a THIRD
+         would be a new bug, not this one.
 
 P3.4  done   (branch v5-topology; four sub-commits + two riders)
 ruff:    clean
