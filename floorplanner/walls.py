@@ -1757,9 +1757,18 @@ class OpeningItem(QGraphicsItem):
         w, h = parse_wwhh(code)
         if w > self.wall.length():
             raise ValueError("Opening is wider than the wall.")
+        # A RESIZE IS ABOUT THE CENTRE, not about the anchored edge (P3.6).
+        # `offset_in` runs to the NEAR EDGE, so leaving it alone while the width
+        # changes grows the opening away from its anchor -- which pushed an
+        # auto-sized garage door clean off the end of its wall and was caught by
+        # shadow mode as I7. Widening a door in place is what a user means, so
+        # the centre is held and the offset re-derived.
+        centre = self.s if self.anchor_v is not None else None
         self.code = code.strip()
         self.prepareGeometryChange()
         self.width, self.height = w, h
+        if centre is not None:
+            self.s = centre
         if rebuild:
             self.wall.rebuild()           # re-cuts the gap, re-syncs children
 

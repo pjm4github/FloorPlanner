@@ -82,6 +82,24 @@ review changes are handed to Claude Code as explicit edit instructions; Claude C
 applies them, commits, and grep-verifies on disk. One extra round-trip, and the only
 channel that has destroyed work in this project is closed.
 
+### The gate must be checked, not printed — settled at P3.6
+
+**`python -m pytest -q | tail -1 && git commit` does not gate anything.** A
+pipeline's exit status is the LAST command's, so `&&` was testing `tail`, which
+always succeeds. Every gate run in that shape reported its counts honestly and
+enforced nothing — which is how P3.6(3) came to be committed with **two errors**
+in the ON and DEEP runs, visible in the very output that was pasted into the
+commit message.
+
+The errors were real and were shadow mode doing its job (`I7: 0 -> 1`, an
+opening pushed off its wall by a width change). They were found and fixed
+minutes later, so nothing shipped broken — but they were found by *reading* the
+output, which is exactly the manual step the gate exists to replace.
+
+**Run the command, capture its status, then print.** A helper that stores the
+output, keeps `$?`, echoes the tail and returns the status; or simply
+`set -o pipefail`. Never `... | tail -N && <next step>`.
+
 ### Destructive experiments run in a worktree, or after a WIP commit — settled at P3.5
 
 **Never against uncommitted work.** `git checkout <file>` has no undo. At P3.5 it

@@ -381,9 +381,26 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
                 held = o.get("from")
                 at_v1 = held != "v2" and s0 <= 1e-6
                 at_v2 = held == "v2" and s1 >= L - 1e-6
+                # SCOPE FENCE. Fidelity applies to an anchor that CAN be
+                # honoured. When the opening straddles this segment's end its
+                # stored offset describes a door hanging off the wall, and the
+                # old path's `max(0.0, off)` quietly slid it back on -- another
+                # silent repair of the kind this task deletes, living in the
+                # walk rather than in `rebuild`. Removing it is R2b/R5's (report
+                # the opening that no longer fits); R4b does not smuggle a
+                # behaviour change in under a fidelity fix, so a straddler keeps
+                # the previous path until then.
+                straddles = not (s0 - 1e-6 <= s - ow / 2.0
+                                 and s + ow / 2.0 <= s1 + 1e-6)
+                if straddles:
+                    at_v1 = at_v2 = False
                 if at_v1 or at_v2:
                     frm = held
                     off = float(o.get("offset_in", 0.0))
+                elif straddles:
+                    near1 = loc <= seg_len / 2.0             # R2b replaces this
+                    frm = "v1" if near1 else "v2"
+                    off = ((loc if near1 else seg_len - loc) - ow / 2.0)
                 else:
                     frm = "v2" if held == "v2" else "v1"      # SAME side
                     off = ((loc if frm == "v1" else seg_len - loc) - ow / 2.0)
