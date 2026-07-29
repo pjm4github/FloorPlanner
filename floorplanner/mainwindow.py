@@ -20,8 +20,9 @@ from floorplanner.items import *  # noqa: F401
 from floorplanner.model import (  # serialization bridge (aliased)
     DEFAULT_FLOOR, Floor,
 )
+from floorplanner.design.validate import check   # defect 28 evidence
 from floorplanner.design.verify import (  # P1.6 shadow mode
-    DesignVerificationError, verify,
+    BASELINE_ATTR as VERIFY_BASELINE_ATTR, DesignVerificationError, verify,
 )
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
@@ -994,11 +995,68 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             verify(self, where, **kw)
             return True
         except DesignVerificationError as exc:
+            self._persist_verify_corpse(where, exc, kw)
             msg = f"Shadow mode: {exc}"
             if msg != getattr(self, "_last_verify_report", None):
                 self._last_verify_report = msg
                 self.status(msg)
             return False
+
+    def _persist_verify_corpse(self, where, exc, kw):
+        """Write everything about a caught violation to disk, then carry on.
+
+        THE GUARD MAKES THIS NEARLY FREE, and that is the point. Before defect
+        26's fix a violation ended the process and took its own evidence with
+        it; now every catch can pay a permanent artifact instead. At a rate of
+        ~2 deep runs in 10, each run is a lottery ticket, and one win yields the
+        exact document, the exact rooms and the exact call path -- examinable
+        offline, forever, instead of a race to re-observe.
+
+        Recorded: the failing `Design`, the accepted baseline, the full
+        violation list, and the PROVENANCE -- a real Python stack, because
+        `where` only says "operation" or "save" and there are seven callback
+        paths into three call sites (defect 26's audit). The stack says which.
+
+        Never raises. Evidence-gathering that can itself fail the operation
+        would be a second defect 26."""
+        import datetime
+        import json
+        import os
+        import tempfile
+        import traceback
+        try:
+            root = os.environ.get("FP_VERIFY_DUMP") or os.path.join(
+                tempfile.gettempdir(), "floorplanner-verify")
+            os.makedirs(root, exist_ok=True)
+            doc = kw.get("doc")
+            if doc is None:
+                doc = self.snapshot()
+            stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+            payload = {
+                "when": stamp,
+                "where": where,
+                "error": str(exc),
+                "baseline": getattr(self, VERIFY_BASELINE_ATTR, None),
+                "violations": check(doc, deep=True),
+                "provenance": traceback.format_stack()[-14:],
+                # defect 28: is this window still the LIVE one, or a corpse of
+                # an earlier test whose dirty timer never stopped?
+                "window": {
+                    "id": id(self),
+                    "visible": bool(self.isVisible()),
+                    "timer_active": bool(self._dirty_timer.isActive()),
+                    "live_mainwindows": sum(
+                        1 for w in QApplication.topLevelWidgets()
+                        if type(w).__name__ == "MainWindow"),
+                    "title": self.windowTitle(),
+                },
+                "document": doc,
+            }
+            path = os.path.join(root, f"verify-{stamp}.json")
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(payload, fh, indent=1, default=str)
+        except Exception:                     # evidence must never break the app
+            pass
 
     def _commit_if_changed(self):
         """Snapshot the plan as one undo step if it differs from the last
