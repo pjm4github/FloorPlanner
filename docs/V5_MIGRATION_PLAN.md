@@ -170,7 +170,7 @@ gap rather than papering over it.
 | ☑ | **P3.3** Wall move = move vertices + split rule | ruff + pytest |
 | ☑ | **P3.4** Topology ops replace coalesce/weld/fracture | ruff + pytest |
 | ☑ | **P3.5** Delete the detection engine | ruff + pytest |
-| ☐ | **P3.6** Opening anchors | ruff + pytest |
+| ☑ | **P3.6** Opening anchors | ruff + pytest |
 | ☐ | **P3.7** Delete `OpenWall` | ruff + pytest |
 | ☐ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** | ratios recorded |
 | ☐ | **P4.1** Delete-wall keeps the room | ruff + pytest |
@@ -1943,9 +1943,22 @@ THE XFAIL/XPASS DELTA -- ASKED TWICE, ANSWERED FROM DISK. Both ends were run
          successive runs of one build: it straddles. Its ABSOLUTE improved
          sharply (300.7 ms -> ~106 ms at n=8, from the deleted re-detection),
          which is exactly why it now sits ON the threshold instead of well
-         above it. P3.8 owns the reading, and the FLAP deserves its attention
-         independently: a test that alternates every run reports nothing either
-         way, whichever side it lands on.
+         above it.
+         >> WIDENED AT P3.6 FROM ONE TEST TO THE CLASS, by measurement. The
+         P3.6 gate audit replayed OFF and ON at all 27 code-touching branch
+         commits and found 8 red -- of which SEVEN are this, and not one of
+         them is `test_ungroup` alone: `test_bake_scales_subquadratically` was
+         caught red at 8.05 against a threshold of 8, and every one of the
+         seven shows the tell -- exactly "1 failed", ALTERNATING between the
+         OFF and ON runs of the same commit. Code that is broken fails both
+         gates; a ratio that straddles fails whichever run the machine was
+         busier during. So the row is not one flaky test, it is the P0.3b
+         TIMING-RATIO CLASS, flapping at roughly 7 of 27 replays (~26%), and
+         whatever P3.8 decides -- a wider threshold, best-of-N, or moving them
+         out of the suite entirely -- applies to the class and not to one
+         member. Members seen flapping so far: `test_ungroup_scales_
+         subquadratically`, `test_bake_scales_subquadratically`,
+         `test_rebuild_scales_subquadratically`.
 commits: ac9ad45 (0) . 600fdef (1) . 02eff1e (2) . 733d7d6 (3) . f07dbdb (4)
          Logged sub-commit by sub-commit per the handoff-spec rule, so a
          successor reads the state from here plus the four riders at lines
@@ -2218,6 +2231,86 @@ PROCESS NOTE, since the working agreement is explicit about the mechanism: a
          the solution was already in use in this same task, since the perf
          comparison ran the old code in a `git worktree`. The followup below
          used exactly that to verify its new tests against pre-fix code.
+
+P3.6  done   (branch v5-topology; seven sub-commits)
+ruff:    clean
+pytest:  OFF  512 passed, 6 xfailed in 15.9s
+         ON   512 passed, 6 xfailed in 19.8s
+         DEEP 507 passed, 4 xfailed, 7 deselected in 20.0s
+         516 collected; OFF 512+6 and DEEP 507+4+7 both reconcile against
+         `--collect-only`.
+commits: 94a4de6 (0 spec) . 2fb3c77 (1 the anchor) . f964394 (1a the phantom E)
+         . 80435c1 (1b R4b/R2b rulings) . 7fe1aa2 (2 defect 24) . 3cdf046 (3
+         R4b) . e4907c7 (3a the gate that was not gating) . 52111c3 (4 R2c) .
+         41cc975 (5 R2b) . ea50dce (6 R5)
+
+THE AMENDED ACCEPTANCE (R1), and each of its four properties green:
+  (a) an opening anchored `from: "v2"` keeps its `offset_in` exactly when the
+      wall is stretched AT v2 -- `test_an_opening_holds_its_offset_when_the_
+      far_end_is_stretched`. RECEIPT: failed against s-based code before the
+      anchor landed.
+  (b) reversing a wall leaves the opening's physical position unchanged --
+      `test_reversing_a_wall_leaves_its_openings_where_they_are`. RECEIPT:
+      failed measurably, the door mirroring 200.0 -> 40.0.
+  (c) the split of R2 -- `test_a_split_clear_of_a_door_leaves_it_exactly_where_
+      it_was`. WRITTEN AT R2b, and it did not exist before: R1 listed it, but
+      the split coverage was the two refusal pins, and refusal is not a
+      property of the anchor -- it is the absence of one.
+  (d) loading a plan whose door no longer fits REPORTS it --
+      `test_an_opening_that_cannot_be_placed_is_reported_not_dropped`, on the
+      v4 load path specifically.
+
+THE THREE NUMBERS IN THE TASK LINE WERE ALL WRONG, and the read-back is what
+         caught them: "13 `except ValueError` sites" was every such site in the
+         package, not the opening drops (7 at baseline, 8 today); `walls.py:568`
+         had moved to `:1004`; and "P0.4 test 1 passes without xfail" pinned
+         nothing, having never been xfail. Corrected in place at 94a4de6.
+
+TWO DEFECTS FOUND WHILE DOING IT, both measured before being claimed:
+         * DEFECT 24 -- `offset_in` read and written as a CENTRE distance in
+           `topology.py`, near-edge everywhere else. 18.00" on a 36" door.
+           THREE sites, not the two first registered: the third was a fourth
+           hand-written copy of the arithmetic inline in `apply_merge_plan`,
+           found only when fixing the other two turned its test red. All now
+           route through one conversion.
+         * DEFECT 25 -- a gesture can create a door-straddles-junction scene
+           state the document can only represent as a reported fault. Registered
+           P4.1 per ruling, with my argument for P4.3 and a move trigger in the
+           entry rather than swallowed.
+
+THE GATE AUDIT, ruled at the process failure, and it is a measurement in three
+         layers because the first two were not trustworthy:
+         1. GREP of every commit message (44 branch + 172 main): ONE hit, and
+            it is e4907c7 -- my own disclosure, not a gate committed over.
+         2. WHY THAT IS NOT THE ANSWER: 3cdf046's gate line was transcribed
+            WITHOUT its ", 2 errors". The message looked green. Grepping
+            messages audits what I wrote, not what ran.
+         3. EMPIRICAL REPLAY of OFF and ON at all 27 code-touching branch
+            commits: 8 red. Re-replayed with the P0.3b ratio class excluded:
+            SEVEN GO GREEN, ONE STAYS RED.
+         VERDICT: exactly ONE commit was made over a genuinely red gate --
+         3cdf046 (P3.6(3), R4b), red on ON and DEEP with 2 errors, green at
+         e4907c7 the next commit. Everything else was the timing-ratio class.
+
+AND THE SEVEN ARE THE FLAP ROW'S EVIDENCE. `test_bake_scales_subquadratically`
+         was caught red at 8.05 against a threshold of 8, and all seven show
+         the tell: exactly "1 failed", ALTERNATING between the OFF and ON runs
+         of the same commit. Broken code fails both; a straddling ratio fails
+         whichever run the machine was busier during. ~7 of 27 replays, so the
+         P3.8 row is widened from one test to the CLASS, with three members
+         named.
+
+TESTS: +9 (tests/test_openings.py, new). CHANGED, each with its one line:
+         * the two R2b PINS flipped -- `split_edge` raising, `split_wall_at`
+           declining. Both were placeholders pending representability;
+           `match="P3.6"` was one test naming its own executioner.
+         * the drag-side twin of the decline in test_wall_move.
+         * two in test_topology_ops / test_topology that had encoded defect
+           24's arithmetic (offset 50.0 where the near edge is 18.0) or were
+           passing only because of it (a midpoint split that always fell
+           inside the door).
+         * test_a_clipped_band_leaves_every_room_coherent gained `rebase(win)`
+           -- see the phantom-E resolution above.
 
 P3.5-followup  done   commit d0ab89d -- DEFECT 22: a group move is a vertex move.
 ruff:    clean
