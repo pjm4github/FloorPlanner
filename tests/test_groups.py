@@ -516,9 +516,17 @@ def test_a_clipped_band_leaves_every_room_coherent(fp, win):
         g.setPos(dx, dy)
         g.bake()
 
+    cols = _columns(fp, win, dx, dy, before)
+    # The stranded rooms are this test's SUBJECT, so declare the state it built
+    # as the accepted baseline -- the same move `_overlapping_rooms` makes for
+    # its deliberate overlap. Without it the `win` fixture's teardown verify
+    # fires under FP_VERIFY_DESIGN=deep and the test is reported TWICE (an `E`
+    # in the progress line and a second xfail), which is what the phantom `E`
+    # sighted during the P3.5-followup actually was.
+    from floorplanner.design.verify import rebase
+    rebase(win)
     incoherent = {n: (wm, wt, cm, ct)
-                  for n, (wm, wt, cm, ct, _i) in
-                  _columns(fp, win, dx, dy, before).items() if wm != cm}
+                  for n, (wm, wt, cm, ct, _i) in cols.items() if wm != cm}
     assert not incoherent, (
         "rooms whose walls and outline disagree about the move: "
         + "; ".join(f"{n} walls {a}/{b} vs corners {c}/{d}"

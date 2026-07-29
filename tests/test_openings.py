@@ -62,3 +62,31 @@ def test_reversing_a_wall_leaves_its_openings_where_they_are(fp, scene):
     assert after.x() == pytest.approx(before.x(), abs=1e-6), \
         f"the door mirrored: {before.x()} -> {after.x()}"
     assert after.y() == pytest.approx(before.y(), abs=1e-6)
+
+
+def test_a_weld_carries_an_anchor_but_a_share_does_not(fp, scene):
+    """The two halves of `_fuse_anchors`, and the refusal is the load-bearing
+    one -- it is what keeps R1(b) true.
+
+    A WELD fuses two ends that are already at one corner onto a single
+    `Vertex`: same physical corner, so an anchor on the absorbed vertex must
+    follow it or the opening is orphaned and mirrors. A SHARE or a swap points
+    an end at a vertex somewhere ELSE, and there the anchor must stay exactly
+    where it is -- re-pointing it would move the opening, which is the mirroring
+    bug wearing different clothes."""
+    w, op = _wall_with_door(fp, scene, 240.0, 200.0)
+    assert op.anchor_from() == "v2"
+
+    # WELD: a co-located vertex replaces p2 -- the anchor follows
+    v2 = w.end_vertex("p2")
+    twin = fp.Vertex(v2.point().x(), v2.point().y())
+    assert twin is not v2
+    w.set_end_vertex("p2", twin)
+    assert op.anchor_v is twin, "a weld did not carry the anchor"
+    assert op.anchor_from() == "v2"
+    assert op.s == pytest.approx(200.0)
+
+    # SHARE: a vertex somewhere else -- the anchor must NOT follow
+    elsewhere = fp.Vertex(90.0, 0.0)
+    w.set_end_vertex("p2", elsewhere)
+    assert op.anchor_v is twin, "a share dragged the anchor off its corner"
