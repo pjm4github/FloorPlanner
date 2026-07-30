@@ -2344,6 +2344,91 @@ DEFECT 28 -- RULINGS AT THE SESSION BOUNDARY (2026-07-29). Committed here
      and the "suppressing" interventions are all explained by it, and no
      separate cause is outstanding.
 
+P3.8 (1)  the numbers, measured SAME-MACHINE and as MEDIANS OF SEVEN.
+ruff:    clean
+pytest:  (trailer with the sub-commit)
+THE METHOD IS THE FIRST FINDING. Every previous perf entry in this log is a
+         SINGLE RUN, and the flap class says a single run of a ratio is not a
+         measurement. So: 7 runs per tree, medians reported, spread reported
+         beside them -- and the comparison tree is re-measured TODAY in a
+         worktree rather than quoted from a table recorded weeks ago, because
+         comparing today's HEAD against an old table conflates the code change
+         with the machine.
+         Anchor: `1a4d125^` = `b82256c`, the commit immediately before Phase 3
+         opened.
+
+                    PRE-PHASE-3 (b82256c)        HEAD (dedfc57)
+                    n=4  -> n=8    ratio         n=4  -> n=8    ratio
+  rebuild           1.2  ->   3.3   2.82         1.0  ->   2.6   2.61
+  snapshot          2.1  ->  10.8   5.06         2.2  ->  10.8   4.80
+  undo             22.0  -> 154.0   6.99        19.1  -> 126.2   6.64
+  select_burst      0.2  ->   1.0   5.26         0.2  ->   1.0   5.48
+  select_interact   2.5  ->   7.6   3.19         2.4  ->   9.5   4.13
+  group            27.8  -> 349.7  12.77        29.3  -> 356.4  12.43
+  bake             41.0  -> 279.0   6.81         6.4  ->  26.4   4.09
+  ungroup          41.5  -> 292.5   6.89        11.5  ->  99.8   8.64
+
+THE HEADLINE IS `bake`: 279.0 -> 26.4 ms at 64 rooms, **10.6x faster**, ratio
+         6.81 -> 4.09. That is P3.5's deletion of the detection engine, paid
+         out: a group move used to end in `refresh_rooms` re-detecting every
+         room it touched, and nothing re-detects now.
+`ungroup` IS THE HONEST HALF: 292.5 -> 99.8 ms, **2.9x faster absolutely**,
+         while its RATIO WORSENS 6.89 -> 8.64 and crosses the threshold of 8.
+         Both are true and the row must say both. It is `xfail(strict=False)`,
+         so it xfails today where it used to pass -- exactly the reading P3.5
+         predicted and left for this task.
+`rebuild` ANSWERS P0.3's WARNING. P0.3 recorded 2.7 and warned that the
+         memoized machinery was already sub-linear, so a regression here would
+         be a real finding rather than noise. It improved: 2.82 -> 2.61, and
+         3.3 -> 2.6 ms absolute.
+`group` IS UNCHANGED (12.77 -> 12.43) and remains the one op Phase 3 did not
+         touch. It is not wall duplication -- the harness groups walls AND
+         rooms, which copies nothing (measured below).
+`select_interactive` READS 25% SLOWER THAN PRE-PHASE-3 (7.6 -> 9.5 ms), AND
+         THAT IS NOT P3.7's PAINT ADDITION -- measured against `2c5fd8d`, the
+         commit immediately before it, with the same 7-run method: pre-paint
+         10.3 ms / spread 21.98x, HEAD 9.5 ms / spread 1.49x. HEAD is faster
+         and far steadier. The Phase-3-wide difference is real and unattributed;
+         it is small, and the op is one of the flap class's four members.
+
+AND THE SPREAD COLUMN IS THE FLAP CLASS'S EVIDENCE, gathered here because this
+         is the task that has to decide about it. Same code, same machine,
+         seven runs:
+           rebuild            ratio spread 2.12x  (2.32 .. 4.91)
+           select_interactive ratio spread 1.49x on HEAD -- but **21.98x** at
+                              2c5fd8d (1.22 .. 26.82), where a `< 8` assertion
+                              passes six times and fails once
+           ungroup            1.12x on HEAD, 1.70x pre-paint
+         THE DIAGNOSIS, and it points at the fix: the n=4 leg is 0.2-4 ms, so
+         the RATIO is a quotient of two noise-dominated numbers. It is not that
+         the code is unstable; it is that the instrument divides by a
+         millisecond. Any decision that keeps ratio-of-small-durations as a
+         gating assertion will keep flapping whatever threshold it picks.
+
+THE 0-NEW-WALLS ACCEPTANCE IS AMBIGUOUS, AND MEASUREMENT SPLIT IT IN TWO --
+         the P0.4 test-2 precedent, applied without being asked:
+           * rooms AND their walls (Ctrl+A, or a band -- what a user's
+             selection actually contains): 80 walls -> 80 after group -> 80
+             after bake. **0 new walls, asserted** in
+             `test_grouping_twenty_rooms_with_their_walls_creates_no_walls`.
+           * the 20 ROOM items alone, which is what the sentence literally
+             says: **+868 walls**. `duplicate_wall` copies a room's walls when
+             the room is grouped without them, and P3.5's census assigned that
+             to **P4.5**. Pinned as `xfail(strict=False)` naming P4.5 rather
+             than asserted-and-failed or quietly reworded.
+         AND THE DUPLICATION COMPOUNDS, which is new: grouping the 20 rooms one
+         at a time sums to **258** new walls, all together **868** -- 3.4x more,
+         because each room's copy sees the copies the earlier rooms just made.
+         Per room it is roughly 2x that room's own wall count (Foyer: 4 own ->
+         10 new). Recorded for P4.5, whose deliverable this is.
+         COST, DECLARED: these two tests TRIPLED the suite -- 16s -> 46s --
+         because one loads a 20-room plan and the other builds 868 walls.
+         Both are marked `slow` (not `perf`: they are deterministic and
+         belong in CI), so `--quick` is 13s again while the full gate pays
+         ~50s. A 10-run re-certification now costs ~10 minutes, which is a
+         real change to the gate's ergonomics and is said out loud rather
+         than discovered by whoever runs it next.
+
 P3.7  done -- TICKED 2026-07-30 by the reviewer. Three sub-commits, each at a
          full-mode green gate.
 ruff:    clean

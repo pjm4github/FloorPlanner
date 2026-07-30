@@ -632,3 +632,57 @@ def test_a_group_move_never_drags_a_wall_outside_it(fp, win, make_room):
     assert (stub.p1.x(), stub.p1.y(), stub.p2.x(), stub.p2.y()) == before, \
         "the group dragged a wall that was not in it"
     assert room.corners[0].x() != 0 or room.corners[1].x() != 0
+
+
+def _nwalls(fp, sc):
+    return sum(isinstance(i, fp.WallItem) for i in sc.items())
+
+
+def test_grouping_twenty_rooms_with_their_walls_creates_no_walls(fp, win):
+    """P3.8's acceptance: 'Grouping 20 rooms creates 0 new walls'.
+
+    STATED FOR THE SELECTION A USER ACTUALLY MAKES -- Ctrl+A, or a band over
+    the plan -- which takes the rooms AND their walls. Measured on
+    symmetricP1: 80 walls in, 80 after grouping, 80 after a bake. The room's
+    own selected walls ride in as themselves; nothing is copied.
+
+    The rooms-ONLY selection is a different question and still duplicates; it
+    is the xfail below, and P4.5's."""
+    _v5_plan(fp, win)
+    sc = win.scene
+    assert sum(isinstance(i, fp.RoomItem) for i in sc.items()) == 20
+    before = _nwalls(fp, sc)
+    sc.clearSelection()
+    for it in sc.items():
+        if isinstance(it, (fp.RoomItem, fp.WallItem)) and it.group() is None:
+            it.setSelected(True)
+    win.group_selected()
+    assert _nwalls(fp, sc) == before, "grouping copied walls"
+    for g in [i for i in sc.items() if isinstance(i, fp.GroupItem)]:
+        g.setPos(48.0, 0.0)
+        g.bake()
+    assert _nwalls(fp, sc) == before, "the bake copied walls"
+
+
+@pytest.mark.slow          # +868 walls is inherently slow to build
+@pytest.mark.xfail(strict=False, reason="grouping a room ALONE still copies "
+                   "its walls (duplicate_wall); what a group IS is P4.5's")
+def test_grouping_twenty_rooms_alone_creates_no_walls(fp, win):
+    """The same sentence read literally -- the 20 ROOM items and nothing else.
+
+    Split from the test above for the reason P0.4's test 2 was split: one
+    assertion cannot tell today's behaviour from P4.5's, and a test that
+    passes in both worlds proves nothing about the change. MEASURED TODAY on
+    symmetricP1: +868 walls, and the duplication COMPOUNDS -- grouping the
+    same rooms one at a time sums to only 258, because each room's copy sees
+    the copies the previous rooms already made. `duplicate_wall` dies at
+    P4.5, and this flips there."""
+    _v5_plan(fp, win)
+    sc = win.scene
+    before = _nwalls(fp, sc)
+    sc.clearSelection()
+    for it in sc.items():
+        if isinstance(it, fp.RoomItem):
+            it.setSelected(True)
+    win.group_selected()
+    assert _nwalls(fp, sc) == before
