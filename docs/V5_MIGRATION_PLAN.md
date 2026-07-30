@@ -496,13 +496,43 @@ Dragging a wall moves its two vertices. Implement the split rule: a collinear co
 
 ### P3.7 — Delete `OpenWall`
 An outline edge with `wall: null` renders dashed.
-**Acceptance.** `test_open_walls.py` rewritten against null edges; the class is gone.
+~~**Acceptance.** `test_open_walls.py` rewritten against null edges; the class is gone.~~
+
+**AMENDED ACCEPTANCE, settled 2026‑07‑30 before any code** *(the P3.6 lesson applied to a three-line task: a spec whose acceptance can pass vacuously is the same class of problem as a task line whose three numbers were all wrong — fix the spec first, then the code).*
+
+**Two rulings from the read-back, and they are what the amendment implements.**
+
+**R1 — RENDER-ONLY. No item, no interaction.** An open edge is *the absence of a wall*; interacting with an absence means either drawing a wall there (the draw tool already owns that) or moving the room (the room owns that). Selection of a nothing has no meaning to implement. `test_open_wall_is_editable`, deleted at P3.5 because "it asserted drag controls on a placeholder nothing constructs", **stays a precedent rather than a casualty**: no drag controls on something nothing constructs. The cue is drawn in `RoomItem.paint` from `RoomItem.open_edges()` — the fact and the cue from **one** representation, which is what the P3.5 Known-regression row promised. **Match the old `OpenWall` dash visually** so the row closes as *"same cue, one representation"* and not as *"different cue"*. If a later phase needs open-edge hit-testing, **that phase specs it** (P4.2 extract/join is the plausible candidate); a fence comment at the paint site naming P4.2 is welcome, not mandatory.
+
+**R2 — THE PIXEL ASSERTION IS REQUIRED, on P3.4's junction-contract template:** render, **measure the polarity first**, then assert with a measured threshold. A dashed line is the canonical structurally-green / visually-absent cue, and the old acceptance would have passed with nothing drawn at all.
+
+**The four acceptance items:**
+
+**(a) `test_open_walls.py` against null edges — VERIFY, DO NOT RE-DO.** Already landed at P3.5 and logged there as `[DIVERGENCE — the whole file]`: `_open_count` sums `r.open_edges()` and the file's docstring states the old→new mechanism. What remains of it here is only its four `not w.is_open` helper filters, which fall with the flag in (c).
+
+**(b) Pixel assertion, polarity measured**, on a room with an open edge: the dashed cue is drawn along the vacated stretch, and the closed sides are unaffected. Both halves in one test — positive and negative — so the positive assertion cannot go vacuous, exactly as P3.4's junction test does.
+
+**(c) The class is gone**, by the standing rule (*a line dies when its last caller dies*). **Census taken on disk 2026‑07‑30, and it diverges from the estimate in two ways — reported rather than forced:**
+
+- **THERE IS NO LIVE PRODUCER, and there has not been since P3.5.** `grep "OpenWall("` over the tree returns **zero** constructor calls. The **P2.3 producer branch in `apply`** named in the estimate is already deleted — `bridge.py:959` is now a *comment* recording that it went at P3.5. **The Progress-log line at P2.3 ("apply now builds an `OpenWall` per `wall: null` outline edge; P3.7 retires the branch") is stale history and is annotated as such**, not acted on. So the class is dead code today: deleting it removes a definition, not a behaviour.
+- **`is_open` IS THE REAL SWEEP, and it is ~7× the estimate.** The estimate said "comments/docstrings ×7". Measured: the flag is read at **23 sites in `floorplanner/`, 19 in `tests/`, and 2 in `docs/make_gallery.py` — 44 readers across 17 files** — plus the definition (`walls.py:902`) and the override (`:1685`). **Every one of them is permanently `False`** once nothing constructs an `OpenWall`, and `walls.py:1631` already says so in a comment. The flag dies with its producer and the readers go with it: *a permanently-false flag is worse than no flag, because it tells every future reader that open walls exist as items.* Sub-committed separately from the rendering, so the mechanical sweep is its own rollback point.
+
+**(d) The P3.5 Known-regression row closes**, citing the pixel test (b) as its receipt — not the deletion, and not "the code now draws something". The row's own wording is the bar: *the same cue drawn from the one representation instead of a second one.*
+
+**Sub-commits:** (1) this amended acceptance; (2) rendering + pixel test; (3) the deletion sweep. **Full-mode `tools/gate.py` trailers throughout.**
 
 ### P3.8 — Perf verification
 Re-run P0.3 and compare against the P0.6 numbers.
 **Acceptance.** Ratios recorded in the log. Grouping 20 rooms creates **0** new walls — assert it.
 
 **Also: the SPLIT-ON-WRITE EXIT SURVEY** *(added 2026‑07‑28)*. Assigning `p1`/`p2` mints a fresh vertex for that end, and three separate defects have now come from something downstream being left on the old one: the P3.1 shim's own telemetry, **defect 22** (bake orphaning room outlines) and **the anchor orphaning** found at P3.6(1) (12 of 41 openings mirrored on loading `planc1`). Three members is a pattern, not a coincidence. **Census at P3.6: 9 direct coordinate-assignment sites remain** — `mainwindow.py:568,569` (align to grid), `:578,579` (`_translate_shape`), `view.py:402` (the rubber-band wall being drawn), `walls.py:1511,1513` (the endpoint drag), `walls.py:1549,1551` (the `rigid` and `tee` branches, both P4.5's / P3.3's by ruling). P3.8 re-runs this grep, records the count, and for each survivor states what carries the things attached to that end — or names the task that will.
+
+**And: the OPEN DRAG QUESTIONS.** *(table added 2026‑07‑30.)* Two questions about what a mouse gesture does have now been left explicitly unanswered rather than guessed, each because the measurement that would settle it was out of its task's scope. They are surveyed together here because they are the same organ — the endpoint drag — and because an unassigned question with no home is one nobody re-reads. **Neither is scoped to P3.8 by this table; P3.8 records the answer or names the task that will.** *(Structural note: this table is new. The split-on-write survey above is prose, and defect 13's drag half lives in the defect register's row 13 as "unassigned (drag)" — it is restated here so the two sit beside each other, not moved.)*
+
+| question | why it is open | how to answer it |
+|---|---|---|
+| **Defect 13's drag half — does a drag's RESULT depend on view zoom?** | Measured at P3.5 **before** anything was deleted: the same scene-space gesture gave **0 open sides at 0.25× and 1 at 0.5×–4×**, leaving the wall's far end at y=120 versus y=60. The detection half closed structurally; the zoom terms that remain are the drag's own — `mousePressEvent`'s `20.0 / _view_scale()` endpoint catch radius and `_project_to_orthogonal`'s `16.0 / view_scale` stick. Retargeted and left **unassigned** rather than invented a home for. | Drive the same gesture at pinned zooms and compare the resulting geometry, as P3.5 did — then decide whether a gesture tolerance *should* be zoom-relative (it probably should) and whether the RESULT may be. **P4.2** is the nearest task that touches the drag. |
+| **Does a real endpoint drag re-point every outline holder, or strand a third room?** | The 38 synthetic drags at the defect-28 resolution **moved the corner in none of them**, so the app is neither cleared nor accused — that run's "0 stranded" is vacuous and was discarded rather than quoted as an acquittal. The question matters because the *test* that stranded a third room was hand-rolling what the drag does, and `mousePressEvent` step 4 gathers outline edges from the **run's rooms**, which is not obviously the same set as **every room holding the corner**. | **Answer with a real drag** — driven far enough to actually move the corner, asserted as having moved — **on a corner held by 3+ rooms**, then check every holder followed. |
 
 ---
 
