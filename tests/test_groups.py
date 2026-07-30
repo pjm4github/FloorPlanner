@@ -664,21 +664,26 @@ def test_grouping_twenty_rooms_with_their_walls_creates_no_walls(fp, win):
     assert _nwalls(fp, sc) == before, "the bake copied walls"
 
 
-@pytest.mark.slow          # +868 walls is inherently slow to build
 @pytest.mark.xfail(strict=False, reason="grouping a room ALONE still copies "
                    "its walls (duplicate_wall); what a group IS is P4.5's")
-def test_grouping_twenty_rooms_alone_creates_no_walls(fp, win):
-    """The same sentence read literally -- the 20 ROOM items and nothing else.
+def test_grouping_rooms_without_their_walls_still_copies_them(fp, win,
+                                                              make_room):
+    """The same sentence read literally -- the ROOM items and nothing else.
 
     Split from the test above for the reason P0.4's test 2 was split: one
-    assertion cannot tell today's behaviour from P4.5's, and a test that
-    passes in both worlds proves nothing about the change. MEASURED TODAY on
-    symmetricP1: +868 walls, and the duplication COMPOUNDS -- grouping the
-    same rooms one at a time sums to only 258, because each room's copy sees
-    the copies the previous rooms already made. `duplicate_wall` dies at
-    P4.5, and this flips there."""
-    _v5_plan(fp, win)
+    assertion cannot tell today's behaviour from P4.5's, and a test that passes
+    in both worlds proves nothing about the change.
+
+    THE MECHANISM IS PINNED HERE; THE SCALE IS RECORDED IN THE LOG. Measured at
+    P3.8 on symmetricP1's twenty rooms: +868 walls, and the duplication
+    COMPOUNDS -- the same rooms grouped one at a time sum to only 258, because
+    each room's copy sees the copies the earlier ones made. Pinning that here
+    would cost the suite 40 seconds to rebuild a number the log already states,
+    so this uses two rooms: `duplicate_wall` either copies or it does not, and
+    at P4.5 it dies and this flips."""
     sc = win.scene
+    make_room(sc, 0, 0, 120, 120, "A")
+    make_room(sc, 120, 0, 120, 120, "B")
     before = _nwalls(fp, sc)
     sc.clearSelection()
     for it in sc.items():

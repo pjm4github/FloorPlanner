@@ -23,6 +23,7 @@ rounding difference, so it is treated as red.
 
     python tools/gate.py            # ruff + OFF + ON + DEEP
     python tools/gate.py --quick    # ruff + OFF only
+    python tools/gate.py --perf     # the timing lane, explicitly (P3.8)
 """
 import re
 import subprocess
@@ -33,9 +34,21 @@ OUTCOMES = ("passed", "failed", "xfailed", "xpassed", "error", "errors",
             "skipped", "deselected")
 RED = ("failed", "error", "errors")
 
+# P3.8, THE FLAP-CLASS RULING: the timing lane is excluded from EVERY mode, not
+# just DEEP. It used to run in OFF and ON, where a wall-clock ratio could turn
+# the gate red on machine load alone -- and did, 1 of 8 and 2 of 8 in two
+# sweeps. A gate whose red has two indistinguishable causes (a regression, or a
+# busy machine) is separable only by reading which test failed, which is the
+# manual step this tool exists to remove.
+#
+# It also makes the three runs' censuses reconcile against the SAME collected
+# total, instead of DEEP alone reporting "7 deselected".
+#
+# The lane is not abandoned: `tools/gate.py --perf` runs it explicitly and
+# prints its numbers, which is what P0.3b ruled it was for.
 GATES = [
-    ("OFF ", {}, []),
-    ("ON  ", {"FP_VERIFY_DESIGN": "1"}, []),
+    ("OFF ", {}, ["-m", "not perf"]),
+    ("ON  ", {"FP_VERIFY_DESIGN": "1"}, ["-m", "not perf"]),
     ("DEEP", {"FP_VERIFY_DESIGN": "deep"}, ["-m", "not perf"]),
 ]
 
@@ -66,7 +79,25 @@ def _counts(line: str) -> dict:
     return got
 
 
+def _perf() -> int:
+    """Run the timing lane explicitly and print its numbers.
+
+    P0.3b: the harness is "a local gate, invoked explicitly at P0.6 and P3.8 --
+    the two moments its numbers decide something". This is that invocation, so
+    it stops being a remembered incantation. It asserts only the catastrophic
+    absolute bounds (P3.8's flap ruling); the ratios are printed to be READ."""
+    rc, out = _run(["pytest", "-q", "-p", "no:randomly", "-m", "perf", "-s"])
+    for line in out.splitlines():
+        if line.startswith("[scaling]") or " passed" in line or " failed" in line:
+            print(line)
+    print(f"Perf-Verdict: {'RED' if rc else 'GREEN'} (absolute bounds only -- "
+          f"the ratios above are RECORDED, not asserted)")
+    return rc
+
+
 def main() -> int:
+    if "--perf" in sys.argv:
+        return _perf()
     quick = "--quick" in sys.argv
     rc, out = _run(["ruff", "check", "."])
     ruff = "clean" if rc == 0 else f"{out.strip().splitlines()[-1]}"

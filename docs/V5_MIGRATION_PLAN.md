@@ -2021,6 +2021,13 @@ THE XFAIL/XPASS DELTA -- ASKED TWICE, ANSWERED FROM DISK. Both ends were run
          (ratio **9.71** against the threshold of 8), while the three runs after
          the paint addition read **4.10 / 2.22 / 4.00**. The flap is the class,
          not the change.
+         >> RESOLVED AT P3.8 (2): the ratios are RECORDED, never asserted;
+         every timing assertion is an ABSOLUTE bound at n=8; and the lane is
+         out of the gate in all three modes (`tools/gate.py --perf` runs it
+         explicitly). The wider-threshold option is RULED OUT by measurement,
+         not preference -- the ratio's noise band reaches ~27 while the whole
+         diagnostic range it exists to read is 4 (linear) to 16 (quadratic).
+         Full reasoning in the P3.8 (2) entry.
          CONSTRAINT ON THE P3.8 DECISION, ruled 2026-07-30 and NOT negotiable:
          **no wall-clock ratio may remain a gate-reddening hard pass on a shared
          machine.** Wider thresholds, best-of-N, or a non-gating
@@ -2343,6 +2350,76 @@ DEFECT 28 -- RULINGS AT THE SESSION BOUNDARY (2026-07-29). Committed here
      stale window's timer firing inside a later test -- so the four sightings
      and the "suppressing" interventions are all explained by it, and no
      separate cause is outstanding.
+
+P3.8 (2)  THE FLAP-CLASS DECISION, made from the numbers and applied to the
+         class. It is the merge checklist's item 3 and the precondition for
+         trusting any later gate run.
+
+THE DECISION IN ONE LINE: **the ratios are RECORDED, never asserted; every
+         timing assertion is an ABSOLUTE bound at the large grid; and the
+         timing lane is out of the gate in every mode.**
+
+AND IT IS NOT A NEW MECHANISM -- IT IS THIS FILE'S OWN PRECEDENT, APPLIED TO
+         THE CLASS. `tests/test_scaling.py` already converted two ops for
+         exactly this reason and wrote the reason down at the time:
+           * `select_burst`, P0.6 -- "the numbers here (0.2 ms -> 1.1 ms) sit
+             at the perf_counter floor, so a ratio built on them is timer noise
+             wearing a threshold's clothing. The absolute is the meaningful
+             guard."
+           * `undo`, P2.3 -- "An ABSOLUTE bound, not a ratio: a ratio assertion
+             this close to the threshold would flap (the P0.6 precedent)."
+         The flap class is precisely the ops that were never converted. So the
+         ruling's "applied class-wide" is satisfied by finishing a job this file
+         started twice and stopped halfway through.
+
+WHY NOT A WIDER THRESHOLD -- the option the evidence RULES OUT rather than
+         merely disfavours. Measured over 7 identical runs per tree:
+           ratio spread, four big ops        1.06 .. 1.70x
+           ratio spread, `select_interactive` at 2c5fd8d   **21.98x**
+                                             (1.22 .. 26.82)
+           ABSOLUTE spread at n=8, big ops   **1.03 .. 1.15x**
+         The diagnosis: the n=4 leg is 0.2-4 ms, so a ratio divides one
+         noise-dominated number by another and doubles its exposure. THE NOISE
+         BAND (up to ~27) SWALLOWS THE ENTIRE DIAGNOSTIC RANGE THE RATIO EXISTS
+         TO READ -- 4 is linear, 8 the threshold, 16 quadratic. A threshold
+         cannot separate signal from noise when the noise is wider than the
+         signal. Only a different measurement can, and the absolute is it.
+
+WHY NOT BEST-OF-N: it would work -- a minimum is the right estimator when
+         interference is one-sided -- but it costs N x the lane's runtime to
+         buy back a number the absolute gives for free at 1.05x spread. It is
+         recorded here as the option not taken, and it remains available if a
+         later task needs the RATIO to be trustworthy rather than merely
+         recorded.
+
+WHAT CHANGED, five assertions and one tool:
+         * `rebuild` / `select_interactive` / `group` / `bake` / `ungroup`:
+           ratio assertion -> absolute bound at n=8, each with its measured
+           median in the comment. `bake`'s bound (200 ms, median 26.4) is set
+           so A RETURN TO THE PRE-PHASE-3 COST (279.0) TRIPS IT -- the one
+           regression here that would matter most, and one the ratio would have
+           called "still under 8".
+         * THE TWO xfail MARKERS GO WITH THEM (`group`, `ungroup`). There is no
+           ratio assertion left to expect-a-failure from, and a known-quadratic
+           op's fact now lives in prose and the printed report instead of in a
+           marker that flapped between xfail and xpass on machine load.
+         * `tools/gate.py`: `-m "not perf"` in ALL THREE modes, not just DEEP.
+           The lane could redden OFF and ON, and did. A side effect worth
+           having: all three runs now reconcile against the SAME collected
+           total, where DEEP alone used to report "7 deselected".
+         * `tools/gate.py --perf` runs the lane explicitly and prints its
+           numbers -- P0.3b's "invoked explicitly at the moments its numbers
+           decide something", given a command instead of a memory.
+
+WHAT THIS COSTS, said plainly: an absolute bound catches a BLOW-UP, not a
+         DRIFT. A 20% regression will pass every bound here. That is the trade
+         the evidence forces -- a ratio that cannot tell 4 from 27 was not
+         catching drift either, it was reporting the machine's mood -- and
+         drift is now caught where P0.3b always said it would be: by the
+         numbers being read at the tasks whose decisions depend on them.
+
+RECEIPT: 8 consecutive full-mode gate runs, all three modes each, after the
+         change. See the sub-commit's trailer and the tally below.
 
 P3.8 (1)  the numbers, measured SAME-MACHINE and as MEDIANS OF SEVEN.
 ruff:    clean
