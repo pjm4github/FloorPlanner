@@ -2276,6 +2276,69 @@ DEFECT 28 -- RULINGS AT THE SESSION BOUNDARY (2026-07-29). Committed here
      and the "suppressing" interventions are all explained by it, and no
      separate cause is outstanding.
 
+DEFECT 28 -- THE CORPSE TABLE, AND IT IS COMPLETE (2026-07-29). Ruling 3's
+         standard met: no blank rows, every corpse attributed to the test whose
+         scene it actually holds. Full table and method in
+         `docs/evidence/defect28-ownership.json`; the register row carries the
+         summary. Swept DIRECTLY, per the amendment, rather than waiting for a
+         2-in-10 race.
+
+  'Kitchen'/'Pan' IS OWNED, and the owner is `test_groups.py::test_a_group_move_
+  leaves_the_outlines_still_holding_their_corners` -- defect 22's own receipt.
+  So is 'M Bath'/'Toi', and so are two pairs the re-harvest added
+  ('Garage'/'PWDR', 'Garage'/'Mud'). `'A'`/`'B'` stays owned-innocent, and its
+  provenance stack shows the running test IS the owner -- it was never a
+  misreport at all.
+
+  ATTRIBUTION BY DOCUMENT SIGNATURE, which is what finally cracked it. Every
+  20-room corpse's own document is symmetricP1 translated +48" in x with ONE
+  corner displaced a further (+12,+12) -- that test's literal script (:545 and
+  :557), run by no other test in the suite. The reduced evidence file had kept
+  only a summary, so the ownership question was unanswerable until a 10-run
+  re-harvest on the unfixed tree (4 red, 14 dumps) produced corpses carrying
+  their FULL documents. Confirmed twice more: solo, with no other window in the
+  session, the test errors at its own teardown 1 run in 12; and on a red DEEP
+  run PYTEST ALREADY NAMES IT ("ERROR ... test_a_group_move_leaves_the_outlines_
+  still_holding_their_corners", at "win fixture teardown").
+
+  THAT LAST POINT IS A CORRECTION TO THIS DEFECT'S OWN FRAMING. The leak
+  misattributes the corpse FILE (the stack shows `macro.py:98 processEvents()`
+  above `_commit_if_changed`, a stale timer inside a later test) -- it does NOT
+  misattribute the pytest error. The red DEEP runs were correctly blamed all
+  along; only the evidence artifacts pointed at the wrong test.
+
+  ROOT CAUSE, and "the race picks the victim" is WITHDRAWN -- there is no race
+  in the choice. The test picks its party wall with `next(w for w in
+  win.scene.items() if ...)`, and scene item order is not stable across
+  processes, so the PICK varies per run. It then re-points the moved vertex for
+  the party wall's TWO rooms only (`for r in (a, b)`), leaving any THIRD room
+  whose outline holds that corner behind; where the geometry allows, that room
+  overlaps a neighbour. MEASURED EXHAUSTIVELY over all 59 candidate picks:
+  18 produce an I11 (31%, against the measured 4-in-10 red runs), and
+  re-pointing EVERY holder of the corner produces 0. Which is what both app
+  corner-movers already do -- `_DragVertex.ends`/`.edges` on the drag,
+  `GroupItem._corner_records` on bake and rotation.
+
+  TWO OF MY OWN CLAIMS WITHDRAWN BY THE SWEEP:
+    * `window.visible=false` is NOT a staleness tell. No fixture window is ever
+      shown, so a LIVE fixture window reads exactly the same. The original
+      "recorded by a window that is NOT VISIBLE, while an unrelated test was
+      running" over-read it.
+    * A stale window's walk is SILENT on this tree. Forcing `_commit_if_changed`
+      -- the identical call the leaked timer makes -- on every live window after
+      every test, 518 times, produced ZERO reports, because every I11 a stale
+      scene holds sits in that scene's own accepted baseline. The leak is real
+      and still worth fixing; it is not what turns a run red.
+
+  NOT ESTABLISHED, AND NOT ASSERTED: that an equivalent APP gesture can strand a
+  holder. 38 synthetic endpoint drags over multi-room corners moved the corner
+  in NONE of them -- the branch does not drive headlessly that way -- so that
+  run's "0 stranded, 0 I11" is VACUOUS and is discarded rather than quoted as an
+  acquittal. Checked because a "clean" result that was never in a position to be
+  dirty is exactly defect 21's near-miss. The app is neither cleared nor accused
+  here; if the question is wanted answered it needs a harness that drives the
+  drag for real.
+
 P3.6  CODE COMPLETE, NOT TICKED -- blocked by defect 28 (branch v5-topology)
          DEFECT 26 IS FIXED and the diagnosis is worth carrying forward as the
          standard for what "root cause" means here: a stack, then an

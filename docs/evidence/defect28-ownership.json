@@ -1,0 +1,70 @@
+{
+ "what": "Defect 28 -- ownership of every harvested corpse, established by DIRECT SWEEP rather than by waiting for the race. Written 2026-07-29 at the P3.6 exit work.",
+ "method": [
+  "SWEEP A (own scene at own teardown): every test's own fixture target checked under the deep invariants BEFORE its fixtures tear down, recording every I11 it holds. 518 collected, 18 I11-holding scenes, ALL of them in their own accepted baseline.",
+  "SWEEP B (every quiescent point): floorplanner.design.verify.fault_profile wrapped -- the one funnel verify/rebase/_verify_or_report all reach -- so every check of every scene is sampled, not just teardowns. 53 I11 observations, 12 distinct pairs, NO 'Kitchen'/'Pan' among them.",
+  "SWEEP C (force the leak): _commit_if_changed() -- the exact call the leaked QTimer makes -- invoked on EVERY live MainWindow after EVERY test, with windows tagged by their creating test. 0 reports: a stale window's walk is silent, because every I11 in a stale scene is in that scene's own baseline.",
+  "RE-HARVEST: 10 DEEP runs on the unfixed tree with dumps kept. 4 red, 14 dumps, and the four 20-room corpses carry their FULL documents -- which is what finally identified the owner, the reduced evidence file having kept only a summary.",
+  "PICK CENSUS: the owner test's party-wall pick walked exhaustively, 59 candidates, under two corner-move rules."
+ ],
+ "corpse_table": [
+  {
+   "corpse": "I11 rooms 'A' and 'B' overlap",
+   "count": "3 of the original 5 harvest, 10 of the 14 re-harvest",
+   "where": "save",
+   "reported_under": "tests/test_verify_design.py::test_save_verifies_deep",
+   "owner": "tests/test_verify_design.py::test_save_verifies_deep -- ITSELF",
+   "verdict": "OWNED-INNOCENT. The test's own deliberate two-room overlap; the save refusal is the behaviour under test, and the corpse is the defect-26 guard working as designed. Attribution is not inferred: the provenance stack runs test -> save_path -> _verify_or_report inside the running test.",
+   "window_visible": false,
+   "note": "window.visible=false proves nothing about staleness -- NO fixture window is ever shown (offscreen, nothing calls show()), so invisibility is the normal state of a live fixture window too. The original entry read it as a staleness tell; it is not one."
+  },
+  {
+   "corpse": "I11 rooms 'M Bath' and 'Toi' overlap",
+   "where": "operation",
+   "reported_under": "tests/test_macro.py::test_select_prefers_furnishing_over_room (original harvest); a macro test again on re-harvest",
+   "owner": "tests/test_groups.py::test_a_group_move_leaves_the_outlines_still_holding_their_corners",
+   "verdict": "OWNED, MISATTRIBUTED BY THE LEAK. The stack shows macro.py:98 QApplication.processEvents() directly above _commit_if_changed: a stale window's timer firing inside a later test, exactly as the mechanism predicted."
+  },
+  {
+   "corpse": "I11 rooms 'Kitchen' and 'Pan' overlap",
+   "where": "operation",
+   "reported_under": "tests/test_macro.py::test_arrow_nudge_moves_selection",
+   "owner": "tests/test_groups.py::test_a_group_move_leaves_the_outlines_still_holding_their_corners",
+   "verdict": "OWNED. This is the row that was UNOWNED at the session boundary; it is owned now.",
+   "attribution_evidence": [
+    "DOCUMENT SIGNATURE: the corpse's own document is symmetricP1 translated +48\" in x with exactly one corner displaced a further (+12,+12). That is this test's literal script -- g.setPos(48.0, 0.0) at test_groups.py:545 and v.relocated_to(v.x + 12, v.y + 12) at :557 -- and no other test in the suite performs it (the neighbouring whole-plan move uses (60, 36)).",
+    "SOLO REPRODUCTION: the test run ALONE, no other window in the session, errors at its own win-fixture teardown 1 run in 12 -- so the state is its own, not something a leak lends it.",
+    "SUITE ATTRIBUTION: on a red DEEP run pytest already blames it correctly -- 'ERROR tests/test_groups.py::test_a_group_move_leaves_the_outlines_still_holding_their_corners', at 'win fixture teardown'. The leak misattributes the CORPSE FILE, not the pytest error.",
+    "PICK CENSUS: 'Kitchen'/'Pan' is one of the pairs the exhaustive census produces (pick 41/44, party wall Kitchen/PWDR, third room Pan left behind)."
+   ]
+  },
+  {
+   "corpse": "I11 rooms 'Garage' and 'PWDR' overlap",
+   "where": "operation",
+   "reported_under": "a macro test (leaked timer)",
+   "owner": "tests/test_groups.py::test_a_group_move_leaves_the_outlines_still_holding_their_corners",
+   "verdict": "OWNED. New in the re-harvest; same document signature; the census produces this pair at picks 34 and 42."
+  },
+  {
+   "corpse": "I11 rooms 'Garage' and 'Mud' overlap",
+   "where": "operation",
+   "reported_under": "a macro test (leaked timer)",
+   "owner": "tests/test_groups.py::test_a_group_move_leaves_the_outlines_still_holding_their_corners",
+   "verdict": "OWNED by document signature. NOT among the pairs the census enumerated, and that is expected rather than awkward: the census is exhaustive within ONE process, and the bake's corner records depend on scene order, so another process reaches a slightly different vertex-sharing and a different pair set. Recorded as attributed-by-signature, not by census."
+  }
+ ],
+ "why_the_victim_varies": {
+  "claim_withdrawn": "'the race picks the victim' -- there is no race in the choice.",
+  "mechanism": "The test picks its party wall with next(w for w in win.scene.items() if ...). QGraphicsScene item order is not stable across processes, so the pick varies per run, and with it which corner moves and which rooms overlap.",
+  "rate": "18 of 59 candidate picks (31%) produce an I11 -- consistent with the 4-in-10 red DEEP runs measured on the unfixed tree."
+ },
+ "root_cause": {
+  "statement": "The test hand-rolls a corner move and re-points the moved vertex for the party wall's TWO rooms only (`for r in (a, b)`). Any THIRD room whose outline holds that same corner keeps the old vertex and is left behind, so its region no longer agrees with the walls -- and where the geometry allows, it overlaps a neighbour.",
+  "contrast_with_the_app": "Both app corner-movers collect their holders from the geometry and re-point every one: `_DragVertex` (walls.py, the drag) carries `ends` and `edges`, and `GroupItem._corner_records` (items.py, bake and rotation) records every wall end and every outline edge on the corner.",
+  "receipt": "Re-pointing EVERY room holding the corner: 0 of 59 picks produce an I11, against 18 of 59 under the test's current rule."
+ },
+ "not_established": [
+  "That an equivalent APP gesture can strand a holder. A synthetic endpoint drag was attempted over 38 multi-room corners and moved the corner in NONE of them -- the mouse path did not drive that branch headlessly, so the run reported '0 stranded' vacuously. That reading is discarded rather than quoted: the app is neither cleared nor accused here.",
+  "That DEEP's green/red has been meaningless throughout (ruling 5's bound, unchanged). The observed instances remain P3.6's."
+ ]
+}
