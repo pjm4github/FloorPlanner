@@ -170,7 +170,7 @@ gap rather than papering over it.
 | ☑ | **P3.3** Wall move = move vertices + split rule | ruff + pytest |
 | ☑ | **P3.4** Topology ops replace coalesce/weld/fracture | ruff + pytest |
 | ☑ | **P3.5** Delete the detection engine | ruff + pytest |
-| ☐ | **P3.6** Opening anchors — *code complete; tick blocked on **defect 28 → resolution pending corpse table + re-certification**. Defect 26 (the crash) is FIXED. Ticks when DEEP runs green 10/10 under the machine trailer.* | ruff + pytest |
+| ☑ | **P3.6** Opening anchors — *ticked 2026-07-30 on the re-certification: **10/10 GREEN** under full-mode `tools/gate.py` trailers (ruff + OFF + ON + DEEP, every sum reconciling). Defects 26, 28 and 29 all closed.* | ruff + pytest |
 | ☐ | **P3.7** Delete `OpenWall` | ruff + pytest |
 | ☐ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** | ratios recorded |
 | ☐ | **P4.1** Delete-wall keeps the room | ruff + pytest |
@@ -2339,7 +2339,96 @@ DEFECT 28 -- THE CORPSE TABLE, AND IT IS COMPLETE (2026-07-29). Ruling 3's
   here; if the question is wanted answered it needs a harness that drives the
   drag for real.
 
+P3.6-followup  done -- DEFECTS 28 AND 29, AND P3.6 TICKS (branch v5-topology)
+ruff:    clean
+pytest:  the re-certification, ruling 4's condition, met in FULL mode:
+         TEN consecutive `python tools/gate.py` runs, 10/10 GREEN, each
+         trailer machine-written and each sum reconciled against
+         --collect-only. The last of them:
+           Gate-Census: collected=519 ruff=clean
+           Gate-OFF: 513 passed, 6 xfailed, 3 warnings in 15.52s  -> sum 519  OK
+           Gate-ON: 513 passed, 6 xfailed, 4 warnings in 17.44s  -> sum 519  OK
+           Gate-DEEP: 508 passed, 7 deselected, 4 xfailed, 3 warnings in 16.77s
+                      -> sum 519  OK
+           Gate-Verdict: GREEN (every sum reconciles against --collect-only)
+         These are the FIRST `Gate-DEEP` trailers on the branch -- every
+         previous commit carried `--quick` (Census + OFF only), which is why
+         the trailer requirement was made explicit: a 10/10 claimed against
+         quick trailers would be the transcription class returning through the
+         mode flag.
+commits: b1679a4 (the corpse table) . c1496fe (28A, the owning test) .
+         ee7e4e5 (28B, the fixture leak) . e8a7348 (29) . plus this doc commit.
+census:  518 -> 519 collected, +1: test_undo::test_closing_a_window_stops_its_
+         dirty_timer. Nothing removed.
+
+WHAT THE DEEP FLAP ACTUALLY WAS, and it was not the leak. The corpse table's
+         owner -- `test_a_group_move_leaves_the_outlines_still_holding_their_
+         corners` -- picked its party wall with `next(w for w in
+         win.scene.items() ...)`, and scene item order is not stable across
+         processes. 18 of its 59 candidate picks leave two rooms overlapping
+         (31%, against the measured 4-in-10 red DEEP runs), because the test
+         re-pointed the moved corner for the party wall's TWO rooms and left
+         any THIRD holder behind. Deterministic pick + every holder re-pointed:
+         0 of 59, and 15 consecutive solo DEEP runs green where the same test
+         on the same tree was 1-red-in-12 before.
+
+THE LEAK IS REAL AND IS FIXED, AND IT IS NOT WHAT TURNED RUNS RED -- the two
+         are separate and were being read as one. Measured across the suite:
+         peak live MainWindows 16 -> 0, peak holding a LIVE dirty timer 9 -> 0,
+         alive at session end 12 -> 0. What the leak did was misattribute the
+         corpse FILES (a stale timer firing inside a macro test, the stack
+         showing `macro.py:98 processEvents()` above `_commit_if_changed`); the
+         pytest ERROR was correctly blamed on the owner all along.
+
+THE GUARD IS AN INVARIANT, NOT A BUDGET: no window outlives its test holding a
+         live dirty timer. A cap on the count would pass a suite that leaks
+         quietly as long as it leaked few enough. FAIL-FIRST RECEIPT, in a
+         detached worktree per the standing rule: the guard alone against
+         pre-fix code produces 333 teardown errors.
+
+TWO MISTAKES IN THE DISPOSAL, both found by running it rather than reading it,
+         and both worth carrying forward:
+         * stopping the timer BEFORE the close silences a timer the close then
+           RESTARTS -- closing emits scene changes, they reach `_mark_dirty`.
+           Close, let them settle, then stop.
+         * `processEvents()` does not deliver `DeferredDelete`, so `deleteLater`
+           left the window standing and still counting. `sendPostedEvents(None,
+           DeferredDelete)` is what destroys it.
+
+AND THE GUARD IMMEDIATELY EARNED ITS KEEP: `test_scaling._measure` leaks the
+         same way, and its two windows come from a MODULE-scoped fixture, so
+         they predate every per-test disposal and outlived the whole file.
+         Fixed at source rather than by loosening the guard -- 67 errors in the
+         OFF/ON runs (the perf tests DEEP deselects), which is the whole blast
+         radius of (B).
+
+DEFECT 29, SEPARATELY per ruling 1: `closeEvent` stops the timer, and only once
+         the close is ACCEPTED -- a close the user cancels must leave the
+         window as it was, debounce included, or the edit in flight when they
+         hit the X never becomes an undo step. Its test asserts the
+         PRECONDITION (that the edit started the debounce) before asserting the
+         fix, so it cannot pass vacuously, and it fails pre-fix on exactly the
+         line it names.
+
+THREE CLAIMS OF MY OWN WITHDRAWN BY MEASUREMENT, recorded because the register
+         carried them as fact:
+         * "the race picks the victim" -- there is no race in the choice; the
+           PICK varies because scene order does.
+         * `window.visible=false` is a staleness tell -- it is not; no fixture
+           window is ever shown, so a live one reads identically.
+         * a stale window's walk reports -- forcing `_commit_if_changed` on
+           every live window after every test, 518 times, gave ZERO reports:
+           every I11 a stale scene holds sits in its own accepted baseline.
+
+NOT ESTABLISHED, AND NOT ASSERTED: that an equivalent APP gesture can strand a
+         room holding a dragged corner. 38 synthetic endpoint drags moved the
+         corner in NONE of them, so that run's "0 stranded" is vacuous and is
+         discarded rather than quoted as an acquittal -- the app is neither
+         cleared nor accused. Answering it needs a harness that drives the drag
+         for real, and that is not this task's.
+
 P3.6  CODE COMPLETE, NOT TICKED -- blocked by defect 28 (branch v5-topology)
+      [SUPERSEDED: ticked at the P3.6-followup above, 2026-07-30.]
          DEFECT 26 IS FIXED and the diagnosis is worth carrying forward as the
          standard for what "root cause" means here: a stack, then an
          explanation for every property the bug had, then a narrow fix. It was
