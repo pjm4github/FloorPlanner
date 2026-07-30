@@ -1989,6 +1989,10 @@ THE XFAIL/XPASS DELTA -- ASKED TWICE, ANSWERED FROM DISK. Both ends were run
          member. Members seen flapping so far: `test_ungroup_scales_
          subquadratically`, `test_bake_scales_subquadratically`,
          `test_rebuild_scales_subquadratically`.
+         >> SIGHTING, P3.7 (2026-07-30): `test_ungroup_scales_subquadratically`
+         XPASSED once in 8 ON runs -- that is what the P3.7 (2) gate trailer's
+         "5 xfailed, 1 xpassed" was. Named by re-running with `-ra` rather than
+         inferred, because the trailer reports counts and not names.
 commits: ac9ad45 (0) . 600fdef (1) . 02eff1e (2) . 733d7d6 (3) . f07dbdb (4)
          Logged sub-commit by sub-commit per the handoff-spec rule, so a
          successor reads the state from here plus the four riders at lines

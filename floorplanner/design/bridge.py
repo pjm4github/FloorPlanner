@@ -313,8 +313,7 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
     Design is a document and a `QGraphicsItem` has no business in one.
     `weld_check=False` skips the O(n^2) disagreement count, which only exists to
     warn a human and has no reader on the detection path."""
-    w_items = [it for it in _ordered(items, WallItem, _wall_key)
-               if not it.is_open]
+    w_items = _ordered(items, WallItem, _wall_key)
     r_items = _ordered(items, RoomItem, _room_key)
     raw = [{"p1": [w.p1.x(), w.p1.y()], "p2": [w.p2.x(), w.p2.y()],
             "type": w.wall_type,
@@ -956,11 +955,12 @@ def apply_design_to_scene(target, design, report=None, strict=False,
             if e.wall is not None:                       # read, not detected
                 room.bind_wall(e.wall)
             # An edge with `wall: null` -- an archway or a detached side --
-            # stays null. Until P3.5 this branch built a dashed `OpenWall`
-            # placeholder so undo would not silently drop an archway; the
-            # outline now carries that fact itself (`RoomItem.open_edges`), so
-            # the placeholder was the second representation of it and went with
-            # the rest of them. P3.7 renders a null edge dashed directly.
+            # stays null. Until P3.5 this branch built a dashed placeholder
+            # item so undo would not silently drop an archway; the outline
+            # carries that fact itself (`RoomItem.open_edges`), so the
+            # placeholder was a second representation of it and went with the
+            # rest of them. Since P3.7 a null edge renders dashed directly,
+            # drawn by the room from its own outline.
         rep["rooms"] += 1
 
     for fd in doc.get("furnishings", []):

@@ -71,7 +71,6 @@ def test_fracture_delete_shared_wall_keeps_both_rooms(fp, scene):
     fp.fracture_delete_wall(scene, shared)
     # the shared edge survives (one segment, still bound to both rooms)
     kept = [w for w in scene.items() if isinstance(w, fp.WallItem)
-            and not w.is_open
             and abs(w.p1.x() - 120) < 0.5 and abs(w.p2.x() - 120) < 0.5]
     assert len(kept) == 1
     assert {r.name for r in kept[0].rooms} == {"A", "B"}

@@ -44,7 +44,7 @@ def _pos(d):
 
 def _walls(scene, fp):
     return [w for w in scene.items()
-            if isinstance(w, fp.WallItem) and not w.is_open]
+            if isinstance(w, fp.WallItem)]
 
 
 def _add(scene, fp, x1, y1, x2, y2, wall_type="interior"):
@@ -448,7 +448,7 @@ def test_the_menu_command_still_tidies_the_plan(fp, win):
     fp.rebuild_all_walls(win.scene)
     win.coalesce_all_now()
     walls = [w for w in win.scene.items()
-             if isinstance(w, fp.WallItem) and not w.is_open]
+             if isinstance(w, fp.WallItem)]
     # the T-junction is load-bearing, so the run does NOT merge through it;
     # what the pass achieves is that the corner is now one shared vertex
     assert len(walls) == 3

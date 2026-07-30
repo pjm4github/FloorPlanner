@@ -278,7 +278,7 @@ class PlanIOMixin:
                     extra=dict(it.extra_state()),
                     floor=getattr(it, "floor", DEFAULT_FLOOR),
                 ))
-            elif isinstance(it, WallItem) and not it.is_open:
+            elif isinstance(it, WallItem):
                 walls.append(WallModel(
                     wall_type=it.wall_type,
                     p1=(it.p1.x(), it.p1.y()),

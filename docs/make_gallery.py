@@ -206,8 +206,8 @@ def build_open_wall():
                     corners=res[2])
     sc.addItem(r)
     FP.bind_room_walls(sc, r)
-    bottom = next(w for w in r.walls if not w.is_open
-                  and abs(w.p1.y() - 168) < 1 and abs(w.p2.y() - 168) < 1)
+    bottom = next(w for w in r.walls
+                  if abs(w.p1.y() - 168) < 1 and abs(w.p2.y() - 168) < 1)
     FP.detach_wall_from_room(sc, bottom)
     if abs(bottom.p1.x() - 216) < 1:           # leave the right half open
         bottom.p1 = QPointF(108, 168)
@@ -235,8 +235,8 @@ def build_coincident_door():
     kit.properties["room_type"] = "Kitchen"
     sc.addItem(kit)
     FP.bind_room_walls(sc, kit)
-    shared = next(w for w in kit.walls if not w.is_open
-                  and abs(w.p1.x() - 144) < 1 and abs(w.p2.x() - 144) < 1)
+    shared = next(w for w in kit.walls
+                  if abs(w.p1.x() - 144) < 1 and abs(w.p2.x() - 144) < 1)
     door = FP.OpeningItem(shared, "door", "3280", 60)
     shared.openings.append(door)
     FP.rebuild_all_walls(sc)

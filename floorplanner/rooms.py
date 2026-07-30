@@ -132,8 +132,7 @@ def share_outline_vertices(room):
     An edge whose coordinate matches no wall corner keeps the vertex it has --
     an OPEN edge (`wall is None`) spans a gap with no wall end to share, and
     inventing a share there would be the same false authority P3.2 refused."""
-    walls = [w for w in room.walls
-             if isinstance(w, WallItem) and not w.is_open]
+    walls = [w for w in room.walls if isinstance(w, WallItem)]
     if not walls or not room.outline:
         return 0
     idx = _CornerIndex(walls)
@@ -385,7 +384,7 @@ class RoomItem(QGraphicsItem):
             return []
         band = self._boundary_band()
         return [it for it in sc.items()
-                if isinstance(it, WallItem) and not it.is_open
+                if isinstance(it, WallItem)
                 and not it._hit.intersects(band)
                 and self.path.contains(it.p1) and self.path.contains(it.p2)]
 
@@ -418,10 +417,11 @@ class RoomItem(QGraphicsItem):
         all (the v5 `wall: null`), or it names one that no longer SPANS it --
         a corner dragged away leaves the wall short of the edge it backs.
         Before P3.5 the second case was represented by interposing a dashed
-        `OpenWall` item, so "is this side open?" was answered by looking for a
-        placeholder object; it is now answered from the outline, which is where
-        the document has always answered it (`bridge._rooms_of` emits exactly
-        these as open edges). `OpenWall` itself goes at P3.7."""
+        placeholder item, so "is this side open?" was answered by looking for
+        an object; it is now answered from the outline, which is where the
+        document has always answered it (`bridge._rooms_of` emits exactly
+        these as open edges). The placeholder class went at P3.7, and the
+        dashed cue is drawn from these edges by `_paint_open_edges`."""
         corners = self.corners or []
         n = len(corners)
         return [e for i, e in enumerate(self.outline)
@@ -448,7 +448,7 @@ class RoomItem(QGraphicsItem):
         """Draw a vacated side dashed (P3.7).
 
         The cue is drawn FROM THE OUTLINE, which is the whole point: an open
-        side used to be an ITEM -- a dashed `OpenWall` the binder interposed --
+        side used to be an ITEM -- a dashed placeholder the binder interposed --
         so the scene carried a second representation of something the document
         already said (`wall: null`). The fact and the cue now come from one
         place, and the pen matches the item's exactly (same colour, same dash,
@@ -780,7 +780,7 @@ class RoomItem(QGraphicsItem):
         if sc is None:
             return
         for w in list(self.walls):
-            if w.is_open or len(w.rooms) <= 1:
+            if len(w.rooms) <= 1:
                 continue
             span = self._perimeter_span(w)
             if span is None:
@@ -997,7 +997,7 @@ def _edge_wall(scene, a: QPointF, b: QPointF, floor=None):
     ux, uy = (b.x() - a.x()) / L, (b.y() - a.y()) / L
     best, best_key = None, None
     for w in scene.items():
-        if (not isinstance(w, WallItem) or w.is_open or w.group() is not None
+        if (not isinstance(w, WallItem) or w.group() is not None
                 or (floor is not None and w.floor != floor)):
             continue
         ss = []
@@ -1030,12 +1030,12 @@ def room_walls(room) -> list:
     seen, out = set(), []
     for e in room.outline:
         w = e.wall
-        if (w is not None and not w.is_open and id(w) not in seen):
+        if (w is not None and id(w) not in seen):
             seen.add(id(w))
             out.append(w)
     if not out:
         out = [w for w in room.walls
-               if isinstance(w, WallItem) and not w.is_open]
+               if isinstance(w, WallItem)]
     return out
 
 
@@ -1110,7 +1110,8 @@ def bind_room_walls(scene, room, settle=True):
     P3.5 -- AND THE NAME NOW MEANS SOMETHING NARROWER THAN IT DID. This used to
     REBUILD the room's edge loop, and it did so by editing the plan: a
     three-priority search that could synthesize a private duplicate of a party
-    wall (`synthesize_room_edge`) or interpose an `OpenWall` for a gap. Asking
+    wall (`synthesize_room_edge`) or interpose a dashed placeholder item for a
+    gap. Asking
     which walls a room owned therefore changed the document, and it ran on
     every `rebuild_all_walls` via `refresh_rooms`.
 
@@ -1121,8 +1122,8 @@ def bind_room_walls(scene, room, settle=True):
     edges name nothing. `_edge_wall` answers for those, and for nothing else.
 
     Nothing is created, nothing is deleted, and no coordinate moves. An edge no
-    wall covers keeps `wall = None` -- the v5 `wall: null`, which P3.7 renders
-    dashed once `OpenWall` is gone."""
+    wall covers keeps `wall = None` -- the v5 `wall: null`, which the room
+    itself renders dashed (`_paint_open_edges`, P3.7)."""
     if not room.outline:
         return
     corners = room.corners
@@ -1145,7 +1146,7 @@ def bind_room_walls(scene, room, settle=True):
 def detach_wall_from_room(scene, wall):
     """Unlock `wall`'s corners so the user can drag its endpoints.  The wall
     stays part of the room; pulling a corner away from the neighbouring wall
-    opens that side (a dashed OpenWall bridges the gap)."""
+    opens that side, and the room draws the vacated stretch dashed."""
     if not wall.rooms:
         return
     wall._corners_unlocked = True

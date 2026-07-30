@@ -24,7 +24,7 @@ pytestmark = pytest.mark.walls
 
 def _walls(scene, fp):
     return [w for w in scene.items()
-            if isinstance(w, fp.WallItem) and not w.is_open]
+            if isinstance(w, fp.WallItem)]
 
 
 def test_within_grid_parallel_walls_merge_to_one(fp, scene):

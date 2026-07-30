@@ -458,7 +458,7 @@ def test_fracture_delete_keeps_room_edge_drops_overhang(fp, scene, make_room):
     fp.fracture_delete_wall(scene, edge)
     assert room.area_sqft == pytest.approx(100.0, rel=0.05)   # 120x120 in sq ft
     kept = next(w for w in scene.items() if isinstance(w, fp.WallItem)
-                and not w.is_open and abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1)
+                and abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1)
     assert max(kept.p1.x(), kept.p2.x()) == pytest.approx(120, abs=1)  # no over
     assert room in kept.rooms
 

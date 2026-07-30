@@ -20,7 +20,7 @@ def _add_opening(room, kind, code, min_len):
     """Put one door/window on the first bound wall long enough and not yet
     opened; return the OpeningItem."""
     for w in room.walls:
-        if w.is_open or w.openings or w.length() < min_len:
+        if w.openings or w.length() < min_len:
             continue
         op = fp.OpeningItem(w, kind, code, w.length() / 2.0)
         w.openings.append(op)
@@ -55,8 +55,7 @@ def _group(win, items):
 
 def _counts(sc):
     walls = [w for w in sc.items() if isinstance(w, fp.WallItem)]
-    return (sum(not w.is_open for w in walls),
-            sum(len(w.openings) for w in walls))
+    return (len(walls), sum(len(w.openings) for w in walls))
 
 
 # --------------------------------------------------------------------------
@@ -104,7 +103,7 @@ def _delete_a_room_wall(win, make_room, fid):
     sc = win.scene
     room, ops, furns = _furnished_room(win, make_room, fid)
     name, area = room.name, room.area_sqft
-    wall = next(w for w in room.walls if not w.is_open)
+    wall = next(iter(room.walls))
     sc.clearSelection()
     wall.setSelected(True)
     win.delete_selected()
@@ -130,8 +129,8 @@ def test_delete_wall_actually_removes_the_wall(win, make_room, first_furnishing)
     sc, name, _area, _furns = _delete_a_room_wall(win, make_room, first_furnishing)
     room = next(r for r in sc.items()
                 if isinstance(r, fp.RoomItem) and r.name == name)
-    built = sum(1 for w in room.walls if not w.is_open)
-    openn = sum(1 for w in room.walls if w.is_open)
+    built = len(room.walls)
+    openn = len(room.open_edges())
     assert built == 3 and openn == 1, \
         f"delete was a no-op: {built} built walls, {openn} open edges"
 

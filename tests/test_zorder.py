@@ -78,7 +78,7 @@ def test_clicking_a_shared_wall_lifts_it_above_a_crossing_wall(fp, win):
 
     def find(a, b):
         for w in sc.items():
-            if isinstance(w, fp.WallItem) and not w.is_open:
+            if isinstance(w, fp.WallItem):
                 k = (round(w.p1.x()), round(w.p1.y()),
                      round(w.p2.x()), round(w.p2.y()))
                 if k == a + b or k == b + a:

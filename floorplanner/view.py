@@ -242,7 +242,7 @@ class PlanView(QGraphicsView):
         base = pt.x() if horizontal else pt.y()
         best, bestd = None, tol
         for w in sc.items():
-            if not isinstance(w, WallItem) or w is exclude or w.is_open:
+            if not isinstance(w, WallItem) or w is exclude:
                 continue
             for end in (w.p1, w.p2):
                 if not wall_endpoint_open(sc, end, ignore=(w, exclude)):

@@ -1,4 +1,4 @@
-"""Wall graphics items (WallItem/OpenWall/OpeningItem) and the wall-network
+"""Wall graphics items (WallItem/OpeningItem) and the wall-network
 algorithms: spatial indices, coalescing, welding, fracturing, junction
 clipping, and the full-scene rebuild.
 
@@ -120,7 +120,7 @@ class _WallIndex:
         self.lines = {}          # ("h"|"v", n) -> [walls on that line offset]
         self.diag = []           # non-axis-aligned real walls (rare)
         for w in items:
-            if w.is_open or w.length() < 1e-6:
+            if w.length() < 1e-6:
                 continue
             b = line_bucket((w.p1.x(), w.p1.y()), (w.p2.x(), w.p2.y()))
             if b is None:
@@ -157,7 +157,7 @@ def coincident_walls(scene, wall, index=None, perp_tol=1.5):
     else:
         cands = scene.items()
     for w in cands:
-        if not isinstance(w, WallItem) or w is wall or w.is_open \
+        if not isinstance(w, WallItem) or w is wall \
                 or w.length() < 1e-6 or w.scene() is None \
                 or w.floor != wall.floor:        # coalesce stays on one floor
             continue
@@ -263,7 +263,7 @@ def graph_from_scene(scene, floor=None):
     if scene is None:
         return GraphView([], {}, {})
     walls = sorted((w for w in scene.items()
-                    if isinstance(w, WallItem) and not w.is_open
+                    if isinstance(w, WallItem)
                     and w.group() is None and w.length() > 1e-6
                     and (floor is None or w.floor == floor)),
                    key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y(),
@@ -499,7 +499,7 @@ def weld_scene(scene, max_passes=6):
     moved = 0
     for _ in range(max_passes):
         walls = sorted((w for w in scene.items()
-                        if isinstance(w, WallItem) and not w.is_open
+                        if isinstance(w, WallItem)
                         and w.group() is None),
                        key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()))
         step = sum(_snap_wall_ends(scene, w) for w in walls)
@@ -536,7 +536,7 @@ def merge_wall(scene, wall, perp_tol=None):
     caller's own order, so putting `wall` first is all it takes to say so."""
     if not SETTINGS.get("auto_coalesce", True):
         return wall
-    if (scene is None or wall is None or wall.scene() is None or wall.is_open
+    if (scene is None or wall is None or wall.scene() is None
             or wall.group() is not None or wall.length() < 1e-6):
         return wall
     if perp_tol is None:
@@ -657,7 +657,7 @@ def fracture_delete_wall(scene, wall, settle=True):
     room needs are removed.  A wall that borders no room is deleted whole."""
     if scene is None or wall.scene() is None:
         return
-    if wall.is_open or not wall.rooms:
+    if not wall.rooms:
         for r in list(wall.rooms):
             r.unbind_wall(wall)
         scene.removeItem(wall)
@@ -733,7 +733,7 @@ def wall_endpoint_open(scene, p: QPointF, ignore=()) -> bool:
     if scene is None:
         return False
     for w in scene.items():
-        if not isinstance(w, WallItem) or w.is_open or w in ignore:
+        if not isinstance(w, WallItem) or w in ignore:
             continue
         if (QLineF(w.p1, p).length() < JOIN_TOL
                 or QLineF(w.p2, p).length() < JOIN_TOL):
@@ -867,15 +867,12 @@ def _compute_wall_junctions(scene, walls=None):
         walls = [it for it in scene.items() if isinstance(it, WallItem)]
     bbi = _WallBBoxIndex(scene)
     for w in walls:
-        if w.is_open:                        # dashed placeholders don't merge
-            w._outline_clip = None
-            continue
         wb = w._solid.boundingRect()
         union = QPainterPath()
         found = False
         for other in bbi.near(wb):
             if (other is w or not isinstance(other, WallItem)
-                    or other.is_open or other._solid.isEmpty()
+                    or other._solid.isEmpty()
                     or other.floor != w.floor):   # junctions don't cross floors
                 continue
             if (other._solid.boundingRect().intersects(wb)
@@ -898,8 +895,6 @@ class WallItem(QGraphicsItem):
     Door/window OpeningItems are child items; each remembers its distance
     `s` along the wall from p1, so they ride along when the wall moves.
     """
-
-    is_open = False                   # OpenWall (a dashed gap) sets this True
 
     def __init__(self, p1: QPointF, p2: QPointF, wall_type: str = "exterior"):
         super().__init__()
@@ -1108,17 +1103,16 @@ class WallItem(QGraphicsItem):
             holes.addRect(QRectF(op.s - half, -t / 2 - 0.5, op.width, t + 1.0))
         # open the body where a coincident wall carries a door/window, so a
         # plain party wall doesn't cover the opening on the wall next to it
-        if not self.is_open:
-            u = self.unit()
-            for w in coincident_walls(self.scene(), self, index):
-                for op in w.openings:
-                    p = w.point_at(op.s)
-                    sl = ((p.x() - self.p1.x()) * u.x()
-                          + (p.y() - self.p1.y()) * u.y())
-                    half = op.width / 2
-                    if -half < sl < length + half:
-                        holes.addRect(QRectF(sl - half, -t / 2 - 0.5,
-                                             op.width, t + 1.0))
+        u = self.unit()
+        for w in coincident_walls(self.scene(), self, index):
+            for op in w.openings:
+                p = w.point_at(op.s)
+                sl = ((p.x() - self.p1.x()) * u.x()
+                      + (p.y() - self.p1.y()) * u.y())
+                half = op.width / 2
+                if -half < sl < length + half:
+                    holes.addRect(QRectF(sl - half, -t / 2 - 0.5,
+                                         op.width, t + 1.0))
         if not holes.isEmpty():
             body = body.subtracted(holes)
 
@@ -1148,7 +1142,7 @@ class WallItem(QGraphicsItem):
         for op in self.openings:
             op.sync()
         self.update()
-        if cascade and not self.is_open:
+        if cascade:
             for w in coincident_walls(self.scene(), self):
                 w.rebuild(cascade=False)
 
@@ -1384,7 +1378,7 @@ class WallItem(QGraphicsItem):
         stick = max(WALL_PROJECT_STICK, 16.0 / max(self._view_scale(), 1e-6))
         best_s, best_d = None, stick
         for w in sc.items():
-            if (not isinstance(w, WallItem) or w is self or w.is_open
+            if (not isinstance(w, WallItem) or w is self
                     or w.length() < 1e-6):
                 continue
             v = w.unit()
@@ -1455,7 +1449,7 @@ class WallItem(QGraphicsItem):
     def _run_wall_under(self, p: QPointF, tol=0.75):
         """The run wall whose BODY (not its ends) the point `p` lands on."""
         for w in self._run:
-            if w.is_open or w.length() < MIN_WALL_LEN:
+            if w.length() < MIN_WALL_LEN:
                 continue
             u = w.unit()
             vx, vy = p.x() - w.p1.x(), p.y() - w.p1.y()
@@ -1627,10 +1621,10 @@ class WallItem(QGraphicsItem):
             # the wall back in: re-lock its corners (right-click to detach
             # again)
             # P3.5: "fully walled again" is a question about the room's OUTLINE
-            # (does a wall span every edge?), not about whether a dashed
-            # OpenWall placeholder happens to exist. Nothing creates those any
-            # more, so `any(w.is_open ...)` would be permanently False and the
-            # wall would re-lock on the very drag that opened the side.
+            # -- does a wall span every edge? -- which is what `open_edges()`
+            # answers. It used to be asked of a dashed placeholder item, and
+            # asking THAT would have re-locked the wall on the very drag that
+            # opened the side. The placeholder went at P3.7.
             if (corner_drag and self._corners_unlocked
                     and not any(r.open_edges() for r in self.rooms)):
                 self._corners_unlocked = False
@@ -1671,42 +1665,6 @@ class WallItem(QGraphicsItem):
         elif chosen is a_del and sc is not None:
             fracture_delete_wall(sc, self)   # keep room-edge stretches intact
         e.accept()
-
-
-class OpenWall(WallItem):
-    """A dashed placeholder for a room edge that has no built wall.
-
-    It belongs to a room's edge loop (so the room stays closed for area
-    and re-detection through the gap) and carries the SAME drag controls
-    as a wall, but it does not block room flood-fill and is drawn as a thin
-    dashed line.  Open walls are derived from a room's open edges, so they
-    are regenerated by bind_room_walls rather than serialized."""
-
-    is_open = True
-
-    def __init__(self, p1: QPointF, p2: QPointF, room=None):
-        super().__init__(p1, p2, "interior")
-        self.rooms = [room] if room is not None else []
-        self.setZValue(WALL_Z)
-
-    def paint(self, painter, option, widget=None):
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        lod = max(option.levelOfDetailFromTransform(painter.worldTransform()),
-                  1e-6)
-        ghost = floor_display_mode(self.floor) != "active"
-        col = FLOOR_GHOST if ghost else QColor(90, 120, 170)
-        pen = QPen(col, max(1.2, 1.6 / lod), Qt.PenStyle.DashLine)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawLine(self.p1, self.p2)
-        if ghost:
-            return
-        if self.isSelected():
-            hs = 9.0 / lod
-            painter.setPen(QPen(QColor(40, 40, 40), 0))
-            painter.setBrush(QBrush(QColor(255, 200, 0)))
-            for q in (self.p1, self.p2):
-                painter.drawRect(QRectF(q.x() - hs / 2, q.y() - hs / 2, hs, hs))
 
 
 class OpeningItem(QGraphicsItem):

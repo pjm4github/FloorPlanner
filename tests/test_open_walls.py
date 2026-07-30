@@ -8,8 +8,8 @@ justification is stated here rather than repeated per test.
 OLD: an open side was an ITEM. `refresh_rooms` re-detected the room, failed
 (flood-fill escapes through the gap), fell back to `reloop_open_room` to
 rebuild the corner loop from the room's own walls, and `bind_room_walls`
-interposed a dashed `OpenWall` across each vacated stretch. Every assertion
-below therefore counted `OpenWall`s in the scene.
+interposed a dashed placeholder item across each vacated stretch. Every
+assertion below therefore counted those items in the scene.
 
 NEW: an open side is a FACT ABOUT THE OUTLINE. The outline is stored and holds
 the walls' own corner vertices, so pulling a corner away leaves the room's shape
@@ -19,12 +19,14 @@ achieve -- and the side that lost its wall is simply an edge no wall spans.
 `design.bridge._rooms_of` has always emitted for the document (`wall: null`,
 counted as `open_edges`).
 
-WHAT THIS COSTS, until P3.7: the vacated stretch no longer RENDERS as a dashed
-line, because nothing creates the item that drew it. The document is unchanged
-(it said `wall: null` before and says it now) and so is the room's geometry --
-only the on-screen cue is missing. P3.7 deletes `OpenWall` and renders a
-`wall: null` edge dashed directly, which is the same cue drawn from the outline
-instead of from a placeholder. Logged in Known regressions.
+WHAT IT COST BETWEEN P3.5 AND P3.7: the vacated stretch stopped RENDERING as a
+dashed line, because nothing created the item that drew it. The document was
+unchanged (it said `wall: null` before and after) and so was the room's
+geometry -- only the on-screen cue was missing. CLOSED AT P3.7: the placeholder
+class is deleted and the room draws a `wall: null` edge dashed itself, from the
+outline, with the same pen the item used. `test_an_open_side_is_drawn_dashed`
+is the receipt, and it had to be a PIXEL test -- every structural assertion in
+this file stayed green for the whole life of the regression.
 
 `test_open_wall_is_editable` is DELETED rather than rewritten: it asserted that
 the dashed placeholder carried the same drag controls as a wall, and there is no
@@ -54,12 +56,12 @@ def _room(fp, scene, x=0, y=0, w=120, h=120, name="A"):
 
 
 def _right_wall(fp, room):
-    return next(w for w in room.walls if not w.is_open
-                and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
+    return next(w for w in room.walls
+                if abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
 
 
 def _open_count(fp, scene):
-    """Open SIDES of every room -- the successor to counting OpenWall items."""
+    """Open SIDES of every room -- the successor to counting placeholder items."""
     return sum(len(r.open_edges()) for r in scene.items()
                if isinstance(r, fp.RoomItem))
 
@@ -197,7 +199,7 @@ def test_the_document_calls_the_vacated_edge_open(fp, win):
 
     This is why the placeholder could go: the v5 walk has reported an
     uncovered outline edge as open since P1.4, entirely without reference to
-    `OpenWall`. The scene was carrying a second, item-shaped representation of
+    a placeholder. The scene was carrying a second, item-shaped representation of
     something the document already said."""
     from floorplanner.design.bridge import design_from_scene
 
@@ -237,8 +239,8 @@ def test_corner_drag_opens_side_via_mouse(fp, win, make_room, drag):
     win.set_tool(fp.TOOL_SELECT)
     win.show()
     win.zoom_fit()
-    right = next(w for w in room.walls if not w.is_open
-                 and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
+    right = next(w for w in room.walls
+                 if abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
     fp.detach_wall_from_room(sc, right)
     # drag the (120,120) corner up 60 scene units -> opens the lower-right side
     dy_px = int(-60 * win.view.transform().m11())
@@ -258,8 +260,8 @@ def test_body_slide_carries_the_open_side(fp, win, make_room, drag):
     win.resize(1100, 900)
     win.show()
     win.zoom_fit()
-    right = next(w for w in room.walls if not w.is_open
-                 and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
+    right = next(w for w in room.walls
+                 if abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
     fp.detach_wall_from_room(sc, right)
     m = win.view.transform().m11()
     drag(win, QPointF(120, 120), 0, int(-60 * m), steps=4)   # open lower-right
@@ -289,8 +291,8 @@ def test_closing_gap_refuses_and_relocks(fp, win, make_room, drag):
     win.view.resetTransform()
     win.view.scale(2.0, 2.0)
     win.view.centerOn(QPointF(60, 60))
-    right = next(w for w in room.walls if not w.is_open
-                 and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
+    right = next(w for w in room.walls
+                 if abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1)
     fp.detach_wall_from_room(sc, right)
     m = win.view.transform().m11()
     drag(win, QPointF(120, 120), 0, int(-60 * m), steps=4)   # open

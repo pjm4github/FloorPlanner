@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture
 
 - The app is the **`floorplanner/` package** (PyQt6 QGraphicsScene editor). Run with `python FloorPlanner.py` (a compatibility shim) or the `floorplanner` console script. `import FloorPlanner` still works — the shim re-exports the whole package API, so `fp.WallItem`, `fp.SETTINGS`, etc. resolve regardless of which submodule they live in.
-- **Module layout** (dependency order, low → high): `config.py` (constants + the shared mutable `SETTINGS` + path/font/icon helpers) · `geometry.py` (pure coord/format helpers + item-stacking) · `catalog.py` (furnishing library + AI pricing) · `model.py` (Qt-free dataclasses — the single definition of the JSON schema; `Project.to_dict`/`from_dict` own version migration) · `walls.py` (`WallItem`/`OpenWall`/`OpeningItem` + wall-network algorithms) · `rooms.py` (`RoomItem` + detection/binding + room-edge helpers) · `items.py` (furnishings/stairs/groups/reference-image) · `dialogs.py` · `view.py` (`PlanView` + palette) · `macro.py` · **`planio.py` / `csvio.py` / `imageio.py` / `levels.py`** (mixins split out of `MainWindow` at P2.5 — plan open/save/export incl. the scene↔document bridges, room-CSV import/export, reference-image import + wall extraction, and the floor roster) · `mainwindow.py` (`MainWindow` = UI wiring + edit orchestration, inheriting those four mixins) · `app.py` (`main()`).
+- **Module layout** (dependency order, low → high): `config.py` (constants + the shared mutable `SETTINGS` + path/font/icon helpers) · `geometry.py` (pure coord/format helpers + item-stacking) · `catalog.py` (furnishing library + AI pricing) · `model.py` (Qt-free dataclasses — the single definition of the JSON schema; `Project.to_dict`/`from_dict` own version migration) · `walls.py` (`WallItem`/`OpeningItem` + wall-network algorithms) · `rooms.py` (`RoomItem` + detection/binding + room-edge helpers) · `items.py` (furnishings/stairs/groups/reference-image) · `dialogs.py` · `view.py` (`PlanView` + palette) · `macro.py` · **`planio.py` / `csvio.py` / `imageio.py` / `levels.py`** (mixins split out of `MainWindow` at P2.5 — plan open/save/export incl. the scene↔document bridges, room-CSV import/export, reference-image import + wall extraction, and the floor roster) · `mainwindow.py` (`MainWindow` = UI wiring + edit orchestration, inheriting those four mixins) · `app.py` (`main()`).
   - The four are **mixins, not delegating wrappers**, so every call site and test still resolves `win.serialize()`, `win._import_rooms(...)`, `win.switch_floor(...)` unchanged — the split is internal structure, invisible at the API. Add a method to the module that owns its concern, not to `MainWindow`.
   - Three payload methods live in `planio.py` and are deliberately distinct: `snapshot()` (canonical v5 doc — undo + dirty), `design_document()` (what gets written: snapshot + provenance + unmodelled settings + `active_floor`), and `serialize()` (legacy v4, **only** for File ▸ Export legacy v4). Submodules use Qt + lower-layer **star imports**; the `walls↔rooms` cycle is broken with 4 late (function-local) imports. When adding cross-module refs, keep the import direction acyclic (items←walls←rooms; UI imports the scene layer) and use a late import only to close a genuine cycle.
 - Scene units are **inches** (1 scene unit = 1 inch). Canvas size comes from `SETTINGS` via `canvas_rect()`.
@@ -17,8 +17,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## v5 migration (in progress)
 The file format and domain model are moving to `floorplanner/design/design-schema.v5.json` (vendored at P0.7; pointer at `docs/design-schema.v5.md`).
 Read `docs/V5_MIGRATION_PLAN.md` before changing walls/rooms/items/mainwindow —
-it says which code is being deleted and in which phase. Do not add new callers of
-`OpenWall` (removed at P3.7). `coalesce_*` / `weld_all` went at P3.4 (use
+it says which code is being deleted and in which phase. `OpenWall` and its
+`is_open` flag went at P3.7 — an open side is an outline edge no wall spans
+(`RoomItem.open_edges()`), drawn dashed by the room itself; there is no
+placeholder item and nothing to filter out of a wall query. `coalesce_*` /
+`weld_all` went at P3.4 (use
 `merge_wall` / `merge_all` / `weld_scene` / `normalize_walls`); the room-detection
 engine went at P3.5 (`detect_room` now lifts the scene to a `Design` and asks
 `topology.enclosing_face`; `refresh_rooms` is gone entirely).

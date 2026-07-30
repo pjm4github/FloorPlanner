@@ -281,7 +281,7 @@ def _body_tee_scene(fp, scene):
 
 def _wall_count(fp, scene):
     return sum(1 for w in scene.items()
-               if isinstance(w, fp.WallItem) and not w.is_open)
+               if isinstance(w, fp.WallItem))
 
 
 def test_a_body_landing_splits_the_wall_it_lands_on(fp, scene):
@@ -605,7 +605,7 @@ def test_pressing_every_wall_changes_nothing_across_the_corpus(fp, win, plan):
     from floorplanner.design.bridge import design_from_scene
     win.load_path(str(EXAMPLES / plan))
     walls = [w for w in win.scene.items()
-             if isinstance(w, fp.WallItem) and not w.is_open]
+             if isinstance(w, fp.WallItem)]
     assert walls, "the corpus plan has no walls"
 
     before, splits = design_from_scene(win).to_dict(), split_count()

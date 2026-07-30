@@ -40,7 +40,7 @@ def _add_opening(room, kind, code):
     """Put one door/window at the centre of the first long-enough bound wall of
     `room` that has no opening yet."""
     for w in room.walls:
-        if w.is_open or w.openings or w.length() < CELL - 12:
+        if w.openings or w.length() < CELL - 12:
             continue
         try:
             op = fp.OpeningItem(w, kind, code, w.length() / 2.0)

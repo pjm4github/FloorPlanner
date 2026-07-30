@@ -865,7 +865,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             elif isinstance(it, RoomItem):
                 seen = set()
                 for w in it.bounding_walls() + it.interior_walls():
-                    if not isinstance(w, WallItem) or w.is_open or id(w) in seen:
+                    if not isinstance(w, WallItem) or id(w) in seen:
                         continue
                     seen.add(id(w))
                     if w in direct_walls:

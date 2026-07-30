@@ -128,7 +128,7 @@ def test_bake_carries_room_without_traced_corners(fp, win, make_room):
 
 
 def _built_walls(fp, sc):
-    return sum(isinstance(w, fp.WallItem) and not w.is_open for w in sc.items())
+    return sum(isinstance(w, fp.WallItem) for w in sc.items())
 
 
 def test_grouping_room_with_its_walls_makes_no_coincident_copies(fp, win,

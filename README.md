@@ -51,9 +51,9 @@ console script), plus bundled fonts and artwork.
   Slide that partly-open wall and the opening travels with it while both
   adjoining walls stretch; drag the wall back to the corners and the gap
   closes and the wall fuses back into the room (right-click to detach it
-  again). *(An open side is not currently drawn — it was a dashed
-  placeholder until the v5 topology work replaced it with a property of the
-  room's own outline, and it is redrawn from that at P3.7.)* Right-click a room name
+  again). An open side is **drawn dashed**, by the room itself, from the very
+  outline edge that records it — no placeholder item, so the cue and the fact
+  cannot disagree. Right-click a room name
   for an **inventory** — its
   properties plus every furnishing and opening in the room, in an aligned
   table you can copy as TSV for Excel. Rooms can be copied and pasted
