@@ -171,7 +171,7 @@ gap rather than papering over it.
 | ☑ | **P3.4** Topology ops replace coalesce/weld/fracture | ruff + pytest |
 | ☑ | **P3.5** Delete the detection engine | ruff + pytest |
 | ☑ | **P3.6** Opening anchors — *ticked 2026-07-30 on the re-certification: **10/10 GREEN** under full-mode `tools/gate.py` trailers (ruff + OFF + ON + DEEP, every sum reconciling). Defects 26, 28 and 29 all closed.* | ruff + pytest |
-| ☐ | **P3.7** Delete `OpenWall` | ruff + pytest |
+| ☑ | **P3.7** Delete `OpenWall` — *ticked 2026-07-30 against the amended acceptance: the cue is drawn from the outline and pinned by a pixel test with measured polarity, the class and its `is_open` flag are gone (zero `git grep` hits in `*.py`), and the P3.5 Known-regression row closes on that test.* | ruff + pytest |
 | ☐ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** | ratios recorded |
 | ☐ | **P4.1** Delete-wall keeps the room | ruff + pytest |
 | ☐ | **P4.2** Extract / join | ruff + pytest |
@@ -2344,8 +2344,8 @@ DEFECT 28 -- RULINGS AT THE SESSION BOUNDARY (2026-07-29). Committed here
      and the "suppressing" interventions are all explained by it, and no
      separate cause is outstanding.
 
-P3.7  CODE COMPLETE, NOT TICKED -- the box is the reviewer's, per the working
-         agreement. Three sub-commits, each at a full-mode green gate.
+P3.7  done -- TICKED 2026-07-30 by the reviewer. Three sub-commits, each at a
+         full-mode green gate.
 ruff:    clean
 pytest:  Gate-Census: collected=520 ruff=clean
          Gate-OFF: 514 passed, 6 xfailed in 15.36s  -> sum 520  OK
