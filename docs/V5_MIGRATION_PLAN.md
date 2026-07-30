@@ -1993,6 +1993,29 @@ THE XFAIL/XPASS DELTA -- ASKED TWICE, ANSWERED FROM DISK. Both ends were run
          XPASSED once in 8 ON runs -- that is what the P3.7 (2) gate trailer's
          "5 xfailed, 1 xpassed" was. Named by re-running with `-ra` rather than
          inferred, because the trailer reports counts and not names.
+         >> FOURTH MEMBER, AND IT CHANGES THE STAKES (2026-07-30):
+         `test_select_interactive_scales_subquadratically` FAILED **1 of 8 and
+         2 of 8** across two ON sweeps. The first three members are
+         `xfail(strict=False)` -- they flap in a column nobody reads. THIS ONE
+         IS A HARD PASS, so it turns the GATE RED on a busy machine.
+         CONSEQUENCE, and it is why the P3.8 decision stops being housekeeping:
+         **as of today a red gate has two indistinguishable causes -- a
+         regression or machine load -- separable only by READING WHICH TEST
+         FAILED, which is precisely the manual step the gate exists to
+         replace.** The decision is therefore a PRECONDITION for trusting any
+         future gate, and the merge does not happen before it is made and
+         applied class-wide.
+         EXONERATION OF P3.7's PAINT ADDITION, measured not assumed: the same
+         failure reproduces on the PRE-P3.7 tree in a worktree at `2c5fd8d`
+         (ratio **9.71** against the threshold of 8), while the three runs after
+         the paint addition read **4.10 / 2.22 / 4.00**. The flap is the class,
+         not the change.
+         CONSTRAINT ON THE P3.8 DECISION, ruled 2026-07-30 and NOT negotiable:
+         **no wall-clock ratio may remain a gate-reddening hard pass on a shared
+         machine.** Wider thresholds, best-of-N, or a non-gating
+         recorded-benchmark lane with one very loose catastrophic guard -- P3.8
+         chooses from its own fresh numbers, but it chooses for the CLASS (all
+         four members), not for one test.
 commits: ac9ad45 (0) . 600fdef (1) . 02eff1e (2) . 733d7d6 (3) . f07dbdb (4)
          Logged sub-commit by sub-commit per the handoff-spec rule, so a
          successor reads the state from here plus the four riders at lines
