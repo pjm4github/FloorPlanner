@@ -389,7 +389,18 @@ Extract `io.py` (open/save/export), `csvio.py` (`_import_rooms`/`_export_rooms`,
 
 # Phase 3 — Vertices own the geometry
 
-> **Branch.** `git switch -c v5-topology`. This is the only phase where `main` should not track HEAD. Merge when P3.8 records its numbers.
+> **Branch.** `git switch -c v5-topology`. This is the only phase where `main` should not track HEAD.
+
+### The Phase-3 merge checklist — ruled 2026‑07‑30
+
+~~*Merge when P3.8 records its numbers.*~~ That one line was the whole condition, and it is not enough: it would have merged a branch whose gate can go red for reasons unrelated to the code, onto a `main` whose CI runs neither of the invariants that caught the only real corruption this project has seen. **PR #1 merges when ALL of the following hold.**
+
+1. **P3.8's numbers are recorded** — a full P0.3 re-run against **both** the P0.3 baseline and the P3.5-exit numbers, ratios in the Progress log; and **grouping 20 rooms creates 0 new walls, asserted** (not observed).
+2. **All four exit-survey rows are answered** — by measurement, or explicitly dispositioned to a named task. **No blank rows**, the corpse-table standard applied to the survey: the split-on-write assignment-site census, the stranding question, defect 13's drag half, and the P2.3 collinear-run row.
+3. **The flap-class decision is made and applied to the CLASS** (all four members). **Constraint from member four, not negotiable: no wall-clock ratio may remain a gate-reddening hard pass on a shared machine.** Wider thresholds, best-of-N, or a non-gating recorded-benchmark lane with one very loose catastrophic guard — P3.8 decides from its own fresh numbers, but it decides for the class. *Why this is a merge condition and not housekeeping: as of today a red gate has two indistinguishable causes — a regression, or machine load — separable only by reading which test failed, which is the manual step the gate exists to replace.*
+4. **Defect 27, first half: a DEEP CI job** (`FP_VERIFY_DESIGN=deep`, ubuntu) **is added and green before merge.** Defect 26's fix removed the crash that made this impossible. I11 and I14 caught `planc1`'s real corruption, and they do not land on `main` guarded by nothing but a human running a local gate. **The windows-latest half stays filed in defect 27 as its own task — desirable, not merge-blocking.**
+5. **Gate 3 passed by Patrick, findings dispositioned** — `docs/SANITY_CHECK.md`.
+6. **CI green on the branch head**, and **merge commit, not squash.** The sub-commit history carries the rollback points and the receipts live in the commit messages; flattening it would delete the audit trail this phase spent so much effort making true.
 
 ### P3.1 — Vertex table live
 `Design.vertices` becomes the live store. `WallItem` gains `v1`/`v2` ids; `p1`/`p2` become read-through properties resolving against the table, so **every existing caller keeps working**. Assignment to `p1`/`p2` moves the vertex and is logged under `--verify-design`.

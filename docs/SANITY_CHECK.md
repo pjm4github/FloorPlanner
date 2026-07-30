@@ -1,13 +1,14 @@
 # Manual sanity check
 
-Two moments in this migration are worth checking by hand. Everything else is either invisible or covered by the suite.
+Three moments in this migration are worth checking by hand. Everything else is either invisible or covered by the suite.
 
 | Gate | When | Why then | Risk to your data |
 |---|---|---|---|
-| **Gate 1** | End of Phase 0 (**now** — after P0.6) | Phase 0 is behaviour-preserving *except* five deliberate fixes and one deliberate regression. Anything else you notice is a real bug, and the signal is clean because nothing structural has moved yet. | None — file format unchanged |
+| **Gate 1** | End of Phase 0 (after P0.6) | Phase 0 is behaviour-preserving *except* five deliberate fixes and one deliberate regression. Anything else you notice is a real bug, and the signal is clean because nothing structural has moved yet. | None — file format unchanged |
 | **Gate 2** | After **P2.2** (save writes v5) | The file format changes. This is the only point in the migration that can touch your real plans. | **Back up your plan files first** |
+| **Gate 3** | End of Phase 3 (**now** — before PR #1 merges) | Phase 3 rebuilt what geometry *is*: vertices own it, rooms store outlines, the detection engine is gone. The suite says the document is right; only a human can say the editor still feels right. It is also the last point before the branch lands on `main`. | None to files — but this is the last look before `main` moves |
 
-**Gate 1 — PASSED** (2026‑07‑26). **Gate 2 — PASSED** (2026‑07‑27), with **one finding, found and fixed** before Phase 3 branched: commit `d665e06`.
+**Gate 1 — PASSED** (2026‑07‑26). **Gate 2 — PASSED** (2026‑07‑27), with **one finding, found and fixed** before Phase 3 branched: commit `d665e06`. **Gate 3 — pending**, and it is item 5 of the Phase-3 merge checklist in `V5_MIGRATION_PLAN.md`.
 
 Phase 1 is a shadow model with no user-visible effect; P0.7 is tooling. Phase 3 runs on a branch, so `main` stays checkable throughout.
 
@@ -107,3 +108,51 @@ Anything in A, or a "was" behaviour still present in B, is a real finding — th
 - [ ] `python tools/validate_design.py <yourfile>` → Schema PASS, Invariants PASS (schema defaults to the packaged `floorplanner/design/design-schema.v5.json`)
 
 If a room's area changes and it *isn't* in the conversion report, stop and report it. That would mean the weld moved geometry it shouldn't have.
+
+---
+
+# Gate 3 — end of Phase 3 (before PR #1 merges)
+
+**Status: PENDING.** Item 5 of the Phase-3 merge checklist (`docs/V5_MIGRATION_PLAN.md`, Phase 3 banner): the merge does not happen until this is passed and its findings dispositioned.
+
+```
+python FloorPlanner.py
+```
+
+**Work on copies.** `examples/planc1.json` and `examples/sample_plan.json` are frozen fixtures — open them, never save over them.
+
+## A. Conversions and reports (~5 min)
+
+- [ ] Open `planc1.json` (v3): the **conversion report appears** — welds, area corrections (**M Bath 591.6 → 182.0**, **Hall 243.5 → 61.5**), duplicate doors, and **opening entries** (new since Gate 2). Console quiet otherwise
+- [ ] Open `symmetricP1.json` (v5): opens **clean, not dirty**, console silent
+- [ ] **Save As** from each, then reopen: clean, no report, and `python tools/validate_design.py <file>` → **PASS / PASS**
+
+## B. Phase-3 behaviours, each with its observable
+
+- [ ] **Whole-plan band → group → move**: every room tracks (was: porches stranded). Console silent
+- [ ] **Deliberately clip one room** with the band → group → move: that room **strands** — expected until P4.5 — with **one** status-line warning naming *the edit*, not the legacy file, **said once**
+- [ ] **Draw a wall T-ing through a doorway**: the door is **reported**, not silently dropped or slid
+- [ ] **Drag a wall endpoint** to stretch a wall with a door on it: the door **keeps its distance from its near end** — no drift, no mirroring
+- [ ] **A room with an open side shows a dashed edge** (the cue missing since P3.5 is back)
+- [ ] **Select all 20 rooms one by one, group, ungroup, undo, redo**: no lag, no console output
+
+## C. Deliberately still broken — don't report these
+
+| Symptom | Fixed at |
+|---|---|
+| Deleting a room's perimeter wall does nothing | **P4.1** |
+| Clipped-band room stranding | **P4.5** (defect 23, semantics ruling pending) |
+| Groups vanish on save/reload; unrelated undo dissolves them | **P4.5** |
+| Z-order / bring-to-front reverted by undo | **P4.5** |
+
+## Report back
+
+```
+Gate 3
+A (conversions/reports):  pass | issues: ...
+B (six behaviours):       1_ 2_ 3_ 4_ 5_ 6_
+C (known-broken):         confirmed | unexpected: ...
+anything else:            ...
+```
+
+Anything in A, or a B observable that does not appear, is a real finding — that is the point of doing this by hand.
