@@ -2344,6 +2344,60 @@ DEFECT 28 -- RULINGS AT THE SESSION BOUNDARY (2026-07-29). Committed here
      and the "suppressing" interventions are all explained by it, and no
      separate cause is outstanding.
 
+P3.7  CODE COMPLETE, NOT TICKED -- the box is the reviewer's, per the working
+         agreement. Three sub-commits, each at a full-mode green gate.
+ruff:    clean
+pytest:  Gate-Census: collected=520 ruff=clean
+         Gate-OFF: 514 passed, 6 xfailed in 15.36s  -> sum 520  OK
+         Gate-ON: 514 passed, 5 xfailed, 1 xpassed in 18.49s  -> sum 520  OK
+         Gate-DEEP: 509 passed, 7 deselected, 4 xfailed in 17.82s -> sum 520 OK
+         Gate-Verdict: GREEN (every sum reconciles against --collect-only)
+         519 -> 520 collected, +1 (test_an_open_side_is_drawn_dashed); nothing
+         removed.
+commits: 2c5fd8d (1 amended acceptance) . b8fec07 (2 the cue) . 1260721 (3 the
+         deletion sweep)
+
+THE SPEC WAS AMENDED BEFORE THE CODE, and the census is why that mattered. Two
+         divergences from the estimate, both found by grepping disk rather than
+         reading the task line:
+         * NO LIVE PRODUCER since P3.5 -- zero `OpenWall(` calls tree-wide. The
+           "P2.3 producer branch in apply" the estimate named is already a
+           COMMENT. The P2.3 log line promising P3.7 would retire it is stale
+           history, ANNOTATED not rewritten (the log is history; wrong history
+           gets an annotation).
+         * `is_open` was the real sweep at ~7x the estimate: 44 readers across
+           17 files, every one permanently False.
+
+(a) VERIFIED, NOT RE-DONE: `test_open_walls.py` went to null edges at P3.5.
+(b) THE PIXEL ASSERTION, polarity measured FIRST (P3.4's template): wall body
+         150, vacated stretch with no cue 255 (pure background -- the
+         regression), dash ~124 with gaps at ~255. So the cue is a DARK, GAPPED
+         line and CLAUDE.md's `< 190` sits between dash and background. Both
+         halves in one test. RECEIPT: fails in a worktree without the paint
+         addition, in the regression row's own words -- `[255, ... 255]`.
+(c) THE CLASS IS GONE: `git grep is_open -- '*.py'` and `git grep OpenWall --
+         '*.py'` both return NOTHING. Prose keeps the history.
+(d) THE KNOWN-REGRESSION ROW CLOSES on the pixel test, and it HAD to be pixels:
+         every structural assertion in that file stayed green for the whole life
+         of the regression, because they ask the outline what is open and the
+         outline was always right.
+
+SAME CUE, PROVEN NOT ASSERTED: drawing the new cue and a real `OpenWall` at once
+         puts them on the same pixels (124 each alone, 97 stacked), so the row
+         closes as "the same cue from one representation" rather than "a
+         different cue". `docs/gallery/08-open-walls.png` regenerates with the
+         dash visible and the README sentence P3.5 had to amend is reverted.
+
+MY OWN SWEEP FAILED TWICE BEFORE IT WORKED, recorded because the mechanism is
+         reusable and so are the traps: the tree is CRLF, so every MULTI-LINE
+         pattern matched zero times while single-line ones applied (a half-swept
+         tree), and two `if not w.is_open\n and abs(...)` sites left a dangling
+         `and` -- syntax errors written into the tree. Recovered with `git
+         checkout`, safe ONLY because every piece of real work was already
+         committed and the sole uncommitted content WAS the broken sweep. That
+         is the P3.5 rule read the right way round: the danger is uncommitted
+         WORK, and there was none.
+
 DEFECT 28 -- THE CORPSE TABLE, AND IT IS COMPLETE (2026-07-29). Ruling 3's
          standard met: no blank rows, every corpse attributed to the test whose
          scene it actually holds. Full table and method in
