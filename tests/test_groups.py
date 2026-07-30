@@ -548,24 +548,43 @@ def test_a_group_move_leaves_the_outlines_still_holding_their_corners(fp, win):
     fp.rebuild_all_walls(win.scene)
     assert _corner_sharing(fp, win) == (140, 140)
 
-    party = next(w for w in win.scene.items()
+    # DETERMINISTIC PICK (defect 28). `next(w for w in win.scene.items() ...)`
+    # took whichever party wall the scene happened to list first, and scene item
+    # order is not stable across processes -- so this test moved a DIFFERENT
+    # corner on different runs, and 18 of the 59 candidates leave the plan with
+    # two rooms overlapping. Sorting on geometry makes the subject the same wall
+    # every run; the assertion below is unchanged.
+    party = min((w for w in win.scene.items()
                  if isinstance(w, fp.WallItem) and len(w.rooms) == 2
-                 and w.group() is None)
+                 and w.group() is None),
+                key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()))
     a, b = party.rooms[0], party.rooms[1]
     a0, b0 = a.area_sqft, b.area_sqft
     v = party.end_vertex("p1")
+    # EVERY room holding this corner follows it -- which is what the app's own
+    # corner-movers do (`_DragVertex.ends`/`.edges` on the drag,
+    # `GroupItem._corner_records` on bake and rotation): the holders are
+    # collected from the geometry, not from the wall. Re-pointing only the
+    # party wall's two rooms left a third holder behind on the old vertex,
+    # which is how this test came to leave overlapping rooms behind it.
+    holders = [r for r in win.scene.items()
+               if isinstance(r, fp.RoomItem) and any(e.v is v for e in r.outline)]
     moved = v.relocated_to(QPointF(v.x + 12, v.y + 12))
     for w in win.scene.items():                    # move that corner for real
         if isinstance(w, fp.WallItem):
             for at in ("p1", "p2"):
                 if w.end_vertex(at) is v:
                     w.set_end_vertex(at, moved)
-    for r in (a, b):
+    for r in holders:
         for e in r.outline:
             if e.v is v:
                 e.v = moved
     assert (a.area_sqft, b.area_sqft) != (a0, b0), \
         "the rooms did not follow the corner -- the outlines were orphaned"
+    left_behind = [r.name for r in holders
+                   if not any(e.v is moved for e in r.outline)]
+    assert not left_behind, \
+        f"rooms left on the old corner while the walls moved: {left_behind}"
 
 
 def test_a_group_rotation_also_keeps_the_corners(fp, win):
