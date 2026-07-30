@@ -1237,6 +1237,16 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         # otherwise the modal save dialog would block on close
         headless = QApplication.platformName() == "offscreen"
         if headless or self._confirm_discard_changes("Quit Floor Planner"):
+            # DEFECT 29. A closed window went on walking the WHOLE document
+            # every 180 ms -- snapshotting it, verifying it, and (before defect
+            # 26's guard) able to abort the process from it. Close one plan
+            # window with another still open and you paid that cost forever,
+            # invisibly, for a window you believe is gone.
+            #
+            # Stopped only once the close is ACCEPTED: a close the user cancels
+            # must leave the window exactly as it was, debounce included, or
+            # the edit in flight when they hit the X never becomes an undo step.
+            self._dirty_timer.stop()
             e.accept()
         else:
             e.ignore()
