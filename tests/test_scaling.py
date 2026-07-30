@@ -164,7 +164,12 @@ def _measure(n):
     g.setSelected(True)
     t["ungroup"] = _time(win.ungroup_selected)
 
-    win.close()
+    # DEFECT 28: `win.close()` hides a window and leaves its 180 ms dirty timer
+    # running. These two windows are built by a MODULE-scoped fixture, so they
+    # predate every per-test disposal and would outlive the whole file --
+    # exactly the leak the conftest guard exists to catch, and it caught these.
+    from conftest import dispose_window
+    dispose_window(win)
     return t
 
 
