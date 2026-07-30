@@ -429,6 +429,50 @@ class RoomItem(QGraphicsItem):
                 or not _wall_spans_segment(e.wall, corners[i],
                                            corners[(i + 1) % n])]
 
+    def open_edge_segments(self):
+        """`[(a, b)]` in item coordinates for every open edge -- the paint-side
+        form of `open_edges()`.
+
+        Edge `i` of the outline spans corner `i` to corner `i+1`, and the
+        corners ARE the walls' own vertices, so these segments track a drag
+        with nothing to recompute them."""
+        corners = self.corners or []
+        n = len(corners)
+        if n < 2:
+            return []
+        opens = {id(e) for e in self.open_edges()}
+        return [(corners[i], corners[(i + 1) % n])
+                for i, e in enumerate(self.outline) if id(e) in opens]
+
+    def _paint_open_edges(self, painter, option, ghost):
+        """Draw a vacated side dashed (P3.7).
+
+        The cue is drawn FROM THE OUTLINE, which is the whole point: an open
+        side used to be an ITEM -- a dashed `OpenWall` the binder interposed --
+        so the scene carried a second representation of something the document
+        already said (`wall: null`). The fact and the cue now come from one
+        place, and the pen matches the item's exactly (same colour, same dash,
+        same lod-scaled width) so this closes the P3.5 regression as the SAME
+        cue rather than a different one.
+
+        RENDER-ONLY, and deliberately: an open edge is the ABSENCE of a wall.
+        Interacting with an absence means drawing a wall there (the draw tool
+        owns that) or moving the room (the room owns that), so there is no
+        selection or drag control to implement -- which is why the old
+        `test_open_wall_is_editable` was deleted rather than rewritten. If a
+        later task needs open edges to be hit-testable, P4.2 (extract / join)
+        is the one that would, and it specs it."""
+        segs = self.open_edge_segments()
+        if not segs:
+            return
+        lod = max(option.levelOfDetailFromTransform(painter.worldTransform()),
+                  1e-6)
+        col = FLOOR_GHOST if ghost else QColor(90, 120, 170)
+        painter.setPen(QPen(col, max(1.2, 1.6 / lod), Qt.PenStyle.DashLine))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        for a, b in segs:
+            painter.drawLine(a, b)
+
     def room_openings(self):
         return [op for w in self.walls for op in w.openings]
 
@@ -583,9 +627,11 @@ class RoomItem(QGraphicsItem):
             painter.setPen(QPen(FLOOR_GHOST, 0))
             painter.drawText(r, Qt.AlignmentFlag.AlignHCenter
                              | Qt.AlignmentFlag.AlignTop, self.name)
+            self._paint_open_edges(painter, option, ghost=True)
             return
         painter.setBrush(QBrush(QColor(120, 170, 255, 26)))
         painter.drawPath(self.path)
+        self._paint_open_edges(painter, option, ghost=False)
         if self.isSelected():
             painter.setPen(QPen(QColor(0, 122, 255), 0, Qt.PenStyle.DashLine))
             painter.setBrush(Qt.BrushStyle.NoBrush)

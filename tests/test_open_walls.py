@@ -75,6 +75,65 @@ def _shorten(fp, scene, wall, new_far=None):
     fp.rebuild_all_walls(scene)
 
 
+def _render(scene, size=200):
+    """The scene rendered to a QImage, for pixel assertions (P3.4's helper)."""
+    from PyQt6.QtCore import QRectF
+    from PyQt6.QtGui import QImage, QPainter
+    img = QImage(size, size, QImage.Format.Format_RGB32)
+    img.fill(0xFFFFFFFF)
+    pr = QPainter(img)
+    pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    scene.render(pr, QRectF(0, 0, size, size), QRectF(0, 0, size, size))
+    pr.end()
+    return img
+
+
+def test_an_open_side_is_drawn_dashed(fp, scene):
+    """P3.7's PIXEL HALF, and it carries the whole Known-regression row.
+
+    The row P3.5 opened says the vacated stretch "renders as nothing rather
+    than as a dashed line" -- a defect that is invisible to every structural
+    assertion in this file, all of which stayed green throughout, because they
+    ask the OUTLINE what is open and the outline was always right. Only a
+    rendered pixel can tell "the cue is drawn" from "the cue is missing", so
+    the row closes on this test and on nothing else.
+
+    POLARITY MEASURED, NOT ASSUMED (the P3.4 junction template). On white:
+      * a wall body reads 150,
+      * a vacated stretch with NO cue reads 255 -- pure background, which is
+        exactly the regression,
+      * the dash reads ~124 with its gaps back at ~255.
+    So the cue is a DARK, GAPPED line, and the `< 190` threshold from
+    CLAUDE.md sits between dash and background. The wall body's 150 is not in
+    play along a vacated stretch, because there is no wall there -- that is
+    what open means.
+
+    Both halves in one test, so the positive cannot go vacuous: the open side
+    is dashed, and a side that is still walled shows the solid body instead."""
+    room = _room(fp, scene)                         # 0,0 .. 120,120
+    wall = _right_wall(fp, room)
+    fp.detach_wall_from_room(scene, wall)
+    _shorten(fp, scene, wall)                       # far end to y=60
+    assert len(room.open_edges()) == 1              # the precondition, stated
+
+    img = _render(scene)
+    vacated = [img.pixelColor(120, y).red() for y in range(68, 118)]
+    assert min(vacated) < 190, (
+        f"the open side renders as nothing -- no dash on the vacated "
+        f"stretch: {vacated}")
+    assert max(vacated) > 200, (
+        f"the open side is drawn SOLID, not dashed -- no gaps: {vacated}")
+
+    # the negative half: the stretch the wall still spans is a solid body, and
+    # a closed side is untouched by any of this
+    walled = [img.pixelColor(120, y).red() for y in range(12, 49)]
+    assert max(walled) - min(walled) <= 10 and max(walled) < 190, (
+        f"the still-walled stretch stopped reading as a solid wall: {walled}")
+    closed = [img.pixelColor(x, 0).red() for x in range(20, 101)]
+    assert max(closed) - min(closed) <= 10, (
+        f"a closed side picked up gaps it should not have: {closed}")
+
+
 def test_detach_unlocks_corners_without_unbinding(fp, scene):
     room = _room(fp, scene)
     wall = _right_wall(fp, room)
