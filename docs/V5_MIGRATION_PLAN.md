@@ -2351,6 +2351,91 @@ DEFECT 28 -- RULINGS AT THE SESSION BOUNDARY (2026-07-29). Committed here
      and the "suppressing" interventions are all explained by it, and no
      separate cause is outstanding.
 
+P3.8 (5)  THE REMAINING TWO SURVEY ROWS, and the survey is complete.
+
+THE P2.3 COLLINEAR-RUN ROW: RE-CHECKED BY HAND, DOES NOT CLOSE, cause intact.
+         Built the row's own scenario -- a 480" wall with a mid-span T,
+         bordering NO room -- and ran it:
+           before undo   2 walls, spans [120, 480]
+           after undo    3 walls, spans [120, 240, 240]
+           the grabbed segment borders 0 rooms
+           `_collinear_run()` gathers 1 of 2 collinear segments -- SHORT-CIRCUITED
+           a 12" body drag moves 1 of 2 segments
+         Every clause of the row is still literally true, and the fix it names
+         still fits: gather the run over VERTEX ADJACENCY rather than
+         short-circuiting to `[self]` when `self.rooms` is empty. Left
+         UNASSIGNED with P4.2 as the nearest task that touches the drag --
+         unchanged from P3.4 (iv), and now re-verified rather than assumed at
+         the phase exit.
+         NOTE THE COMPANY IT KEEPS: this is the same family as defect 30 and
+         the four coordinate-assignment faces above -- an operation that knows
+         about ROOMS where it should know about CORNERS. P4.2 inherits one
+         theme, not four errands.
+
+DEFECT 13's DRAG HALF: DISPOSITIONED, NOT RE-MEASURED, and that is deliberate.
+         The merge condition is "answered by measurement OR explicitly
+         dispositioned to a named task". This row was measured at P3.5 (0 open
+         sides at 0.25x, 1 at 0.5x-4x; the wall's far end at y=120 vs y=60) and
+         its cause named (the drag's `20.0 / _view_scale()` catch radius and
+         `16.0 / view_scale` stick). Nothing since has touched those terms.
+         Re-running it would re-derive a number the register already holds;
+         what it needs is a RULING on whether a gesture tolerance may set a
+         geometric RESULT, and that is P4.2's to make. Status stays
+         authoritative in register row 13, per the pointer filed at P3.7.
+
+P3.8 (4)  THE SPLIT-ON-WRITE EXIT SURVEY -- re-grepped, and the count went UP
+         because the census method was wrong, not because the code got worse.
+
+P3.6 RECORDED 9 SITES. THE TRUE FIGURE IS 11, and the two extra were never
+         missing from the code -- they were invisible to the GREP. The census
+         searched for `.p1 = ` / `.p2 = `, which cannot see an assignment made
+         through `setattr(wall, attr, ...)`. P3.6's list did contain two setattr
+         sites (the `rigid` and `tee` branches, found by reading rather than by
+         the pattern), so the pattern had already failed once without being
+         corrected. The survey now greps BOTH FORMS, and that is the finding to
+         carry: a census is only as good as the shape it looks for.
+
+THE ELEVEN, EACH WITH WHAT CARRIES THE THINGS ATTACHED TO THAT END:
+
+  1-2  `mainwindow.py:571,572`  align-to-grid (`w.p1/p2 = grid_snap(...)`).
+       CARRIES NOTHING -- it snaps each end independently, so a shared corner
+       comes apart and any room outline on it is left behind. It is a
+       user-invoked plan-wide normalisation, and the honest fix is the same one
+       defect 30 names: move CORNERS, not coordinates. UNASSIGNED, argue P4.2.
+  3-4  `mainwindow.py:581,582`  `_translate_shape`. Same shape, same answer,
+       but lower stakes: it translates a whole selection by the same delta, so
+       the geometry stays self-consistent even though identity is minted fresh.
+       UNASSIGNED, argue P4.5 (it is the group/selection family).
+  5    `view.py:402`  the rubber-band wall being DRAWN. Nothing is attached to
+       an end that does not exist yet -- this is the one site where
+       split-on-write is not merely safe but correct. KEEP, permanently.
+  6-7  `walls.py:1563,1565`  the ENDPOINT drag. Split-on-write is the DESIGNED
+       behaviour here (P3.1's ruling), and P3.7 made it visible: pulling a
+       corner away opens that side and the room keeps its shape. KEEP.
+  8    `walls.py:290`  `_adopt_end`, the merge applier's fallback. NEW TO THE
+       CENSUS. Documented at P3.4 (i) and correct: it splits only when the plan
+       named no corner, i.e. the end is landing where no corner was. KEEP.
+  9    `walls.py:455`  `weld_scene`'s geometric snap. NEW TO THE CENSUS, and
+       the interesting one: it closes a gap by MOVING a coordinate, then the
+       topology half shares the ends. Assigning here is what the weld is for --
+       but it means a room outline holding the old position is not carried.
+       Not observed to bite (load does not weld, and the explicit command
+       re-shares afterwards); RECORDED, argue P4.2 with defect 30, since it is
+       the same "coordinate moved, holders not told" shape.
+  10-11 `walls.py:1601,1603`  the `rigid` and `tee` branches of the body drag.
+       Unchanged disposition: `rigid` is a grouped wall held back by the group
+       guard -> P4.5; `tee` is a body-landing, which P3.4 (ii) gave a real
+       vertex, so this branch is now reached only for landings the split
+       declined (a straddling opening) -> P3.6's report path covers it.
+
+SO THE SURVEY'S OWN QUESTION -- "what carries the things attached to that end"
+         -- has three answers: FIVE sites are correct as they are (5, 6, 7, 8,
+         and the tee half of 11), TWO are lower-stakes identity churn (3, 4),
+         and FOUR are the same defect-30 shape at different call sites (1, 2, 9,
+         and the rigid half of 11). That is the number worth carrying forward:
+         **the coordinate-assignment family is no longer a list of survivors to
+         chase, it is ONE defect with four faces.**
+
 P3.8 (2)  THE FLAP-CLASS DECISION, made from the numbers and applied to the
          class. It is the merge checklist's item 3 and the precondition for
          trusting any later gate run.
