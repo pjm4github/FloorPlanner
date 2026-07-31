@@ -23,7 +23,14 @@ rounding difference, so it is treated as red.
 
     python tools/gate.py            # ruff + OFF + ON + DEEP
     python tools/gate.py --quick    # ruff + OFF only
+    python tools/gate.py --deep     # ruff + DEEP only -- what CI's deep job runs
     python tools/gate.py --perf     # the timing lane, explicitly (P3.8)
+
+CI CALLS THIS TOOL RATHER THAN REIMPLEMENTING IT (defect 27, P3.8). The DEEP
+job runs `--deep`, so the invariant set, the perf exclusion and the census
+reconciliation are defined ONCE. Two implementations of a gate are two things
+that can drift, and this project has already paid for that once (F2's disease,
+P3.4 point 1).
 """
 import re
 import subprocess
@@ -99,6 +106,7 @@ def main() -> int:
     if "--perf" in sys.argv:
         return _perf()
     quick = "--quick" in sys.argv
+    deep_only = "--deep" in sys.argv          # CI's DEEP job (defect 27)
     rc, out = _run(["ruff", "check", "."])
     ruff = "clean" if rc == 0 else f"{out.strip().splitlines()[-1]}"
     if rc:
@@ -109,7 +117,8 @@ def main() -> int:
 
     lines = [f"Gate-Census: collected={collected} ruff={ruff}"]
     bad = rc != 0
-    for label, env, extra in (GATES[:1] if quick else GATES):
+    modes = GATES[:1] if quick else (GATES[2:3] if deep_only else GATES)
+    for label, env, extra in modes:
         grc, gout = _run(["pytest", "-q", "-p", "no:randomly", *extra], env)
         summary = _summary(gout)
         c = _counts(summary)
