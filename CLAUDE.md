@@ -14,6 +14,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Headless macro tool (for AI/script-driven edits): the in-app hook is `MainWindow.run_macro()` / `MacroRunner` plus `export_canvas`/`load_path`/`save_path`/`scene_summary`; the driver is `fp_macro.py`. Token grammar is in `docs/macro_language.md`. Note: don't synthesize Ctrl-modified key events headlessly — it leaks `QApplication.keyboardModifiers()`; route shortcuts/arrows through app methods (as `MacroRunner` does).
 - PNG → plan extractor: `fp_extract.py` (numpy + `QImage`, no OpenCV/Pillow). Detects rectilinear walls and writes `floorplanner-json`. Gotchas: a `QApplication` must exist before `QImage` decodes a PNG (image plugins); keep the `QApplication` alive in a module global (a local gets GC'd and crashes `MainWindow`); copy QImage buffers into numpy (`arr.copy()`) — a view into the freed `QImage` segfaults. Its `setup_app()` sets the app font, so in-process tests use the conftest app/module (the `fp` fixture), not `setup_app()`.
 
+## Starting a session
+
+Read **`docs/SESSION_SNAPSHOT.md`** first: where the work stands, what to read in
+what order, the rules that bind it, and the traps that waste time. It is an index
+and a state marker — where it points at another document, that document wins.
+
 ## v5 migration (in progress)
 The file format and domain model are moving to `floorplanner/design/design-schema.v5.json` (vendored at P0.7; pointer at `docs/design-schema.v5.md`).
 Read `docs/V5_MIGRATION_PLAN.md` before changing walls/rooms/items/mainwindow —
