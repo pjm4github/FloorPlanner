@@ -172,7 +172,7 @@ gap rather than papering over it.
 | ☑ | **P3.5** Delete the detection engine | ruff + pytest |
 | ☑ | **P3.6** Opening anchors — *ticked 2026-07-30 on the re-certification: **10/10 GREEN** under full-mode `tools/gate.py` trailers (ruff + OFF + ON + DEEP, every sum reconciling). Defects 26, 28 and 29 all closed.* | ruff + pytest |
 | ☑ | **P3.7** Delete `OpenWall` — *ticked 2026-07-30 against the amended acceptance: the cue is drawn from the outline and pinned by a pixel test with measured polarity, the class and its `is_open` flag are gone (zero `git grep` hits in `*.py`), and the P3.5 Known-regression row closes on that test.* | ruff + pytest |
-| ☐ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** | ratios recorded |
+| ☑ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** — *ticked 2026-07-30. `bake` 10.6× faster (279.0 → 26.4 ms at 64 rooms); all four survey rows answered or dispositioned; the flap class retired class-wide; defect 27's DEEP CI job green. Merge checklist items 1–4 done — **Phase 3 is code-complete, and the merge waits on Gate 3.*** | ratios recorded |
 | ☐ | **P4.1** Delete-wall keeps the room | ruff + pytest |
 | ☐ | **P4.2** Extract / join | ruff + pytest |
 | ☐ | **P4.3** Shuffle mode | ruff + pytest |
@@ -2350,6 +2350,93 @@ DEFECT 28 -- RULINGS AT THE SESSION BOUNDARY (2026-07-29). Committed here
      stale window's timer firing inside a later test -- so the four sightings
      and the "suppressing" interventions are all explained by it, and no
      separate cause is outstanding.
+
+P3.8  done -- PERF VERIFICATION AND THE EXIT SURVEY. The last task of Phase 3.
+ruff:    clean
+pytest:  Gate-Census: collected=523 ruff=clean
+         Gate-OFF: 510 passed, 7 deselected, 6 xfailed in 12.89s  -> sum 523  OK
+         Gate-ON: 510 passed, 7 deselected, 6 xfailed in 15.55s   -> sum 523  OK
+         Gate-DEEP: 510 passed, 7 deselected, 6 xfailed in 16.35s -> sum 523  OK
+         Gate-Verdict: GREEN (every sum reconciles against --collect-only)
+commits: 4997da2 (1 the numbers) . 7b6c342 (2 the flap decision) . 65c4c02 +
+         90bad2d (defect 27's DEEP half) . 28e6a59 (3 the stranding row) .
+         9bd52c3 (4-5 the survey completed) . plus this entry.
+
+=== 1. THE NUMBERS, against BOTH baselines, same machine, medians of seven ===
+
+                    PRE-PHASE-3 (b82256c)      HEAD              what it says
+                    n=4 -> n=8    ratio        n=4 -> n=8  ratio
+  rebuild           1.2 ->   3.3   2.82        1.0 ->  2.6  2.61   improved
+  snapshot          2.1 ->  10.8   5.06        2.2 -> 10.8  4.80   flat
+  undo             22.0 -> 154.0   6.99       19.1 ->126.2  6.64   -18%
+  select_burst      0.2 ->   1.0   5.26        0.2 ->  1.0  5.48   flat
+  select_interact   2.5 ->   7.6   3.19        2.4 ->  9.5  4.13   +25%, unattributed
+  group            27.8 -> 349.7  12.77       29.3 ->356.4 12.43   untouched
+  bake             41.0 -> 279.0   6.81        6.4 -> 26.4  4.09   **10.6x**
+  ungroup          41.5 -> 292.5   6.89       11.5 -> 99.8  8.64   2.9x abs, ratio worse
+
+  P0.3's reading rule: 4 is linear in rooms, 16 quadratic, 8 = rooms^1.5.
+  `bake` is the headline and the mechanism is exactly P3.5's deletion: a group
+  move used to end in `refresh_rooms` re-detecting every room it touched.
+  `ungroup` is the honest half -- 2.9x faster absolutely while its ratio crosses
+  the threshold; both true, and the row says both. `rebuild` answers P0.3's
+  standing warning that a regression there would be a real finding: it improved.
+  `group` is the one op Phase 3 never touched.
+
+  0 NEW WALLS, ASSERTED (not observed): grouping the 20 rooms of symmetricP1
+  together with their walls -- what Ctrl+A or a band actually selects -- leaves
+  80 walls at 80 across group and bake. The rooms-ALONE reading of the same
+  sentence is +868 walls and is P4.5's; it is pinned xfail, not reworded.
+
+=== 2. THE FOUR SURVEY ROWS, and the theme they share ===
+
+  * SPLIT-ON-WRITE: 9 -> 11 sites, because the P3.6 census grepped a shape that
+    cannot see `setattr(wall, attr, ...)`. Five are correct as they are, two are
+    lower-stakes identity churn (P4.5), FOUR are one defect with four faces.
+  * STRANDING: ANSWERED BY A REAL DRAG -- it strands. Defect 30, filed not
+    fixed. The endpoint drag is a separate and correct answer.
+  * THE P2.3 COLLINEAR ROW: re-checked by hand, does not close, cause intact,
+    unassigned -> P4.2.
+  * DEFECT 13's DRAG HALF: dispositioned, not re-measured; it needs a ruling,
+    not another number. Register row 13 stays authoritative.
+
+  **THE THESIS P4.2 INHERITS, and it is one thesis rather than four errands:
+  every one of these is an operation that knows about ROOMS where it should
+  know about CORNERS.** Defect 30's gather, the four coordinate-assignment
+  faces, and `_collinear_run()`'s short-circuit are the same mistake wearing
+  four hats -- Phase 3 moved the geometry onto vertices, and these are the call
+  sites that still ask a room what they should be asking a corner.
+
+=== 3. THE FLAP DECISION, applied class-wide ===
+
+  Ratios are RECORDED, never asserted; every timing assertion is an ABSOLUTE
+  bound at n=8; the lane is out of the gate in all three modes and runs under
+  `tools/gate.py --perf`. The wider-threshold option is ruled out BY
+  MEASUREMENT: the ratio's noise band reaches ~27 while the whole diagnostic
+  range it exists to read is 4 to 16. Receipt: 8 consecutive full-mode gate
+  runs, 24 mode-runs, every one byte-identical, zero xpassed and zero failed --
+  against 1-in-8 and 2-in-8 red before. It is this file's own precedent
+  (`select_burst` P0.6, `undo` P2.3) finished rather than a new mechanism.
+
+=== 4. CI NOW RUNS THE DEEP INVARIANTS ===
+
+  https://github.com/pjm4github/FloorPlanner/actions/runs/30592873265
+  Gate-DEEP: 510 passed, 7 deselected, 5 xfailed in 21.26s -> sum 522 OK
+  The job calls `tools/gate.py --deep`, so CI and the local gate are ONE
+  instrument. Its census was byte-identical to the local Windows run -- the
+  branch's first cross-platform confirmation, and it landed on the two things
+  most likely to differ: the deep invariant walk and the pixel assertions.
+
+=== 5. THE MERGE CHECKLIST, hashes verified on disk ===
+
+  | # | condition | state |
+  |---|---|---|
+  | 1 | P3.8's numbers recorded; 0 new walls asserted | DONE `4997da2` |
+  | 2 | four survey rows answered or dispositioned | DONE `28e6a59`, `9bd52c3` |
+  | 3 | flap decision made and applied class-wide | DONE `7b6c342` |
+  | 4 | defect 27 DEEP CI job added and green | DONE `65c4c02`, `90bad2d` |
+  | 5 | Gate 3 passed by Patrick, findings dispositioned | PENDING -- his |
+  | 6 | CI green on branch head; MERGE COMMIT, not squash | CI green; merge waits on 5 |
 
 P3.8 (5)  THE REMAINING TWO SURVEY ROWS, and the survey is complete.
 
