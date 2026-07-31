@@ -77,6 +77,17 @@ class PlanIOMixin:
         than silently re-welded; that asymmetry is the point of promoting
         'welded' from a hopeful post-condition to a checked invariant."""
         self._conversion = None
+        # GATE 3: which format a plan arrived in decides whether the bridge's
+        # unwelded-ends warning has anything to say. A v5 document already
+        # holds one vertex per corner, so an "unwelded end" seen on open is a
+        # property of how the SCENE decomposes it -- and, measured, one that
+        # Edit > Coalesce all walls now silences without changing a single
+        # document coordinate. See `bridge._warn_unwelded`.
+        # ON THE SCENE, not on the window: `design_from_scene` resolves its
+        # argument to the QGraphicsScene before warning, and that is where the
+        # warning's own baseline attribute lives too. Setting it on the window
+        # reads fine and does nothing.
+        self.scene._v5_source = data.get("format") == "floorplanner-design"
         if data.get("format") == "floorplanner-design":
             design = Design.from_dict(data)
             apply_design_to_scene(self, design)

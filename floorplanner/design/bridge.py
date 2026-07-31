@@ -273,38 +273,51 @@ def _warn_unwelded(scene, n):
     finds MORE than the baseline warns -- naming the split between what the plan
     arrived with and what has appeared since. Equal or better is silent.
 
-    GATE 3 CAUGHT THE SAME DISEASE ONE LEVEL DOWN, in the OPENED-WITH branch:
-    it blamed the legacy-load path unconditionally and promised that Edit >
-    Coalesce all walls now "closes them". Measured on a V5 file
-    (`planc1TestV5.json`, 5 ends at load): the command drops the scene count
-    5 -> 0, and the SAVED DOCUMENT IS BYTE-IDENTICAL BEFORE AND AFTER -- 62
-    vertices either way. Save and reopen and the 5 are back. Nothing was
-    repaired because nothing was broken in the document: it already holds one
-    vertex per corner, and the count is a property of how the SCENE decomposes
-    those walls into items, which is exactly what this module says two
-    paragraphs down about planc1 going 5 -> 15 through a byte-identical Design.
+    GATE 3 SILENCED THE OPENED-WITH BRANCH FOR A V5 PLAN, because measurement
+    showed it had nothing to tell the user. On `planc1TestV5.json` (5 ends at
+    open):
 
-    So the opened-with message now states the observation, distinguishes the two
-    causes it cannot tell apart from here, and promises a repair only where one
-    is possible. Advice that appears to work and then does not survive a save is
-    worse than the misattribution it replaced."""
+        Edit > Coalesce all walls now : scene count 5 -> 0
+        the document's own gaps       : 4 -> 4, UNCHANGED
+        saved file                    : byte-identical, 62 vertices either way
+
+    The command silences the count without closing anything. It can, because
+    this count is computed on the SCENE's decomposition of the walls, and
+    merging collinear runs removes the ends that would weld without moving a
+    coordinate. Meanwhile the same measurement found `planc1.json` and
+    `symmetricP1.json` each carrying TWO 6.003" document gaps and warning about
+    neither -- so the channel both cried wolf and missed the wolf.
+
+    A 6" gap is very likely deliberate: the schema calls `join_tol_in` a GESTURE
+    tolerance and says in as many words that "a wall deliberately stopping 6"
+    short of another is a legitimate design (a reveal, a pilaster gap), and
+    nothing may silently close it". So the document-side gaps are not
+    automatically faults either, and nothing here can tell a reveal from a
+    mistake.
+
+    WHAT IS LEFT IS THE ONE CASE THAT IS ACTIONABLE: an EDIT that tears the wall
+    network, where the count rises above what the plan opened with. That branch
+    stays. On open, a v5 plan says nothing (there is nothing the user could do
+    that would change the file) and a LEGACY plan still warns, because there the
+    ends really are the file's own unwelded coordinates and the command really
+    does repair them.
+
+    The real repair gap -- a document that carries a 1.53" gap no command
+    closes -- is defect 34, and is not this function's to fix."""
     base = getattr(scene, _BASELINE_ATTR, None)
     if base is None:
         setattr(scene, _BASELINE_ATTR, n)
         base = n
+        if n and getattr(scene, "_v5_source", False):
+            return                   # nothing to repair -- see the docstring
         if n:
-            msg = (f"design_from_scene: this plan OPENED with {n} wall end(s) "
-                   f"sitting within the {JOIN_TOL}\" join tolerance of a "
-                   f"neighbour without sharing a corner with it. The Design "
-                   f"reports the coordinates unchanged. TWO CAUSES LOOK ALIKE "
-                   f"from here: a legacy (v1-v4) plan arrives unwelded because "
-                   f"load never welds (F5 in docs/CODE_REVIEW_v2.md), and "
-                   f"Edit > Coalesce all walls now genuinely repairs that; a "
-                   f"v5 plan already holds one vertex per corner, so this "
-                   f"count is about how the scene DECOMPOSES its walls into "
-                   f"items and the command will change the scene but not the "
-                   f"file. If the warning returns after you save and reopen, "
-                   f"it was the second case and there is nothing to repair.")
+            msg = (f"design_from_scene: this legacy (v1-v4) plan OPENED with {n} "
+                   f"wall "
+                   f"end(s) sitting within the {JOIN_TOL}\" join tolerance of "
+                   f"a neighbour without sharing a corner with it -- the "
+                   f"file's own coordinates, which load never welds (F5 in "
+                   f"docs/CODE_REVIEW_v2.md). Edit > Coalesce all walls now "
+                   f"closes them, and saving afterwards writes them closed.")
         else:
             return
     elif n > base:

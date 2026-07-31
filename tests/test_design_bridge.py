@@ -512,3 +512,36 @@ def test_apply_accepts_a_design_object(fp, win):
     d1, _ = _walk(win)
     _apply(win, Design.from_dict(d1))
     assert _walk(win)[0] == d1
+
+
+def test_a_v5_plan_does_not_warn_about_its_own_decomposition(fp, win):
+    """GATE 3: the opened-with warning is silent for a v5 plan, because there is
+    nothing the user could do about it that would change the file.
+
+    MEASURED on `planc1TestV5.json`, which opens with 5 such ends:
+      * Edit > Coalesce all walls now takes the scene count 5 -> 0;
+      * the document's own near-vertex gaps stay 4 -> 4;
+      * the saved file is byte-identical, 62 vertices either way.
+    The count describes how the SCENE decomposes the walls into items, and
+    merging collinear runs removes the ends that would weld without moving a
+    coordinate. A warning that a command can silence without repairing anything
+    is worse than no warning.
+
+    The legacy branch still warns -- there the ends really are the file's own
+    unwelded coordinates and the command really does close them (pinned by
+    `test_a_legacy_plan_is_blamed_on_the_file_not_on_an_edit`), and an EDIT that
+    tears the network still warns (pinned by
+    `test_the_warning_names_the_cause_and_says_it_once`)."""
+    import json
+    import pathlib
+    ex = pathlib.Path(__file__).resolve().parent.parent / "examples"
+    doc = json.loads((ex / "planc1TestV5.json").read_text(encoding="utf-8"))
+    win.open_document(doc, interactive=False)
+
+    rep = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")        # any warning fails the test
+        design_from_scene(win, report=rep)
+    # the finding is still COUNTED -- it is telemetry, not a secret
+    assert rep["unwelded_ends"] == 5, \
+        "the count itself must survive; only the user-facing warning is silent"
