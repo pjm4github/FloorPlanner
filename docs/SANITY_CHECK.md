@@ -8,7 +8,7 @@ Three moments in this migration are worth checking by hand. Everything else is e
 | **Gate 2** | After **P2.2** (save writes v5) | The file format changes. This is the only point in the migration that can touch your real plans. | **Back up your plan files first** |
 | **Gate 3** | End of Phase 3 (**now** — before PR #1 merges) | Phase 3 rebuilt what geometry *is*: vertices own it, rooms store outlines, the detection engine is gone. The suite says the document is right; only a human can say the editor still feels right. It is also the last point before the branch lands on `main`. | None to files — but this is the last look before `main` moves |
 
-**Gate 1 — PASSED** (2026‑07‑26). **Gate 2 — PASSED** (2026‑07‑27), with **one finding, found and fixed** before Phase 3 branched: commit `d665e06`. **Gate 3 — pending**, and it is item 5 of the Phase-3 merge checklist in `V5_MIGRATION_PLAN.md`.
+**Gate 1 — PASSED** (2026‑07‑26). **Gate 2 — PASSED** (2026‑07‑27), with **one finding, found and fixed** before Phase 3 branched: commit `d665e06`. **Gate 3 — PASSED** (2026‑07‑31), with **five findings**: two fixed pre-merge (31, 32), one closed as a duplicate of 23 (33), one registered and carried to Phase 4 (34), and a first real-user confirmation of defect 25's gesture arm.
 
 Phase 1 is a shadow model with no user-visible effect; P0.7 is tooling. Phase 3 runs on a branch, so `main` stays checkable throughout.
 
@@ -113,7 +113,19 @@ If a room's area changes and it *isn't* in the conversion report, stop and repor
 
 # Gate 3 — end of Phase 3 (before PR #1 merges)
 
-**Status: PENDING.** Item 5 of the Phase-3 merge checklist (`docs/V5_MIGRATION_PLAN.md`, Phase 3 banner): the merge does not happen until this is passed and its findings dispositioned.
+**Status: PASSED — 2026-07-31**, user-run against the branch head, sections A and B re-run after the findings below were fixed. Item 5 of the Phase-3 merge checklist is met.
+
+**Findings, all dispositioned before the merge:**
+
+| # | finding | disposition |
+|---|---|---|
+| **31** | The group selection box **stretched during a drag** — leading edge at ~2× the mouse, trailing edge static. Two mechanisms at defect 14's site: `_content_points` mixed frames (walls in the group's frame, furnishings via `mapToScene`), and the box cache was dropped in `ItemPositionChange`, which fires *before* the move commits, so the reported box lagged by exactly one step. | **FIXED pre-merge**, confirmed by the reporter in the app. Regression test pins a walls-only group stable and an edge-furnishing group unstretched. |
+| **32** | The unwelded-ends warning **gave advice that could not work**: it blamed the legacy-load path on a *v5* file and named a command that silences the scene count without changing the document. | **FIXED pre-merge.** A v5 plan is now silent on open; legacy still warns; an edit that tears the network still warns. The count survives as telemetry. |
+| **33** | **Rooms left behind by a group move** on a dirty-baseline file — once in many cycles. | **CLOSED as a duplicate of defect 23.** The app has no Ctrl+A: "select the whole plan" is a rubber band taking only items *wholly inside*, so a hand-drawn band clips sometimes. Measured: at 100% coverage **zero** strand; every band short of it strands precisely the rooms it clipped. Workaround: start the band outside the plan's extent. Semantics remain P4.5's. |
+| **34** | Opened by finishing 32's measurement: a **document gap in the (0.6″, 9.0″) band** is reported by nothing and closed by nothing, and the command that looks like a repair only silences the report. | **REGISTERED, not fixed** — argued P4.2. It wants a *review*, not an auto-repair: two of the four measured gaps are 6.003″, and the schema calls a deliberate 6″ reveal a legitimate design that nothing may silently close. |
+| **25** | New sighting: drawing a wall that **ends on a doorway** leaves the end unwelded (the join correctly declines to split through the door) and the user gets the generic torn-network warning instead of a message naming the cause at gesture time. | **First real-user confirmation of defect 25's gesture arm.** Strengthens P4.1 over the P4.3 dissent. |
+
+**The register's numbering, settled here so the sequence has no gaps:** **31** = the group-box stretch, **32** = the false advice, **33** = the dirty-file stranding (closed as a duplicate of 23), **34** = the unreported/unrepairable document gap. All four were opened by this gate; 31 and 32 are fixed in the branch, 33 is closed, 34 is carried to Phase 4.
 
 ```
 python FloorPlanner.py
