@@ -156,7 +156,13 @@ def test_unwelded_ends_warns_and_strict_raises(fp, win):
     """The finding is surfaced, and `strict=True` escalates it -- the hook
     P1.6's `--verify-design` pulls."""
     _load(fp, win, "planc1.json")
-    with pytest.warns(UserWarning, match="disagrees with itself"):
+    # MATCH CHANGED AT GATE 3, one line: the old phrase was "disagrees with
+    # itself as it arrived", which the reword deleted because it is false for a
+    # v5 plan -- the scene does not disagree with itself, it DECOMPOSES the
+    # document's shared corners into items that then sit near each other. The
+    # assertion still pins that the finding is surfaced; only the words it
+    # quotes moved, and it now quotes the stable half of the sentence.
+    with pytest.warns(UserWarning, match="join tolerance of a neighbour"):
         design_from_scene(win)
     with pytest.raises(ValueError, match="wall end"):
         design_from_scene(win, strict=True)

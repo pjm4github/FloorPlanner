@@ -691,3 +691,45 @@ def test_grouping_rooms_without_their_walls_still_copies_them(fp, win,
             it.setSelected(True)
     win.group_selected()
     assert _nwalls(fp, sc) == before
+
+
+def test_the_group_box_does_not_stretch_when_the_group_moves(fp, win,
+                                                             first_furnishing):
+    """GATE 3 finding 1 -- the selection box grew as you dragged a group: its
+    leading edge ran at ~2x the mouse while its trailing edge stood still.
+
+    TWO MECHANISMS AT ONE SITE, both measured before either was fixed:
+      * `_content_points` mixed frames -- wall children in the group's own
+        frame, furnishing children in SCENE. They agree only at the origin, so
+        moving the group shifted the furnishing points and `boundingRect()`,
+        read in the item's frame, applied that shift a second time.
+      * the cache was dropped on `ItemPositionChange`, which fires BEFORE the
+        move commits, so a rebuild during it stored the box for the position
+        being LEFT. Measured: the box lagged the group by exactly one step.
+
+    THE FURNISHING SITS AT THE EDGE ON PURPOSE. The first draft of this repro
+    put it at the centre, where it never determines an extreme, and reported a
+    clean box for a reason that had nothing to do with the mechanism."""
+    sc = win.scene
+    for a, b in [((0, 0), (240, 0)), ((240, 0), (240, 240)),
+                 ((240, 240), (0, 240)), ((0, 240), (0, 0))]:
+        sc.addItem(fp.WallItem(QPointF(*a), QPointF(*b), "interior"))
+    fp.rebuild_all_walls(sc)
+    sc.addItem(fp.FurnishingItem(first_furnishing, QPointF(236, 236), 0))
+    sc.clearSelection()
+    for it in sc.items():
+        if isinstance(it, (fp.WallItem, fp.FurnishingItem)):
+            it.setSelected(True)
+    win.group_selected()
+    g = next(i for i in sc.items() if isinstance(i, fp.GroupItem))
+
+    at_rest = g.boundingRect()
+    for dx, dy in ((24, 0), (48, 0), (48, 36), (-48, 0)):
+        g.setPos(dx, dy)
+        moved = g.boundingRect()
+        assert moved.width() == pytest.approx(at_rest.width(), abs=0.01), (
+            f"the box stretched in x at ({dx}, {dy}): "
+            f"{at_rest.width():.1f} -> {moved.width():.1f}")
+        assert moved.height() == pytest.approx(at_rest.height(), abs=0.01), (
+            f"the box stretched in y at ({dx}, {dy}): "
+            f"{at_rest.height():.1f} -> {moved.height():.1f}")

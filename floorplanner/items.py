@@ -465,7 +465,14 @@ class GroupItem(QGraphicsItemGroup):
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
-            self._obox = None             # moved -> furnishing content pts stale
+            # No longer dropped on a MOVE: since `_content_points` answers in
+            # this group's own frame, the box does not depend on where the group
+            # sits, so a move cannot stale it. Dropping it here was also one
+            # step WRONG -- `ItemPositionChange` fires BEFORE the move commits,
+            # so anything that rebuilt the cache during it (a repaint, a
+            # boundingRect query) stored the box for the position the group was
+            # LEAVING. Measured at Gate 3: the reported box lagged the group by
+            # exactly one drag step.
             return grid_snap(value)
         return super().itemChange(change, value)
 
@@ -485,17 +492,29 @@ class GroupItem(QGraphicsItemGroup):
         return tr
 
     def _content_points(self) -> list:
-        """Scene-coord extreme points of the members (wall endpoints and
-        furnishing footprint corners) -- the box hugs these."""
+        """Extreme points of the members -- wall endpoints and furnishing
+        footprint corners -- ALL IN THIS GROUP'S OWN FRAME.
+
+        THE FRAME MATTERS AND USED TO BE MIXED (Gate 3). A wall child
+        contributes `ch.p1`/`ch.p2`, which are the wall's own geometry and so
+        already in the group's frame; a furnishing used to contribute
+        `ch.mapToScene(...)`, which is SCENE. The two agree only while the group
+        sits at the origin. Move the group and the furnishing's points shift by
+        the group's translation while the wall's do not -- and since
+        `boundingRect()` is read in the item's own frame, that translation is
+        then applied a SECOND time, so the box's leading edge ran at ~2x the
+        mouse while its trailing edge stood still. `mapToParent` is the same
+        query asked in the frame the answer is used in."""
         pts = []
         for ch in self.childItems():
             if isinstance(ch, WallItem):
                 pts += [ch.p1, ch.p2]
             elif isinstance(ch, FurnishingItem):
                 r = QRectF(-ch.w / 2, -ch.d / 2, ch.w, ch.d)
-                pts += [ch.mapToScene(r.topLeft()), ch.mapToScene(r.topRight()),
-                        ch.mapToScene(r.bottomRight()),
-                        ch.mapToScene(r.bottomLeft())]
+                pts += [ch.mapToParent(r.topLeft()),
+                        ch.mapToParent(r.topRight()),
+                        ch.mapToParent(r.bottomRight()),
+                        ch.mapToParent(r.bottomLeft())]
         return pts
 
     def _oriented_box(self) -> tuple:
