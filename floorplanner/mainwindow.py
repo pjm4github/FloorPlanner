@@ -15,13 +15,15 @@ from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
-from floorplanner.walls import _coalesce_all_impl  # star skips underscores
 from floorplanner.rooms import *  # noqa: F401
 from floorplanner.items import *  # noqa: F401
 from floorplanner.model import (  # serialization bridge (aliased)
     DEFAULT_FLOOR, Floor,
 )
-from floorplanner.design.verify import verify  # P1.6 shadow mode
+from floorplanner.design.validate import check   # defect 28 evidence
+from floorplanner.design.verify import (  # P1.6 shadow mode
+    BASELINE_ATTR as VERIFY_BASELINE_ATTR, DesignVerificationError, verify,
+)
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
 from floorplanner.macro import *  # noqa: F401
@@ -580,12 +582,13 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             w.p2 = QPointF(w.p2.x() + dx, w.p2.y() + dy)
         r = shape["room"]
         if r is not None:
-            r.prepareGeometryChange()
             r.anchor = QPointF(r.anchor.x() + dx, r.anchor.y() + dy)
-            r.path = QTransform.fromTranslate(dx, dy).map(r.path)
-            if r.corners:
-                r.corners = [QPointF(c.x() + dx, c.y() + dy) for c in r.corners]
-            r._sync_corner_props()
+            # region derives from the outline (P3.5): shifting the corners
+            # shifts it. The mapped path is only the outline-less fallback.
+            r.set_region(QTransform.fromTranslate(dx, dy).map(r.path),
+                         r.area_sqft,
+                         [QPointF(c.x() + dx, c.y() + dy) for c in r.corners]
+                         if r.corners else None)
 
     def distribute_rooms(self, horizontal: bool):
         """Space the selected rooms so the gaps between them are equal,
@@ -620,18 +623,28 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
     def refresh_rooms_cmd(self):
         """Re-scan the canvas: delete any room whose region is no longer
         enclosed by walls (e.g. a gray area left behind after its walls
-        were moved away), then re-detect the survivors."""
+        were moved away), then re-attach the survivors to their walls.
+
+        P3.5: the second half used to be a re-detection sweep (`refresh_rooms`)
+        that this command merely triggered on demand. Regions now derive from
+        their outlines, so there is nothing to re-detect -- what a user still
+        wants from this menu item is the ORPHAN SWEEP above plus a re-bind, and
+        that is what it does."""
         sc = self.scene
         removed = 0
         # only the active floor: room_walled tests against active-floor walls, so
         # a room parked on another floor would look unwalled and be wrongly
-        # deleted (defect 2). refresh_rooms is already active-floor scoped.
-        for it in list(sc.items()):
-            if (isinstance(it, RoomItem) and it.floor == self.active_floor
-                    and not room_walled(sc, it)):
+        # deleted (defect 2).
+        rooms = [it for it in sc.items()
+                 if isinstance(it, RoomItem) and it.floor == self.active_floor]
+        for it in rooms:
+            if not room_walled(sc, it):
                 sc.removeItem(it)
                 removed += 1
-        refresh_rooms(sc)                 # re-detect the survivors' regions
+        for it in rooms:
+            if it.scene() is not None:
+                bind_room_walls(sc, it, settle=False)
+        rebuild_all_walls(sc)
         self.status(f"Rooms refreshed — removed {removed} orphaned room(s)."
                     if removed else "Rooms refreshed — all rooms are walled.")
 
@@ -645,9 +658,14 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         for it in getattr(self, "_sel_order", []):
             shape = None
             if isinstance(it, RoomItem) and it.corners:
+                # the room's OWN walls, off its outline -- not every wall
+                # whose body touches its boundary band. `bounding_walls()` is a
+                # proximity query with no floor filter, so it picks up the
+                # neighbour's walls and other floors' walls too, and
+                # `room_boolean` DELETES what it is handed (defect 8).
                 shape = {"corners": [QPointF(c) for c in it.corners],
                          "name": it.name, "props": dict(it.properties),
-                         "walls": list(it.bounding_walls()),
+                         "walls": room_walls(it),
                          "room": it, "group": None, "key": id(it)}
             elif isinstance(it, GroupItem):
                 gw = [c for c in it.childItems() if isinstance(c, WallItem)]
@@ -668,14 +686,61 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                 shapes.append(shape)
         return shapes
 
+    @staticmethod
+    def _source_edge(a, b, sources, default_floor):
+        """(wall_type, floor) for a result edge a->b, from whichever input wall
+        runs along it -- exterior wins a tie, so a combine cannot downgrade an
+        exterior wall to an interior one. `("interior", default_floor)` for an
+        edge no input covers, which for a boolean result is a genuinely new
+        edge and not a lost one."""
+        L = QLineF(a, b).length()
+        if L < 1e-6:
+            return "interior", default_floor
+        ux, uy = (b.x() - a.x()) / L, (b.y() - a.y()) / L
+        best = None
+        for p1, p2, kind, fl in sources:
+            ss = []
+            for p in (p1, p2):
+                vx, vy = p.x() - a.x(), p.y() - a.y()
+                if abs(vy * ux - vx * uy) > 1.5:
+                    break
+                ss.append(vx * ux + vy * uy)
+            if len(ss) != 2:
+                continue
+            lo, hi = max(0.0, min(ss)), min(L, max(ss))
+            if hi - lo < 1.0:
+                continue
+            key = (kind != "exterior", -(hi - lo))
+            if best is None or key < best[0]:
+                best = (key, kind, fl)
+        return (best[1], best[2]) if best else ("interior", default_floor)
+
     def room_boolean(self, op: str):
-        """Boolean op on the two selected rooms' perimeter polygons.
+        """Boolean op on the two selected rooms' OUTLINE polygons.
 
         combine = union, intersect = overlap only, subtract = first room
         minus second (selection order), fragment = the three pieces
         (first-only, second-only, overlap).  The two rooms may be selected
         directly, via their groups, or as grouped wall-loops.  The inputs
-        and their walls are replaced by freshly walled result rooms."""
+        and their walls are replaced by freshly walled result rooms.
+
+        DEFECT 8, closed at P3.5, and it was two faults in one operation:
+
+          * IT DELETED WALLS THAT WERE NOT ITS OWN. The inputs' walls came from
+            `bounding_walls()`, a proximity query over the whole scene with no
+            floor filter -- so a neighbouring room's shared wall, and any wall
+            of any other floor whose body happened to touch the band, was
+            removed along with the inputs. They now come from each room's
+            outline (`room_walls`), which is the definition of "this room's
+            walls", and a wall still bordering another room is kept.
+          * IT FORCED EVERY RESULT WALL TO `"interior"`. An exterior wall came
+            back as a 4.5" interior one after a combine. Each result edge now
+            inherits the type (and floor) of whichever input wall runs along it,
+            falling back to interior only for an edge no input wall covers --
+            which, for a boolean, is a genuinely new edge.
+
+        Both were possible because the operation worked from a re-traced
+        boundary rather than from what the rooms said they were made of."""
         shapes = self._selected_room_shapes()
         if len(shapes) != 2:
             self.status("Select two rooms or grouped wall-loops first.")
@@ -710,13 +775,25 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         else:
             return
 
+        # remember what the inputs were made of BEFORE removing them, so the
+        # result walls can inherit type and floor per edge instead of being
+        # forced to interior (defect 8, second half)
+        sources = [(QPointF(w.p1), QPointF(w.p2), w.wall_type, w.floor)
+                   for w in list(s1["walls"]) + list(s2["walls"])]
+        src_room = s1["room"] or s2["room"]
+        floor = src_room.floor if src_room is not None else self.active_floor
+
         # drop the input rooms and the walls that defined them
         old_walls = set(s1["walls"]) | set(s2["walls"])
         for s in (s1, s2):
             if s["room"] is not None and s["room"].scene() is not None:
                 sc.removeItem(s["room"])
         for w in old_walls:
-            if w.scene() is not None:
+            # a wall still bordering a room that is NOT an input is that room's
+            # too; deleting it would break a bystander open (defect 8)
+            keep = [r for r in w.rooms
+                    if r is not s1["room"] and r is not s2["room"]]
+            if w.scene() is not None and not keep:
                 sc.removeItem(w)
 
         # gather result sub-polygons
@@ -735,7 +812,9 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             for j in range(n):
                 a, b = corners[j], corners[(j + 1) % n]
                 if QLineF(a, b).length() >= MIN_WALL_LEN:
-                    w = WallItem(QPointF(a), QPointF(b), "interior")
+                    kind, fl = self._source_edge(a, b, sources, floor)
+                    w = WallItem(QPointF(a), QPointF(b), kind)
+                    w.floor = fl
                     sc.addItem(w)
                     ws.append(w)
             region_walls.append(ws)
@@ -786,7 +865,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             elif isinstance(it, RoomItem):
                 seen = set()
                 for w in it.bounding_walls() + it.interior_walls():
-                    if not isinstance(w, WallItem) or w.is_open or id(w) in seen:
+                    if not isinstance(w, WallItem) or id(w) in seen:
                         continue
                     seen.add(id(w))
                     if w in direct_walls:
@@ -818,18 +897,27 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             g.bake()                      # members keep their moved spot
             for c in g.dissolve():
                 c.setSelected(True)
-        coalesce_all(self.scene)          # now-free walls may merge with the plan
+        # P4.5's to REMOVE, not (iii)'s to migrate: once groups move the real
+        # items nothing is duplicated, so nothing needs merging on ungroup.
+        # Wired to the new pass meanwhile so behaviour is unchanged.
+        merge_all(self.scene)             # now-free walls may merge with the plan
         rebuild_all_walls(self.scene)     # rooms re-detect region/outline
         self.status("Ungrouped — items left in place.")
 
     def coalesce_all_now(self):
-        """Edit ▸ Coalesce all walls now: force the full-plan merge + weld sweep
-        even when auto-coalesce is switched off."""
-        n = _coalesce_all_impl(self.scene)
-        weld_all(self.scene)                 # close T/L joints across the plan
+        """Edit ▸ Coalesce all walls now: the explicit plan-wide normalization.
+
+        The COMMAND outlives the implementation it was named after (P3.4 (iii)).
+        Same menu item, same user intent -- tidy my walls -- new machinery:
+        merge every collinear run, then weld the junctions into shared
+        vertices. Still forced even when auto-coalesce is switched off."""
+        merged, _moved, _shared, split = normalize_walls(self.scene)
         rebuild_all_walls(self.scene)
-        self.status(f"Coalesced {n} overlapping wall(s) and welded junctions."
-                    if n else "Welded wall junctions.")
+        msg = (f"Coalesced {merged} overlapping wall(s) and welded junctions."
+               if merged else "Welded wall junctions.")
+        if split:
+            msg += f" Split {split} wall(s) at junctions."
+        self.status(msg)
 
     def _selection_spec(self):
         """Selected walls/furnishings (groups expand to their members)
@@ -877,11 +965,115 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         if not self._restoring:
             self._dirty_timer.start()
 
+    def _verify_or_report(self, where, **kw):
+        """Run shadow mode, and REPORT a violation instead of dying of it.
+
+        DEFECT 26. `verify()` raises by design, and that is right -- a genuine
+        invariant violation must not pass silently. What is wrong is WHERE the
+        raise lands: every one of this app's three `verify()` call sites is
+        reachable from a Qt callback (the dirty timer, menu actions for
+        undo/redo, image import, floor ops and save), and since PyQt 5.5 an
+        exception escaping a C++ -> Python callback goes to `sys.excepthook` and
+        then `qFatal()`, which calls `abort()`. So a violation found at a
+        quiescent point KILLED THE PROCESS -- on Windows, in a GUI session, the
+        user loses their work.
+
+        The catch is deliberately narrow: `DesignVerificationError` ONLY. A
+        blanket `except Exception` here would be the `except ValueError:
+        continue` disease at application scale, hiding real faults behind the
+        thing that was meant to surface them. Anything else still propagates.
+
+        Said once, per the R5 wording standard: shadow mode fires at every
+        quiescent point, so an unchanged message would repeat on every timer
+        tick.
+
+        Returns True when clean. The caller decides what a violation MEANS --
+        the edit path carries on (the edit already happened), the save path
+        still refuses to write. Only the fatality was the bug; the refusal is a
+        deliberate data-integrity decision that predates this fix."""
+        try:
+            verify(self, where, **kw)
+            return True
+        except DesignVerificationError as exc:
+            self._persist_verify_corpse(where, exc, kw)
+            msg = f"Shadow mode: {exc}"
+            if msg != getattr(self, "_last_verify_report", None):
+                self._last_verify_report = msg
+                self.status(msg)
+            return False
+
+    def _persist_verify_corpse(self, where, exc, kw):
+        """Write everything about a caught violation to disk, then carry on.
+
+        THE GUARD MAKES THIS NEARLY FREE, and that is the point. Before defect
+        26's fix a violation ended the process and took its own evidence with
+        it; now every catch can pay a permanent artifact instead. At a rate of
+        ~2 deep runs in 10, each run is a lottery ticket, and one win yields the
+        exact document, the exact rooms and the exact call path -- examinable
+        offline, forever, instead of a race to re-observe.
+
+        Recorded: the failing `Design`, the accepted baseline, the full
+        violation list, and the PROVENANCE -- a real Python stack, because
+        `where` only says "operation" or "save" and there are seven callback
+        paths into three call sites (defect 26's audit). The stack says which.
+
+        Never raises. Evidence-gathering that can itself fail the operation
+        would be a second defect 26."""
+        import datetime
+        import json
+        import os
+        import tempfile
+        import traceback
+        try:
+            root = os.environ.get("FP_VERIFY_DUMP") or os.path.join(
+                tempfile.gettempdir(), "floorplanner-verify")
+            os.makedirs(root, exist_ok=True)
+            doc = kw.get("doc")
+            if doc is None:
+                doc = self.snapshot()
+            stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+            payload = {
+                "when": stamp,
+                "where": where,
+                "error": str(exc),
+                "baseline": getattr(self, VERIFY_BASELINE_ATTR, None),
+                "violations": check(doc, deep=True),
+                "provenance": traceback.format_stack()[-14:],
+                # defect 28: is this window still the LIVE one, or a corpse of
+                # an earlier test whose dirty timer never stopped?
+                "window": {
+                    "id": id(self),
+                    "visible": bool(self.isVisible()),
+                    "timer_active": bool(self._dirty_timer.isActive()),
+                    "live_mainwindows": sum(
+                        1 for w in QApplication.topLevelWidgets()
+                        if type(w).__name__ == "MainWindow"),
+                    "title": self.windowTitle(),
+                },
+                "document": doc,
+            }
+            path = os.path.join(root, f"verify-{stamp}.json")
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(payload, fh, indent=1, default=str)
+        except Exception:                     # evidence must never break the app
+            pass
+
     def _commit_if_changed(self):
         """Snapshot the plan as one undo step if it differs from the last
         committed state."""
         if self._restoring:
             return
+        # R5, EDIT SURFACE: an opening an edit could not place is reported at
+        # the quiescent point, naming the edit that dropped it, and SAID ONCE --
+        # the 06c2145 wording standard. Eight sites used to swallow these with
+        # `except ValueError: continue` (defect 6); they now file into one
+        # vocabulary and this is where the edit half of it reaches a human.
+        failed = drain_opening_failures(self.scene)
+        if failed and failed != getattr(self, "_last_opening_report", None):
+            self._last_opening_report = failed
+            head = failed[0]
+            more = f" (+{len(failed) - 1} more)" if len(failed) > 1 else ""
+            self.status(f"Could not place {head}{more}")
         # ONE walk, shared: the snapshot and the shadow-mode check happen at
         # the same quiescent point, and walking the scene twice here would
         # double the per-edit cost for nothing.
@@ -890,7 +1082,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         # P1.6 shadow mode: a settled operation is exactly where the document
         # must be consistent, so this is the per-mutation hook.  Cheap twelve
         # only -- an O(n^2) sweep per edit would make the app unusable.
-        verify(self, "operation", doc=state, walk_report=rep)
+        self._verify_or_report("operation", doc=state, walk_report=rep)
         if state == self._committed_state:
             return
         self._undo_stack.append(self._committed_state)
@@ -994,7 +1186,10 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             for od in wd["openings"]:
                 try:
                     op = OpeningItem(wall, od["kind"], od["code"], od["s"])
-                except ValueError:
+                except ValueError as exc:
+                    report_opening_failure(self.scene, wall, od["kind"],
+                                           od["code"], od["s"],
+                                           f"{exc} (pasting)")
                     continue
                 op.door_type = od["door_type"]
                 op.swing = od["swing"]
@@ -1042,6 +1237,16 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         # otherwise the modal save dialog would block on close
         headless = QApplication.platformName() == "offscreen"
         if headless or self._confirm_discard_changes("Quit Floor Planner"):
+            # DEFECT 29. A closed window went on walking the WHOLE document
+            # every 180 ms -- snapshotting it, verifying it, and (before defect
+            # 26's guard) able to abort the process from it. Close one plan
+            # window with another still open and you paid that cost forever,
+            # invisibly, for a window you believe is gone.
+            #
+            # Stopped only once the close is ACCEPTED: a close the user cancels
+            # must leave the window exactly as it was, debounce included, or
+            # the edit in flight when they hit the X never becomes an undo step.
+            self._dirty_timer.stop()
             e.accept()
         else:
             e.ignore()
@@ -1089,7 +1294,10 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             for od in wd["openings"]:
                 try:
                     op = OpeningItem(wall, od["kind"], od["code"], od["s"])
-                except ValueError:
+                except ValueError as exc:
+                    report_opening_failure(self.scene, wall, od["kind"],
+                                           od["code"], od["s"],
+                                           f"{exc} (pasting)")
                     continue
                 op.door_type = od["door_type"]
                 op.swing = od["swing"]

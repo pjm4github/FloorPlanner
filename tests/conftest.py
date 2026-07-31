@@ -92,7 +92,88 @@ def win(qapp):
     _verify_rebase(w)
     yield w
     _verify_teardown(w, "win fixture teardown")
+    dispose_window(w)
+
+
+# --------------------------------------------------------------------------
+# DEFECT 28 -- a closed window is not a destroyed one.
+#
+# This fixture used to end with `w.close()`, which HIDES a window and neither
+# destroys it nor stops its 180 ms dirty timer.  MainWindows therefore
+# accumulated for the whole session (measured: peak 16 live, 9 of them holding
+# an active timer, 12 still alive at session end), and any later test that
+# pumps the event loop -- the macro runner calls `processEvents()` after every
+# token -- let a stale timer fire, walk its own dead scene and write a report
+# under the running test's name.  That is how a macro test building ONE room
+# produced a corpse containing symmetricP1's twenty.
+#
+# The guard below is the acceptance, and it is stated as the invariant rather
+# than as a count: after a test, no MainWindow is left holding a live dirty
+# timer.  A budget on the number alone would pass a suite that leaks windows
+# quietly as long as it leaked few enough.
+#
+# The app half -- `MainWindow.close()` itself leaving the timer running, which
+# costs a USER a full document walk every 180 ms for a window they believe is
+# gone -- is defect 29, fixed separately: a behaviour change in the app has no
+# business riding in under a test-isolation fix.
+# --------------------------------------------------------------------------
+def _mainwindows():
+    out = []
+    for w in QApplication.topLevelWidgets():
+        try:
+            if isinstance(w, _fp.MainWindow):
+                out.append(w)
+        except RuntimeError:                 # destroyed C++ side mid-iteration
+            pass
+    return out
+
+
+def _timer_is_live(w):
+    t = getattr(w, "_dirty_timer", None)
+    try:
+        return bool(t is not None and t.isActive())
+    except RuntimeError:                     # already destroyed C++ side
+        return False
+
+
+def dispose_window(w):
+    """Destroy a MainWindow, rather than merely hiding it.
+
+    ORDER MATTERS, and getting it wrong is how the first cut of this failed:
+    closing emits scene changes, which reach `_mark_dirty` and RESTART the
+    timer -- so stopping it before the close silences a timer that is then
+    started again. Close, let those signals settle, and only then stop it.
+
+    `processEvents()` alone does not deliver `DeferredDelete`, so the window
+    would survive `deleteLater()` and keep counting against the guard;
+    `sendPostedEvents(None, DeferredDelete)` is what actually destroys it."""
     w.close()
+    _app.processEvents()                     # close-time signals settle first
+    t = getattr(w, "_dirty_timer", None)
+    if t is not None:
+        t.stop()
+    w.deleteLater()
+    _app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+
+@pytest.fixture(autouse=True)
+def _no_window_outlives_its_test(qapp):
+    """Dispose every MainWindow a test created, then assert none is left with a
+    live dirty timer.
+
+    Autouse fixtures tear down LAST, so this runs after `win`'s own finalizer
+    and catches the windows tests build for themselves too (test_io,
+    test_floors, test_load_path and test_rooms all do)."""
+    before = {id(w) for w in _mainwindows()}
+    yield
+    for w in _mainwindows():
+        if id(w) not in before:
+            dispose_window(w)
+    stale = [w for w in _mainwindows() if _timer_is_live(w)]
+    assert not stale, (
+        f"{len(stale)} MainWindow(s) outlived the test still holding a live "
+        f"180 ms dirty timer -- each will walk its own dead scene inside a "
+        f"later test that pumps the event loop (defect 28).")
 
 
 # --------------------------------------------------------------------------

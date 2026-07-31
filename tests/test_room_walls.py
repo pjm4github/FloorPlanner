@@ -71,7 +71,6 @@ def test_fracture_delete_shared_wall_keeps_both_rooms(fp, scene):
     fp.fracture_delete_wall(scene, shared)
     # the shared edge survives (one segment, still bound to both rooms)
     kept = [w for w in scene.items() if isinstance(w, fp.WallItem)
-            and not w.is_open
             and abs(w.p1.x() - 120) < 0.5 and abs(w.p2.x() - 120) < 0.5]
     assert len(kept) == 1
     assert {r.name for r in kept[0].rooms} == {"A", "B"}
@@ -97,8 +96,14 @@ def test_moving_a_room_does_not_distort_its_neighbour(fp, scene):
     b = _make(fp, scene, 120, 0, 120, 120, "B",
               skip=[(QPointF(120, 0), QPointF(120, 120))])
     area_a, area_b = a.area_sqft, b.area_sqft
+    shared = next(w for w in a.walls if len(w.rooms) == 2)
     a._moving_room = True
     a._privatize_shared_walls()          # what mousePress does on move start
+    # the OUTLINE is what says which walls are the room's (P3.5), so the
+    # privatised edge must name the copy -- otherwise `room_walls` still hands
+    # the shared wall to bake / room_boolean and the swap only half happened
+    assert shared not in fp.room_walls(a)
+    assert shared in fp.room_walls(b)
     a._translate(0, 300)                 # drop into empty space below
     fp.rebuild_all_walls(scene)
     assert b.area_sqft == pytest.approx(area_b)   # neighbour untouched
@@ -120,16 +125,33 @@ def test_translate_moves_walls_openings_and_region(fp, scene):
 
 
 def test_wall_stretch_keeps_binding(fp, scene):
+    """REWRITTEN AT P3.5: the room's bottom corners are RELOCATED rather than
+    given new coordinates.
+
+    Same claim -- stretching a room's side grows its area and keeps all four
+    walls bound -- but the old mechanism was `w.p1 = ...` per wall followed by
+    a re-detection sweep. A bare assignment is split-on-write (P3.1): it mints
+    a fresh vertex for that one wall end, so the two walls meeting at a corner
+    come apart and only detection could put the room back together. Moving the
+    CORNER moves everything holding it, which is what the editor's drag now
+    does and what the outline needs to follow without re-detecting."""
     room = _make(fp, scene, 0, 0, 120, 120, "A")
     area0 = room.area_sqft
-    # widen the room downward, keeping the loop closed: lower every endpoint
-    # on the bottom edge (the bottom wall and the bottoms of the side walls)
+    # widen the room downward: relocate each corner on the bottom edge once
+    seen = {}
     for w in room.walls:
-        if w.p1.y() >= 119.5:
-            w.p1 = QPointF(w.p1.x(), w.p1.y() + 36)
-        if w.p2.y() >= 119.5:
-            w.p2 = QPointF(w.p2.x(), w.p2.y() + 36)
-        w.rebuild()
+        for a in ("p1", "p2"):
+            v = w.end_vertex(a)
+            if v.y >= 119.5 and id(v) not in seen:
+                seen[id(v)] = (v, v.relocated_to(QPointF(v.x, v.y + 36)))
+    for v, moved in seen.values():
+        for w in room.walls:
+            for a in ("p1", "p2"):
+                if w.end_vertex(a) is v:
+                    w.set_end_vertex(a, moved)
+        for e in room.outline:
+            if e.v is v:
+                e.v = moved
     fp.rebuild_all_walls(scene)
     assert room.area_sqft > area0
     assert len(room.walls) == 4 and all(room in w.rooms for w in room.walls)

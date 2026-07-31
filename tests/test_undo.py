@@ -178,6 +178,36 @@ def test_undo_keeps_the_reference_image(fp, qapp, win, make_room, tmp_path):
         "undo deleted the backdrop"
 
 
+def test_closing_a_window_stops_its_dirty_timer(fp, qapp):
+    """DEFECT 29. `close()` hid the window and left the 180 ms debounce
+    running, so a closed window went on walking the WHOLE document -- snapshot,
+    verify, and (before defect 26's guard) able to abort the process -- forever,
+    for a window the user believes is gone.
+
+    Built directly rather than through the `win` fixture, because the fixture
+    now DESTROYS its window (defect 28) and would hide the app behaviour under
+    test."""
+    w = fp.MainWindow()
+    try:
+        w.scene.addItem(fp.make_furnishing("sofa", QPointF(100, 100)))
+        qapp.processEvents()
+        # the precondition, asserted rather than assumed: a test that never
+        # started the timer would pass this whatever close() did
+        assert w._dirty_timer.isActive(), "the edit did not start the debounce"
+        undo_depth = len(w._undo_stack)
+
+        w.close()
+
+        assert not w._dirty_timer.isActive(), \
+            "a closed window is still walking the document every 180 ms"
+        qapp.processEvents()
+        assert len(w._undo_stack) == undo_depth, \
+            "the closed window committed a snapshot after closing"
+    finally:
+        from conftest import dispose_window
+        dispose_window(w)
+
+
 def test_undo_after_grouping_restores_the_plan(fp, qapp, win, make_room):
     """What P2.3 must preserve. The GROUP dissolving is expected until P4.5 --
     the bridge emits groups: [] because mapping a grouped wall onto its split

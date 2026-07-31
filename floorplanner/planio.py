@@ -42,7 +42,8 @@ from floorplanner.design.importer import (       # P2.1 legacy -> v5
 )
 from floorplanner.design.model import Design
 from floorplanner.design.validate import check
-from floorplanner.design.verify import rebase, verify  # P1.6 shadow mode
+from floorplanner.design.bridge import rebase_weld_baseline
+from floorplanner.design.verify import rebase  # P1.6 shadow mode
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
 from floorplanner.macro import *  # noqa: F401
@@ -76,6 +77,17 @@ class PlanIOMixin:
         than silently re-welded; that asymmetry is the point of promoting
         'welded' from a hopeful post-condition to a checked invariant."""
         self._conversion = None
+        # GATE 3: which format a plan arrived in decides whether the bridge's
+        # unwelded-ends warning has anything to say. A v5 document already
+        # holds one vertex per corner, so an "unwelded end" seen on open is a
+        # property of how the SCENE decomposes it -- and, measured, one that
+        # Edit > Coalesce all walls now silences without changing a single
+        # document coordinate. See `bridge._warn_unwelded`.
+        # ON THE SCENE, not on the window: `design_from_scene` resolves its
+        # argument to the QGraphicsScene before warning, and that is where the
+        # warning's own baseline attribute lives too. Setting it on the window
+        # reads fine and does nothing.
+        self.scene._v5_source = data.get("format") == "floorplanner-design"
         if data.get("format") == "floorplanner-design":
             design = Design.from_dict(data)
             apply_design_to_scene(self, design)
@@ -165,8 +177,15 @@ class PlanIOMixin:
             for om in wm.openings:
                 try:
                     op = OpeningItem(wall, om.kind, om.code, om.s)
-                except ValueError:
-                    continue              # e.g. opening wider than the wall
+                except ValueError as exc:
+                    # DEFECT 6's "incl. on load" -- this is the v4 site, and it
+                    # silently dropped the opening. It now files into the same
+                    # vocabulary the v5 apply path has used since P1.5, which
+                    # ends the asymmetry where a v5 load reported and a v4 load
+                    # did not.
+                    report_opening_failure(self.scene, wall, om.kind, om.code,
+                                           om.s, f"{exc} (opening the plan)")
+                    continue
                 op.door_type = om.door_type
                 op.swing = om.swing
                 wall.openings.append(op)
@@ -178,7 +197,7 @@ class PlanIOMixin:
         # (welding is NOT done here: load is also the undo-restore path and
         # welding does not fully converge at messy junctions -> geometry would
         # drift on every undo.  Junctions weld on draw and via the manual sweep.)
-        coalesce_all(self.scene)
+        merge_all(self.scene)
         rebuild_all_walls(self.scene)
         missing = []
         for rm in project.rooms:
@@ -200,8 +219,13 @@ class PlanIOMixin:
                     res = (path, 0.0, None)
                     missing.append(rm.name)
             name = unique_room_name(self.scene, rm.name)
-            room = RoomItem(name, anchor, res[0], res[1],
-                            rm.properties, res[2])
+            # perimeter_corners is READ above (the open-room fallback) and then
+            # dropped: the live scene derives corners from the outline, so a
+            # copy left in `properties` would be stale data nothing maintains --
+            # exactly the class of bug this migration exists to kill.
+            props = {k: v for k, v in (rm.properties or {}).items()
+                     if k != "perimeter_corners"}
+            room = RoomItem(name, anchor, res[0], res[1], props, res[2])
             room.floor = rm.floor                 # load overrides the default tag
             room.show_dims = rm.show_dimensions
             room.label_offset = QPointF(*rm.label_offset)
@@ -229,6 +253,16 @@ class PlanIOMixin:
         if unknown:
             notes.append("Skipped unknown furnishing kind(s): "
                          + ", ".join(unknown) + ".")
+        # R5, LOAD SURFACE: openings that could not be placed join the
+        # open/conversion report rather than vanishing. Drained here so the
+        # edit-path drain never picks up a load's entries and reports them as
+        # something the user just did.
+        failed = drain_opening_failures(self.scene)
+        if failed:
+            notes.append(f"{len(failed)} opening(s) could not be placed: "
+                         + "; ".join(failed[:3])
+                         + (f" (+{len(failed) - 3} more)" if len(failed) > 3
+                            else ""))
         if notes:
             self.status("  ".join(notes))
         # P1.6: load DEFINES the baseline.  A plan opened from a corrupt legacy
@@ -236,6 +270,9 @@ class PlanIOMixin:
         # not fire on those -- only on corruption introduced afterwards.  Undo's
         # restore comes through here too, reinstating an already-verified state.
         rebase(self)
+        # ...and the unwelded-ends baseline: whatever a legacy file arrives with
+        # is the plan's arrival state, not a tear an edit made (defect 22)
+        rebase_weld_baseline(self.scene)
 
     def project_from_scene(self) -> Project:
         """Walk the scene into the Qt-free domain model (model.Project).
@@ -252,7 +289,7 @@ class PlanIOMixin:
                     extra=dict(it.extra_state()),
                     floor=getattr(it, "floor", DEFAULT_FLOOR),
                 ))
-            elif isinstance(it, WallItem) and not it.is_open:
+            elif isinstance(it, WallItem):
                 walls.append(WallModel(
                     wall_type=it.wall_type,
                     p1=(it.p1.x(), it.p1.y()),
@@ -269,7 +306,11 @@ class PlanIOMixin:
                     anchor=(it.anchor.x(), it.anchor.y()),
                     label_offset=(it.label_offset.x(), it.label_offset.y()),
                     show_dimensions=it.show_dims,
-                    properties=dict(it.properties),   # copy: model must not
+                    # P3.2: perimeter_corners is re-DERIVED here from the
+                    # outline (same 2dp rounding the old live mirror used), so
+                    # the legacy export stays byte-compatible. It is produced
+                    # at serialization time and nowhere else.
+                    properties=it.export_properties(),
                     floor=getattr(it, "floor", DEFAULT_FLOOR),  # alias the live dict
                 ))
         # the roster MUST come from self.floors (an empty floor has no items to
@@ -370,7 +411,15 @@ class PlanIOMixin:
         self._write_plan(path)
 
     def _write_plan(self, path: str):
-        verify(self, "save", deep=True)      # P1.6: all fifteen before writing
+        # guarded: reached from the Save menu action, a Qt callback, where a
+        # raise becomes abort() (defect 26). The REFUSAL TO WRITE IS UNCHANGED
+        # -- "don't write a corrupt plan" is a deliberate decision this fix has
+        # no business overruling. Only the fatality was the bug, and a refusal
+        # the user can SEE was always the intent (defect 17's lesson).
+        if not self._verify_or_report("save", deep=True):   # all fifteen
+            self.status("Not saved: the plan has invariant violations "
+                        "(see the message above).")
+            return
         state = self.snapshot()
         on_disk = self.design_document()     # P2.2: the FILE is v5 now
         try:
@@ -419,7 +468,15 @@ class PlanIOMixin:
 
     def save_path(self, path: str):
         """Non-interactive save (no dialogs).  Raises on failure."""
-        verify(self, "save", deep=True)      # P1.6: all fifteen before writing
+        # guarded: reached from the Save menu action, a Qt callback, where a
+        # raise becomes abort() (defect 26). The REFUSAL TO WRITE IS UNCHANGED
+        # -- "don't write a corrupt plan" is a deliberate decision this fix has
+        # no business overruling. Only the fatality was the bug, and a refusal
+        # the user can SEE was always the intent (defect 17's lesson).
+        if not self._verify_or_report("save", deep=True):   # all fifteen
+            self.status("Not saved: the plan has invariant violations "
+                        "(see the message above).")
+            return
         state = self.snapshot()
         on_disk = self.design_document()     # P2.2: the FILE is v5 now
         with open(path, "w", encoding="utf-8") as f:

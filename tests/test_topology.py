@@ -128,17 +128,76 @@ def test_split_edge_adds_one_wall_and_preserves_faces():
     assert len(topology.trace_faces(d2)) == len(topology.trace_faces(d))
 
 
-def test_split_edge_raises_on_a_wall_with_openings():
-    # the landmine guard: splitting a wall that carries a door/window needs the
-    # P3.3 redistribution rule, so split_edge must FAIL LOUD rather than quietly
-    # leaving the opening on one segment
+def _opening_centre(d, w):
+    """(s, scene point) of `w`'s single opening, along `w`."""
+    pos = _pos(d)
+    a, b = pos[w.v1], pos[w.v2]
+    length = math.dist(a, b)
+    u = ((b[0] - a[0]) / length, (b[1] - a[1]) / length)
+    anc = w.openings[0].anchor
+    s = (anc["offset_in"] if anc["from"] == "v1"
+         else length - anc["offset_in"])
+    return s, length, (a[0] + u[0] * s, a[1] + u[1] * s)
+
+
+def test_split_edge_redistributes_the_openings_it_used_to_refuse():
+    """REWRITTEN AT P3.4(ii) -- old op: split_edge REFUSED any wall carrying an
+    opening, and this test asserted the refusal. New op: it redistributes, so
+    the assertion moves from "raises" to "the door lands on the segment that
+    holds it and none is lost". The refusal was a placeholder for unbuilt work
+    (its own message said so, naming P3.3); the work is built here, so the
+    assertion that pinned its absence has nothing left to pin."""
     d = _design("symmetricP1.json")
     pos = _pos(d)
-    w = next(w for w in d.walls if isinstance(w.openings, list) and w.openings)
+    # a wall whose midpoint is CLEAR of its openings -- this test is about
+    # redistribution, and a cut through a door is the straddle case next door.
+    # It used to take the first wall with any opening and split at the middle,
+    # which passed only because defect 24 put the planner's idea of every
+    # opening half a door away from its real place: on `w6` (49.8" long, 36"
+    # door) the midpoint genuinely falls INSIDE the door and always did.
+    def _clear(w):
+        a, b = pos[w.v1], pos[w.v2]
+        L = math.dist(a, b)
+        return all(abs(topology._opening_centre(o, L) - L / 2)
+                   > topology._code_width(o.code) / 2 + 1.0
+                   for o in w.openings)
+    w = next(w for w in d.walls
+             if isinstance(w.openings, list) and w.openings and _clear(w))
     a, b = pos[w.v1], pos[w.v2]
     mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
-    with pytest.raises(NotImplementedError, match="P3.3"):
-        topology.split_edge(d, w.id, mid[0], mid[1])
+    before = sum(len(x.openings or ()) for x in d.walls)
+    d2 = topology.split_edge(d, w.id, mid[0], mid[1])
+    assert len(d2.walls) == len(d.walls) + 1
+    assert sum(len(x.openings or ()) for x in d2.walls) == before
+    assert len(topology.trace_faces(d2)) == len(topology.trace_faces(d))
+
+
+def test_split_edge_is_total_and_reports_the_cut_it_runs_through():
+    """FLIPPED AT R2c -- old: `pytest.raises(NotImplementedError, match="P3.6")`;
+    new: it splits, and files the opening. WHY THE ASSERTION MOVED: the guard
+    was a placeholder pending representability from the day it was written --
+    `match="P3.6"` was this test naming its own executioner -- and it cannot
+    survive for a reason that is not taste. LOAD-TIME PLANARIZE CANNOT DECLINE.
+    A crossing that exists in the data has to split; refusing there aborts or
+    corrupts a load. So the primitive is TOTAL: the opening lands on the segment
+    holding its anchor (R2b) and the caller is told (R2c/R5)."""
+    d = _design("symmetricP1.json")
+    for w in d.walls:
+        if not (isinstance(w.openings, list) and len(w.openings) == 1):
+            continue
+        s, length, cut = _opening_centre(d, w)
+        if topology.WELD_TOL * 2 < s < length - topology.WELD_TOL * 2:
+            break
+    else:                                              # pragma: no cover
+        pytest.skip("no mid-span single-opening wall in the fixture")
+
+    before = sum(len(x.openings or ()) for x in d.walls)
+    report = []
+    d2 = topology.split_edge(d, w.id, cut[0], cut[1], report=report)
+
+    assert len(d2.walls) == len(d.walls) + 1, "the cut was refused"
+    assert sum(len(x.openings or ()) for x in d2.walls) == before, "a door was lost"
+    assert len(report) == 1 and "runs through it" in report[0]
 
 
 def test_merge_collinear_preserves_faces_and_reduces_walls():

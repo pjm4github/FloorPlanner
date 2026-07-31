@@ -64,7 +64,7 @@ def test_walls_do_not_coalesce_across_floors(fp, win):
     b = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
     b.floor = "Upper"
     sc.addItem(b)
-    fp.coalesce_all(sc)
+    fp.merge_all(sc)
     fp.rebuild_all_walls(sc)
     walls = [w for w in sc.items() if isinstance(w, fp.WallItem)]
     assert len(walls) == 2                              # same coords, no merge

@@ -15,6 +15,7 @@ from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import WallItem, rebuild_all_walls
 from floorplanner.rooms import RoomItem, room_owns_walls, walls_cover_room
+from floorplanner.vertex import Vertex
 
 # Stairs — a dynamic "Framing" furnishing: step count from the room's ceiling
 # height (standard ~7" risers); full or half flight to a landing.
@@ -455,6 +456,8 @@ class GroupItem(QGraphicsItemGroup):
         self._rotating = False
         self._angle = 0.0                 # current orientation of the box
         self._obox = None                 # cached _oriented_box(); see there
+        self._snap_walls = self._snap_furn = self._snap_rooms = []
+        self._snap_corners = []           # corners a rotation moves (defect 22)
 
     def _invalidate_box(self):
         """Drop the cached oriented box after any geometry change."""
@@ -462,7 +465,14 @@ class GroupItem(QGraphicsItemGroup):
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
-            self._obox = None             # moved -> furnishing content pts stale
+            # No longer dropped on a MOVE: since `_content_points` answers in
+            # this group's own frame, the box does not depend on where the group
+            # sits, so a move cannot stale it. Dropping it here was also one
+            # step WRONG -- `ItemPositionChange` fires BEFORE the move commits,
+            # so anything that rebuilt the cache during it (a repaint, a
+            # boundingRect query) stored the box for the position the group was
+            # LEAVING. Measured at Gate 3: the reported box lagged the group by
+            # exactly one drag step.
             return grid_snap(value)
         return super().itemChange(change, value)
 
@@ -482,17 +492,29 @@ class GroupItem(QGraphicsItemGroup):
         return tr
 
     def _content_points(self) -> list:
-        """Scene-coord extreme points of the members (wall endpoints and
-        furnishing footprint corners) -- the box hugs these."""
+        """Extreme points of the members -- wall endpoints and furnishing
+        footprint corners -- ALL IN THIS GROUP'S OWN FRAME.
+
+        THE FRAME MATTERS AND USED TO BE MIXED (Gate 3). A wall child
+        contributes `ch.p1`/`ch.p2`, which are the wall's own geometry and so
+        already in the group's frame; a furnishing used to contribute
+        `ch.mapToScene(...)`, which is SCENE. The two agree only while the group
+        sits at the origin. Move the group and the furnishing's points shift by
+        the group's translation while the wall's do not -- and since
+        `boundingRect()` is read in the item's own frame, that translation is
+        then applied a SECOND time, so the box's leading edge ran at ~2x the
+        mouse while its trailing edge stood still. `mapToParent` is the same
+        query asked in the frame the answer is used in."""
         pts = []
         for ch in self.childItems():
             if isinstance(ch, WallItem):
                 pts += [ch.p1, ch.p2]
             elif isinstance(ch, FurnishingItem):
                 r = QRectF(-ch.w / 2, -ch.d / 2, ch.w, ch.d)
-                pts += [ch.mapToScene(r.topLeft()), ch.mapToScene(r.topRight()),
-                        ch.mapToScene(r.bottomRight()),
-                        ch.mapToScene(r.bottomLeft())]
+                pts += [ch.mapToParent(r.topLeft()),
+                        ch.mapToParent(r.topRight()),
+                        ch.mapToParent(r.bottomRight()),
+                        ch.mapToParent(r.bottomLeft())]
         return pts
 
     def _oriented_box(self) -> tuple:
@@ -607,6 +629,11 @@ class GroupItem(QGraphicsItemGroup):
                     self._snap_rooms.append(
                         (it, [QPointF(c) for c in (it.corners or [])],
                          QPointF(it.anchor), QPainterPath(it.path)))
+        # the corners this gesture will move, resolved ONCE (defect 22): the
+        # rotation then relocates each of them per event instead of assigning
+        # coordinates to wall ends and rebuilding room corner lists beside them
+        self._snap_corners = self._corner_records(
+            group_walls, [r for r, *_ in self._snap_rooms])
 
     def _apply_rotation(self, scene_pt: QPointF, snap: bool):
         theta = self._angle_to(scene_pt) - self._rot_start
@@ -621,24 +648,25 @@ class GroupItem(QGraphicsItemGroup):
         tr.translate(-c.x(), -c.y())
         self.prepareGeometryChange()
         self._obox = None                     # angle + children changed
-        for w, p1_0, p2_0 in self._snap_walls:
-            w.p1, w.p2 = tr.map(p1_0), tr.map(p2_0)
+        # the whole geometric move: relocate the corners, and every wall end and
+        # room outline edge holding them comes along (defect 22)
+        self._apply_corner_records(self._snap_corners, tr)
+        for w, _p1_0, _p2_0 in self._snap_walls:
             w.rebuild()                       # re-syncs its openings too
         for f, pos_0, rot_0 in self._snap_furn:
             f.setPos(tr.map(pos_0))
             f.setRotation((rot_0 + theta) % 360.0)
         for room, corners_0, anchor_0, path_0 in self._snap_rooms:
             room.prepareGeometryChange()
-            if corners_0:
-                room.corners = [tr.map(p) for p in corners_0]
             room.anchor = tr.map(anchor_0)
-            room.path = tr.map(path_0)
-            room._sync_corner_props()
+            if not corners_0:                 # outline-less: the path IS the region
+                room.set_region(tr.map(path_0), room.area_sqft, None)
             room.update()
         self.update()
 
     def _finish_rotation(self):
         self._snap_walls = self._snap_furn = self._snap_rooms = []
+        self._snap_corners = []
         self.prepareGeometryChange()
         self._obox = None
         self.update()
@@ -680,12 +708,86 @@ class GroupItem(QGraphicsItemGroup):
             sc.removeItem(self)
         return children
 
+    def _corner_records(self, group_walls, carry_rooms):
+        """Every CORNER the group's geometry holds, as
+        `[start_point, vertex, [(wall, attr)...], [outline_edge...]]`.
+
+        DEFECT 22, P3.5-followup, and the one mechanism both a bake and a
+        rotation now move through. Both used to assign new COORDINATES to every
+        member wall end -- split-on-write, by P3.1's ruling, so each end came
+        away on a fresh `Vertex` -- and then rebuild each carried room's corner
+        LIST separately, which minted a third set. The two agreed numerically
+        and shared nothing, so afterwards a room's outline no longer held its
+        walls' corners and a later wall drag left the room behind (measured:
+        140/140 shared corners -> 0/140). `refresh_rooms` used to re-bind and
+        re-share after every group move, which is why deferring the conversion
+        to P4.5 was safe until P3.5 deleted it.
+
+        A CORNER AN OUTSIDE WALL ALSO HOLDS IS SPLIT HERE, before anything
+        moves. That is P3.3's split-before-share discipline, and it preserves
+        today's behaviour exactly: the group moves, whatever is outside it does
+        not. Relocating such a corner wholesale would drag a non-member's end --
+        the very wiring the `group() is None` guards exist to prevent.
+
+        A carried room whose outline corner is on NO member wall (sharing was
+        already broken -- a legacy import, or a group move from before this fix)
+        gets a record of its own, so it is carried rather than left behind."""
+        sc = self.scene()
+        held, ends = {}, []
+        for w in group_walls:
+            for a in ("p1", "p2"):
+                v = w.end_vertex(a)
+                held.setdefault(id(v), v)
+                ends.append((w, a, v))
+        shared_out = set()
+        for it in (sc.items() if sc is not None else ()):
+            if isinstance(it, WallItem) and it not in group_walls:
+                for a in ("p1", "p2"):
+                    if id(it.end_vertex(a)) in held:
+                        shared_out.add(id(it.end_vertex(a)))
+        recs = {}
+        for k, v in held.items():
+            # split off a corner an outsider also holds; ours becomes a new one
+            keep = Vertex.at(v.point()) if k in shared_out else v
+            recs[k] = [QPointF(v.point()), keep, [], []]
+        for w, a, v in ends:
+            rec = recs[id(v)]
+            rec[2].append((w, a))
+            w.set_end_vertex(a, rec[1])          # apply the split, if any
+        for r in carry_rooms:
+            for e in r.outline:
+                rec = recs.get(id(e.v))
+                if rec is None:
+                    rec = recs[id(e.v)] = [QPointF(e.v.point()), e.v, [], []]
+                rec[3].append(e)
+                e.v = rec[1]
+        return list(recs.values())
+
+    @staticmethod
+    def _apply_corner_records(recs, tr):
+        """Relocate every corner to `tr` of where it STARTED, and rebind every
+        wall end and outline edge on it.  Mapping from the start point rather
+        than from the current one is what lets a rotation re-apply this on each
+        mouse event without accumulating drift."""
+        for rec in recs:
+            v = rec[1].relocated_to(tr.map(rec[0]))
+            rec[1] = v
+            for w, a in rec[2]:
+                w.set_end_vertex(a, v)
+            for e in rec[3]:
+                e.v = v
+
     def bake(self):
         """Fold the group's current translation into its members and
         reset the group to (0, 0).  A room whose perimeter is fully walled
         by the group rides along -- its anchor (label) and region shift too
         -- even when an extra coincident wall (e.g. a shared party wall the
-        room edge was copied from) also touches its boundary."""
+        room edge was copied from) also touches its boundary.
+
+        The move is a VERTEX move (defect 22): the members' corners relocate,
+        and their walls and the carried rooms' outlines follow because they are
+        holding those corners -- the same thing a wall drag does, and the only
+        shape that keeps P3.5's by-construction property across a bake."""
         d = self.pos()
         if abs(d.x()) < 1e-9 and abs(d.y()) < 1e-9:
             return
@@ -699,26 +801,24 @@ class GroupItem(QGraphicsItemGroup):
                     moved_rooms.append(it)
         self.prepareGeometryChange()
         self._obox = None                 # child coords change below
-        for ch in self.childItems():
-            if isinstance(ch, WallItem):
-                ch.p1 = QPointF(ch.p1.x() + d.x(), ch.p1.y() + d.y())
-                ch.p2 = QPointF(ch.p2.x() + d.x(), ch.p2.y() + d.y())
-            else:
-                ch.setPos(ch.pos().x() + d.x(), ch.pos().y() + d.y())
         tr = QTransform.fromTranslate(d.x(), d.y())
+        self._apply_corner_records(
+            self._corner_records(group_walls, moved_rooms), tr)
+        for ch in self.childItems():
+            # a member WALL needs nothing here: its ends moved with the corner,
+            # and the `rebuild_all_walls` below rebuilds it. Rebuilding it here
+            # too costs a cascading neighbour query per member -- measured at
+            # 9x on the 64-room harness, which is how it was caught.
+            if not isinstance(ch, WallItem):
+                ch.setPos(ch.pos().x() + d.x(), ch.pos().y() + d.y())
         for r in moved_rooms:
             r.prepareGeometryChange()
             r.anchor = QPointF(r.anchor.x() + d.x(), r.anchor.y() + d.y())
-            # carry the region itself: a rigid translation of the walls
-            # translates the room rigidly, so the fill/outline stay put
-            # even before (and in case) re-detection runs
-            r.path = tr.map(r.path)
-            if r.corners:
-                r.corners = [QPointF(c.x() + d.x(), c.y() + d.y())
-                             for c in r.corners]
-            r._sync_corner_props()
+            if not r.outline:             # outline-less: the stored path IS it
+                r.set_region(tr.map(r.path), r.area_sqft, None)
+            r.update()
         self.setPos(0.0, 0.0)
-        rebuild_all_walls(sc)             # re-detects rooms at new anchors
+        rebuild_all_walls(sc)
 
     def mousePressEvent(self, e):
         if (e.button() == Qt.MouseButton.LeftButton and self.isSelected()

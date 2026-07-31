@@ -1,4 +1,4 @@
-"""Wall graphics items (WallItem/OpenWall/OpeningItem) and the wall-network
+"""Wall graphics items (WallItem/OpeningItem) and the wall-network
 algorithms: spatial indices, coalescing, welding, fracturing, junction
 clipping, and the full-scene rebuild.
 
@@ -13,7 +13,42 @@ from PyQt6.QtGui import *  # noqa: F401
 from PyQt6.QtWidgets import *  # noqa: F401
 
 from floorplanner.config import *  # noqa: F401
+from floorplanner.design.topology import (
+    ON_SEG_TOL, GraphView, OpeningView, WallView, bucket_reach, line_bucket,
+    plan_merge_collinear, plan_split_edge,
+)
 from floorplanner.geometry import *  # noqa: F401
+from floorplanner.vertex import Vertex
+
+
+SHARE_TOL = 0.6        # two ends this close ARE one corner (== vertex_weld_in)
+
+
+class _DragVertex:
+    """One corner being moved by a drag (P3.3): the vertex, where it started,
+    and every wall end that references it.
+
+    `ends` is resolved ONCE, at drag start, so the per-event cost is the size of
+    the corner and not the size of the plan -- the view repaints everything on
+    every change, so anything per-event that scales with the scene is the thing
+    that stalls a big plan."""
+
+    __slots__ = ("v", "orig", "ends", "edges")
+
+    def __init__(self, vertex):
+        self.v = vertex
+        self.orig = QPointF(vertex.point())
+        self.ends = []
+        self.edges = []       # room OutlineEdges holding this same corner (P3.5)
+
+    def apply(self, dx, dy):
+        """Move the corner. Every end follows because it IS the corner."""
+        self.v = self.v.relocated_to(QPointF(self.orig.x() + dx,
+                                             self.orig.y() + dy))
+        for w, attr in self.ends:
+            w.set_end_vertex(attr, self.v)
+        for e in self.edges:
+            e.v = self.v
 
 
 def nearest_wall_endpoint(scene, p: QPointF, tol: float, exclude=None):
@@ -65,60 +100,44 @@ def nearest_wall_body_point(scene, p: QPointF, tol: float, exclude=None):
 
 class _WallIndex:
     """Per-rebuild spatial cache so each wall's rebuild() is O(local) instead
-    of O(all walls): an endpoint hash (joined corners) + per-line buckets
+    of O(all walls): the corner fold (joined ends) + per-line buckets
     (coincident party walls).  Built once by rebuild_all_walls and passed to
     every wall; the exact predicates are unchanged, the index just narrows the
-    candidate set to a guaranteed superset."""
+    candidate set to a guaranteed superset.
 
-    EP = 4.0          # endpoint hash cell (>> the 0.6" join tolerance)
-    OFF = 3.0         # line-offset bucket (>> the 1.5" coincidence tolerance)
+    P3.4 (iii) took the endpoint hash out: `joined_at` reads a `_CornerIndex`,
+    so "is this end joined" is a DEGREE lookup rather than a 3x3 cell search,
+    and it answers from the same fold that decides what one corner is
+    everywhere else in this module. The LINE buckets stay, and stay here --
+    they are a spatial index, not detection machinery -- but the bucketing
+    POLICY does not: `topology.line_bucket` owns it, so this and the planner
+    narrow candidates by one definition rather than two transcriptions."""
 
     def __init__(self, scene):
-        self.eps = {}            # (i, j) -> [(wall, x, y)]
-        self.hb = {}             # round(y/OFF) -> [horizontal walls]
-        self.vb = {}             # round(x/OFF) -> [vertical walls]
+        items = [w for w in (scene.items() if scene is not None else [])
+                 if isinstance(w, WallItem)]
+        self.corners = _CornerIndex(items)   # every wall, open and grouped too
+        self.lines = {}          # ("h"|"v", n) -> [walls on that line offset]
         self.diag = []           # non-axis-aligned real walls (rare)
-        for w in (scene.items() if scene is not None else []):
-            if not isinstance(w, WallItem):
+        for w in items:
+            if w.length() < 1e-6:
                 continue
-            for p in (w.p1, w.p2):
-                self.eps.setdefault((round(p.x() / self.EP),
-                                     round(p.y() / self.EP)), []).append(
-                    (w, p.x(), p.y()))
-            if w.is_open or w.length() < 1e-6:
-                continue
-            u = w.unit()
-            if abs(u.y()) < 1e-4:
-                self.hb.setdefault(round(w.p1.y() / self.OFF), []).append(w)
-            elif abs(u.x()) < 1e-4:
-                self.vb.setdefault(round(w.p1.x() / self.OFF), []).append(w)
-            else:
+            b = line_bucket((w.p1.x(), w.p1.y()), (w.p2.x(), w.p2.y()))
+            if b is None:
                 self.diag.append(w)
+            else:
+                self.lines.setdefault(b, []).append(w)
 
-    def joined_at(self, p, exclude) -> bool:
-        px, py = p.x(), p.y()
-        ki, kj = round(px / self.EP), round(py / self.EP)
-        for di in (-1, 0, 1):
-            for dj in (-1, 0, 1):
-                for w, qx, qy in self.eps.get((ki + di, kj + dj), ()):
-                    if w is not exclude and (qx - px) ** 2 + (qy - py) ** 2 \
-                            < 0.36:
-                        return True
-        return False
+    def joined_at(self, wall, attr) -> bool:
+        return self.corners.joined(wall, attr)
 
     def coincident_candidates(self, wall, reach=1):
-        u = wall.unit()
-        rng = range(-reach, reach + 1)                  # widen for a bigger tol
-        if abs(u.y()) < 1e-4:                          # horizontal query
-            b = round(wall.p1.y() / self.OFF)
-            return [w for d in rng for w in self.hb.get(b + d, ())] \
-                + self.diag
-        if abs(u.x()) < 1e-4:                          # vertical query
-            b = round(wall.p1.x() / self.OFF)
-            return [w for d in rng for w in self.vb.get(b + d, ())] \
-                + self.diag
-        return ([w for ws in self.hb.values() for w in ws]   # diagonal: rare
-                + [w for ws in self.vb.values() for w in ws] + self.diag)
+        b = line_bucket((wall.p1.x(), wall.p1.y()), (wall.p2.x(), wall.p2.y()))
+        if b is None:                                  # diagonal query: rare
+            return [w for ws in self.lines.values() for w in ws] + self.diag
+        axis, n = b
+        return [w for d in range(-reach, reach + 1)
+                for w in self.lines.get((axis, n + d), ())] + self.diag
 
 
 def coincident_walls(scene, wall, index=None, perp_tol=1.5):
@@ -133,12 +152,12 @@ def coincident_walls(scene, wall, index=None, perp_tol=1.5):
     length = wall.length()
     out = []
     if index is not None:
-        reach = int(perp_tol / _WallIndex.OFF) + 1
+        reach = bucket_reach(perp_tol)
         cands = index.coincident_candidates(wall, reach)
     else:
         cands = scene.items()
     for w in cands:
-        if not isinstance(w, WallItem) or w is wall or w.is_open \
+        if not isinstance(w, WallItem) or w is wall \
                 or w.length() < 1e-6 or w.scene() is None \
                 or w.floor != wall.floor:        # coalesce stays on one floor
             continue
@@ -158,132 +177,466 @@ def coincident_walls(scene, wall, index=None, perp_tol=1.5):
     return out
 
 
-def _coalesce_wall_impl(scene, wall, index=None, rebuild=True):
-    """Merge `wall` with every parallel, SAME-type wall whose body overlaps its
-    span and lies within the on-centre grid (perpendicular).  The survivor is
-    `wall`, grown to the union span (snapped to grid) and carrying every merged
-    wall's openings; its `rooms` become the union of all merged walls' rooms (a
-    coalesced party wall borders several rooms -- the shared-wall model).
-    Grouped and open walls are never merged.  Returns `wall`.  Pass
-    rebuild=False in a bulk sweep where a single rebuild_all_walls follows."""
-    if (scene is None or wall.scene() is None or wall.is_open
-            or wall.group() is not None or wall.length() < 1e-6):
-        return wall
-    perp = SETTINGS.get("wall_snap_in", WALL_SNAP_DEFAULT)
-    absorbed = [w for w in coincident_walls(scene, wall, index=index,
-                                            perp_tol=perp)
-                if not w.is_open and w.group() is None
-                and w.wall_type == wall.wall_type and w.length() > 1e-6]
-    if not absorbed:
-        return wall
-    origin, u = QPointF(wall.p1), wall.unit()
-    ux, uy = u.x(), u.y()
+# ------------------------------------------------------ topology ops (P3.4)
+# The SCENE half of the planner/applier split. The decision logic lives once,
+# pure, in `design.topology`; everything here either feeds it a view of the live
+# scene or executes the delta it returns. See that module's header for why this
+# is neither "lift the scene to a Design" nor a scene-side reimplementation.
 
-    def s_of(p):
-        return (p.x() - origin.x()) * ux + (p.y() - origin.y()) * uy
+def _corner_at(pos, cells, cell, x, y, floor):
+    """The existing corner key within SHARE_TOL of (x, y) on `floor`, or None."""
+    ci, cj = round(x / cell), round(y / cell)
+    best, best_d = None, SHARE_TOL
+    for di in (-1, 0, 1):
+        for dj in (-1, 0, 1):
+            for k in cells.get((floor, ci + di, cj + dj), ()):
+                d = math.hypot(pos[k][0] - x, pos[k][1] - y)
+                if d <= best_d:
+                    best, best_d = k, d
+    return best
 
-    ss = [0.0, s_of(wall.p2)]
-    moved_ops = []                       # (kind, code, scene_pt, door_type, swing)
-    new_rooms = list(wall.rooms)
-    for w in absorbed:
-        ss += [s_of(w.p1), s_of(w.p2)]
-        for op in w.openings:
-            moved_ops.append((op.kind, op.code, w.point_at(op.s),
-                              op.door_type, op.swing))
-        for r in w.rooms:
-            if r not in new_rooms:
-                new_rooms.append(r)
-        for r in list(w.rooms):          # detach the absorbed wall from its
-            r.unbind_wall(w)             # rooms (leaves survivor to carry them)
-        scene.removeItem(w)
-    smin, smax = min(ss), max(ss)
-    wall.p1 = wall_snap(QPointF(origin.x() + ux * smin, origin.y() + uy * smin))
-    wall.p2 = wall_snap(QPointF(origin.x() + ux * smax, origin.y() + uy * smax))
-    for op in wall.openings:             # own openings ride the new p1
-        op.s -= smin
-    np1, nu = wall.p1, wall.unit()
-    for kind, code, pt, dtype, swing in moved_ops:
-        s = (pt.x() - np1.x()) * nu.x() + (pt.y() - np1.y()) * nu.y()
-        try:
-            op = OpeningItem(wall, kind, code, s)
-        except ValueError:
+
+class _CornerIndex:
+    """Wall ends folded into CORNERS -- the vertex adjacency the task line asks
+    for, and the single definition of "these ends are the same corner".
+
+    Two ends are one corner when they hold the same `Vertex` OR sit within
+    SHARE_TOL of each other. Both halves are needed and neither is redundant:
+    identity is the real answer, but P3.1 is split-on-write and load
+    deliberately does not weld, so most coincident ends in a loaded plan are
+    still distinct objects and only position can see the corner. That second
+    half is also, exactly, the 0.6" endpoint hash `_WallIndex` used to keep --
+    which is why `joined_at` can move onto this without changing a pixel."""
+
+    def __init__(self, walls):
+        self.pos, self.anchor, self.of, self.walls_at = {}, {}, {}, {}
+        self._cells, self._seen = {}, {}
+        cell = max(SHARE_TOL, 1e-6)
+        for w in walls:
+            for attr in ("p1", "p2"):
+                v = w.end_vertex(attr)
+                key = self._seen.get(id(v))
+                if key is None:
+                    p = v.point()
+                    key = _corner_at(self.pos, self._cells, cell,
+                                     p.x(), p.y(), w.floor)
+                    if key is None:
+                        key = len(self.pos)
+                        self.pos[key] = (p.x(), p.y())
+                        self.anchor[key] = v
+                        self._cells.setdefault(
+                            (w.floor, round(p.x() / cell),
+                             round(p.y() / cell)), []).append(key)
+                    self._seen[id(v)] = key
+                self.of[(id(w), attr)] = key
+                self.walls_at.setdefault(key, []).append(w)
+
+    def joined(self, wall, attr) -> bool:
+        """True when another wall meets `wall` at this end -- a degree query,
+        where `_WallIndex` ran a 3x3 cell search per call."""
+        return len(self.walls_at.get(self.of.get((id(wall), attr)), ())) > 1
+
+    def vertex_at(self, p, floor):
+        """The corner `Vertex` at scene point `p` on `floor`, or None -- the
+        point-keyed lookup a room outline needs to adopt the corner its walls
+        already meet at (P3.5)."""
+        key = _corner_at(self.pos, self._cells, max(SHARE_TOL, 1e-6),
+                         p.x(), p.y(), floor)
+        return self.anchor.get(key) if key is not None else None
+
+
+def graph_from_scene(scene, floor=None):
+    """A `GraphView` of the live wall network for `design.topology`'s planners.
+
+    THE CORNERS ARE THE VERTEX ADJACENCY the task line calls for: two ends
+    holding the same `Vertex` object are one corner, and ends within SHARE_TOL
+    of one another are folded into one corner for planning. The fold is not a
+    concession -- P3.1 is split-on-write and P3.3 shares only the corners a drag
+    touches, so most coincident ends in a loaded plan are still distinct
+    objects. Folding by position is what lets the planner see the corner that is
+    physically there; the applier then makes it real, by adopting one `Vertex`.
+
+    `floor=None` views every floor at once. Level is part of the planner's
+    grouping key, so floors stay apart there rather than by one pass per floor.
+    Open (dashed) and grouped walls are excluded, exactly as coalesce excluded
+    them."""
+    if scene is None:
+        return GraphView([], {}, {})
+    walls = sorted((w for w in scene.items()
+                    if isinstance(w, WallItem)
+                    and w.group() is None and w.length() > 1e-6
+                    and (floor is None or w.floor == floor)),
+                   key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y(),
+                                  w.wall_type))
+    corners = _CornerIndex(walls)
+    views = [WallView(w, w.floor, corners.of[(id(w), "p1")],
+                      corners.of[(id(w), "p2")], w.wall_type,
+                      tuple(OpeningView(i, op.s, op.width, (op.kind, op.code),
+                                        op.anchor_from())
+                            for i, op in enumerate(w.openings)))
+             for w in walls]
+    return GraphView(views, corners.pos, corners.anchor)
+
+
+def _adopt_end(wall, attr, vertex, xy):
+    """Put a merged end on the corner the plan named -- REAL SHARING, which is
+    what coalesce never created -- or, when the plan named none, move it to the
+    planned coordinate. The second case splits on write, correctly: that end is
+    landing where no corner was."""
+    if vertex is not None:
+        if wall.end_vertex(attr) is not vertex:
+            wall.set_end_vertex(attr, vertex)
+        return
+    setattr(wall, attr, QPointF(xy[0], xy[1]))
+
+
+def apply_merge_plan_to_scene(scene, plan, rebuild=True):
+    """Execute a merge delta on the live items, touching ONLY what it names.
+
+    No full-plan rebuild, so selection, in-flight drag state, group membership
+    and the P3.1 uids all survive -- the property that disqualified
+    lift-to-Design-and-apply-back. Returns the surviving walls."""
+    survivors = []
+    for m in plan:
+        surv = m.survivor
+        if sip.isdeleted(surv) or surv.scene() is not scene:
             continue
-        op.door_type, op.swing = dtype, swing
-        wall.openings.append(op)
-    for r in new_rooms:                  # survivor now borders every merged room
-        r.bind_wall(wall)
+        # openings are read off the PRE-merge geometry, before anything moves
+        specs = []
+        for po in m.openings:
+            src = po.wall
+            if sip.isdeleted(src) or po.index >= len(src.openings):
+                continue
+            op = src.openings[po.index]
+            specs.append((op if src is surv else None, op.kind, op.code,
+                          po.s, op.door_type, op.swing))
+        rooms = list(surv.rooms)               # the survivor borders them all
+        for w in m.absorbed:
+            if sip.isdeleted(w):
+                continue
+            for r in w.rooms:
+                if r not in rooms:
+                    rooms.append(r)
+            for r in list(w.rooms):
+                r.unbind_wall(w)
+            if w.scene() is not None:
+                scene.removeItem(w)
+        _adopt_end(surv, "p1", m.v1, m.p1)
+        _adopt_end(surv, "p2", m.v2, m.p2)
+        keep = []
+        for op, kind, code, s, door_type, swing in specs:
+            if op is not None:                 # the survivor's own: it rides on
+                op.s = s
+                keep.append(op)
+                continue
+            try:
+                new = OpeningItem(surv, kind, code, s)
+            except ValueError as exc:          # wider than the merged wall
+                report_opening_failure(surv.scene(), surv, kind, code, s,
+                                       f"{exc} (merging collinear walls)")
+                continue
+            new.door_type, new.swing = door_type, swing
+            keep.append(new)
+        for op in surv.openings:               # deduped away (defect 9)
+            if op not in keep and not sip.isdeleted(op):
+                op.setParentItem(None)
+                if op.scene() is not None:
+                    scene.removeItem(op)
+        surv.openings = keep
+        for r in rooms:
+            r.bind_wall(surv)
+        survivors.append(surv)
+        if rebuild:
+            surv.rebuild()
+    return survivors
+
+
+def merge_collinear_scene(scene, floor=None, perp_tol=None, max_passes=6):
+    """Merge every collinear run in the scene -- P3.4's replacement for
+    coalesce, and the same planner `design.topology.merge_collinear` runs, so a
+    scene and its document merge identically by construction.
+
+    `perp_tol` defaults to the wall-snap grid, which is the tolerance coalesce
+    used and therefore exactly the set of duplicates the editor has always
+    cleaned up. Returns the number of walls absorbed."""
+    if scene is None:
+        return 0
+    if perp_tol is None:
+        perp_tol = SETTINGS.get("wall_snap_in", WALL_SNAP_DEFAULT)
+    absorbed = 0
+    for _ in range(max_passes):                # runs are maximal; a fuse only
+        plan = plan_merge_collinear(graph_from_scene(scene, floor),
+                                    perp_tol=perp_tol)
+        if not plan:
+            break
+        apply_merge_plan_to_scene(scene, plan)
+        absorbed += sum(len(m.absorbed) for m in plan)
+    return absorbed
+
+
+def share_coincident_ends(scene, floor=None):
+    """Fold wall ends that already sit at the same point onto ONE `Vertex`.
+
+    THE HALF `weld_all` NEVER HAD. A welded corner used to be two coordinates
+    that happened to agree -- which is exactly what P3.3's drag then had to
+    rediscover by scanning, at every press. "What counts as one corner" is
+    decided by `graph_from_scene`'s fold, so this module has one definition of
+    it and not two.
+
+    Adopting a corner can move an end by up to SHARE_TOL (0.6"). That is the
+    schema's own `vertex_weld_in`: at or below it two points ARE one vertex, so
+    by the document's own definition nothing moved (P2.1's noise-floor rule).
+    Returns the number of ends rebound."""
+    view = graph_from_scene(scene, floor)
+    rebound = 0
+    for wv in view.walls:
+        for attr, key in (("p1", wv.v1), ("p2", wv.v2)):
+            anchor = view.anchor.get(key)
+            if anchor is not None and wv.key.end_vertex(attr) is not anchor:
+                wv.key.set_end_vertex(attr, anchor)
+                rebound += 1
+    return rebound
+
+
+def split_body_landings(scene, floor=None, max_passes=6):
+    """Split every wall on which another wall's END lands -- the split rule's
+    second half, applied plan-wide rather than at one drag's press.
+
+    A pass splits each wall at most once, so it iterates. A landing inside a
+    doorway is declined by `split_wall_at` (P3.6's case) and stays unsplit.
+    Returns the number of splits made."""
+    made = 0
+    for _ in range(max_passes):
+        view = graph_from_scene(scene, floor)
+        plans, done = [], set()
+        for wv in view.walls:
+            if id(wv.key) in done:
+                continue
+            for key, p in view.pos.items():
+                if key in (wv.v1, wv.v2):
+                    continue
+                sp = plan_split_edge(view, wv.key, p[0], p[1])
+                if sp is not None and not sp.straddled:
+                    plans.append(sp)
+                    done.add(id(wv.key))
+                    break
+        if not plans:
+            break
+        for sp in plans:
+            if apply_split_plan_to_scene(scene, sp) is not None:
+                made += 1
+    return made
+
+
+def _snap_wall_ends(scene, wall):
+    """Move each free end of `wall` onto a nearby wall's end, or onto the body
+    of a wall it stops on (T-junction), within JOIN_TOL. Never grows a wall
+    toward a far one -- if it doesn't reach, the gap is left for the user.
+
+    Lifted from `WallItem.join_endpoints` (P3.4 (iii)) so that method can be
+    retired. It stays a COORDINATE snap on purpose: closing a 9" gap is a
+    geometry repair, not topology, and it is the only way a drawn or
+    pixel-extracted plan closes its junctions at all. The topology follows in
+    `share_coincident_ends`, once the ends actually coincide."""
+    moved = 0
+    for attr, other in (("p1", "p2"), ("p2", "p1")):
+        p = getattr(wall, attr)
+        q = nearest_wall_endpoint(scene, p, JOIN_TOL, exclude=wall)
+        if q is None:
+            hit = nearest_wall_body(scene, p, JOIN_TOL, exclude=wall)
+            if hit is not None:
+                target, q = hit
+                ip = axis_wall_intersection(target, getattr(wall, other), p)
+                if ip is not None and QLineF(ip, p).length() <= JOIN_TOL * 2:
+                    q = ip
+        if q is not None:
+            if QLineF(q, p).length() > 1e-9:
+                moved += 1
+            setattr(wall, attr, q)
+    return moved
+
+
+def weld_wall_ends(scene, wall, rebuild=True):
+    """Weld ONE wall's ends -- P3.4 (iii)'s replacement for
+    `WallItem.join_endpoints`, called on draw release.
+
+    Snap, then SHARE: once the geometry lands, the ends that are now coincident
+    are folded onto one `Vertex`, so a drawn corner is topology from the moment
+    it is drawn rather than two coordinates a later drag must rediscover.
+
+    Deliberately does NOT split a wall whose body this end landed on, though
+    the machinery is right here. That is a real edit to a wall the user did not
+    touch, and making it silently on every draw is a wider blast radius than a
+    call-site migration should have. It belongs to the EXPLICIT pass
+    (`normalize_walls`) -- and a drag makes it at press anyway (P3.4 (ii))."""
+    if scene is None or wall is None or wall.scene() is None:
+        return
+    _snap_wall_ends(scene, wall)
+    share_coincident_ends(scene, wall.floor)
     if rebuild:
         wall.rebuild()
+
+
+def weld_scene(scene, max_passes=6):
+    """Weld the whole plan -- P3.4 (iii)'s replacement for `weld_all`.
+
+    Two stages, deliberately different kinds of thing: the GEOMETRY snap that
+    closes gaps (iterated to a fixed point, as `weld_all` was, so a welded plan
+    doesn't move on a further pass), then the TOPOLOGY `weld_all` had no way to
+    do -- folding the now-coincident ends onto one vertex.
+
+    IT DOES NOT SPLIT BODY LANDINGS, and that is the same rule `weld_wall_ends`
+    follows: splitting is an edit to a wall the user did not touch, so it
+    belongs to the EXPLICIT pass (`normalize_walls`) and nowhere else. Applied
+    here it would silently turn a 5-wall extracted plan into a 7-wall one --
+    correct topology, but a behaviour change smuggled in under a call-site
+    migration. P3.5 will want plan-wide planarity for `enclosing_face`; that is
+    P3.5's to ask for, through the pass that exists for it.
+
+    Returns `(moved, shared)`."""
+    if scene is None:
+        return (0, 0)
+    moved = 0
+    for _ in range(max_passes):
+        walls = sorted((w for w in scene.items()
+                        if isinstance(w, WallItem)
+                        and w.group() is None),
+                       key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()))
+        step = sum(_snap_wall_ends(scene, w) for w in walls)
+        moved += step
+        if not step:
+            break
+    return moved, share_coincident_ends(scene)
+
+
+def normalize_walls(scene):
+    """THE EXPLICIT PLAN-WIDE NORMALIZATION -- Edit ▸ Coalesce all walls now.
+
+    The menu item outlives the implementation it was named after. Same command,
+    same user intent ("tidy my walls"), new machinery: merge every collinear
+    run, then weld -- close the gaps, fold coincident ends onto one vertex, and
+    split a wall wherever another's end lands on its body. Ungated by
+    `auto_coalesce`, because the user asked for it explicitly.
+
+    Returns `(merged, moved, shared, split)`."""
+    if scene is None:
+        return (0, 0, 0, 0)
+    merged = merge_collinear_scene(scene)
+    moved, shared = weld_scene(scene)
+    return merged, moved, shared, split_body_landings(scene)
+
+
+def merge_wall(scene, wall, perp_tol=None):
+    """Merge just the run `wall` sits in -- P3.4 (iii)'s replacement for
+    `coalesce_wall`, and gated by the same `auto_coalesce` setting.
+
+    `wall` is forced to be the run's SURVIVOR, which is not a detail: the
+    caller has just drawn or dragged that item and holds a reference to it,
+    and it carries the selection. The planner takes the run's first wall in the
+    caller's own order, so putting `wall` first is all it takes to say so."""
+    if not SETTINGS.get("auto_coalesce", True):
+        return wall
+    if (scene is None or wall is None or wall.scene() is None
+            or wall.group() is not None or wall.length() < 1e-6):
+        return wall
+    if perp_tol is None:
+        perp_tol = SETTINGS.get("wall_snap_in", WALL_SNAP_DEFAULT)
+    view = graph_from_scene(scene, wall.floor)
+    view = view._replace(walls=sorted(view.walls, key=lambda v: v.key is not wall))
+    plan = [m for m in plan_merge_collinear(view, perp_tol=perp_tol)
+            if m.survivor is wall]
+    if plan:
+        apply_merge_plan_to_scene(scene, plan)
     return wall
 
 
-def coalesce_wall(scene, wall, index=None):
-    """Auto-coalesce entry: a no-op when the user has switched auto-coalesce
-    off (the manual 'Coalesce all walls now' action calls the _impl directly)."""
-    if not SETTINGS.get("auto_coalesce", True):
-        return wall
-    return _coalesce_wall_impl(scene, wall, index)
-
-
-def _wall_count(scene):
-    return sum(1 for w in scene.items()
-               if isinstance(w, WallItem) and not w.is_open)
-
-
-def _coalesce_all_impl(scene):
-    """Sweep the whole plan, merging every overlapping same-type wall pair to a
-    fixed point.  Heavy (O(walls^2)); used by load/import and the manual sweep
-    action.  Returns the number of walls absorbed."""
-    if scene is None:
-        return 0
-    start = _wall_count(scene)
-    changed = True
-    while changed:
-        changed = False
-        index = _WallIndex(scene)            # one local index per pass
-        walls = sorted((w for w in scene.items()
-                        if isinstance(w, WallItem) and not w.is_open
-                        and w.group() is None),
-                       key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y(),
-                                      w.wall_type))
-        before = _wall_count(scene)
-        for w in walls:
-            if w.scene() is None:                # already absorbed this pass
-                continue
-            _coalesce_wall_impl(scene, w, index, rebuild=False)
-        if _wall_count(scene) < before:
-            changed = True
-    return start - _wall_count(scene)
-
-
-def coalesce_all(scene):
-    """Auto-coalesce sweep (load/import); a no-op when auto-coalesce is off."""
+def merge_all(scene):
+    """Plan-wide auto-merge (load, import, ungroup) -- P3.4 (iii)'s replacement
+    for `coalesce_all`, gated by `auto_coalesce` exactly as that was. Returns
+    the number of walls absorbed."""
     if not SETTINGS.get("auto_coalesce", True):
         return 0
-    return _coalesce_all_impl(scene)
+    return merge_collinear_scene(scene)
 
 
-def weld_all(scene, max_passes=6):
-    """Weld every wall's free endpoints onto the walls they meet (T/L joints),
-    so a drawn-or-loaded plan reads as one connected structure.  Iterated to a
-    fixed point (a welded plan does not move on a further pass), which keeps
-    save/load round-trips stable.  Grouped walls are left alone."""
-    if scene is None:
-        return
-    for _ in range(max_passes):
-        walls = sorted((w for w in scene.items()
-                        if isinstance(w, WallItem) and not w.is_open
-                        and w.group() is None),
-                       key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()))
-        moved = False
-        for w in walls:
-            b1, b2 = QPointF(w.p1), QPointF(w.p2)
-            w.join_endpoints(rebuild=False)
-            if (QLineF(b1, w.p1).length() > 1e-6
-                    or QLineF(b2, w.p2).length() > 1e-6):
-                moved = True
-        if not moved:
-            break
+def apply_split_plan_to_scene(scene, split, rebuild=True):
+    """Execute a split delta on the live items. The source wall keeps its
+    identity and becomes the FIRST segment; a new `WallItem` takes the second.
+
+    Vertex-native throughout: the split corner and the far corner are both
+    handed over with `set_end_vertex`, so a split costs ZERO split-on-writes and
+    whatever sharing the far end already had survives it."""
+    src = split.wall
+    if sip.isdeleted(src) or src.scene() is not scene:
+        return None
+    at = QPointF(split.at[0], split.at[1])
+    vsplit = split.v if split.v is not None else Vertex.at(at)
+    far = src.end_vertex("p2")
+    moved = [(src.openings[po.index], po.s) for po in split.move_openings
+             if po.index < len(src.openings)]
+    kept = [src.openings[po.index] for po in split.keep_openings
+            if po.index < len(src.openings)]
+
+    seg = WallItem(at, QPointF(far.point()), src.wall_type)
+    seg.floor = src.floor
+    seg.set_end_vertex("p1", vsplit)
+    seg.set_end_vertex("p2", far)
+    scene.addItem(seg)
+    src.set_end_vertex("p2", vsplit)
+
+    for op, s in moved:
+        try:
+            new = OpeningItem(seg, op.kind, op.code, s)
+        except ValueError as exc:              # wider than the second segment
+            report_opening_failure(seg.scene(), seg, op.kind, op.code, s,
+                                   f"{exc} (splitting a wall)")
+            continue
+        new.door_type, new.swing = op.door_type, op.swing
+        seg.openings.append(new)
+        op.setParentItem(None)
+        if op.scene() is not None:
+            scene.removeItem(op)
+    src.openings = kept
+    for r in list(src.rooms):                  # both halves run the same edges
+        r.bind_wall(seg)
+    if rebuild:
+        src.rebuild()
+        seg.rebuild()
+    return seg
+
+
+def split_wall_at(scene, wall, p, on_seg_tol=ON_SEG_TOL, report=None):
+    """Split `wall` at the scene point `p` -- THE SPLIT RULE'S SECOND HALF:
+    a vertex landing on another wall's body splits that wall. Returns the new
+    segment, or None when there is nothing to split.
+
+    **THE DECLINE IS GONE (R2c).** A split whose point falls inside an opening
+    used to return None here while `topology.split_edge` raised -- one planner,
+    two policies. Both are retired for the same reason, and it is defect 17's:
+    a gesture that silently does nothing is the worst of the three options, and
+    keeping a second case of it on purpose is how folklore starts. The split now
+    happens; the opening lands on the segment holding its anchor (R2b) and is
+    appended to `report` if the caller passes one.
+
+    The remaining asymmetry is not one: `topology.split_edge` and this take the
+    same delta from the same planner and now do the same thing with it. What
+    differs is only where each one's report is surfaced -- the conversion report
+    for a load, a status line for an edit (R5)."""
+    if scene is None or wall is None:
+        return None
+    split = plan_split_edge(graph_from_scene(scene, wall.floor), wall,
+                            p.x(), p.y(), on_seg_tol=on_seg_tol)
+    if split is None:
+        return None
+    if split.straddled and report is not None:
+        for po in split.straddled:
+            op = wall.openings[po.index] if po.index < len(wall.openings) else None
+            report.append(
+                f"{op.kind if op else 'opening'} "
+                f"{op.code if op else po.index} on a wall at "
+                f"({wall.p1.x():.0f}, {wall.p1.y():.0f}): a junction lands "
+                f"inside it, so it no longer fits the segment it sits on")
+    return apply_split_plan_to_scene(scene, split)
 
 
 def _merge_intervals(intervals):
@@ -304,7 +657,7 @@ def fracture_delete_wall(scene, wall, settle=True):
     room needs are removed.  A wall that borders no room is deleted whole."""
     if scene is None or wall.scene() is None:
         return
-    if wall.is_open or not wall.rooms:
+    if not wall.rooms:
         for r in list(wall.rooms):
             r.unbind_wall(wall)
         scene.removeItem(wall)
@@ -339,7 +692,9 @@ def fracture_delete_wall(scene, wall, settle=True):
             if s0 <= s <= s1:
                 try:
                     op = OpeningItem(seg, kind, code, s - s0)
-                except ValueError:
+                except ValueError as exc:
+                    report_opening_failure(scene, seg, kind, code, s - s0,
+                                           f"{exc} (deleting part of a wall)")
                     continue
                 op.door_type, op.swing = dtype, swing
                 seg.openings.append(op)
@@ -357,11 +712,28 @@ def fracture_delete_wall(scene, wall, settle=True):
 def wall_endpoint_open(scene, p: QPointF, ignore=()) -> bool:
     """True when `p` is a free, dangling wall end: no other (non-open) wall has
     an endpoint within JOIN_TOL of it.  Walls in `ignore` are skipped (the
-    endpoint's own wall, and the wall being drawn)."""
+    endpoint's own wall, and the wall being drawn).
+
+    THIS IS RIGHTLY SPATIAL, AND IT STAYS THAT WAY -- it is not a survivor of
+    the pre-vertex world awaiting migration to vertex degree, so please do not
+    "finish the job" by converting it.
+
+    The tolerance is JOIN_TOL, the GESTURE tolerance, and gesture questions are
+    inherently spatial. Degree answers the MODELLING question ("are these ends
+    one corner?"); this answers the AIMING question ("is there something near
+    enough to snap to?"), and those are different questions with different
+    right answers. Degree cannot serve here even in principle, because the ends
+    worth offering the user are precisely the ones NOT yet welded -- a degree
+    query would report every one of them as free and the snap would have
+    nothing to aim at.
+
+    (`WallItem._joined_at` is the one that did migrate, at P3.4 (iii): its
+    tolerance was SHARE_TOL, it asked the modelling question, and vertex
+    adjacency answers it exactly.)"""
     if scene is None:
         return False
     for w in scene.items():
-        if not isinstance(w, WallItem) or w.is_open or w in ignore:
+        if not isinstance(w, WallItem) or w in ignore:
             continue
         if (QLineF(w.p1, p).length() < JOIN_TOL
                 or QLineF(w.p2, p).length() < JOIN_TOL):
@@ -379,14 +751,33 @@ def wall_bbox(w) -> QRectF:
 
 class _WallBBoxIndex:
     """Walls hashed by bbox cells so 'which walls are near this box' is
-    O(local) -- used by the memoized room dirty-check instead of scanning every
-    wall per room."""
+    O(local) instead of a scan.
+
+    RIGHTLY SPATIAL, PERMANENTLY -- the third of three, and the reason it is
+    worth naming as a category. P3.4 (iii) reframed `wall_endpoint_open` this
+    way (its tolerance is JOIN_TOL, the GESTURE tolerance, and "is there
+    something near enough to snap to?" is inherently a question about distance,
+    which degree cannot answer even in principle). P3.4 (iv) then REFUSED the
+    adjacency swap in `_compute_wall_junctions` for the same kind of reason: two
+    walls can cross mid-span sharing no corner at all, so adjacency finds
+    nothing where the bodies genuinely overlap.
+
+    This index is what that refusal runs on. P3.4 (iv) forecast it as P3.5's on
+    the grounds that the memoized room dirty-check was its last caller; P3.5
+    deleted that check and the index stayed, because the same sub-commit's
+    junction ruling had already created the caller that outlives it. A line dies
+    when its LAST caller dies -- and here one correct decision invalidated
+    another's forecast, which is what per-task ledgers are for.
+
+    None of the three is a survivor of the old world. They are the queries whose
+    question is about SPACE rather than about topology, and vertex adjacency was
+    never the right instrument for any of them."""
 
     CELL = 60.0          # 5 ft cells
 
     def __init__(self, scene, floor=None):
         # floor=None indexes every wall; pass a floor to index only that floor's
-        # walls (room detection scopes the dirty-check to the active floor).
+        # walls (the junction pass scopes neighbours to the wall's own floor).
         self.cells = {}
         for w in (scene.items() if scene is not None else []):
             if not isinstance(w, WallItem):
@@ -413,8 +804,51 @@ class _WallBBoxIndex:
         return out
 
 
+# --------------------------------------------------- R5: one vocabulary
+def describe_opening(wall, kind, code, s, why) -> str:
+    """One entry in the `openings_failed` vocabulary (P3.6 / R5): what the
+    opening was, which wall it was going on, where it was aimed, and why it
+    could not be placed. The same sentence shape the walk files, so a load
+    report and an edit report read alike."""
+    where = (f"({wall.p1.x():.0f}, {wall.p1.y():.0f})"
+             if wall is not None else "an unknown wall")
+    at = f" at {s:.0f}\"" if s is not None else ""
+    return f"{kind} {code} on the wall at {where}{at}: {why}"
+
+
+def report_opening_failure(scene, wall, kind, code, s, why):
+    """File an opening that could not be placed, on the SCENE.
+
+    P3.6 replaces eight `except ValueError: continue` sites that dropped an
+    opening in silence -- including on load, which is defect 6's "incl. on
+    load". Scene-scoped rather than global for the same reason the weld
+    baseline is: two windows must not share a report. `MainWindow` drains it at
+    the debounce point and says it once."""
+    if scene is None:
+        return
+    if not hasattr(scene, "_fp_opening_failures"):
+        scene._fp_opening_failures = []
+    scene._fp_opening_failures.append(
+        describe_opening(wall, kind, code, s, why))
+
+
+def drain_opening_failures(scene) -> list:
+    """Take and clear whatever has been filed since the last drain."""
+    out = list(getattr(scene, "_fp_opening_failures", ()) or ())
+    if out:
+        scene._fp_opening_failures = []
+    return out
+
+
 def rebuild_all_walls(scene):
-    from floorplanner.rooms import refresh_rooms  # late: breaks the walls<->rooms cycle
+    """Rebuild every wall's geometry and the junction clips.
+
+    IT NO LONGER TOUCHES ROOMS (P3.5). This used to end in `refresh_rooms`,
+    which re-detected every room whose nearby walls had changed -- the editor's
+    hot path, and the reason a wall edit cost a raster flood-fill plus a planar
+    face walk. A room's region now DERIVES from its outline, and the outline
+    holds the very vertices the walls hold, so a wall edit updates the rooms it
+    borders before this function is even called."""
     if scene is None:
         return
     index = _WallIndex(scene)                # shared: rebuild is O(local), not
@@ -422,7 +856,6 @@ def rebuild_all_walls(scene):
     for it in walls:                         # O(all walls) per wall
         it.rebuild(cascade=False, index=index)
     _compute_wall_junctions(scene, walls)
-    refresh_rooms(scene)
 
 
 def _compute_wall_junctions(scene, walls=None):
@@ -434,15 +867,12 @@ def _compute_wall_junctions(scene, walls=None):
         walls = [it for it in scene.items() if isinstance(it, WallItem)]
     bbi = _WallBBoxIndex(scene)
     for w in walls:
-        if w.is_open:                        # dashed placeholders don't merge
-            w._outline_clip = None
-            continue
         wb = w._solid.boundingRect()
         union = QPainterPath()
         found = False
         for other in bbi.near(wb):
             if (other is w or not isinstance(other, WallItem)
-                    or other.is_open or other._solid.isEmpty()
+                    or other._solid.isEmpty()
                     or other.floor != w.floor):   # junctions don't cross floors
                 continue
             if (other._solid.boundingRect().intersects(wb)
@@ -466,19 +896,21 @@ class WallItem(QGraphicsItem):
     `s` along the wall from p1, so they ride along when the wall moves.
     """
 
-    is_open = False                   # OpenWall (a dashed gap) sets this True
-
     def __init__(self, p1: QPointF, p2: QPointF, wall_type: str = "exterior"):
         super().__init__()
         self.wall_type = wall_type
-        self.p1 = QPointF(p1)
-        self.p2 = QPointF(p2)
+        # P3.1: the geometry lives in VERTICES now. p1/p2 are read-through
+        # properties over them, so every existing caller keeps working; two
+        # wall ends referencing the SAME Vertex object are the same corner.
+        self._v1 = Vertex.at(p1)
+        self._v2 = Vertex.at(p2)
         self.floor = active_floor()   # tagged with the active floor (load overrides)
         self.openings = []            # OpeningItem children
         self.rooms = []               # RoomItems this wall borders ([] = free)
         self._corners_unlocked = False  # endpoints draggable while in a room
         self._drawing = False         # True while being rubber-banded
         self._mode = None             # None | 'p1' | 'p2' | 'move'
+        self._vmoves = []             # P3.3: the corners a body-drag moves
         self._path = QPainterPath()
         self._solid = QPainterPath()     # body footprint, no opening holes
         self._outline_clip = None        # outline-clip so junctions read solid
@@ -487,6 +919,96 @@ class WallItem(QGraphicsItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setZValue(WALL_Z)           # above the translucent room fill (3)
         self.rebuild()
+
+    # -- vertices (P3.1) -----------------------------------------------------
+    # p1/p2 read through to the vertex table; ASSIGNMENT IS SPLIT-ON-WRITE --
+    # it mints a fresh vertex for this end and leaves any sharer where it was,
+    # preserving today's independent-ends semantics exactly. Shared movement is
+    # P3.3's wall-move operation, never a side effect of assignment.
+    @property
+    def v1(self) -> str:
+        """Stable uid of the start vertex (persistent across edits)."""
+        return self._v1.uid
+
+    @property
+    def v2(self) -> str:
+        return self._v2.uid
+
+    @property
+    def p1(self) -> QPointF:
+        return self._v1.point()
+
+    @p1.setter
+    def p1(self, value):
+        v = getattr(self, "_v1", None)
+        self._v1 = v.moved_to(value) if v is not None else Vertex.at(value)
+        self._carry_anchors(v, self._v1)
+
+    @property
+    def p2(self) -> QPointF:
+        return self._v2.point()
+
+    @p2.setter
+    def p2(self, value):
+        v = getattr(self, "_v2", None)
+        self._v2 = v.moved_to(value) if v is not None else Vertex.at(value)
+        self._carry_anchors(v, self._v2)
+
+    def _carry_anchors(self, old, new):
+        """Keep every opening dimensioned off `old` dimensioned off `new`.
+
+        THE END DID NOT CHANGE -- its coordinate did. Assigning `p1`/`p2` is
+        split-on-write, so the same corner comes away on a fresh `Vertex` with a
+        fresh uid, and an anchor still naming the old object is orphaned. An
+        orphaned anchor re-seats on `p1`, which for an opening dimensioned off
+        `p2` MIRRORS it down the wall. Measured on `planc1` before this existed:
+        12 of 41 openings changed position on load.
+
+        Deliberately NOT what `set_end_vertex` does for a vertex somewhere else
+        -- that is a swap or an explicit share, where the anchor must go on
+        naming the corner it names. See `_fuse_anchors`."""
+        if old is None or old is new:
+            return
+        for op in getattr(self, "openings", ()):
+            if op.anchor_v is old:
+                op.anchor_v = new
+
+    def _fuse_anchors(self, old, new):
+        """The WELD case: two ends at one corner fuse onto a single `Vertex`.
+        Same physical corner, so an anchor on the absorbed vertex follows it --
+        but only when the replacement really is in the same place. A
+        `set_end_vertex` to a vertex ELSEWHERE is a swap or a deliberate share,
+        and there the anchor must stay put or reversing a wall would move its
+        openings (R1(b)). A RELOCATION lands here too and is left alone on
+        purpose: it carries its uid, so `_anchor_attr` re-seats it for free."""
+        if old is None or old is new:
+            return
+        a, b = old.point(), new.point()
+        if abs(a.x() - b.x()) > SHARE_TOL or abs(a.y() - b.y()) > SHARE_TOL:
+            return
+        for op in getattr(self, "openings", ()):
+            if op.anchor_v is old:
+                op.anchor_v = new
+
+    def end_vertex(self, attr: str) -> Vertex:
+        """The Vertex object behind `p1` or `p2` -- the corner's IDENTITY, not
+        its position. Two ends are the same corner iff this returns the same
+        object for both (`is`, never `==`)."""
+        return self._v1 if attr == "p1" else self._v2
+
+    def set_end_vertex(self, attr: str, vertex: Vertex):
+        """Point this end AT `vertex`, sharing it.
+
+        The deliberate counterpart to assigning `p1`/`p2`, which splits on write
+        and therefore cannot express sharing at all. P3.3's wall move is the
+        first caller: it shares the corners it is about to move, then moves the
+        vertex once for every end on it."""
+        old = self._v1 if attr == "p1" else self._v2
+        if attr == "p1":
+            self._v1 = vertex
+        else:
+            self._v2 = vertex
+        self._fuse_anchors(old, vertex)
 
     @property
     def primary_room(self):
@@ -532,13 +1054,20 @@ class WallItem(QGraphicsItem):
         return max(0.0, min(self.length(), s))
 
     # -- geometry cache ------------------------------------------------------
-    def _joined_at(self, p: QPointF, index=None) -> bool:
-        """True when another wall shares (within 1/2") this endpoint."""
+    def _joined_at(self, attr: str, index=None) -> bool:
+        """True when another wall meets this wall at `attr` ("p1" / "p2").
+
+        A VERTEX-DEGREE question (P3.4 (iii)), where it used to be a 0.6"
+        coordinate search. The corner fold behind it treats same-`Vertex` and
+        within-0.6" ends alike, so the answer is unchanged on a plan that was
+        never welded -- and on one that was, it is now the real question rather
+        than a proximity proxy for it."""
         if index is not None:
-            return index.joined_at(p, self)
+            return index.joined_at(self, attr)
         sc = self.scene()
         if sc is None:
             return False
+        p = getattr(self, attr)
         for it in sc.items():
             if isinstance(it, WallItem) and it is not self:
                 if (QLineF(p, it.p1).length() < 0.6
@@ -556,30 +1085,34 @@ class WallItem(QGraphicsItem):
         length, t, ang = self.length(), self.t, self.angle_rad()
 
         # extend joined ends by half a thickness so corners fill in solid
-        ext1 = t * 0.5 if self._joined_at(self.p1, index) else 0.0
-        ext2 = t * 0.5 if self._joined_at(self.p2, index) else 0.0
+        ext1 = t * 0.5 if self._joined_at("p1", index) else 0.0
+        ext2 = t * 0.5 if self._joined_at("p2", index) else 0.0
 
         body = QPainterPath()
         body.addRect(QRectF(-ext1, -t / 2, length + ext1 + ext2, t))
         solid_local = QPainterPath(body)   # footprint before openings are cut
         holes = QPainterPath()
         for op in self.openings:
+            # NO CLAMP (P3.6). This used to read
+            #     op.s = min(max(op.s, half), max(half, length - half))
+            # which silently SLID a door back onto a wall that had shrunk under
+            # it -- repairing stored data on the render path, where nobody could
+            # see it happen. An opening that no longer fits is a fact about the
+            # plan (`op.fits()`), reported, not corrected in passing.
             half = op.width / 2
-            op.s = min(max(op.s, half), max(half, length - half))
             holes.addRect(QRectF(op.s - half, -t / 2 - 0.5, op.width, t + 1.0))
         # open the body where a coincident wall carries a door/window, so a
         # plain party wall doesn't cover the opening on the wall next to it
-        if not self.is_open:
-            u = self.unit()
-            for w in coincident_walls(self.scene(), self, index):
-                for op in w.openings:
-                    p = w.point_at(op.s)
-                    sl = ((p.x() - self.p1.x()) * u.x()
-                          + (p.y() - self.p1.y()) * u.y())
-                    half = op.width / 2
-                    if -half < sl < length + half:
-                        holes.addRect(QRectF(sl - half, -t / 2 - 0.5,
-                                             op.width, t + 1.0))
+        u = self.unit()
+        for w in coincident_walls(self.scene(), self, index):
+            for op in w.openings:
+                p = w.point_at(op.s)
+                sl = ((p.x() - self.p1.x()) * u.x()
+                      + (p.y() - self.p1.y()) * u.y())
+                half = op.width / 2
+                if -half < sl < length + half:
+                    holes.addRect(QRectF(sl - half, -t / 2 - 0.5,
+                                         op.width, t + 1.0))
         if not holes.isEmpty():
             body = body.subtracted(holes)
 
@@ -609,7 +1142,7 @@ class WallItem(QGraphicsItem):
         for op in self.openings:
             op.sync()
         self.update()
-        if cascade and not self.is_open:
+        if cascade:
             for w in coincident_walls(self.scene(), self):
                 w.rebuild(cascade=False)
 
@@ -742,27 +1275,52 @@ class WallItem(QGraphicsItem):
             # stretch -- corner joints fully, T-joints sideways only
             self._slide_u = self.unit()
             self._run = self._collinear_run()
-            self._run_orig = [(w, QPointF(w.p1), QPointF(w.p2))
-                              for w in self._run]
             run_ids = {id(w) for w in self._run}
-            run_pts = [p for w in self._run for p in (w.p1, w.p2)]
+            run_ends = [(w, a) for w in self._run for a in ("p1", "p2")]
+            run_pts = [getattr(w, a) for w, a in run_ends]
             self._attached = []
+            self._continuations = []      # collinear -- split, never dragged
             sc, length = self.scene(), self.length()
             ux, uy = self._slide_u.x(), self._slide_u.y()
             if sc is not None:
                 for w in sc.items():
-                    if not isinstance(w, WallItem) or id(w) in run_ids:
+                    # SAME LEVEL ONLY (defect 12a). This scan was one of defect
+                    # 12's unfiltered paths, and the promotion below raises the
+                    # stakes: a cross-floor coincident end used to be a
+                    # TRANSIENT mis-drag that ended with the mouse-up, but a
+                    # shared vertex carries exactly one level, so sharing across
+                    # floors would violate I2 outright or silently rewrite a
+                    # wall's level, permanently. Filtered at the loop head, so
+                    # cross-level sharing is impossible by construction rather
+                    # than avoided by luck.
+                    if (not isinstance(w, WallItem) or id(w) in run_ids
+                            or w.floor != self.floor):
                         continue
                     for attr in ("p1", "p2"):
                         q = getattr(w, attr)
-                        if any(QLineF(q, rp).length() < 0.6 for rp in run_pts):
-                            self._attached.append((w, attr, QPointF(q), True))
+                        if any(QLineF(q, rp).length() < SHARE_TOL
+                               for rp in run_pts):
+                            if self._is_continuation(w):
+                                self._continuations.append((w, attr))
+                            else:
+                                # a GROUPED neighbour still follows, but on the
+                                # old coordinate path -- grouping duplicates a
+                                # room's walls onto the originals, so promoting
+                                # one would wire a group member to an outside
+                                # wall permanently, and what a group even IS
+                                # topologically is P4.5's question. Same
+                                # instinct as the `group() is None` gate that
+                                # keeps grouped walls out of coalesce.
+                                kind = "corner" if w.group() is None else "rigid"
+                                self._attached.append((w, attr, QPointF(q), kind))
                         else:
                             vx, vy = q.x() - self.p1.x(), q.y() - self.p1.y()
                             s = vx * ux + vy * uy
                             if (0.0 < s < length
                                     and abs(vy * ux - vx * uy) <= 0.75):
-                                self._attached.append((w, attr, QPointF(q), False))
+                                self._attached.append((w, attr, QPointF(q), "tee"))
+            run_ends = self._split_body_landings(run_ends)
+            self._plan_vertex_moves(run_ends)
 
         if self._mode in ("p1", "p2"):
             moving = self.p1 if self._mode == "p1" else self.p2
@@ -820,7 +1378,7 @@ class WallItem(QGraphicsItem):
         stick = max(WALL_PROJECT_STICK, 16.0 / max(self._view_scale(), 1e-6))
         best_s, best_d = None, stick
         for w in sc.items():
-            if (not isinstance(w, WallItem) or w is self or w.is_open
+            if (not isinstance(w, WallItem) or w is self
                     or w.length() < 1e-6):
                 continue
             v = w.unit()
@@ -876,6 +1434,125 @@ class WallItem(QGraphicsItem):
                 run.append(w)
         return run
 
+    def _is_continuation(self, w) -> bool:
+        """True when `w` runs along the SAME LINE as the slide -- a collinear
+        continuation past one of the run's endpoints.
+
+        Same parallel tolerance as `_collinear_run`, because it is the same
+        question asked of a wall that answered no to being in the run (it
+        belongs to another room, or to none)."""
+        if w.length() < 1e-6:
+            return False
+        wu, u = w.unit(), self._slide_u
+        return abs(wu.x() * u.y() - wu.y() * u.x()) <= 0.02
+
+    def _run_wall_under(self, p: QPointF, tol=0.75):
+        """The run wall whose BODY (not its ends) the point `p` lands on."""
+        for w in self._run:
+            if w.length() < MIN_WALL_LEN:
+                continue
+            u = w.unit()
+            vx, vy = p.x() - w.p1.x(), p.y() - w.p1.y()
+            s = vx * u.x() + vy * u.y()
+            if (SHARE_TOL < s < w.length() - SHARE_TOL
+                    and abs(vy * u.x() - vx * u.y()) <= tol):
+                return w
+        return None
+
+    def _split_body_landings(self, run_ends):
+        """THE SPLIT RULE'S SECOND HALF (P3.4 (ii)). A neighbour's end resting
+        on the run's BODY has, until now, had no vertex to be: P3.3 could only
+        stretch it sideways from coordinates, which is a split-on-write per
+        mouse event. Cutting the run wall at the landing point MAKES the vertex,
+        and the landing is then promoted exactly as a corner is -- a T-junction
+        stops being a coincidence the drag has to remember and becomes topology.
+
+        Declines quietly wherever it cannot cut: a landing inside a doorway
+        (P3.6's case, which `split_wall_at` refuses), or a wall too short to
+        halve. Those stay `tee` on P3.3's coordinate path, so the worst case is
+        the previous behaviour rather than a broken drag.
+
+        Returns the run_ends, extended with each new segment's two ends."""
+        if not any(kind == "tee" for *_rest, kind in self._attached):
+            return run_ends
+        sc = self.scene()
+        for i, (w, attr, orig, kind) in enumerate(self._attached):
+            if kind != "tee":
+                continue
+            host = self._run_wall_under(orig)
+            if host is None:
+                continue
+            seg = split_wall_at(sc, host, orig, on_seg_tol=0.75)
+            if seg is None:
+                continue
+            self._run.append(seg)
+            run_ends = run_ends + [(seg, "p1"), (seg, "p2")]
+            self._attached[i] = (w, attr, orig, "corner")
+        return run_ends
+
+    def _plan_vertex_moves(self, run_ends):
+        """Turn the 0.6" coincidence discovery into REAL VERTEX SHARING, once,
+        at drag start -- P3.3's whole content.
+
+        Until now the drag *scanned* for coincident ends and moved each one by
+        hand, which is split-on-write: the corner came apart and was rebuilt
+        from coordinates on every mouse event. After this pass the ends that ARE
+        one corner reference ONE `Vertex`, and the drag moves the vertex -- so a
+        neighbour follows because it is the same corner, not because a loop
+        remembered to drag it. That is the difference between geometry that
+        happens to agree and topology.
+
+        THE SPLIT RULE COMES FIRST, and it is a rule about what must NOT be
+        shared. A wall collinear with the slide that continues past an endpoint
+        cannot ride the corner: the slide is perpendicular, so moving the shared
+        end would swing the continuation's far end and SHEAR it. So the corner
+        is split -- the continuation gets its own vertex and stays exactly where
+        it is -- before any sharing is created. Split first, shear never.
+
+        Tee attachments are deliberately NOT promoted: they land on the dragged
+        wall's BODY, not on a corner, so there is no vertex to share. They keep
+        the sideways-only stretch, and become real topology at P3.4, where
+        `split_edge` gives a body-landing a vertex to be."""
+        # 1. split off the collinear continuations, before anything is shared
+        for w, attr in self._continuations:
+            v = w.end_vertex(attr)
+            if any(rw.end_vertex(ra) is v for rw, ra in run_ends):
+                w.set_end_vertex(attr, Vertex.at(v.point()))
+
+        # 2. the run's own ends are the corners this drag moves
+        moves, by_id = [], {}
+        for w, attr in run_ends:
+            v = w.end_vertex(attr)
+            dv = by_id.get(id(v))
+            if dv is None:
+                dv = by_id[id(v)] = _DragVertex(v)
+                moves.append(dv)
+            dv.ends.append((w, attr))
+
+        # 3. promote each coincident neighbour end onto the corner it sits on
+        self._promoted = 0
+        for w, attr, orig, kind in self._attached:
+            if kind != "corner":
+                continue
+            host = min(((rw, ra) for rw, ra in run_ends),
+                       key=lambda t: QLineF(orig, getattr(t[0], t[1])).length())
+            v = host[0].end_vertex(host[1])
+            if w.end_vertex(attr) is not v:
+                w.set_end_vertex(attr, v)
+                self._promoted += 1
+            by_id[id(v)].ends.append((w, attr))
+
+        # 4. the room outlines holding these corners ride along (P3.5). A room
+        # region is DERIVED from its outline, so this is the whole of "the rooms
+        # either side resize when a party wall slides" -- there is no detection
+        # pass left to do it, and there does not need to be.
+        for room in {id(r): r for w in self._run for r in w.rooms}.values():
+            for e in getattr(room, "outline", ()):
+                dv = by_id.get(id(e.v))
+                if dv is not None:
+                    dv.edges.append(e)
+        self._vmoves = moves
+
     def mouseMoveEvent(self, e):
         if self._mode is None:
             return
@@ -901,22 +1578,28 @@ class WallItem(QGraphicsItem):
                 nx_, ny_ = -uy, ux
                 s = wall_snap_len(delta.x() * nx_ + delta.y() * ny_)
                 dx, dy = nx_ * s, ny_ * s
-            # translate the whole collinear side (self + open-wall gap + any
-            # collinear neighbours) by the same delta
-            for w, o1, o2 in self._run_orig:
-                w.p1 = QPointF(o1.x() + dx, o1.y() + dy)
-                w.p2 = QPointF(o2.x() + dx, o2.y() + dy)
+            # P3.3: MOVE THE VERTICES. One move per corner carries the whole
+            # collinear side (self + the open-wall gap + any collinear
+            # neighbour) AND every promoted corner joint, because they are all
+            # ends of the same vertices now -- there is nothing left to keep in
+            # step by hand.
+            for dv in self._vmoves:
+                dv.apply(dx, dy)
+            for w in self._run:
                 if w is not self:
                     w.rebuild()
-            # corner joints follow fully; T-joints follow only the sideways
-            # part of the slide so they stretch instead of tilting
+            # what could not be promoted still moves by coordinate. T-joints
+            # follow only the sideways part of the slide so they stretch
+            # instead of tilting -- a body-landing has no vertex to share until
+            # P3.4 makes one; a `rigid` corner is a grouped wall, held back
+            # from sharing by the group guard, not by geometry.
             ux, uy = self._slide_u.x(), self._slide_u.y()
             along = dx * ux + dy * uy
             px, py = dx - along * ux, dy - along * uy
-            for w, attr, orig, is_corner in self._attached:
-                if is_corner:
+            for w, attr, orig, kind in self._attached:
+                if kind == "rigid":
                     setattr(w, attr, QPointF(orig.x() + dx, orig.y() + dy))
-                else:
+                elif kind == "tee":
                     setattr(w, attr, QPointF(orig.x() + px, orig.y() + py))
                 w.rebuild()
         self.rebuild()
@@ -932,39 +1615,22 @@ class WallItem(QGraphicsItem):
             # Shift.
             endpoint_edit = self._mode in ("p1", "p2")
             corner_drag = endpoint_edit and bool(self.rooms)
-            coalesce_wall(self.scene(), self)       # fuse if it now overlaps
+            merge_wall(self.scene(), self)          # fuse if it now overlaps
             rebuild_all_walls(self.scene())
             # dragging a corner back so the room is fully walled again fuses
             # the wall back in: re-lock its corners (right-click to detach
             # again)
+            # P3.5: "fully walled again" is a question about the room's OUTLINE
+            # -- does a wall span every edge? -- which is what `open_edges()`
+            # answers. It used to be asked of a dashed placeholder item, and
+            # asking THAT would have re-locked the wall on the very drag that
+            # opened the side. The placeholder went at P3.7.
             if (corner_drag and self._corners_unlocked
-                    and not any(w.is_open for r in self.rooms
-                                for w in r.walls)):
+                    and not any(r.open_edges() for r in self.rooms)):
                 self._corners_unlocked = False
                 self.primary_room.raise_to_front()   # normalise z to siblings
         self._mode = None
         e.accept()
-
-    def join_endpoints(self, rebuild=True):
-        """Weld each endpoint onto a nearby endpoint of another wall, or onto
-        the body of a wall it stops on (T-junction), within JOIN_TOL.  Never
-        grows a wall toward a far one -- if it doesn't reach, the gap is left
-        for the user to close by hand.  Pass rebuild=False in a bulk weld where
-        a single rebuild_all_walls follows."""
-        for attr, other in (("p1", "p2"), ("p2", "p1")):
-            p = getattr(self, attr)
-            q = nearest_wall_endpoint(self.scene(), p, JOIN_TOL, exclude=self)
-            if q is None:
-                hit = nearest_wall_body(self.scene(), p, JOIN_TOL, exclude=self)
-                if hit is not None:
-                    target, q = hit
-                    ip = axis_wall_intersection(target, getattr(self, other), p)
-                    if ip is not None and QLineF(ip, p).length() <= JOIN_TOL * 2:
-                        q = ip
-            if q is not None:
-                setattr(self, attr, q)
-        if rebuild:
-            self.rebuild()
 
     def contextMenuEvent(self, e):
         from floorplanner.rooms import detach_wall_from_room  # late (cycle)
@@ -1001,45 +1667,28 @@ class WallItem(QGraphicsItem):
         e.accept()
 
 
-class OpenWall(WallItem):
-    """A dashed placeholder for a room edge that has no built wall.
-
-    It belongs to a room's edge loop (so the room stays closed for area
-    and re-detection through the gap) and carries the SAME drag controls
-    as a wall, but it does not block room flood-fill and is drawn as a thin
-    dashed line.  Open walls are derived from a room's open edges, so they
-    are regenerated by bind_room_walls rather than serialized."""
-
-    is_open = True
-
-    def __init__(self, p1: QPointF, p2: QPointF, room=None):
-        super().__init__(p1, p2, "interior")
-        self.rooms = [room] if room is not None else []
-        self.setZValue(WALL_Z)
-
-    def paint(self, painter, option, widget=None):
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        lod = max(option.levelOfDetailFromTransform(painter.worldTransform()),
-                  1e-6)
-        ghost = floor_display_mode(self.floor) != "active"
-        col = FLOOR_GHOST if ghost else QColor(90, 120, 170)
-        pen = QPen(col, max(1.2, 1.6 / lod), Qt.PenStyle.DashLine)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawLine(self.p1, self.p2)
-        if ghost:
-            return
-        if self.isSelected():
-            hs = 9.0 / lod
-            painter.setPen(QPen(QColor(40, 40, 40), 0))
-            painter.setBrush(QBrush(QColor(255, 200, 0)))
-            for q in (self.p1, self.p2):
-                painter.drawRect(QRectF(q.x() - hs / 2, q.y() - hs / 2, hs, hs))
-
-
 class OpeningItem(QGraphicsItem):
     """A door or window.  Child of its wall; local x runs along the wall,
-    local y across the thickness.  `s` = distance of centre from wall.p1."""
+    local y across the thickness.
+
+    **ANCHORED TO A NAMED END (P3.6), not measured from `p1`.** The opening
+    holds the `Vertex` it is dimensioned off and `offset_in`, the distance from
+    that corner to its NEAR EDGE -- which is how a drawing dimensions a door,
+    and what the v5 schema stores. `s` (the centre's distance from `p1`) stays
+    as a read-through property so every existing caller keeps working: the
+    compat-shim discipline P3.1 used for `p1`/`p2` and P3.2 for `corners`.
+
+    The anchor is a VERTEX and not the string "v1"/"v2", which is what makes
+    the schema's three claims true rather than approximately true:
+      * STRETCHED at the far end -- the offset is from the corner that did not
+        move, so nothing slides;
+      * REVERSED -- swapping which end is `p1` renames the ends and moves no
+        geometry, and an opening anchored to a corner does not care what that
+        corner is currently called;
+      * SPLIT -- the opening goes with the segment its anchor corner is on,
+        which is R2's rule stated literally rather than reconstructed from
+        coordinates.
+    Absolute `s` survives none of the three, which is the whole of defect 7."""
 
     def __init__(self, wall: WallItem, kind: str, code: str, s: float):
         super().__init__(wall)
@@ -1049,20 +1698,103 @@ class OpeningItem(QGraphicsItem):
         self.width, self.height = 32.0, 80.0
         self.door_type = "LH"
         self.swing = -1                   # -1 / +1 : which face it swings to
-        self.s = s
+        self.anchor_v = None              # the Vertex this is dimensioned off
+        self.offset_in = 0.0              # ...to the opening's NEAR EDGE
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setZValue(OPENING_Z)
-        self.set_code(code, rebuild=False)
+        self.set_code(code, rebuild=False)      # sets width, which s needs
+        # NEARER END, ties toward v1 (R4) -- the same rule `bridge._walls_of`
+        # already emits with, so the scene and the document agree on which end
+        # a given opening is dimensioned off and canonical form round-trips.
+        length = wall.length()
+        self.anchor_v = wall.end_vertex("p1" if s <= length / 2.0 else "p2")
+        self.s = s
         self.sync()
+
+    # -- the anchor -----------------------------------------------------------
+    def _anchor_attr(self) -> str:
+        """"p1" / "p2" -- which end this opening is dimensioned off, resolved by
+        IDENTITY and SELF-HEALING.
+
+        Object identity first, because it holds in the common case and costs
+        nothing. When it fails the corner has been RELOCATED (P3.3 mints a new
+        `Vertex` carrying the same uid), so the uid still matches and the anchor
+        is re-pointed at the new object -- once per move, not once per read.
+        That matters: `s` is read on every rebuild and every paint, and forcing
+        a uid mint per read is exactly the allocation P3.1 had to remove."""
+        w = self.wall
+        # A DELETED WALL IS A HARD CRASH, not an exception (P3.6). `s` became a
+        # property here, so it now touches `self.wall` on every read -- and an
+        # `OpeningItem` outlives its wall's C++ object often enough to matter
+        # (teardown, undo restore, a fractured wall's discarded segments). The
+        # old stored float never dereferenced anything. Same `sip.isdeleted`
+        # guard `WallItem.itemChange` and `RoomItem.itemChange` already carry.
+        if w is None or sip.isdeleted(w):
+            return "p1"
+        v1, v2 = w.end_vertex("p1"), w.end_vertex("p2")
+        if self.anchor_v is v1:
+            return "p1"
+        if self.anchor_v is v2:
+            return "p2"
+        if self.anchor_v is not None:
+            uid = self.anchor_v._uid          # no mint: None means never named
+            if uid is not None:
+                if v1._uid == uid:
+                    self.anchor_v = v1
+                    return "p1"
+                if v2._uid == uid:
+                    self.anchor_v = v2
+                    return "p2"
+        self.anchor_v = v1                    # orphaned -> re-seat on v1
+        return "p1"
+
+    def anchor_from(self, wall=None) -> str:
+        """"v1" / "v2" -- the anchor as the DOCUMENT names it."""
+        return "v1" if self._anchor_attr() == "p1" else "v2"
+
+    @property
+    def s(self) -> float:
+        """Distance of the opening's CENTRE from `wall.p1` -- derived from the
+        anchor, so it moves when the anchored corner does and not otherwise."""
+        if self.wall is None or sip.isdeleted(self.wall):
+            return self.offset_in + self.width / 2.0
+        if self._anchor_attr() == "p2":
+            return self.wall.length() - self.offset_in - self.width / 2.0
+        return self.offset_in + self.width / 2.0
+
+    @s.setter
+    def s(self, value: float):
+        """Place the centre at `value` from `p1`, re-expressed against the end
+        this opening is dimensioned off. The drag writes through here."""
+        if self._anchor_attr() == "p2":
+            self.offset_in = (self.wall.length() - float(value)
+                              - self.width / 2.0)
+        else:
+            self.offset_in = float(value) - self.width / 2.0
+
+    def fits(self) -> bool:
+        """False when the opening no longer lies within its wall -- the
+        condition `rebuild`'s clamp used to hide by sliding the door (P3.6)."""
+        half = self.width / 2.0
+        return -1e-6 <= self.s - half and self.s + half <= self.wall.length() + 1e-6
 
     # -- data -----------------------------------------------------------------
     def set_code(self, code: str, rebuild: bool = True):
         w, h = parse_wwhh(code)
         if w > self.wall.length():
             raise ValueError("Opening is wider than the wall.")
+        # A RESIZE IS ABOUT THE CENTRE, not about the anchored edge (P3.6).
+        # `offset_in` runs to the NEAR EDGE, so leaving it alone while the width
+        # changes grows the opening away from its anchor -- which pushed an
+        # auto-sized garage door clean off the end of its wall and was caught by
+        # shadow mode as I7. Widening a door in place is what a user means, so
+        # the centre is held and the offset re-derived.
+        centre = self.s if self.anchor_v is not None else None
         self.code = code.strip()
         self.prepareGeometryChange()
         self.width, self.height = w, h
+        if centre is not None:
+            self.s = centre
         if rebuild:
             self.wall.rebuild()           # re-cuts the gap, re-syncs children
 
@@ -1246,7 +1978,13 @@ class OpeningItem(QGraphicsItem):
         if self.wall is not None and self.wall.group() is not None:
             e.ignore()
             return
-        # slide along the wall, snapping to the nearest inch
+        # slide along the wall, snapping to the nearest inch.
+        # THIS CLAMP LIVES, DELIBERATELY (P3.6 / R3), and it is not the one that
+        # died in `rebuild`. That one silently repaired STORED DATA on the
+        # render path; this one BOUNDS A GESTURE -- it stops the user dragging a
+        # door off the end of its wall, which is the drag's job. Same
+        # distinction that keeps `wall_endpoint_open` and `_WallBBoxIndex`:
+        # rightly spatial, permanently. Do not remove it as a leftover of P3.6.
         s = round(self.wall.s_of(e.scenePos()))
         half = self.width / 2
         self.s = min(max(s, half), max(half, self.wall.length() - half))

@@ -1,0 +1,55 @@
+[
+ {
+  "where": "operation",
+  "violation": "I11 rooms 'M Bath' and 'Toi' overlap",
+  "window": null,
+  "running_test": "test_macro.pytest_select_prefers_furnishing_over_room\n    win.run_macro(macro)",
+  "rooms": 20
+ },
+ {
+  "where": "save",
+  "violation": "I11 rooms 'A' and 'B' overlap",
+  "window": null,
+  "running_test": "test_verify_design.pytest_save_verifies_deep\n    win.save_path(str(tmp_path / \"p.json\"))",
+  "rooms": 2
+ },
+ {
+  "where": "save",
+  "violation": "I11 rooms 'A' and 'B' overlap",
+  "window": {
+   "id": 2726463644016,
+   "visible": false,
+   "timer_active": false,
+   "live_mainwindows": 11,
+   "title": "Floor Planner \u2014 canvas 100'-0\" \u00d7 70'-0\""
+  },
+  "running_test": "test_verify_design.pytest_save_verifies_deep\n    win.save_path(str(tmp_path / \"p.json\"))",
+  "rooms": 2
+ },
+ {
+  "where": "operation",
+  "violation": "I11 rooms 'Kitchen' and 'Pan' overlap",
+  "window": {
+   "id": 2393371654128,
+   "visible": false,
+   "timer_active": false,
+   "live_mainwindows": 7,
+   "title": "Floor Planner \u2014 canvas 100'-0\" \u00d7 70'-0\""
+  },
+  "running_test": "test_macro.pytest_arrow_nudge_moves_selection\n    win.run_macro(\"PLACE sofa 120 96 0  SELECT 120 96\")",
+  "rooms": 20
+ },
+ {
+  "where": "save",
+  "violation": "I11 rooms 'A' and 'B' overlap",
+  "window": {
+   "id": 2393411027984,
+   "visible": false,
+   "timer_active": false,
+   "live_mainwindows": 10,
+   "title": "Floor Planner \u2014 canvas 100'-0\" \u00d7 70'-0\""
+  },
+  "running_test": "test_verify_design.pytest_save_verifies_deep\n    win.save_path(str(tmp_path / \"p.json\"))",
+  "rooms": 2
+ }
+]

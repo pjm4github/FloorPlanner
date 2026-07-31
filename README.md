@@ -46,12 +46,14 @@ console script), plus bundled fonts and artwork.
   are locked while it belongs to the room — right-click it and **Detach
   wall from room** to unlock its corners (the wall stays part of the room).
   Drag a corner along the wall (Shift for any angle) and where it pulls
-  away from its neighbour that side **opens**: a dashed **open wall**
-  bridges the gap and keeps the room closed for its area — so rooms no
-  longer need a wall on every side. Slide that partly-open wall and the
-  dashed segment travels with it while both adjoining walls stretch; drag
-  the wall back to the corners and the gap closes and the wall fuses back
-  into the room (right-click to detach it again). Right-click a room name
+  away from its neighbour that side **opens**: the room keeps its shape and
+  its area across the gap, so rooms no longer need a wall on every side.
+  Slide that partly-open wall and the opening travels with it while both
+  adjoining walls stretch; drag the wall back to the corners and the gap
+  closes and the wall fuses back into the room (right-click to detach it
+  again). An open side is **drawn dashed**, by the room itself, from the very
+  outline edge that records it — no placeholder item, so the cue and the fact
+  cannot disagree. Right-click a room name
   for an **inventory** — its
   properties plus every furnishing and opening in the room, in an aligned
   table you can copy as TSV for Excel. Rooms can be copied and pasted

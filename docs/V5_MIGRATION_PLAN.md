@@ -82,6 +82,62 @@ review changes are handed to Claude Code as explicit edit instructions; Claude C
 applies them, commits, and grep-verifies on disk. One extra round-trip, and the only
 channel that has destroyed work in this project is closed.
 
+### The gate must be checked, not printed — settled at P3.6
+
+**`python -m pytest -q | tail -1 && git commit` does not gate anything.** A
+pipeline's exit status is the LAST command's, so `&&` was testing `tail`, which
+always succeeds. Every gate run in that shape reported its counts honestly and
+enforced nothing — which is how P3.6(3) came to be committed with **two errors**
+in the ON and DEEP runs, visible in the very output that was pasted into the
+commit message.
+
+The errors were real and were shadow mode doing its job (`I7: 0 -> 1`, an
+opening pushed off its wall by a width change). They were found and fixed
+minutes later, so nothing shipped broken — but they were found by *reading* the
+output, which is exactly the manual step the gate exists to replace.
+
+**Run the command, capture its status, then print.** A helper that stores the
+output, keeps `$?`, echoes the tail and returns the status; or simply
+`set -o pipefail`. Never `... | tail -N && <next step>`.
+
+### Destructive experiments run in a worktree, or after a WIP commit — settled at P3.5
+
+**Never against uncommitted work.** `git checkout <file>` has no undo. At P3.5 it
+was used to revert a deliberate break-it-to-prove-the-test experiment (making
+the two defect-8 regressions fail on purpose, to confirm they catch what they
+name — which is the right thing to do) and it took that file's *uncommitted*
+work with it.
+
+The solution was already in use in the same task: the P3.5 perf comparison ran
+the old code in a `git worktree`, which cannot touch the working tree at all.
+So: **`git worktree add --detach <path> <ref>` for anything that needs the code
+in another state, or commit first and experiment on top.** The P3.5-followup
+verified its five new tests against pre-fix code exactly that way, and found
+that one of them passes on both sides — which is a finding the experiment only
+surfaces if it is safe enough to run.
+
+The doc-edit rule below is the same rule for a different asset. Stated once
+here so it does not have to be re-learned per file type.
+
+### A checkpoint is not complete until its handoff spec is committed — settled at P3.3
+
+**Session-end summaries and hand-off prompts are chat, and chat is not the record.**
+The P3.3 boundary proved it: the "five settled points" that fully specified the task
+existed **only in conversation**. The commit that was supposed to carry them
+(`3d6d32e`) changed exactly two lines — the defect 12a row and the P2.3 regression
+row — and the Progress log still ended at P3.2. Only the read-back verification
+caught it.
+
+**So: before ending a session mid-task, commit the spec** — into the Progress log or
+the task text — **then summarize.** The summary describes what was committed; it is
+never the thing itself.
+
+And the read-back is the check that makes the rule enforceable, so it stays: **quote
+what disk supports, name what it doesn't, proceed on the verified subset.** A number
+that cannot be found on disk is not quoted back as though it were — at P3.3 the
+"72 splits" figure appeared nowhere in the repo, and saying so is what surfaced the
+gap rather than papering over it.
+
 ---
 
 ## Status
@@ -109,14 +165,14 @@ channel that has destroyed work in this project is closed.
 | ☑ | **P2.3** Undo snapshots the v5 dict | ruff + pytest |
 | ☑ | **P2.4** Convert the corpus and the tooling | ruff + pytest |
 | ☑ | **P2.5** Split `MainWindow` IO/CSV/image/floors out | ruff + pytest |
-| ☐ | **P3.1** Vertex table live; `WallItem` holds `v1`/`v2` | branch, ruff + pytest |
-| ☐ | **P3.2** `RoomItem.outline`; drop `perimeter_corners` | ruff + pytest |
-| ☐ | **P3.3** Wall move = move vertices + split rule | ruff + pytest |
-| ☐ | **P3.4** Topology ops replace coalesce/weld/fracture | ruff + pytest |
-| ☐ | **P3.5** Delete the detection engine | ruff + pytest |
-| ☐ | **P3.6** Opening anchors | ruff + pytest |
-| ☐ | **P3.7** Delete `OpenWall` | ruff + pytest |
-| ☐ | **P3.8** Perf verification vs P0.3 | ratios recorded |
+| ☑ | **P3.1** Vertex table live; `WallItem` holds `v1`/`v2` | branch, ruff + pytest |
+| ☑ | **P3.2** `RoomItem.outline`; drop `perimeter_corners` | ruff + pytest |
+| ☑ | **P3.3** Wall move = move vertices + split rule | ruff + pytest |
+| ☑ | **P3.4** Topology ops replace coalesce/weld/fracture | ruff + pytest |
+| ☑ | **P3.5** Delete the detection engine | ruff + pytest |
+| ☑ | **P3.6** Opening anchors — *ticked 2026-07-30 on the re-certification: **10/10 GREEN** under full-mode `tools/gate.py` trailers (ruff + OFF + ON + DEEP, every sum reconciling). Defects 26, 28 and 29 all closed.* | ruff + pytest |
+| ☑ | **P3.7** Delete `OpenWall` — *ticked 2026-07-30 against the amended acceptance: the cue is drawn from the outline and pinned by a pixel test with measured polarity, the class and its `is_open` flag are gone (zero `git grep` hits in `*.py`), and the P3.5 Known-regression row closes on that test.* | ruff + pytest |
+| ☑ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** — *ticked 2026-07-30. `bake` 10.6× faster (279.0 → 26.4 ms at 64 rooms); all four survey rows answered or dispositioned; the flap class retired class-wide; defect 27's DEEP CI job green. Merge checklist items 1–4 done — **Phase 3 is code-complete, and the merge waits on Gate 3.*** | ratios recorded |
 | ☐ | **P4.1** Delete-wall keeps the room | ruff + pytest |
 | ☐ | **P4.2** Extract / join | ruff + pytest |
 | ☐ | **P4.3** Shuffle mode | ruff + pytest |
@@ -240,7 +296,9 @@ Behaviour that is deliberately worse between the task that broke it and the task
 | Broken at | Behaviour | Workaround today | Restored at |
 |---|---|---|---|
 | **P0.5** (fix 4) | Rubber-band-select a room whose edge is a longer party wall, then group + move it — the region no longer follows. The walls captured by the band move; the room does not. | Drag the room by its **label** instead: `_privatize_shared_walls` handles the party wall correctly on that path. | **P4.2** (`extract` replaces the accidental privatisation with a real operation) |
-| **P2.3** | **After the first undo, a wall that crosses a junction comes back split.** Undo now restores through `apply_design_to_scene`, which rebuilds walls edge-granularly. Measured: one 480″ wall with a T-junction at its midpoint returns as two 240″ walls. Body-dragging what looked like one wall now moves half of it and leaves the neighbour. | Drag the two halves together (rubber-band or shift-click), or re-draw the wall in one stroke — `coalesce` merges same-type overlaps on release. Nothing is lost: the **document is unchanged**, because `design_from_scene` planarises to the same canonical form either way, so the dirty flag and undo comparison correctly do not notice. | **P3.3 / P3.4** (vertex-native drag makes granularity moot — a wall move moves vertices, so how the run is subdivided stops mattering) |
+| **pre-dates the branch** (surfaced at P3.5, defect 23) | **A rubber band that clips a room's wall set strands that room.** The band takes only items fully inside it, so a wall poking out is left behind, that room's remaining walls are duplicated into the group, and the group moves those while the room's region stays where it was — it reads as a detached dashed outline at the original position. 3 of 20 rooms on a band covering 92% of `symmetricP1`. | **Band whole rooms** — include every wall of any room you mean to take — **or move the room individually** by dragging its label, which carries its walls and openings correctly. | **P4.5**, where "what a group is" is decided. Listed here rather than as a Phase-3 regression because the branch measurably IMPROVES it (148.3" of drift before P3.5, 46.65" now) — the Phase-3 gate is no-worse, not all-better. |
+| ~~**P3.5**~~ **CLOSED at P3.7 (2)** | ~~**An open side of a room is not drawn.**~~ **The cue is back, drawn from the outline: `RoomItem._paint_open_edges` strokes every `open_edge_segments()` with the same colour, dash and lod-scaled width the `OpenWall` item used — so this closes as *the same cue from one representation*, which is what the "Restored at" column asked for, and not as a different cue. RECEIPT, and it is a pixel test rather than a structural one because every structural assertion in `test_open_walls.py` stayed green throughout the regression: `test_an_open_side_is_drawn_dashed`. Polarity measured first (wall body 150, dash ~124, gaps and bare background 255), and it FAILS against a tree without the paint addition with the row's own words — `[255, 255, … 255]`, the open side rendering as nothing.** Original text: **An open side of a room is not drawn.** Detach a wall from its room and pull a corner away and the side opens — the room keeps its shape and area, and the document says `wall: null` exactly as before — but the vacated stretch renders as nothing rather than as a dashed line. The producer of the dashed `OpenWall` placeholder was `refresh_rooms` → `reloop_open_room` → `bind_room_walls`, all deleted here; the fact itself moved onto the outline (`RoomItem.open_edges()`), which is where the document had always kept it. | None needed for correctness — nothing is lost but the on-screen cue. The room's area, outline and saved file are unaffected. | **P3.7** (`OpenWall` is deleted and a `wall: null` edge renders dashed from the outline, which is the same cue drawn from the one representation instead of a second one) |
+| **P2.3** | **After the first undo, a wall that crosses a junction comes back split** — and if it borders NO room, body-dragging it moves only that segment. Measured at P3.3: one 480″ wall with a mid-span T returns as two 240″ walls. **Narrower than first recorded**: `_collinear_run()` (`walls.py:888`) gathers the whole room *side*, so for a wall on a room perimeter — the common case, and the one a user would notice — both halves still move as one. Verified with a room: `_collinear_run()` gathers 2 of 2. The row applies only to room-less walls, where `self.rooms` is empty and the run short-circuits to `[self]`. | Bind the wall to a room, or drag the halves together. Nothing is lost either way: the **document is unchanged**, since `design_from_scene` planarises to the same canonical form. | ~~P3.4~~ → **retargeted at P3.4 (iv), and the predicted fix was wrong on its own terms.** Re-checked by hand: the 480″ wall still returns as two 240″ segments, `merge_all` does **not** re-merge them, and the body-drag still moves one segment. It must not — the mid-span T is a **degree-3 vertex**, load-bearing for the planar subdivision, and merging through it would destroy planarity. `merge_collinear` refuses for exactly the right reason, so this row was never merge's to close. The fix belongs in the **drag's run-gathering**: `_collinear_run()` (`walls.py`) short-circuits to `[self]` when the wall borders no room, which is precisely the case the row describes. Gathering the run over **vertex adjacency** instead would carry both segments. Unassigned rather than invented — it is one small change, and the honest place is whichever task next touches the drag (**P4.2** extract/join is the nearest) |
 
 ### P0.6 — Cheap render wins
 **Touches.** `items.py`, `rooms.py`, `mainwindow.py`, `view.py`.
@@ -331,11 +389,26 @@ Extract `io.py` (open/save/export), `csvio.py` (`_import_rooms`/`_export_rooms`,
 
 # Phase 3 — Vertices own the geometry
 
-> **Branch.** `git switch -c v5-topology`. This is the only phase where `main` should not track HEAD. Merge when P3.8 records its numbers.
+> **Branch.** `git switch -c v5-topology`. This is the only phase where `main` should not track HEAD.
+
+### The Phase-3 merge checklist — ruled 2026‑07‑30
+
+~~*Merge when P3.8 records its numbers.*~~ That one line was the whole condition, and it is not enough: it would have merged a branch whose gate can go red for reasons unrelated to the code, onto a `main` whose CI runs neither of the invariants that caught the only real corruption this project has seen. **PR #1 merges when ALL of the following hold.**
+
+1. **P3.8's numbers are recorded** — a full P0.3 re-run against **both** the P0.3 baseline and the P3.5-exit numbers, ratios in the Progress log; and **grouping 20 rooms creates 0 new walls, asserted** (not observed).
+2. **All four exit-survey rows are answered** — by measurement, or explicitly dispositioned to a named task. **No blank rows**, the corpse-table standard applied to the survey: the split-on-write assignment-site census, the stranding question, defect 13's drag half, and the P2.3 collinear-run row.
+3. **The flap-class decision is made and applied to the CLASS** (all four members). **Constraint from member four, not negotiable: no wall-clock ratio may remain a gate-reddening hard pass on a shared machine.** Wider thresholds, best-of-N, or a non-gating recorded-benchmark lane with one very loose catastrophic guard — P3.8 decides from its own fresh numbers, but it decides for the class. *Why this is a merge condition and not housekeeping: as of today a red gate has two indistinguishable causes — a regression, or machine load — separable only by reading which test failed, which is the manual step the gate exists to replace.*
+4. **Defect 27, first half: a DEEP CI job** (`FP_VERIFY_DESIGN=deep`, ubuntu) **is added and green before merge.** Defect 26's fix removed the crash that made this impossible. I11 and I14 caught `planc1`'s real corruption, and they do not land on `main` guarded by nothing but a human running a local gate. **The windows-latest half stays filed in defect 27 as its own task — desirable, not merge-blocking.**
+5. ~~**Gate 3 passed by Patrick, findings dispositioned**~~ — **DONE, 2026‑07‑31.** Sections A and B re-run clean against the branch head. **Five findings, all dispositioned:** **31** the group-box stretch (fixed pre-merge, two mechanisms at defect 14's site) · **32** the warning's false advice (fixed pre-merge; a v5 plan is now silent on open) · **33** rooms left behind by a clipped band (**closed as a duplicate of 23** — measured: 100% band coverage strands zero, every band short of it strands what it clipped) · **34** a document gap in the (0.6″, 9.0″) band that nothing reports and nothing closes (**registered, carried to P4.2**; it wants a review, not an auto-repair) · and a **first real-user confirmation of defect 25's gesture arm** — a wall drawn onto a doorway leaves the end unwelded and the user sees only the generic torn-network message. Record in `docs/SANITY_CHECK.md`.
+6. **CI green on the branch head**, and **merge commit, not squash.** The sub-commit history carries the rollback points and the receipts live in the commit messages; flattening it would delete the audit trail this phase spent so much effort making true.
 
 ### P3.1 — Vertex table live
 `Design.vertices` becomes the live store. `WallItem` gains `v1`/`v2` ids; `p1`/`p2` become read-through properties resolving against the table, so **every existing caller keeps working**. Assignment to `p1`/`p2` moves the vertex and is logged under `--verify-design`.
-**Decide id policy here.** Items should carry **persistent uids, minted once** — stable across edits, and therefore macro-addressable — with `_canonicalize` (P1.5, `design/bridge.py`) applied only at **snapshot/serialization time**, for equality. Content-derived ids recomputed per walk are almost certainly the wrong thing to *persist*: P1.5's canonical ids sort by geometry, so moving one wall renumbers its neighbours. That is harmless for round-trip and undo comparison, which is all it was built for, but P3.1 makes scene items id-carrying and **P4.5 serializes groups by member id** — a group whose members are renumbered by an unrelated wall move is a live bug. Settle it at this task rather than discovering it at P4.5.
+**Assignment is SPLIT-ON-WRITE, not shared-move** *(ruled 2026‑07‑27)*. Assigning a new position to `p1`/`p2` **mints a fresh vertex for that wall's end** and leaves any sharer on the old one — today's independent-ends semantics, preserved exactly. That is what makes "suite green with no test changes" achievable at all: a shared move would drag a neighbour's end and break tests that have nothing to do with this task. Sharing is created **explicitly** (weld/join making two ends reference one vertex) and broken **explicitly** (split-on-write); shared movement arrives at **P3.3** as the wall-move *operation*, never as a side effect of assignment. Representation changes first, behaviour second, each observable separately. **Log every split-on-write under `--verify-design`** — the count of implicit splits per operation is exactly the data P3.3 needs to decide which call sites should become real vertex moves.
+
+**Gate additions** *(the Gate 2 lesson, applied verbatim)*: the task's gate includes a round-trip through **both** apply paths — `load_data` (faithful) and `open_document` (converting) — plus the `--verify-design` run. Compositions, not just paths.
+
+**Decide id policy here.** **Live items carry persistent uids, minted once; FILES stay canonical.** Persistence is an **in-memory** property; canonical form is the **interchange** property; P2.3's canonical comparison is the bridge that makes a persistent-uid document compare equal to its canonical form. Save canonicalizes at serialization exactly as P2.2 already built it, so **nothing on disk changes because of this decision** — fixtures, diffs and the equality definition are all untouched. Items should carry **persistent uids, minted once** — stable across edits, and therefore macro-addressable — with `canonicalize` (`design/canonical.py`) applied only at **snapshot/serialization time**, for equality. Content-derived ids recomputed per walk are almost certainly the wrong thing to *persist*: P1.5's canonical ids sort by geometry, so moving one wall renumbers its neighbours. That is harmless for round-trip and undo comparison, which is all it was built for, but P3.1 makes scene items id-carrying and **P4.5 serializes groups by member id** — a group whose members are renumbered by an unrelated wall move is a live bug. Settle it at this task rather than discovering it at P4.5.
 **Acceptance.** Suite green with no test changes. The `--verify-design` run stays green.
 
 ### P3.2 — `RoomItem.outline`
@@ -348,23 +421,129 @@ Dragging a wall moves its two vertices. Implement the split rule: a collinear co
 
 ### P3.4 — Topology ops replace coalesce/weld/fracture
 `coalesce_wall`, `coalesce_all`, `_coalesce_*_impl`, `weld_all`, `join_endpoints`, `fracture_delete_wall`, `_WallIndex`, `_WallBBoxIndex`, `_compute_wall_junctions` → `merge_collinear`, `split_edge`, vertex adjacency. **Defect 9 closes here** (merge dedups openings).
-**Acceptance.** `test_coalesce.py` and the coalesce half of `test_walls.py` rewritten against the new ops — **and this is the biggest "changed test" risk in the plan, so every rewritten assertion must be justified in the log.** ~330 lines deleted from `walls.py`.
+**Inherits the split rule's second half from P3.3: a vertex landing on another wall's body splits that wall.** P3.3 built only the first half (a collinear continuation past an endpoint splits first, so it can never be sheared); the body-landing half is `split_edge` applied scene-side, which is exactly this task, and building it twice would have meant building it wrong once. Until it lands, a body-landing has no vertex to be: P3.3 leaves those attachments on the old coordinate path (`kind == "tee"` in `WallItem.mousePressEvent`) with a comment naming this task. **Also remove `split_edge`'s `NotImplementedError` guard on walls carrying openings** (`design/topology.py`, added at P1.3-followup and pinned by `pytest.raises(match="P3.3")`) as the redistribution it names is built — the guard's message points at P3.3, so retarget or retire it rather than leaving it lying about which task owns the work.
+**Settled before implementation** *(2026‑07‑27 — seven points; committed to this file first, per the handoff-spec rule above, so the implementing session reads them from disk rather than from a summary).*
+
+**1. The crux — one pure planner, two thin appliers.** The ops in `design/topology.py` are pure `Design → Design`; this task needs them acting on a live scene of `WallItem`s carrying `OpeningItem` children, room bindings, groups, z-order and floors. Two obvious routes were considered and **both are rejected**:
+
+- **(a) Lift the scene to a `Design`, run the pure op, apply back.** Disqualified *on measurement*, not on taste: it makes every wall edit a **full-plan rebuild**, which destroys item identity — selection, in-flight drag state, group membership, and the whole point of P3.1's persistent uids — and would regress precisely the numbers **P3.8** exists to improve.
+- **(b) Scene-side siblings that share only the algorithm.** This is **F2's disease**: one concept, two implementations, drifting apart from the day they are written.
+
+**The third way: the decision logic runs ONCE, pure; only the mutation is dual.** `plan_merge_collinear(...)` / `plan_split_edge(...)` compute a **delta** — which vertices merge, which walls die, which openings land where and with what anchors — and two **thin** appliers execute it: the `Design` applier (essentially what `topology.py` already is) and a new **scene** applier that touches **only the items named in the delta**. No full rebuild; the algorithm single-sourced.
+
+**The drift risk that makes dual appliers frightening is already policed.** `--verify-design` re-derives the `Design` from the scene at every quiescent point, so **if the two appliers ever disagree, the shadow gate fires**. P1.6 was built for exactly this moment; this is the task that collects on it.
+
+*Bonus, and it is not incidental:* **a delta plus an applier is a command in all but name.** **P6.1** (`QUndoStack` + `MoveVertices`/`EditOpening`/…) inherits this shape for free rather than inventing it later.
+
+**2. The three unlisted helpers — let the call-site census decide, not the list.** The rule is: **a line dies when its last caller dies. Anything deleted must be uncalled; anything still called migrates.**
+
+- `_merge_intervals` is `fracture_delete_wall`'s alone → **falls with it**.
+- `coincident_walls` and `wall_endpoint_open` have callers in the **drawing / snap paths that survive Phase 3** → **they do not fall.** They are **reimplemented as thin queries over vertex adjacency** — a vertex's degree and its incident walls — which is precisely what the task line's "vertex adjacency" clause means. Census taken at P3.3, and it is **wider than "view.py"**: `wall_endpoint_open` at `view.py:248` (draw-release snapping); `coincident_walls` at `view.py:597` **and at `walls.py:656` and `walls.py:695`, inside `WallItem.rebuild` and `paint`** — those two are the party-wall opening cascade and the render path, neither of which Phase 3 removes. Only the `walls.py:201` caller (inside `_coalesce_wall_impl`) dies. Migrate on the census, not on the module a helper happens to live in.
+
+**3. Junction rendering — the inputs change, the output must not.** `_compute_wall_junctions` found neighbours by **bbox search**; adjacency hands them over **by lookup** (the walls sharing a vertex). The `_outline_clip` cache is recomputed from adjacency. **Seam-free is an OUTPUT contract: if the junction test needs touching, the replacement is wrong.**
+
+> **Correction, made at the read-back rather than discovered mid-task: the existing guard is NOT a pixel test.** `tests/test_walls.py:360` `test_junction_outline_is_clipped_so_walls_read_solid` asserts `w._outline_clip is not None` for crossing walls and `is None` for a lone one — **structural, not rendered**. It would pass against a replacement that populates the cache with the *wrong* clip, which is exactly the failure a bbox→adjacency swap can produce. So point 3 has two halves: keep that test green **unchanged** (it pins the cache's shape), **and add the pixel assertion it never had** — render a cross junction and assert no light seam pixel at the crossing. Per `CLAUDE.md`, antialiased 1-px assertions need a lenient threshold (`< 190`, not `< 100`). This is an **addition**, not a rewrite, so it does not count against the changed-test budget point 4 governs.
+
+**4. Rewritten tests get one line each: old op → new op → why the assertion moved.** For **defect 9**, the closing test is **live-editing shaped**: merge two collinear walls carrying identical openings → one survivor, openings deduped. (`planc1`'s three stacked doors were cleaned at import; this guards **the path that created them**, which is the one still open.)
+
+**5. Telemetry expectations, stated in advance so the numbers are predictions and not rationalisations.** The tee branch's **2** split-on-writes → **0** when the split rule's second half lands. `GroupItem.bake`'s **80 remain**: they are **P4.5's**, and the counter staying nonzero until then is **correct, not unfinished**. The split-on-write shim stays until its counter is owned entirely by P4.5's rebuild.
+
+**6. Sub-commits, each at a FULL green gate** (the P0.5 per-fix precedent — and this task is the size that earns it: one task, several rollback points):
+
+  1. planner/applier factoring + the scene applier for `merge_collinear`;
+  2. `split_edge` scene-side + the split rule's second half + the guard retarget (with its **pre-authorized** `match=` change, named in the log rather than slipped through);
+  3. call-site migration, **family by family**;
+  4. deletion of the dead ~375 and the junction swap.
+
+**7. On exit.** Re-check the **P2.3 Known-regressions row by hand** — the 480″ body-drag moving as one run again — and **flip it only if it genuinely closes**. Report the **measured** deletion count against the estimated 375.
+
+**Acceptance.** `test_coalesce.py` and the coalesce half of `test_walls.py` rewritten against the new ops — **and this is the biggest "changed test" risk in the plan, so every rewritten assertion must be justified in the log.** ~330 lines deleted from `walls.py` — **measured at P3.3 as 375 across 13 functions (25% of the file), including the three helpers point 2 adjudicates**; report the real figure on exit.
 
 ### P3.5 — Delete the detection engine
 `_RoomGrid`, `_WallGraph`, `detect_room`, `_detect_room`, `room_signature`, `refresh_rooms` memoization, `bind_room_walls`, `_wall_along_segment`, `_perimeter_span`, `room_owns_walls`, `walls_cover_room`, `duplicate_wall`, `_privatize_shared_walls`, `synthesize_room_edge`, `reloop_open_room`. "Detect room here" becomes `topology.enclosing_face`. **Defects 8 and 13 close here.**
 **Acceptance.** ~550 lines deleted from `rooms.py`. `test_rooms.py` and `test_room_walls.py` pass against stored outlines. `room_boolean` rewritten as a polygon op on outlines that touches only its own walls.
 
+**Settled before implementation** *(2026‑07‑27 — four riders on the read-back; committed to this file first, per the handoff-spec rule, so the implementing session reads them from disk).*
+
+**1. The headline check — the acceptance's essence in one assertion.** After the flip a wall move must update room outlines **by construction, with zero recomputation**: the outline references the same `Vertex` the wall does, so `relocated_to` moves both, or the model is wrong. **The proof is the existing P3.3 demo test** — the Lounge / Front Porch party wall, +12 y, ±17.5 sf, total unchanged — **passing with `refresh_rooms` deleted.** That one test surviving the deletion of the machinery that used to make it pass is the whole phase in a single assertion.
+
+**2. The tripwire disambiguation, made mechanical.** `test_a_corner_is_still_two_distinct_wall_vertices` can go red two ways: the designed outline flip, or a weld reaching the room-creation path (P3.4 built `share_coincident_ends`; `make_room` never calls it). **Sequence the sub-commits so the flip is unambiguous: retarget the docstrings → flip outlines to vertex identity (the guards flip HERE, for the designed reason) → then any path changes.** Red at any other point is a finding, not the flip.
+
+**3. Defect 13 — do not tick it on the disappearance of its measuring instrument.** The read-back established that `detach_wall_from_room` contains no detection today, and the only zoom-dependent quantities on that path are the drag's (`mousePressEvent`'s `20.0 / _view_scale()` endpoint catch radius, `_project_to_orthogonal`'s `16.0 / view_scale` stick). *Archaeological note:* the original `test_zzprobe` evidence counted **OpenWalls after `detach_wall_from_room` at pinned zooms** — and `reloop_open_room` plus the bind machinery die here while `OpenWall` itself dies at **P3.7**, so the repro's substrate is being demolished across two tasks. If it cannot be reproduced at the P3.5 exit, write **"repro substrate removed, defect retargeted to the drag tolerances"** rather than ticking it. *A defect closed by the disappearance of its measuring instrument is not closed.*
+
+**4. Census divergences, approved as tabled.** Realistic deletion **~470 from `rooms.py` + 34 from `walls.py`** against the ~550 estimate, with four names owned elsewhere: `_perimeter_span` (24) falls with `fracture_delete_wall` at **P4.1**; `duplicate_wall` (15) at **P4.5**; `room_owns_walls` (14) and `walls_cover_room` (20) are **rewritten as outline predicates, not deleted** (last caller is `GroupItem.bake`). `_privatize_shared_walls` (28) is assessed **in-task**, with the outlines already flipped, rather than guessed now. `synthesize_room_edge` (13) is already callerless — a free deletion. **`test_rooms.py` / `test_room_walls.py` rewrites are this task's authorized zone**, same discipline as P3.4: one line per rewritten assertion, old mechanism → stored outline → why.
+
 ### P3.6 — Opening anchors
-`s` → `{from, offset_in}`. Delete the silent clamp in `WallItem.rebuild` (`walls.py:568`) — an out-of-range opening is an error surfaced to the user, not a slid door. Replace the 13 `except ValueError: continue` sites with a collected, reported error list. **Defects 6 and 7 close here.**
-**Acceptance.** P0.4 test 1 passes without xfail. Loading a plan whose door no longer fits reports it instead of dropping it.
+`s` → `{from, offset_in}`. Delete the silent clamp in `WallItem.rebuild` (**`walls.py:1004`**, not `:568` — the line moved through P3.3–P3.5) — an out-of-range opening is an error surfaced to the user, not a slid door. Replace the **8 verified** `except ValueError: continue` sites that silently drop an opening with a collected, reported error list. **Defects 6 and 7 close here.**
+
+**Read-back corrections, settled 2026‑07‑28** *(the numbers in the line above were quoted from the review and did not survive being checked; recorded here rather than carried).*
+
+- **"13" was never the count of opening drops.** Measured at the migration baseline `841264e`: **13 is the count of *every* `except ValueError` in `floorplanner/`**, of which **7** wrapped an `OpeningItem(…)`. Today: 17 total, 9 wrapping `OpeningItem`, of which **8 are still silent** (`bridge.py` was converted to a reported list at P1.5 and its comment forecast this task). The other four at baseline are catalog price parsing ×2, `macro._is_num`, and dialog handlers that already report — feeding those into an opening-error list would be wrong. **The 8:** `planio.py:169` (the v4 load — defect 6's "incl. on load"), `mainwindow.py:1082` and `:1177` (paste), `rooms.py:749` (privatize), `rooms.py:1046` (`duplicate_wall`), `walls.py:333` (merge), `:587` (split), `:675` (fracture).
+- **"P0.4 test 1 passes without xfail" pinned nothing** — it was never xfail. P0.4's own log says *"Passes: opening-s under group move AND rotate"*, and both still pass. Replaced by R1 below.
+- **Defect 7's four cited sites are stale.** The *condition* is verified intact — nothing anywhere re-bases `op.s` — and that condition, not the site list, is what the anchor closes.
+
+**Rulings, settled 2026‑07‑28 (R1–R5).**
+
+**R1 — Acceptance.** The schema's own rationale, as three tests plus the report:
+  (a) an opening anchored `from: "v2"` keeps its `offset_in` exactly when the wall is stretched **at v2** — *the discriminating case*, since absolute `s` holds position relative to v1 instead;
+  (b) reversing a wall leaves the opening's physical position unchanged;
+  (c) the split of R2;
+  (d) loading a plan whose door no longer fits **reports** it.
+  **Receipt standard:** (a) and (b) must be shown failing against `s`-based code in a worktree before the anchor lands.
+
+**R2 — Straddle: the primitive becomes TOTAL, and both pins flip.** P3.4(ii)'s decline was a placeholder pending representability, and `match="P3.6"` was that test naming its own executioner. **Load-time planarize cannot decline** — a crossing that exists in the data has to split, and refusing there aborts or corrupts a load. Semantics: the opening anchors to the segment containing its **anchored end**; if its extent no longer fits that segment, it joins the collected report. **The scene op's decline dies with it** — a gesture that silently does nothing is defect 17's disease and we do not keep a second case on purpose. Both flipped assertions carry a one-line justification citing this ruling.
+
+**R3 — The drag clamp LIVES,** and is annotated so a later census does not kill it as a survivor of this task. `rebuild`'s clamp silently repairs *stored data* (dies); `OpeningItem.mouseMoveEvent`'s (**`walls.py:1821`**) bounds a *gesture* (lives) — the same distinction that keeps `wall_endpoint_open` and `_WallBBoxIndex` in the "rightly spatial, permanently" category.
+
+**R4 — `center`: consume, never produce.** Emitting `center` requires knowing the user *meant* centred, and inferring that from coordinates that happen to be the midpoint is detection-from-geometry — the disease v5 exists to kill. P3.6 emits `v1`/`v2` only, **nearer end, ties broken toward `v1`**, so canonicalization round-trips deterministically. **Production of `center` is deferred until a UI expresses the intent.**
+
+**R5 — One vocabulary, two surfaces.** All 8 sites feed the `rep["openings_failed"]` structure, entries naming wall, opening type and anchor. Surfaced by context: **load-path** entries (`planio.py:169` included — that is defect 6's "incl. on load" closing, and it ends the v4-silent / v5-reported asymmetry) join the open/conversion report per P2.1; **edit-path** entries (paste ×2, merge, split, fracture, privatize, `duplicate_wall`) surface as a status-bar line naming the edit, **said once** — the `06c2145` wording standard applies.
+
+**R4b — anchors: FIDELITY on round-trip, canonical at MINT only** *(settled 2026‑07‑28; overrules the canonicalize-on-emit shipped at P3.6(1))*. An anchor that already exists — loaded from a v5 file, or held by the live item — round-trips **verbatim**. The nearer-end / tie-to-`v1` rule of R4 applies **only when minting**: a legacy import, or an opening that has never had an anchor. *Why:* the anchor end changes behaviour under stretch, so re-basing it on save is **silent loss of intent — the same category as the clamp P3.6 deletes.** `_walls_of` reads the stored anchor when present and mints only when absent. Pinned by a round-trip test: a hand-authored FAR-end anchor survives load → save unchanged.
+
+**R2b — the straddle rule, confirmed as read.** **Extent decides:** an opening wholly inside one segment lands there regardless of which end it is anchored to. The anchored-end rule is the tiebreak for the **true straddle only** — where the opening necessarily overhangs and is necessarily reported. When an opening lands on the segment that does *not* contain its anchor vertex, it **re-seats to the same-side end of its new segment** (the split vertex), exact position preserved, offset recomputed — **same-side, not nearer-end**, consistent with R4b.
+
+**Also in scope, found during the read-back: defect 24.** `topology.graph_from_design` and `_reanchor` read and write `offset_in` as a **centre** distance where the schema, `bridge._walls_of` and `bridge._opening_s` all define it as a **near-edge** distance. This is the anchor arithmetic, so it is this task's; and R2's straddle test (`ov.s - half < s < ov.s + half`) rests on the value being right.
 
 ### P3.7 — Delete `OpenWall`
 An outline edge with `wall: null` renders dashed.
-**Acceptance.** `test_open_walls.py` rewritten against null edges; the class is gone.
+~~**Acceptance.** `test_open_walls.py` rewritten against null edges; the class is gone.~~
+
+**AMENDED ACCEPTANCE, settled 2026‑07‑30 before any code** *(the P3.6 lesson applied to a three-line task: a spec whose acceptance can pass vacuously is the same class of problem as a task line whose three numbers were all wrong — fix the spec first, then the code).*
+
+**Two rulings from the read-back, and they are what the amendment implements.**
+
+**R1 — RENDER-ONLY. No item, no interaction.** An open edge is *the absence of a wall*; interacting with an absence means either drawing a wall there (the draw tool already owns that) or moving the room (the room owns that). Selection of a nothing has no meaning to implement. `test_open_wall_is_editable`, deleted at P3.5 because "it asserted drag controls on a placeholder nothing constructs", **stays a precedent rather than a casualty**: no drag controls on something nothing constructs. The cue is drawn in `RoomItem.paint` from `RoomItem.open_edges()` — the fact and the cue from **one** representation, which is what the P3.5 Known-regression row promised. **Match the old `OpenWall` dash visually** so the row closes as *"same cue, one representation"* and not as *"different cue"*. If a later phase needs open-edge hit-testing, **that phase specs it** (P4.2 extract/join is the plausible candidate); a fence comment at the paint site naming P4.2 is welcome, not mandatory.
+
+**R2 — THE PIXEL ASSERTION IS REQUIRED, on P3.4's junction-contract template:** render, **measure the polarity first**, then assert with a measured threshold. A dashed line is the canonical structurally-green / visually-absent cue, and the old acceptance would have passed with nothing drawn at all.
+
+**The four acceptance items:**
+
+**(a) `test_open_walls.py` against null edges — VERIFY, DO NOT RE-DO.** Already landed at P3.5 and logged there as `[DIVERGENCE — the whole file]`: `_open_count` sums `r.open_edges()` and the file's docstring states the old→new mechanism. What remains of it here is only its four `not w.is_open` helper filters, which fall with the flag in (c).
+
+**(b) Pixel assertion, polarity measured**, on a room with an open edge: the dashed cue is drawn along the vacated stretch, and the closed sides are unaffected. Both halves in one test — positive and negative — so the positive assertion cannot go vacuous, exactly as P3.4's junction test does.
+
+**(c) The class is gone**, by the standing rule (*a line dies when its last caller dies*). **Census taken on disk 2026‑07‑30, and it diverges from the estimate in two ways — reported rather than forced:**
+
+- **THERE IS NO LIVE PRODUCER, and there has not been since P3.5.** `grep "OpenWall("` over the tree returns **zero** constructor calls. The **P2.3 producer branch in `apply`** named in the estimate is already deleted — `bridge.py:959` is now a *comment* recording that it went at P3.5. **The Progress-log line at P2.3 ("apply now builds an `OpenWall` per `wall: null` outline edge; P3.7 retires the branch") is stale history and is annotated as such**, not acted on. So the class is dead code today: deleting it removes a definition, not a behaviour.
+- **`is_open` IS THE REAL SWEEP, and it is ~7× the estimate.** The estimate said "comments/docstrings ×7". Measured: the flag is read at **23 sites in `floorplanner/`, 19 in `tests/`, and 2 in `docs/make_gallery.py` — 44 readers across 17 files** — plus the definition (`walls.py:902`) and the override (`:1685`). **Every one of them is permanently `False`** once nothing constructs an `OpenWall`, and `walls.py:1631` already says so in a comment. The flag dies with its producer and the readers go with it: *a permanently-false flag is worse than no flag, because it tells every future reader that open walls exist as items.* Sub-committed separately from the rendering, so the mechanical sweep is its own rollback point.
+
+**(d) The P3.5 Known-regression row closes**, citing the pixel test (b) as its receipt — not the deletion, and not "the code now draws something". The row's own wording is the bar: *the same cue drawn from the one representation instead of a second one.*
+
+**Sub-commits:** (1) this amended acceptance; (2) rendering + pixel test; (3) the deletion sweep. **Full-mode `tools/gate.py` trailers throughout.**
 
 ### P3.8 — Perf verification
 Re-run P0.3 and compare against the P0.6 numbers.
 **Acceptance.** Ratios recorded in the log. Grouping 20 rooms creates **0** new walls — assert it.
+
+**Also: the SPLIT-ON-WRITE EXIT SURVEY** *(added 2026‑07‑28)*. Assigning `p1`/`p2` mints a fresh vertex for that end, and three separate defects have now come from something downstream being left on the old one: the P3.1 shim's own telemetry, **defect 22** (bake orphaning room outlines) and **the anchor orphaning** found at P3.6(1) (12 of 41 openings mirrored on loading `planc1`). Three members is a pattern, not a coincidence. **Census at P3.6: 9 direct coordinate-assignment sites remain** — `mainwindow.py:568,569` (align to grid), `:578,579` (`_translate_shape`), `view.py:402` (the rubber-band wall being drawn), `walls.py:1511,1513` (the endpoint drag), `walls.py:1549,1551` (the `rigid` and `tee` branches, both P4.5's / P3.3's by ruling). P3.8 re-runs this grep, records the count, and for each survivor states what carries the things attached to that end — or names the task that will.
+
+**And: the OPEN DRAG QUESTIONS.** *(table added 2026‑07‑30.)* Two questions about what a mouse gesture does have now been left explicitly unanswered rather than guessed, each because the measurement that would settle it was out of its task's scope. They are surveyed together here because they are the same organ — the endpoint drag — and because an unassigned question with no home is one nobody re-reads. **Neither is scoped to P3.8 by this table; P3.8 records the answer or names the task that will.** *(Structural note: this table is new. The split-on-write survey above is prose, and defect 13's drag half lives in the defect register's row 13 as "unassigned (drag)" — it is restated here so the two sit beside each other, not moved.)*
+
+| question | why it is open | how to answer it |
+|---|---|---|
+| **Defect 13's drag half — does a drag's RESULT depend on view zoom?** *(**Status authoritative in register row 13; this row is the exit checkpoint.** One direction only — the register keeps the history, the survey blocks the exit. This row is a restatement, so it is the one that can drift.)* | Measured at P3.5 **before** anything was deleted: the same scene-space gesture gave **0 open sides at 0.25× and 1 at 0.5×–4×**, leaving the wall's far end at y=120 versus y=60. The detection half closed structurally; the zoom terms that remain are the drag's own — `mousePressEvent`'s `20.0 / _view_scale()` endpoint catch radius and `_project_to_orthogonal`'s `16.0 / view_scale` stick. Retargeted and left **unassigned** rather than invented a home for. | Drive the same gesture at pinned zooms and compare the resulting geometry, as P3.5 did — then decide whether a gesture tolerance *should* be zoom-relative (it probably should) and whether the RESULT may be. **P4.2** is the nearest task that touches the drag. |
+| ~~**Does a real endpoint drag re-point every outline holder, or strand a third room?**~~ **ANSWERED at P3.8 (3): IT STRANDS — registered as defect 30.** A real viewport-driven body drag at `symmetricP1`'s 4-way corner (582, 714) moved it **(0, −24)**; Dining and Kitchen followed; **Foyer and Great Room were left behind**, each with one wall end at the new corner and one at the old while its outline stayed at the old. Step 4 gathers from the **run's rooms**, not the corner's **holders**. The ENDPOINT drag is a separate answer: it assigns `p1`/`p2`, which is split-on-write by P3.1's ruling and deliberately leaves the outline behind — that is the open-side feature, not a defect. Pinned `xfail` by `test_a_dragged_corner_carries_every_room_that_holds_it`. | The 38 synthetic drags at the defect-28 resolution **moved the corner in none of them**, so the app is neither cleared nor accused — that run's "0 stranded" is vacuous and was discarded rather than quoted as an acquittal. The question matters because the *test* that stranded a third room was hand-rolling what the drag does, and `mousePressEvent` step 4 gathers outline edges from the **run's rooms**, which is not obviously the same set as **every room holding the corner**. | **Answer with a real drag** — driven far enough to actually move the corner, asserted as having moved — **on a corner held by 3+ rooms**, then check every holder followed. |
 
 ---
 
@@ -388,6 +567,7 @@ Create a room by typed dimension; duplicate a room as a floating unit; save/load
 
 ### P4.5 — Group semantics + z-order
 Groups move the real items — no `duplicate_wall`, no `coalesce_all` on ungroup. Groups serialize (`Design.groups`). Collapse the four z schemes into one that is serialized. **Defects 3 and 11 close here.**
+**Retire or re-justify P3.3's `kind == "rigid"` carve-out here, explicitly.** A wall drag promotes coincident ends into shared vertices, but *excludes grouped neighbours* — they keep the old coordinate path, following the drag without becoming topology. The reason is this task's premise: grouping **duplicates** a room's walls onto the originals, so a grouped coincident end is the common case and not an exotic one, and sharing one would wire a group member to an outside wall permanently while what a group *is* topologically is still undefined. Exactly the reasoning behind the `group() is None` gate that keeps grouped walls out of coalesce — deliberately not topology. **When groups stop copying walls, that reason evaporates**, and a carve-out whose justification has gone is how a workaround becomes folklore. Decide it here: delete it, or write down the new reason.
 **Acceptance.** P0.4 tests 3, 4 and 6 flip to pass. `test_groups.py` rewritten — the three tests encoding duplicate-on-group semantics (`:64`, `:133`, `:155`) are *intentionally* replaced; say so in the log.
 
 ---
@@ -1513,4 +1693,1857 @@ result:  GATE 2 -- PASSED, one finding found and fixed (d665e06). Patrick's two
          trailing checks (original file untouched on disk, undo feel) ride as
          optional confirmations, not blockers.
 meaning: Phase 2's acceptance is complete. P3.1 may proceed.
+
+P3.1  done   (commit f0990d4, on branch v5-topology)
+ruff:    clean
+pytest:  OFF  415 passed, 4 xfailed, 1 xpassed in 16.69s
+         ON   415 passed, 4 xfailed, 1 xpassed in 20.20s
+         DEEP 410 passed, 3 xfailed, 7 deselected in 18.22s
+files:   floorplanner/vertex.py (new), floorplanner/walls.py (read-through
+         p1/p2 + v1/v2), floorplanner/design/verify.py (split logging),
+         tests/test_vertices.py (new, 12)
+ACCEPTANCE: suite green with NO TEST CHANGES -- `git status tests/` shows only
+         the new file -- and the --verify-design run stays green.
+notes:   A Vertex is a shared, identity-bearing point; two wall ends holding the
+         SAME Vertex object are the same corner. No registry: the "table" is the
+         set of vertices reachable from the walls, exactly as Design.vertices is.
+         SPLIT-ON-WRITE, per the ruling. Assigning a moved position mints a
+         fresh vertex and leaves any sharer put; a NO-OP assignment returns the
+         same vertex, so identity and sharing survive the many places that
+         re-set the same coordinates. Pinned by a test that shares a corner
+         explicitly, moves one end, and asserts the other did not follow.
+         SPLIT LOGGING: verify() records the per-operation delta in
+         win._vertex_split_log. It LOGS rather than warns -- a drag legitimately
+         splits, so a warning per drag would be noise, not signal.
+         A PERFORMANCE REGRESSION I INTRODUCED AND FIXED, recorded because the
+         HARNESS caught it and review would not have: the first version
+         allocated a QPointF on every p1/p2 READ and a uid string on every
+         write. p1/p2 are read on every rebuild, paint and hit-test, so rebuild
+         slowed ~50% and bake nearly doubled -- test_bake flapped at 8.54
+         against a threshold of 8. Fixed by storing the QPointF once and
+         returning it SHARED, and minting uids lazily. Both are safe only
+         because a vertex is never mutated in place: a move produces a NEW
+         vertex, so a caller holding an old p1 still sees the old position --
+         identical to the previous behaviour, where assignment rebound the
+         attribute to a fresh QPointF. Verified before relying on it (nothing in
+         the codebase mutates a p1/p2 in place; every access is .x()/.y()) and
+         pinned by test_vertex_is_never_mutated_in_place. bake now 43.7 -> 297
+         ms ratio 6.83 vs P2.3's recorded 40.8 -> 278.7 ratio 6.83 -- restored,
+         not merely under the threshold. This is the second time P0.3's harness
+         has paid for itself on a change that looked free.
+         FINDING -- WHY P3.1 STOPS AT THE REPRESENTATION. design_from_scene
+         still builds its own vertex table by welding COORDINATES at 0.6"; it
+         does not yet consume the live uids. It cannot: nothing creates sharing
+         yet, so today every coincident wall end is a DISTINCT vertex, and
+         emitting live uids would put two vertices 0" apart in the document and
+         trip I14 across the whole corpus. Consuming the live table therefore
+         has to wait until weld/join create shared vertices explicitly, at
+         P3.3/P3.4. That ordering is not a shortcut -- it is the same
+         representation-then-behaviour discipline the split-on-write ruling
+         encodes.
+         COMPOSITION GATE (the Gate 2 lesson): round trips asserted through BOTH
+         apply paths -- load_data (faithful) and open_document (converting,
+         composed all the way out to a legacy export and back).
+
+CI-ON-BRANCH  done   (draft PR #1)
+notes:   Pushing v5-topology ran NO CI -- ci.yml triggers on push-to-main and
+         pull_request only, so the whole geometry rewrite would have gone
+         unvalidated until the merge: exactly the situation P0.3 called out.
+         Fixed with a DRAFT PR (v5-topology -> main) rather than editing
+         ci.yml's push list: the pull_request trigger then covers every push,
+         and it costs no config change on main that we would later revert. The
+         PR also gives a running diff of the phase and is the merge vehicle at
+         P3.8. First run green: ruff, py3.10 and py3.13, both suite runs.
+
+P3.2  done   (commit 77bc91a, branch v5-topology)
+ruff:    clean
+pytest:  OFF  428 passed, 4 xfailed, 1 xpassed in 16.69s
+         ON   428 passed, 4 xfailed, 1 xpassed in 18.64s
+         DEEP 423 passed, 3 xfailed, 7 deselected in 16.80s
+files:   floorplanner/rooms.py (OutlineEdge, derived corners, mirror deleted,
+         edge->wall in bind_room_walls, clipboard fix), floorplanner/planio.py
+         (export re-derives, load strips), floorplanner/items.py +
+         mainwindow.py (mirror call sites), tests/test_outline.py (new, 13),
+         tests/test_groups.py (one deleted-method call)
+ACCEPTANCE: room areas unchanged across the corpus (asserted on sample_plan and
+         planc1 through the faithful apply, with the document identical after);
+         _sync_corner_props and its six call sites deleted.
+notes:   INTERIM REPRESENTATION, stated not implied: an outline edge holds a
+         COORDINATE, not a vertex identity. P3.1's split-on-write world has no
+         shared corner vertex to name -- at every corner each wall owns a
+         distinct Vertex. Borrowing one wall's end picks arbitrarily between
+         two (and two rooms meeting there could pick differently); minting a
+         room-owned vertex adds a third object no wall references. Both encode
+         an authority that does not exist yet; a coordinate states exactly what
+         is known. THE TEST FOR CHOOSING AN INTERIM REPRESENTATION IS WHICH ONE
+         DOES NOT LIE.
+         Two guards pin the gap: outline corner and wall end have equal
+         coordinates but are distinct objects, and a corner is still two
+         distinct wall vertices. Both say in their docstrings that FAILING is
+         the signal P3.4 closed the gap, not that something broke.
+         The edge->wall mapping is the real content of the task -- before it a
+         room had corners and an unordered walls list with no correspondence.
+         SHIPPED POPULATED (bind_room_walls already computed it to place
+         OpenWall placeholders), so the fallback rider does not apply and P3.4
+         inherits nothing.
+         THREE FATES, all three exercised by tests: the live mirror DELETED;
+         the legacy v4 export KEPT byte-compatibly via
+         RoomItem.export_properties() re-deriving at serialization time at the
+         same 2dp rounding (the v4 loader needs it for OPEN rooms, whose
+         detection fails); the importer reading legacy FILES untouched forever.
+         Plus "ignored on load" -- read for the fallback, then stripped.
+         AUDIT FINDING -- THE MIRROR WAS MASKING A LATENT BUG, and only the
+         grep-everything instruction found it. _copy_spec carried
+         dict(self.properties) -- including the SOURCE room's perimeter_corners
+         -- into the clipboard; paste_room passed it to the new RoomItem, where
+         _sync_corner_props overwrote it. Deleting the mirror naively would have
+         shipped the source room's geometry into every pasted room, in a corner
+         the suite does not reach. Fixed by keeping geometry out of the
+         clipboard, with a test. All 20 tree-wide hits reconcile: 6 importer
+         (4 live + 2 docstrings), 2 mirror body, 1 legacy-load fallback, 1
+         bridge pop, 1 tool docstring, 8 tests, 1 schema (which FORBIDS the key,
+         confirming the plan's parenthetical).
+         The room-properties dialog and the inventory paths were checked too:
+         the dialog updates an explicit key list, inventory reads include_sqft
+         only. Neither touches geometry.
+         TEST CHANGED (1): tests/test_groups.py called room._sync_corner_props()
+         directly -- a SEVENTH call site, in tests rather than production.
+         Removed; a call to a deleted private method, not an assertion (the P0.2
+         class). The change I PREDICTED to test_design_bridge's _project_areas
+         did NOT materialise: because the export re-derives the key rather than
+         dropping it, that helper reads it unchanged.
+
+P3.3  done   (branch v5-topology)
+ruff:    clean
+pytest:  OFF  447 passed, 4 xfailed, 1 xpassed in 18.04s
+         ON   447 passed, 4 xfailed, 1 xpassed in 19.61s
+         DEEP 442 passed, 3 xfailed, 7 deselected in 17.69s
+files:   floorplanner/vertex.py (relocated_to + call-site attribution),
+         floorplanner/walls.py (_DragVertex, end_vertex/set_end_vertex,
+         _is_continuation, _plan_vertex_moves, the drag rewritten),
+         floorplanner/design/verify.py (SITE_LOG_ATTR),
+         tests/test_wall_move.py (new, 19)
+ACCEPTANCE: suite green with NO TEST CHANGES -- `git status tests/` shows only
+         the new file, all three ways.
+THE LOG ENTRY FOR THIS TASK WAS NOT ON DISK. The brief said the five settled
+         points were in this Progress log; they were not, and 3d6d32e touched
+         only two lines (defect 12a, and the P2.3 regression row). Reported
+         rather than reconstructed, per the P0.6 rule. Two of the five WERE on
+         disk and are quoted here: the same-level constraint (defect 12a,
+         `_attached`) and `_collinear_run` at walls.py:888 gathering 2 of 2. The
+         "72 splits" figure appears nowhere in the repo (a grep for it over
+         docs/*.md is empty), so it is not quoted; the measured figure for this
+         task's scenario is below. The 0.6" tolerance was verified in the CODE
+         (walls.py, `QLineF(q, rp).length() < 0.6`), which matches
+         vertex_weld_in / WELD_TOL -- the schema's own definition of one vertex,
+         and now named SHARE_TOL rather than repeated as a literal.
+THE HEADLINE NUMBER, measured both ways on the same 4x4 grid: 12 wall drags
+         caused 148 SPLIT-ON-WRITES before this task and 2 after. The two that
+         remain are the branches deliberately NOT promoted (see below), so the
+         drag path is converted, not merely quieter.
+(1) PROMOTION. The 0.6" scan used to discover coincident ends and then push each
+         one by hand on every mouse event, which is split-on-write: the corner
+         came apart and was rebuilt from coordinates 60 times a second. Now the
+         scan runs ONCE at press and REBINDS those ends to one Vertex object
+         (`set_end_vertex`), and the drag moves the vertex (`relocated_to`) --
+         so a neighbour follows because it IS the corner. Asserted with `is`,
+         never `==`: equal coordinates are exactly what the old code already
+         produced and would not distinguish the two worlds.
+         `relocated_to` CARRIES THE UID. A moved corner is the same corner, so
+         renaming it would be wrong on its own terms and would also break P4.5,
+         which serializes groups by member id. It is not counted as a split,
+         because it is not one -- otherwise P3.3's own conversion would show up
+         in the very telemetry that exists to find the call sites still needing
+         it. A test pins that the count does not move across a drag.
+         SAME LEVEL ONLY (defect 12a, now closed). Filtered at the LOOP HEAD, so
+         cross-level sharing is impossible by construction. Note the filter
+         covers the whole scan, not just the promotion: leaving the tee branch
+         unfiltered would have left half of defect 12a alive for no benefit, and
+         the transient cross-floor mis-drag is a real bug too. Declared because
+         it is one line wider than "promotion is same-level".
+(2) THE SPLIT RULE, and what it is really a rule about: what must NOT be shared.
+         A wall collinear with the slide that continues past an endpoint cannot
+         ride the corner -- the slide is perpendicular, so moving the shared end
+         would swing its far end and SHEAR it. So the continuation is split off
+         FIRST (its own vertex, and it stays put), before any sharing is made.
+         Verified in both directions rather than asserted: with P3.3 reverted,
+         test_a_collinear_continuation_is_never_sheared FAILS with the
+         continuation's end at y=12 instead of y=0 -- it really was being
+         dragged and sheared, so this is a behaviour FIX, not just a
+         representation change.
+         THE FIRST EARNED BEHAVIOUR CHANGE OF PHASE 3, and the label is the
+         standard rather than a flourish. Phase 3's contract is that P3.1 and
+         P3.2 are compat shims -- representation moves, behaviour does not, and
+         "suite green with no test changes" is the receipt. A behaviour change
+         inside that contract has to earn its place, which means all three of:
+         DECLARED in advance (the split rule was in the task text), TESTED IN
+         BOTH DIRECTIONS (it fails on reverted code, at a named coordinate, so
+         the bug is exhibited and not merely described), and BRACKETED BY A
+         MEASUREMENT (148 -> 2 splits over the same 12 drags, so the size of
+         the change is known and not guessed). A behaviour change with fewer
+         than three is a regression that has not been noticed yet.
+         The rule also has to BREAK sharing that already exists, not merely
+         decline to create it (a corner welded by an earlier operation is
+         exactly what P3.4's weld produces). Own test.
+(3) DETECTION STAYS AUTHORITATIVE. Nothing here reads outlines off vertices;
+         room areas after a drag are what refresh_rooms arrives at, and the
+         scene test asserts that. P3.5 flips it.
+(4) CALL-SITE ATTRIBUTION, and the data it immediately produced. P3.1's counter
+         said an operation splits; it could not say WHERE, and "which call sites
+         should become real vertex moves" is a question about lines. `_blame()`
+         walks past this module and past the p1/p2 setters -- blaming the
+         setters would put every split on two lines and answer nothing.
+         MEASURED, over coalesce + weld + group + bake + ungroup + 12 drags = 82
+         splits:
+             40  items.py:703 in bake()
+             40  items.py:704 in bake()
+              2  walls.py     in mouseMoveEvent()
+         So 80 of 82 are GroupItem.bake, on two adjacent lines, and that is
+         P4.5's ("groups move the real items -- no duplicate_wall"). The 2 are
+         the tee and grouped branches this task deliberately left on the
+         coordinate path. The drag's own corner moves contribute ZERO.
+         TWO LOGS, not a wider tuple: SPLIT_LOG_ATTR keeps its (operation,
+         splits) shape and SITE_LOG_ATTR carries the blame, so the P3.1 reader
+         (and its test) is not broken to add data it did not ask for.
+         COST measured, per the P3.1 lesson: 622 ns per split for the
+         sys._getframe walk. Never on a READ -- reads are the hot path P3.1 had
+         to fix -- and at 82 splits per heavy session it is under noise. The
+         harness confirms: bake ratio 6.57 / 6.90 / 7.78 over three runs
+         (absolute 303-332 ms) against P3.1's recorded 6.83 / 297 ms. The 7.78
+         sample is variance, not a regression -- checked by re-running rather
+         than by assuming, because the first run alone looked like one.
+A HAZARD FOUND WHILE REVIEWING MY OWN DIFF, and it is not a corner case:
+         GROUPING DUPLICATES A ROOM'S WALLS ONTO THE ORIGINALS, so a grouped end
+         coincident with a dragged wall is the COMMON case. Promoting it would
+         wire a group member to an outside wall permanently, and what a group is
+         topologically is P4.5's open question. Grouped neighbours therefore
+         keep the OLD coordinate path (`kind == "rigid"`) -- they still follow
+         the drag exactly as today, they just do not become topology. Same
+         instinct as the `group() is None` gate that keeps grouped walls out of
+         coalesce, applied one task before the semantics that need it.
+COMPOSITION GATE (the standing additions): both apply paths after a real drag --
+         load_data (faithful) and open_document (converting, composed out to a
+         legacy v4 export and back, ends_moved == 0) -- plus a corpus test that
+         presses EVERY wall of sample_plan and planc1 without dragging and
+         asserts the whole document is unchanged and zero splits occurred. That
+         last one is the new risk this task introduces and nothing else would
+         catch: the press rewrites which vertex a neighbour points at, on every
+         wall the user so much as clicks. Areas would survive a promotion that
+         re-pointed an end at the WRONG corner; the document would not, so the
+         document is what is asserted. Measured on planc1: 80 walls pressed,
+         document byte-identical, 0 splits.
+DEFERRED, DECLARED, NOT DONE -- and it needs a ruling. The plan's P3.3 task text
+         has a second half of the split rule: "a vertex landing on another
+         wall's body splits that wall." It is NOT among the five settled points
+         (which specify the promotion, detection authority, attribution, the
+         four tests, and the gate), and it is P3.4's shape of work: splitting a
+         WallItem at a landing point is `split_edge` scene-side, in the same
+         task that replaces coalesce/weld/fracture. Doing it here would
+         duplicate that and would add an automatic wall-splitting side effect to
+         every drag release -- a wide blast radius for something no acceptance
+         test asks for. The tee branch is left on the coordinate path with a
+         comment naming P3.4. Flagging rather than quietly widening or
+         narrowing the task: say the word and it lands here instead.
+DEMO PORT: `w24` no longer exists as that wall. The demo named it, but ids are
+         canonical and the Gate 2 regeneration (82 walls -> 80, 47/62 vertex ids
+         renumbered) moved every id in symmetricP1.json -- w24 is now a Master
+         Suite / Rear Porch wall, and pre-Gate-2 it was Hall / Lounge. The
+         BEHAVIOURAL pin holds exactly on today's fixture: the Lounge / Front
+         Porch party wall (currently w18, 210" at y=864), +12 y, Lounge +17.5 sf
+         and Front Porch -17.5 sf, TOTAL UNCHANGED to 0.0, check(deep=True) ==
+         []. The test picks the wall by rooms and axis, never by id, so it fails
+         for a regression rather than for a renumbering. A second test pins that
+         the chosen wall really has no collinear continuation -- the demo's own
+         precondition -- so the first cannot pass by luck.
+
+P3.5  done   (branch v5-topology; five sub-commits)
+ruff:    clean
+pytest:  OFF  497 passed, 5 xfailed in 13.7s
+         ON   497 passed, 5 xfailed in 16.0s
+         DEEP 492 passed, 3 xfailed, 7 deselected in 15.4s
+         (baseline in: P3.4's 491/4/1.)
+THE XFAIL/XPASS DELTA -- ASKED TWICE, ANSWERED FROM DISK. Both ends were run
+         in worktrees and the marker lists diffed, rather than reasoned about:
+
+           c133205 (P3.5 in)   493 passed, 4 xfailed, 1 xpassed
+           f738437 (P3.5 out)  497 passed, 5 xfailed
+
+         THERE IS NO "+1 XFAIL". The marked set is BYTE-IDENTICAL at both ends
+         -- the same five tests, same order, same reason strings:
+           test_characterization::test_delete_wall_actually_removes_the_wall  P4.1
+           test_characterization::test_group_survives_roundtrip               P4.5
+           test_groups::test_extracted_room_region_follows_move               P4.2
+           test_scaling::test_group_scales_subquadratically                   P3.8
+           test_scaling::test_ungroup_scales_subquadratically                 P3.8
+         P3.5 added no marker and retired none.
+
+         THE VANISHED XPASS IS THE LAST OF THEM, `test_ungroup_scales_
+         subquadratically` -- same test, same `xfail(strict=False)` marker,
+         reporting XPASS at c133205 and XFAIL at f738437 because its ratio
+         crossed the threshold of 8. MEASURED 7.85 / 8.29 / 8.54 / 8.82 on
+         successive runs of one build: it straddles. Its ABSOLUTE improved
+         sharply (300.7 ms -> ~106 ms at n=8, from the deleted re-detection),
+         which is exactly why it now sits ON the threshold instead of well
+         above it.
+         >> WIDENED AT P3.6 FROM ONE TEST TO THE CLASS, by measurement. The
+         P3.6 gate audit replayed OFF and ON at all 27 code-touching branch
+         commits and found 8 red -- of which SEVEN are this, and not one of
+         them is `test_ungroup` alone: `test_bake_scales_subquadratically` was
+         caught red at 8.05 against a threshold of 8, and every one of the
+         seven shows the tell -- exactly "1 failed", ALTERNATING between the
+         OFF and ON runs of the same commit. Code that is broken fails both
+         gates; a ratio that straddles fails whichever run the machine was
+         busier during. So the row is not one flaky test, it is the P0.3b
+         TIMING-RATIO CLASS, flapping at roughly 7 of 27 replays (~26%), and
+         whatever P3.8 decides -- a wider threshold, best-of-N, or moving them
+         out of the suite entirely -- applies to the class and not to one
+         member. Members seen flapping so far: `test_ungroup_scales_
+         subquadratically`, `test_bake_scales_subquadratically`,
+         `test_rebuild_scales_subquadratically`.
+         >> SIGHTING, P3.7 (2026-07-30): `test_ungroup_scales_subquadratically`
+         XPASSED once in 8 ON runs -- that is what the P3.7 (2) gate trailer's
+         "5 xfailed, 1 xpassed" was. Named by re-running with `-ra` rather than
+         inferred, because the trailer reports counts and not names.
+         >> FOURTH MEMBER, AND IT CHANGES THE STAKES (2026-07-30):
+         `test_select_interactive_scales_subquadratically` FAILED **1 of 8 and
+         2 of 8** across two ON sweeps. The first three members are
+         `xfail(strict=False)` -- they flap in a column nobody reads. THIS ONE
+         IS A HARD PASS, so it turns the GATE RED on a busy machine.
+         CONSEQUENCE, and it is why the P3.8 decision stops being housekeeping:
+         **as of today a red gate has two indistinguishable causes -- a
+         regression or machine load -- separable only by READING WHICH TEST
+         FAILED, which is precisely the manual step the gate exists to
+         replace.** The decision is therefore a PRECONDITION for trusting any
+         future gate, and the merge does not happen before it is made and
+         applied class-wide.
+         EXONERATION OF P3.7's PAINT ADDITION, measured not assumed: the same
+         failure reproduces on the PRE-P3.7 tree in a worktree at `2c5fd8d`
+         (ratio **9.71** against the threshold of 8), while the three runs after
+         the paint addition read **4.10 / 2.22 / 4.00**. The flap is the class,
+         not the change.
+         >> RESOLVED AT P3.8 (2): the ratios are RECORDED, never asserted;
+         every timing assertion is an ABSOLUTE bound at n=8; and the lane is
+         out of the gate in all three modes (`tools/gate.py --perf` runs it
+         explicitly). The wider-threshold option is RULED OUT by measurement,
+         not preference -- the ratio's noise band reaches ~27 while the whole
+         diagnostic range it exists to read is 4 (linear) to 16 (quadratic).
+         Full reasoning in the P3.8 (2) entry.
+         CONSTRAINT ON THE P3.8 DECISION, ruled 2026-07-30 and NOT negotiable:
+         **no wall-clock ratio may remain a gate-reddening hard pass on a shared
+         machine.** Wider thresholds, best-of-N, or a non-gating
+         recorded-benchmark lane with one very loose catastrophic guard -- P3.8
+         chooses from its own fresh numbers, but it chooses for the CLASS (all
+         four members), not for one test.
+commits: ac9ad45 (0) . 600fdef (1) . 02eff1e (2) . 733d7d6 (3) . f07dbdb (4)
+         Logged sub-commit by sub-commit per the handoff-spec rule, so a
+         successor reads the state from here plus the four riders at lines
+         416-424 rather than from a chat summary.
+(0) done   commit ac9ad45 -- doc-only, committed BEFORE any code per rider 2.
+         THE RETARGET WAS ITSELF A FINDING: both P3.2 guards' docstrings named
+         P3.4 as the task that would close the coordinates-vs-identity gap.
+         P3.4 replaced the coalesce/weld/fracture ops and never touched
+         outlines, so both stayed green straight through it -- they were
+         addressed to the wrong task. Retargeted in tests/test_outline.py
+         (module + both docstrings + both failure messages) and rooms.py's
+         OutlineEdge note, and the second guard's message now names BOTH ways
+         it can fire so a red says which.
+(1) done   commit 600fdef -- the flip.
+ruff:    clean
+pytest:  OFF  493 passed, 4 xfailed, 1 xpassed in 18.4s
+         ON   493 passed, 4 xfailed, 1 xpassed in 20.3s
+         DEEP 488 passed, 3 xfailed, 7 deselected in 18.5s
+files:   rooms.py (OutlineEdge holds a Vertex, `p` read-through;
+         share_outline_vertices; the bind_room_walls hook), walls.py
+         (_CornerIndex.vertex_at), vertex.py (defect 21),
+         tests/test_outline.py (the two guards replaced + rider 1's test),
+         tests/test_wall_move.py (+1, the defect-21 case)
+THE GUARDS FLIPPED, AND ONLY THE GUARDS -- both P3.2 tests went red at this
+         change and the whole rest of the suite stayed green through it. That
+         is exactly what rider 2's sequencing was for: the red is the flip,
+         not a weld that wandered in. Their two causes turned out to BE one
+         cause: the weld is the flip's first step, because an outline can only
+         NAME a vertex once the corner IS one vertex.
+DEFECT 21 -- FOUND BY RIDER 1's OWN TEST, and it is the best kind of find.
+         `relocated_to` copied `self._uid`, and uids mint LAZILY on first
+         read, so a corner nobody had named carried None across a move and got
+         a FRESH identity the moment anything asked. Invisible while only the
+         document walk read uids -- which is how it survived P3.1, P3.3 and
+         P3.4 -- and a live bug at P4.5, which serializes groups by member id.
+         THE NEAR-MISS IS THE LESSON: P3.3's
+         test_relocation_carries_the_vertex_identity has pinned this exact
+         rule since P3.3 and PASSES FOR A REASON IT DOES NOT STATE -- it reads
+         `v.uid` before relocating, which forces the mint. A test that
+         establishes the precondition it means to test cannot see the bug.
+         Fixed, and pinned by a test that constructs the unnamed case.
+PERF, checked not assumed (the P3.1 lesson): test_bake flagged 8.83 against a
+         threshold of 8 on the first full run. Re-ran three times -- 6.31 /
+         6.89 / 7.17, absolutes 307-310 ms against P3.3's recorded 297-332 --
+         so variance, not the new property read. Same call as P3.3's 7.78.
+(2) done   commit 02eff1e -- the region derives from the outline.
+ruff:    clean
+pytest:  OFF  495 passed, 4 xfailed, 1 xpassed / ON same / DEEP 490, 3 xfailed
+files:   rooms.py (path + area_sqft become properties; _translate relocates),
+         walls.py (_DragVertex carries outline edges), items.py + mainwindow.py
+         (three rigid-move sites go through set_region),
+         tests/test_outline.py (+2)
+THE STEP P3.2 AND (1) DID NOT TAKE, and without it the deletion is impossible
+         rather than merely risky. `corners` derived from the outline at P3.2
+         and the corners became real vertex identities at (1) -- but `path` and
+         `area_sqft` were still a stored QPainterPath and a stored float that
+         ONLY `refresh_rooms` refreshed. So an outline that moved by
+         construction still reported a stale area until a detection pass caught
+         up, and deleting that pass would have frozen every number a user reads.
+         Both derive now, memoized on the corner COORDINATES -- not identity,
+         because `relocated_to` returns a NEW vertex for a moved corner and an
+         id-keyed memo would be stale in exactly the case that matters.
+NO EXISTING TEST CHANGED.
+
+(3) done   commit 733d7d6 -- the deletion, and the lift.
+ruff:    clean
+pytest:  OFF  495 passed, 5 xfailed / ON 495/4/1xpassed / DEEP 490, 3 xfailed
+DELETED, 418 lines across 11 top-level definitions, all callerless:
+         `_RoomGrid` (90) + `_WallGraph` (131) -- the two engines, a raster
+         flood-fill and a hand-rolled planar face walk; `_detect_room` (12),
+         `detect_room_region` (6), `trace_room_perimeter` (6); the memo,
+         `room_signature` (23) + `refresh_rooms` (53) + `_room_probe_points`
+         (19); `reloop_open_room` (48); `synthesize_room_edge` (15) and
+         `_wall_along_segment` (15). Plus `bind_room_walls` 70 -> 38.
+         rooms.py 1425 -> 1162 lines.
+`detect_room` SURVIVES AS A NAME, and this is the census's one real divergence
+         on the rooms.py side. The task line lists it among the dead; it has
+         ~40 call sites across the app, the tooling, the fixtures and eleven
+         test modules, and this task's authorized rewrite zone is two test
+         files. Deleting the NAME would have been a rewrite of the suite
+         wearing a deletion's clothes. What the line MEANS is delivered in
+         full: the editor no longer has its own answer to "what is a face". It
+         asks the document's, through `bridge.face_at` -> `enclosing_face`.
+THE LIFT, and why it is allowed where P3.4 point 1 forbade it. That ruling
+         rejected lift-to-Design for EDIT ops, on measurement: an edit runs per
+         mouse event and a full-plan rebuild destroys item identity. "Detect
+         room here" is a ONE-SHOT gesture -- the six call sites (csvio, macro,
+         mainwindow x2, planio, view) each fire once per user action -- so the
+         walk costs no more than the `_RoomGrid` + `_WallGraph` pair it
+         replaces, both of which were also rebuilt per call and one of which
+         was O(walls^2). Single-sourced instead of duplicated.
+THREE THINGS CAME FREE, and they are why the swap is worth making rather than
+         merely equivalent:
+         * DEFECT 16 closes STRUCTURALLY. The grid was sized by `canvas_rect()`
+           and any flood reaching its edge counted as unenclosed, so a plan
+           larger than the canvas silently lost its edge rooms. A graph walk has
+           no canvas in it. Closed by deletion, which is the only kind of fix
+           that cannot regress. Pinned.
+         * every returned edge NAMES the wall covering it, so `bind_room_walls`
+           stopped SEARCHING for a room's own walls and now only attaches them.
+           A room binds its outline as a fact the detection reports.
+         * a wall split at a T yields one edge per SEGMENT -- invariant I5
+           ("every outline edge maps to exactly one wall") holding by
+           construction, where the old tracer dropped pass-through corners and
+           could leave an edge no single wall covered.
+DEFECT 13 -- REPRODUCED BEFORE THE SUBSTRATE WENT, which rider 3 asked for and
+         which is the reason the verdict is worth anything. At zooms 0.25x-4x
+         on the `detach_wall_from_room` path, measured on the code as it stood:
+         * DETECTION was already IDENTICAL at every zoom -- same area, same
+           corners, 5/5. It never read the view.
+         * THE DRAG was not. The same scene-space gesture gave 0 open sides at
+           0.25x and 1 at 0.5x-4x, leaving the wall's far end at y=120 vs y=60.
+         So the defect is real and its mechanism is the drag's zoom terms
+         (`20.0 / _view_scale()` catch radius, `16.0 / view_scale` stick),
+         exactly as rider 3 predicted. Detection half CLOSED and now structural;
+         drag half RETARGETED and left UNASSIGNED, the same disposition the P2.3
+         row got, with P4.2 as the nearest task that touches the drag. NOT
+         "repro substrate removed" -- the substrate was still there and the
+         measurement was taken.
+TWO CORRECTIONS THE LIFT NEEDED, both found by a failing test rather than by
+         reasoning, and both are findings about `trace_faces` as much as about
+         this task:
+         * SPUR PRUNING. A dangling wall stub is IN the wall graph, so the face
+           walk enters it and comes straight back out. Free for a FACE (the
+           excursion encloses no area) and wrong for an OUTLINE: the room grows
+           a corner at the stub's free end, and every consumer that asks "is
+           this room inside the rubber band" answers from it. Caught by
+           test_selection, which is not in the authorized zone and was right not
+           to be changed. `bridge._prune_spurs`.
+         * CANONICAL WINDING. `_inner_faces` picks the inner sign by MAJORITY,
+           decisive from two rooms on but a TIE at exactly one -- a lone wall
+           loop traces two faces of equal area and opposite winding. So a
+           one-room plan came back wound whichever way the rest of the plan
+           happened to vote, and the outline ORDER is serialized. Caught by
+           test_room_walls' idempotent round-trip. Fixed at the one-shot entry
+           to the sign the document already uses (positive shoelace, verified
+           against every face of symmetricP1).
+THE APPLY PATH NOW CARRIES THE DOCUMENT'S VERTEX IDENTITY, one live `Vertex`
+         per document vertex, shared by every wall end and outline edge naming
+         it. The first attempt reconstructed it by WELDING
+         (`share_outline_vertices`) and `test_malformed_v5_is_reported_not_
+         rewelded` caught it within the minute: apply must not repair, and a
+         corner that has drifted 0.3" is a malformed file to be REPORTED, not
+         quietly closed up. The document already knows the identities; reading
+         them is exact where welding is a guess.
+
+(4) done   commit f07dbdb -- defect 8, the predicates, the privatize ruling.
+ruff:    clean
+pytest:  OFF  497 passed, 5 xfailed / ON 497/5 / DEEP 492, 3 xfailed
+DEFECT 8, and it was TWO faults with ONE cause -- `room_boolean` worked from a
+         re-traced boundary rather than from what the rooms said they were made
+         of. (a) It DELETED WALLS THAT WERE NOT ITS OWN: inputs came from
+         `bounding_walls()`, a proximity query with no floor filter, and the op
+         removes everything handed to it -- so a combine took the wall a third
+         room shared with an input, breaking that room open, and any wall of any
+         other FLOOR whose body touched the band. (b) It FORCED every result
+         wall to "interior", downgrading 6" exterior walls to 4 1/2" ones.
+         Both fixed at the source: inputs come from the room's OUTLINE
+         (`room_walls`), a wall still bordering a non-input room is kept, and
+         each result edge inherits type and floor from whichever input wall runs
+         along it. TWO REGRESSION TESTS, both CONFIRMED FAILING against the old
+         code before being kept -- and the first fixture was rebuilt on the
+         shared-wall model, because two `make_room` calls leave a coincident
+         PAIR at the boundary and a duplicate wall is a different problem.
+THE TWO PREDICATES, rewritten and not deleted, exactly as rider 4 tabled.
+         `room_owns_walls` and `walls_cover_room` keep their criteria and read
+         the outline through a new `room_walls(room)` -- one answer to "which
+         walls are this room's?" -- instead of the parallel bound-wall list the
+         deleted binder maintained.
+`_privatize_shared_walls` ASSESSED IN-TASK: KEEP. Its reason is untouched -- a
+         party wall is one wall, so a room moving off it must stop owning it.
+         It needed one repair to stay honest: it swapped the room's BOUND wall
+         for a private copy and left the OUTLINE naming the shared one, and the
+         outline is now the authority, so `room_walls` went on handing bake and
+         room_boolean a wall the room had just given up.
+         AND IT WORKS FOR A REASON WORTH WRITING DOWN: `_translate` RELOCATES
+         corners, and a relocation mints a new `Vertex` that only the ends
+         REBOUND to it follow -- so a wall the room no longer owns simply stays
+         on the old corner, with nothing holding it back. P4.2's real `extract`
+         still replaces the shape of it; `_perimeter_span` still falls with
+         `fracture_delete_wall` at P4.1.
+
+EXIT 1 -- MEASURED DELETION vs THE CENSUS. Rider 4 tabled ~470 from rooms.py
+         + 34 from walls.py. MEASURED: 418 in whole definitions plus 32 from
+         `bind_room_walls`' shrink = 450 of the ~470, and 0 from walls.py.
+         Two divergences, both reported rather than forced:
+         * `_wall_along_segment` (15) is REPLACED, not deleted, by `_edge_wall`
+           (48) -- LARGER, because it absorbed the job the deleted three-priority
+           search was doing: find the wall behind an outline edge that came from
+           a FILE and names none. It also had to accept PARTIAL cover, or a v4
+           reload stops agreeing with the live scene about a side whose corner
+           was dragged away, and the round-trip stops being idempotent.
+         * `_WallBBoxIndex` (34) CANNOT DIE, and P3.4 (iv) is why. That
+           sub-commit reported it as P3.5's on the grounds that `refresh_rooms`
+           was its last caller -- but the SAME sub-commit refused the adjacency
+           swap in `_compute_wall_junctions` and said so at length: an unwelded
+           crossing shares no corner, so bbox search is the only thing that can
+           answer there. `_compute_wall_junctions` stays, so its index stays. A
+           line dies when its LAST caller dies, and P3.4 (iv)'s own ruling
+           created the caller that outlives this task.
+EXIT 2 -- RIDER 1'S HEADLINE CHECK, PASSING, AND THE ASSERTIONS DID NOT MOVE.
+         `test_a_dragged_wall_resizes_the_rooms_it_borders` -- the editor half
+         of the Lounge / Front Porch demo -- still asserts equal and opposite
+         resizing with the total unchanged, now with `refresh_rooms` DELETED.
+         Written at P3.3 the numbers came from detection; they now arrive
+         because the rooms' outlines hold the very vertices the divider holds.
+         A `not hasattr(fp, "refresh_rooms")` guard makes the claim explicit
+         rather than implied, so the test cannot quietly stop proving it.
+EXIT 3 -- PERF, MEASURED NOT ASSUMED: the same harness on the same machine at
+         c133205 (pre-P3.5) vs HEAD. P0.3 warned that `rebuild` at 2.7 was
+         ALREADY sub-linear and that a regression there would be a real
+         finding. It improved.
+                        before (n=4 -> n=8)      after
+           rebuild      1.2 -> 3.7   r 3.05     1.0 -> 2.4    r 2.31
+           bake        44.8 -> 299.1 r 6.68     6.9 -> 28.0   r 4.03  <- 10.7x
+           ungroup     45.9 -> 300.7 r 6.55    13.5 -> 106.1  r 7.85  <- 2.8x
+           undo        21.3 -> 157.7 r 7.40    20.9 -> 123.5  r 5.92
+           group       27.7 -> 360.1 r 12.99   33.3 -> 370.1  r 11.10 (P3.8's)
+         `bake` is the headline and the mechanism is exactly the deletion: a
+         group move ended in `rebuild_all_walls` -> `refresh_rooms`, which
+         re-detected every room the move touched. Nothing re-detects now. The
+         ungroup RATIO worsened while its absolute fell 2.8x -- it is
+         xfail(strict=False) -> P3.8 either way, and P3.8 owns the reading.
+EXIT 4 -- TOOLING. `python docs/make_gallery.py` and
+         `python examples/make_examples.py` both run; images regenerated.
+         `08-open-walls.png` legitimately changed and README's open-wall
+         paragraph was corrected to match -- see the new Known-regressions row.
+
+CHANGED-TEST LEDGER, one line each, since this is the second-biggest such risk
+         in the plan after P3.4:
+         * test_rooms.py [AUTHORIZED]: test_region_follows_wall_move rewritten
+           -- coordinate assignment -> corner relocation, because a bare
+           `w.p1 = ...` is SPLIT-ON-WRITE by P3.1's ruling, so the old test
+           replaced wall ends and asked detection to notice. Three
+           room_signature / refresh-memo tests DELETED with the memo they
+           measured. +4: defect 13 (view-independence), defect 16 (no canvas
+           clip), and the two defect-8 regressions.
+         * test_room_walls.py [AUTHORIZED]: test_wall_stretch_keeps_binding
+           rewritten, same one-line reason. +2 assertions in the privatize test.
+         * test_open_walls.py [DIVERGENCE -- the whole file]: this is P3.7's
+           rewrite arriving early, because P3.5 deletes the PRODUCER. An open
+           side was an ITEM (a dashed `OpenWall`, regenerated by
+           `reloop_open_room` + `bind_room_walls`); it is now a fact about the
+           outline, reported by the new `RoomItem.open_edges()` -- which is
+           where `bridge._rooms_of` has emitted it since P1.4. The scene was
+           carrying a second, item-shaped representation of something the
+           document already said. `test_open_wall_is_editable` DELETED: it
+           asserted drag controls on a placeholder nothing constructs. The
+           CLASS still dies at P3.7, as planned.
+         * test_design_bridge.py + test_verify_design.py [OUTSIDE THE ZONE, and
+           named as such]: planc1's I6 characterization 17 -> 13. planc1's four
+           divider walls stop 1.5" short, so each is a dangling STUB; the old
+           tracer carried those out-and-back excursions into the outline (which
+           is how Hall and M Bath each held 21 corners, several at the free end
+           of a wall nowhere near the room). Spur pruning drops them, so four
+           walls only a spur ever touched stop being claimed. Same fault
+           classes, same Hall/M Bath collapse, same areas -- all three verified.
+         * test_wall_move.py: docstrings + the `refresh_rooms`-is-gone guard.
+           The ASSERTIONS DID NOT MOVE; that is exit check 2.
+         * test_outline.py: +3 (the region derives; the memo is keyed on
+           coordinates; plus (1)'s pair).
+PROCESS NOTE, since the working agreement is explicit about the mechanism: a
+         `git checkout floorplanner/mainwindow.py`, used to undo a deliberate
+         break-it-to-prove-the-test experiment, discarded that file's
+         uncommitted work along with it. Reapplied and re-verified. The rule is
+         written for handed-back DOC edits; it applies to uncommitted code just
+         as literally, and the safe move is to make the experiment in a copy.
+         RULED at the P3.5 close and now a working-agreement entry of its own
+         ("Destructive experiments run in a worktree, or after a WIP commit"):
+         the solution was already in use in this same task, since the perf
+         comparison ran the old code in a `git worktree`. The followup below
+         used exactly that to verify its new tests against pre-fix code.
+
+DEFECT 28 -- RULINGS AT THE SESSION BOUNDARY (2026-07-29). Committed here
+         before stopping, per the handoff-spec rule: a fresh session reads the
+         state from this block and needs nothing from chat.
+
+  1. TWO DEFECTS, NOT ONE. The leak has a test half and an app half and they
+     are fixed separately.
+       * THE FIXTURE LEAK -- `tests/conftest.py`'s `win` fixture ends with
+         `w.close()`, which hides a window and neither destroys it nor stops
+         its 180 ms dirty timer. Registered under DEFECT 28.
+       * DEFECT 29 -- the APP half: `MainWindow.close()` leaves a timer running
+         that walks the whole document. A user closing one plan window while
+         another is open pays that cost invisibly, so this is a real behaviour
+         defect and NOT to be slipped in under a test-isolation fix.
+
+  2. LEAK GUARD AS ACCEPTANCE, WITH A FAIL-FIRST RECEIPT. The fix is accepted
+     by a guard that asserts no stale `MainWindow` keeps an active dirty timer
+     (equivalently: `live_mainwindows` stays bounded across the suite). The
+     guard MUST be shown FAILING against the current tree before the fix
+     lands -- the receipt standard, unchanged.
+
+  3. THE CORPSE-TABLE STANDARD: NO BLANK ROWS. Every corpse is attributed to
+     the test whose scene it actually holds, not the test that was running.
+     A corpse with no owner is listed AS unowned rather than dropped.
+     Currently unowned: **'Kitchen' / 'Pan' on symmetricP1** -- no test has yet
+     been shown to leave that overlap, and until one is, defect 28 is NOT
+     dissolved into "leaked windows misreport". `'A'`/`'B'` IS owned:
+     `test_save_verifies_deep`'s own deliberate fixture, working as designed.
+
+  4. RE-CERTIFICATION: DEEP GREEN 10/10 under the machine-written trailer
+     (`tools/gate.py`). Not 1 clean run, not "it looks fixed" -- ten.
+
+  5. THE HISTORICAL CLAIM IS BOUNDED. What is established: a leaked window CAN
+     misreport an earlier test's state, and did, five times on two harvests.
+     What is NOT established, and must not be asserted: that DEEP's green/red
+     has been meaningless for its whole existence. The mechanism has existed as
+     long as the timer has; the OBSERVED instances are all from P3.6, when the
+     first tests loading a twenty-room plan into `win` arrived. Anything wider
+     needs its own measurement.
+
+  6. DEFECT 26's `E` SIGHTINGS, one line: they are the same mechanism -- a
+     stale window's timer firing inside a later test -- so the four sightings
+     and the "suppressing" interventions are all explained by it, and no
+     separate cause is outstanding.
+
+P3.8  done -- PERF VERIFICATION AND THE EXIT SURVEY. The last task of Phase 3.
+ruff:    clean
+pytest:  Gate-Census: collected=523 ruff=clean
+         Gate-OFF: 510 passed, 7 deselected, 6 xfailed in 12.89s  -> sum 523  OK
+         Gate-ON: 510 passed, 7 deselected, 6 xfailed in 15.55s   -> sum 523  OK
+         Gate-DEEP: 510 passed, 7 deselected, 6 xfailed in 16.35s -> sum 523  OK
+         Gate-Verdict: GREEN (every sum reconciles against --collect-only)
+commits: 4997da2 (1 the numbers) . 7b6c342 (2 the flap decision) . 65c4c02 +
+         90bad2d (defect 27's DEEP half) . 28e6a59 (3 the stranding row) .
+         9bd52c3 (4-5 the survey completed) . plus this entry.
+
+=== 1. THE NUMBERS, against BOTH baselines, same machine, medians of seven ===
+
+                    PRE-PHASE-3 (b82256c)      HEAD              what it says
+                    n=4 -> n=8    ratio        n=4 -> n=8  ratio
+  rebuild           1.2 ->   3.3   2.82        1.0 ->  2.6  2.61   improved
+  snapshot          2.1 ->  10.8   5.06        2.2 -> 10.8  4.80   flat
+  undo             22.0 -> 154.0   6.99       19.1 ->126.2  6.64   -18%
+  select_burst      0.2 ->   1.0   5.26        0.2 ->  1.0  5.48   flat
+  select_interact   2.5 ->   7.6   3.19        2.4 ->  9.5  4.13   +25%, unattributed
+  group            27.8 -> 349.7  12.77       29.3 ->356.4 12.43   untouched
+  bake             41.0 -> 279.0   6.81        6.4 -> 26.4  4.09   **10.6x**
+  ungroup          41.5 -> 292.5   6.89       11.5 -> 99.8  8.64   2.9x abs, ratio worse
+
+  P0.3's reading rule: 4 is linear in rooms, 16 quadratic, 8 = rooms^1.5.
+  `bake` is the headline and the mechanism is exactly P3.5's deletion: a group
+  move used to end in `refresh_rooms` re-detecting every room it touched.
+  `ungroup` is the honest half -- 2.9x faster absolutely while its ratio crosses
+  the threshold; both true, and the row says both. `rebuild` answers P0.3's
+  standing warning that a regression there would be a real finding: it improved.
+  `group` is the one op Phase 3 never touched.
+
+  0 NEW WALLS, ASSERTED (not observed): grouping the 20 rooms of symmetricP1
+  together with their walls -- what Ctrl+A or a band actually selects -- leaves
+  80 walls at 80 across group and bake. The rooms-ALONE reading of the same
+  sentence is +868 walls and is P4.5's; it is pinned xfail, not reworded.
+
+=== 2. THE FOUR SURVEY ROWS, and the theme they share ===
+
+  * SPLIT-ON-WRITE: 9 -> 11 sites, because the P3.6 census grepped a shape that
+    cannot see `setattr(wall, attr, ...)`. Five are correct as they are, two are
+    lower-stakes identity churn (P4.5), FOUR are one defect with four faces.
+  * STRANDING: ANSWERED BY A REAL DRAG -- it strands. Defect 30, filed not
+    fixed. The endpoint drag is a separate and correct answer.
+  * THE P2.3 COLLINEAR ROW: re-checked by hand, does not close, cause intact,
+    unassigned -> P4.2.
+  * DEFECT 13's DRAG HALF: dispositioned, not re-measured; it needs a ruling,
+    not another number. Register row 13 stays authoritative.
+
+  **THE THESIS P4.2 INHERITS, and it is one thesis rather than four errands:
+  every one of these is an operation that knows about ROOMS where it should
+  know about CORNERS.** Defect 30's gather, the four coordinate-assignment
+  faces, and `_collinear_run()`'s short-circuit are the same mistake wearing
+  four hats -- Phase 3 moved the geometry onto vertices, and these are the call
+  sites that still ask a room what they should be asking a corner.
+
+=== 3. THE FLAP DECISION, applied class-wide ===
+
+  Ratios are RECORDED, never asserted; every timing assertion is an ABSOLUTE
+  bound at n=8; the lane is out of the gate in all three modes and runs under
+  `tools/gate.py --perf`. The wider-threshold option is ruled out BY
+  MEASUREMENT: the ratio's noise band reaches ~27 while the whole diagnostic
+  range it exists to read is 4 to 16. Receipt: 8 consecutive full-mode gate
+  runs, 24 mode-runs, every one byte-identical, zero xpassed and zero failed --
+  against 1-in-8 and 2-in-8 red before. It is this file's own precedent
+  (`select_burst` P0.6, `undo` P2.3) finished rather than a new mechanism.
+
+=== 4. CI NOW RUNS THE DEEP INVARIANTS ===
+
+  https://github.com/pjm4github/FloorPlanner/actions/runs/30592873265
+  Gate-DEEP: 510 passed, 7 deselected, 5 xfailed in 21.26s -> sum 522 OK
+  The job calls `tools/gate.py --deep`, so CI and the local gate are ONE
+  instrument. Its census was byte-identical to the local Windows run -- the
+  branch's first cross-platform confirmation, and it landed on the two things
+  most likely to differ: the deep invariant walk and the pixel assertions.
+
+=== 5. THE MERGE CHECKLIST, hashes verified on disk ===
+
+  | # | condition | state |
+  |---|---|---|
+  | 1 | P3.8's numbers recorded; 0 new walls asserted | DONE `4997da2` |
+  | 2 | four survey rows answered or dispositioned | DONE `28e6a59`, `9bd52c3` |
+  | 3 | flap decision made and applied class-wide | DONE `7b6c342` |
+  | 4 | defect 27 DEEP CI job added and green | DONE `65c4c02`, `90bad2d` |
+  | 5 | Gate 3 passed by Patrick, findings dispositioned | PENDING -- his |
+  | 6 | CI green on branch head; MERGE COMMIT, not squash | CI green; merge waits on 5 |
+
+P3.8 (5)  THE REMAINING TWO SURVEY ROWS, and the survey is complete.
+
+THE P2.3 COLLINEAR-RUN ROW: RE-CHECKED BY HAND, DOES NOT CLOSE, cause intact.
+         Built the row's own scenario -- a 480" wall with a mid-span T,
+         bordering NO room -- and ran it:
+           before undo   2 walls, spans [120, 480]
+           after undo    3 walls, spans [120, 240, 240]
+           the grabbed segment borders 0 rooms
+           `_collinear_run()` gathers 1 of 2 collinear segments -- SHORT-CIRCUITED
+           a 12" body drag moves 1 of 2 segments
+         Every clause of the row is still literally true, and the fix it names
+         still fits: gather the run over VERTEX ADJACENCY rather than
+         short-circuiting to `[self]` when `self.rooms` is empty. Left
+         UNASSIGNED with P4.2 as the nearest task that touches the drag --
+         unchanged from P3.4 (iv), and now re-verified rather than assumed at
+         the phase exit.
+         NOTE THE COMPANY IT KEEPS: this is the same family as defect 30 and
+         the four coordinate-assignment faces above -- an operation that knows
+         about ROOMS where it should know about CORNERS. P4.2 inherits one
+         theme, not four errands.
+
+DEFECT 13's DRAG HALF: DISPOSITIONED, NOT RE-MEASURED, and that is deliberate.
+         The merge condition is "answered by measurement OR explicitly
+         dispositioned to a named task". This row was measured at P3.5 (0 open
+         sides at 0.25x, 1 at 0.5x-4x; the wall's far end at y=120 vs y=60) and
+         its cause named (the drag's `20.0 / _view_scale()` catch radius and
+         `16.0 / view_scale` stick). Nothing since has touched those terms.
+         Re-running it would re-derive a number the register already holds;
+         what it needs is a RULING on whether a gesture tolerance may set a
+         geometric RESULT, and that is P4.2's to make. Status stays
+         authoritative in register row 13, per the pointer filed at P3.7.
+
+P3.8 (4)  THE SPLIT-ON-WRITE EXIT SURVEY -- re-grepped, and the count went UP
+         because the census method was wrong, not because the code got worse.
+
+P3.6 RECORDED 9 SITES. THE TRUE FIGURE IS 11, and the two extra were never
+         missing from the code -- they were invisible to the GREP. The census
+         searched for `.p1 = ` / `.p2 = `, which cannot see an assignment made
+         through `setattr(wall, attr, ...)`. P3.6's list did contain two setattr
+         sites (the `rigid` and `tee` branches, found by reading rather than by
+         the pattern), so the pattern had already failed once without being
+         corrected. The survey now greps BOTH FORMS, and that is the finding to
+         carry: a census is only as good as the shape it looks for.
+
+THE ELEVEN, EACH WITH WHAT CARRIES THE THINGS ATTACHED TO THAT END:
+
+  1-2  `mainwindow.py:571,572`  align-to-grid (`w.p1/p2 = grid_snap(...)`).
+       CARRIES NOTHING -- it snaps each end independently, so a shared corner
+       comes apart and any room outline on it is left behind. It is a
+       user-invoked plan-wide normalisation, and the honest fix is the same one
+       defect 30 names: move CORNERS, not coordinates. UNASSIGNED, argue P4.2.
+  3-4  `mainwindow.py:581,582`  `_translate_shape`. Same shape, same answer,
+       but lower stakes: it translates a whole selection by the same delta, so
+       the geometry stays self-consistent even though identity is minted fresh.
+       UNASSIGNED, argue P4.5 (it is the group/selection family).
+  5    `view.py:402`  the rubber-band wall being DRAWN. Nothing is attached to
+       an end that does not exist yet -- this is the one site where
+       split-on-write is not merely safe but correct. KEEP, permanently.
+  6-7  `walls.py:1563,1565`  the ENDPOINT drag. Split-on-write is the DESIGNED
+       behaviour here (P3.1's ruling), and P3.7 made it visible: pulling a
+       corner away opens that side and the room keeps its shape. KEEP.
+  8    `walls.py:290`  `_adopt_end`, the merge applier's fallback. NEW TO THE
+       CENSUS. Documented at P3.4 (i) and correct: it splits only when the plan
+       named no corner, i.e. the end is landing where no corner was. KEEP.
+  9    `walls.py:455`  `weld_scene`'s geometric snap. NEW TO THE CENSUS, and
+       the interesting one: it closes a gap by MOVING a coordinate, then the
+       topology half shares the ends. Assigning here is what the weld is for --
+       but it means a room outline holding the old position is not carried.
+       Not observed to bite (load does not weld, and the explicit command
+       re-shares afterwards); RECORDED, argue P4.2 with defect 30, since it is
+       the same "coordinate moved, holders not told" shape.
+  10-11 `walls.py:1601,1603`  the `rigid` and `tee` branches of the body drag.
+       Unchanged disposition: `rigid` is a grouped wall held back by the group
+       guard -> P4.5; `tee` is a body-landing, which P3.4 (ii) gave a real
+       vertex, so this branch is now reached only for landings the split
+       declined (a straddling opening) -> P3.6's report path covers it.
+
+SO THE SURVEY'S OWN QUESTION -- "what carries the things attached to that end"
+         -- has three answers: FIVE sites are correct as they are (5, 6, 7, 8,
+         and the tee half of 11), TWO are lower-stakes identity churn (3, 4),
+         and FOUR are the same defect-30 shape at different call sites (1, 2, 9,
+         and the rigid half of 11). That is the number worth carrying forward:
+         **the coordinate-assignment family is no longer a list of survivors to
+         chase, it is ONE defect with four faces.**
+
+P3.8 (2)  THE FLAP-CLASS DECISION, made from the numbers and applied to the
+         class. It is the merge checklist's item 3 and the precondition for
+         trusting any later gate run.
+
+THE DECISION IN ONE LINE: **the ratios are RECORDED, never asserted; every
+         timing assertion is an ABSOLUTE bound at the large grid; and the
+         timing lane is out of the gate in every mode.**
+
+AND IT IS NOT A NEW MECHANISM -- IT IS THIS FILE'S OWN PRECEDENT, APPLIED TO
+         THE CLASS. `tests/test_scaling.py` already converted two ops for
+         exactly this reason and wrote the reason down at the time:
+           * `select_burst`, P0.6 -- "the numbers here (0.2 ms -> 1.1 ms) sit
+             at the perf_counter floor, so a ratio built on them is timer noise
+             wearing a threshold's clothing. The absolute is the meaningful
+             guard."
+           * `undo`, P2.3 -- "An ABSOLUTE bound, not a ratio: a ratio assertion
+             this close to the threshold would flap (the P0.6 precedent)."
+         The flap class is precisely the ops that were never converted. So the
+         ruling's "applied class-wide" is satisfied by finishing a job this file
+         started twice and stopped halfway through.
+
+WHY NOT A WIDER THRESHOLD -- the option the evidence RULES OUT rather than
+         merely disfavours. Measured over 7 identical runs per tree:
+           ratio spread, four big ops        1.06 .. 1.70x
+           ratio spread, `select_interactive` at 2c5fd8d   **21.98x**
+                                             (1.22 .. 26.82)
+           ABSOLUTE spread at n=8, big ops   **1.03 .. 1.15x**
+         The diagnosis: the n=4 leg is 0.2-4 ms, so a ratio divides one
+         noise-dominated number by another and doubles its exposure. THE NOISE
+         BAND (up to ~27) SWALLOWS THE ENTIRE DIAGNOSTIC RANGE THE RATIO EXISTS
+         TO READ -- 4 is linear, 8 the threshold, 16 quadratic. A threshold
+         cannot separate signal from noise when the noise is wider than the
+         signal. Only a different measurement can, and the absolute is it.
+
+WHY NOT BEST-OF-N: it would work -- a minimum is the right estimator when
+         interference is one-sided -- but it costs N x the lane's runtime to
+         buy back a number the absolute gives for free at 1.05x spread. It is
+         recorded here as the option not taken, and it remains available if a
+         later task needs the RATIO to be trustworthy rather than merely
+         recorded.
+
+WHAT CHANGED, five assertions and one tool:
+         * `rebuild` / `select_interactive` / `group` / `bake` / `ungroup`:
+           ratio assertion -> absolute bound at n=8, each with its measured
+           median in the comment. `bake`'s bound (200 ms, median 26.4) is set
+           so A RETURN TO THE PRE-PHASE-3 COST (279.0) TRIPS IT -- the one
+           regression here that would matter most, and one the ratio would have
+           called "still under 8".
+         * THE TWO xfail MARKERS GO WITH THEM (`group`, `ungroup`). There is no
+           ratio assertion left to expect-a-failure from, and a known-quadratic
+           op's fact now lives in prose and the printed report instead of in a
+           marker that flapped between xfail and xpass on machine load.
+         * `tools/gate.py`: `-m "not perf"` in ALL THREE modes, not just DEEP.
+           The lane could redden OFF and ON, and did. A side effect worth
+           having: all three runs now reconcile against the SAME collected
+           total, where DEEP alone used to report "7 deselected".
+         * `tools/gate.py --perf` runs the lane explicitly and prints its
+           numbers -- P0.3b's "invoked explicitly at the moments its numbers
+           decide something", given a command instead of a memory.
+
+WHAT THIS COSTS, said plainly: an absolute bound catches a BLOW-UP, not a
+         DRIFT. A 20% regression will pass every bound here. That is the trade
+         the evidence forces -- a ratio that cannot tell 4 from 27 was not
+         catching drift either, it was reporting the machine's mood -- and
+         drift is now caught where P0.3b always said it would be: by the
+         numbers being read at the tasks whose decisions depend on them.
+
+RECEIPT: 8 consecutive full-mode gate runs, all three modes each, after the
+         change. See the sub-commit's trailer and the tally below.
+
+P3.8 (1)  the numbers, measured SAME-MACHINE and as MEDIANS OF SEVEN.
+ruff:    clean
+pytest:  (trailer with the sub-commit)
+THE METHOD IS THE FIRST FINDING. Every previous perf entry in this log is a
+         SINGLE RUN, and the flap class says a single run of a ratio is not a
+         measurement. So: 7 runs per tree, medians reported, spread reported
+         beside them -- and the comparison tree is re-measured TODAY in a
+         worktree rather than quoted from a table recorded weeks ago, because
+         comparing today's HEAD against an old table conflates the code change
+         with the machine.
+         Anchor: `1a4d125^` = `b82256c`, the commit immediately before Phase 3
+         opened.
+
+                    PRE-PHASE-3 (b82256c)        HEAD (dedfc57)
+                    n=4  -> n=8    ratio         n=4  -> n=8    ratio
+  rebuild           1.2  ->   3.3   2.82         1.0  ->   2.6   2.61
+  snapshot          2.1  ->  10.8   5.06         2.2  ->  10.8   4.80
+  undo             22.0  -> 154.0   6.99        19.1  -> 126.2   6.64
+  select_burst      0.2  ->   1.0   5.26         0.2  ->   1.0   5.48
+  select_interact   2.5  ->   7.6   3.19         2.4  ->   9.5   4.13
+  group            27.8  -> 349.7  12.77        29.3  -> 356.4  12.43
+  bake             41.0  -> 279.0   6.81         6.4  ->  26.4   4.09
+  ungroup          41.5  -> 292.5   6.89        11.5  ->  99.8   8.64
+
+THE HEADLINE IS `bake`: 279.0 -> 26.4 ms at 64 rooms, **10.6x faster**, ratio
+         6.81 -> 4.09. That is P3.5's deletion of the detection engine, paid
+         out: a group move used to end in `refresh_rooms` re-detecting every
+         room it touched, and nothing re-detects now.
+`ungroup` IS THE HONEST HALF: 292.5 -> 99.8 ms, **2.9x faster absolutely**,
+         while its RATIO WORSENS 6.89 -> 8.64 and crosses the threshold of 8.
+         Both are true and the row must say both. It is `xfail(strict=False)`,
+         so it xfails today where it used to pass -- exactly the reading P3.5
+         predicted and left for this task.
+`rebuild` ANSWERS P0.3's WARNING. P0.3 recorded 2.7 and warned that the
+         memoized machinery was already sub-linear, so a regression here would
+         be a real finding rather than noise. It improved: 2.82 -> 2.61, and
+         3.3 -> 2.6 ms absolute.
+`group` IS UNCHANGED (12.77 -> 12.43) and remains the one op Phase 3 did not
+         touch. It is not wall duplication -- the harness groups walls AND
+         rooms, which copies nothing (measured below).
+`select_interactive` READS 25% SLOWER THAN PRE-PHASE-3 (7.6 -> 9.5 ms), AND
+         THAT IS NOT P3.7's PAINT ADDITION -- measured against `2c5fd8d`, the
+         commit immediately before it, with the same 7-run method: pre-paint
+         10.3 ms / spread 21.98x, HEAD 9.5 ms / spread 1.49x. HEAD is faster
+         and far steadier. The Phase-3-wide difference is real and unattributed;
+         it is small, and the op is one of the flap class's four members.
+
+AND THE SPREAD COLUMN IS THE FLAP CLASS'S EVIDENCE, gathered here because this
+         is the task that has to decide about it. Same code, same machine,
+         seven runs:
+           rebuild            ratio spread 2.12x  (2.32 .. 4.91)
+           select_interactive ratio spread 1.49x on HEAD -- but **21.98x** at
+                              2c5fd8d (1.22 .. 26.82), where a `< 8` assertion
+                              passes six times and fails once
+           ungroup            1.12x on HEAD, 1.70x pre-paint
+         THE DIAGNOSIS, and it points at the fix: the n=4 leg is 0.2-4 ms, so
+         the RATIO is a quotient of two noise-dominated numbers. It is not that
+         the code is unstable; it is that the instrument divides by a
+         millisecond. Any decision that keeps ratio-of-small-durations as a
+         gating assertion will keep flapping whatever threshold it picks.
+
+THE 0-NEW-WALLS ACCEPTANCE IS AMBIGUOUS, AND MEASUREMENT SPLIT IT IN TWO --
+         the P0.4 test-2 precedent, applied without being asked:
+           * rooms AND their walls (Ctrl+A, or a band -- what a user's
+             selection actually contains): 80 walls -> 80 after group -> 80
+             after bake. **0 new walls, asserted** in
+             `test_grouping_twenty_rooms_with_their_walls_creates_no_walls`.
+           * the 20 ROOM items alone, which is what the sentence literally
+             says: **+868 walls**. `duplicate_wall` copies a room's walls when
+             the room is grouped without them, and P3.5's census assigned that
+             to **P4.5**. Pinned as `xfail(strict=False)` naming P4.5 rather
+             than asserted-and-failed or quietly reworded.
+         AND THE DUPLICATION COMPOUNDS, which is new: grouping the 20 rooms one
+         at a time sums to **258** new walls, all together **868** -- 3.4x more,
+         because each room's copy sees the copies the earlier rooms just made.
+         Per room it is roughly 2x that room's own wall count (Foyer: 4 own ->
+         10 new). Recorded for P4.5, whose deliverable this is.
+         COST, DECLARED: these two tests TRIPLED the suite -- 16s -> 46s --
+         because one loads a 20-room plan and the other builds 868 walls.
+         Both are marked `slow` (not `perf`: they are deterministic and
+         belong in CI), so `--quick` is 13s again while the full gate pays
+         ~50s. A 10-run re-certification now costs ~10 minutes, which is a
+         real change to the gate's ergonomics and is said out loud rather
+         than discovered by whoever runs it next.
+
+P3.7  done -- TICKED 2026-07-30 by the reviewer. Three sub-commits, each at a
+         full-mode green gate.
+ruff:    clean
+pytest:  Gate-Census: collected=520 ruff=clean
+         Gate-OFF: 514 passed, 6 xfailed in 15.36s  -> sum 520  OK
+         Gate-ON: 514 passed, 5 xfailed, 1 xpassed in 18.49s  -> sum 520  OK
+         Gate-DEEP: 509 passed, 7 deselected, 4 xfailed in 17.82s -> sum 520 OK
+         Gate-Verdict: GREEN (every sum reconciles against --collect-only)
+         519 -> 520 collected, +1 (test_an_open_side_is_drawn_dashed); nothing
+         removed.
+commits: 2c5fd8d (1 amended acceptance) . b8fec07 (2 the cue) . 1260721 (3 the
+         deletion sweep)
+
+THE SPEC WAS AMENDED BEFORE THE CODE, and the census is why that mattered. Two
+         divergences from the estimate, both found by grepping disk rather than
+         reading the task line:
+         * NO LIVE PRODUCER since P3.5 -- zero `OpenWall(` calls tree-wide. The
+           "P2.3 producer branch in apply" the estimate named is already a
+           COMMENT. The P2.3 log line promising P3.7 would retire it is stale
+           history, ANNOTATED not rewritten (the log is history; wrong history
+           gets an annotation).
+         * `is_open` was the real sweep at ~7x the estimate: 44 readers across
+           17 files, every one permanently False.
+
+(a) VERIFIED, NOT RE-DONE: `test_open_walls.py` went to null edges at P3.5.
+(b) THE PIXEL ASSERTION, polarity measured FIRST (P3.4's template): wall body
+         150, vacated stretch with no cue 255 (pure background -- the
+         regression), dash ~124 with gaps at ~255. So the cue is a DARK, GAPPED
+         line and CLAUDE.md's `< 190` sits between dash and background. Both
+         halves in one test. RECEIPT: fails in a worktree without the paint
+         addition, in the regression row's own words -- `[255, ... 255]`.
+(c) THE CLASS IS GONE: `git grep is_open -- '*.py'` and `git grep OpenWall --
+         '*.py'` both return NOTHING. Prose keeps the history.
+(d) THE KNOWN-REGRESSION ROW CLOSES on the pixel test, and it HAD to be pixels:
+         every structural assertion in that file stayed green for the whole life
+         of the regression, because they ask the outline what is open and the
+         outline was always right.
+
+SAME CUE, PROVEN NOT ASSERTED: drawing the new cue and a real `OpenWall` at once
+         puts them on the same pixels (124 each alone, 97 stacked), so the row
+         closes as "the same cue from one representation" rather than "a
+         different cue". `docs/gallery/08-open-walls.png` regenerates with the
+         dash visible and the README sentence P3.5 had to amend is reverted.
+
+MY OWN SWEEP FAILED TWICE BEFORE IT WORKED, recorded because the mechanism is
+         reusable and so are the traps: the tree is CRLF, so every MULTI-LINE
+         pattern matched zero times while single-line ones applied (a half-swept
+         tree), and two `if not w.is_open\n and abs(...)` sites left a dangling
+         `and` -- syntax errors written into the tree. Recovered with `git
+         checkout`, safe ONLY because every piece of real work was already
+         committed and the sole uncommitted content WAS the broken sweep. That
+         is the P3.5 rule read the right way round: the danger is uncommitted
+         WORK, and there was none.
+
+DEFECT 28 -- THE CORPSE TABLE, AND IT IS COMPLETE (2026-07-29). Ruling 3's
+         standard met: no blank rows, every corpse attributed to the test whose
+         scene it actually holds. Full table and method in
+         `docs/evidence/defect28-ownership.json`; the register row carries the
+         summary. Swept DIRECTLY, per the amendment, rather than waiting for a
+         2-in-10 race.
+
+  'Kitchen'/'Pan' IS OWNED, and the owner is `test_groups.py::test_a_group_move_
+  leaves_the_outlines_still_holding_their_corners` -- defect 22's own receipt.
+  So is 'M Bath'/'Toi', and so are two pairs the re-harvest added
+  ('Garage'/'PWDR', 'Garage'/'Mud'). `'A'`/`'B'` stays owned-innocent, and its
+  provenance stack shows the running test IS the owner -- it was never a
+  misreport at all.
+
+  ATTRIBUTION BY DOCUMENT SIGNATURE, which is what finally cracked it. Every
+  20-room corpse's own document is symmetricP1 translated +48" in x with ONE
+  corner displaced a further (+12,+12) -- that test's literal script (:545 and
+  :557), run by no other test in the suite. The reduced evidence file had kept
+  only a summary, so the ownership question was unanswerable until a 10-run
+  re-harvest on the unfixed tree (4 red, 14 dumps) produced corpses carrying
+  their FULL documents. Confirmed twice more: solo, with no other window in the
+  session, the test errors at its own teardown 1 run in 12; and on a red DEEP
+  run PYTEST ALREADY NAMES IT ("ERROR ... test_a_group_move_leaves_the_outlines_
+  still_holding_their_corners", at "win fixture teardown").
+
+  THAT LAST POINT IS A CORRECTION TO THIS DEFECT'S OWN FRAMING. The leak
+  misattributes the corpse FILE (the stack shows `macro.py:98 processEvents()`
+  above `_commit_if_changed`, a stale timer inside a later test) -- it does NOT
+  misattribute the pytest error. The red DEEP runs were correctly blamed all
+  along; only the evidence artifacts pointed at the wrong test.
+
+  ROOT CAUSE, and "the race picks the victim" is WITHDRAWN -- there is no race
+  in the choice. The test picks its party wall with `next(w for w in
+  win.scene.items() if ...)`, and scene item order is not stable across
+  processes, so the PICK varies per run. It then re-points the moved vertex for
+  the party wall's TWO rooms only (`for r in (a, b)`), leaving any THIRD room
+  whose outline holds that corner behind; where the geometry allows, that room
+  overlaps a neighbour. MEASURED EXHAUSTIVELY over all 59 candidate picks:
+  18 produce an I11 (31%, against the measured 4-in-10 red runs), and
+  re-pointing EVERY holder of the corner produces 0. Which is what both app
+  corner-movers already do -- `_DragVertex.ends`/`.edges` on the drag,
+  `GroupItem._corner_records` on bake and rotation.
+
+  TWO OF MY OWN CLAIMS WITHDRAWN BY THE SWEEP:
+    * `window.visible=false` is NOT a staleness tell. No fixture window is ever
+      shown, so a LIVE fixture window reads exactly the same. The original
+      "recorded by a window that is NOT VISIBLE, while an unrelated test was
+      running" over-read it.
+    * A stale window's walk is SILENT on this tree. Forcing `_commit_if_changed`
+      -- the identical call the leaked timer makes -- on every live window after
+      every test, 518 times, produced ZERO reports, because every I11 a stale
+      scene holds sits in that scene's own accepted baseline. The leak is real
+      and still worth fixing; it is not what turns a run red.
+
+  NOT ESTABLISHED, AND NOT ASSERTED: that an equivalent APP gesture can strand a
+  holder. 38 synthetic endpoint drags over multi-room corners moved the corner
+  in NONE of them -- the branch does not drive headlessly that way -- so that
+  run's "0 stranded, 0 I11" is VACUOUS and is discarded rather than quoted as an
+  acquittal. Checked because a "clean" result that was never in a position to be
+  dirty is exactly defect 21's near-miss. The app is neither cleared nor accused
+  here; if the question is wanted answered it needs a harness that drives the
+  drag for real.
+
+P3.6-followup  done -- DEFECTS 28 AND 29, AND P3.6 TICKS (branch v5-topology)
+ruff:    clean
+pytest:  the re-certification, ruling 4's condition, met in FULL mode:
+         TEN consecutive `python tools/gate.py` runs, 10/10 GREEN, each
+         trailer machine-written and each sum reconciled against
+         --collect-only. The last of them:
+           Gate-Census: collected=519 ruff=clean
+           Gate-OFF: 513 passed, 6 xfailed, 3 warnings in 15.52s  -> sum 519  OK
+           Gate-ON: 513 passed, 6 xfailed, 4 warnings in 17.44s  -> sum 519  OK
+           Gate-DEEP: 508 passed, 7 deselected, 4 xfailed, 3 warnings in 16.77s
+                      -> sum 519  OK
+           Gate-Verdict: GREEN (every sum reconciles against --collect-only)
+         These are the FIRST `Gate-DEEP` trailers on the branch -- every
+         previous commit carried `--quick` (Census + OFF only), which is why
+         the trailer requirement was made explicit: a 10/10 claimed against
+         quick trailers would be the transcription class returning through the
+         mode flag.
+commits: b1679a4 (the corpse table) . c1496fe (28A, the owning test) .
+         ee7e4e5 (28B, the fixture leak) . e8a7348 (29) . plus this doc commit.
+census:  518 -> 519 collected, +1: test_undo::test_closing_a_window_stops_its_
+         dirty_timer. Nothing removed.
+
+WHAT THE DEEP FLAP ACTUALLY WAS, and it was not the leak. The corpse table's
+         owner -- `test_a_group_move_leaves_the_outlines_still_holding_their_
+         corners` -- picked its party wall with `next(w for w in
+         win.scene.items() ...)`, and scene item order is not stable across
+         processes. 18 of its 59 candidate picks leave two rooms overlapping
+         (31%, against the measured 4-in-10 red DEEP runs), because the test
+         re-pointed the moved corner for the party wall's TWO rooms and left
+         any THIRD holder behind. Deterministic pick + every holder re-pointed:
+         0 of 59, and 15 consecutive solo DEEP runs green where the same test
+         on the same tree was 1-red-in-12 before.
+
+THE LEAK IS REAL AND IS FIXED, AND IT IS NOT WHAT TURNED RUNS RED -- the two
+         are separate and were being read as one. Measured across the suite:
+         peak live MainWindows 16 -> 0, peak holding a LIVE dirty timer 9 -> 0,
+         alive at session end 12 -> 0. What the leak did was misattribute the
+         corpse FILES (a stale timer firing inside a macro test, the stack
+         showing `macro.py:98 processEvents()` above `_commit_if_changed`); the
+         pytest ERROR was correctly blamed on the owner all along.
+
+THE GUARD IS AN INVARIANT, NOT A BUDGET: no window outlives its test holding a
+         live dirty timer. A cap on the count would pass a suite that leaks
+         quietly as long as it leaked few enough. FAIL-FIRST RECEIPT, in a
+         detached worktree per the standing rule: the guard alone against
+         pre-fix code produces 333 teardown errors.
+
+TWO MISTAKES IN THE DISPOSAL, both found by running it rather than reading it,
+         and both worth carrying forward:
+         * stopping the timer BEFORE the close silences a timer the close then
+           RESTARTS -- closing emits scene changes, they reach `_mark_dirty`.
+           Close, let them settle, then stop.
+         * `processEvents()` does not deliver `DeferredDelete`, so `deleteLater`
+           left the window standing and still counting. `sendPostedEvents(None,
+           DeferredDelete)` is what destroys it.
+
+AND THE GUARD IMMEDIATELY EARNED ITS KEEP: `test_scaling._measure` leaks the
+         same way, and its two windows come from a MODULE-scoped fixture, so
+         they predate every per-test disposal and outlived the whole file.
+         Fixed at source rather than by loosening the guard -- 67 errors in the
+         OFF/ON runs (the perf tests DEEP deselects), which is the whole blast
+         radius of (B).
+
+DEFECT 29, SEPARATELY per ruling 1: `closeEvent` stops the timer, and only once
+         the close is ACCEPTED -- a close the user cancels must leave the
+         window as it was, debounce included, or the edit in flight when they
+         hit the X never becomes an undo step. Its test asserts the
+         PRECONDITION (that the edit started the debounce) before asserting the
+         fix, so it cannot pass vacuously, and it fails pre-fix on exactly the
+         line it names.
+
+THREE CLAIMS OF MY OWN WITHDRAWN BY MEASUREMENT, recorded because the register
+         carried them as fact:
+         * "the race picks the victim" -- there is no race in the choice; the
+           PICK varies because scene order does.
+         * `window.visible=false` is a staleness tell -- it is not; no fixture
+           window is ever shown, so a live one reads identically.
+         * a stale window's walk reports -- forcing `_commit_if_changed` on
+           every live window after every test, 518 times, gave ZERO reports:
+           every I11 a stale scene holds sits in its own accepted baseline.
+
+NOT ESTABLISHED, AND NOT ASSERTED: that an equivalent APP gesture can strand a
+         room holding a dragged corner. 38 synthetic endpoint drags moved the
+         corner in NONE of them, so that run's "0 stranded" is vacuous and is
+         discarded rather than quoted as an acquittal -- the app is neither
+         cleared nor accused. Answering it needs a harness that drives the drag
+         for real, and that is not this task's.
+
+P3.6  CODE COMPLETE, NOT TICKED -- blocked by defect 28 (branch v5-topology)
+      [SUPERSEDED: ticked at the P3.6-followup above, 2026-07-30.]
+         DEFECT 26 IS FIXED and the diagnosis is worth carrying forward as the
+         standard for what "root cause" means here: a stack, then an
+         explanation for every property the bug had, then a narrow fix. It was
+         never memory corruption -- `verify()` raised inside a QTimer callback,
+         and PyQt turns an exception escaping a C++ -> Python callback into
+         `qFatal()` -> `abort()`. The guard is narrow (that exception type only,
+         at the 7 callback paths reaching the 3 call sites) and the acceptance
+         was 0/10 crashes against ~4/20 before.
+         WHAT REMAINS IS DEFECT 28, which the crash was hiding: a group rotation
+         genuinely produces overlapping placed rooms (I11), ~2/10 deep runs. The
+         tick waits on it, because DEEP green-and-reliable is the condition.
+         Every acceptance property is green and every ruling is implemented,
+         and the tick is still withheld, because the gate ruled at this task
+         is what found the reason. `tools/gate.py` runs the three gates with
+         their output CAPTURED, and under `FP_VERIFY_DESIGN=deep` the suite
+         then ABORTS about 40% of the time -- rc 0xC0000409, a hard process
+         crash, not a failing test. Bisected to P3.6: 0 of 4 at `e3fabb6`,
+         the commit immediately before this task's first. A phase whose gate
+         cannot be relied on to run is not a phase that has passed its gate,
+         whatever the counts say when it does complete.
+ruff:    clean
+pytest:  OFF  512 passed, 6 xfailed in 15.9s
+         ON   512 passed, 6 xfailed in 19.8s
+         DEEP 507 passed, 4 xfailed, 7 deselected in 20.0s
+         516 collected; OFF 512+6 and DEEP 507+4+7 both reconcile against
+         `--collect-only`.
+commits: 94a4de6 (0 spec) . 2fb3c77 (1 the anchor) . f964394 (1a the phantom E)
+         . 80435c1 (1b R4b/R2b rulings) . 7fe1aa2 (2 defect 24) . 3cdf046 (3
+         R4b) . e4907c7 (3a the gate that was not gating) . 52111c3 (4 R2c) .
+         41cc975 (5 R2b) . ea50dce (6 R5)
+
+THE AMENDED ACCEPTANCE (R1), and each of its four properties green:
+  (a) an opening anchored `from: "v2"` keeps its `offset_in` exactly when the
+      wall is stretched AT v2 -- `test_an_opening_holds_its_offset_when_the_
+      far_end_is_stretched`. RECEIPT: failed against s-based code before the
+      anchor landed.
+  (b) reversing a wall leaves the opening's physical position unchanged --
+      `test_reversing_a_wall_leaves_its_openings_where_they_are`. RECEIPT:
+      failed measurably, the door mirroring 200.0 -> 40.0.
+  (c) the split of R2 -- `test_a_split_clear_of_a_door_leaves_it_exactly_where_
+      it_was`. WRITTEN AT R2b, and it did not exist before: R1 listed it, but
+      the split coverage was the two refusal pins, and refusal is not a
+      property of the anchor -- it is the absence of one.
+  (d) loading a plan whose door no longer fits REPORTS it --
+      `test_an_opening_that_cannot_be_placed_is_reported_not_dropped`, on the
+      v4 load path specifically.
+
+THE THREE NUMBERS IN THE TASK LINE WERE ALL WRONG, and the read-back is what
+         caught them: "13 `except ValueError` sites" was every such site in the
+         package, not the opening drops (7 at baseline, 8 today); `walls.py:568`
+         had moved to `:1004`; and "P0.4 test 1 passes without xfail" pinned
+         nothing, having never been xfail. Corrected in place at 94a4de6.
+
+TWO DEFECTS FOUND WHILE DOING IT, both measured before being claimed:
+         * DEFECT 24 -- `offset_in` read and written as a CENTRE distance in
+           `topology.py`, near-edge everywhere else. 18.00" on a 36" door.
+           THREE sites, not the two first registered: the third was a fourth
+           hand-written copy of the arithmetic inline in `apply_merge_plan`,
+           found only when fixing the other two turned its test red. All now
+           route through one conversion.
+         * DEFECT 25 -- a gesture can create a door-straddles-junction scene
+           state the document can only represent as a reported fault. Registered
+           P4.1 per ruling, with my argument for P4.3 and a move trigger in the
+           entry rather than swallowed.
+
+THE GATE AUDIT, ruled at the process failure, and it is a measurement in three
+         layers because the first two were not trustworthy:
+         1. GREP of every commit message (44 branch + 172 main): ONE hit, and
+            it is e4907c7 -- my own disclosure, not a gate committed over.
+         2. WHY THAT IS NOT THE ANSWER: 3cdf046's gate line was transcribed
+            WITHOUT its ", 2 errors". The message looked green. Grepping
+            messages audits what I wrote, not what ran.
+         3. EMPIRICAL REPLAY of OFF and ON at all 27 code-touching branch
+            commits: 8 red. Re-replayed with the P0.3b ratio class excluded:
+            SEVEN GO GREEN, ONE STAYS RED.
+         VERDICT: exactly ONE commit was made over a genuinely red gate --
+         3cdf046 (P3.6(3), R4b), red on ON and DEEP with 2 errors, green at
+         e4907c7 the next commit. Everything else was the timing-ratio class.
+
+AND THE SEVEN ARE THE FLAP ROW'S EVIDENCE. `test_bake_scales_subquadratically`
+         was caught red at 8.05 against a threshold of 8, and all seven show
+         the tell: exactly "1 failed", ALTERNATING between the OFF and ON runs
+         of the same commit. Broken code fails both; a straddling ratio fails
+         whichever run the machine was busier during. ~7 of 27 replays, so the
+         P3.8 row is widened from one test to the CLASS, with three members
+         named.
+
+TESTS: +9 (tests/test_openings.py, new). CHANGED, each with its one line:
+         * the two R2b PINS flipped -- `split_edge` raising, `split_wall_at`
+           declining. Both were placeholders pending representability;
+           `match="P3.6"` was one test naming its own executioner.
+         * the drag-side twin of the decline in test_wall_move.
+         * two in test_topology_ops / test_topology that had encoded defect
+           24's arithmetic (offset 50.0 where the near edge is 18.0) or were
+           passing only because of it (a midpoint split that always fell
+           inside the door).
+         * test_a_clipped_band_leaves_every_room_coherent gained `rebase(win)`
+           -- see the phantom-E resolution above.
+
+P3.5-followup  done   commit d0ab89d -- DEFECT 22: a group move is a vertex move.
+ruff:    clean
+pytest:  OFF  503 passed, 5 xfailed in 16.5s
+         ON   503 passed, 5 xfailed in 19.4s
+         DEEP 498 passed, 3 xfailed, 7 deselected in 19.1s
+FOUND BY A SMOKE TEST, not by the suite, and the gap is the finding as much as
+         the bug. Symptoms on a v5 plan: some rooms did not track a whole-design
+         group move; later individual room moves worked; and `unwelded_ends`
+         warnings fired repeatedly with a moving count on a file that opened at
+         zero.
+REPRODUCED HEADLESSLY BEFORE ANY FIX, per the standard:
+         * 140 of 140 room outline corners held one of their own walls'
+           vertices before the bake -- 0 of 140 after. A party-wall drag then
+           resized NOTHING: M Bath -18.20 sf / WIC +9.50 sf before, +0.00 /
+           +0.00 after.
+         * `unwelded_ends` 0 -> 133 grouping every ROOM; 0 -> 1 on a rubber
+           band; 0 -> 0 grouping every WALL.
+         * split telemetry during the bake: 160, all at items.py:703/704 --
+           the exact residue P3.4 (iv) attributed to `bake()` and assigned to
+           P4.5.
+THE HYPOTHESIS WAS CONFIRMED FOR THE LOAD-BEARING HALF AND REFUTED FOR THE
+         VISIBLE ONE, which is worth separating. CONFIRMED: `bake` assigned new
+         COORDINATES to every member wall end (split-on-write) and rebuilt each
+         carried room's corner list beside it, so the two agreed numerically and
+         shared nothing -- orphaning the outlines P3.5 made authoritative.
+         `refresh_rooms` re-bound and re-shared after every bake, so deferring
+         bake's conversion to P4.5 was safe exactly as long as detection
+         existed; P3.5 changed the deferral's premise, which is why this is a
+         P3.5-followup and not P4.5's. REFUTED as the cause of "some rooms don't
+         track": that is duplicate-on-group (defect 3, P4.5). A rubber band
+         needs an item FULLY inside, so a wall poking out is left behind, its
+         room's walls are DUPLICATED into the group, and `room_owns_walls` is
+         then correctly false -- 17 of 20 tracked, and the 3 that did not were
+         right not to. P3.5 only removed the re-detection that used to hide it.
+THE FIX IS THE PLAN'S OWN `move_vertices`, and it is smaller than what it
+         replaces. `_corner_records` resolves every corner the group's geometry
+         holds together with the wall ends and outline edges on it;
+         `_apply_corner_records` relocates each once. Walls and outlines follow
+         because they hold those corners -- a bake is now the same operation as
+         a wall drag.
+THE CARVE-OUT IS RESPECTED BY SPLITTING, not by an exclusion list. A corner a
+         NON-member wall also holds is split off before anything moves, so the
+         group goes and the outsider stays -- today's behaviour exactly.
+         Relocating it wholesale would wire a member to an outside wall, which
+         is what the `group() is None` guards exist to prevent. Own test.
+ROTATION HAD THE IDENTICAL DEFECT (140/140 -> 0/140) and now moves through the
+         same records, resolved once at `_begin_rotation` and re-applied from
+         the START point each event -- drift-free AND identity-preserving, where
+         before it was split-on-write per mouse move. THE FIRST ATTEMPT WAS
+         WRONG AND SAID SO: re-welding at `_finish_rotation` CONVERGED rather
+         than closed (0/140 -> 138/140, then 139/140 on a second pass), which is
+         how a positional instrument fails where an identity one is needed.
+THE WARNING'S ERGONOMICS, because a correct warning that misattributes teaches
+         people to ignore the channel that will one day be right. It said
+         "expected on a plan loaded from a legacy file" for EVERY case -- true
+         of what a file arrives with, false of what an edit tears -- and fired
+         on every debounced snapshot, so a plan that opened clean produced a
+         stream of them with a moving count. Now the first walk after a load
+         sets the BASELINE, only a walk finding MORE warns, the message names
+         the split (opened-with vs NEW), and a repeat of the same state is
+         silent. `strict=True` is untouched: two tests pin it.
+PERF HELD, and the harness earned its keep twice. bake 6.5 -> 28.6 ms
+         (n=4 -> n=8), ratio 4.39, against P3.5's 6.9 -> 28.0 / 4.03. The FIRST
+         cut rebuilt each member wall inside the loop -- redundant with the
+         `rebuild_all_walls` that follows, and cascading -- and cost 9x
+         (25.9 -> 251.3 ms, ratio 9.70). Caught by `test_bake_scales_
+         subquadratically` on the first full run.
+TESTS ADDED (5), and one of them is NOT the receipt -- verified by running all
+         five against pre-fix code in a worktree:
+         * whole-plan group + move carries every room, unwelded_ends still 0.
+           PASSES ON BOTH SIDES: the old bake translated each carried room's
+           corner list explicitly, so the rooms tracked POSITIONALLY. It guards
+           the property at a scale the rest of test_groups.py never reaches (20
+           rooms / 80 walls vs ~5 members) and is the first group test to look
+           at the debris counter at all. Annotated as such in its own docstring
+           so it is not mistaken for the receipt later.
+         * the outlines still hold their corners after a bake, and a corner move
+           still resizes the rooms -- THE RECEIPT, fails pre-fix.
+         * the rotation half -- fails pre-fix.
+         * a group move never drags a wall outside it -- the carve-out guard;
+           passes on both sides by design, since it pins what must NOT change.
+         * the warning names its cause and says it once (plus its mirror, that a
+           legacy plan is still blamed on the file) -- both fail pre-fix.
+WHY 503 GREEN TESTS MISSED IT: every group test in the suite tops out at ~5
+         members, and not one had ever asserted on `unwelded_ends`. The bug
+         needed a plan big enough to have party walls and a check nobody was
+         making. Both gaps are closed here.
+
+P3.5-followup, PER-ROOM DIAGNOSIS -- asked for after the fix landed, to explain
+         the TWO presentations in the reported screenshot (one room fully
+         detached with its dashed outline at the original position, another
+         offset but coherent). Measured per room on a rubber-band selection over
+         92% of symmetricP1, reporting (a) outline vertices matching no endpoint
+         of any wall the room names, (b) whether walls moved, outline moved,
+         both or neither, and the identity count underneath both.
+         THE TWO PRESENTATIONS ARE TWO DIFFERENT DEFECTS, and the prediction
+         that they collapse to one cause is REFUTED. Recording that is the
+         point of having predicted:
+         * OFFSET BUT COHERENT -- 17 of 20 rooms. walls 13/13 moved, outline
+           13/13 moved, (a) = 0. Nothing visible is wrong. IDENTITY 0/13: every
+           corner is a different object from its wall's vertex, because the old
+           bake computed the room's new corner list SEPARATELY from the walls'
+           new coordinates and the two agreed only numerically. This is DEFECT
+           22, it is invisible in any screenshot, and it is fixed -- the same
+           run post-fix reads 13/13 identity with every other column unchanged.
+         * FULLY DETACHED -- 3 of 20 (Garage, PKT Off, Util). walls 6/9 moved,
+           outline 0/9, (a) = 5 stranded corners, identity 4/9 -- the four
+           corners it shares with the walls that did NOT move. The room was not
+           carried at all (`room_owns_walls` false), because the band clipped
+           one of its walls and `group_selected` duplicated the rest.
+           BYTE-IDENTICAL BEFORE AND AFTER THE DEFECT-22 FIX: 46.65" / 39.98" /
+           23.32" of region-to-walls drift either way. The vertex translation
+           cannot touch it, because the room is not in the set being moved.
+         AND THE "P3.5 UNMASKED IT" CLAIM IS WITHDRAWN, having been asserted
+         before it was measured. The same drift measurement on the pre-P3.5
+         tree strands Garage by 148.3" against 46.65" now -- re-detection was
+         not hiding the detachment, it was landing the room somewhere worse.
+         The detached presentation predates P3.5 and is REGISTERED AS DEFECT 23
+         against P4.5, because what to do about it is a semantics decision (does
+         a room whose walls partly moved DEFORM to follow the corners that
+         moved, as a party-wall drag already makes both its rooms do -- or stay
+         put?) and that question is what a group IS.
+         METHOD NOTE: metric (a) is NOT comparable across the P3.5 boundary.
+         Before P3.5 an outline edge could be spanned by a LONGER wall, so a
+         corner legitimately sat mid-wall; "corner matches no wall endpoint"
+         only became a defect once one edge meant one wall end to end. The
+         cross-boundary comparison is the drift number, which is basis-free.
+
+P3.5-followup, ACCEPTANCE ITEMS -- four, answered in order.
+
+COMMIT NAMING, and the rule was NOT honoured on the first pass. The fix, its
+         telemetry and its tests went in as ONE commit, d0ab89d, not three. The
+         full gate (ruff + OFF/ON/DEEP) was run immediately before it, so the
+         green is real; what is missing is the ROLLBACK POINTS the sub-commit
+         rule exists to create. Recorded rather than rewritten -- history
+         surgery to make a log entry look tidier is the wrong trade. The
+         remainder was split properly: 06c2145 (a) the warning wording,
+         408adf7 (b) the tests, plus this doc commit, each at a full gate.
+
+THE +6, named from a collect-only diff of f738437 against HEAD (502 -> 508
+         collected; nothing removed):
+           test_groups::test_whole_plan_group_move_carries_every_room
+           test_groups::test_a_group_move_leaves_the_outlines_still_holding_
+             their_corners
+           test_groups::test_a_group_rotation_also_keeps_the_corners
+           test_groups::test_a_group_move_never_drags_a_wall_outside_it
+           test_design_bridge::test_the_warning_names_the_cause_and_says_it_once
+           test_design_bridge::test_a_legacy_plan_is_blamed_on_the_file_not_on_
+             an_edit
+         Plus, at (b), a SEVENTH that is an xfail rather than a pass:
+         test_groups::test_a_clipped_band_leaves_every_room_coherent -> P4.5.
+         So the census is now 503 passed / 6 xfailed, and the sixth marker is
+         that one -- named here so the next delta starts from a known set.
+
+STEP 4 WAS HALF-DONE AND IS NOW WHOLE. The whole-plan test asserted only that
+         each room's outline LANDED in the right place, which is why it passed
+         against the pre-fix code. It now asserts all four per-room columns --
+         walls-moved, outline-moved, identity, unwelded_ends -- on a 100%
+         selection with no clipped rooms, and FAILS pre-fix (identity 0 where 4
+         is required, verified in a worktree). The diagnosis's columns and the
+         guard's columns are now the same columns.
+
+STEP 5 WAS DONE AT d0ab89d, and the specific question is answered by
+         measurement on the defect-23 repro POST-FIX: the duplicated walls left
+         behind by a clipped band DO register as unwelded ends under a live
+         gesture, so the rewording belongs to this task exactly as reasoned.
+         Same 10-walk sequence (open, idle, group, bake, four debounced
+         snapshots, a second move, one more snapshot):
+           BEFORE  8 warnings, one per snapshot, every one of them saying
+                   "expected on a plan loaded from a legacy file"
+           AFTER   2 warnings, one per DISTINCT state (1 end, then 8), both
+                   reading "... are NEW ... this is not the legacy-load case"
+         The idle and post-open walks are silent in both, and the legacy case
+         still says legacy (`test_a_legacy_plan_is_blamed_on_the_file_not_on_an_
+         edit`). Reading the message the repro actually printed also caught the
+         copy saying it backwards -- "0 of them since the plan was opened and 1
+         NEW" -- fixed at 06c2145.
+
+ONE UNEXPLAINED OBSERVATION, recorded rather than dismissed: a single `E`
+         appeared in one DEEP run's truncated progress output. Not reproduced in
+         five subsequent full DEEP runs (NOT "under different random seeds" --
+         that phrase is withdrawn at defect 26 round 2: pytest-randomly is not
+         installed, so every run in this project has always been in the same
+         order), and an
+         explicit ERROR grep over a full `-ra` run finds nothing. Most likely a
+         cut-off pipe rather than a real error, but it is written down here so
+         that if it recurs at P3.6 it is the second sighting, not the first.
+         STANDING INSTRUCTION, carried into P3.6 by ruling: a recurrence during
+         P3.6 is a SECOND SIGHTING and is investigated on the spot -- not
+         re-filed as a first.
+         >> RESOLVED AT P3.6, and the guess above was wrong in both halves: not
+         a cut-off pipe, and not a timing flap. It is
+         `test_a_clipped_band_leaves_every_room_coherent`, added at 408adf7 --
+         the defect-23 characterization. It deliberately leaves the scene
+         corrupt (stranded rooms are its subject) and never declared that state
+         as a baseline, so under FP_VERIFY_DESIGN=deep the `win` fixture's
+         teardown verify fires and pytest reports the test TWICE: an `E` in the
+         progress line, a second XFAIL in the summary. Fixed with `rebase(win)`,
+         the move `_overlapping_rooms` has always made for its deliberate
+         overlap. THE SAME DOUBLE-REPORT WAS THE OFF-vs-DEEP CENSUS DISCREPANCY
+         -- one cause, two symptoms. Recorded as a closed sighting; a THIRD
+         would be a new bug, not this one.
+
+P3.4  done   (branch v5-topology; four sub-commits + two riders)
+ruff:    clean
+pytest:  OFF  491 passed, 4 xfailed, 1 xpassed in 19.2s
+         ON   491 passed, 4 xfailed, 1 xpassed in 24.6s
+         DEEP 486 passed, 3 xfailed, 7 deselected in 22.2s
+         (baseline in: P3.3's 447/4/1. +44 tests, one deleted -- see (iv).)
+commits: ea54413 (i) · 340816c (ii) · a4a3336 457105e e49c07f (iii, three
+         families) · 670fded (rider: the two divergence rulings) · 89f3d8b (iv)
+         · cf7f850 (defect 20) · plus the per-sub-commit doc entries below.
+         Logged sub-commit by sub-commit per the handoff-spec rule, so a
+         successor session reads the state from here plus the seven settled
+         points at lines 375-408 rather than from a chat summary.
+(i) done   commit ea54413 -- planner/applier factoring + the scene applier for
+         merge_collinear.
+ruff:    clean
+pytest:  OFF  468 passed, 4 xfailed, 1 xpassed in 18.4s
+         ON   468 passed, 4 xfailed, 1 xpassed in 21.9s
+         DEEP 463 passed, 3 xfailed, 7 deselected in 18.5s
+files:   floorplanner/design/topology.py (GraphView/WallView/OpeningView,
+         Merge/PlannedOpening, plan_merge_collinear, apply_merge_plan,
+         graph_from_design; merge_collinear becomes their composition),
+         floorplanner/walls.py (graph_from_scene, apply_merge_plan_to_scene,
+         merge_collinear_scene), tests/test_topology_ops.py (new, 21)
+NO EXISTING TEST CHANGED -- `git status tests/` shows only the new file, all
+         three ways. The changed-test budget point 4 governs is still untouched
+         going into (iii).
+THE SHAPE, since it is the crux and the thing (ii)-(iv) all lean on: the
+         decision runs ONCE, pure, over a neutral `GraphView` whose keys and
+         anchors are the CALLER's own handles -- wall ids and vertex ids for a
+         Design, `WallItem`s and `Vertex` objects for a scene. It returns a
+         `Merge` delta (survivor, absorbed, the corner anchors the ends adopt,
+         the planned opening offsets, the corners consumed). Two thin appliers
+         execute it, touching only what it names. The delta deliberately does
+         NOT name room binding: a Design records that as wall.left/right, the
+         scene as WallItem.rooms, and each applier derives its own from
+         `Merge.absorbed`. That is the one thing the two targets genuinely
+         represent differently, and saying so is cheaper than pretending
+         otherwise.
+TWO BEHAVIOUR CHANGES IN THE PURE OP, both found BY single-sourcing rather
+         than in spite of it, and both fixes:
+         * merge no longer REFUSES a wall carrying openings. They are
+           redistributed onto the merged span and deduped -- DEFECT 9, closed
+           on the live-editing path the task text names. Guarded both ways: the
+           new op yields one door, and `_coalesce_all_impl` on the identical
+           input still yields two, so the closure is legible rather than
+           asserted.
+         * the survivor keeps its OWN DIRECTION. The old code wrote
+           `w1.v1, w1.v2 = far1, far2`, which REVERSES the survivor whenever the
+           run extends behind its v1 -- and did not swap left/right to match, so
+           every side on that wall silently flipped. Latent, unpinned, and
+           invisible until the same code had to serve a scene that renders
+           sides. Own test.
+TELEMETRY, ahead of point 5's ledger: an exact end-to-end merge causes ZERO
+         split-on-writes -- the merged end is re-pointed AT the corner's vertex
+         (`set_end_vertex`), not assigned a coordinate as coalesce did. A merge
+         absorbing a wall from up to perp_tol off the line still splits, and
+         that is correct: that end lands where no corner was, so it is a new
+         corner and should say so.
+A NARROWER CLAIM THAN IT LOOKS, stated so (iii) does not inherit a
+         misconception: the merge shares the SURVIVOR's end with the corner
+         anchor. It does not rebind OTHER walls sitting at that corner -- that
+         is weld's job, and weld is still on this task's deletion list. What is
+         true today is that both ops resolve the same corner to the same
+         representative `Vertex`, so they converge rather than fight.
+(ii) done  commit 340816c -- split_edge scene-side, the split rule's second
+         half, the guard retarget.
+ruff:    clean
+pytest:  OFF  482 passed, 4 xfailed, 1 xpassed in 18.4s
+         ON   482 passed, 4 xfailed, 1 xpassed in 21.8s
+         DEEP 477 passed, 3 xfailed, 7 deselected in 20.7s
+files:   design/topology.py (Split, plan_split_edge, apply_split_plan;
+         split_edge becomes their composition), walls.py
+         (apply_split_plan_to_scene, split_wall_at, WallItem.
+         _split_body_landings + _run_wall_under), tests/test_wall_move.py
+         (+7, ADDITIONS ONLY -- 0 deletions), tests/test_topology_ops.py (+7),
+         tests/test_topology.py (the one rewrite, below)
+THE SPLIT RULE IS NOW WHOLE. P3.3 built the first half and left the second
+         declared-but-not-done, tee branch on the coordinate path with a
+         comment naming this task. A body-landing now SPLITS the wall it lands
+         on -- which MAKES the vertex it never had -- and is then promoted onto
+         it exactly as a corner attachment is. The new segment joins the run,
+         so the user still slides the whole wall they grabbed (own test; that
+         is the way this could have silently gone wrong).
+TEST CHANGED (1), the pre-authorized one, named per the working agreement:
+         tests/test_topology.py::test_split_edge_raises_on_a_wall_with_openings
+         asserted `pytest.raises(NotImplementedError, match="P3.3")`. OLD OP:
+         split_edge refused any wall carrying an opening. NEW OP: it
+         redistributes them. WHY THE ASSERTION MOVED: that message was a
+         placeholder for unbuilt work and said so; the work is built here, so
+         the assertion pinning its absence has nothing left to pin. Rewritten
+         as TWO tests -- redistribution works, and the guard SURVIVES narrowed
+         to the case redistribution genuinely cannot answer. Hence the
+         pre-authorized string change, `match="P3.3"` -> `match="P3.6"`.
+THE GUARD IS RETARGETED, NOT RETIRED, and the distinction is the content of the
+         ruling. Redistribution answers "which segment owns the door". It
+         cannot answer "which segment owns a door the cut runs THROUGH",
+         because neither does -- that is an opening which no longer fits where
+         it lands, and reporting one instead of silently sliding it is P3.6's
+         line in this plan. So the guard keeps its P1.3-followup discipline
+         (fail loud AT the call site) on a strictly smaller domain.
+TWO POLICIES, ONE DECISION -- declared, because it is the closest this task
+         comes to the applier drift point 1 forbids, and it is not that.
+         `topology.split_edge` RAISES on a straddling split; the scene op
+         DECLINES it. Same planner, same delta, same `straddled` flag. What
+         differs is what each CALLER does with a flagged delta, because one is
+         a document repair and the other is a mouse gesture that must not
+         crash mid-drag. The decision is single-sourced; only the policy is
+         local, and a declined split leaves P3.3's exact behaviour behind.
+TELEMETRY -- point 5's prediction, measured BOTH ways rather than asserted:
+         * dedicated tee scenario, 12 drags: 12 split-on-writes BEFORE
+           (measured by disabling the new pass), 0 AFTER. The branch is silent,
+           which is the claim point 5 makes.
+         * composite (coalesce + weld + group + bake + ungroup + 12 drags):
+           mouseMoveEvent splits 4 -> 1.
+         * AND THE RESIDUE IS NOT THE TEE BRANCH FAILING. Two landings were
+           DECLINED because the split point falls inside an opening -- and
+           those openings turn out to be 15 IDENTICAL 96" windows stacked at
+           one `s`, produced by the old `_coalesce_wall_impl` on the
+           bake/ungroup path. That is DEFECT 9 in the wild, inside the code
+           (iii)/(iv) delete. PREDICTION FOR (iii), recorded now so it is a
+           prediction and not a rationalisation: retiring coalesce removes the
+           stacks and those two landings then split.
+         * a call site P3.3's scenario never triggered: 8 splits at
+           walls.py:233 in `_coalesce_wall_impl`. Also (iii)/(iv)'s.
+THE CORPUS GUARD HAS GONE VACUOUS, and saying so is the point. P3.3's
+         press-every-wall test still passes -- but neither corpus plan has an
+         unwelded body-landing, so pressing every wall of sample_plan and
+         planc1 now makes exactly 0 splits (measured). It no longer exercises
+         the risk it was written for. Added the case that DOES split, asserting
+         the document is unchanged across it: the scene walk already cuts walls
+         at junctions (`split_params`), so a press-time split only makes the
+         scene agree with what the document always said. Verified rather than
+         assumed -- 2 scene walls -> 3, document byte-identical, 3 document
+         walls before and after.
+(iii) done  commits a4a3336 (family 1), 457105e (family 2), e49c07f (family 3).
+ruff:    clean
+pytest:  OFF  491 passed, 4 xfailed, 1 xpassed in 16.7s
+         ON   491 passed, 4 xfailed, 1 xpassed in 19.3s
+         DEEP 486 passed, 3 xfailed, 7 deselected in 17.4s
+NO EXISTING TEST CHANGED across all three families. The changed-test budget
+         point 4 governs is still spent only on (ii)'s one pre-authorized
+         rewrite, going into (iv).
+FAMILY 1 -- COALESCE (5 sites): view.py:487 and walls.py:1385 (draw / drag
+         release) -> `merge_wall`; planio.py:181 (load), rooms.py:1020 (room
+         label drop), mainwindow.py:820 (ungroup) -> `merge_all`.
+         `merge_wall` forces the passed wall to be the run's SURVIVOR -- the
+         caller has just drawn or dragged that item, holds a reference to it,
+         and it carries the selection; the planner takes the run's first wall
+         in the caller's order, so the whole of "this one survives" is a sort
+         key. UNGROUP IS WIRED, NOT MIGRATED, per the ruling, with the comment
+         at the site: under P4.5 nothing is duplicated so nothing needs merging
+         on ungroup, making that call P4.5's to DELETE rather than this task's
+         to port.
+         Behaviour change, small and a fix: the merged wall lands on the union
+         span exactly, where `_coalesce_wall_impl` re-snapped both ends to the
+         6" grid. bridge.py:550 already flags that snap in its own words
+         ("Coalesce MOVES geometry"). No test depended on it.
+         PERF: the planner gained `_candidate_groups`, `_WallIndex`'s line
+         bucketing moved to where the merge decision now lives -- without it a
+         per-wall merge scans every wall on every draw-release, trading
+         coalesce's O(local) for O(plan), the direction P3.8 must not go.
+FAMILY 2 -- WELD (3 sites): view.py:489 `join_endpoints` -> `weld_wall_ends`;
+         imageio.py:180 `weld_all` -> `weld_scene`; mainwindow.py:827 ->
+         `normalize_walls`. After this the whole coalesce+weld set is a
+         CALLERLESS ISLAND.
+         THE COMMAND OUTLIVES ITS IMPLEMENTATION, per the ruling. Edit ▸
+         Coalesce all walls now is the explicit plan-wide normalization: merge
+         every collinear run, then weld -- close the gaps, fold coincident ends
+         onto one vertex, split a wall where another's end lands on its body.
+         Same menu item, same intent, new machinery, still ungated.
+         Welding now has a TOPOLOGY half. `weld_all` left a welded corner as
+         two coordinates that happened to agree, which is exactly what P3.3's
+         drag then had to rediscover by scanning at every press. The geometry
+         snap is kept verbatim: closing a 9" gap is a repair, not topology, and
+         it is the only way a drawn or extracted plan closes junctions at all.
+         ONE RULE, FOUND BY A FAILING TEST. The first cut had `weld_scene`
+         split body landings too, and test_extract_from_reference_adds_walls
+         went 5 walls -> 7. The split is CORRECT topology -- but shipping it
+         inside a call-site migration is a behaviour change smuggled under a
+         rename, and it edits a wall the user never touched. So splitting
+         belongs to the EXPLICIT pass and nowhere else: `weld_wall_ends`
+         doesn't, `weld_scene` doesn't, `normalize_walls` does. Applying the
+         rule uniformly made the test change unnecessary, which is the tell
+         that the rule was right and not a dodge. P3.5 will want plan-wide
+         planarity for `enclosing_face`; that is P3.5's to ask for, through the
+         pass built for it.
+FAMILY 3 -- THE QUERY HELPERS: one migrated, one policed, two divergences.
+         `_joined_at` MIGRATED: a 0.6" coordinate search becomes a DEGREE
+         lookup on a `_CornerIndex`, and `_WallIndex`'s endpoint hash is gone.
+         Zero behaviour change, and the replacement carries its own oracle --
+         `_joined_at`'s un-indexed fallback still runs the old search, so the
+         test compares the two directly on every end rather than trusting the
+         reasoning. `_CornerIndex` is now the SINGLE definition of "these ends
+         are one corner"; both halves earn their place, since identity is the
+         real question but load deliberately does not weld, so in a loaded plan
+         only position can see the corner.
+         `coincident_walls` POLICED, NOT MERGED, and that is a decision. It is
+         on the hottest path in the app (`WallItem.rebuild`, once per wall per
+         pass) and routing it through the planner would allocate a view per
+         candidate to prove a predicate that is already a transcription. A
+         drift gate pins the two equal across overlapping / off-grid /
+         abutting / perpendicular / diagonal pairs instead -- the same move
+         `--verify-design` makes for the two appliers.
+TWO CENSUS DIVERGENCES, reported rather than forced (Touches lists are hints):
+         * `_WallBBoxIndex` CANNOT die at P3.4. The task line lists it, but its
+           last caller is rooms.py:340, the memoized room dirty-check -- and
+           "refresh_rooms memoization" is on P3.5's list BY NAME. A line dies
+           when its last caller dies, and this one's last caller is P3.5's.
+         * `wall_endpoint_open` NOT migrated to degree, deliberately. Its
+           tolerance is JOIN_TOL (9"), not SHARE_TOL: the 9" scan was a PROXY
+           for a question the pre-vertex code could not ask. Degree is the
+           truer question, but swapping them changes which ends the draw-snap
+           offers to align with on unwelded geometry -- a behaviour change
+           needing this task's own three-part earning, and it buys no deletion
+           since the helper survives Phase 3 either way. Recommended as its own
+           change or as P3.5's.
+         Consequence: `_WallIndex` SHRINKS rather than dies. Its line buckets
+         are a spatial index, not detection machinery, and the planner needed
+         the identical bucketing badly enough that `_candidate_groups` is a
+         copy of them. The honest end-state is one index, not zero.
+RIDER (commit 670fded) -- the two (iii) divergences, ruled:
+         * `wall_endpoint_open` REFRAMED PERMANENTLY, in its own docstring, so
+           no future task "migrates" it out of a misplaced sense of
+           completeness. It is not a survivor of the old world; it is a correct
+           citizen of the new one. Its tolerance is JOIN_TOL, the GESTURE
+           tolerance, and gesture questions are inherently spatial. Degree
+           answers the MODELLING question ("are these ends one corner?"); this
+           answers the AIMING question ("is there something near enough to snap
+           to?"). Degree cannot serve here even in principle -- the ends worth
+           offering the user are precisely the ones NOT yet welded, so a degree
+           query calls every one of them free and the snap has nothing to aim
+           at. The docstring names `_joined_at` as the one that DID migrate.
+         * THE BUCKETING DUPLICATION UNIFIED, not pinned. `topology.line_bucket`
+           + `bucket_reach` are the one definition; `_candidate_groups` and
+           `_WallIndex` both call them and `_WallIndex.OFF` is gone.
+           Unification beat a second drift gate because the policy is pure
+           coordinates, so it belongs on the Qt-free side with the scene
+           importing it -- the dependency flows the right way, which is not
+           true of most things one might want to share across that fence.
+
+(iv) done   commit 89f3d8b -- the deletion, the junction contract, the checks.
+DELETED, 149 lines across 7 functions, all callerless after (iii):
+         `_coalesce_wall_impl` (59), `coalesce_wall` (8), `_wall_count` (5),
+         `_coalesce_all_impl` (26), `coalesce_all` (7), `weld_all` (23),
+         `WallItem.join_endpoints` (21) -- plus `_WallIndex`'s endpoint hash,
+         folded into `_CornerIndex` at (iii): 50 lines -> 40.
+EXIT CHECK 1 -- MEASURED DELETION vs THE ESTIMATE. Estimated 375 across 13
+         functions; MEASURED 149 across 7. The gap is three survivors with
+         named reasons, not shortfall, and 169 lines of the census live on:
+         * `fracture_delete_wall` (55) + `_merge_intervals` (9) -> P4.1. Two
+           live callers, not migrated at (iii), and retiring them IS P4.1's
+           deliverable -- its acceptance is literally "P0.4 test 2 flips to
+           pass". AND THE MEASUREMENT IS THE FINDING: a plain delete now KEEPS
+           the room (1 room, 100.0 sf, 3 built walls + 1 open edge -- exactly
+           test 2b's assertion), because P3.2 gave RoomItem a stored outline.
+           P4.1's blocker is already gone and P4.1 is now a small change;
+           doing it here would be landing another task's deliverable under this
+           one's name.
+         * `_WallBBoxIndex` (34) -> P3.5, as reported at (iii).
+         * `_compute_wall_junctions` (31) STAYS -- next paragraph.
+         * `_WallIndex` (40) shrank rather than died.
+EXIT CHECK 4 -- THE JUNCTION CONTRACT, AND THE SWAP IT REFUSED. Point 3 said
+         "if the junction test needs touching, the replacement is wrong."
+         IT NEEDS TOUCHING, so the replacement is not made. Measured on the
+         structural guard's own scene -- a horizontal and a vertical wall
+         crossing mid-span -- the two share ZERO corners (all four ends degree
+         1) while their `_solid`s genuinely intersect and the bbox pass
+         correctly clips both. Adjacency-only neighbours find nothing, set both
+         clips to None, and fail the guard. An unwelded crossing is a legal
+         scene state (crossing-point insertion is not built), so bbox search is
+         not legacy machinery here -- it is the only thing that answers the
+         question. The contract worked exactly as designed: it was written to
+         catch a wrong replacement, and it caught one.
+         THE PIXEL ASSERTION LANDED ANYWAY, an ADDITION, because it is what
+         makes any future attempt safe. POLARITY MEASURED, NOT ASSUMED, and it
+         is the INVERSE of the spec's wording: the wall body is grey (150) and
+         a seam is a DARK line across the junction (56), so "no LIGHT seam
+         pixel" names the wrong failure. Seam-free asserts the interior stays
+         body-grey; the `< 190` threshold is used where it genuinely belongs --
+         the negative half, clip cleared, where an antialiased 1-px dark line
+         must read under 190 and nowhere near 100. Both halves in one test, so
+         the positive assertion cannot go vacuous. The structural pin is green
+         and UNCHANGED.
+EXIT CHECK 2 -- THE P2.3 KNOWN-REGRESSIONS ROW DOES NOT CLOSE, and the row's
+         predicted fix was wrong on its own terms. Checked by hand: the 480"
+         wall still returns as two 240" segments after the undo restore,
+         `merge_all` does NOT re-merge them, and the body-drag still moves one
+         segment (p1.y 12 and 0). It MUST not -- the mid-span T is a degree-3
+         vertex, load-bearing for the planar subdivision, and merging through
+         it would destroy planarity. So this was never merge's row to close.
+         NOT FLIPPED; retargeted in place with the real fix named: the drag's
+         run-gathering, where `_collinear_run()` short-circuits to `[self]` for
+         a room-less wall. Left unassigned rather than invented, with P4.2 as
+         the nearest task that touches the drag.
+EXIT CHECK 3 -- THE DEFECT-9 PREDICTION, GRADED HALF-RIGHT AND PRECISELY.
+         FIRST HALF CONFIRMED: retiring coalesce removed the stacks -- 16
+         openings on one wall became 1. SECOND HALF FALSIFIED: the two tee
+         landings still decline. But the residual cause is now legitimate
+         rather than debris -- the harness puts a 96" window at the centre of a
+         240" wall and the neighbouring grid line lands at s=120, dead inside
+         it (measured: openings [(120.0, 96.0)], straddled 1). A genuine
+         straddle, correctly declined, P3.6's case. The count coinciding at 2
+         is coincidence; the mechanism the prediction named was real and is
+         gone. Recording the falsified half is the point of having predicted.
+EXIT CHECK 5 -- TELEMETRY RESIDUE, 137 splits on the composite scenario:
+         64 + 64  items.py:703/704 in bake()   -- P4.5's, correct that they stay
+          8       walls.py in _adopt_end()     -- MOVED, not new
+          1       walls.py in mouseMoveEvent() -- the grouped/rigid branch, P4.5
+         The 8 were `_coalesce_wall_impl`'s at (ii); they are the merge
+         applier splitting on write when an absorbed end lands where no corner
+         was -- declared at (i) as correct for that case. Same count, honest
+         new home.
+TESTS REWRITTEN -- the plan's biggest changed-test risk, one line each:
+         * test_coalesce.py (whole file): `_coalesce_*_impl` -> `merge_all` /
+           `merge_wall`. THE ASSERTIONS DID NOT MOVE -- they are the behaviour
+           contract, not the implementation, and every line still says exactly
+           what it said. Only the call changed.
+         * test_walls.py: `join_endpoints` -> `weld_wall_ends`, `weld_all` ->
+           `weld_scene`, `_coalesce_wall_impl` -> `merge_wall`. Assertions
+           unchanged: the geometry snap they pin was lifted verbatim into
+           `_snap_wall_ends`. Plus the pixel test, an addition.
+         * test_characterization.py 5 and test_floors.py: `coalesce_all` ->
+           `merge_all`; the group-exemption and cross-floor assertions
+           unchanged.
+         * test_topology_ops.py: the defect-9 OLD-op comparison DELETED with
+           the op it exercised. Once the defect's implementation is gone there
+           is no old behaviour left to exhibit and the test would be asserting
+           against a museum piece. It did its job at (i) and (ii); a claim
+           about code that no longer exists belongs in this log, and a comment
+           at the site says so.
+         * test_scaling.py, test_design_bridge.py: stale `coalesce_all` wording
+           only, no assertion touched.
+(iv) EXIT CHECKS as fixed before the work (all five answered above):
+         1. the measured deletion count against the estimated 375 across 13
+            functions, with `_WallIndex`/`_WallBBoxIndex` surviving named;
+         2. the P2.3 Known-regressions row re-checked BY HAND (the 480"
+            body-drag moving as one run) and flipped ONLY if it genuinely
+            closes;
+         3. (ii)'s recorded prediction, promoted to an exit check by ruling:
+            retiring coalesce removes the defect-9 stacks, so the two tee
+            landings that DECLINED in the composite telemetry should then
+            split. Falsifiable, cheap, and if it holds it is the cleanest
+            demonstration yet that the old machinery was manufacturing the
+            conditions that defeated the new one;
+         4. the junction contract's two halves: `test_junction_outline_is_
+            clipped_so_walls_read_solid` green UNCHANGED, plus the new pixel
+            assertion at the `< 190` threshold;
+         5. tests/test_scaling.py's ungroup xfail reason still says "calls
+            O(walls^2) coalesce_all" -- stale from family 1, true again only as
+            history. Fix it with the deletion, where the claim actually changes.
+Census re-verified on disk before starting:
+         `coincident_walls` at walls.py:656 and :695 and view.py:597,
+         `wall_endpoint_open` at view.py:248, and the dying caller at
+         walls.py:201 inside `_coalesce_wall_impl`. ONE CORRECTION to the
+         census's wording, not its content: BOTH walls.py hits are inside
+         `WallItem.rebuild` (:656 is the party-wall opening cascade, :695 the
+         neighbour-rebuild tail), not "rebuild and paint" -- `paint` reads the
+         already-built `_path`. The adjudication is unaffected; both survive
+         Phase 3 and both migrate.
 ```

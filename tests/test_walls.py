@@ -1,8 +1,8 @@
 """Wall geometry plus door/window opening sizing and garage-door defaults."""
 import pytest
-from PyQt6.QtCore import QPointF, Qt
+from PyQt6.QtCore import QPointF, QRectF, Qt
 
-from floorplanner.walls import _coalesce_wall_impl
+from floorplanner.walls import merge_wall, weld_scene, weld_wall_ends
 
 pytestmark = pytest.mark.walls
 
@@ -55,7 +55,7 @@ def test_no_autogrow_when_released_short(fp, scene):
     w = fp.WallItem(QPointF(0, 100), QPointF(250, 100), "interior")
     scene.addItem(w)
     fp.rebuild_all_walls(scene)
-    w.join_endpoints()
+    weld_wall_ends(scene, w)
     assert w.p2.x() == pytest.approx(250)        # stayed short, no growth
     assert target.p2.y() == pytest.approx(200)   # target wall unchanged
 
@@ -298,7 +298,7 @@ def test_coalesce_overlapping_same_type_walls(fp, scene):
     b = fp.WallItem(QPointF(60, 0), QPointF(204, 0), "interior")   # on 6" grid
     scene.addItem(a)
     scene.addItem(b)
-    _coalesce_wall_impl(scene, a)
+    merge_wall(scene, a)
     walls = [it for it in scene.items() if isinstance(it, fp.WallItem)]
     assert len(walls) == 1
     assert (walls[0].p1.x(), walls[0].p2.x()) == pytest.approx((0, 204))
@@ -308,7 +308,7 @@ def test_no_coalesce_different_wall_types(fp, scene):
     a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
     scene.addItem(a)
     scene.addItem(fp.WallItem(QPointF(60, 0), QPointF(200, 0), "exterior"))
-    _coalesce_wall_impl(scene, a)
+    merge_wall(scene, a)
     assert len([it for it in scene.items()
                 if isinstance(it, fp.WallItem)]) == 2
 
@@ -320,7 +320,7 @@ def test_coalesce_merges_free_wall_into_room_wall(fp, scene, make_room):
     rw = room.walls[0]
     free = fp.WallItem(QPointF(rw.p1), QPointF(rw.p2), rw.wall_type)
     scene.addItem(free)
-    survivor = _coalesce_wall_impl(scene, free)
+    survivor = merge_wall(scene, free)
     assert rw.scene() is None                     # rw was absorbed
     assert len(room.walls) == 4                   # still one wall per edge
     assert survivor in room.walls and room in survivor.rooms
@@ -332,28 +332,28 @@ def test_coalesce_carries_openings_across(fp, scene):
     scene.addItem(a)
     scene.addItem(b)
     b.openings.append(fp.OpeningItem(b, "door", "3280", 150))
-    _coalesce_wall_impl(scene, a)
+    merge_wall(scene, a)
     walls = [it for it in scene.items() if isinstance(it, fp.WallItem)]
     assert len(walls) == 1
     assert len(walls[0].openings) == 1 and walls[0].openings[0].kind == "door"
 
 
 # -- welding: a drawn end fuses onto the wall it meets (T/L joint) -------------
-def test_join_endpoints_welds_onto_a_through_wall(fp, scene):
+def test_welding_an_end_onto_a_through_wall(fp, scene):
     scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100), "interior"))
     stem = fp.WallItem(QPointF(100, 108), QPointF(100, 200), "interior")  # 8" gap
     scene.addItem(stem)
     fp.rebuild_all_walls(scene)
-    stem.join_endpoints()
+    weld_wall_ends(scene, stem)
     assert stem.p1.y() == pytest.approx(100, abs=0.01)   # welded onto the wall
 
 
-def test_join_endpoints_leaves_a_far_end_alone(fp, scene):
+def test_welding_leaves_a_far_end_alone(fp, scene):
     scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100), "interior"))
     stem = fp.WallItem(QPointF(100, 130), QPointF(100, 260), "interior")  # 30" gap
     scene.addItem(stem)
     fp.rebuild_all_walls(scene)
-    stem.join_endpoints()
+    weld_wall_ends(scene, stem)
     assert stem.p1.y() == pytest.approx(130)             # too far -> not welded
 
 
@@ -371,16 +371,64 @@ def test_junction_outline_is_clipped_so_walls_read_solid(fp, scene):
     assert lone._outline_clip is None                          # nothing to clip
 
 
-def test_weld_all_closes_near_miss_junctions_and_is_idempotent(fp, scene):
+def _render(scene, size=200):
+    """The scene rendered to a QImage, for pixel assertions."""
+    from PyQt6.QtGui import QImage, QPainter
+    img = QImage(size, size, QImage.Format.Format_RGB32)
+    img.fill(0xFFFFFFFF)
+    pr = QPainter(img)
+    pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    scene.render(pr, QRectF(0, 0, size, size), QRectF(0, 0, size, size))
+    pr.end()
+    return img
+
+
+def test_a_cross_junction_paints_with_no_seam(fp, scene):
+    """THE PIXEL HALF of the junction contract (P3.4 (iv)) -- an ADDITION, not
+    a rewrite: the structural guard above stays exactly as it was.
+
+    That guard asserts the clip CACHE is populated. It would pass against a
+    replacement that populated it with the WRONG clip, which is precisely what
+    changing how junction neighbours are found can produce. Seam-free is an
+    OUTPUT contract, so this one looks at the output.
+
+    POLARITY, measured rather than assumed: the wall body is grey (150) and a
+    seam is a DARK line across the junction interior -- the inverse of "no
+    LIGHT seam pixel". So seam-free means the interior stays body-grey, and the
+    `< 190` threshold from CLAUDE.md is used where it actually belongs: on the
+    negative half, where an antialiased 1-px dark line reads well under 190 but
+    nowhere near 100."""
+    scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100), "interior"))
+    scene.addItem(fp.WallItem(QPointF(100, 0), QPointF(100, 200), "interior"))
+    fp.rebuild_all_walls(scene)
+    walls = [w for w in scene.items() if isinstance(w, fp.WallItem)]
+
+    span = range(94, 107)                      # the junction interior
+    inside = ([_render(scene).pixelColor(x, 100).red() for x in span]
+              + [_render(scene).pixelColor(100, y).red() for y in span])
+    body = max(inside)
+    assert min(inside) >= body - 10, (
+        f"a seam crosses the junction: {inside}")
+
+    # the negative half -- without the clip the seam is really there, so the
+    # assertion above can fail and is not vacuous
+    for w in walls:
+        w._outline_clip = None
+    img = _render(scene)
+    bare = [img.pixelColor(x, 100).red() for x in span]
+    assert min(bare) < 190, f"expected a visible seam without the clip: {bare}"
+
+
+def test_welding_closes_near_miss_junctions_and_is_idempotent(fp, scene):
     scene.addItem(fp.WallItem(QPointF(0, 0), QPointF(300, 0), "interior"))
     scene.addItem(fp.WallItem(QPointF(150, 7), QPointF(150, 120), "interior"))
     fp.rebuild_all_walls(scene)
-    fp.weld_all(scene)
+    weld_scene(scene)
     stem = next(w for w in scene.items() if isinstance(w, fp.WallItem)
                 and abs(w.p1.x() - 150) < 1 and abs(w.p2.x() - 150) < 1)
     assert min(stem.p1.y(), stem.p2.y()) == pytest.approx(0)   # gap closed
     before = (QPointF(stem.p1), QPointF(stem.p2))
-    fp.weld_all(scene)                                   # second sweep: no move
+    weld_scene(scene)                                    # second sweep: no move
     assert stem.p1 == before[0] and stem.p2 == before[1]
 
 
@@ -410,7 +458,7 @@ def test_fracture_delete_keeps_room_edge_drops_overhang(fp, scene, make_room):
     fp.fracture_delete_wall(scene, edge)
     assert room.area_sqft == pytest.approx(100.0, rel=0.05)   # 120x120 in sq ft
     kept = next(w for w in scene.items() if isinstance(w, fp.WallItem)
-                and not w.is_open and abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1)
+                and abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1)
     assert max(kept.p1.x(), kept.p2.x()) == pytest.approx(120, abs=1)  # no over
     assert room in kept.rooms
 

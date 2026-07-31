@@ -96,24 +96,35 @@ def test_planc1_reports_its_real_faults(fp, win):
     walk must REPORT them rather than repair them on the way past.
 
     Asserted as what it actually reports (per the P1.4 acceptance), not forced
-    to []: 17 walls are claimed by an outline whose sides disagree (I6), and
-    Hall and M Bath overlap (I11)."""
+    to []: walls claimed by an outline whose sides disagree (I6), and Hall and
+    M Bath overlapping (I11).
+
+    17 -> 13 AT P3.5, and the four that went were never real claims. planc1's
+    four divider walls stop 1.5" short of the corridor wall, so each is a
+    DANGLING STUB, and the face walk enters a stub and comes straight back out.
+    The old tracer kept those excursions in the outline -- which is how Hall and
+    M Bath each carried 21 corners, several of them at the free end of a wall
+    nowhere near the room. `bridge._prune_spurs` drops them, so the walls only a
+    spur ever touched are no longer claimed by a room that does not name them.
+    Same fault classes, same collapse, same areas; four fewer bogus claims."""
     _load(fp, win, "planc1.json")
     doc, _rep = _walk(win)
     errs = check(doc, deep=True)
 
     kinds = {e.split()[0] for e in errs}
     assert kinds == {"I6", "I11"}, f"unexpected fault classes: {sorted(kinds)}"
-    assert sum(e.startswith("I6") for e in errs) == 17
+    assert sum(e.startswith("I6") for e in errs) == 13
     assert [e for e in errs if e.startswith("I11")] == \
         ["I11 rooms 'Hall' and 'M Bath' overlap"]
 
     # The corruption carried here is the SCENE's, and it is worse than the
     # file's. On disk the two rooms at least differ (Hall 243.5 sf / 18 corners,
     # M Bath 591.6 sf / 24 corners). Load re-detects rooms, the 1.5" divider gap
-    # leaks the flood-fill, and BOTH anchors resolve to the one merged region --
-    # so they come out as the same 21-vertex loop. I11 is firing on an exact
-    # coincidence, not a partial overlap. Repairing that belongs at P2.1.
+    # means neither anchor is separately enclosed, and BOTH resolve to the one
+    # merged region -- so they come out as the same loop (21 vertices before
+    # P3.5's spur pruning, 13 after; identical either way, which is the fault).
+    # I11 is firing on an exact coincidence, not a partial overlap. Repairing
+    # that belongs at P2.1.
     loops = {r["name"]: [e["v"] for e in r["outline"]] for r in doc["rooms"]}
     assert set(loops["Hall"]) == set(loops["M Bath"])
     areas = _room_areas(doc)
@@ -145,10 +156,68 @@ def test_unwelded_ends_warns_and_strict_raises(fp, win):
     """The finding is surfaced, and `strict=True` escalates it -- the hook
     P1.6's `--verify-design` pulls."""
     _load(fp, win, "planc1.json")
-    with pytest.warns(UserWarning, match="disagrees with itself"):
+    # MATCH CHANGED AT GATE 3, one line: the old phrase was "disagrees with
+    # itself as it arrived", which the reword deleted because it is false for a
+    # v5 plan -- the scene does not disagree with itself, it DECOMPOSES the
+    # document's shared corners into items that then sit near each other. The
+    # assertion still pins that the finding is surfaced; only the words it
+    # quotes moved, and it now quotes the stable half of the sentence.
+    with pytest.warns(UserWarning, match="join tolerance of a neighbour"):
         design_from_scene(win)
     with pytest.raises(ValueError, match="wall end"):
         design_from_scene(win, strict=True)
+
+
+def test_the_warning_names_the_cause_and_says_it_once(fp, win):
+    """DEFECT 22, the ergonomics half. The message used to say one thing for
+    every case -- "expected on a plan loaded from a legacy file" -- which is
+    true of the ends a file ARRIVES with and false of the ends an edit tears
+    open. And it fired on every debounced snapshot, so a plan that opened clean
+    produced a stream of warnings with a moving count, all blaming the file.
+
+    A correct warning that misattributes is worse than none: it teaches people
+    to ignore the channel that will one day be right."""
+    import json
+    import pathlib
+    ex = pathlib.Path(__file__).resolve().parent.parent / "examples"
+    win.open_document(json.loads((ex / "symmetricP1.json").read_text("utf-8")),
+                      interactive=False)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")        # opened clean -> silent
+        design_from_scene(win)
+
+    # tear one corner open exactly as planc1's dividers are torn: pull a wall
+    # 1.5" back ALONG ITS OWN AXIS off a shared corner, so its end now stops
+    # short of the neighbour's body. That is inside the 9" join tolerance and
+    # more than the 0.6" noise floor, which is what the counter counts.
+    at = {}
+    for it in win.scene.items():
+        if isinstance(it, fp.WallItem):
+            for a in ("p1", "p2"):
+                at.setdefault((round(getattr(it, a).x(), 3),
+                               round(getattr(it, a).y(), 3)), []).append((it, a))
+    (w, a) = next(v[0] for v in at.values() if len(v) >= 2)
+    u, p = w.unit(), getattr(w, a)
+    back = 1.5 if a == "p1" else -1.5
+    setattr(w, a, QPointF(p.x() + u.x() * back, p.y() + u.y() * back))
+
+    with pytest.warns(UserWarning, match="NEW") as rec:
+        design_from_scene(win)
+    assert "not the legacy-load case" in str(rec[0].message),         "an edit-induced tear was blamed on the file"
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")        # same state -> not repeated
+        design_from_scene(win)
+
+
+def test_a_legacy_plan_is_blamed_on_the_file_not_on_an_edit(fp, win):
+    """The other side of the same split: what planc1 arrives with is the
+    file's, and the message must go on saying so."""
+    _load(fp, win, "planc1.json")
+    with pytest.warns(UserWarning, match="OPENED with") as rec:
+        design_from_scene(win)
+    assert "legacy" in str(rec[0].message)
 
 
 def test_clean_scene_neither_warns_nor_raises(fp, win):
@@ -312,7 +381,7 @@ def test_round_trip_is_identical_at_the_second_design(fp, win, name):
 
 
 def test_apply_does_not_coalesce(fp, win):
-    """`apply_project_to_scene` runs `coalesce_all`; this must not.
+    """`apply_project_to_scene` runs the merge sweep; this must not.
 
     Coalesce MOVES geometry -- it re-snaps the survivor's endpoints onto the 6"
     on-centre grid independently of their neighbours (walls.py:200-201, the
@@ -443,3 +512,36 @@ def test_apply_accepts_a_design_object(fp, win):
     d1, _ = _walk(win)
     _apply(win, Design.from_dict(d1))
     assert _walk(win)[0] == d1
+
+
+def test_a_v5_plan_does_not_warn_about_its_own_decomposition(fp, win):
+    """GATE 3: the opened-with warning is silent for a v5 plan, because there is
+    nothing the user could do about it that would change the file.
+
+    MEASURED on `planc1TestV5.json`, which opens with 5 such ends:
+      * Edit > Coalesce all walls now takes the scene count 5 -> 0;
+      * the document's own near-vertex gaps stay 4 -> 4;
+      * the saved file is byte-identical, 62 vertices either way.
+    The count describes how the SCENE decomposes the walls into items, and
+    merging collinear runs removes the ends that would weld without moving a
+    coordinate. A warning that a command can silence without repairing anything
+    is worse than no warning.
+
+    The legacy branch still warns -- there the ends really are the file's own
+    unwelded coordinates and the command really does close them (pinned by
+    `test_a_legacy_plan_is_blamed_on_the_file_not_on_an_edit`), and an EDIT that
+    tears the network still warns (pinned by
+    `test_the_warning_names_the_cause_and_says_it_once`)."""
+    import json
+    import pathlib
+    ex = pathlib.Path(__file__).resolve().parent.parent / "examples"
+    doc = json.loads((ex / "planc1TestV5.json").read_text(encoding="utf-8"))
+    win.open_document(doc, interactive=False)
+
+    rep = {}
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")        # any warning fails the test
+        design_from_scene(win, report=rep)
+    # the finding is still COUNTED -- it is telemetry, not a secret
+    assert rep["unwelded_ends"] == 5, \
+        "the count itself must survive; only the user-facing warning is silent"

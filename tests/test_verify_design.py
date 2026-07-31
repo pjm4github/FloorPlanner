@@ -69,13 +69,19 @@ def test_flag_parsing(monkeypatch, val, enabled, deep):
 
 # -------------------------------------------------------------- baseline rules
 def test_corrupt_at_rest_does_not_fire(fp, win, on):
-    """planc1 opens with 17x I6 + 1x I11 and shadow mode must tolerate it.
+    """planc1 opens with 13x I6 + 1x I11 and shadow mode must tolerate it.
 
     This is the rule that makes shadow mode usable at all: it reports what an
-    operation BROKE, not what the file arrived broken."""
+    operation BROKE, not what the file arrived broken.
+
+    (17 -> 13 at P3.5: four of the I6 claims came from outline corners on the
+    free ends of planc1's short divider stubs, which the face walk no longer
+    carries. See `test_design_bridge.py::test_planc1_reports_its_real_faults`
+    -- the count is a characterization of the fixture, and the fixture's real
+    faults are unchanged.)"""
     win.load_data(json.loads((EXAMPLES / "planc1.json").read_text("utf-8")))
     base = getattr(win, V.BASELINE_ATTR)
-    assert base["I6"] == 17 and base["I11"] == 1
+    assert base["I6"] == 13 and base["I11"] == 1
     V.verify(win, "no-op")                       # must not raise
     win._commit_if_changed()                     # nor the real per-op hook
 
@@ -172,11 +178,20 @@ def test_apply_design_rebases(fp, win, on):
 
 
 def test_save_verifies_deep(fp, win, on, tmp_path):
-    """Save runs all fifteen before writing -- paid once, stakes highest."""
+    """Save runs all fifteen before writing -- paid once, stakes highest.
+
+    ASSERTION CHANGED AT DEFECT 26: `pytest.raises` -> the violation is
+    REPORTED and the write still refused. The raise was fatal, not strict: save
+    is reached from a menu QAction, and since PyQt 5.5 an exception escaping a
+    Qt callback calls qFatal() -> abort(), so this check killed the process
+    rather than declining. THE REFUSAL IS UNCHANGED -- "don't write a corrupt
+    plan" is the decision this test was written to protect, and it still holds;
+    only the way the user hears about it moved from a crash to a message."""
     V.rebase(win)
     _rect(fp, win.scene, 0, 0, 120, 96, "A")
     _rect(fp, win.scene, 60, 48, 120, 96, "B")
-    with pytest.raises(V.DesignVerificationError, match="I11"):
-        win.save_path(str(tmp_path / "p.json"))
+    win.save_path(str(tmp_path / "p.json"))
     assert not (tmp_path / "p.json").exists(), "a corrupt plan was written"
+    msg = win.statusBar().currentMessage()
+    assert "Not saved" in msg, f"the refusal was silent: {msg!r}"
     V.rebase(win)                                # ends corrupt on purpose

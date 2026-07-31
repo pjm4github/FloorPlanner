@@ -56,7 +56,8 @@ from PyQt6.QtCore import QPointF
 from PyQt6.QtWidgets import QGraphicsScene
 
 from floorplanner.config import (
-    DEFAULT_FLOOR, DEFAULT_SETTINGS, JOIN_TOL, SETTINGS, set_floor_state,
+    DEFAULT_FLOOR, DEFAULT_SETTINGS, JOIN_TOL, SETTINGS, active_floor,
+    set_floor_state,
 )
 from floorplanner.design.canonical import canonicalize
 from floorplanner.design.legacy import (
@@ -68,11 +69,12 @@ from floorplanner.items import (
     FurnishingItem, ReferenceImageItem, furnishing_spec, make_furnishing,
 )
 from floorplanner.model import Floor
+from floorplanner.vertex import Vertex
 from floorplanner.rooms import (
-    RoomItem, poly_area_sqft, room_path_from_corners, room_signature,
+    OutlineEdge, RoomItem, poly_area_sqft, room_path_from_corners,
 )
 from floorplanner.walls import (
-    OpeningItem, OpenWall, WallItem, rebuild_all_walls,
+    OpeningItem, WallItem, rebuild_all_walls,
 )
 
 # names that make a room exterior rather than interior.  Kept identical to
@@ -241,24 +243,127 @@ def _walk(va, vb, edge, adj, vt, max_hops=10):
     return chain if cur == vb else None
 
 
+# ------------------------------------------------- the unwelded-ends warning
+_BASELINE_ATTR = "_fp_unwelded_baseline"
+_WARNED_ATTR = "_fp_unwelded_warned"
+
+
+def rebase_weld_baseline(scene):
+    """Forget what the scene's weld state was, so the next walk re-reads it.
+
+    Called by both load paths. A load REPLACES the document, so whatever it
+    arrives with is its baseline -- not a tear some edit made."""
+    for a in (_BASELINE_ATTR, _WARNED_ATTR):
+        if hasattr(scene, a):
+            delattr(scene, a)
+
+
+def _warn_unwelded(scene, n):
+    """Report unwelded ends BY CAUSE, and at most once per distinct state.
+
+    The old message said one thing for every case: "expected on a plan loaded
+    from a legacy file". That is true of the ends a legacy file arrives with and
+    false of the ends an EDIT tears open, and it fired on every debounced
+    snapshot -- so a user watching a plan that opened clean got a stream of
+    warnings, with a count that moved as they worked, all blaming the file. A
+    correct warning that misattributes is worse than none: it teaches people to
+    ignore the channel that will one day be right.
+
+    So: the first walk after a load sets the BASELINE, and only a walk that
+    finds MORE than the baseline warns -- naming the split between what the plan
+    arrived with and what has appeared since. Equal or better is silent.
+
+    GATE 3 SILENCED THE OPENED-WITH BRANCH FOR A V5 PLAN, because measurement
+    showed it had nothing to tell the user. On `planc1TestV5.json` (5 ends at
+    open):
+
+        Edit > Coalesce all walls now : scene count 5 -> 0
+        the document's own gaps       : 4 -> 4, UNCHANGED
+        saved file                    : byte-identical, 62 vertices either way
+
+    The command silences the count without closing anything. It can, because
+    this count is computed on the SCENE's decomposition of the walls, and
+    merging collinear runs removes the ends that would weld without moving a
+    coordinate. Meanwhile the same measurement found `planc1.json` and
+    `symmetricP1.json` each carrying TWO 6.003" document gaps and warning about
+    neither -- so the channel both cried wolf and missed the wolf.
+
+    A 6" gap is very likely deliberate: the schema calls `join_tol_in` a GESTURE
+    tolerance and says in as many words that "a wall deliberately stopping 6"
+    short of another is a legitimate design (a reveal, a pilaster gap), and
+    nothing may silently close it". So the document-side gaps are not
+    automatically faults either, and nothing here can tell a reveal from a
+    mistake.
+
+    WHAT IS LEFT IS THE ONE CASE THAT IS ACTIONABLE: an EDIT that tears the wall
+    network, where the count rises above what the plan opened with. That branch
+    stays. On open, a v5 plan says nothing (there is nothing the user could do
+    that would change the file) and a LEGACY plan still warns, because there the
+    ends really are the file's own unwelded coordinates and the command really
+    does repair them.
+
+    The real repair gap -- a document that carries a 1.53" gap no command
+    closes -- is defect 34, and is not this function's to fix."""
+    base = getattr(scene, _BASELINE_ATTR, None)
+    if base is None:
+        setattr(scene, _BASELINE_ATTR, n)
+        base = n
+        if n and getattr(scene, "_v5_source", False):
+            return                   # nothing to repair -- see the docstring
+        if n:
+            msg = (f"design_from_scene: this legacy (v1-v4) plan OPENED with {n} "
+                   f"wall "
+                   f"end(s) sitting within the {JOIN_TOL}\" join tolerance of "
+                   f"a neighbour without sharing a corner with it -- the "
+                   f"file's own coordinates, which load never welds (F5 in "
+                   f"docs/CODE_REVIEW_v2.md). Edit > Coalesce all walls now "
+                   f"closes them, and saving afterwards writes them closed.")
+        else:
+            return
+    elif n > base:
+        msg = (f"design_from_scene: {n} wall end(s) now sit within the "
+               f"{JOIN_TOL}\" join tolerance of a neighbour without being "
+               f"welded to it -- {base} were there when the plan opened and "
+               f"{n - base} are NEW. An edit has torn the wall network; this is "
+               f"not the legacy-load case.")
+    else:
+        return                       # unchanged, or repaired -- nothing to say
+    if getattr(scene, _WARNED_ATTR, None) == n:
+        return                       # same state, already reported
+    setattr(scene, _WARNED_ATTR, n)
+    warnings.warn(msg, stacklevel=3)
+
+
 # ------------------------------------------------------------------ level walk
-def _walls_of(items, lid, nid, vt, rep):
+def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
     """This level's walls, split at every junction and room corner, as v5 wall
     dicts.  Openings are re-anchored from absolute `s` to {from, offset_in} on
-    the segment that carries them."""
-    w_items = [it for it in _ordered(items, WallItem, _wall_key)
-               if not it.is_open]
+    the segment that carries them.
+
+    Pass `src` (a dict) to receive `{(v1, v2) sorted: WallItem}` -- which scene
+    wall each emitted segment came from.  `face_at` needs it and nothing else
+    does, so it is an out-param rather than a field on the wall dicts: the
+    Design is a document and a `QGraphicsItem` has no business in one.
+    `weld_check=False` skips the O(n^2) disagreement count, which only exists to
+    warn a human and has no reader on the detection path."""
+    w_items = _ordered(items, WallItem, _wall_key)
     r_items = _ordered(items, RoomItem, _room_key)
     raw = [{"p1": [w.p1.x(), w.p1.y()], "p2": [w.p2.x(), w.p2.y()],
             "type": w.wall_type,
             "openings": sorted(
                 [{"kind": o.kind, "code": o.code, "s": float(o.s),
                   "width": float(o.width), "door_type": o.door_type,
-                  "swing": float(o.swing)} for o in w.openings],
+                  "swing": float(o.swing),
+                  # R4b: the end this opening is ACTUALLY dimensioned off, and
+                  # its stored offset -- carried so the emit can honour them
+                  # rather than recompute a nearer-end anchor over the top
+                  "from": o.anchor_from(), "offset_in": float(o.offset_in)}
+                 for o in w.openings],
                 key=lambda o: o["s"]),
             "extra": getattr(w, "_v5_extra", None) or {}}
            for w in w_items]
-    rep["unwelded_ends"] += _weld_delta(raw)
+    if weld_check:
+        rep["unwelded_ends"] += _weld_delta(raw)
 
     loops = [[(c.x(), c.y()) for c in r.corners] for r in r_items if r.corners]
     prep, cuts = split_params(raw, loops)
@@ -268,6 +373,27 @@ def _walls_of(items, lid, nid, vt, rep):
         a, _b, u, L = prep[i]
         stops = sorted({0.0, L} |
                        {c for c in cuts[i] if MIN_SPAN < c < L - MIN_SPAN})
+        # WHICH SEGMENT OWNS EACH OPENING, decided ONCE per opening rather than
+        # re-derived per segment (R2b). Extent decides: an opening wholly inside
+        # one segment lands there. A STRADDLER -- one the cuts run through --
+        # goes to the segment on the same side as its anchor: the lowest it
+        # overlaps for a `v1` anchor, the highest for a `v2` one. Deciding this
+        # per segment, as a centre-containment test used to, put a door whose
+        # centre sat exactly ON a cut into BOTH segments.
+        owner = {}
+        for oi, o in enumerate(w["openings"]):
+            lo = o["s"] - o["width"] / 2.0
+            hi = o["s"] + o["width"] / 2.0
+            over = [k for k in range(len(stops) - 1)
+                    if stops[k] - 1e-6 < hi and lo < stops[k + 1] + 1e-6]
+            if not over:
+                continue
+            whole = [k for k in over
+                     if stops[k] - 1e-6 <= lo and hi <= stops[k + 1] + 1e-6]
+            if whole:
+                owner[oi] = whole[0]
+            else:
+                owner[oi] = over[-1] if o.get("from") == "v2" else over[0]
         for k in range(len(stops) - 1):
             s0, s1 = stops[k], stops[k + 1]
             if s1 - s0 < MIN_SPAN:
@@ -278,20 +404,65 @@ def _walls_of(items, lid, nid, vt, rep):
                 continue
             rep["segments"] += 1
             seg_ops, seg_len = [], s1 - s0
-            for o in w["openings"]:
+            for oi, o in enumerate(w["openings"]):
                 s = o["s"]
-                if not (s0 - 1e-6 <= s <= s1 + 1e-6):
+                if owner.get(oi) != k:
                     continue
                 ow = o["width"]
                 if ow > seg_len + 1e-6:
                     rep["openings_dropped"] += 1
                     continue
                 loc = s - s0
-                near1 = loc <= seg_len / 2.0
-                off = (loc if near1 else seg_len - loc) - ow / 2.0
-                rec = {"id": nid("o"), "kind": o["kind"], "code": o["code"],
-                       "anchor": {"from": "v1" if near1 else "v2",
-                                  "offset_in": round(max(0.0, off), 3)}}
+                # R4b -- FIDELITY WHERE THE ANCHORED END SURVIVES, re-seat where
+                # it does not, and mint nowhere here.
+                #
+                # A wall is emitted as one or more SEGMENTS. If the end this
+                # opening is dimensioned off is still an end of the segment it
+                # lands on -- `p1` and the segment starts at 0, or `p2` and the
+                # segment ends at the wall's far end -- the stored anchor is
+                # carried VERBATIM, offset and all. Recomputing a nearer-end
+                # anchor over the top is what R4b overrules: the anchor end
+                # decides which way the opening moves when the wall is
+                # stretched, so rewriting it on save is a silent loss of intent.
+                #
+                # When a split has cut the anchored end off this segment, the
+                # anchor RE-SEATS to the same-side end of the segment (R2b) --
+                # low end for a `v1` anchor, high end for a `v2` one -- which
+                # preserves the opening's position exactly and changes only its
+                # description. Never the NEARER end: that would flip the anchor
+                # for openings that happen to sit past the midpoint.
+                held = o.get("from")
+                at_v1 = held != "v2" and s0 <= 1e-6
+                at_v2 = held == "v2" and s1 >= L - 1e-6
+                # R2c -- THE WALK IS TOTAL: it reports and emits, it never
+                # slides. `max(0.0, off)` used to pull a straddling opening back
+                # onto the segment, which is the same silent repair the charter
+                # deletes from `rebuild`, hiding in a different room. A door the
+                # document must cut in half is a real fault; it is emitted where
+                # R2b puts it and FILED, and `verify` learns to expect an I7
+                # for exactly the openings that were filed.
+                straddles = not (s0 - 1e-6 <= s - ow / 2.0
+                                 and s + ow / 2.0 <= s1 + 1e-6)
+                if at_v1 or at_v2:
+                    frm = held
+                    off = float(o.get("offset_in", 0.0))
+                else:
+                    # SAME SIDE (R2b), for a re-seat and for a straddler alike:
+                    # low end for a v1 anchor, high end for a v2 one. Position
+                    # is preserved exactly; only the description changes.
+                    frm = "v2" if held == "v2" else "v1"
+                    off = ((loc if frm == "v1" else seg_len - loc) - ow / 2.0)
+                oid = nid("o")
+                rec = {"id": oid, "kind": o["kind"], "code": o["code"],
+                       "anchor": {"from": frm, "offset_in": round(off, 3)}}
+                if straddles:
+                    rep["openings_failed"].append(
+                        f"{oid}: {o['kind']} {o['code']} on the wall at "
+                        f"{tuple(round(v, 1) for v in a)} is cut by a junction "
+                        f"-- anchored {round(off, 1)}\" from {frm}, and no "
+                        f"segment can hold it")
+                    rep["openings_failed_ids"].add(oid)
+                near1 = frm != "v2"
                 if o["kind"] == "door":
                     dt = o["door_type"]
                     rec["door_type"] = dt
@@ -305,6 +476,8 @@ def _walls_of(items, lid, nid, vt, rep):
                 seg_ops.append(rec)
 
             key = (*sorted((v1, v2)),)
+            if src is not None:
+                src.setdefault(key, w_items[i])    # which scene wall covers it
             if key in by_pair:                     # invariant I4 enforced here
                 ex = by_pair[key]
                 rep["merged"] += 1
@@ -464,7 +637,11 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
     rep = report if report is not None else {}
     rep.update({"levels": len(roster), "segments": 0, "merged": 0,
                 "open_edges": 0, "openings_dropped": 0, "openings_deduped": 0,
-                "rooms_without_outline": 0, "unwelded_ends": 0})
+                "rooms_without_outline": 0, "unwelded_ends": 0,
+                # R5's one vocabulary. Strings for a human; ids for `verify`,
+                # which exempts an I7 only for openings that were actually
+                # filed -- an unreported I7 stays a full regression.
+                "openings_failed": [], "openings_failed_ids": set()})
 
     buckets = _by_floor(scene)
     levels, vertices, walls, rooms, furnishings = [], [], [], [], []
@@ -487,16 +664,14 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         rooms += lr
         furnishings += lf
 
-    if rep["unwelded_ends"]:
-        msg = (f"design_from_scene: {rep['unwelded_ends']} wall end(s) sit "
-               f"within the {JOIN_TOL}\" join tolerance of a neighbour without "
-               f"being welded to it. The scene disagrees with itself; the "
-               f"Design reports the scene's own coordinates unchanged. "
-               f"Expected on a plan loaded from a legacy file -- load never "
-               f"welds (see F5 in docs/CODE_REVIEW_v2.md).")
-        if strict:
-            raise ValueError(msg)
-        warnings.warn(msg, stacklevel=2)
+    n = rep["unwelded_ends"]
+    if n and strict:
+        raise ValueError(
+            f"design_from_scene: {n} wall end(s) sit within the {JOIN_TOL}\" "
+            f"join tolerance of a neighbour without being welded to it. The "
+            f"scene disagrees with itself; the Design reports the scene's own "
+            f"coordinates unchanged.")
+    _warn_unwelded(scene, n)
 
     settings = dict(SETTINGS)
     auto = bool(settings.pop("auto_coalesce", True))
@@ -519,6 +694,115 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         # reason.
         "groups": [],
     }))
+
+
+# -------------------------------------------------- "detect room here" (P3.5)
+def _prune_spurs(ids):
+    """Drop out-and-back excursions from a traced face loop.
+
+    A wall that dangles into (or off) a room -- a stub with a degree-1 end --
+    is part of the wall graph and therefore part of the face walk, which enters
+    it and comes straight back out. That is correct for a FACE (the excursion
+    encloses no area, so it costs nothing) and wrong for a room OUTLINE: the
+    room would carry a corner at the stub's free end, miles off its boundary,
+    and every consumer that asks "is this room inside the rubber band" or "how
+    long is its perimeter" would answer from it.
+
+    A tip is a vertex whose predecessor and successor in the loop are the same
+    vertex. Removing it and one of the two visits to that neighbour leaves a
+    loop whose consecutive pairs are still graph edges, so the edge -> wall
+    mapping survives. Repeated, because a stub can hang off a stub."""
+    out = list(ids)
+    guard = 0
+    while len(out) > 3 and guard < 4 * len(ids) + 8:
+        guard += 1
+        n = len(out)
+        tip = next((i for i in range(n)
+                    if out[(i - 1) % n] == out[(i + 1) % n]), None)
+        if tip is None:
+            break
+        for k in sorted((tip, (tip + 1) % n), reverse=True):
+            del out[k]
+    return out
+
+
+def face_at(scene, point, floor=None):
+    """The wall-graph face enclosing `point`, as `[(QPointF corner, WallItem
+    covering the edge that STARTS there), ...]`, or None.
+
+    THE ONE-SHOT LIFT. This is P3.5's replacement for the flood-fill room
+    detector: the scene's walls are lifted to a `Design` and
+    `topology.enclosing_face` answers on it -- the room a click falls in is the
+    face around it, which is a question about the wall graph and was never a
+    question about pixels.
+
+    Lifting a whole level per call is exactly what P3.4's point 1 rejected for
+    edit ops, and the distinction is the reason this is allowed: an edit happens
+    per mouse event and must touch only what it names, but "detect room here" is
+    a ONE-SHOT gesture -- six call sites, each once per user action. Paying a
+    plan walk there costs no more than the `_RoomGrid` + `_WallGraph` pair it
+    replaces (both were rebuilt per call too, and the graph's split-finding was
+    O(walls^2)), and it single-sources the topology instead of keeping a second
+    implementation of it in the editor.
+
+    THREE THINGS COME FOR FREE, and they are the reason the swap is worth making
+    rather than merely equivalent:
+      * the walk is unbounded, so DEFECT 16 closes structurally -- the raster
+        grid was clipped to `canvas_rect()` and silently lost the edge rooms of
+        any plan larger than the canvas;
+      * every returned edge names the wall covering it, so a room binds its
+        outline at creation instead of searching for its own walls afterwards;
+      * a wall split at a T-junction yields one edge per SEGMENT, which is
+        invariant I5 ("every outline edge maps to exactly one wall") holding by
+        construction. The old tracer dropped those pass-through corners, so a
+        room could carry an edge no single wall covered.
+    """
+    from floorplanner.design import topology as T
+
+    lid = "L1"
+    items = _by_floor(scene).get(floor or active_floor(), [])
+    seq = defaultdict(int)
+
+    def nid(prefix):
+        seq[prefix] += 1
+        return f"{prefix}{seq[prefix]}"
+
+    vt = VertexTable(lambda: nid("v"))
+    src = {}
+    walls = _walls_of(items, lid, nid, vt, defaultdict(int), src,
+                      weld_check=False)
+    if not walls:
+        return None
+    used = {v for w in walls for v in (w["v1"], w["v2"])}
+    design = Design.from_dict({
+        "levels": [{"id": lid, "name": "detect", "elevation_in": 0.0,
+                    "height_in": 96.0, "kind": "storey"}],
+        "vertices": [r for r in vt.rows if r["id"] in used],
+        "walls": walls, "rooms": [], "furnishings": [],
+    })
+    face = T.enclosing_face(design, (point.x(), point.y()), lid)
+    if face is None:
+        return None
+    ids = _prune_spurs(face.vertices)
+    if len(ids) < 3:
+        return None
+    # CANONICAL WINDING, and it is not cosmetic. `_inner_faces` picks the inner
+    # sign by MAJORITY, which is decisive from two rooms on but a tie at one:
+    # a lone wall loop traces two faces of equal area and opposite winding, so
+    # which one comes back depends on the rest of the plan. The vertex set is
+    # the same either way, but the outline's ORDER is not -- and that order is
+    # serialized, so the same room round-tripped through save/load came back
+    # wound the other way. Fixed here at the one-shot entry, to the sign the
+    # document already uses for inner faces (positive shoelace, interior on the
+    # `left` side of each edge -- verified against every face of symmetricP1).
+    if _area2([vt.xy(v) for v in ids]) < 0:
+        ids = ids[:1] + ids[:0:-1]             # reverse, keeping the start
+    out = []
+    for i, vid in enumerate(ids):
+        x, y = vt.xy(vid)
+        nxt = ids[(i + 1) % len(ids)]
+        out.append((QPointF(x, y), src.get((*sorted((vid, nxt)),))))
+    return out
 
 
 # ------------------------------------------------------- Design -> scene (P1.5)
@@ -553,11 +837,13 @@ def apply_design_to_scene(target, design, report=None, strict=False,
     differ from the first through no fault of the bridge.  Walls are built, then
     `rebuild_all_walls` runs once for rendering only.
 
-    **Rooms are read, never re-detected.**  Each `RoomItem` takes its corners,
-    path and area straight from the stored outline.  The rebuild happens BEFORE
-    any room exists, so `refresh_rooms` returns at its empty-list guard and
-    cannot overwrite an outline with a flood-fill; each room's detection memo is
-    then primed so a later rebuild leaves it alone too.
+    **Rooms are read, never re-detected.**  Each `RoomItem` takes its corners
+    straight from the stored outline, and its region derives from those.  This
+    used to need two defences -- rebuilding before any room existed, so
+    `refresh_rooms` hit its empty-list guard, and then priming each room's
+    detection memo so a later rebuild left it alone.  P3.5 deleted the pass both
+    were guarding against, so the rule now holds because there is nothing that
+    could break it.
 
     **Openings invert exactly.**  See `_opening_s`.
 
@@ -622,10 +908,24 @@ def apply_design_to_scene(target, design, report=None, strict=False,
         set_floor_state(active=win.active_floor)
 
     pos = {v["id"]: QPointF(v["x"], v["y"]) for v in doc.get("vertices", [])}
+    # THE DOCUMENT'S VERTEX IDENTITY, CARRIED INTO THE SCENE (P3.5). One live
+    # `Vertex` per document vertex, handed to every wall end and every outline
+    # edge that names it -- so a corner two walls share in the file is one
+    # corner in the scene, and a room's outline is holding the very object its
+    # walls hold. Reconstructing that by WELDING here would be a repair, and
+    # apply must not repair: a file whose corner has drifted 0.3" is malformed
+    # and is reported as such, not quietly closed up
+    # (`test_malformed_v5_is_reported_not_rewelded`).
+    # fresh uids, NOT the document's ids: those are canonical (renumbered by
+    # geometry at every save), and a live uid is persistent. P3.1 settled that
+    # the two id spaces stay separate and `canonicalize` bridges them.
+    vmap = {vid: Vertex(p.x(), p.y()) for vid, p in pos.items()}
 
     wmap = {}
     for wd in doc.get("walls", []):
         wall = WallItem(pos[wd["v1"]], pos[wd["v2"]], wd.get("type", "interior"))
+        wall.set_end_vertex("p1", vmap[wd["v1"]])
+        wall.set_end_vertex("p2", vmap[wd["v2"]])
         wall.floor = lname.get(wd["level"], DEFAULT_FLOOR)   # never the global
         wall._v5_extra = {k: v for k, v in wd.items() if k not in _WALL_MODELLED}
         scene.addItem(wall)
@@ -644,6 +944,14 @@ def apply_design_to_scene(target, design, report=None, strict=False,
                 # surfaced, and escalated under strict
                 rep["openings_failed"].append(f"{od['id']}: {exc}")
                 continue
+            # R4b -- FIDELITY: the document's anchor is adopted VERBATIM, not
+            # re-derived. `OpeningItem.__init__` mints against the nearer end,
+            # which is right for an opening that has never had an anchor and
+            # wrong for one that arrived with a deliberate far-end dimension.
+            # Re-basing it here would lose that intent on every load, silently
+            # -- the same category as the clamp this task deletes.
+            op.anchor_v = wall.end_vertex("p1" if a["from"] != "v2" else "p2")
+            op.offset_in = float(a["offset_in"])
             # v5 carries door_type for DOORS only ("meaningful only when
             # kind == door"), so absent means "not applicable", not "empty" --
             # clobbering it would rewrite a window's harmless default and make
@@ -667,32 +975,25 @@ def apply_design_to_scene(target, design, report=None, strict=False,
         room = RoomItem(rd["name"], QPointF(cx + off[0], cy + off[1]),
                         room_path_from_corners(corners),
                         poly_area_sqft(corners),
-                        rd.get("properties") or {}, corners)
+                        rd.get("properties") or {},
+                        [OutlineEdge(vmap[e["v"]], wmap.get(e.get("wall")))
+                         for e in rd["outline"]])
         room.floor = lname.get(rd["level"], DEFAULT_FLOOR)   # never the global
         room._v5_extra = {k: v for k, v in rd.items() if k not in _ROOM_MODELLED}
         room.show_dims = bool((rd.get("label") or {}).get("show_dimensions",
                                                           False))
         room.label_offset = QPointF(0.0, 0.0)
         scene.addItem(room)
-        n = len(rd["outline"])
-        for i, e in enumerate(rd["outline"]):   # the outline IS the binding --
-            if e.get("wall") and e["wall"] in wmap:      # read, not detected
-                room.bind_wall(wmap[e["wall"]])
-            elif not e.get("wall"):
-                # An OPEN edge (`wall: null`) -- an archway or a detached side.
-                # The v4 loader regenerated these via bind_room_walls; that path
-                # is detection, which apply must not run, so build the dashed
-                # placeholder straight from the edge the document records.
-                # Without this, undo (which now restores through here, P2.3)
-                # would silently drop every archway. P3.7 deletes OpenWall and
-                # renders `wall: null` dashed directly, retiring this branch.
-                ow = OpenWall(corners[i], corners[(i + 1) % n], room)
-                ow.floor = room.floor
-                scene.addItem(ow)
-                room.bind_wall(ow)
-        # prime the detection memo so a later rebuild_all_walls treats this room
-        # as current instead of re-detecting over the stored outline
-        room._detect_sig = room_signature(scene, room)
+        for e in room.outline:                  # the outline IS the binding --
+            if e.wall is not None:                       # read, not detected
+                room.bind_wall(e.wall)
+            # An edge with `wall: null` -- an archway or a detached side --
+            # stays null. Until P3.5 this branch built a dashed placeholder
+            # item so undo would not silently drop an archway; the outline
+            # carries that fact itself (`RoomItem.open_edges`), so the
+            # placeholder was a second representation of it and went with the
+            # rest of them. Since P3.7 a null edge renders dashed directly,
+            # drawn by the room from its own outline.
         rep["rooms"] += 1
 
     for fd in doc.get("furnishings", []):
@@ -716,6 +1017,7 @@ def apply_design_to_scene(target, design, report=None, strict=False,
     # with.)
     from floorplanner.design.verify import rebase   # late: verify imports this
     rebase(target)
+    rebase_weld_baseline(scene)        # ...and the weld counter, for the same reason
 
     if rep["openings_failed"]:
         msg = ("apply_design_to_scene: %d opening(s) could not be placed: %s"
