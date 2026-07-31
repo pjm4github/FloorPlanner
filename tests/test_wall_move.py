@@ -649,3 +649,80 @@ def test_a_grouped_neighbour_follows_but_is_never_promoted(fp, win):
         "a grouped wall was promoted across the group boundary")
     assert a._promoted == 0
     assert ("rigid" in [k for *_, k in a._attached]), "not even tracked"
+
+
+def _four_room_junction(fp, scene):
+    """Four rooms meeting at ONE corner, with four wall ends actually AT it.
+
+    Deliberately built from walls that END at the centre rather than crossing
+    through it: a crossing shares no wall end, and the question here is about a
+    corner that several rooms genuinely hold."""
+    for a, b in [((0, 0), (240, 0)), ((240, 0), (240, 240)),
+                 ((240, 240), (0, 240)), ((0, 240), (0, 0)),
+                 ((120, 0), (120, 120)), ((120, 120), (120, 240)),
+                 ((0, 120), (120, 120)), ((120, 120), (240, 120))]:
+        scene.addItem(fp.WallItem(QPointF(*a), QPointF(*b), "interior"))
+    # WELD FIRST, or the four ends at the centre stay four separate vertices and
+    # each room later welds only its OWN two -- the corner is then held by two
+    # rooms, not four, and the test sails past the case it exists for. A plan
+    # loaded from a v5 file arrives already sharing, which is why the
+    # symmetricP1 measurement saw four holders.
+    fp.weld_scene(scene)
+    fp.rebuild_all_walls(scene)
+    rooms = []
+    for i, (cx, cy) in enumerate(((60, 60), (180, 60), (60, 180), (180, 180))):
+        res = fp.detect_room(scene, QPointF(cx, cy))
+        assert res is not None, f"cell {i} not detected"
+        r = fp.RoomItem(f"R{i}", QPointF(cx, cy), res[0], res[1], corners=res[2])
+        scene.addItem(r)
+        fp.bind_room_walls(scene, r)
+        rooms.append(r)
+    return rooms
+
+
+def _holders(fp, scene, v):
+    return [r for r in scene.items()
+            if isinstance(r, fp.RoomItem) and any(e.v is v for e in r.outline)]
+
+
+@pytest.mark.xfail(strict=False, reason="a body drag gathers outline edges from "
+                   "the RUN's rooms, so a room holding the corner but owning no "
+                   "wall in the run is left behind -- P3.8 survey row, defect 30")
+def test_a_dragged_corner_carries_every_room_that_holds_it(fp, scene):
+    """P3.8's survey row, pinned: does a real drag re-point EVERY outline holder
+    of the corner it moves, or strand a room?
+
+    MEASURED ON symmetricP1 FIRST, with a viewport-driven drag at the 4-way
+    corner (582, 714) held by Dining, Foyer, Great Room and Kitchen: the corner
+    moved (0, -24), Dining and Kitchen followed, and FOYER AND GREAT ROOM WERE
+    LEFT BEHIND -- each ending with one wall end at the new corner and one at
+    the old, while its outline stayed wholly at the old. Their regions no
+    longer meet their own walls.
+
+    The mechanism is `mousePressEvent` step 4: it gathers outline edges from
+    the rooms of the walls in the COLLINEAR RUN, which is not the same set as
+    the rooms holding the corner. Both app corner-movers that DO get this right
+    collect their holders from the geometry (`GroupItem._corner_records`, and
+    the fix applied to the defect-28 test).
+
+    Non-vacuity is built in twice: `_body_drag` asserts the press produced a
+    body slide, and the corner displacement is asserted before the verdict."""
+    _four_room_junction(fp, scene)
+    centre = next(w.end_vertex("p2") for w in scene.items()
+                  if isinstance(w, fp.WallItem)
+                  and abs(w.p2.x() - 120) < 0.01 and abs(w.p2.y() - 120) < 0.01)
+    held = _holders(fp, scene, centre)
+    assert len(held) >= 3, f"the precondition needs 3+ holders, got {len(held)}"
+
+    wall = next(w for w in scene.items()
+                if isinstance(w, fp.WallItem)
+                and abs(w.p1.x() - 0) < 0.01 and abs(w.p1.y() - 120) < 0.01)
+    before = (centre.x, centre.y)
+    _body_drag(wall, 0, -24)
+    moved = wall.end_vertex("p2")
+    assert (moved.x, moved.y) != before, \
+        "the drag did not move the corner -- the verdict would be vacuous"
+
+    stranded = [r.name for r in held if not any(e.v is moved for e in r.outline)]
+    assert not stranded, (
+        f"rooms holding the dragged corner were left behind: {stranded}")

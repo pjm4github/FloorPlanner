@@ -3,3 +3,4 @@
 pytest
 ruff
 jsonschema        # validates the v5 design corpus (floorplanner.design.validate)
+pyyaml            # workflow YAML validation before push (.github/workflows)
