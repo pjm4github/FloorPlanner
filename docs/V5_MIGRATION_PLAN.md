@@ -172,7 +172,7 @@ gap rather than papering over it.
 | ☑ | **P3.5** Delete the detection engine | ruff + pytest |
 | ☑ | **P3.6** Opening anchors — *ticked 2026-07-30 on the re-certification: **10/10 GREEN** under full-mode `tools/gate.py` trailers (ruff + OFF + ON + DEEP, every sum reconciling). Defects 26, 28 and 29 all closed.* | ruff + pytest |
 | ☑ | **P3.7** Delete `OpenWall` — *ticked 2026-07-30 against the amended acceptance: the cue is drawn from the outline and pinned by a pixel test with measured polarity, the class and its `is_open` flag are gone (zero `git grep` hits in `*.py`), and the P3.5 Known-regression row closes on that test.* | ruff + pytest |
-| ☑ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** — *ticked 2026-07-30. `bake` 10.6× faster (279.0 → 26.4 ms at 64 rooms); all four survey rows answered or dispositioned; the flap class retired class-wide; defect 27's DEEP CI job green. Merge checklist items 1–4 done — **Phase 3 is code-complete, and the merge waits on Gate 3.*** | ratios recorded |
+| ☑ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** — *ticked 2026-07-30; **Phase 3 merged to `main` at `03f3868` on 2026‑07‑31**, all eight P3 rows complete.*  *(P3.8 detail: `bake` 10.6× faster (279.0 → 26.4 ms at 64 rooms); all four survey rows answered or dispositioned; the flap class retired class-wide; defect 27's DEEP CI job green. Merge checklist items 1–4 done at the tick; Gate 3 passed 2026‑07‑31 and the merge followed.)* | ratios recorded |
 | ☐ | **P4.1** Delete-wall keeps the room | ruff + pytest |
 | ☐ | **P4.2** Extract / join | ruff + pytest |
 | ☐ | **P4.3** Shuffle mode | ruff + pytest |
@@ -390,6 +390,24 @@ Extract `io.py` (open/save/export), `csvio.py` (`_import_rooms`/`_export_rooms`,
 # Phase 3 — Vertices own the geometry
 
 > **Branch.** `git switch -c v5-topology`. This is the only phase where `main` should not track HEAD.
+>
+> ## ✅ **MERGED — `03f3868`, 2026‑07‑31.** PR #1, as a **merge commit, not a squash**, so the sub-commit history keeps this phase's rollback points and the receipts in its commit messages. CI green on `main` at the merge commit: ruff, py3.10, py3.13, and the deep-invariant job. All six merge conditions met; the checklist below is closed. **`main` tracks HEAD again — Phase 4 opens against `main`.**
+
+### What Phase 3 carries into Phase 4 — the open list, in one place
+
+Written at the merge so Phase 4 starts from a list rather than a search. Each is registered in `docs/CODE_REVIEW_v2.md`; nothing here blocked the merge.
+
+| | open item | argued phase |
+|---|---|---|
+| **23** | A group move strands a room it does not fully own. Confirmed by a real user at Gate 3 and reproduced exactly: a rubber band takes only items **wholly inside**, so a band that clips a room's wall set strands it — **100% coverage strands zero; every band short of it strands what it clipped**. The decision is semantic (deform-to-follow, or stay put?), which is what "what a group IS" means. | **P4.5** |
+| **25** | A gesture can create a door-straddles-junction state the document can only report. **First real-user confirmation at Gate 3** (a wall drawn onto a doorway; the join correctly declines and the user gets the generic torn-network message). The mechanism works; the gesture-time message is missing. | **P4.1** *(my P4.3 dissent is on the record and Gate 3 weakened it)* |
+| **30** | A body drag strands every room that holds the moved corner but owns no wall in the dragged run — its walls partly follow, its region does not. Measured with a real drag at a 4-way corner. | **P4.2** |
+| **34** | A document gap in the (0.6″, 9.0″) band is reported by nothing and closed by nothing, and the command that looks like a repair only silences the report. **Must be a review, not an auto-repair** — a deliberate 6″ reveal is legitimate and nothing may silently close it. | **P4.2** *(alt P4.3)* |
+| **13** (drag half) | Whether a gesture tolerance may set a geometric **result** — the endpoint catch radius and orthogonal stick are zoom-relative. Measured at P3.5; needs a ruling, not another number. | **P4.2** |
+| — | **The P3.1 split-on-write shim**: `GroupItem.bake`'s residue is P4.5's by ruling, and the shim stays until that counter is owned entirely by P4.5's rebuild. | **P4.5** |
+| — | **Two identity-churn assignment sites** (`_translate_shape`'s pair): they translate a whole selection by one delta, so the geometry stays self-consistent while identity is minted fresh. Lower stakes than the four defect-30 faces. | **P4.5** |
+
+**They share one thesis, and P4.2 inherits it: every one is an operation that knows about ROOMS where it should know about CORNERS.** Phase 3 moved the geometry onto vertices; these are the call sites that still ask a room what they should be asking a corner.
 
 ### The Phase-3 merge checklist — ruled 2026‑07‑30
 
