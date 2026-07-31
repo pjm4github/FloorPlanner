@@ -410,12 +410,27 @@ class PlanView(QGraphicsView):
     def select_in_rect(self, area: QRectF):
         """Additively select everything the rubber band fully encloses.
 
-        Only items wholly inside `area` are selected, so a room can be
-        picked out by its walls while the longer party walls that run past
-        it stay unselected.  When a room's interior is enclosed but an edge
-        is carried by such a longer wall, a fresh copy of that edge is
-        synthesized (and selected) so the room comes through as a complete,
-        movable loop -- the original long wall is left untouched."""
+        Only items wholly inside `area` are selected, so a room can be picked
+        out by its walls while the longer party walls that run past it stay
+        unselected.
+
+        SELECTION CREATES NOTHING (defect 10, P0.5). This docstring used to
+        promise the opposite -- that an edge carried by a longer party wall was
+        SYNTHESIZED as a fresh copy "so the room comes through as a complete,
+        movable loop" -- and that synthesis was removed three phases ago,
+        because a selection gesture that mutates the document is the worse
+        defect. The prose survived the code, which made it a promise the
+        function had stopped keeping.
+
+        IT MATTERS BECAUSE IT DESCRIBES THE MISSING MECHANISM BEHIND A REPORTED
+        SYMPTOM. A band that clips any of a room's walls leaves that room
+        without a complete selected loop, `group_selected` duplicates the rest,
+        `room_owns_walls` is then correctly false, and the room is NOT carried
+        by the move -- it stays put as a dashed outline while the walls walk
+        away. That is defect 23, it is expected until P4.5 decides what a group
+        IS, and the workaround is exact: band the WHOLE plan. Measured on
+        `planc1TestV5.json` -- a band at 100% coverage strands zero rooms, and
+        every band short of it strands the rooms it clipped."""
         scene = self.scene()
         if scene is None:
             return
@@ -425,8 +440,10 @@ class PlanView(QGraphicsView):
             if (isinstance(top, (WallItem, FurnishingItem, GroupItem))
                     and item_fully_inside(top, area)):
                 top.setSelected(True)
-        # rooms whose perimeter is enclosed: select the room and make sure
-        # every edge is a selected wall (duplicating shared/longer walls)
+        # rooms whose perimeter is enclosed: select the room, and select the
+        # walls that back its edges -- WITHOUT creating any (see the docstring;
+        # the old comment here said "duplicating shared/longer walls", which
+        # has not been true since P0.5)
         rooms = [it for it in scene.items() if isinstance(it, RoomItem)]
         for room in rooms:
             if not room.corners or not item_fully_inside(room, area):
