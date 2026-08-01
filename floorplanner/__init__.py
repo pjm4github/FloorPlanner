@@ -13,6 +13,7 @@ from .model import *  # noqa: F401,F403
 from .walls import *  # noqa: F401,F403
 from .rooms import *  # noqa: F401,F403
 from .items import *  # noqa: F401,F403
+from .extract import *  # noqa: F401,F403
 from .dialogs import *  # noqa: F401,F403
 from .view import *  # noqa: F401,F403
 from .macro import *  # noqa: F401,F403

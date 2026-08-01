@@ -175,6 +175,15 @@ class RoomItem(QGraphicsItem):
         self.outline = []                # list[OutlineEdge]; corners derives
         self.corners = corners
         self.walls = []                  # WallItems this room owns (edge loop)
+        # placement (P4.2): whether this room participates in the shared wall
+        # network. A "placed" room is bound into the plan; a "floating" room is
+        # genuinely independent -- no shared wall, no shared vertex (I12) --
+        # which is what makes it safe to move as one unit. Modelled on the item
+        # so the walk emits it and the stash (`_v5_extra`) retires for it.
+        self.placement_state = "placed"
+        self.extracted_from = None       # level it was extracted from, or None
+        self.placement_rotation = 0.0
+        self._floating_furnishings = []  # captured at extract; ride _translate
         self._moving_room = False        # drag-the-name moves the whole room
         self._room_grab = QPointF(0.0, 0.0)
         self.show_dims = False
@@ -629,8 +638,17 @@ class RoomItem(QGraphicsItem):
                              | Qt.AlignmentFlag.AlignTop, self.name)
             self._paint_open_edges(painter, option, ghost=True)
             return
-        painter.setBrush(QBrush(QColor(120, 170, 255, 26)))
+        floating = self.placement_state == "floating"
+        # a floating room reads distinctly -- warm fill + dashed boundary --
+        # so "extracted, not yet joined" is visible at a glance (P4.2)
+        painter.setBrush(QBrush(QColor(255, 170, 60, 34) if floating
+                                else QColor(120, 170, 255, 26)))
         painter.drawPath(self.path)
+        if floating:
+            painter.setPen(QPen(QColor(216, 130, 26), 0, Qt.PenStyle.DashLine))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawPath(self.path)
+            painter.setPen(Qt.PenStyle.NoPen)
         self._paint_open_edges(painter, option, ghost=False)
         if self.isSelected():
             painter.setPen(QPen(QColor(0, 122, 255), 0, Qt.PenStyle.DashLine))
@@ -652,7 +670,8 @@ class RoomItem(QGraphicsItem):
         painter.setPen(QPen(QColor(115, 115, 135), 0))
         painter.drawText(r, Qt.AlignmentFlag.AlignHCenter
                          | Qt.AlignmentFlag.AlignBottom,
-                         f"{self.area_sqft:.0f} sq ft")
+                         f"{self.area_sqft:.0f} sq ft"
+                         + (" (floating)" if floating else ""))
         if self.show_dims:
             self._paint_dims(painter)
 
@@ -837,6 +856,9 @@ class RoomItem(QGraphicsItem):
             e.v = moved[id(e.v)]
         for w in self.walls:
             w.rebuild()                       # repositions its openings too
+        for f in getattr(self, "_floating_furnishings", ()) or ():
+            if f.scene() is not None:         # captured at extract (P4.2):
+                f.moveBy(dx, dy)              # furnishings ride the float
         if not self.outline:                  # no outline -> the fallback moves
             self._path = QTransform.fromTranslate(dx, dy).map(self._path)
         self.anchor = QPointF(self.anchor.x() + dx, self.anchor.y() + dy)
@@ -854,7 +876,15 @@ class RoomItem(QGraphicsItem):
             self._dragging_label = True
             if self.walls and not ctrl:
                 self._moving_room = True
-                self._privatize_shared_walls()   # don't drag neighbours' walls
+                if self.placement_state != "floating":
+                    self._privatize_shared_walls()   # don't drag neighbours' walls
+                elif not self._floating_furnishings:
+                    # a room LOADED floating never ran extract, so its
+                    # furnishing capture (scene state, not document state)
+                    # happens lazily at first drag
+                    from floorplanner.extract import (  # late: higher layer
+                        capture_floating_furnishings)
+                    capture_floating_furnishings(self.scene(), self)
                 self._room_grab = QPointF(e.scenePos())
             else:
                 self._moving_room = False
@@ -894,8 +924,13 @@ class RoomItem(QGraphicsItem):
             if moved:
                 sc = self.scene()
                 if sc is not None:
-                    merge_all(sc)             # dropped adjacent -> re-merge
-                    rebuild_all_walls(sc)     # re-detect region + re-bind walls
+                    if self.placement_state == "floating":
+                        # a floating move is CLOSED (P4.2, section 4): nothing
+                        # merges, welds or binds until an explicit Join
+                        rebuild_all_walls(sc)
+                    else:
+                        merge_all(sc)         # dropped adjacent -> re-merge
+                        rebuild_all_walls(sc)  # re-detect + re-bind walls
                 self.raise_to_front()
             e.accept()
             return
@@ -916,6 +951,11 @@ class RoomItem(QGraphicsItem):
         a_inv = menu.addAction("Inventory…")
         a_ren = menu.addAction("Rename…")
         a_copy = menu.addAction("Copy room")
+        a_extract = a_join = None
+        if self.placement_state == "floating":
+            a_join = menu.addAction("Join room into plan")
+        elif self.walls:
+            a_extract = menu.addAction("Extract room (float it)")
         menu.addSeparator()
         a_del = menu.addAction("Delete room")
         a_front, a_back = add_front_back_actions(menu)
@@ -933,6 +973,20 @@ class RoomItem(QGraphicsItem):
                 v.win.status(f"Copied room '{self.name}' — with the Room "
                              "Name tool active, right-click a blank spot "
                              "to paste.")
+        elif a_extract is not None and chosen is a_extract:
+            from floorplanner.extract import extract_room  # late: higher layer
+            extract_room(self.scene(), self)
+            v = self._view()
+            if v is not None:
+                v.win.status(f"Extracted '{self.name}' — drag it by its name, "
+                             "then right-click it to join it back into the "
+                             "plan.")
+        elif a_join is not None and chosen is a_join:
+            from floorplanner.extract import join_room  # late: higher layer
+            join_room(self.scene(), self)
+            v = self._view()
+            if v is not None:
+                v.win.status(f"Joined '{self.name}' into the plan.")
         elif chosen is a_props:
             dlg = RoomPropertiesDialog(self, self._view())
             if dlg.exec() == QDialog.DialogCode.Accepted:

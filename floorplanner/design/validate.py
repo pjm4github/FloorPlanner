@@ -287,12 +287,27 @@ def check(d, deep=True):
     #     is the tight modelling one (0.6"), NOT the 9" gesture tolerance: a
     #     wall deliberately stopping short of another stays where the user put it.
     tol = float((d.get("settings") or {}).get("vertex_weld_in", 0.6))
+    # P4.2: a FLOATING room legitimately sits anywhere -- within weld
+    # tolerance of the plan, or exactly over its old berth. Its walls are
+    # exempt from weld closure AGAINST the plan (and against other floating
+    # rooms); closure WITHIN one floating room still holds. I12 is the
+    # invariant that guards the floating boundary, and I14 must not re-demand
+    # the very sharing I12 forbids. Same class of exemption I11 grants.
+    floatw = {}
+    for r in d["rooms"]:
+        if (r.get("placement") or {}).get("state") == "floating":
+            for e in r["outline"]:
+                if e.get("wall"):
+                    floatw[e["wall"]] = r["id"]
     if deep:                              # O(walls^2), deep only
         for w in d["walls"]:
             a, b = xy(w["v1"]), xy(w["v2"])
             for o in d["walls"]:
                 if o["id"] == w["id"] or o["level"] != w["level"]:
                     continue
+                if (floatw.get(w["id"]) != floatw.get(o["id"])
+                        and (w["id"] in floatw or o["id"] in floatw)):
+                    continue              # floating-vs-plan pair: exempt
                 c, e2 = xy(o["v1"]), xy(o["v2"])
                 L = math.dist(c, e2)
                 if L < 1e-6:
