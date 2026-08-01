@@ -138,6 +138,18 @@ that cannot be found on disk is not quoted back as though it were — at P3.3 th
 "72 splits" figure appeared nowhere in the repo, and saying so is what surfaced the
 gap rather than papering over it.
 
+### The pre-work census is a phase of the task, not a virtue — settled 2026‑07‑31 at the P4.1 read-back
+
+Task-line deletion figures have now failed checking three times: P3.4's estimate
+(375 across 13 functions; measured 149 across 7), P3.5's rider table (~470;
+measured 450 with two named divergences), and P4.1's ("`_perimeter_span` falls
+with `fracture_delete_wall`" — on disk twice and false; it has two callers that
+outlive fracture, so P4.1 deletes 66 lines, not 90). Doctrine: **every task
+opens with a fresh census of what it deletes and touches, run against the tree
+at task open, and the read-back protocol is its enforcement.** A task-line
+number is an estimate until the census confirms it; the census is quoted with
+spans and callers so the reviewer can check it without re-running it.
+
 ---
 
 ## Status
@@ -174,6 +186,7 @@ gap rather than papering over it.
 | ☑ | **P3.7** Delete `OpenWall` — *ticked 2026-07-30 against the amended acceptance: the cue is drawn from the outline and pinned by a pixel test with measured polarity, the class and its `is_open` flag are gone (zero `git grep` hits in `*.py`), and the P3.5 Known-regression row closes on that test.* | ruff + pytest |
 | ☑ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** — *ticked 2026-07-30; **Phase 3 merged to `main` at `03f3868` on 2026‑07‑31**, all eight P3 rows complete.*  *(P3.8 detail: `bake` 10.6× faster (279.0 → 26.4 ms at 64 rooms); all four survey rows answered or dispositioned; the flap class retired class-wide; defect 27's DEEP CI job green. Merge checklist items 1–4 done at the tick; Gate 3 passed 2026‑07‑31 and the merge followed.)* | ratios recorded |
 | ☐ | **P4.1** Delete-wall keeps the room | ruff + pytest |
+| ☐ | **P4.1b** Defect 25's gesture-time message *(ruled 2026‑07‑31; branches when P4.1's PR merges)* | ruff + pytest |
 | ☐ | **P4.2** Extract / join | ruff + pytest |
 | ☐ | **P4.3** Shuffle mode | ruff + pytest |
 | ☐ | **P4.4** Concept rooms, `nominal_size`, duplicate-as-template | ruff + pytest |
@@ -567,11 +580,73 @@ Re-run P0.3 and compare against the P0.6 numbers.
 
 # Phase 4 — Rooms as durable movable units
 
+### Phase‑4 branch strategy — ruled 2026‑07‑31 at the P4.1 read-back
+
+**Per-task branches**, each PR'd into `main` as a **merge commit** (never
+squash), full-mode `tools/gate.py` trailers on every sub-commit. The facts that
+changed since Phase 3's single-branch ruling: `main` now runs the DEEP
+invariant job in CI itself (defect 27's closure), and Phase 4's tasks are
+separable, releasable deliverables — each leaves `main` shippable, so there is
+no intermediate state a long branch needs to hide.
+
+**Two designated mini-gates:** P4.2 and P4.5 additionally require a Patrick
+manual check before their PRs merge — they are the two tasks that change what
+gestures MEAN (extract/join, and the group-semantics ruling). P4.1, P4.1b,
+P4.3 and P4.4 merge on green CI plus reviewer acceptance.
+
 ### P4.1 — Delete-wall keeps the room
+*(branch `p4.1-delete-wall`; scope verified and amended at the read-back, 2026‑07‑31)*
+
+Deleting a wall genuinely deletes it; the room survives because its stored
+outline (P3.2/P3.5) holds the corners — the vacated edge becomes open
+(`wall: null`), drawn dashed by the room. No fracture, no trim-and-rebind.
+**Defect 17 closes here**, with a coda measured at the read-back: post-P3.7 the
+fracture "no-op" is not even silent any more — fracture deletes the original
+wall and mints a replacement segment, the outline still names the dead wall,
+and `open_edges()` therefore counts the edge open, so the room paints a dashed
+open cue over an edge a wall actually covers (measured: 4 bound walls + 1 open
+edge, against P0.4-era 4 + 0). Defect 17's silence aged into misinformation —
+the final argument for deletion over repair.
+
+**Census (fresh at the read-back, 2026‑07‑31):** `fracture_delete_wall`
+(walls.py:653–709, 57 lines; live callers `delete_selected` at
+mainwindow.py:490 and the wall context menu at walls.py:1666) and
+`_merge_intervals` (walls.py:642–650, 9 lines; sole caller inside fracture)
+die — **66 lines, two call sites**. `_perimeter_span` does **not** die here —
+see the register's carried census note (authoritative copy).
+
+**Tests that change, declared in advance and approved:** characterization 2b's
+xfail marker comes off (the acceptance itself; its comment's "0 open edges"
+figure is era-stale — today the no-op measures 4 built + 1 open);
+`test_walls.py::test_fracture_delete_free_wall_removes_whole` preserves its
+behaviour through the new delete entry point; `test_walls.py::
+test_fracture_delete_keeps_room_edge_drops_overhang` and `test_room_walls.py::
+test_fracture_delete_shared_wall_keeps_both_rooms` are **intentionally
+replaced** to encode the measured new truth: the whole wall goes and each
+bordering room keeps its area with one open edge (party-wall case measured at
+the read-back: both rooms 100.0 sf, 3 bound + 1 open each).
+
 **Acceptance.** P0.4 test 2 flips to pass.
+
+### P4.1b — Defect 25's gesture-time message
+*(ruled 2026‑07‑31: standalone and immediate — branches the moment P4.1's PR merges)*
+
+The register's move trigger fired on both arms at once (P4.1 opened; Gate 3
+delivered the first user report), and folding into P4.1 was rejected on the
+fold-proposer's own honesty: the fold rested on next-to-touch plus the fired
+trigger, not on mechanism. Scope, **message only**: draw-release and end-drag
+say at gesture time what R2c's walk already detects and files — a message
+naming *this* edit and *the doorway*, through the defect-6 edit-path
+vocabulary, replacing the generic torn-network breadcrumb. Explicitly NOT in
+scope: any change to what the gesture *does* — decline/split/weld policy stays
+P4.3's with the `auto_*` flags (the dissent's surviving kernel).
+**Acceptance.** Drawing a wall whose end lands inside a doorway produces the
+specific message at release (and the same for an end-drag); the document
+walk's report path stays unchanged as the load-path safety net.
 
 ### P4.2 — Extract / join
 Per §4 of `DESIGN_MODEL_v5.md`. Extract privatizes walls and vertices, sets `state: floating`, `extracted_from`. Join welds, merges coincident walls, splits, rebinds, sets `state: placed`, and coalesces only the touched degree-2 vertices.
+**Inherits a QUESTION from P4.1's census, not a claim** *(authoritative copy: the register's carried census note, 2026‑07‑31)*: whether `_perimeter_span` dies here — it does only if `_copy_spec` (its other surviving caller, owned by no phase) is also reshaped here. P4.2's read-back must answer it.
 **Acceptance.** Extract → move 500″ → join at a new location → `check()` clean at every step; furnishings and openings intact; I12 holds while floating.
 **Also required:** flip `test_groups.py::test_extracted_room_region_follows_move` back from `xfail` to a hard pass — via a real `extract`, not via selection-time synthesis. That test is the receipt for the P0.5 regression in Known regressions above.
 
@@ -2233,6 +2308,14 @@ THE TWO PREDICATES, rewritten and not deleted, exactly as rider 4 tabled.
          on the old corner, with nothing holding it back. P4.2's real `extract`
          still replaces the shape of it; `_perimeter_span` still falls with
          `fracture_delete_wall` at P4.1.
+         [ANNOTATED at the P4.1 read-back, 2026-07-31 -- the last clause failed
+         checking, the third task-line census figure to do so. `_perimeter_span`
+         does NOT fall at P4.1: `_copy_spec` (rooms.py:335, unowned by any
+         phase) and `_privatize_shared_walls` (rooms.py:785, P4.2's) both call
+         it and both outlive `fracture_delete_wall`. Earliest death is P4.2,
+         contingent on `_copy_spec` being reshaped there; the authoritative
+         statement is the register's carried census note. The line above stands
+         as written -- this corrects it in place without rewriting history.]
 
 EXIT 1 -- MEASURED DELETION vs THE CENSUS. Rider 4 tabled ~470 from rooms.py
          + 34 from walls.py. MEASURED: 418 in whole definitions plus 32 from
