@@ -432,17 +432,20 @@ def test_welding_closes_near_miss_junctions_and_is_idempotent(fp, scene):
     assert stem.p1 == before[0] and stem.p2 == before[1]
 
 
-# -- fracture-on-delete: keep room-edge stretches, drop the rest ---------------
-def test_fracture_delete_free_wall_removes_whole(fp, scene):
+# -- delete is deletion (P4.1): the wall goes whole; a bordering room survives
+# via its stored outline, the vacated edge open. These two INTENTIONALLY
+# replace the fracture-on-delete pair that encoded the old trim-and-rebind
+# semantics (see the P4.1 task text and Progress log entry).
+def test_delete_free_wall_removes_whole(fp, scene):
     w = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
     scene.addItem(w)
     fp.rebuild_all_walls(scene)
-    fp.fracture_delete_wall(scene, w)
+    fp.delete_wall(scene, w)
     assert w.scene() is None
     assert not [x for x in scene.items() if isinstance(x, fp.WallItem)]
 
 
-def test_fracture_delete_keeps_room_edge_drops_overhang(fp, scene, make_room):
+def test_delete_overhanging_wall_goes_whole_room_keeps_area(fp, scene, make_room):
     room = make_room(scene, 0, 0, 120, 120, "Den")
     top = next(w for w in room.walls
                if abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1)
@@ -455,12 +458,15 @@ def test_fracture_delete_keeps_room_edge_drops_overhang(fp, scene, make_room):
     fp.rebuild_all_walls(scene)
     edge = next(w for w in room.walls
                 if abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1)
-    fp.fracture_delete_wall(scene, edge)
+    fp.delete_wall(scene, edge)
+    # P4.1: no trimmed survivor is minted -- the wall is genuinely gone and
+    # the room keeps its area through its stored outline, the edge now open
+    assert edge.scene() is None
+    assert not [w for w in scene.items() if isinstance(w, fp.WallItem)
+                and abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1]
     assert room.area_sqft == pytest.approx(100.0, rel=0.05)   # 120x120 in sq ft
-    kept = next(w for w in scene.items() if isinstance(w, fp.WallItem)
-                and abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1)
-    assert max(kept.p1.x(), kept.p2.x()) == pytest.approx(120, abs=1)  # no over
-    assert room in kept.rooms
+    assert len(room.open_edges()) == 1
+    assert len(room.walls) == 3
 
 
 @pytest.mark.gui

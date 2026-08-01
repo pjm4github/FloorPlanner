@@ -639,69 +639,14 @@ def split_wall_at(scene, wall, p, on_seg_tol=ON_SEG_TOL, report=None):
     return apply_split_plan_to_scene(scene, split)
 
 
-def _merge_intervals(intervals):
-    """Merge (lo, hi) ranges into disjoint, ascending intervals."""
-    out = []
-    for lo, hi in sorted(intervals):
-        if out and lo <= out[-1][1] + 1e-6:
-            out[-1] = (out[-1][0], max(out[-1][1], hi))
-        else:
-            out.append((lo, hi))
-    return out
-
-
-def fracture_delete_wall(scene, wall, settle=True):
-    """Delete `wall`, but FRACTURE it at room perimeters: every stretch that
-    runs along a bordering room's edge is kept (as a segment still bound to
-    that room) so deleting the wall never breaks a room open; the stretches no
-    room needs are removed.  A wall that borders no room is deleted whole."""
+def delete_wall(scene, wall, settle=True):
+    """Delete `wall` outright (P4.1).  A bordering room SURVIVES by
+    construction: its stored outline holds the corners (P3.2/P3.5), so the
+    vacated edge simply becomes an open edge (`wall: null`, drawn dashed by
+    the room itself).  Nothing is fractured, trimmed or rebound -- deletion
+    is deletion."""
     if scene is None or wall.scene() is None:
         return
-    if not wall.rooms:
-        for r in list(wall.rooms):
-            r.unbind_wall(wall)
-        scene.removeItem(wall)
-        if settle:
-            rebuild_all_walls(scene)
-        return
-    room_spans = []                          # (room, (s0, s1)) along the wall
-    for r in list(wall.rooms):
-        span = r._perimeter_span(wall)
-        if span is not None:
-            room_spans.append((r, span))
-    if not room_spans:                       # touches rooms but is no edge
-        for r in list(wall.rooms):
-            r.unbind_wall(wall)
-        scene.removeItem(wall)
-        if settle:
-            rebuild_all_walls(scene)
-        return
-    keep = _merge_intervals([s for _, s in room_spans])
-    u, p1 = wall.unit(), QPointF(wall.p1)
-    ops = [(op.kind, op.code, op.s, op.door_type, op.swing)
-           for op in wall.openings]
-    for s0, s1 in keep:
-        if s1 - s0 < MIN_WALL_LEN:
-            continue
-        a = QPointF(p1.x() + u.x() * s0, p1.y() + u.y() * s0)
-        b = QPointF(p1.x() + u.x() * s1, p1.y() + u.y() * s1)
-        seg = WallItem(a, b, wall.wall_type)
-        seg.floor = wall.floor               # kept stretch stays on the wall's floor
-        scene.addItem(seg)
-        for kind, code, s, dtype, swing in ops:
-            if s0 <= s <= s1:
-                try:
-                    op = OpeningItem(seg, kind, code, s - s0)
-                except ValueError as exc:
-                    report_opening_failure(scene, seg, kind, code, s - s0,
-                                           f"{exc} (deleting part of a wall)")
-                    continue
-                op.door_type, op.swing = dtype, swing
-                seg.openings.append(op)
-        for r, (a0, a1) in room_spans:       # bind to the rooms it still serves
-            if a0 < s1 - 1e-6 and a1 > s0 + 1e-6:
-                r.bind_wall(seg)
-        seg.rebuild()
     for r in list(wall.rooms):
         r.unbind_wall(wall)
     scene.removeItem(wall)
@@ -1663,7 +1608,7 @@ class WallItem(QGraphicsItem):
             self.setSelected(True)
             detach_wall_from_room(sc, self)   # opens the vacated edge
         elif chosen is a_del and sc is not None:
-            fracture_delete_wall(sc, self)   # keep room-edge stretches intact
+            delete_wall(sc, self)   # room survives via its outline; edge opens
         e.accept()
 
 

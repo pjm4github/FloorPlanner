@@ -485,9 +485,9 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                 if wall.scene() is not None:
                     wall.rebuild()
             elif isinstance(it, WallItem):
-                # fracture at room perimeters so deleting a shared/through wall
-                # never breaks an adjacent room open
-                fracture_delete_wall(self.scene, it, settle=False)
+                # a bordering room survives via its stored outline; the
+                # vacated edge becomes an open edge (P4.1)
+                delete_wall(self.scene, it, settle=False)
             elif isinstance(it, (RoomItem, FurnishingItem, GroupItem)):
                 self.scene.removeItem(it)
         rebuild_all_walls(self.scene)

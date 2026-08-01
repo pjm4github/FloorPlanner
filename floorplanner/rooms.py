@@ -774,8 +774,11 @@ class RoomItem(QGraphicsItem):
 
         It is still the wrong SHAPE for the job, and the plan already says where
         that is fixed: P4.2 replaces this silent duplicate-on-drag with a real
-        `extract` operation, and `_perimeter_span` (its one remaining private
-        dependency) falls with `fracture_delete_wall` at P4.1."""
+        `extract` operation. (CORRECTED at the P4.1 read-back, 2026-07-31: an
+        earlier version of this docstring said `_perimeter_span` falls with
+        `fracture_delete_wall` at P4.1. It does not -- `_copy_spec` and this
+        method both call it and both outlive fracture, so its death is P4.2's
+        at the earliest, contingent on `_copy_spec` being reshaped there.)"""
         sc = self.scene()
         if sc is None:
             return

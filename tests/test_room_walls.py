@@ -60,7 +60,12 @@ def test_adjacent_rooms_share_one_wall(fp, scene):
     assert {r.name for r in shared[0].rooms} == {"A", "B"}
 
 
-def test_fracture_delete_shared_wall_keeps_both_rooms(fp, scene):
+def test_delete_shared_wall_keeps_both_rooms(fp, scene):
+    # INTENTIONALLY REPLACES the fracture-era test that asserted the shared
+    # edge SURVIVES deletion (the defect-17 no-op). P4.1's measured new truth:
+    # the party wall genuinely goes, and BOTH rooms survive through their
+    # stored outlines, each with one open edge and its area unchanged
+    # (measured at the P4.1 read-back: 100.0 sf, 3 bound + 1 open each).
     a = _make(fp, scene, 0, 0, 120, 120, "A")
     b = _make(fp, scene, 120, 0, 120, 120, "B",
               skip=[(QPointF(120, 0), QPointF(120, 120))])
@@ -68,14 +73,14 @@ def test_fracture_delete_shared_wall_keeps_both_rooms(fp, scene):
                   if isinstance(w, fp.WallItem)
                   and abs(w.p1.x() - 120) < 0.5 and abs(w.p2.x() - 120) < 0.5)
     area_a, area_b = a.area_sqft, b.area_sqft
-    fp.fracture_delete_wall(scene, shared)
-    # the shared edge survives (one segment, still bound to both rooms)
-    kept = [w for w in scene.items() if isinstance(w, fp.WallItem)
-            and abs(w.p1.x() - 120) < 0.5 and abs(w.p2.x() - 120) < 0.5]
-    assert len(kept) == 1
-    assert {r.name for r in kept[0].rooms} == {"A", "B"}
+    fp.delete_wall(scene, shared)
+    assert shared.scene() is None
+    assert not [w for w in scene.items() if isinstance(w, fp.WallItem)
+                and abs(w.p1.x() - 120) < 0.5 and abs(w.p2.x() - 120) < 0.5]
     assert a.area_sqft == pytest.approx(area_a)
     assert b.area_sqft == pytest.approx(area_b)
+    assert len(a.walls) == 3 and len(b.walls) == 3
+    assert len(a.open_edges()) == 1 and len(b.open_edges()) == 1
 
 
 def test_rebind_is_idempotent(fp, scene):

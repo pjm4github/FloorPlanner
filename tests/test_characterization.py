@@ -86,16 +86,19 @@ def test_group_rotate_preserves_opening_s(win, make_room, first_furnishing):
 
 
 # --------------------------------------------------------------------------
-# 2. deleting one wall of a room -- split into 2a/2b (P4.1).
-# One test cannot distinguish today's behaviour from P4.1's: the room survives
-# today ONLY because the wall is never actually deleted. fracture_delete_wall
-# (walls.py:300-354) keeps every stretch running along a room perimeter and
-# rebinds it, so deleting a room's own perimeter wall is silently a no-op --
-# measured at P0.4: 4 walls in, 4 walls out, 0 open edges (defect 17: the user
-# presses Delete and nothing happens, with no message). Under P4.1 the wall
+# 2. deleting one wall of a room -- split into 2a/2b (P4.1, landed).
+# One test could not distinguish pre-P4.1 behaviour from P4.1's: the room used
+# to survive ONLY because the wall was never actually deleted --
+# fracture_delete_wall kept every stretch running along a room perimeter and
+# rebound it, so deleting a room's own perimeter wall was silently a no-op
+# (defect 17; measured at P0.4: 4 walls in, 4 walls out, 0 open edges; re-
+# measured at the P4.1 read-back as 4 walls + 1 OPEN edge -- post-P3.5 the
+# outline still named the dead wall fracture replaced, so the no-op painted a
+# dashed open cue over an edge a wall actually covered). Under P4.1 the wall
 # genuinely goes and the edge becomes `wall: null`. So:
-#   2a asserts the durable invariant (room survives) -- passes today, hard.
-#   2b asserts the wall is actually gone -- xfail until P4.1.
+#   2a asserts the durable invariant (room survives) -- passed before and
+#      after P4.1, asserts hard.
+#   2b asserts the wall is actually gone -- was xfail, flipped at P4.1.
 # --------------------------------------------------------------------------
 def _delete_a_room_wall(win, make_room, fid):
     """Build a furnished room, delete one built perimeter wall; return
@@ -111,8 +114,8 @@ def _delete_a_room_wall(win, make_room, fid):
 
 
 def test_delete_wall_keeps_room(win, make_room, first_furnishing):
-    # asserts only the invariant, NOT the wall count, so it stays valid when
-    # P4.1 changes the mechanism (wall removed; room persists via stored outline)
+    # asserts only the invariant, NOT the wall count, so it stayed valid when
+    # P4.1 changed the mechanism (wall removed; room persists via stored outline)
     sc, name, area, furns = _delete_a_room_wall(win, make_room, first_furnishing)
     rooms = [r for r in sc.items() if isinstance(r, fp.RoomItem)]
     assert any(r.name == name for r in rooms), "room gone after deleting a wall"
@@ -121,11 +124,9 @@ def test_delete_wall_keeps_room(win, make_room, first_furnishing):
     assert all(f.scene() is sc for f in furns), "furnishings lost"
 
 
-@pytest.mark.xfail(reason="delete is a no-op on a room's own wall until P4.1 "
-                          "(defect 17)", strict=False)
 def test_delete_wall_actually_removes_the_wall(win, make_room, first_furnishing):
-    # under P4.1 the deleted wall is really gone: the room keeps 3 built walls
-    # and 1 open (wall: null) edge, not the 4 built walls it has today
+    # P4.1: the deleted wall is really gone -- the room keeps 3 built walls
+    # and 1 open (wall: null) edge, not the 4 the fracture no-op used to leave
     sc, name, _area, _furns = _delete_a_room_wall(win, make_room, first_furnishing)
     room = next(r for r in sc.items()
                 if isinstance(r, fp.RoomItem) and r.name == name)
