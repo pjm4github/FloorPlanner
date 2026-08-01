@@ -1610,11 +1610,17 @@ class WallItem(QGraphicsItem):
         wall's BODY, not on a corner, so there is no vertex to share. They keep
         the sideways-only stretch, and become real topology at P3.4, where
         `split_edge` gives a body-landing a vertex to be."""
-        # 1. split off the collinear continuations, before anything is shared
+        # 1. split off the collinear continuations, before anything is shared.
+        # Each split leaves a STATIONARY twin of the corner, recorded here --
+        # step 4 must know where a continuation-bordered room's corner now
+        # lives.
+        stat_by_old = {}
         for w, attr in self._continuations:
             v = w.end_vertex(attr)
             if any(rw.end_vertex(ra) is v for rw, ra in run_ends):
-                w.set_end_vertex(attr, Vertex.at(v.point()))
+                nv = Vertex.at(v.point())
+                w.set_end_vertex(attr, nv)
+                stat_by_old[id(v)] = nv
 
         # 2. the run's own ends are the corners this drag moves
         moves, by_id = [], {}
@@ -1644,23 +1650,39 @@ class WallItem(QGraphicsItem):
         # either side resize when a party wall slides" -- there is no detection
         # pass left to do it, and there does not need to be.
         #
-        # THE GATHER IS HOLDERS OF THE CORNER, NOT ROOMS OF THE RUN (defect 30,
-        # fixed at P4.2). A room can hold the moved corner while owning no wall
-        # in the dragged run -- at a 4-way corner, two of the four rooms -- and
-        # gathering from the run's rooms stranded exactly those: walls partly
-        # followed, the region did not. The corner is ONE vertex and moving it
-        # moves everything on it (Phase 3's identity rule, not a deform
-        # policy); both correct corner-movers already gather from the geometry
-        # (`_DragVertex.ends`, `GroupItem._corner_records`). Identity lookup
-        # (`by_id`) makes a floor filter redundant -- a vertex carries exactly
-        # one level (I2). Duck-typed on `outline` because walls cannot import
-        # rooms (the cycle rule).
+        # WHICH WAY A ROOM'S CORNER GOES IS DECIDED BY ITS OWN BOUNDARY
+        # (defect 30, P4.2 -- and CORRECTED at the P4.2 mini-gate, where the
+        # first cut's blanket follow tore a diagonal across the off-run rooms,
+        # caught by Patrick's screenshot). The anti-shear split (step 1) makes
+        # the old corner TWO corners: the run's, which the drag moves, and the
+        # continuation's, which stays exactly where it was. A room bordered at
+        # the corner by a RUN wall follows the run's vertex -- its edge must
+        # stay on the dragged wall. A room bordered by the CONTINUATION keeps
+        # the stationary vertex -- its edge must stay on the wall that did not
+        # move, and dragging its corner is what drew the diagonal. The
+        # perpendicular walls stretch between the two corners. Duck-typed on
+        # `outline` because walls cannot import rooms (the cycle rule);
+        # identity lookup makes a floor filter redundant (I2).
         sc = self.scene()
+        run = set(self._run)
         for room in (sc.items() if sc is not None else ()):
-            for e in getattr(room, "outline", None) or ():
+            outline = getattr(room, "outline", None) or ()
+            n = len(outline)
+            for i, e in enumerate(outline):
                 dv = by_id.get(id(e.v))
-                if dv is not None:
-                    dv.edges.append(e)
+                if dv is None:
+                    continue
+                prev = outline[i - 1] if n > 1 else None
+                on_run = ((e.wall is not None and e.wall in run)
+                          or (prev is not None and prev.wall is not None
+                              and prev.wall in run))
+                if on_run:
+                    dv.edges.append(e)      # bordered by the dragged run:
+                    continue                # the corner carries the room
+                stat = stat_by_old.get(id(e.v))
+                if stat is not None:
+                    e.v = stat              # bordered by the continuation:
+                                            # the room keeps the old corner
         self._vmoves = moves
 
     def mouseMoveEvent(self, e):

@@ -3806,4 +3806,34 @@ notes:   CORE FIRST, HARVEST AFTER, per the ordering constraint -- each
          8. FLOATING ROUND-TRIP: save while a room is floating -> close ->
             reopen. Expect: still floating, everything intact, and
             tools/validate_design.py on the saved file -> PASS/PASS.
+
+P4.2+ mini-gate finding: DEFECT 30's FIRST CUT CORRECTED (item 6 caught it)
+ruff:    clean
+pytest:  527 passed, 7 deselected, 4 xfailed (sum 538 local; CI sees 536 --
+         the two extra are Patrick's untracked examples/symmetricP2/P3.json
+         picked up by the corpus validation, both green, not committed)
+files:   walls.py (_plan_vertex_moves steps 1+4), tests/test_wall_move.py
+         (pin revised), docs/CODE_REVIEW_v2.md (row 30 corrected), this file.
+notes:   Patrick ran item 6 on symmetricP3 and the blanket follow tore a
+         DIAGONAL across Foyer and Great Room -- their boundary at the
+         corner is the CONTINUATION, which the anti-shear split holds
+         still, so dragging their corner off it was the first cut's own
+         error, screenshot on file (Screenshot 2026-08-01 162708.png).
+         CORRECTED: the split makes the old corner TWO corners, and each
+         room's corner goes with ITS OWN BOUNDARY -- run-bordered rooms
+         follow the moved vertex; continuation-bordered rooms re-point to
+         the stationary twin the split mints (now recorded in step 1).
+         The pin is revised to the corrected expectation and renamed
+         (test_a_dragged_corner_splits_by_each_rooms_own_boundary), with a
+         no-diagonal assertion so the tear cannot come back. Fail-first:
+         red against the first cut in a worktree ("borders the continuation
+         but was dragged off it"), green on the correction. Verified on
+         pristine symmetricP1: Foyer/Great Room outlines unchanged through
+         a 24" down-drag, Dining/Kitchen resize, zero new off-axis edges
+         (the four flagged are a pre-existing 0.3" skew at (582.3, 483.6)
+         in the shipped example itself, below the weld band, identical
+         before and after).
+         NOTE for the re-run: symmetricP3.json still CONTAINS the damage
+         from the bad-drag session -- re-cut it from symmetricP1 before
+         re-running item 6, or drag and undo on the fixed build.
 ```

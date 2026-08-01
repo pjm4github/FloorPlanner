@@ -685,28 +685,25 @@ def _holders(fp, scene, v):
             if isinstance(r, fp.RoomItem) and any(e.v is v for e in r.outline)]
 
 
-# HARD PASS since P4.2 (defect 30 fixed): the drag's step 4 gathers HOLDERS
-# OF THE CORNER, not rooms of the run. Phase 3's identity rule, not a deform
-# policy -- the room follows because ITS corner moved. Distinct from defect
-# 23 (P4.5's): that is group MEMBERSHIP under a clipped band, where the
-# room's walls were duplicated into a group it never joined; this is vertex
-# identity, where the room holds the very corner the drag moved.
-def test_a_dragged_corner_carries_every_room_that_holds_it(fp, scene):
-    """P3.8's survey row, pinned: does a real drag re-point EVERY outline holder
-    of the corner it moves, or strand a room?
+# CORRECTED at the P4.2 mini-gate (defect 30, second cut). The first cut made
+# EVERY holder follow the moved vertex -- and Patrick's screenshot caught it
+# tearing a diagonal across the off-run rooms, whose boundary is the
+# CONTINUATION the anti-shear split deliberately holds still. The corrected
+# rule: the split makes the corner TWO corners, and each room's corner goes
+# with its own boundary -- run-bordered rooms follow the moved vertex,
+# continuation-bordered rooms keep the stationary one. Nobody tears.
+def test_a_dragged_corner_splits_by_each_rooms_own_boundary(fp, scene):
+    """Defect 30's pinned scene, asserting the CORRECTED behaviour.
 
-    MEASURED ON symmetricP1 FIRST, with a viewport-driven drag at the 4-way
-    corner (582, 714) held by Dining, Foyer, Great Room and Kitchen: the corner
-    moved (0, -24), Dining and Kitchen followed, and FOYER AND GREAT ROOM WERE
-    LEFT BEHIND -- each ending with one wall end at the new corner and one at
-    the old, while its outline stayed wholly at the old. Their regions no
-    longer meet their own walls.
+    The original measurement (symmetricP1, 4-way at (582, 714)): Dining and
+    Kitchen followed, Foyer and Great Room were stranded -- walls partly
+    following, outlines wholly behind. The first fix blanket-followed every
+    holder, which the mini-gate refuted: Foyer's boundary is the continuation,
+    which stays, so dragging its corner drew a diagonal across its region.
 
-    The mechanism is `mousePressEvent` step 4: it gathers outline edges from
-    the rooms of the walls in the COLLINEAR RUN, which is not the same set as
-    the rooms holding the corner. Both app corner-movers that DO get this right
-    collect their holders from the geometry (`GroupItem._corner_records`, and
-    the fix applied to the defect-28 test).
+    Correct: run-bordered rooms (R0, R2 here) follow the moved vertex;
+    continuation-bordered rooms (R1, R3) keep the stationary corner the
+    anti-shear split minted; every room's outline stays axis-aligned.
 
     Non-vacuity is built in twice: `_body_drag` asserts the press produced a
     body slide, and the corner displacement is asserted before the verdict."""
@@ -720,15 +717,34 @@ def test_a_dragged_corner_carries_every_room_that_holds_it(fp, scene):
     wall = next(w for w in scene.items()
                 if isinstance(w, fp.WallItem)
                 and abs(w.p1.x() - 0) < 0.01 and abs(w.p1.y() - 120) < 0.01)
+    run_rooms = set(wall.rooms)
+    assert run_rooms and len(run_rooms) < len(held), \
+        "precondition: some holders must NOT border the dragged wall"
     before = (centre.x, centre.y)
     _body_drag(wall, 0, -24)
     moved = wall.end_vertex("p2")
     assert (moved.x, moved.y) != before, \
         "the drag did not move the corner -- the verdict would be vacuous"
 
-    stranded = [r.name for r in held if not any(e.v is moved for e in r.outline)]
-    assert not stranded, (
-        f"rooms holding the dragged corner were left behind: {stranded}")
+    for r in held:
+        if r in run_rooms:
+            assert any(e.v is moved for e in r.outline), \
+                f"{r.name} borders the dragged run but did not follow"
+        else:
+            assert not any(e.v is moved for e in r.outline), \
+                f"{r.name} borders the continuation but was dragged off it"
+            assert any(abs(e.v.x - before[0]) < 0.01
+                       and abs(e.v.y - before[1]) < 0.01
+                       for e in r.outline), \
+                f"{r.name} lost its stationary corner"
+    # and the diagonal tear the mini-gate caught can never come back: every
+    # room's outline stays axis-aligned through the drag
+    for r in held:
+        pts = r.corners
+        for i in range(len(pts)):
+            a, b = pts[i], pts[(i + 1) % len(pts)]
+            assert abs(a.x() - b.x()) < 0.01 or abs(a.y() - b.y()) < 0.01, \
+                f"{r.name} has a DIAGONAL edge after the drag"
 
 
 @pytest.mark.xfail(strict=False, reason="P2.3 row, REFUTED second fix (P4.2): "
