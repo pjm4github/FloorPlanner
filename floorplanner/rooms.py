@@ -15,7 +15,7 @@ from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.vertex import Vertex
 from floorplanner.walls import (
-    OpeningItem, WallItem, _CornerIndex, merge_all, rebuild_all_walls,
+    OpeningItem, WallItem, _CornerIndex, rebuild_all_walls,
     report_opening_failure,
 )
 
@@ -184,6 +184,7 @@ class RoomItem(QGraphicsItem):
         self.extracted_from = None       # level it was extracted from, or None
         self.placement_rotation = 0.0
         self._floating_furnishings = []  # captured at extract; ride _translate
+        self._drag_autofloat = False     # this drag auto-extracted the room
         self._moving_room = False        # drag-the-name moves the whole room
         self._room_grab = QPointF(0.0, 0.0)
         self.show_dims = False
@@ -778,58 +779,6 @@ class RoomItem(QGraphicsItem):
                                          exclude=self)
             self.update()
 
-    def _privatize_shared_walls(self):
-        """Before a move, swap every wall shared with another room for a private
-        copy of just this room's edge (carrying in-span openings), so moving the
-        room never drags the neighbour.  Dropped walls re-merge on release.
-
-        ASSESSED AND KEPT AT P3.5 (rider 4 left the call open until the outlines
-        had flipped). It survives because its reason is untouched: a party wall
-        is ONE wall, so a room that moves off one must stop owning it or the
-        neighbour is reshaped. What P3.5 changes is only how that works --
-        `_translate` relocates corners, and a relocation produces a new `Vertex`
-        that only the ends REBOUND to it follow, so a wall this room no longer
-        owns simply stays on the old corner. Nothing has to hold it back.
-
-        It is still the wrong SHAPE for the job, and the plan already says where
-        that is fixed: P4.2 replaces this silent duplicate-on-drag with a real
-        `extract` operation. (CORRECTED at the P4.1 read-back, 2026-07-31: an
-        earlier version of this docstring said `_perimeter_span` falls with
-        `fracture_delete_wall` at P4.1. It does not -- `_copy_spec` and this
-        method both call it and both outlive fracture, so its death is P4.2's
-        at the earliest, contingent on `_copy_spec` being reshaped there.)"""
-        sc = self.scene()
-        if sc is None:
-            return
-        for w in list(self.walls):
-            if len(w.rooms) <= 1:
-                continue
-            span = self._perimeter_span(w)
-            if span is None:
-                continue
-            s0, s1 = span
-            c = WallItem(w.point_at(s0), w.point_at(s1), w.wall_type)
-            c.floor = w.floor                 # private copy stays on the wall's floor
-            sc.addItem(c)
-            for op in w.openings:             # carry this edge's doors/windows
-                if s0 - 1e-6 <= op.s <= s1 + 1e-6:
-                    try:
-                        nop = OpeningItem(c, op.kind, op.code, op.s - s0)
-                    except ValueError as exc:
-                        report_opening_failure(sc, c, op.kind, op.code,
-                                               op.s - s0,
-                                               f"{exc} (moving a room off a "
-                                               f"wall it shares)")
-                        continue
-                    nop.door_type, nop.swing = op.door_type, op.swing
-                    c.openings.append(nop)
-            self.unbind_wall(w)               # this room drops the shared wall
-            self.bind_wall(c)                 # and takes its private copy
-            for e in self.outline:            # ...and its outline says so: the
-                if e.wall is w:               # outline is the authority on
-                    e.wall = c                # which walls are this room's
-            c.rebuild()
-
     def _translate(self, dx: float, dy: float):
         """Rigidly shift the room's owned walls, openings and region.
 
@@ -877,7 +826,17 @@ class RoomItem(QGraphicsItem):
             if self.walls and not ctrl:
                 self._moving_room = True
                 if self.placement_state != "floating":
-                    self._privatize_shared_walls()   # don't drag neighbours' walls
+                    # P4.2: the label-drag of a PLACED room is extract ->
+                    # move -> join through the REAL ops -- the same
+                    # observable result the privatize-then-merge_all path
+                    # produced, minus the shadow implementation it was
+                    from floorplanner.extract import extract_room  # late
+                    extract_room(self.scene(), self)
+                    # the plain drag moves the room, not its furnishings --
+                    # today's behaviour, preserved; carrying furnishings is
+                    # the EXPLICIT extract's trait
+                    self._floating_furnishings = []
+                    self._drag_autofloat = True
                 elif not self._floating_furnishings:
                     # a room LOADED floating never ran extract, so its
                     # furnishing capture (scene state, not document state)
@@ -921,16 +880,21 @@ class RoomItem(QGraphicsItem):
         if self._dragging_label:
             moved, self._dragging_label, self._moving_room = (
                 self._moving_room, False, False)
-            if moved:
-                sc = self.scene()
+            sc = self.scene()
+            if getattr(self, "_drag_autofloat", False):
+                # the drag owns this float (a placed room's label-drag is
+                # extract -> move -> join, P4.2): it ends PLACED whether the
+                # mouse moved or not -- a click must not leave a room afloat
+                self._drag_autofloat = False
                 if sc is not None:
-                    if self.placement_state == "floating":
-                        # a floating move is CLOSED (P4.2, section 4): nothing
-                        # merges, welds or binds until an explicit Join
-                        rebuild_all_walls(sc)
-                    else:
-                        merge_all(sc)         # dropped adjacent -> re-merge
-                        rebuild_all_walls(sc)  # re-detect + re-bind walls
+                    from floorplanner.extract import join_room  # late
+                    join_room(sc, self)
+            elif moved and sc is not None:
+                # an explicitly floating room: the move is CLOSED (P4.2,
+                # section 4) -- nothing merges, welds or binds until an
+                # explicit Join
+                rebuild_all_walls(sc)
+            if moved:
                 self.raise_to_front()
             e.accept()
             return
