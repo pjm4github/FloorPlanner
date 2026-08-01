@@ -14,6 +14,75 @@ from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
 from floorplanner.items import *  # noqa: F401
 
+class GapReviewDialog(QDialog):
+    """DEFECT 34's review (P4.2): LIST the document's near-vertex gaps in the
+    (vertex_weld_in, join_tol_in) band with their distances, and let the user
+    close the ones they did not intend -- one pair at a time, explicitly.
+    Nothing auto-closes: a deliberate reveal is legitimate design (the schema
+    says so in as many words), and nothing here can tell a reveal from a
+    mistake. Same discipline as P2.1's conversion report: report to a human,
+    repair only on their say-so."""
+
+    def __init__(self, win):
+        super().__init__(win)
+        self.win = win
+        self.setWindowTitle("Review wall gaps")
+        self.resize(520, 340)
+        lay = QVBoxLayout(self)
+        self.info = QLabel()
+        self.info.setWordWrap(True)
+        lay.addWidget(self.info)
+        self.listw = QListWidget()
+        lay.addWidget(self.listw)
+        row = QHBoxLayout()
+        self.b_close = QPushButton("Close selected gap")
+        self.b_close.clicked.connect(self._close_selected)
+        row.addWidget(self.b_close)
+        b_done = QPushButton("Done")
+        b_done.clicked.connect(self.accept)
+        row.addWidget(b_done)
+        lay.addLayout(row)
+        self.refresh()
+
+    def refresh(self):
+        import warnings
+        from floorplanner.design.bridge import design_from_scene
+        from floorplanner.design.validate import near_vertex_gaps
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            doc = design_from_scene(self.win).to_dict()
+        self._levels = {lv["id"]: lv["name"] for lv in doc.get("levels", [])}
+        self.gaps = near_vertex_gaps(doc)
+        self.listw.clear()
+        for lvl, a, b, dist in self.gaps:
+            self.listw.addItem(
+                f"{self._levels.get(lvl, lvl)}: "
+                f"({fmt_ftin(a[0])}, {fmt_ftin(a[1])}) and "
+                f"({fmt_ftin(b[0])}, {fmt_ftin(b[1])}) are {dist:.2f}\" apart")
+        if self.gaps:
+            self.info.setText(
+                f"{len(self.gaps)} pair(s) of corners sit close together "
+                f"without sharing a corner. Some may be deliberate (a "
+                f"reveal, a pilaster gap) -- those need no action. Closing "
+                f"a gap welds the two corners into one, at the first point.")
+            self.listw.setCurrentRow(0)
+        else:
+            self.info.setText("No near-vertex gaps -- every pair of corners "
+                              "is either welded or genuinely apart.")
+        self.b_close.setEnabled(bool(self.gaps))
+
+    def _close_selected(self):
+        i = self.listw.currentRow()
+        if i < 0 or i >= len(self.gaps):
+            return
+        lvl, a, b, dist = self.gaps[i]
+        n = close_gap(self.win.scene, QPointF(*a), QPointF(*b),
+                      floor=self._levels.get(lvl))
+        self.win.status(f"Closed a {dist:.2f}\" gap ({n} corner(s) welded)."
+                        if n else "Nothing to weld at that pair.")
+        self.refresh()
+
+
 # Inventory table headers (itemised plan tables, exportable to CSV).
 FURN_INV_HEADERS = ["Item", "Quantity", "Unit price", "Line total"]
 HOUSE_INV_HEADERS = ["Item", "Detail", "Quantity", "Size"]

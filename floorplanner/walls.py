@@ -865,6 +865,51 @@ def report_doorway_landings(scene, wall, gesture, ends=("p1", "p2")):
     return filed
 
 
+def close_gap(scene, a: QPointF, b: QPointF, floor=None, tol=0.75):
+    """DEFECT 34's apply half (P4.2): make the two corners at `a` and `b`
+    ONE corner at `a` -- explicitly, one pair at a time, from the review op.
+    Never automatic: a deliberate reveal is legitimate design and nothing
+    can tell it from a mistake, so the user picks the pair.
+
+    Every wall end and room-outline corner whose vertex sits at `b` (within
+    `tol`, and nearer `b` than `a`) is RELOCATED to `a` -- identity-carrying,
+    so every holder follows by construction, exactly as `_translate` moves a
+    room -- then coincident ends fold onto one vertex and the walls rebuild.
+    Returns the number of vertices relocated."""
+    if scene is None:
+        return 0
+    floor = floor if floor is not None else active_floor()
+    relocated = {}
+
+    def _near_b(v):
+        db = QLineF(v.point(), b).length()
+        return db <= tol and db < QLineF(v.point(), a).length()
+
+    def _moved(v):
+        if id(v) not in relocated:
+            relocated[id(v)] = v.relocated_to(QPointF(a))
+        return relocated[id(v)]
+
+    for w in [it for it in scene.items()
+              if isinstance(it, WallItem) and it.floor == floor]:
+        for attr in ("p1", "p2"):
+            v = w.end_vertex(attr)
+            if _near_b(v):
+                w.set_end_vertex(attr, _moved(v))
+    for room in scene.items():                # duck-typed: the cycle rule
+        if getattr(room, "floor", None) != floor:
+            continue
+        for e in getattr(room, "outline", None) or ():
+            if id(e.v) in relocated:
+                e.v = relocated[id(e.v)]
+            elif _near_b(e.v):
+                e.v = _moved(e.v)
+    if relocated:
+        share_coincident_ends(scene, floor)
+        rebuild_all_walls(scene)
+    return len(relocated)
+
+
 def rebuild_all_walls(scene):
     """Rebuild every wall's geometry and the junction clips.
 

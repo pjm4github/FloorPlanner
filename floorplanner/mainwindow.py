@@ -278,6 +278,9 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         a_coalesce = QAction("Coalesce all walls now", self)
         a_coalesce.triggered.connect(self.coalesce_all_now)
         m_edit.addAction(a_coalesce)
+        a_gaps = QAction("Review wall gaps…", self)
+        a_gaps.triggered.connect(self.review_wall_gaps)
+        m_edit.addAction(a_gaps)
 
         m_rooms = self.menuBar().addMenu("&Rooms")
         self._room_op_actions = []
@@ -918,6 +921,13 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         if split:
             msg += f" Split {split} wall(s) at junctions."
         self.status(msg)
+
+    def review_wall_gaps(self):
+        """Edit ▸ Review wall gaps… -- defect 34's REVIEW, deliberately not a
+        repair. Lists the document's near-vertex pairs in the (0.6", 9.0")
+        band; the user closes chosen pairs one at a time. A deliberate 6"
+        reveal left alone stays exactly as drawn."""
+        GapReviewDialog(self).exec()
 
     def _selection_spec(self):
         """Selected walls/furnishings (groups expand to their members)

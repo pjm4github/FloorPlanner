@@ -338,6 +338,48 @@ def check(d, deep=True):
     return list(dict.fromkeys(E))
 
 
+def near_vertex_gaps(d, lo=None, hi=None):
+    """DEFECT 34's listing half (P4.2): the document's near-vertex pairs in
+    the (vertex_weld_in, join_tol_in) band -- real gaps in the FILE that
+    nothing reports and nothing may silently close. At or below `lo` two
+    points ARE one vertex (the walk welds them); at or beyond `hi` the wall
+    is simply elsewhere. In between, a 1.5" gap is probably a mistake and a
+    6" gap is probably a reveal, and nothing here can tell which -- so this
+    only LISTS, with distances, for a human to close one pair at a time
+    (`walls.close_gap`, the review op's apply half). Floating rooms'
+    vertices are exempt: their distance to the plan is their position, not
+    a gap.
+
+    Returns [(level_id, (ax, ay), (bx, by), dist)], nearest first."""
+    s = d.get("settings") or {}
+    lo = float(s.get("vertex_weld_in", 0.6)) if lo is None else lo
+    hi = float(s.get("join_tol_in", 9.0)) if hi is None else hi
+    floatv, floatw = set(), set()
+    for r in d["rooms"]:
+        if (r.get("placement") or {}).get("state") == "floating":
+            for e in r["outline"]:
+                floatv.add(e["v"])
+                if e.get("wall"):
+                    floatw.add(e["wall"])
+    for w in d["walls"]:
+        if w["id"] in floatw:
+            floatv.add(w["v1"])
+            floatv.add(w["v2"])
+    out = []
+    V = d["vertices"]
+    for i, a in enumerate(V):
+        if a["id"] in floatv:
+            continue
+        for b in V[i + 1:]:
+            if b["id"] in floatv or a.get("level") != b.get("level"):
+                continue
+            dd = math.dist((a["x"], a["y"]), (b["x"], b["y"]))
+            if lo < dd < hi:
+                out.append((a.get("level"), (a["x"], a["y"]),
+                            (b["x"], b["y"]), dd))
+    return sorted(out, key=lambda t: t[3])
+
+
 def report(d):
     V = {v["id"]: (v["x"], v["y"]) for v in d["vertices"]}
     rows = []
