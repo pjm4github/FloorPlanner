@@ -300,7 +300,7 @@ class AboutDialog(QDialog):
         v = QVBoxLayout(self)
         head = QLabel(
             f'<h2 style="margin-bottom:2px;">{APP_NAME}</h2>'
-            f'<p style="color:#555;margin-top:0;">Version {APP_VERSION} '
+            f'<p style="color:#555;margin-top:0;">{code_version()} '
             "— a 2D architectural floor-plan editor built with PyQt6.<br>"
             f'<a href="{APP_URL}">{APP_URL}</a></p>')
         head.setTextFormat(Qt.TextFormat.RichText)
