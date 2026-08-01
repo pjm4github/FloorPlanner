@@ -1436,10 +1436,26 @@ class WallItem(QGraphicsItem):
         """The full room 'side' this wall lies on: every wall of the same room
         (real and dashed open walls) that is collinear with it.  Body-sliding
         the wall moves the whole side -- including the open-wall gap -- as one,
-        so the dashed segment travels with the wall."""
-        if not self.rooms or self.length() < 1e-6:
+        so the dashed segment travels with the wall.
+
+        THE ROOM-LESS `[self]` SHORT-CIRCUIT STAYS, and the P2.3 row's second
+        predicted fix is REFUTED (P4.2). Ruling (e) asked for a
+        vertex-adjacency gather here so an undo-split wall body-drags as one;
+        implemented, it turned P3.3's anti-shear tests red -- `_tee_scene`
+        (a wall, its collinear continuation, a stem at the shared corner) is
+        topologically IDENTICAL to the undo-split segments, and P3.3's
+        settled rule ("split first, shear never": the continuation keeps its
+        vertex and stays exactly where it is) occupies that topology with
+        three pinned tests. The representation cannot distinguish "one wall
+        stored as two segments" from "two walls drawn end-to-end", so one
+        rule must own the topology, and the settled one does. Pinned by the
+        xfail `test_a_roomless_split_wall_body_drags_as_one_run`; the row
+        needs a RULING (carry vs stay), not a third predicted fix."""
+        if self.length() < 1e-6:
             return [self]
         u = self.unit()
+        if not self.rooms:
+            return [self]
         run = []
         side = {self}
         for r in self.rooms:

@@ -729,3 +729,33 @@ def test_a_dragged_corner_carries_every_room_that_holds_it(fp, scene):
     stranded = [r.name for r in held if not any(e.v is moved for e in r.outline)]
     assert not stranded, (
         f"rooms holding the dragged corner were left behind: {stranded}")
+
+
+@pytest.mark.xfail(strict=False, reason="P2.3 row, REFUTED second fix (P4.2): "
+                   "the vertex-adjacency gather this asserts collides with "
+                   "P3.3's settled anti-shear rule on identical topology "
+                   "(_tee_scene) -- 'split first, shear never' says the "
+                   "collinear continuation STAYS. Needs a ruling, carry vs "
+                   "stay; the topology cannot serve both.")
+def test_a_roomless_split_wall_body_drags_as_one_run(fp, scene):
+    # P2.3's Known-regressions row: after an undo a junction-crossing wall
+    # returns as the segments the document holds, and a ROOM-LESS wall's run
+    # short-circuits to [self] -- so a body drag moves one segment. The row
+    # predicted a vertex-adjacency gather fixes it; implementing that turned
+    # P3.3's anti-shear pins red (a collinear continuation past an endpoint
+    # must stay put), and the two cases are topologically INDISTINGUISHABLE.
+    # This test pins the row's wanted behaviour so the eventual ruling flips
+    # it or deletes it deliberately.
+    w = fp.WallItem(QPointF(0, 0), QPointF(480, 0), "interior")
+    scene.addItem(w)
+    stem = fp.WallItem(QPointF(240, 0), QPointF(240, 120), "interior")
+    scene.addItem(stem)
+    fp.rebuild_all_walls(scene)
+    seg = fp.split_wall_at(scene, w, QPointF(240, 0))
+    assert seg is not None                       # precondition: really split
+    fp.weld_wall_ends(scene, stem)               # stem joins the T vertex
+    fp.rebuild_all_walls(scene)
+    assert not w.rooms and not seg.rooms         # precondition: room-less
+    run = w._collinear_run()
+    assert seg in run, "the far segment is not in the drag's run"
+    assert stem not in run                       # perpendicular: stays put
