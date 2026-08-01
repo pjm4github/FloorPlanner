@@ -646,7 +646,7 @@ walk's report path stays unchanged as the load-path safety net.
 
 ### P4.2 — Extract / join
 Per §4 of `DESIGN_MODEL_v5.md`. Extract privatizes walls and vertices, sets `state: floating`, `extracted_from`. Join welds, merges coincident walls, splits, rebinds, sets `state: placed`, and coalesces only the touched degree-2 vertices.
-**Inherits a QUESTION from P4.1's census, not a claim** *(authoritative copy: the register's carried census note, 2026‑07‑31)*: whether `_perimeter_span` dies here — it does only if `_copy_spec` (its other surviving caller, owned by no phase) is also reshaped here. P4.2's read-back must answer it.
+**Inherits a QUESTION from P4.1's census, not a claim** *(authoritative copy: the register's carried census note, 2026‑07‑31)*: whether `_perimeter_span` dies here — it does only if `_copy_spec` (its other surviving caller, owned by no phase) is also reshaped here. P4.2's read-back must answer it. *(ANSWERED at the P4.2 read-back: no — `_copy_spec` is §4's "Duplicate a room", which is P4.4's; re-argued to P4.4 as a contingency. See the register's note, which stays authoritative.)*
 **Acceptance.** Extract → move 500″ → join at a new location → `check()` clean at every step; furnishings and openings intact; I12 holds while floating.
 **Also required:** flip `test_groups.py::test_extracted_room_region_follows_move` back from `xfail` to a hard pass — via a real `extract`, not via selection-time synthesis. That test is the receipt for the P0.5 regression in Known regressions above.
 
@@ -3724,4 +3724,86 @@ notes:   REPORT ONLY, per the ruling -- no change to what the gesture DOES;
          Census 526 -> 528 (the two gui tests), every sum reconciling.
          The walk's report path (R2c) is untouched and stays as the
          load-path safety net, exactly as the register entry planned.
+
+P4.2  done   (branch p4.2-extract-join, 7 sub-commits: dfd30af core,
+         4cf67e8 label-drag rewire, 9821571 defect 30, 5c8795e the P2.3
+         refutation, 7dbd740 defect 13, 216e755 defect 34, + this docs
+         commit. AWAITS THE PATRICK MINI-GATE before its PR merges.)
+ruff:    clean
+pytest:  525 passed, 7 deselected, 4 xfailed (OFF/ON/DEEP each, sum 536 OK)
+files:   extract.py (NEW: extract_room/join_room/capture_floating_
+         furnishings), rooms.py (placement modelled; label-drag =
+         extract->move->join; _privatize_shared_walls DELETED, 51 lines;
+         floating paint cue; context menu Extract/Join), design/bridge.py
+         (placement emit/apply; stash retired for placement; per-floating-
+         room vertex namespaces in the level walk), design/validate.py
+         (I14 floating exemption; near_vertex_gaps), walls.py (defect-30
+         gather; defect-13 stick; close_gap), dialogs.py (GapReviewDialog),
+         mainwindow.py (Review wall gaps... action), CLAUDE.md, register,
+         tests: test_extract_join.py (NEW), test_groups.py (party-wall
+         flip), test_room_walls.py, test_wall_move.py, test_walls.py.
+notes:   CORE FIRST, HARVEST AFTER, per the ordering constraint -- each
+         piece its own sub-commit at a full green gate.
+         ACCEPTANCE MET: extract -> move 500" -> join, check() clean at
+         EVERY step, I12 while floating, furnishings and openings intact;
+         the party-wall round trip fuses back to ONE shared wall; the
+         party-wall regression test flipped xfail -> hard pass via the
+         real extract (P0.5 Known-regressions row closes).
+         TWO MODEL CONSEQUENCES, not workarounds: the level walk folds
+         each floating room in its OWN vertex namespace (coincident-is-one-
+         corner is exactly the sharing I12 breaks), and I14 exempts
+         floating-vs-plan pairs (closure within a floating room still
+         holds) -- same exemption class as I11.
+         RULINGS EXECUTED: (a) label-drag rewired, behaviour-preserving by
+         construction (the old path already WAS extract->move->join in old
+         clothes); (b) defect 30 fixed as a BUG (holders of the corner via
+         vertex identity; 23-vs-30 boundary stated for P4.5); (c) defect 34
+         closed as the review op (list, never auto-close); (d) defect 13's
+         drag half closed (stick -> scene-space WALL_PROJECT_STICK, 9",
+         == join_tol_in; catch radius stays screen-space); (f)
+         _perimeter_span re-argued to P4.4 in the register, contingent,
+         not counted in this census.
+         RULING (e) REFUTED BY THE TREE, reverted, recorded: the vertex-
+         adjacency run gather turned P3.3's anti-shear pins red --
+         _tee_scene is topologically IDENTICAL to the undo-split segments,
+         and "split first, shear never" owns that topology with three
+         tests. The P2.3 row's SECOND predicted fix to fail on its own
+         terms; the row now needs a carry-vs-stay RULING, pinned by the
+         xfail test_a_roomless_split_wall_body_drags_as_one_run.
+         TESTS CHANGED, all declared: the party-wall flip (route only,
+         assertions unchanged); test_moving_a_room_does_not_distort_its_
+         neighbour drives extract_room (follows the mousePress it always
+         mirrored). Census 528 -> 536 (3 acceptance + 1 conflict pin +
+         1 zoom pin + 3 gap tests), xfails 5 -> 4 net (party-wall and
+         defect-30 flips out, P2.3 conflict pin in).
+
+         THE PATRICK MINI-GATE (P4.2 is the first task under the ruling --
+         the PR does NOT merge until this passes; ~15 min, stated
+         expectations, Gate-3 style):
+         1. EXTRACT: open planc1TestV5.json, right-click a room with
+            shared walls -> Extract room. Expect: room reads floating
+            (warm fill, dashed boundary, "(floating)" under the name); the
+            plan keeps every wall; neighbours unchanged; no warning.
+         2. FLOAT-MOVE: drag it ~500" away by its name. Expect: walls +
+            doors + furnishings + region move as one unit; nothing else
+            moves; nothing welds in passing.
+         3. JOIN: place it beside existing walls -> right-click -> Join
+            room into plan. Expect: coincident walls merge, no doubled
+            wall, no duplicated openings; room reads placed.
+         4. THE OLD WORKFLOW UNCHANGED: plain label-drag a PLACED room one
+            bay over. Expect: exactly the old behaviour -- party wall
+            stays with the neighbour, room re-merges on drop, furnishings
+            stay put.
+         5. UNDO back through all of it. Expect: each step reverses
+            cleanly.
+         6. DEFECT 30: body-drag a party wall at a 4-way corner. Expect:
+            every room touching that corner follows; no stranded dashed
+            outline.
+         7. DEFECT 34: Edit > Review wall gaps... on planc1TestV5.json.
+            Expect: the known 1.53"/6.003" pairs listed with distances;
+            closing one 1.53" pair welds it; the 6" pairs left alone stay;
+            the saved file is otherwise unchanged.
+         8. FLOATING ROUND-TRIP: save while a room is floating -> close ->
+            reopen. Expect: still floating, everything intact, and
+            tools/validate_design.py on the saved file -> PASS/PASS.
 ```
