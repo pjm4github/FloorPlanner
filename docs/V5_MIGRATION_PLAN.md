@@ -185,7 +185,7 @@ spans and callers so the reviewer can check it without re-running it.
 | ☑ | **P3.6** Opening anchors — *ticked 2026-07-30 on the re-certification: **10/10 GREEN** under full-mode `tools/gate.py` trailers (ruff + OFF + ON + DEEP, every sum reconciling). Defects 26, 28 and 29 all closed.* | ruff + pytest |
 | ☑ | **P3.7** Delete `OpenWall` — *ticked 2026-07-30 against the amended acceptance: the cue is drawn from the outline and pinned by a pixel test with measured polarity, the class and its `is_open` flag are gone (zero `git grep` hits in `*.py`), and the P3.5 Known-regression row closes on that test.* | ruff + pytest |
 | ☑ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** — *ticked 2026-07-30; **Phase 3 merged to `main` at `03f3868` on 2026‑07‑31**, all eight P3 rows complete.*  *(P3.8 detail: `bake` 10.6× faster (279.0 → 26.4 ms at 64 rooms); all four survey rows answered or dispositioned; the flap class retired class-wide; defect 27's DEEP CI job green. Merge checklist items 1–4 done at the tick; Gate 3 passed 2026‑07‑31 and the merge followed.)* | ratios recorded |
-| ☐ | **P4.1** Delete-wall keeps the room | ruff + pytest |
+| ☑ | **P4.1** Delete-wall keeps the room — *ticked 2026‑07‑31, accepted at **PR #2** (merge commit; sub-commits `0df3aa5` census + rulings, `a0e1b95` delete_wall + 2b flip, `cce2eb6` corpse + tests). Acceptance met: P0.4 test 2b flipped xfail→pass on exactly the call-site switch (513/6 → 514/5); census 526 unchanged; defect 17 closed with the visible-lie coda.* | ruff + pytest |
 | ☐ | **P4.1b** Defect 25's gesture-time message *(ruled 2026‑07‑31; branches when P4.1's PR merges)* | ruff + pytest |
 | ☐ | **P4.2** Extract / join | ruff + pytest |
 | ☐ | **P4.3** Shuffle mode | ruff + pytest |
