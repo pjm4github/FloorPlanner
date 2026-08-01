@@ -1571,8 +1571,21 @@ class WallItem(QGraphicsItem):
         # region is DERIVED from its outline, so this is the whole of "the rooms
         # either side resize when a party wall slides" -- there is no detection
         # pass left to do it, and there does not need to be.
-        for room in {id(r): r for w in self._run for r in w.rooms}.values():
-            for e in getattr(room, "outline", ()):
+        #
+        # THE GATHER IS HOLDERS OF THE CORNER, NOT ROOMS OF THE RUN (defect 30,
+        # fixed at P4.2). A room can hold the moved corner while owning no wall
+        # in the dragged run -- at a 4-way corner, two of the four rooms -- and
+        # gathering from the run's rooms stranded exactly those: walls partly
+        # followed, the region did not. The corner is ONE vertex and moving it
+        # moves everything on it (Phase 3's identity rule, not a deform
+        # policy); both correct corner-movers already gather from the geometry
+        # (`_DragVertex.ends`, `GroupItem._corner_records`). Identity lookup
+        # (`by_id`) makes a floor filter redundant -- a vertex carries exactly
+        # one level (I2). Duck-typed on `outline` because walls cannot import
+        # rooms (the cycle rule).
+        sc = self.scene()
+        for room in (sc.items() if sc is not None else ()):
+            for e in getattr(room, "outline", None) or ():
                 dv = by_id.get(id(e.v))
                 if dv is not None:
                     dv.edges.append(e)

@@ -685,9 +685,12 @@ def _holders(fp, scene, v):
             if isinstance(r, fp.RoomItem) and any(e.v is v for e in r.outline)]
 
 
-@pytest.mark.xfail(strict=False, reason="a body drag gathers outline edges from "
-                   "the RUN's rooms, so a room holding the corner but owning no "
-                   "wall in the run is left behind -- P3.8 survey row, defect 30")
+# HARD PASS since P4.2 (defect 30 fixed): the drag's step 4 gathers HOLDERS
+# OF THE CORNER, not rooms of the run. Phase 3's identity rule, not a deform
+# policy -- the room follows because ITS corner moved. Distinct from defect
+# 23 (P4.5's): that is group MEMBERSHIP under a clipped band, where the
+# room's walls were duplicated into a group it never joined; this is vertex
+# identity, where the room holds the very corner the drag moved.
 def test_a_dragged_corner_carries_every_room_that_holds_it(fp, scene):
     """P3.8's survey row, pinned: does a real drag re-point EVERY outline holder
     of the corner it moves, or strand a room?
