@@ -1396,11 +1396,22 @@ class WallItem(QGraphicsItem):
         """The exact axis distance at which this wall's axis crosses the
         projected line of a NEARBY ORTHOGONAL wall, when the drag is within the
         stick tolerance of it -- else None (so it falls back to the grid).
-        Snaps only to such lines, never to endpoints or bodies."""
+        Snaps only to such lines, never to endpoints or bodies.
+
+        THE STICK IS SCENE-SPACE, by the defect-13 ruling (P4.2): a gesture
+        tolerance may pick the TARGET, but committed geometry derives from
+        scene-space rules -- this threshold decides where the end LANDS, so a
+        wall's final position must not depend on zoom. It used to widen by
+        `16.0 / view_scale` (64" at 0.25x), which is exactly the zoom-
+        dependent geometry defect 13 measured. The value is the vocabulary's
+        own: WALL_PROJECT_STICK (9", == JOIN_TOL, the schema's gesture
+        tolerance -- the same radius draw-release already snaps ends within).
+        The ~20px endpoint CATCH radius in `mousePressEvent` stays
+        zoom-scaled by the same ruling: it only decides what you grabbed."""
         sc = self.scene()
         if sc is None:
             return None
-        stick = max(WALL_PROJECT_STICK, 16.0 / max(self._view_scale(), 1e-6))
+        stick = WALL_PROJECT_STICK
         best_s, best_d = None, stick
         for w in sc.items():
             if (not isinstance(w, WallItem) or w is self

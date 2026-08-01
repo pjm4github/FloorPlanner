@@ -759,3 +759,33 @@ def test_a_roomless_split_wall_body_drags_as_one_run(fp, scene):
     run = w._collinear_run()
     assert seg in run, "the far segment is not in the drag's run"
     assert stem not in run                       # perpendicular: stays put
+
+
+def test_orthogonal_stick_is_zoom_independent(fp, win):
+    # defect 13's drag half, RULED at P4.2: a gesture tolerance may pick the
+    # TARGET; committed geometry must derive from scene-space rules. The stick
+    # threshold decides where a stretched end LANDS, so it must not read the
+    # view. (The ~20px endpoint catch radius stays zoom-scaled by the same
+    # ruling -- it only decides what you grabbed.)
+    sc = win.scene
+    a = fp.WallItem(QPointF(0, 0), QPointF(100, 0), "interior")
+    ortho = fp.WallItem(QPointF(230, -60), QPointF(230, 60), "interior")
+    sc.addItem(a)
+    sc.addItem(ortho)
+    fp.rebuild_all_walls(sc)
+    o, u = QPointF(0, 0), QPointF(1, 0)
+    results = []
+    for zoom in (0.25, 1.0, 4.0):
+        win.view.resetTransform()
+        win.view.scale(zoom, zoom)
+        results.append(a._project_to_orthogonal(o, u, 200.0))  # 30" short
+    assert results[0] == results[1] == results[2], \
+        f"where the end lands depends on zoom: {results}"
+    # the scene-space rule is the vocabulary's own 9" (WALL_PROJECT_STICK ==
+    # JOIN_TOL, the schema's gesture tolerance): 30" away never sticks...
+    assert results[1] is None
+    # ...and 5" away always does, at any zoom
+    for zoom in (0.25, 4.0):
+        win.view.resetTransform()
+        win.view.scale(zoom, zoom)
+        assert a._project_to_orthogonal(o, u, 225.0) == pytest.approx(230.0)
