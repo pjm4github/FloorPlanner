@@ -3863,4 +3863,42 @@ notes:   Patrick closed symmetricP1's reviewed gaps, then dragged the
          down-drag adds ZERO diagonals (the four flagged are the file's
          own pre-existing 0.3" skew at (582.3, 483.6), below the weld
          band, identical at load and untouched throughout).
+
+P4.2+ mini-gate finding 3: THE MIXED CORNER (partial-side run coverage)
+ruff:    clean
+pytest:  529 passed, 7 deselected, 4 xfailed (sum 540 local; CI 538 -- the
+         two extra remain Patrick's untracked example files)
+files:   walls.py (_plan_vertex_moves step 4: mixed-corner step surgery;
+         collapse_degenerate_outline_edges + release/close_gap call sites),
+         tests/test_wall_move.py (step pin), docs/CODE_REVIEW_v2.md (row
+         30, third finding), this file.
+notes:   Patrick: clean gaps, drag the Master Suite / M Bath wall down --
+         diagonal across Hall (Screenshot 2026-08-01 172305.png). NOT the
+         stranding class (the invariant held, 0 stranded); a genuinely
+         deeper case: the dragged run is Master Suite's WHOLE south side
+         (x 30..330) but Hall's top side extends past the run's end
+         (330..396, backed by the Clst|Hall wall -- a continuation, which
+         correctly stays). Hall's corner at x=330 is run-backed on one
+         adjacent edge and continuation-backed on the other; one corner
+         cannot serve two stretches that now sit on different lines --
+         follow tears the continuation stretch (the diagonal seen), stay
+         tears the run stretch. FIX, outline surgery at drag start (the
+         same moment the anti-shear split runs): the mixed corner becomes
+         TWO corners joined by an OPEN step edge (wall: null, drawn dashed
+         -- at insert time there genuinely is no wall on the jog; the
+         stretched perpendicular wall covers it after the drag, so the
+         dash-over-wall is a known presentational wrinkle, noted not
+         hidden). Hygiene: collapse_degenerate_outline_edges drops
+         zero-length edges -- the welded corner pair a closed gap leaves
+         in a room that held both corners (the Hall doubled-corner residue)
+         and a step whose drag ended where it began -- unbinding a wall
+         whose only naming edge was the zero one.
+         RECEIPTS, fail-first: the step pin (4-room replica: run-bordered
+         rooms follow, Clst byte-still, Hall gains the OPEN step at the
+         run's end, everything axis-aligned) red against the pre-fix tree
+         in a worktree, green on the fix. End-to-end on symmetricP1: clean
+         gaps -> drag Master Suite/M Bath 24" down -> 0 diagonals, 0
+         stranded, Hall = (248.4,678)(330,678)(330,654)(379.4,654)
+         (396,654)(396,714)(248.4,714) exactly, Clst untouched, doubled
+         corner gone.
 ```

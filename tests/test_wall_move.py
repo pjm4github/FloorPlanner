@@ -805,3 +805,58 @@ def test_orthogonal_stick_is_zoom_independent(fp, win):
         win.view.resetTransform()
         win.view.scale(zoom, zoom)
         assert a._project_to_orthogonal(o, u, 225.0) == pytest.approx(230.0)
+
+
+def test_a_partial_side_slide_steps_the_neighbours_outline(fp, scene):
+    """The P4.2 mini-gate's third finding, pinned. The dragged run is one
+    room's whole side, but a NEIGHBOUR's side extends past the run's end
+    (symmetricP1: Master Suite's south side slides; Hall's top side runs on
+    under Clst). One corner cannot serve two stretches that now sit on
+    different lines, so it becomes TWO corners joined by an OPEN step edge
+    -- and nothing tears diagonal. Clst, bordered by the continuation only,
+    must not move at all."""
+    for a, b in [((0, 0), (240, 0)), ((0, 240), (240, 240)),
+                 ((0, 0), (0, 240)), ((240, 0), (240, 240)),
+                 ((0, 120), (80, 120)), ((80, 120), (160, 120)),
+                 ((160, 120), (240, 120)), ((160, 0), (160, 120)),
+                 ((80, 120), (80, 240))]:
+        scene.addItem(fp.WallItem(QPointF(*a), QPointF(*b), "interior"))
+    fp.weld_scene(scene)
+    fp.rebuild_all_walls(scene)
+    rooms = {}
+    for name, (cx, cy) in {"A": (80, 60), "B": (40, 180),
+                           "Hall": (160, 180), "Clst": (200, 60)}.items():
+        res = fp.detect_room(scene, QPointF(cx, cy))
+        assert res is not None, f"{name} not detected"
+        r = fp.RoomItem(name, QPointF(cx, cy), res[0], res[1], corners=res[2])
+        scene.addItem(r)
+        fp.bind_room_walls(scene, r)
+        rooms[name] = r
+    clst_before = [(p.x(), p.y()) for p in rooms["Clst"].corners]
+    wall = next(w for w in scene.items() if isinstance(w, fp.WallItem)
+                and abs(w.p1.y() - 120) < 0.01 and abs(w.p2.y() - 120) < 0.01
+                and max(w.p1.x(), w.p2.x()) <= 80.01)
+    assert {r.name for r in wall.rooms} == {"A", "B"}   # precondition
+    _body_drag(wall, 0, 24)
+    assert abs(wall.p1.y() - 144) < 0.01, "precondition: the drag moved"
+    for r in rooms.values():
+        pts = r.corners
+        for i in range(len(pts)):
+            pa, pb = pts[i], pts[(i + 1) % len(pts)]
+            assert (abs(pa.x() - pb.x()) < 0.01
+                    or abs(pa.y() - pb.y()) < 0.01), (
+                f"{r.name} tore diagonal: "
+                f"({pa.x():.1f},{pa.y():.1f})->({pb.x():.1f},{pb.y():.1f})")
+    hall = rooms["Hall"]
+    hc = [(round(p.x(), 1), round(p.y(), 1)) for p in hall.corners]
+    assert (160.0, 144.0) in hc and (160.0, 120.0) in hc, \
+        f"Hall did not gain the step: {hc}"
+    n = len(hall.outline)
+    step = next((e for i, e in enumerate(hall.outline)
+                 if {(round(e.v.x, 1), round(e.v.y, 1)),
+                     (round(hall.outline[(i + 1) % n].v.x, 1),
+                      round(hall.outline[(i + 1) % n].v.y, 1))}
+                 == {(160.0, 144.0), (160.0, 120.0)}), None)
+    assert step is not None and step.wall is None, "the step must be OPEN"
+    assert [(p.x(), p.y()) for p in rooms["Clst"].corners] == clst_before, \
+        "Clst borders only the continuation and must not move"

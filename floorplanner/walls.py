@@ -865,6 +865,53 @@ def report_doorway_landings(scene, wall, gesture, ends=("p1", "p2")):
     return filed
 
 
+def collapse_degenerate_outline_edges(scene, floor=None, tol=1e-6):
+    """Drop zero-length OPEN outline edges -- two consecutive corners at one
+    point with no wall between them. Two producers (both P4.2): closing a
+    reviewed gap welds a pair of corners a room held as distinct outline
+    corners, leaving a zero-length open edge between them; and a drag's
+    mixed-corner STEP collapses to zero length when the drag ends where it
+    began. Purely hygiene: only `wall is None` edges of zero extent go, so
+    nothing a wall backs and nothing with area can ever be dropped.
+    Returns the number of edges removed."""
+    if scene is None:
+        return 0
+    floor = floor if floor is not None else active_floor()
+    removed = 0
+    for room in scene.items():                # duck-typed: the cycle rule
+        if getattr(room, "floor", None) != floor:
+            continue
+        outline = getattr(room, "outline", None) or []
+        n = len(outline)
+        if n < 4:
+            continue
+        keep, dropped_walls, drop = [], [], 0
+        for i, e in enumerate(outline):
+            nxt = outline[(i + 1) % n]
+            zero = (e.v is nxt.v
+                    or (abs(e.v.x - nxt.v.x) <= tol
+                        and abs(e.v.y - nxt.v.y) <= tol))
+            if zero and n - drop > 4:
+                drop += 1
+                if e.wall is not None:
+                    dropped_walls.append(e.wall)
+                continue
+            keep.append(e)
+        if len(keep) != n and len(keep) >= 3:
+            if hasattr(room, "prepareGeometryChange"):
+                room.prepareGeometryChange()
+            removed += n - len(keep)
+            room.outline[:] = keep
+            # a wall whose ONLY naming edge was the zero-length one backs
+            # nothing of this room any more -- the outline is the authority
+            # on which walls are the room's (P3.5)
+            for w in dropped_walls:
+                if (not any(k.wall is w for k in keep)
+                        and hasattr(room, "unbind_wall")):
+                    room.unbind_wall(w)
+    return removed
+
+
 def close_gap(scene, a: QPointF, b: QPointF, floor=None, tol=0.75):
     """DEFECT 34's apply half (P4.2): make the two corners at `a` and `b`
     ONE corner at `a` -- explicitly, one pair at a time, from the review op.
@@ -919,6 +966,9 @@ def close_gap(scene, a: QPointF, b: QPointF, floor=None, tol=0.75):
             if (getattr(room, "floor", None) == floor
                     and getattr(room, "outline", None)):
                 share_outline_vertices(room)
+        # a room that held BOTH corners of the closed pair as its own outline
+        # corners is left with a zero-length open edge between them -- gone
+        collapse_degenerate_outline_edges(scene, floor)
         rebuild_all_walls(scene)
     return len(relocated)
 
@@ -1676,26 +1726,68 @@ class WallItem(QGraphicsItem):
         # perpendicular walls stretch between the two corners. Duck-typed on
         # `outline` because walls cannot import rooms (the cycle rule);
         # identity lookup makes a floor filter redundant (I2).
+        # A room can also be bordered by BOTH at one corner -- a run wall on
+        # one side and the continuation on the other, both along the slide
+        # line (the run covers only PART of that room's side; found at the
+        # P4.2 mini-gate, third finding: Master Suite's south side slides,
+        # Hall's top side extends past the run's end). One corner cannot
+        # serve two stretches that now sit on different lines, so it becomes
+        # TWO corners with an OPEN step edge between them (`wall: null`,
+        # drawn dashed -- there genuinely is no wall on the jog).
         sc = self.scene()
         run = set(self._run)
+        su = self._slide_u
+
+        def _run_backed(edge):
+            return edge is not None and edge.wall is not None and edge.wall in run
+
+        def _along_line(pa, pb):
+            dx, dy = pb.x() - pa.x(), pb.y() - pa.y()
+            ln = math.hypot(dx, dy)
+            return (ln > 1e-6
+                    and abs((dx / ln) * su.y() - (dy / ln) * su.x()) <= 0.05)
+
         for room in (sc.items() if sc is not None else ()):
             outline = getattr(room, "outline", None) or ()
             n = len(outline)
+            steps = []                       # (index, kind) -- applied after
             for i, e in enumerate(outline):
                 dv = by_id.get(id(e.v))
                 if dv is None:
                     continue
                 prev = outline[i - 1] if n > 1 else None
-                on_run = ((e.wall is not None and e.wall in run)
-                          or (prev is not None and prev.wall is not None
-                              and prev.wall in run))
-                if on_run:
+                run_prev, run_e = _run_backed(prev), _run_backed(e)
+                stat = stat_by_old.get(id(e.v))
+                if run_prev and not run_e and stat is not None \
+                        and _along_line(e.v.point(),
+                                        outline[(i + 1) % n].v.point()):
+                    steps.append((i, "after"))   # prev moves, e stays
+                elif run_e and not run_prev and stat is not None \
+                        and _along_line(outline[i - 1].v.point(),
+                                        e.v.point()):
+                    steps.append((i, "before"))  # e moves, prev stays
+                elif run_prev or run_e:
                     dv.edges.append(e)      # bordered by the dragged run:
                     continue                # the corner carries the room
-                stat = stat_by_old.get(id(e.v))
-                if stat is not None:
+                elif stat is not None:
                     e.v = stat              # bordered by the continuation:
                                             # the room keeps the old corner
+            if steps and hasattr(room, "prepareGeometryChange"):
+                room.prepareGeometryChange()
+            for i, kind in reversed(steps):
+                e = outline[i]
+                dv = by_id[id(e.v)]
+                stat = stat_by_old[id(e.v)]
+                if kind == "after":
+                    # ... prev_edge -> [moved] --step-- [stat] -> e ...
+                    step = type(e)(e.v, None)
+                    e.v = stat
+                    room.outline.insert(i, step)
+                    dv.edges.append(step)
+                else:
+                    # ... prev_edge -> [stat] --step-- [moved] -> e ...
+                    room.outline.insert(i, type(e)(stat, None))
+                    dv.edges.append(e)
         self._vmoves = moves
 
     def mouseMoveEvent(self, e):
@@ -1760,6 +1852,10 @@ class WallItem(QGraphicsItem):
             # Shift.
             endpoint_edit = self._mode in ("p1", "p2")
             corner_drag = endpoint_edit and bool(self.rooms)
+            if self._mode == "move":
+                # a mixed-corner STEP inserted at press collapses to nothing
+                # when the drag ends where it began (P4.2)
+                collapse_degenerate_outline_edges(self.scene(), self.floor)
             merge_wall(self.scene(), self)          # fuse if it now overlaps
             if endpoint_edit and self.scene() is not None:
                 # defect 25 (P4.1b): an end dragged into a doorway reports at
