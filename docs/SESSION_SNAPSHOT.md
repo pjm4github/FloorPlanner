@@ -8,15 +8,15 @@
 
 | | |
 |---|---|
-| **Branch** | `main` — P4.1 is merged, so `main` tracks HEAD again |
-| **Merge commit** | **`0d6db8e`** (PR #2, a merge commit, not a squash), 2026‑07‑31 |
-| **CI** | green on `main` post-merge (run 30682374579) — ruff, py3.10, py3.13, and the deep-invariant job |
-| **Census** | **526 collected**; OFF / ON / DEEP each **514 passed, 7 deselected, 5 xfailed**, every sum reconciling |
-| **Phases done** | 0, 1, 2, 3 complete; **P4.1 complete and ticked** (sub-commits `0df3aa5`, `a0e1b95`, `cce2eb6`). |
+| **Branch** | `main` — P4.1 and P4.1b are merged, so `main` tracks HEAD again |
+| **Merge commit** | **`ec5f207`** (P4.1b, PR #3, a merge commit, not a squash), 2026‑08‑01; P4.1 merged at `0d6db8e` (PR #2) |
+| **CI** | green on `main` post-merge (run 30711605997) — ruff, py3.10, py3.13, and the deep-invariant job |
+| **Census** | **528 collected**; OFF / ON / DEEP each **516 passed, 7 deselected, 5 xfailed**, every sum reconciling |
+| **Phases done** | 0, 1, 2, 3 complete; **P4.1 and P4.1b complete and ticked** (P4.1: `0df3aa5`, `a0e1b95`, `cce2eb6`; P4.1b: `1d3eaa6`, `e0519ae`). |
 
-**The next action is P4.1b** — defect 25's gesture-time message, ruled standalone at the P4.1 read-back, branching now that PR #2 is merged (branch `p4.1b-doorway-message`). Scope is **message only**: draw-release and end-drag say at gesture time what R2c's walk already detects and files — naming *the edit* and *the doorway*, through the defect-6 edit-path vocabulary; no change to what the gesture *does* (decline/split/weld policy stays P4.3's with the `auto_*` flags). Acceptance: Patrick's exact Gate-3 scenario — draw a wall ending on a doorway — produces the specific message instead of the generic torn-network line, pinned by a test asserting the message names the doorway, with a fail-first receipt against `main`.
+**The next action is the P4.2 read-back, run against `main`, and nothing else.** No P4.2 code until it is confirmed. It must OPEN with the census answering the inherited `_copy_spec` question by measurement (below), and also cover: the extract/join task text re-verified against the tree (task-line numbers are 0-for-3 across phases — the census doctrine applies), the party-wall regression restoration named in the task line (`test_groups.py::test_extracted_room_region_follows_move`, xfail → hard pass via a real `extract`), defects 30 and 34 (both argued to P4.2), and the defect-23 boundary — what P4.2 decides versus what stays reserved for P4.5's deform-vs-stay-put ruling.
 
-**After P4.1b comes P4.2 (extract/join)**, which carries two things ruled at the P4.1 read-back: a **Patrick manual mini-gate before its PR merges** (it changes what gestures mean), and an inherited **open question, not a claim** — whether `_perimeter_span` dies there, contingent on `_copy_spec` (its other surviving caller, owned by no phase) being reshaped there too. Authoritative copy: the register's carried census note.
+**P4.2 carries two things ruled at the P4.1 read-back:** a **Patrick manual mini-gate before its PR merges** (it changes what gestures mean) — the exit report must include the check's script as a short stated-expectations list, Gate-3-style, not a rediscovery exercise — and the inherited **open question, not a claim**: whether `_perimeter_span` dies there, contingent on `_copy_spec` (its other surviving caller, owned by no phase) being reshaped there too. Authoritative copy: the register's carried census note.
 
 ---
 
@@ -60,7 +60,7 @@ These are settled and are not up for re-litigation; each was paid for by a failu
 
 **Authoritative list: `docs/V5_MIGRATION_PLAN.md` → "What Phase 3 carries into Phase 4" (as amended by the P4.1 rulings) and the register.** Index only:
 
-defect **25** (gesture-time doorway message → **P4.1b, ruled, next up**) · **23** (group move strands a clipped room → P4.5) · **30** (a body drag strands corner-holders outside the dragged run → P4.2) · **34** (the (0.6″, 9.0″) document-gap band — must be a **review**, not an auto-repair → P4.2) · **defect 13's drag half** (may a gesture tolerance set a geometric result? → P4.2) · the **P3.1 split-on-write shim** (→ P4.5) · **two identity-churn assignment sites** (→ P4.5) · the **`_perimeter_span`/`_copy_spec` contingency** (→ P4.2's read-back, as a question).
+**23** (group move strands a clipped room → P4.5) · **30** (a body drag strands corner-holders outside the dragged run → P4.2) · **34** (the (0.6″, 9.0″) document-gap band — must be a **review**, not an auto-repair → P4.2) · **defect 13's drag half** (may a gesture tolerance set a geometric result? → P4.2) · the **P3.1 split-on-write shim** (→ P4.5) · **two identity-churn assignment sites** (→ P4.5) · the **`_perimeter_span`/`_copy_spec` contingency** (→ P4.2's read-back, as a question). *(Defect 25 closed at P4.1b, `ec5f207`.)*
 
 **They share one thesis: every one is an operation that knows about ROOMS where it should know about CORNERS.** P4.1 was the first Phase-4 confirmation of it — deletion needed no fracture because the corners already carry the room.
 
