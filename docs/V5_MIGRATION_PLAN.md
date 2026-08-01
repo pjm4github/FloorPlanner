@@ -3688,4 +3688,40 @@ notes:   CENSUS DOCTRINE APPLIED at task open, and it earned its keep a third
          1 open each).
          Defect 25 deliberately NOT touched here: P4.1b branches the moment
          this task's PR merges, message-only scope per its task text.
+
+P4.1b done   (branch p4.1b-doorway-message: 1d3eaa6 mechanism + tests;
+         this commit, docs)
+ruff:    clean
+pytest:  516 passed, 7 deselected, 5 xfailed (OFF/ON/DEEP each, sum 528 OK)
+files:   walls.py (report_gesture_fault / drain_gesture_faults /
+         report_doorway_landings + the endpoint-drag release hook),
+         view.py (draw-release hook), mainwindow.py (_commit_if_changed
+         drains the new list beside the defect-6 report), tests/
+         test_walls.py (two gui tests), docs/CODE_REVIEW_v2.md (defect 25
+         closed), this file.
+notes:   REPORT ONLY, per the ruling -- no change to what the gesture DOES;
+         decline/split/weld policy stays P4.3's with the auto_* flags (the
+         dissent's surviving kernel). The straddle question is asked of
+         plan_split_edge -- one planner, no second definition of "a junction
+         lands inside this opening" (P3.4 point 1). The body search runs at
+         ON_SEG_TOL, not JOIN_TOL, so a deliberate reveal (a wall stopped
+         short of another) never nags -- only an end ON the body, whose
+         junction is genuinely owed a split, reports. The drag checks only
+         the end it moved (ends=(mode,)), so an old landing on the far end
+         is not re-announced by an unrelated drag.
+         CHANNEL: the defect-6 discipline exactly (scene-filed, drained at
+         the debounce, said once, the sentence naming the edit and the
+         thing in the way) as its OWN list -- nothing failed to be PLACED,
+         so draining through "Could not place ..." would misblame a door
+         that is fine. Drained after the opening report so the gesture the
+         user just made wins the status bar.
+         RECEIPT, fail-first and mechanism-proving: both tests run UNCHANGED
+         against pre-fix main@708dc2e in a worktree, reach their
+         preconditions (the drawn/dragged end measurably rests on the
+         host's centreline inside the door span -- the defect-28 vacuity
+         lesson applied), and FAIL on the message assert, the status bar
+         holding only the generic tool hint. Both pass on the branch.
+         Census 526 -> 528 (the two gui tests), every sum reconciling.
+         The walk's report path (R2c) is untouched and stays as the
+         load-path safety net, exactly as the register entry planned.
 ```
