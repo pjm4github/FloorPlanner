@@ -639,6 +639,21 @@ def split_wall_at(scene, wall, p, on_seg_tol=ON_SEG_TOL, report=None):
     return apply_split_plan_to_scene(scene, split)
 
 
+def delete_wall(scene, wall, settle=True):
+    """Delete `wall` outright (P4.1).  A bordering room SURVIVES by
+    construction: its stored outline holds the corners (P3.2/P3.5), so the
+    vacated edge simply becomes an open edge (`wall: null`, drawn dashed by
+    the room itself).  Nothing is fractured, trimmed or rebound -- deletion
+    is deletion."""
+    if scene is None or wall.scene() is None:
+        return
+    for r in list(wall.rooms):
+        r.unbind_wall(wall)
+    scene.removeItem(wall)
+    if settle:
+        rebuild_all_walls(scene)
+
+
 def _merge_intervals(intervals):
     """Merge (lo, hi) ranges into disjoint, ascending intervals."""
     out = []
@@ -1663,7 +1678,7 @@ class WallItem(QGraphicsItem):
             self.setSelected(True)
             detach_wall_from_room(sc, self)   # opens the vacated edge
         elif chosen is a_del and sc is not None:
-            fracture_delete_wall(sc, self)   # keep room-edge stretches intact
+            delete_wall(sc, self)   # room survives via its outline; edge opens
         e.accept()
 
 
