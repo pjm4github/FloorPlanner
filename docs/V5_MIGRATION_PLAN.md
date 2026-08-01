@@ -3836,4 +3836,31 @@ notes:   Patrick ran item 6 on symmetricP3 and the blanket follow tore a
          NOTE for the re-run: symmetricP3.json still CONTAINS the damage
          from the bad-drag session -- re-cut it from symmetricP1 before
          re-running item 6, or drag and undo on the fixed build.
+
+P4.2+ mini-gate finding 2: CLOSE_GAP STRANDED OUTLINES (item 7 + a drag)
+ruff:    clean
+pytest:  528 passed, 7 deselected, 4 xfailed (sum 539 local; CI 537 -- the
+         two extra remain Patrick's untracked example files)
+files:   walls.py (close_gap), tests/test_walls.py (invariant pin),
+         docs/CODE_REVIEW_v2.md (row 34 corrected), this file.
+notes:   Patrick closed symmetricP1's reviewed gaps, then dragged the
+         M Bath/Lounge wall down -- and M Bath, Hall and Lounge drew dashed
+         DIAGONALS to corners their walls no longer held (Screenshot
+         2026-08-01 170311.png). Not deferred recalculation -- there is no
+         later recalculation since P3.5, by design; outlines follow walls
+         only through shared vertex IDENTITY, and close_gap's first cut
+         broke exactly that: it folded WALL ends onto one anchor
+         (share_coincident_ends) but left the OUTLINES holding coincident-
+         but-distinct twins, so the next drag moved the walls' corner and
+         stranded the rooms'. FIX: after the fold, every room on the floor
+         re-adopts its walls' corner vertices (share_outline_vertices, the
+         load path's own discipline, late-imported per the cycle rule).
+         RECEIPTS, fail-first: the invariant pin (every outline corner IS
+         one of its room's wall-end vertices, by identity) red against the
+         first cut in a worktree, green on the fix; end-to-end headless on
+         symmetricP1: both 6.003" gaps close (1 weld each at (379.4, 456)
+         and (379.4, 654)), stranded corners 0, and the M Bath/Lounge 24"
+         down-drag adds ZERO diagonals (the four flagged are the file's
+         own pre-existing 0.3" skew at (582.3, 483.6), below the weld
+         band, identical at load and untouched throughout).
 ```

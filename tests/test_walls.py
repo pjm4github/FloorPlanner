@@ -631,3 +631,32 @@ def test_floating_room_distance_is_not_a_gap(fp, win):
     room._translate(78, 0)     # park the floating room 2" from the lone wall
     gaps = near_vertex_gaps(_gap_doc(win))
     assert gaps == [], f"a floating room's position listed as a gap: {gaps}"
+
+
+def test_close_gap_leaves_outlines_holding_their_walls_corners(fp, win,
+                                                               make_room):
+    # Found at the P4.2 mini-gate (second finding): close the review's gaps,
+    # then drag a wall -- M Bath / Hall / Lounge drew dashed DIAGONALS to
+    # corners their walls no longer held. Root cause: close_gap folded WALL
+    # ends onto one anchor vertex but left the OUTLINES holding coincident-
+    # but-distinct twins (the P3.5 invariant broken); the next drag moved the
+    # walls' vertex and stranded the outline corners. The invariant is
+    # asserted directly: after closing, every outline corner IS one of its
+    # room's wall-end vertices, by identity.
+    from floorplanner.design.validate import near_vertex_gaps
+    sc = win.scene
+    ra = make_room(sc, 0, 0, 120, 120, "A")
+    rb = make_room(sc, 121.5, 0, 120, 120, "B")
+    gaps = near_vertex_gaps(_gap_doc(win))
+    assert len(gaps) == 2, f"precondition: two 1.5\" pairs, got {gaps}"
+    for _lvl, a, b, _dist in list(gaps):
+        assert fp.close_gap(sc, QPointF(*a), QPointF(*b)) >= 1
+    assert near_vertex_gaps(_gap_doc(win)) == []
+    for room in (ra, rb):
+        ends = {id(w.end_vertex(at)) for w in room.walls
+                for at in ("p1", "p2")}
+        for e in room.outline:
+            assert id(e.v) in ends, (
+                f"{room.name}: outline corner at ({e.v.x:.1f}, {e.v.y:.1f}) "
+                f"is not one of its walls' corners -- the next drag strands "
+                f"it into a diagonal")

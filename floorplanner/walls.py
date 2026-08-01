@@ -906,6 +906,19 @@ def close_gap(scene, a: QPointF, b: QPointF, floor=None, tol=0.75):
                 e.v = _moved(e.v)
     if relocated:
         share_coincident_ends(scene, floor)
+        # RESTORE THE P3.5 INVARIANT: the fold above re-binds WALL ends onto
+        # one anchor vertex per corner, and an outline left holding a
+        # coincident-but-distinct twin is a stranding the NEXT drag turns
+        # into a diagonal tear (found at the P4.2 mini-gate: close the gaps,
+        # drag a wall, and M Bath / Hall / Lounge drew dashed diagonals to
+        # corners their walls no longer held). Every room on the floor
+        # re-adopts its walls' corner vertices -- idempotent, and the same
+        # discipline the load path applies.
+        from floorplanner.rooms import share_outline_vertices  # late (cycle)
+        for room in scene.items():
+            if (getattr(room, "floor", None) == floor
+                    and getattr(room, "outline", None)):
+                share_outline_vertices(room)
         rebuild_all_walls(scene)
     return len(relocated)
 
