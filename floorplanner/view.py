@@ -504,6 +504,10 @@ class PlanView(QGraphicsView):
                 merge_wall(self.scene(), w)
                 if w.scene() is not None:
                     weld_wall_ends(self.scene(), w, rebuild=False)
+                    # defect 25 (P4.1b): a drawn end that came to rest inside
+                    # a doorway reports at the gesture -- the walk would only
+                    # say "torn network" later, blaming a tear, not this draw
+                    report_doorway_landings(self.scene(), w, "drawing a wall")
                 rebuild_all_walls(self.scene())
             e.accept()
             return

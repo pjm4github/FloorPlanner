@@ -490,3 +490,67 @@ def test_body_slide_never_snaps_an_end_to_another_wall(fp, win, drag):
     drag(win, QPointF(100, 100), 0, int(12 * m), steps=4)
     assert a.p1.y() == pytest.approx(a.p2.y())     # parallel: no snap-tilt
     assert a.p1.y() > 100                           # it did move
+
+
+# -- defect 25 (P4.1b): a wall end landing inside a doorway says so AT THE
+# GESTURE, naming the doorway -- not the later generic torn-network line.
+# Both tests assert through the public surface (the status bar after the
+# debounce drain) so they run unchanged against pre-fix code, where they fail
+# on the message assert: that run is the fail-first receipt.
+def _host_with_door(fp, sc):
+    host = fp.WallItem(QPointF(0, 0), QPointF(240, 0), "interior")
+    sc.addItem(host)
+    door = fp.OpeningItem(host, "door", "3280", 120.0)   # spans 104..136
+    host.openings.append(door)
+    fp.rebuild_all_walls(sc)
+    return host
+
+
+@pytest.mark.gui
+def test_drawing_a_wall_into_a_doorway_names_the_doorway_at_release(
+        fp, win, drag):
+    # the Gate-3 scenario: draw a wall whose end lands on the host's body
+    # inside the door; the join correctly declines to split through it, so
+    # the end stays unwelded -- and the gesture must say so, naming the door
+    sc = win.scene
+    host = _host_with_door(fp, sc)
+    win.resize(1100, 900)
+    win.show()
+    win.zoom_fit()
+    win.set_tool(fp.TOOL_WALL_INT)
+    m = win.view.transform().m11()
+    drag(win, QPointF(120, 96), 0, -int(96 * m), steps=4)
+    drawn = next(w for w in sc.items() if isinstance(w, fp.WallItem)
+                 and w is not host and abs(w.p1.x() - 120) < 6)
+    end = min((drawn.p1, drawn.p2), key=lambda p: abs(p.y()))
+    # precondition (the defect-28 lesson): the gesture really made the state
+    # -- the drawn end rests ON the host's centreline, inside the door span
+    assert abs(end.y()) < 1.0 and 104 < end.x() < 136
+    win._commit_if_changed()
+    msg = win.statusBar().currentMessage()
+    assert "door 3280" in msg, f"gesture said nothing specific: {msg!r}"
+    assert "drawing a wall" in msg
+
+
+@pytest.mark.gui
+def test_dragging_an_end_into_a_doorway_names_the_doorway_at_release(
+        fp, win, drag):
+    sc = win.scene
+    _host_with_door(fp, sc)
+    w = fp.WallItem(QPointF(120, 60), QPointF(120, 180), "interior")
+    sc.addItem(w)
+    fp.rebuild_all_walls(sc)
+    win.resize(1100, 900)
+    win.show()
+    win.zoom_fit()
+    win.set_tool(fp.TOOL_SELECT)
+    w.setSelected(True)
+    m = win.view.transform().m11()
+    # grab the free end at (120, 60) and drag it down onto the door
+    drag(win, QPointF(120, 60), 0, -int(60 * m), steps=4)
+    end = min((w.p1, w.p2), key=lambda p: abs(p.y()))
+    assert abs(end.y()) < 1.0 and 104 < end.x() < 136   # precondition
+    win._commit_if_changed()
+    msg = win.statusBar().currentMessage()
+    assert "door 3280" in msg, f"gesture said nothing specific: {msg!r}"
+    assert "dragging a wall end" in msg

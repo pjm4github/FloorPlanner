@@ -1074,6 +1074,16 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             head = failed[0]
             more = f" (+{len(failed) - 1} more)" if len(failed) > 1 else ""
             self.status(f"Could not place {head}{more}")
+        # Defect 25's gesture arm (P4.1b): the same discipline, its own head
+        # -- nothing failed to be placed, so "Could not place" would misblame
+        # a door that is fine. The filed sentence is complete on its own.
+        # Drained after the opening report so the gesture the user just made
+        # wins the status bar when both fire at one quiescent point.
+        faults = drain_gesture_faults(self.scene)
+        if faults and faults != getattr(self, "_last_gesture_report", None):
+            self._last_gesture_report = faults
+            more = f" (+{len(faults) - 1} more)" if len(faults) > 1 else ""
+            self.status(f"{faults[0]}{more}")
         # ONE walk, shared: the snapshot and the shadow-mode check happen at
         # the same quiescent point, and walking the scene twice here would
         # double the per-edit cost for nothing.

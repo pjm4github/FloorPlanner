@@ -785,6 +785,86 @@ def drain_opening_failures(scene) -> list:
     return out
 
 
+def report_gesture_fault(scene, msg):
+    """File a gesture-time fault, on the SCENE -- defect 25's channel (P4.1b).
+
+    The defect-6 discipline exactly (`report_opening_failure` above): scene-
+    scoped, drained by `MainWindow` at the debounce point, said once, the
+    sentence naming the edit and the thing in the way. A separate list only
+    because the head differs -- nothing here failed to be PLACED, a junction
+    was declined -- so draining it through "Could not place ..." would blame
+    an opening that is perfectly fine."""
+    if scene is None:
+        return
+    if not hasattr(scene, "_fp_gesture_faults"):
+        scene._fp_gesture_faults = []
+    scene._fp_gesture_faults.append(msg)
+
+
+def drain_gesture_faults(scene) -> list:
+    """Take and clear whatever has been filed since the last drain."""
+    out = list(getattr(scene, "_fp_gesture_faults", ()) or ())
+    if out:
+        scene._fp_gesture_faults = []
+    return out
+
+
+def report_doorway_landings(scene, wall, gesture, ends=("p1", "p2")):
+    """DEFECT 25's gesture arm (P4.1b): a wall end has come to rest on another
+    wall's BODY inside a doorway -- say so NOW, naming the edit and the door.
+
+    The scene is self-consistent (the door still fits its wall), but the
+    document must split the host at the junction and no segment can then hold
+    the door: the walk reports it (R2c, `openings_failed`) and the join
+    machinery declines to split through the opening (`split_body_landings`
+    skips straddled plans), so the end stays unwelded -- all correct, and all
+    of it silent at the moment the user could still act on it. The only later
+    signal is the generic torn-network warning, which sends the user hunting
+    for a tear rather than a doorway (Gate 3, first real-user confirmation).
+
+    REPORT ONLY, by ruling: what the gesture DOES (decline / split / weld) is
+    untouched -- that policy is P4.3's, with the `auto_*` flags. The straddle
+    question is asked of `plan_split_edge`, the ONE definition of "a junction
+    lands inside this opening" (P3.4 point 1: no second planner). The body
+    search uses ON_SEG_TOL, not JOIN_TOL, on purpose: an end deliberately
+    stopped short of a wall (a reveal) is legitimate design and must not be
+    nagged about -- only an end ON the body, whose junction is genuinely owed
+    a split, reports.
+
+    `ends` limits the check to the end(s) the gesture actually moved, so an
+    old landing on the far end is not re-announced by an unrelated drag.
+    Returns the number of messages filed."""
+    if scene is None or wall is None or wall.scene() is None:
+        return 0
+    filed = 0
+    view = None
+    for attr in ends:
+        p = getattr(wall, attr)
+        hit = nearest_wall_body(scene, p, ON_SEG_TOL, exclude=wall)
+        if hit is None:
+            continue
+        host = hit[0]
+        if view is None:
+            view = graph_from_scene(scene, wall.floor)
+        sp = plan_split_edge(view, host, p.x(), p.y())
+        if sp is None or not sp.straddled:
+            continue
+        for po in sp.straddled:
+            op = (host.openings[po.index]
+                  if po.index < len(host.openings) else None)
+            kind = op.kind if op is not None else "opening"
+            code = op.code if op is not None else str(po.index)
+            report_gesture_fault(
+                scene,
+                f"The wall end at ({p.x():.0f}, {p.y():.0f}) lands inside "
+                f"{kind} {code} on the wall at "
+                f"({host.p1.x():.0f}, {host.p1.y():.0f}): a junction cannot "
+                f"weld through a {kind}, so the end stays unwelded until it "
+                f"or the {kind} moves ({gesture})")
+            filed += 1
+    return filed
+
+
 def rebuild_all_walls(scene):
     """Rebuild every wall's geometry and the junction clips.
 
@@ -1561,6 +1641,13 @@ class WallItem(QGraphicsItem):
             endpoint_edit = self._mode in ("p1", "p2")
             corner_drag = endpoint_edit and bool(self.rooms)
             merge_wall(self.scene(), self)          # fuse if it now overlaps
+            if endpoint_edit and self.scene() is not None:
+                # defect 25 (P4.1b): an end dragged into a doorway reports at
+                # the gesture, not at the next document walk -- and only the
+                # end this drag moved, so an old landing is not re-announced
+                report_doorway_landings(self.scene(), self,
+                                        "dragging a wall end",
+                                        ends=(self._mode,))
             rebuild_all_walls(self.scene())
             # dragging a corner back so the room is fully walled again fuses
             # the wall back in: re-lock its corners (right-click to detach
