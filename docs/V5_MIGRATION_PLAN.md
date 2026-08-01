@@ -3647,4 +3647,45 @@ Census re-verified on disk before starting:
          neighbour-rebuild tail), not "rebuild and paint" -- `paint` reads the
          already-built `_path`. The adjudication is unaffected; both survive
          Phase 3 and both migrate.
+
+P4.1  done   (branch p4.1-delete-wall, 3 sub-commits: 0df3aa5 census
+         corrections + the three rulings; a0e1b95 delete_wall + both call
+         sites + 2b flip; this commit, corpse + tests + docs)
+ruff:    clean
+pytest:  514 passed, 7 deselected, 5 xfailed (OFF/ON/DEEP each, sum 526 OK)
+files:   walls.py (delete_wall added; fracture_delete_wall + _merge_intervals
+         DELETED, 66 lines; context-menu call site), mainwindow.py
+         (delete_selected), rooms.py (docstring corrected),
+         tests/test_characterization.py (2b marker off),
+         tests/test_walls.py + tests/test_room_walls.py (fracture trio
+         renamed/replaced), CLAUDE.md, docs/CODE_REVIEW_v2.md (defect 17
+         closed with coda; defect 25 -> P4.1b ruled; carried census note),
+         this file.
+notes:   CENSUS DOCTRINE APPLIED at task open, and it earned its keep a third
+         time: _perimeter_span does NOT die here -- _copy_spec (unowned) and
+         _privatize_shared_walls (P4.2's) both outlive fracture -- so the
+         deletion is 66 lines, not the ~90 the task-line record implied.
+         Stated as a contingency in the register (authoritative copy) so
+         P4.2's read-back inherits a question, not a claim.
+         RECEIPT, fail-first: 2b re-measured xfailing against main@5a7711c
+         this session, then flipped green on exactly the call-site switch --
+         513 passed / 6 xfailed -> 514 / 5, nothing else moved. Census 526
+         unchanged across all three sub-commits (tests replaced 1:1).
+         VISIBLE-LIE CODA now in defect 17's closing entry: post-P3.7 the
+         fracture no-op measured 4 bound walls + 1 OPEN edge (the outline
+         still naming the dead wall fracture replaced), i.e. a dashed open
+         cue painted over an edge a wall actually covers. The silence had
+         aged into misinformation -- the final argument for deletion over
+         repair.
+         TESTS CHANGED -- all four declared at the read-back, approved before
+         work began: characterization 2b (marker off; IS the acceptance);
+         test_delete_free_wall_removes_whole (behaviour preserved through the
+         new delete_wall entry point); test_delete_overhanging_wall_goes_
+         whole_room_keeps_area and test_delete_shared_wall_keeps_both_rooms
+         (INTENTIONALLY replace the fracture-era pair: the wall genuinely
+         goes; each bordering room keeps its area with one open edge -- the
+         party-wall numbers measured at the read-back: 100.0 sf, 3 bound +
+         1 open each).
+         Defect 25 deliberately NOT touched here: P4.1b branches the moment
+         this task's PR merges, message-only scope per its task text.
 ```
