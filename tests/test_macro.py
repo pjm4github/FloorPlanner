@@ -572,3 +572,39 @@ def test_recorded_opening_replays_without_dialog(fp, win):
     wall = next(it for it in win.scene.items() if isinstance(it, fp.WallItem))
     assert len(wall.openings) == 1
     assert wall.openings[0].kind == "door"
+
+
+def test_recorder_captures_action_shortcuts(fp, win, qapp):
+    # P4.2: a keystroke matching a menu QAction shortcut (Ctrl+G group,
+    # Ctrl+Shift+G ungroup, Del, Ctrl+Z undo...) is consumed by Qt's
+    # shortcut system and never arrives as a KeyPress -- so recordings
+    # silently lacked exactly the plan-MODIFYING shortcuts. The recorder
+    # now also captures ShortcutOverride, which Qt delivers for every
+    # keystroke before matching. (QKeyEvents are built directly with their
+    # modifiers -- never synthesized Ctrl via QTest, which leaks global
+    # keyboardModifiers headlessly.)
+    from floorplanner.macro import MacroRecorderDialog
+    dlg = MacroRecorderDialog(win)
+    dlg.start()
+    try:
+        cases = [
+            (Qt.Key.Key_G, Qt.KeyboardModifier.ControlModifier, "^G"),
+            (Qt.Key.Key_G, Qt.KeyboardModifier.ControlModifier
+             | Qt.KeyboardModifier.ShiftModifier, "^+G"),
+            (Qt.Key.Key_Delete, Qt.KeyboardModifier.NoModifier, "DEL"),
+            (Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier, "^Z"),
+            (Qt.Key.Key_Left, Qt.KeyboardModifier.NoModifier, "LEFT"),
+        ]
+        for key, mods, _tok in cases:
+            ov = QKeyEvent(QEvent.Type.ShortcutOverride, key, mods)
+            QApplication.sendEvent(win.view, ov)
+            # the same event object propagating again must not double-record
+            QApplication.sendEvent(win.view, ov)
+            rel = QKeyEvent(QEvent.Type.KeyRelease, key, mods)
+            QApplication.sendEvent(win.view, rel)
+        text = dlg.edit.toPlainText().split()
+        assert text == [t for _k, _m, t in cases], text
+    finally:
+        dlg.stop()
+        dlg.deleteLater()
+        qapp.processEvents()

@@ -550,6 +550,7 @@ class MacroRecorderDialog(QDialog):
         self._modal_line = False         # a PUP + its menu/dialog keys, 1 line
         self._last_key_ev = None         # de-dupe doubled key deliveries
         self._last_key_sig = None        # (timestamp, key, mods) of last press
+        self._pending_press = None       # (key, mods): override awaiting echo
         self._replay_lines = []
         self._replay_idx = 0
 
@@ -783,6 +784,7 @@ class MacroRecorderDialog(QDialog):
         if et == QEvent.Type.KeyRelease:
             self._last_key_ev = None       # a press/release pair completed
             self._last_key_sig = None
+            self._pending_press = None
             return
         if obj is self.win.view.viewport():
             if et == QEvent.Type.MouseButtonPress and \
@@ -811,18 +813,36 @@ class MacroRecorderDialog(QDialog):
                 # below while the menu is open)
                 sp = self.win.view.mapToScene(ev.pos())
                 self.on_popup(sp)
-        elif et == QEvent.Type.KeyPress:
+        elif et in (QEvent.Type.KeyPress, QEvent.Type.ShortcutOverride):
+            # ShortcutOverride TOO (P4.2): a keystroke that matches a menu
+            # QAction shortcut — Ctrl+G group, Ctrl+Shift+G ungroup, Del,
+            # Ctrl+Z/X/C/V — is consumed by Qt's shortcut system and never
+            # arrives as a KeyPress, so recordings silently lacked exactly
+            # the plan-modifying shortcuts. ShortcutOverride is delivered to
+            # this filter for EVERY keystroke, before matching, carrying the
+            # same key and modifiers.
+            #
             # de-dupe: one physical key press can reach this filter more than
-            # once — Qt propagates an unaccepted key up the parent chain, and a
+            # once — ShortcutOverride precedes an unmatched key's KeyPress,
+            # Qt propagates an unaccepted key up the parent chain, and a
             # popup/dialog re-dispatches it.  Skip a repeat of the same event
             # object, or (for real events) the same (timestamp, key, mods); a
             # KeyRelease resets this so genuine repeats still record.
             ts = ev.timestamp()
             sig = (ts, ev.key(), ev.modifiers())
+            if et == QEvent.Type.KeyPress and \
+                    self._pending_press == (ev.key(), ev.modifiers()):
+                # the KeyPress echo of a ShortcutOverride already captured --
+                # paired explicitly, because programmatic and menu-dispatched
+                # events carry timestamp 0 and the sig de-dupe cannot see them
+                self._pending_press = None
+                return
             if ev is self._last_key_ev or (ts and sig == self._last_key_sig):
                 return
             self._last_key_ev = ev
             self._last_key_sig = sig
+            if et == QEvent.Type.ShortcutOverride:
+                self._pending_press = (ev.key(), ev.modifiers())
             in_modal = (QApplication.activePopupWidget() is not None
                         or QApplication.activeModalWidget() is not None)
             # only capture modal keystrokes for a PUP-opened menu/dialog;
