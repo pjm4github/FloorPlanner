@@ -21,7 +21,9 @@ private copy before the state flips.
 from PyQt6.QtCore import QPointF
 
 from floorplanner.items import FurnishingItem
-from floorplanner.rooms import bind_room_walls, share_outline_vertices
+from floorplanner.rooms import (
+    RoomItem, bind_room_walls, rebind_dead_edges, share_outline_vertices,
+)
 from floorplanner.vertex import Vertex
 from floorplanner.walls import (
     OpeningItem, WallItem, merge_wall, rebuild_all_walls,
@@ -199,9 +201,18 @@ def join_room(scene, room):
     for w in list(room.walls):
         if w.scene() is not None:
             merge_wall(scene, w)
-    # -- rebind: edges whose wall was absorbed re-resolve to the survivor
+    # -- rebind: edges whose wall was absorbed re-resolve to the survivor --
+    # for THIS room via the full bind, and for every NEIGHBOUR via the narrow
+    # dead-reference repair (found by the fiveRoomTest macro: the merge
+    # forces the returning room's copy as survivor, absorbing the original
+    # party wall the neighbour's outline still named, so R2/R3 painted their
+    # shared edge as open over a wall that was right there)
     bind_room_walls(scene, room, settle=False)
     share_outline_vertices(room)
+    for r in scene.items():
+        if isinstance(r, RoomItem) and r is not room and r.floor == floor:
+            if rebind_dead_edges(scene, r):
+                share_outline_vertices(r)
     room.placement_state = "placed"
     room.extracted_from = None
     room._floating_furnishings = []

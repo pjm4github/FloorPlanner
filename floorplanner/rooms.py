@@ -1125,6 +1125,35 @@ def duplicate_wall(scene, w):
     return nw
 
 
+def rebind_dead_edges(scene, room):
+    """Re-resolve outline edges whose named wall has LEFT THE SCENE -- and
+    only those (P4.2, found by the fiveRoomTest macro). A merge can absorb a
+    wall a neighbouring room's outline still names; the neighbour then paints
+    the edge as open over a wall that is right there. Deliberately NARROWER
+    than `bind_room_walls`: an edge whose wall is None stays None -- a
+    deliberately opened side must never be silently re-closed -- so only
+    dead references (`wall.scene() is None`) are looked up again. Returns
+    the number of edges repaired."""
+    if not room.outline or not room.corners:
+        return 0
+    corners = room.corners
+    n = len(corners)
+    fixed = 0
+    for i, e in enumerate(room.outline):
+        if e.wall is None or e.wall.scene() is not None:
+            continue
+        dead = e.wall
+        a, b = corners[i], corners[(i + 1) % n]
+        e.wall = (None if QLineF(a, b).length() < MIN_WALL_LEN
+                  else _edge_wall(scene, a, b, room.floor))
+        if dead in room.walls and not any(k.wall is dead for k in room.outline):
+            room.unbind_wall(dead)
+        if e.wall is not None:
+            room.bind_wall(e.wall)
+            fixed += 1
+    return fixed
+
+
 def bind_room_walls(scene, room, settle=True):
     """Bind `room` to the wall behind every edge of its STORED outline.
 

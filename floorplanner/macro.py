@@ -566,12 +566,14 @@ class MacroRecorderDialog(QDialog):
         self.b_start = QPushButton("Start")
         self.b_pause = QPushButton("Pause")
         self.b_stop = QPushButton("Stop")
+        self.b_load = QPushButton("Load…")
         self.b_replay = QPushButton("Replay")
         self.b_saveas = QPushButton("Save As…")
         self.b_cancel = QPushButton("Cancel")
         self.b_start.clicked.connect(self.start)
         self.b_pause.clicked.connect(self.toggle_pause)
         self.b_stop.clicked.connect(self.stop)
+        self.b_load.clicked.connect(self.load_from)
         self.b_replay.clicked.connect(self.replay)
         self.b_saveas.clicked.connect(self.save_as)
         self.b_cancel.clicked.connect(self.cancel)
@@ -579,8 +581,8 @@ class MacroRecorderDialog(QDialog):
         self.edit.textChanged.connect(self._sync_buttons)
 
         row = QHBoxLayout()
-        for b in (self.b_start, self.b_pause, self.b_stop, self.b_replay,
-                  self.b_saveas, self.b_cancel):
+        for b in (self.b_start, self.b_pause, self.b_stop, self.b_load,
+                  self.b_replay, self.b_saveas, self.b_cancel):
             row.addWidget(b)
         lay = QVBoxLayout(self)
         lay.addWidget(self.edit)
@@ -600,6 +602,7 @@ class MacroRecorderDialog(QDialog):
         self.b_stop.setEnabled(rec)
         self.b_pause.setEnabled(rec)
         self.b_pause.setText("Resume" if self._paused else "Pause")
+        self.b_load.setEnabled(not rec and not replaying)
         self.b_replay.setEnabled(self.edit.textCursor().hasSelection()
                                  and not rec and not replaying)
         self.b_saveas.setEnabled(bool(self.edit.toPlainText().strip()))
@@ -681,6 +684,28 @@ class MacroRecorderDialog(QDialog):
         res = self.win.run_macro(line)
         if res["errors"]:
             self.status_lbl.setText("Replay: " + "; ".join(res["errors"][:2]))
+
+    # -- load ----------------------------------------------------------------
+    def load_from(self):
+        """Load a saved .fpm into the editor and SELECT IT WHOLE, so Replay
+        is one click away -- the load-then-replay loop the P4.2 mini-gate
+        runs (record once, replay against a fresh plan again and again)."""
+        if self._recording or self._replay_timer.isActive():
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load macro", str(designs_dir()),
+            "Macro files (*.fpm *.txt);;All files (*)")
+        if not path:
+            return
+        try:
+            with open(path, encoding="utf-8") as fh:
+                self.edit.setPlainText(fh.read())
+        except OSError as ex:
+            QMessageBox.critical(self, "Load failed", str(ex))
+            return
+        self.edit.selectAll()
+        self.status_lbl.setText(f"Loaded {path} — click Replay to run it.")
+        self._sync_buttons()
 
     # -- save ----------------------------------------------------------------
     def save_as(self):

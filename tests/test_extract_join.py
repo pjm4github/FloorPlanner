@@ -158,3 +158,37 @@ def test_floating_room_saves_and_reloads_floating(win):
     fp.join_room(win.scene, a2)
     assert a2.placement_state == "placed"
     _clean(win, "after join following reload")
+
+
+@pytest.mark.gui
+def test_five_room_macro_round_trip_leaves_no_open_edges(win):
+    # Patrick's fiveRoomTest reproduction, pinned VERBATIM: replay his
+    # recorded macro (label-drag R1 out to empty canvas, release, drag it
+    # back home) and the plan must come back whole. Pre-fix, the join's
+    # merge forced the returning room's wall COPY as survivor, absorbing the
+    # original party wall that R2/R3's outlines still named -- so both
+    # painted their shared edge as a dashed open edge over a wall that was
+    # right there ("it leaves a wall behind"). rebind_dead_edges is the fix.
+    import pathlib
+    ex = pathlib.Path(__file__).resolve().parent.parent / "examples"
+    win.resize(1400, 1000)
+    win.show()
+    win.load_path(str(ex / "fiveRoomTest.json"))
+    win.zoom_fit()
+    for line in (ex / "fiveRoomTestMacro.fpm").read_text().splitlines():
+        if line.strip():
+            res = win.run_macro(line)
+            assert res["ok"], res
+    sc = win.scene
+    rooms = sorted((r for r in sc.items() if isinstance(r, fp.RoomItem)),
+                   key=lambda r: r.name)
+    walls = [w for w in sc.items() if isinstance(w, fp.WallItem)]
+    assert len(walls) == 16, f"wall count {len(walls)} after the round trip"
+    assert not [w for w in walls if min(w.p1.x(), w.p2.x()) > 850], \
+        "a wall was left behind at the drop zone"
+    for r in rooms:
+        assert r.placement_state == "placed", f"{r.name} not placed"
+        assert len(r.open_edges()) == 0, \
+            f"{r.name} has a dashed open edge after the round trip"
+    r1 = next(r for r in rooms if r.name == "R1")
+    assert r1.area_sqft == pytest.approx(149.8, abs=0.5)
