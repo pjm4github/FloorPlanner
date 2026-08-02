@@ -53,10 +53,25 @@ class LevelsMixin:
         return next((f for f in self.floors if f.name == name), None)
 
     def _rebuild_floor_menu(self):
-        """Repopulate &Floors: New floor, a submenu per floor (edit/rename/
-        reference/delete), then the Show-other-floors toggle."""
+        """Repopulate &Floors: cycle shortcuts, New floor, a submenu per floor
+        (edit/rename/reference/delete), then the Show-other-floors toggle."""
         m = self.m_floors
         m.clear()
+        if not hasattr(self, "a_next_floor"):
+            # created ONCE (the menu is rebuilt often; the shortcuts must
+            # not be re-registered each time). Ctrl+F / Ctrl+Shift+F cycle
+            # the active floor -- the keyboard route to floor manipulation,
+            # and therefore the macro-recordable one: every switch, from
+            # any route, records as `^F "name"` via the switch_floor hook.
+            self.a_next_floor = QAction("Next floor", self)
+            self.a_next_floor.setShortcut(QKeySequence("Ctrl+F"))
+            self.a_next_floor.triggered.connect(lambda: self.cycle_floor(+1))
+            self.a_prev_floor = QAction("Previous floor", self)
+            self.a_prev_floor.setShortcut(QKeySequence("Ctrl+Shift+F"))
+            self.a_prev_floor.triggered.connect(lambda: self.cycle_floor(-1))
+        m.addAction(self.a_next_floor)
+        m.addAction(self.a_prev_floor)
+        m.addSeparator()
         a_new = m.addAction("&New floor…")
         a_new.triggered.connect(self.new_floor)
         m.addSeparator()
@@ -95,6 +110,16 @@ class LevelsMixin:
             a.triggered.connect(lambda _=False, n=f.name: self.switch_floor(n))
         menu.exec(self.floor_label.mapToGlobal(self.floor_label.rect().topLeft()))
 
+    def cycle_floor(self, step):
+        """Ctrl+F / Ctrl+Shift+F: switch to the next / previous floor in the
+        roster, wrapping."""
+        names = [f.name for f in self.floors]
+        if len(names) < 2:
+            self.status("Only one floor.")
+            return
+        i = names.index(self.active_floor) if self.active_floor in names else 0
+        self.switch_floor(names[(i + step) % len(names)])
+
     def switch_floor(self, name):
         """Make `name` the active (editable) floor.  View state only — no undo
         step, no dirty (serialize() is unchanged across a switch)."""
@@ -103,6 +128,9 @@ class LevelsMixin:
         self.active_floor = name
         self._sync_floor_state()
         self.status(f"Editing floor '{name}'.")
+        rec = getattr(self, "_recorder", None)
+        if rec is not None:              # macro recorder: any route to a
+            rec.on_floor(name)           # floor switch, as one ^F token
 
     def new_floor(self):
         name, ok = QInputDialog.getText(self, "New floor", "Floor name:")

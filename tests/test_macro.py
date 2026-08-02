@@ -707,3 +707,36 @@ def test_ctrl_s_with_no_file_skips_instead_of_failing(fp, win):
     # skips it rather than failing the whole macro
     res = win.run_macro("^S")
     assert res["ok"] and not res["errors"], res
+
+
+def test_floor_switch_records_and_replays_by_name(fp, win, qapp):
+    # ^F "name" (Patrick's ask: floor manipulation recordable). Ctrl+F /
+    # Ctrl+Shift+F cycle the active floor in the app; EVERY switch, from any
+    # route, records the RESULTING floor by name via the switch_floor hook,
+    # so replay is deterministic however the user got there.
+    from floorplanner.macro import MacroRecorderDialog
+    win.new_floor_named("Upper")           # roster: default, Upper (active)
+    win.switch_floor("default")
+    dlg = MacroRecorderDialog(win)
+    dlg.start()
+    try:
+        win.cycle_floor(+1)                # what Ctrl+F triggers
+        assert win.active_floor == "Upper"
+        win.cycle_floor(-1)                # what Ctrl+Shift+F triggers
+        assert win.active_floor == "default"
+        text = dlg.edit.toPlainText().split("\n")
+        text = [t for t in text if t.strip()]
+        assert text == ['^F "Upper"', '^F "default"'], text
+    finally:
+        dlg.stop()
+        dlg.deleteLater()
+        qapp.processEvents()
+    res = win.run_macro('^F "Upper"')
+    assert res["ok"], res
+    assert win.active_floor == "Upper"
+    res = win.run_macro('^F "Penthouse"')  # not a floor: an honest error,
+    assert not res["ok"]                   # not a silent no-op
+    assert "no floor named" in res["errors"][0]
+    # the cycle actions exist on the Floors menu with their shortcuts
+    assert win.a_next_floor.shortcut().toString() == "Ctrl+F"
+    assert win.a_prev_floor.shortcut().toString() == "Ctrl+Shift+F"

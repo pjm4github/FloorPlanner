@@ -44,6 +44,7 @@ CARET_SHORTCUTS = {
     "S":  {"key": Qt.Key.Key_S, "method": None},
     "O":  {"key": Qt.Key.Key_O, "method": None, "record": False},
     "+S": {"key": Qt.Key.Key_S, "method": None, "record": False},
+    "F":  {"key": Qt.Key.Key_F, "method": None, "record": False},
 }
 # hook-emitted tokens the recorder must not raw-record (see "record" above)
 CARET_HOOK_TOKENS = {t for t, s in CARET_SHORTCUTS.items()
@@ -67,9 +68,12 @@ class MacroRunner:
                                        new / undo / redo / cut / copy / paste /
                                        group / select-all / save-to-current.
                                        Prefix '+' adds Shift: ^+G ungroup,
-                                       ^+Z redo.  ^O "path" opens that file and
-                                       ^+S "path" saves to it (what the
-                                       recorder emits for File>Open / Save As).
+                                       ^+Z redo.  ^O "path" opens that file,
+                                       ^+S "path" saves to it, ^F "name"
+                                       switches to that floor (what the
+                                       recorder emits for File>Open / Save As /
+                                       any floor switch; Ctrl+F / Ctrl+Shift+F
+                                       cycle floors in the app).
                                        The full set lives in CARET_SHORTCUTS —
                                        one row records AND replays a shortcut.
       Arrow nudge   LEFT RIGHT UP DOWN          (^ prefix = fine 1" step)
@@ -216,6 +220,16 @@ class MacroRunner:
                 self.win.load_path(path)
             else:
                 self.win.save_path(path)
+            return i
+        if key == "F":
+            # ^F "name" -- what the recorder emits for ANY floor switch
+            # (Ctrl+F / Ctrl+Shift+F cycling, the Floors menu, the status
+            # bar popup): the RESULTING floor rides in the token, so replay
+            # is deterministic however the user got there
+            (name,), i = self._take(toks, i, 1)
+            if self.win._floor(name) is None:
+                raise ValueError(f"no floor named {name!r}")
+            self.win.switch_floor(name)
             return i
         if key == "A":
             self._select_all()
@@ -823,6 +837,13 @@ class MacroRecorderDialog(QDialog):
         if self._active():
             self._end_modal_line()
             self._append(f'^+S "{path}"', newline=True)
+
+    def on_floor(self, name):
+        # a floor switch, from ANY route (Ctrl+F cycle, Floors menu, the
+        # status-bar popup): the RESULTING floor rides in the token
+        if self._active():
+            self._end_modal_line()
+            self._append(f'^F "{name}"', newline=True)
 
     def on_room(self, name, scene_pt):
         # room name came from a dialog — capture it into a ROOM token.
