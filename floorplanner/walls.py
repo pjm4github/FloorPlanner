@@ -909,6 +909,43 @@ def collapse_degenerate_outline_edges(scene, floor=None, tol=1e-6):
                 if (not any(k.wall is w for k in keep)
                         and hasattr(room, "unbind_wall")):
                     room.unbind_wall(w)
+        # collinear SPIKES (P4.2, finding 6's residue): the boundary
+        # overshoots along a line and doubles straight back -- zero area,
+        # left where a stationary corner was passed by its sliding side.
+        # The room's true boundary runs A -> C direct, so the fold corner
+        # goes. Iterate: removing one spike can expose another.
+        for _ in range(len(room.outline)):
+            outline = room.outline
+            n = len(outline)
+            if n < 4:
+                break
+            spike = None
+            for i in range(n):
+                a = outline[i].v.point()
+                b = outline[(i + 1) % n].v.point()
+                c = outline[(i + 2) % n].v.point()
+                d1x, d1y = b.x() - a.x(), b.y() - a.y()
+                d2x, d2y = c.x() - b.x(), c.y() - b.y()
+                l1 = math.hypot(d1x, d1y)
+                l2 = math.hypot(d2x, d2y)
+                if l1 < 1e-6 or l2 < 1e-6:
+                    continue
+                dot = (d1x * d2x + d1y * d2y) / (l1 * l2)
+                cross = abs(d1x * d2y - d1y * d2x) / (l1 * l2)
+                if dot < -0.999 and cross < 1e-3:
+                    spike = (i + 1) % n
+                    break
+            if spike is None:
+                break
+            if hasattr(room, "prepareGeometryChange"):
+                room.prepareGeometryChange()
+            dropped = outline[spike]
+            del outline[spike]
+            removed += 1
+            if (dropped.wall is not None
+                    and not any(k.wall is dropped.wall for k in outline)
+                    and hasattr(room, "unbind_wall")):
+                room.unbind_wall(dropped.wall)
     return removed
 
 
@@ -1467,6 +1504,7 @@ class WallItem(QGraphicsItem):
                                         (w, attr, QPointF(q), "tee"))
                                     break
             run_ends = self._split_body_landings(run_ends)
+            run_ends = self._split_outline_landings(run_ends)
             self._plan_vertex_moves(run_ends)
 
         if self._mode in ("p1", "p2"):
@@ -1662,6 +1700,47 @@ class WallItem(QGraphicsItem):
             self._run.append(seg)
             run_ends = run_ends + [(seg, "p1"), (seg, "p2")]
             self._attached[i] = (w, attr, orig, "corner")
+        return run_ends
+
+    def _split_outline_landings(self, run_ends):
+        """A ROOM CORNER resting on the run's BODY is a tee the wall gather
+        cannot see (P4.2, mini-gate finding 6 -- fiveRoomDragSplit2 line 13):
+        no wall END sits there, only an outline vertex, so the run slid out
+        from under it and tore the room diagonal. Cut the run wall at the
+        corner and point every coincident outline corner AT THE SPLIT VERTEX
+        -- identity is what rides -- so the corner travels exactly as a
+        promoted tee does. Duck-typed on `outline` (the cycle rule).
+        Returns run_ends, extended with each new segment's ends."""
+        sc = self.scene()
+        if sc is None:
+            return run_ends
+        run_vids = {id(w.end_vertex(a)) for w, a in run_ends}
+        for room in list(sc.items()):
+            if getattr(room, "floor", None) != self.floor:
+                continue
+            for e in getattr(room, "outline", None) or ():
+                if id(e.v) in run_vids:
+                    continue
+                p = QPointF(e.v.point())
+                host = self._run_wall_under(p)
+                if host is None:
+                    continue
+                seg = split_wall_at(sc, host, p, on_seg_tol=0.75)
+                if seg is None:
+                    continue
+                self._run.append(seg)
+                run_ends = run_ends + [(host, "p2"), (seg, "p1"),
+                                       (seg, "p2")]
+                vs = seg.end_vertex("p1")       # the junction vertex
+                run_vids.add(id(vs))
+                for other in sc.items():        # every coincident corner
+                    if getattr(other, "floor", None) != self.floor:
+                        continue
+                    for oe in getattr(other, "outline", None) or ():
+                        if (oe.v is not vs
+                                and QLineF(oe.v.point(), p).length()
+                                <= SHARE_TOL):
+                            oe.v = vs
         return run_ends
 
     def _plan_vertex_moves(self, run_ends):
@@ -1881,11 +1960,18 @@ class WallItem(QGraphicsItem):
                 # Bindings and outline structure re-derive; no coordinate
                 # moves.
                 from floorplanner.rooms import (  # late (cycle)
-                    rebind_dead_edges, split_partially_covered_edges)
+                    repair_edge_bindings, share_outline_vertices,
+                    split_partially_covered_edges)
                 for room in sc_after.items():
                     if (getattr(room, "outline", None)
                             and getattr(room, "floor", None) == self.floor):
-                        rebind_dead_edges(sc_after, room)
+                        repair_edge_bindings(sc_after, room)
+                        # re-adopt the walls' corner vertices: an outline
+                        # corner left coincident-but-DISTINCT from the wall
+                        # network's vertex cannot ride the next drag (the
+                        # close_gap stranding class; fiveRoomDragSplit2
+                        # line 13 accumulated one through a long sequence)
+                        share_outline_vertices(room)
                         split_partially_covered_edges(sc_after, room)
             if endpoint_edit and self.scene() is not None:
                 # defect 25 (P4.1b): an end dragged into a doorway reports at

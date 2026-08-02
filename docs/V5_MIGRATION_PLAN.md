@@ -3960,4 +3960,45 @@ notes:   Patrick's macro (drag R2 out/back 6" offset, slide the R3|R4 wall,
          on the fixes; the full replay is clean at every step, R1 ending
          as the correct stepped shape, R4 with the correct tee corner.
          Census 544 -> 545, sums reconciling.
+
+P4.2+ mini-gate finding 6 (via fiveRoomDragSplit2.fpm): three more, fixed
+ruff:    clean
+pytest:  535 passed, 7 deselected, 4 xfailed (sum 546)
+files:   rooms.py (repair_edge_bindings, grown from rebind_dead_edges:
+         upgrade-only rebind of live-but-outspanned edges; the deliberate-
+         open guard moved from junction degree to _corners_unlocked),
+         walls.py (_split_outline_landings; spike collapse in
+         collapse_degenerate_outline_edges; release repair re-adopts
+         wall corner vertices), tests/test_extract_join.py (macro pin),
+         examples/fiveRoomDragSplit2.fpm, this file.
+notes:   Patrick's 13-gesture macro seeded and tore through THREE more
+         mechanisms, each introspected to its exact site before touching:
+         (a) MISBOUND EDGE: an edge named a collinear NEIGHBOUR wall that
+         covered none of it while the exactly-matching wall sat right
+         there (_edge_wall's partial-cover acceptance grabbed the wrong
+         candidate during an earlier repair). repair_edge_bindings now
+         also fixes live-but-outspanned names, UPGRADE ONLY (rebind solely
+         when the candidate fully spans -- a legitimately short detached
+         wall is never swapped). The junction-DEGREE guard from finding 5
+         was WRONG and is replaced by the explicit workflow flag
+         (_corners_unlocked): a slid wall can leave a genuinely dangling
+         structural end mid-edge.
+         (b) OUTLINE-CORNER TEE: a pure room corner resting mid-span on
+         the run wall's BODY -- no wall end there at all, so the tee
+         gather cannot see it -- and the run slid out from under it.
+         _split_outline_landings (drag start, beside the wall-end tee
+         pass): cut the run wall at the corner, point every coincident
+         outline corner at the split vertex; identity is what rides.
+         (c) COLLINEAR SPIKE: a zero-area overshoot (A->B then straight
+         back) left where a stationary corner was passed by its sliding
+         side; collapsed as a degenerate, iteratively, walls unbound when
+         their last naming edge goes.
+         Release repair also re-adopts wall corner vertices
+         (share_outline_vertices) so coincident-but-distinct outline
+         corners cannot accumulate.
+         RECEIPT, fail-first: the macro pinned VERBATIM (after EVERY line:
+         nothing diagonal, no edge names a wall that does not span it) --
+         red against 6f3e2b9 in a worktree, green here. Both earlier
+         macros replay with zero violations (no regression). Census
+         545 -> 546, sums reconciling.
 ```

@@ -1125,33 +1125,58 @@ def duplicate_wall(scene, w):
     return nw
 
 
-def rebind_dead_edges(scene, room):
-    """Re-resolve outline edges whose named wall has LEFT THE SCENE -- and
-    only those (P4.2, found by the fiveRoomTest macro). A merge can absorb a
-    wall a neighbouring room's outline still names; the neighbour then paints
-    the edge as open over a wall that is right there. Deliberately NARROWER
-    than `bind_room_walls`: an edge whose wall is None stays None -- a
-    deliberately opened side must never be silently re-closed -- so only
-    dead references (`wall.scene() is None`) are looked up again. Returns
-    the number of edges repaired."""
+def repair_edge_bindings(scene, room):
+    """Re-resolve outline edges whose named wall is WRONG in one of two
+    narrow, safe-to-fix ways (P4.2, found by the fiveRoom macros):
+
+    * DEAD -- the wall has left the scene (a merge absorbed it); the edge
+      is looked up afresh, partial cover accepted, exactly as a load would.
+    * OUTSPANNED -- the wall is alive but does not span the edge, while
+      ANOTHER wall FULLY spans it (the fiveRoomDragSplit2 macro seeded
+      this at its line 4: an edge bound to a collinear neighbour that
+      covers none of it, with the exactly-matching wall right there --
+      `_edge_wall`'s partial-cover acceptance had grabbed the wrong
+      candidate during an earlier repair). UPGRADE ONLY: the rebind happens
+      solely when the candidate fully spans -- a named wall that is
+      legitimately short (a detached wall mid-open, a stretch awaiting the
+      partial-cover splitter) is never swapped sideways or downgraded.
+
+    Deliberately NARROWER than `bind_room_walls`: an edge whose wall is
+    None stays None -- a deliberately opened side must never be silently
+    re-closed. Returns the number of edges repaired."""
     if not room.outline or not room.corners:
         return 0
     corners = room.corners
     n = len(corners)
     fixed = 0
     for i, e in enumerate(room.outline):
-        if e.wall is None or e.wall.scene() is not None:
+        if e.wall is None:
             continue
-        dead = e.wall
         a, b = corners[i], corners[(i + 1) % n]
-        e.wall = (None if QLineF(a, b).length() < MIN_WALL_LEN
-                  else _edge_wall(scene, a, b, room.floor))
-        if dead in room.walls and not any(k.wall is dead for k in room.outline):
-            room.unbind_wall(dead)
+        dead = e.wall.scene() is None
+        if not dead and _wall_spans_segment(e.wall, a, b):
+            continue
+        old = e.wall
+        cand = (None if QLineF(a, b).length() < MIN_WALL_LEN
+                else _edge_wall(scene, a, b, room.floor))
+        if dead:
+            e.wall = cand
+        elif (cand is not None and cand is not old
+                and _wall_spans_segment(cand, a, b)):
+            e.wall = cand
+        else:
+            continue
+        if old in room.walls and not any(k.wall is old for k in room.outline):
+            room.unbind_wall(old)
         if e.wall is not None:
             room.bind_wall(e.wall)
             fixed += 1
     return fixed
+
+
+# the original, narrower name -- kept callable; the repair grew a second
+# case at the fiveRoomDragSplit2 finding and was renamed to say what it does
+rebind_dead_edges = repair_edge_bindings
 
 
 def split_partially_covered_edges(scene, room, tol=0.75):
@@ -1196,22 +1221,18 @@ def split_partially_covered_edges(scene, room, tol=0.75):
                 perp = abs((p.y() - a.y()) * ex - (p.x() - a.x()) * ey)
                 if not (perp <= tol and 1.0 < s < elen - 1.0):
                     continue
-                # split only at a WELDED JUNCTION (the vertex is held by 2+
-                # wall ends -- a structural boundary). A DANGLING end
-                # mid-edge is the deliberately-opened side (detach + drag
-                # the corner away), whose openness must stay DERIVED so
-                # dragging the end back re-closes it -- splitting there
-                # froze the gap open (test_closing_gap_refuses_and_relocks
-                # caught it).
-                vp_c = w.end_vertex(attr)
-                deg = 0
-                for ow in scene.items():
-                    if isinstance(ow, WallItem) and ow.floor == room.floor:
-                        deg += (ow.end_vertex("p1") is vp_c)
-                        deg += (ow.end_vertex("p2") is vp_c)
-                        if deg >= 2:
-                            break
-                if deg < 2:
+                # NEVER split under the deliberate-open workflow: a DETACHED
+                # wall (`_corners_unlocked`, set only by
+                # `detach_wall_from_room`, cleared at relock) retracted
+                # mid-edge must keep its openness DERIVED, so dragging the
+                # end back re-closes the gap -- splitting there froze it
+                # open (test_closing_gap_refuses_and_relocks caught it).
+                # Everything else mid-edge is a structural boundary. (A
+                # junction-DEGREE guard was tried first and was wrong: a
+                # slid wall can leave a genuinely dangling structural end
+                # mid-edge, which the fiveRoomDragSplit2 macro seeded at
+                # its line 4 and tore at line 12.)
+                if getattr(w, "_corners_unlocked", False):
                     continue
                 split = (i, e, w, attr, a, b, p)
                 break

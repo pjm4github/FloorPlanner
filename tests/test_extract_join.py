@@ -235,3 +235,46 @@ def test_drag_split_macro_keeps_every_room_rectilinear(win):
                                                pts[(i + 1) % n]), (
                         f"line {ln}: {r.name} edge names a wall that does "
                         f"not span it -- a latent tear")
+
+
+@pytest.mark.gui
+def test_drag_split2_macro_keeps_every_room_rectilinear(win):
+    # Patrick's fiveRoomDragSplit2 macro, pinned VERBATIM -- mini-gate
+    # finding 6, a 13-gesture sequence that seeded and tore through three
+    # more mechanisms: (a) an edge MISBOUND to a collinear neighbour that
+    # covered none of it (repair_edge_bindings' upgrade-only case); (b) a
+    # pure OUTLINE corner resting mid-span on the run wall's body -- the
+    # outline analog of a tee, invisible to the wall-end gather -- now
+    # split and adopted at drag start (_split_outline_landings); (c) a
+    # collinear SPIKE left where a stationary corner was passed by its
+    # sliding side, collapsed as a degenerate. After every line: nothing
+    # diagonal, and no edge names a wall that does not span it.
+    import pathlib
+    from floorplanner.rooms import _wall_spans_segment
+    ex = pathlib.Path(__file__).resolve().parent.parent / "examples"
+    win.resize(1400, 1000)
+    win.show()
+    win.load_path(str(ex / "fiveRoomTest.json"))
+    win.zoom_fit()
+    for ln, line in enumerate(
+            (ex / "fiveRoomDragSplit2.fpm").read_text().splitlines(), 1):
+        if not line.strip():
+            continue
+        res = win.run_macro(line)
+        assert res["ok"], res
+        for r in (x for x in win.scene.items()
+                  if isinstance(x, fp.RoomItem)):
+            pts = r.corners or []
+            n = len(pts)
+            for i in range(n):
+                a, b = pts[i], pts[(i + 1) % n]
+                assert (abs(a.x() - b.x()) < 0.5
+                        or abs(a.y() - b.y()) < 0.5), (
+                    f"line {ln}: {r.name} tore diagonal "
+                    f"({a.x():.1f},{a.y():.1f})->({b.x():.1f},{b.y():.1f})")
+            for i, e in enumerate(r.outline):
+                if e.wall is not None and e.wall.scene() is not None:
+                    assert _wall_spans_segment(e.wall, pts[i],
+                                               pts[(i + 1) % n]), (
+                        f"line {ln}: {r.name} edge names a wall that does "
+                        f"not span it -- a latent tear")
