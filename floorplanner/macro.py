@@ -850,6 +850,19 @@ class MacroRecorderDialog(QDialog):
         # popup/dialog re-dispatches it.  Skip a repeat of the same event
         # object, or (for real events) the same (timestamp, key, mods); a
         # KeyRelease resets this so genuine repeats still record.
+        # ELIGIBILITY FIRST, STATE SECOND (P4.2, Patrick's Ctrl+G retest):
+        # Qt delivers each key event at the QWindow level BEFORE the widget
+        # level, and a QWindow never passes _belongs_to_main. The old order
+        # set the de-dupe guards on that first, non-recordable delivery --
+        # poisoning the widget-level delivery that follows, so a
+        # shortcut-consumed chord (whose override is its only appearance)
+        # recorded nothing. A delivery this filter will not emit from must
+        # not touch the de-dupe state at all.
+        in_modal = (QApplication.activePopupWidget() is not None
+                    or QApplication.activeModalWidget() is not None)
+        if not ((in_modal and self._modal_line)
+                or (not in_modal and self._belongs_to_main(obj))):
+            return
         et = ev.type()
         ts = ev.timestamp()
         sig = (ts, ev.key(), ev.modifiers())
@@ -876,14 +889,12 @@ class MacroRecorderDialog(QDialog):
         self._last_key_sig = sig
         if et == QEvent.Type.ShortcutOverride:
             self._pending_press = chord
-        in_modal = (QApplication.activePopupWidget() is not None
-                    or QApplication.activeModalWidget() is not None)
-        # only capture modal keystrokes for a PUP-opened menu/dialog;
-        # tool-driven dialogs (door/window size, room name) already record
-        # their value via on_opening/on_room, so don't double-capture them
-        if in_modal and self._modal_line:
+        # modal keystrokes only for a PUP-opened menu/dialog; tool-driven
+        # dialogs (door/window size, room name) already record their value
+        # via on_opening/on_room, so don't double-capture them
+        if in_modal:
             self._emit_modal_key(ev)
-        elif not in_modal and self._belongs_to_main(obj):
+        else:
             self._emit_key(ev)
 
     def _emit_mouse(self, p1, p2, moved, ctrl):

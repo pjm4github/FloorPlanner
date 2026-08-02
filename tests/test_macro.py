@@ -591,7 +591,10 @@ def test_recorder_captures_action_shortcuts(fp, win, qapp):
     dlg = MacroRecorderDialog(win)
     dlg.start()
     try:
+        win.show()
+        win.winId()                       # force the native window to exist
         vp = win.view.viewport()
+        wh = win.windowHandle()
         cases = [
             (Qt.Key.Key_G, Qt.KeyboardModifier.ControlModifier, "^G"),
             (Qt.Key.Key_G, Qt.KeyboardModifier.ControlModifier
@@ -602,6 +605,11 @@ def test_recorder_captures_action_shortcuts(fp, win, qapp):
         ]
         for key, mods, _tok in cases:
             ov = QKeyEvent(QEvent.Type.ShortcutOverride, key, mods)
+            # Qt delivers at the QWINDOW level first -- a delivery the
+            # recorder must IGNORE WITHOUT TOUCHING ITS DE-DUPE STATE, or
+            # the widget-level delivery that follows is poisoned (Patrick's
+            # Ctrl+G retest: shortcut-consumed chords recorded nothing)
+            QApplication.sendEvent(wh, ov)
             QApplication.sendEvent(vp, ov)
             # the same event object propagating again must not double-record
             QApplication.sendEvent(vp, ov)
