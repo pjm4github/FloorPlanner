@@ -15,6 +15,41 @@ from floorplanner.rooms import *  # noqa: F401
 from floorplanner.items import *  # noqa: F401
 
 
+# ---------------------------------------------------------------------------
+# THE CTRL-SHORTCUT TABLE — one row per shortcut, shared by the RUNNER
+# (token → MainWindow method) and the RECORDER (keystroke → token). ADDING A
+# MENU SHORTCUT IS ONE ROW HERE and it records and replays; a design-guard
+# test asserts every named method really exists on MainWindow.
+#   token key : "<letter>" = Ctrl+letter, "+<letter>" = Ctrl+Shift+letter
+#               (written in macros with a leading '^': ^G, ^+G)
+#   "key"     : the Qt key the recorder matches while Ctrl is held
+#   "method"  : the MainWindow method the runner calls; None = special
+#               handling in `MacroRunner._caret` (^A drives the scene; ^S
+#               saves to the current file; ^O / ^+S carry a file path)
+#   "record"  : False for tokens an APP HOOK emits WITH their dialog value
+#               (^O "path" via on_open, ^+S "path" via on_save_as) — the raw
+#               keystroke must not also record, or a cancelled dialog would
+#               leave a broken bare token in the macro
+CARET_SHORTCUTS = {
+    "Z":  {"key": Qt.Key.Key_Z, "method": "undo"},
+    "+Z": {"key": Qt.Key.Key_Z, "method": "redo"},
+    "Y":  {"key": Qt.Key.Key_Y, "method": "redo"},
+    "X":  {"key": Qt.Key.Key_X, "method": "cut_selected"},
+    "C":  {"key": Qt.Key.Key_C, "method": "copy_selected"},
+    "V":  {"key": Qt.Key.Key_V, "method": "paste_clipboard"},
+    "G":  {"key": Qt.Key.Key_G, "method": "group_selected"},
+    "+G": {"key": Qt.Key.Key_G, "method": "ungroup_selected"},
+    "N":  {"key": Qt.Key.Key_N, "method": "clear_plan"},
+    "A":  {"key": Qt.Key.Key_A, "method": None},
+    "S":  {"key": Qt.Key.Key_S, "method": None},
+    "O":  {"key": Qt.Key.Key_O, "method": None, "record": False},
+    "+S": {"key": Qt.Key.Key_S, "method": None, "record": False},
+}
+# hook-emitted tokens the recorder must not raw-record (see "record" above)
+CARET_HOOK_TOKENS = {t for t, s in CARET_SHORTCUTS.items()
+                     if not s.get("record", True)}
+
+
 class MacroRunner:
     """Drives a MainWindow from a space/newline-delimited macro string so an
     external program (or an AI) can edit a plan headlessly.
@@ -32,8 +67,11 @@ class MacroRunner:
                                        new / undo / redo / cut / copy / paste /
                                        group / select-all / save-to-current.
                                        Prefix '+' adds Shift: ^+G ungroup,
-                                       ^+Z redo.  ^O "path" opens that file
-                                       (what the recorder emits for File>Open).
+                                       ^+Z redo.  ^O "path" opens that file and
+                                       ^+S "path" saves to it (what the
+                                       recorder emits for File>Open / Save As).
+                                       The full set lives in CARET_SHORTCUTS —
+                                       one row records AND replays a shortcut.
       Arrow nudge   LEFT RIGHT UP DOWN          (^ prefix = fine 1" step)
       Keys          ESC DEL ENTER
       Mouse         CLICK x y | ^CLICK x y (Ctrl) | RCLICK x y | MOVE x y |
@@ -62,10 +100,9 @@ class MacroRunner:
     _TOOL_NAMES = {"select": TOOL_SELECT, "extwall": TOOL_WALL_EXT,
                    "intwall": TOOL_WALL_INT, "door": TOOL_DOOR,
                    "window": TOOL_WINDOW, "room": TOOL_ROOM}
-    _CARET_METHODS = {"Z": "undo", "Y": "redo", "+Z": "redo",
-                      "X": "cut_selected", "C": "copy_selected",
-                      "V": "paste_clipboard", "G": "group_selected",
-                      "+G": "ungroup_selected", "N": "clear_plan"}
+    # derived from THE TABLE — add rows there, never here
+    _CARET_METHODS = {t: s["method"] for t, s in CARET_SHORTCUTS.items()
+                      if s["method"]}
     _ARROWS = {"LEFT": (-1, 0), "RIGHT": (1, 0), "UP": (0, -1), "DOWN": (0, 1)}
     # keys that drive a popped-up menu / modal dialog after a PUP token
     _MENU_KEYS = {"UP": Qt.Key.Key_Up, "DOWN": Qt.Key.Key_Down,
@@ -162,15 +199,23 @@ class MacroRunner:
             return i
         if key == "S":
             if not self.win.current_path:
-                raise ValueError("no current file — use 'SAVE path'")
+                # a recorded Ctrl+S with no file falls through to Save As in
+                # the app, and the recorder emits the '^+S "path"' that
+                # follows -- skip rather than fail the whole macro
+                self.win.status("^S skipped: no current file")
+                return i
             self.win.save_path(self.win.current_path)
             return i
-        if key == "O":
-            # ^O "path" -- what the recorder emits when File > Open (or
-            # Ctrl+O) completes: the chosen file is part of the token, so
-            # replay needs no dialog (P4.2, the on_place/on_room pattern)
+        if key in ("O", "+S"):
+            # ^O "path" / ^+S "path" -- what the recorder emits when
+            # File > Open / Save As completes: the chosen file is part of
+            # the token, so replay needs no dialog (the on_place/on_room
+            # pattern)
             (path,), i = self._take(toks, i, 1)
-            self.win.load_path(path)
+            if key == "O":
+                self.win.load_path(path)
+            else:
+                self.win.save_path(path)
             return i
         if key == "A":
             self._select_all()
@@ -532,9 +577,9 @@ class MacroRecorderDialog(QDialog):
     """
 
     MOVE_THRESHOLD = 4.0          # scene inches; a shorter drag becomes a CLICK
-    _CARET_KEYS = {Qt.Key.Key_C: "C", Qt.Key.Key_V: "V", Qt.Key.Key_X: "X",
-                   Qt.Key.Key_Z: "Z", Qt.Key.Key_Y: "Y", Qt.Key.Key_G: "G",
-                   Qt.Key.Key_A: "A", Qt.Key.Key_N: "N", Qt.Key.Key_S: "S"}
+    # derived from THE TABLE (CARET_SHORTCUTS) — add rows there, never here
+    _CARET_KEYS = {s["key"]: t for t, s in CARET_SHORTCUTS.items()
+                   if not t.startswith("+")}
     _ARROW_KEYS = {Qt.Key.Key_Left: "LEFT", Qt.Key.Key_Right: "RIGHT",
                    Qt.Key.Key_Up: "UP", Qt.Key.Key_Down: "DOWN"}
     _TOOL_CODES = {TOOL_SELECT: "S", TOOL_WALL_EXT: "E", TOOL_WALL_INT: "I",
@@ -772,6 +817,13 @@ class MacroRecorderDialog(QDialog):
             self._end_modal_line()
             self._append(f'^O "{path}"', newline=True)
 
+    def on_save_as(self, path):
+        # File > Save As (or a first Ctrl+S falling through to it): the
+        # chosen file rides in the token, same as on_open
+        if self._active():
+            self._end_modal_line()
+            self._append(f'^+S "{path}"', newline=True)
+
     def on_room(self, name, scene_pt):
         # room name came from a dialog — capture it into a ROOM token.
         if self._active():
@@ -966,7 +1018,13 @@ class MacroRecorderDialog(QDialog):
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._append("ENTER")
         elif ctrl and key in self._CARET_KEYS:
-            self._append("^" + ("+" if shift else "") + self._CARET_KEYS[key])
+            name = ("+" if shift else "") + self._CARET_KEYS[key]
+            # only chords THE TABLE names record (Ctrl+Shift+C is nothing),
+            # and hook-emitted tokens (^O, ^+S) are written by their app
+            # hook WITH the chosen file -- a raw bare token here would
+            # break replay, and a cancelled dialog would leave it stranded
+            if name in CARET_SHORTCUTS and name not in CARET_HOOK_TOKENS:
+                self._append("^" + name)
 
     def _belongs_to_main(self, obj) -> bool:
         """True if `obj` is the plan window or one of its children (not this

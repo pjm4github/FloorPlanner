@@ -595,12 +595,19 @@ def test_recorder_captures_action_shortcuts(fp, win, qapp):
         win.winId()                       # force the native window to exist
         vp = win.view.viewport()
         wh = win.windowHandle()
-        cases = [
-            (Qt.Key.Key_G, Qt.KeyboardModifier.ControlModifier, "^G"),
-            (Qt.Key.Key_G, Qt.KeyboardModifier.ControlModifier
-             | Qt.KeyboardModifier.ShiftModifier, "^+G"),
+        # TABLE-DRIVEN: every recordable Ctrl-shortcut in CARET_SHORTCUTS is
+        # exercised, so a new row is covered the moment it is added; the
+        # hook-emitted tokens (^O, ^+S) are asserted NOT to raw-record.
+        from floorplanner.macro import CARET_HOOK_TOKENS, CARET_SHORTCUTS
+        cases = []
+        for tok, spec in CARET_SHORTCUTS.items():
+            mods = Qt.KeyboardModifier.ControlModifier
+            if tok.startswith("+"):
+                mods |= Qt.KeyboardModifier.ShiftModifier
+            expect = None if tok in CARET_HOOK_TOKENS else f"^{tok}"
+            cases.append((spec["key"], mods, expect))
+        cases += [
             (Qt.Key.Key_Delete, Qt.KeyboardModifier.NoModifier, "DEL"),
-            (Qt.Key.Key_Z, Qt.KeyboardModifier.ControlModifier, "^Z"),
             (Qt.Key.Key_Left, Qt.KeyboardModifier.NoModifier, "LEFT"),
         ]
         for key, mods, _tok in cases:
@@ -619,7 +626,7 @@ def test_recorder_captures_action_shortcuts(fp, win, qapp):
             QApplication.sendEvent(
                 vp, QKeyEvent(QEvent.Type.KeyRelease, key, mods))
         text = dlg.edit.toPlainText().split()
-        assert text == [t for _k, _m, t in cases], text
+        assert text == [t for _k, _m, t in cases if t is not None], text
     finally:
         dlg.stop()
         dlg.deleteLater()
@@ -651,3 +658,52 @@ def test_recorder_emits_open_token_and_runner_replays_it(fp, win, qapp,
     names = sorted(r.name for r in win.scene.items()
                    if isinstance(r, fp.RoomItem))
     assert names == ["R1", "R2", "R3", "R4", "R5"]
+
+
+def test_caret_shortcut_table_methods_all_exist(fp, win):
+    # THE DESIGN GUARD: adding a shortcut is one CARET_SHORTCUTS row, and
+    # this test fails the moment a row names a MainWindow method that does
+    # not exist -- so a typo cannot ship as a silently dead token.
+    from floorplanner.macro import CARET_SHORTCUTS
+    for tok, spec in CARET_SHORTCUTS.items():
+        m = spec["method"]
+        if m is not None:
+            assert callable(getattr(win, m, None)), \
+                f"CARET_SHORTCUTS[{tok!r}] names missing method {m!r}"
+        assert "key" in spec, f"CARET_SHORTCUTS[{tok!r}] has no Qt key"
+
+
+def test_save_as_records_and_replays_with_its_path(fp, win, qapp, tmp_path):
+    # ^+S "path": Save As records its chosen file into one token (on_save_as
+    # hook), and the runner replays it -- write, wipe, reopen, all headless.
+    import pathlib
+    from floorplanner.macro import MacroRecorderDialog
+    ex = pathlib.Path(__file__).resolve().parent.parent / "examples"
+    win.load_path(str(ex / "fiveRoomTest.json"))
+    out = str(tmp_path / "saved_copy.json")
+    dlg = MacroRecorderDialog(win)
+    dlg.start()
+    try:
+        win._recorder.on_save_as(out)
+        text = dlg.edit.toPlainText().strip()
+        assert text == f'^+S "{out}"', text
+    finally:
+        dlg.stop()
+        dlg.deleteLater()
+        qapp.processEvents()
+    res = win.run_macro(text)
+    assert res["ok"], res
+    assert os.path.exists(out)
+    res = win.run_macro(f'^N ^O "{out}"')
+    assert res["ok"], res
+    names = sorted(r.name for r in win.scene.items()
+                   if isinstance(r, fp.RoomItem))
+    assert names == ["R1", "R2", "R3", "R4", "R5"]
+
+
+def test_ctrl_s_with_no_file_skips_instead_of_failing(fp, win):
+    # a recorded ^S with no current file falls through to Save As in the
+    # app (whose ^+S "path" token follows in the recording) -- the runner
+    # skips it rather than failing the whole macro
+    res = win.run_macro("^S")
+    assert res["ok"] and not res["errors"], res

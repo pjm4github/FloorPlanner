@@ -412,6 +412,10 @@ class PlanIOMixin:
         if not path:
             return
         self._write_plan(path)
+        if self.current_path == path:    # _write_plan sets it ONLY on success
+            rec = getattr(self, "_recorder", None)
+            if rec is not None:          # macro recorder: Save As with its
+                rec.on_save_as(path)     # chosen file, as one ^+S token
 
     def _write_plan(self, path: str):
         # guarded: reached from the Save menu action, a Qt callback, where a
