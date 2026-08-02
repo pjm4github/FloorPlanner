@@ -23,10 +23,11 @@ from PyQt6.QtCore import QPointF
 from floorplanner.items import FurnishingItem
 from floorplanner.rooms import (
     RoomItem, bind_room_walls, rebind_dead_edges, share_outline_vertices,
+    split_partially_covered_edges,
 )
 from floorplanner.vertex import Vertex
 from floorplanner.walls import (
-    OpeningItem, WallItem, merge_wall, rebuild_all_walls,
+    SHARE_TOL, OpeningItem, WallItem, merge_wall, rebuild_all_walls,
     report_opening_failure, share_coincident_ends, split_wall_at,
 )
 
@@ -197,10 +198,17 @@ def join_room(scene, room):
     share_coincident_ends(scene, floor)
     share_outline_vertices(room)
     # -- merge: private walls now coincident/collinear with plan walls fuse;
-    # only the runs this room touches
+    # only the runs this room touches. AT THE WELD TOLERANCE, not the 6"
+    # auto-coalesce one (P4.2, mini-gate finding 5, Patrick's
+    # fiveRoomDragSplit macro): a room dropped a gesture-width off had its
+    # neighbours' walls SNAPPED onto its own line by the default perp_tol --
+    # measured: R4's north wall physically moved 6" to meet the offset R2,
+    # stranding R4's outline. The join's own rule (docstring above) is that
+    # at or below vertex_weld_in two lines ARE one and beyond it nothing
+    # moves; the merge must obey the same line.
     for w in list(room.walls):
         if w.scene() is not None:
-            merge_wall(scene, w)
+            merge_wall(scene, w, perp_tol=SHARE_TOL)
     # -- rebind: edges whose wall was absorbed re-resolve to the survivor --
     # for THIS room via the full bind, and for every NEIGHBOUR via the narrow
     # dead-reference repair (found by the fiveRoomTest macro: the merge
@@ -213,6 +221,11 @@ def join_room(scene, room):
         if isinstance(r, RoomItem) and r is not room and r.floor == floor:
             if rebind_dead_edges(scene, r):
                 share_outline_vertices(r)
+    # an offset landing can leave an edge only partly covered by its named
+    # wall -- a latent tear (finding 5); make the coverage boundary a corner
+    for r in scene.items():
+        if isinstance(r, RoomItem) and r.floor == floor:
+            split_partially_covered_edges(scene, r)
     room.placement_state = "placed"
     room.extracted_from = None
     room._floating_furnishings = []

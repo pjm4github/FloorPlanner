@@ -1154,6 +1154,95 @@ def rebind_dead_edges(scene, room):
     return fixed
 
 
+def split_partially_covered_edges(scene, room, tol=0.75):
+    """Split an outline edge at the END of a live wall that covers only PART
+    of it (P4.2, mini-gate finding 5 -- Patrick's fiveRoomDragSplit macro).
+
+    A drag that stretches or shrinks a perpendicular wall, or a join that
+    lands a room slightly offset, leaves an edge NAMED by a wall that no
+    longer spans it. That state is a LATENT TEAR: the next drag moves the
+    wall's end vertex and the un-split edge follows at only one corner --
+    the diagonal. The cure is structural: the coverage boundary becomes a
+    real corner HOLDING THE WALL'S OWN END VERTEX, so later drags carry it
+    by construction (and the mixed-corner step logic sees a plain corner
+    instead of a hidden seam); the uncovered remainder re-binds to whatever
+    actually covers it, or stays honestly open (None). Runs at drag release
+    and after a join -- derived-state repair, never a coordinate move.
+    Returns the number of splits made."""
+    made = 0
+    guard = len(room.outline) + 8
+    while guard > 0:
+        guard -= 1
+        corners = room.corners or []
+        n = len(corners)
+        if n < 3:
+            return made
+        split = None
+        for i, e in enumerate(room.outline):
+            w = e.wall
+            if w is None or w.scene() is None:
+                continue
+            a, b = corners[i], corners[(i + 1) % n]
+            if _wall_spans_segment(w, a, b):
+                continue
+            ex, ey = b.x() - a.x(), b.y() - a.y()
+            elen = math.hypot(ex, ey)
+            if elen < 2.0:
+                continue
+            ex, ey = ex / elen, ey / elen
+            for attr in ("p1", "p2"):
+                p = getattr(w, attr)
+                s = (p.x() - a.x()) * ex + (p.y() - a.y()) * ey
+                perp = abs((p.y() - a.y()) * ex - (p.x() - a.x()) * ey)
+                if not (perp <= tol and 1.0 < s < elen - 1.0):
+                    continue
+                # split only at a WELDED JUNCTION (the vertex is held by 2+
+                # wall ends -- a structural boundary). A DANGLING end
+                # mid-edge is the deliberately-opened side (detach + drag
+                # the corner away), whose openness must stay DERIVED so
+                # dragging the end back re-closes it -- splitting there
+                # froze the gap open (test_closing_gap_refuses_and_relocks
+                # caught it).
+                vp_c = w.end_vertex(attr)
+                deg = 0
+                for ow in scene.items():
+                    if isinstance(ow, WallItem) and ow.floor == room.floor:
+                        deg += (ow.end_vertex("p1") is vp_c)
+                        deg += (ow.end_vertex("p2") is vp_c)
+                        if deg >= 2:
+                            break
+                if deg < 2:
+                    continue
+                split = (i, e, w, attr, a, b, p)
+                break
+            if split is not None:
+                break
+        if split is None:
+            return made
+        i, e, w, attr, a, b, p = split
+        vp = w.end_vertex(attr)
+        uw, lw = w.unit(), w.length()
+        sa = (a.x() - w.p1.x()) * uw.x() + (a.y() - w.p1.y()) * uw.y()
+        pa = abs((a.y() - w.p1.y()) * uw.x() - (a.x() - w.p1.x()) * uw.y())
+        a_covered = pa <= tol and -tol <= sa <= lw + tol
+        room.prepareGeometryChange()
+        if a_covered:
+            # a..p stays with w; the p..b remainder re-binds
+            other = _edge_wall(scene, QPointF(p), QPointF(b), room.floor)
+            other = None if other is w else other
+            room.outline.insert(i + 1, OutlineEdge(vp, other))
+        else:
+            # a..p re-binds; p..b keeps w
+            other = _edge_wall(scene, QPointF(a), QPointF(p), room.floor)
+            other = None if other is w else other
+            e.wall = other
+            room.outline.insert(i + 1, OutlineEdge(vp, w))
+        if other is not None:
+            room.bind_wall(other)
+        made += 1
+    return made
+
+
 def bind_room_walls(scene, room, settle=True):
     """Bind `room` to the wall behind every edge of its STORED outline.
 

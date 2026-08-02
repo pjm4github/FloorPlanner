@@ -1413,8 +1413,7 @@ class WallItem(QGraphicsItem):
             run_pts = [getattr(w, a) for w, a in run_ends]
             self._attached = []
             self._continuations = []      # collinear -- split, never dragged
-            sc, length = self.scene(), self.length()
-            ux, uy = self._slide_u.x(), self._slide_u.y()
+            sc = self.scene()
             if sc is not None:
                 for w in sc.items():
                     # SAME LEVEL ONLY (defect 12a). This scan was one of defect
@@ -1447,11 +1446,26 @@ class WallItem(QGraphicsItem):
                                 kind = "corner" if w.group() is None else "rigid"
                                 self._attached.append((w, attr, QPointF(q), kind))
                         else:
-                            vx, vy = q.x() - self.p1.x(), q.y() - self.p1.y()
-                            s = vx * ux + vy * uy
-                            if (0.0 < s < length
-                                    and abs(vy * ux - vx * uy) <= 0.75):
-                                self._attached.append((w, attr, QPointF(q), "tee"))
+                            # a body-landing on ANY run wall, not just self
+                            # (P4.2, mini-gate finding 5): the run slides as
+                            # ONE line, so an end resting mid-span of any
+                            # member must ride -- testing only self's body
+                            # left a mid-run corner floating when the line
+                            # moved out from under it
+                            for rw in self._run:
+                                rl = rw.length()
+                                if rl < 1e-6:
+                                    continue
+                                ru = rw.unit()
+                                vx = q.x() - rw.p1.x()
+                                vy = q.y() - rw.p1.y()
+                                s = vx * ru.x() + vy * ru.y()
+                                if (0.0 < s < rl
+                                        and abs(vy * ru.x()
+                                                - vx * ru.y()) <= 0.75):
+                                    self._attached.append(
+                                        (w, attr, QPointF(q), "tee"))
+                                    break
             run_ends = self._split_body_landings(run_ends)
             self._plan_vertex_moves(run_ends)
 
@@ -1857,6 +1871,22 @@ class WallItem(QGraphicsItem):
                 # when the drag ends where it began (P4.2)
                 collapse_degenerate_outline_edges(self.scene(), self.floor)
             merge_wall(self.scene(), self)          # fuse if it now overlaps
+            sc_after = self.scene()
+            if sc_after is not None:
+                # derived-state repair at the gesture's end (P4.2, mini-gate
+                # findings 4+5): the merge can absorb a wall a neighbour's
+                # outline still names (dead ref), and a stretched/shrunk
+                # perpendicular can leave an edge only PARTLY covered by its
+                # named wall -- a latent tear the NEXT drag turns diagonal.
+                # Bindings and outline structure re-derive; no coordinate
+                # moves.
+                from floorplanner.rooms import (  # late (cycle)
+                    rebind_dead_edges, split_partially_covered_edges)
+                for room in sc_after.items():
+                    if (getattr(room, "outline", None)
+                            and getattr(room, "floor", None) == self.floor):
+                        rebind_dead_edges(sc_after, room)
+                        split_partially_covered_edges(sc_after, room)
             if endpoint_edit and self.scene() is not None:
                 # defect 25 (P4.1b): an end dragged into a doorway reports at
                 # the gesture, not at the next document walk -- and only the

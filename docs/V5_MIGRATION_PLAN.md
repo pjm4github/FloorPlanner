@@ -3918,4 +3918,46 @@ notes:   Patrick reported residual drag diagonals after the mixed-corner
          (a1e6083: status bar + About now show "v1.2 - <branch> @ <sha7>",
          captured at LAUNCH, with two pins -- names the checkout, and
          launch-stable.)
+
+P4.2+ mini-gate finding 5 (via fiveRoomDragSplit.fpm): a three-bug cascade
+ruff:    clean
+pytest:  534 passed, 7 deselected, 4 xfailed (sum 545)
+files:   extract.py (join merges at SHARE_TOL), rooms.py
+         (split_partially_covered_edges, junction-degree guarded),
+         walls.py (run-wide tee gather; release repair pass),
+         tests/test_extract_join.py (macro pin),
+         examples/fiveRoomDragSplit.fpm (Patrick's reproduction), this file.
+notes:   Patrick's macro (drag R2 out/back 6" offset, slide the R3|R4 wall,
+         slide the R1|R3 wall) tore R1 and R4 diagonal. THREE distinct
+         bugs, each measured before being touched:
+         (a) JOIN MERGED AT THE WRONG TOLERANCE: merge_wall's default
+         perp_tol is the 6" auto-coalesce snap, so a room dropped a
+         gesture-width off SNAPPED ITS NEIGHBOURS' WALLS onto its own line
+         -- R4's north wall physically moved 6" to meet the offset R2,
+         stranding R4's outline. The join now merges at SHARE_TOL (0.6",
+         vertex_weld_in): at or below it two lines ARE one; beyond it
+         nothing moves -- the join's own stated rule, now obeyed by its
+         merge step.
+         (b) PARTIAL COVER IS A LATENT TEAR: an outline edge NAMED by a
+         live wall that covers only part of it follows at only one corner
+         on the next drag -- the diagonal. split_partially_covered_edges
+         (release + join): the coverage boundary becomes a real corner
+         HOLDING THE WALL'S OWN END VERTEX, so later drags carry it by
+         construction; the remainder re-binds or stays honestly open.
+         GUARDED BY JUNCTION DEGREE: only a vertex held by 2+ wall ends
+         splits -- a DANGLING end mid-edge is the deliberately-opened side,
+         whose openness stays DERIVED so dragging the end back re-closes
+         it (test_closing_gap_refuses_and_relocks caught the unguarded
+         version freezing the gap open; it passes unchanged now).
+         (c) THE TEE GATHER TESTED ONLY SELF'S BODY: an end resting
+         mid-span of another RUN member was invisible, so the run slid out
+         from under a mid-run corner, leaving it floating. Body landings
+         now test against every run wall -- the run slides as one line.
+         RECEIPT, fail-first: the macro pinned VERBATIM
+         (test_drag_split_macro_keeps_every_room_rectilinear -- after
+         EVERY line, nothing diagonal and no edge names a wall that does
+         not span it), red against the pre-fix tree in a worktree, green
+         on the fixes; the full replay is clean at every step, R1 ending
+         as the correct stepped shape, R4 with the correct tee corner.
+         Census 544 -> 545, sums reconciling.
 ```
