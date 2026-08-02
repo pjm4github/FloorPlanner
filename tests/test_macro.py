@@ -575,18 +575,23 @@ def test_recorded_opening_replays_without_dialog(fp, win):
 
 
 def test_recorder_captures_action_shortcuts(fp, win, qapp):
-    # P4.2: a keystroke matching a menu QAction shortcut (Ctrl+G group,
-    # Ctrl+Shift+G ungroup, Del, Ctrl+Z undo...) is consumed by Qt's
-    # shortcut system and never arrives as a KeyPress -- so recordings
-    # silently lacked exactly the plan-MODIFYING shortcuts. The recorder
-    # now also captures ShortcutOverride, which Qt delivers for every
-    # keystroke before matching. (QKeyEvents are built directly with their
-    # modifiers -- never synthesized Ctrl via QTest, which leaks global
-    # keyboardModifiers headlessly.)
+    # P4.2, two capture bugs pinned at once. (1) a keystroke matching a menu
+    # QAction shortcut (Ctrl+G group, Ctrl+Shift+G ungroup, Del, Ctrl+Z
+    # undo...) is consumed by Qt's shortcut system and never arrives as a
+    # KeyPress -- so recordings lacked exactly the plan-MODIFYING shortcuts;
+    # the recorder now also captures ShortcutOverride. (2) the canvas
+    # keyboard focus sits on the VIEWPORT, and the capture's `obj is
+    # viewport` mouse branch came FIRST -- so every canvas keystroke fell
+    # into it and was dropped; keys are now handled by event TYPE before any
+    # object test. Hence the events here target the VIEWPORT, the real-app
+    # delivery. (QKeyEvents are built directly with their modifiers -- never
+    # synthesized Ctrl via QTest, which leaks global keyboardModifiers
+    # headlessly.)
     from floorplanner.macro import MacroRecorderDialog
     dlg = MacroRecorderDialog(win)
     dlg.start()
     try:
+        vp = win.view.viewport()
         cases = [
             (Qt.Key.Key_G, Qt.KeyboardModifier.ControlModifier, "^G"),
             (Qt.Key.Key_G, Qt.KeyboardModifier.ControlModifier
@@ -597,14 +602,44 @@ def test_recorder_captures_action_shortcuts(fp, win, qapp):
         ]
         for key, mods, _tok in cases:
             ov = QKeyEvent(QEvent.Type.ShortcutOverride, key, mods)
-            QApplication.sendEvent(win.view, ov)
+            QApplication.sendEvent(vp, ov)
             # the same event object propagating again must not double-record
-            QApplication.sendEvent(win.view, ov)
-            rel = QKeyEvent(QEvent.Type.KeyRelease, key, mods)
-            QApplication.sendEvent(win.view, rel)
+            QApplication.sendEvent(vp, ov)
+            # ...nor its KeyPress echo (same key+mods, timestamp 0)
+            QApplication.sendEvent(
+                vp, QKeyEvent(QEvent.Type.KeyPress, key, mods))
+            QApplication.sendEvent(
+                vp, QKeyEvent(QEvent.Type.KeyRelease, key, mods))
         text = dlg.edit.toPlainText().split()
         assert text == [t for _k, _m, t in cases], text
     finally:
         dlg.stop()
         dlg.deleteLater()
         qapp.processEvents()
+
+
+def test_recorder_emits_open_token_and_runner_replays_it(fp, win, qapp,
+                                                         tmp_path):
+    # ^O "path": File > Open's chosen file is captured as one self-contained
+    # token (the on_place/on_room pattern -- the dialog is modal, so the
+    # event stream cannot see the path), and the runner replays it without
+    # any dialog.
+    import pathlib
+    from floorplanner.macro import MacroRecorderDialog
+    ex = pathlib.Path(__file__).resolve().parent.parent / "examples"
+    plan = str(ex / "fiveRoomTest.json")
+    dlg = MacroRecorderDialog(win)
+    dlg.start()
+    try:
+        win._recorder.on_open(plan)
+        text = dlg.edit.toPlainText().strip()
+        assert text == f'^O "{plan}"', text
+    finally:
+        dlg.stop()
+        dlg.deleteLater()
+        qapp.processEvents()
+    res = win.run_macro(text)
+    assert res["ok"], res
+    names = sorted(r.name for r in win.scene.items()
+                   if isinstance(r, fp.RoomItem))
+    assert names == ["R1", "R2", "R3", "R4", "R5"]

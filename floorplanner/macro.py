@@ -32,7 +32,8 @@ class MacroRunner:
                                        new / undo / redo / cut / copy / paste /
                                        group / select-all / save-to-current.
                                        Prefix '+' adds Shift: ^+G ungroup,
-                                       ^+Z redo.
+                                       ^+Z redo.  ^O "path" opens that file
+                                       (what the recorder emits for File>Open).
       Arrow nudge   LEFT RIGHT UP DOWN          (^ prefix = fine 1" step)
       Keys          ESC DEL ENTER
       Mouse         CLICK x y | ^CLICK x y (Ctrl) | RCLICK x y | MOVE x y |
@@ -127,7 +128,7 @@ class MacroRunner:
         if cmd == "^CLICK":
             return self._do_click(toks, i, ctrl=True)
         if raw.startswith("^"):
-            return self._caret(raw[1:], i)
+            return self._caret(raw[1:], toks, i)
         if len(cmd) == 1 and cmd in self._TOOL_CODES:
             self.win.set_tool(self._TOOL_CODES[cmd])
             return i
@@ -153,7 +154,7 @@ class MacroRunner:
             raise ValueError("unknown command")
         return handler(toks, i)
 
-    def _caret(self, key, i):
+    def _caret(self, key, toks, i):
         key = key.upper()
         if key in self._ARROWS:                  # ^LEFT = fine (1") nudge
             dx, dy = self._ARROWS[key]
@@ -165,7 +166,12 @@ class MacroRunner:
             self.win.save_path(self.win.current_path)
             return i
         if key == "O":
-            raise ValueError("use 'OPEN path' in a macro")
+            # ^O "path" -- what the recorder emits when File > Open (or
+            # Ctrl+O) completes: the chosen file is part of the token, so
+            # replay needs no dialog (P4.2, the on_place/on_room pattern)
+            (path,), i = self._take(toks, i, 1)
+            self.win.load_path(path)
+            return i
         if key == "A":
             self._select_all()
             return i
@@ -758,6 +764,14 @@ class MacroRecorderDialog(QDialog):
             self._append(f"{tok} {round(scene_pt.x())} {round(scene_pt.y())} "
                          f"{code}", newline=self.nl_check.isChecked())
 
+    def on_open(self, path):
+        # the file came from a modal QFileDialog the event stream cannot
+        # see -- capture it into a self-contained "^O path" token, exactly
+        # the on_opening/on_room pattern, so replay needs no dialog
+        if self._active():
+            self._end_modal_line()
+            self._append(f'^O "{path}"', newline=True)
+
     def on_room(self, name, scene_pt):
         # room name came from a dialog — capture it into a ROOM token.
         if self._active():
@@ -786,6 +800,14 @@ class MacroRecorderDialog(QDialog):
             self._last_key_sig = None
             self._pending_press = None
             return
+        # KEY EVENTS FIRST, BY TYPE (P4.2): the canvas keyboard focus sits on
+        # the VIEWPORT, and the old `obj is viewport` mouse branch came first
+        # -- so every canvas keystroke fell into it and was dropped, which is
+        # why recordings had mouse lines only. An event's disposition is its
+        # TYPE's, never the receiving object's.
+        if et in (QEvent.Type.KeyPress, QEvent.Type.ShortcutOverride):
+            self._capture_key(obj, ev)
+            return
         if obj is self.win.view.viewport():
             if et == QEvent.Type.MouseButtonPress and \
                     ev.button() == Qt.MouseButton.LeftButton:
@@ -813,45 +835,56 @@ class MacroRecorderDialog(QDialog):
                 # below while the menu is open)
                 sp = self.win.view.mapToScene(ev.pos())
                 self.on_popup(sp)
-        elif et in (QEvent.Type.KeyPress, QEvent.Type.ShortcutOverride):
-            # ShortcutOverride TOO (P4.2): a keystroke that matches a menu
-            # QAction shortcut — Ctrl+G group, Ctrl+Shift+G ungroup, Del,
-            # Ctrl+Z/X/C/V — is consumed by Qt's shortcut system and never
-            # arrives as a KeyPress, so recordings silently lacked exactly
-            # the plan-modifying shortcuts. ShortcutOverride is delivered to
-            # this filter for EVERY keystroke, before matching, carrying the
-            # same key and modifiers.
-            #
-            # de-dupe: one physical key press can reach this filter more than
-            # once — ShortcutOverride precedes an unmatched key's KeyPress,
-            # Qt propagates an unaccepted key up the parent chain, and a
-            # popup/dialog re-dispatches it.  Skip a repeat of the same event
-            # object, or (for real events) the same (timestamp, key, mods); a
-            # KeyRelease resets this so genuine repeats still record.
-            ts = ev.timestamp()
-            sig = (ts, ev.key(), ev.modifiers())
-            if et == QEvent.Type.KeyPress and \
-                    self._pending_press == (ev.key(), ev.modifiers()):
-                # the KeyPress echo of a ShortcutOverride already captured --
-                # paired explicitly, because programmatic and menu-dispatched
-                # events carry timestamp 0 and the sig de-dupe cannot see them
-                self._pending_press = None
-                return
-            if ev is self._last_key_ev or (ts and sig == self._last_key_sig):
-                return
+    def _capture_key(self, obj, ev):
+        # ShortcutOverride TOO (P4.2): a keystroke that matches a menu
+        # QAction shortcut — Ctrl+G group, Ctrl+Shift+G ungroup, Del,
+        # Ctrl+Z/X/C/V — is consumed by Qt's shortcut system and never
+        # arrives as a KeyPress, so recordings silently lacked exactly
+        # the plan-modifying shortcuts. ShortcutOverride is delivered to
+        # this filter for EVERY keystroke, before matching, carrying the
+        # same key and modifiers.
+        #
+        # de-dupe: one physical key press can reach this filter more than
+        # once — ShortcutOverride precedes an unmatched key's KeyPress,
+        # Qt propagates an unaccepted key up the parent chain, and a
+        # popup/dialog re-dispatches it.  Skip a repeat of the same event
+        # object, or (for real events) the same (timestamp, key, mods); a
+        # KeyRelease resets this so genuine repeats still record.
+        et = ev.type()
+        ts = ev.timestamp()
+        sig = (ts, ev.key(), ev.modifiers())
+        chord = (ev.key(), ev.modifiers())
+        if et == QEvent.Type.ShortcutOverride and \
+                self._pending_press == chord:
+            # Qt synthesizes one ShortcutOverride per delivered press; a
+            # second override of the SAME chord before any release is the
+            # same physical keystroke arriving again -- one capture is it
+            return
+        if et == QEvent.Type.KeyPress and self._pending_press == chord:
+            # the KeyPress echo of a ShortcutOverride already captured --
+            # paired explicitly (programmatic and menu-dispatched events
+            # carry timestamp 0, invisible to the sig de-dupe), and the
+            # guards are PINNED to it so the same press object's further
+            # propagation deliveries (viewport -> view -> window) skip too
+            self._pending_press = None
             self._last_key_ev = ev
             self._last_key_sig = sig
-            if et == QEvent.Type.ShortcutOverride:
-                self._pending_press = (ev.key(), ev.modifiers())
-            in_modal = (QApplication.activePopupWidget() is not None
-                        or QApplication.activeModalWidget() is not None)
-            # only capture modal keystrokes for a PUP-opened menu/dialog;
-            # tool-driven dialogs (door/window size, room name) already record
-            # their value via on_opening/on_room, so don't double-capture them
-            if in_modal and self._modal_line:
-                self._emit_modal_key(ev)
-            elif not in_modal and self._belongs_to_main(obj):
-                self._emit_key(ev)
+            return
+        if ev is self._last_key_ev or (ts and sig == self._last_key_sig):
+            return
+        self._last_key_ev = ev
+        self._last_key_sig = sig
+        if et == QEvent.Type.ShortcutOverride:
+            self._pending_press = chord
+        in_modal = (QApplication.activePopupWidget() is not None
+                    or QApplication.activeModalWidget() is not None)
+        # only capture modal keystrokes for a PUP-opened menu/dialog;
+        # tool-driven dialogs (door/window size, room name) already record
+        # their value via on_opening/on_room, so don't double-capture them
+        if in_modal and self._modal_line:
+            self._emit_modal_key(ev)
+        elif not in_modal and self._belongs_to_main(obj):
+            self._emit_key(ev)
 
     def _emit_mouse(self, p1, p2, moved, ctrl):
         self._end_modal_line()

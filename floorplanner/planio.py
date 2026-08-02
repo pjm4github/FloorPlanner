@@ -394,6 +394,9 @@ class PlanIOMixin:
         self._finish_open()              # ...unless it was CONVERTED -> dirty
         self._update_title()
         self.status(f"Opened {path}")
+        rec = getattr(self, "_recorder", None)
+        if rec is not None:              # macro recorder: File > Open with
+            rec.on_open(path)            # its chosen file, as one ^O token
 
     def save_plan(self):
         if not self.current_path:
