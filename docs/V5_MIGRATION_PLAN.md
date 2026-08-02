@@ -3901,4 +3901,21 @@ notes:   Patrick: clean gaps, drag the Master Suite / M Bath wall down --
          stranded, Hall = (248.4,678)(330,678)(330,654)(379.4,654)
          (396,654)(396,714)(248.4,714) exactly, Clst untouched, doubled
          corner gone.
+
+P4.2+ mini-gate: DEFECT 35 FILED (residual drag report, shelved), and the
+         version label added so the next report carries its code identity
+notes:   Patrick reported residual drag diagonals after the mixed-corner
+         fix and shelved them; filed as register row 35 rather than lost.
+         The replay of the exact sequence on the fixed tree is clean twice
+         over (outline edges AND painted cue segments), the reporting
+         session's code identity is unverifiable (it predates the label),
+         so the row records the report, the clean replay, both candidate
+         explanations (stale process vs uncovered gesture), and the
+         re-open protocol: reproduce with the status-bar version label
+         visible (launch >= a1e6083) plus the gesture sequence. The P4.2
+         mini-gate re-run decides: confirmed -> fixed before the PR
+         merges; unreproduced with the label -> closed as stale-process.
+         (a1e6083: status bar + About now show "v1.2 - <branch> @ <sha7>",
+         captured at LAUNCH, with two pins -- names the checkout, and
+         launch-stable.)
 ```
