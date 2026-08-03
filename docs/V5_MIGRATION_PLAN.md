@@ -187,7 +187,7 @@ spans and callers so the reviewer can check it without re-running it.
 | ☑ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** — *ticked 2026-07-30; **Phase 3 merged to `main` at `03f3868` on 2026‑07‑31**, all eight P3 rows complete.*  *(P3.8 detail: `bake` 10.6× faster (279.0 → 26.4 ms at 64 rooms); all four survey rows answered or dispositioned; the flap class retired class-wide; defect 27's DEEP CI job green. Merge checklist items 1–4 done at the tick; Gate 3 passed 2026‑07‑31 and the merge followed.)* | ratios recorded |
 | ☑ | **P4.1** Delete-wall keeps the room — *ticked 2026‑07‑31, accepted at **PR #2** (merge commit; sub-commits `0df3aa5` census + rulings, `a0e1b95` delete_wall + 2b flip, `cce2eb6` corpse + tests). Acceptance met: P0.4 test 2b flipped xfail→pass on exactly the call-site switch (513/6 → 514/5); census 526 unchanged; defect 17 closed with the visible-lie coda.* | ruff + pytest |
 | ☑ | **P4.1b** Defect 25's gesture-time message — *ticked 2026‑08‑01, accepted at **PR #3** (merge commit `ec5f207`; sub-commits `1d3eaa6` mechanism + tests, `e0519ae` record). Acceptance met: both gestures produce the specific message naming the doorway at release, pinned by two gui tests with a fail-first receipt against `main@708dc2e`; defect 25 closed; census 526 → 528.* | ruff + pytest |
-| ☐ | **P4.2** Extract / join | ruff + pytest |
+| ☑ | **P4.2** Extract / join — *ticked 2026‑08‑02, accepted at **PR #4** (merge commit; 26 sub-commits, `dfd30af` … `ed9286c` + the record commit: core 1–7, mini-gate findings 8–15, tooling & floors 16–23, hand-off 24, census hygiene 25, record 26) — the first task under the Phase‑4 ruling's **Patrick mini-gate: PASSED, all 8 items**, on a fresh launch with the version label verified. Acceptance met: extract → move 500″ → join with `check()` clean at every step, I12 while floating, furnishings and openings intact; the party-wall regression flipped xfail → hard pass via the real `extract` (the P0.5 Known-regressions row closes). Defects 30, 34 and 13 (drag half) closed; defect 35 closed on the reporter's confirmation; six mini-gate findings fixed against measured reproductions, pinned by his macros verbatim. Census 528 → 552, local == CI.* | ruff + pytest |
 | ☐ | **P4.3** Shuffle mode | ruff + pytest |
 | ☐ | **P4.4** Concept rooms, `nominal_size`, duplicate-as-template | ruff + pytest |
 | ☐ | **P4.5** Group semantics + z-order collapse | ruff + pytest |
@@ -311,7 +311,7 @@ Behaviour that is deliberately worse between the task that broke it and the task
 | **P0.5** (fix 4) | Rubber-band-select a room whose edge is a longer party wall, then group + move it — the region no longer follows. The walls captured by the band move; the room does not. | Drag the room by its **label** instead: `_privatize_shared_walls` handles the party wall correctly on that path. | **P4.2** (`extract` replaces the accidental privatisation with a real operation) |
 | **pre-dates the branch** (surfaced at P3.5, defect 23) | **A rubber band that clips a room's wall set strands that room.** The band takes only items fully inside it, so a wall poking out is left behind, that room's remaining walls are duplicated into the group, and the group moves those while the room's region stays where it was — it reads as a detached dashed outline at the original position. 3 of 20 rooms on a band covering 92% of `symmetricP1`. | **Band whole rooms** — include every wall of any room you mean to take — **or move the room individually** by dragging its label, which carries its walls and openings correctly. | **P4.5**, where "what a group is" is decided. Listed here rather than as a Phase-3 regression because the branch measurably IMPROVES it (148.3" of drift before P3.5, 46.65" now) — the Phase-3 gate is no-worse, not all-better. |
 | ~~**P3.5**~~ **CLOSED at P3.7 (2)** | ~~**An open side of a room is not drawn.**~~ **The cue is back, drawn from the outline: `RoomItem._paint_open_edges` strokes every `open_edge_segments()` with the same colour, dash and lod-scaled width the `OpenWall` item used — so this closes as *the same cue from one representation*, which is what the "Restored at" column asked for, and not as a different cue. RECEIPT, and it is a pixel test rather than a structural one because every structural assertion in `test_open_walls.py` stayed green throughout the regression: `test_an_open_side_is_drawn_dashed`. Polarity measured first (wall body 150, dash ~124, gaps and bare background 255), and it FAILS against a tree without the paint addition with the row's own words — `[255, 255, … 255]`, the open side rendering as nothing.** Original text: **An open side of a room is not drawn.** Detach a wall from its room and pull a corner away and the side opens — the room keeps its shape and area, and the document says `wall: null` exactly as before — but the vacated stretch renders as nothing rather than as a dashed line. The producer of the dashed `OpenWall` placeholder was `refresh_rooms` → `reloop_open_room` → `bind_room_walls`, all deleted here; the fact itself moved onto the outline (`RoomItem.open_edges()`), which is where the document had always kept it. | None needed for correctness — nothing is lost but the on-screen cue. The room's area, outline and saved file are unaffected. | **P3.7** (`OpenWall` is deleted and a `wall: null` edge renders dashed from the outline, which is the same cue drawn from the one representation instead of a second one) |
-| **P2.3** | **After the first undo, a wall that crosses a junction comes back split** — and if it borders NO room, body-dragging it moves only that segment. Measured at P3.3: one 480″ wall with a mid-span T returns as two 240″ walls. **Narrower than first recorded**: `_collinear_run()` (`walls.py:888`) gathers the whole room *side*, so for a wall on a room perimeter — the common case, and the one a user would notice — both halves still move as one. Verified with a room: `_collinear_run()` gathers 2 of 2. The row applies only to room-less walls, where `self.rooms` is empty and the run short-circuits to `[self]`. | Bind the wall to a room, or drag the halves together. Nothing is lost either way: the **document is unchanged**, since `design_from_scene` planarises to the same canonical form. | ~~P3.4~~ → **retargeted at P3.4 (iv), and the predicted fix was wrong on its own terms.** Re-checked by hand: the 480″ wall still returns as two 240″ segments, `merge_all` does **not** re-merge them, and the body-drag still moves one segment. It must not — the mid-span T is a **degree-3 vertex**, load-bearing for the planar subdivision, and merging through it would destroy planarity. `merge_collinear` refuses for exactly the right reason, so this row was never merge's to close. The fix belongs in the **drag's run-gathering**: `_collinear_run()` (`walls.py`) short-circuits to `[self]` when the wall borders no room, which is precisely the case the row describes. Gathering the run over **vertex adjacency** instead would carry both segments. Unassigned rather than invented — it is one small change, and the honest place is whichever task next touches the drag (**P4.2** extract/join is the nearest) |
+| **P2.3** | **After the first undo, a wall that crosses a junction comes back split** — and if it borders NO room, body-dragging it moves only that segment. Measured at P3.3: one 480″ wall with a mid-span T returns as two 240″ walls. **Narrower than first recorded**: `_collinear_run()` (`walls.py:888`) gathers the whole room *side*, so for a wall on a room perimeter — the common case, and the one a user would notice — both halves still move as one. Verified with a room: `_collinear_run()` gathers 2 of 2. The row applies only to room-less walls, where `self.rooms` is empty and the run short-circuits to `[self]`. | Bind the wall to a room, or drag the halves together. Nothing is lost either way: the **document is unchanged**, since `design_from_scene` planarises to the same canonical form. | ~~P3.4~~ → **retargeted at P3.4 (iv), and the predicted fix was wrong on its own terms.** Re-checked by hand: the 480″ wall still returns as two 240″ segments, `merge_all` does **not** re-merge them, and the body-drag still moves one segment. It must not — the mid-span T is a **degree-3 vertex**, load-bearing for the planar subdivision, and merging through it would destroy planarity. `merge_collinear` refuses for exactly the right reason, so this row was never merge's to close. The fix belongs in the **drag's run-gathering**: `_collinear_run()` (`walls.py`) short-circuits to `[self]` when the wall borders no room, which is precisely the case the row describes. Gathering the run over **vertex adjacency** instead would carry both segments. Unassigned rather than invented — it is one small change, and the honest place is whichever task next touches the drag (**P4.2** extract/join is the nearest). **SECOND PREDICTED FIX REFUTED AT P4.2** — the vertex-adjacency gather was implemented (per ruling e) and turned P3.3's anti-shear pins red: `_tee_scene` (a wall, its collinear continuation, a stem at the shared corner) is topologically **identical** to the undo-split segments, and P3.3's settled "split first, shear never" rule — the continuation keeps its vertex and stays exactly where it is — occupies that topology with three pinned tests. The representation cannot distinguish "one wall stored as two segments" from "two walls drawn end-to-end", so one rule must own the topology, and the settled one does. Reverted; the row's wanted behaviour is pinned by the xfail `test_wall_move.py::test_a_roomless_split_wall_body_drags_as_one_run`. **The row now needs a RULING (carry vs stay), not a third predicted fix** — both of its predictions have now failed on their own terms, each caught by a settled rule doing its job. |
 
 ### P0.6 — Cheap render wins
 **Touches.** `items.py`, `rooms.py`, `mainwindow.py`, `view.py`.
@@ -646,7 +646,7 @@ walk's report path stays unchanged as the load-path safety net.
 
 ### P4.2 — Extract / join
 Per §4 of `DESIGN_MODEL_v5.md`. Extract privatizes walls and vertices, sets `state: floating`, `extracted_from`. Join welds, merges coincident walls, splits, rebinds, sets `state: placed`, and coalesces only the touched degree-2 vertices.
-**Inherits a QUESTION from P4.1's census, not a claim** *(authoritative copy: the register's carried census note, 2026‑07‑31)*: whether `_perimeter_span` dies here — it does only if `_copy_spec` (its other surviving caller, owned by no phase) is also reshaped here. P4.2's read-back must answer it.
+**Inherits a QUESTION from P4.1's census, not a claim** *(authoritative copy: the register's carried census note, 2026‑07‑31)*: whether `_perimeter_span` dies here — it does only if `_copy_spec` (its other surviving caller, owned by no phase) is also reshaped here. P4.2's read-back must answer it. *(ANSWERED at the P4.2 read-back: no — `_copy_spec` is §4's "Duplicate a room", which is P4.4's; re-argued to P4.4 as a contingency. See the register's note, which stays authoritative.)*
 **Acceptance.** Extract → move 500″ → join at a new location → `check()` clean at every step; furnishings and openings intact; I12 holds while floating.
 **Also required:** flip `test_groups.py::test_extracted_room_region_follows_move` back from `xfail` to a hard pass — via a real `extract`, not via selection-time synthesis. That test is the receipt for the P0.5 regression in Known regressions above.
 
@@ -3724,4 +3724,363 @@ notes:   REPORT ONLY, per the ruling -- no change to what the gesture DOES;
          Census 526 -> 528 (the two gui tests), every sum reconciling.
          The walk's report path (R2c) is untouched and stays as the
          load-path safety net, exactly as the register entry planned.
+
+P4.2  done   (branch p4.2-extract-join, 7 sub-commits: dfd30af core,
+         4cf67e8 label-drag rewire, 9821571 defect 30, 5c8795e the P2.3
+         refutation, 7dbd740 defect 13, 216e755 defect 34, + this docs
+         commit. AWAITS THE PATRICK MINI-GATE before its PR merges.)
+ruff:    clean
+pytest:  525 passed, 7 deselected, 4 xfailed (OFF/ON/DEEP each, sum 536 OK)
+files:   extract.py (NEW: extract_room/join_room/capture_floating_
+         furnishings), rooms.py (placement modelled; label-drag =
+         extract->move->join; _privatize_shared_walls DELETED, 51 lines;
+         floating paint cue; context menu Extract/Join), design/bridge.py
+         (placement emit/apply; stash retired for placement; per-floating-
+         room vertex namespaces in the level walk), design/validate.py
+         (I14 floating exemption; near_vertex_gaps), walls.py (defect-30
+         gather; defect-13 stick; close_gap), dialogs.py (GapReviewDialog),
+         mainwindow.py (Review wall gaps... action), CLAUDE.md, register,
+         tests: test_extract_join.py (NEW), test_groups.py (party-wall
+         flip), test_room_walls.py, test_wall_move.py, test_walls.py.
+notes:   CORE FIRST, HARVEST AFTER, per the ordering constraint -- each
+         piece its own sub-commit at a full green gate.
+         ACCEPTANCE MET: extract -> move 500" -> join, check() clean at
+         EVERY step, I12 while floating, furnishings and openings intact;
+         the party-wall round trip fuses back to ONE shared wall; the
+         party-wall regression test flipped xfail -> hard pass via the
+         real extract (P0.5 Known-regressions row closes).
+         TWO MODEL CONSEQUENCES, not workarounds: the level walk folds
+         each floating room in its OWN vertex namespace (coincident-is-one-
+         corner is exactly the sharing I12 breaks), and I14 exempts
+         floating-vs-plan pairs (closure within a floating room still
+         holds) -- same exemption class as I11.
+         RULINGS EXECUTED: (a) label-drag rewired, behaviour-preserving by
+         construction (the old path already WAS extract->move->join in old
+         clothes); (b) defect 30 fixed as a BUG (holders of the corner via
+         vertex identity; 23-vs-30 boundary stated for P4.5); (c) defect 34
+         closed as the review op (list, never auto-close); (d) defect 13's
+         drag half closed (stick -> scene-space WALL_PROJECT_STICK, 9",
+         == join_tol_in; catch radius stays screen-space); (f)
+         _perimeter_span re-argued to P4.4 in the register, contingent,
+         not counted in this census.
+         RULING (e) REFUTED BY THE TREE, reverted, recorded: the vertex-
+         adjacency run gather turned P3.3's anti-shear pins red --
+         _tee_scene is topologically IDENTICAL to the undo-split segments,
+         and "split first, shear never" owns that topology with three
+         tests. The P2.3 row's SECOND predicted fix to fail on its own
+         terms; the row now needs a carry-vs-stay RULING, pinned by the
+         xfail test_a_roomless_split_wall_body_drags_as_one_run.
+         TESTS CHANGED, all declared: the party-wall flip (route only,
+         assertions unchanged); test_moving_a_room_does_not_distort_its_
+         neighbour drives extract_room (follows the mousePress it always
+         mirrored). Census 528 -> 536 (3 acceptance + 1 conflict pin +
+         1 zoom pin + 3 gap tests), xfails 5 -> 4 net (party-wall and
+         defect-30 flips out, P2.3 conflict pin in).
+
+         THE PATRICK MINI-GATE (P4.2 is the first task under the ruling --
+         the PR does NOT merge until this passes; ~15 min, stated
+         expectations, Gate-3 style):
+         1. EXTRACT: open planc1TestV5.json, right-click a room with
+            shared walls -> Extract room. Expect: room reads floating
+            (warm fill, dashed boundary, "(floating)" under the name); the
+            plan keeps every wall; neighbours unchanged; no warning.
+         2. FLOAT-MOVE: drag it ~500" away by its name. Expect: walls +
+            doors + furnishings + region move as one unit; nothing else
+            moves; nothing welds in passing.
+         3. JOIN: place it beside existing walls -> right-click -> Join
+            room into plan. Expect: coincident walls merge, no doubled
+            wall, no duplicated openings; room reads placed.
+         4. THE OLD WORKFLOW UNCHANGED: plain label-drag a PLACED room one
+            bay over. Expect: exactly the old behaviour -- party wall
+            stays with the neighbour, room re-merges on drop, furnishings
+            stay put.
+         5. UNDO back through all of it. Expect: each step reverses
+            cleanly.
+         6. DEFECT 30: body-drag a party wall at a 4-way corner. Expect:
+            every room touching that corner follows; no stranded dashed
+            outline.
+         7. DEFECT 34: Edit > Review wall gaps... on planc1TestV5.json.
+            Expect: the known 1.53"/6.003" pairs listed with distances;
+            closing one 1.53" pair welds it; the 6" pairs left alone stay;
+            the saved file is otherwise unchanged.
+         8. FLOATING ROUND-TRIP: save while a room is floating -> close ->
+            reopen. Expect: still floating, everything intact, and
+            tools/validate_design.py on the saved file -> PASS/PASS.
+
+P4.2+ mini-gate finding: DEFECT 30's FIRST CUT CORRECTED (item 6 caught it)
+ruff:    clean
+pytest:  527 passed, 7 deselected, 4 xfailed (sum 538 local; CI sees 536 --
+         the two extra are Patrick's untracked examples/symmetricP2/P3.json
+         picked up by the corpus validation, both green, not committed)
+files:   walls.py (_plan_vertex_moves steps 1+4), tests/test_wall_move.py
+         (pin revised), docs/CODE_REVIEW_v2.md (row 30 corrected), this file.
+notes:   Patrick ran item 6 on symmetricP3 and the blanket follow tore a
+         DIAGONAL across Foyer and Great Room -- their boundary at the
+         corner is the CONTINUATION, which the anti-shear split holds
+         still, so dragging their corner off it was the first cut's own
+         error, screenshot on file (Screenshot 2026-08-01 162708.png).
+         CORRECTED: the split makes the old corner TWO corners, and each
+         room's corner goes with ITS OWN BOUNDARY -- run-bordered rooms
+         follow the moved vertex; continuation-bordered rooms re-point to
+         the stationary twin the split mints (now recorded in step 1).
+         The pin is revised to the corrected expectation and renamed
+         (test_a_dragged_corner_splits_by_each_rooms_own_boundary), with a
+         no-diagonal assertion so the tear cannot come back. Fail-first:
+         red against the first cut in a worktree ("borders the continuation
+         but was dragged off it"), green on the correction. Verified on
+         pristine symmetricP1: Foyer/Great Room outlines unchanged through
+         a 24" down-drag, Dining/Kitchen resize, zero new off-axis edges
+         (the four flagged are a pre-existing 0.3" skew at (582.3, 483.6)
+         in the shipped example itself, below the weld band, identical
+         before and after).
+         NOTE for the re-run: symmetricP3.json still CONTAINS the damage
+         from the bad-drag session -- re-cut it from symmetricP1 before
+         re-running item 6, or drag and undo on the fixed build.
+
+P4.2+ mini-gate finding 2: CLOSE_GAP STRANDED OUTLINES (item 7 + a drag)
+ruff:    clean
+pytest:  528 passed, 7 deselected, 4 xfailed (sum 539 local; CI 537 -- the
+         two extra remain Patrick's untracked example files)
+files:   walls.py (close_gap), tests/test_walls.py (invariant pin),
+         docs/CODE_REVIEW_v2.md (row 34 corrected), this file.
+notes:   Patrick closed symmetricP1's reviewed gaps, then dragged the
+         M Bath/Lounge wall down -- and M Bath, Hall and Lounge drew dashed
+         DIAGONALS to corners their walls no longer held (Screenshot
+         2026-08-01 170311.png). Not deferred recalculation -- there is no
+         later recalculation since P3.5, by design; outlines follow walls
+         only through shared vertex IDENTITY, and close_gap's first cut
+         broke exactly that: it folded WALL ends onto one anchor
+         (share_coincident_ends) but left the OUTLINES holding coincident-
+         but-distinct twins, so the next drag moved the walls' corner and
+         stranded the rooms'. FIX: after the fold, every room on the floor
+         re-adopts its walls' corner vertices (share_outline_vertices, the
+         load path's own discipline, late-imported per the cycle rule).
+         RECEIPTS, fail-first: the invariant pin (every outline corner IS
+         one of its room's wall-end vertices, by identity) red against the
+         first cut in a worktree, green on the fix; end-to-end headless on
+         symmetricP1: both 6.003" gaps close (1 weld each at (379.4, 456)
+         and (379.4, 654)), stranded corners 0, and the M Bath/Lounge 24"
+         down-drag adds ZERO diagonals (the four flagged are the file's
+         own pre-existing 0.3" skew at (582.3, 483.6), below the weld
+         band, identical at load and untouched throughout).
+
+P4.2+ mini-gate finding 3: THE MIXED CORNER (partial-side run coverage)
+ruff:    clean
+pytest:  529 passed, 7 deselected, 4 xfailed (sum 540 local; CI 538 -- the
+         two extra remain Patrick's untracked example files)
+files:   walls.py (_plan_vertex_moves step 4: mixed-corner step surgery;
+         collapse_degenerate_outline_edges + release/close_gap call sites),
+         tests/test_wall_move.py (step pin), docs/CODE_REVIEW_v2.md (row
+         30, third finding), this file.
+notes:   Patrick: clean gaps, drag the Master Suite / M Bath wall down --
+         diagonal across Hall (Screenshot 2026-08-01 172305.png). NOT the
+         stranding class (the invariant held, 0 stranded); a genuinely
+         deeper case: the dragged run is Master Suite's WHOLE south side
+         (x 30..330) but Hall's top side extends past the run's end
+         (330..396, backed by the Clst|Hall wall -- a continuation, which
+         correctly stays). Hall's corner at x=330 is run-backed on one
+         adjacent edge and continuation-backed on the other; one corner
+         cannot serve two stretches that now sit on different lines --
+         follow tears the continuation stretch (the diagonal seen), stay
+         tears the run stretch. FIX, outline surgery at drag start (the
+         same moment the anti-shear split runs): the mixed corner becomes
+         TWO corners joined by an OPEN step edge (wall: null, drawn dashed
+         -- at insert time there genuinely is no wall on the jog; the
+         stretched perpendicular wall covers it after the drag, so the
+         dash-over-wall is a known presentational wrinkle, noted not
+         hidden). Hygiene: collapse_degenerate_outline_edges drops
+         zero-length edges -- the welded corner pair a closed gap leaves
+         in a room that held both corners (the Hall doubled-corner residue)
+         and a step whose drag ended where it began -- unbinding a wall
+         whose only naming edge was the zero one.
+         RECEIPTS, fail-first: the step pin (4-room replica: run-bordered
+         rooms follow, Clst byte-still, Hall gains the OPEN step at the
+         run's end, everything axis-aligned) red against the pre-fix tree
+         in a worktree, green on the fix. End-to-end on symmetricP1: clean
+         gaps -> drag Master Suite/M Bath 24" down -> 0 diagonals, 0
+         stranded, Hall = (248.4,678)(330,678)(330,654)(379.4,654)
+         (396,654)(396,714)(248.4,714) exactly, Clst untouched, doubled
+         corner gone.
+
+P4.2+ mini-gate: DEFECT 35 FILED (residual drag report, shelved), and the
+         version label added so the next report carries its code identity
+notes:   Patrick reported residual drag diagonals after the mixed-corner
+         fix and shelved them; filed as register row 35 rather than lost.
+         The replay of the exact sequence on the fixed tree is clean twice
+         over (outline edges AND painted cue segments), the reporting
+         session's code identity is unverifiable (it predates the label),
+         so the row records the report, the clean replay, both candidate
+         explanations (stale process vs uncovered gesture), and the
+         re-open protocol: reproduce with the status-bar version label
+         visible (launch >= a1e6083) plus the gesture sequence. The P4.2
+         mini-gate re-run decides: confirmed -> fixed before the PR
+         merges; unreproduced with the label -> closed as stale-process.
+         (a1e6083: status bar + About now show "v1.2 - <branch> @ <sha7>",
+         captured at LAUNCH, with two pins -- names the checkout, and
+         launch-stable.)
+
+P4.2+ mini-gate finding 5 (via fiveRoomDragSplit.fpm): a three-bug cascade
+ruff:    clean
+pytest:  534 passed, 7 deselected, 4 xfailed (sum 545)
+files:   extract.py (join merges at SHARE_TOL), rooms.py
+         (split_partially_covered_edges, junction-degree guarded),
+         walls.py (run-wide tee gather; release repair pass),
+         tests/test_extract_join.py (macro pin),
+         examples/fiveRoomDragSplit.fpm (Patrick's reproduction), this file.
+notes:   Patrick's macro (drag R2 out/back 6" offset, slide the R3|R4 wall,
+         slide the R1|R3 wall) tore R1 and R4 diagonal. THREE distinct
+         bugs, each measured before being touched:
+         (a) JOIN MERGED AT THE WRONG TOLERANCE: merge_wall's default
+         perp_tol is the 6" auto-coalesce snap, so a room dropped a
+         gesture-width off SNAPPED ITS NEIGHBOURS' WALLS onto its own line
+         -- R4's north wall physically moved 6" to meet the offset R2,
+         stranding R4's outline. The join now merges at SHARE_TOL (0.6",
+         vertex_weld_in): at or below it two lines ARE one; beyond it
+         nothing moves -- the join's own stated rule, now obeyed by its
+         merge step.
+         (b) PARTIAL COVER IS A LATENT TEAR: an outline edge NAMED by a
+         live wall that covers only part of it follows at only one corner
+         on the next drag -- the diagonal. split_partially_covered_edges
+         (release + join): the coverage boundary becomes a real corner
+         HOLDING THE WALL'S OWN END VERTEX, so later drags carry it by
+         construction; the remainder re-binds or stays honestly open.
+         GUARDED BY JUNCTION DEGREE: only a vertex held by 2+ wall ends
+         splits -- a DANGLING end mid-edge is the deliberately-opened side,
+         whose openness stays DERIVED so dragging the end back re-closes
+         it (test_closing_gap_refuses_and_relocks caught the unguarded
+         version freezing the gap open; it passes unchanged now).
+         (c) THE TEE GATHER TESTED ONLY SELF'S BODY: an end resting
+         mid-span of another RUN member was invisible, so the run slid out
+         from under a mid-run corner, leaving it floating. Body landings
+         now test against every run wall -- the run slides as one line.
+         RECEIPT, fail-first: the macro pinned VERBATIM
+         (test_drag_split_macro_keeps_every_room_rectilinear -- after
+         EVERY line, nothing diagonal and no edge names a wall that does
+         not span it), red against the pre-fix tree in a worktree, green
+         on the fixes; the full replay is clean at every step, R1 ending
+         as the correct stepped shape, R4 with the correct tee corner.
+         Census 544 -> 545, sums reconciling.
+
+P4.2+ mini-gate finding 6 (via fiveRoomDragSplit2.fpm): three more, fixed
+ruff:    clean
+pytest:  535 passed, 7 deselected, 4 xfailed (sum 546)
+files:   rooms.py (repair_edge_bindings, grown from rebind_dead_edges:
+         upgrade-only rebind of live-but-outspanned edges; the deliberate-
+         open guard moved from junction degree to _corners_unlocked),
+         walls.py (_split_outline_landings; spike collapse in
+         collapse_degenerate_outline_edges; release repair re-adopts
+         wall corner vertices), tests/test_extract_join.py (macro pin),
+         examples/fiveRoomDragSplit2.fpm, this file.
+notes:   Patrick's 13-gesture macro seeded and tore through THREE more
+         mechanisms, each introspected to its exact site before touching:
+         (a) MISBOUND EDGE: an edge named a collinear NEIGHBOUR wall that
+         covered none of it while the exactly-matching wall sat right
+         there (_edge_wall's partial-cover acceptance grabbed the wrong
+         candidate during an earlier repair). repair_edge_bindings now
+         also fixes live-but-outspanned names, UPGRADE ONLY (rebind solely
+         when the candidate fully spans -- a legitimately short detached
+         wall is never swapped). The junction-DEGREE guard from finding 5
+         was WRONG and is replaced by the explicit workflow flag
+         (_corners_unlocked): a slid wall can leave a genuinely dangling
+         structural end mid-edge.
+         (b) OUTLINE-CORNER TEE: a pure room corner resting mid-span on
+         the run wall's BODY -- no wall end there at all, so the tee
+         gather cannot see it -- and the run slid out from under it.
+         _split_outline_landings (drag start, beside the wall-end tee
+         pass): cut the run wall at the corner, point every coincident
+         outline corner at the split vertex; identity is what rides.
+         (c) COLLINEAR SPIKE: a zero-area overshoot (A->B then straight
+         back) left where a stationary corner was passed by its sliding
+         side; collapsed as a degenerate, iteratively, walls unbound when
+         their last naming edge goes.
+         Release repair also re-adopts wall corner vertices
+         (share_outline_vertices) so coincident-but-distinct outline
+         corners cannot accumulate.
+         RECEIPT, fail-first: the macro pinned VERBATIM (after EVERY line:
+         nothing diagonal, no edge names a wall that does not span it) --
+         red against 6f3e2b9 in a worktree, green here. Both earlier
+         macros replay with zero violations (no regression). Census
+         545 -> 546, sums reconciling.
+
+P4.2+ tooling & floors run, 2026-08-02 (sub-commits 16-23; consolidated
+         here, details in the commit messages, each at a full green gate)
+pytest:  543 passed, 7 deselected, 4 xfailed (sum 554 local; CI 552 --
+         the two extra remain Patrick's untracked symmetricP2/P3 examples)
+THE RECORDER, made whole (16-19) -- keyboard capture was broken THREE
+         separate ways, each found by Patrick's restart-and-retest and
+         each now pinned by a test replicating the REAL Qt delivery order:
+         (16) shortcut-consumed chords never arrive as KeyPress ->
+              capture ShortcutOverride too;
+         (17) the `obj is viewport` mouse branch ran FIRST and ate every
+              canvas keystroke (keyboard recording had never worked in
+              the app); keys are dispatched by event TYPE now. ^O "path"
+              records File>Open with its chosen file (hook pattern);
+         (18) the QWindow-level delivery (which precedes widget delivery
+              and never passes _belongs_to_main) SET the de-dupe guards
+              before the eligibility check, poisoning the recordable
+              delivery -- eligibility first, state second;
+         (19) CARET_SHORTCUTS: ONE module-level table drives recorder AND
+              runner -- adding a menu shortcut is one row, a design-guard
+              test fails on a row naming a missing MainWindow method.
+              ^+S "path" (Save As, hook), ^S soft-skips with no current
+              file, unnamed chords record nothing.
+FLOORS, per Patrick's spec (20-23; 20's cycle design was superseded by
+         his fuller spec ONE SESSION LATER, stated not blended):
+         (21) Floors menu = Select... (^F) / New... (^+F) / floors
+              (default FIRST, "name (Default)" = the roster's first
+              whatever its alias) / ghost toggle. ONE popup surface
+              (^F, status-bar label, right-click on blank canvas except
+              the Room tool) with the default PRE-HIGHLIGHTED so bare
+              ENTER selects it. Macro: ^F "name" switches, BARE ^F ->
+              default, ^+F "name" creates (IDEMPOTENT on replay); the
+              popup route records PUP ... # ^F "name" (comment form).
+         (22) floors paint in Z-BANDS: active floor = band 0 (always on
+              top; new items land on top with no re-sync), ghosts on
+              negative bands in a user-arranged display stack (per-floor
+              Move to front/back (display); view state, not serialized).
+              Applied as a DELTA so within-floor z is untouched -- NOT a
+              fifth z scheme; defect 11's P4.5 collapse should absorb the
+              band as the one between-floor term. Reference backdrop to
+              the true bottom. Fail-first receipt: "assert 5.0 > 5.0" --
+              all floors had shared one z.
+         (23) ATMOSPHERIC DEPTH: active floor full contrast, each visible
+              floor beneath fades by stack depth (0.60/0.39/0.25...,
+              floor 0.18) via per-item opacity -- no paint() touched.
+              Quick flip: Ctrl+PgDown/PgUp cycle; recording stays
+              deterministic (the hook emits the resulting ^F token).
+STANDING:  PR #4 remains on HOLD for the Patrick mini-gate (items 1-8, on
+         a fresh launch; findings 1-6 all fixed and pinned). Defect 35
+         stays OPEN until Patrick confirms the macro reproductions
+         covered everything on his shelf. _perimeter_span's re-argument
+         to P4.4 stands in the register. Noted follow-up, not built:
+         per-floor visibility (show a chosen subset while editing).
+
+P4.2  MINI-GATE PASSED 2026-08-02 -- defect 35 closed, census hygiene,
+         P4.2 TICKED; PR #4 merges as a merge commit on this record
+ruff:    clean
+pytest:  541 passed, 7 deselected, 4 xfailed (sum 552 -- and LOCAL == CI
+         for the first time since the mini-gate findings began: Patrick
+         removed his two untracked symmetricP2/P3.json, so the 554/552
+         delta the record has carried line-by-line is GONE)
+files:   examples/multifloor.fpm (committed at P4.2(25)),
+         docs/CODE_REVIEW_v2.md (row 35 closed), this file (the tick +
+         this block).
+notes:   Patrick ran the mini-gate on a FRESH LAUNCH with the status-bar
+         version label verified at the launch sha -- ALL 8 ITEMS PASS.
+         (The label discipline the stale-process round bought, doing its
+         job on the very run it was built for.)
+         DEFECT 35 CLOSED on the reporter's confirmation, per the row's
+         own re-open protocol: the shelf is EMPTY -- nothing remains on
+         the "still some problems with the drag" report beyond the
+         harvested findings 4-6. The residuals were neither stale-process
+         nor unreproducible: the macro loop converted them into findings
+         5 and 6 (six mechanisms, fixed against measured reproductions,
+         pinned verbatim); the reporter's confirmation retires the
+         report, which the clean replay alone never could.
+         MULTIFLOOR.FPM RULING, asked and recorded: CONVENIENCE FILE,
+         not pinned as a regression test -- the floors/token machinery
+         keeps its existing unit pins as its guard.
+         P4.2 ticked in the Status table citing PR #4 and the sub-commit
+         range dfd30af..ed9286c + this record commit (26 in all). The
+         snapshot is re-cut AT THE MERGE, on main, as the next action.
 ```

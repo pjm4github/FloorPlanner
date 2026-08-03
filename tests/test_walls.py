@@ -554,3 +554,109 @@ def test_dragging_an_end_into_a_doorway_names_the_doorway_at_release(
     msg = win.statusBar().currentMessage()
     assert "door 3280" in msg, f"gesture said nothing specific: {msg!r}"
     assert "dragging a wall end" in msg
+
+
+# -- defect 34 (P4.2): the gap REVIEW -- list, never auto-close ---------------
+def _gap_doc(win):
+    import warnings
+    from floorplanner.design.bridge import design_from_scene
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return design_from_scene(win).to_dict()
+
+
+def test_near_vertex_gaps_lists_the_band_and_only_the_band(fp, win):
+    from floorplanner.design.validate import near_vertex_gaps
+    sc = win.scene
+    # a 1.5" gap (probably a mistake) and a 6" gap (probably a reveal):
+    # BOTH listed with distances -- the review reports, a human decides
+    fp.rebuild_all_walls(sc)
+    sc.addItem(fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior"))
+    sc.addItem(fp.WallItem(QPointF(121.5, 0), QPointF(240, 0), "interior"))
+    sc.addItem(fp.WallItem(QPointF(0, 60), QPointF(120, 60), "interior"))
+    sc.addItem(fp.WallItem(QPointF(126, 60), QPointF(240, 60), "interior"))
+    # welded corners (0.0") and honestly-apart ends (>= 9") must NOT list
+    fp.rebuild_all_walls(sc)
+    gaps = near_vertex_gaps(_gap_doc(win))
+    dists = sorted(round(g[3], 2) for g in gaps)
+    assert dists == [1.5, 6.0], f"listed {dists}"
+
+
+def test_close_gap_welds_one_pair_and_leaves_the_reveal(fp, win):
+    from floorplanner.design.validate import near_vertex_gaps
+    sc = win.scene
+    sc.addItem(fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior"))
+    sc.addItem(fp.WallItem(QPointF(121.5, 0), QPointF(240, 0), "interior"))
+    sc.addItem(fp.WallItem(QPointF(0, 60), QPointF(120, 60), "interior"))
+    sc.addItem(fp.WallItem(QPointF(126, 60), QPointF(240, 60), "interior"))
+    fp.rebuild_all_walls(sc)
+    gaps = near_vertex_gaps(_gap_doc(win))
+    assert len(gaps) == 2
+    lvl, a, b, dist = gaps[0]                     # nearest first: the 1.5"
+    assert dist == pytest.approx(1.5)
+    n = fp.close_gap(sc, QPointF(*a), QPointF(*b))
+    assert n >= 1                                 # something really welded
+    left = near_vertex_gaps(_gap_doc(win))
+    dists = [round(g[3], 2) for g in left]
+    assert dists == [6.0], f"after closing the 1.5\": {dists}"
+    # the closed pair is ONE corner now, at the kept point `a`
+    ends = [w.end_vertex(attr) for w in sc.items()
+            if isinstance(w, fp.WallItem) and abs(w.p1.y()) < 1
+            for attr in ("p1", "p2")]
+    at_a = [v for v in ends
+            if abs(v.x - a[0]) < 0.01 and abs(v.y - a[1]) < 0.01]
+    assert len(at_a) == 2 and at_a[0] is at_a[1]  # same Vertex object
+    # and the deliberate 6" reveal is exactly where the user drew it
+    reveal = next(w for w in sc.items() if isinstance(w, fp.WallItem)
+                  and abs(w.p1.y() - 60) < 1 and w.p1.x() > 120)
+    assert min(reveal.p1.x(), reveal.p2.x()) == pytest.approx(126)
+
+
+def test_floating_room_distance_is_not_a_gap(fp, win):
+    from floorplanner.design.validate import near_vertex_gaps
+    from floorplanner.extract import extract_room
+    sc = win.scene
+    corners = [QPointF(0, 0), QPointF(120, 0), QPointF(120, 120),
+               QPointF(0, 120)]
+    for i in range(4):
+        sc.addItem(fp.WallItem(corners[i], corners[(i + 1) % 4], "interior"))
+    fp.rebuild_all_walls(sc)
+    res = fp.detect_room(sc, QPointF(60, 60))
+    room = fp.RoomItem("Den", QPointF(60, 60), res[0], res[1], corners=res[2])
+    sc.addItem(room)
+    fp.bind_room_walls(sc, room)
+    sc.addItem(fp.WallItem(QPointF(200, 0), QPointF(200, 120), "interior"))
+    fp.rebuild_all_walls(sc)
+    extract_room(sc, room)
+    room._translate(78, 0)     # park the floating room 2" from the lone wall
+    gaps = near_vertex_gaps(_gap_doc(win))
+    assert gaps == [], f"a floating room's position listed as a gap: {gaps}"
+
+
+def test_close_gap_leaves_outlines_holding_their_walls_corners(fp, win,
+                                                               make_room):
+    # Found at the P4.2 mini-gate (second finding): close the review's gaps,
+    # then drag a wall -- M Bath / Hall / Lounge drew dashed DIAGONALS to
+    # corners their walls no longer held. Root cause: close_gap folded WALL
+    # ends onto one anchor vertex but left the OUTLINES holding coincident-
+    # but-distinct twins (the P3.5 invariant broken); the next drag moved the
+    # walls' vertex and stranded the outline corners. The invariant is
+    # asserted directly: after closing, every outline corner IS one of its
+    # room's wall-end vertices, by identity.
+    from floorplanner.design.validate import near_vertex_gaps
+    sc = win.scene
+    ra = make_room(sc, 0, 0, 120, 120, "A")
+    rb = make_room(sc, 121.5, 0, 120, 120, "B")
+    gaps = near_vertex_gaps(_gap_doc(win))
+    assert len(gaps) == 2, f"precondition: two 1.5\" pairs, got {gaps}"
+    for _lvl, a, b, _dist in list(gaps):
+        assert fp.close_gap(sc, QPointF(*a), QPointF(*b)) >= 1
+    assert near_vertex_gaps(_gap_doc(win)) == []
+    for room in (ra, rb):
+        ends = {id(w.end_vertex(at)) for w in room.walls
+                for at in ("p1", "p2")}
+        for e in room.outline:
+            assert id(e.v) in ends, (
+                f"{room.name}: outline corner at ({e.v.x:.1f}, {e.v.y:.1f}) "
+                f"is not one of its walls' corners -- the next drag strands "
+                f"it into a diagonal")

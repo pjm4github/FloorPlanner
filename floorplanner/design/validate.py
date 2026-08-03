@@ -287,12 +287,27 @@ def check(d, deep=True):
     #     is the tight modelling one (0.6"), NOT the 9" gesture tolerance: a
     #     wall deliberately stopping short of another stays where the user put it.
     tol = float((d.get("settings") or {}).get("vertex_weld_in", 0.6))
+    # P4.2: a FLOATING room legitimately sits anywhere -- within weld
+    # tolerance of the plan, or exactly over its old berth. Its walls are
+    # exempt from weld closure AGAINST the plan (and against other floating
+    # rooms); closure WITHIN one floating room still holds. I12 is the
+    # invariant that guards the floating boundary, and I14 must not re-demand
+    # the very sharing I12 forbids. Same class of exemption I11 grants.
+    floatw = {}
+    for r in d["rooms"]:
+        if (r.get("placement") or {}).get("state") == "floating":
+            for e in r["outline"]:
+                if e.get("wall"):
+                    floatw[e["wall"]] = r["id"]
     if deep:                              # O(walls^2), deep only
         for w in d["walls"]:
             a, b = xy(w["v1"]), xy(w["v2"])
             for o in d["walls"]:
                 if o["id"] == w["id"] or o["level"] != w["level"]:
                     continue
+                if (floatw.get(w["id"]) != floatw.get(o["id"])
+                        and (w["id"] in floatw or o["id"] in floatw)):
+                    continue              # floating-vs-plan pair: exempt
                 c, e2 = xy(o["v1"]), xy(o["v2"])
                 L = math.dist(c, e2)
                 if L < 1e-6:
@@ -321,6 +336,48 @@ def check(d, deep=True):
             E.append(f"I13 room {r['id']} ({r['name']}) is on site level "
                      f"'{lv['name']}' but category is {r.get('category')}")
     return list(dict.fromkeys(E))
+
+
+def near_vertex_gaps(d, lo=None, hi=None):
+    """DEFECT 34's listing half (P4.2): the document's near-vertex pairs in
+    the (vertex_weld_in, join_tol_in) band -- real gaps in the FILE that
+    nothing reports and nothing may silently close. At or below `lo` two
+    points ARE one vertex (the walk welds them); at or beyond `hi` the wall
+    is simply elsewhere. In between, a 1.5" gap is probably a mistake and a
+    6" gap is probably a reveal, and nothing here can tell which -- so this
+    only LISTS, with distances, for a human to close one pair at a time
+    (`walls.close_gap`, the review op's apply half). Floating rooms'
+    vertices are exempt: their distance to the plan is their position, not
+    a gap.
+
+    Returns [(level_id, (ax, ay), (bx, by), dist)], nearest first."""
+    s = d.get("settings") or {}
+    lo = float(s.get("vertex_weld_in", 0.6)) if lo is None else lo
+    hi = float(s.get("join_tol_in", 9.0)) if hi is None else hi
+    floatv, floatw = set(), set()
+    for r in d["rooms"]:
+        if (r.get("placement") or {}).get("state") == "floating":
+            for e in r["outline"]:
+                floatv.add(e["v"])
+                if e.get("wall"):
+                    floatw.add(e["wall"])
+    for w in d["walls"]:
+        if w["id"] in floatw:
+            floatv.add(w["v1"])
+            floatv.add(w["v2"])
+    out = []
+    V = d["vertices"]
+    for i, a in enumerate(V):
+        if a["id"] in floatv:
+            continue
+        for b in V[i + 1:]:
+            if b["id"] in floatv or a.get("level") != b.get("level"):
+                continue
+            dd = math.dist((a["x"], a["y"]), (b["x"], b["y"]))
+            if lo < dd < hi:
+                out.append((a.get("level"), (a["x"], a["y"]),
+                            (b["x"], b["y"]), dd))
+    return sorted(out, key=lambda t: t[3])
 
 
 def report(d):

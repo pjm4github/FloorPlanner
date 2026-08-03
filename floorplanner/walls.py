@@ -865,6 +865,151 @@ def report_doorway_landings(scene, wall, gesture, ends=("p1", "p2")):
     return filed
 
 
+def collapse_degenerate_outline_edges(scene, floor=None, tol=1e-6):
+    """Drop zero-length OPEN outline edges -- two consecutive corners at one
+    point with no wall between them. Two producers (both P4.2): closing a
+    reviewed gap welds a pair of corners a room held as distinct outline
+    corners, leaving a zero-length open edge between them; and a drag's
+    mixed-corner STEP collapses to zero length when the drag ends where it
+    began. Purely hygiene: only `wall is None` edges of zero extent go, so
+    nothing a wall backs and nothing with area can ever be dropped.
+    Returns the number of edges removed."""
+    if scene is None:
+        return 0
+    floor = floor if floor is not None else active_floor()
+    removed = 0
+    for room in scene.items():                # duck-typed: the cycle rule
+        if getattr(room, "floor", None) != floor:
+            continue
+        outline = getattr(room, "outline", None) or []
+        n = len(outline)
+        if n < 4:
+            continue
+        keep, dropped_walls, drop = [], [], 0
+        for i, e in enumerate(outline):
+            nxt = outline[(i + 1) % n]
+            zero = (e.v is nxt.v
+                    or (abs(e.v.x - nxt.v.x) <= tol
+                        and abs(e.v.y - nxt.v.y) <= tol))
+            if zero and n - drop > 4:
+                drop += 1
+                if e.wall is not None:
+                    dropped_walls.append(e.wall)
+                continue
+            keep.append(e)
+        if len(keep) != n and len(keep) >= 3:
+            if hasattr(room, "prepareGeometryChange"):
+                room.prepareGeometryChange()
+            removed += n - len(keep)
+            room.outline[:] = keep
+            # a wall whose ONLY naming edge was the zero-length one backs
+            # nothing of this room any more -- the outline is the authority
+            # on which walls are the room's (P3.5)
+            for w in dropped_walls:
+                if (not any(k.wall is w for k in keep)
+                        and hasattr(room, "unbind_wall")):
+                    room.unbind_wall(w)
+        # collinear SPIKES (P4.2, finding 6's residue): the boundary
+        # overshoots along a line and doubles straight back -- zero area,
+        # left where a stationary corner was passed by its sliding side.
+        # The room's true boundary runs A -> C direct, so the fold corner
+        # goes. Iterate: removing one spike can expose another.
+        for _ in range(len(room.outline)):
+            outline = room.outline
+            n = len(outline)
+            if n < 4:
+                break
+            spike = None
+            for i in range(n):
+                a = outline[i].v.point()
+                b = outline[(i + 1) % n].v.point()
+                c = outline[(i + 2) % n].v.point()
+                d1x, d1y = b.x() - a.x(), b.y() - a.y()
+                d2x, d2y = c.x() - b.x(), c.y() - b.y()
+                l1 = math.hypot(d1x, d1y)
+                l2 = math.hypot(d2x, d2y)
+                if l1 < 1e-6 or l2 < 1e-6:
+                    continue
+                dot = (d1x * d2x + d1y * d2y) / (l1 * l2)
+                cross = abs(d1x * d2y - d1y * d2x) / (l1 * l2)
+                if dot < -0.999 and cross < 1e-3:
+                    spike = (i + 1) % n
+                    break
+            if spike is None:
+                break
+            if hasattr(room, "prepareGeometryChange"):
+                room.prepareGeometryChange()
+            dropped = outline[spike]
+            del outline[spike]
+            removed += 1
+            if (dropped.wall is not None
+                    and not any(k.wall is dropped.wall for k in outline)
+                    and hasattr(room, "unbind_wall")):
+                room.unbind_wall(dropped.wall)
+    return removed
+
+
+def close_gap(scene, a: QPointF, b: QPointF, floor=None, tol=0.75):
+    """DEFECT 34's apply half (P4.2): make the two corners at `a` and `b`
+    ONE corner at `a` -- explicitly, one pair at a time, from the review op.
+    Never automatic: a deliberate reveal is legitimate design and nothing
+    can tell it from a mistake, so the user picks the pair.
+
+    Every wall end and room-outline corner whose vertex sits at `b` (within
+    `tol`, and nearer `b` than `a`) is RELOCATED to `a` -- identity-carrying,
+    so every holder follows by construction, exactly as `_translate` moves a
+    room -- then coincident ends fold onto one vertex and the walls rebuild.
+    Returns the number of vertices relocated."""
+    if scene is None:
+        return 0
+    floor = floor if floor is not None else active_floor()
+    relocated = {}
+
+    def _near_b(v):
+        db = QLineF(v.point(), b).length()
+        return db <= tol and db < QLineF(v.point(), a).length()
+
+    def _moved(v):
+        if id(v) not in relocated:
+            relocated[id(v)] = v.relocated_to(QPointF(a))
+        return relocated[id(v)]
+
+    for w in [it for it in scene.items()
+              if isinstance(it, WallItem) and it.floor == floor]:
+        for attr in ("p1", "p2"):
+            v = w.end_vertex(attr)
+            if _near_b(v):
+                w.set_end_vertex(attr, _moved(v))
+    for room in scene.items():                # duck-typed: the cycle rule
+        if getattr(room, "floor", None) != floor:
+            continue
+        for e in getattr(room, "outline", None) or ():
+            if id(e.v) in relocated:
+                e.v = relocated[id(e.v)]
+            elif _near_b(e.v):
+                e.v = _moved(e.v)
+    if relocated:
+        share_coincident_ends(scene, floor)
+        # RESTORE THE P3.5 INVARIANT: the fold above re-binds WALL ends onto
+        # one anchor vertex per corner, and an outline left holding a
+        # coincident-but-distinct twin is a stranding the NEXT drag turns
+        # into a diagonal tear (found at the P4.2 mini-gate: close the gaps,
+        # drag a wall, and M Bath / Hall / Lounge drew dashed diagonals to
+        # corners their walls no longer held). Every room on the floor
+        # re-adopts its walls' corner vertices -- idempotent, and the same
+        # discipline the load path applies.
+        from floorplanner.rooms import share_outline_vertices  # late (cycle)
+        for room in scene.items():
+            if (getattr(room, "floor", None) == floor
+                    and getattr(room, "outline", None)):
+                share_outline_vertices(room)
+        # a room that held BOTH corners of the closed pair as its own outline
+        # corners is left with a zero-length open edge between them -- gone
+        collapse_degenerate_outline_edges(scene, floor)
+        rebuild_all_walls(scene)
+    return len(relocated)
+
+
 def rebuild_all_walls(scene):
     """Rebuild every wall's geometry and the junction clips.
 
@@ -1305,8 +1450,7 @@ class WallItem(QGraphicsItem):
             run_pts = [getattr(w, a) for w, a in run_ends]
             self._attached = []
             self._continuations = []      # collinear -- split, never dragged
-            sc, length = self.scene(), self.length()
-            ux, uy = self._slide_u.x(), self._slide_u.y()
+            sc = self.scene()
             if sc is not None:
                 for w in sc.items():
                     # SAME LEVEL ONLY (defect 12a). This scan was one of defect
@@ -1339,12 +1483,28 @@ class WallItem(QGraphicsItem):
                                 kind = "corner" if w.group() is None else "rigid"
                                 self._attached.append((w, attr, QPointF(q), kind))
                         else:
-                            vx, vy = q.x() - self.p1.x(), q.y() - self.p1.y()
-                            s = vx * ux + vy * uy
-                            if (0.0 < s < length
-                                    and abs(vy * ux - vx * uy) <= 0.75):
-                                self._attached.append((w, attr, QPointF(q), "tee"))
+                            # a body-landing on ANY run wall, not just self
+                            # (P4.2, mini-gate finding 5): the run slides as
+                            # ONE line, so an end resting mid-span of any
+                            # member must ride -- testing only self's body
+                            # left a mid-run corner floating when the line
+                            # moved out from under it
+                            for rw in self._run:
+                                rl = rw.length()
+                                if rl < 1e-6:
+                                    continue
+                                ru = rw.unit()
+                                vx = q.x() - rw.p1.x()
+                                vy = q.y() - rw.p1.y()
+                                s = vx * ru.x() + vy * ru.y()
+                                if (0.0 < s < rl
+                                        and abs(vy * ru.x()
+                                                - vx * ru.y()) <= 0.75):
+                                    self._attached.append(
+                                        (w, attr, QPointF(q), "tee"))
+                                    break
             run_ends = self._split_body_landings(run_ends)
+            run_ends = self._split_outline_landings(run_ends)
             self._plan_vertex_moves(run_ends)
 
         if self._mode in ("p1", "p2"):
@@ -1396,11 +1556,22 @@ class WallItem(QGraphicsItem):
         """The exact axis distance at which this wall's axis crosses the
         projected line of a NEARBY ORTHOGONAL wall, when the drag is within the
         stick tolerance of it -- else None (so it falls back to the grid).
-        Snaps only to such lines, never to endpoints or bodies."""
+        Snaps only to such lines, never to endpoints or bodies.
+
+        THE STICK IS SCENE-SPACE, by the defect-13 ruling (P4.2): a gesture
+        tolerance may pick the TARGET, but committed geometry derives from
+        scene-space rules -- this threshold decides where the end LANDS, so a
+        wall's final position must not depend on zoom. It used to widen by
+        `16.0 / view_scale` (64" at 0.25x), which is exactly the zoom-
+        dependent geometry defect 13 measured. The value is the vocabulary's
+        own: WALL_PROJECT_STICK (9", == JOIN_TOL, the schema's gesture
+        tolerance -- the same radius draw-release already snaps ends within).
+        The ~20px endpoint CATCH radius in `mousePressEvent` stays
+        zoom-scaled by the same ruling: it only decides what you grabbed."""
         sc = self.scene()
         if sc is None:
             return None
-        stick = max(WALL_PROJECT_STICK, 16.0 / max(self._view_scale(), 1e-6))
+        stick = WALL_PROJECT_STICK
         best_s, best_d = None, stick
         for w in sc.items():
             if (not isinstance(w, WallItem) or w is self
@@ -1436,10 +1607,26 @@ class WallItem(QGraphicsItem):
         """The full room 'side' this wall lies on: every wall of the same room
         (real and dashed open walls) that is collinear with it.  Body-sliding
         the wall moves the whole side -- including the open-wall gap -- as one,
-        so the dashed segment travels with the wall."""
-        if not self.rooms or self.length() < 1e-6:
+        so the dashed segment travels with the wall.
+
+        THE ROOM-LESS `[self]` SHORT-CIRCUIT STAYS, and the P2.3 row's second
+        predicted fix is REFUTED (P4.2). Ruling (e) asked for a
+        vertex-adjacency gather here so an undo-split wall body-drags as one;
+        implemented, it turned P3.3's anti-shear tests red -- `_tee_scene`
+        (a wall, its collinear continuation, a stem at the shared corner) is
+        topologically IDENTICAL to the undo-split segments, and P3.3's
+        settled rule ("split first, shear never": the continuation keeps its
+        vertex and stays exactly where it is) occupies that topology with
+        three pinned tests. The representation cannot distinguish "one wall
+        stored as two segments" from "two walls drawn end-to-end", so one
+        rule must own the topology, and the settled one does. Pinned by the
+        xfail `test_a_roomless_split_wall_body_drags_as_one_run`; the row
+        needs a RULING (carry vs stay), not a third predicted fix."""
+        if self.length() < 1e-6:
             return [self]
         u = self.unit()
+        if not self.rooms:
+            return [self]
         run = []
         side = {self}
         for r in self.rooms:
@@ -1515,6 +1702,47 @@ class WallItem(QGraphicsItem):
             self._attached[i] = (w, attr, orig, "corner")
         return run_ends
 
+    def _split_outline_landings(self, run_ends):
+        """A ROOM CORNER resting on the run's BODY is a tee the wall gather
+        cannot see (P4.2, mini-gate finding 6 -- fiveRoomDragSplit2 line 13):
+        no wall END sits there, only an outline vertex, so the run slid out
+        from under it and tore the room diagonal. Cut the run wall at the
+        corner and point every coincident outline corner AT THE SPLIT VERTEX
+        -- identity is what rides -- so the corner travels exactly as a
+        promoted tee does. Duck-typed on `outline` (the cycle rule).
+        Returns run_ends, extended with each new segment's ends."""
+        sc = self.scene()
+        if sc is None:
+            return run_ends
+        run_vids = {id(w.end_vertex(a)) for w, a in run_ends}
+        for room in list(sc.items()):
+            if getattr(room, "floor", None) != self.floor:
+                continue
+            for e in getattr(room, "outline", None) or ():
+                if id(e.v) in run_vids:
+                    continue
+                p = QPointF(e.v.point())
+                host = self._run_wall_under(p)
+                if host is None:
+                    continue
+                seg = split_wall_at(sc, host, p, on_seg_tol=0.75)
+                if seg is None:
+                    continue
+                self._run.append(seg)
+                run_ends = run_ends + [(host, "p2"), (seg, "p1"),
+                                       (seg, "p2")]
+                vs = seg.end_vertex("p1")       # the junction vertex
+                run_vids.add(id(vs))
+                for other in sc.items():        # every coincident corner
+                    if getattr(other, "floor", None) != self.floor:
+                        continue
+                    for oe in getattr(other, "outline", None) or ():
+                        if (oe.v is not vs
+                                and QLineF(oe.v.point(), p).length()
+                                <= SHARE_TOL):
+                            oe.v = vs
+        return run_ends
+
     def _plan_vertex_moves(self, run_ends):
         """Turn the 0.6" coincidence discovery into REAL VERTEX SHARING, once,
         at drag start -- P3.3's whole content.
@@ -1538,11 +1766,17 @@ class WallItem(QGraphicsItem):
         wall's BODY, not on a corner, so there is no vertex to share. They keep
         the sideways-only stretch, and become real topology at P3.4, where
         `split_edge` gives a body-landing a vertex to be."""
-        # 1. split off the collinear continuations, before anything is shared
+        # 1. split off the collinear continuations, before anything is shared.
+        # Each split leaves a STATIONARY twin of the corner, recorded here --
+        # step 4 must know where a continuation-bordered room's corner now
+        # lives.
+        stat_by_old = {}
         for w, attr in self._continuations:
             v = w.end_vertex(attr)
             if any(rw.end_vertex(ra) is v for rw, ra in run_ends):
-                w.set_end_vertex(attr, Vertex.at(v.point()))
+                nv = Vertex.at(v.point())
+                w.set_end_vertex(attr, nv)
+                stat_by_old[id(v)] = nv
 
         # 2. the run's own ends are the corners this drag moves
         moves, by_id = [], {}
@@ -1571,10 +1805,81 @@ class WallItem(QGraphicsItem):
         # region is DERIVED from its outline, so this is the whole of "the rooms
         # either side resize when a party wall slides" -- there is no detection
         # pass left to do it, and there does not need to be.
-        for room in {id(r): r for w in self._run for r in w.rooms}.values():
-            for e in getattr(room, "outline", ()):
+        #
+        # WHICH WAY A ROOM'S CORNER GOES IS DECIDED BY ITS OWN BOUNDARY
+        # (defect 30, P4.2 -- and CORRECTED at the P4.2 mini-gate, where the
+        # first cut's blanket follow tore a diagonal across the off-run rooms,
+        # caught by Patrick's screenshot). The anti-shear split (step 1) makes
+        # the old corner TWO corners: the run's, which the drag moves, and the
+        # continuation's, which stays exactly where it was. A room bordered at
+        # the corner by a RUN wall follows the run's vertex -- its edge must
+        # stay on the dragged wall. A room bordered by the CONTINUATION keeps
+        # the stationary vertex -- its edge must stay on the wall that did not
+        # move, and dragging its corner is what drew the diagonal. The
+        # perpendicular walls stretch between the two corners. Duck-typed on
+        # `outline` because walls cannot import rooms (the cycle rule);
+        # identity lookup makes a floor filter redundant (I2).
+        # A room can also be bordered by BOTH at one corner -- a run wall on
+        # one side and the continuation on the other, both along the slide
+        # line (the run covers only PART of that room's side; found at the
+        # P4.2 mini-gate, third finding: Master Suite's south side slides,
+        # Hall's top side extends past the run's end). One corner cannot
+        # serve two stretches that now sit on different lines, so it becomes
+        # TWO corners with an OPEN step edge between them (`wall: null`,
+        # drawn dashed -- there genuinely is no wall on the jog).
+        sc = self.scene()
+        run = set(self._run)
+        su = self._slide_u
+
+        def _run_backed(edge):
+            return edge is not None and edge.wall is not None and edge.wall in run
+
+        def _along_line(pa, pb):
+            dx, dy = pb.x() - pa.x(), pb.y() - pa.y()
+            ln = math.hypot(dx, dy)
+            return (ln > 1e-6
+                    and abs((dx / ln) * su.y() - (dy / ln) * su.x()) <= 0.05)
+
+        for room in (sc.items() if sc is not None else ()):
+            outline = getattr(room, "outline", None) or ()
+            n = len(outline)
+            steps = []                       # (index, kind) -- applied after
+            for i, e in enumerate(outline):
                 dv = by_id.get(id(e.v))
-                if dv is not None:
+                if dv is None:
+                    continue
+                prev = outline[i - 1] if n > 1 else None
+                run_prev, run_e = _run_backed(prev), _run_backed(e)
+                stat = stat_by_old.get(id(e.v))
+                if run_prev and not run_e and stat is not None \
+                        and _along_line(e.v.point(),
+                                        outline[(i + 1) % n].v.point()):
+                    steps.append((i, "after"))   # prev moves, e stays
+                elif run_e and not run_prev and stat is not None \
+                        and _along_line(outline[i - 1].v.point(),
+                                        e.v.point()):
+                    steps.append((i, "before"))  # e moves, prev stays
+                elif run_prev or run_e:
+                    dv.edges.append(e)      # bordered by the dragged run:
+                    continue                # the corner carries the room
+                elif stat is not None:
+                    e.v = stat              # bordered by the continuation:
+                                            # the room keeps the old corner
+            if steps and hasattr(room, "prepareGeometryChange"):
+                room.prepareGeometryChange()
+            for i, kind in reversed(steps):
+                e = outline[i]
+                dv = by_id[id(e.v)]
+                stat = stat_by_old[id(e.v)]
+                if kind == "after":
+                    # ... prev_edge -> [moved] --step-- [stat] -> e ...
+                    step = type(e)(e.v, None)
+                    e.v = stat
+                    room.outline.insert(i, step)
+                    dv.edges.append(step)
+                else:
+                    # ... prev_edge -> [stat] --step-- [moved] -> e ...
+                    room.outline.insert(i, type(e)(stat, None))
                     dv.edges.append(e)
         self._vmoves = moves
 
@@ -1640,7 +1945,34 @@ class WallItem(QGraphicsItem):
             # Shift.
             endpoint_edit = self._mode in ("p1", "p2")
             corner_drag = endpoint_edit and bool(self.rooms)
+            if self._mode == "move":
+                # a mixed-corner STEP inserted at press collapses to nothing
+                # when the drag ends where it began (P4.2)
+                collapse_degenerate_outline_edges(self.scene(), self.floor)
             merge_wall(self.scene(), self)          # fuse if it now overlaps
+            sc_after = self.scene()
+            if sc_after is not None:
+                # derived-state repair at the gesture's end (P4.2, mini-gate
+                # findings 4+5): the merge can absorb a wall a neighbour's
+                # outline still names (dead ref), and a stretched/shrunk
+                # perpendicular can leave an edge only PARTLY covered by its
+                # named wall -- a latent tear the NEXT drag turns diagonal.
+                # Bindings and outline structure re-derive; no coordinate
+                # moves.
+                from floorplanner.rooms import (  # late (cycle)
+                    repair_edge_bindings, share_outline_vertices,
+                    split_partially_covered_edges)
+                for room in sc_after.items():
+                    if (getattr(room, "outline", None)
+                            and getattr(room, "floor", None) == self.floor):
+                        repair_edge_bindings(sc_after, room)
+                        # re-adopt the walls' corner vertices: an outline
+                        # corner left coincident-but-DISTINCT from the wall
+                        # network's vertex cannot ride the next drag (the
+                        # close_gap stranding class; fiveRoomDragSplit2
+                        # line 13 accumulated one through a long sequence)
+                        share_outline_vertices(room)
+                        split_partially_covered_edges(sc_after, room)
             if endpoint_edit and self.scene() is not None:
                 # defect 25 (P4.1b): an end dragged into a doorway reports at
                 # the gesture, not at the next document walk -- and only the

@@ -15,7 +15,7 @@ from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.vertex import Vertex
 from floorplanner.walls import (
-    OpeningItem, WallItem, _CornerIndex, merge_all, rebuild_all_walls,
+    OpeningItem, WallItem, _CornerIndex, rebuild_all_walls,
     report_opening_failure,
 )
 
@@ -175,6 +175,16 @@ class RoomItem(QGraphicsItem):
         self.outline = []                # list[OutlineEdge]; corners derives
         self.corners = corners
         self.walls = []                  # WallItems this room owns (edge loop)
+        # placement (P4.2): whether this room participates in the shared wall
+        # network. A "placed" room is bound into the plan; a "floating" room is
+        # genuinely independent -- no shared wall, no shared vertex (I12) --
+        # which is what makes it safe to move as one unit. Modelled on the item
+        # so the walk emits it and the stash (`_v5_extra`) retires for it.
+        self.placement_state = "placed"
+        self.extracted_from = None       # level it was extracted from, or None
+        self.placement_rotation = 0.0
+        self._floating_furnishings = []  # captured at extract; ride _translate
+        self._drag_autofloat = False     # this drag auto-extracted the room
         self._moving_room = False        # drag-the-name moves the whole room
         self._room_grab = QPointF(0.0, 0.0)
         self.show_dims = False
@@ -629,8 +639,17 @@ class RoomItem(QGraphicsItem):
                              | Qt.AlignmentFlag.AlignTop, self.name)
             self._paint_open_edges(painter, option, ghost=True)
             return
-        painter.setBrush(QBrush(QColor(120, 170, 255, 26)))
+        floating = self.placement_state == "floating"
+        # a floating room reads distinctly -- warm fill + dashed boundary --
+        # so "extracted, not yet joined" is visible at a glance (P4.2)
+        painter.setBrush(QBrush(QColor(255, 170, 60, 34) if floating
+                                else QColor(120, 170, 255, 26)))
         painter.drawPath(self.path)
+        if floating:
+            painter.setPen(QPen(QColor(216, 130, 26), 0, Qt.PenStyle.DashLine))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawPath(self.path)
+            painter.setPen(Qt.PenStyle.NoPen)
         self._paint_open_edges(painter, option, ghost=False)
         if self.isSelected():
             painter.setPen(QPen(QColor(0, 122, 255), 0, Qt.PenStyle.DashLine))
@@ -652,7 +671,8 @@ class RoomItem(QGraphicsItem):
         painter.setPen(QPen(QColor(115, 115, 135), 0))
         painter.drawText(r, Qt.AlignmentFlag.AlignHCenter
                          | Qt.AlignmentFlag.AlignBottom,
-                         f"{self.area_sqft:.0f} sq ft")
+                         f"{self.area_sqft:.0f} sq ft"
+                         + (" (floating)" if floating else ""))
         if self.show_dims:
             self._paint_dims(painter)
 
@@ -759,58 +779,6 @@ class RoomItem(QGraphicsItem):
                                          exclude=self)
             self.update()
 
-    def _privatize_shared_walls(self):
-        """Before a move, swap every wall shared with another room for a private
-        copy of just this room's edge (carrying in-span openings), so moving the
-        room never drags the neighbour.  Dropped walls re-merge on release.
-
-        ASSESSED AND KEPT AT P3.5 (rider 4 left the call open until the outlines
-        had flipped). It survives because its reason is untouched: a party wall
-        is ONE wall, so a room that moves off one must stop owning it or the
-        neighbour is reshaped. What P3.5 changes is only how that works --
-        `_translate` relocates corners, and a relocation produces a new `Vertex`
-        that only the ends REBOUND to it follow, so a wall this room no longer
-        owns simply stays on the old corner. Nothing has to hold it back.
-
-        It is still the wrong SHAPE for the job, and the plan already says where
-        that is fixed: P4.2 replaces this silent duplicate-on-drag with a real
-        `extract` operation. (CORRECTED at the P4.1 read-back, 2026-07-31: an
-        earlier version of this docstring said `_perimeter_span` falls with
-        `fracture_delete_wall` at P4.1. It does not -- `_copy_spec` and this
-        method both call it and both outlive fracture, so its death is P4.2's
-        at the earliest, contingent on `_copy_spec` being reshaped there.)"""
-        sc = self.scene()
-        if sc is None:
-            return
-        for w in list(self.walls):
-            if len(w.rooms) <= 1:
-                continue
-            span = self._perimeter_span(w)
-            if span is None:
-                continue
-            s0, s1 = span
-            c = WallItem(w.point_at(s0), w.point_at(s1), w.wall_type)
-            c.floor = w.floor                 # private copy stays on the wall's floor
-            sc.addItem(c)
-            for op in w.openings:             # carry this edge's doors/windows
-                if s0 - 1e-6 <= op.s <= s1 + 1e-6:
-                    try:
-                        nop = OpeningItem(c, op.kind, op.code, op.s - s0)
-                    except ValueError as exc:
-                        report_opening_failure(sc, c, op.kind, op.code,
-                                               op.s - s0,
-                                               f"{exc} (moving a room off a "
-                                               f"wall it shares)")
-                        continue
-                    nop.door_type, nop.swing = op.door_type, op.swing
-                    c.openings.append(nop)
-            self.unbind_wall(w)               # this room drops the shared wall
-            self.bind_wall(c)                 # and takes its private copy
-            for e in self.outline:            # ...and its outline says so: the
-                if e.wall is w:               # outline is the authority on
-                    e.wall = c                # which walls are this room's
-            c.rebuild()
-
     def _translate(self, dx: float, dy: float):
         """Rigidly shift the room's owned walls, openings and region.
 
@@ -837,6 +805,9 @@ class RoomItem(QGraphicsItem):
             e.v = moved[id(e.v)]
         for w in self.walls:
             w.rebuild()                       # repositions its openings too
+        for f in getattr(self, "_floating_furnishings", ()) or ():
+            if f.scene() is not None:         # captured at extract (P4.2):
+                f.moveBy(dx, dy)              # furnishings ride the float
         if not self.outline:                  # no outline -> the fallback moves
             self._path = QTransform.fromTranslate(dx, dy).map(self._path)
         self.anchor = QPointF(self.anchor.x() + dx, self.anchor.y() + dy)
@@ -854,7 +825,25 @@ class RoomItem(QGraphicsItem):
             self._dragging_label = True
             if self.walls and not ctrl:
                 self._moving_room = True
-                self._privatize_shared_walls()   # don't drag neighbours' walls
+                if self.placement_state != "floating":
+                    # P4.2: the label-drag of a PLACED room is extract ->
+                    # move -> join through the REAL ops -- the same
+                    # observable result the privatize-then-merge_all path
+                    # produced, minus the shadow implementation it was
+                    from floorplanner.extract import extract_room  # late
+                    extract_room(self.scene(), self)
+                    # the plain drag moves the room, not its furnishings --
+                    # today's behaviour, preserved; carrying furnishings is
+                    # the EXPLICIT extract's trait
+                    self._floating_furnishings = []
+                    self._drag_autofloat = True
+                elif not self._floating_furnishings:
+                    # a room LOADED floating never ran extract, so its
+                    # furnishing capture (scene state, not document state)
+                    # happens lazily at first drag
+                    from floorplanner.extract import (  # late: higher layer
+                        capture_floating_furnishings)
+                    capture_floating_furnishings(self.scene(), self)
                 self._room_grab = QPointF(e.scenePos())
             else:
                 self._moving_room = False
@@ -891,11 +880,21 @@ class RoomItem(QGraphicsItem):
         if self._dragging_label:
             moved, self._dragging_label, self._moving_room = (
                 self._moving_room, False, False)
-            if moved:
-                sc = self.scene()
+            sc = self.scene()
+            if getattr(self, "_drag_autofloat", False):
+                # the drag owns this float (a placed room's label-drag is
+                # extract -> move -> join, P4.2): it ends PLACED whether the
+                # mouse moved or not -- a click must not leave a room afloat
+                self._drag_autofloat = False
                 if sc is not None:
-                    merge_all(sc)             # dropped adjacent -> re-merge
-                    rebuild_all_walls(sc)     # re-detect region + re-bind walls
+                    from floorplanner.extract import join_room  # late
+                    join_room(sc, self)
+            elif moved and sc is not None:
+                # an explicitly floating room: the move is CLOSED (P4.2,
+                # section 4) -- nothing merges, welds or binds until an
+                # explicit Join
+                rebuild_all_walls(sc)
+            if moved:
                 self.raise_to_front()
             e.accept()
             return
@@ -916,6 +915,11 @@ class RoomItem(QGraphicsItem):
         a_inv = menu.addAction("Inventory…")
         a_ren = menu.addAction("Rename…")
         a_copy = menu.addAction("Copy room")
+        a_extract = a_join = None
+        if self.placement_state == "floating":
+            a_join = menu.addAction("Join room into plan")
+        elif self.walls:
+            a_extract = menu.addAction("Extract room (float it)")
         menu.addSeparator()
         a_del = menu.addAction("Delete room")
         a_front, a_back = add_front_back_actions(menu)
@@ -933,6 +937,20 @@ class RoomItem(QGraphicsItem):
                 v.win.status(f"Copied room '{self.name}' — with the Room "
                              "Name tool active, right-click a blank spot "
                              "to paste.")
+        elif a_extract is not None and chosen is a_extract:
+            from floorplanner.extract import extract_room  # late: higher layer
+            extract_room(self.scene(), self)
+            v = self._view()
+            if v is not None:
+                v.win.status(f"Extracted '{self.name}' — drag it by its name, "
+                             "then right-click it to join it back into the "
+                             "plan.")
+        elif a_join is not None and chosen is a_join:
+            from floorplanner.extract import join_room  # late: higher layer
+            join_room(self.scene(), self)
+            v = self._view()
+            if v is not None:
+                v.win.status(f"Joined '{self.name}' into the plan.")
         elif chosen is a_props:
             dlg = RoomPropertiesDialog(self, self._view())
             if dlg.exec() == QDialog.DialogCode.Accepted:
@@ -1105,6 +1123,145 @@ def duplicate_wall(scene, w):
         nw.openings.append(nop)
     nw.rebuild()
     return nw
+
+
+def repair_edge_bindings(scene, room):
+    """Re-resolve outline edges whose named wall is WRONG in one of two
+    narrow, safe-to-fix ways (P4.2, found by the fiveRoom macros):
+
+    * DEAD -- the wall has left the scene (a merge absorbed it); the edge
+      is looked up afresh, partial cover accepted, exactly as a load would.
+    * OUTSPANNED -- the wall is alive but does not span the edge, while
+      ANOTHER wall FULLY spans it (the fiveRoomDragSplit2 macro seeded
+      this at its line 4: an edge bound to a collinear neighbour that
+      covers none of it, with the exactly-matching wall right there --
+      `_edge_wall`'s partial-cover acceptance had grabbed the wrong
+      candidate during an earlier repair). UPGRADE ONLY: the rebind happens
+      solely when the candidate fully spans -- a named wall that is
+      legitimately short (a detached wall mid-open, a stretch awaiting the
+      partial-cover splitter) is never swapped sideways or downgraded.
+
+    Deliberately NARROWER than `bind_room_walls`: an edge whose wall is
+    None stays None -- a deliberately opened side must never be silently
+    re-closed. Returns the number of edges repaired."""
+    if not room.outline or not room.corners:
+        return 0
+    corners = room.corners
+    n = len(corners)
+    fixed = 0
+    for i, e in enumerate(room.outline):
+        if e.wall is None:
+            continue
+        a, b = corners[i], corners[(i + 1) % n]
+        dead = e.wall.scene() is None
+        if not dead and _wall_spans_segment(e.wall, a, b):
+            continue
+        old = e.wall
+        cand = (None if QLineF(a, b).length() < MIN_WALL_LEN
+                else _edge_wall(scene, a, b, room.floor))
+        if dead:
+            e.wall = cand
+        elif (cand is not None and cand is not old
+                and _wall_spans_segment(cand, a, b)):
+            e.wall = cand
+        else:
+            continue
+        if old in room.walls and not any(k.wall is old for k in room.outline):
+            room.unbind_wall(old)
+        if e.wall is not None:
+            room.bind_wall(e.wall)
+            fixed += 1
+    return fixed
+
+
+# the original, narrower name -- kept callable; the repair grew a second
+# case at the fiveRoomDragSplit2 finding and was renamed to say what it does
+rebind_dead_edges = repair_edge_bindings
+
+
+def split_partially_covered_edges(scene, room, tol=0.75):
+    """Split an outline edge at the END of a live wall that covers only PART
+    of it (P4.2, mini-gate finding 5 -- Patrick's fiveRoomDragSplit macro).
+
+    A drag that stretches or shrinks a perpendicular wall, or a join that
+    lands a room slightly offset, leaves an edge NAMED by a wall that no
+    longer spans it. That state is a LATENT TEAR: the next drag moves the
+    wall's end vertex and the un-split edge follows at only one corner --
+    the diagonal. The cure is structural: the coverage boundary becomes a
+    real corner HOLDING THE WALL'S OWN END VERTEX, so later drags carry it
+    by construction (and the mixed-corner step logic sees a plain corner
+    instead of a hidden seam); the uncovered remainder re-binds to whatever
+    actually covers it, or stays honestly open (None). Runs at drag release
+    and after a join -- derived-state repair, never a coordinate move.
+    Returns the number of splits made."""
+    made = 0
+    guard = len(room.outline) + 8
+    while guard > 0:
+        guard -= 1
+        corners = room.corners or []
+        n = len(corners)
+        if n < 3:
+            return made
+        split = None
+        for i, e in enumerate(room.outline):
+            w = e.wall
+            if w is None or w.scene() is None:
+                continue
+            a, b = corners[i], corners[(i + 1) % n]
+            if _wall_spans_segment(w, a, b):
+                continue
+            ex, ey = b.x() - a.x(), b.y() - a.y()
+            elen = math.hypot(ex, ey)
+            if elen < 2.0:
+                continue
+            ex, ey = ex / elen, ey / elen
+            for attr in ("p1", "p2"):
+                p = getattr(w, attr)
+                s = (p.x() - a.x()) * ex + (p.y() - a.y()) * ey
+                perp = abs((p.y() - a.y()) * ex - (p.x() - a.x()) * ey)
+                if not (perp <= tol and 1.0 < s < elen - 1.0):
+                    continue
+                # NEVER split under the deliberate-open workflow: a DETACHED
+                # wall (`_corners_unlocked`, set only by
+                # `detach_wall_from_room`, cleared at relock) retracted
+                # mid-edge must keep its openness DERIVED, so dragging the
+                # end back re-closes the gap -- splitting there froze it
+                # open (test_closing_gap_refuses_and_relocks caught it).
+                # Everything else mid-edge is a structural boundary. (A
+                # junction-DEGREE guard was tried first and was wrong: a
+                # slid wall can leave a genuinely dangling structural end
+                # mid-edge, which the fiveRoomDragSplit2 macro seeded at
+                # its line 4 and tore at line 12.)
+                if getattr(w, "_corners_unlocked", False):
+                    continue
+                split = (i, e, w, attr, a, b, p)
+                break
+            if split is not None:
+                break
+        if split is None:
+            return made
+        i, e, w, attr, a, b, p = split
+        vp = w.end_vertex(attr)
+        uw, lw = w.unit(), w.length()
+        sa = (a.x() - w.p1.x()) * uw.x() + (a.y() - w.p1.y()) * uw.y()
+        pa = abs((a.y() - w.p1.y()) * uw.x() - (a.x() - w.p1.x()) * uw.y())
+        a_covered = pa <= tol and -tol <= sa <= lw + tol
+        room.prepareGeometryChange()
+        if a_covered:
+            # a..p stays with w; the p..b remainder re-binds
+            other = _edge_wall(scene, QPointF(p), QPointF(b), room.floor)
+            other = None if other is w else other
+            room.outline.insert(i + 1, OutlineEdge(vp, other))
+        else:
+            # a..p re-binds; p..b keeps w
+            other = _edge_wall(scene, QPointF(a), QPointF(p), room.floor)
+            other = None if other is w else other
+            e.wall = other
+            room.outline.insert(i + 1, OutlineEdge(vp, w))
+        if other is not None:
+            room.bind_wall(other)
+        made += 1
+    return made
 
 
 def bind_room_walls(scene, room, settle=True):

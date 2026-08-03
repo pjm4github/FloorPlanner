@@ -92,13 +92,15 @@ EXTERIOR_NAMES = ("porch", "deck", "patio", "terrace", "lanai")
 # so it survives ordinary edits but DIES WITH THE ITEM. A wall carrying
 # thickness_in that gets coalesced away, or a room deleted and re-detected,
 # silently loses its stash. That is acceptable only because these fields have no
-# editor yet -- P4/P5 model them properly (placement/nominal_size at P4.2-P4.4,
+# editor yet -- P4/P5 model them properly (nominal_size at P4.4,
 # area_accounting and the finishes at P5.1-P5.3) and the stash retires then.
+# `placement` retired at P4.2 exactly this way: modelled on RoomItem, emitted
+# by the walk, applied on load, and no longer stashed.
 # Written down here so it is a known limit, not a mystery discovered later.
 _WALL_MODELLED = frozenset(("id", "level", "v1", "v2", "type", "left", "right",
                             "openings"))
 _ROOM_MODELLED = frozenset(("id", "level", "name", "outline", "label",
-                            "properties"))
+                            "properties", "placement"))
 # settings keys the walk re-emits itself; anything else in a document's
 # settings (e.g. `name`) is likewise retained rather than lost
 WALK_SETTINGS = frozenset(DEFAULT_SETTINGS) | {"vertex_weld_in", "join_tol_in",
@@ -552,19 +554,25 @@ def _rooms_of(items, lid, nid, vt, walls, rep):
             "category": ("exterior" if any(k in low for k in EXTERIOR_NAMES)
                          else "interior"),
             "outline": loop,
-            "placement": {"state": "placed", "rotation": 0.0,
-                          "extracted_from": None},
+            # P4.2: placement is MODELLED on the item now -- the walk reads it
+            # rather than stamping "placed", so a floating room round-trips
+            # through save, undo and verify without the stash
+            "placement": {
+                "state": getattr(r, "placement_state", None) or "placed",
+                "rotation": float(getattr(r, "placement_rotation", 0.0) or 0.0),
+                "extracted_from": getattr(r, "extracted_from", None)},
             "label": {"offset": [round(r.anchor.x() + r.label_offset.x() - cx, 3),
                                  round(r.anchor.y() + r.label_offset.y() - cy, 3)],
                       "show_dimensions": bool(r.show_dims),
                       "show_area": True},
             "properties": props,
         }
-        # v5 fields the SCENE has no home for (category, placement,
-        # area_accounting, holes, nominal_size) ride back out verbatim, or a
-        # save would quietly drop them -- measured: symmetricP1's Garage lost
-        # area_accounting: "unconditioned". The derived defaults above stand
-        # for a scene that was never loaded from a v5 document.
+        # v5 fields the SCENE has no home for (category, area_accounting,
+        # holes, nominal_size) ride back out verbatim, or a save would quietly
+        # drop them -- measured: symmetricP1's Garage lost area_accounting:
+        # "unconditioned". The derived defaults above stand for a scene that
+        # was never loaded from a v5 document. (`placement` left the stash at
+        # P4.2 -- it is modelled above.)
         rec.update(getattr(r, "_v5_extra", None) or {})
         rooms.append(rec)
     return rooms
@@ -651,17 +659,35 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
                        "height_in": 96.0, "kind": "storey",
                        "reference": bool(f.reference)})
         items = buckets.get(f.name, [])    # ...ITEMS INNER, and only these
-        vt = VertexTable(lambda: nid("v"))
-        lw = _walls_of(items, lid, nid, vt, rep)
-        lr = _rooms_of(items, lid, nid, vt, lw, rep)
-        poly = _bind_sides(lr, lw, vt)
-        lf = _furnishings_of(items, lid, nid, lr, poly)
-        # I10: emit only the vertices some wall or outline actually uses
-        used = {v for w in lw for v in (w["v1"], w["v2"])}
-        used |= {e["v"] for rm in lr for e in rm["outline"]}
-        vertices += [row for row in vt.rows if row["id"] in used]
-        walls += lw
-        rooms += lr
+        # P4.2: a FLOATING room folds among its own items only. The lift's
+        # "coincident coordinates are one corner" rule is exactly the sharing
+        # a floating room has explicitly broken (I12), so each floating room
+        # walks with its OWN vertex table -- a room parked over its old berth
+        # emits private vertices instead of being silently re-welded to the
+        # plan, and a floating room a gesture-width from a wall is not an
+        # "unwelded end" (the weld check runs per partition too).
+        floating = [r for r in items if isinstance(r, RoomItem)
+                    and getattr(r, "placement_state", "placed") == "floating"]
+        fids = {id(r) for r in floating}
+        fids |= {id(w) for r in floating for w in r.walls}
+        parts = [[it for it in items if id(it) not in fids]]
+        parts += [[r] + [w for w in r.walls if w.scene() is not None]
+                  for r in floating]
+        lw_all, lr_all, poly_all = [], [], {}
+        for part in parts:
+            vt = VertexTable(lambda: nid("v"))
+            lw = _walls_of(part, lid, nid, vt, rep)
+            lr = _rooms_of(part, lid, nid, vt, lw, rep)
+            poly_all.update(_bind_sides(lr, lw, vt))
+            # I10: emit only the vertices some wall or outline actually uses
+            used = {v for w in lw for v in (w["v1"], w["v2"])}
+            used |= {e["v"] for rm in lr for e in rm["outline"]}
+            vertices += [row for row in vt.rows if row["id"] in used]
+            lw_all += lw
+            lr_all += lr
+        lf = _furnishings_of(items, lid, nid, lr_all, poly_all)
+        walls += lw_all
+        rooms += lr_all
         furnishings += lf
 
     n = rep["unwelded_ends"]
@@ -980,6 +1006,10 @@ def apply_design_to_scene(target, design, report=None, strict=False,
                          for e in rd["outline"]])
         room.floor = lname.get(rd["level"], DEFAULT_FLOOR)   # never the global
         room._v5_extra = {k: v for k, v in rd.items() if k not in _ROOM_MODELLED}
+        pl = rd.get("placement") or {}
+        room.placement_state = pl.get("state") or "placed"
+        room.extracted_from = pl.get("extracted_from")
+        room.placement_rotation = float(pl.get("rotation") or 0.0)
         room.show_dims = bool((rd.get("label") or {}).get("show_dimensions",
                                                           False))
         room.label_offset = QPointF(0.0, 0.0)

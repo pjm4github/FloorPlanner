@@ -4,6 +4,7 @@ This is the home of the shared mutable ``SETTINGS`` dict (read across the whole
 app) and the immutable constants.  Everything imports these from here so the
 settings object is a single shared instance, never duplicated.
 """
+import os
 import sys
 from pathlib import Path
 
@@ -23,6 +24,7 @@ __all__ = [
     "TOOL_WINDOW", "TOOL_ROOM", "DOOR_TYPES", "GARAGE_DEFAULTS", "ROOM_CELL",
     "ROOM_TYPES", "CEILING_TYPES", "FLOOR_FINISHES", "WALL_FINISHES",
     "HVAC_TYPES", "DEFAULT_ROOM_PROPS", "APP_NAME", "APP_VERSION", "APP_URL",
+    "CODE_VERSION", "code_version",
     "config_dir", "settings_file", "designs_dir", "app_settings",
     "FONT_DIR", "FONT_FAMILY", "load_fonts",
     "ICON_DIR", "FURN_DIR", "FURN_MIME", "tool_icon",
@@ -120,6 +122,52 @@ DEFAULT_ROOM_PROPS = {
 APP_NAME = "FloorPlanner"
 APP_VERSION = "1.2"
 APP_URL = "https://github.com/pjm4github/FloorPlanner"
+
+
+def _read_code_version() -> str:
+    """`vAPP_VERSION · <branch> @ <sha7>` for the checkout this process was
+    launched from, read straight off `.git` (no subprocess). Falls back to
+    the bare version outside a git checkout."""
+    v = f"v{APP_VERSION}"
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    try:
+        with open(os.path.join(root, ".git", "HEAD"), encoding="utf-8") as fh:
+            head = fh.read().strip()
+    except OSError:
+        return v
+    if not head.startswith("ref: "):
+        return f"{v} · detached @ {head[:7]}"
+    ref = head[5:].strip()
+    branch = ref.rsplit("/", 1)[-1]
+    sha = ""
+    try:
+        with open(os.path.join(root, ".git", *ref.split("/")),
+                  encoding="utf-8") as fh:
+            sha = fh.read().strip()[:7]
+    except OSError:
+        try:
+            with open(os.path.join(root, ".git", "packed-refs"),
+                      encoding="utf-8") as fh:
+                for line in fh:
+                    if line.strip().endswith(ref):
+                        sha = line.split(None, 1)[0][:7]
+                        break
+        except OSError:
+            pass
+    return f"{v} · {branch}" + (f" @ {sha}" if sha else "")
+
+
+# Captured ONCE, at import -- i.e. at launch. A running Python process keeps
+# the code it imported, so the truthful answer to "which code is this window
+# running?" is what .git said when the process started, not what is on disk
+# now (the P4.2 mini-gate's stale-process lesson: a fix landed on disk while
+# an app launched earlier kept reproducing the old bug).
+CODE_VERSION = _read_code_version()
+
+
+def code_version() -> str:
+    """The launch-time code identity: version, branch and commit."""
+    return CODE_VERSION
 
 
 def config_dir() -> Path:

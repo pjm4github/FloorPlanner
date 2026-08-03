@@ -572,3 +572,194 @@ def test_recorded_opening_replays_without_dialog(fp, win):
     wall = next(it for it in win.scene.items() if isinstance(it, fp.WallItem))
     assert len(wall.openings) == 1
     assert wall.openings[0].kind == "door"
+
+
+def test_recorder_captures_action_shortcuts(fp, win, qapp):
+    # P4.2, two capture bugs pinned at once. (1) a keystroke matching a menu
+    # QAction shortcut (Ctrl+G group, Ctrl+Shift+G ungroup, Del, Ctrl+Z
+    # undo...) is consumed by Qt's shortcut system and never arrives as a
+    # KeyPress -- so recordings lacked exactly the plan-MODIFYING shortcuts;
+    # the recorder now also captures ShortcutOverride. (2) the canvas
+    # keyboard focus sits on the VIEWPORT, and the capture's `obj is
+    # viewport` mouse branch came FIRST -- so every canvas keystroke fell
+    # into it and was dropped; keys are now handled by event TYPE before any
+    # object test. Hence the events here target the VIEWPORT, the real-app
+    # delivery. (QKeyEvents are built directly with their modifiers -- never
+    # synthesized Ctrl via QTest, which leaks global keyboardModifiers
+    # headlessly.)
+    from floorplanner.macro import MacroRecorderDialog
+    dlg = MacroRecorderDialog(win)
+    dlg.start()
+    try:
+        win.show()
+        win.winId()                       # force the native window to exist
+        vp = win.view.viewport()
+        wh = win.windowHandle()
+        # TABLE-DRIVEN: every recordable Ctrl-shortcut in CARET_SHORTCUTS is
+        # exercised, so a new row is covered the moment it is added; the
+        # hook-emitted tokens (^O, ^+S) are asserted NOT to raw-record.
+        from floorplanner.macro import CARET_HOOK_TOKENS, CARET_SHORTCUTS
+        cases = []
+        for tok, spec in CARET_SHORTCUTS.items():
+            mods = Qt.KeyboardModifier.ControlModifier
+            if tok.startswith("+"):
+                mods |= Qt.KeyboardModifier.ShiftModifier
+            expect = None if tok in CARET_HOOK_TOKENS else f"^{tok}"
+            cases.append((spec["key"], mods, expect))
+        cases += [
+            (Qt.Key.Key_Delete, Qt.KeyboardModifier.NoModifier, "DEL"),
+            (Qt.Key.Key_Left, Qt.KeyboardModifier.NoModifier, "LEFT"),
+        ]
+        for key, mods, _tok in cases:
+            ov = QKeyEvent(QEvent.Type.ShortcutOverride, key, mods)
+            # Qt delivers at the QWINDOW level first -- a delivery the
+            # recorder must IGNORE WITHOUT TOUCHING ITS DE-DUPE STATE, or
+            # the widget-level delivery that follows is poisoned (Patrick's
+            # Ctrl+G retest: shortcut-consumed chords recorded nothing)
+            QApplication.sendEvent(wh, ov)
+            QApplication.sendEvent(vp, ov)
+            # the same event object propagating again must not double-record
+            QApplication.sendEvent(vp, ov)
+            # ...nor its KeyPress echo (same key+mods, timestamp 0)
+            QApplication.sendEvent(
+                vp, QKeyEvent(QEvent.Type.KeyPress, key, mods))
+            QApplication.sendEvent(
+                vp, QKeyEvent(QEvent.Type.KeyRelease, key, mods))
+        text = dlg.edit.toPlainText().split()
+        assert text == [t for _k, _m, t in cases if t is not None], text
+    finally:
+        dlg.stop()
+        dlg.deleteLater()
+        qapp.processEvents()
+
+
+def test_recorder_emits_open_token_and_runner_replays_it(fp, win, qapp,
+                                                         tmp_path):
+    # ^O "path": File > Open's chosen file is captured as one self-contained
+    # token (the on_place/on_room pattern -- the dialog is modal, so the
+    # event stream cannot see the path), and the runner replays it without
+    # any dialog.
+    import pathlib
+    from floorplanner.macro import MacroRecorderDialog
+    ex = pathlib.Path(__file__).resolve().parent.parent / "examples"
+    plan = str(ex / "fiveRoomTest.json")
+    dlg = MacroRecorderDialog(win)
+    dlg.start()
+    try:
+        win._recorder.on_open(plan)
+        text = dlg.edit.toPlainText().strip()
+        assert text == f'^O "{plan}"', text
+    finally:
+        dlg.stop()
+        dlg.deleteLater()
+        qapp.processEvents()
+    res = win.run_macro(text)
+    assert res["ok"], res
+    names = sorted(r.name for r in win.scene.items()
+                   if isinstance(r, fp.RoomItem))
+    assert names == ["R1", "R2", "R3", "R4", "R5"]
+
+
+def test_caret_shortcut_table_methods_all_exist(fp, win):
+    # THE DESIGN GUARD: adding a shortcut is one CARET_SHORTCUTS row, and
+    # this test fails the moment a row names a MainWindow method that does
+    # not exist -- so a typo cannot ship as a silently dead token.
+    from floorplanner.macro import CARET_SHORTCUTS
+    for tok, spec in CARET_SHORTCUTS.items():
+        m = spec["method"]
+        if m is not None:
+            assert callable(getattr(win, m, None)), \
+                f"CARET_SHORTCUTS[{tok!r}] names missing method {m!r}"
+        assert "key" in spec, f"CARET_SHORTCUTS[{tok!r}] has no Qt key"
+
+
+def test_save_as_records_and_replays_with_its_path(fp, win, qapp, tmp_path):
+    # ^+S "path": Save As records its chosen file into one token (on_save_as
+    # hook), and the runner replays it -- write, wipe, reopen, all headless.
+    import pathlib
+    from floorplanner.macro import MacroRecorderDialog
+    ex = pathlib.Path(__file__).resolve().parent.parent / "examples"
+    win.load_path(str(ex / "fiveRoomTest.json"))
+    out = str(tmp_path / "saved_copy.json")
+    dlg = MacroRecorderDialog(win)
+    dlg.start()
+    try:
+        win._recorder.on_save_as(out)
+        text = dlg.edit.toPlainText().strip()
+        assert text == f'^+S "{out}"', text
+    finally:
+        dlg.stop()
+        dlg.deleteLater()
+        qapp.processEvents()
+    res = win.run_macro(text)
+    assert res["ok"], res
+    assert os.path.exists(out)
+    res = win.run_macro(f'^N ^O "{out}"')
+    assert res["ok"], res
+    names = sorted(r.name for r in win.scene.items()
+                   if isinstance(r, fp.RoomItem))
+    assert names == ["R1", "R2", "R3", "R4", "R5"]
+
+
+def test_ctrl_s_with_no_file_skips_instead_of_failing(fp, win):
+    # a recorded ^S with no current file falls through to Save As in the
+    # app (whose ^+S "path" token follows in the recording) -- the runner
+    # skips it rather than failing the whole macro
+    res = win.run_macro("^S")
+    assert res["ok"] and not res["errors"], res
+
+
+def test_floor_select_and_new_record_and_replay(fp, win, qapp):
+    # The P4.2 Floors-menu spec (supersedes the one-session-old cycle
+    # design, deliberately): Ctrl+F pops the floor selector (default floor
+    # first and PRE-HIGHLIGHTED, so ENTER with no arrows selects it);
+    # Ctrl+Shift+F is New floor. Macro side: ^F "name" switches, BARE ^F
+    # returns to the default (roster's first, whatever its name), and
+    # ^+F "name" creates -- idempotently, so replays repeat cleanly.
+    from floorplanner.macro import MacroRecorderDialog
+    # runner: ^+F creates + switches; repeat is a switch, not a failure
+    res = win.run_macro('^+F "Upper" ^+F "Top Floor" ^+F "Upper"')
+    assert res["ok"], res
+    assert win.active_floor == "Upper"
+    assert [f.name for f in win.floors] == ["default", "Upper", "Top Floor"]
+    # runner: named switch, then BARE ^F back to the default
+    res = win.run_macro('^F "Top Floor"')
+    assert res["ok"] and win.active_floor == "Top Floor"
+    res = win.run_macro("^F")
+    assert res["ok"] and win.active_floor == "default"
+    # the popup: default first and pre-highlighted (ENTER = default)
+    menu = win._build_floor_popup()
+    acts = menu.actions()
+    assert "(Default)" in acts[0].text() and "default" in acts[0].text()
+    assert menu.activeAction() is acts[0]
+    # recorder: a menu-route switch records the clean token; a popup-route
+    # switch (a PUP line is open) records the deterministic COMMENT form
+    dlg = MacroRecorderDialog(win)
+    dlg.start()
+    try:
+        win.switch_floor("Upper")
+        dlg._modal_line = True             # as an open PUP line leaves it
+        win.switch_floor("Top Floor")
+        text = [t for t in dlg.edit.toPlainText().split("\n") if t.strip()]
+        assert text[0] == '^F "Upper"', text
+        assert text[1].endswith('# ^F "Top Floor"'), text
+        dlg.edit.clear()
+        win._recorder.on_new_floor("Attic")
+        assert dlg.edit.toPlainText().strip() == '^+F "Attic"'
+    finally:
+        dlg.stop()
+        dlg.deleteLater()
+        qapp.processEvents()
+    # the menu actions carry the spec'd shortcuts
+    assert win.a_select_floor.shortcut().toString() == "Ctrl+F"
+    assert win.a_new_floor.shortcut().toString() == "Ctrl+Shift+F"
+    # renamed default is still the bare-^F target: rename via the roster
+    win.floors[0].name = "Ground"
+    for it in win.scene.items():
+        if getattr(it, "floor", None) == "default":
+            it.floor = "Ground"
+    win.active_floor = "Ground"
+    win._sync_floor_state()
+    win.run_macro('^F "Upper"')
+    res = win.run_macro("^F")
+    assert res["ok"] and win.active_floor == "Ground"

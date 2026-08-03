@@ -685,25 +685,25 @@ def _holders(fp, scene, v):
             if isinstance(r, fp.RoomItem) and any(e.v is v for e in r.outline)]
 
 
-@pytest.mark.xfail(strict=False, reason="a body drag gathers outline edges from "
-                   "the RUN's rooms, so a room holding the corner but owning no "
-                   "wall in the run is left behind -- P3.8 survey row, defect 30")
-def test_a_dragged_corner_carries_every_room_that_holds_it(fp, scene):
-    """P3.8's survey row, pinned: does a real drag re-point EVERY outline holder
-    of the corner it moves, or strand a room?
+# CORRECTED at the P4.2 mini-gate (defect 30, second cut). The first cut made
+# EVERY holder follow the moved vertex -- and Patrick's screenshot caught it
+# tearing a diagonal across the off-run rooms, whose boundary is the
+# CONTINUATION the anti-shear split deliberately holds still. The corrected
+# rule: the split makes the corner TWO corners, and each room's corner goes
+# with its own boundary -- run-bordered rooms follow the moved vertex,
+# continuation-bordered rooms keep the stationary one. Nobody tears.
+def test_a_dragged_corner_splits_by_each_rooms_own_boundary(fp, scene):
+    """Defect 30's pinned scene, asserting the CORRECTED behaviour.
 
-    MEASURED ON symmetricP1 FIRST, with a viewport-driven drag at the 4-way
-    corner (582, 714) held by Dining, Foyer, Great Room and Kitchen: the corner
-    moved (0, -24), Dining and Kitchen followed, and FOYER AND GREAT ROOM WERE
-    LEFT BEHIND -- each ending with one wall end at the new corner and one at
-    the old, while its outline stayed wholly at the old. Their regions no
-    longer meet their own walls.
+    The original measurement (symmetricP1, 4-way at (582, 714)): Dining and
+    Kitchen followed, Foyer and Great Room were stranded -- walls partly
+    following, outlines wholly behind. The first fix blanket-followed every
+    holder, which the mini-gate refuted: Foyer's boundary is the continuation,
+    which stays, so dragging its corner drew a diagonal across its region.
 
-    The mechanism is `mousePressEvent` step 4: it gathers outline edges from
-    the rooms of the walls in the COLLINEAR RUN, which is not the same set as
-    the rooms holding the corner. Both app corner-movers that DO get this right
-    collect their holders from the geometry (`GroupItem._corner_records`, and
-    the fix applied to the defect-28 test).
+    Correct: run-bordered rooms (R0, R2 here) follow the moved vertex;
+    continuation-bordered rooms (R1, R3) keep the stationary corner the
+    anti-shear split minted; every room's outline stays axis-aligned.
 
     Non-vacuity is built in twice: `_body_drag` asserts the press produced a
     body slide, and the corner displacement is asserted before the verdict."""
@@ -717,12 +717,146 @@ def test_a_dragged_corner_carries_every_room_that_holds_it(fp, scene):
     wall = next(w for w in scene.items()
                 if isinstance(w, fp.WallItem)
                 and abs(w.p1.x() - 0) < 0.01 and abs(w.p1.y() - 120) < 0.01)
+    run_rooms = set(wall.rooms)
+    assert run_rooms and len(run_rooms) < len(held), \
+        "precondition: some holders must NOT border the dragged wall"
     before = (centre.x, centre.y)
     _body_drag(wall, 0, -24)
     moved = wall.end_vertex("p2")
     assert (moved.x, moved.y) != before, \
         "the drag did not move the corner -- the verdict would be vacuous"
 
-    stranded = [r.name for r in held if not any(e.v is moved for e in r.outline)]
-    assert not stranded, (
-        f"rooms holding the dragged corner were left behind: {stranded}")
+    for r in held:
+        if r in run_rooms:
+            assert any(e.v is moved for e in r.outline), \
+                f"{r.name} borders the dragged run but did not follow"
+        else:
+            assert not any(e.v is moved for e in r.outline), \
+                f"{r.name} borders the continuation but was dragged off it"
+            assert any(abs(e.v.x - before[0]) < 0.01
+                       and abs(e.v.y - before[1]) < 0.01
+                       for e in r.outline), \
+                f"{r.name} lost its stationary corner"
+    # and the diagonal tear the mini-gate caught can never come back: every
+    # room's outline stays axis-aligned through the drag
+    for r in held:
+        pts = r.corners
+        for i in range(len(pts)):
+            a, b = pts[i], pts[(i + 1) % len(pts)]
+            assert abs(a.x() - b.x()) < 0.01 or abs(a.y() - b.y()) < 0.01, \
+                f"{r.name} has a DIAGONAL edge after the drag"
+
+
+@pytest.mark.xfail(strict=False, reason="P2.3 row, REFUTED second fix (P4.2): "
+                   "the vertex-adjacency gather this asserts collides with "
+                   "P3.3's settled anti-shear rule on identical topology "
+                   "(_tee_scene) -- 'split first, shear never' says the "
+                   "collinear continuation STAYS. Needs a ruling, carry vs "
+                   "stay; the topology cannot serve both.")
+def test_a_roomless_split_wall_body_drags_as_one_run(fp, scene):
+    # P2.3's Known-regressions row: after an undo a junction-crossing wall
+    # returns as the segments the document holds, and a ROOM-LESS wall's run
+    # short-circuits to [self] -- so a body drag moves one segment. The row
+    # predicted a vertex-adjacency gather fixes it; implementing that turned
+    # P3.3's anti-shear pins red (a collinear continuation past an endpoint
+    # must stay put), and the two cases are topologically INDISTINGUISHABLE.
+    # This test pins the row's wanted behaviour so the eventual ruling flips
+    # it or deletes it deliberately.
+    w = fp.WallItem(QPointF(0, 0), QPointF(480, 0), "interior")
+    scene.addItem(w)
+    stem = fp.WallItem(QPointF(240, 0), QPointF(240, 120), "interior")
+    scene.addItem(stem)
+    fp.rebuild_all_walls(scene)
+    seg = fp.split_wall_at(scene, w, QPointF(240, 0))
+    assert seg is not None                       # precondition: really split
+    fp.weld_wall_ends(scene, stem)               # stem joins the T vertex
+    fp.rebuild_all_walls(scene)
+    assert not w.rooms and not seg.rooms         # precondition: room-less
+    run = w._collinear_run()
+    assert seg in run, "the far segment is not in the drag's run"
+    assert stem not in run                       # perpendicular: stays put
+
+
+def test_orthogonal_stick_is_zoom_independent(fp, win):
+    # defect 13's drag half, RULED at P4.2: a gesture tolerance may pick the
+    # TARGET; committed geometry must derive from scene-space rules. The stick
+    # threshold decides where a stretched end LANDS, so it must not read the
+    # view. (The ~20px endpoint catch radius stays zoom-scaled by the same
+    # ruling -- it only decides what you grabbed.)
+    sc = win.scene
+    a = fp.WallItem(QPointF(0, 0), QPointF(100, 0), "interior")
+    ortho = fp.WallItem(QPointF(230, -60), QPointF(230, 60), "interior")
+    sc.addItem(a)
+    sc.addItem(ortho)
+    fp.rebuild_all_walls(sc)
+    o, u = QPointF(0, 0), QPointF(1, 0)
+    results = []
+    for zoom in (0.25, 1.0, 4.0):
+        win.view.resetTransform()
+        win.view.scale(zoom, zoom)
+        results.append(a._project_to_orthogonal(o, u, 200.0))  # 30" short
+    assert results[0] == results[1] == results[2], \
+        f"where the end lands depends on zoom: {results}"
+    # the scene-space rule is the vocabulary's own 9" (WALL_PROJECT_STICK ==
+    # JOIN_TOL, the schema's gesture tolerance): 30" away never sticks...
+    assert results[1] is None
+    # ...and 5" away always does, at any zoom
+    for zoom in (0.25, 4.0):
+        win.view.resetTransform()
+        win.view.scale(zoom, zoom)
+        assert a._project_to_orthogonal(o, u, 225.0) == pytest.approx(230.0)
+
+
+def test_a_partial_side_slide_steps_the_neighbours_outline(fp, scene):
+    """The P4.2 mini-gate's third finding, pinned. The dragged run is one
+    room's whole side, but a NEIGHBOUR's side extends past the run's end
+    (symmetricP1: Master Suite's south side slides; Hall's top side runs on
+    under Clst). One corner cannot serve two stretches that now sit on
+    different lines, so it becomes TWO corners joined by an OPEN step edge
+    -- and nothing tears diagonal. Clst, bordered by the continuation only,
+    must not move at all."""
+    for a, b in [((0, 0), (240, 0)), ((0, 240), (240, 240)),
+                 ((0, 0), (0, 240)), ((240, 0), (240, 240)),
+                 ((0, 120), (80, 120)), ((80, 120), (160, 120)),
+                 ((160, 120), (240, 120)), ((160, 0), (160, 120)),
+                 ((80, 120), (80, 240))]:
+        scene.addItem(fp.WallItem(QPointF(*a), QPointF(*b), "interior"))
+    fp.weld_scene(scene)
+    fp.rebuild_all_walls(scene)
+    rooms = {}
+    for name, (cx, cy) in {"A": (80, 60), "B": (40, 180),
+                           "Hall": (160, 180), "Clst": (200, 60)}.items():
+        res = fp.detect_room(scene, QPointF(cx, cy))
+        assert res is not None, f"{name} not detected"
+        r = fp.RoomItem(name, QPointF(cx, cy), res[0], res[1], corners=res[2])
+        scene.addItem(r)
+        fp.bind_room_walls(scene, r)
+        rooms[name] = r
+    clst_before = [(p.x(), p.y()) for p in rooms["Clst"].corners]
+    wall = next(w for w in scene.items() if isinstance(w, fp.WallItem)
+                and abs(w.p1.y() - 120) < 0.01 and abs(w.p2.y() - 120) < 0.01
+                and max(w.p1.x(), w.p2.x()) <= 80.01)
+    assert {r.name for r in wall.rooms} == {"A", "B"}   # precondition
+    _body_drag(wall, 0, 24)
+    assert abs(wall.p1.y() - 144) < 0.01, "precondition: the drag moved"
+    for r in rooms.values():
+        pts = r.corners
+        for i in range(len(pts)):
+            pa, pb = pts[i], pts[(i + 1) % len(pts)]
+            assert (abs(pa.x() - pb.x()) < 0.01
+                    or abs(pa.y() - pb.y()) < 0.01), (
+                f"{r.name} tore diagonal: "
+                f"({pa.x():.1f},{pa.y():.1f})->({pb.x():.1f},{pb.y():.1f})")
+    hall = rooms["Hall"]
+    hc = [(round(p.x(), 1), round(p.y(), 1)) for p in hall.corners]
+    assert (160.0, 144.0) in hc and (160.0, 120.0) in hc, \
+        f"Hall did not gain the step: {hc}"
+    n = len(hall.outline)
+    step = next((e for i, e in enumerate(hall.outline)
+                 if {(round(e.v.x, 1), round(e.v.y, 1)),
+                     (round(hall.outline[(i + 1) % n].v.x, 1),
+                      round(hall.outline[(i + 1) % n].v.y, 1))}
+                 == {(160.0, 144.0), (160.0, 120.0)}), None)
+    assert step is not None and step.wall is None, "the step must be OPEN"
+    assert [(p.x(), p.y()) for p in rooms["Clst"].corners] == clst_before, \
+        "Clst borders only the continuation and must not move"

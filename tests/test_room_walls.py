@@ -95,15 +95,17 @@ def test_rebind_is_idempotent(fp, scene):
 
 
 def test_moving_a_room_does_not_distort_its_neighbour(fp, scene):
-    # A and B share one wall; moving A to empty space must privatize that wall
-    # so B keeps its full area
+    # A and B share one wall; moving A to empty space must leave that wall
+    # with B so B keeps its full area. ROUTE CHANGED AT P4.2 (declared): the
+    # label-drag's move start is extract_room now -- _privatize_shared_walls,
+    # the 51-line shadow of it, is deleted. Assertions unchanged.
     a = _make(fp, scene, 0, 0, 120, 120, "A")
     b = _make(fp, scene, 120, 0, 120, 120, "B",
               skip=[(QPointF(120, 0), QPointF(120, 120))])
     area_a, area_b = a.area_sqft, b.area_sqft
     shared = next(w for w in a.walls if len(w.rooms) == 2)
     a._moving_room = True
-    a._privatize_shared_walls()          # what mousePress does on move start
+    fp.extract_room(scene, a)            # what mousePress does on move start
     # the OUTLINE is what says which walls are the room's (P3.5), so the
     # privatised edge must name the copy -- otherwise `room_walls` still hands
     # the shared wall to bake / room_boolean and the swap only half happened

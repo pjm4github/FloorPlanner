@@ -180,19 +180,17 @@ def test_group_move_room_only_does_not_orphan_walls(fp, win, make_room):
     assert sum(isinstance(r, fp.RoomItem) for r in sc.items()) == 1
 
 
-# xfail carried as a Known regression (V5_MIGRATION_PLAN): P0.5 fix 4 made
-# select_in_rect read-only, removing the accidental "extract" it performed
-# (synthesise the party-wall edge + rebuild rebinds the room to that private
-# copy, so bake's room_owns_walls could carry it). The rubber-band-then-move
-# route to this workflow is gone until P4.2 rebuilds extract as a real
-# operation; P4.2's acceptance flips this back to a hard pass. (Dragging the
-# room by its label still works today via _privatize_shared_walls.)
-@pytest.mark.xfail(reason="rubber-band extract removed at P0.5 fix 4; real "
-                          "extract restores it at P4.2", strict=False)
+# FLIPPED TO A HARD PASS AT P4.2, via the REAL extract operation -- exactly
+# as the Known-regressions row promised. The rubber-band route this test
+# originally drove died at P0.5 fix 4 (selection is read-only, permanently);
+# the workflow it protected is now the operation itself: extract the room,
+# move it, and the region follows because the room's corners moved. The
+# ASSERTIONS are unchanged -- the region follows the move; the stationary
+# longer party wall stays exactly where it was -- only the route changed,
+# declared at the P4.2 read-back and approved.
 def test_extracted_room_region_follows_move(fp, win):
-    # extract a room whose right edge is a longer party wall, then move the
-    # group clear of that wall: the grey region/outline must follow (baked
-    # on release, not live)
+    # extract a room whose right edge is a longer party wall, then move it
+    # clear of that wall: the grey region/outline must follow
     sc = win.scene
     party = fp.WallItem(QPointF(120, 0), QPointF(120, 300), "interior")
     sc.addItem(party)
@@ -203,14 +201,11 @@ def test_extracted_room_region_follows_move(fp, win):
     res = fp.detect_room(sc, QPointF(60, 72))
     room = fp.RoomItem("Den", QPointF(60, 72), res[0], res[1], corners=res[2])
     sc.addItem(room)
-
-    win.view.select_in_rect(QRectF(-12, -12, 150, 174))   # duplicates the edge
+    fp.bind_room_walls(sc, room)
     before = room.path.boundingRect()
 
-    win.group_selected()
-    g = next(i for i in sc.items() if isinstance(i, fp.GroupItem))
-    g.setPos(200, 100)            # move clear of the stationary party wall
-    g.bake()
+    fp.extract_room(sc, room)     # the room takes its own stretch of the
+    room._translate(200, 100)     # party wall; the original never moves
 
     after = room.path.boundingRect()
     assert after.x() - before.x() == pytest.approx(200, abs=8)

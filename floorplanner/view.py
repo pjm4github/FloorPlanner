@@ -524,6 +524,14 @@ class PlanView(QGraphicsView):
                 self.win.paste_room(grid_snap(self.mapToScene(e.pos())))
             e.accept()
             return
+        if self.itemAt(e.pos()) is None:
+            # blank canvas, any other tool -> the floor popup (P4.2 spec):
+            # default pre-highlighted so ENTER selects it, DOWN walks the
+            # floors, ESC cancels. Recorded as a PUP line; the resulting
+            # switch appends its deterministic `# ^F "name"` comment.
+            self.win.select_floor_popup(e.globalPos())
+            e.accept()
+            return
         super().contextMenuEvent(e)
 
     # -- furnishing drag & drop ---------------------------------------------------

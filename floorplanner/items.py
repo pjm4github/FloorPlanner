@@ -949,7 +949,9 @@ class ReferenceImageItem(QGraphicsItem):
     inches-per-image-pixel (the scale): drag the body to move, drag a corner
     to rescale, right-click to calibrate / crop / extract / remove."""
 
-    Z = -100.0
+    # far below every floor's z-band (P4.2: ghost floors sit on negative
+    # bands of 100k) -- a BACKDROP is beneath everything, always
+    Z = -1_000_000_000.0
     HANDLE_PX = 9.0           # corner handle half-size, in view pixels
     MIN_IPP = 0.05
 
