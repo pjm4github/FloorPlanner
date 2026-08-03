@@ -747,21 +747,20 @@ def test_a_dragged_corner_splits_by_each_rooms_own_boundary(fp, scene):
                 f"{r.name} has a DIAGONAL edge after the drag"
 
 
-@pytest.mark.xfail(strict=False, reason="P2.3 row, REFUTED second fix (P4.2): "
-                   "the vertex-adjacency gather this asserts collides with "
-                   "P3.3's settled anti-shear rule on identical topology "
-                   "(_tee_scene) -- 'split first, shear never' says the "
-                   "collinear continuation STAYS. Needs a ruling, carry vs "
-                   "stay; the topology cannot serve both.")
-def test_a_roomless_split_wall_body_drags_as_one_run(fp, scene):
-    # P2.3's Known-regressions row: after an undo a junction-crossing wall
-    # returns as the segments the document holds, and a ROOM-LESS wall's run
-    # short-circuits to [self] -- so a body drag moves one segment. The row
-    # predicted a vertex-adjacency gather fixes it; implementing that turned
-    # P3.3's anti-shear pins red (a collinear continuation past an endpoint
-    # must stay put), and the two cases are topologically INDISTINGUISHABLE.
-    # This test pins the row's wanted behaviour so the eventual ruling flips
-    # it or deletes it deliberately.
+# -- the P2.3 row, RULED at P4.3: STAY, superseded-by-ruling. Both of the
+# row's predicted fixes failed on their own terms, and the settled anti-shear
+# rule owns the topology -- "one wall stored as two segments" is
+# indistinguishable from "two walls drawn end-to-end", so one rule serves
+# both and it is "split first, shear never": the continuation STAYS. The
+# xfail pin that held the conflict open is replaced by these two hard
+# passes (the ruling's own amendment): the stay contract asserted, and the
+# HEAL -- the restoration the row actually wanted, arriving through the
+# document (auto_coalesce dissolving the seam) instead of the gesture.
+def test_a_roomless_body_drag_moves_the_grabbed_segment_only(fp, scene):
+    # (i) the stay contract, promoted from implied to asserted. The exact
+    # construction the xfail pinned: a 480" room-less wall split at a
+    # mid-span T, the stem welded onto the junction -- topologically the
+    # undo-split state the P2.3 row described.
     w = fp.WallItem(QPointF(0, 0), QPointF(480, 0), "interior")
     scene.addItem(w)
     stem = fp.WallItem(QPointF(240, 0), QPointF(240, 120), "interior")
@@ -772,9 +771,39 @@ def test_a_roomless_split_wall_body_drags_as_one_run(fp, scene):
     fp.weld_wall_ends(scene, stem)               # stem joins the T vertex
     fp.rebuild_all_walls(scene)
     assert not w.rooms and not seg.rooms         # precondition: room-less
-    run = w._collinear_run()
-    assert seg in run, "the far segment is not in the drag's run"
-    assert stem not in run                       # perpendicular: stays put
+    s1, s2 = QPointF(seg.p1), QPointF(seg.p2)
+    _body_drag(w, 0, 24)
+    assert w.p1.y() == pytest.approx(24)
+    assert w.p2.y() == pytest.approx(24), "the grabbed segment must move"
+    assert seg.p1.y() == pytest.approx(s1.y()), (
+        "the continuation must STAY -- the ruling's contract")
+    assert seg.p2.y() == pytest.approx(s2.y())
+    assert seg.p1.y() == pytest.approx(seg.p2.y()), "the continuation SHEARED"
+    assert (seg.p1.x(), seg.p2.x()) == pytest.approx((s1.x(), s2.x()))
+
+
+def test_the_roomless_seam_heals_and_then_drags_as_one(fp, scene):
+    # (ii) the HEAL. With auto_coalesce on, the room-less DEGREE-2 collinear
+    # seam an undo leaves behind dissolves at the next merge pass (every
+    # gesture release runs one), and the merged wall body-drags as one --
+    # which is why the row's workaround is not permanent in spirit: it
+    # survives only in the shuffle / auto_coalesce-off world, where staying
+    # split is honest.
+    w = fp.WallItem(QPointF(0, 0), QPointF(480, 0), "interior")
+    scene.addItem(w)
+    fp.rebuild_all_walls(scene)
+    seg = fp.split_wall_at(scene, w, QPointF(240, 0))
+    assert seg is not None and not w.rooms       # the undo-shaped seam
+    assert fp.SETTINGS["auto_coalesce"] is True  # precondition: the default
+    fp.merge_wall(scene, w)                      # the release's own pass
+    walls = [it for it in scene.items() if isinstance(it, fp.WallItem)]
+    assert len(walls) == 1, "the degree-2 seam must dissolve"
+    assert walls[0] is w, "the dragged/drawn wall is the survivor"
+    ends = {(w.p1.x(), w.p1.y()), (w.p2.x(), w.p2.y())}
+    assert ends == {(0.0, 0.0), (480.0, 0.0)}
+    _body_drag(w, 0, 24)
+    assert w.p1.y() == pytest.approx(24)
+    assert w.p2.y() == pytest.approx(24), "the healed wall body-drags as ONE"
 
 
 def test_orthogonal_stick_is_zoom_independent(fp, win):
