@@ -187,7 +187,7 @@ spans and callers so the reviewer can check it without re-running it.
 | ☑ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** — *ticked 2026-07-30; **Phase 3 merged to `main` at `03f3868` on 2026‑07‑31**, all eight P3 rows complete.*  *(P3.8 detail: `bake` 10.6× faster (279.0 → 26.4 ms at 64 rooms); all four survey rows answered or dispositioned; the flap class retired class-wide; defect 27's DEEP CI job green. Merge checklist items 1–4 done at the tick; Gate 3 passed 2026‑07‑31 and the merge followed.)* | ratios recorded |
 | ☑ | **P4.1** Delete-wall keeps the room — *ticked 2026‑07‑31, accepted at **PR #2** (merge commit; sub-commits `0df3aa5` census + rulings, `a0e1b95` delete_wall + 2b flip, `cce2eb6` corpse + tests). Acceptance met: P0.4 test 2b flipped xfail→pass on exactly the call-site switch (513/6 → 514/5); census 526 unchanged; defect 17 closed with the visible-lie coda.* | ruff + pytest |
 | ☑ | **P4.1b** Defect 25's gesture-time message — *ticked 2026‑08‑01, accepted at **PR #3** (merge commit `ec5f207`; sub-commits `1d3eaa6` mechanism + tests, `e0519ae` record). Acceptance met: both gestures produce the specific message naming the doorway at release, pinned by two gui tests with a fail-first receipt against `main@708dc2e`; defect 25 closed; census 526 → 528.* | ruff + pytest |
-| ☐ | **P4.2** Extract / join | ruff + pytest |
+| ☑ | **P4.2** Extract / join — *ticked 2026‑08‑02, accepted at **PR #4** (merge commit; 26 sub-commits, `dfd30af` … `ed9286c` + the record commit: core 1–7, mini-gate findings 8–15, tooling & floors 16–23, hand-off 24, census hygiene 25, record 26) — the first task under the Phase‑4 ruling's **Patrick mini-gate: PASSED, all 8 items**, on a fresh launch with the version label verified. Acceptance met: extract → move 500″ → join with `check()` clean at every step, I12 while floating, furnishings and openings intact; the party-wall regression flipped xfail → hard pass via the real `extract` (the P0.5 Known-regressions row closes). Defects 30, 34 and 13 (drag half) closed; defect 35 closed on the reporter's confirmation; six mini-gate findings fixed against measured reproductions, pinned by his macros verbatim. Census 528 → 552, local == CI.* | ruff + pytest |
 | ☐ | **P4.3** Shuffle mode | ruff + pytest |
 | ☐ | **P4.4** Concept rooms, `nominal_size`, duplicate-as-template | ruff + pytest |
 | ☐ | **P4.5** Group semantics + z-order collapse | ruff + pytest |
@@ -4054,4 +4054,33 @@ STANDING:  PR #4 remains on HOLD for the Patrick mini-gate (items 1-8, on
          covered everything on his shelf. _perimeter_span's re-argument
          to P4.4 stands in the register. Noted follow-up, not built:
          per-floor visibility (show a chosen subset while editing).
+
+P4.2  MINI-GATE PASSED 2026-08-02 -- defect 35 closed, census hygiene,
+         P4.2 TICKED; PR #4 merges as a merge commit on this record
+ruff:    clean
+pytest:  541 passed, 7 deselected, 4 xfailed (sum 552 -- and LOCAL == CI
+         for the first time since the mini-gate findings began: Patrick
+         removed his two untracked symmetricP2/P3.json, so the 554/552
+         delta the record has carried line-by-line is GONE)
+files:   examples/multifloor.fpm (committed at P4.2(25)),
+         docs/CODE_REVIEW_v2.md (row 35 closed), this file (the tick +
+         this block).
+notes:   Patrick ran the mini-gate on a FRESH LAUNCH with the status-bar
+         version label verified at the launch sha -- ALL 8 ITEMS PASS.
+         (The label discipline the stale-process round bought, doing its
+         job on the very run it was built for.)
+         DEFECT 35 CLOSED on the reporter's confirmation, per the row's
+         own re-open protocol: the shelf is EMPTY -- nothing remains on
+         the "still some problems with the drag" report beyond the
+         harvested findings 4-6. The residuals were neither stale-process
+         nor unreproducible: the macro loop converted them into findings
+         5 and 6 (six mechanisms, fixed against measured reproductions,
+         pinned verbatim); the reporter's confirmation retires the
+         report, which the clean replay alone never could.
+         MULTIFLOOR.FPM RULING, asked and recorded: CONVENIENCE FILE,
+         not pinned as a regression test -- the floors/token machinery
+         keeps its existing unit pins as its guard.
+         P4.2 ticked in the Status table citing PR #4 and the sub-commit
+         range dfd30af..ed9286c + this record commit (26 in all). The
+         snapshot is re-cut AT THE MERGE, on main, as the next action.
 ```
