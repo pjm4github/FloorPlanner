@@ -4083,4 +4083,94 @@ notes:   Patrick ran the mini-gate on a FRESH LAUNCH with the status-bar
          P4.2 ticked in the Status table citing PR #4 and the sub-commit
          range dfd30af..ed9286c + this record commit (26 in all). The
          snapshot is re-cut AT THE MERGE, on main, as the next action.
+
+P4.3(1) the pre-work census + both rulings recorded (branch p4.3-shuffle
+         from main@778b4b9; read-back answered 2026-08-02, work begins)
+ruff:    clean
+pytest:  (census commit -- code untouched; trailer below is the branch-point
+         gate)
+files:   this file only.
+notes:   RULING 1 (the P2.3 row) -- STAY, with the amendment: the settled
+         anti-shear rule keeps the topology; the row closes as
+         superseded-by-ruling, and the xfail pin is REPLACED BY TWO HARD
+         PASSES, not deleted: (i) the stay contract promoted (a room-less
+         body drag moves the grabbed segment only, continuation untouched
+         -- the topology's one owner, asserted rather than implied);
+         (ii) the HEAL (with auto_coalesce on, the room-less degree-2
+         collinear seam an undo leaves dissolves at the next pass, and
+         the merged wall body-drags as one) -- the restoration the row
+         wanted, arriving through the document instead of the gesture.
+         The workaround line survives only for the shuffle/
+         auto_coalesce-off world, where staying split is honest.
+         Executed at P4.3(5).
+         RULING 2 (defect 25's deferred policy, all three questions) --
+         TIERED: jamb within the gesture's join tolerance -> snap the end
+         to the jamb and weld there (a legitimate gesture-tolerance move;
+         gestures are where the 9" tolerance is allowed to act); no jamb
+         in tolerance -> land-unwelded-and-report (P4.1b's message, the
+         standing fallback). NEVER split (manufactures a homeless-door
+         reported-fault document from a live gesture; R2c reserved that
+         totality for loads, where no user is present), NEVER refuse (a
+         gesture that undoes itself is defect 17's disease). It is
+         AUTO_WELD'S decision -- no fifth flag (the doorway case is a
+         sub-case of the weld pass's target-finding; the editing_modes
+         family is complete at four). Under shuffle the landing never
+         welds and the message is SUPPRESSED (an unwelded end is the
+         mode's intended state, not a tear); the deferred information is
+         delivered at the EXPLICIT JOIN, which reports anything it could
+         not place or weld through the defect-6 vocabulary.
+         THE CENSUS, measured against main@778b4b9 (the task line's four
+         flags, one live and three dead):
+         * auto_coalesce (LIVE): internal gates walls.py:537 (merge_wall)
+           / :557 (merge_all); callers view.py:504 (draw release),
+           walls.py:1952 (drag release), mainwindow.py:915 (ungroup),
+           planio.py:200 (legacy load), extract.py:211 (EXPLICIT join).
+           FINDING: the explicit join routes through the gated merge_wall,
+           so auto_coalesce off (or shuffle) would leave a Join with
+           doubled walls -- the join must merge regardless (the schema's
+           own "rooms are joined explicitly"); fix = a force param for
+           explicit callers. normalize_walls stays ungated by design.
+         * auto_weld (dead): ONE gesture site -- view.py:506, the
+           draw-release weld_wall_ends. Stated non-sites: the end-drag
+           release never welds by design (walls.py:1940 "left exactly
+           where the drag put it"); imageio.py:180 weld_scene is defect
+           19's import repair; close_gap is defect 34's explicit review
+           op; join/normalize are explicit. Ruling 2's jamb-snap tier
+           lands on BOTH release paths (draw + end-drag), gated by
+           effective auto_weld; the end-drag jamb-snap is a deliberate,
+           narrow exception to "never snapped on release" and carries
+           the fail-first receipt.
+         * auto_bind (dead): NO gateable automatic site exists today --
+           measured over all 9 bind_room_walls/repair callers: Room tool
+           view.py:280, paste mainwindow.py:1348, room_boolean :849,
+           undo restore :658 (constitutive of explicit gestures); load
+           paths planio.py:235, csvio.py:148, macro.py:413; the explicit
+           join extract.py:218; and the release repair family
+           walls.py:1968-1975, which is tear-repair of derived state and
+           is exempted DELIBERATELY (gating it would reintroduce the
+           mini-gate's stranding class). auto_bind lands plumbed
+           (SETTINGS, document, UI) with an empty enforcement surface,
+           honored implicitly under shuffle because a floating room
+           reaches no bind at all. Stated, not invented.
+         * shuffle (dead): four touchpoints -- (a) implies the other
+           three off (one effective-flag accessor, config.py, so every
+           gate asks the same question); (b) the label-drag drop-join
+           rooms.py:884-891: under shuffle a MOVED room stays floating
+           (the task line's "joins nothing automatically"); a click that
+           never moved still ends placed (P4.2's "a click must not leave
+           a room afloat" -- needs a genuine moved flag, today's
+           _moving_room is mode, not displacement); (c) suppresses the
+           P4.1b doorway message per ruling 2; (d) the toolbar toggle
+           (mainwindow.py:143 is the toolbar).
+         * emit/apply: bridge.py:709 emit hardcodes the editing block ->
+           reads live SETTINGS; bridge.py:891-901 apply already iterates
+           DEFAULT_SETTINGS over editing.* -- adding the three keys makes
+           load correct BY CONSTRUCTION; importer.py:333's conversion
+           defaults are RIGHT for legacy docs (no shuffle concept to
+           preserve) and stay; planio.py:144's legacy apply iterates
+           DEFAULT_SETTINGS, so the new bool keys default correctly on
+           v1-v4 loads.
+         Order of work (per the go): plumbing -> gesture gating with the
+         tiered weld -> acceptance -> ruling 1's tests + row closure.
+         Merge on green CI + Patrick's acceptance; no mini-gate.
 ```
