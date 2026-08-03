@@ -311,7 +311,7 @@ Behaviour that is deliberately worse between the task that broke it and the task
 | **P0.5** (fix 4) | Rubber-band-select a room whose edge is a longer party wall, then group + move it — the region no longer follows. The walls captured by the band move; the room does not. | Drag the room by its **label** instead: `_privatize_shared_walls` handles the party wall correctly on that path. | **P4.2** (`extract` replaces the accidental privatisation with a real operation) |
 | **pre-dates the branch** (surfaced at P3.5, defect 23) | **A rubber band that clips a room's wall set strands that room.** The band takes only items fully inside it, so a wall poking out is left behind, that room's remaining walls are duplicated into the group, and the group moves those while the room's region stays where it was — it reads as a detached dashed outline at the original position. 3 of 20 rooms on a band covering 92% of `symmetricP1`. | **Band whole rooms** — include every wall of any room you mean to take — **or move the room individually** by dragging its label, which carries its walls and openings correctly. | **P4.5**, where "what a group is" is decided. Listed here rather than as a Phase-3 regression because the branch measurably IMPROVES it (148.3" of drift before P3.5, 46.65" now) — the Phase-3 gate is no-worse, not all-better. |
 | ~~**P3.5**~~ **CLOSED at P3.7 (2)** | ~~**An open side of a room is not drawn.**~~ **The cue is back, drawn from the outline: `RoomItem._paint_open_edges` strokes every `open_edge_segments()` with the same colour, dash and lod-scaled width the `OpenWall` item used — so this closes as *the same cue from one representation*, which is what the "Restored at" column asked for, and not as a different cue. RECEIPT, and it is a pixel test rather than a structural one because every structural assertion in `test_open_walls.py` stayed green throughout the regression: `test_an_open_side_is_drawn_dashed`. Polarity measured first (wall body 150, dash ~124, gaps and bare background 255), and it FAILS against a tree without the paint addition with the row's own words — `[255, 255, … 255]`, the open side rendering as nothing.** Original text: **An open side of a room is not drawn.** Detach a wall from its room and pull a corner away and the side opens — the room keeps its shape and area, and the document says `wall: null` exactly as before — but the vacated stretch renders as nothing rather than as a dashed line. The producer of the dashed `OpenWall` placeholder was `refresh_rooms` → `reloop_open_room` → `bind_room_walls`, all deleted here; the fact itself moved onto the outline (`RoomItem.open_edges()`), which is where the document had always kept it. | None needed for correctness — nothing is lost but the on-screen cue. The room's area, outline and saved file are unaffected. | **P3.7** (`OpenWall` is deleted and a `wall: null` edge renders dashed from the outline, which is the same cue drawn from the one representation instead of a second one) |
-| **P2.3** | **After the first undo, a wall that crosses a junction comes back split** — and if it borders NO room, body-dragging it moves only that segment. Measured at P3.3: one 480″ wall with a mid-span T returns as two 240″ walls. **Narrower than first recorded**: `_collinear_run()` (`walls.py:888`) gathers the whole room *side*, so for a wall on a room perimeter — the common case, and the one a user would notice — both halves still move as one. Verified with a room: `_collinear_run()` gathers 2 of 2. The row applies only to room-less walls, where `self.rooms` is empty and the run short-circuits to `[self]`. | Bind the wall to a room, or drag the halves together. Nothing is lost either way: the **document is unchanged**, since `design_from_scene` planarises to the same canonical form. | ~~P3.4~~ → **retargeted at P3.4 (iv), and the predicted fix was wrong on its own terms.** Re-checked by hand: the 480″ wall still returns as two 240″ segments, `merge_all` does **not** re-merge them, and the body-drag still moves one segment. It must not — the mid-span T is a **degree-3 vertex**, load-bearing for the planar subdivision, and merging through it would destroy planarity. `merge_collinear` refuses for exactly the right reason, so this row was never merge's to close. The fix belongs in the **drag's run-gathering**: `_collinear_run()` (`walls.py`) short-circuits to `[self]` when the wall borders no room, which is precisely the case the row describes. Gathering the run over **vertex adjacency** instead would carry both segments. Unassigned rather than invented — it is one small change, and the honest place is whichever task next touches the drag (**P4.2** extract/join is the nearest). **SECOND PREDICTED FIX REFUTED AT P4.2** — the vertex-adjacency gather was implemented (per ruling e) and turned P3.3's anti-shear pins red: `_tee_scene` (a wall, its collinear continuation, a stem at the shared corner) is topologically **identical** to the undo-split segments, and P3.3's settled "split first, shear never" rule — the continuation keeps its vertex and stays exactly where it is — occupies that topology with three pinned tests. The representation cannot distinguish "one wall stored as two segments" from "two walls drawn end-to-end", so one rule must own the topology, and the settled one does. Reverted; the row's wanted behaviour is pinned by the xfail `test_wall_move.py::test_a_roomless_split_wall_body_drags_as_one_run`. **The row now needs a RULING (carry vs stay), not a third predicted fix** — both of its predictions have now failed on their own terms, each caught by a settled rule doing its job. |
+| **P2.3** | **After the first undo, a wall that crosses a junction comes back split** — and if it borders NO room, body-dragging it moves only that segment. Measured at P3.3: one 480″ wall with a mid-span T returns as two 240″ walls. **Narrower than first recorded**: `_collinear_run()` (`walls.py:888`) gathers the whole room *side*, so for a wall on a room perimeter — the common case, and the one a user would notice — both halves still move as one. Verified with a room: `_collinear_run()` gathers 2 of 2. The row applies only to room-less walls, where `self.rooms` is empty and the run short-circuits to `[self]`. | Bind the wall to a room, or drag the halves together. Nothing is lost either way: the **document is unchanged**, since `design_from_scene` planarises to the same canonical form. | ~~P3.4~~ → **retargeted at P3.4 (iv), and the predicted fix was wrong on its own terms.** Re-checked by hand: the 480″ wall still returns as two 240″ segments, `merge_all` does **not** re-merge them, and the body-drag still moves one segment. It must not — the mid-span T is a **degree-3 vertex**, load-bearing for the planar subdivision, and merging through it would destroy planarity. `merge_collinear` refuses for exactly the right reason, so this row was never merge's to close. The fix belongs in the **drag's run-gathering**: `_collinear_run()` (`walls.py`) short-circuits to `[self]` when the wall borders no room, which is precisely the case the row describes. Gathering the run over **vertex adjacency** instead would carry both segments. Unassigned rather than invented — it is one small change, and the honest place is whichever task next touches the drag (**P4.2** extract/join is the nearest). **SECOND PREDICTED FIX REFUTED AT P4.2** — the vertex-adjacency gather was implemented (per ruling e) and turned P3.3's anti-shear pins red: `_tee_scene` (a wall, its collinear continuation, a stem at the shared corner) is topologically **identical** to the undo-split segments, and P3.3's settled "split first, shear never" rule — the continuation keeps its vertex and stays exactly where it is — occupies that topology with three pinned tests. The representation cannot distinguish "one wall stored as two segments" from "two walls drawn end-to-end", so one rule must own the topology, and the settled one does. Reverted; the row's wanted behaviour is pinned by the xfail `test_wall_move.py::test_a_roomless_split_wall_body_drags_as_one_run`. **The row now needs a RULING (carry vs stay), not a third predicted fix** — both of its predictions have now failed on their own terms, each caught by a settled rule doing its job. **RULED at P4.3 (2026‑08‑03): STAY — the row CLOSES as superseded-by-ruling.** The settled rule keeps the topology; the drag moves the grabbed segment only, permanently. The xfail pin is **replaced by two hard passes** per the ruling's amendment: `test_a_roomless_body_drag_moves_the_grabbed_segment_only` (the stay contract, promoted from implied to asserted — the topology's one owner) and `test_the_roomless_seam_heals_and_then_drags_as_one` (with `auto_coalesce` on, the room-less degree-2 collinear seam an undo leaves dissolves at the next merge pass and the merged wall body-drags as one — **the restoration this row actually wanted, arriving through the document instead of the gesture**). The workaround column survives only for the shuffle / `auto_coalesce`-off world, where staying split is honest. |
 
 ### P0.6 — Cheap render wins
 **Touches.** `items.py`, `rooms.py`, `mainwindow.py`, `view.py`.
@@ -4083,4 +4083,193 @@ notes:   Patrick ran the mini-gate on a FRESH LAUNCH with the status-bar
          P4.2 ticked in the Status table citing PR #4 and the sub-commit
          range dfd30af..ed9286c + this record commit (26 in all). The
          snapshot is re-cut AT THE MERGE, on main, as the next action.
+
+P4.3(1) the pre-work census + both rulings recorded (branch p4.3-shuffle
+         from main@778b4b9; read-back answered 2026-08-02, work begins)
+ruff:    clean
+pytest:  (census commit -- code untouched; trailer below is the branch-point
+         gate)
+files:   this file only.
+notes:   RULING 1 (the P2.3 row) -- STAY, with the amendment: the settled
+         anti-shear rule keeps the topology; the row closes as
+         superseded-by-ruling, and the xfail pin is REPLACED BY TWO HARD
+         PASSES, not deleted: (i) the stay contract promoted (a room-less
+         body drag moves the grabbed segment only, continuation untouched
+         -- the topology's one owner, asserted rather than implied);
+         (ii) the HEAL (with auto_coalesce on, the room-less degree-2
+         collinear seam an undo leaves dissolves at the next pass, and
+         the merged wall body-drags as one) -- the restoration the row
+         wanted, arriving through the document instead of the gesture.
+         The workaround line survives only for the shuffle/
+         auto_coalesce-off world, where staying split is honest.
+         Executed at P4.3(5).
+         RULING 2 (defect 25's deferred policy, all three questions) --
+         TIERED: jamb within the gesture's join tolerance -> snap the end
+         to the jamb and weld there (a legitimate gesture-tolerance move;
+         gestures are where the 9" tolerance is allowed to act); no jamb
+         in tolerance -> land-unwelded-and-report (P4.1b's message, the
+         standing fallback). NEVER split (manufactures a homeless-door
+         reported-fault document from a live gesture; R2c reserved that
+         totality for loads, where no user is present), NEVER refuse (a
+         gesture that undoes itself is defect 17's disease). It is
+         AUTO_WELD'S decision -- no fifth flag (the doorway case is a
+         sub-case of the weld pass's target-finding; the editing_modes
+         family is complete at four). Under shuffle the landing never
+         welds and the message is SUPPRESSED (an unwelded end is the
+         mode's intended state, not a tear); the deferred information is
+         delivered at the EXPLICIT JOIN, which reports anything it could
+         not place or weld through the defect-6 vocabulary.
+         THE CENSUS, measured against main@778b4b9 (the task line's four
+         flags, one live and three dead):
+         * auto_coalesce (LIVE): internal gates walls.py:537 (merge_wall)
+           / :557 (merge_all); callers view.py:504 (draw release),
+           walls.py:1952 (drag release), mainwindow.py:915 (ungroup),
+           planio.py:200 (legacy load), extract.py:211 (EXPLICIT join).
+           FINDING: the explicit join routes through the gated merge_wall,
+           so auto_coalesce off (or shuffle) would leave a Join with
+           doubled walls -- the join must merge regardless (the schema's
+           own "rooms are joined explicitly"); fix = a force param for
+           explicit callers. normalize_walls stays ungated by design.
+         * auto_weld (dead): ONE gesture site -- view.py:506, the
+           draw-release weld_wall_ends. Stated non-sites: the end-drag
+           release never welds by design (walls.py:1940 "left exactly
+           where the drag put it"); imageio.py:180 weld_scene is defect
+           19's import repair; close_gap is defect 34's explicit review
+           op; join/normalize are explicit. Ruling 2's jamb-snap tier
+           lands on BOTH release paths (draw + end-drag), gated by
+           effective auto_weld; the end-drag jamb-snap is a deliberate,
+           narrow exception to "never snapped on release" and carries
+           the fail-first receipt.
+         * auto_bind (dead): NO gateable automatic site exists today --
+           measured over all 9 bind_room_walls/repair callers: Room tool
+           view.py:280, paste mainwindow.py:1348, room_boolean :849,
+           undo restore :658 (constitutive of explicit gestures); load
+           paths planio.py:235, csvio.py:148, macro.py:413; the explicit
+           join extract.py:218; and the release repair family
+           walls.py:1968-1975, which is tear-repair of derived state and
+           is exempted DELIBERATELY (gating it would reintroduce the
+           mini-gate's stranding class). auto_bind lands plumbed
+           (SETTINGS, document, UI) with an empty enforcement surface,
+           honored implicitly under shuffle because a floating room
+           reaches no bind at all. Stated, not invented.
+         * shuffle (dead): four touchpoints -- (a) implies the other
+           three off (one effective-flag accessor, config.py, so every
+           gate asks the same question); (b) the label-drag drop-join
+           rooms.py:884-891: under shuffle a MOVED room stays floating
+           (the task line's "joins nothing automatically"); a click that
+           never moved still ends placed (P4.2's "a click must not leave
+           a room afloat" -- needs a genuine moved flag, today's
+           _moving_room is mode, not displacement); (c) suppresses the
+           P4.1b doorway message per ruling 2; (d) the toolbar toggle
+           (mainwindow.py:143 is the toolbar).
+         * emit/apply: bridge.py:709 emit hardcodes the editing block ->
+           reads live SETTINGS; bridge.py:891-901 apply already iterates
+           DEFAULT_SETTINGS over editing.* -- adding the three keys makes
+           load correct BY CONSTRUCTION; importer.py:333's conversion
+           defaults are RIGHT for legacy docs (no shuffle concept to
+           preserve) and stay; planio.py:144's legacy apply iterates
+           DEFAULT_SETTINGS, so the new bool keys default correctly on
+           v1-v4 loads.
+         Order of work (per the go): plumbing -> gesture gating with the
+         tiered weld -> acceptance -> ruling 1's tests + row closure.
+         Merge on green CI + Patrick's acceptance; no mini-gate.
+
+P4.3  implemented (branch p4.3-shuffle, sub-commits: a6ded30 census +
+         rulings, e9abeb3 plumbing, 2e11a05 gesture gating + tiered
+         weld, 0f5642f acceptance, + this record commit. PR opens on
+         this commit; MERGE AWAITS PATRICK'S ACCEPTANCE -- the reviewer
+         ticks the box, not the implementer.)
+ruff:    clean
+pytest:  558 passed, 7 deselected, 3 xfailed (sum 568, all three modes,
+         every sum reconciling; trailer in this commit's message)
+files:   config.py (three flags join DEFAULT_SETTINGS; editing_enabled,
+         the ONE effective-flag accessor -- shuffle implies the auto_*
+         passes off without rewriting them), walls.py (merge gates
+         through editing_enabled; merge_wall force=True for explicit
+         callers; snap_end_to_doorway_jamb; end-drag release wires
+         snap + gated report), view.py (draw release: gated weld,
+         tier-1 snap, gated report), rooms.py (label-drag drop under
+         shuffle: moved -> stays floating, click -> still placed, via
+         a real displacement flag), extract.py (join merges force=True;
+         join-time doorway reporting, unconditional), bridge.py
+         (editing block emitted from live SETTINGS; v5 apply re-syncs
+         the editing UI), dialogs.py (auto_weld/auto_bind checkboxes),
+         mainwindow.py (Shuffle toolbar toggle, text-only QToolButton;
+         _sync_editing_ui on every load path; dirty on flip),
+         tests: test_shuffle.py (NEW, 11), test_walls.py (4 doorway-
+         policy gui tests), test_wall_move.py (xfail replaced by the
+         two ruling-1 hard passes), register row (P2.3 closure), this
+         file.
+notes:   ACCEPTANCE MET, as the task line states it: with shuffle on, a
+         floating room dragged ACROSS the plan -- one gesture through
+         the real handlers, stepped straight through the anchor room's
+         footprint -- leaves both unchanged, check() deep-clean at
+         EVERY step (I11 exempts the floating room; I12/I14 exemptions
+         hold), the door survives, the plan-side furnishing stays put.
+         RULING 1 EXECUTED: the xfail deleted, the two hard passes in
+         (stay contract asserted; the heal -- auto_coalesce dissolves
+         the room-less degree-2 seam at the next merge pass and the
+         merged wall drags as one); the P2.3 Known-regressions row
+         CLOSED as superseded-by-ruling, its workaround column alive
+         only for the shuffle/auto_coalesce-off world. Census: xfails
+         4 -> 3 (the pin retired by ruling, stated).
+         RULING 2 EXECUTED: the tiered doorway weld at both release
+         paths (snap-to-jamb within JOIN_TOL, else the P4.1b message,
+         never split, never refuse), auto_weld's decision with no fifth
+         flag; shuffle suppresses the message (an unwelded end is the
+         mode's intended state); the explicit join delivers deferred
+         information through the defect-6 channel unconditionally. The
+         P4.1b pins run UNCHANGED (their landing is 16" from either
+         jamb, outside the tolerance -- tier 2 IS the old behaviour).
+         RECEIPT, fail-first (worktree at e9abeb3, new tests copied in
+         unchanged): all five behaviour flips RED on their verdict
+         asserts with preconditions held (the drawn jamb case lands
+         measurably at (108, 0) inside the door and fails on
+         "108.0 == 104.0 +/- 0.1"; the shuffle label-drag fails on
+         'placed' == 'floating'); the click-stays-placed pin passes
+         BOTH eras (preservation, not a flip). All green here.
+         TESTS CHANGED, declared: the xfail
+         test_a_roomless_split_wall_body_drags_as_one_run DELETED by
+         the ruling it existed to force (replaced, not relaxed).
+         auto_bind lands PLUMBED with an empty enforcement surface
+         (the census's measured conclusion, recorded not invented).
+         NOTED follow-ups, not built: no macro token for the shuffle
+         toggle (the recorder records nothing for it -- same class as
+         the pre-P4.2 unnamed chords); a shuffle keyboard shortcut.
+         Patrick wants ten minutes with the toggle after the merge.
+
+P4.3(6) Patrick's finding: THE FUSE STRAGGLER (dragWallFuseStraggler.fpm)
+ruff:    clean
+pytest:  559 passed, 7 deselected, 3 xfailed (sum 569, every sum
+         reconciling; trailer in the commit)
+files:   extract.py (extract_room step 1b), examples/
+         dragWallFuseStraggler.fpm (Patrick's reproduction, committed),
+         tests/test_extract_join.py (the verbatim macro pin),
+         docs/CODE_REVIEW_v2.md (row 36), this file.
+notes:   Patrick: moving the fiveRoomTest design with his macro "leaves
+         a wall behind that should not have been copied out."
+         REPRODUCED HEADLESS VERBATIM, introspected to three measured
+         links (register row 36 has the full chain): an offset join
+         round-trip (6" off, by design) + a plain CLICK's release merge
+         (6" perp_tol, across a seam that IS degree-2 by identity --
+         the horizontals pass mid-body, so no planner rule broke) left
+         R2 BOUND to a fused five-room column that no R2 outline edge
+         names. extract_room then partitioned by the OUTLINE (step 1)
+         but floated the BINDING list (_translate moves room.walls) --
+         two definitions of "the room's walls" -- so the column rode
+         out bodily with floating R2 and the return join stranded it.
+         FIX at the operation whose contract broke: step 1b releases
+         every bound wall no outline edge names (the outline is the one
+         definition, P3.5); the wall stays with the plan.
+         RECEIPT, fail-first: the macro pinned verbatim, red against
+         b23d685 in a worktree on "wall count 15 != baseline 16: a wall
+         was minted or stranded", green on the fix; fixed end state ==
+         the fresh load (16 walls, areas identical, zero open edges,
+         check() clean). The pin replays at the DEFAULT window geometry
+         (the macro was recorded there; the two fiveRoomDragSplit pins
+         replay at 1400x1000+fit for the same reason, stated in each).
+         PRODUCER NOTED, not fixed: the release-merge's unconditional
+         rebind of absorbed walls' rooms can still mint binding-without-
+         naming; extract is immune now, rebind semantics are P4.5's.
+         Census 568 -> 569.
 ```

@@ -825,6 +825,7 @@ class RoomItem(QGraphicsItem):
             self._dragging_label = True
             if self.walls and not ctrl:
                 self._moving_room = True
+                self._room_moved = False      # displacement, not mode (P4.3)
                 if self.placement_state != "floating":
                     # P4.2: the label-drag of a PLACED room is extract ->
                     # move -> join through the REAL ops -- the same
@@ -861,6 +862,7 @@ class RoomItem(QGraphicsItem):
             dy = wall_snap_len(sp.y() - self._room_grab.y())
             if dx or dy:
                 self._translate(dx, dy)
+                self._room_moved = True
                 self._room_grab = QPointF(self._room_grab.x() + dx,
                                           self._room_grab.y() + dy)
             e.accept()
@@ -884,11 +886,20 @@ class RoomItem(QGraphicsItem):
             if getattr(self, "_drag_autofloat", False):
                 # the drag owns this float (a placed room's label-drag is
                 # extract -> move -> join, P4.2): it ends PLACED whether the
-                # mouse moved or not -- a click must not leave a room afloat
+                # mouse moved or not -- a click must not leave a room afloat.
+                # UNDER SHUFFLE (P4.3) a room that actually MOVED stays
+                # floating -- "leaving shuffle joins nothing automatically",
+                # and the floating paint cue is the signal; join is explicit
+                # (right-click > Join room into plan). A click that never
+                # moved still ends placed, exactly as P4.2 ruled.
                 self._drag_autofloat = False
                 if sc is not None:
-                    from floorplanner.extract import join_room  # late
-                    join_room(sc, self)
+                    if (SETTINGS.get("shuffle", False)
+                            and getattr(self, "_room_moved", False)):
+                        rebuild_all_walls(sc)
+                    else:
+                        from floorplanner.extract import join_room  # late
+                        join_room(sc, self)
             elif moved and sc is not None:
                 # an explicitly floating room: the move is CLOSED (P4.2,
                 # section 4) -- nothing merges, welds or binds until an

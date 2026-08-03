@@ -556,6 +556,102 @@ def test_dragging_an_end_into_a_doorway_names_the_doorway_at_release(
     assert "dragging a wall end" in msg
 
 
+# -- ruling 2 (P4.3): the tiered doorway policy ------------------------------
+# Tier 1: a jamb within the gesture's JOIN_TOL of the landing point takes the
+# end (snap-to-jamb, the junction the user meant). Tier 2: no jamb in
+# tolerance -> land-unwelded-and-report (the P4.1b message above, unchanged --
+# its landing at x=120 sits 16" from either jamb, outside the tolerance).
+# Never split, never refuse. auto_weld's decision: with it off, or under
+# shuffle, no weld is attempted and the message stays quiet.
+@pytest.mark.gui
+def test_a_drawn_end_near_a_jamb_snaps_to_it(fp, win, drag):
+    sc = win.scene
+    host = _host_with_door(fp, sc)          # door 3280 spans 104..136
+    win.resize(1100, 900)
+    win.show()
+    win.zoom_fit()
+    win.set_tool(fp.TOOL_WALL_INT)
+    m = win.view.transform().m11()
+    # drawn to rest at x=108: inside the span, 4" from the jamb at 104
+    drag(win, QPointF(108, 96), 0, -int(96 * m), steps=4)
+    drawn = next(w for w in sc.items() if isinstance(w, fp.WallItem)
+                 and w is not host and abs(max(w.p1.y(), w.p2.y()) - 96) < 6)
+    end = min((drawn.p1, drawn.p2), key=lambda p: abs(p.y()))
+    assert abs(end.y()) < 1.0               # precondition: really landed
+    assert end.x() == pytest.approx(104.0, abs=0.1), (
+        "the end must snap to the jamb, not rest inside the doorway")
+    win._commit_if_changed()
+    assert "door 3280" not in win.statusBar().currentMessage(), (
+        "a snapped landing has nothing to report")
+
+
+@pytest.mark.gui
+def test_a_dragged_end_near_a_jamb_snaps_to_it(fp, win, drag):
+    sc = win.scene
+    _host_with_door(fp, sc)
+    w = fp.WallItem(QPointF(108, 60), QPointF(108, 180), "interior")
+    sc.addItem(w)
+    fp.rebuild_all_walls(sc)
+    win.resize(1100, 900)
+    win.show()
+    win.zoom_fit()
+    win.set_tool(fp.TOOL_SELECT)
+    w.setSelected(True)
+    m = win.view.transform().m11()
+    drag(win, QPointF(108, 60), 0, -int(60 * m), steps=4)
+    end = min((w.p1, w.p2), key=lambda p: abs(p.y()))
+    assert abs(end.y()) < 1.0               # precondition: really landed
+    assert end.x() == pytest.approx(104.0, abs=0.1), (
+        "the dragged end must snap to the jamb -- the ruling's deliberate, "
+        "narrow exception to 'left exactly where the drag put it'")
+    win._commit_if_changed()
+    assert "door 3280" not in win.statusBar().currentMessage()
+
+
+@pytest.mark.gui
+def test_auto_weld_off_leaves_the_end_alone_and_says_nothing(fp, win, drag):
+    sc = win.scene
+    _host_with_door(fp, sc)
+    fp.SETTINGS["auto_weld"] = False
+    win.resize(1100, 900)
+    win.show()
+    win.zoom_fit()
+    win.set_tool(fp.TOOL_WALL_INT)
+    m = win.view.transform().m11()
+    drag(win, QPointF(108, 96), 0, -int(96 * m), steps=4)
+    drawn = next(w for w in sc.items() if isinstance(w, fp.WallItem)
+                 and abs(max(w.p1.y(), w.p2.y()) - 96) < 6)
+    end = min((drawn.p1, drawn.p2), key=lambda p: abs(p.y()))
+    assert abs(end.y()) < 1.0               # precondition: really landed
+    assert end.x() == pytest.approx(108.0, abs=0.1), (
+        "with auto_weld off NO weld pass runs -- no jamb snap either")
+    win._commit_if_changed()
+    assert "door 3280" not in win.statusBar().currentMessage(), (
+        "no weld attempted -> no policy question -> no message")
+
+
+@pytest.mark.gui
+def test_shuffle_suppresses_the_doorway_message(fp, win, drag):
+    # the P4.1b geometry VERBATIM (landing at 120, deep inside the door),
+    # under shuffle: an unwelded end is the mode's intended state, and
+    # warning about it would be nagging the mode for working
+    sc = win.scene
+    _host_with_door(fp, sc)
+    fp.SETTINGS["shuffle"] = True
+    win.resize(1100, 900)
+    win.show()
+    win.zoom_fit()
+    win.set_tool(fp.TOOL_WALL_INT)
+    m = win.view.transform().m11()
+    drag(win, QPointF(120, 96), 0, -int(96 * m), steps=4)
+    drawn = next(w for w in sc.items() if isinstance(w, fp.WallItem)
+                 and abs(max(w.p1.y(), w.p2.y()) - 96) < 6)
+    end = min((drawn.p1, drawn.p2), key=lambda p: abs(p.y()))
+    assert abs(end.y()) < 1.0 and 104 < end.x() < 136   # precondition
+    win._commit_if_changed()
+    assert "door 3280" not in win.statusBar().currentMessage()
+
+
 # -- defect 34 (P4.2): the gap REVIEW -- list, never auto-close ---------------
 def _gap_doc(win):
     import warnings

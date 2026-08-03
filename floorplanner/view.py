@@ -500,9 +500,17 @@ class PlanView(QGraphicsView):
             else:
                 # an overlapping same-type wall coalesces into one; then the
                 # drawn end welds onto whatever wall it lands on (T/L joint) so
-                # it reads as one connected structure, not a loose segment
+                # it reads as one connected structure, not a loose segment.
+                # The weld pass is auto_weld's (P4.3): with it off -- or under
+                # shuffle -- the wall lands exactly where drawn, nothing snaps,
+                # and the doorway report stays quiet (an unwelded end is the
+                # chosen state, not a tear).
                 merge_wall(self.scene(), w)
-                if w.scene() is not None:
+                if w.scene() is not None and editing_enabled("auto_weld"):
+                    # ruling 2, tier 1: a jamb within the join tolerance is
+                    # the junction the user meant -- snap to it; else the end
+                    # lands as drawn and tier 2 reports (P4.1b's message)
+                    snap_end_to_doorway_jamb(self.scene(), w)
                     weld_wall_ends(self.scene(), w, rebuild=False)
                     # defect 25 (P4.1b): a drawn end that came to rest inside
                     # a doorway reports at the gesture -- the walk would only

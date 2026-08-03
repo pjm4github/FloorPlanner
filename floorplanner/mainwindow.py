@@ -182,6 +182,21 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         tb.addAction(a_fit)
 
         tb.addSeparator()
+        # the shuffle-mode toggle (P4.3). Text-only on purpose: a mode reads
+        # better as a word than as one more pictogram, and it saves an asset
+        self.a_shuffle = QAction("Shuffle", self)
+        self.a_shuffle.setCheckable(True)
+        self.a_shuffle.setChecked(bool(SETTINGS.get("shuffle", False)))
+        self.a_shuffle.setToolTip(
+            "Shuffle mode: drag rooms freely -- nothing merges, welds or "
+            "binds until you join a room explicitly")
+        self.a_shuffle.toggled.connect(self._set_shuffle)
+        shuffle_btn = QToolButton()
+        shuffle_btn.setDefaultAction(self.a_shuffle)
+        shuffle_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        tb.addWidget(shuffle_btn)
+
+        tb.addSeparator()
         self.a_undo = QAction(tool_icon("undo"), "Undo", self)
         self.a_undo.setShortcut(QKeySequence.StandardKey.Undo)
         self.a_undo.setToolTip("Undo  [Ctrl+Z]")
@@ -456,6 +471,30 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self.scene.setSceneRect(canvas_rect().adjusted(-m, -m, m, m))
         self.scene.update()
         self._update_title()
+        self._sync_editing_ui()
+
+    def _sync_editing_ui(self):
+        """Point the toolbar's shuffle toggle at the document's flag. Called
+        from `_apply_canvas` (legacy open / import / New) and from the bridge's
+        v5 apply, which never reaches `_apply_canvas`; `_set_shuffle`'s
+        same-value guard keeps the setChecked from echoing back into
+        SETTINGS."""
+        a = getattr(self, "a_shuffle", None)
+        if a is not None:
+            a.setChecked(bool(SETTINGS.get("shuffle", False)))
+
+    def _set_shuffle(self, on):
+        """The toolbar toggle -> the document's `settings.editing.shuffle`.
+        Same-value guard: sync from a loaded document must not re-trigger."""
+        on = bool(on)
+        if bool(SETTINGS.get("shuffle", False)) == on:
+            return
+        SETTINGS["shuffle"] = on
+        self._mark_dirty()               # settings are document state (saved)
+        self.status("Shuffle mode ON: nothing merges, welds or binds -- "
+                    "join rooms explicitly (right-click > Join room into "
+                    "plan)." if on else
+                    "Shuffle mode off: automatic joining passes re-enabled.")
 
     def set_tool(self, tool):
         self.tool = tool

@@ -278,3 +278,57 @@ def test_drag_split2_macro_keeps_every_room_rectilinear(win):
                                                pts[(i + 1) % n]), (
                         f"line {ln}: {r.name} edge names a wall that does "
                         f"not span it -- a latent tear")
+
+
+@pytest.mark.gui
+def test_fuse_straggler_macro_steals_no_wall(win):
+    # Patrick's dragWallFuseStraggler macro, pinned VERBATIM (P4.3): an
+    # offset round-trip left R2 six inches off, and a plain CLICK on the
+    # interior column fused R2's offset wall into it through the now
+    # degree-2 seam, REBINDING R2 onto a survivor that runs off R2's own
+    # edge -- binding without naming (R2's edge goes honestly OPEN, the
+    # binding stands). The next label-drag's extract walked the OUTLINE to
+    # decide what to copy-trim but floated the BINDING list, so the
+    # five-room column rode out bodily with floating R2 and was stranded at
+    # the drop zone on the return. The fix: extract releases every bound
+    # wall no outline edge names (the outline is what says which walls are
+    # the room's, P3.5). After every line: every bound wall is named by at
+    # least one of its bound rooms' outlines. At the end: the wall count is
+    # the baseline's, nothing lies beyond the plan's extent, every room is
+    # placed and closed at its loaded area.
+    import pathlib
+    ex = pathlib.Path(__file__).resolve().parent.parent / "examples"
+    # NO resize / zoom_fit: this macro was recorded at the default window
+    # geometry, and the replay must map its clicks the same way (the other
+    # two pins' macros were recorded at 1400x1000 + fit)
+    win.load_path(str(ex / "fiveRoomTest.json"))
+    base = {r.name: r.area_sqft for r in win.scene.items()
+            if isinstance(r, fp.RoomItem)}
+    n_base = sum(1 for w in win.scene.items() if isinstance(w, fp.WallItem))
+    lines = (ex / "dragWallFuseStraggler.fpm").read_text().splitlines()
+    for ln, line in enumerate(lines, 1):
+        line = line.strip()
+        if not line or line.startswith("^O"):
+            continue          # the ^O re-open is the harness's load_path
+        res = win.run_macro(line)
+        assert res["ok"], res
+        for w in (x for x in win.scene.items()
+                  if isinstance(x, fp.WallItem)):
+            if not w.rooms:
+                continue
+            named = any(e.wall is w for r in w.rooms for e in r.outline)
+            assert named, (
+                f"line {ln}: wall ({w.p1.x():.1f},{w.p1.y():.1f})-"
+                f"({w.p2.x():.1f},{w.p2.y():.1f}) is bound to "
+                f"{sorted(r.name for r in w.rooms)} but named by none of "
+                f"their outlines -- the straggler class")
+    walls = [w for w in win.scene.items() if isinstance(w, fp.WallItem)]
+    assert len(walls) == n_base, (
+        f"wall count {len(walls)} != baseline {n_base}: a wall was minted "
+        f"or stranded")
+    assert all(max(w.p1.x(), w.p2.x()) <= 830 for w in walls), (
+        "a wall was left behind beyond the plan's extent")
+    for r in (x for x in win.scene.items() if isinstance(x, fp.RoomItem)):
+        assert r.placement_state == "placed", f"{r.name} not placed"
+        assert len(r.open_edges()) == 0, f"{r.name} still open"
+        assert r.area_sqft == pytest.approx(base[r.name], abs=0.5)

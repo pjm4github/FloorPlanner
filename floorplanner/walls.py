@@ -526,15 +526,19 @@ def normalize_walls(scene):
     return merged, moved, shared, split_body_landings(scene)
 
 
-def merge_wall(scene, wall, perp_tol=None):
+def merge_wall(scene, wall, perp_tol=None, force=False):
     """Merge just the run `wall` sits in -- P3.4 (iii)'s replacement for
-    `coalesce_wall`, and gated by the same `auto_coalesce` setting.
+    `coalesce_wall`, and gated by the same `auto_coalesce` setting (through
+    `editing_enabled`, so shuffle mode implies off -- P4.3). `force=True` is
+    for EXPLICIT operations (the join): "rooms are joined explicitly, not
+    silently" is the schema's own contract, so an explicit join must merge
+    coincident walls whatever the automatic flags say.
 
     `wall` is forced to be the run's SURVIVOR, which is not a detail: the
     caller has just drawn or dragged that item and holds a reference to it,
     and it carries the selection. The planner takes the run's first wall in the
     caller's own order, so putting `wall` first is all it takes to say so."""
-    if not SETTINGS.get("auto_coalesce", True):
+    if not force and not editing_enabled("auto_coalesce"):
         return wall
     if (scene is None or wall is None or wall.scene() is None
             or wall.group() is not None or wall.length() < 1e-6):
@@ -552,9 +556,10 @@ def merge_wall(scene, wall, perp_tol=None):
 
 def merge_all(scene):
     """Plan-wide auto-merge (load, import, ungroup) -- P3.4 (iii)'s replacement
-    for `coalesce_all`, gated by `auto_coalesce` exactly as that was. Returns
+    for `coalesce_all`, gated by `auto_coalesce` exactly as that was (through
+    `editing_enabled`, so shuffle implies off -- P4.3). Returns
     the number of walls absorbed."""
-    if not SETTINGS.get("auto_coalesce", True):
+    if not editing_enabled("auto_coalesce"):
         return 0
     return merge_collinear_scene(scene)
 
@@ -807,6 +812,55 @@ def drain_gesture_faults(scene) -> list:
     if out:
         scene._fp_gesture_faults = []
     return out
+
+
+def snap_end_to_doorway_jamb(scene, wall, ends=("p1", "p2")):
+    """RULING 2's first tier (P4.3): a gesture that leaves a wall end resting
+    on another wall's body INSIDE a doorway snaps the end to the nearest JAMB
+    (the opening's edge on the host) when one lies within the gesture's join
+    tolerance -- almost certainly the junction the user meant, visible the
+    instant it happens, and a legitimate gesture-tolerance move: gestures are
+    exactly where `JOIN_TOL` is allowed to act (defect 13's ruling -- the
+    tolerance picks the TARGET; the committed point is the jamb, a scene-space
+    fact). Beyond the tolerance nothing moves and the P4.1b report stands as
+    the fallback. NEVER splits the host and NEVER refuses the landing, by the
+    same ruling. Returns the number of ends moved.
+
+    Callers gate this with `editing_enabled("auto_weld")`: the doorway case is
+    a sub-case of the weld pass's target-finding, not a fifth flag."""
+    if scene is None or wall is None or wall.scene() is None:
+        return 0
+    moved = 0
+    view = None
+    for attr in ends:
+        p = getattr(wall, attr)
+        hit = nearest_wall_body(scene, p, ON_SEG_TOL, exclude=wall)
+        if hit is None:
+            continue
+        host = hit[0]
+        if view is None:
+            view = graph_from_scene(scene, wall.floor)
+        sp = plan_split_edge(view, host, p.x(), p.y())
+        if sp is None or not sp.straddled:
+            continue
+        u, L = host.unit(), host.length()
+        s_p = (p.x() - host.p1.x()) * u.x() + (p.y() - host.p1.y()) * u.y()
+        best = None
+        for po in sp.straddled:
+            op = (host.openings[po.index]
+                  if po.index < len(host.openings) else None)
+            if op is None:
+                continue
+            for sj in (op.s - op.width / 2.0, op.s + op.width / 2.0):
+                if 0.0 <= sj <= L and abs(sj - s_p) <= JOIN_TOL:
+                    if best is None or abs(sj - s_p) < abs(best - s_p):
+                        best = sj
+        if best is not None:
+            setattr(wall, attr, host.point_at(best))
+            moved += 1
+    if moved:
+        wall.rebuild()
+    return moved
 
 
 def report_doorway_landings(scene, wall, gesture, ends=("p1", "p2")):
@@ -1951,6 +2005,15 @@ class WallItem(QGraphicsItem):
                 collapse_degenerate_outline_edges(self.scene(), self.floor)
             merge_wall(self.scene(), self)          # fuse if it now overlaps
             sc_after = self.scene()
+            if (endpoint_edit and sc_after is not None
+                    and editing_enabled("auto_weld")):
+                # ruling 2, tier 1 (P4.3): an end dragged to rest inside a
+                # doorway snaps to a jamb within the join tolerance -- a
+                # deliberate, narrow exception to "left exactly where the
+                # drag put it", taken by the ruling; only the end this drag
+                # moved is considered. Runs BEFORE the binding repairs so
+                # they re-derive from the final geometry.
+                snap_end_to_doorway_jamb(sc_after, self, ends=(self._mode,))
             if sc_after is not None:
                 # derived-state repair at the gesture's end (P4.2, mini-gate
                 # findings 4+5): the merge can absorb a wall a neighbour's
@@ -1973,10 +2036,14 @@ class WallItem(QGraphicsItem):
                         # line 13 accumulated one through a long sequence)
                         share_outline_vertices(room)
                         split_partially_covered_edges(sc_after, room)
-            if endpoint_edit and self.scene() is not None:
+            if (endpoint_edit and self.scene() is not None
+                    and editing_enabled("auto_weld")):
                 # defect 25 (P4.1b): an end dragged into a doorway reports at
                 # the gesture, not at the next document walk -- and only the
-                # end this drag moved, so an old landing is not re-announced
+                # end this drag moved, so an old landing is not re-announced.
+                # Gated with the weld pass (P4.3, ruling 2): with auto_weld
+                # off or under shuffle an unwelded end is the intended state,
+                # and the message would be nagging the mode for working.
                 report_doorway_landings(self.scene(), self,
                                         "dragging a wall end",
                                         ends=(self._mode,))

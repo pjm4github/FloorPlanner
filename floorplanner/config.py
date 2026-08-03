@@ -17,7 +17,8 @@ __all__ = [
     "FOOT", "EXTERIOR_T", "INTERIOR_T", "GRID_MINOR", "GRID_MAJOR",
     "SNAP_STEP", "WALL_SNAP_DEFAULT", "WALL_SNAP_CHOICES", "ROTATE_SNAP_DEFAULT",
     "CANVAS_W_DEFAULT", "CANVAS_H_DEFAULT", "MAX_CANVAS_IN",
-    "DEFAULT_SETTINGS", "SETTINGS", "JOIN_TOL", "MIN_WALL_LEN",
+    "DEFAULT_SETTINGS", "SETTINGS", "editing_enabled", "JOIN_TOL",
+    "MIN_WALL_LEN",
     "WALL_PROJECT_STICK", "WALL_PROJECT_NEAR", "ROOM_SIG_MARGIN",
     "WALL_Z", "OPENING_Z", "canvas_rect",
     "TOOL_SELECT", "TOOL_WALL_EXT", "TOOL_WALL_INT", "TOOL_DOOR",
@@ -59,9 +60,25 @@ DEFAULT_SETTINGS = {
     "canvas_w_in": CANVAS_W_DEFAULT,
     "canvas_h_in": CANVAS_H_DEFAULT,
     "cost_per_sqft": 150.0,           # building cost estimate, $/sq ft
+    # editing modes (schema $defs.editing_modes, P4.3) -- persisted in the
+    # file's settings.editing block; read through editing_enabled() below
     "auto_coalesce": True,            # fuse overlapping same-type walls on edit
+    "shuffle": False,                 # shuffle mode: nothing joins automatically
+    "auto_weld": True,                # snap a drawn end onto what it lands near
+    "auto_bind": True,                # bind room edges to coincident walls
+    #                                   (policy flag; no automatic site today --
+    #                                   the P4.3 census, stated not invented)
 }
 SETTINGS = dict(DEFAULT_SETTINGS)
+
+
+def editing_enabled(flag: str) -> bool:
+    """Effective editing-mode flag (P4.3). ``shuffle: true`` implies the three
+    ``auto_*`` joining passes are all off -- the schema's own contract -- so
+    every gate asks this one question instead of re-deriving the implication."""
+    if SETTINGS.get("shuffle", False):
+        return False
+    return bool(SETTINGS.get(flag, True))
 JOIN_TOL = 9.0            # endpoints within 9" join together
 MIN_WALL_LEN = 6.0
 WALL_PROJECT_STICK = 9.0  # stretch sticks within 9" of an orthogonal wall line

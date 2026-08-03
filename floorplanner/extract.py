@@ -28,7 +28,8 @@ from floorplanner.rooms import (
 from floorplanner.vertex import Vertex
 from floorplanner.walls import (
     SHARE_TOL, OpeningItem, WallItem, merge_wall, rebuild_all_walls,
-    report_opening_failure, share_coincident_ends, split_wall_at,
+    report_doorway_landings, report_opening_failure, share_coincident_ends,
+    split_wall_at,
 )
 
 
@@ -123,6 +124,22 @@ def extract_room(scene, room):
             room.bind_wall(c)
             room.outline[i].wall = c
             c.rebuild()
+    # -- 1b. a wall BOUND to the room that no outline edge names is not the
+    # room's to take. The outline is what says which walls are the room's
+    # (P3.5); the binding list can outgrow it -- the release-merge rebinds a
+    # room onto the survivor that absorbed its wall even when that survivor
+    # runs off the room's own edge, which leaves the edge honestly OPEN but
+    # the binding standing. Step 1 walks the outline, so such a wall is
+    # neither copy-trimmed nor released -- and the float (`_translate` moves
+    # `room.walls`) would steal it bodily from every other room on it.
+    # Measured: dragWallFuseStraggler.fpm, where a five-room fused column
+    # rode out with floating R2 and was left stranded on the return.
+    # Release it; it stays with the plan.
+    if n:
+        named = {id(e.wall) for e in room.outline if e.wall is not None}
+        for w in list(room.walls):
+            if id(w) not in named:
+                room.unbind_wall(w)
     # -- 2 + 3. privatize every vertex an outside wall still touches
     room_walls = set(room.walls)
     outside = set()
@@ -206,9 +223,12 @@ def join_room(scene, room):
     # stranding R4's outline. The join's own rule (docstring above) is that
     # at or below vertex_weld_in two lines ARE one and beyond it nothing
     # moves; the merge must obey the same line.
+    # force=True: the join is EXPLICIT -- it must merge coincident walls even
+    # under shuffle / auto_coalesce off, or a Join would leave doubled walls
+    # (P4.3 census finding)
     for w in list(room.walls):
         if w.scene() is not None:
-            merge_wall(scene, w, perp_tol=SHARE_TOL)
+            merge_wall(scene, w, perp_tol=SHARE_TOL, force=True)
     # -- rebind: edges whose wall was absorbed re-resolve to the survivor --
     # for THIS room via the full bind, and for every NEIGHBOUR via the narrow
     # dead-reference repair (found by the fiveRoomTest macro: the merge
@@ -230,5 +250,14 @@ def join_room(scene, room):
     room.extracted_from = None
     room._floating_furnishings = []
     rebuild_all_walls(scene)
+    # ruling 2's addition (P4.3): the explicit join is where information a
+    # mode deferred is DELIVERED -- anything this join could not weld says so
+    # now through the defect-6 channel (a room-wall end resting inside a plan
+    # doorway stays unwelded and names the door), not at the next document
+    # walk. Unconditional: joining is the user's stated intent, whatever the
+    # automatic flags say.
+    for w in room.walls:
+        if w.scene() is not None:
+            report_doorway_landings(scene, w, "joining the room")
     room.update()
     return room
