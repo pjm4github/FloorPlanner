@@ -526,15 +526,19 @@ def normalize_walls(scene):
     return merged, moved, shared, split_body_landings(scene)
 
 
-def merge_wall(scene, wall, perp_tol=None):
+def merge_wall(scene, wall, perp_tol=None, force=False):
     """Merge just the run `wall` sits in -- P3.4 (iii)'s replacement for
-    `coalesce_wall`, and gated by the same `auto_coalesce` setting.
+    `coalesce_wall`, and gated by the same `auto_coalesce` setting (through
+    `editing_enabled`, so shuffle mode implies off -- P4.3). `force=True` is
+    for EXPLICIT operations (the join): "rooms are joined explicitly, not
+    silently" is the schema's own contract, so an explicit join must merge
+    coincident walls whatever the automatic flags say.
 
     `wall` is forced to be the run's SURVIVOR, which is not a detail: the
     caller has just drawn or dragged that item and holds a reference to it,
     and it carries the selection. The planner takes the run's first wall in the
     caller's own order, so putting `wall` first is all it takes to say so."""
-    if not SETTINGS.get("auto_coalesce", True):
+    if not force and not editing_enabled("auto_coalesce"):
         return wall
     if (scene is None or wall is None or wall.scene() is None
             or wall.group() is not None or wall.length() < 1e-6):
@@ -552,9 +556,10 @@ def merge_wall(scene, wall, perp_tol=None):
 
 def merge_all(scene):
     """Plan-wide auto-merge (load, import, ungroup) -- P3.4 (iii)'s replacement
-    for `coalesce_all`, gated by `auto_coalesce` exactly as that was. Returns
+    for `coalesce_all`, gated by `auto_coalesce` exactly as that was (through
+    `editing_enabled`, so shuffle implies off -- P4.3). Returns
     the number of walls absorbed."""
-    if not SETTINGS.get("auto_coalesce", True):
+    if not editing_enabled("auto_coalesce"):
         return 0
     return merge_collinear_scene(scene)
 

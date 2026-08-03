@@ -206,9 +206,12 @@ def join_room(scene, room):
     # stranding R4's outline. The join's own rule (docstring above) is that
     # at or below vertex_weld_in two lines ARE one and beyond it nothing
     # moves; the merge must obey the same line.
+    # force=True: the join is EXPLICIT -- it must merge coincident walls even
+    # under shuffle / auto_coalesce off, or a Join would leave doubled walls
+    # (P4.3 census finding)
     for w in list(room.walls):
         if w.scene() is not None:
-            merge_wall(scene, w, perp_tol=SHARE_TOL)
+            merge_wall(scene, w, perp_tol=SHARE_TOL, force=True)
     # -- rebind: edges whose wall was absorbed re-resolve to the survivor --
     # for THIS room via the full bind, and for every NEIGHBOUR via the narrow
     # dead-reference repair (found by the fiveRoomTest macro: the merge

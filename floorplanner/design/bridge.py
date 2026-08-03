@@ -700,14 +700,19 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
     _warn_unwelded(scene, n)
 
     settings = dict(SETTINGS)
-    auto = bool(settings.pop("auto_coalesce", True))
+    # the editing block is emitted from the LIVE flags (P4.3 -- the hardcoded
+    # block predates the runtime half existing); the flat copies are popped so
+    # each flag exists once, inside `editing`, where the schema puts it
+    editing = {"shuffle": bool(settings.pop("shuffle", False)),
+               "auto_coalesce": bool(settings.pop("auto_coalesce", True)),
+               "auto_weld": bool(settings.pop("auto_weld", True)),
+               "auto_bind": bool(settings.pop("auto_bind", True))}
     settings["vertex_weld_in"] = WELD_TOL
     settings["join_tol_in"] = JOIN_TOL
     # centerline, NOT the migrator's inside_face: the scene's areas ARE
     # centreline areas, and declaring the better basis would be a repair
     settings["area_basis"] = "centerline"
-    settings["editing"] = {"shuffle": False, "auto_coalesce": auto,
-                           "auto_weld": True, "auto_bind": True}
+    settings["editing"] = editing
 
     return Design.from_dict(canonicalize({
         "format": "floorplanner-design", "version": 5, "units": "inches",
@@ -904,6 +909,11 @@ def apply_design_to_scene(target, design, report=None, strict=False,
         # later phase adds) would otherwise evaporate on the first save
         win._doc_settings = {k: v for k, v in settings.items()
                              if k not in WALK_SETTINGS and k != "active_floor"}
+        # the v5 open path never reaches _apply_canvas, so the editing-mode
+        # UI (the shuffle toggle) re-syncs here (P4.3)
+        sync = getattr(win, "_sync_editing_ui", None)
+        if sync is not None:
+            sync()
 
     backdrops = []
     if keep_backdrop:
