@@ -124,6 +124,22 @@ def extract_room(scene, room):
             room.bind_wall(c)
             room.outline[i].wall = c
             c.rebuild()
+    # -- 1b. a wall BOUND to the room that no outline edge names is not the
+    # room's to take. The outline is what says which walls are the room's
+    # (P3.5); the binding list can outgrow it -- the release-merge rebinds a
+    # room onto the survivor that absorbed its wall even when that survivor
+    # runs off the room's own edge, which leaves the edge honestly OPEN but
+    # the binding standing. Step 1 walks the outline, so such a wall is
+    # neither copy-trimmed nor released -- and the float (`_translate` moves
+    # `room.walls`) would steal it bodily from every other room on it.
+    # Measured: dragWallFuseStraggler.fpm, where a five-room fused column
+    # rode out with floating R2 and was left stranded on the return.
+    # Release it; it stays with the plan.
+    if n:
+        named = {id(e.wall) for e in room.outline if e.wall is not None}
+        for w in list(room.walls):
+            if id(w) not in named:
+                room.unbind_wall(w)
     # -- 2 + 3. privatize every vertex an outside wall still touches
     room_walls = set(room.walls)
     outside = set()

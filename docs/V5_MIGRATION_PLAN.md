@@ -4237,4 +4237,39 @@ notes:   ACCEPTANCE MET, as the task line states it: with shuffle on, a
          toggle (the recorder records nothing for it -- same class as
          the pre-P4.2 unnamed chords); a shuffle keyboard shortcut.
          Patrick wants ten minutes with the toggle after the merge.
+
+P4.3(6) Patrick's finding: THE FUSE STRAGGLER (dragWallFuseStraggler.fpm)
+ruff:    clean
+pytest:  559 passed, 7 deselected, 3 xfailed (sum 569, every sum
+         reconciling; trailer in the commit)
+files:   extract.py (extract_room step 1b), examples/
+         dragWallFuseStraggler.fpm (Patrick's reproduction, committed),
+         tests/test_extract_join.py (the verbatim macro pin),
+         docs/CODE_REVIEW_v2.md (row 36), this file.
+notes:   Patrick: moving the fiveRoomTest design with his macro "leaves
+         a wall behind that should not have been copied out."
+         REPRODUCED HEADLESS VERBATIM, introspected to three measured
+         links (register row 36 has the full chain): an offset join
+         round-trip (6" off, by design) + a plain CLICK's release merge
+         (6" perp_tol, across a seam that IS degree-2 by identity --
+         the horizontals pass mid-body, so no planner rule broke) left
+         R2 BOUND to a fused five-room column that no R2 outline edge
+         names. extract_room then partitioned by the OUTLINE (step 1)
+         but floated the BINDING list (_translate moves room.walls) --
+         two definitions of "the room's walls" -- so the column rode
+         out bodily with floating R2 and the return join stranded it.
+         FIX at the operation whose contract broke: step 1b releases
+         every bound wall no outline edge names (the outline is the one
+         definition, P3.5); the wall stays with the plan.
+         RECEIPT, fail-first: the macro pinned verbatim, red against
+         b23d685 in a worktree on "wall count 15 != baseline 16: a wall
+         was minted or stranded", green on the fix; fixed end state ==
+         the fresh load (16 walls, areas identical, zero open edges,
+         check() clean). The pin replays at the DEFAULT window geometry
+         (the macro was recorded there; the two fiveRoomDragSplit pins
+         replay at 1400x1000+fit for the same reason, stated in each).
+         PRODUCER NOTED, not fixed: the release-merge's unconditional
+         rebind of absorbed walls' rooms can still mint binding-without-
+         naming; extract is immune now, rebind semantics are P4.5's.
+         Census 568 -> 569.
 ```
