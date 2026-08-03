@@ -28,7 +28,8 @@ from floorplanner.rooms import (
 from floorplanner.vertex import Vertex
 from floorplanner.walls import (
     SHARE_TOL, OpeningItem, WallItem, merge_wall, rebuild_all_walls,
-    report_opening_failure, share_coincident_ends, split_wall_at,
+    report_doorway_landings, report_opening_failure, share_coincident_ends,
+    split_wall_at,
 )
 
 
@@ -233,5 +234,14 @@ def join_room(scene, room):
     room.extracted_from = None
     room._floating_furnishings = []
     rebuild_all_walls(scene)
+    # ruling 2's addition (P4.3): the explicit join is where information a
+    # mode deferred is DELIVERED -- anything this join could not weld says so
+    # now through the defect-6 channel (a room-wall end resting inside a plan
+    # doorway stays unwelded and names the door), not at the next document
+    # walk. Unconditional: joining is the user's stated intent, whatever the
+    # automatic flags say.
+    for w in room.walls:
+        if w.scene() is not None:
+            report_doorway_landings(scene, w, "joining the room")
     room.update()
     return room

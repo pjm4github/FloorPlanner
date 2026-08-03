@@ -814,6 +814,55 @@ def drain_gesture_faults(scene) -> list:
     return out
 
 
+def snap_end_to_doorway_jamb(scene, wall, ends=("p1", "p2")):
+    """RULING 2's first tier (P4.3): a gesture that leaves a wall end resting
+    on another wall's body INSIDE a doorway snaps the end to the nearest JAMB
+    (the opening's edge on the host) when one lies within the gesture's join
+    tolerance -- almost certainly the junction the user meant, visible the
+    instant it happens, and a legitimate gesture-tolerance move: gestures are
+    exactly where `JOIN_TOL` is allowed to act (defect 13's ruling -- the
+    tolerance picks the TARGET; the committed point is the jamb, a scene-space
+    fact). Beyond the tolerance nothing moves and the P4.1b report stands as
+    the fallback. NEVER splits the host and NEVER refuses the landing, by the
+    same ruling. Returns the number of ends moved.
+
+    Callers gate this with `editing_enabled("auto_weld")`: the doorway case is
+    a sub-case of the weld pass's target-finding, not a fifth flag."""
+    if scene is None or wall is None or wall.scene() is None:
+        return 0
+    moved = 0
+    view = None
+    for attr in ends:
+        p = getattr(wall, attr)
+        hit = nearest_wall_body(scene, p, ON_SEG_TOL, exclude=wall)
+        if hit is None:
+            continue
+        host = hit[0]
+        if view is None:
+            view = graph_from_scene(scene, wall.floor)
+        sp = plan_split_edge(view, host, p.x(), p.y())
+        if sp is None or not sp.straddled:
+            continue
+        u, L = host.unit(), host.length()
+        s_p = (p.x() - host.p1.x()) * u.x() + (p.y() - host.p1.y()) * u.y()
+        best = None
+        for po in sp.straddled:
+            op = (host.openings[po.index]
+                  if po.index < len(host.openings) else None)
+            if op is None:
+                continue
+            for sj in (op.s - op.width / 2.0, op.s + op.width / 2.0):
+                if 0.0 <= sj <= L and abs(sj - s_p) <= JOIN_TOL:
+                    if best is None or abs(sj - s_p) < abs(best - s_p):
+                        best = sj
+        if best is not None:
+            setattr(wall, attr, host.point_at(best))
+            moved += 1
+    if moved:
+        wall.rebuild()
+    return moved
+
+
 def report_doorway_landings(scene, wall, gesture, ends=("p1", "p2")):
     """DEFECT 25's gesture arm (P4.1b): a wall end has come to rest on another
     wall's BODY inside a doorway -- say so NOW, naming the edit and the door.
@@ -1956,6 +2005,15 @@ class WallItem(QGraphicsItem):
                 collapse_degenerate_outline_edges(self.scene(), self.floor)
             merge_wall(self.scene(), self)          # fuse if it now overlaps
             sc_after = self.scene()
+            if (endpoint_edit and sc_after is not None
+                    and editing_enabled("auto_weld")):
+                # ruling 2, tier 1 (P4.3): an end dragged to rest inside a
+                # doorway snaps to a jamb within the join tolerance -- a
+                # deliberate, narrow exception to "left exactly where the
+                # drag put it", taken by the ruling; only the end this drag
+                # moved is considered. Runs BEFORE the binding repairs so
+                # they re-derive from the final geometry.
+                snap_end_to_doorway_jamb(sc_after, self, ends=(self._mode,))
             if sc_after is not None:
                 # derived-state repair at the gesture's end (P4.2, mini-gate
                 # findings 4+5): the merge can absorb a wall a neighbour's
@@ -1978,10 +2036,14 @@ class WallItem(QGraphicsItem):
                         # line 13 accumulated one through a long sequence)
                         share_outline_vertices(room)
                         split_partially_covered_edges(sc_after, room)
-            if endpoint_edit and self.scene() is not None:
+            if (endpoint_edit and self.scene() is not None
+                    and editing_enabled("auto_weld")):
                 # defect 25 (P4.1b): an end dragged into a doorway reports at
                 # the gesture, not at the next document walk -- and only the
-                # end this drag moved, so an old landing is not re-announced
+                # end this drag moved, so an old landing is not re-announced.
+                # Gated with the weld pass (P4.3, ruling 2): with auto_weld
+                # off or under shuffle an unwelded end is the intended state,
+                # and the message would be nagging the mode for working.
                 report_doorway_landings(self.scene(), self,
                                         "dragging a wall end",
                                         ends=(self._mode,))
