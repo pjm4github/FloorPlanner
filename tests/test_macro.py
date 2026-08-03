@@ -709,34 +709,57 @@ def test_ctrl_s_with_no_file_skips_instead_of_failing(fp, win):
     assert res["ok"] and not res["errors"], res
 
 
-def test_floor_switch_records_and_replays_by_name(fp, win, qapp):
-    # ^F "name" (Patrick's ask: floor manipulation recordable). Ctrl+F /
-    # Ctrl+Shift+F cycle the active floor in the app; EVERY switch, from any
-    # route, records the RESULTING floor by name via the switch_floor hook,
-    # so replay is deterministic however the user got there.
+def test_floor_select_and_new_record_and_replay(fp, win, qapp):
+    # The P4.2 Floors-menu spec (supersedes the one-session-old cycle
+    # design, deliberately): Ctrl+F pops the floor selector (default floor
+    # first and PRE-HIGHLIGHTED, so ENTER with no arrows selects it);
+    # Ctrl+Shift+F is New floor. Macro side: ^F "name" switches, BARE ^F
+    # returns to the default (roster's first, whatever its name), and
+    # ^+F "name" creates -- idempotently, so replays repeat cleanly.
     from floorplanner.macro import MacroRecorderDialog
-    win.new_floor_named("Upper")           # roster: default, Upper (active)
-    win.switch_floor("default")
+    # runner: ^+F creates + switches; repeat is a switch, not a failure
+    res = win.run_macro('^+F "Upper" ^+F "Top Floor" ^+F "Upper"')
+    assert res["ok"], res
+    assert win.active_floor == "Upper"
+    assert [f.name for f in win.floors] == ["default", "Upper", "Top Floor"]
+    # runner: named switch, then BARE ^F back to the default
+    res = win.run_macro('^F "Top Floor"')
+    assert res["ok"] and win.active_floor == "Top Floor"
+    res = win.run_macro("^F")
+    assert res["ok"] and win.active_floor == "default"
+    # the popup: default first and pre-highlighted (ENTER = default)
+    menu = win._build_floor_popup()
+    acts = menu.actions()
+    assert "(Default)" in acts[0].text() and "default" in acts[0].text()
+    assert menu.activeAction() is acts[0]
+    # recorder: a menu-route switch records the clean token; a popup-route
+    # switch (a PUP line is open) records the deterministic COMMENT form
     dlg = MacroRecorderDialog(win)
     dlg.start()
     try:
-        win.cycle_floor(+1)                # what Ctrl+F triggers
-        assert win.active_floor == "Upper"
-        win.cycle_floor(-1)                # what Ctrl+Shift+F triggers
-        assert win.active_floor == "default"
-        text = dlg.edit.toPlainText().split("\n")
-        text = [t for t in text if t.strip()]
-        assert text == ['^F "Upper"', '^F "default"'], text
+        win.switch_floor("Upper")
+        dlg._modal_line = True             # as an open PUP line leaves it
+        win.switch_floor("Top Floor")
+        text = [t for t in dlg.edit.toPlainText().split("\n") if t.strip()]
+        assert text[0] == '^F "Upper"', text
+        assert text[1].endswith('# ^F "Top Floor"'), text
+        dlg.edit.clear()
+        win._recorder.on_new_floor("Attic")
+        assert dlg.edit.toPlainText().strip() == '^+F "Attic"'
     finally:
         dlg.stop()
         dlg.deleteLater()
         qapp.processEvents()
-    res = win.run_macro('^F "Upper"')
-    assert res["ok"], res
-    assert win.active_floor == "Upper"
-    res = win.run_macro('^F "Penthouse"')  # not a floor: an honest error,
-    assert not res["ok"]                   # not a silent no-op
-    assert "no floor named" in res["errors"][0]
-    # the cycle actions exist on the Floors menu with their shortcuts
-    assert win.a_next_floor.shortcut().toString() == "Ctrl+F"
-    assert win.a_prev_floor.shortcut().toString() == "Ctrl+Shift+F"
+    # the menu actions carry the spec'd shortcuts
+    assert win.a_select_floor.shortcut().toString() == "Ctrl+F"
+    assert win.a_new_floor.shortcut().toString() == "Ctrl+Shift+F"
+    # renamed default is still the bare-^F target: rename via the roster
+    win.floors[0].name = "Ground"
+    for it in win.scene.items():
+        if getattr(it, "floor", None) == "default":
+            it.floor = "Ground"
+    win.active_floor = "Ground"
+    win._sync_floor_state()
+    win.run_macro('^F "Upper"')
+    res = win.run_macro("^F")
+    assert res["ok"] and win.active_floor == "Ground"

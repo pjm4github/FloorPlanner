@@ -45,6 +45,7 @@ CARET_SHORTCUTS = {
     "O":  {"key": Qt.Key.Key_O, "method": None, "record": False},
     "+S": {"key": Qt.Key.Key_S, "method": None, "record": False},
     "F":  {"key": Qt.Key.Key_F, "method": None, "record": False},
+    "+F": {"key": Qt.Key.Key_F, "method": None, "record": False},
 }
 # hook-emitted tokens the recorder must not raw-record (see "record" above)
 CARET_HOOK_TOKENS = {t for t, s in CARET_SHORTCUTS.items()
@@ -69,11 +70,13 @@ class MacroRunner:
                                        group / select-all / save-to-current.
                                        Prefix '+' adds Shift: ^+G ungroup,
                                        ^+Z redo.  ^O "path" opens that file,
-                                       ^+S "path" saves to it, ^F "name"
-                                       switches to that floor (what the
-                                       recorder emits for File>Open / Save As /
-                                       any floor switch; Ctrl+F / Ctrl+Shift+F
-                                       cycle floors in the app).
+                                       ^+S "path" saves to it.  ^F "name"
+                                       switches to that floor, BARE ^F to the
+                                       default (the roster's first), and
+                                       ^+F "name" creates a floor (switches if
+                                       it exists, so replays repeat cleanly).
+                                       In the app Ctrl+F pops the floor
+                                       selector, Ctrl+Shift+F is New floor.
                                        The full set lives in CARET_SHORTCUTS —
                                        one row records AND replays a shortcut.
       Arrow nudge   LEFT RIGHT UP DOWN          (^ prefix = fine 1" step)
@@ -222,14 +225,25 @@ class MacroRunner:
                 self.win.save_path(path)
             return i
         if key == "F":
-            # ^F "name" -- what the recorder emits for ANY floor switch
-            # (Ctrl+F / Ctrl+Shift+F cycling, the Floors menu, the status
-            # bar popup): the RESULTING floor rides in the token, so replay
-            # is deterministic however the user got there
+            # ^F "name" -- what the recorder emits for ANY floor switch:
+            # the RESULTING floor rides in the token, so replay is
+            # deterministic however the user got there. BARE ^F (next token
+            # names no existing floor, or is absent) returns to the DEFAULT
+            # floor -- the roster's first, whatever it was renamed to.
+            if i < len(toks) and self.win._floor(toks[i]) is not None:
+                self.win.switch_floor(toks[i])
+                return i + 1
+            self.win.switch_floor(self.win.default_floor_name())
+            return i
+        if key == "+F":
+            # ^+F "name" -- New floor. IDEMPOTENT on replay: a floor that
+            # already exists is switched to rather than failing, so a
+            # recorded session replays again and again (the mini-gate loop)
             (name,), i = self._take(toks, i, 1)
             if self.win._floor(name) is None:
-                raise ValueError(f"no floor named {name!r}")
-            self.win.switch_floor(name)
+                self.win.new_floor_named(name)
+            else:
+                self.win.switch_floor(name)
             return i
         if key == "A":
             self._select_all()
@@ -839,11 +853,25 @@ class MacroRecorderDialog(QDialog):
             self._append(f'^+S "{path}"', newline=True)
 
     def on_floor(self, name):
-        # a floor switch, from ANY route (Ctrl+F cycle, Floors menu, the
-        # status-bar popup): the RESULTING floor rides in the token
+        # a floor switch, from ANY route. Through the blank-canvas POPUP the
+        # PUP tokens already replay the switch, so the deterministic
+        # equivalent rides the SAME LINE as a comment --
+        #     PUP 200 300 DOWN ENTER # ^F "Top Floor"
+        # -- every other route records the real token.
+        if self._active():
+            if self._modal_line:
+                self._append(f'# ^F "{name}"')
+                self._end_modal_line()
+            else:
+                self._end_modal_line()
+                self._append(f'^F "{name}"', newline=True)
+
+    def on_new_floor(self, name):
+        # New floor: the typed name rides in the token (the dialog is modal;
+        # the event stream cannot see it)
         if self._active():
             self._end_modal_line()
-            self._append(f'^F "{name}"', newline=True)
+            self._append(f'^+F "{name}"', newline=True)
 
     def on_room(self, name, scene_pt):
         # room name came from a dialog — capture it into a ROOM token.

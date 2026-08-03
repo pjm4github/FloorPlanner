@@ -52,33 +52,39 @@ class LevelsMixin:
     def _floor(self, name):
         return next((f for f in self.floors if f.name == name), None)
 
+    def default_floor_name(self) -> str:
+        """The DEFAULT floor is the roster's FIRST — whatever it has been
+        renamed to. Bare `^F` (and ENTER straight into the floor popup)
+        targets it by position, not by the word 'default'."""
+        return self.floors[0].name if self.floors else self.active_floor
+
     def _rebuild_floor_menu(self):
-        """Repopulate &Floors: cycle shortcuts, New floor, a submenu per floor
-        (edit/rename/reference/delete), then the Show-other-floors toggle."""
+        """Repopulate &Floors per the P4.2 spec: Select… (^F), New… (^+F),
+        separator, the floors (default first, marked), separator, the
+        Show-other-floors toggle."""
         m = self.m_floors
         m.clear()
-        if not hasattr(self, "a_next_floor"):
+        if not hasattr(self, "a_select_floor"):
             # created ONCE (the menu is rebuilt often; the shortcuts must
-            # not be re-registered each time). Ctrl+F / Ctrl+Shift+F cycle
-            # the active floor -- the keyboard route to floor manipulation,
-            # and therefore the macro-recordable one: every switch, from
-            # any route, records as `^F "name"` via the switch_floor hook.
-            self.a_next_floor = QAction("Next floor", self)
-            self.a_next_floor.setShortcut(QKeySequence("Ctrl+F"))
-            self.a_next_floor.triggered.connect(lambda: self.cycle_floor(+1))
-            self.a_prev_floor = QAction("Previous floor", self)
-            self.a_prev_floor.setShortcut(QKeySequence("Ctrl+Shift+F"))
-            self.a_prev_floor.triggered.connect(lambda: self.cycle_floor(-1))
-        m.addAction(self.a_next_floor)
-        m.addAction(self.a_prev_floor)
-        m.addSeparator()
-        a_new = m.addAction("&New floor…")
-        a_new.triggered.connect(self.new_floor)
+            # not be re-registered each time). Ctrl+F pops the floor
+            # selector; Ctrl+Shift+F is New floor. Every switch, from any
+            # route, records as `^F "name"` via the switch_floor hook.
+            self.a_select_floor = QAction("&Select…", self)
+            self.a_select_floor.setShortcut(QKeySequence("Ctrl+F"))
+            self.a_select_floor.triggered.connect(
+                lambda: self.select_floor_popup())
+            self.a_new_floor = QAction("&New…", self)
+            self.a_new_floor.setShortcut(QKeySequence("Ctrl+Shift+F"))
+            self.a_new_floor.triggered.connect(self.new_floor)
+        m.addAction(self.a_select_floor)
+        m.addAction(self.a_new_floor)
         m.addSeparator()
         grp = QActionGroup(self)
         grp.setExclusive(True)
+        default = self.default_floor_name()
         for f in self.floors:
-            tag = f"{f.name}{'  (R)' if f.reference else ''}" \
+            tag = f"{f.name}{'  (Default)' if f.name == default else ''}" \
+                  f"{'  (R)' if f.reference else ''}" \
                   f"{'  ●' if f.name == self.active_floor else ''}"
             sub = m.addMenu(tag)
             a_edit = sub.addAction("Edit this floor")
@@ -102,23 +108,34 @@ class LevelsMixin:
         a_show.setChecked(self.show_other_floors)
         a_show.triggered.connect(self.toggle_show_others)
 
+    def _build_floor_popup(self) -> QMenu:
+        """The ONE floor-selection surface (P4.2 spec): default floor first
+        and PRE-HIGHLIGHTED, so ENTER with no arrows selects the default,
+        DOWN walks the other floors, ESC cancels. Built separately from
+        showing so tests can assert its shape headless."""
+        menu = QMenu(self)
+        default = self.default_floor_name()
+        for f in self.floors:
+            tag = f"{f.name}{'  (Default)' if f.name == default else ''}" \
+                  f"{'  ●' if f.name == self.active_floor else ''}"
+            a = menu.addAction(tag)
+            a.triggered.connect(lambda _=False, n=f.name: self.switch_floor(n))
+        if menu.actions():
+            menu.setActiveAction(menu.actions()[0])
+        return menu
+
+    def select_floor_popup(self, global_pos=None):
+        """Select… (^F) and the blank-canvas right-click both land here."""
+        menu = self._build_floor_popup()
+        if global_pos is None:
+            global_pos = self.view.mapToGlobal(
+                self.view.viewport().rect().center())
+        menu.exec(global_pos)
+
     def _popup_floor_menu(self):
         """Quick floor switch from the status-bar label."""
-        menu = QMenu(self)
-        for f in self.floors:
-            a = menu.addAction(f"{f.name}{'  ●' if f.name == self.active_floor else ''}")
-            a.triggered.connect(lambda _=False, n=f.name: self.switch_floor(n))
-        menu.exec(self.floor_label.mapToGlobal(self.floor_label.rect().topLeft()))
-
-    def cycle_floor(self, step):
-        """Ctrl+F / Ctrl+Shift+F: switch to the next / previous floor in the
-        roster, wrapping."""
-        names = [f.name for f in self.floors]
-        if len(names) < 2:
-            self.status("Only one floor.")
-            return
-        i = names.index(self.active_floor) if self.active_floor in names else 0
-        self.switch_floor(names[(i + step) % len(names)])
+        self.select_floor_popup(
+            self.floor_label.mapToGlobal(self.floor_label.rect().topLeft()))
 
     def switch_floor(self, name):
         """Make `name` the active (editable) floor.  View state only — no undo
@@ -142,6 +159,9 @@ class LevelsMixin:
                                 f"A floor named '{name}' already exists.")
             return
         self.new_floor_named(name)
+        rec = getattr(self, "_recorder", None)
+        if rec is not None:              # macro recorder: New floor with its
+            rec.on_new_floor(name)       # typed name, as one ^+F token
 
     def new_floor_named(self, name):
         """Add an EMPTY floor (Phase 1) and switch to it.  Non-interactive core
