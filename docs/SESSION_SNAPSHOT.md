@@ -1,6 +1,6 @@
 # Session snapshot — read this first
 
-**Re-cut 2026‑08‑02 at the P4.2 merge (`main` @ `6d24969`).** This file exists so a fresh session can start from disk instead of from a chat summary. It is an **index and a state marker, not a second copy of the record** — where it points at another document, that document is authoritative and this one must not be trusted over it.
+**Re-cut 2026‑08‑03 at the P4.3 merge (`main` @ `4050e44`).** This file exists so a fresh session can start from disk instead of from a chat summary. It is an **index and a state marker, not a second copy of the record** — where it points at another document, that document is authoritative and this one must not be trusted over it.
 
 ---
 
@@ -8,30 +8,32 @@
 
 | | |
 |---|---|
-| **Branch** | `main` @ `6d24969` — the **PR #4 merge commit** (merge, not squash). `p4.2-extract-join` carried 26 sub-commits (`dfd30af` … `3b62142`), each at a full green gate. |
-| **PR** | **#4 MERGED 2026‑08‑02** after the Patrick mini-gate **PASSED — all 8 items**, fresh launch, status-bar version label verified at the launch sha. CI green at every push and on the merge. |
-| **Census** | **552 collected, local == CI** (541 passed, 7 deselected, 4 xfailed, every sum reconciling). The 554/552 delta is gone: Patrick removed his two untracked `examples/symmetricP2/P3.json`; `examples/multifloor.fpm` is committed as a **convenience file, not pinned** (his ruling, recorded). |
-| **Phases done** | 0–3, P4.1, P4.1b, **P4.2 — ticked 2026‑08‑02 and merged.** Next: **P4.3 (shuffle mode), read-back sent, nothing started.** |
+| **Branch** | `main` @ `4050e44` — the **PR #5 merge commit** (merge, not squash). `p4.3-shuffle` carried 6 sub-commits (`a6ded30` … `545b79a`), each at a full green gate. |
+| **PR** | **#5 MERGED 2026‑08‑03 on Patrick's acceptance** (green CI + acceptance — the P4.3/P4.4 rule; no mini-gate). CI green at every push and on the merge. |
+| **Census** | **569 collected, local == CI** (559 passed, 7 deselected, 3 xfailed, every sum reconciling). The 3 xfails are all P4.5's (group round-trip, clipped band, group wall-copying). |
+| **Phases done** | 0–3, P4.1, P4.1b, P4.2, **P4.3 — ticked 2026‑08‑03 and merged.** Next: **post-merge dispositions (one commit), then the P4.4 read-back.** |
 
-**What P4.2 landed** (detail in the Progress log's P4.2 blocks, 1–26):
-1. **The task** (1–7): `extract.py` (extract/join per §4), placement modelled end-to-end, acceptance green, party-wall regression flipped (P0.5 Known-regressions row closed), label-drag rewired (`_privatize_shared_walls` deleted), defects 30/34/13-drag closed, the P2.3 row's second predicted fix refuted and recorded.
-2. **Six mini-gate findings** (8–15), each fixed against a measured reproduction with a fail-first pin; Patrick's macro files pinned verbatim as regression tests.
-3. **Tooling & floors** (16–23): the macro recorder made whole (three capture bugs; `CARET_SHORTCUTS`; `^O`/`^+S` tokens), and the Floors work per Patrick's spec (Select `^F` / New `^+F`, one popup surface, deterministic floor tokens, z-banded stacking, atmospheric depth fade, Ctrl+PgDown/PgUp).
-4. **The close-out** (24–26): the hand-off record, census hygiene (`multifloor.fpm`), the mini-gate pass recorded, **defect 35 CLOSED** on the reporter's confirmation (shelf empty; residuals were harvested as findings 5–6), P4.2 ticked.
+**What P4.3 landed** (detail in the Progress log's P4.3 blocks, 1–6):
+1. **Census + both rulings** (1): four `settings.editing` flags measured (one live, three dead); ruling 1 (STAY + two-test amendment) and ruling 2 (tiered doorway weld) recorded verbatim before work began.
+2. **Plumbing** (2): `editing_enabled()` — shuffle implies the `auto_*` passes off without rewriting them; document emit from live SETTINGS; the document-synced Shuffle toolbar toggle.
+3. **Gesture gating + tiered weld** (3): jamb-snap within `JOIN_TOL` at both release paths, else the P4.1b message; never split, never refuse; `auto_weld`'s decision; shuffle suppresses the message and the label-drag drop-join (moved → stays floating, click → still placed); explicit join reports deferred information. Five fail-first receipts.
+4. **Acceptance** (4): shuffle drag across the plan through the real handlers, both unchanged, `check()` deep-clean at every step.
+5. **Ruling 1 executed** (5): the P2.3 Known-regressions row closed as superseded-by-ruling (STAY); the xfail replaced by two hard passes (stay contract + the `auto_coalesce` heal).
+6. **The fuse straggler** (6, register row 36): extract used two definitions of "the room's walls" (outline to copy-trim, binding list to float) — a bound-but-unnamed five-room wall rode out and was stranded; fixed by step 1b (extract releases bound walls no outline edge names); Patrick's macro pinned verbatim.
 
 **The next actions, in order:**
-1. **P4.3 (shuffle mode)** starts on Patrick's answers to the read-back (sent 2026‑08‑02): the **carry-vs-stay ruling** on the P2.3 row (both contracts quoted side by side; pinned by the xfail `test_a_roomless_split_wall_body_drags_as_one_run`), and **defect 25's deferred gesture-policy questions** (decline/split/weld — the `auto_*` flags are P4.3's).
-2. Per the Phase‑4 branch strategy: per-task branch, PR into `main`, **merge on green CI + acceptance** (no mini-gate for P4.3; the next mini-gate task is P4.5).
-3. P4.4's read-back inherits the `_perimeter_span`/`_copy_spec` contingency (register's carried census note, re-argued at P4.2 — authoritative there).
+1. **Post-merge dispositions, one commit** (ruled by Patrick 2026‑08‑03): (a) `auto_bind` leaves the UI — stays modelled/emitted/plumbed, control returns when a gateable site exists (register disposition with the census reasoning); (b) row 36's merge-rebind producer carried to P4.5 **conditionally on a CI watch test** (red if the producer or the extract guard changes); (c) the shuffle toggle's missing macro token/shortcut filed as its own register row.
+2. **P4.4 read-back** (concept rooms, `nominal_size`, duplicate-as-template): census first; inherits the `_perimeter_span`/`_copy_spec` question (register's carried census note **authoritative**); must also state explicitly what P4.4 does to the **binding-list/outline duality in the clipboard path** — P4.5's rulings assume that consumer is resolved.
+3. **P4.5** (group semantics + z-order) is the second designated **mini-gate** task; P4.4 merges on green CI + acceptance.
 
 ---
 
 ## 2. What to read, in order
 
-1. **`CLAUDE.md`** — architecture and house rules; current through P4.2 (extract.py, rooms-as-movable-units, floors tooling).
-2. **`docs/V5_MIGRATION_PLAN.md`** — Working agreement (census doctrine included), Status table (P4.2 ticked with its acceptance line), the Phase‑4 branch-strategy ruling, P4.3 task text (§ "P4.3 — Shuffle mode"), and the **Progress log**, whose P4.2 blocks (1–26) are the detailed record of the merged branch.
-3. **`docs/CODE_REVIEW_v2.md`** — the register: rows 13/17/25/30/34 closed with receipts; **row 35 CLOSED 2026‑08‑02** (shelf confirmed empty by the reporter at the mini-gate pass); the **carried census note** (authoritative: `_perimeter_span` → P4.4, contingent).
-4. **The schema** — `floorplanner/design/design-schema.v5.json` `$defs.editing_modes`: shuffle's contract in the document format (shuffle implies `auto_coalesce`/`auto_weld`/`auto_bind` all off; leaving shuffle joins nothing automatically — "rooms are joined explicitly, not silently").
+1. **`CLAUDE.md`** — architecture and house rules.
+2. **`docs/V5_MIGRATION_PLAN.md`** — Working agreement (census doctrine included), Status table (P4.2 and P4.3 ticked with acceptance lines), the Phase‑4 branch-strategy ruling, P4.4/P4.5 task text, and the **Progress log** (P4.2 blocks 1–26; P4.3 blocks 1–6 + dispositions).
+3. **`docs/CODE_REVIEW_v2.md`** — the register: rows 13/17/25/30/34/35/36 closed with receipts; the **carried census note** (authoritative: `_perimeter_span` → P4.4, contingent on `_copy_spec`); the auto_bind standing disposition; the shuffle-token row.
+4. **The schema** — `design-schema.v5.json` `$defs.editing_modes` (shuffle's contract) and the room `nominal_size` / `category: concept` fields (P4.4's ground; I13: a concept room must be floating).
 
 **One-direction rule.** Where a fact is restated in two places, the text says which copy is authoritative. Never resolve a disagreement by editing the copy that is easier to reach.
 
@@ -39,33 +41,34 @@
 
 ## 3. The rules that bind the work (unchanged; each was paid for)
 
-- **Gate with `tools/gate.py`** (full mode; paste the trailer verbatim — capture it programmatically, one transcription slip is on record in P4.2(12)'s reply).
-- **The pre-work census is a phase of the task**; read-backs quote disk; task-line figures are estimates until measured (0-for-3 across phases).
+- **Gate with `tools/gate.py`** (full mode; paste the trailer verbatim — capture it programmatically).
+- **The pre-work census is a phase of the task**; read-backs quote disk; task-line figures are estimates until measured.
 - **Sub-commit per piece at a full green gate. A changed test is a red flag, named and justified. Receipts are fail-first against the unfixed tree, with preconditions asserted before verdicts.**
 - **Destructive experiments in a worktree. Chat is not the record. The reviewer ticks the boxes.**
-- **Phase‑4 branch strategy:** per-task branches, PR into `main` as a merge commit; **P4.5 needs the Patrick mini-gate before merge** (P4.2's is passed and done); P4.3/P4.4 merge on green CI + acceptance.
-- **Findings are fixed only against measured reproductions** — the six mini-gate findings all followed reproduce → introspect → fix → pin; two proposed fixes (P2.3's vertex-adjacency gather, finding 5's junction-degree guard) were **refuted by the tree and reverted with the refutation recorded**, which is the system working.
+- **Phase‑4 branch strategy:** per-task branches, PR into `main` as a merge commit; **P4.5 needs the Patrick mini-gate before merge**; P4.4 merges on green CI + acceptance.
+- **Findings are fixed only against measured reproductions** — reproduce → introspect → fix → pin, fail-first.
 
 ---
 
-## 4. What the merged branch established, in one paragraph
+## 4. What P4.2 + P4.3 established, in one paragraph
 
-**Rooms are durable movable units.** Extract lifts a room out of the shared wall network (`placed → floating`, I12 by construction — the plan keeps every wall it had) and join welds it back; the label-drag of a placed room *is* extract→move→join through those ops. The document walk folds each floating room in its own vertex namespace; I14 exempts floating-vs-plan pairs. The drag machinery honors the corners-not-rooms thesis in every direction: a moved corner carries each room by that room's *own boundary* (run-bordered follows, continuation-bordered stays, mixed corners step, partial covers split at the wall's end vertex, outline-corner tees split the run). And the session toolchain — record/replay macros covering mouse, keyboard, shortcuts, files and floors — is what converted "the drag is wrong somewhere" into six named, pinned mechanisms, and what let the reporter confirm the shelf empty (defect 35 closed).
+**Rooms are durable movable units, and joining is explicit.** Extract lifts a room out of the shared wall network (`placed → floating`, I12 by construction) and join welds it back; the label-drag of a placed room *is* extract→move→join. The outline is the one definition of which walls are a room's — extract releases bound walls no outline edge names (row 36). Shuffle mode turns off every automatic joining pass through one accessor (`editing_enabled`): a moved room stays floating, nothing merges/welds/binds in passing, and information a mode defers is delivered at the explicit join. The doorway policy is tiered by ruling: snap-to-jamb within the gesture tolerance, else land-unwelded-and-report; never split, never refuse.
 
 ---
 
 ## 5. Open items
 
-The **P2.3 carry-vs-stay ruling** (both predicted fixes refuted; pinned by an xfail; asked in the P4.3 read-back) · **defect 25's gesture-policy questions** (decline/split/weld → P4.3's `auto_*` flags; asked in the read-back) · defect **23** (→ P4.5, boundary stated in the register) · the **P3.1 split-on-write shim** (→ P4.5) · **two identity-churn sites** (→ P4.5) · `_perimeter_span`/`_copy_spec` (→ **P4.4**'s read-back, as a question) · per-floor **visibility** (noted follow-up, not built) · **dashed-cue-over-covered-stretch** presentational wrinkle (disclosed at finding 3; not flagged at the mini-gate) · the **windows-latest CI leg** (register row 27, open, explicitly not merge-blocking).
+The **three dispositions** (next commit — see §1) · `_perimeter_span`/`_copy_spec` (→ **P4.4**'s read-back, as a question; register note authoritative) · the **clipboard path's binding/outline duality** (P4.4 must state its disposition) · defect **23** (→ P4.5) · defect **3** (groups serialize, P4.5) · defect **11** (z-order collapse, P4.5) · the **P3.1 split-on-write shim** (→ P4.5) · **two identity-churn sites** (→ P4.5) · the **`kind == "rigid"` carve-out** (retire or re-justify at P4.5) · **row 36's merge-rebind producer** (carried to P4.5, watched) · the **windows-latest CI leg** (row 27, open, not merge-blocking) · per-floor **visibility** (follow-up, not built).
 
 ---
 
 ## 6. Things that will waste your time if you don't know them
 
-- **A running app keeps the code it imported** — the status-bar version label shows the launch identity; restart after any push before re-testing. (This cost a full round once; the mini-gate pass ran under it.)
+- **A running app keeps the code it imported** — the status-bar version label shows the launch identity; restart after any push before re-testing.
 - **The timing lane is not in the gate**; `tools/gate.py --perf` runs it deliberately.
 - **`gh` is not on `PATH`**: `& "C:\Program Files\GitHub CLI\gh.exe"` (PowerShell) or `"/c/Program Files/GitHub CLI/gh.exe"` (bash).
 - **Files on disk are CRLF**; multi-line `\n` patterns silently match nothing.
-- **Headless drags:** build `QMouseEvent`s with `buttons=LeftButton` to the viewport; `centerOn` first; a wall's midpoint is often an opening. **Headless keys:** construct `QKeyEvent`s with modifiers directly — never QTest Ctrl synthesis (global `keyboardModifiers` leak); the recorder's capture is pinned against the real delivery order (QWindow → widget, ShortcutOverride before KeyPress).
-- **Patrick's macro loop** is the fastest reproduction channel: record in-app (Load…/Replay in the recorder), commit the `.fpm` to `examples/`, replay headless via `win.run_macro`, pin verbatim.
+- **Headless drags:** build `QMouseEvent`s with `buttons=LeftButton` to the viewport; `centerOn` first. **Headless keys:** construct `QKeyEvent`s with modifiers directly — never QTest Ctrl synthesis; the recorder's capture is pinned against the real delivery order.
+- **Macro replay geometry matters:** a `.fpm` replays correctly only at the window geometry it was recorded at — the fiveRoomDragSplit pins run at 1400×1000+fit, the fuse-straggler pin at the default window; each test states which.
+- **Patrick's macro loop** is the fastest reproduction channel: record in-app, commit the `.fpm` to `examples/`, replay headless via `win.run_macro`, pin verbatim.
 - **The suite's console is cp1252** — no non-ASCII in test output.
