@@ -4001,4 +4001,57 @@ notes:   Patrick's 13-gesture macro seeded and tore through THREE more
          red against 6f3e2b9 in a worktree, green here. Both earlier
          macros replay with zero violations (no regression). Census
          545 -> 546, sums reconciling.
+
+P4.2+ tooling & floors run, 2026-08-02 (sub-commits 16-23; consolidated
+         here, details in the commit messages, each at a full green gate)
+pytest:  543 passed, 7 deselected, 4 xfailed (sum 554 local; CI 552 --
+         the two extra remain Patrick's untracked symmetricP2/P3 examples)
+THE RECORDER, made whole (16-19) -- keyboard capture was broken THREE
+         separate ways, each found by Patrick's restart-and-retest and
+         each now pinned by a test replicating the REAL Qt delivery order:
+         (16) shortcut-consumed chords never arrive as KeyPress ->
+              capture ShortcutOverride too;
+         (17) the `obj is viewport` mouse branch ran FIRST and ate every
+              canvas keystroke (keyboard recording had never worked in
+              the app); keys are dispatched by event TYPE now. ^O "path"
+              records File>Open with its chosen file (hook pattern);
+         (18) the QWindow-level delivery (which precedes widget delivery
+              and never passes _belongs_to_main) SET the de-dupe guards
+              before the eligibility check, poisoning the recordable
+              delivery -- eligibility first, state second;
+         (19) CARET_SHORTCUTS: ONE module-level table drives recorder AND
+              runner -- adding a menu shortcut is one row, a design-guard
+              test fails on a row naming a missing MainWindow method.
+              ^+S "path" (Save As, hook), ^S soft-skips with no current
+              file, unnamed chords record nothing.
+FLOORS, per Patrick's spec (20-23; 20's cycle design was superseded by
+         his fuller spec ONE SESSION LATER, stated not blended):
+         (21) Floors menu = Select... (^F) / New... (^+F) / floors
+              (default FIRST, "name (Default)" = the roster's first
+              whatever its alias) / ghost toggle. ONE popup surface
+              (^F, status-bar label, right-click on blank canvas except
+              the Room tool) with the default PRE-HIGHLIGHTED so bare
+              ENTER selects it. Macro: ^F "name" switches, BARE ^F ->
+              default, ^+F "name" creates (IDEMPOTENT on replay); the
+              popup route records PUP ... # ^F "name" (comment form).
+         (22) floors paint in Z-BANDS: active floor = band 0 (always on
+              top; new items land on top with no re-sync), ghosts on
+              negative bands in a user-arranged display stack (per-floor
+              Move to front/back (display); view state, not serialized).
+              Applied as a DELTA so within-floor z is untouched -- NOT a
+              fifth z scheme; defect 11's P4.5 collapse should absorb the
+              band as the one between-floor term. Reference backdrop to
+              the true bottom. Fail-first receipt: "assert 5.0 > 5.0" --
+              all floors had shared one z.
+         (23) ATMOSPHERIC DEPTH: active floor full contrast, each visible
+              floor beneath fades by stack depth (0.60/0.39/0.25...,
+              floor 0.18) via per-item opacity -- no paint() touched.
+              Quick flip: Ctrl+PgDown/PgUp cycle; recording stays
+              deterministic (the hook emits the resulting ^F token).
+STANDING:  PR #4 remains on HOLD for the Patrick mini-gate (items 1-8, on
+         a fresh launch; findings 1-6 all fixed and pinned). Defect 35
+         stays OPEN until Patrick confirms the macro reproductions
+         covered everything on his shelf. _perimeter_span's re-argument
+         to P4.4 stands in the register. Noted follow-up, not built:
+         per-floor visibility (show a chosen subset while editing).
 ```
