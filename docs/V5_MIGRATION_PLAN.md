@@ -4302,4 +4302,29 @@ notes:   (a) AUTO_BIND LEAVES THE UI: modelled, emitted and plumbed
          task, one table row + a chord choice, and P4.4's duplicate-as-
          template work is exactly where floating rooms and shuffle get
          exercised together in recorded macros.
+
+P4.3+ Patrick's field report: THE PARKED-FLOAT FURNISHING STEAL (row 38)
+ruff:    clean
+pytest:  566 passed, 7 deselected, 3 xfailed (sum 576, every sum
+         reconciling; trailer in the commit)
+files:   rooms.py (sentinel + press guard), extract.py (prev-aware
+         capture with claimed-exclusion; join resets to None),
+         mainwindow.py (_set_shuffle re-baseline),
+         tests/test_shuffle.py (6 pins + the acceptance's declared
+         change), docs/CODE_REVIEW_v2.md (row 38), this file.
+notes:   REPRODUCED before his clarification arrived, mechanism
+         measured: init [] == captured-empty, falsy lazy-capture guard
+         -> a parked float re-captured at EVERY press by whatever it
+         hovered over. THE CONTRACT, ruled: (a) floating captures the
+         furnishings inside, any mode; (b) under shuffle EVERY dragged
+         room keeps its furnishings (plain non-shuffle drag still
+         leaves them -- P4.2's trait, scoped); (c) no mid-shuffle
+         pickup ever; the ONE re-baseline is the shuffle-ON toggle --
+         carried stays its own, inside-and-unclaimed becomes assigned,
+         claimed-by-a-placed-room is never taken.
+         TESTS CHANGED, declared: the P4.3 acceptance's furnishing
+         assert flips from stays-put to rides (ruling (b) reached the
+         path it pinned); red pre-fix with the three new flips, three
+         preservation pins pass both eras.
+         Census 570 -> 576.
 ```

@@ -61,14 +61,37 @@ def _copy_edge_stretch(scene, room, edge, a: QPointF, b: QPointF):
 
 
 def capture_floating_furnishings(scene, room):
-    """(Re)capture the furnishings that live inside `room` so they ride its
-    floating moves. Run at extract, and lazily at drag start for a room that
-    was LOADED floating (the capture is scene state, not document state)."""
+    """(Re)capture the furnishings ASSIGNED to `room` so they ride its
+    floating moves. Run at extract, once (lazily) at first drag for a room
+    that was LOADED floating, and at every shuffle-ON toggle -- the one
+    re-baseline event (ruled 2026-08-03: a float never picks up furnishings
+    mid-shuffle; what it holds is fixed until shuffle is turned off and on
+    again).
+
+    Assigned means: inside the room's footprint AND either already carried
+    (`prev` -- a furnishing that rode the float stays its own even while the
+    float is parked over a placed room) or unclaimed by any PLACED room on
+    the floor (a furnishing sitting in a placed room belongs to that room,
+    not to a float hovering over it). At extract time the exclusion is a
+    no-op by construction -- the room's own footprint is the placed room it
+    is leaving, and I11 keeps placed rooms from overlapping."""
+    prev = {id(f) for f in (getattr(room, "_floating_furnishings", None)
+                            or ())}
+    placed = [r for r in scene.items()
+              if isinstance(r, RoomItem) and r is not room
+              and r.floor == room.floor
+              and getattr(r, "placement_state", "placed") == "placed"]
+
+    def _claimed(pt):
+        return any(r.path.contains(pt) for r in placed)
+
     room._floating_furnishings = [
         f for f in scene.items()
         if isinstance(f, FurnishingItem) and f.floor == room.floor
         and f.group() is None
-        and room.path.contains(f.sceneBoundingRect().center())]
+        and room.path.contains(f.sceneBoundingRect().center())
+        and (id(f) in prev
+             or not _claimed(f.sceneBoundingRect().center()))]
     return room._floating_furnishings
 
 
@@ -248,7 +271,7 @@ def join_room(scene, room):
             split_partially_covered_edges(scene, r)
     room.placement_state = "placed"
     room.extracted_from = None
-    room._floating_furnishings = []
+    room._floating_furnishings = None     # placed: no float capture (P4.3+)
     rebuild_all_walls(scene)
     # ruling 2's addition (P4.3): the explicit join is where information a
     # mode deferred is DELIVERED -- anything this join could not weld says so

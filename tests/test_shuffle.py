@@ -234,10 +234,10 @@ def test_acceptance_shuffle_drag_across_the_plan(fp, win, first_furnishing):
     anchor_walls = sorted(
         (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()) for w in anchor.walls)
     area_m, walls_m = mover.area_sqft, len(mover.walls)
-    # the plain label-drag deliberately does NOT carry furnishings (P4.2's
-    # preserved trait -- carrying is the explicit Extract's), so on this path
-    # the furnishing is PLAN-side state and "unchanged" means it stays put
-    furn_pos = QPointF(furn.scenePos())
+    # CHANGED BY THE P4.3+ RULING (declared): under shuffle every dragged
+    # room KEEPS its furnishings, so the mover's furnishing is the ROOM's
+    # cargo on this path and "unchanged" means it rides in step
+    furn_rel = furn.scenePos().x() - mover.anchor.x()
 
     # one gesture, stepped ACROSS the plan -- straight through Anchor's
     # footprint -- through the REAL handlers; nothing may merge, weld, bind
@@ -266,9 +266,9 @@ def test_acceptance_shuffle_drag_across_the_plan(fp, win, first_furnishing):
                   for w in anchor.walls) == anchor_walls
     assert mover.area_sqft == pytest.approx(area_m)
     assert len(anchor.walls[0].openings) == 1, "the door must survive"
-    assert furn.scenePos().x() == pytest.approx(furn_pos.x())
-    assert furn.scenePos().y() == pytest.approx(furn_pos.y()), (
-        "the plan-side furnishing must not be dragged along")
+    assert (furn.scenePos().x() - mover.anchor.x()
+            == pytest.approx(furn_rel)), (
+        "under shuffle the room's furnishing must ride the drag")
     _clean("after release")
 
 
@@ -288,3 +288,130 @@ def test_explicit_join_still_joins_under_shuffle(fp, scene):
     assert len(party) == 1, (
         f"the explicit join must merge coincident walls even under shuffle "
         f"(found {len(party)})")
+
+
+# --------------------------------------------------------------------------
+# Furnishing capture (P4.3+, ruled 2026-08-03): (a) floating a room captures
+# the furnishings inside it, shuffle or not; (b) under shuffle EVERY dragged
+# room -- label drag or float drag -- keeps its furnishings; (c) once
+# floating, a room NEVER picks up additional furnishings; the one re-baseline
+# event is the shuffle-ON toggle.
+# --------------------------------------------------------------------------
+def _furn(fp, scene, first_furnishing, x, y):
+    f = fp.FurnishingItem(first_furnishing, QPointF(x, y), 0)
+    scene.addItem(f)
+    return f
+
+
+@pytest.mark.rooms
+def test_a_parked_float_never_absorbs_furnishings(fp, scene, first_furnishing):
+    # THE REPORTED STEAL: an extracted room with an EMPTY capture, parked
+    # over a furnished room, re-captured at the next press and dragged the
+    # other room's furnishings away. The sentinel (None vs []) kills it.
+    a = _make_room(fp, scene, 0, 0, 120, 120, "Mover")
+    _make_room(fp, scene, 240, 0, 144, 120, "Furnished")
+    f = _furn(fp, scene, first_furnishing, 300, 60)
+    fp.rebuild_all_walls(scene)
+    fp.SETTINGS["shuffle"] = True
+    fp.extract_room(scene, a)                    # captures: nothing inside
+    assert a._floating_furnishings == []         # captured-and-empty, not None
+    a._translate(240, 0)                         # park the float over Furnished
+    f0 = QPointF(f.scenePos())
+    _label_drag(fp, a, 0, 300)                   # drag the float away
+    assert f.scenePos().x() == pytest.approx(f0.x())
+    assert f.scenePos().y() == pytest.approx(f0.y()), (
+        "the parked float STOLE the furnished room's furnishing")
+    assert f not in (a._floating_furnishings or [])
+
+
+@pytest.mark.rooms
+def test_shuffle_label_drag_carries_the_rooms_own_furnishings(
+        fp, scene, first_furnishing):
+    # (b): under shuffle a label-dragged PLACED room keeps its furnishings
+    a = _make_room(fp, scene, 0, 0, 120, 120, "A")
+    f = _furn(fp, scene, first_furnishing, 60, 60)
+    fp.rebuild_all_walls(scene)
+    fp.SETTINGS["shuffle"] = True
+    _label_drag(fp, a, 0, 300)
+    assert a.placement_state == "floating"
+    assert f.scenePos().y() == pytest.approx(60 + 300), (
+        "under shuffle the dragged room must KEEP its furnishings")
+
+
+@pytest.mark.rooms
+def test_plain_label_drag_still_leaves_furnishings(fp, scene,
+                                                   first_furnishing):
+    # P4.2's trait, preserved outside shuffle: the plain drag moves the
+    # room, not its furnishings (passes both eras -- a preservation pin)
+    a = _make_room(fp, scene, 0, 0, 120, 120, "A")
+    f = _furn(fp, scene, first_furnishing, 60, 60)
+    fp.rebuild_all_walls(scene)
+    _label_drag(fp, a, 0, 300)
+    assert a.placement_state == "placed"
+    assert f.scenePos().y() == pytest.approx(60), (
+        "the plain (non-shuffle) drag must not move furnishings")
+
+
+@pytest.mark.rooms
+def test_extract_captures_inside_furnishings_in_any_mode(fp, scene,
+                                                         first_furnishing):
+    # (a): the EXPLICIT extract captures what is inside, shuffle or not
+    a = _make_room(fp, scene, 0, 0, 120, 120, "A")
+    f = _furn(fp, scene, first_furnishing, 60, 60)
+    fp.rebuild_all_walls(scene)
+    assert fp.SETTINGS["shuffle"] is False       # precondition: shuffle OFF
+    fp.extract_room(scene, a)
+    assert f in a._floating_furnishings
+    a._translate(0, 300)
+    assert f.scenePos().y() == pytest.approx(60 + 300), (
+        "the extracted room's furnishings must ride the float")
+
+
+@pytest.mark.rooms
+def test_shuffle_reentry_rebaselines_the_capture(fp, win, first_furnishing):
+    # (c): mid-shuffle a float picks up NOTHING; the shuffle-ON toggle is
+    # the one re-baseline -- what is inside and unclaimed becomes assigned
+    sc = win.scene
+    a = _make_room(fp, sc, 0, 0, 120, 120, "A")
+    win.a_shuffle.setChecked(True)               # through the toggle, so the
+    fp.extract_room(sc, a)                       # off/on below really fires
+    a._translate(0, 300)                         # float over empty canvas
+    loose = _furn(fp, win.scene, first_furnishing, 60, 360)  # inside, loose
+    _label_drag(fp, a, 240, 0)                   # mid-shuffle drag
+    assert loose.scenePos().x() == pytest.approx(60), (
+        "a float must pick up NOTHING mid-shuffle")
+    a._translate(-240, 0)                        # back over the loose one
+    win.a_shuffle.setChecked(False)              # shuffle off...
+    win.a_shuffle.setChecked(True)               # ...and on: the re-baseline
+    assert loose in a._floating_furnishings, (
+        "shuffle re-entry must assign the unclaimed furnishing inside")
+    _label_drag(fp, a, 240, 0)
+    assert loose.scenePos().x() == pytest.approx(60 + 240), (
+        "after the re-baseline the assigned furnishing rides")
+
+
+@pytest.mark.rooms
+def test_rebaseline_keeps_carried_and_excludes_claimed(fp, win,
+                                                       first_furnishing):
+    # (c)'s two edges at once: at the re-baseline a furnishing the float
+    # already CARRIED stays its own even while parked over a placed room,
+    # and the placed room's own furnishing is NOT taken (claimed)
+    sc = win.scene
+    a = _make_room(fp, sc, 0, 0, 120, 120, "Mover")
+    _make_room(fp, sc, 240, 0, 144, 120, "Furnished")
+    own = _furn(fp, sc, first_furnishing, 60, 60)        # inside Mover
+    theirs = _furn(fp, sc, first_furnishing, 330, 80)    # inside Furnished
+    fp.rebuild_all_walls(sc)
+    win.a_shuffle.setChecked(True)               # through the toggle (below)
+    fp.extract_room(sc, a)                       # captures [own]
+    a._translate(240, 0)                         # park over Furnished
+    win.a_shuffle.setChecked(False)
+    win.a_shuffle.setChecked(True)               # the re-baseline, parked
+    assert own in a._floating_furnishings, (
+        "a carried furnishing must survive the re-baseline")
+    assert theirs not in a._floating_furnishings, (
+        "the placed room's furnishing is CLAIMED -- not the float's to take")
+    _label_drag(fp, a, 0, 300)
+    assert own.scenePos().y() == pytest.approx(60 + 300)
+    assert theirs.scenePos().y() == pytest.approx(80), (
+        "the claimed furnishing must stay with its placed room")

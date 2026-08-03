@@ -490,6 +490,20 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         if bool(SETTINGS.get("shuffle", False)) == on:
             return
         SETTINGS["shuffle"] = on
+        if on:
+            # THE ONE RE-BASELINE EVENT (ruled 2026-08-03): entering shuffle
+            # re-captures what each floating room holds -- what is inside it
+            # NOW and unclaimed by a placed room is assigned to it; what it
+            # already carried stays its own. Mid-shuffle a float never picks
+            # up anything; only turning shuffle off and on again re-runs
+            # this.
+            from floorplanner.extract import (  # late: higher layer
+                capture_floating_furnishings)
+            for it in self.scene.items():
+                if (isinstance(it, RoomItem)
+                        and getattr(it, "placement_state", "placed")
+                        == "floating"):
+                    capture_floating_furnishings(self.scene, it)
         self._mark_dirty()               # settings are document state (saved)
         self.status("Shuffle mode ON: nothing merges, welds or binds -- "
                     "join rooms explicitly (right-click > Join room into "

@@ -183,7 +183,11 @@ class RoomItem(QGraphicsItem):
         self.placement_state = "placed"
         self.extracted_from = None       # level it was extracted from, or None
         self.placement_rotation = 0.0
-        self._floating_furnishings = []  # captured at extract; ride _translate
+        # None = NEVER captured (the sentinel matters: a captured-but-EMPTY
+        # list must not re-capture at the next drag, or a float parked over
+        # another room absorbs its furnishings -- the P4.3+ steal). Captured
+        # at extract / shuffle-ON; carried by _translate.
+        self._floating_furnishings = None
         self._drag_autofloat = False     # this drag auto-extracted the room
         self._moving_room = False        # drag-the-name moves the whole room
         self._room_grab = QPointF(0.0, 0.0)
@@ -833,15 +837,21 @@ class RoomItem(QGraphicsItem):
                     # produced, minus the shadow implementation it was
                     from floorplanner.extract import extract_room  # late
                     extract_room(self.scene(), self)
-                    # the plain drag moves the room, not its furnishings --
-                    # today's behaviour, preserved; carrying furnishings is
-                    # the EXPLICIT extract's trait
-                    self._floating_furnishings = []
+                    if not SETTINGS.get("shuffle", False):
+                        # the plain drag moves the room, not its
+                        # furnishings -- P4.2's trait, preserved; under
+                        # SHUFFLE every dragged room KEEPS its furnishings
+                        # (ruled 2026-08-03), so the extract's capture
+                        # stands there
+                        self._floating_furnishings = []
                     self._drag_autofloat = True
-                elif not self._floating_furnishings:
-                    # a room LOADED floating never ran extract, so its
-                    # furnishing capture (scene state, not document state)
-                    # happens lazily at first drag
+                elif self._floating_furnishings is None:
+                    # a room LOADED floating never ran extract: capture
+                    # ONCE, at its first drag. `is None`, not falsy -- a
+                    # captured-but-empty float parked over another room
+                    # must never absorb that room's furnishings at the
+                    # next press (the P4.3+ steal). The only re-baseline
+                    # is the shuffle-ON toggle.
                     from floorplanner.extract import (  # late: higher layer
                         capture_floating_furnishings)
                     capture_floating_furnishings(self.scene(), self)
