@@ -33,16 +33,27 @@ from floorplanner.macro import *  # noqa: F401
 
 
 class LevelsMixin:
+    # z-band between floors (P4.2): the ACTIVE floor's band is 0, so every
+    # newly created item (walls z=5, rooms 4, ...) lands in it with nothing
+    # to re-apply; ghosted floors sit on NEGATIVE bands in the user's display
+    # order. Wide enough that within-floor z machinery (raise_to_front's
+    # running max) can never bleed across bands. VIEW STATE, like
+    # active_floor: not serialized, not undoable. (Defect 11's P4.5 z-order
+    # collapse should fold this band in as the one BETWEEN-floor term.)
+    FLOOR_Z_BAND = 100_000.0
+
     def _sync_floor_state(self):
         """Mirror the authoritative roster (self.floors / active_floor /
         show_other_floors) into config's runtime cache, then re-apply
-        visibility and repaint.  Cheap; called on init, load, and floor ops."""
+        visibility, floor stacking and repaint.  Cheap; called on init,
+        load, and floor ops."""
         set_floor_state(
             active=self.active_floor,
             reference={f.name for f in self.floors if f.reference},
             show_others=self.show_other_floors,
         )
         apply_floor_visibility(self.scene)
+        self._apply_floor_stacking()
         self.scene.update()
         if hasattr(self, "floor_label"):
             self.floor_label.setText(f"Floor: {self.active_floor}")
@@ -51,6 +62,61 @@ class LevelsMixin:
 
     def _floor(self, name):
         return next((f for f in self.floors if f.name == name), None)
+
+    def _repair_floor_stack(self):
+        """The display stack (bottom → top), kept in step with the roster:
+        deleted floors drop out, new floors join at the TOP of the ghost
+        pile."""
+        names = [f.name for f in self.floors]
+        stack = [n for n in getattr(self, "floor_stack", []) if n in names]
+        stack += [n for n in names if n not in stack]
+        self.floor_stack = stack
+        return stack
+
+    def _display_order(self):
+        """Bottom → top for PAINTING: the user's stack with the ACTIVE floor
+        forced topmost — you are editing it, and a grayed ghost must never
+        occlude it. The stack order governs the ghosts beneath."""
+        stack = [n for n in self._repair_floor_stack()
+                 if n != self.active_floor]
+        return stack + [self.active_floor]
+
+    def _apply_floor_stacking(self):
+        """Band every top-level item's z by its floor's display position
+        (active = band 0, ghosts negative), preserving within-floor z by
+        applying the band as a DELTA — raise_to_front etc. are untouched."""
+        order = self._display_order()
+        n = len(order)
+        band_of = {name: -(n - 1 - i) * self.FLOOR_Z_BAND
+                   for i, name in enumerate(order)}
+        for it in self.scene.items():
+            if it.parentItem() is not None:
+                continue
+            floor = getattr(it, "floor", None)
+            if floor is None or floor not in band_of:
+                continue
+            new = band_of[floor]
+            old = getattr(it, "_floor_band", 0.0)
+            if new != old:
+                it.setZValue(it.zValue() - old + new)
+                it._floor_band = new
+
+    def floor_display_front(self, name):
+        """Floors ▸ <floor> ▸ Move to front (display): topmost of the
+        GHOSTS — the active floor always paints above."""
+        stack = self._repair_floor_stack()
+        if name in stack:
+            stack.remove(name)
+            stack.append(name)
+            self._sync_floor_state()
+
+    def floor_display_back(self, name):
+        """Floors ▸ <floor> ▸ Move to back (display)."""
+        stack = self._repair_floor_stack()
+        if name in stack:
+            stack.remove(name)
+            stack.insert(0, name)
+            self._sync_floor_state()
 
     def default_floor_name(self) -> str:
         """The DEFAULT floor is the roster's FIRST — whatever it has been
@@ -102,6 +168,15 @@ class LevelsMixin:
             a_del = sub.addAction("Delete floor")
             a_del.setEnabled(len(self.floors) > 1)
             a_del.triggered.connect(lambda _=False, n=f.name: self.delete_floor(n))
+            sub.addSeparator()
+            # display stacking (P4.2): the active floor always paints on
+            # top; these arrange the GHOSTS beneath it
+            a_fr = sub.addAction("Move to front (display)")
+            a_fr.triggered.connect(
+                lambda _=False, n=f.name: self.floor_display_front(n))
+            a_bk = sub.addAction("Move to back (display)")
+            a_bk.triggered.connect(
+                lambda _=False, n=f.name: self.floor_display_back(n))
         m.addSeparator()
         a_show = m.addAction("Show other floors (ghosted)")
         a_show.setCheckable(True)
@@ -191,6 +266,8 @@ class LevelsMixin:
             if getattr(it, "floor", None) == name:
                 it.floor = new
         f.name = new
+        self.floor_stack = [new if n == name else n
+                            for n in getattr(self, "floor_stack", [])]
         if self.active_floor == name:
             self.active_floor = new
         self._sync_floor_state()

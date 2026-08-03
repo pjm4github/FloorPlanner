@@ -180,3 +180,51 @@ def test_refresh_rooms_cmd_spares_inactive_floor_rooms(fp, win, make_room):
     rooms = [r for r in win.scene.items() if isinstance(r, fp.RoomItem)]
     assert any(r.name == "Den" and r.floor == fp.DEFAULT_FLOOR for r in rooms), \
         "refresh_rooms_cmd deleted an inactive-floor room"
+
+
+def test_floor_display_stacking(fp, win):
+    # P4.2: floors paint in z BANDS -- the ACTIVE floor's band is 0 (so a
+    # newly drawn item lands on top with nothing to re-apply) and ghosts sit
+    # on negative bands in the user's display order, arranged per floor via
+    # Floors > <floor> > Move to front/back (display). The band rides as a
+    # DELTA on each top-level item's z, so within-floor z machinery
+    # (raise_to_front's running max) is untouched.
+    from PyQt6.QtCore import QPointF
+    sc = win.scene
+    w_default = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    sc.addItem(w_default)
+    win.new_floor_named("Mid")
+    w_mid = fp.WallItem(QPointF(0, 24), QPointF(120, 24), "interior")
+    sc.addItem(w_mid)
+    win.new_floor_named("Top")
+    w_top = fp.WallItem(QPointF(0, 48), QPointF(120, 48), "interior")
+    sc.addItem(w_top)
+    win.show_other_floors = True
+    win._sync_floor_state()
+    # active (Top) is band 0 -- strictly above both ghosts
+    assert w_top.zValue() > w_mid.zValue()
+    assert w_top.zValue() > w_default.zValue()
+    # a NEW item on the active floor needs no re-sync to be on top
+    w_new = fp.WallItem(QPointF(0, 72), QPointF(120, 72), "interior")
+    sc.addItem(w_new)
+    assert w_new.zValue() > w_mid.zValue()
+    # ghosts follow the stack: default joined first, so it sits below Mid;
+    # move default to the front (of the ghosts) and the order flips
+    assert w_default.zValue() < w_mid.zValue()
+    win.floor_display_front("default")
+    assert w_default.zValue() > w_mid.zValue()
+    assert w_top.zValue() > w_default.zValue()      # active still on top
+    win.floor_display_back("default")
+    assert w_default.zValue() < w_mid.zValue()
+    # switching the active floor re-tops it, whatever the stack says
+    win.switch_floor("default")
+    assert w_default.zValue() > w_mid.zValue()
+    assert w_default.zValue() > w_top.zValue()
+    # within-floor z survived the banding round trips exactly
+    assert w_mid.zValue() - w_mid._floor_band == pytest.approx(fp.WALL_Z)
+    # the per-floor submenu carries the two display actions
+    win._rebuild_floor_menu()
+    subs = [a.menu() for a in win.m_floors.actions() if a.menu()]
+    texts = [a.text() for a in subs[0].actions()]
+    assert "Move to front (display)" in texts
+    assert "Move to back (display)" in texts
