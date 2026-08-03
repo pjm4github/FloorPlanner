@@ -197,6 +197,81 @@ def test_shuffle_label_click_still_ends_placed(fp, scene):
         "afloat")
 
 
+# --------------------------------------------------------------------------
+# THE P4.3 ACCEPTANCE, as the task line states it: "With shuffle on, dragging
+# a floating room across the plan leaves both unchanged; check() clean
+# throughout (I11 exempts floating rooms)."
+# --------------------------------------------------------------------------
+@pytest.mark.rooms
+def test_acceptance_shuffle_drag_across_the_plan(fp, win, first_furnishing):
+    import warnings
+
+    from floorplanner.design.validate import check
+
+    def _clean(label):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            doc = design_from_scene(win).to_dict()
+        errs = check(doc, deep=True)
+        assert errs == [], f"check() not clean {label}: {errs}"
+
+    sc = win.scene
+    mover = _make_room(fp, sc, 0, 0, 120, 120, "Mover")
+    anchor = _make_room(fp, sc, 240, 0, 144, 120, "Anchor")
+    door = fp.OpeningItem(anchor.walls[0], "door", "3280",
+                          anchor.walls[0].length() / 2)
+    anchor.walls[0].openings.append(door)
+    furn = fp.FurnishingItem(first_furnishing, QPointF(48, 48), 0)
+    sc.addItem(furn)
+    fp.rebuild_all_walls(sc)
+    _clean("before anything")
+
+    fp.SETTINGS["shuffle"] = True
+    _label_drag(fp, mover, 0, 300)                   # shuffle: float it
+    assert mover.placement_state == "floating"
+    _clean("after the shuffle float")
+
+    anchor_walls = sorted(
+        (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()) for w in anchor.walls)
+    area_m, walls_m = mover.area_sqft, len(mover.walls)
+    # the plain label-drag deliberately does NOT carry furnishings (P4.2's
+    # preserved trait -- carrying is the explicit Extract's), so on this path
+    # the furnishing is PLAN-side state and "unchanged" means it stays put
+    furn_pos = QPointF(furn.scenePos())
+
+    # one gesture, stepped ACROSS the plan -- straight through Anchor's
+    # footprint -- through the REAL handlers; nothing may merge, weld, bind
+    # or move in passing at ANY step
+    grab = mover.mapToScene(mover._label_rect().center())
+    mover.mousePressEvent(_Ev(pos=mover._label_rect().center(),
+                              scene_pos=grab))
+    x, y = grab.x(), grab.y()
+    for i, (dx, dy) in enumerate([(120, -300), (120, 0), (120, 0),
+                                  (120, 0), (120, 0)]):
+        x, y = x + dx, y + dy
+        mover.mouseMoveEvent(_Ev(scene_pos=QPointF(x, y)))
+        fp.rebuild_all_walls(sc)
+        _clean(f"mid-drag step {i} (over the plan)")
+        assert mover.placement_state == "floating"
+        now = sorted((w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y())
+                     for w in anchor.walls)
+        assert now == anchor_walls, f"the PLAN moved at step {i}"
+        assert mover.area_sqft == pytest.approx(area_m), "the room deformed"
+        assert len(mover.walls) == walls_m
+    mover.mouseReleaseEvent(_Ev(scene_pos=QPointF(x, y)))
+
+    # released past the far side: still floating, both still unchanged
+    assert mover.placement_state == "floating"
+    assert sorted((w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y())
+                  for w in anchor.walls) == anchor_walls
+    assert mover.area_sqft == pytest.approx(area_m)
+    assert len(anchor.walls[0].openings) == 1, "the door must survive"
+    assert furn.scenePos().x() == pytest.approx(furn_pos.x())
+    assert furn.scenePos().y() == pytest.approx(furn_pos.y()), (
+        "the plan-side furnishing must not be dragged along")
+    _clean("after release")
+
+
 @pytest.mark.rooms
 def test_explicit_join_still_joins_under_shuffle(fp, scene):
     a = _make_room(fp, scene, 0, 0, 120, 120, "A")
