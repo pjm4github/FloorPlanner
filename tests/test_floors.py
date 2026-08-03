@@ -228,3 +228,38 @@ def test_floor_display_stacking(fp, win):
     texts = [a.text() for a in subs[0].actions()]
     assert "Move to front (display)" in texts
     assert "Move to back (display)" in texts
+
+
+def test_floor_depth_fade_and_quick_flip(fp, win):
+    # Patrick's refinement: atmospheric depth -- the edited floor is dark
+    # (opacity 1.0) and each visible floor beneath it fades grayer with its
+    # depth in the display stack -- plus Ctrl+PgDown/PgUp quick flipping,
+    # which records deterministically for free (the switch_floor hook emits
+    # the resulting ^F token, never the cycle gesture).
+    from PyQt6.QtCore import QPointF
+    sc = win.scene
+    w0 = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    sc.addItem(w0)
+    win.new_floor_named("Mid")
+    w1 = fp.WallItem(QPointF(0, 24), QPointF(120, 24), "interior")
+    sc.addItem(w1)
+    win.new_floor_named("Top")
+    w2 = fp.WallItem(QPointF(0, 48), QPointF(120, 48), "interior")
+    sc.addItem(w2)
+    win.show_other_floors = True
+    win._sync_floor_state()
+    # active full-contrast; ghosts fade with depth (nearer ghost less faded)
+    assert w2.opacity() == pytest.approx(1.0)
+    assert 0.18 <= w1.opacity() < 1.0
+    assert 0.18 <= w0.opacity() < w1.opacity() + 1e-9
+    assert w0.opacity() < w1.opacity()
+    # flipping restores full contrast to the newly active floor
+    win.cycle_floor(-1)                      # Top -> Mid
+    assert win.active_floor == "Mid"
+    assert w1.opacity() == pytest.approx(1.0)
+    assert w2.opacity() < 1.0
+    # the quick-flip actions carry their shortcuts
+    assert win.a_floor_up.shortcut().toString() in ("Ctrl+PgDown",
+                                                    "Ctrl+PageDown")
+    assert win.a_floor_down.shortcut().toString() in ("Ctrl+PgUp",
+                                                      "Ctrl+PageUp")

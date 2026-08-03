@@ -84,11 +84,22 @@ class LevelsMixin:
     def _apply_floor_stacking(self):
         """Band every top-level item's z by its floor's display position
         (active = band 0, ghosts negative), preserving within-floor z by
-        applying the band as a DELTA — raise_to_front etc. are untouched."""
+        applying the band as a DELTA — raise_to_front etc. are untouched.
+
+        ATMOSPHERIC DEPTH (P4.2, Patrick's refinement): each floor also
+        gets an opacity from its depth in the display order — the active
+        floor full-contrast, each ghost beneath it grayer as it drops back
+        (the flat ghost paint fading toward the background reads as
+        distance). Item opacity is view state, applied here alongside the
+        band, restored to 1.0 the moment a floor becomes active."""
         order = self._display_order()
         n = len(order)
-        band_of = {name: -(n - 1 - i) * self.FLOOR_Z_BAND
-                   for i, name in enumerate(order)}
+        band_of, fade_of = {}, {}
+        for i, name in enumerate(order):
+            depth = n - 1 - i                 # 0 = active (topmost)
+            band_of[name] = -depth * self.FLOOR_Z_BAND
+            fade_of[name] = (1.0 if depth == 0
+                             else max(0.18, 0.60 * (0.65 ** (depth - 1))))
         for it in self.scene.items():
             if it.parentItem() is not None:
                 continue
@@ -100,6 +111,8 @@ class LevelsMixin:
             if new != old:
                 it.setZValue(it.zValue() - old + new)
                 it._floor_band = new
+            if it.opacity() != fade_of[floor]:
+                it.setOpacity(fade_of[floor])
 
     def floor_display_front(self, name):
         """Floors ▸ <floor> ▸ Move to front (display): topmost of the
@@ -142,8 +155,19 @@ class LevelsMixin:
             self.a_new_floor = QAction("&New…", self)
             self.a_new_floor.setShortcut(QKeySequence("Ctrl+Shift+F"))
             self.a_new_floor.triggered.connect(self.new_floor)
+            # quick flip (Patrick's refinement): cycle without the popup.
+            # Recording stays deterministic for free -- the switch_floor
+            # hook emits the RESULTING `^F "name"` token, never the cycle.
+            self.a_floor_up = QAction("Next floor", self)
+            self.a_floor_up.setShortcut(QKeySequence("Ctrl+PgDown"))
+            self.a_floor_up.triggered.connect(lambda: self.cycle_floor(+1))
+            self.a_floor_down = QAction("Previous floor", self)
+            self.a_floor_down.setShortcut(QKeySequence("Ctrl+PgUp"))
+            self.a_floor_down.triggered.connect(lambda: self.cycle_floor(-1))
         m.addAction(self.a_select_floor)
         m.addAction(self.a_new_floor)
+        m.addAction(self.a_floor_up)
+        m.addAction(self.a_floor_down)
         m.addSeparator()
         grp = QActionGroup(self)
         grp.setExclusive(True)
@@ -211,6 +235,17 @@ class LevelsMixin:
         """Quick floor switch from the status-bar label."""
         self.select_floor_popup(
             self.floor_label.mapToGlobal(self.floor_label.rect().topLeft()))
+
+    def cycle_floor(self, step):
+        """Ctrl+PgDown / Ctrl+PgUp: flip to the next / previous floor in
+        roster order, wrapping — the fast path between floors; ^F pops the
+        selector when you want to aim."""
+        names = [f.name for f in self.floors]
+        if len(names) < 2:
+            self.status("Only one floor.")
+            return
+        i = names.index(self.active_floor) if self.active_floor in names else 0
+        self.switch_floor(names[(i + step) % len(names)])
 
     def switch_floor(self, name):
         """Make `name` the active (editable) floor.  View state only — no undo
