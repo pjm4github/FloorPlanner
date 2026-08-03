@@ -332,3 +332,44 @@ def test_fuse_straggler_macro_steals_no_wall(win):
         assert r.placement_state == "placed", f"{r.name} not placed"
         assert len(r.open_edges()) == 0, f"{r.name} still open"
         assert r.area_sqft == pytest.approx(base[r.name], abs=0.5)
+
+
+def test_the_merge_rebind_producer_is_watched(scene):
+    # REGISTER ROW 36's WATCH (ruled 2026-08-03): the producer -- the
+    # release-merge's unconditional rebind of an absorbed wall's rooms onto a
+    # survivor that runs off the room's own edge -- is CARRIED to P4.5
+    # conditionally on this test existing. Its PRECONDITION asserts the
+    # producer still mints binding-without-naming: the day merge semantics
+    # change, the precondition goes red and the row must be re-argued. Its
+    # VERDICT asserts extract's step 1b releases the state: the day the guard
+    # regresses, CI catches it here rather than a field macro catching it in
+    # a stranded wall.
+    room = _make(scene, 0, 0, 120, 120, "R")
+    west = next(w for w in room.walls
+                if abs(w.p1.x()) < 0.5 and abs(w.p2.x()) < 0.5)
+    # the offset absorber: parallel, same type, 5" off -- inside the 6"
+    # auto-coalesce perp_tol, beyond the naming/weld band
+    a = fp.WallItem(QPointF(-5, 0), QPointF(-5, 120), "interior")
+    scene.addItem(a)
+    fp.rebuild_all_walls(scene)
+    fp.merge_wall(scene, a)                      # the release's own pass
+    # -- PRECONDITION: the producer minted binding-without-naming
+    assert west.scene() is None, (
+        "precondition lost: the merge no longer absorbs the 5\"-offset "
+        "wall -- re-argue register row 36 before touching this test")
+    assert a in room.walls and room in a.rooms, (
+        "precondition lost: the merge no longer rebinds the absorbed "
+        "wall's room -- the row-36 producer is gone; re-argue the row")
+    assert all(e.wall is not a for e in room.outline), (
+        "precondition lost: the survivor is now NAMED by the room's "
+        "outline -- the binding-without-naming state no longer arises")
+    # -- VERDICT: extract releases the bound-but-unnamed wall (step 1b)
+    p1, p2 = QPointF(a.p1), QPointF(a.p2)
+    fp.extract_room(scene, room)
+    assert a not in room.walls, (
+        "extract took a wall no outline edge names -- the straggler class")
+    assert a.scene() is scene
+    room._translate(0, 300)
+    assert (a.p1.x(), a.p1.y(), a.p2.x(), a.p2.y()) == \
+        (p1.x(), p1.y(), p2.x(), p2.y()), (
+        "the float STOLE the bound-but-unnamed wall -- row 36 regressed")

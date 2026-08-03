@@ -494,17 +494,16 @@ class SettingsDialog(QDialog):
         self.ck_coalesce.setChecked(bool(SETTINGS.get("auto_coalesce", True)))
         form.addRow("Auto-coalesce walls", self.ck_coalesce)
 
-        # the shuffle MODE itself lives on the toolbar (one surface); these two
-        # are its sibling editing flags (schema $defs.editing_modes, P4.3)
+        # the shuffle MODE itself lives on the toolbar (one surface); this is
+        # its sibling editing flag (schema $defs.editing_modes, P4.3).
+        # auto_bind is deliberately NOT here: it is modelled, emitted and
+        # plumbed, but the P4.3 census measured NO gateable automatic site,
+        # so a control would promise behaviour nothing enforces -- the UI
+        # returns when a gateable site exists (ruled 2026-08-03; register).
         self.ck_weld = QCheckBox(
             "Weld a drawn wall end onto whatever it lands near")
         self.ck_weld.setChecked(bool(SETTINGS.get("auto_weld", True)))
         form.addRow("Auto-weld ends", self.ck_weld)
-
-        self.ck_bind = QCheckBox(
-            "Bind room edges to coincident walls automatically")
-        self.ck_bind.setChecked(bool(SETTINGS.get("auto_bind", True)))
-        form.addRow("Auto-bind rooms", self.ck_bind)
 
         note = QLabel("Defaults: 6\" wall snap, 15° rotation snap, "
                       "100' × 70' canvas, $150 / sq ft.\n"
@@ -526,7 +525,6 @@ class SettingsDialog(QDialog):
         SETTINGS["cost_per_sqft"] = float(self.sp_cost.value())
         SETTINGS["auto_coalesce"] = bool(self.ck_coalesce.isChecked())
         SETTINGS["auto_weld"] = bool(self.ck_weld.isChecked())
-        SETTINGS["auto_bind"] = bool(self.ck_bind.isChecked())
 
 
 class ImageImportDialog(QDialog):

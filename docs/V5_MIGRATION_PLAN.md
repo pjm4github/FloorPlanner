@@ -4272,4 +4272,34 @@ notes:   Patrick: moving the fiveRoomTest design with his macro "leaves
          rebind of absorbed walls' rooms can still mint binding-without-
          naming; extract is immune now, rebind semantics are P4.5's.
          Census 568 -> 569.
+
+P4.3+ the three ruled dispositions, one commit (post-merge, on main;
+         ruled by Patrick 2026-08-03 with the acceptance)
+ruff:    clean
+pytest:  (trailer in the commit; census 569 -> 570, the watch test)
+files:   dialogs.py (auto_bind checkbox removed),
+         tests/test_extract_join.py (the row-36 watch),
+         docs/CODE_REVIEW_v2.md (standing disposition + row 36 carry
+         note + row 37), this file.
+notes:   (a) AUTO_BIND LEAVES THE UI: modelled, emitted and plumbed
+         with no gateable site as of P4.3; the control returns when one
+         exists. Standing disposition in the register QUOTES the
+         census reasoning verbatim. Nothing changes in SETTINGS, the
+         document block, or editing_enabled -- a checkbox promising
+         behaviour nothing enforces is what goes.
+         (b) ROW 36's PRODUCER: carried to P4.5 CONDITIONALLY on the CI
+         watch (test_the_merge_rebind_producer_is_watched): its
+         preconditions pin that the producer still mints binding-
+         without-naming (red -> re-argue the row before touching the
+         test); its verdict pins that extract's step 1b releases the
+         state (red -> the guard regressed, caught by CI not a field
+         macro). If the watch goes, the carry ruling goes with it.
+         (c) THE SHUFFLE TOGGLE'S MISSING TOKEN/SHORTCUT: filed as
+         register row 37 -- a user-facing mode the recorder cannot see
+         is a gap in the one-table CARET_SHORTCUTS design; a replayed
+         session that toggled shuffle replays with the wrong mode,
+         silently. ARGUED TO P4.4 (my call, invited): earliest next
+         task, one table row + a chord choice, and P4.4's duplicate-as-
+         template work is exactly where floating rooms and shuffle get
+         exercised together in recorded macros.
 ```
