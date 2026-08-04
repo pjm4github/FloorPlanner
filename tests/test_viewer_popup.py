@@ -130,22 +130,42 @@ def test_the_popup_uses_the_save_paths_producer(win, monkeypatch):
     assert seen.get("called") == 1, "the popup did not use design_document()"
 
 
-def test_the_surface_format_guard_is_import_safe():
-    """app.main() sets the Qt Quick 3D surface format before the
-    QApplication -- and must still start with the optional stack absent, so
-    the call is guarded. Asserted on the source, because running main()
-    would build a second QApplication."""
+def test_the_editor_launches_with_no_qtquick3d(monkeypatch):
+    """SIMULATE the optional stack being absent and prove the startup path
+    survives it -- the failure that would otherwise turn a missing extra into
+    a dead editor.
+
+    Exercised for real, not read off the source: the import is made to fail
+    exactly as it would on a machine without Qt Quick 3D, and the startup
+    call must RETURN (reporting False) rather than raise."""
+    import builtins
+
+    from floorplanner import app
+    real = builtins.__import__
+
+    def _no_quick3d(name, *a, **k):
+        if "QtQuick3D" in name:
+            raise ImportError("simulated: no Qt Quick 3D")
+        return real(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", _no_quick3d)
+    assert app.set_3d_surface_format() is False   # returns; does not raise
+    monkeypatch.undo()
+    # ...and with the stack present it really does set the format
+    assert app.set_3d_surface_format() is True
+
+
+def test_the_surface_format_precedes_the_qapplication():
+    """The ordering half, which no runtime test can observe (running main()
+    would build a second QApplication): Qt reads the default surface format
+    at GUI init, so a call after the QApplication is silently too late."""
     import inspect
 
     from floorplanner import app
     src = inspect.getsource(app.main)
-    assert "idealSurfaceFormat" in src
-    fmt = src.index("idealSurfaceFormat")
+    call = src.index("set_3d_surface_format()")
     qapp = src.index("QApplication(sys.argv)")
-    assert fmt < qapp, "the surface format must precede the QApplication"
-    guard = src.rindex("try:", 0, fmt)
-    assert "except ImportError" in src[guard:qapp], (
-        "the optional Qt Quick 3D import must be guarded")
+    assert call < qapp, "the surface format must precede the QApplication"
 
 
 def test_the_qml_document_ships_beside_the_module():
