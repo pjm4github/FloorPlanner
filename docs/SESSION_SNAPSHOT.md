@@ -22,7 +22,7 @@
 5. **The record** (5).
 
 **The next actions, in order:**
-1. **The viewer move + merge** (register row 39, whose trigger — "after P4.4 merges" — has now fired): `viewer/` → `floorplanner/viewer/`, `packages = [… "floorplanner.viewer"]`, script entry `floorplanner.viewer.fp3d:main`.
+1. ~~The viewer move + merge~~ — **done 2026‑08‑04** (row 39): the viewer lives at `floorplanner/viewer/`, one top-level name per project. Row **40** stays open: the 3D menu action, when built, must report a missing optional dependency rather than raise.
 2. **P4.5 read-back** (group semantics + z-order collapse): census first; it is the **second designated mini-gate task**, so its PR does not merge until Patrick runs the gate.
 3. Then Phase 5 (site/landscape) and Phase 6 (command undo, final perf).
 

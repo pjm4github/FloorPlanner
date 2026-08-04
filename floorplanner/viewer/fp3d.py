@@ -2,11 +2,11 @@
 """
 fp3d.py -- standalone 3D viewer for FloorPlanner v5 design documents.
 
-    python fp3d.py examples/symmetricP1.json
-    python fp3d.py plan.json --level L1 --no-furnishings
-    python fp3d.py plan.json --dump              # headless: mesh stats + report
-    python fp3d.py plan.json --obj out.obj       # export, no window
-    python fp3d.py plan.json --shot view.png     # render offscreen to PNG
+    fp3d examples/symmetricP1.json               # the installed console script
+    python -m floorplanner.viewer.fp3d plan.json --level L1 --no-furnishings
+    python -m floorplanner.viewer.fp3d plan.json --dump   # headless: stats
+    python -m floorplanner.viewer.fp3d plan.json --obj out.obj   # no window
+    python -m floorplanner.viewer.fp3d plan.json --shot view.png # offscreen
 
 Nothing here imports `floorplanner`; it reads the v5 JSON directly, so it can
 be run against any saved design and cannot affect the app.  The geometry half
