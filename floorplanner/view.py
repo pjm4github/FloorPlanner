@@ -531,12 +531,16 @@ class PlanView(QGraphicsView):
             a_paste = menu.addAction("Paste room")
             a_paste.setEnabled(self.win.room_clipboard is not None)
             a_concept = menu.addAction("New concept room…")
+            menu.addSeparator()
+            a_3d = menu.addAction("3D view…")
             chosen = menu.exec(e.globalPos())
             at = self.mapToScene(e.pos())
             if chosen is a_paste:
                 self.win.paste_room(grid_snap(at))
             elif chosen is a_concept:
                 self.win.new_concept_room(at=grid_snap(at))
+            elif chosen is a_3d:
+                self.win.show_3d_view()
             e.accept()
             return
         if self.itemAt(e.pos()) is None:
@@ -544,7 +548,7 @@ class PlanView(QGraphicsView):
             # default pre-highlighted so ENTER selects it, DOWN walks the
             # floors, ESC cancels. Recorded as a PUP line; the resulting
             # switch appends its deterministic `# ^F "name"` comment.
-            self.win.select_floor_popup(e.globalPos())
+            self.win.select_floor_popup(e.globalPos(), scene_menu=True)
             e.accept()
             return
         super().contextMenuEvent(e)

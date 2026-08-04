@@ -223,9 +223,20 @@ class LevelsMixin:
             menu.setActiveAction(menu.actions()[0])
         return menu
 
-    def select_floor_popup(self, global_pos=None):
-        """Select… (^F) and the blank-canvas right-click both land here."""
+    def select_floor_popup(self, global_pos=None, scene_menu=False):
+        """Select… (^F) and the blank-canvas right-click both land here.
+
+        `scene_menu=True` is the RIGHT-CLICK route only: it appends the
+        scene-wide actions (3D view) below the floors. The keyboard route
+        (^F) and the status-bar label stay a pure floor selector -- the P4.2
+        spec's "one popup surface" is about floor selection having one
+        surface, and a chord named "select a floor" should not offer a
+        renderer."""
         menu = self._build_floor_popup()
+        if scene_menu:
+            menu.addSeparator()
+            a_3d = menu.addAction("3D view…")
+            a_3d.triggered.connect(self.show_3d_view)
         if global_pos is None:
             global_pos = self.view.mapToGlobal(
                 self.view.viewport().rect().center())
