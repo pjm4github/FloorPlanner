@@ -4657,4 +4657,46 @@ RULED (7) MINI-GATE APPROVED, with a NEW ITEM 1 -- the headline number
          and 4 were for. Time it too -- it should feel instant. The
          eight items from the read-back follow as 2-9.
 
+P4.5(1a) the three amendments to (1), before the mechanism work
+ruff:    clean
+pytest:  601 passed, 7 deselected, 4 xfailed (sum 612; trailer in the commit)
+files:   docs/CODE_REVIEW_v2.md (rows 41 + 42 amended), this file.
+notes:   ROW 41 NOW CARRIES MEASURED FIXTURES, verified here rather than
+         inherited. A loop can be non-simple by TOUCHING as well as by
+         crossing, and the shipped corpus has the touching kind:
+           python -m floorplanner.viewer.fp3d examples/symmetricP1.json --dump
+           python -m floorplanner.viewer.fp3d examples/planc1.v5.json --dump
+         Measured: symmetricP1.json -- WIC, 1 zero-width spur;
+         planc1.v5.json -- Hall 4, M Bath 6, WIC 1 (the last not named in
+         the ruling, found by running it). Both files return ZERO I5b
+         errors under check(deep=True) -- planc1.v5 reports 23 errors of
+         other kinds, none of them I5b -- so they pass the invariant while
+         being non-simple. Both halves of the claim verified before
+         recording, per the standing rule.
+         AND THE FIXTURES CARRY A CONSTRAINT WITH THEM: symmetricP1.json
+         is the REFERENCE CLEAN FILE and is corpus-frozen, so "is a
+         spurred loop an I5b violation?" cannot be answered without also
+         deciding whether the frozen reference gets re-cut. That is a
+         corpus decision as much as an invariant one, and it now has
+         something concrete to be decided against.
+         ROW 42 sharpened as ruled, plus the adjacent finding recorded and
+         NOT acted on: the three structurally identical appliers
+         (_DragVertex.apply, GroupItem._apply_corner_records,
+         RoomItem._translate) are a consolidation candidate -- one concept,
+         three implementations, F2's shape, and the reason row 42 exists
+         at all is that there was no single seam to hang a check on.
+         ARGUED PHASE 6, where the command layer's MoveVertices IS that
+         seam. Not P4.5's.
+         THE XFAIL IN test_self_intersection.py IS A MECHANISM RECEIPT,
+         and is named as such here so a future reader does not tidy it
+         away as a stale marker. It is a DISTINCT USE from the P0.4
+         characterization xfails: those mark behaviour that is wrong today
+         and will be fixed; this one marks a test that CANNOT pass under
+         copy-based grouping for a structural reason (_corner_records
+         deliberately splits any corner an outsider holds, so a clipped
+         bake cannot deform a room and there is nothing to report). Its
+         flip in the no-copy sub-commit is therefore not a bug fix but the
+         PROOF THE MECHANISM ACTUALLY CHANGED -- if it still xfails after
+         duplicate_wall dies, the death was cosmetic.
+
 ```
