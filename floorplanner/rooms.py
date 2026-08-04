@@ -1123,16 +1123,27 @@ def room_walls(room) -> list:
     binder; the outline's own `wall` references are the authority now, and
     `room.walls` is the association list walls read back (`WallItem.rooms`).
     Falls back to `room.walls` for a room with no outline at all -- a legacy
-    import whose corners never traced."""
+    import whose corners never traced.
+
+    LIVE WALLS ONLY. An outline edge goes on NAMING a wall that has left the
+    scene -- a merge absorbs the wall but does not clear the reference, so
+    `e.wall` is a Python object outside the scene, "dead but not absent"
+    (measured at P4.5). Handing one back made this predicate lie: a dead wall
+    is not a wall this room has, and every consumer either wants a live one or
+    re-checks liveness itself. It also had a live consequence once
+    `group_selected` began consuming this list (P4.5(2)) -- grouping such a
+    room ADOPTED the dead wall, and adoption re-parents it into the scene, so
+    a wall the merge had deleted came back. Filtering here fixes it for every
+    consumer at once rather than at each call site."""
     seen, out = set(), []
     for e in room.outline:
         w = e.wall
-        if (w is not None and id(w) not in seen):
+        if (w is not None and w.scene() is not None and id(w) not in seen):
             seen.add(id(w))
             out.append(w)
     if not out:
         out = [w for w in room.walls
-               if isinstance(w, WallItem)]
+               if isinstance(w, WallItem) and w.scene() is not None]
     return out
 
 

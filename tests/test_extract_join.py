@@ -395,3 +395,41 @@ def test_a_grouped_merge_never_binds_a_room_it_does_not_border(win):
     assert a not in room.walls and room not in a.rooms, (
         "the grouped merge bound a room to a survivor no outline edge "
         "names -- the second producer path is back")
+
+
+def test_a_merge_does_not_resurrect_the_absorbed_wall_through_a_group(win):
+    """The rebind fix's own aftermath, measured at P4.5 and fixed with it.
+
+    When the rebind correctly DECLINES, the outline edge goes on naming the
+    absorbed wall -- "dead but not absent": a Python object outside the
+    scene, neither None nor a deleted C++ object. Most predicates that read
+    an edge's wall re-check liveness (5 of them do explicitly); `room_walls`
+    did not, and P4.5(2) made `group_selected` consume it -- so grouping such
+    a room ADOPTED the dead wall, and adoption re-parents it into the scene.
+    A wall the merge had deleted came back.
+
+    Fixed in the predicate rather than at the call site, so every consumer is
+    covered at once."""
+    sc = win.scene
+    room = _make(sc, 0, 0, 120, 120, "R")
+    west = next(w for w in room.walls
+                if abs(w.p1.x()) < 0.5 and abs(w.p2.x()) < 0.5)
+    a = fp.WallItem(QPointF(-5, 0), QPointF(-5, 120), "interior")
+    sc.addItem(a)
+    fp.rebuild_all_walls(sc)
+    fp.merge_wall(sc, a)
+    # PRECONDITION: the state exists -- the edge still names the dead wall
+    assert west.scene() is None
+    assert any(e.wall is west for e in room.outline), (
+        "precondition lost: the edge no longer names the absorbed wall, so "
+        "there is no dangling reference to mishandle")
+    # VERDICT
+    assert west not in fp.room_walls(room), "room_walls handed back a dead wall"
+    n_before = sum(1 for i in sc.items() if isinstance(i, fp.WallItem))
+    sc.clearSelection()
+    room.setSelected(True)
+    win.group_selected()
+    assert sum(1 for i in sc.items()
+               if isinstance(i, fp.WallItem)) == n_before, (
+        "grouping resurrected the absorbed wall into the scene")
+    assert west.scene() is None, "the deleted wall is back in the scene"
