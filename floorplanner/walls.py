@@ -258,13 +258,26 @@ def graph_from_scene(scene, floor=None):
 
     `floor=None` views every floor at once. Level is part of the planner's
     grouping key, so floors stay apart there rather than by one pass per floor.
-    Open (dashed) and grouped walls are excluded, exactly as coalesce excluded
-    them."""
+
+    GROUPED WALLS ARE IN THE VIEW SINCE P4.5, and the exclusion that used to
+    sit here was load-bearing for exactly one reason: a grouped wall was a
+    COPY, so admitting it would have doubled every edge the copy shadowed.
+    With `duplicate_wall` dead a grouped wall IS a plan wall, and the same
+    line inverts in meaning -- it stops preventing duplicates and starts
+    hiding real geometry from the one view the planner reasons over. A
+    planner that cannot see a wall produces a plan that disagrees with the
+    scene, which is F1 and F2 rebuilt by hand.
+
+    THIS IS VISIBILITY ONLY. What the planner may DO with a grouped wall is
+    governed separately, by `merge_wall` and `weld_scene`, and those still
+    refuse -- so the state after this change is coherent: complete
+    information, no new action. (Working agreement: retire visibility before
+    permission.)"""
     if scene is None:
         return GraphView([], {}, {})
     walls = sorted((w for w in scene.items()
                     if isinstance(w, WallItem)
-                    and w.group() is None and w.length() > 1e-6
+                    and w.length() > 1e-6
                     and (floor is None or w.floor == floor)),
                    key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y(),
                                   w.wall_type))

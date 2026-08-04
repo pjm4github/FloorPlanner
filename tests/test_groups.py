@@ -754,3 +754,55 @@ def test_the_group_box_does_not_stretch_when_the_group_moves(fp, win,
         assert moved.height() == pytest.approx(at_rest.height(), abs=0.01), (
             f"the box stretched in y at ({dx}, {dy}): "
             f"{at_rest.height():.1f} -> {moved.height():.1f}")
+
+
+# --------------------------------------------------------------------------
+# P4.5: the four `group() is None` guards come down ONE AT A TIME, and
+# VISIBILITY comes down before PERMISSION (working agreement). These pin the
+# boundary between the two so the intermediate states stay coherent.
+# --------------------------------------------------------------------------
+def test_the_planner_can_see_a_grouped_wall(fp, win, make_room):
+    """VISIBILITY guard retired (graph_from_scene). The exclusion was
+    load-bearing only while a grouped wall was a COPY -- admitting it would
+    have doubled every edge the copy shadowed. With nothing duplicated the
+    same line inverts: it hides real geometry from the one view the planner
+    reasons over, and a planner that cannot see a wall produces a plan that
+    disagrees with the scene."""
+    from floorplanner.walls import graph_from_scene
+    sc = win.scene
+    a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    b = fp.WallItem(QPointF(120, 0), QPointF(120, 120), "interior")
+    for w in (a, b):
+        sc.addItem(w)
+        w.setSelected(True)
+    fp.rebuild_all_walls(sc)
+    assert len(graph_from_scene(sc).walls) == 2      # precondition: both seen
+    win.group_selected()
+    assert a.group() is not None and b.group() is not None
+    seen = {id(v.key) for v in graph_from_scene(sc).walls}
+    assert id(a) in seen and id(b) in seen, (
+        "the planner is blind to a grouped wall -- F1/F2 by hand")
+
+
+def test_seeing_a_grouped_wall_is_not_permission_to_merge_it(fp, win):
+    """The other half of the same boundary, and the reason the guards come
+    down one at a time: after the VISIBILITY retirement the planner has
+    complete information and still declines to act. `merge_wall` and
+    `weld_scene` are separate guards, each its own sub-commit and its own
+    rollback point."""
+    sc = win.scene
+    a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    b = fp.WallItem(QPointF(60, 0), QPointF(180, 0), "interior")  # overlapping
+    for w in (a, b):
+        sc.addItem(w)
+        w.setSelected(True)
+    fp.rebuild_all_walls(sc)
+    win.group_selected()
+    n = _nwalls(fp, sc)
+    fp.merge_wall(sc, a)
+    assert _nwalls(fp, sc) == n, "a grouped wall was merged"
+    # weld_scene skips grouped walls too -- asserted on its own return value,
+    # which is what it would have to change to have acted
+    moved, shared = fp.weld_scene(sc)
+    assert (moved, shared) == (0, 0), "a grouped end was welded"
+    assert _nwalls(fp, sc) == n
