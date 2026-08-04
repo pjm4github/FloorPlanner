@@ -557,7 +557,14 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             self.status(self.VIEWER_HINT)
             return None
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
+            # SCOPED TO THE ONE MESSAGE, not a blanket ignore. Silencing the
+            # whole call would swallow any OTHER warning the walk raises --
+            # `except ValueError: continue` wearing a different hat, and the
+            # exact family defect 6 spent a phase removing. Only the
+            # unwelded-ends line is suppressed, and only because it belongs
+            # to the edit that tore the network: the debounce walk owns that
+            # channel and will say so within a frame.
+            warnings.filterwarnings("ignore", message="design_from_scene:")
             doc = self.design_document()
         model = build_model(doc)
         dlg = QDialog(self)

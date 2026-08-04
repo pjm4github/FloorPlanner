@@ -22,6 +22,8 @@ files:   <added/changed>
 notes:   <anything surprising — especially a test you had to change and why>
 ```
 
+**Code reaches Claude Code as INSTRUCTIONS, not whole-file handoffs — added 2026‑08‑04, and it is Patrick's rule about Patrick's own habit.** A whole-file replacement sent to be "diffed in" silently overwrites work the repo's discipline already produced: the viewer's B023 closure fix was made at source under the P0.1 standing rule, then lost when a newer copy of `fp3d.py` arrived as a file rather than as a change, and had to be re-applied a second time. The lint bar, the fail-first receipts and the at-source fixes are only worth what they survive; a handoff that bypasses them spends the same effort twice and quietly re-opens closed findings. This applies to the viewer exactly as it does to everything else.
+
 **A changed test is a red flag, not a detail.** If a task required editing an existing assertion, say so explicitly. Half this migration's risk lives in tests being quietly relaxed to match new behaviour.
 
 **Prompt shape for Claude Code:**

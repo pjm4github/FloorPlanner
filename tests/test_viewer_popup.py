@@ -94,6 +94,33 @@ def test_the_3d_view_changes_nothing(win, tmp_path):
         f"the 3D view spoke in the edit channel: {msg!r}")
 
 
+def test_the_suppression_is_scoped_to_the_one_message(win, monkeypatch):
+    """The popup silences the walk's unwelded-ends line and NOTHING else.
+
+    The read-only receipt above cannot see this: an inner blanket ignore
+    satisfies its outer `simplefilter("error")` exactly as well as a narrow
+    one does. So this test raises a DIFFERENT warning from inside the same
+    call and requires it to survive -- a blanket suppression is
+    `except ValueError: continue` wearing a different hat, and the walk's
+    other reports are how the app tells the truth about a document."""
+    _plan(win)
+    real = win.design_document
+
+    def _also_warns():
+        warnings.warn("unrelated: something else the walk found",
+                      stacklevel=2)
+        return real()
+
+    monkeypatch.setattr(win, "design_document", _also_warns)
+    _close_modal_soon()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        win.show_3d_view()
+    msgs = [str(w.message) for w in caught]
+    assert any(m.startswith("unrelated:") for m in msgs), (
+        f"an unrelated warning was swallowed by the suppression: {msgs}")
+
+
 def test_it_degrades_when_the_optional_stack_is_missing(win, monkeypatch):
     """A missing optional dependency REPORTS; it never raises. Simulated by
     making the import fail, so the test is honest on a machine that has the
