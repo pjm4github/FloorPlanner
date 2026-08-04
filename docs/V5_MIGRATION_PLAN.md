@@ -663,7 +663,14 @@ Create a room by typed dimension; duplicate a room as a floating unit; save/load
 ### P4.5 — Group semantics + z-order
 Groups move the real items — no `duplicate_wall`, no `coalesce_all` on ungroup. Groups serialize (`Design.groups`). Collapse the four z schemes into one that is serialized. **Defects 3 and 11 close here.**
 **Retire or re-justify P3.3's `kind == "rigid"` carve-out here, explicitly.** A wall drag promotes coincident ends into shared vertices, but *excludes grouped neighbours* — they keep the old coordinate path, following the drag without becoming topology. The reason is this task's premise: grouping **duplicates** a room's walls onto the originals, so a grouped coincident end is the common case and not an exotic one, and sharing one would wire a group member to an outside wall permanently while what a group *is* topologically is still undefined. Exactly the reasoning behind the `group() is None` gate that keeps grouped walls out of coalesce — deliberately not topology. **When groups stop copying walls, that reason evaporates**, and a carve-out whose justification has gone is how a workaround becomes folklore. Decide it here: delete it, or write down the new reason.
-**Acceptance.** P0.4 tests 3, 4 and 6 flip to pass. `test_groups.py` rewritten — the three tests encoding duplicate-on-group semantics (`:64`, `:133`, `:155`) are *intentionally* replaced; say so in the log.
+**Acceptance — CORRECTED 2026‑08‑04 against the merged tree, and the correction is the point.** The original line read *"P0.4 tests 3, 4 and 6 flip to pass"* and named three `test_groups.py` tests by LINE. Measured at `adaa519`: **only ONE flip is available** — test 3 (`test_characterization.py::test_group_survives_roundtrip`) is the sole surviving xfail of the three. Test 4 (`test_group_move_undo_restores`) was promoted to a hard pass at **P0.5** (its own comment says so) and test 6 (`test_group_ungroup_reaches_fixed_point`) passes today. The line numbers had also drifted — **the fourth instance of that class**, so every test below is named, never numbered.
+
+**Acceptance, as it now stands:**
+1. `test_characterization.py::test_group_survives_roundtrip` flips xfail → pass (defect 3).
+2. `test_groups.py::test_a_clipped_band_leaves_every_room_coherent` passes — and the log must say it passed **as a consequence of the mechanism, not as a fix** (§2a's ruling).
+3. `test_groups.py::test_grouping_rooms_without_their_walls_still_copies_them` is **rewritten into its opposite** (grouping a room alone creates nothing and moves the originals) — a declared assertion change.
+4. The three tests encoding duplicate-on-group semantics are *intentionally* replaced, named not numbered: `test_grouping_a_room_duplicates_its_walls`, `test_grouping_room_with_its_walls_makes_no_coincident_copies`, `test_group_move_room_only_does_not_orphan_walls`.
+5. `test_grouping_twenty_rooms_with_their_walls_creates_no_walls` is renamed and widened to **creates no OBJECTS at all** (walls *and* openings).
 
 ---
 
@@ -4491,5 +4498,163 @@ notes:   THE STARTUP CHANGE, stated plainly because it is the part with
          something to find: a tomllib import (3.11+) in the new test.
          MERGE HELD FOR PATRICK'S 8-ITEM SMOKE TEST and the reviewer's
          ruling; merge commit, not squash.
+
+P4.5(0) THE RULINGS, recorded BEFORE any code (branch p4.5-groups-zorder
+         from main@adaa519). Patrick ruled all of sections 2-4 of the
+         read-back plus three amendments; the census that preceded them
+         is in the read-back and its measured numbers are used below.
+
+RULED (2a) DEFORM -- RATIFIED AS A CONSEQUENCE, NOT CHOSEN AS A POLICY.
+         Under vertex identity a room holding a moved corner follows
+         BECAUSE THE CORNER MOVED; stay-put is the option that would need
+         machinery built to hold a room back from corners it holds. So:
+         build no hold-back. And when test_a_clipped_band_leaves_every_
+         room_coherent passes, the log says it passed AS A CONSEQUENCE OF
+         THE MECHANISM rather than claiming a fix -- that distinction is
+         the record's to keep, not the code's.
+         ASKED WITH IT: which invariant catches a room whose OWN outline
+         crosses itself after a large deforming move?
+         ANSWERED, and it is NOT a gap: I5b -- "room-outline
+         self-intersection", validate.py:155-168, O(edges^2) per room.
+         It exists and it is exact.
+         THE FINDING IS ITS REACH, not its absence, and it is sharper
+         than "reports": I5b is one of the THREE DEEP-ONLY checks
+         (validate.py:77), so shadow mode's always-on twelve never sees
+         it while editing -- but save_path runs _verify_or_report("save",
+         deep=True) and REFUSES TO WRITE when it fails. So a deform that
+         self-intersects is SILENT AT THE GESTURE and then BLOCKS THE
+         SAVE: the user learns at the moment they try to keep their work,
+         which is the worst possible ordering. (The refusal itself is
+         deliberate and correct -- P4.1's "do not write a corrupt plan"
+         -- so the fix is NOT to relax it.)
+         PROPOSED, for Patrick's ruling and NOT built here: run I5b
+         SCOPED TO THE ROOMS A GROUP MOVE ACTUALLY CARRIED, at bake, and
+         report through the status channel. Scoped, it is cheap (edges^2
+         over a handful of rooms, not the plan), it fires at the gesture
+         that caused it, and the deep sweep stays exactly where it is.
+         The operation stays allowed either way -- this is about WHEN the
+         document speaks, not whether the gesture is permitted.
+
+RULED (2b) DO NOT PROMOTE. The band takes exactly what it encloses.
+         Option (c), a size threshold, is out for defect 13's reason: a
+         tolerance may pick a TARGET, it may not set a semantic RESULT.
+         THE DECIDING ARGUMENT IS PATRICK'S, recorded because the
+         read-back did not make it: PROMOTION HAS NO NATURAL STOPPING
+         POINT. If clipping a room's wall pulls in that whole room, does
+         it also pull in the walls that room shares with rooms outside
+         the band? And theirs? In a connected plan that cascades toward
+         "select everything", and any rule that stops it is an arbitrary
+         depth limit. Selection stays what it LOOKS like. Deformation is
+         the honest, visible result, and extract is the tool for
+         detaching a room first -- which is precisely why P4.2 built it.
+         REQUIRED ALONGSIDE: the group action REPORTS WHAT IT DID at the
+         moment it does it -- e.g. "Grouped 5 rooms; 3 partly enclosed --
+         their shapes will follow." Not a warning, and not the edit-tear
+         channel: the plain status line, said once, to the 06c2145
+         wording standard (that commit fixed a message that read as
+         nonsense at its boundary value -- "0 of them since the plan was
+         opened" -- so the standard is: read the sentence the code will
+         actually print, at its edge cases, before shipping it). The
+         difference between a surprising result and an explained one is
+         one sentence, and this is the gesture most likely to surprise.
+
+RULED (3) RETIRE kind == "rigid", and record the expired justification
+         VERBATIM beside its removal, so the record shows a carve-out
+         that died when its stated reason expired rather than one that
+         quietly vanished. The reason, from walls.py:1529-1537 as it
+         stands today: "a GROUPED neighbour still follows, but on the
+         old coordinate path -- grouping duplicates a room's walls onto
+         the originals, so promoting one would wire a group member to an
+         outside wall permanently, and what a group even IS
+         topologically is P4.5's question. Same instinct as the
+         `group() is None` gate that keeps grouped walls out of
+         coalesce." BOTH clauses expire in this task.
+
+AMENDED (3b) DO NOT RETIRE THE 12 group() is None GUARDS AS A CLASS.
+         Patrick's split, and the census confirms it: they are not one
+         guard. Enumerated, with what each protects and its disposition.
+         KEEP -- 7, not one of them about duplication:
+           1. extract.py:91 (capture_floating_furnishings) -- a GROUPED
+              furnishing is not swept into a floating room's cargo.
+              Ownership arbitration between a group and a float.
+           2. items.py:94 (_handle_visible) -- the individual selection
+              box/rotator hide inside a group; the group's outline
+              governs. Pure presentation.
+           3. macro.py:315 (^A select-all) -- top-level items only.
+              Selecting a child AND its group double-moves it.
+           4. mainwindow.py:728 (arrow nudge) -- the same double-move
+              class: groups move as groups.
+           5. walls.py:1448 (WallItem.mousePressEvent) -- a grouped
+              wall's drag belongs to the GROUP, not to the wall.
+              Interaction ownership.
+           6. walls.py:2389 (OpeningItem.mousePressEvent) -- ditto.
+           7. walls.py:2409 (OpeningItem.mouseMoveEvent) -- ditto.
+         RETIRE -- 1:
+           8. walls.py:1537 -- the rigid carve-out itself (ruling 3).
+         CONSEQUENTIAL, RULING NEEDED BEFORE ANY IS TOUCHED -- 4. These
+         are the "grouped walls are exempt from the topology passes"
+         family, and letting grouped walls in is a far larger change
+         than retiring a drag branch:
+           9.  walls.py:544  (merge_wall) -- THE coalesce exemption
+               Patrick named by hand.
+           10. walls.py:503  (weld_scene) -- grouped ends never weld.
+           11. walls.py:267  (graph_from_scene) -- grouped walls are
+               invisible to the planner's graph view entirely, so
+               merge / split / weld cannot see them at all.
+           12. rooms.py:1030 -- a room outline edge will not bind to a
+               grouped wall.
+         WHY THESE CANNOT BE WAVED THROUGH: today they are load-bearing
+         because a grouped wall is a COPY -- letting copies into the
+         graph would double every edge. Under no-copy a grouped wall IS
+         a plan wall, so the same guards become the opposite thing: a
+         wall the planner is blind to. That is a change of KIND, not of
+         degree. And 9-11 are exactly ROW 36's producer path (the
+         release-merge rebind), so relaxing them is precisely what would
+         trip the watch. Each returns to Patrick individually.
+
+RULED (4) ASSENT to z = floor_term + stack_term + type_term, with both
+         consequences accepted: the backdrop's -1e9 becomes a TYPE TERM
+         rather than a magic number, and z ENTERS THE SNAPSHOT so "Bring
+         to front" survives save/load and becomes undoable (F4's
+         complaint closes). bring_to_front's full-scene max scan dies
+         with it.
+         ADDITION 1 -- STATE THE BAND ARITHMETIC AS CONSTANTS AND ASSERT
+         IT. This is one scheme rather than three that happen not to
+         collide only because max(type_term) < STACK_BAND and
+         max(stack_term) < FLOOR_BAND. Those become NAMED CONSTANTS with
+         the inequality written beside them, PINNED BY A TEST --
+         otherwise it is three schemes again the first time someone
+         raises a type constant.
+         ADDITION 2 -- CHECK THE SCHEMA BEFORE ASSUMING. Done, and the
+         answer SPLITS THIS TASK: design-schema.v5.json has NO field for
+         a stacking index anywhere -- not on room, wall, furnishing or
+         group -- and all four set additionalProperties: false, so there
+         is nowhere to put one and no way to smuggle one in. The
+         measured property lists are in the read-back.
+         THEREFORE, and NOT folded in: the RUNTIME collapse (one scheme,
+         one number, the constants and their test, the full-scene scan
+         retired) proceeds in P4.5. The SERIALIZATION half is BLOCKED on
+         a schema ruling with version implications, and returns to
+         Patrick as its own decision. Until it is ruled, z stays OUT of
+         the document and defect 11 closes only its runtime half --
+         stated plainly rather than half-claimed.
+
+RULED (5) Test dispositions agreed as read back, including the rewrite
+         of test_grouping_rooms_without_their_walls_still_copies_them
+         into its opposite, and the widening of the twenty-room test
+         from "creates no walls" to "creates no objects at all".
+
+RULED (6) ROW 36's WATCH IS A LIVE TRIPWIRE FOR THIS TASK. If
+         test_the_merge_rebind_producer_is_watched goes red mid-task:
+         STOP. The row is re-argued and Patrick rules BEFORE the test is
+         touched. Confirmed green against the merged tree at adaa519.
+
+RULED (7) MINI-GATE APPROVED, with a NEW ITEM 1 -- the headline number
+         of the whole migration: group the WHOLE PLAN (20 rooms), move
+         it, ungroup. Expect ZERO new objects. The original review
+         measured >= 106 duplicate walls and >= 149 duplicate openings
+         on exactly this gesture; closing that to zero is what Phases 3
+         and 4 were for. Time it too -- it should feel instant. The
+         eight items from the read-back follow as 2-9.
 
 ```
