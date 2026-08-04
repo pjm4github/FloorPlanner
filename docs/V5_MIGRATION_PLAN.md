@@ -4683,6 +4683,14 @@ RULED (7) MINI-GATE APPROVED, with a NEW ITEM 1 -- the headline number
          on exactly this gesture; closing that to zero is what Phases 3
          and 4 were for. Time it too -- it should feel instant. The
          eight items from the read-back follow as 2-9.
+         CROSS-CUTTING, ADDED 2026-08-04 -- not a tenth item but a thing to
+         watch at EVERY step: NO ROOM MAY SHOW A DASHED OPEN EDGE WHERE A
+         WALL ACTUALLY EXISTS. That is the user-visible signature of the
+         whole group-guard family (a room reading OPEN over a wall that is
+         right there), it costs nothing extra to watch for while doing the
+         nine items, and it catches the class ANYWHERE in the gate rather
+         than only where we thought to look -- which is exactly how the
+         P4.2 mini-gate's six findings were caught.
 
 P4.5(1a) the three amendments to (1), before the mechanism work
 ruff:    clean

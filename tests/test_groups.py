@@ -830,3 +830,81 @@ def test_a_grouped_wall_merges_and_welds_like_any_other(fp, win):
     assert shared >= 1, "the share half still declines a grouped end"
     # the 0.4" gap really closed -- the ends are one point now
     assert c.p2.y() == pytest.approx(d.p1.y(), abs=1e-6)
+
+
+def test_a_grouped_wall_can_be_rebound_to_its_own_room(fp, win):
+    """GUARD 4 RETIRED (_edge_wall's group refusal). Its premise was the
+    others': a grouped wall was a COPY, so binding an edge to one risked
+    attaching a room to a transient duplicate. Grouping a room now puts the
+    room's OWN walls in the group, so the refusal inverted into "a room may
+    not re-bind to its own wall while that wall is grouped" -- and the edge
+    read OPEN over a wall that was right there, which is the symptom class
+    P4.2 spent six mini-gate findings killing."""
+    from floorplanner.rooms import _edge_wall
+    sc = win.scene
+    cs = [QPointF(0, 0), QPointF(120, 0), QPointF(120, 120), QPointF(0, 120)]
+    for i in range(4):
+        sc.addItem(fp.WallItem(cs[i], cs[(i + 1) % 4], "interior"))
+    fp.rebuild_all_walls(sc)
+    res = fp.detect_room(sc, QPointF(60, 60))
+    room = fp.RoomItem("R", QPointF(60, 60), res[0], res[1], corners=res[2])
+    sc.addItem(room)
+    fp.bind_room_walls(sc, room)
+    sc.clearSelection()
+    room.setSelected(True)
+    win.group_selected()
+    # PRECONDITION: the wall really is grouped, or there is no refusal to test
+    target = room.outline[0].wall
+    assert target is not None and target.group() is not None
+    assert _edge_wall(sc, room.corners[0], room.corners[1],
+                      room.floor) is target, "the binder cannot see it"
+    # the reachable case: the edge loses its reference and must re-bind
+    room.outline[0].wall = None
+    fp.bind_room_walls(sc, room)
+    assert room.outline[0].wall is target, "the edge could not re-bind"
+    assert len(room.open_edges()) == 0, (
+        "a dashed OPEN edge over a wall that is right there")
+
+
+def test_the_edge_wall_tie_break_is_a_contract(fp, win):
+    """PINNED AS A CONTRACT, not left as an observation.
+
+    Two overlapping-but-not-identical walls on one edge is a LEGAL document
+    state -- row 44's measurement proved a parallel/sub-segment pair passes
+    every invariant -- so the two-candidate case is reachable in a valid plan
+    rather than a corner case. `_edge_wall`'s order is: (1) a wall whose ENDS
+    MATCH the edge beats one that merely runs along it; (2) then the one
+    covering MORE of the edge; (3) then the geometrically smallest, so the
+    pick cannot depend on scene item order. Determinism that is merely
+    observed is determinism that changes silently."""
+    from floorplanner.rooms import _edge_wall
+    sc = win.scene
+    a, b = QPointF(0, 0), QPointF(120, 0)
+
+    # (1) ENDS MATCH beats longer-but-running-along
+    exact = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    longer = fp.WallItem(QPointF(-60, 0), QPointF(240, 0), "interior")
+    for w in (longer, exact):        # added longer FIRST: order must not decide
+        sc.addItem(w)
+    fp.rebuild_all_walls(sc)
+    assert _edge_wall(sc, a, b) is exact, "ends-match must win"
+
+    # (2) with no exact match, MORE COVERAGE wins
+    sc.removeItem(exact)
+    less = fp.WallItem(QPointF(0, 0), QPointF(40, 0), "interior")
+    sc.addItem(less)
+    fp.rebuild_all_walls(sc)
+    assert _edge_wall(sc, a, b) is longer, "more coverage must win"
+
+    # (3) among equals, the pick is deterministic and order-independent
+    sc.removeItem(longer)
+    sc.removeItem(less)
+    twin_a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    twin_b = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    for w in (twin_a, twin_b):
+        sc.addItem(w)
+    fp.rebuild_all_walls(sc)
+    first = _edge_wall(sc, a, b)
+    assert first in (twin_a, twin_b)
+    for _ in range(5):               # repeated queries agree
+        assert _edge_wall(sc, a, b) is first, "the tie-break is not stable"

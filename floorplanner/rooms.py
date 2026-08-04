@@ -1094,7 +1094,17 @@ def _edge_wall(scene, a: QPointF, b: QPointF, floor=None):
     ux, uy = (b.x() - a.x()) / L, (b.y() - a.y()) / L
     best, best_key = None, None
     for w in scene.items():
-        if (not isinstance(w, WallItem) or w.group() is not None
+        # GROUPED WALLS ARE CANDIDATES SINCE P4.5 -- the last of the four
+        # exemptions. Its premise was the others': a grouped wall was a COPY
+        # lying on the original, so admitting it risked binding a room's edge
+        # to a transient duplicate that vanishes on ungroup. Nothing is copied
+        # now -- grouping a room puts the room's OWN walls in the group -- so
+        # the refusal inverted into "a room may not re-bind to its own wall
+        # while that wall is grouped", and the edge read OPEN over a wall that
+        # was right there. Measured before the change: 307 of 307 live-wall
+        # edges across symmetricP1 / planc1TestV5 / fiveRoomTest could not be
+        # recovered by this search once the plan was grouped.
+        if (not isinstance(w, WallItem)
                 or (floor is not None and w.floor != floor)):
             continue
         ss = []
