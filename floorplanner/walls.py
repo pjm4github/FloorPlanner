@@ -1526,16 +1526,34 @@ class WallItem(QGraphicsItem):
                             if self._is_continuation(w):
                                 self._continuations.append((w, attr))
                             else:
-                                # a GROUPED neighbour still follows, but on the
-                                # old coordinate path -- grouping duplicates a
-                                # room's walls onto the originals, so promoting
-                                # one would wire a group member to an outside
-                                # wall permanently, and what a group even IS
-                                # topologically is P4.5's question. Same
-                                # instinct as the `group() is None` gate that
-                                # keeps grouped walls out of coalesce.
-                                kind = "corner" if w.group() is None else "rigid"
-                                self._attached.append((w, attr, QPointF(q), kind))
+                                # RETIRED AT P4.5: this used to read
+                                #   kind = "corner" if w.group() is None
+                                #          else "rigid"
+                                # and its justification, verbatim, was:
+                                #
+                                #   "a GROUPED neighbour still follows, but on
+                                #    the old coordinate path -- grouping
+                                #    duplicates a room's walls onto the
+                                #    originals, so promoting one would wire a
+                                #    group member to an outside wall
+                                #    permanently, and what a group even IS
+                                #    topologically is P4.5's question. Same
+                                #    instinct as the `group() is None` gate
+                                #    that keeps grouped walls out of coalesce."
+                                #
+                                # BOTH clauses expired here, in the same task
+                                # the comment named. Grouping no longer
+                                # duplicates anything (`duplicate_wall` is
+                                # deleted), so a grouped coincident end is an
+                                # ordinary coincident end and promoting it
+                                # wires nothing that was not already one
+                                # corner; and what a group IS is now answered
+                                # -- a membership list over real items. A
+                                # carve-out whose stated reason has expired is
+                                # how a workaround becomes folklore, so it goes
+                                # rather than being re-justified by silence.
+                                self._attached.append(
+                                    (w, attr, QPointF(q), "corner"))
                         else:
                             # a body-landing on ANY run wall, not just self
                             # (P4.2, mini-gate finding 5): the run slides as
@@ -1974,16 +1992,15 @@ class WallItem(QGraphicsItem):
                     w.rebuild()
             # what could not be promoted still moves by coordinate. T-joints
             # follow only the sideways part of the slide so they stretch
-            # instead of tilting -- a body-landing has no vertex to share until
-            # P3.4 makes one; a `rigid` corner is a grouped wall, held back
-            # from sharing by the group guard, not by geometry.
+            # instead of tilting -- a body-landing has no vertex to share
+            # until P3.4 makes one. The `rigid` kind retired at P4.5 with the
+            # group carve-out that produced it, so "tee" is the only
+            # coordinate case left here.
             ux, uy = self._slide_u.x(), self._slide_u.y()
             along = dx * ux + dy * uy
             px, py = dx - along * ux, dy - along * uy
             for w, attr, orig, kind in self._attached:
-                if kind == "rigid":
-                    setattr(w, attr, QPointF(orig.x() + dx, orig.y() + dy))
-                elif kind == "tee":
+                if kind == "tee":
                     setattr(w, attr, QPointF(orig.x() + px, orig.y() + py))
                 w.rebuild()
         self.rebuild()

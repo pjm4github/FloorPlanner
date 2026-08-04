@@ -621,15 +621,20 @@ def test_pressing_every_wall_changes_nothing_across_the_corpus(fp, win, plan):
 
 
 # --------------------------------------------------------- the group boundary
-def test_a_grouped_neighbour_follows_but_is_never_promoted(fp, win):
-    """Grouping DUPLICATES a room's walls onto the originals, so a grouped end
-    coincident with a dragged wall is the common case, not an exotic one.
+def test_a_grouped_neighbour_is_promoted_like_any_other(fp, win):
+    """REWRITTEN INTO ITS OPPOSITE AT P4.5, with the carve-out it pinned.
 
-    Promoting it would wire a group member to an outside wall permanently, and
-    what a group is topologically is P4.5's question -- so it keeps the old
-    coordinate path and still follows the drag exactly as it does today. The
-    same instinct as the `group() is None` gate that keeps grouped walls out of
-    coalesce, applied one task earlier than the semantics that need it."""
+    It used to assert that a grouped coincident end followed the drag on the
+    old COORDINATE path and was never promoted (`kind == "rigid"`). Its own
+    docstring gave the reason: "grouping DUPLICATES a room's walls onto the
+    originals, so a grouped end coincident with a dragged wall is the common
+    case... promoting it would wire a group member to an outside wall
+    permanently, and what a group is topologically is P4.5's question."
+
+    Both clauses expired here. Nothing is duplicated any more, and a group is
+    a membership list over real items -- so a grouped coincident end is an
+    ordinary coincident end, and it promotes like any other. A corner is one
+    corner regardless of what selection set happens to hold it."""
     sc = win.scene
     grouped = fp.WallItem(QPointF(120, 0), QPointF(120, 120), "interior")
     mate = fp.WallItem(QPointF(120, 120), QPointF(240, 120), "interior")
@@ -645,10 +650,12 @@ def test_a_grouped_neighbour_follows_but_is_never_promoted(fp, win):
     fp.rebuild_all_walls(sc)
     _body_drag(a, 0, 12)
 
-    assert a.end_vertex("p2") is not grouped.end_vertex("p1"), (
-        "a grouped wall was promoted across the group boundary")
-    assert a._promoted == 0
-    assert ("rigid" in [k for *_, k in a._attached]), "not even tracked"
+    assert a.end_vertex("p2") is grouped.end_vertex("p1"), (
+        "a grouped neighbour was still held out of the shared corner")
+    assert a._promoted == 1
+    assert "rigid" not in [k for *_, k in a._attached], "the kind survived"
+    # ...and it follows the drag, which is what the old test also required
+    assert grouped.p1.y() == pytest.approx(12)
 
 
 def _four_room_junction(fp, scene):
