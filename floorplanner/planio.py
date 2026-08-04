@@ -41,6 +41,10 @@ from floorplanner.design.importer import (       # P2.1 legacy -> v5
     conversion_report, import_legacy,
 )
 from floorplanner.design.model import Design
+from floorplanner.design.template import (        # P4.4 one-room templates
+    merge_room_document, room_subdocument, template_offset_to,
+    template_room_name,
+)
 from floorplanner.design.validate import check
 from floorplanner.design.bridge import rebase_weld_baseline
 from floorplanner.design.verify import rebase  # P1.6 shadow mode
@@ -372,6 +376,125 @@ class PlanIOMixin:
         changes never alter the snapshot — keeping undo/redo comparison
         correct."""
         return self.project_from_scene().to_dict()
+
+    # -- one-room templates: duplicate / copy-paste / save-load (P4.4) --------
+    def room_template(self, room) -> dict:
+        """The one-room v5 template document for `room` — §4's *Duplicate a
+        room*, and what File ▸ Save template room… writes.
+
+        A FLOATING room is cut straight out of the walk: it already owns its
+        walls and its own vertex namespace (I12), so the subset is closed.
+        A PLACED room's walls are NOT wholly its own, and rather than inventing
+        a second way to trim them (`_copy_spec`'s `bounding_walls` proximity +
+        `_perimeter_span`, both deleted here) this cuts it out through the REAL
+        ops: extract, template, join back. The zero-offset round trip is
+        precisely the P4.2 label-CLICK path — press, no move, release — which
+        every room click already performs, so it is proven rather than new."""
+        from floorplanner.extract import extract_room, join_room  # late
+        if getattr(room, "placement_state", "placed") == "floating":
+            return room_subdocument(design_from_scene(self).to_dict(),
+                                    room.name)
+        extract_room(self.scene, room)
+        try:
+            return room_subdocument(design_from_scene(self).to_dict(),
+                                    room.name)
+        finally:
+            join_room(self.scene, room)      # the plan comes back as it was
+
+    def insert_room_template(self, tmpl: dict, at=None, name=None):
+        """Fold a one-room template into THIS design as a floating room,
+        centred on `at` (scene point) when given. Returns the new `RoomItem`.
+
+        Document-level by construction: the template is merged into the
+        current document and the result applied through the one apply path,
+        so an inserted room arrives by exactly the route a loaded file does.
+        It lands FLOATING — it has joined nothing yet — which is the same
+        contract Extract gives and what makes an insert under shuffle behave
+        like every other float."""
+        base = self.design_document()
+        lid = next((lv["id"] for lv in base.get("levels") or []
+                    if lv["name"] == self.active_floor), None)
+        dx = dy = 0.0
+        if at is not None:
+            dx, dy = template_offset_to(tmpl, at.x(), at.y())
+        want = unique_room_name(self.scene,
+                                name or template_room_name(tmpl))
+        merged = merge_room_document(base, tmpl, lid, dx, dy, want)
+        self.load_data(merged)
+        return next((r for r in self.scene.items()
+                     if isinstance(r, RoomItem) and r.name == want), None)
+
+    def duplicate_room(self, room, at=None):
+        """§4's *Duplicate a room* end to end: template it, insert the copy as
+        a floating room. Nothing about the source changes."""
+        return self.insert_room_template(self.room_template(room), at=at)
+
+    def save_template_path(self, path: str, room):
+        """Non-interactive template write (the `save_path` convention)."""
+        tmpl = self.room_template(room)
+        errs = check(tmpl, deep=True)
+        if errs:
+            raise ValueError("the room template is not a valid design: "
+                             + "; ".join(errs[:3]))
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(tmpl, f, indent=1)
+
+    def load_template_path(self, path: str, at=None):
+        """Non-interactive template insert (the `load_path` convention)."""
+        with open(path, "r", encoding="utf-8") as f:
+            tmpl = json.load(f)
+        if tmpl.get("format") != "floorplanner-design":
+            raise ValueError("not a floorplanner design file")
+        template_room_name(tmpl)            # raises unless it is ONE room
+        return self.insert_room_template(tmpl, at=at)
+
+    def selected_floating_room(self):
+        """The single selected floating room, or None — what File ▸ Save
+        template room… is enabled by (the ruled rule, and a structural one:
+        only a floating room owns its walls outright)."""
+        rooms = [it for it in self.scene.selectedItems()
+                 if isinstance(it, RoomItem)
+                 and getattr(it, "placement_state", "placed") == "floating"]
+        return rooms[0] if len(rooms) == 1 else None
+
+    def save_template_room(self):
+        room = self.selected_floating_room()
+        if room is None:
+            QMessageBox.information(
+                self, "Save template room",
+                "Select a single FLOATING room first (right-click a room ▸ "
+                "Extract room). Only a floating room owns its walls "
+                "outright, so only it can be cut out whole.")
+            return
+        start = str(designs_dir() / f"{room.name}.room.json")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save template room", start,
+            "Room template (*.json);;All files (*)")
+        if not path:
+            return
+        try:
+            self.save_template_path(path, room)
+        except (OSError, ValueError) as ex:
+            QMessageBox.critical(self, "Save template failed", str(ex))
+            return
+        self.status(f"Saved room template '{room.name}' to {path}")
+
+    def load_template_room(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load template room", str(designs_dir()),
+            "Room template (*.json);;All files (*)")
+        if not path:
+            return
+        try:
+            centre = self.view.mapToScene(
+                self.view.viewport().rect().center())
+            room = self.load_template_path(path, at=centre)
+        except (OSError, ValueError, KeyError, TypeError) as ex:
+            QMessageBox.critical(self, "Load template failed", str(ex))
+            return
+        self.status(f"Inserted template room '{room.name}' — it is FLOATING: "
+                    "drag it by its name, then right-click it to join it "
+                    "into the plan.")
 
     def open_plan(self):
         if not self._confirm_discard_changes("Open plan"):

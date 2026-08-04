@@ -523,13 +523,20 @@ class PlanView(QGraphicsView):
         super().mouseReleaseEvent(e)
 
     def contextMenuEvent(self, e):
-        # Room Name tool + blank canvas -> offer to paste the copied room
+        # Room Name tool + blank canvas -> paste the copied room, or type a
+        # new CONCEPT room right here (P4.4: the dialog is on this menu and
+        # on Rooms > New concept room…, per the ruling)
         if self.win.tool == TOOL_ROOM and self.itemAt(e.pos()) is None:
             menu = QMenu(self)
             a_paste = menu.addAction("Paste room")
             a_paste.setEnabled(self.win.room_clipboard is not None)
-            if menu.exec(e.globalPos()) is a_paste:
-                self.win.paste_room(grid_snap(self.mapToScene(e.pos())))
+            a_concept = menu.addAction("New concept room…")
+            chosen = menu.exec(e.globalPos())
+            at = self.mapToScene(e.pos())
+            if chosen is a_paste:
+                self.win.paste_room(grid_snap(at))
+            elif chosen is a_concept:
+                self.win.new_concept_room(at=grid_snap(at))
             e.accept()
             return
         if self.itemAt(e.pos()) is None:

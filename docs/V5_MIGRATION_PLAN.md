@@ -4327,4 +4327,110 @@ notes:   REPRODUCED before his clarification arrived, mechanism
          path it pinned); red pre-fix with the three new flips, three
          preservation pins pass both eras.
          Census 570 -> 576.
+
+P4.4(1) the four rulings recorded + the pre-work census (branch
+         p4.4-concept-duplicate from main@e4b2028; read-back answered
+         2026-08-03, work begins)
+ruff:    clean
+pytest:  (census commit -- code untouched; branch-point gate trailer in
+         the commit)
+files:   this file only.
+notes:   THE FOUR RULINGS, verbatim in substance:
+         (1) CONTINGENCY CONFIRMED -- duplicate is built on the extract
+         machinery per section 4. Consequence executed at P4.4(3):
+         _copy_spec and _perimeter_span DIE (the carried census note's
+         contingency resolves YES); Copy/Paste room rewire to the new
+         op; the clipboard path's third definition of "the room's
+         walls" (bounding_walls proximity + _perimeter_span trim) dies
+         with them, so P4.5 inherits the binding/outline duality with
+         the clipboard consumer RESOLVED.
+         (2) CREATE-BY-TYPED-DIMENSION mints a FLOATING, WALL-LESS room
+         carrying nominal_size -- a dialog off the Room tool AND from
+         the menu. category: concept; I13 (concept must be floating)
+         is the guard.
+         (3) FILE MENU: "Load template room..." and "Save template
+         room..."; Save enabled ONLY when a floating room is selected
+         (highlighted).
+         (4) THE SHUFFLE CHORD IS ^H (register row 37's fix, this
+         task's first code piece).
+         CENSUS (measured at the read-back + this commit):
+         _perimeter_span rooms.py:314-337 (24 lines), sole caller
+         _copy_spec rooms.py:339-373, sole caller the context-menu
+         Copy (rooms.py:947 -> win.room_clipboard), sole consumer
+         paste_room mainwindow.py:1348-1388 (rebuild + detect_room +
+         bind_room_walls), surfaced at view.py:530. bounding_walls
+         SURVIVES (report/inventory callers rooms.py:517,:575,
+         mainwindow.py:918). Schema ground already present:
+         room.nominal_size ("Never authoritative -- the outline is"),
+         category concept, I13 in validate.py; model/bridge ride
+         nominal_size verbatim (bridge.py:95 names P4.4). The macro
+         table: CARET_SHORTCUTS one-row design, hook pattern on_floor/
+         on_open; H unclaimed.
+P4.4  implemented (branch p4.4-concept-duplicate, sub-commits 868e315
+         census + rulings, ef74e11 the ^H chord + token, 8f3382b
+         duplicate-as-template, d02d5ea concept rooms, + this record
+         commit. PR opens on this commit; MERGE AWAITS PATRICK'S
+         ACCEPTANCE -- the reviewer ticks the box.)
+ruff:    clean over floorplanner/ + tests/ (the full-tree run is red only
+         on viewer/fp3d.py, Patrick's parallel WIP, staged in the index
+         and deliberately untouched by this branch -- stated, not
+         counted green; its packaging is its own branch)
+pytest:  588 passed, 7 deselected, 3 xfailed (sum 598, all three modes,
+         every sum reconciling; trailer in the commit)
+files:   design/template.py (NEW), rooms.py (make_concept_room;
+         category/nominal_size modelled; the wall-less label drag;
+         _copy_spec + _perimeter_span DELETED, 59 lines), planio.py
+         (room_template / insert_room_template / duplicate_room /
+         save+load_template_path / the interactive pair /
+         selected_floating_room), mainwindow.py (File menu pair with
+         the ruled enable rule, Rooms > New concept room...,
+         new_concept_room, paste_room rewritten, _sync_template_action,
+         toggle_shuffle / set_shuffle_mode), dialogs.py
+         (ConceptRoomDialog), view.py (the Room-tool blank-canvas menu),
+         macro.py (^H row + on_shuffle hook), design/bridge.py
+         (category + nominal_size modelled in emit AND apply),
+         tests: test_template.py (NEW, 11), test_concept_rooms.py
+         (NEW, 8), test_shuffle.py (+3), test_outline.py (rewritten
+         guard), register (row 37 + the carried census note), this file.
+notes:   ACCEPTANCE MET, as the task line states it: a one-room file
+         validates against the SCHEMA and all fifteen invariants and
+         loads into an existing design as a FLOATING room, the host
+         design untouched (test_save_and_load_template_room builds a
+         SECOND MainWindow, so "an existing design" is genuinely
+         another document rather than the same scene).
+         THE INHERITED QUESTION ANSWERED YES, and the family is gone:
+         _copy_spec + _perimeter_span deleted (59 lines), and with them
+         the clipboard's THIRD definition of a room's walls. P4.5
+         inherits the binding/outline duality with its clipboard
+         consumer RESOLVED, which is what its rulings assumed.
+         ONE MECHANISM, THREE WORKFLOWS: room -> one-room document ->
+         floating room. A clipboard between the halves = Copy/Paste; a
+         FILE between them = Save/Load template; back to back =
+         Duplicate. The merged document goes through the ONE apply
+         path, so an inserted room arrives by exactly the route a
+         loaded file does.
+         WHY FLOATING IS STRUCTURAL, not menu polish: the level walk
+         gives a floating room its own vertex namespace and its own
+         walls (I12), so the subset {room, the walls its OUTLINE names,
+         their vertices, its furnishings} is CLOSED. A PLACED room is
+         cut out through the REAL ops -- extract, template, join back
+         -- whose zero-offset round trip IS the P4.2 label-click path;
+         pinned by snapshot byte-equality across the operation.
+         CONCEPT ROOMS: category + nominal_size MODELLED on the item
+         (the P4.2 placement pattern, next field family) so a room the
+         app itself creates can carry them; the name heuristic stays as
+         the FALLBACK, pinned. I13 holds BY CONSTRUCTION (the factory
+         cannot mint a placed concept room) and I11 exempts the class,
+         so a sketch unit parks over the plan legally.
+         FIXED IN PASSING, same class as the P4.3+ steal: the label
+         drag required self.walls, so a WALL-LESS room's region stayed
+         behind while its label wandered off.
+         TESTS CHANGED, declared: test_copying_a_room_does_not_carry_
+         its_geometry now asks its guard of the template DOCUMENT (the
+         payload that also goes to disk -- the stronger place); paste
+         lands a FLOATING room centred on the click rather than a
+         placed one snapped to the grid.
+         ROW 37 CLOSED with the ruled ^H chord (sub-commit 2).
+         Census 576 -> 598.
+
 ```

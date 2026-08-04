@@ -46,6 +46,7 @@ CARET_SHORTCUTS = {
     "+S": {"key": Qt.Key.Key_S, "method": None, "record": False},
     "F":  {"key": Qt.Key.Key_F, "method": None, "record": False},
     "+F": {"key": Qt.Key.Key_F, "method": None, "record": False},
+    "H":  {"key": Qt.Key.Key_H, "method": "toggle_shuffle", "record": False},
 }
 # hook-emitted tokens the recorder must not raw-record (see "record" above)
 CARET_HOOK_TOKENS = {t for t, s in CARET_SHORTCUTS.items()
@@ -77,6 +78,10 @@ class MacroRunner:
                                        it exists, so replays repeat cleanly).
                                        In the app Ctrl+F pops the floor
                                        selector, Ctrl+Shift+F is New floor.
+                                       ^H "on"/"off" sets shuffle mode
+                                       absolutely (what the recorder emits
+                                       for any flip); BARE ^H toggles.
+                                       In the app Ctrl+H is the toggle.
                                        The full set lives in CARET_SHORTCUTS —
                                        one row records AND replays a shortcut.
       Arrow nudge   LEFT RIGHT UP DOWN          (^ prefix = fine 1" step)
@@ -244,6 +249,16 @@ class MacroRunner:
                 self.win.new_floor_named(name)
             else:
                 self.win.switch_floor(name)
+            return i
+        if key == "H":
+            # ^H "on"/"off" -- what the recorder emits for ANY shuffle flip
+            # (toolbar click or Ctrl+H): the RESULTING state rides in the
+            # token (the ^F pattern), so replay is absolute and idempotent.
+            # BARE ^H toggles, for hand-written macros.
+            if i < len(toks) and toks[i].lower() in ("on", "off"):
+                self.win.set_shuffle_mode(toks[i].lower() == "on")
+                return i + 1
+            self.win.toggle_shuffle()
             return i
         if key == "A":
             self._select_all()
@@ -851,6 +866,16 @@ class MacroRecorderDialog(QDialog):
         if self._active():
             self._end_modal_line()
             self._append(f'^+S "{path}"', newline=True)
+
+    def on_shuffle(self, on):
+        # a shuffle flip, from ANY route (toolbar click or Ctrl+H): the
+        # RESULTING state rides in the token (the on_floor pattern), so
+        # replay is absolute however the user flipped it. Row 37's fix --
+        # before this, a replayed session that toggled shuffle replayed in
+        # the wrong mode, silently.
+        if self._active():
+            self._end_modal_line()
+            self._append(f'^H "{"on" if on else "off"}"', newline=True)
 
     def on_floor(self, name):
         # a floor switch, from ANY route. Through the blank-canvas POPUP the

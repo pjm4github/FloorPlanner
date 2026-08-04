@@ -415,3 +415,42 @@ def test_rebaseline_keeps_carried_and_excludes_claimed(fp, win,
     assert own.scenePos().y() == pytest.approx(60 + 300)
     assert theirs.scenePos().y() == pytest.approx(80), (
         "the claimed furnishing must stay with its placed room")
+
+
+# --------------------------------------------------------------------------
+# register row 37 (P4.4): the shuffle mode has a chord (^H / Ctrl+H) and a
+# macro token, so a recorded session that flips the mode replays in the
+# RIGHT mode instead of silently the wrong one
+# --------------------------------------------------------------------------
+@pytest.mark.macro
+def test_caret_h_sets_and_toggles_shuffle(fp, win):
+    win.run_macro('^H "on"')
+    assert fp.SETTINGS["shuffle"] is True
+    assert win.a_shuffle.isChecked(), "the toolbar must follow the token"
+    win.run_macro('^H "on"')                     # absolute: idempotent
+    assert fp.SETTINGS["shuffle"] is True
+    win.run_macro('^H "off"')
+    assert fp.SETTINGS["shuffle"] is False
+    win.run_macro("^H")                          # bare: toggle
+    assert fp.SETTINGS["shuffle"] is True
+    win.run_macro("^H")
+    assert fp.SETTINGS["shuffle"] is False
+
+
+@pytest.mark.macro
+def test_a_shuffle_flip_records_an_absolute_token(fp, win):
+    dlg = fp.MacroRecorderDialog(win)
+    dlg.start()
+    win.a_shuffle.setChecked(True)               # the toolbar route
+    win.a_shuffle.setChecked(False)              # ...and back
+    dlg.stop()
+    lines = [ln for ln in dlg.edit.toPlainText().splitlines() if ln.strip()]
+    assert '^H "on"' in lines, f"recorded: {lines}"
+    assert '^H "off"' in lines, (
+        "every flip must record its RESULTING state -- row 37's gap")
+
+
+@pytest.mark.macro
+def test_shuffle_action_carries_the_ruled_chord(fp, win):
+    from PyQt6.QtGui import QKeySequence
+    assert win.a_shuffle.shortcut() == QKeySequence("Ctrl+H")
