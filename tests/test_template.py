@@ -214,6 +214,33 @@ def test_save_and_load_template_room(win, tmp_path):
         dispose_window(win2)
 
 
+def test_save_template_is_live_only_for_a_selected_floating_room(win):
+    """The ruled enable rule -- and it is structural, not menu polish: only a
+    floating room owns its walls outright, so only it can be cut out whole."""
+    a = _make(win.scene, 0, 0, 120, 120, "A")
+    b = _make(win.scene, 240, 0, 120, 120, "B")
+    assert not win.a_save_template.isEnabled(), "nothing selected"
+
+    a.setSelected(True)
+    assert not win.a_save_template.isEnabled(), "PLACED: still not offered"
+
+    fp.extract_room(win.scene, a)
+    a.setSelected(False)
+    a.setSelected(True)                      # re-fire selectionChanged
+    assert win.a_save_template.isEnabled(), "floating + selected -> live"
+    assert win.selected_floating_room() is a
+
+    b.setSelected(True)                      # a PLACED room alongside is not
+    assert win.a_save_template.isEnabled()   # ambiguous: one float is meant
+    assert win.selected_floating_room() is a
+
+    fp.extract_room(win.scene, b)            # TWO floats IS ambiguous
+    b.setSelected(False)
+    b.setSelected(True)
+    assert not win.a_save_template.isEnabled()
+    assert win.selected_floating_room() is None
+
+
 def test_a_template_inserts_repeatedly(win):
     room = _make(win.scene, 0, 0, 120, 120, "Den")
     tmpl = win.room_template(room)
