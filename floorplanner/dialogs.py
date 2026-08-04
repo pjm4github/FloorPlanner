@@ -442,6 +442,56 @@ class RoomPropertiesDialog(QDialog):
         })
 
 
+class ConceptRoomDialog(QDialog):
+    """New concept room… (P4.4): a room typed in BY DIMENSION rather than
+    drawn — the "12 x 14 bedroom" the schema's `nominal_size` describes.
+
+    Feet, because that is how a room is spoken; the document stores inches.
+    What it makes is wall-less and floating: a sketch unit you park where you
+    like and turn into real walls later."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("New concept room")
+        form = QFormLayout(self)
+
+        self.ed_name = QLineEdit("Room")
+        self.ed_name.selectAll()
+        form.addRow("Name", self.ed_name)
+
+        self.sp_w = QDoubleSpinBox()
+        self.sp_w.setRange(1.0, 200.0)
+        self.sp_w.setDecimals(2)
+        self.sp_w.setSuffix(" ft")
+        self.sp_w.setValue(12.0)
+        form.addRow("Width", self.sp_w)
+
+        self.sp_d = QDoubleSpinBox()
+        self.sp_d.setRange(1.0, 200.0)
+        self.sp_d.setDecimals(2)
+        self.sp_d.setSuffix(" ft")
+        self.sp_d.setValue(14.0)
+        form.addRow("Depth", self.sp_d)
+
+        note = QLabel("Creates a FLOATING, wall-less room at the canvas "
+                      "centre.\nDrag it by its name; the typed size is "
+                      "recorded as design intent.")
+        note.setStyleSheet("color: #666;")
+        form.addRow(note)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        form.addRow(buttons)
+
+    def values(self):
+        """(name, width_in, depth_in) — inches, the document's unit."""
+        return (self.ed_name.text().strip() or "Room",
+                float(self.sp_w.value()) * FOOT,
+                float(self.sp_d.value()) * FOOT)
+
+
 class SettingsDialog(QDialog):
     """File > Settings…: plan-wide preferences, saved in the plan file."""
 

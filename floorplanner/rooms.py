@@ -110,6 +110,38 @@ class OutlineEdge:
         return f"OutlineEdge(({self.p.x():.1f}, {self.p.y():.1f}), {w})"
 
 
+def make_concept_room(scene, name, width_in, depth_in, at, floor=None):
+    """A CONCEPT room (P4.4): a room typed in by dimension rather than drawn.
+
+    Wall-less and floating by construction, which is what the schema means by
+    the category: *"sketch units never intended to join the plan, and always
+    floating"* — so I13 holds by construction and I11 exempts it, which is why
+    a concept room can be parked anywhere, including over the plan, while you
+    decide where it goes. Every outline edge is OPEN (`wall: null`) and draws
+    dashed; `nominal_size` records the typed intent and is never authoritative
+    — the outline is, exactly as the schema says.
+
+    `at` is the CENTRE of the new room. Returns the `RoomItem`."""
+    w, d = float(width_in), float(depth_in)
+    if w <= 0 or d <= 0:
+        raise ValueError("a concept room needs a positive width and depth")
+    x0, y0 = at.x() - w / 2.0, at.y() - d / 2.0
+    corners = [QPointF(x0, y0), QPointF(x0 + w, y0),
+               QPointF(x0 + w, y0 + d), QPointF(x0, y0 + d)]
+    room = RoomItem(unique_room_name(scene, name), QPointF(at),
+                    room_path_from_corners(corners), poly_area_sqft(corners),
+                    corners=[OutlineEdge(c) for c in corners])
+    if floor is not None:
+        room.floor = floor
+    room.category = "concept"
+    room.nominal_size = {"width_in": w, "depth_in": d}
+    room.placement_state = "floating"
+    room._floating_furnishings = []   # captured (empty), never re-scanned
+    scene.addItem(room)
+    room.update()
+    return room
+
+
 def share_outline_vertices(room):
     """Make `room`'s outline reference the SAME `Vertex` objects its walls do.
 
@@ -183,6 +215,14 @@ class RoomItem(QGraphicsItem):
         self.placement_state = "placed"
         self.extracted_from = None       # level it was extracted from, or None
         self.placement_rotation = 0.0
+        # v5 `category` and `nominal_size`, MODELLED at P4.4 (the placement
+        # pattern, one field family at a time -- they used to ride the
+        # `_v5_extra` stash, which meant a room the app itself created could
+        # not have either). `category = None` means "derive it" (the walk's
+        # name heuristic); `nominal_size` is the typed design intent of a
+        # concept room and is NEVER authoritative -- the outline is.
+        self.category = None
+        self.nominal_size = None
         # None = NEVER captured (the sentinel matters: a captured-but-EMPTY
         # list must not re-capture at the next drag, or a float parked over
         # another room absorbs its furnishings -- the P4.3+ steal). Captured
@@ -767,7 +807,11 @@ class RoomItem(QGraphicsItem):
             self.raise_to_front()
             ctrl = bool(e.modifiers() & Qt.KeyboardModifier.ControlModifier)
             self._dragging_label = True
-            if self.walls and not ctrl:
+            # `or self.corners`: a WALL-LESS room (a P4.4 concept room, or one
+            # whose walls were all deleted) still moves as a unit -- it has an
+            # outline to carry and nothing to tear. Before this it fell to the
+            # label-only nudge and the region stayed behind.
+            if (self.walls or self.corners) and not ctrl:
                 self._moving_room = True
                 self._room_moved = False      # displacement, not mode (P4.3)
                 if self.placement_state != "floating":

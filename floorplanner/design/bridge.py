@@ -100,7 +100,9 @@ EXTERIOR_NAMES = ("porch", "deck", "patio", "terrace", "lanai")
 _WALL_MODELLED = frozenset(("id", "level", "v1", "v2", "type", "left", "right",
                             "openings"))
 _ROOM_MODELLED = frozenset(("id", "level", "name", "outline", "label",
-                            "properties", "placement"))
+                            "properties", "placement",
+                            # P4.4: modelled on the item, like `placement`
+                            "category", "nominal_size"))
 # settings keys the walk re-emits itself; anything else in a document's
 # settings (e.g. `name`) is likewise retained rather than lost
 WALK_SETTINGS = frozenset(DEFAULT_SETTINGS) | {"vertex_weld_in", "join_tol_in",
@@ -551,8 +553,12 @@ def _rooms_of(items, lid, nid, vt, walls, rep):
         low = r.name.lower()
         rec = {
             "id": nid("r"), "level": lid, "name": r.name,
-            "category": ("exterior" if any(k in low for k in EXTERIOR_NAMES)
-                         else "interior"),
+            # P4.4: the item's own category wins; the name heuristic is the
+            # FALLBACK for a room that was never told one (which is every
+            # room drawn before concept rooms existed)
+            "category": (getattr(r, "category", None)
+                         or ("exterior" if any(k in low for k in EXTERIOR_NAMES)
+                             else "interior")),
             "outline": loop,
             # P4.2: placement is MODELLED on the item now -- the walk reads it
             # rather than stamping "placed", so a floating room round-trips
@@ -567,9 +573,10 @@ def _rooms_of(items, lid, nid, vt, walls, rep):
                       "show_area": True},
             "properties": props,
         }
-        # v5 fields the SCENE has no home for (category, area_accounting,
-        # holes, nominal_size) ride back out verbatim, or a save would quietly
-        # drop them -- measured: symmetricP1's Garage lost area_accounting:
+        if getattr(r, "nominal_size", None):     # P4.4, modelled on the item
+            rec["nominal_size"] = dict(r.nominal_size)
+        # v5 fields the SCENE has no home for (area_accounting, holes) ride
+        # back out verbatim, or a save would quietly drop them -- measured: symmetricP1's Garage lost area_accounting:
         # "unconditioned". The derived defaults above stand for a scene that
         # was never loaded from a v5 document. (`placement` left the stash at
         # P4.2 -- it is modelled above.)
@@ -1020,6 +1027,8 @@ def apply_design_to_scene(target, design, report=None, strict=False,
         room.placement_state = pl.get("state") or "placed"
         room.extracted_from = pl.get("extracted_from")
         room.placement_rotation = float(pl.get("rotation") or 0.0)
+        room.category = rd.get("category")           # P4.4, modelled
+        room.nominal_size = rd.get("nominal_size")
         room.show_dims = bool((rd.get("label") or {}).get("show_dimensions",
                                                           False))
         room.label_offset = QPointF(0.0, 0.0)

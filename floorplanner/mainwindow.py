@@ -319,6 +319,10 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         m_edit.addAction(a_gaps)
 
         m_rooms = self.menuBar().addMenu("&Rooms")
+        a_concept = QAction("&New concept room…", self)      # P4.4
+        a_concept.triggered.connect(lambda: self.new_concept_room())
+        m_rooms.addAction(a_concept)
+        m_rooms.addSeparator()
         self._room_op_actions = []
         for label, op in [("&Combine (union)", "combine"),
                           ("&Fragment into pieces", "fragment"),
@@ -524,6 +528,22 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                     "join rooms explicitly (right-click > Join room into "
                     "plan)." if on else
                     "Shuffle mode off: automatic joining passes re-enabled.")
+
+    def new_concept_room(self, at=None):
+        """Rooms ▸ New concept room… (and the Room tool's blank-canvas menu):
+        type a size, get a wall-less FLOATING room there (P4.4)."""
+        dlg = ConceptRoomDialog(self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return None
+        name, w, d = dlg.values()
+        if at is None:
+            at = self.view.mapToScene(self.view.viewport().rect().center())
+        room = make_concept_room(self.scene, name, w, d, at,
+                                 floor=self.active_floor)
+        self.status(f"Concept room '{room.name}' "
+                    f"({w / FOOT:g}' x {d / FOOT:g}') — floating and "
+                    "wall-less; drag it by its name.")
+        return room
 
     def _sync_template_action(self):
         """File ▸ Save template room… is live only while exactly one FLOATING
