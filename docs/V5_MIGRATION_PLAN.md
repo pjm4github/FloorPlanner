@@ -22,6 +22,8 @@ files:   <added/changed>
 notes:   <anything surprising — especially a test you had to change and why>
 ```
 
+**Code reaches Claude Code as INSTRUCTIONS, not whole-file handoffs — added 2026‑08‑04, and it is Patrick's rule about Patrick's own habit.** A whole-file replacement sent to be "diffed in" silently overwrites work the repo's discipline already produced: the viewer's B023 closure fix was made at source under the P0.1 standing rule, then lost when a newer copy of `fp3d.py` arrived as a file rather than as a change, and had to be re-applied a second time. The lint bar, the fail-first receipts and the at-source fixes are only worth what they survive; a handoff that bypasses them spends the same effort twice and quietly re-opens closed findings. This applies to the viewer exactly as it does to everything else.
+
 **A changed test is a red flag, not a detail.** If a task required editing an existing assertion, say so explicitly. Half this migration's risk lives in tests being quietly relaxed to match new behaviour.
 
 **Prompt shape for Claude Code:**
@@ -4432,5 +4434,62 @@ notes:   ACCEPTANCE MET, as the task line states it: a one-room file
          placed one snapped to the grid.
          ROW 37 CLOSED with the ruled ^H chord (sub-commit 2).
          Census 576 -> 598.
+
+OUT-OF-SEQUENCE, 2026-08-04: THE 3D VIEW POPUP (branch viewer-popup)
+         NOT migration work, and recorded here precisely BECAUSE it is not:
+         it landed between P4.4 and P4.5 rather than as a phase task, and
+         it TOUCHES THE APP STARTUP PATH -- floorplanner/app.py, which no
+         Phase-4 task has needed to open. A change to the first ten lines
+         the process runs deserves a row in the sequence it stepped
+         outside of, or the next person reading this log will find app.py
+         changed by nobody.
+ruff:    clean
+pytest:  594 passed, 7 deselected, 3 xfailed (sum 604; trailer in the
+         commits) -- census 598 -> 604, +6: five for the popup's own
+         discipline and one more when the surface-format guard grew a
+         BEHAVIOURAL test (simulate the missing import) beside the
+         source assertion for the ordering.
+files:   viewer/fp3dq.py (Plan3DQuickWidget extracted from main(), which
+         becomes a caller), viewer/scene.qml (NEW -- the QML leaves the
+         inline temp file), viewer/fp3d.py + viewer/system-checker.py
+         (lint at source), viewer/VIEWER_NOTES.md (section 5), app.py
+         (set_3d_surface_format), mainwindow.py (show_3d_view),
+         view.py + levels.py (the two blank-canvas menus),
+         pyproject.toml (scene.qml as package-data),
+         tests/test_viewer_popup.py (NEW, 6).
+notes:   THE STARTUP CHANGE, stated plainly because it is the part with
+         blast radius: QSurfaceFormat.setDefaultFormat(QQuick3D.ideal
+         SurfaceFormat(4)) MUST run before the QApplication exists (Qt
+         reads the default format at GUI init), so it cannot live in the
+         viewer with the rest of the Qt Quick 3D code -- main() is the
+         one place guaranteed to be earlier. It is extracted as
+         set_3d_surface_format() and GUARDED: the 3D stack is an optional
+         extra, and an unguarded import at the entry point would make
+         `pip install -r requirements-viewer.txt` mandatory just to
+         launch the editor. Pinned by SIMULATING the missing import (the
+         call returns False rather than raising) plus a source assertion
+         for the ordering, which no runtime test can observe without
+         building a second QApplication.
+         READ-ONLY IS THE ACCEPTANCE: the popup reads design_document() --
+         the SAME producer _write_plan writes, so no second definition of
+         the plan was introduced -- and the walk's warning channel is
+         suppressed for that one call, because an unwelded-end report
+         belongs to the edit that tore the network and the 180 ms
+         debounce walk owns it. Pinned against a genuinely SAVED plan:
+         dirty flag, snapshot, and wall/room counts all unchanged, with
+         any warning promoted to an error.
+         ONE WIDGET, ONE QML: the CLI tool and the popup render through
+         Plan3DQuickWidget and scene.qml, so neither can drift from the
+         other. w._keep survives the extraction and is why -- QML holds
+         no Python reference to the geometry.
+         MENU PLACEMENT: appended to the blank-canvas right-click only on
+         the RIGHT-CLICK route; ^F and the status-bar label stay a pure
+         floor selector (P4.2's one-popup-surface spec is about floor
+         SELECTION, and a chord named "select a floor" should not offer a
+         renderer).
+         CI's py3.10 leg earned its keep on the first change that gave it
+         something to find: a tomllib import (3.11+) in the new test.
+         MERGE HELD FOR PATRICK'S 8-ITEM SMOKE TEST and the reviewer's
+         ruling; merge commit, not squash.
 
 ```

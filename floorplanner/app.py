@@ -11,6 +11,35 @@ from floorplanner.design.verify import ENV_VAR as VERIFY_ENV
 from floorplanner.mainwindow import MainWindow
 
 
+def set_3d_surface_format() -> bool:
+    """Ask Qt Quick 3D for the surface format it wants, if it is installed.
+
+    TWO CONSTRAINTS MEET HERE, which is why this is its own function rather
+    than three lines inside `main()`:
+
+    * IT MUST RUN BEFORE THE QApplication IS CONSTRUCTED. Qt reads the default
+      surface format when the GUI application initialises, so setting it later
+      is silently too late -- the 3D scene then renders without MSAA, or not at
+      all. That ordering is what forbids this from living in the viewer with
+      the rest of the Qt Quick 3D code; `main()` is the one place guaranteed
+      to be earlier.
+    * THE 3D STACK IS OPTIONAL. `pyqtgraph` / `PyOpenGL` / Qt Quick 3D come
+      from `pip install -r requirements-viewer.txt`. An unguarded import at the
+      app's entry point would make that extra mandatory just to LAUNCH the
+      editor -- turning a missing optional dependency into a dead application,
+      which is the failure the whole optional-extra seam exists to prevent.
+
+    Returns True if the format was set, False if the stack is absent. Never
+    raises: a missing optional dependency is a fact to report, not a fault."""
+    try:
+        from PyQt6.QtGui import QSurfaceFormat
+        from PyQt6.QtQuick3D import QQuick3D
+    except ImportError:
+        return False
+    QSurfaceFormat.setDefaultFormat(QQuick3D.idealSurfaceFormat(4))
+    return True
+
+
 def main():
     # P1.6 shadow mode.  The flag just sets the env var the verifier reads, so
     # there is ONE switch however it was thrown -- and the test suite (which
@@ -23,6 +52,7 @@ def main():
     # QApplication startup, which silences the missing-font-dir warning
     if FONT_DIR.is_dir():
         os.environ.setdefault("QT_QPA_FONTDIR", str(FONT_DIR))
+    set_3d_surface_format()          # MUST precede the QApplication (see below)
     app = QApplication(sys.argv)
     # set only the application name (no org) so the standard AppConfig path
     # is .../FloorPlanner rather than .../FloorPlanner/FloorPlanner

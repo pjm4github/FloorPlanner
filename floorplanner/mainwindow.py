@@ -529,6 +529,63 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                     "plan)." if on else
                     "Shuffle mode off: automatic joining passes re-enabled.")
 
+    VIEWER_HINT = ("3D view needs pip install -r requirements-viewer.txt")
+
+    def show_3d_view(self):
+        """The 3D popup: render the CURRENT plan, modal, without touching it.
+
+        READ-ONLY BY CONSTRUCTION, and that is the whole discipline here:
+        the document comes from `design_document()` -- the same producer the
+        save path writes, so there is no second definition of "what this plan
+        is" -- and nothing downstream of it holds a scene reference. No file
+        is written, no item is touched, and the dirty flag cannot move because
+        nothing changes.
+
+        The walk's warning channel is silenced for this call ON PURPOSE: an
+        unwelded-end report belongs to the edit that tore the network, and the
+        180 ms debounce walk owns that channel and will say so within a frame.
+        A viewer that opens is not an edit and must not speak in the edit
+        channel -- the same reasoning that keeps `active_floor` out of undo.
+        (In a live window the weld baseline is already set by the snapshot in
+        `__init__`, so this call cannot establish one either.)
+        """
+        import warnings
+        try:
+            from floorplanner.viewer.fp3d import build_model
+            from floorplanner.viewer.fp3dq import Plan3DQuickWidget
+        except ImportError:
+            self.status(self.VIEWER_HINT)
+            return None
+        with warnings.catch_warnings():
+            # SCOPED TO THE ONE MESSAGE, not a blanket ignore. Silencing the
+            # whole call would swallow any OTHER warning the walk raises --
+            # `except ValueError: continue` wearing a different hat, and the
+            # exact family defect 6 spent a phase removing. Only the
+            # unwelded-ends line is suppressed, and only because it belongs
+            # to the edit that tore the network: the debounce walk owns that
+            # channel and will say so within a frame.
+            warnings.filterwarnings("ignore", message="design_from_scene:")
+            doc = self.design_document()
+        model = build_model(doc)
+        dlg = QDialog(self)
+        dlg.setWindowTitle("3D view")
+        lay = QVBoxLayout(dlg)
+        lay.setContentsMargins(0, 0, 0, 0)
+        try:
+            body = Plan3DQuickWidget(model, parent=dlg)
+        except ImportError:          # Qt Quick 3D itself is the optional half
+            dlg.deleteLater()
+            self.status(self.VIEWER_HINT)
+            return None
+        except RuntimeError as exc:  # QML loaded but failed -- say which
+            dlg.deleteLater()
+            self.status(f"3D view could not load its scene: {exc}")
+            return None
+        lay.addWidget(body)
+        dlg.resize(1100, 780)
+        dlg.exec()
+        return dlg
+
     def new_concept_room(self, at=None):
         """Rooms ▸ New concept room… (and the Room tool's blank-canvas menu):
         type a size, get a wall-less FLOATING room there (P4.4)."""

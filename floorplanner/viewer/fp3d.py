@@ -2,11 +2,12 @@
 """
 fp3d.py -- standalone 3D viewer for FloorPlanner v5 design documents.
 
-    fp3d examples/symmetricP1.json               # the installed console script
-    python -m floorplanner.viewer.fp3d plan.json --level L1 --no-furnishings
-    python -m floorplanner.viewer.fp3d plan.json --dump   # headless: stats
-    python -m floorplanner.viewer.fp3d plan.json --obj out.obj   # no window
-    python -m floorplanner.viewer.fp3d plan.json --shot view.png # offscreen
+    python fp3d.py examples/symmetricP1.json
+    python fp3d.py plan.json --level L1 --no-furnishings
+    python fp3d.py plan.json --edges --xray      # drawn look, see-through walls
+    python fp3d.py plan.json --dump              # headless: mesh stats + report
+    python fp3d.py plan.json --obj out.obj       # export, no window
+    python fp3d.py plan.json --shot view.png     # render offscreen to PNG
 
 Nothing here imports `floorplanner`; it reads the v5 JSON directly, so it can
 be run against any saved design and cannot affect the app.  The geometry half
@@ -22,6 +23,11 @@ Conventions
   so the plan reads correctly from above: world = (x, -y, z), z up.
 * An opening is dimensioned per the v5 schema as an offset from a NAMED end.
 * Openings that do not fit their wall are REPORTED, not silently dropped.
+* Lighting is baked per face in numpy (key / fill / sky, world-fixed so the sun
+  does not swim as you orbit).  No GLSL is compiled, so no driver or pyqtgraph
+  version can refuse it; --flat falls back to pyqtgraph's own shader.
+* Colour comes from three tables: WALL_C by wall type, FLOOR_C by room
+  category, FAMILY_C by furnishing material family.  Edit and re-run.
 """
 
 from __future__ import annotations
@@ -57,24 +63,59 @@ FLOOR_C = {                      # by room category
     "site": (0.52, 0.70, 0.42, 1.0), "concept": (0.55, 0.60, 0.85, 0.45),
 }
 FLOATING_C = (0.95, 0.72, 0.28, 1.0)     # a room that is not placed
-FURN_C = (0.45, 0.52, 0.62, 0.85)
 
 DEFAULT_SILL = 36.0              # window sill when the document doesn't say
 SLAB_T = 1.0                     # floor slab thickness, drawn below z0
 
-# Rough footprints so furnishings read as "something is here" without
-# pretending to be furniture.  w x d x h, inches, local to the item.
-FURN_SIZE = {
-    "bathtub": (60, 30, 20), "toilet": (20, 28, 30), "sink": (24, 20, 34),
-    "vanity": (36, 21, 34), "shower": (36, 36, 78), "bed_queen": (60, 80, 24),
-    "bed_king": (76, 80, 24), "bed_twin": (38, 75, 24), "sofa": (84, 36, 30),
-    "loveseat": (60, 36, 30), "chair": (30, 30, 34), "table": (48, 30, 30),
-    "dining_table": (72, 40, 30), "desk": (60, 30, 30), "range": (30, 26, 36),
-    "refrigerator": (36, 30, 70), "dishwasher": (24, 24, 34),
-    "washer": (27, 27, 38), "dryer": (27, 27, 38), "island": (72, 36, 36),
-    "stairs": (36, 120, 8), "car": (72, 180, 55),
+# Footprints and material family, keyed on the catalog's furnishing kinds.
+# (width, depth, height) inches, then the family that picks the colour.
+FURN = {
+    # seating / soft goods
+    "sofa": (84, 36, 30, "soft"),         "loveseat": (60, 36, 30, "soft"),
+    "armchair": (34, 34, 32, "soft"),     "dining_chair": (18, 20, 34, "wood"),
+    "bench": (48, 18, 18, "wood"),
+    # tables and casework
+    "coffee_table": (48, 24, 18, "wood"), "side_table": (22, 22, 24, "wood"),
+    "dining_table": (72, 40, 30, "wood"), "workbench": (72, 30, 36, "wood"),
+    "buffet": (60, 20, 36, "wood"),       "hutch": (54, 20, 78, "wood"),
+    "dresser": (60, 20, 34, "wood"),      "wardrobe": (48, 24, 72, "wood"),
+    "nightstand": (22, 18, 26, "wood"),   "desk": (60, 30, 30, "wood"),
+    "island": (72, 36, 36, "wood"),
+    # sleeping
+    "bed_king": (76, 80, 26, "soft"),     "bed_queen": (60, 80, 26, "soft"),
+    "bed_twin": (38, 75, 26, "soft"),
+    # plumbing
+    "bathtub": (60, 30, 20, "porcelain"), "toilet": (20, 28, 30, "porcelain"),
+    "sink": (24, 20, 34, "porcelain"),    "shower": (36, 36, 78, "glass"),
+    "walk_in_shower": (60, 36, 78, "glass"),
+    "vanity": (36, 21, 34, "wood"),       "vanity_24": (24, 21, 34, "wood"),
+    "vanity_36": (36, 21, 34, "wood"),    "swim_spa": (180, 90, 40, "water"),
+    # appliances and mechanical
+    "range": (30, 26, 36, "metal"),       "refrigerator": (36, 30, 70, "metal"),
+    "dishwasher": (24, 24, 34, "metal"),  "washer": (27, 27, 38, "metal"),
+    "dryer": (27, 27, 38, "metal"),       "gas_fireplace": (48, 16, 40, "stone"),
+    # circulation, vehicles, outdoor
+    "stairs": (36, 120, 8, "wood"),       "car": (72, 180, 55, "vehicle"),
+    "suv": (78, 195, 70, "vehicle"),      "garden_tractor": (48, 72, 45, "vehicle"),
+    "riding_mower_snow": (48, 72, 45, "vehicle"),
+    "snowblower": (26, 36, 42, "vehicle"),
+    "tree": (96, 96, 180, "planting"),    "shrub": (36, 36, 36, "planting"),
+    "planter": (24, 24, 24, "stone"),
 }
-FURN_DEFAULT = (24, 24, 30)
+FURN_DEFAULT = (24, 24, 30, "unknown")
+
+FAMILY_C = {
+    "soft":      (0.44, 0.49, 0.57, 1.00),
+    "wood":      (0.52, 0.37, 0.23, 1.00),
+    "porcelain": (0.93, 0.94, 0.95, 1.00),
+    "glass":     (0.62, 0.76, 0.80, 0.35),
+    "water":     (0.28, 0.54, 0.70, 0.55),
+    "metal":     (0.66, 0.68, 0.71, 1.00),
+    "stone":     (0.55, 0.53, 0.50, 1.00),
+    "vehicle":   (0.26, 0.28, 0.32, 1.00),
+    "planting":  (0.30, 0.50, 0.28, 1.00),
+    "unknown":   (0.85, 0.35, 0.55, 1.00),   # loud on purpose: no size known
+}
 
 
 # --------------------------------------------------------------------------
@@ -100,19 +141,25 @@ class Model:
 
 
 def _box(corners_xy, z0, z1):
-    """Prism over a 4-point plan quad.  corners_xy is CCW-or-CW, order kept."""
-    b = [(x, y, z0) for x, y in corners_xy]
-    t = [(x, y, z1) for x, y in corners_xy]
-    v = np.array(b + t, dtype=float)
-    f = np.array([
-        [0, 1, 2], [0, 2, 3],            # bottom
-        [4, 6, 5], [4, 7, 6],            # top
-        [0, 4, 5], [0, 5, 1],
-        [1, 5, 6], [1, 6, 2],
-        [2, 6, 7], [2, 7, 3],
-        [3, 7, 4], [3, 4, 0],
-    ], dtype=int)
-    return v, f
+    """Prism over a 4-point plan quad, wound so every normal points OUTWARD.
+
+    The callers build quads in whatever order suits them, so the winding is
+    normalised here.  It only matters once the lighting is real: a shader that
+    trusts the normal renders an inward-wound face black.
+    """
+    p = list(corners_xy)
+    a2 = sum(p[i][0] * p[(i + 1) % 4][1] - p[(i + 1) % 4][0] * p[i][1]
+             for i in range(4))
+    if a2 < 0:                                   # make it counter-clockwise
+        p = p[::-1]
+    v = np.array([(x, y, z0) for x, y in p] + [(x, y, z1) for x, y in p],
+                 dtype=float)
+    f = [[0, 2, 1], [0, 3, 2],                   # bottom, normal -z
+         [4, 5, 6], [4, 6, 7]]                   # top, normal +z
+    for i in range(4):                           # sides, normals outward
+        j = (i + 1) % 4
+        f += [[i, j, j + 4], [i, j + 4, i + 4]]
+    return v, np.array(f, dtype=int)
 
 
 def _merge(parts):
@@ -442,10 +489,9 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 n_open += 1
         cuts.sort()
 
-        # the loop variables are bound as defaults (the repo's own idiom, e.g.
-        # extract._span): `quad` is only ever called inside this iteration, but
-        # a closure over a loop variable is a real footgun the moment anyone
-        # defers the call -- so it is closed here rather than excluded (B023)
+        # loop variables bound as defaults (the repo's idiom, cf.
+        # extract._span): a closure over a loop variable is a footgun
+        # the moment anyone defers the call (B023)
         def quad(a, b, p1=p1, ux=ux, uy=uy, nx=nx, ny=ny, t=t):
             return [(p1[0] + ux * a + nx * t / 2, p1[1] + uy * a + ny * t / 2),
                     (p1[0] + ux * b + nx * t / 2, p1[1] + uy * b + ny * t / 2),
@@ -474,13 +520,16 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
 
     # ---- furnishings -----------------------------------------------------
     if furnishings:
-        parts = []
+        parts, unknown = {}, set()
         for fu in doc.get("furnishings", []):
             if fu.get("level") not in lv:
                 continue
             pos = fu.get("pos") or [0, 0]
             cx, cy = float(pos[0]), -float(pos[1])
-            fw, fd, fh = FURN_SIZE.get(fu.get("kind", ""), FURN_DEFAULT)
+            kind = fu.get("kind", "")
+            if kind not in FURN:
+                unknown.add(kind)
+            fw, fd, fh, fam = FURN.get(kind, FURN_DEFAULT)
             a = math.radians(-float(fu.get("rotation", 0.0)))
             ca, sa = math.cos(a), math.sin(a)
             corners = []
@@ -488,11 +537,17 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 lx, ly = sx * fw / 2, sy * fd / 2
                 corners.append((cx + lx * ca - ly * sa, cy + lx * sa + ly * ca))
             z = base(fu.get("level"))
-            parts.append(_box(corners, z, z + fh))
+            parts.setdefault(fam, []).append(_box(corners, z, z + fh))
             n_furn += 1
-        if parts:
-            v, f = _merge(parts)
-            model.meshes.append(Mesh("furnishings", v, f, FURN_C, True))
+        for fam, plist in parts.items():
+            v, f = _merge(plist)
+            col = FAMILY_C.get(fam, FAMILY_C["unknown"])
+            model.meshes.append(Mesh(f"furnishings:{fam}", v, f, col,
+                                     translucent=col[3] < 1.0))
+        if unknown:
+            model.notes.append(
+                "furnishing kind(s) with no footprint in FURN, drawn at the "
+                "default size in magenta: " + ", ".join(sorted(unknown)))
 
     # ---- bounds ----------------------------------------------------------
     allv = [m.verts for m in model.meshes if len(m.verts)]
@@ -523,7 +578,40 @@ def export_obj(model, path):
 # Qt viewer
 # --------------------------------------------------------------------------
 
-def make_view(model, edges=False, parent=None):
+# Key / fill / sky rig, applied in numpy rather than GLSL.
+#
+# An earlier version of this file registered a custom shader.  It compiled
+# against desktop GLSL and failed hard on stacks that build with "#version 100"
+# (GLSL ES), where gl_Normal / gl_Color / ftransform do not exist.  Since the
+# rig is deliberately WORLD-fixed -- the sun must not swim while you orbit --
+# nothing is lost by baking it into per-face colours, and it now works on every
+# driver and every pyqtgraph version, with no shader compilation at all.
+_KEY = np.array([0.352, -0.554, 0.755])
+_FILL = np.array([-0.701, 0.409, 0.584])
+
+
+def shade_faces(verts, faces, color):
+    """Per-face RGBA for a mesh, lit by the rig above.  (M, 4) float32.
+
+    Relies on `_box` and the floor builder winding every face outward; a face
+    wound inward would come out dark, which is why the winding is normalised
+    at source rather than papered over with abs() here.
+    """
+    tri = verts[faces]
+    n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+    ln = np.linalg.norm(n, axis=1, keepdims=True)
+    ln[ln == 0] = 1.0
+    n = n / ln
+    key = np.maximum(n @ _KEY, 0.0)
+    fill = np.maximum(n @ _FILL, 0.0)
+    sky = 0.5 + 0.5 * n[:, 2]                    # up-facing reads lighter
+    lit = np.minimum(0.24 + 0.58 * key + 0.16 * fill + 0.18 * sky, 1.30)
+    rgb = np.clip(lit[:, None] * np.asarray(color[:3])[None, :], 0.0, 1.0)
+    alpha = color[3] if len(color) > 3 else 1.0
+    return np.hstack([rgb, np.full((len(rgb), 1), alpha)]).astype(np.float32)
+
+
+def make_view(model, edges=False, xray=False, flat=False, parent=None):
     """A GLViewWidget showing `model`, recentred on the origin.
 
     Recentring (rather than moving the camera target) keeps this working
@@ -570,18 +658,29 @@ def make_view(model, edges=False, parent=None):
     for m in model.meshes:
         if not len(m.faces):
             continue
-        view.addItem(gl.GLMeshItem(
-            vertexes=m.verts - ctr, faces=m.faces, smooth=False,
-            color=m.color, shader="shaded", drawEdges=edges,
-            edgeColor=(0, 0, 0, 0.25),
-            glOptions="translucent" if m.translucent else "opaque"))
+        col, translucent = m.color, m.translucent
+        if xray and m.name.startswith("walls:"):
+            col = (col[0], col[1], col[2], 0.30)       # see the plan through it
+            translucent = True
+        opts = dict(smooth=False, drawEdges=edges, edgeColor=(0, 0, 0, 0.25),
+                    glOptions="translucent" if translucent else "opaque")
+        if flat:
+            # Escape hatch: pyqtgraph's own shader, flat colour.  Floors go
+            # dark -- it has one hard-coded light and no sky term -- but it is
+            # the configuration that is known to work everywhere.
+            view.addItem(gl.GLMeshItem(vertexes=m.verts - ctr, faces=m.faces,
+                                       color=col, shader="shaded", **opts))
+        else:
+            md = gl.MeshData(vertexes=m.verts - ctr, faces=m.faces,
+                             faceColors=shade_faces(m.verts, m.faces, col))
+            view.addItem(gl.GLMeshItem(meshdata=md, shader=None, **opts))
 
     view._home = span * 1.4
     view.setCameraPosition(distance=view._home, elevation=28, azimuth=-60)
     return view
 
 
-def Plan3DWidget(model, edges=False, parent=None):
+def Plan3DWidget(model, edges=False, xray=False, flat=False, parent=None):
     """The reusable piece: view + a one-line status strip, as a QWidget.
 
     This is what to drop into a QDialog when the app grows a 3D popup:
@@ -597,7 +696,7 @@ def Plan3DWidget(model, edges=False, parent=None):
     lay = QVBoxLayout(w)
     lay.setContentsMargins(0, 0, 0, 0)
     lay.setSpacing(0)
-    view = make_view(model, edges=edges)
+    view = make_view(model, edges=edges, xray=xray, flat=flat)
     lay.addWidget(view, 1)
 
     s = model.stats
@@ -636,6 +735,10 @@ def main(argv=None):
                     help='override level height, inches (default: the level\'s)')
     ap.add_argument("--edges", action="store_true",
                     help="draw mesh edges (reads more like a drawing)")
+    ap.add_argument("--flat", action="store_true",
+                    help="use pyqtgraph's own shader instead of baked lighting")
+    ap.add_argument("--xray", action="store_true",
+                    help="walls translucent, so the whole plan reads at once")
     ap.add_argument("-v", "--verbose", action="store_true",
                     help="also list routine outline tidy-ups")
     ap.add_argument("--dump", action="store_true",
@@ -696,7 +799,7 @@ def main(argv=None):
     app = QApplication(sys.argv[:1])
     win = QMainWindow()
     win.setWindowTitle(f"FloorPlanner 3D \u2014 {a.design}")
-    body = Plan3DWidget(model, edges=a.edges)
+    body = Plan3DWidget(model, edges=a.edges, xray=a.xray, flat=a.flat)
     win.setCentralWidget(body)
     win.resize(1200, 820)
     win.show()

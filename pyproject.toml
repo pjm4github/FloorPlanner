@@ -44,3 +44,6 @@ py-modules = ["FloorPlanner", "fp_macro", "fp_extract"]
 # install (pip install -e .) keeps the layout so config.py resolves them.
 floorplanner = []
 "floorplanner.design" = ["design-schema.v5.json"]   # packaged v5 JSON Schema
+# the Qt Quick 3D scene graph is a QML document loaded from disk at runtime,
+# so it must ship with the package or the 3D view has nothing to render
+"floorplanner.viewer" = ["scene.qml"]
