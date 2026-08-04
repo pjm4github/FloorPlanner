@@ -4327,4 +4327,43 @@ notes:   REPRODUCED before his clarification arrived, mechanism
          path it pinned); red pre-fix with the three new flips, three
          preservation pins pass both eras.
          Census 570 -> 576.
+
+P4.4(1) the four rulings recorded + the pre-work census (branch
+         p4.4-concept-duplicate from main@e4b2028; read-back answered
+         2026-08-03, work begins)
+ruff:    clean
+pytest:  (census commit -- code untouched; branch-point gate trailer in
+         the commit)
+files:   this file only.
+notes:   THE FOUR RULINGS, verbatim in substance:
+         (1) CONTINGENCY CONFIRMED -- duplicate is built on the extract
+         machinery per section 4. Consequence executed at P4.4(3):
+         _copy_spec and _perimeter_span DIE (the carried census note's
+         contingency resolves YES); Copy/Paste room rewire to the new
+         op; the clipboard path's third definition of "the room's
+         walls" (bounding_walls proximity + _perimeter_span trim) dies
+         with them, so P4.5 inherits the binding/outline duality with
+         the clipboard consumer RESOLVED.
+         (2) CREATE-BY-TYPED-DIMENSION mints a FLOATING, WALL-LESS room
+         carrying nominal_size -- a dialog off the Room tool AND from
+         the menu. category: concept; I13 (concept must be floating)
+         is the guard.
+         (3) FILE MENU: "Load template room..." and "Save template
+         room..."; Save enabled ONLY when a floating room is selected
+         (highlighted).
+         (4) THE SHUFFLE CHORD IS ^H (register row 37's fix, this
+         task's first code piece).
+         CENSUS (measured at the read-back + this commit):
+         _perimeter_span rooms.py:314-337 (24 lines), sole caller
+         _copy_spec rooms.py:339-373, sole caller the context-menu
+         Copy (rooms.py:947 -> win.room_clipboard), sole consumer
+         paste_room mainwindow.py:1348-1388 (rebuild + detect_room +
+         bind_room_walls), surfaced at view.py:530. bounding_walls
+         SURVIVES (report/inventory callers rooms.py:517,:575,
+         mainwindow.py:918). Schema ground already present:
+         room.nominal_size ("Never authoritative -- the outline is"),
+         category concept, I13 in validate.py; model/bridge ride
+         nominal_size verbatim (bridge.py:95 names P4.4). The macro
+         table: CARET_SHORTCUTS one-row design, hook pattern on_floor/
+         on_open; H unclaimed.
 ```
