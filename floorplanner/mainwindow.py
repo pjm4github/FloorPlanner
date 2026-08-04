@@ -1031,7 +1031,17 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         # a room's walls are duplicated EXCEPT any already selected this way, so
         # selecting a room together with its walls doesn't make a coincident
         # copy of every edge (which bloated the wall count until ungroup).
-        direct_walls = {it for it in selected if isinstance(it, WallItem)}
+        # P4.5: A GROUP NEVER COPIES ANYTHING. The schema says so in as many
+        # words -- "moving it translates the vertices its members reference
+        # plus its member furnishings; rooms are the durable unit" -- and
+        # `duplicate_wall` is deleted. A selected room contributes its REAL
+        # walls, so there is nothing to reconcile afterwards: no coincident
+        # copies to merge on ungroup, no `room_owns_walls` reading false
+        # against a group of clones, and no wall count that grows with every
+        # group/move/ungroup cycle. `seen` now guards against adopting one
+        # wall twice (two selected rooms share a party wall) rather than
+        # against copying it twice.
+        seen = {id(it) for it in selected if isinstance(it, WallItem)}
         members, old_groups = [], []
         for it in selected:
             if isinstance(it, GroupItem):
@@ -1039,14 +1049,11 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             elif isinstance(it, (WallItem, FurnishingItem)):
                 members.append(it)
             elif isinstance(it, RoomItem):
-                seen = set()
-                for w in it.bounding_walls() + it.interior_walls():
+                for w in room_walls(it) + it.interior_walls():
                     if not isinstance(w, WallItem) or id(w) in seen:
                         continue
                     seen.add(id(w))
-                    if w in direct_walls:
-                        continue          # already a member; don't copy it
-                    members.append(duplicate_wall(self.scene, w))
+                    members.append(w)
         for g in old_groups:
             g.bake()
             members += g.dissolve()
@@ -1073,11 +1080,14 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             g.bake()                      # members keep their moved spot
             for c in g.dissolve():
                 c.setSelected(True)
-        # P4.5's to REMOVE, not (iii)'s to migrate: once groups move the real
-        # items nothing is duplicated, so nothing needs merging on ungroup.
-        # Wired to the new pass meanwhile so behaviour is unchanged.
-        merge_all(self.scene)             # now-free walls may merge with the plan
-        rebuild_all_walls(self.scene)     # rooms re-detect region/outline
+        # REMOVED AT P4.5, exactly as the task line called for ("no
+        # duplicate_wall, no coalesce_all on ungroup"). The merge existed to
+        # clean up the COPIES grouping used to make; with nothing duplicated
+        # there is nothing to clean, and running it anyway is destructive --
+        # measured on symmetricP1, the ungroup absorbed 2 real walls (80 ->
+        # 78) that no gesture asked it to touch. A tidy-up pass that outlives
+        # the mess it tidied only deletes the user's geometry.
+        rebuild_all_walls(self.scene)     # rooms re-derive region/outline
         self.status("Ungrouped — items left in place.")
 
     def coalesce_all_now(self):

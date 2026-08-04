@@ -15,9 +15,11 @@ from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.vertex import Vertex
 from floorplanner.walls import (
-    OpeningItem, WallItem, _CornerIndex, rebuild_all_walls,
-    report_gesture_fault, report_opening_failure,
+    WallItem, _CornerIndex, rebuild_all_walls, report_gesture_fault,
 )
+# `OpeningItem` and `report_opening_failure` left this module with
+# `duplicate_wall` at P4.5: copying a wall's openings into a group was the only
+# reason rooms.py ever built an opening or had one fail to fit.
 
 
 def poly_area_sqft(corners) -> float:
@@ -1178,25 +1180,6 @@ def walls_cover_room(walls, room) -> bool:
         if not any(_wall_spans_segment(w, a, b) for w in moving):
             return False
     return True
-
-
-def duplicate_wall(scene, w):
-    """A standalone copy of wall `w` (same type + openings), added to the scene
-    and bound to no room.  Used when grouping a room duplicates its walls."""
-    nw = WallItem(QPointF(w.p1), QPointF(w.p2), w.wall_type)
-    nw.floor = w.floor                          # inherit the source wall's floor
-    scene.addItem(nw)
-    for op in w.openings:
-        try:
-            nop = OpeningItem(nw, op.kind, op.code, op.s)
-        except ValueError as exc:
-            report_opening_failure(scene, nw, op.kind, op.code, op.s,
-                                   f"{exc} (copying a wall into a group)")
-            continue
-        nop.door_type, nop.swing = op.door_type, op.swing
-        nw.openings.append(nop)
-    nw.rebuild()
-    return nw
 
 
 def repair_edge_bindings(scene, room):

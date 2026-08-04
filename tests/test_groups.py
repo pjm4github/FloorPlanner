@@ -61,9 +61,12 @@ def test_ungrouped_walls_survive_gc(fp, win, make_room, first_furnishing,
     assert counts(sc) == before
 
 
-def test_grouping_a_room_duplicates_its_walls(fp, win, make_room, counts):
-    # selecting a ROOM and grouping duplicates its walls into the group; the
-    # original room keeps its own walls (the group is a movable copy)
+def test_grouping_a_room_adopts_its_real_walls(fp, win, make_room, counts):
+    # INTENTIONALLY REPLACED AT P4.5 (was test_grouping_a_room_duplicates_
+    # its_walls). The old name WAS the old contract: grouping a room
+    # duplicated its walls and the group was a movable copy. A group never
+    # copies anything now -- the schema says so in as many words -- so every
+    # assertion here inverts.
     sc = win.scene
     room = make_room(sc, 0, 0, 144, 120, "Den")
     n_walls_before = sum(isinstance(i, fp.WallItem) for i in sc.items())
@@ -73,12 +76,13 @@ def test_grouping_a_room_duplicates_its_walls(fp, win, make_room, counts):
     win.group_selected()
     g = next(i for i in sc.items() if isinstance(i, fp.GroupItem))
     grouped = [c for c in g.childItems() if isinstance(c, fp.WallItem)]
-    assert len(grouped) >= 4                       # the room's 4 walls copied
-    # walls doubled (originals + grouped copies); originals still owned by room
-    assert sum(isinstance(i, fp.WallItem) for i in sc.items()) >= \
-        n_walls_before + 4
+    assert len(grouped) == 4                       # the room's OWN 4 walls
+    assert sum(isinstance(i, fp.WallItem)
+               for i in sc.items()) == n_walls_before, "grouping made a wall"
+    # the very same objects, and the room still owns them
+    assert all(w in grouped for w in orig_walls)
     assert all(w in room.walls for w in orig_walls)
-    assert all(w.group() is None for w in orig_walls)
+    assert all(w.group() is g for w in orig_walls)
 
 
 def test_bake_translates_room_region(fp, win, make_room):
@@ -153,30 +157,30 @@ def test_grouping_room_with_its_walls_makes_no_coincident_copies(fp, win,
     assert room.path.boundingRect().x() == pytest.approx(123, abs=6)  # room rode
 
 
-def test_group_move_room_only_does_not_orphan_walls(fp, win, make_room):
-    # regression (wall leak): grouping a room ALONE makes a movable copy (the
-    # original stays). bake() used to move the ORIGINAL room onto the coincident
-    # copies via walls_cover_room's loop-coverage path, abandoning the room's
-    # own walls -- so orphans piled up every group/move/ungroup cycle
-    # (4 -> 6 -> 7 -> 8...). Now the original stays put and only the copy moves,
-    # so repeated cycles are stable.
+def test_repeated_group_move_ungroup_creates_nothing(fp, win, make_room):
+    # INTENTIONALLY REPLACED AT P4.5 (was test_group_move_room_only_does_not_
+    # orphan_walls). Its premise was the copy semantics -- "grouping a room
+    # ALONE makes a movable copy (the original stays)" -- so the strongest
+    # thing it could assert was that the leak did not COMPOUND. With no
+    # copies there is nothing to leak, so the assertion sharpens: the count
+    # is the FIRST count on every cycle, not merely a stable one.
     sc = win.scene
     make_room(sc, 0, 0, 144, 120, "Den")
+    n0 = _built_walls(fp, sc)
     counts = []
     for _ in range(4):
         room = next(r for r in sc.items() if isinstance(r, fp.RoomItem))
         sc.clearSelection()
-        room.setSelected(True)               # room ONLY -> walls duplicated
+        room.setSelected(True)               # room ONLY -> its OWN walls
         win.group_selected()
         g = next(it for it in sc.items() if isinstance(it, fp.GroupItem))
-        g.setPos(0, 300)                     # move the copy clear of the original
+        g.setPos(0, 300)                     # ...and the room rides with them
         g.bake()
         sc.clearSelection()
         g.setSelected(True)
         win.ungroup_selected()
         counts.append(_built_walls(fp, sc))
-    # stable across cycles (original 4 + one persistent copy) -- not compounding
-    assert counts[1:] == counts[:-1], counts
+    assert counts == [n0] * 4, counts
     assert sum(isinstance(r, fp.RoomItem) for r in sc.items()) == 1
 
 
@@ -633,59 +637,81 @@ def _nwalls(fp, sc):
     return sum(isinstance(i, fp.WallItem) for i in sc.items())
 
 
-def test_grouping_twenty_rooms_with_their_walls_creates_no_walls(fp, win):
-    """P3.8's acceptance: 'Grouping 20 rooms creates 0 new walls'.
+def test_grouping_twenty_rooms_creates_no_objects_at_all(fp, win):
+    """P3.8's acceptance, WIDENED AT P4.5 from walls to OBJECTS.
 
-    STATED FOR THE SELECTION A USER ACTUALLY MAKES -- Ctrl+A, or a band over
-    the plan -- which takes the rooms AND their walls. Measured on
-    symmetricP1: 80 walls in, 80 after grouping, 80 after a bake. The room's
-    own selected walls ride in as themselves; nothing is copied.
+    The original counted walls only, and that was the number available while
+    grouping still copied: the review measured **>=106 duplicate walls and
+    >=149 duplicate OPENINGS** on this gesture, so a wall-only count left the
+    larger half unwatched. With `duplicate_wall` dead there is nothing to
+    copy, and the honest assertion is the whole scene: no walls, no openings,
+    no rooms, no furnishings created -- by grouping, by the bake, or by the
+    ungroup that used to merge the copies away.
 
-    The rooms-ONLY selection is a different question and still duplicates; it
-    is the xfail below, and P4.5's."""
+    Both selections are pinned here now, because they are no longer different
+    questions: the rooms-AND-walls selection a band gives you, and the
+    rooms-ONLY selection that used to duplicate."""
     _v5_plan(fp, win)
     sc = win.scene
     assert sum(isinstance(i, fp.RoomItem) for i in sc.items()) == 20
-    before = _nwalls(fp, sc)
+
+    def census():
+        n_open = sum(len(w.openings) for w in sc.items()
+                     if isinstance(w, fp.WallItem))
+        return (_nwalls(fp, sc), n_open,
+                sum(isinstance(i, fp.RoomItem) for i in sc.items()),
+                sum(isinstance(i, fp.FurnishingItem) for i in sc.items()))
+
+    before = census()
+    assert before[1] > 0, "precondition: the plan has openings to duplicate"
     sc.clearSelection()
     for it in sc.items():
         if isinstance(it, (fp.RoomItem, fp.WallItem)) and it.group() is None:
             it.setSelected(True)
     win.group_selected()
-    assert _nwalls(fp, sc) == before, "grouping copied walls"
+    assert census() == before, "grouping created objects"
     for g in [i for i in sc.items() if isinstance(i, fp.GroupItem)]:
         g.setPos(48.0, 0.0)
         g.bake()
-    assert _nwalls(fp, sc) == before, "the bake copied walls"
+    assert census() == before, "the bake created objects"
+    for g in [i for i in sc.items() if isinstance(i, fp.GroupItem)]:
+        sc.clearSelection()
+        g.setSelected(True)
+        win.ungroup_selected()
+    assert census() == before, "the ungroup created objects"
 
 
-@pytest.mark.xfail(strict=False, reason="grouping a room ALONE still copies "
-                   "its walls (duplicate_wall); what a group IS is P4.5's")
-def test_grouping_rooms_without_their_walls_still_copies_them(fp, win,
-                                                              make_room):
-    """The same sentence read literally -- the ROOM items and nothing else.
+def test_grouping_rooms_without_their_walls_copies_nothing(fp, win,
+                                                           make_room):
+    """REWRITTEN INTO ITS OPPOSITE AT P4.5 (was ...still_copies_them, xfail).
 
-    Split from the test above for the reason P0.4's test 2 was split: one
-    assertion cannot tell today's behaviour from P4.5's, and a test that passes
-    in both worlds proves nothing about the change.
+    The old name asserted the old contract: selecting the ROOM items and
+    nothing else duplicated their walls. It was xfail-pinned so that the day
+    `duplicate_wall` died it would flip -- and it did, which is why the name
+    had to go with it. A test called `still_copies_them` that passes because
+    nothing copies is a trap for the next reader.
 
-    THE MECHANISM IS PINNED HERE; THE SCALE IS RECORDED IN THE LOG. Measured at
-    P3.8 on symmetricP1's twenty rooms: +868 walls, and the duplication
-    COMPOUNDS -- the same rooms grouped one at a time sum to only 258, because
-    each room's copy sees the copies the earlier ones made. Pinning that here
-    would cost the suite 40 seconds to rebuild a number the log already states,
-    so this uses two rooms: `duplicate_wall` either copies or it does not, and
-    at P4.5 it dies and this flips."""
+    THE SCALE IT PINNED, kept because it is the number the phase existed for:
+    measured at P3.8 on symmetricP1's twenty rooms, this gesture created
+    **+868 walls**, and the duplication COMPOUNDED -- the same rooms grouped
+    one at a time summed to only 258, because each room's copy saw the copies
+    the earlier ones had made. Two rooms are enough to pin the mechanism;
+    the twenty-room number is the mini-gate's item 1."""
     sc = win.scene
-    make_room(sc, 0, 0, 120, 120, "A")
-    make_room(sc, 120, 0, 120, 120, "B")
+    a = make_room(sc, 0, 0, 120, 120, "A")
+    b = make_room(sc, 120, 0, 120, 120, "B")
     before = _nwalls(fp, sc)
+    own = {id(w) for r in (a, b) for w in r.walls}
     sc.clearSelection()
     for it in sc.items():
         if isinstance(it, fp.RoomItem):
             it.setSelected(True)
     win.group_selected()
-    assert _nwalls(fp, sc) == before
+    assert _nwalls(fp, sc) == before, "grouping rooms alone copied walls"
+    # ...and what the group holds is the rooms' OWN walls, not lookalikes
+    g = next(i for i in sc.items() if isinstance(i, fp.GroupItem))
+    grouped = [c for c in g.childItems() if isinstance(c, fp.WallItem)]
+    assert grouped and all(id(w) in own for w in grouped)
 
 
 def test_the_group_box_does_not_stretch_when_the_group_moves(fp, win,
