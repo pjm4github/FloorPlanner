@@ -784,12 +784,17 @@ def test_the_planner_can_see_a_grouped_wall(fp, win, make_room):
         "the planner is blind to a grouped wall -- F1/F2 by hand")
 
 
-def test_seeing_a_grouped_wall_is_not_permission_to_merge_it(fp, win):
-    """The other half of the same boundary, and the reason the guards come
-    down one at a time: after the VISIBILITY retirement the planner has
-    complete information and still declines to act. `merge_wall` and
-    `weld_scene` are separate guards, each its own sub-commit and its own
-    rollback point."""
+def test_a_grouped_wall_merges_but_still_does_not_weld(fp, win):
+    """THE BOUNDARY MARKER, MOVED -- it expired exactly where it was declared
+    to (was ..._is_not_permission_to_merge_it, retired at the merge_wall
+    sub-commit as pre-declared).
+
+    A grouped wall may now MERGE: the refusal existed because a grouped wall
+    was a copy sitting on the original it came from, and merging those two
+    would have fused a wall with its own shadow. Nothing is copied now.
+    WELDING is still refused -- that is `weld_scene`, the next sub-commit and
+    its own rollback point -- so this keeps marking the line, one guard
+    further along, and expires there in turn."""
     sc = win.scene
     a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
     b = fp.WallItem(QPointF(60, 0), QPointF(180, 0), "interior")  # overlapping
@@ -800,9 +805,26 @@ def test_seeing_a_grouped_wall_is_not_permission_to_merge_it(fp, win):
     win.group_selected()
     n = _nwalls(fp, sc)
     fp.merge_wall(sc, a)
-    assert _nwalls(fp, sc) == n, "a grouped wall was merged"
-    # weld_scene skips grouped walls too -- asserted on its own return value,
-    # which is what it would have to change to have acted
+    assert _nwalls(fp, sc) == n - 1, "the grouped run did not merge"
+    assert a.scene() is sc and a.group() is not None, (
+        "the survivor left the group -- a merge must not empty it")
+
+    # WELD IS HALF OPEN ALREADY, and measuring that is what corrected the
+    # record: weld_scene's SNAP half filters grouped walls itself, but its
+    # SHARE half is `share_coincident_ends`, which scopes itself by
+    # `graph_from_scene` -- so retiring the VISIBILITY guard silently granted
+    # sharing (measured: (0,0) at 7a00fe1, (0,1) at ac86173). The remaining
+    # guard is therefore snap-only, and that is what expires next.
+    c = fp.WallItem(QPointF(400, 0), QPointF(520, 0), "interior")
+    d = fp.WallItem(QPointF(520, 0.4), QPointF(640, 0.4), "interior")
+    for w in (c, d):
+        sc.addItem(w)
+    fp.rebuild_all_walls(sc)
+    sc.clearSelection()
+    for w in (c, d):
+        w.setSelected(True)
+    win.group_selected()
     moved, shared = fp.weld_scene(sc)
-    assert (moved, shared) == (0, 0), "a grouped end was welded"
-    assert _nwalls(fp, sc) == n
+    assert moved == 0, "the snap half no longer declines -- guard 3 expired"
+    assert shared >= 1, (
+        "the share half declined; it has not since the visibility guard fell")

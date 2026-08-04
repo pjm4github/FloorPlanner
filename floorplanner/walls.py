@@ -550,11 +550,20 @@ def merge_wall(scene, wall, perp_tol=None, force=False):
     `wall` is forced to be the run's SURVIVOR, which is not a detail: the
     caller has just drawn or dragged that item and holds a reference to it,
     and it carries the selection. The planner takes the run's first wall in the
-    caller's own order, so putting `wall` first is all it takes to say so."""
+    caller's own order, so putting `wall` first is all it takes to say so.
+
+    A GROUPED WALL MAY MERGE SINCE P4.5 -- the second of the four exemptions
+    to come down, and the first that grants PERMISSION rather than sight. The
+    refusal existed because a grouped wall was a COPY sitting exactly on the
+    original it was copied from: merging those two would have "fused" a wall
+    with its own shadow and destroyed the group's contents. Nothing is copied
+    now, so a grouped wall is a plan wall that happens to be selected, and
+    refusing it left the plan un-normalised for as long as anything stayed
+    grouped -- which is the state a user works in, not an edge case."""
     if not force and not editing_enabled("auto_coalesce"):
         return wall
     if (scene is None or wall is None or wall.scene() is None
-            or wall.group() is not None or wall.length() < 1e-6):
+            or wall.length() < 1e-6):
         return wall
     if perp_tol is None:
         perp_tol = SETTINGS.get("wall_snap_in", WALL_SNAP_DEFAULT)
