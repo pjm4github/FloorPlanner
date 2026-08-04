@@ -315,66 +315,6 @@ class RoomItem(QGraphicsItem):
         return sum(QLineF(poly[i], poly[i + 1]).length()
                    for i in range(poly.size() - 1))
 
-    def _perimeter_span(self, w) -> tuple | None:
-        """[s0, s1] of wall `w`'s centreline that runs along this room's
-        perimeter, or None when the wall doesn't follow any edge of it."""
-        if not self.corners:
-            return None
-        u, length = w.unit(), w.length()
-        lo = hi = None
-        n = len(self.corners)
-        for i in range(n):
-            a, b = self.corners[i], self.corners[(i + 1) % n]
-            da = abs((a.y() - w.p1.y()) * u.x() - (a.x() - w.p1.x()) * u.y())
-            db = abs((b.y() - w.p1.y()) * u.x() - (b.x() - w.p1.x()) * u.y())
-            if max(da, db) > 1.0:         # edge not collinear with the wall
-                continue
-            sa = (a.x() - w.p1.x()) * u.x() + (a.y() - w.p1.y()) * u.y()
-            sb = (b.x() - w.p1.x()) * u.x() + (b.y() - w.p1.y()) * u.y()
-            s0, s1 = max(0.0, min(sa, sb)), min(length, max(sa, sb))
-            if s1 - s0 < 1.0:
-                continue
-            lo = s0 if lo is None else min(lo, s0)
-            hi = s1 if hi is None else max(hi, s1)
-        if lo is None or hi - lo < MIN_WALL_LEN:
-            return None
-        return lo, hi
-
-    def _copy_spec(self) -> dict:
-        """Clipboard payload: the room plus its bounding walls/openings,
-        each wall trimmed to the stretch that follows the room perimeter
-        (shared/through walls don't drag their full length along)."""
-        walls = []
-        for w in self.bounding_walls():
-            span = self._perimeter_span(w)
-            if span is None:
-                if self.corners:
-                    continue              # touches the room but isn't part
-                span = (0.0, w.length())  # of the perimeter -> don't copy
-            lo, hi = span
-            tp1, tp2 = w.point_at(lo), w.point_at(hi)
-            walls.append({
-                "type": w.wall_type,
-                "p1": [tp1.x(), tp1.y()],
-                "p2": [tp2.x(), tp2.y()],
-                "openings": [{
-                    "kind": op.kind, "code": op.code, "s": op.s - lo,
-                    "door_type": op.door_type, "swing": op.swing,
-                } for op in w.openings if lo <= op.s <= hi],
-            })
-        return {
-            "name": self.name,
-            "anchor": [self.anchor.x(), self.anchor.y()],
-            "show_dimensions": self.show_dims,
-                # geometry stays OUT of the clipboard: paste re-detects its own
-            # corners, and carrying the source room's would silently ship them
-            # into the pasted room (the live mirror used to overwrite them,
-            # which is exactly the kind of masking P3.2 removes)
-            "properties": {k: v for k, v in self.properties.items()
-                           if k != "perimeter_corners"},
-            "walls": walls,
-        }
-
     def _boundary_band(self) -> QPainterPath:
         # wide enough to safely contain the wall centrelines: the flood
         # region edge sits up to t/2 + one raster cell from a centreline,
@@ -954,7 +894,11 @@ class RoomItem(QGraphicsItem):
         elif chosen is a_copy:
             v = self._view()
             if v is not None:
-                v.win.room_clipboard = self._copy_spec()
+                # P4.4: the clipboard holds a one-room TEMPLATE DOCUMENT --
+                # the same payload File > Save template room writes, so copy/
+                # paste and save/load template are one mechanism with a
+                # clipboard or a file in the middle
+                v.win.room_clipboard = v.win.room_template(self)
                 v.win.status(f"Copied room '{self.name}' — with the Room "
                              "Name tool active, right-click a blank spot "
                              "to paste.")

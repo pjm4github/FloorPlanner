@@ -132,6 +132,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self._dirty_timer.timeout.connect(self._commit_if_changed)
         self._dirty_timer.timeout.connect(self._update_totals)   # debounced
         self.scene.changed.connect(self._mark_dirty)
+        self.scene.selectionChanged.connect(self._sync_template_action)
         self._update_undo_actions()
 
         self.resize(1280, 860)
@@ -277,6 +278,16 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         a_v4 = QAction("Export legacy v4…", self)     # one release, so nobody
         a_v4.triggered.connect(self.export_legacy_v4)  # is stranded on v5
         m_file.addAction(a_v4)
+        m_file.addSeparator()
+        a_tload = QAction("&Load template room…", self)   # P4.4
+        a_tload.triggered.connect(self.load_template_room)
+        m_file.addAction(a_tload)
+        self.a_save_template = QAction("Sa&ve template room…", self)
+        self.a_save_template.triggered.connect(self.save_template_room)
+        self.a_save_template.setEnabled(False)   # only with a floating room
+        self.a_save_template.setToolTip(
+            "Save the selected FLOATING room as a one-room template")
+        m_file.addAction(self.a_save_template)
         m_edit = self.menuBar().addMenu("&Edit")
         m_edit.addAction(self.a_undo)    # same actions as the toolbar buttons
         m_edit.addAction(self.a_redo)
@@ -513,6 +524,15 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                     "join rooms explicitly (right-click > Join room into "
                     "plan)." if on else
                     "Shuffle mode off: automatic joining passes re-enabled.")
+
+    def _sync_template_action(self):
+        """File ▸ Save template room… is live only while exactly one FLOATING
+        room is selected (P4.4's ruled rule -- and a structural one: only a
+        floating room owns its walls outright, so only it can be cut out
+        whole)."""
+        a = getattr(self, "a_save_template", None)
+        if a is not None:
+            a.setEnabled(self.selected_floating_room() is not None)
 
     def toggle_shuffle(self):
         """Flip shuffle mode through the action, so the toolbar stays in
@@ -1374,46 +1394,22 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
 
 
     def paste_room(self, sp: QPointF):
-        """Recreate the copied room (walls, openings, properties) with its
-        anchor at `sp`; the name gets a number appended if already used."""
-        spec = self.room_clipboard
-        if not spec:
+        """Paste the copied room, centred on `sp`, as a FLOATING room.
+
+        P4.4: the clipboard holds a one-room TEMPLATE DOCUMENT, so paste is
+        `insert_room_template` -- the same operation File > Load template room
+        performs, with a clipboard instead of a file in the middle. It arrives
+        floating because it has joined nothing yet; right-click > Join room
+        into plan (or drop it outside shuffle mode) places it.
+        """
+        if not self.room_clipboard:
             return
-        src = QPointF(*spec["anchor"])
-        dx = wall_snap_len(sp.x() - src.x())   # pasted walls stay on the
-        dy = wall_snap_len(sp.y() - src.y())   # same on-centre grid
-        for wd in spec["walls"]:
-            wall = WallItem(QPointF(wd["p1"][0] + dx, wd["p1"][1] + dy),
-                            QPointF(wd["p2"][0] + dx, wd["p2"][1] + dy),
-                            wd["type"])
-            self.scene.addItem(wall)
-            for od in wd["openings"]:
-                try:
-                    op = OpeningItem(wall, od["kind"], od["code"], od["s"])
-                except ValueError as exc:
-                    report_opening_failure(self.scene, wall, od["kind"],
-                                           od["code"], od["s"],
-                                           f"{exc} (pasting)")
-                    continue
-                op.door_type = od["door_type"]
-                op.swing = od["swing"]
-                wall.openings.append(op)
-            wall.rebuild()
-        rebuild_all_walls(self.scene)
-        anchor = QPointF(src.x() + dx, src.y() + dy)
-        res = detect_room(self.scene, anchor)
-        if res is None:
-            self.status("Pasted the walls, but no enclosed room was "
-                        "detected at the paste point.")
+        room = self.insert_room_template(self.room_clipboard, at=sp)
+        if room is None:
+            self.status("Could not paste the room.")
             return
-        path, area, corners = res
-        name = unique_room_name(self.scene, spec["name"])
-        room = RoomItem(name, anchor, path, area,
-                        dict(spec["properties"]), corners)
-        room.show_dims = bool(spec["show_dimensions"])
-        self.scene.addItem(room)
-        bind_room_walls(self.scene, room)
-        self.status(f"Pasted room '{name}'.")
+        self.status(f"Pasted room '{room.name}' -- it is FLOATING: drag it "
+                    "by its name, then right-click it to join it in.")
 
     # -- CSV room import ----------------------------------------------------------
 

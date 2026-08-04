@@ -216,14 +216,23 @@ def test_the_importer_still_reads_legacy_corners(fp):
 
 
 def test_copying_a_room_does_not_carry_its_geometry(fp, win, make_room):
-    """Found by the P3.2 audit, and the mirror was MASKING it: `_copy_spec`
-    carried `dict(self.properties)`, including the SOURCE room's
+    """Found by the P3.2 audit, and the mirror was MASKING it: the clipboard
+    payload carried `dict(self.properties)`, including the SOURCE room's
     perimeter_corners, and only `_sync_corner_props` overwriting them on the
     pasted room hid the fact. With the mirror gone the stale geometry would
-    have shipped into the paste."""
+    have shipped into the paste.
+
+    REWRITTEN AT P4.4 (declared): the payload is a one-room TEMPLATE DOCUMENT
+    now (`_copy_spec`/`_perimeter_span` are deleted), so the guard is asked of
+    the document -- which is the stronger place to ask it, since that payload
+    is also what File ▸ Save template room writes to disk."""
     room = make_room(win.scene, 0, 0, 144, 120, "Den")
-    spec = room._copy_spec()
-    assert "perimeter_corners" not in spec["properties"]
+    tmpl = win.room_template(room)
+    props = (tmpl["rooms"][0].get("properties") or {})
+    assert "perimeter_corners" not in props
+    # the geometry that IS carried is the outline, on the document's own
+    # vertices -- one representation, not a second copy in a property bag
+    assert len(tmpl["rooms"][0]["outline"]) == 4
 
 
 # ------------------------------------------------------ areas across the corpus
