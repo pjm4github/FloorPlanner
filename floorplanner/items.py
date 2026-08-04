@@ -14,7 +14,9 @@ from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import WallItem, rebuild_all_walls
-from floorplanner.rooms import RoomItem, room_owns_walls, walls_cover_room
+from floorplanner.rooms import (
+    RoomItem, report_self_intersections, room_owns_walls, walls_cover_room,
+)
 from floorplanner.vertex import Vertex
 
 # Stairs — a dynamic "Framing" furnishing: step count from the room's ceiling
@@ -764,6 +766,17 @@ class GroupItem(QGraphicsItemGroup):
         return list(recs.values())
 
     @staticmethod
+    def _rooms_holding(scene, vertex_ids):
+        """Every room whose outline holds one of `vertex_ids` — the rooms a
+        corner move will reshape, found by identity rather than by proximity
+        (defect 30's lesson: ask the corner who holds it)."""
+        if scene is None or not vertex_ids:
+            return []
+        return [it for it in scene.items()
+                if isinstance(it, RoomItem)
+                and any(id(e.v) in vertex_ids for e in it.outline)]
+
+    @staticmethod
     def _apply_corner_records(recs, tr):
         """Relocate every corner to `tr` of where it STARTED, and rebind every
         wall end and outline edge on it.  Mapping from the start point rather
@@ -802,8 +815,15 @@ class GroupItem(QGraphicsItemGroup):
         self.prepareGeometryChange()
         self._obox = None                 # child coords change below
         tr = QTransform.fromTranslate(d.x(), d.y())
-        self._apply_corner_records(
-            self._corner_records(group_walls, moved_rooms), tr)
+        recs = self._corner_records(group_walls, moved_rooms)
+        # WHICH ROOMS CAN THIS DEFORM (P4.5 §2a). Not `moved_rooms`: a room the
+        # group fully owns moves RIGIDLY and cannot cross itself. The exposure
+        # is the CLIPPED room -- it holds some corners this bake moves and some
+        # it does not, so its shape changes. Gathered by vertex identity (the
+        # defect-30 gather), and gathered BEFORE the move, because
+        # `relocated_to` hands back a new object.
+        watched = self._rooms_holding(sc, {id(rec[1]) for rec in recs})
+        self._apply_corner_records(recs, tr)
         for ch in self.childItems():
             # a member WALL needs nothing here: its ends moved with the corner,
             # and the `rebuild_all_walls` below rebuilds it. Rebuilding it here
@@ -819,6 +839,10 @@ class GroupItem(QGraphicsItemGroup):
             r.update()
         self.setPos(0.0, 0.0)
         rebuild_all_walls(sc)
+        # ...and say so AT THE GESTURE if the deform crossed an outline. The
+        # document check (I5b) is deep-only and would not speak until the save
+        # refused to write -- learning at the wrong moment, defect 17's disease.
+        report_self_intersections(sc, watched)
 
     def mousePressEvent(self, e):
         if (e.button() == Qt.MouseButton.LeftButton and self.isSelected()

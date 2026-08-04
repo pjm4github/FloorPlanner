@@ -16,7 +16,7 @@ from floorplanner.geometry import *  # noqa: F401
 from floorplanner.vertex import Vertex
 from floorplanner.walls import (
     OpeningItem, WallItem, _CornerIndex, rebuild_all_walls,
-    report_opening_failure,
+    report_gesture_fault, report_opening_failure,
 )
 
 
@@ -108,6 +108,71 @@ class OutlineEdge:
     def __repr__(self):
         w = self.wall.wall_type if self.wall is not None else "open"
         return f"OutlineEdge(({self.p.x():.1f}, {self.p.y():.1f}), {w})"
+
+
+def outline_self_intersects(room) -> bool:
+    """Does this room's OWN outline cross itself? — I5b, asked of the scene.
+
+    THE SAME PREDICATE the document check uses (`validate._seg_cross`), not a
+    second one: one definition of "these two edges cross", per P3.4 point 1.
+    Only the question's *timing* differs — I5b is a deep-only document check,
+    and this asks it of a live room the instant a gesture deformed it."""
+    from floorplanner.design.validate import _seg_cross  # late: design layer
+    pts = [(c.x(), c.y()) for c in (room.corners or [])]
+    n = len(pts)
+    if n < 4:                       # a triangle cannot cross itself
+        return False
+    for i in range(n):
+        for j in range(i + 2, n):
+            if i == 0 and j == n - 1:
+                continue            # adjacent edges share a corner, not a cross
+            if _seg_cross(pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n]):
+                return True
+    return False
+
+
+def report_self_intersections(scene, rooms):
+    """Report any of `rooms` whose outline now crosses itself — P4.5's ruling
+    on §2a, and the point is WHEN it is said.
+
+    I5b already catches this exactly, but it is one of the three DEEP-ONLY
+    checks: shadow mode never runs it while editing, while `save_path` does
+    run it and REFUSES TO WRITE. So without this the user deforms a room,
+    hears nothing, and finds out at the moment they try to keep their work —
+    the same disease as defects 17 and 25, learning at the wrong moment. The
+    save refusal stays exactly as it is (P4.1: do not write a corrupt plan);
+    what changes is that the gesture speaks first.
+
+    SCOPED to the rooms a move actually carried, so the cost is edges² over a
+    handful of rooms rather than the plan. The message names the room AND the
+    remedy, per the 06c2145 standard — a diagnostic the user cannot act on is
+    only half a message.
+
+    IT DOES NOT PROMISE THAT THE SAVE WILL REFUSE, and that omission is
+    deliberate: measured, it sometimes will not. The document walk PLANARISES,
+    so two crossing outline walls are split at their intersection and the room
+    emits as a *pinched* loop that visits that point twice — which `_seg_cross`
+    does not report, because it is a PROPER-crossing test by design (it must
+    not fire on the collinear edges two rooms legitimately share). A message
+    that told the user "you cannot save this" when they demonstrably can is
+    exactly the 06c2145 failure: copy that reads as nonsense at a real value.
+    The gap itself is register row 41, filed not fixed. Returns the rooms
+    reported."""
+    bad = [r for r in rooms if outline_self_intersects(r)]
+    if not bad:
+        return []
+    names = [r.name for r in bad]
+    if len(names) == 1:
+        who = f"{names[0]}'s outline now crosses itself"
+    elif len(names) == 2:
+        who = f"{names[0]} and {names[1]} now have outlines that cross themselves"
+    else:
+        who = (f"{', '.join(names[:-1])} and {names[-1]} now have outlines "
+               f"that cross themselves")
+    report_gesture_fault(
+        scene,
+        f"{who} — undo, or extract the room before moving it.")
+    return bad
 
 
 def make_concept_room(scene, name, width_in, depth_in, at, floor=None):
