@@ -187,9 +187,10 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self.a_shuffle = QAction("Shuffle", self)
         self.a_shuffle.setCheckable(True)
         self.a_shuffle.setChecked(bool(SETTINGS.get("shuffle", False)))
+        self.a_shuffle.setShortcut("Ctrl+H")     # row 37: the ruled chord
         self.a_shuffle.setToolTip(
             "Shuffle mode: drag rooms freely -- nothing merges, welds or "
-            "binds until you join a room explicitly")
+            "binds until you join a room explicitly  [Ctrl+H]")
         self.a_shuffle.toggled.connect(self._set_shuffle)
         shuffle_btn = QToolButton()
         shuffle_btn.setDefaultAction(self.a_shuffle)
@@ -505,10 +506,23 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                         == "floating"):
                     capture_floating_furnishings(self.scene, it)
         self._mark_dirty()               # settings are document state (saved)
+        rec = getattr(self, "_recorder", None)
+        if rec is not None:              # macro recorder: any route to a
+            rec.on_shuffle(on)           # flip, as one absolute ^H token
         self.status("Shuffle mode ON: nothing merges, welds or binds -- "
                     "join rooms explicitly (right-click > Join room into "
                     "plan)." if on else
                     "Shuffle mode off: automatic joining passes re-enabled.")
+
+    def toggle_shuffle(self):
+        """Flip shuffle mode through the action, so the toolbar stays in
+        sync -- the macro runner's ^H (bare) target."""
+        self.a_shuffle.toggle()
+
+    def set_shuffle_mode(self, on):
+        """Set shuffle mode absolutely through the action -- the macro
+        runner's '^H \"on\"/\"off\"' target."""
+        self.a_shuffle.setChecked(bool(on))
 
     def set_tool(self, tool):
         self.tool = tool
