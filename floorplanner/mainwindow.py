@@ -1088,10 +1088,12 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         # WHAT IT ACTUALLY COST, measured on the pre-P4.5 tree rather than
         # assumed: it is PLAN-WIDE, so it re-decomposed walls no gesture had
         # touched -- symmetricP1 80 -> 78 items, planc1TestV5 82 -> 78,
-        # planc1.v5 83 -> 80. But the DOCUMENT is byte-identical across it on
-        # all three: those are collinear same-type segments the walk
-        # planarises to the same thing, and wall count is presentation state
-        # (P2.3). So NO GEOMETRY WAS EVER LOST -- what was wrong is that a
+        # planc1.v5 83 -> 80. But the SAVED FILE is byte-identical across it
+        # on all three -- measured on `design_document()`, the producer
+        # `_write_plan` writes, and on the literal `json.dump` output, not
+        # only on `snapshot()`: those are collinear same-type segments the
+        # walk planarises to the same thing, and wall count is presentation
+        # state (P2.3). So NO GEOMETRY WAS EVER LOST -- what was wrong is that a
         # local gesture silently reshaped the whole plan's item structure,
         # which breaks "the group moves and nothing else changes" and makes
         # undo steps that look bigger than the edit.

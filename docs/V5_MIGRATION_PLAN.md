@@ -4725,8 +4725,22 @@ notes:   THE QUESTION, asked before filing: was ungroup's plan-wide
          IDENTICAL numbers, confirming the loss came from the plan-wide
          pass and not from the group.
          AND THEN THE DECIDING MEASUREMENT, which is the one that changes
-         the filing: win.snapshot() is BYTE-IDENTICAL across merge_all on
-         all three plans. The absorbed walls are collinear same-type
+         the filing -- RE-TAKEN ON THE SAVED-FILE PRODUCER after the
+         reviewer asked which instrument it used, because the claim is
+         'nothing reached a saved plan differently' and snapshot() is
+         NOT that producer (it is canonicalize(design_from_scene(...))
+         minus provenance, unmodelled settings and active_floor):
+           snapshot()          identical on all three
+           design_document()   identical on all three  <- _write_plan's
+           json.dump bytes     identical on all three  <- the user's file
+         They agree because design_from_scene CANONICALISES internally
+         (Design.from_dict(canonicalize(...))), so both producers rest
+         on a canonical walk, and the three things design_document adds
+         are window state merge_all cannot touch. Reasoning that out
+         would have been enough to be right and not enough to be
+         MEASURED, which is the difference the census doctrine exists
+         for. The original wording said only win.snapshot() and is
+         superseded by this. The absorbed walls are collinear same-type
          segments the walk planarises to the same document, and wall count
          is PRESENTATION state (P2.3's Known-regressions row says so in as
          many words). So NO GEOMETRY WAS EVER LOST, by ungroup or
