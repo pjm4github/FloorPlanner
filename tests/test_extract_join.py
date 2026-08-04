@@ -373,3 +373,55 @@ def test_the_merge_rebind_producer_is_watched(scene):
     assert (a.p1.x(), a.p1.y(), a.p2.x(), a.p2.y()) == \
         (p1.x(), p1.y(), p2.x(), p2.y()), (
         "the float STOLE the bound-but-unnamed wall -- row 36 regressed")
+
+
+def test_a_grouped_wall_merging_is_watched_too(win):
+    """ROW 36's WATCH, EXTENDED TO THE PATH GUARD 2 OPENED (P4.5).
+
+    "Untested either way" was acceptable while a grouped wall could not
+    merge at all. `merge_wall`'s exemption came down at P4.5(7), and MERGING
+    IS THE PRODUCER -- so the reachable-but-unmeasured case is exactly the
+    one the conditional carry cares about. Required before guard 3, and the
+    trigger is a MEASUREMENT rather than the watch going red.
+
+    Same geometry as the sibling above, with the absorbing wall GROUPED."""
+    sc = win.scene
+    room = _make(sc, 0, 0, 120, 120, "R")
+    west = next(w for w in room.walls
+                if abs(w.p1.x()) < 0.5 and abs(w.p2.x()) < 0.5)
+    a = fp.WallItem(QPointF(-5, 0), QPointF(-5, 120), "interior")
+    b = fp.WallItem(QPointF(-5, 120), QPointF(-5, 240), "interior")
+    for w in (a, b):
+        sc.addItem(w)
+    fp.rebuild_all_walls(sc)
+    sc.clearSelection()
+    for w in (a, b):
+        w.setSelected(True)
+    win.group_selected()
+    assert a.group() is not None, "precondition: the absorber is grouped"
+
+    fp.merge_wall(sc, a)
+
+    # -- PRECONDITIONS, asserted rather than branched on (the sibling's
+    # discipline, and the boundary-marker rule: a test about what did or did
+    # not happen must first establish that the conditions for it were there).
+    # MEASURED 2026-08-04: all three hold -- a grouped merge DOES mint
+    # binding-without-naming, which is what re-opened row 36's argument.
+    assert west.scene() is None, (
+        "precondition lost: the grouped merge no longer absorbs -- re-argue "
+        "register row 36 before touching this test")
+    assert a in room.walls and room in a.rooms, (
+        "precondition lost: the grouped merge no longer rebinds the absorbed "
+        "wall's room")
+    assert all(e.wall is not a for e in room.outline), (
+        "precondition lost: the survivor is NAMED by the outline, so the "
+        "binding-without-naming state no longer arises on this path")
+    # -- VERDICT, same as the sibling: extract must release it
+    p1, p2 = QPointF(a.p1), QPointF(a.p2)
+    fp.extract_room(sc, room)
+    assert a not in room.walls, (
+        "extract took a wall no outline edge names -- the straggler class, "
+        "reached through a GROUPED merge")
+    room._translate(0, 300)
+    assert (a.p1.x(), a.p1.y(), a.p2.x(), a.p2.y()) == \
+        (p1.x(), p1.y(), p2.x(), p2.y()), "the float stole a grouped wall"
