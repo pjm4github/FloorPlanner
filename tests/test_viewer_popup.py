@@ -151,14 +151,18 @@ def test_the_surface_format_guard_is_import_safe():
 def test_the_qml_document_ships_beside_the_module():
     """The scene graph is a real .qml on disk (not an inline temp file), and
     it is packaged -- a viewer whose QML is missing renders nothing."""
-    import tomllib
     from pathlib import Path
 
     from floorplanner.viewer import fp3dq
     p = Path(fp3dq.QML_PATH)
     assert p.is_file() and p.name == "scene.qml"
     assert "View3D" in p.read_text(encoding="utf-8")
+    # read as TEXT, not via tomllib: this project supports py3.10, where
+    # tomllib does not exist (caught by CI's 3.10 leg, not by the 3.13 box
+    # it was written on -- which is exactly what that leg is for)
     root = Path(__file__).resolve().parent.parent
-    data = tomllib.load(open(root / "pyproject.toml", "rb"))
-    pkg = data["tool"]["setuptools"]["package-data"]
-    assert "scene.qml" in pkg["floorplanner.viewer"]
+    toml = (root / "pyproject.toml").read_text(encoding="utf-8")
+    line = next((ln for ln in toml.splitlines()
+                 if ln.strip().startswith('"floorplanner.viewer"')), None)
+    assert line is not None, "floorplanner.viewer has no package-data entry"
+    assert "scene.qml" in line, line
