@@ -356,7 +356,31 @@ def apply_merge_plan_to_scene(scene, plan, rebuild=True):
                 if op.scene() is not None:
                     scene.removeItem(op)
         surv.openings = keep
+        # THE OUTLINE DECIDES WHICH WALLS ARE A ROOM'S -- register row 36,
+        # fixed at source at P4.5. This rebind used to be unconditional: every
+        # room that bordered an ABSORBED wall was bound to the survivor,
+        # whether or not the survivor ran along any edge that room actually
+        # has. A room 5" from the survivor's line came away bound to a wall no
+        # outline edge named -- binding without naming -- and the wall then
+        # rode out with the room on the next extract until step 1b started
+        # releasing it.
+        #
+        # That release is a NET UNDER THE HOLE, not a closed hole: every time
+        # the producer's surface widened (a grouped wall may merge since
+        # P4.5(7)) the net's coverage became a fresh question. Closing it here
+        # retires the question. And the condition is not invented for the
+        # occasion -- it is the thesis this phase has enforced everywhere
+        # else (`room_walls()` over `bounding_walls()`, the outline as the
+        # single answer to which walls are a room's). This rebind was the last
+        # site holding a different answer.
+        from floorplanner.rooms import _wall_spans_segment  # late (cycle)
         for r in rooms:
+            corners = r.corners or []
+            n = len(corners)
+            if n and not any(_wall_spans_segment(surv, corners[i],
+                                                 corners[(i + 1) % n])
+                             for i in range(n)):
+                continue                   # spans no edge this room has
             r.bind_wall(surv)
         survivors.append(surv)
         if rebuild:
