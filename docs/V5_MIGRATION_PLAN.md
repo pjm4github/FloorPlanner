@@ -24,6 +24,8 @@ notes:   <anything surprising — especially a test you had to change and why>
 
 **Code reaches Claude Code as INSTRUCTIONS, not whole-file handoffs — added 2026‑08‑04, and it is Patrick's rule about Patrick's own habit.** A whole-file replacement sent to be "diffed in" silently overwrites work the repo's discipline already produced: the viewer's B023 closure fix was made at source under the P0.1 standing rule, then lost when a newer copy of `fp3d.py` arrived as a file rather than as a change, and had to be re-applied a second time. The lint bar, the fail-first receipts and the at-source fixes are only worth what they survive; a handoff that bypasses them spends the same effort twice and quietly re-opens closed findings. This applies to the viewer exactly as it does to everything else.
 
+**A tidy-up pass that outlives the mess it tidied only touches things nobody asked it to — added 2026‑08‑04, as a general rule.** Recorded here rather than beside the function that prompted it, because it is not an observation about that function. A cleanup exists to repair a specific mess; when the mess is designed out, the pass does not become harmless, it becomes an unexplained side effect of whatever gesture still calls it. Found at P4.5: `ungroup` ran a **plan-wide** `merge_all` whose only job was absorbing the copies grouping used to make. **Measured on the pre-P4.5 tree before filing** — the honest answer mattered, because "it deletes geometry" and "it re-decomposes items" are different defects: scene items fell 80→78 / 82→78 / 83→80 on three plans, but the emitted **document was byte-identical in every case**, so nothing was ever lost; wall count is presentation state (P2.3). The cost was that a local gesture silently reshaped the whole plan's item structure. **Phase 6 meets this rule again when `snapshot()` retires** — the debounced full-document snapshot exists to serve snapshot-undo, and once the command stack owns undo, every remaining caller of it needs re-justifying rather than inheriting.
+
 **A changed test is a red flag, not a detail.** If a task required editing an existing assertion, say so explicitly. Half this migration's risk lives in tests being quietly relaxed to match new behaviour.
 
 **Prompt shape for Claude Code:**
@@ -4698,5 +4700,56 @@ notes:   ROW 41 NOW CARRIES MEASURED FIXTURES, verified here rather than
          flip in the no-copy sub-commit is therefore not a bug fix but the
          PROOF THE MECHANISM ACTUALLY CHANGED -- if it still xfails after
          duplicate_wall dies, the death was cosmetic.
+
+P4.5(2a) the ungroup-merge question, measured on the PRE-P4.5 tree, and a
+         claim of my own withdrawn
+ruff:    clean
+pytest:  602 passed, 7 deselected, 3 xfailed (sum 612; trailer in the commit)
+files:   mainwindow.py (the comment corrected), this file (the rule + this
+         block).
+notes:   THE QUESTION, asked before filing: was ungroup's plan-wide
+         merge_all destroying geometry BEFORE P4.5, or only after the
+         copies stopped hiding it? Two filings hung on it -- "a pass that
+         was about to become harmful" (one line) versus "the shipped app
+         has been silently deleting walls from real plans" (an F5-family
+         defect, with a note that saved plans may have lost geometry).
+         MEASURED in a worktree at main@adaa519. The isolation that makes
+         it decisive: merge_all is PLAN-WIDE, so it does not care whether
+         a wall was in the group -- running it alone on a freshly loaded
+         file answers the question without any grouping at all.
+           symmetricP1.json    scene walls 80 -> 78
+           planc1TestV5.json   scene walls 82 -> 78
+           planc1.v5.json      scene walls 83 -> 80
+           fiveRoomTest.json   scene walls 16 -> 16
+         End-to-end (group everything, bake a move, ungroup) gives the
+         IDENTICAL numbers, confirming the loss came from the plan-wide
+         pass and not from the group.
+         AND THEN THE DECIDING MEASUREMENT, which is the one that changes
+         the filing: win.snapshot() is BYTE-IDENTICAL across merge_all on
+         all three plans. The absorbed walls are collinear same-type
+         segments the walk planarises to the same document, and wall count
+         is PRESENTATION state (P2.3's Known-regressions row says so in as
+         many words). So NO GEOMETRY WAS EVER LOST, by ungroup or
+         otherwise, and this files as (1): a pass removed before it became
+         harmful. One line, no defect number, nothing for SANITY_CHECK.md.
+         A CLAIM OF MINE IS WITHDRAWN. P4.5(2)'s message said the ungroup
+         "absorbed 2 REAL walls that no gesture asked it to touch" and
+         called it "purely destructive". The first half is true of wall
+         ITEMS and the second half is false: nothing was destroyed. The
+         code comment is corrected to the measured truth, and the
+         correction is recorded here rather than amended away -- the same
+         discipline as defect 32's withdrawal and defect 23's.
+         WHAT WAS ACTUALLY WRONG, stated accurately: a LOCAL gesture
+         silently reshaped the WHOLE plan's item structure, which breaks
+         "the group moves and nothing else changes" and makes an undo step
+         look bigger than the edit that caused it. That is reason enough
+         to remove it, and it is the reason the task line already gave.
+         THE RULE IS RECORDED IN THE WORKING AGREEMENT, not beside the
+         function, because it is general: "a tidy-up pass that outlives
+         the mess it tidied only touches things nobody asked it to."
+         Phase 6 meets it again when snapshot() retires -- the debounced
+         full-document walk exists to serve snapshot-undo, and once the
+         command stack owns undo every remaining caller needs
+         re-justifying rather than inheriting.
 
 ```

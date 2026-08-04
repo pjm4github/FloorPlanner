@@ -1083,10 +1083,18 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         # REMOVED AT P4.5, exactly as the task line called for ("no
         # duplicate_wall, no coalesce_all on ungroup"). The merge existed to
         # clean up the COPIES grouping used to make; with nothing duplicated
-        # there is nothing to clean, and running it anyway is destructive --
-        # measured on symmetricP1, the ungroup absorbed 2 real walls (80 ->
-        # 78) that no gesture asked it to touch. A tidy-up pass that outlives
-        # the mess it tidied only deletes the user's geometry.
+        # there is nothing to clean.
+        #
+        # WHAT IT ACTUALLY COST, measured on the pre-P4.5 tree rather than
+        # assumed: it is PLAN-WIDE, so it re-decomposed walls no gesture had
+        # touched -- symmetricP1 80 -> 78 items, planc1TestV5 82 -> 78,
+        # planc1.v5 83 -> 80. But the DOCUMENT is byte-identical across it on
+        # all three: those are collinear same-type segments the walk
+        # planarises to the same thing, and wall count is presentation state
+        # (P2.3). So NO GEOMETRY WAS EVER LOST -- what was wrong is that a
+        # local gesture silently reshaped the whole plan's item structure,
+        # which breaks "the group moves and nothing else changes" and makes
+        # undo steps that look bigger than the edit.
         rebuild_all_walls(self.scene)     # rooms re-derive region/outline
         self.status("Ungrouped — items left in place.")
 
