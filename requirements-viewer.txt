@@ -1,0 +1,5 @@
+# 3D viewer (floorplanner/viewer/fp3d.py) -- optional; the editor runs without it.
+#     pip install -r requirements-viewer.txt
+-r requirements.txt
+pyqtgraph>=0.13
+PyOpenGL>=3.1

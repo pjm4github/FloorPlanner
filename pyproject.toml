@@ -16,16 +16,27 @@ dependencies = [
     "numpy>=1.24",                    # fp_extract.py + Import-from-image
 ]
 
+[project.optional-dependencies]
+# The 3D viewer (floorplanner/viewer/fp3d.py).  Optional on purpose: the editor runs
+# without it, and CI has no OpenGL surface, so the base install and all four
+# CI jobs are unchanged.  Install with:
+#     pip install -e ".[viewer]"        or   pip install -r requirements-viewer.txt
+viewer = [
+    "pyqtgraph>=0.13",
+    "PyOpenGL>=3.1",
+]
+
 [project.urls]
 Homepage = "https://github.com/pjm4github/FloorPlanner"
 
 [project.scripts]
 floorplanner = "floorplanner.app:main"
+fp3d = "floorplanner.viewer.fp3d:main"
 
 [tool.setuptools]
 # the app package (+ the design subpackage), plus the top-level shim and
 # headless tools as modules
-packages = ["floorplanner", "floorplanner.design"]
+packages = ["floorplanner", "floorplanner.design", "floorplanner.viewer"]
 py-modules = ["FloorPlanner", "fp_macro", "fp_extract"]
 
 [tool.setuptools.package-data]
