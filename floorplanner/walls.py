@@ -535,9 +535,18 @@ def weld_scene(scene, max_passes=6):
         return (0, 0)
     moved = 0
     for _ in range(max_passes):
+        # GROUPED WALLS SNAP SINCE P4.5 -- the last of the four exemptions,
+        # and by then the smallest: this filter only ever covered the SNAP
+        # half. The SHARE half is `share_coincident_ends`, which scopes
+        # itself by `graph_from_scene` and so opened at the visibility
+        # retirement (measured: (0,0) -> (0,1)). The census entry that said
+        # "grouped ends never weld" was therefore half wrong, which is why
+        # behavioural claims get measured like counts. The reason the filter
+        # existed is the reason all four had: a grouped wall was a COPY lying
+        # on its original, and snapping one to the other would have closed a
+        # gap that did not exist between two walls that were the same wall.
         walls = sorted((w for w in scene.items()
-                        if isinstance(w, WallItem)
-                        and w.group() is None),
+                        if isinstance(w, WallItem)),
                        key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()))
         step = sum(_snap_wall_ends(scene, w) for w in walls)
         moved += step

@@ -784,17 +784,19 @@ def test_the_planner_can_see_a_grouped_wall(fp, win, make_room):
         "the planner is blind to a grouped wall -- F1/F2 by hand")
 
 
-def test_a_grouped_wall_merges_but_still_does_not_weld(fp, win):
-    """THE BOUNDARY MARKER, MOVED -- it expired exactly where it was declared
-    to (was ..._is_not_permission_to_merge_it, retired at the merge_wall
-    sub-commit as pre-declared).
+def test_a_grouped_wall_merges_and_welds_like_any_other(fp, win):
+    """THE BOUNDARY MARKER, RETIRED -- there is no boundary left to mark.
 
-    A grouped wall may now MERGE: the refusal existed because a grouped wall
-    was a copy sitting on the original it came from, and merging those two
-    would have fused a wall with its own shadow. Nothing is copied now.
-    WELDING is still refused -- that is `weld_scene`, the next sub-commit and
-    its own rollback point -- so this keeps marking the line, one guard
-    further along, and expires there in turn."""
+    It moved twice and expired both times exactly where it was declared to:
+    at merge_wall (was ..._is_not_permission_to_merge_it) and again here at
+    weld_scene, on its own words, "the snap half no longer declines -- guard
+    3 expired". All four group exemptions are down, so this is now an
+    ordinary regression test: a grouped wall is a plan wall that happens to
+    be selected, and every topology pass treats it as one.
+
+    Kept rather than deleted because the assertions are the contract -- the
+    thing a future change would break -- even though the marker role is
+    over."""
     sc = win.scene
     a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
     b = fp.WallItem(QPointF(60, 0), QPointF(180, 0), "interior")  # overlapping
@@ -809,12 +811,11 @@ def test_a_grouped_wall_merges_but_still_does_not_weld(fp, win):
     assert a.scene() is sc and a.group() is not None, (
         "the survivor left the group -- a merge must not empty it")
 
-    # WELD IS HALF OPEN ALREADY, and measuring that is what corrected the
-    # record: weld_scene's SNAP half filters grouped walls itself, but its
-    # SHARE half is `share_coincident_ends`, which scopes itself by
-    # `graph_from_scene` -- so retiring the VISIBILITY guard silently granted
-    # sharing (measured: (0,0) at 7a00fe1, (0,1) at ac86173). The remaining
-    # guard is therefore snap-only, and that is what expires next.
+    # ...and welding, BOTH halves. The snap half filtered grouped walls until
+    # guard 3; the share half is `share_coincident_ends`, which scopes itself
+    # by `graph_from_scene` and so opened at the visibility retirement
+    # (measured: (0,0) at 7a00fe1, (0,1) at ac86173 -- which is how the
+    # "grouped ends never weld" census claim was found to be half wrong).
     c = fp.WallItem(QPointF(400, 0), QPointF(520, 0), "interior")
     d = fp.WallItem(QPointF(520, 0.4), QPointF(640, 0.4), "interior")
     for w in (c, d):
@@ -825,6 +826,7 @@ def test_a_grouped_wall_merges_but_still_does_not_weld(fp, win):
         w.setSelected(True)
     win.group_selected()
     moved, shared = fp.weld_scene(sc)
-    assert moved == 0, "the snap half no longer declines -- guard 3 expired"
-    assert shared >= 1, (
-        "the share half declined; it has not since the visibility guard fell")
+    assert moved >= 1, "the snap half still declines a grouped end"
+    assert shared >= 1, "the share half still declines a grouped end"
+    # the 0.4" gap really closed -- the ends are one point now
+    assert c.p2.y() == pytest.approx(d.p1.y(), abs=1e-6)
