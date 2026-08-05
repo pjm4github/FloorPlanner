@@ -52,11 +52,27 @@ repo root so relative paths like `examples/foo.json` resolve.
   `center` to a span along the wall. This mirrors the schema's own reasoning:
   an offset from a named end survives the wall being stretched, split, or
   reversed; an absolute `s` survives none of those.
-* **Colour comes from three tables** near the top of `fp3d.py` — `WALL_C` by
-  wall type, `FLOOR_C` by room category, `FAMILY_C` by furnishing material
-  family. But see the palette caveat in §5: **these values are tuned for
-  `fp3d`'s baked flat shading and read much darker under Qt Quick 3D's PBR
-  lighting.** The palette is renderer-dependent; that is a finding, not a bug.
+* **Colour has two sources, and the split is the point.** `WALL_C` by wall
+  type and `FLOOR_C` by room category live in `fp3d.py`, because both are
+  typed by the **document**. Furnishing colour does not: it comes from
+  `assets/furnishings/materials.json`, keyed by the `material` name each
+  catalog entry carries, and neither viewer states a furnishing colour,
+  size, height or roughness of its own. See the palette caveat in §5:
+  **these values are tuned for `fp3d`'s baked flat shading and read much
+  darker under Qt Quick 3D's PBR lighting.** The palette is
+  renderer-dependent; that is a finding, not a bug.
+* **The furnishing catalog is READ, never restated.** `load_catalog()` reads
+  `manifest.json` and `materials.json` as data — no `floorplanner` import, so
+  the isolation above is untouched — and resolves them by walking **up** from
+  the module to the directory holding `assets/`, so it works as a script, as
+  an import, and from any working directory. A missing catalog is **reported**
+  and the item drawn at a default box; it is never raised and never silently
+  guessed. `fp3d.py` used to carry its own `FURN` table of footprints and a
+  `FAMILY_C` of colours, and `fp3dq._pbr` its own roughness/metalness by mesh
+  name. Both are gone: **58 of the 95 catalog kinds were missing from `FURN`
+  altogether, and of the 37 it shared, 22 disagreed on footprint — three by
+  transposing width and depth, so the item rendered rotated 90°.** A second
+  definition of catalog data does not merely duplicate it; it drifts.
 * **Every face is wound outward.** `_box` normalises the winding of whatever
   quad the caller hands it, and the floor builder emits top faces `+z` and
   bottom faces `-z`. This is not cosmetic: signed lighting renders an
@@ -238,9 +254,10 @@ time the two are compared side by side.
 Now mostly **assets, not architecture**:
 
 1. **Furniture as real models.** The catalog would carry a glTF per kind
-   alongside its 2D symbol; `FURN`'s box dimensions become the fallback and the
-   placement bounds. This is the largest remaining item and it is an asset
-   problem more than a code one.
+   alongside its 2D symbol; the manifest's `width_in`/`depth_in`/`height_in`
+   become the fallback and the placement bounds — they are already the single
+   source, so nothing has to be reconciled first. This is the largest
+   remaining item and it is an asset problem more than a code one.
 2. **Textures.** Wood grain, tile, rugs, counters. Cheap once UV coordinates
    are generated, which for axis-aligned walls and floors is close to trivial.
 3. **Materials from the document.** Drive colour from
@@ -255,6 +272,19 @@ Now mostly **assets, not architecture**:
 5. **A cutaway camera.** The reference images are orthographic-ish dollhouse
    views with the ceiling removed — which is already the case here, since no
    ceilings are generated.
+
+6. **The rest of the `form` generators — and `prism` first.** Each catalog
+   entry names a `form`; `build_solid()` builds `box` and `slab` (a top on
+   legs), and every other recognised form — `seat`, `bed`, `basin`,
+   `enclosure`, `vehicle`, `planting` — is built as a box and **said so in the
+   report's info channel**, which is what makes this a known gap rather than a
+   silent guess. **`prism` is the next one and is the interesting one:** it
+   extrudes the symbol's own SVG outline, so a round table is round and an
+   L-shaped desk is L-shaped, with no second drawing to maintain — the 2D
+   symbol already *is* the plan profile, at true scale in inches, which is why
+   this is the highest-value form and not merely the next one on the list. A
+   form nothing recognises is treated exactly like an unknown kind: box shape,
+   magenta, named in the notes.
 
 An **offline render** path (export glTF, render headless in Blender/Cycles for
 presentation images) remains open and would share `build_model` too. That is the
@@ -337,8 +367,13 @@ and it sits inside an `except ImportError`.
 
 * No ceilings, roofs, or floor-to-floor structure; multi-level plans stack by
   `elevation_in` but nothing spans between them.
-* Furniture rotation is honoured; furniture *elevation* is not (everything sits
-  on the level's floor — no wall-mounted or counter-top items).
+* ~~Furniture *elevation* is not honoured.~~ **Closed.** Each catalog entry
+  carries `elevation_in`, the height of the item's underside above the level's
+  floor, and `build_solid` builds a wall-hung item exactly like a
+  floor-standing one, higher up — no second code path. Eight items are off
+  the floor: the three upper cabinets at 54″, `large_tv` at 42″,
+  `electric_panel` at 48″, `car_charger` at 42″, `battery_wall` at 24″, and
+  the counter-mounted `kitchen_sink` at 26″, whose rim then lands at 36″.
 * Room `holes` in the schema are ignored.
 * Door leaves, swings and window frames are not drawn — an opening is a void.
 * `fp3d.py --shot` grabs the framebuffer after three `processEvents` calls,
@@ -346,6 +381,16 @@ and it sits inside an `except ImportError`.
 * `fp3dq.py` has no view presets (the pyqtgraph viewer's T / F / S / I / R) and
   no `--xray`, `--edges`, `--obj` or `--dump`; it is a presentation view, not a
   replacement CLI.
-* Neither viewer has any test coverage. `build_model` is pure and headless and
-  would be straightforward to pin — outline degeneracy handling and
-  `opening_span`'s three anchor cases are the obvious first assertions.
+* ~~Neither viewer has any test coverage.~~ **Partly closed.**
+  `tests/test_viewer_model.py` (11 tests, marker `viewer`) pins the catalog's
+  3D data and what `build_model` does with it: every entry carries a usable
+  `height_in`/`elevation_in`/`form`/`material`; every material named resolves;
+  an unknown form falls back to a box **in magenta and is reported**;
+  `elevation_in` puts an item off the floor, with a floor-standing control so
+  the assertion discriminates; a missing catalog is reported rather than
+  raised; and — in a subprocess, because this session has already imported
+  both — `build_model` pulls in neither Qt nor `floorplanner`. The module is
+  loaded **by path**, the way running it as a script loads it; importing
+  `floorplanner.viewer.fp3d` would drag in the whole editor and quietly test
+  something else. **Still unpinned, and still the obvious next assertions:**
+  outline degeneracy handling and `opening_span`'s three anchor cases.
