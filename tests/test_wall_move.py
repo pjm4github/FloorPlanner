@@ -896,3 +896,129 @@ def test_a_partial_side_slide_steps_the_neighbours_outline(fp, scene):
     assert step is not None and step.wall is None, "the step must be OPEN"
     assert [(p.x(), p.y()) for p in rooms["Clst"].corners] == clst_before, \
         "Clst borders only the continuation and must not move"
+
+
+# --------------------------------------------------------------------------
+# P4.5: the endpoint drag joins the vertex ops (the P3.1 shim, writer 4 of 4)
+# --------------------------------------------------------------------------
+def _press_move_release(wall, points, mods=Qt.KeyboardModifier.NoModifier):
+    """Drive one gesture directly on the item, sampling identity per event.
+
+    Direct rather than through the `drag` fixture on purpose: what is under
+    test is what each MOUSE-MOVE EVENT does to identity, so the events have to
+    be individually addressable."""
+    class _Ev:
+        def __init__(self, p):
+            self._p = p
+
+        def scenePos(self):
+            return self._p
+
+        def button(self):
+            return Qt.MouseButton.LeftButton
+
+        def modifiers(self):
+            return mods
+
+        def accept(self):
+            pass
+
+        def ignore(self):
+            pass
+
+    wall.mousePressEvent(_Ev(points[0]))
+    seen = []
+    for p in points[1:]:
+        wall.mouseMoveEvent(_Ev(p))
+        seen.append(wall.end_vertex("p2"))
+    wall.mouseReleaseEvent(_Ev(points[-1]))
+    return seen
+
+
+def _corner_pair(fp, scene):
+    """Two walls welded at (120, 0) -- so there is a shared corner to leave."""
+    a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    b = fp.WallItem(QPointF(120, 0), QPointF(120, 96), "interior")
+    scene.addItem(a)
+    scene.addItem(b)
+    fp.weld_scene(scene)
+    fp.rebuild_all_walls(scene)
+    return a, b
+
+
+def test_an_endpoint_drag_detaches_once_per_gesture_not_once_per_event(
+        fp, scene):
+    """THE SPLIT BELONGS TO THE GESTURE, NOT TO THE EVENT.
+
+    Assigning `p1`/`p2` is split-on-write, so the old endpoint drag minted a
+    fresh `Vertex` -- and a fresh uid -- on every mouse-move event that moved
+    the end, re-seating the end's opening anchors each time. The semantics were
+    right and are unchanged: an endpoint drag DETACHES this end and leaves
+    anything sharing the corner where it was. What is under test is that the
+    detach happens ONCE and the corner is then RELOCATED, identity intact."""
+    a, b = _corner_pair(fp, scene)
+    assert a.end_vertex("p2") is b.end_vertex("p1"), \
+        "precondition: the two walls share the corner being dragged"
+    shared = b.end_vertex("p1")
+
+    seen = _press_move_release(
+        a, [QPointF(120, 0)] + [QPointF(120 + 6 * i, 0) for i in range(1, 8)])
+
+    assert a._mode is None, "the gesture ended"
+    moved = [v for v in seen if v is not shared]
+    assert moved, "precondition: the drag actually moved the end off the corner"
+    # ONE detached corner for the whole gesture, whatever the event count
+    assert len({v.uid for v in moved}) == 1, \
+        f"the end changed identity {len({v.uid for v in moved})} times in one drag"
+    # ...and the neighbour never moved, which is what "detach" means
+    assert b.end_vertex("p1") is shared
+    assert (b.p1.x(), b.p1.y()) == (120.0, 0.0)
+    assert a.end_vertex("p2") is not b.end_vertex("p1")
+    assert a.p2.x() == pytest.approx(162.0)
+
+
+def test_pressing_an_endpoint_without_moving_leaves_the_corner_shared(
+        fp, scene):
+    """The detach is LAZY, and that is behaviour worth keeping rather than an
+    accident of the old setter: `moved_to` returned `self` unchanged on a
+    zero-length move, so a press-and-release never took a corner apart. A
+    detach-at-press would have broken a corner on a click."""
+    a, b = _corner_pair(fp, scene)
+    shared = a.end_vertex("p2")
+    assert shared is b.end_vertex("p1"), "precondition: the corner is shared"
+
+    seen = _press_move_release(a, [QPointF(120, 0), QPointF(120, 0)])
+
+    assert a._mode is None
+    assert seen, "precondition: at least one move event was delivered"
+    assert all(v is shared for v in seen), \
+        "a gesture that moved nothing still took the corner apart"
+    assert a.end_vertex("p2") is b.end_vertex("p1")
+
+
+def test_the_endpoint_drag_runs_on_the_same_applier_as_the_body_drag(fp, scene):
+    """Row 42 names THREE structurally identical corner-appliers as a
+    Phase-6 consolidation candidate. This change must not make it four: the
+    endpoint drag now uses `_DragVertex` -- the body drag's applier -- and
+    differs only in WHAT IT GATHERS (one deliberately detached end, rather
+    than every end on the corner). The gather is where body and endpoint
+    drags should differ; the application is not."""
+    from floorplanner.walls import _DragVertex
+    a, _b = _corner_pair(fp, scene)
+    _press_move_release(a, [QPointF(120, 0), QPointF(150, 0), QPointF(162, 0)])
+    # the gesture cleared it on release, so re-run one press+move and look
+    a.mousePressEvent(type("E", (), {
+        "scenePos": lambda s: QPointF(162, 0),
+        "button": lambda s: Qt.MouseButton.LeftButton,
+        "modifiers": lambda s: Qt.KeyboardModifier.NoModifier,
+        "accept": lambda s: None, "ignore": lambda s: None})())
+    assert a._mode in ("p1", "p2"), "precondition: an endpoint drag started"
+    a.mouseMoveEvent(type("E", (), {
+        "scenePos": lambda s: QPointF(180, 0),
+        "button": lambda s: Qt.MouseButton.LeftButton,
+        "modifiers": lambda s: Qt.KeyboardModifier.NoModifier,
+        "accept": lambda s: None, "ignore": lambda s: None})())
+    assert isinstance(a._ep_move, _DragVertex), \
+        "the endpoint drag grew its own applier instead of joining the existing one"
+    assert len(a._ep_move.ends) == 1, \
+        "an endpoint drag must carry exactly the end it grabbed"

@@ -1190,6 +1190,7 @@ class WallItem(QGraphicsItem):
         self._drawing = False         # True while being rubber-banded
         self._mode = None             # None | 'p1' | 'p2' | 'move'
         self._vmoves = []             # P3.3: the corners a body-drag moves
+        self._ep_move = None          # the ONE corner an endpoint drag detaches
         self._path = QPainterPath()
         self._solid = QPainterPath()     # body footprint, no opening holes
         self._outline_clip = None        # outline-clip so junctions read solid
@@ -1538,6 +1539,7 @@ class WallItem(QGraphicsItem):
         # want never buries it behind a coincident/crossing room wall
         bring_to_front(self)
 
+        self._ep_move = None               # a fresh gesture detaches nothing yet
         if near_p1:
             self._mode = "p1"
             self._anchor = QPointF(self.p2)
@@ -2010,16 +2012,49 @@ class WallItem(QGraphicsItem):
                     dv.edges.append(e)
         self._vmoves = moves
 
+    def _drag_end_to(self, attr, p: QPointF):
+        """Stretch ONE end to `p` -- the endpoint drag, on the vertex ops.
+
+        THE SEMANTICS ARE UNCHANGED AND ARE THE POINT: an endpoint drag DETACHES
+        this end from any corner it shared ("this wall's end moved, and anything
+        sharing it did not"), which is `vertex.moved_to`'s contract and the
+        designed open-side behaviour (defect 30's row draws exactly this line
+        against the BODY drag, where the corner carries everything on it).
+
+        What changes is WHEN the detach happens. Assigning `p1`/`p2` split on
+        every mouse-move event, so one gesture minted a fresh `Vertex` -- and a
+        fresh uid -- several times over, re-seating the end's opening anchors
+        each time. **The split belongs to the GESTURE, not to the event.** So it
+        happens once, lazily, on the first event that actually moves the end;
+        afterwards the detached corner is RELOCATED, which is identity-carrying,
+        exactly as the body drag has done since P3.3.
+
+        Lazily, because a press-and-release that never moves must not take a
+        corner apart: `moved_to` returned `self` unchanged on a zero-length
+        move, and that no-op is behaviour worth keeping, not an accident."""
+        dv = self._ep_move
+        if dv is None:
+            cur = self.end_vertex(attr)
+            here = cur.point()
+            if p.x() == here.x() and p.y() == here.y():
+                return                      # not moved yet: stay shared
+            # the one deliberate split of this gesture. `set_end_vertex` carries
+            # any opening anchored to the old corner across, because the
+            # replacement is in the same place (`_fuse_anchors`).
+            fresh = Vertex.at(here)
+            self.set_end_vertex(attr, fresh)
+            dv = self._ep_move = _DragVertex(fresh)
+            dv.ends.append((self, attr))
+        dv.apply(p.x() - dv.orig.x(), p.y() - dv.orig.y())
+
     def mouseMoveEvent(self, e):
         if self._mode is None:
             return
         sp = e.scenePos()
         target = (self._corner_target if self.rooms
                   else self._endpoint_target)
-        if self._mode == "p1":
-            self.p1 = target(sp, e.modifiers())
-        elif self._mode == "p2":
-            self.p2 = target(sp, e.modifiers())
+        if self._mode in ("p1", "p2"):
+            self._drag_end_to(self._mode, target(sp, e.modifiers()))
         elif self._mode == "move":
             delta = QPointF(sp.x() - self._press.x(), sp.y() - self._press.y())
             if e.modifiers() & Qt.KeyboardModifier.ControlModifier:
@@ -2133,6 +2168,7 @@ class WallItem(QGraphicsItem):
                 self._corners_unlocked = False
                 self.primary_room.raise_to_front()   # normalise z to siblings
         self._mode = None
+        self._ep_move = None
         e.accept()
 
     def contextMenuEvent(self, e):
