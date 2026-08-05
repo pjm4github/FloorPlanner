@@ -52,11 +52,27 @@ repo root so relative paths like `examples/foo.json` resolve.
   `center` to a span along the wall. This mirrors the schema's own reasoning:
   an offset from a named end survives the wall being stretched, split, or
   reversed; an absolute `s` survives none of those.
-* **Colour comes from three tables** near the top of `fp3d.py` — `WALL_C` by
-  wall type, `FLOOR_C` by room category, `FAMILY_C` by furnishing material
-  family. But see the palette caveat in §5: **these values are tuned for
-  `fp3d`'s baked flat shading and read much darker under Qt Quick 3D's PBR
-  lighting.** The palette is renderer-dependent; that is a finding, not a bug.
+* **Colour has two sources, and the split is the point.** `WALL_C` by wall
+  type and `FLOOR_C` by room category live in `fp3d.py`, because both are
+  typed by the **document**. Furnishing colour does not: it comes from
+  `assets/furnishings/materials.json`, keyed by the `material` name each
+  catalog entry carries, and neither viewer states a furnishing colour,
+  size, height or roughness of its own. See the palette caveat in §5:
+  **these values are tuned for `fp3d`'s baked flat shading and read much
+  darker under Qt Quick 3D's PBR lighting.** The palette is
+  renderer-dependent; that is a finding, not a bug.
+* **The furnishing catalog is READ, never restated.** `load_catalog()` reads
+  `manifest.json` and `materials.json` as data — no `floorplanner` import, so
+  the isolation above is untouched — and resolves them by walking **up** from
+  the module to the directory holding `assets/`, so it works as a script, as
+  an import, and from any working directory. A missing catalog is **reported**
+  and the item drawn at a default box; it is never raised and never silently
+  guessed. `fp3d.py` used to carry its own `FURN` table of footprints and a
+  `FAMILY_C` of colours, and `fp3dq._pbr` its own roughness/metalness by mesh
+  name. Both are gone: **58 of the 95 catalog kinds were missing from `FURN`
+  altogether, and of the 37 it shared, 22 disagreed on footprint — three by
+  transposing width and depth, so the item rendered rotated 90°.** A second
+  definition of catalog data does not merely duplicate it; it drifts.
 * **Every face is wound outward.** `_box` normalises the winding of whatever
   quad the caller hands it, and the floor builder emits top faces `+z` and
   bottom faces `-z`. This is not cosmetic: signed lighting renders an
@@ -139,6 +155,46 @@ should be visible.
 
 ---
 
+### The viewer as a second opinion on the invariants
+
+The viewer reads **the same documents the editor does** and fails **differently**,
+and that difference is the whole reason `--dump` is worth running. The editor's
+invariants ask *is this document legal*. The geometry pass asks *can this be
+drawn* — and it must clean an outline before it can triangulate one, so it names
+degeneracies no invariant is looking for. Two independent readers of one file,
+failing on different things, is a check; two readers sharing a definition is not.
+
+```
+python floorplanner/viewer/fp3d.py <plan.json> --dump -v
+```
+
+**Anything listed under "needed attention" is a claim no invariant makes.** That
+is the value and equally the limit: a clean `--dump` is not a legality verdict,
+and a legal document is not necessarily a drawable one.
+
+Standing results on the shipped corpus, reproducible with the line above:
+
+| file | flagged |
+|---|---|
+| `examples/symmetricP1.json` | `WIC` — 1 zero-width spur |
+| `examples/planc1.v5.json` | `Hall` 4 · `M Bath` 6 · `WIC` 1 |
+
+All seven are **the same class**: a room outline that is non-simple by
+*touching* rather than by *crossing*. `I5b` does not catch it — its
+proper-crossing test is deliberately built **not** to fire on the collinear
+edges two rooms legitimately share, and a loop that merely revisits one of its
+own vertices is not a proper crossing. So these files pass `check(deep=True)`
+on that invariant while being non-simple.
+
+The measured instances, the reasoning, and the open question of whether a
+touching loop is an `I5b` violation at all live in the register's row on
+**non-simple outlines that `I5b` does not report** (`docs/CODE_REVIEW_v2.md`).
+They are not restated here, and the row is referred to by description rather
+than by number on purpose: it is filed on the P4.5 branch, and a number quoted
+from here would be a broken pointer the day this branch merges first.
+
+---
+
 ## 5. The renderer decision — settled 2026-08-04
 
 **Two renderers, one geometry core. Both stay.**
@@ -198,9 +254,10 @@ time the two are compared side by side.
 Now mostly **assets, not architecture**:
 
 1. **Furniture as real models.** The catalog would carry a glTF per kind
-   alongside its 2D symbol; `FURN`'s box dimensions become the fallback and the
-   placement bounds. This is the largest remaining item and it is an asset
-   problem more than a code one.
+   alongside its 2D symbol; the manifest's `width_in`/`depth_in`/`height_in`
+   become the fallback and the placement bounds — they are already the single
+   source, so nothing has to be reconciled first. This is the largest
+   remaining item and it is an asset problem more than a code one.
 2. **Textures.** Wood grain, tile, rugs, counters. Cheap once UV coordinates
    are generated, which for axis-aligned walls and floors is close to trivial.
 3. **Materials from the document.** Drive colour from
@@ -216,10 +273,146 @@ Now mostly **assets, not architecture**:
    views with the ceiling removed — which is already the case here, since no
    ceilings are generated.
 
+6. **The rest of the `form` generators.** Each catalog entry names a `form`;
+   `build_solid()` builds `box` and `slab` (a top on legs), and every other
+   recognised form — `seat`, `bed`, `basin`, `enclosure`, `vehicle`,
+   `planting` — is built as a box and **said so in the report's info
+   channel**, which is what makes this a known gap rather than a silent guess.
+   A form nothing recognises is treated exactly like an unknown kind: box
+   shape, magenta, named in the notes. The design for the two that matter is
+   §5a below.
+
 An **offline render** path (export glTF, render headless in Blender/Cycles for
 presentation images) remains open and would share `build_model` too. That is the
 reason to keep that function Qt-free and renderer-agnostic no matter what
 happens above it.
+
+### §5a — Better furnishing solids: two problems, two answers, and they are not the same one
+
+Asked at the end of the `viewer-furnishings` branch (2026‑08‑05): *what has to
+be in place before a `Car` is more than a box?* The answer splits cleanly in
+two, and conflating them is the expensive mistake, because **one needs no
+change to anything and the other changes the vertex format**.
+
+#### (a) FLAT models — a faceted car of ~100 faces. Needs no structural change at all.
+
+**`Mesh` does not change. No normals array, no UVs, no stride change.** §3's
+argument holds facet for facet: every surface in a plan is flat, so lighting
+baked per face costs nothing visually — and a low-poly faceted model is
+*nothing but* flat surfaces. The baked per-face rig is not a limitation being
+worked around here; it is the correct renderer for this class of model.
+
+**The symbol already carries the geometry, and this is the finding.** A top
+view extruded once (`prism`) gives a cookie-cutter: a car-shaped slab with a
+flat top, because a top view carries no roofline. But the symbols are not
+silhouettes — measured on `car.svg`, which is `72 × 180` inches:
+
+| element | what it is |
+|---|---|
+| rounded rect `70 × 178`, `rx 16` | the body footprint |
+| rounded rect `56 × 92` at y 50–142, `rx 9` | **the roof outline** |
+| two cross lines at y 70 / y 122 | the pillars |
+| two `7 × 4` tabs at x 0.5 / 64.5 | the mirrors |
+
+It is already a **two-level contour drawing**. What it lacks is not artwork,
+it is a **z for each outline** — so the uplift is mostly metadata, not
+redrawing.
+
+**The shape that fits is a LOFT between stacked rings**, not one extrusion:
+body ring z 0→18; a skirt from the body ring up to the roof ring z 18→30,
+whose sloped quads *are* the windscreen and the rear glass; roof ring z 30→56;
+four wheels as short prisms. Flattening each rounded rect to ~24 points gives
+~24 side faces per ring, ~48 triangles of skirt, plus caps and wheels —
+**about 150 triangles per car**, which is the ~100 that was asked for.
+
+**Cost, measured against what is on disk:** `symmetricP1` is 3,224 triangles
+today; 50 furnishings at ~150 each puts it near 10,000. Qt Quick 3D was
+comfortable at 2,900 with shadows and AO on Intel integrated graphics, and
+`fp3d`'s per-frame cost is the Python draw-call loop, which **does not grow** —
+meshes still merge by material.
+
+**THE VIEWER MUST NOT PARSE SVG, and the reason is this branch's own history.**
+An SVG is a data file, so reading one would not break the isolation rule — but
+parsing arbitrary path syntax is a large new surface, and worse, it would make
+the 3D profile a *second reading* of the artwork. That is exactly the drift
+that put 22 wrong footprints and three transposed ones in the deleted `FURN`.
+`_gen_assets.py` already holds the geometry as Python primitives
+(`R(1, 1, 70, 178, 16, …)`), so **it emits the rings itself**, to a third
+generated asset beside the other two:
+
+```
+assets/furnishings/profiles.json   {kind: [{z0, z1, material, ring: [[x, y], …]}, …]}
+```
+
+Rings already flattened to polylines, already centred in the item's local
+frame, in inches. The viewer reads it exactly as it reads `manifest.json` and
+`materials.json`. **The 2D symbol and the 3D profile then come from one
+authoring statement and cannot disagree** — which is the whole point.
+
+**What comes free, and is worth not re-deciding:** `triangulate()` already
+ear-clips the caps and `clean_ring()` already reports a badly authored ring in
+the same channel that reports a bad room outline; `vehicle` is already in
+`KNOWN_FORMS` and already routes through
+`build_solid(form, place, w, d, h, z0)`, whose `place()` carries rotation and
+position so a generator thinks only in local axes — so **no new vocabulary and
+no new dispatch**; and body/glass/wheels as separate rings with separate
+materials emit separate meshes that the existing merge collapses **across**
+items, so twenty cars still cost one body draw call and one glass draw call.
+
+**The honest limit, recorded so nobody chases it through this door:** a contour
+stack cannot give a curved windscreen or true wheel arches. It gives a
+faceted, architectural-model car. That is the whole of what this design
+delivers, and it is enough.
+
+**Suggested order:** `profiles.json` for `car` alone (the two rings it already
+has, plus wheels) → the `vehicle` branch in `build_solid` → fail-first receipt
+(12 triangles → ~150, plus a test that the loft is a *loft*: the roof ring is
+inset from the body ring at mid-height, the same discriminating shape as
+`test_slab_is_a_top_on_legs`) → the rest of the vehicles → then `prism`, which
+is this same machinery with **one** ring, for the flat-topped kinds: planters,
+islands, L-shaped desks, round tables.
+
+#### (b) SMOOTH models — glTF chairs and sofas. This one does change the vertex format.
+
+Separated from (a) deliberately: the two look like one task and are not. Here
+is the census, taken 2026‑08‑05 so the session that does it does not repeat it.
+
+**`Mesh` is read at 9 sites, all inside these two files** — `fp3d.py`: the
+bbox (`:687`), the triangle stat (`:693`), `export_obj` (`:703‑708`),
+`make_view` (`:793‑809`); `fp3dq.py`: the entry loop (`:277‑284`). Nothing
+else in the repo touches it, so widening it is a contained change.
+
+**Two channels you would assume are missing are already plumbed.** Per-*face*
+colour exists: `Mesh.color` is a BASE colour and `shade_faces()` returns an
+`(M, 4)` array, one RGBA per triangle, to `MeshData(faceColors=…)`. Per-*vertex*
+colour exists too: `_interleaved()` packs `pos(3) + normal(3) + colour(4)`
+float32 per vertex and `scene.qml` sets `vertexColorsEnabled: true` — today the
+producer fills it with one colour tiled. **Colour variation is not what gates
+realism.**
+
+**Three things do, and only the first is a real foreclosure:**
+1. **Normals are flat, derived from winding.** Both renderers cross-product per
+   triangle and repeat across its three vertices. A glTF supplies *smooth*
+   normals and `Mesh` has nowhere to put them, so they would be **discarded on
+   import** and the model would render faceted however good it is. This is the
+   one place the present shape throws away information a real model carries.
+2. **No UVs anywhere.** `_make_geometry` fixes a 40-byte stride with three
+   attributes; textures need `UV(2)`, so stride 48, a fourth attribute, and a
+   UV array on `Mesh`.
+3. **One material per mesh — and here the current design is already right.** A
+   sofa is fabric, wood and metal, so it emits one mesh per material, and
+   merge-by-material then collapses them across items. The strategy that
+   exists for flat plans is the correct one for multi-material models. No
+   change.
+
+Also: `export_obj` writes no material library, so the OBJ path already loses
+colour. That function is the natural seam for a glTF *exporter* later.
+
+**Do not widen `Mesh` speculatively.** A field nothing reads is the same
+disease as a table nothing maintains, and it is how an abstraction gets shaped
+for a consumer that turns out to want something else. Take (1) and (2) in one
+commit, with a loader that consumes them, in the session that has a model to
+load.
 
 ---
 
@@ -297,8 +490,13 @@ and it sits inside an `except ImportError`.
 
 * No ceilings, roofs, or floor-to-floor structure; multi-level plans stack by
   `elevation_in` but nothing spans between them.
-* Furniture rotation is honoured; furniture *elevation* is not (everything sits
-  on the level's floor — no wall-mounted or counter-top items).
+* ~~Furniture *elevation* is not honoured.~~ **Closed.** Each catalog entry
+  carries `elevation_in`, the height of the item's underside above the level's
+  floor, and `build_solid` builds a wall-hung item exactly like a
+  floor-standing one, higher up — no second code path. Eight items are off
+  the floor: the three upper cabinets at 54″, `large_tv` at 42″,
+  `electric_panel` at 48″, `car_charger` at 42″, `battery_wall` at 24″, and
+  the counter-mounted `kitchen_sink` at 26″, whose rim then lands at 36″.
 * Room `holes` in the schema are ignored.
 * Door leaves, swings and window frames are not drawn — an opening is a void.
 * `fp3d.py --shot` grabs the framebuffer after three `processEvents` calls,
@@ -306,6 +504,16 @@ and it sits inside an `except ImportError`.
 * `fp3dq.py` has no view presets (the pyqtgraph viewer's T / F / S / I / R) and
   no `--xray`, `--edges`, `--obj` or `--dump`; it is a presentation view, not a
   replacement CLI.
-* Neither viewer has any test coverage. `build_model` is pure and headless and
-  would be straightforward to pin — outline degeneracy handling and
-  `opening_span`'s three anchor cases are the obvious first assertions.
+* ~~Neither viewer has any test coverage.~~ **Partly closed.**
+  `tests/test_viewer_model.py` (11 tests, marker `viewer`) pins the catalog's
+  3D data and what `build_model` does with it: every entry carries a usable
+  `height_in`/`elevation_in`/`form`/`material`; every material named resolves;
+  an unknown form falls back to a box **in magenta and is reported**;
+  `elevation_in` puts an item off the floor, with a floor-standing control so
+  the assertion discriminates; a missing catalog is reported rather than
+  raised; and — in a subprocess, because this session has already imported
+  both — `build_model` pulls in neither Qt nor `floorplanner`. The module is
+  loaded **by path**, the way running it as a script loads it; importing
+  `floorplanner.viewer.fp3d` would drag in the whole editor and quietly test
+  something else. **Still unpinned, and still the obvious next assertions:**
+  outline degeneracy handling and `opening_span`'s three anchor cases.

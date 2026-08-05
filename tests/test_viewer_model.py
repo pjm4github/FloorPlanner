@@ -1,0 +1,296 @@
+"""The 3D viewers' geometry core -- the first tests it has ever had.
+
+WHAT THIS PINS, and why here rather than through the app: `build_model` is
+Qt-free and imports no `floorplanner`, so it needs neither a QApplication nor
+the editor.  The module is therefore loaded BY PATH, exactly as running
+`python floorplanner/viewer/fp3d.py` loads it -- importing
+`floorplanner.viewer.fp3d` would drag in the whole editor through the
+package's star-imports and quietly test something else (VIEWER_NOTES.md s1).
+
+The acceptance is that the CATALOG IS THE ONE SOURCE.  fp3d used to carry its
+own table of footprints, heights and colours; these tests exist so it cannot
+grow one back without something going red.
+"""
+import importlib.util
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+pytestmark = pytest.mark.viewer
+
+ROOT = Path(__file__).resolve().parents[1]
+FURN_DIR = ROOT / "assets" / "furnishings"
+
+
+def _load_fp3d():
+    """fp3d.py loaded by path, the way running it as a script loads it."""
+    path = ROOT / "floorplanner" / "viewer" / "fp3d.py"
+    spec = importlib.util.spec_from_file_location("fp3d_under_test", path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod          # @dataclass looks its module up
+    spec.loader.exec_module(mod)
+    return mod
+
+
+@pytest.fixture(scope="module")
+def fp3d():
+    return _load_fp3d()
+
+
+@pytest.fixture(scope="module")
+def manifest():
+    return json.loads((FURN_DIR / "manifest.json").read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="module")
+def materials():
+    return json.loads((FURN_DIR / "materials.json").read_text(encoding="utf-8"))
+
+
+def _doc(kind, level_z=0.0, rotation=0.0):
+    """A document holding exactly one furnishing, so what is measured is that
+    furnishing and nothing else."""
+    return {"levels": [{"id": "L1", "elevation_in": level_z,
+                        "height_in": 96.0}],
+            "vertices": [], "walls": [], "rooms": [],
+            "furnishings": [{"id": "f1", "level": "L1", "kind": kind,
+                             "pos": [0.0, 0.0], "rotation": rotation}]}
+
+
+def _furn_mesh(model):
+    return next(m for m in model.meshes if m.name.startswith("furnishings"))
+
+
+# --------------------------------------------------------------------------
+# the catalog is complete, and it is what the viewer can read
+# --------------------------------------------------------------------------
+
+def test_every_catalog_entry_carries_a_solid(manifest):
+    """height_in, elevation_in, form and material on all 95 -- height_in most
+    of all, because it is the one field with no safe default."""
+    assert len(manifest) == 95, "catalog size changed; check this on purpose"
+    missing = {}
+    for e in manifest:
+        absent = [f for f in ("height_in", "elevation_in", "form", "material")
+                  if f not in e]
+        if absent:
+            missing[e["id"]] = absent
+    assert not missing, f"catalog entries with no 3D data: {missing}"
+
+    bad = {e["id"]: e["height_in"] for e in manifest
+           if not isinstance(e["height_in"], (int, float))
+           or e["height_in"] <= 0}
+    assert not bad, f"height_in must be a positive number: {bad}"
+
+    bad = {e["id"]: e["elevation_in"] for e in manifest
+           if not isinstance(e["elevation_in"], (int, float))
+           or e["elevation_in"] < 0}
+    assert not bad, f"elevation_in must be >= 0: {bad}"
+
+
+def test_every_material_named_resolves(manifest, materials):
+    """A name is only a single source if it resolves.  Also checks the
+    properties are the shape the renderers read, not merely present."""
+    named = sorted({e["material"] for e in manifest})
+    assert named, "precondition: the catalog names at least one material"
+    unresolved = [m for m in named if m not in materials]
+    assert not unresolved, f"materials named but not defined: {unresolved}"
+
+    for name in named:
+        m = materials[name]
+        col = m["colour"]
+        assert len(col) == 4 and all(0.0 <= float(c) <= 1.0 for c in col), \
+            f"{name}: colour must be four channels in 0..1, got {col}"
+        assert 0.0 <= float(m["roughness"]) <= 1.0
+        assert 0.0 <= float(m["metalness"]) <= 1.0
+
+    assert "unknown" in materials, \
+        "the loud fallback must exist even though no entry names it"
+
+
+def test_every_catalog_form_is_one_the_viewer_knows(manifest, fp3d):
+    """The shipped catalog must never trip the viewer's own unknown-form
+    path -- that path is for a catalog from the future, not for this one."""
+    unknown = sorted({e["form"] for e in manifest
+                      if e["form"] not in fp3d.KNOWN_FORMS})
+    assert not unknown, f"catalog names form(s) the viewer cannot build: " \
+                        f"{unknown}"
+
+
+def test_the_viewer_finds_the_catalog_the_app_ships(fp3d, manifest):
+    """`load_catalog()` walks up from the module, so it must resolve however
+    the file is run.  A broken walk returns empty and reports -- which is the
+    honest failure, and exactly what this asserts is NOT happening."""
+    specs, materials, problems = fp3d.load_catalog()
+    assert problems == [], f"the catalog did not load cleanly: {problems}"
+    assert len(specs) == len(manifest)
+    assert specs["wall_cab_30"]["height_in"] == 30
+    assert materials["wood"]["colour"][0] == pytest.approx(0.52)
+
+
+# --------------------------------------------------------------------------
+# what the viewer does with it
+# --------------------------------------------------------------------------
+
+def test_elevation_places_an_item_off_the_floor(fp3d, manifest):
+    """A wall-hung item must not sit on the floor -- with a floor-standing
+    control in the same run, so "off the floor" is discriminating rather than
+    a property every item happens to have."""
+    spec = {e["id"]: e for e in manifest}
+    hung, standing = spec["wall_cab_30"], spec["base_cab_36"]
+    assert hung["elevation_in"] > 0, "precondition: wall_cab_30 is elevated"
+    assert standing["elevation_in"] == 0, \
+        "precondition: base_cab_36 stands on the floor"
+
+    LEVEL_Z = 120.0                      # an upper storey, so 0 cannot pass
+    for entry, name in ((hung, "wall_cab_30"), (standing, "base_cab_36")):
+        model = fp3d.build_model(_doc(name, level_z=LEVEL_Z), floors=False)
+        v = _furn_mesh(model).verts
+        assert v[:, 2].min() == pytest.approx(LEVEL_Z + entry["elevation_in"])
+        assert v[:, 2].max() == pytest.approx(
+            LEVEL_Z + entry["elevation_in"] + entry["height_in"])
+
+    # and the two really do differ, which is the whole claim
+    hung_z = fp3d.build_model(_doc("wall_cab_30", level_z=LEVEL_Z),
+                              floors=False)
+    stand_z = fp3d.build_model(_doc("base_cab_36", level_z=LEVEL_Z),
+                               floors=False)
+    assert (_furn_mesh(hung_z).verts[:, 2].min()
+            > _furn_mesh(stand_z).verts[:, 2].min())
+
+
+def test_an_unknown_form_falls_back_visibly_and_is_reported(fp3d):
+    """Box shape, MAGENTA colour, and a note naming the form.  A fallback
+    nobody can see is a silent guess, which is what this whole change
+    removed."""
+    FORM = "hovercraft"
+    assert FORM not in fp3d.KNOWN_FORMS, "precondition: the form is unknown"
+    catalog = (
+        {"oddity": {"width_in": 40.0, "depth_in": 20.0, "height_in": 30.0,
+                    "elevation_in": 0.0, "form": FORM, "material": "wood"}},
+        {"wood": {"colour": [0.52, 0.37, 0.23, 1.0], "roughness": 0.85,
+                  "metalness": 0.0},
+         "unknown": {"colour": [0.85, 0.35, 0.55, 1.0], "roughness": 0.6,
+                     "metalness": 0.0}},
+        [])
+    model = fp3d.build_model(_doc("oddity"), catalog=catalog, floors=False)
+    mesh = _furn_mesh(model)
+
+    assert mesh.color == pytest.approx(catalog[1]["unknown"]["colour"]), \
+        "an unknown form must not be drawn in its plausible material"
+    assert len(mesh.faces) == 12, "fell back to something other than a box"
+    v = mesh.verts
+    assert v[:, 0].max() - v[:, 0].min() == pytest.approx(40.0)
+    assert v[:, 1].max() - v[:, 1].min() == pytest.approx(20.0)
+    assert any(FORM in n for n in model.notes), \
+        f"the form was not named in the report: {model.notes}"
+
+
+def test_a_form_awaiting_its_generator_is_info_not_a_fault(fp3d):
+    """The severity split of VIEWER_NOTES s4, applied to forms: a RECOGNISED
+    form whose generator is a later pass is routine, and reporting it as a
+    fault would cry wolf.  Boundary marker for the first pass -- it expires
+    when the last generator lands, and then this test is deleted with it."""
+    pending = [f for f in fp3d.KNOWN_FORMS if f not in fp3d.BUILT_FORMS]
+    assert pending, "precondition: some form is still awaiting its generator"
+    form = pending[0]
+    catalog = (
+        {"waiting": {"width_in": 30.0, "depth_in": 30.0, "height_in": 30.0,
+                     "elevation_in": 0.0, "form": form, "material": "wood"}},
+        {"wood": {"colour": [0.52, 0.37, 0.23, 1.0], "roughness": 0.85,
+                  "metalness": 0.0}},
+        [])
+    model = fp3d.build_model(_doc("waiting"), catalog=catalog, floors=False)
+
+    assert not any(form in n for n in model.notes), \
+        "a form awaiting its generator is not a fault"
+    assert any(form in n for n in model.info), \
+        f"...but it must still be said: {model.info}"
+    assert _furn_mesh(model).color == pytest.approx([0.52, 0.37, 0.23, 1.0]), \
+        "it is a known form, so it keeps its real material"
+
+
+def test_slab_is_a_top_on_legs(fp3d, manifest):
+    """Not just "the box got more triangles": there is SPACE under a table."""
+    spec = {e["id"]: e for e in manifest}["desk"]
+    assert spec["form"] == "slab", "precondition: desk is a slab"
+    model = fp3d.build_model(_doc("desk"), floors=False)
+    mesh = _furn_mesh(model)
+    assert len(mesh.faces) > 12, "still a single box"
+
+    # every part is a 8-vertex prism; find the ones spanning mid-height and
+    # check none of them covers the centre of the footprint
+    v, mid = mesh.verts, spec["height_in"] / 2.0
+    covering = []
+    for i in range(0, len(v), 8):
+        part = v[i:i + 8]
+        if part[:, 2].min() <= mid <= part[:, 2].max():
+            if (part[:, 0].min() <= 0 <= part[:, 0].max()
+                    and part[:, 1].min() <= 0 <= part[:, 1].max()):
+                covering.append(i)
+    assert not covering, \
+        "something solid sits at the centre of the desk at half height"
+
+
+def test_a_missing_catalog_is_reported_not_silent(fp3d):
+    """The fallback exists so a viewer without assets still draws.  It must
+    say so: an unannounced default box is indistinguishable from a measured
+    one, which is the failure mode the catalog move exists to end."""
+    problem = "furnishing catalog: cannot read manifest.json (test)"
+    model = fp3d.build_model(_doc("sofa"), catalog=({}, {}, [problem]),
+                             floors=False)
+    assert problem in model.notes, "the missing catalog was not reported"
+
+    v = _furn_mesh(model).verts
+    assert len(_furn_mesh(model).faces) == 12
+    assert v[:, 0].max() - v[:, 0].min() == pytest.approx(
+        fp3d.CATALOG_DEFAULT["width_in"])
+    assert v[:, 2].max() - v[:, 2].min() == pytest.approx(
+        fp3d.CATALOG_DEFAULT["height_in"])
+    assert _furn_mesh(model).color == pytest.approx(fp3d.UNKNOWN_C)
+
+
+def test_load_catalog_reports_rather_than_raises_when_assets_are_absent(
+        fp3d, tmp_path):
+    """Pointed at a directory with no manifest, load_catalog returns empty
+    and SAYS WHY -- it does not raise into whatever called it."""
+    empty = tmp_path / "furnishings"
+    empty.mkdir()
+    specs, materials, problems = fp3d.load_catalog(str(empty))
+    assert specs == {} and materials == {}
+    assert len(problems) == 2, problems
+    assert any("manifest.json" in p for p in problems)
+    assert any("materials.json" in p for p in problems)
+
+
+def test_build_model_imports_neither_qt_nor_floorplanner():
+    """VIEWER_NOTES s1's isolation claim, asserted rather than asserted-about.
+
+    Run in a SUBPROCESS on purpose: the test session has already imported both
+    PyQt6 and floorplanner, so checking this process's sys.modules would pass
+    no matter what fp3d did."""
+    probe = (
+        "import importlib.util, sys, json\n"
+        f"spec = importlib.util.spec_from_file_location('m', r'"
+        f"{ROOT / 'floorplanner' / 'viewer' / 'fp3d.py'}')\n"
+        "m = importlib.util.module_from_spec(spec)\n"
+        "sys.modules['m'] = m\n"
+        "spec.loader.exec_module(m)\n"
+        "doc = {'levels': [{'id': 'L1', 'elevation_in': 0, 'height_in': 96}],"
+        " 'vertices': [], 'walls': [], 'rooms': [],"
+        " 'furnishings': [{'id': 'f', 'level': 'L1', 'kind': 'sofa',"
+        " 'pos': [0, 0], 'rotation': 0}]}\n"
+        "model = m.build_model(doc)\n"
+        "assert model.meshes, 'built nothing, so the check is vacuous'\n"
+        "leaked = sorted(k for k in sys.modules\n"
+        "                if k.split('.')[0] in ('PyQt6', 'floorplanner',\n"
+        "                                       'FloorPlanner'))\n"
+        "print(json.dumps(leaked))\n")
+    out = subprocess.run([sys.executable, "-c", probe], capture_output=True,
+                         text=True, cwd=str(ROOT))
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout.strip()) == [], \
+        f"build_model pulled in {out.stdout.strip()}"

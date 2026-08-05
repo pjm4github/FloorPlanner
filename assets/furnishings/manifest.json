@@ -6,6 +6,10 @@
     "file": "sofa.svg",
     "width_in": 84,
     "depth_in": 36,
+    "height_in": 32,
+    "elevation_in": 0,
+    "form": "seat",
+    "material": "soft",
     "price": 650.0
   },
   {
@@ -15,6 +19,10 @@
     "file": "loveseat.svg",
     "width_in": 58,
     "depth_in": 36,
+    "height_in": 32,
+    "elevation_in": 0,
+    "form": "seat",
+    "material": "soft",
     "price": 480.0
   },
   {
@@ -24,6 +32,10 @@
     "file": "armchair.svg",
     "width_in": 33,
     "depth_in": 33,
+    "height_in": 32,
+    "elevation_in": 0,
+    "form": "seat",
+    "material": "soft",
     "price": 300.0
   },
   {
@@ -33,6 +45,10 @@
     "file": "coffee_table.svg",
     "width_in": 48,
     "depth_in": 24,
+    "height_in": 18,
+    "elevation_in": 0,
+    "form": "slab",
+    "material": "wood",
     "price": 120.0
   },
   {
@@ -42,6 +58,10 @@
     "file": "side_table.svg",
     "width_in": 20,
     "depth_in": 20,
+    "height_in": 24,
+    "elevation_in": 0,
+    "form": "slab",
+    "material": "wood",
     "price": 80.0
   },
   {
@@ -51,6 +71,10 @@
     "file": "tv_stand.svg",
     "width_in": 60,
     "depth_in": 16,
+    "height_in": 24,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 180.0
   },
   {
@@ -60,6 +84,10 @@
     "file": "large_tv.svg",
     "width_in": 66,
     "depth_in": 4,
+    "height_in": 38,
+    "elevation_in": 42,
+    "form": "box",
+    "material": "screen",
     "price": 300.0
   },
   {
@@ -69,6 +97,10 @@
     "file": "gas_fireplace.svg",
     "width_in": 48,
     "depth_in": 20,
+    "height_in": 40,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "stone",
     "price": 2000.0
   },
   {
@@ -78,6 +110,10 @@
     "file": "dining_table.svg",
     "width_in": 72,
     "depth_in": 36,
+    "height_in": 30,
+    "elevation_in": 0,
+    "form": "slab",
+    "material": "wood",
     "price": 450.0
   },
   {
@@ -87,6 +123,10 @@
     "file": "dining_table_round.svg",
     "width_in": 48,
     "depth_in": 48,
+    "height_in": 30,
+    "elevation_in": 0,
+    "form": "slab",
+    "material": "wood",
     "price": 400.0
   },
   {
@@ -96,6 +136,10 @@
     "file": "dining_chair.svg",
     "width_in": 18,
     "depth_in": 18,
+    "height_in": 34,
+    "elevation_in": 0,
+    "form": "seat",
+    "material": "wood",
     "price": 50.0
   },
   {
@@ -105,6 +149,10 @@
     "file": "buffet.svg",
     "width_in": 60,
     "depth_in": 18,
+    "height_in": 36,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 350.0
   },
   {
@@ -114,6 +162,10 @@
     "file": "hutch.svg",
     "width_in": 60,
     "depth_in": 20,
+    "height_in": 78,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 400.0
   },
   {
@@ -123,6 +175,10 @@
     "file": "refrigerator.svg",
     "width_in": 36,
     "depth_in": 30,
+    "height_in": 70,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 825.0
   },
   {
@@ -132,6 +188,10 @@
     "file": "range.svg",
     "width_in": 30,
     "depth_in": 26,
+    "height_in": 36,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 710.0
   },
   {
@@ -141,6 +201,10 @@
     "file": "dishwasher.svg",
     "width_in": 24,
     "depth_in": 24,
+    "height_in": 34,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 385.0
   },
   {
@@ -150,6 +214,10 @@
     "file": "kitchen_sink.svg",
     "width_in": 33,
     "depth_in": 22,
+    "height_in": 10,
+    "elevation_in": 26,
+    "form": "basin",
+    "material": "metal",
     "price": 240.0
   },
   {
@@ -159,6 +227,10 @@
     "file": "base_cab_24.svg",
     "width_in": 24,
     "depth_in": 24,
+    "height_in": 36,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 290.0
   },
   {
@@ -168,6 +240,10 @@
     "file": "base_cab_36.svg",
     "width_in": 36,
     "depth_in": 24,
+    "height_in": 36,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 360.0
   },
   {
@@ -177,6 +253,10 @@
     "file": "drawer_base_18.svg",
     "width_in": 18,
     "depth_in": 24,
+    "height_in": 36,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 360.0
   },
   {
@@ -186,6 +266,10 @@
     "file": "sink_base_36.svg",
     "width_in": 36,
     "depth_in": 24,
+    "height_in": 36,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 440.0
   },
   {
@@ -195,6 +279,10 @@
     "file": "corner_base_36.svg",
     "width_in": 36,
     "depth_in": 36,
+    "height_in": 36,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 585.0
   },
   {
@@ -204,6 +292,10 @@
     "file": "pantry_18.svg",
     "width_in": 18,
     "depth_in": 24,
+    "height_in": 84,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 610.0
   },
   {
@@ -213,6 +305,10 @@
     "file": "pantry_24.svg",
     "width_in": 24,
     "depth_in": 24,
+    "height_in": 84,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 720.0
   },
   {
@@ -222,6 +318,10 @@
     "file": "pantry_36.svg",
     "width_in": 36,
     "depth_in": 24,
+    "height_in": 84,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 825.0
   },
   {
@@ -231,6 +331,10 @@
     "file": "wall_cab_24.svg",
     "width_in": 24,
     "depth_in": 12,
+    "height_in": 30,
+    "elevation_in": 54,
+    "form": "box",
+    "material": "wood",
     "price": 250.0
   },
   {
@@ -240,6 +344,10 @@
     "file": "wall_cab_30.svg",
     "width_in": 30,
     "depth_in": 12,
+    "height_in": 30,
+    "elevation_in": 54,
+    "form": "box",
+    "material": "wood",
     "price": 340.0
   },
   {
@@ -249,6 +357,10 @@
     "file": "wall_cab_36.svg",
     "width_in": 36,
     "depth_in": 12,
+    "height_in": 30,
+    "elevation_in": 54,
+    "form": "box",
+    "material": "wood",
     "price": 425.0
   },
   {
@@ -258,6 +370,10 @@
     "file": "kitchen_island.svg",
     "width_in": 72,
     "depth_in": 39,
+    "height_in": 36,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 1450.0
   },
   {
@@ -267,6 +383,10 @@
     "file": "island_sink.svg",
     "width_in": 84,
     "depth_in": 42,
+    "height_in": 36,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 2100.0
   },
   {
@@ -276,6 +396,10 @@
     "file": "bed_king.svg",
     "width_in": 76,
     "depth_in": 80,
+    "height_in": 26,
+    "elevation_in": 0,
+    "form": "bed",
+    "material": "soft",
     "price": 650.0
   },
   {
@@ -285,6 +409,10 @@
     "file": "bed_queen.svg",
     "width_in": 60,
     "depth_in": 80,
+    "height_in": 26,
+    "elevation_in": 0,
+    "form": "bed",
+    "material": "soft",
     "price": 500.0
   },
   {
@@ -294,6 +422,10 @@
     "file": "bed_full.svg",
     "width_in": 54,
     "depth_in": 75,
+    "height_in": 26,
+    "elevation_in": 0,
+    "form": "bed",
+    "material": "soft",
     "price": 400.0
   },
   {
@@ -303,6 +435,10 @@
     "file": "bed_twin.svg",
     "width_in": 39,
     "depth_in": 75,
+    "height_in": 26,
+    "elevation_in": 0,
+    "form": "bed",
+    "material": "soft",
     "price": 300.0
   },
   {
@@ -312,6 +448,10 @@
     "file": "nightstand.svg",
     "width_in": 20,
     "depth_in": 16,
+    "height_in": 26,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 100.0
   },
   {
@@ -321,6 +461,10 @@
     "file": "dresser.svg",
     "width_in": 60,
     "depth_in": 18,
+    "height_in": 34,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 150.0
   },
   {
@@ -330,6 +474,10 @@
     "file": "bathtub.svg",
     "width_in": 30,
     "depth_in": 60,
+    "height_in": 20,
+    "elevation_in": 0,
+    "form": "enclosure",
+    "material": "porcelain",
     "price": 500.0
   },
   {
@@ -339,6 +487,10 @@
     "file": "shower.svg",
     "width_in": 36,
     "depth_in": 36,
+    "height_in": 78,
+    "elevation_in": 0,
+    "form": "enclosure",
+    "material": "glass",
     "price": 700.0
   },
   {
@@ -348,6 +500,10 @@
     "file": "walk_in_shower.svg",
     "width_in": 60,
     "depth_in": 42,
+    "height_in": 78,
+    "elevation_in": 0,
+    "form": "enclosure",
+    "material": "glass",
     "price": 2500.0
   },
   {
@@ -357,6 +513,10 @@
     "file": "glass_shower.svg",
     "width_in": 60,
     "depth_in": 48,
+    "height_in": 78,
+    "elevation_in": 0,
+    "form": "enclosure",
+    "material": "glass",
     "price": 3000.0
   },
   {
@@ -366,6 +526,10 @@
     "file": "toilet.svg",
     "width_in": 20,
     "depth_in": 28,
+    "height_in": 30,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "porcelain",
     "price": 175.0
   },
   {
@@ -375,6 +539,10 @@
     "file": "vanity.svg",
     "width_in": 30,
     "depth_in": 21,
+    "height_in": 34,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 600.0
   },
   {
@@ -384,6 +552,10 @@
     "file": "vanity_24.svg",
     "width_in": 24,
     "depth_in": 21,
+    "height_in": 34,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 450.0
   },
   {
@@ -393,6 +565,10 @@
     "file": "vanity_36.svg",
     "width_in": 36,
     "depth_in": 21,
+    "height_in": 34,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 750.0
   },
   {
@@ -402,6 +578,10 @@
     "file": "vanity_48.svg",
     "width_in": 48,
     "depth_in": 21,
+    "height_in": 34,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 950.0
   },
   {
@@ -411,6 +591,10 @@
     "file": "washer.svg",
     "width_in": 27,
     "depth_in": 30,
+    "height_in": 38,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 500.0
   },
   {
@@ -420,6 +604,10 @@
     "file": "dryer.svg",
     "width_in": 27,
     "depth_in": 30,
+    "height_in": 38,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 500.0
   },
   {
@@ -429,6 +617,10 @@
     "file": "suv.svg",
     "width_in": 78,
     "depth_in": 192,
+    "height_in": 70,
+    "elevation_in": 0,
+    "form": "vehicle",
+    "material": "vehicle",
     "price": 16000.0
   },
   {
@@ -438,6 +630,10 @@
     "file": "car.svg",
     "width_in": 72,
     "depth_in": 180,
+    "height_in": 56,
+    "elevation_in": 0,
+    "form": "vehicle",
+    "material": "vehicle",
     "price": 12000.0
   },
   {
@@ -447,6 +643,10 @@
     "file": "motorcycle.svg",
     "width_in": 32,
     "depth_in": 84,
+    "height_in": 48,
+    "elevation_in": 0,
+    "form": "vehicle",
+    "material": "vehicle",
     "price": 6000.0
   },
   {
@@ -456,6 +656,10 @@
     "file": "bicycle.svg",
     "width_in": 24,
     "depth_in": 68,
+    "height_in": 42,
+    "elevation_in": 0,
+    "form": "vehicle",
+    "material": "vehicle",
     "price": 250.0
   },
   {
@@ -465,6 +669,10 @@
     "file": "boat.svg",
     "width_in": 68,
     "depth_in": 168,
+    "height_in": 60,
+    "elevation_in": 0,
+    "form": "vehicle",
+    "material": "vehicle",
     "price": 4500.0
   },
   {
@@ -474,6 +682,10 @@
     "file": "workbench.svg",
     "width_in": 72,
     "depth_in": 24,
+    "height_in": 36,
+    "elevation_in": 0,
+    "form": "slab",
+    "material": "wood",
     "price": 150.0
   },
   {
@@ -483,6 +695,10 @@
     "file": "storage_shelves.svg",
     "width_in": 48,
     "depth_in": 18,
+    "height_in": 72,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 150.0
   },
   {
@@ -492,6 +708,10 @@
     "file": "lawnmower.svg",
     "width_in": 22,
     "depth_in": 62,
+    "height_in": 40,
+    "elevation_in": 0,
+    "form": "vehicle",
+    "material": "vehicle",
     "price": 150.0
   },
   {
@@ -501,6 +721,10 @@
     "file": "garden_tractor.svg",
     "width_in": 54,
     "depth_in": 120,
+    "height_in": 50,
+    "elevation_in": 0,
+    "form": "vehicle",
+    "material": "vehicle",
     "price": 13000.0
   },
   {
@@ -510,6 +734,10 @@
     "file": "riding_mower_snow.svg",
     "width_in": 46,
     "depth_in": 96,
+    "height_in": 46,
+    "elevation_in": 0,
+    "form": "vehicle",
+    "material": "vehicle",
     "price": 1200.0
   },
   {
@@ -519,6 +747,10 @@
     "file": "boat_trailer.svg",
     "width_in": 78,
     "depth_in": 216,
+    "height_in": 72,
+    "elevation_in": 0,
+    "form": "vehicle",
+    "material": "vehicle",
     "price": 1100.0
   },
   {
@@ -528,6 +760,10 @@
     "file": "snowblower.svg",
     "width_in": 28,
     "depth_in": 58,
+    "height_in": 42,
+    "elevation_in": 0,
+    "form": "vehicle",
+    "material": "vehicle",
     "price": 500.0
   },
   {
@@ -537,6 +773,10 @@
     "file": "wheelbarrow.svg",
     "width_in": 27,
     "depth_in": 58,
+    "height_in": 30,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 70.0
   },
   {
@@ -546,6 +786,10 @@
     "file": "trashcan.svg",
     "width_in": 24,
     "depth_in": 24,
+    "height_in": 40,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 35.0
   },
   {
@@ -555,6 +799,10 @@
     "file": "toolchest.svg",
     "width_in": 41,
     "depth_in": 18,
+    "height_in": 40,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 300.0
   },
   {
@@ -564,6 +812,10 @@
     "file": "table_saw.svg",
     "width_in": 40,
     "depth_in": 27,
+    "height_in": 36,
+    "elevation_in": 0,
+    "form": "slab",
+    "material": "metal",
     "price": 500.0
   },
   {
@@ -573,6 +825,10 @@
     "file": "lathe.svg",
     "width_in": 60,
     "depth_in": 18,
+    "height_in": 48,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 2500.0
   },
   {
@@ -582,6 +838,10 @@
     "file": "jointer.svg",
     "width_in": 60,
     "depth_in": 20,
+    "height_in": 36,
+    "elevation_in": 0,
+    "form": "slab",
+    "material": "metal",
     "price": 2000.0
   },
   {
@@ -591,6 +851,10 @@
     "file": "drill_press.svg",
     "width_in": 20,
     "depth_in": 28,
+    "height_in": 68,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 200.0
   },
   {
@@ -600,6 +864,10 @@
     "file": "cutoff_saw.svg",
     "width_in": 40,
     "depth_in": 24,
+    "height_in": 40,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 1000.0
   },
   {
@@ -609,6 +877,10 @@
     "file": "bandsaw.svg",
     "width_in": 24,
     "depth_in": 30,
+    "height_in": 72,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 180.0
   },
   {
@@ -618,6 +890,10 @@
     "file": "planer.svg",
     "width_in": 24,
     "depth_in": 24,
+    "height_in": 42,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 300.0
   },
   {
@@ -627,6 +903,10 @@
     "file": "lounge_chair.svg",
     "width_in": 27,
     "depth_in": 78,
+    "height_in": 30,
+    "elevation_in": 0,
+    "form": "seat",
+    "material": "soft",
     "price": 150.0
   },
   {
@@ -636,6 +916,10 @@
     "file": "sauna.svg",
     "width_in": 72,
     "depth_in": 72,
+    "height_in": 84,
+    "elevation_in": 0,
+    "form": "enclosure",
+    "material": "wood",
     "price": 3500.0
   },
   {
@@ -645,6 +929,10 @@
     "file": "umbrella_table.svg",
     "width_in": 96,
     "depth_in": 96,
+    "height_in": 30,
+    "elevation_in": 0,
+    "form": "slab",
+    "material": "wood",
     "price": 1500.0
   },
   {
@@ -654,6 +942,10 @@
     "file": "swim_spa.svg",
     "width_in": 90,
     "depth_in": 180,
+    "height_in": 40,
+    "elevation_in": 0,
+    "form": "enclosure",
+    "material": "water",
     "price": 15000.0
   },
   {
@@ -663,6 +955,10 @@
     "file": "whirlpool.svg",
     "width_in": 84,
     "depth_in": 84,
+    "height_in": 36,
+    "elevation_in": 0,
+    "form": "enclosure",
+    "material": "water",
     "price": 6500.0
   },
   {
@@ -672,6 +968,10 @@
     "file": "desk.svg",
     "width_in": 60,
     "depth_in": 30,
+    "height_in": 30,
+    "elevation_in": 0,
+    "form": "slab",
+    "material": "wood",
     "price": 350.0
   },
   {
@@ -681,6 +981,10 @@
     "file": "office_chair.svg",
     "width_in": 24,
     "depth_in": 24,
+    "height_in": 40,
+    "elevation_in": 0,
+    "form": "seat",
+    "material": "soft",
     "price": 120.0
   },
   {
@@ -690,6 +994,10 @@
     "file": "office_set.svg",
     "width_in": 54,
     "depth_in": 36,
+    "height_in": 30,
+    "elevation_in": 0,
+    "form": "slab",
+    "material": "wood",
     "price": 450.0
   },
   {
@@ -699,6 +1007,10 @@
     "file": "corner_desk.svg",
     "width_in": 60,
     "depth_in": 60,
+    "height_in": 30,
+    "elevation_in": 0,
+    "form": "slab",
+    "material": "wood",
     "price": 400.0
   },
   {
@@ -708,6 +1020,10 @@
     "file": "bookshelf.svg",
     "width_in": 36,
     "depth_in": 12,
+    "height_in": 72,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 180.0
   },
   {
@@ -717,6 +1033,10 @@
     "file": "wardrobe.svg",
     "width_in": 48,
     "depth_in": 24,
+    "height_in": 72,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 250.0
   },
   {
@@ -726,6 +1046,10 @@
     "file": "gas_furnace.svg",
     "width_in": 24,
     "depth_in": 30,
+    "height_in": 60,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 1200.0
   },
   {
@@ -735,6 +1059,10 @@
     "file": "electric_furnace.svg",
     "width_in": 21,
     "depth_in": 30,
+    "height_in": 60,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 1500.0
   },
   {
@@ -744,6 +1072,10 @@
     "file": "oil_furnace.svg",
     "width_in": 26,
     "depth_in": 34,
+    "height_in": 60,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 2400.0
   },
   {
@@ -753,6 +1085,10 @@
     "file": "gas_water_heater.svg",
     "width_in": 22,
     "depth_in": 22,
+    "height_in": 60,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 700.0
   },
   {
@@ -762,6 +1098,10 @@
     "file": "electric_water_heater.svg",
     "width_in": 22,
     "depth_in": 22,
+    "height_in": 60,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 600.0
   },
   {
@@ -771,6 +1111,10 @@
     "file": "water_softener.svg",
     "width_in": 24,
     "depth_in": 15,
+    "height_in": 48,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 700.0
   },
   {
@@ -780,6 +1124,10 @@
     "file": "gas_tank.svg",
     "width_in": 120,
     "depth_in": 36,
+    "height_in": 40,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 1500.0
   },
   {
@@ -789,6 +1137,10 @@
     "file": "oil_tank.svg",
     "width_in": 60,
     "depth_in": 27,
+    "height_in": 44,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 1200.0
   },
   {
@@ -798,6 +1150,10 @@
     "file": "electric_panel.svg",
     "width_in": 16,
     "depth_in": 4,
+    "height_in": 30,
+    "elevation_in": 48,
+    "form": "box",
+    "material": "metal",
     "price": 500.0
   },
   {
@@ -807,6 +1163,10 @@
     "file": "car_charger.svg",
     "width_in": 8,
     "depth_in": 6,
+    "height_in": 14,
+    "elevation_in": 42,
+    "form": "box",
+    "material": "metal",
     "price": 550.0
   },
   {
@@ -816,6 +1176,10 @@
     "file": "battery_wall.svg",
     "width_in": 45,
     "depth_in": 6,
+    "height_in": 30,
+    "elevation_in": 24,
+    "form": "box",
+    "material": "metal",
     "price": 9200.0
   },
   {
@@ -825,6 +1189,10 @@
     "file": "well_pump.svg",
     "width_in": 24,
     "depth_in": 24,
+    "height_in": 36,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 900.0
   },
   {
@@ -834,6 +1202,10 @@
     "file": "heat_exchanger.svg",
     "width_in": 30,
     "depth_in": 30,
+    "height_in": 30,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 1200.0
   },
   {
@@ -843,6 +1215,10 @@
     "file": "stairs.svg",
     "width_in": 36,
     "depth_in": 120,
+    "height_in": 108,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
     "price": 3500.0
   },
   {
@@ -852,6 +1228,10 @@
     "file": "elevator.svg",
     "width_in": 48,
     "depth_in": 60,
+    "height_in": 96,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
     "price": 40000.0
   }
 ]
