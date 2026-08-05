@@ -199,6 +199,57 @@ def _box(corners_xy, z0, z1):
     return v, np.array(f, dtype=int)
 
 
+# --------------------------------------------------------------------------
+# furnishing solids -- one generator per `form` in the catalog
+# --------------------------------------------------------------------------
+# The catalog names a form per item; this is where a name becomes geometry.
+# FIRST PASS: `box` and `slab` are built.  The rest are RECOGNISED but not yet
+# implemented, and an item using one is built as a box and SAID SO in the
+# report -- a known gap that announces itself is a different thing from a
+# silent guess, which is what the deleted FURN table was.
+#
+# `prism` -- extruding the symbol's true SVG outline -- is the second pass and
+# is recorded as a follow-up in VIEWER_NOTES.md section 5.
+KNOWN_FORMS = ("box", "slab", "seat", "bed", "basin", "enclosure", "vehicle",
+               "planting", "prism")
+BUILT_FORMS = ("box", "slab")
+
+
+def _plan_quad(place, x0, x1, y0, y1):
+    """The four world corners of a local axis-aligned rectangle."""
+    return [place(x0, y0), place(x1, y0), place(x1, y1), place(x0, y1)]
+
+
+def build_solid(form, place, w, d, h, z0):
+    """[(verts, faces), ...] for one furnishing, in its own local frame.
+
+    `place(lx, ly) -> (x, y)` carries rotation and position, so a generator
+    only has to think in the item's own axes.  `z0` is the UNDERSIDE (the
+    level's floor plus the catalog's elevation_in), so a wall-hung item is
+    built exactly like a floor-standing one, higher up."""
+    z1 = z0 + h
+    if form == "slab":
+        # A top on legs: table, desk, workbench, machine table.  The top is a
+        # real thickness rather than a plane, because a zero-thickness top
+        # z-fights and casts no shadow under the Qt Quick 3D path.
+        t = min(2.0, max(0.75, h * 0.08))
+        leg = min(3.0, w / 8.0, d / 8.0)
+        parts = [_box(_plan_quad(place, -w / 2, w / 2, -d / 2, d / 2),
+                      z1 - t, z1)]
+        if leg > 0.1 and z1 - t > z0 + 1e-6:
+            for sx in (-1, 1):
+                for sy in (-1, 1):
+                    x0 = sx * (w / 2 - leg) if sx > 0 else sx * w / 2
+                    x1 = sx * w / 2 if sx > 0 else sx * (w / 2 - leg)
+                    y0 = sy * (d / 2 - leg) if sy > 0 else sy * d / 2
+                    y1 = sy * d / 2 if sy > 0 else sy * (d / 2 - leg)
+                    parts.append(_box(_plan_quad(place, x0, x1, y0, y1),
+                                      z0, z1 - t))
+        return parts
+    # box, and every form whose own generator is still to come
+    return [_box(_plan_quad(place, -w / 2, w / 2, -d / 2, d / 2), z0, z1)]
+
+
 def _merge(parts):
     """Concatenate (verts, faces) pairs into one mesh."""
     vs, fs, off = [], [], 0
@@ -565,7 +616,9 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         specs, materials, problems = (catalog if catalog is not None
                                       else load_catalog())
         model.notes.extend(problems)
-        parts, unknown_kind, unknown_mat = {}, set(), set()
+        parts = {}
+        unknown_kind, unknown_mat, unknown_form, pending_form = (
+            set(), set(), set(), set())
         for fu in doc.get("furnishings", []):
             if fu.get("level") not in lv:
                 continue
@@ -581,20 +634,30 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             fh = float(spec.get("height_in", CATALOG_DEFAULT["height_in"]))
             elev = float(spec.get("elevation_in", 0.0) or 0.0)
             mat = spec.get("material") or "unknown"
+            form = spec.get("form") or "box"
+            if form not in KNOWN_FORMS:
+                # A form nothing recognises is a catalog the viewer cannot
+                # read, so it is loud, exactly like an unknown kind.
+                unknown_form.add(form)
+                form, mat = "box", "unknown"
+            elif form not in BUILT_FORMS:
+                pending_form.add(form)
             if _colour(materials, mat) is None:
                 unknown_mat.add(mat)
                 mat = "unknown"
             a = math.radians(-float(fu.get("rotation", 0.0)))
             ca, sa = math.cos(a), math.sin(a)
-            corners = []
-            for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
-                lx, ly = sx * fw / 2, sy * fd / 2
-                corners.append((cx + lx * ca - ly * sa, cy + lx * sa + ly * ca))
+
+            def place(lx, ly, cx=cx, cy=cy, ca=ca, sa=sa):
+                # loop variables bound as defaults (B023, the repo's idiom)
+                return (cx + lx * ca - ly * sa, cy + lx * sa + ly * ca)
+
             # elevation_in is the UNDERSIDE above the level's floor: 0 for
             # anything floor-bearing, non-zero for the wall-hung and
             # counter-mounted items, which used to sit on the floor.
             z = base(fu.get("level")) + elev
-            parts.setdefault(mat, []).append(_box(corners, z, z + fh))
+            parts.setdefault(mat, []).extend(
+                build_solid(form, place, fw, fd, fh, z))
             n_furn += 1
         for mat, plist in parts.items():
             v, f = _merge(plist)
@@ -609,6 +672,16 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             model.notes.append(
                 "furnishing material(s) not in materials.json, drawn in "
                 "magenta: " + ", ".join(sorted(unknown_mat)))
+        if unknown_form:
+            model.notes.append(
+                "furnishing form(s) this viewer does not recognise, drawn as "
+                "a box in magenta: " + ", ".join(sorted(unknown_form)))
+        if pending_form:
+            # INFO, not a note: a recognised form whose generator is a later
+            # pass is a known gap, not a document that could not be drawn.
+            model.info.append(
+                "furnishing form(s) recognised but not yet built, drawn as a "
+                "box: " + ", ".join(sorted(pending_form)))
 
     # ---- bounds ----------------------------------------------------------
     allv = [m.verts for m in model.meshes if len(m.verts)]
@@ -801,7 +874,8 @@ def main(argv=None):
     ap.add_argument("--xray", action="store_true",
                     help="walls translucent, so the whole plan reads at once")
     ap.add_argument("-v", "--verbose", action="store_true",
-                    help="also list routine outline tidy-ups")
+                    help="also list the routine items (outline tidy-ups, "
+                         "forms not yet built)")
     ap.add_argument("--dump", action="store_true",
                     help="print stats and the placement report, then exit")
     ap.add_argument("--obj", metavar="PATH", help="write OBJ and exit")
@@ -842,12 +916,11 @@ def main(argv=None):
             print(f"    - {n}")
     if model.info:
         if a.verbose:
-            print(f"  {len(model.info)} routine outline tidy-up(s):")
+            print(f"  {len(model.info)} routine item(s):")
             for n in model.info:
                 print(f"    - {n}")
         else:
-            print(f"  ({len(model.info)} routine outline tidy-ups; "
-                  f"-v to list)")
+            print(f"  ({len(model.info)} routine items; -v to list)")
 
     if a.obj:
         export_obj(model, a.obj)

@@ -671,7 +671,10 @@ SOLIDS = {
     "coffee_table":           (18,      0, "slab",      "wood"),
     "side_table":             (24,      0, "slab",      "wood"),
     "tv_stand":               (24,      0, "box",       "wood"),
-    "large_tv":               (38,     42, "slab",      "screen"),
+    # A wall-hung panel is a box, not a top on legs.  It was authored `slab`
+    # before the slab generator existed; writing the generator is what showed
+    # the name was wrong, which is the argument for naming forms at all.
+    "large_tv":               (38,     42, "box",       "screen"),
     "gas_fireplace":          (40,      0, "box",       "stone"),
     # -- Dining
     "dining_table":           (30,      0, "slab",      "wood"),

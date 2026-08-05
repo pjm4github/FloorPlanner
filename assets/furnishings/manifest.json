@@ -86,7 +86,7 @@
     "depth_in": 4,
     "height_in": 38,
     "elevation_in": 42,
-    "form": "slab",
+    "form": "box",
     "material": "screen",
     "price": 300.0
   },
