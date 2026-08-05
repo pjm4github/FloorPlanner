@@ -547,7 +547,16 @@ class RoomItem(QGraphicsItem):
         if win is None or not hasattr(win, "_z_top"):
             return
         win._z_top += 1
-        base = win._z_top * 10
+        order = win._z_top * 10
+        # THE BAND AND THE WITHIN-FLOOR ORDER ARE DIFFERENT QUANTITIES, and z
+        # carries both: `levels._apply_floor_stacking` rides the floor band on
+        # as a DELTA precisely so this running max keeps working. Assigning
+        # `order` alone would drop the band -- and a room raised on a ghost
+        # floor would paint OVER the floor being edited, leaving `_floor_band`
+        # stale so the next re-band added the band again on top of the escaped
+        # value. Re-base into this room's own band instead (defect 11).
+        band = getattr(self, "_floor_band", 0.0)
+        base = order + band
         # the translucent fill + label sit at `base` (above OTHER rooms); the
         # walls/openings sit ABOVE the fill so a wall is never hidden under its
         # own room tint and a 'Bring to front' is not undone on the next click
@@ -557,7 +566,10 @@ class RoomItem(QGraphicsItem):
             # at a shared corner grab IT (to edit) rather than a locked neighbour
             w.setZValue(base + 5 if w._corners_unlocked else base + 4)
         for op in self.room_openings():
-            op.setZValue(base + 6)
+            # an opening is a CHILD of its wall, so its z is relative to that
+            # wall and the band must NOT be applied here -- a banded child
+            # would sink behind the very wall it is cut into.
+            op.setZValue(order + 6)
 
     def opening_stats(self):
         """(window count, window glazing sq ft, door count) on this

@@ -230,6 +230,57 @@ def test_floor_display_stacking(fp, win):
     assert "Move to back (display)" in texts
 
 
+def test_raising_a_ghost_room_keeps_it_inside_its_floor_band(fp, win, make_room):
+    """Defect 11, the half that is independently correct: `raise_to_front`
+    assigns z ABSOLUTELY from a running counter, while `_apply_floor_stacking`
+    applies the floor band as a DELTA. So raising a room on a ghost floor used
+    to launch it out of its band and paint it OVER the floor being edited --
+    and leave `_floor_band` stale, so the next re-band added the band a second
+    time on top of the wrong value.
+
+    The band and the within-floor order are different quantities and both must
+    survive: a room raised on a ghost floor goes to the front OF ITS OWN FLOOR
+    and stays behind the active one."""
+    sc = win.scene
+    ghost = make_room(sc, 0, 0, 120, 96, "Ghost")
+    win.new_floor_named("Upper")                  # Upper becomes active
+    top = make_room(sc, 300, 0, 120, 96, "Top")
+    win.show_other_floors = True
+    win._sync_floor_state()
+
+    # preconditions, asserted before the verdict: there IS a band to lose, and
+    # the ghost starts behind the active floor. Without these the assertion
+    # below passes on a scene where nothing was ever stacked.
+    # (`_floor_band` is only materialised when the band CHANGES, so an item
+    # that has only ever been band 0 has no attribute -- read it the way the
+    # production code does)
+    assert ghost._floor_band < 0, "precondition: Ghost is on a ghost band"
+    assert getattr(top, "_floor_band", 0.0) == 0, \
+        "precondition: the active floor is band 0"
+    assert ghost.zValue() < top.zValue(), \
+        "precondition: the ghost starts behind the active floor"
+    before = ghost.zValue()
+
+    ghost.raise_to_front()
+
+    assert ghost.zValue() < top.zValue(), \
+        "raising a room on a ghost floor painted it over the floor being edited"
+    for w in ghost.walls:
+        assert w.zValue() < top.zValue(), \
+            "a ghost room's walls escaped the band even though the room did not"
+    # it still went to the front OF ITS OWN FLOOR -- the fix must not simply
+    # make raise_to_front a no-op for ghosts
+    assert ghost.zValue() > before
+    # z decomposes into (within-floor order) + (band), and the band is still
+    # the one the item records -- so the next re-band is a delta from the
+    # right place instead of from a value that already escaped it
+    assert ghost.zValue() - ghost._floor_band > 0
+    win.switch_floor(fp.DEFAULT_FLOOR)
+    assert ghost._floor_band == 0
+    assert ghost.zValue() > top.zValue(), \
+        "the ghost did not come back to the front when its floor became active"
+
+
 def test_floor_depth_fade_and_quick_flip(fp, win):
     # Patrick's refinement: atmospheric depth -- the edited floor is dark
     # (opacity 1.0) and each visible floor beneath it fades grayer with its
