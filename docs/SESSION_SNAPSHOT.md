@@ -65,15 +65,15 @@
 
 Unchanged, plus these added during P4.5 (all in the Working agreement): **a green signal is only evidence about what it measures** (with the artifact→check table); **retire visibility before permission**, and enumerate a view's consumers first — those that scope themselves by it are permission grants in disguise; **a task that changes what an operation does owes a differential receipt** alongside the green gate; **vacuity has three shapes**, only tautology is machine-detectable; **negative assertions are where vacuity concentrates**, so preconditions are mandatory there; **verify a probe — and a record edit — actually landed**; **measure survival justifications** like any other claim; **in a test, call the production predicate rather than restating it**; and **a tidy-up pass that outlives its mess only touches things nobody asked it to**.
 
-**Carried over from the viewer-furnishings branch, for P4.5 to apply when it
-resumes:** the register's non-simple-outline row (row 41, which exists only on
-`p4.5-groups-zorder`) states its reproduction as
-`python -m floorplanner.viewer.fp3d …`. That form is documented in
-`floorplanner/viewer/VIEWER_NOTES.md` §1 as the one that **breaks the viewer's
-isolation** — `-m` imports the parent package and therefore the whole editor.
-The script form `python floorplanner/viewer/fp3d.py …` is correct and is what
-VIEWER_NOTES §4 now uses. Fix the row on its own branch; editing it from a
-branch that does not own that file would be the mistake the rule above forbids.
+**~~Carried over from the viewer-furnishings branch~~ — DONE 2026‑08‑05.**
+Row 41's reproduction stated `python -m floorplanner.viewer.fp3d …`, the form
+`floorplanner/viewer/VIEWER_NOTES.md` §1 documents as **breaking the viewer's
+isolation** (`-m` imports the parent package, hence the whole editor). It could
+not be fixed from the branch that found it, which did not own
+`CODE_REVIEW_v2.md`; merging `main` in gave this branch both files, and the row
+now states the script form. Kept here rather than deleted because it is the
+worked example of the rule above: *a record edit belongs on the branch that
+owns the file*, and the wait was one merge long.
 
 ---
 
