@@ -39,7 +39,7 @@ notes:   <anything surprising — especially a test you had to change and why>
 
 **Only the first is machine-detectable**, and `tools/gate.py` now greps `tests/` for it and fails the gate on a hit (`Gate-Census: … vacuous=N`). The other two need a human asking *what did this test establish before it asserted?* — which is why preconditions are asserted before verdicts throughout this suite.
 
-**AND THE MACHINE CHECK'S OWN BOUNDARY, STATED — added 2026‑08‑05, at an instance it would have missed.** `_VACUOUS` knows exactly four shapes: `assert … or True`, `assert … or 1`, `assert True`, `assert not False`. **It does not know a tautology built from the code under test** — an expression compared to itself (`assert f(x) == f(x)`), a comparison of two calls that cannot differ, or any identity that happens to hold whatever the production code does. One of those was written during P4.5(22) and removed on a re-read, not by an instrument: it would have gone in **green** and read as coverage in the diff, which is the worst property vacuity has. So `vacuous=0` means *"none of four literal patterns"*, and it must not be quoted as *"no unfailable assertions"*. This is row 44's **accepted limit** applied to a tool rather than to the invariants, and it follows the same rule as the green-signal table above: **a check whose coverage is unstated gets trusted past its boundary.** Widening the grep is not obviously right — a pattern general enough to catch `f(x) == f(x)` starts flagging legitimate round-trip assertions — so the honest move is to state the limit rather than to chase it.
+**The vacuity grep's own boundary is one of the five in the instrument-boundary table above** — it knows four literal shapes and not a tautology built from the code under test. Widening it is not obviously right: a pattern general enough to catch `f(x) == f(x)` starts flagging legitimate round-trip assertions, so the limit is stated rather than chased.
 
 **Fail-first receipts: verify the probe actually mutated the tree before trusting its red — added 2026‑08‑04.** A receipt is only as good as the instrument that took it, and an instrument that silently did nothing produces a red (or a green) about the wrong tree — **vacuity one layer up**. Worked example, P4.5(5): the fail-first probe for the visibility guard was applied with a `python -c` replace whose pattern did not match because the file is CRLF on disk; it exited 0 and reported success while changing nothing. Caught by `grep`-ing the file for the restored line rather than trusting the exit code. So: after applying a probe, **confirm the edit is present** (grep the line, or `git diff --stat`) before running the test, and say in the receipt how the mutation was confirmed.
 
@@ -223,6 +223,28 @@ Every artifact a task changes needs the check that covers *it*:
 | the record (plan, register, notes) | `tools/record.py` — anchored edit, re-read from disk, non-zero if the text is not there afterwards |
 | what an operation DOES | a **differential receipt** — measured before and after (row 44) |
 | a document's legality | `check(doc, deep=True)` — and only legality; never "is this the document the gesture should have produced" |
+
+**THE COROLLARY — AN INSTRUMENT'S NAME ALWAYS SUGGESTS A BROADER QUESTION THAN
+IT ANSWERS, added 2026‑08‑05 at the fifth instance.** The boundary is invisible
+from the name, which is exactly why it gets crossed: nothing about `vacuous=0`
+says *"none of four literal patterns"*, and nothing about `split_count()` says
+*"split-on-write only"*. So **state at the instrument the question it actually
+answers, and state what it does not cover** — the second half is the one that
+gets skipped, and it is the one that stops a green being borrowed. Five
+instances, all found by walking into the boundary rather than by foreseeing it:
+
+| instrument | the question it answers | what it does NOT cover |
+|---|---|---|
+| `check(doc, deep=True)` | is this document CONSISTENT? | its HISTORY — a resurrected wall passes all fifteen (row 44) |
+| `tools/gate.py` | is the CODE green? | the record; it runs ruff and pytest, and neither reads a `.md` |
+| the vacuity grep | does any test match one of FOUR literal unfailable shapes? | a tautology built from the code under test (`assert f(x) == f(x)`) — written once at P4.5(22) and caught by a re-read, not by the grep |
+| `vertex.split_count()` | how many SPLIT-ON-WRITES happened? | identity change as such — P4.5(24)'s deliberate detach goes through `Vertex.at`, so an endpoint drag now reports **0** and still changes identity |
+| `validate._seg_cross` | do two edges PROPERLY cross? | a loop that is non-simple by *touching* — deliberate, so it cannot fire on the collinear edges two rooms share (row 41) |
+
+Three of the five are recorded where the defect lives (rows 41 and 44) or at
+the call site (`split_count`); they are cited here rather than restated,
+because five notes saying the same thing is the duplication disease arriving in
+the record instead of in the code.
 
 **TWO FAILURE SHAPES, and they are not the same — separate them.** *(a) A
 MISSING CHECK*: P4.5(8)'s edit used `if anchor in s:` and skipped silently —
@@ -4889,6 +4911,30 @@ notes:   TWO COMMIT MESSAGES ON THIS BRANCH CONTAIN CLAIMS THAT WERE FALSE
          them is tools/record.py, added at P4.5(18) -- which then refused
          its own second edit on an ambiguous anchor, which is the behaviour
          being bought.
+
+P4.5(24) THE ENDPOINT DRAG JOINS THE VERTEX OPS -- three method notes kept
+         because each is a rule being obeyed rather than a result
+notes:   * A COUNT WAS NOT ACCEPTED AS A FINDING. The receipt showed "2
+           distinct uids" across a drag, which reads as churn REDUCED. Traced
+           event by event it is V1, V2, V2, V2, V2, V2, V2 -- the original
+           shared corner sampled before the snapped target had left it, then
+           ONE detached vertex for the whole gesture. Churn ELIMINATED, not
+           reduced, and the two readings are different claims.
+         * DEFECT 13's RULING WAS MEASURED, NOT ARGUED. The conversion does
+           not touch `_endpoint_target`/`_corner_target`, so "where the end
+           lands is unchanged" was deducible -- and was taken at 0.25x, 1.0x
+           and 4.0x anyway, identical before and after. An identity change
+           that also moved geometry would be two changes wearing one commit,
+           and the difference between a correct inference and a taken reading
+           is the whole of "being right from the source is not the same as
+           having measured".
+         * A RECEIPT WAS DOWNGRADED RATHER THAN QUOTED AT FACE VALUE. Of the
+           two fail-first reds, one was a behavioural verdict ("the end
+           changed identity 6 times in one drag") and one was an
+           AttributeError -- the API not existing yet. The second shows the
+           test is new, not that the behaviour was wrong, and it is reported
+           as the weaker shape it is. A red is not evidence merely because it
+           is red.
 
 
 ```
