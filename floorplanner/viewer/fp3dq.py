@@ -45,10 +45,10 @@ import sys
 import numpy as np
 
 try:                                  # imported as part of the package
-    from .fp3d import build_model     # (same geometry core, unchanged)
+    from .fp3d import build_model, load_catalog   # (same geometry core)
 except ImportError:                   # ...or run as a loose script
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from fp3d import build_model  # noqa: E402
+    from fp3d import build_model, load_catalog  # noqa: E402
 
 # --------------------------------------------------------------------------
 # QML scene.  A real document beside the module (packaged as package-data),
@@ -108,22 +108,35 @@ def _make_geometry(QQuick3DGeometry, QByteArray, QVector3D, verts, faces, rgba):
     return g
 
 
-# Rough PBR per mesh name -- roughness, metalness.  Nothing elaborate; enough
-# to see that materials are declarative here rather than hand-shaded.
-def _pbr(name):
+# Wall and floor surfaces are typed by the DOCUMENT, not by the catalog, so
+# these two are viewer defaults and are NOT duplication of anything: no other
+# file states them.  Driving them from the document's own finish strings is
+# VIEWER_NOTES.md section 5 item 3, deliberately reserved until finishes
+# actually vary.  They are not folded into assets/furnishings/materials.json
+# because a wall surface is not a furnishing, and filing it under one would be
+# a worse error than the duplication it would remove.
+WALL_PBR = (0.92, 0.0)                      # roughness, metalness
+FLOOR_PBR = (0.72, 0.0)
+FURN_PBR_DEFAULT = (0.85, 0.0)
+
+
+def _pbr(name, materials=None):
+    """(roughness, metalness) for a mesh, from the CATALOG where it owns it.
+
+    fp3d names each furnishing mesh `furnishings:<material>`, and the material
+    is a catalog name whose properties live once in materials.json.  This
+    function used to restate them by sniffing the mesh name for 'metal',
+    'glass', 'porcelain', 'vehicle' -- a second definition of catalog data,
+    and one that could not be corrected without editing the viewer."""
     if name.startswith("walls"):
-        return 0.92, 0.0
+        return WALL_PBR
     if name.startswith("floors"):
-        return 0.72, 0.0
-    if "metal" in name:
-        return 0.35, 0.85
-    if "glass" in name or "water" in name:
-        return 0.12, 0.0
-    if "porcelain" in name:
-        return 0.25, 0.0
-    if "vehicle" in name:
-        return 0.45, 0.30
-    return 0.85, 0.0
+        return FLOOR_PBR
+    mat = (materials or {}).get(name.split(":", 1)[-1])
+    if isinstance(mat, dict):
+        return (float(mat.get("roughness", FURN_PBR_DEFAULT[0])),
+                float(mat.get("metalness", FURN_PBR_DEFAULT[1])))
+    return FURN_PBR_DEFAULT
 
 
 # --------------------------------------------------------------------------
@@ -256,11 +269,14 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
         def status(self):
             return self._t
 
+    # The catalog's materials, read the same way build_model reads them --
+    # data files, no floorplanner import.
+    _materials = load_catalog()[1]
     entries = []
     for m in model.meshes:
         if not len(m.faces):
             continue
-        rough, metal = _pbr(m.name)
+        rough, metal = _pbr(m.name, _materials)
         rgba = (m.color[0], m.color[1], m.color[2], 1.0)
         g = _make_geometry(QQuick3DGeometry, QByteArray, QVector3D,
                            m.verts - ctr, m.faces, rgba)

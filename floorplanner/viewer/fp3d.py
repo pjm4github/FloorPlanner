@@ -26,8 +26,11 @@ Conventions
 * Lighting is baked per face in numpy (key / fill / sky, world-fixed so the sun
   does not swim as you orbit).  No GLSL is compiled, so no driver or pyqtgraph
   version can refuse it; --flat falls back to pyqtgraph's own shader.
-* Colour comes from three tables: WALL_C by wall type, FLOOR_C by room
-  category, FAMILY_C by furnishing material family.  Edit and re-run.
+* Wall and floor colour come from two tables here, WALL_C by wall type and
+  FLOOR_C by room category, because both are typed by the DOCUMENT.
+* Furnishings are not: their size, height, elevation, form and material come
+  from assets/furnishings/manifest.json + materials.json, read as data.  This
+  file states no furnishing dimension of its own.
 """
 
 from __future__ import annotations
@@ -35,6 +38,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 from dataclasses import dataclass, field
 
@@ -67,55 +71,88 @@ FLOATING_C = (0.95, 0.72, 0.28, 1.0)     # a room that is not placed
 DEFAULT_SILL = 36.0              # window sill when the document doesn't say
 SLAB_T = 1.0                     # floor slab thickness, drawn below z0
 
-# Footprints and material family, keyed on the catalog's furnishing kinds.
-# (width, depth, height) inches, then the family that picks the colour.
-FURN = {
-    # seating / soft goods
-    "sofa": (84, 36, 30, "soft"),         "loveseat": (60, 36, 30, "soft"),
-    "armchair": (34, 34, 32, "soft"),     "dining_chair": (18, 20, 34, "wood"),
-    "bench": (48, 18, 18, "wood"),
-    # tables and casework
-    "coffee_table": (48, 24, 18, "wood"), "side_table": (22, 22, 24, "wood"),
-    "dining_table": (72, 40, 30, "wood"), "workbench": (72, 30, 36, "wood"),
-    "buffet": (60, 20, 36, "wood"),       "hutch": (54, 20, 78, "wood"),
-    "dresser": (60, 20, 34, "wood"),      "wardrobe": (48, 24, 72, "wood"),
-    "nightstand": (22, 18, 26, "wood"),   "desk": (60, 30, 30, "wood"),
-    "island": (72, 36, 36, "wood"),
-    # sleeping
-    "bed_king": (76, 80, 26, "soft"),     "bed_queen": (60, 80, 26, "soft"),
-    "bed_twin": (38, 75, 26, "soft"),
-    # plumbing
-    "bathtub": (60, 30, 20, "porcelain"), "toilet": (20, 28, 30, "porcelain"),
-    "sink": (24, 20, 34, "porcelain"),    "shower": (36, 36, 78, "glass"),
-    "walk_in_shower": (60, 36, 78, "glass"),
-    "vanity": (36, 21, 34, "wood"),       "vanity_24": (24, 21, 34, "wood"),
-    "vanity_36": (36, 21, 34, "wood"),    "swim_spa": (180, 90, 40, "water"),
-    # appliances and mechanical
-    "range": (30, 26, 36, "metal"),       "refrigerator": (36, 30, 70, "metal"),
-    "dishwasher": (24, 24, 34, "metal"),  "washer": (27, 27, 38, "metal"),
-    "dryer": (27, 27, 38, "metal"),       "gas_fireplace": (48, 16, 40, "stone"),
-    # circulation, vehicles, outdoor
-    "stairs": (36, 120, 8, "wood"),       "car": (72, 180, 55, "vehicle"),
-    "suv": (78, 195, 70, "vehicle"),      "garden_tractor": (48, 72, 45, "vehicle"),
-    "riding_mower_snow": (48, 72, 45, "vehicle"),
-    "snowblower": (26, 36, 42, "vehicle"),
-    "tree": (96, 96, 180, "planting"),    "shrub": (36, 36, 36, "planting"),
-    "planter": (24, 24, 24, "stone"),
-}
-FURN_DEFAULT = (24, 24, 30, "unknown")
+# --------------------------------------------------------------------------
+# the furnishing catalog -- READ, never restated
+# --------------------------------------------------------------------------
+# This file used to carry its own table of furnishing footprints, heights and
+# material colours.  It was a second definition of data
+# `assets/furnishings/manifest.json` already owned, and a measurably wrong one:
+# 58 of the 95 catalog kinds were absent from it (drawn 24x24x30 in magenta),
+# and of the 37 it shared, 22 disagreed on footprint -- three by transposing
+# width and depth, so the item rendered rotated 90 degrees.  The tables are
+# gone; the catalog is the source.
+#
+# THE ISOLATION IS PRESERVED BECAUSE THESE ARE DATA FILES.  Nothing here
+# imports `floorplanner` -- the manifest is read as JSON, exactly as the design
+# document is, so the viewer still cannot affect the editor and cannot be
+# broken by an editor refactor.  The path is resolved by walking UP from this
+# module to the directory that holds `assets/`, so it works whether the file is
+# run as a script, imported, or executed from another working directory.
 
-FAMILY_C = {
-    "soft":      (0.44, 0.49, 0.57, 1.00),
-    "wood":      (0.52, 0.37, 0.23, 1.00),
-    "porcelain": (0.93, 0.94, 0.95, 1.00),
-    "glass":     (0.62, 0.76, 0.80, 0.35),
-    "water":     (0.28, 0.54, 0.70, 0.55),
-    "metal":     (0.66, 0.68, 0.71, 1.00),
-    "stone":     (0.55, 0.53, 0.50, 1.00),
-    "vehicle":   (0.26, 0.28, 0.32, 1.00),
-    "planting":  (0.30, 0.50, 0.28, 1.00),
-    "unknown":   (0.85, 0.35, 0.55, 1.00),   # loud on purpose: no size known
-}
+# Used only when the catalog cannot be read at all, and reported when it is.
+CATALOG_DEFAULT = {"width_in": 24.0, "depth_in": 24.0, "height_in": 30.0,
+                   "elevation_in": 0.0, "form": "box", "material": "unknown"}
+# Last-resort material if materials.json is missing too.  Loud on purpose.
+UNKNOWN_C = (0.85, 0.35, 0.55, 1.00)
+
+
+def _assets_dir(start=None):
+    """The repo's assets/furnishings, found by walking up from this module."""
+    here = os.path.abspath(start or __file__)
+    d = os.path.dirname(here)
+    while True:
+        cand = os.path.join(d, "assets", "furnishings")
+        if os.path.isdir(cand):
+            return cand
+        parent = os.path.dirname(d)
+        if parent == d:
+            return None
+        d = parent
+
+
+def load_catalog(assets_dir=None):
+    """(specs, materials, problems) straight off the generated asset files.
+
+    `specs` is {kind: entry-dict}, `materials` is {name: {colour, roughness,
+    metalness}}, and `problems` is a list of strings for the model's report.
+    A MISSING CATALOG IS REPORTED, NOT RAISED: the viewer still draws, at the
+    default box, and says in its report that it did -- silently guessing every
+    size is the failure mode this whole change exists to remove."""
+    d = assets_dir or _assets_dir()
+    specs, materials, problems = {}, {}, []
+    if d is None:
+        return specs, materials, [
+            "furnishing catalog not found (no assets/furnishings above "
+            f"{os.path.dirname(os.path.abspath(__file__))}); every furnishing "
+            "drawn at the default box in magenta"]
+    for name, sink in (("manifest.json", "specs"),
+                       ("materials.json", "materials")):
+        path = os.path.join(d, name)
+        try:
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError) as e:
+            problems.append(
+                f"furnishing catalog: cannot read {name} ({e}); "
+                + ("every furnishing drawn at the default box"
+                   if sink == "specs" else "materials fall back to magenta"))
+            continue
+        if sink == "specs":
+            specs = {e["id"]: e for e in data if "id" in e}
+        else:
+            materials = dict(data)
+    return specs, materials, problems
+
+
+def _colour(materials, name):
+    """(r, g, b, a) for a material name, or None if the catalog lacks it."""
+    m = materials.get(name)
+    if not isinstance(m, dict):
+        return None
+    col = m.get("colour")
+    if not (isinstance(col, (list, tuple)) and len(col) == 4):
+        return None
+    return tuple(float(c) for c in col)
 
 
 # --------------------------------------------------------------------------
@@ -336,8 +373,13 @@ def opening_span(anchor, width, length):
 
 
 def build_model(doc, levels=None, furnishings=True, wall_height=None,
-                floors=True, openings=True):
-    """v5 design dict -> Model.  Pure numpy; no Qt, no floorplanner import."""
+                floors=True, openings=True, catalog=None):
+    """v5 design dict -> Model.  Pure numpy; no Qt, no floorplanner import.
+
+    `catalog` is a (specs, materials, problems) triple as `load_catalog()`
+    returns; it defaults to the repo's own.  It is a parameter so a test can
+    hand in a catalog that is missing, or one naming a form nothing
+    implements, without moving files around on disk."""
     model = Model()
 
     lv = {L["id"]: L for L in doc.get("levels", [])}
@@ -520,34 +562,53 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
 
     # ---- furnishings -----------------------------------------------------
     if furnishings:
-        parts, unknown = {}, set()
+        specs, materials, problems = (catalog if catalog is not None
+                                      else load_catalog())
+        model.notes.extend(problems)
+        parts, unknown_kind, unknown_mat = {}, set(), set()
         for fu in doc.get("furnishings", []):
             if fu.get("level") not in lv:
                 continue
             pos = fu.get("pos") or [0, 0]
             cx, cy = float(pos[0]), -float(pos[1])
             kind = fu.get("kind", "")
-            if kind not in FURN:
-                unknown.add(kind)
-            fw, fd, fh, fam = FURN.get(kind, FURN_DEFAULT)
+            spec = specs.get(kind)
+            if spec is None:
+                unknown_kind.add(kind or "?")
+                spec = CATALOG_DEFAULT
+            fw = float(spec.get("width_in", CATALOG_DEFAULT["width_in"]))
+            fd = float(spec.get("depth_in", CATALOG_DEFAULT["depth_in"]))
+            fh = float(spec.get("height_in", CATALOG_DEFAULT["height_in"]))
+            elev = float(spec.get("elevation_in", 0.0) or 0.0)
+            mat = spec.get("material") or "unknown"
+            if _colour(materials, mat) is None:
+                unknown_mat.add(mat)
+                mat = "unknown"
             a = math.radians(-float(fu.get("rotation", 0.0)))
             ca, sa = math.cos(a), math.sin(a)
             corners = []
             for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
                 lx, ly = sx * fw / 2, sy * fd / 2
                 corners.append((cx + lx * ca - ly * sa, cy + lx * sa + ly * ca))
-            z = base(fu.get("level"))
-            parts.setdefault(fam, []).append(_box(corners, z, z + fh))
+            # elevation_in is the UNDERSIDE above the level's floor: 0 for
+            # anything floor-bearing, non-zero for the wall-hung and
+            # counter-mounted items, which used to sit on the floor.
+            z = base(fu.get("level")) + elev
+            parts.setdefault(mat, []).append(_box(corners, z, z + fh))
             n_furn += 1
-        for fam, plist in parts.items():
+        for mat, plist in parts.items():
             v, f = _merge(plist)
-            col = FAMILY_C.get(fam, FAMILY_C["unknown"])
-            model.meshes.append(Mesh(f"furnishings:{fam}", v, f, col,
+            col = _colour(materials, mat) or UNKNOWN_C
+            model.meshes.append(Mesh(f"furnishings:{mat}", v, f, col,
                                      translucent=col[3] < 1.0))
-        if unknown:
+        if unknown_kind:
             model.notes.append(
-                "furnishing kind(s) with no footprint in FURN, drawn at the "
-                "default size in magenta: " + ", ".join(sorted(unknown)))
+                "furnishing kind(s) in no catalog, drawn at the default box "
+                "in magenta: " + ", ".join(sorted(unknown_kind)))
+        if unknown_mat:
+            model.notes.append(
+                "furnishing material(s) not in materials.json, drawn in "
+                "magenta: " + ", ".join(sorted(unknown_mat)))
 
     # ---- bounds ----------------------------------------------------------
     allv = [m.verts for m in model.meshes if len(m.verts)]
