@@ -139,17 +139,29 @@ def test_delete_wall_actually_removes_the_wall(win, make_room, first_furnishing)
 # --------------------------------------------------------------------------
 # 3. a group survives serialize -> load_data  (P4.5)
 # --------------------------------------------------------------------------
-@pytest.mark.xfail(reason="groups do not serialize until P4.5 (defect 3)",
-                   strict=False)
 def test_group_survives_roundtrip(win, make_room, first_furnishing):
+    # FLIPPED xfail -> PASS AT P4.5 (defect 3), with ONE declared change: the
+    # round trip goes through `design_document()`, not `serialize()`. This
+    # test predates P2.3, which demoted serialize() to File > Export legacy
+    # v4 only and said in as many words that "a new caller of this method is
+    # a bug". v4 has no `groups` collection and never will, so asserting
+    # group survival through it would be asserting the impossible. What save
+    # and open actually do is the v5 document; that is what is asserted now.
     sc = win.scene
     r1 = make_room(sc, 0, 0, 120, 96, "Room 1")
     r2 = make_room(sc, 200, 0, 120, 96, "Room 2")
     _group(win, [r1, r2, *r1.walls, *r2.walls])
-    data = win.serialize()
+    before = [g for g in sc.items() if isinstance(g, fp.GroupItem)]
+    assert len(before) == 1                       # precondition: it grouped
+    n_members = len(before[0].childItems())
+
+    data = win.design_document()
+    assert len(data["groups"]) == 1, "the document carries no group"
     win.load_data(data)
-    assert any(isinstance(i, fp.GroupItem) for i in win.scene.items()), \
-        "group did not survive the round-trip"
+
+    after = [g for g in win.scene.items() if isinstance(g, fp.GroupItem)]
+    assert after, "group did not survive the round-trip"
+    assert len(after[0].childItems()) == n_members, "members were lost"
 
 
 # --------------------------------------------------------------------------
