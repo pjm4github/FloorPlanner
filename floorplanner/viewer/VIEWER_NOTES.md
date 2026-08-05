@@ -273,23 +273,146 @@ Now mostly **assets, not architecture**:
    views with the ceiling removed — which is already the case here, since no
    ceilings are generated.
 
-6. **The rest of the `form` generators — and `prism` first.** Each catalog
-   entry names a `form`; `build_solid()` builds `box` and `slab` (a top on
-   legs), and every other recognised form — `seat`, `bed`, `basin`,
-   `enclosure`, `vehicle`, `planting` — is built as a box and **said so in the
-   report's info channel**, which is what makes this a known gap rather than a
-   silent guess. **`prism` is the next one and is the interesting one:** it
-   extrudes the symbol's own SVG outline, so a round table is round and an
-   L-shaped desk is L-shaped, with no second drawing to maintain — the 2D
-   symbol already *is* the plan profile, at true scale in inches, which is why
-   this is the highest-value form and not merely the next one on the list. A
-   form nothing recognises is treated exactly like an unknown kind: box shape,
-   magenta, named in the notes.
+6. **The rest of the `form` generators.** Each catalog entry names a `form`;
+   `build_solid()` builds `box` and `slab` (a top on legs), and every other
+   recognised form — `seat`, `bed`, `basin`, `enclosure`, `vehicle`,
+   `planting` — is built as a box and **said so in the report's info
+   channel**, which is what makes this a known gap rather than a silent guess.
+   A form nothing recognises is treated exactly like an unknown kind: box
+   shape, magenta, named in the notes. The design for the two that matter is
+   §5a below.
 
 An **offline render** path (export glTF, render headless in Blender/Cycles for
 presentation images) remains open and would share `build_model` too. That is the
 reason to keep that function Qt-free and renderer-agnostic no matter what
 happens above it.
+
+### §5a — Better furnishing solids: two problems, two answers, and they are not the same one
+
+Asked at the end of the `viewer-furnishings` branch (2026‑08‑05): *what has to
+be in place before a `Car` is more than a box?* The answer splits cleanly in
+two, and conflating them is the expensive mistake, because **one needs no
+change to anything and the other changes the vertex format**.
+
+#### (a) FLAT models — a faceted car of ~100 faces. Needs no structural change at all.
+
+**`Mesh` does not change. No normals array, no UVs, no stride change.** §3's
+argument holds facet for facet: every surface in a plan is flat, so lighting
+baked per face costs nothing visually — and a low-poly faceted model is
+*nothing but* flat surfaces. The baked per-face rig is not a limitation being
+worked around here; it is the correct renderer for this class of model.
+
+**The symbol already carries the geometry, and this is the finding.** A top
+view extruded once (`prism`) gives a cookie-cutter: a car-shaped slab with a
+flat top, because a top view carries no roofline. But the symbols are not
+silhouettes — measured on `car.svg`, which is `72 × 180` inches:
+
+| element | what it is |
+|---|---|
+| rounded rect `70 × 178`, `rx 16` | the body footprint |
+| rounded rect `56 × 92` at y 50–142, `rx 9` | **the roof outline** |
+| two cross lines at y 70 / y 122 | the pillars |
+| two `7 × 4` tabs at x 0.5 / 64.5 | the mirrors |
+
+It is already a **two-level contour drawing**. What it lacks is not artwork,
+it is a **z for each outline** — so the uplift is mostly metadata, not
+redrawing.
+
+**The shape that fits is a LOFT between stacked rings**, not one extrusion:
+body ring z 0→18; a skirt from the body ring up to the roof ring z 18→30,
+whose sloped quads *are* the windscreen and the rear glass; roof ring z 30→56;
+four wheels as short prisms. Flattening each rounded rect to ~24 points gives
+~24 side faces per ring, ~48 triangles of skirt, plus caps and wheels —
+**about 150 triangles per car**, which is the ~100 that was asked for.
+
+**Cost, measured against what is on disk:** `symmetricP1` is 3,224 triangles
+today; 50 furnishings at ~150 each puts it near 10,000. Qt Quick 3D was
+comfortable at 2,900 with shadows and AO on Intel integrated graphics, and
+`fp3d`'s per-frame cost is the Python draw-call loop, which **does not grow** —
+meshes still merge by material.
+
+**THE VIEWER MUST NOT PARSE SVG, and the reason is this branch's own history.**
+An SVG is a data file, so reading one would not break the isolation rule — but
+parsing arbitrary path syntax is a large new surface, and worse, it would make
+the 3D profile a *second reading* of the artwork. That is exactly the drift
+that put 22 wrong footprints and three transposed ones in the deleted `FURN`.
+`_gen_assets.py` already holds the geometry as Python primitives
+(`R(1, 1, 70, 178, 16, …)`), so **it emits the rings itself**, to a third
+generated asset beside the other two:
+
+```
+assets/furnishings/profiles.json   {kind: [{z0, z1, material, ring: [[x, y], …]}, …]}
+```
+
+Rings already flattened to polylines, already centred in the item's local
+frame, in inches. The viewer reads it exactly as it reads `manifest.json` and
+`materials.json`. **The 2D symbol and the 3D profile then come from one
+authoring statement and cannot disagree** — which is the whole point.
+
+**What comes free, and is worth not re-deciding:** `triangulate()` already
+ear-clips the caps and `clean_ring()` already reports a badly authored ring in
+the same channel that reports a bad room outline; `vehicle` is already in
+`KNOWN_FORMS` and already routes through
+`build_solid(form, place, w, d, h, z0)`, whose `place()` carries rotation and
+position so a generator thinks only in local axes — so **no new vocabulary and
+no new dispatch**; and body/glass/wheels as separate rings with separate
+materials emit separate meshes that the existing merge collapses **across**
+items, so twenty cars still cost one body draw call and one glass draw call.
+
+**The honest limit, recorded so nobody chases it through this door:** a contour
+stack cannot give a curved windscreen or true wheel arches. It gives a
+faceted, architectural-model car. That is the whole of what this design
+delivers, and it is enough.
+
+**Suggested order:** `profiles.json` for `car` alone (the two rings it already
+has, plus wheels) → the `vehicle` branch in `build_solid` → fail-first receipt
+(12 triangles → ~150, plus a test that the loft is a *loft*: the roof ring is
+inset from the body ring at mid-height, the same discriminating shape as
+`test_slab_is_a_top_on_legs`) → the rest of the vehicles → then `prism`, which
+is this same machinery with **one** ring, for the flat-topped kinds: planters,
+islands, L-shaped desks, round tables.
+
+#### (b) SMOOTH models — glTF chairs and sofas. This one does change the vertex format.
+
+Separated from (a) deliberately: the two look like one task and are not. Here
+is the census, taken 2026‑08‑05 so the session that does it does not repeat it.
+
+**`Mesh` is read at 9 sites, all inside these two files** — `fp3d.py`: the
+bbox (`:687`), the triangle stat (`:693`), `export_obj` (`:703‑708`),
+`make_view` (`:793‑809`); `fp3dq.py`: the entry loop (`:277‑284`). Nothing
+else in the repo touches it, so widening it is a contained change.
+
+**Two channels you would assume are missing are already plumbed.** Per-*face*
+colour exists: `Mesh.color` is a BASE colour and `shade_faces()` returns an
+`(M, 4)` array, one RGBA per triangle, to `MeshData(faceColors=…)`. Per-*vertex*
+colour exists too: `_interleaved()` packs `pos(3) + normal(3) + colour(4)`
+float32 per vertex and `scene.qml` sets `vertexColorsEnabled: true` — today the
+producer fills it with one colour tiled. **Colour variation is not what gates
+realism.**
+
+**Three things do, and only the first is a real foreclosure:**
+1. **Normals are flat, derived from winding.** Both renderers cross-product per
+   triangle and repeat across its three vertices. A glTF supplies *smooth*
+   normals and `Mesh` has nowhere to put them, so they would be **discarded on
+   import** and the model would render faceted however good it is. This is the
+   one place the present shape throws away information a real model carries.
+2. **No UVs anywhere.** `_make_geometry` fixes a 40-byte stride with three
+   attributes; textures need `UV(2)`, so stride 48, a fourth attribute, and a
+   UV array on `Mesh`.
+3. **One material per mesh — and here the current design is already right.** A
+   sofa is fabric, wood and metal, so it emits one mesh per material, and
+   merge-by-material then collapses them across items. The strategy that
+   exists for flat plans is the correct one for multi-material models. No
+   change.
+
+Also: `export_obj` writes no material library, so the OBJ path already loses
+colour. That function is the natural seam for a glTF *exporter* later.
+
+**Do not widen `Mesh` speculatively.** A field nothing reads is the same
+disease as a table nothing maintains, and it is how an abstraction gets shaped
+for a consumer that turns out to want something else. Take (1) and (2) in one
+commit, with a loader that consumes them, in the session that has a model to
+load.
 
 ---
 
