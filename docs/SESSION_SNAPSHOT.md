@@ -17,6 +17,28 @@
 
 ---
 
+## 1a. Three branches are in flight — read this before any git operation
+
+| branch | head | state |
+|---|---|---|
+| **`p4.5-groups-zorder`** | `8d7a914` | **clean, green, pushed.** The working branch. Everything below is parked OFF it so it stays shippable. |
+| `p4.5-align-wip` | `5f679e9` | **parked, semi-disposable.** Holds the `align_rooms_to_grid` + `_translate_shape` fix (both relocate corners instead of assigning `p1`/`p2`). **To be REWRITTEN against defect 23's widened gather** — the code will not survive, the measurements in its commit message are the part that matters. |
+| `p4.5-defect23-wip` | `4e967c0` | **parked RED.** Holds defect 23's deform-to-follow mechanism: `_corner_records` no longer splits a corner an outside wall also holds. Two faults open, one trivial and one unruled — see below. |
+
+**Why the align work is parked behind defect 23.** Fixing align/distribute exposed a tear the old code was accidentally hiding: A and B share a party wall, B moves, so A's wall goes to x=150 while A's outline stays at 120. Split-on-write had been destroying identity, and destroying identity is what kept the neighbour intact — **a bug was masking a bug, so the correct fix presents as a regression.** The gather must widen first; then align and distribute inherit it and the tear cannot occur.
+
+**Defect 23's state, measured.** The mechanism works: on the clipped-band case (2 of a room's 4 walls grouped, moved −400/+300) the outline went from **unchanged (stranded)** → **all 4 corners moved (rigid — the opposite error)** → **3 of 4 moved, 1 stayed (deform, correct)**. The middle state came from the legacy-repair branch minting records for corners the group never held; a fully-owned room still gets those (it travels whole), a partly-held room attaches to existing records only.
+
+**Two faults open on `p4.5-defect23-wip`:**
+1. **ruff F401** — `floorplanner.vertex.Vertex` is now unused in `items.py`, having existed only for the removed split. Trivial.
+2. **UNRULED, and it must not be silenced:** `tests/test_rooms.py::test_fragment_groups_each_piece_with_its_own_walls` errors at `win` teardown with **`I11: 1 -> 3, I5b: 0 -> 1`**. Deform-to-follow makes the fragment operation deform rooms into overlapping regions and a self-intersecting outline. Whether `fragment` should extract first, or whether deform-to-follow needs a guard where the deform is degenerate, is **a ruling, not a repair** — adjusting the fragment op to make the error go away would be choosing semantics silently.
+
+**NEITHER XFAIL FLIPPED.** `test_a_clipped_band_leaves_every_room_coherent` and `test_a_bake_that_crosses_an_outline_reports_at_the_gesture` both still xfail after the mechanism change, so it is **not sufficient** for them. This was predicted to flip them and did not — recorded as a failed prediction rather than left to be rediscovered.
+
+**Also still open on the working branch:** `view.py:402`'s `_temp_wall.p2` (the last `p1`/`p2` writer), deleting the setters as the census's completeness proof, and **a tenth mini-gate item ruled but not yet written down**: exercise Align to grid and Distribute on a plan with shared party walls, checking rooms follow their walls and that a subsequent wall drag strands nothing.
+
+---
+
 ## 2. What has landed on this branch
 
 **The rulings first** (`fbbebf4`), before any code, per the standing rule.
