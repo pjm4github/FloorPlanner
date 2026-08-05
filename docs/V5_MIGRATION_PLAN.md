@@ -179,6 +179,30 @@ at task open, and the read-back protocol is its enforcement.** A task-line
 number is an estimate until the census confirms it; the census is quoted with
 spans and callers so the reviewer can check it without re-running it.
 
+**IT COVERS BEHAVIOURAL CLAIMS AS MUCH AS COUNTS, AND SURVIVAL JUSTIFICATIONS
+MOST OF ALL — added 2026-08-04.** A count reads like a number and gets checked;
+a sentence about what the code *does* reads like understanding and does not.
+P4.5's guard census asserted *"grouped ends never weld"* — measured, the snap
+half filtered and the share half never did. **And when a row explains why some
+code SURVIVES a phase that killed its relatives, that explanation asserts what
+the code does and who calls it — a behavioural claim wearing a rationale's
+clothes. Measure the justification before filing the row.** Row 45 justified
+`_edge_wall` with *"outlines arriving from a file"*; measured, no file path
+calls it at all — the loader reads the stored binding. **Both unmeasured claims
+in that stretch were justifications, and both were caught only because the
+measurement was asked for**, which is why this is a rule rather than a
+reminder: a justification is the most dangerous claim to leave unmeasured,
+because it is written precisely to explain why nobody needs to look further.
+
+**VERIFY THAT A RECORD EDIT LANDED, exactly as a code probe must — added
+2026-08-04, the hard way.** The fail-first rule already says to confirm a probe
+mutated the tree before trusting its result. The same applies to edits to THIS
+FILE: two commit messages (P4.5(8), P4.5(16)) claimed record additions that
+never landed, because one script skipped silently on a conditional and the
+other raised and was committed through anyway. The gate was green both times —
+**a green gate says nothing about whether a document edit applied.** Grep for
+the added text before writing the commit message that claims it.
+
 ---
 
 ## Status
