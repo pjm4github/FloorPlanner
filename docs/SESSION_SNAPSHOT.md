@@ -61,6 +61,16 @@
 
 **P4.5 owns:** defect **3** (groups serialize), **11** (z-order collapse), **23** (clipped-band stranding — the deform-vs-stay ruling), the **P3.1 split-on-write shim**, **two identity-churn sites**, the **`kind == "rigid"` carve-out** (retire or re-justify), and **row 36's merge-rebind producer** (carried, **watched** by a CI test whose preconditions re-open the row if merge semantics change). · **Row 39** viewer move (doing next) · **row 40** viewer degrade-on-missing-dep · the **windows-latest CI leg** (row 27, not merge-blocking) · per-floor **visibility** (follow-up, not built).
 
+**Carried over from the viewer-furnishings branch, for P4.5 to apply when it
+resumes:** the register's non-simple-outline row (row 41, which exists only on
+`p4.5-groups-zorder`) states its reproduction as
+`python -m floorplanner.viewer.fp3d …`. That form is documented in
+`floorplanner/viewer/VIEWER_NOTES.md` §1 as the one that **breaks the viewer's
+isolation** — `-m` imports the parent package and therefore the whole editor.
+The script form `python floorplanner/viewer/fp3d.py …` is correct and is what
+VIEWER_NOTES §4 now uses. Fix the row on its own branch; editing it from a
+branch that does not own that file would be the mistake the rule above forbids.
+
 ---
 
 ## 6. Things that will waste your time if you don't know them

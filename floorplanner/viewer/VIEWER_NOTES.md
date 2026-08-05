@@ -139,6 +139,46 @@ should be visible.
 
 ---
 
+### The viewer as a second opinion on the invariants
+
+The viewer reads **the same documents the editor does** and fails **differently**,
+and that difference is the whole reason `--dump` is worth running. The editor's
+invariants ask *is this document legal*. The geometry pass asks *can this be
+drawn* — and it must clean an outline before it can triangulate one, so it names
+degeneracies no invariant is looking for. Two independent readers of one file,
+failing on different things, is a check; two readers sharing a definition is not.
+
+```
+python floorplanner/viewer/fp3d.py <plan.json> --dump -v
+```
+
+**Anything listed under "needed attention" is a claim no invariant makes.** That
+is the value and equally the limit: a clean `--dump` is not a legality verdict,
+and a legal document is not necessarily a drawable one.
+
+Standing results on the shipped corpus, reproducible with the line above:
+
+| file | flagged |
+|---|---|
+| `examples/symmetricP1.json` | `WIC` — 1 zero-width spur |
+| `examples/planc1.v5.json` | `Hall` 4 · `M Bath` 6 · `WIC` 1 |
+
+All seven are **the same class**: a room outline that is non-simple by
+*touching* rather than by *crossing*. `I5b` does not catch it — its
+proper-crossing test is deliberately built **not** to fire on the collinear
+edges two rooms legitimately share, and a loop that merely revisits one of its
+own vertices is not a proper crossing. So these files pass `check(deep=True)`
+on that invariant while being non-simple.
+
+The measured instances, the reasoning, and the open question of whether a
+touching loop is an `I5b` violation at all live in the register's row on
+**non-simple outlines that `I5b` does not report** (`docs/CODE_REVIEW_v2.md`).
+They are not restated here, and the row is referred to by description rather
+than by number on purpose: it is filed on the P4.5 branch, and a number quoted
+from here would be a broken pointer the day this branch merges first.
+
+---
+
 ## 5. The renderer decision — settled 2026-08-04
 
 **Two renderers, one geometry core. Both stay.**
