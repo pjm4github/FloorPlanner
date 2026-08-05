@@ -194,6 +194,30 @@ measurement was asked for**, which is why this is a rule rather than a
 reminder: a justification is the most dangerous claim to leave unmeasured,
 because it is written precisely to explain why nobody needs to look further.
 
+**A GREEN SIGNAL IS ONLY EVIDENCE ABOUT WHAT IT MEASURES — added 2026-08-04, as
+the rule above three instances.** `tools/gate.py` has never made a claim about
+`docs/V5_MIGRATION_PLAN.md`: it runs ruff and pytest, and neither reads this
+file. That is not a bug in the gate; it is **the boundary of what its green
+means**, and the failure mode is borrowing confidence across that boundary.
+Every artifact a task changes needs the check that covers *it*:
+
+| artifact changed | the check that covers it |
+|---|---|
+| code | `tools/gate.py` (ruff + the three modes, sums reconciling) |
+| the record (plan, register, notes) | `tools/record.py` — anchored edit, re-read from disk, non-zero if the text is not there afterwards |
+| what an operation DOES | a **differential receipt** — measured before and after (row 44) |
+| a document's legality | `check(doc, deep=True)` — and only legality; never "is this the document the gesture should have produced" |
+
+**TWO FAILURE SHAPES, and they are not the same — separate them.** *(a) A
+MISSING CHECK*: P4.5(8)'s edit used `if anchor in s:` and skipped silently —
+nothing was watching, and the fix is to add an instrument. *(b) A CORRECT CHECK
+IGNORED*: P4.5(16)'s edit **raised**, and the red was overridden because an
+unrelated green (the gate) was in the same output. **(b) is the more dangerous
+shape** — the instrument worked and was disregarded — and it is the same
+failure as reading a `pytest | tail` and committing on the summary line while
+an error scrolled past above. Adding instruments does nothing for it; only
+refusing to let one green stand in for another does.
+
 **VERIFY THAT A RECORD EDIT LANDED, exactly as a code probe must — added
 2026-08-04, the hard way.** The fail-first rule already says to confirm a probe
 mutated the tree before trusting its result. The same applies to edits to THIS
@@ -4822,5 +4846,33 @@ notes:   THE QUESTION, asked before filing: was ungroup's plan-wide
          full-document walk exists to serve snapshot-undo, and once the
          command stack owns undo every remaining caller needs
          re-justifying rather than inheriting.
+
+P4.5(17a) THE OVERCLAIM ANNOTATION -- history stays, the correction sits
+         beside it (the gate-failure disclosure's treatment, and the CRLF
+         normalisation's)
+notes:   TWO COMMIT MESSAGES ON THIS BRANCH CONTAIN CLAIMS THAT WERE FALSE
+         WHEN WRITTEN. Neither is rewritten; both are named here so the
+         record shows the correction rather than concealing the error.
+         * 7b99030 "P4.5(8) - row 36 re-argued by MEASUREMENT" -- its third
+           bullet claims the census doctrine was extended to cover
+           BEHAVIOURAL claims. That edit never applied: the script used
+           `if anchor in s:` and skipped silently when the anchor did not
+           match -- a MISSING CHECK. The commit's other claims (the
+           grouped-merge measurement, the sibling watch, the
+           visibility/permission procedure, the boundary-marker
+           precondition rule) did land and stand.
+         * 39a4ada "P4.5(16) - the divergence named as latent; justifications
+           join the census" -- its second item claims the doctrine was
+           extended to cover SURVIVAL JUSTIFICATIONS. That edit never
+           applied either: the script RAISED and was committed through
+           because the gate was green in the same output -- a CORRECT CHECK
+           IGNORED, the worse of the two shapes. The commit's first item
+           (row 45's latent-divergence amendment) did land and stands.
+         Both entries were added for real at a6bbd80, in the census section,
+         and grepped for afterwards. The instrument that should have caught
+         them is tools/record.py, added at P4.5(18) -- which then refused
+         its own second edit on an ambiguous anchor, which is the behaviour
+         being bought.
+
 
 ```
