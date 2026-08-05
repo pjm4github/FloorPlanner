@@ -102,6 +102,36 @@ def _perf() -> int:
     return rc
 
 
+# Assertions that cannot fail, in the ONE shape a machine can recognise.
+# See the Working agreement's vacuity entry: of the three shapes, only
+# vacuity BY TAUTOLOGY is detectable by grep -- vacuity by precondition and
+# by basis need a human reading what the test established before it asserted.
+# This catches the cheapest and most misleading one, because it reads as
+# coverage in a diff.
+_VACUOUS = (
+    re.compile(r"\bassert\b.*\bor True\b"),
+    re.compile(r"\bassert\b.*\bor 1\b"),
+    re.compile(r"\bassert True\b"),
+    re.compile(r"\bassert not False\b"),
+)
+
+
+def _vacuity() -> tuple:
+    """Scan the suite for tautologically-unfailable assertions."""
+    import pathlib
+    hits = []
+    for p in sorted(pathlib.Path("tests").rglob("test_*.py")):
+        try:
+            text = p.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for n, line in enumerate(text.splitlines(), 1):
+            code = line.split("#", 1)[0]
+            if any(rx.search(code) for rx in _VACUOUS):
+                hits.append(f"{p.as_posix()}:{n}: {line.strip()}")
+    return len(hits), hits
+
+
 def main() -> int:
     if "--perf" in sys.argv:
         return _perf()
@@ -115,8 +145,14 @@ def main() -> int:
     rc_c, out_c = _run(["pytest", "-q", "--collect-only"])
     collected = len([ln for ln in out_c.splitlines() if "::" in ln])
 
-    lines = [f"Gate-Census: collected={collected} ruff={ruff}"]
-    bad = rc != 0
+    n_vac, vac = _vacuity()
+    lines = [f"Gate-Census: collected={collected} ruff={ruff} "
+             f"vacuous={n_vac}"]
+    bad = rc != 0 or n_vac > 0
+    if vac:
+        print("Unfailable assertions (vacuous by tautology):")
+        for h in vac:
+            print(f"    {h}")
     modes = GATES[:1] if quick else (GATES[2:3] if deep_only else GATES)
     for label, env, extra in modes:
         grc, gout = _run(["pytest", "-q", "-p", "no:randomly", *extra], env)

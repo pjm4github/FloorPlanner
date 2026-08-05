@@ -10,7 +10,7 @@ Item {
         anchors.fill: parent
 
         environment: SceneEnvironment {
-            clearColor: "#1a1c20"
+            clearColor: "#85d258"
             backgroundMode: SceneEnvironment.Color
             antialiasingMode: SceneEnvironment.MSAA
             antialiasingQuality: SceneEnvironment.High
@@ -51,7 +51,7 @@ Item {
         DirectionalLight {                       // sky bounce from below
             eulerRotation.x: 80
             brightness: 0.18
-            color: "#c8d4e0"
+            color: "#d3e4b4"
         }
 
         Repeater3D {

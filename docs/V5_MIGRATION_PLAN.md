@@ -79,10 +79,24 @@ while the copy it produced was 38,760 — a version several commits old. Editing
 stale copy and writing it back overwrites newer work with older content, which is
 exactly the damage seen at P0.4, P0.5 and P0.6.
 
-**Consequence: Cowork no longer edits this file, or CODE_REVIEW_v2.md.** Plan and
-review changes are handed to Claude Code as explicit edit instructions; Claude Code
-applies them, commits, and grep-verifies on disk. One extra round-trip, and the only
-channel that has destroyed work in this project is closed.
+**Consequence: Cowork no longer edits ANY FILE IN THE REPO DIRECTLY.** Changes of
+every kind — plan, review, notes, code — are handed to Claude Code as explicit edit
+instructions; Claude Code applies them, commits, and grep-verifies on disk. One extra
+round-trip, and the only channel that has destroyed work in this project is closed.
+
+**WIDENED 2026‑08‑04, at a second instance the original wording did not cover — and
+the new instance defeats the check that caught the first one.** As first written this
+rule named two files, this one and `CODE_REVIEW_v2.md`, because those were the two
+that had been damaged. The mechanism is not file-specific. On the viewer branch,
+`device_stage_files` served a **stale** copy of `floorplanner/viewer/VIEWER_NOTES.md`
+**while reporting the correct byte count** — so the size disagreement that exposed it
+at P0.6 (46,942 reported against 38,760 delivered) was **absent**, and writing that
+copy back would have destroyed committed work in a file the rule did not mention. A
+near-miss, caught before the write, and only because the file was re-read from disk
+rather than trusted. **A rule enumerated from its instances protects exactly its
+instances**: the correct scope of a rule is its mechanism's scope. That is the same
+correction defect 7 took when it closed by the CONDITION rather than by its four
+cited sites, and the same reason a size check is not a freshness check.
 
 ### The gate must be checked, not printed — settled at P3.6
 
