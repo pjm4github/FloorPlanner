@@ -624,6 +624,210 @@ FURNISHINGS = [
       Ci(40, 30, 1.3, "none", 0.6)]),                           # call panel
 ]
 
+# --------------------------------------------------------------- 3D solids
+# The catalog's THIRD DIMENSION, authored here because the manifest is a
+# generated asset and this is the one place a new symbol can be added.
+#
+# WHY IT LIVES IN THE CATALOG AND NOT IN A VIEWER.  fp3d.py carried its own
+# table of widths, depths, heights and material families -- a second definition
+# of data this file already owns, and measurably a WRONG one: 58 of the 95
+# catalog kinds were missing from it entirely (drawn as a 24x24x30 magenta
+# default), and of the 37 it shared, 22 disagreed on footprint, three of those
+# by transposing width and depth so the item rendered rotated 90 degrees. One
+# definition, here, is the fix.
+#
+#   height_in     REQUIRED, and deliberately has no default.  A wrong height
+#                 that a default supplied is indistinguishable from a right
+#                 one; a missing entry that stops the generator is not.
+#                 AUTHORED, not measured -- these are architect's nominals.
+#   elevation_in  height of the item's UNDERSIDE above the level's floor.
+#                 0 for anything floor-bearing.  Non-zero for the wall-hung
+#                 items and for the one counter-mounted one, kitchen_sink,
+#                 whose rim then lands at the standard 36".
+#   form          which generator builds the solid.  box and slab are
+#                 implemented; seat / bed / basin / enclosure / vehicle build
+#                 as boxes for now, and the viewer reports any form it does
+#                 not know rather than guessing.  planting and prism are
+#                 RESERVED and unused: nothing in the catalog is a plant (see
+#                 the landscape-kinds note below), and prism -- extruding the
+#                 symbol's true SVG outline -- is a second pass.
+#   material      a NAME only.  Colour, roughness and metalness live once, in
+#                 MATERIALS below, and are written to materials.json.  Putting
+#                 three numbers on 95 entries would rebuild the duplication
+#                 this table exists to remove.
+#
+# LANDSCAPE KINDS ARE ABSENT ON PURPOSE.  tools/make_site_demo.py mints
+# `bench`, `planter`, `shrub` and `tree`, which exist in no catalog -- the
+# editor cannot place them and the viewer's old table was their only
+# definition anywhere.  They are not added here: drawing four new symbols
+# would pre-empt P5.2's landscape catalog.  They now render as unknown, which
+# is what the editor already thinks of them.
+SOLIDS = {
+    # id                      height  elev  form         material
+    # -- Living
+    "sofa":                   (32,      0, "seat",      "soft"),
+    "loveseat":               (32,      0, "seat",      "soft"),
+    "armchair":               (32,      0, "seat",      "soft"),
+    "coffee_table":           (18,      0, "slab",      "wood"),
+    "side_table":             (24,      0, "slab",      "wood"),
+    "tv_stand":               (24,      0, "box",       "wood"),
+    "large_tv":               (38,     42, "slab",      "screen"),
+    "gas_fireplace":          (40,      0, "box",       "stone"),
+    # -- Dining
+    "dining_table":           (30,      0, "slab",      "wood"),
+    "dining_table_round":     (30,      0, "slab",      "wood"),
+    "dining_chair":           (34,      0, "seat",      "wood"),
+    "buffet":                 (36,      0, "box",       "wood"),
+    "hutch":                  (78,      0, "box",       "wood"),
+    # -- Kitchen.  Base cabinets and counters 36"; wall cabinets 30" tall with
+    # their underside 54" up, the standard 18" backsplash above a counter.
+    "refrigerator":           (70,      0, "box",       "metal"),
+    "range":                  (36,      0, "box",       "metal"),
+    "dishwasher":             (34,      0, "box",       "metal"),
+    "kitchen_sink":           (10,     26, "basin",     "metal"),
+    "base_cab_24":            (36,      0, "box",       "wood"),
+    "base_cab_36":            (36,      0, "box",       "wood"),
+    "drawer_base_18":         (36,      0, "box",       "wood"),
+    "sink_base_36":           (36,      0, "box",       "wood"),
+    "corner_base_36":         (36,      0, "box",       "wood"),
+    "pantry_18":              (84,      0, "box",       "wood"),
+    "pantry_24":              (84,      0, "box",       "wood"),
+    "pantry_36":              (84,      0, "box",       "wood"),
+    "wall_cab_24":            (30,     54, "box",       "wood"),
+    "wall_cab_30":            (30,     54, "box",       "wood"),
+    "wall_cab_36":            (30,     54, "box",       "wood"),
+    "kitchen_island":         (36,      0, "box",       "wood"),
+    "island_sink":            (36,      0, "box",       "wood"),
+    # -- Bedroom
+    "bed_king":               (26,      0, "bed",       "soft"),
+    "bed_queen":              (26,      0, "bed",       "soft"),
+    "bed_full":               (26,      0, "bed",       "soft"),
+    "bed_twin":               (26,      0, "bed",       "soft"),
+    "nightstand":             (26,      0, "box",       "wood"),
+    "dresser":                (34,      0, "box",       "wood"),
+    # -- Bathroom
+    "bathtub":                (20,      0, "enclosure", "porcelain"),
+    "shower":                 (78,      0, "enclosure", "glass"),
+    "walk_in_shower":         (78,      0, "enclosure", "glass"),
+    "glass_shower":           (78,      0, "enclosure", "glass"),
+    "toilet":                 (30,      0, "box",       "porcelain"),
+    "vanity":                 (34,      0, "box",       "wood"),
+    "vanity_24":              (34,      0, "box",       "wood"),
+    "vanity_36":              (34,      0, "box",       "wood"),
+    "vanity_48":              (34,      0, "box",       "wood"),
+    # -- Laundry
+    "washer":                 (38,      0, "box",       "metal"),
+    "dryer":                  (38,      0, "box",       "metal"),
+    # -- Garage
+    "suv":                    (70,      0, "vehicle",   "vehicle"),
+    "car":                    (56,      0, "vehicle",   "vehicle"),
+    "motorcycle":             (48,      0, "vehicle",   "vehicle"),
+    "bicycle":                (42,      0, "vehicle",   "vehicle"),
+    "boat":                   (60,      0, "vehicle",   "vehicle"),
+    "workbench":              (36,      0, "slab",      "wood"),
+    "storage_shelves":        (72,      0, "box",       "metal"),
+    "lawnmower":              (40,      0, "vehicle",   "vehicle"),
+    "garden_tractor":         (50,      0, "vehicle",   "vehicle"),
+    "riding_mower_snow":      (46,      0, "vehicle",   "vehicle"),
+    "boat_trailer":           (72,      0, "vehicle",   "vehicle"),
+    "snowblower":             (42,      0, "vehicle",   "vehicle"),
+    "wheelbarrow":            (30,      0, "box",       "metal"),
+    "trashcan":               (40,      0, "box",       "metal"),
+    # -- Shop
+    "toolchest":              (40,      0, "box",       "metal"),
+    "table_saw":              (36,      0, "slab",      "metal"),
+    "lathe":                  (48,      0, "box",       "metal"),
+    "jointer":                (36,      0, "slab",      "metal"),
+    "drill_press":            (68,      0, "box",       "metal"),
+    "cutoff_saw":             (40,      0, "box",       "metal"),
+    "bandsaw":                (72,      0, "box",       "metal"),
+    "planer":                 (42,      0, "box",       "metal"),
+    # -- Sunroom.  umbrella_table is the TABLE's height; the umbrella above it
+    # is not modelled, and a 96" box would be a lie about a shade.
+    "lounge_chair":           (30,      0, "seat",      "soft"),
+    "sauna":                  (84,      0, "enclosure", "wood"),
+    "umbrella_table":         (30,      0, "slab",      "wood"),
+    "swim_spa":               (40,      0, "enclosure", "water"),
+    "whirlpool":              (36,      0, "enclosure", "water"),
+    # -- Office / Storage
+    "desk":                   (30,      0, "slab",      "wood"),
+    "office_chair":           (40,      0, "seat",      "soft"),
+    "office_set":             (30,      0, "slab",      "wood"),
+    "corner_desk":            (30,      0, "slab",      "wood"),
+    "bookshelf":              (72,      0, "box",       "wood"),
+    "wardrobe":               (72,      0, "box",       "wood"),
+    # -- HVAC.  The four wall-hung ones carry an elevation; everything else
+    # here stands on the floor.
+    "gas_furnace":            (60,      0, "box",       "metal"),
+    "electric_furnace":       (60,      0, "box",       "metal"),
+    "oil_furnace":            (60,      0, "box",       "metal"),
+    "gas_water_heater":       (60,      0, "box",       "metal"),
+    "electric_water_heater":  (60,      0, "box",       "metal"),
+    "water_softener":         (48,      0, "box",       "metal"),
+    "gas_tank":               (40,      0, "box",       "metal"),
+    "oil_tank":               (44,      0, "box",       "metal"),
+    "electric_panel":         (30,     48, "box",       "metal"),
+    "car_charger":            (14,     42, "box",       "metal"),
+    "battery_wall":           (30,     24, "box",       "metal"),
+    "well_pump":              (36,      0, "box",       "metal"),
+    "heat_exchanger":         (30,      0, "box",       "metal"),
+    # -- Framing.  stairs is a full STOREY RISE, which is what the object's
+    # height is; that a box generator renders it as a 108" block is the
+    # renderer's gap and is reported as one, not hidden by authoring a wrong
+    # number here.
+    "stairs":                (108,      0, "box",       "wood"),
+    "elevator":               (96,      0, "box",       "metal"),
+}
+
+# Material properties, ONCE.  Colour is (r, g, b, a) in 0..1.  These values are
+# carried over unchanged from the viewer's FAMILY_C so that moving them here
+# changes no pixel; the known caveat that they were tuned for baked flat
+# shading and read dark under PBR is recorded in VIEWER_NOTES.md section 5 and
+# is a separate decision from this move.
+MATERIALS = {
+    "soft":      {"colour": [0.44, 0.49, 0.57, 1.00],
+                  "roughness": 0.85, "metalness": 0.00},
+    "wood":      {"colour": [0.52, 0.37, 0.23, 1.00],
+                  "roughness": 0.85, "metalness": 0.00},
+    "porcelain": {"colour": [0.93, 0.94, 0.95, 1.00],
+                  "roughness": 0.25, "metalness": 0.00},
+    "glass":     {"colour": [0.62, 0.76, 0.80, 0.35],
+                  "roughness": 0.12, "metalness": 0.00},
+    "water":     {"colour": [0.28, 0.54, 0.70, 0.55],
+                  "roughness": 0.12, "metalness": 0.00},
+    "metal":     {"colour": [0.66, 0.68, 0.71, 1.00],
+                  "roughness": 0.35, "metalness": 0.85},
+    "stone":     {"colour": [0.55, 0.53, 0.50, 1.00],
+                  "roughness": 0.85, "metalness": 0.00},
+    "vehicle":   {"colour": [0.26, 0.28, 0.32, 1.00],
+                  "roughness": 0.45, "metalness": 0.30},
+    "screen":    {"colour": [0.10, 0.11, 0.13, 1.00],
+                  "roughness": 0.15, "metalness": 0.20},
+    # Loud on purpose, and the ONLY entry a viewer may fall back to: an item
+    # whose kind, form or material the catalog does not define must LOOK wrong.
+    "unknown":   {"colour": [0.85, 0.35, 0.55, 1.00],
+                  "roughness": 0.60, "metalness": 0.00},
+}
+
+# The generator refuses to write a half-authored catalog.  A missing height is
+# the failure this file exists to make impossible: it is the one field with no
+# safe default, so a new symbol added without one stops here rather than
+# reaching a viewer as a guess.
+_ids = {fid for fid, *_ in FURNISHINGS}
+_unauthored = sorted(_ids - set(SOLIDS))
+_orphans = sorted(set(SOLIDS) - _ids)
+_bad_material = sorted({m for _h, _e, _f, m in SOLIDS.values()
+                        if m not in MATERIALS})
+if _unauthored or _orphans or _bad_material:
+    raise SystemExit(
+        "assets not written -- the 3D data model is incomplete:\n"
+        + (f"  {len(_unauthored)} furnishing(s) with no SOLIDS row: "
+           f"{', '.join(_unauthored)}\n" if _unauthored else "")
+        + (f"  {len(_orphans)} SOLIDS row(s) naming no furnishing: "
+           f"{', '.join(_orphans)}\n" if _orphans else "")
+        + (f"  {len(_bad_material)} material(s) not in MATERIALS: "
+           f"{', '.join(_bad_material)}\n" if _bad_material else ""))
+
 # Purchase prices are filled in at runtime by the app's AI ▸ Update
 # furnishing prices… tool, so carry any existing prices across regeneration
 # rather than resetting them to 0.
@@ -637,11 +841,16 @@ except (OSError, ValueError, KeyError, TypeError):
 manifest = []
 for fid, name, cat, w, d, body in FURNISHINGS:
     (FURN / f"{fid}.svg").write_text(svg(w, d, body), encoding="utf-8")
+    height, elevation, form, material = SOLIDS[fid]
     manifest.append({"id": fid, "name": name, "category": cat,
                      "file": f"{fid}.svg", "width_in": w, "depth_in": d,
+                     "height_in": height, "elevation_in": elevation,
+                     "form": form, "material": material,
                      "price": _prev_price.get(fid, 0.0)})
 (FURN / "manifest.json").write_text(
     json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+(FURN / "materials.json").write_text(
+    json.dumps(MATERIALS, indent=2) + "\n", encoding="utf-8")
 
 # Palette sections: furnishings grouped by room type; items are the SVG
 # file names and may appear in several groups.  "All" lists everything
@@ -701,14 +910,38 @@ groups_out += [{"name": name, "items": [f"{i}.svg" for i in ids]}
     "  renders each symbol at true scale (1 scene unit = 1\").\n"
     "* `manifest.json` lists the catalog: `id`, `name`, `category`, `file`,\n"
     "  `width_in`, `depth_in`, `price` (USD purchase cost; the app's\n"
-    "  AI ‣ Update furnishing prices… tool fills these in).\n"
+    "  AI ‣ Update furnishing prices… tool fills these in), plus the four\n"
+    "  fields the 3D viewers read:\n"
+    "  * `height_in` — the item's height in inches.  **Required, and it has\n"
+    "    no default**: a wrong height supplied by a default cannot be told\n"
+    "    apart from a right one, so a symbol added without one stops the\n"
+    "    generator instead.  These are authored architect's nominals.\n"
+    "  * `elevation_in` — the height of the item's underside above the\n"
+    "    level's floor.  `0` for anything floor-bearing; non-zero for the\n"
+    "    wall-hung items (upper cabinets, the large TV, the electric panel,\n"
+    "    the car charger, the battery wall) and for the counter-mounted\n"
+    "    `kitchen_sink`, whose rim then lands at the standard 36\".\n"
+    "  * `form` — which solid generator builds it: `box`, `slab` (a top on\n"
+    "    legs), `seat`, `bed`, `basin`, `enclosure`, `vehicle`, and the\n"
+    "    reserved `planting` and `prism`.  A viewer that does not implement\n"
+    "    a form falls back to `box` and **says so in its report**; an\n"
+    "    unrecognised one renders in the loud magenta.\n"
+    "  * `material` — a name only, resolved in `materials.json`.\n"
+    "* `materials.json` holds each material's `colour` (r, g, b, a in 0..1),\n"
+    "  `roughness` and `metalness` — **once**, so the properties are not\n"
+    "  repeated across 95 catalog entries.  `unknown` is the deliberate\n"
+    "  fallback and is loud on purpose: an item the catalog does not define\n"
+    "  must look wrong rather than plausible.\n"
     "* `groups.json` defines the palette's expandable sections: a list of\n"
     "  `{name, items}` where each item is an SVG file name from this\n"
     "  directory.  A furnishing may appear in several groups.  The `All`\n"
     "  group always shows the whole library and is open by default.\n\n"
     "To add your own symbol: drop an SVG here whose viewBox matches the\n"
     "real-world footprint in inches, add a manifest entry, and list it in\n"
-    "the groups it belongs to.\n",
+    "the groups it belongs to.\n\n"
+    "**Everything in this directory is generated by `_gen_assets.py`** —\n"
+    "including this README, the manifest and `materials.json`.  Edit that\n"
+    "script and re-run it; a hand edit here is overwritten on the next run.\n",
     encoding="utf-8")
 
 # ---------------------------------------------------------------- tool icons
