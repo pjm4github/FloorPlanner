@@ -1,0 +1,71 @@
+{
+ "what": "P4.5 defect 23 -- what room_boolean('fragment') builds, and what a group move does to it under each of the two corner semantics. Reproduce with docs/evidence/defect23_fragment_probe.py (standalone; not collected, pytest.ini has testpaths=tests).",
+ "case": "tests/test_rooms.py::test_fragment_groups_each_piece_with_its_own_walls -- Room 1 (0,0,120x96) and Room 2 (72,48,120x96) overlap; fragment; then the Overlap fragment's group is moved (+300,+300) and baked.",
+ "trees": {
+  "base": "p4.5-groups-zorder @ 63ee151 -- _corner_records SPLITS a corner an outside wall also holds",
+  "red": "p4.5-defect23-wip @ 4e967c0 -- deform-to-follow; that split removed"
+ },
+
+ "fragment_product_identical_on_both_trees": {
+  "note": "measured on both trees; the product is the same, only the later gesture differs",
+  "scene_geometric_points": 10,
+  "scene_distinct_vertex_objects": 20,
+  "points_carrying_duplicate_vertices": {
+   "(72,48)": 3, "(72,96)": 4, "(120,48)": 4, "(120,96)": 3
+  },
+  "document_after_the_walk": {"vertices": 10, "walls": 12, "rooms": 3,
+                              "merged": 4, "unwelded_ends": 0},
+  "check_deep_on_the_product": "CLEAN",
+  "room_owns_walls_for_every_group_room_pair": false,
+  "walls_cover_room_for_each_groups_own_room": true,
+  "outline_corners_of_Overlap_on_its_own_groups_vertices": "3 of 4",
+  "Overlap_outline_edges_naming_a_wall_in_its_own_group": "2 of 4",
+  "original_room_items_surviving_fragment": "none -- all three rooms are fragment's own output; there is no pre-existing neighbour in this scene"
+ },
+
+ "after_the_move_base_63ee151": {
+  "outline_corners_moved": {"Overlap": "0 of 4", "Room 1": "0 of 6", "Room 2": "0 of 6"},
+  "group_walls_moved": "4 of 4",
+  "open_edges": {"before": {"Overlap": 0, "Room 1": 0, "Room 2": 0},
+                 "after": {"Overlap": 2, "Room 1": 1, "Room 2": 1}},
+  "dashed_edges_with_a_real_scene_wall_spanning_them": "4 of 4",
+  "check_deep": "CLEAN",
+  "save_writes": true,
+  "saved_document": "3 rooms in their ORIGINAL positions with zero open edges, plus 4 orphan walls at (372..420, 348..396) bounding nothing -- the walk re-binds each outline edge to a surviving duplicate wall, so the file records that nothing moved"
+ },
+
+ "after_the_move_red_4e967c0": {
+  "outline_corners_moved": {"Overlap": "3 of 4", "Room 1": "2 of 6", "Room 2": "1 of 6"},
+  "which_corner_stayed": "Overlap's (72,96) -- it is a DIFFERENT Vertex object from the one the group's walls hold at that point",
+  "asymmetry_is_binding_order_not_geometry": "at (120,48) Overlap and Room 1 share one vertex while Room 2 holds another at the same point, so Room 1 follows and Room 2 does not; at (120,96) it is the other way round",
+  "areas": {"Overlap": "16.0 -> 16.0 (torn quad, coincidentally equal by shoelace)",
+            "Room 1": "64 -> 264", "Room 2": "64 -> 36"},
+  "open_edges_after": {"Overlap": 2, "Room 1": 2, "Room 2": 2},
+  "dashed_edges_with_a_real_scene_wall_spanning_them": "0 of 6",
+  "check_deep": ["I5b room r3 (Room 2) outline self-intersects at edges 0/4",
+                 "I11 rooms 'Overlap' and 'Room 1' overlap",
+                 "I11 rooms 'Overlap' and 'Room 2' overlap",
+                 "I11 rooms 'Room 1' and 'Room 2' overlap"],
+  "all_three_overlapping_pairs_are_between_rooms_fragment_created": true,
+  "gesture_time_report_fires": "yes, with shadow mode OFF: \"Room 2's outline now crosses itself - undo, or extract the room before moving it.\""
+ },
+
+ "test_signal": {
+  "test_body_passes_on_both_trees": true,
+  "failure_is_at_win_fixture_teardown_only": "I11: 1 -> 3, I5b: 0 -> 1",
+  "modes": {"OFF": "green", "FP_VERIFY_DESIGN=1 (always-on twelve)": "green",
+            "FP_VERIFY_DESIGN=deep": "ERROR"},
+  "consequence": "I11 and I5b are both DEEP-ONLY (validate.py:156, :248), so neither fires while editing"
+ },
+
+ "save_refusal_is_conditional": {
+  "claim_in_the_record": "V5_MIGRATION_PLAN.md ruling 2a: 'save_path runs _verify_or_report(\"save\", deep=True) and REFUSES TO WRITE when it fails'",
+  "measured_on_the_red_tree_with_the_same_corrupt_scene": {
+   "FP_VERIFY_DESIGN unset (shipped default)": "save WROTE the file, carrying all four violations",
+   "FP_VERIFY_DESIGN=1": "save refused",
+   "FP_VERIFY_DESIGN=deep": "save refused"
+  },
+  "mechanism": "verify() returns None immediately unless verify_enabled() (design/verify.py:210); app.py:47 sets the env var only for --verify-design",
+  "consequence": "in the shipped app the deform is silent at the gesture for the I11 half AND unblocked at the save; the gesture-time I5b report is the only channel that fires by default"
+ }
+}
