@@ -210,29 +210,76 @@ def test_boolean_keeps_exterior_walls_exterior(fp, win):
     assert kinds == {"exterior"}, f"result walls downgraded: {kinds}"
 
 
+@pytest.mark.xfail(strict=False, reason="register row 47 -- room_boolean builds "
+                   "a duplicate wall loop per region instead of extracting, so "
+                   "a fragment is not a self-contained unit; flips when "
+                   "fragment converts to extract")
 def test_fragment_groups_each_piece_with_its_own_walls(fp, win):
+    """Each fragment is a SELF-CONTAINED UNIT: no wall belongs to two of them.
+
+    REWRITTEN AT P4.5 (2026-08-05), and the old assertions were vacuous by
+    BASIS, not merely weak. The previous verdict was `all(enclosed(r))` after
+    dragging the Overlap piece clear -- and that passes on both group
+    semantics, because the region the moved piece vacated is still bounded by
+    the DUPLICATE walls the other two fragments were built with. It was
+    measuring the neighbours, never the piece that moved. Measured: on the
+    tree that strands the room completely (0 of 16 outline corners move
+    against 4 of 4 walls) it still reported every fragment enclosed.
+
+    THE MOVE IS DELIBERATELY GONE, and that is a scope reduction stated
+    rather than slipped in. `bake` on this product corrupts the scene -- the
+    measurement is in `docs/evidence/defect23-fragment.json`, reproducible
+    with `docs/evidence/defect23_fragment_probe.py` -- and an `xfail` does not
+    cover a fixture TEARDOWN error, so keeping the gesture here would make
+    DEEP red for a defect this test is not the owner of. Row 47 owns the
+    gesture and carries its reproduction; this test owns the PROPERTY the
+    gesture needs, which is the one the test's name has always claimed.
+
+    The verdict is a NEGATIVE assertion ("no wall is shared"), so the
+    conditions for sharing are asserted first: the pieces must actually abut.
+    Without that a plan of three unrelated rooms would pass it."""
     _overlapping_rooms(fp, win)
     win.room_boolean("fragment")
     sc = win.scene
     rooms = _rooms(fp, win)
-    groups = [it for it in sc.items() if isinstance(it, fp.GroupItem)]
-    assert len(groups) == 3                  # each fragment is its own group
-    for g in groups:                         # each group is a complete loop
-        gw = [c for c in g.childItems() if isinstance(c, fp.WallItem)]
-        assert fp.trace_wall_loop(gw) is not None
 
-    def enclosed(r):
-        return fp.detect_room(
-            sc, QPointF(r.anchor.x(), r.anchor.y())) is not None
+    # PRECONDITION 1 -- fragment produced the partition it claims to.
+    assert sorted(round(r.area_sqft) for r in rooms) == [16, 64, 64]
 
-    assert all(enclosed(r) for r in rooms)
-    # move the overlap fragment clear: every fragment stays enclosed
-    overlap = next(r for r in rooms if r.name == "Overlap")
-    g = next(gp for gp in groups if fp.walls_cover_room(
-        {c for c in gp.childItems() if isinstance(c, fp.WallItem)}, overlap))
-    g.setPos(300, 300)
-    g.bake()
-    assert all(enclosed(r) for r in _rooms(fp, win))
+    # PRECONDITION 2 -- every piece is a real enclosed region, and every
+    # outline edge has a wall on it, so there IS a wall set to reason about.
+    for r in rooms:
+        assert fp.detect_room(sc, QPointF(r.anchor.x(), r.anchor.y())) \
+            is not None, f"{r.name} is not enclosed"
+        assert r.open_edges() == [], f"{r.name} starts with an open edge"
+
+    # PRECONDITION 3 -- the pieces ABUT. Without this the verdict below is
+    # satisfied by three rooms that never touch, which is the vacuity the
+    # negative-assertion rule exists for.
+    def edges(r):
+        cs = r.corners or []
+        return {frozenset((_xy(cs[i]), _xy(cs[(i + 1) % len(cs)])))
+                for i in range(len(cs))}
+
+    shared_edges = sum(
+        len(edges(a) & edges(b))
+        for i, a in enumerate(rooms) for b in rooms[i + 1:])
+    assert shared_edges >= 2, ("the fragments do not abut, so the verdict "
+                               f"would be vacuous (shared edges {shared_edges})")
+
+    # VERDICT -- a piece's walls are its own. `room_walls` is the production
+    # answer to "which walls is this room made of"; two pieces sharing one
+    # means neither can be moved without tearing the other, which is exactly
+    # what `room_owns_walls` refuses to allow `bake` to do.
+    for i, a in enumerate(rooms):
+        for b in rooms[i + 1:]:
+            both = set(fp.room_walls(a)) & set(fp.room_walls(b))
+            assert not both, (f"{a.name} and {b.name} share {len(both)} wall(s), "
+                              f"so neither is a self-contained unit")
+
+
+def _xy(p):
+    return (round(p.x(), 4), round(p.y(), 4))
 
 
 def _box(fp, room):
