@@ -24,6 +24,7 @@ matched prose would make the totals noise:
   DN                     the permanent-key form, the going-forward spelling
   defectN-x / defectN_x  an evidence artifact named for the record it belongs to
   a markdown link to another document, in the usual bracket-paren spelling
+  a backticked path under docs/ -- ADDED at pattern set 2, see below
 
 THIS FILE'S OWN PROSE IS DELIBERATELY WRITTEN NOT TO MATCH. The tool scans every
 tracked text file including itself, so a docstring that spelled out a sample
@@ -37,7 +38,35 @@ WHAT IT DOES NOT LOOK FOR, stated so the boundary is on the record rather than
 discovered later: bare `#N` (indistinguishable from a hex colour, a heading and
 an ordinary count -- 1,002 hits, almost none of them references), phase ids
 (`P4.5`), and commit shas. None of those are defect references and counting
-them would drown the ones that are.
+them would drown the ones that are. It also does not resolve backticked SOURCE
+paths (`rooms.py:29`), deliberately: the register names deleted code on purpose
+and a check that failed on that would punish accuracy.
+
+PATTERN SET 2, AND WHY IT EXISTS -- A BOUNDARY FOUND BY BEING CROSSED. At
+pattern set 1 this tool counted markdown links but not backticked paths, and it
+reported one dangling reference in the whole corpus. A SECOND dangling pointer
+was found BY EYE while reading an unrelated file: `docs/DESIGN_MODEL_v5.md:3`
+pointed at `docs/_superseded/`, a directory deleted at P0.1. The instrument had
+a hole and its docstring did not say so, which is the worse half of the fault.
+
+So `docpath` was added -- a backticked path under `docs/` -- and then MEASURED
+before being trusted: 108 references, 23 distinct targets, 6 unresolved. FIVE OF
+THOSE SIX ARE CORRECT: the P0.1 log recording a directory it deleted, this
+repo's own README explaining that deletion, and two references to
+`docs/design-schema.v5.json`, the pre-P0.7 home of the schema, named in
+historical text. Only one was a live pointer that lied.
+
+THEREFORE `docpath` IS REPORTED AND NEVER ENFORCED, exactly like `mdlink`. A
+document that names where something USED to live is doing its job; one that
+claims something IS somewhere it is not, is not. No pattern can tell those
+apart, so the tool surfaces all six and a human reads them. Enforcing this class
+would fail five correct records to catch one wrong one.
+
+CHANGING THE PATTERN SET INVALIDATES EVERY BASELINE TAKEN BEFORE IT, so the set
+is versioned. `--compare` REFUSES a baseline from a different version rather
+than reporting a difference that is really an instrument change. The step 0
+baseline (`ref-audit-baseline.json`, set 1) is kept unchanged so the docs
+refactor's "nothing was lost" receipt stays reproducible; set 2 has its own.
 
 RESOLUTION has two sources and prefers the newer, so the same code works on
 both sides of the move: `docs/defects/*.md` front matter if that directory
@@ -82,12 +111,15 @@ SELF_ARTIFACTS = re.compile(r"docs/evidence/ref-audit-[\w.-]+\.json$")
 
 # THE FROZEN SET. Changing it invalidates every baseline taken before the
 # change, so a change must be accompanied by a fresh baseline and said so.
+PATTERN_SET_VERSION = 2
+
 PATTERNS = (
     ("defect", re.compile(r"\bdefects?\s+(\d+[a-z]?)\b", re.I)),
     ("row", re.compile(r"\brows?\s+(\d+[a-z]?)\b", re.I)),
     ("dnum", re.compile(r"\bD(\d+[a-z]?)\b")),
     ("artifact", re.compile(r"\bdefect(\d+[a-z]?)[-_]")),
     ("mdlink", re.compile(r"\]\(([^)\s]*\.md)(?:#[^)\s]*)?\)")),
+    ("docpath", re.compile(r"`(docs/[A-Za-z0-9_./-]+)`")),
 )
 
 ID_KINDS = ("defect", "row", "dnum", "artifact")
@@ -156,6 +188,9 @@ def collect():
                         if not ok and target[-1].isalpha() \
                                 and target[:-1] in ids:
                             ok, via = True, "parent"
+                    elif kind == "docpath":
+                        t = ROOT / target.rstrip("/")
+                        ok = t.exists()
                     else:
                         base = (path.parent / target).resolve()
                         ok = base.is_file()
@@ -179,6 +214,7 @@ def inventory():
                          capture_output=True, text=True).stdout.strip()
     return {
         "schema": 1,
+        "pattern_set": PATTERN_SET_VERSION,
         "rev": rev,
         "id_source": id_source,
         "known_ids": sorted(ids, key=lambda s: (int(re.sub(r"\D", "", s)), s)),
@@ -231,6 +267,14 @@ def report(inv, verbose=False):
 def compare(inv, baseline_path):
     """Itemise every difference against a baseline. Nothing may be lost."""
     base = json.loads(pathlib.Path(baseline_path).read_text(encoding="utf-8"))
+    b_set = base.get("pattern_set", 1)
+    if b_set != PATTERN_SET_VERSION:
+        print(f"Ref-Compare: REFUSED -- baseline was taken with pattern set "
+              f"{b_set}, this is set {PATTERN_SET_VERSION}. A difference "
+              f"between them would be an INSTRUMENT change reported as a "
+              f"corpus change. Take a fresh baseline, or compare with the "
+              f"tool at set {b_set}.")
+        return 1
     print(f"Ref-Compare: baseline rev={base['rev'][:9]} total={base['total']}"
           f"  ->  now rev={inv['rev'][:9]} total={inv['total']}"
           f"  delta={inv['total'] - base['total']:+d}")
@@ -294,9 +338,10 @@ def main():
                   f"no record")
             rc |= 1
         else:
-            n_link = len(inv["unresolved"])
-            tail = (f" ({n_link} markdown link(s) dangling, reported not "
-                    f"enforced)") if n_link else ""
+            soft = len(inv["unresolved"])
+            kinds = sorted({r["kind"] for r in inv["unresolved"]})
+            tail = (f" ({soft} dangling {'/'.join(kinds)} reference(s), "
+                    f"reported not enforced)") if soft else ""
             print(f"Ref-Strict: every defect reference resolves{tail}")
     return rc
 
