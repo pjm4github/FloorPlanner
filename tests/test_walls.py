@@ -3,6 +3,7 @@ import pytest
 from PyQt6.QtCore import QPointF, QRectF, Qt
 
 from floorplanner.walls import merge_wall, weld_scene, weld_wall_ends
+from floorplanner.vertex import Vertex
 
 pytestmark = pytest.mark.walls
 
@@ -450,10 +451,10 @@ def test_delete_overhanging_wall_goes_whole_room_keeps_area(fp, scene, make_room
     top = next(w for w in room.walls
                if abs(w.p1.y()) < 1 and abs(w.p2.y()) < 1)
     # extend the top wall 60" past the room's right corner -> an overhang
-    if top.p2.x() > top.p1.x():
-        top.p2 = QPointF(180, 0)
-    else:
-        top.p1 = QPointF(180, 0)
+    # DETACH the end past the corner: the room's outline must stay at 120, so
+    # this is a fresh vertex, not a relocation of the shared corner.
+    attr = "p2" if top.p2.x() > top.p1.x() else "p1"
+    top.set_end_vertex(attr, Vertex.at(QPointF(180, 0)))
     top.rebuild()
     fp.rebuild_all_walls(scene)
     edge = next(w for w in room.walls

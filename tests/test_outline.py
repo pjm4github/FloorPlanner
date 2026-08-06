@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 from PyQt6.QtCore import QPointF
+from floorplanner.vertex import Vertex
 
 pytestmark = pytest.mark.rooms
 
@@ -285,10 +286,11 @@ def test_a_deliberately_open_edge_survives_a_round_trip(fp, win, tmp_path):
 
     south = next(w for w in room.walls
                  if abs(w.p1.y() - 120) < 0.5 and abs(w.p2.y() - 120) < 0.5)
-    if south.p1.x() < south.p2.x():
-        south.p2 = QPointF(60, 120)
-    else:
-        south.p1 = QPointF(60, 120)
+    # DETACH this end (a fresh corner), do not relocate it. The distinction is
+    # load-bearing here: relocating would carry the room's outline corner along
+    # and the edge would never open, which is the very state under test.
+    attr = "p2" if south.p1.x() < south.p2.x() else "p1"
+    south.set_end_vertex(attr, Vertex.at(QPointF(60, 120)))
     south.rebuild()
     fp.rebuild_all_walls(sc)
     # PRECONDITION: an edge that is open WHILE a wall runs along part of it --
