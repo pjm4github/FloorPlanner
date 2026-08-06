@@ -1,3 +1,5 @@
+> **COMPLETED — the work described here shipped; the current plan is [`../V5_MIGRATION_PLAN.md`](../V5_MIGRATION_PLAN.md).** Moved here 2026-08-06. The multi-floor feature it plans is live: `floorplanner/levels.py`, `model.Floor`, and the per-item `floor` tag. Nothing below this line has been edited.
+
 # TODO — Floors (multi-floor plans), Phase 1
 
 Baseline version: **v1.0** (`APP_VERSION`) · file format → v4 (`FILE_VERSION`)

@@ -3,8 +3,9 @@
 **Version 1.2** — single source of truth: `APP_VERSION` in `floorplanner/config.py`
 (also the JSON `FILE_VERSION`, currently 4, for the on-disk plan format — v4 adds
 multi-floor plans). v1.1 = the package split + model layer; v1.2 = multi-floor
-plans. Planning docs (`CODE_REVIEW.md`, `REFACTOR_PLAN.md`, `TODO.md`) are tagged
-with the baseline version they target.
+plans. The planning docs those versions targeted (`CODE_REVIEW.md`,
+`REFACTOR_PLAN.md`, `TODO.md`) are tagged with the baseline version they target
+and now live in `docs/superseded/`.
 
 A 2D architectural floor-plan editor written in Python with PyQt6 — the
 `floorplanner/` package (run `python FloorPlanner.py` or the `floorplanner`
