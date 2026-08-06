@@ -55,37 +55,55 @@ def test_zoom_is_clamped(win):
     assert view.transform().m11() >= 0.03
 
 
-def test_drawing_a_wall_splits_no_vertices(fp, win, drag):
-    """P4.5: the draw gesture RELOCATES the moving end instead of assigning it.
+def test_drawing_a_wall_keeps_the_moving_end_one_corner(fp, win, drag):
+    """P4.5: the draw gesture RELOCATES the moving end instead of assigning it,
+    so the drawn end is ONE corner for the whole gesture.
 
-    `view.py`'s `_temp_wall.p2 = ...` was the last `p1`/`p2` writer left in
-    `floorplanner/` -- the P3.1 split-on-write shim's final production call
-    site -- and it fired once per mouse-move event, minting a fresh `Vertex`
+    `view.py`'s `_temp_wall.p2 = ...` was the last `p1`/`p2` writer in
+    `floorplanner/` -- the P3.1 shim's final production call site -- and it
+    fired once per mouse-move event, minting a fresh `Vertex` (and a fresh uid)
     for an end nobody else was holding yet.
 
-    Differential receipt, one gesture of 40 move events: 40 split-on-writes
-    before, 0 after, with the drawn wall byte-identical at (0,0)-(240,0). The
-    wall is what makes this a regression test rather than a counter-watch: a
-    "0 splits" that also drew nothing would pass an assertion about the
-    counter alone.
+    CONVERTED AT P4.5 from `assert split_count() == before`, in the same pass
+    that retired the counter. The counter answered "how many split-on-writes
+    happened", which is a fact about a mechanism now gone; what this test is
+    really about is that the drawn corner keeps ONE identity across many
+    events. Asserted as the uid, sampled after the first move that actually
+    places the end and compared at release -- strictly stronger than the count,
+    because it fails on churn arriving by any route, including a route with no
+    counter behind it.
 
-    `split_count` answers "how many SPLIT-ON-WRITES happened", not "did
-    identity change" -- a `relocated_to` changes the object and reports zero,
-    deliberately (the instrument-boundary table). That is exactly the
-    distinction being asserted: the drawn end stays ONE corner for the whole
-    gesture."""
-    from floorplanner import vertex as V
+    Differential receipt at the conversion: the same 40-event gesture caused 40
+    split-on-writes before P4.5(33) and 0 after, with the drawn wall
+    byte-identical at (0,0)-(240,0)."""
     win.tool = fp.TOOL_WALL_INT
-    before = V.split_count()
     n0 = sum(1 for it in win.scene.items() if isinstance(it, fp.WallItem))
+    seen = []
+    vp = win.view.viewport()
+    orig = win.view.mouseMoveEvent
 
-    drag(win, QPointF(0, 0), 240, 0, steps=40)
+    def spy(e):
+        orig(e)
+        w = win.view._temp_wall
+        if w is not None and w.length() > 0:
+            seen.append(w.end_vertex("p2").uid)
+
+    win.view.mouseMoveEvent = spy
+    try:
+        drag(win, QPointF(0, 0), 240, 0, steps=40)
+    finally:
+        win.view.mouseMoveEvent = orig
+    assert vp is win.view.viewport()          # the spy went to the right object
 
     walls = [it for it in win.scene.items() if isinstance(it, fp.WallItem)]
-    # PRECONDITION -- the gesture actually drew something, so "0 splits" is a
-    # statement about a draw and not about an event stream that did nothing
+    # PRECONDITIONS -- the gesture drew a wall, and it did so over MANY events.
+    # Either alone would make the verdict empty: one sample cannot churn, and a
+    # gesture that drew nothing has no end to keep.
     assert len(walls) == n0 + 1, "the drag drew no wall"
-    w = walls[-1]
-    assert w.length() > 0
-    assert V.split_count() == before, (
-        f"the draw gesture split {V.split_count() - before} vertices")
+    assert walls[-1].length() > 0
+    assert len(seen) >= 10, f"only {len(seen)} move events placed the end"
+
+    assert len(set(seen)) == 1, (
+        f"the drawn end took {len(set(seen))} identities across "
+        f"{len(seen)} move events")
+    assert walls[-1].end_vertex("p2").uid == seen[0],         "the end was re-minted between the last move and the release"

@@ -27,7 +27,7 @@ import pytest
 from PyQt6.QtCore import QPointF, Qt
 
 from floorplanner.design import validate as VD
-from floorplanner.vertex import Vertex, split_count
+from floorplanner.vertex import Vertex
 
 pytestmark = pytest.mark.walls
 
@@ -210,17 +210,34 @@ def test_a_promoted_corner_follows_the_drag(fp, scene):
     assert a.end_vertex("p2") is c.end_vertex("p1"), "sharing broke mid-drag"
 
 
-def test_moving_a_corner_is_not_counted_as_a_split(fp, scene):
-    """A move is not a split, and the telemetry must agree -- otherwise P3.3's
-    own conversion would show up in the very log that exists to find call sites
-    still needing it."""
-    a, _b, _c = _tee_scene(fp, scene)
+def test_moving_a_corner_keeps_it_the_same_corner(fp, scene):
+    """A MOVE IS NOT A SPLIT: the dragged corner keeps its identity, and the
+    neighbour promoted onto it is still holding the very same object.
+
+    CONVERTED AT P4.5 from `assert split_count() == before`. That watched for
+    the absence of split-on-write; with the mechanism retired it could never
+    have failed again. What it was reaching for is that the corner SURVIVES
+    the drag as one corner, and that is asserted here two ways -- the uid is
+    stable (identity as the document sees it) and the neighbour's end is the
+    same Python object (identity as the scene holds it). Strictly stronger:
+    a fresh corner minted by any route at all fails this."""
+    a, _b, c = _tee_scene(fp, scene)
     a._mode = None
     a.mousePressEvent(_Ev((60, 0)))
-    before = split_count()
+    shared = a.end_vertex("p2")
+    uid = shared.uid
+    # PRECONDITION -- there IS sharing to preserve. The press is what promotes
+    # it, so this is asked after the press; and it is C, the perpendicular, that
+    # may share the corner -- B is the collinear continuation the anti-shear
+    # rule deliberately keeps off it (see `_tee_scene`).
+    assert c.end_vertex("p1") is shared or c.end_vertex("p2") is shared,         "the tee is not shared, so this test would be about nothing"
     for k in (6, 12):
         a.mouseMoveEvent(_Ev((60, k)))
-    assert split_count() == before
+    moved = a.end_vertex("p2")
+    assert (moved.x, moved.y) != (shared.x, shared.y), "the corner never moved"
+
+    assert moved.uid == uid, "the moved corner was renamed -- that is a split"
+    assert c.end_vertex("p1") is moved or c.end_vertex("p2") is moved,         "the neighbour was left on the old corner"
 
 
 # ------------------------------------------------- the split rule: anti-shear
@@ -317,18 +334,25 @@ def test_the_whole_original_span_still_slides_as_one(fp, scene):
     assert ys == [12.0, 12.0], f"the span came apart: {ys}"
 
 
-def test_a_body_landing_costs_no_split_on_writes(fp, scene):
-    """The telemetry point 5 predicted. The tee branch moved its end by
-    coordinate on EVERY mouse event; now the corner is real and the branch is
-    silent."""
+def test_a_body_landing_keeps_one_corner_across_twelve_drags(fp, scene):
+    """The tee branch moved its end by coordinate on EVERY mouse event; now the
+    corner is real, so twelve consecutive landings leave ONE corner, not twelve.
+
+    CONVERTED AT P4.5 from `assert split_count() == before` -- same reasoning
+    as the corner-move test above. Twelve drags is the point: churn per gesture
+    is what the counter was watching for, and a stable uid across twelve of
+    them says it directly."""
     a, _c = _body_tee_scene(fp, scene)
-    before = split_count()
+    uid = a.end_vertex("p1").uid
+    y0 = a.p1.y()
     for _k in range(12):
         a._mode = None
         a.mousePressEvent(_Ev((60, a.p1.y())))
         a.mouseMoveEvent(_Ev((60, a.p1.y() + 6)))
         a.mouseReleaseEvent(_Ev((60, a.p1.y() + 6)))
-    assert split_count() == before
+    # PRECONDITION -- the twelve drags actually moved the end
+    assert a.p1.y() != y0, "nothing moved, so identity was never at risk"
+    assert a.end_vertex("p1").uid == uid,         "the end was renamed during the landings -- one corner became many"
 
 
 def test_a_landing_inside_a_doorway_now_splits_instead_of_declining(fp, scene):
@@ -608,7 +632,9 @@ def test_pressing_every_wall_changes_nothing_across_the_corpus(fp, win, plan):
              if isinstance(w, fp.WallItem)]
     assert walls, "the corpus plan has no walls"
 
-    before, splits = design_from_scene(win).to_dict(), split_count()
+    before = design_from_scene(win).to_dict()
+    # every wall end, by OBJECT identity, before the presses
+    ends = {(id(w), a): w.end_vertex(a) for w in walls for a in ("p1", "p2")}
     for w in walls:
         w._mode = None
         w.mousePressEvent(_Ev(((w.p1.x() + w.p2.x()) / 2,
@@ -617,7 +643,33 @@ def test_pressing_every_wall_changes_nothing_across_the_corpus(fp, win, plan):
     fp.rebuild_all_walls(win.scene)
 
     assert design_from_scene(win).to_dict() == before
-    assert split_count() == splits
+    # CONVERTED AT P4.5 from `assert split_count() == splits`, and TWO drafts
+    # of the conversion were wrong before this one -- both kept, because each
+    # was wrong about something real.
+    #   (a) "every end holds the SAME object afterwards" forbids the PROMOTION
+    #       this test exists to exercise: a press that creates sharing
+    #       re-points one end AT its neighbour's vertex, so the object changes
+    #       by design.
+    #   (b) "every end holds a vertex that already existed" forbids the
+    #       ANTI-SHEAR SPLIT, which mints a stationary twin at press time.
+    #       Measured on sample_plan: 4 ends re-minted, at (216,288) and
+    #       (432,144), every one of them AT THE SAME COORDINATES, and the
+    #       sharing partition re-grouped rather than shrank (8 classes before,
+    #       8 after). The old counter never saw those mints because they go
+    #       through `Vertex.at`, not `moved_to` -- the instrument-boundary
+    #       lesson again, and the reason a conversion cannot be mechanical.
+    # WHAT IS ACTUALLY TRUE, and is the boundary between press and drag: a
+    # press may RE-PARTITION a corner, and may never MOVE one. So every end's
+    # vertex sits where that end's vertex sat before, whatever object it is.
+    # The document comparison above cannot see this: two distinct vertices at
+    # the same coordinates emit an identical document.
+    moved = {(w, a) for w in walls for a in ("p1", "p2")
+             if (w.end_vertex(a).x, w.end_vertex(a).y)
+             != (ends[(id(w), a)].x, ends[(id(w), a)].y)}
+    assert not moved, f"a press moved {len(moved)} wall end(s)"
+    # ...and it must have exercised the re-partition, or it proves nothing
+    assert any(w.end_vertex(a) is not ends[(id(w), a)]
+               for w in walls for a in ("p1", "p2")),         "no end was re-pointed at all, so this says nothing about the press"
 
 
 # --------------------------------------------------------- the group boundary

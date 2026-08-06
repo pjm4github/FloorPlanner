@@ -10,7 +10,6 @@ the pure op means.
 import pytest
 from PyQt6.QtCore import QPointF
 
-from floorplanner import vertex
 from floorplanner.design import topology
 from floorplanner.design.bridge import design_from_scene
 from floorplanner.design.model import Design
@@ -259,14 +258,24 @@ def test_merged_opening_stays_where_it_was_in_space(fp, scene):
 # The properties that made the planner/applier split worth the trouble
 # --------------------------------------------------------------------------
 def test_an_end_to_end_merge_adopts_the_corner_instead_of_splitting(fp, scene):
-    # coalesce assigned p1/p2, which is SPLIT-ON-WRITE: the corner came apart
-    # and was rebuilt from coordinates. The merge re-points the end AT the
-    # corner's vertex, so an exact merge causes no split at all.
-    _add(scene, fp, 0, 0, 100, 0)
-    _add(scene, fp, 100, 0, 200, 0)
-    before = vertex.split_count()
+    """The merge ADOPTS the existing corner objects rather than rebuilding the
+    survivor from coordinates (which is what `coalesce` did).
+
+    CONVERTED AT P4.5 from `assert split_count() == before`. That asserted the
+    ABSENCE of a mechanism, and with split-on-write retired it would have been
+    unfalsifiable. This asserts the property directly -- the survivor's ends
+    ARE the outer vertices the two inputs had -- which is strictly stronger:
+    it holds whether or not any mechanism exists to violate it, and it would
+    still fail if the merge minted fresh corners by some other route."""
+    a = _add(scene, fp, 0, 0, 100, 0)
+    b = _add(scene, fp, 100, 0, 200, 0)
+    outer = (a.end_vertex("p1"), b.end_vertex("p2"))
     merge_collinear_scene(scene)
-    assert vertex.split_count() == before
+
+    walls = [it for it in scene.items() if isinstance(it, fp.WallItem)]
+    assert len(walls) == 1, "precondition: the two did not merge"
+    w = walls[0]
+    assert (w.end_vertex("p1"), w.end_vertex("p2")) == outer,         "the survivor was rebuilt from coordinates instead of adopting the ends"
 
 
 def test_the_applier_touches_only_the_items_the_delta_names(fp, scene):
@@ -311,13 +320,20 @@ def test_scene_split_cuts_the_wall_and_shares_the_new_corner(fp, scene):
         "the split corner must be ONE vertex, not two at the same place")
 
 
-def test_scene_split_costs_no_split_on_writes(fp, scene):
-    # vertex-native: both new ends are handed over with set_end_vertex, so the
-    # op never assigns a coordinate and never mints an anonymous corner
+def test_scene_split_keeps_the_far_ends_identity(fp, scene):
+    """Splitting a wall re-uses the far ends; only the new middle corner is new.
+
+    CONVERTED AT P4.5 from `assert split_count() == before` -- see the merge
+    test above for why. `split_wall_at` hands both new ends over with
+    `set_end_vertex`, so no existing corner is disturbed."""
     a = _add(scene, fp, 0, 0, 240, 0)
-    before = vertex.split_count()
+    left, right = a.end_vertex("p1"), a.end_vertex("p2")
     split_wall_at(scene, a, QPointF(120, 0))
-    assert vertex.split_count() == before
+
+    walls = [it for it in scene.items() if isinstance(it, fp.WallItem)]
+    assert len(walls) == 2, "precondition: the wall did not split"
+    ends = {v for w in walls for v in (w.end_vertex("p1"), w.end_vertex("p2"))}
+    assert left in ends and right in ends,         "the split rebuilt a far end instead of keeping it"
 
 
 def test_scene_split_keeps_the_far_ends_existing_sharing(fp, scene):
