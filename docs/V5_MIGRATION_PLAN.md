@@ -4985,5 +4985,96 @@ notes:   * A COUNT WAS NOT ACCEPTED AS A FINDING. The receipt showed "2
            as the weaker shape it is. A red is not evidence merely because it
            is red.
 
+P4.5(27) THE FRAGMENT CASE MEASURED -- evidence committed before any reading
+notes:   docs/evidence/defect23_fragment_probe.py + defect23-fragment.json.
+         Replayed on both trees. The product is the same on each and is
+         already broken: 20 distinct Vertex objects on 10 geometric points,
+         room_owns_walls FALSE for all nine (group, room) pairs. The walk
+         WELDS on the way out (20 -> 10 vertices, 16 -> 12 walls, merged=4),
+         so check(deep) is CLEAN on it. Base: the gesture moves 4 of 4 walls
+         and 0 of 16 outline corners, opens four dashed edges that each have a
+         real wall on them, and the SAVE SUCCEEDS on a file recording that
+         nothing moved. Deform: I11 1 -> 3, I5b 0 -> 1, all pairs between
+         rooms fragment itself created.
+
+P4.5(28) THE SEVEN RULINGS RECORDED, before any code. Masking accepted as a
+         Working-agreement entry at its second instance; rows 47 (fragment ->
+         extract, first task after P4.5, and mainwindow.py:982-996 named as a
+         SECOND duplication site duplicate_wall never reached), 48 (the
+         invariants have never checked the scene the user edits), 49 (I11
+         speaks nowhere in the shipped app); 2a amended in place; the
+         mini-gate gains a "deliberately still broken" list.
+
+P4.5(29) THE FRAGMENT TEST OFF ITS VACUOUS BASIS. all(enclosed(r)) after the
+         move read the NEIGHBOURS duplicate walls, never the piece that moved
+         -- it passed on a tree that stranded the room completely. New
+         verdict: no wall belongs to two fragments, via room_walls. Three
+         preconditions, including that the pieces ABUT (4 coincident edges
+         measured). --runxfail lands on the VERDICT, not a precondition.
+
+P4.5(30) DEFORM-TO-FOLLOW LANDS. Clipped band: Garage 0 of 9 -> 7 of 9
+         corners, PKT Off 0 -> 5, Util 0 -> 3, the other 17 unchanged.
+         THE OLD ASSERTION COULD NOT HAVE FLIPPED: it compared walls-moved to
+         corners-moved and A RUN OF k WALLS HAS k+1 CORNERS, so "neither xfail
+         flipped" was never evidence against the mechanism. A second
+         formulation was tried and REJECTED FOR VACUITY -- "corners moved ==
+         corners held by a moved wall" passes on the pre-fix tree too, both
+         sides empty -- caught by running it against d57a76f before keeping
+         it.
+
+P4.5(31) THE SECOND XFAIL FLIPS, and it was the TEST's geometry. Its body said
+         "move ONE corner"; a group of the two walls meeting at a corner holds
+         THREE. Its delta (-400,300) yields a NON-crossing quad, so the silence
+         it failed on was correct. Swept: crossing at (0,150) (0,200) (0,300)
+         (60,240) (-60,300). The deform is now a PRECONDITION before the
+         message is demanded.
+
+P4.5(32) ALIGN AND DISTRIBUTE ON THE FINISHED GATHER. rooms_holding moves to
+         rooms.py as the single definition; GroupItem._rooms_holding aliases
+         it. THE RECEIPT IS THE NEIGHBOUR: three rooms on party walls, A and B
+         selected, C never selected -- sharing before -> after (old) -> new is
+         A 4/4 -> 1/4 -> 4/4, B 4/4 -> 0/4 -> 4/4, C 4/4 -> 2/4 -> 4/4, open
+         edges 2/3/2 -> 0/0/0. Distribute destroyed sharing on every room
+         WHILE MOVING THEM BY ZERO. THE GATHER HAD TO WIDEN TO WALLS TOO,
+         found by walking into it: with only the room half widened, C drew a
+         dashed edge with 0 walls spanning it. Same hole in _corner_records
+         (unwelded_ends 0 -> 1 after the clipped bake), fixed by INVERTING the
+         scan that used to split the outsider off.
+
+P4.5(33) view.py:402 -- THE LAST p1/p2 WRITER IN floorplanner/. 40 mouse-move
+         events: 40 split-on-writes -> 0, the drawn wall byte-identical.
+         grep now returns ZERO writers in floorplanner/.
+
+P4.5(34) THE SETTER DELETION IS STOPPED ON A SCOPE-CHANGING MEASUREMENT, and
+         this entry is the finding rather than the work.
+notes:   The completeness proof itself is DELIVERED: `grep -rn "\.p1 = \|\.p2
+         = " floorplanner/` returns nothing. What deleting the setters would
+         additionally buy is that they cannot be re-used; what it COSTS was
+         not visible until censused.
+         MEASURED: `Vertex.moved_to` is the ONLY thing that increments the
+         split counter (`_SPLITS[0] += 1`, vertex.py:145), and its ONLY
+         callers are the two setters (walls.py:1224, 1234). Delete them and
+         `split_count()` is frozen at 0 for the life of the process.
+         CONSEQUENCE: SIX ASSERTIONS BECOME UNFALSIFIABLE -- test_topology_ops
+         :269 and :320, test_wall_move:223, :331 and :620, test_view:90 --
+         each of the form `assert split_count() == before`. They are watches
+         that an operation caused no splits; with nothing able to split they
+         become tautologies that still read as coverage. That is VACUOUS BY
+         TAUTOLOGY, the one shape the gate greps for, in a form its four
+         literal patterns will not match -- and it would be introduced BY a
+         cleanup, which is how the instrument-boundary rule says these
+         arrive.
+         SO THE PIECE IS BIGGER THAN "delete two properties": it is retire the
+         shim AND its telemetry AND convert six watches from "no splits" to
+         "identity preserved" (comparing Vertex objects, which is strictly
+         stronger), plus 22 writers across seven test files and
+         docs/make_gallery.py, plus tests/test_vertices.py, which is the
+         shim's OWN spec and pins split-on-write as a behaviour.
+         NOT DONE, and not fudged: a deletion that silently vacates six
+         assertions is exactly the trade this project stops for. Ruling
+         wanted on whether the counter retires with the setters (converting
+         the watches) or the setters stay until Phase 6's command layer owns
+         the move.
+
 
 ```

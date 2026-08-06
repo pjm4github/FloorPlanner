@@ -1,6 +1,6 @@
 # Session snapshot — read this first
 
-**Re-cut 2026‑08‑04 mid‑P4.5, on branch `p4.5-groups-zorder` @ `52a6aed`.** This file exists so a fresh session can start from disk instead of from a chat summary. It is an **index and a state marker, not a second copy of the record** — where it points at another document, that document is authoritative and this one must not be trusted over it.
+**Re-cut 2026‑08‑05 mid‑P4.5, on branch `p4.5-groups-zorder` @ `5316d35`.** This file exists so a fresh session can start from disk instead of from a chat summary. It is an **index and a state marker, not a second copy of the record** — where it points at another document, that document is authoritative and this one must not be trusted over it.
 
 ---
 
@@ -8,16 +8,59 @@
 
 | | |
 |---|---|
-| **Branch** | `p4.5-groups-zorder`, branched from `main@adaa519`, **23 sub-commits `fbbebf4` … `52a6aed`**, each at a full green gate. **No PR open yet.** |
+| **Branch** | `p4.5-groups-zorder`, branched from `main@adaa519`, **33 sub-commits `fbbebf4` … `5316d35`**, each at a full green gate. **No PR open yet.** |
 | **`main`** | `adaa519` — P4.1, P4.1b, P4.2, P4.3, P4.4 all merged and ticked; the 3D viewer packaged and its popup merged (PRs #4–#8). |
-| **Census** | **619 collected** (610 passed, 7 deselected, 2 xfailed), ruff clean, `vacuous=0`, every sum reconciling in all three modes. |
+| **Census** | **637 collected** (629 passed, 7 deselected, 1 xfailed), ruff clean, `vacuous=0`, every sum reconciling in all three modes. |
 | **Working tree** | clean (only untracked screenshots). |
 
 **P4.5 is the second designated MINI-GATE task — its PR does not merge until Patrick runs the gate.**
 
 ---
 
-## 1a. Three branches are in flight — read this before any git operation
+## 1a. The three branches are RESOLVED — 2026‑08‑05
+
+| branch | disposition |
+|---|---|
+| **`p4.5-groups-zorder`** | `5316d35` — **clean, green, pushed.** Everything below landed here. |
+| `p4.5-defect23-wip` | **absorbed.** `4e967c0` cherry-picked at P4.5(30) with its F401 fixed; the scratch branch is now history, not a parking place. |
+| `p4.5-align-wip` | **discarded, as its own commit message predicted.** Rewritten at P4.5(32) against the finished gather; its code did not survive, its measurements did. |
+
+**Defect 23 is closed and both parked xfails are hard passes.** The clipped band
+went from three stranded rooms (Garage 0 of 9 corners against 6 of 9 walls) to
+20 of 20 coherent. Neither xfail flipped on the mechanism alone — and in **both**
+cases the test was wrong, not the mechanism: one compared walls-moved to
+corners-moved when *a run of k walls has k+1 corners*, the other asked for a
+delta that yields a non-crossing quadrilateral. Both are recorded in the
+Progress log, because "the receipt did not flip" was carried for a day as
+evidence against a mechanism that was working.
+
+**The fragment ruling (2026‑08‑05).** Diagnosis: **masking** — `fragment`'s
+product was already broken (20 `Vertex` objects on 10 points, `room_owns_walls`
+false for all nine pairs) and split-on-write hid it by detaching the group's
+walls from every outline. Remedy accepted in principle, **deferred**: register
+**row 47**, the first task after P4.5 merges. Evidence:
+`docs/evidence/defect23-fragment.json`, reproducible with the probe beside it.
+
+**Two gaps larger than fragment, both filed, neither P4.5's:** **row 48** — the
+invariants have never checked the scene the user edits, because
+`design_from_scene` welds on the way out; **row 49** — I11 speaks *nowhere* in
+the shipped app, since it is deep-only and shadow mode is off by default, so
+the save refusal ruling 2a assumed does not happen.
+
+**ONE PIECE STOPPED, deliberately, and it needs a ruling: deleting the `p1`/`p2`
+setters.** The completeness proof it existed for is already delivered — `grep`
+returns **zero** writers in `floorplanner/`. But `Vertex.moved_to` is the only
+thing that increments the split counter and the setters are its only callers,
+so deleting them freezes `split_count()` at 0 and turns **six** live watches
+(`test_topology_ops` ×2, `test_wall_move` ×3, `test_view` ×1) into tautologies
+that still read as coverage. See the P4.5(34) Progress-log entry.
+
+**Also still open on the working branch:** defect 11's runtime z-order collapse
+(unchanged, still needs the bounded event counter).
+
+---
+
+## 1b. Superseded — what the previous cut said was in flight
 
 | branch | head | state |
 |---|---|---|
@@ -64,10 +107,10 @@
 ## 3. What remains in P4.5
 
 1. **Defect 11 — the runtime z collapse. STOPPED at a scope-changing measurement; needs a ruling before restarting.** The collapse hangs `test_drag_split_macro_keeps_every_room_rectilinear` at macro line 1 (the first drag), bisected to `geometry.py` alone, and **the trigger is the magnitude of the z step** — `(n−old) × 1.0` completes, `× Z_STACK_BAND` (100) hangs. Ruled out: no loop in the new code; the only `zValue()` read in the tree is `levels.py`'s idempotent floor-band delta; the macro's `_drag` has no convergence loop; `faulthandler` produced no traceback in three attempts. **The work was reverted** — nothing of it is on the branch. A separate, independently-correct fix was found and also reverted with it: `raise_to_front` assigns z absolutely while `bring_to_front` applies a delta, so each silently undoes the other's terms (the floor band included). Proposed next step: instrument the drag with a bounded event counter to find the consumer, rather than choosing constants to avoid a symptom.
-2. **The P3.1 split-on-write shim** — retirement.
-3. **~~The two identity-churn sites~~ — the description was WRONG and the census found it (2026‑08‑05).** `_translate_shape`'s pair (`mainwindow.py:754`, called from `:784` and `:793`) is real and is one of **four** writers of `p1`/`p2`; the others are `align_rooms_to_grid` (`mainwindow.py:747‑748`), the draw gesture's `_temp_wall` (`view.py:402`), and — the one that changes the piece's shape — **`WallItem.mouseMoveEvent`'s `"p1"`/`"p2"` branches (`walls.py:2020, 2022`), which split identity PER MOUSE-MOVE EVENT on the live endpoint drag.** That is not "an identity-churn site": it is the endpoint drag's whole identity model, on code that defect 13's zoom ruling and P3.3's vertex work both touch, while the BODY drag already runs on `_plan_vertex_moves`. **This is the third time a carried description has failed its census** (after P4.5's *"grouped ends never weld"* and row 45's *"outlines arriving from a file"*), which is why the pre-work census covers behavioural claims and not only counts.
-4. **The remaining parked xfails** — `test_a_clipped_band_leaves_every_room_coherent` (should pass once the corner gather widens; per §2a it must be reported **as a consequence of the mechanism, not as a fix**) and `test_grouping_rooms_without_their_walls_still_copies_them` → already rewritten; check the current list with `pytest -rxX`.
-5. **Patrick's mini-gate — nine items** (the eight from the read-back plus new **item 1**: group the whole plan of 20 rooms, move, ungroup, expect **zero new objects** and instant timing), **plus the cross-cutting watch: at every step, no room may show a dashed open edge where a wall actually exists.**
+2. **~~The P3.1 split-on-write shim~~ — DONE at P4.5(33).** `view.py:402` was the last `p1`/`p2` writer in `floorplanner/`; the draw gesture now relocates. Measured: 40 mouse-move events, **40 split-on-writes → 0**, drawn wall byte-identical. **Deleting the setters is the part still open** — see §1a, it is stopped on a ruling, not on effort.
+3. **~~The identity-churn sites~~ — DONE at P4.5(32).** All four writers are retired. `align_rooms_to_grid` and `_translate_shape` now run on `relocate_corners` over the **finished gather**, which widens scene-wide to every room *and every wall* holding a corner being moved. The receipt is the **unselected neighbour**: sharing 4-of-4 → 2-of-4 → 4-of-4, open edges 2 → 0.
+4. **~~The remaining parked xfails~~ — BOTH ARE HARD PASSES** (P4.5(30) and P4.5(31)). The only `xfail` left is the deliberate one against **row 47** (fragment → extract), which flips when that task lands. Check with `pytest -rxX`.
+5. **Patrick's mini-gate — TEN items** (item 10, ruled 2026‑08‑05: Align to grid and Distribute on a plan with shared party walls — rooms follow their walls, and a subsequent wall drag strands nothing), plus the **"deliberately still broken — do not report these"** list now in the plan beside the mini-gate ruling: **fragment (row 47)** and defect 11's hang. The cross-cutting dashed-edge watch **exempts the fragment gesture and nothing else**. Originally nine items (the eight from the read-back plus new **item 1**: group the whole plan of 20 rooms, move, ungroup, expect **zero new objects** and instant timing), **plus the cross-cutting watch: at every step, no room may show a dashed open edge where a wall actually exists.**
 6. **PR into `main` as a merge commit**, after the mini-gate passes.
 
 **Standing instruction: run the remainder as ONE BATCH and report once**, when the branch is ready for the mini-gate. Sub-commit per piece, differential receipt per piece, full gate throughout. Stop mid-sequence only for (a) a ruling not already held, (b) a measurement that changes a piece's scope, or (c) a finding that contradicts something already decided. Process observations go in the log; do not stop for them, and do not add Working-agreement entries unless a rule would have prevented a defect actually hit.
