@@ -223,6 +223,17 @@ measurement was asked for**, which is why this is a rule rather than a
 reminder: a justification is the most dangerous claim to leave unmeasured,
 because it is written precisely to explain why nobody needs to look further.
 
+**A CENSUS BY SPELLING FINDS ONLY THAT SPELLING — added 2026‑08‑06, at the SECOND instance, and this one is measured rather than noticed.** When the thing being counted is a *call shape* rather than a name, a grep counts the shape you thought of. The two instances are the same shape twice:
+
+* **P3.6's split-on-write exit survey** counted *"9 direct coordinate-assignment sites"* and listed all nine by the `.p1 = ` / `.p2 = ` spelling.
+* **P4.5(40)'s census** repeated it exactly — 22 writers, same grep — and missed **five** of the form `setattr(wall, attr, <point>)`, with `attr` a variable. They surfaced as `AttributeError` the instant the setters were deleted.
+
+**Measured, and this is the part that makes it a rule rather than an anecdote:** those `setattr` writers were already there at **`03f3868`** (the Phase 3 merge — four of them) and at **`adaa519`** (the P4.4 merge — five). So P3.6's "9" was really 13, and **the same blind spot survived two censuses and the whole of Phase 4 undetected**, because both censuses reached for the same instrument. A second measurement that repeats the first one's method does not corroborate it — it inherits its blind spot and dresses it as confirmation.
+
+**So: the next census of a CALL SHAPE reaches for an AST walk or a runtime probe, not a grep.** `ast` sees `Assign` to an `Attribute` and a `Call` to `setattr` as what they are, whatever the attribute name is spelled by; a probe (make the property raise, run the suite) finds every reachable caller regardless of spelling. A grep stays fine for a NAME — `git grep detach_end` is exact — and that distinction is the whole rule: **grep for identifiers, parse for shapes.**
+
+**The corollary is the cheaper half:** the deletion found what the census could not. Removing the thing and reading the failures is a census, and often the only complete one — which is an argument for retiring a mechanism *before* believing you have enumerated its callers, not after.
+
 **A GREEN SIGNAL IS ONLY EVIDENCE ABOUT WHAT IT MEASURES — added 2026-08-04, as
 the rule above three instances.** `tools/gate.py` has never made a claim about
 `docs/V5_MIGRATION_PLAN.md`: it runs ruff and pytest, and neither reads this
@@ -319,7 +330,8 @@ the added text before writing the commit message that claims it.
 | ☑ | **P4.2** Extract / join — *ticked 2026‑08‑02, accepted at **PR #4** (merge commit; 26 sub-commits, `dfd30af` … `ed9286c` + the record commit: core 1–7, mini-gate findings 8–15, tooling & floors 16–23, hand-off 24, census hygiene 25, record 26) — the first task under the Phase‑4 ruling's **Patrick mini-gate: PASSED, all 8 items**, on a fresh launch with the version label verified. Acceptance met: extract → move 500″ → join with `check()` clean at every step, I12 while floating, furnishings and openings intact; the party-wall regression flipped xfail → hard pass via the real `extract` (the P0.5 Known-regressions row closes). Defects 30, 34 and 13 (drag half) closed; defect 35 closed on the reporter's confirmation; six mini-gate findings fixed against measured reproductions, pinned by his macros verbatim. Census 528 → 552, local == CI.* | ruff + pytest |
 | ☑ | **P4.3** Shuffle mode — *ticked 2026‑08‑03 on Patrick's acceptance, merged at **PR #5** (merge commit `4050e44`; 6 sub-commits `a6ded30` … `545b79a`: census + rulings, plumbing, gesture gating + the tiered doorway weld, acceptance, ruling 1's execution, the fuse-straggler finding). Acceptance met: shuffle on, a floating room dragged across the plan through the real handlers leaves both unchanged, `check()` deep-clean at every step. The P2.3 Known-regressions row closed as superseded-by-ruling (STAY, two replacement hard passes); defect row 36 fixed with the macro pinned verbatim; census 552 → 569, local == CI, xfails 4 → 3.* | ruff + pytest |
 | ☑ | **P4.4** Concept rooms, `nominal_size`, duplicate-as-template — *ticked 2026‑08‑04 on Patrick's acceptance ("it works perfectly"), merged at **PR #6** (merge commit `ae9f0ad`; 5 sub-commits `868e315` … `da38c46`: census + the four rulings, the `^H` chord + token, duplicate-as-template, concept rooms, the record). Acceptance met: a one-room file validates against the schema and all fifteen invariants and loads into an existing design as a floating room (pinned against a **second** `MainWindow`, so "an existing design" is genuinely another document). The **carried census note resolves** — `_copy_spec` + `_perimeter_span` deleted, so P4.5 inherits the binding/outline duality with its clipboard consumer resolved; register row 37 closed with `^H`. Census 576 → 598.* | ruff + pytest |
-| ☐ | **P4.5** Group semantics + z-order collapse | ruff + pytest |
+| ☑ | **P4.5** Group semantics + z-order — *ticked 2026‑08‑06 on Patrick's mini-gate (**all ten items run and passed**, including item 10 — Align to grid and Distribute on a plan with shared party walls — and the cross-cutting dashed-edge watch) and the reviewer's acceptance. Merged at **PR #10** (merge commit `4b379fc`; 45 sub-commits `fbbebf4` … `1c6ff61`). Acceptance met on all five: `test_group_survives_roundtrip` flips xfail → pass (defect 3); `test_a_clipped_band_leaves_every_room_coherent` passes **as a consequence of the mechanism, not as a fix** (§2a's required wording, and literally true — a split simply stopped happening); `…_still_copies_them` rewritten into its opposite; the three duplicate-on-group tests replaced; the twenty-room test widened to **creates no OBJECTS at all**. Headline number: group the whole 20-room plan, move, ungroup → **189 → 189 scene items, zero new objects**, against the review's ≥106 duplicate walls and ≥149 duplicate openings on that same gesture. Defects 3, 11a and 23 closed; register row 36 closed at source; rows 47, 48, 49 filed. The P3.1 split-on-write shim retired entirely, its guarantee moved to the gate (`end_assign=0`). Census 619 → 633, xfails 2 → 1 (the survivor is deliberate, against row 47).*<br><br>**⚠ CARVE-OUT — DEFECT 11 IS ONLY HALF CLOSED, and this row says so rather than letting the tick imply otherwise.** P4.5's charter named the z-order collapse. **11a landed** — a room raised on a ghost floor no longer escapes its floor band (measured z −99996 → +10 against an active floor at 4; fixed by re-basing the raise into the item's own band, openings deliberately exempt). **THE RUNTIME COLLAPSE DID NOT LAND.** It hangs `test_drag_split_macro_keeps_every_room_rectilinear` at the first drag, bisected to `geometry.py`, trigger is the MAGNITUDE of the z step (`×1.0` completes, `×Z_STACK_BAND` hangs); the work was reverted and nothing of it is on the branch. **The agreed rule carries forward intact (ruling 4, unchanged): z = `floor_term + stack_term + type_term`, the backdrop's −1e9 becomes a TYPE TERM rather than a magic number, `bring_to_front`'s full-scene max scan dies with it, and the band arithmetic becomes NAMED CONSTANTS with the inequality `max(type_term) < STACK_BAND` and `max(stack_term) < FLOOR_BAND` written beside them and PINNED BY A TEST** — otherwise it is three schemes again the first time someone raises a type constant. Proposed next step unchanged: instrument the drag with a bounded event counter to find the consumer, rather than choosing constants to avoid a symptom. **The SERIALIZATION half stays blocked** on the schema ruling (v5 has no stacking-index field and all four objects set `additionalProperties: false`), and returns to Patrick as its own decision. **Both halves go to the post-P4.5 queue, second after row 47.** | ruff + pytest |
+| | **▲ PHASE 4 COMPLETE — 2026‑08‑06.** P4.1, P4.1b, P4.2, P4.3, P4.4 and P4.5 all merged and ticked (PRs #2, #3, #4, #5, #6, #10). Rooms are movable units, groups move the real items, the split-on-write shim is gone, and `main` is green on py3.10, py3.13, the deep-invariants job and ruff. **Carried out of the phase, not silently dropped:** defect 11's runtime z-order collapse (see the P4.5 row) and register rows 47, 48, 49. | |
 | ☐ | **P5.1** Site levels, categories, area accounting | ruff + pytest |
 | ☐ | **P5.2** Landscape wall types + gates | ruff + pytest |
 | ☐ | **P5.3** Site schedule fields + reports | ruff + pytest |
@@ -5154,6 +5166,51 @@ notes:   THE CENSUS THAT OPENED THIS PIECE WAS WRONG, and that is the finding.
          anchor must follow, which is what _carry_anchors did. 12 of 41
          openings on planc1 mirrored down their wall before that carry
          existed, so it is folded into the operation rather than deleted.
+
+P4.5    MERGED 2026-08-06 at PR #10 -- merge commit 4b379fc, two parents
+        (b2a7809 main, 1c6ff61 branch). NOT squashed.
+ruff:   clean
+pytest: 633 collected; OFF/ON/DEEP each 625 passed, 7 deselected, 1 xfailed,
+        every sum reconciling; vacuous=0, end_assign=0. CI green on main
+        (py3.10, py3.13, deep invariants, ruff -- run 31067224148).
+notes:  PATRICK'S MINI-GATE: ALL TEN ITEMS RUN AND PASSED, including item 10
+        (Align to grid and Distribute on a plan with shared party walls) and
+        the cross-cutting dashed-edge watch. Ticked on that plus the
+        reviewer's acceptance.
+        PHASE 4 IS COMPLETE at this merge -- P4.1, P4.1b, P4.2, P4.3, P4.4,
+        P4.5 -- and the status table carries the mark with the date.
+        THE TICK CARRIES AN EXPLICIT CARVE-OUT, and that is the point of it:
+        defect 11's RUNTIME z-order collapse was in P4.5's charter and DID
+        NOT LAND. Only 11a did (the ghost-band escape). Ruling 4's z rule is
+        carried forward INTACT in both the status row and register row 11 --
+        floor_term + stack_term + type_term, the backdrop's -1e9 as a TYPE
+        TERM, bring_to_front's full-scene scan retired, and the band
+        arithmetic as NAMED CONSTANTS with max(type_term) < STACK_BAND and
+        max(stack_term) < FLOOR_BAND written beside them and PINNED BY A
+        TEST. The serialization half stays blocked on the schema ruling. A
+        PHASE THAT TICKS OVER AN UNLANDED CHARTER ITEM IS THE RECORD LYING
+        BY OMISSION, so the row says which half landed and where the rest
+        goes.
+        THE TWO WIP BRANCHES ARE DELETED, local and remote, and their heads
+        are recorded HERE because deleting them is what makes this line the
+        only handle left:
+          p4.5-align-wip     5f679e9  DISCARDED. Its own commit message
+                                      predicted it ("this diff will be
+                                      REWRITTEN"); P4.5(32) rewrote it
+                                      against the finished gather. The code
+                                      did not survive, the measurements did.
+          p4.5-defect23-wip  4e967c0  ABSORBED. Cherry-picked at P4.5(30)
+                                      with its F401 fixed and its one open
+                                      ruling taken (fragment: masking, not
+                                      regression).
+        Neither is an ancestor of main -- align-wip because it was rewritten,
+        defect23-wip because a cherry-pick copies content and not the commit
+        object -- so both needed a force delete, and that is why the SHAs are
+        written down rather than left to reflog.
+        THE OPEN QUEUE, in order, all of it carried deliberately: row 47
+        (fragment builds duplicate wall loops instead of extracting -- the
+        first task, ahead of grid snap), defect 11's runtime collapse, rows
+        48 and 49, then grid snap, then Phase 5.
 
 
 ```
