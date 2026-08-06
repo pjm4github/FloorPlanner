@@ -4,8 +4,8 @@ id: 40
 title: "A missing optional dependency must degrade, not crash - the 3D popup is not built yet, and this"
 
 # maps directly onto GitHub Issues fields
-state: open
-state_reason: null
+state: closed
+state_reason: completed
 labels:
   - type:task
   - area:viewer
@@ -13,11 +13,11 @@ milestone: null
 
 # ours; becomes body prose after migration
 opened: 2026-08-03
-closed: null
-closed_by: null
+closed: 2026-08-03
+closed_by: 0a37581
 rank: 41
 related: [26]
-state_source: row
+state_source: receipt
 github_issue: null
 ---
 
@@ -41,3 +41,28 @@ not yet built; `viewer/fp3d.py` (`make_view`) is already correct
 ## Milestone
 
 **whichever task builds the 3D menu action**
+
+## Receipt
+
+**Closed 2026-08-06, in its own commit, after the docs refactor migrated it
+open.** The condition this record set was met on 2026-08-03 and the row was
+never ticked; the refactor found the gap and, per the rule below, did not fold
+the correction into the move.
+
+The record required, verbatim: *"catch the missing dependency at the call site
+and report **\"3D view needs `pip install -r requirements-viewer.txt`\"**
+through the status channel."* On disk:
+
+| | |
+|---|---|
+| `floorplanner/mainwindow.py:532` | `VIEWER_HINT = ("3D view needs pip install -r requirements-viewer.txt")`, used by `show_3d_view` |
+| `tests/test_viewer_popup.py:139` | `assert "requirements-viewer.txt" in win.statusBar().currentMessage()` |
+| `floorplanner/app.py:27` | the `try/except ImportError` guard, so the editor still starts without the 3D stack |
+| `0a37581` | *3D view popup: the same widget the CLI ships, opened read-only* — merged at PR #8, 2026-08-03 |
+
+The message is the one the record specified, at the call site the record
+specified, in the channel the record specified, and a test asserts it. The
+`## Milestone` cell above still reads "whichever task builds the 3D menu action"
+and the `## Site` cell still reads "not yet built": **both were true when
+written and are left as written**, because this record annotates rather than
+rewrites. This section is the annotation.

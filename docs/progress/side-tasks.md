@@ -156,4 +156,35 @@ step 9   THE MAILBOX, and the reference count re-run from step 0.
          NOTHING WAS LOST IN TRANSLATION -- lost=0 is the acceptance
          condition, and every difference above is an addition.
          handoff/ opens with 0001, the pair that produced this task.
+
+step 10  TWO RECORDS CORRECTED, IN THEIR OWN COMMIT.
+         The rule this step exists to establish: a content correction
+         discovered during a structural move is NEVER folded into the
+         move. It keeps the move's verbatim receipt intact and makes the
+         correction visible instead of buried in a diff of relocations.
+         Recorded in docs/defects/README.md, not just practised.
+         D40  its condition was met 2026-08-03 and the row was never
+              ticked. It required the message "3D view needs pip install
+              -r requirements-viewer.txt" at the call site; that is
+              mainwindow.py:532 (VIEWER_HINT), asserted at
+              test_viewer_popup.py:139, guarded at app.py:27.
+              closed_by 0a37581 (PR #8).
+         D3   its Phase cell still read "is still open", written before
+              P4.5 closed it -- the ONLY one of 50 records whose derived
+              state disagreed with SESSION_SNAPSHOT.
+              3 tests pass: test_group_survives_roundtrip (flipped
+              xfail -> pass at P4.5, annotated "defect 3"),
+              test_undo_after_grouping_restores_the_plan,
+              test_group_move_undo_restores.
+              closed_by 52a6aed (P4.5(19)).
+         Neither record's Record, Site or Milestone was touched. They
+         were true when written; the new ## Receipt section is the
+         annotation. state_source: receipt marks the two.
+         open records 13 -> 11.
+         FINDING, reported not fixed: tests/test_characterization.py
+         carries a stale comment above test 4 saying test 3 "stays
+         xfail" -- test 3's own header two lines up says it flipped to
+         PASS at P4.5. A contradiction inside one file, in test code
+         rather than the record, so it is reported rather than folded
+         into this commit for exactly the reason above.
 ```

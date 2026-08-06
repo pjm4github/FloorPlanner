@@ -94,7 +94,9 @@ built`). A check that failed on those would punish accuracy.
 
 ### `state_source`: where a record's state was read from
 
-`row` — the record says so itself. `status-table` — **the record says nothing**,
+`row` — the record says so itself. `receipt` — the record's state was **changed
+after migration** on evidence recorded in its own `## Receipt` section (D3, D40).
+`status-table` — **the record says nothing**,
 and its state was read from the tick against its phase in the plan's Status
 table. Fifteen of the terse early rows are four words and a phase id; their
 state was only ever recorded in that tick box, in another document, and reading
@@ -174,6 +176,37 @@ mirrored from them**, or **issues, with these files frozen as history**?
 the mapping survives either answer. Nothing else about the question is settled.
 
 ---
+
+---
+
+## A content correction is never folded into a structural move
+
+**Ruled 2026-08-06, and it is general.** When a move discovers that a record is
+factually wrong — not misfiled, *wrong* — the move migrates it **as it stands**
+and the correction lands in the **next commit**, with its own receipt.
+
+Two reasons, and the first is the one that makes it a rule rather than a
+preference:
+
+1. **It keeps the move's verbatim receipt intact.** Every step of this refactor
+   claims its moved text is byte-identical to what it replaced, and that claim
+   is what makes the whole thing checkable. A single "while I was in there"
+   correction turns a diff anyone can verify into a diff someone has to read.
+2. **It makes the correction visible.** A state change buried among fifty
+   relocations is invisible; a commit whose whole subject is "this record was
+   wrong, here is the proof" is not.
+
+**Two records were migrated knowingly wrong under this rule and closed
+immediately afterwards:**
+
+| | found | corrected |
+|---|---|---|
+| **D40** | its condition was met on 2026-08-03 and the row was never ticked — the message it required is at `mainwindow.py:532` with a test on it | closed at step 10 with `closed_by: 0a37581` |
+| **D3** | its Phase cell still read *"is still open"*, written before P4.5 closed it; the only one of 50 records whose derived state disagreed with `SESSION_SNAPSHOT.md` | closed at step 10 with `closed_by: 52a6aed` |
+
+Neither `## Record`, `## Site` nor `## Milestone` was touched in either. They
+were true when written; the `## Receipt` section is the annotation, which is the
+same discipline the register itself has always used.
 
 ## Standing notes
 
