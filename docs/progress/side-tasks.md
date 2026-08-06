@@ -93,4 +93,67 @@ step 4   THE PROGRESS LOG TO progress/, SPLIT BY PHASE, VERBATIM.
          The one non-phase entry in the whole log -- the 3D view popup,
          2026-08-04 -- was NOT lifted into this file. Its own text says
          its value is its position between P4.4 and P4.5.
+
+step 5   THE REGISTER SPLIT INTO 50 RECORDS; INDEX.md GENERATED.
+         receipt   150 moved cells (Record/Site/Milestone x 50) compared
+                   byte-for-byte against HEAD's register: 150 IDENTICAL.
+                   Register sections 1-2 and 4-5 IDENTICAL.
+         register  156 -> 103 lines, 107,749 -> 10,891 bytes
+         The body is ## Record, NOT the five specified sections: the
+         register wrote each row as one continuous argument in which
+         symptom, mechanism, evidence, ruling and receipt are
+         interleaved. The five sections are documented as the shape NEW
+         records take and the shape a record takes when NEXT REVISED.
+         38 DEFECTS, NOT 49. Nothing removed, nothing closed -- the
+         categories got honest. 50 records: 38 defect, 6 gap, 1 limit,
+         5 task.
+         State came from the PHASE CELL, not the prose, and finding out
+         why was the substance of the step. Struck-through text is
+         superseded and must not vote (4 rows); the Defect cell is
+         append-only prose that keeps overruled proposals (4 more); and
+         15 terse early rows say nothing at all -- their state lives in
+         the Status table's tick box, in another document.
+         Checked against SESSION_SNAPSHOT: agrees on 49 of 50. The one
+         disagreement is D3, whose cell still reads "is still open" --
+         migrated as the register has it, deferred to step 10.
+         handoff: 0001
+
+step 6   tools/defects_to_github.py -- --dry-run emits 50 valid gh
+         commands and exits 0; flags verified against gh 2.93.0 rather
+         than assumed. Labels and milestones are emitted FIRST because
+         `gh issue create --label X` fails if X does not exist.
+         `--execute` was run BY ACCIDENT and reached the GitHub API,
+         failing on exactly that ordering. Nothing was created (verified:
+         empty issue list, no github_issue written, clean status). The
+         fix is in the tool: --execute now requires --yes.
+
+step 7   gate.py --docs, ITS OWN LANE, plus a CI job.
+         fail-first  8 probes, 8 behaved as required, each PROVED on disk
+                     before its red was believed.
+                     docs/evidence/docs-gate-failfirst.txt + probe
+         The probe-verification column earned itself on the first run:
+         probe 1 reported MISSING while the gate went red -- the mutation
+         had applied and the MARKER was wrong. Without that column the
+         run would have read 8/8 with one probe unverified.
+         Dangling KEYS fail; dangling LINKS do not. A broken key means
+         the register lost a row; a link can be dangling and correct.
+         ruff caught a py3.10 break (a 3.12-only f-string) before CI did.
+
+step 8   .gitignore gains Screenshot*.png -- and nothing else happens.
+         `_tot.png` needed no entry: `_*.png` already covered it, which
+         corrects the read-back. No untracked file was touched. Proved on
+         files that do not exist yet, the only way to test a rule whose
+         subject is absent.
+
+step 9   THE MAILBOX, and the reference count re-run from step 0.
+         reference audit, same frozen module, same pattern set:
+             413 -> 828 references (+415)
+             tokens 55 -> 183:  LOST 0   gained 128   recount 5
+             gained = 50 dnum (the permanent-key form, one per record)
+                    + 78 mdlink (the first dense cross-linking)
+             recount = 5, every one an INCREASE
+             unresolved 0 -> 1: the historical link recorded at step 2
+         NOTHING WAS LOST IN TRANSLATION -- lost=0 is the acceptance
+         condition, and every difference above is an addition.
+         handoff/ opens with 0001, the pair that produced this task.
 ```
