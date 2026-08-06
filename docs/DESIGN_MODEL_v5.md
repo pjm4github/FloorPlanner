@@ -2,6 +2,16 @@
 
 **Supersedes `DATA_MODEL_v5.md` / `plan-schema.v5.json`** (moved to `docs/_superseded/`). That draft made a room a *face* of the wall complex, so a room existed only while a closed loop of walls existed. This revision inverts the dependency:
 
+> **Dead link, annotated 2026-08-06 rather than repointed.** `docs/_superseded/`
+> no longer exists: P0.1 moved it to `_to_delete/` and dropped it, because *"dead
+> drafts kept alive behind a lint exclusion is exactly how scaffolding rots"*.
+> Neither named file was ever committed, so there is nothing to link to and
+> nothing to recover — the sentence above is a true statement about where they
+> went, not a pointer that can be followed. **It is not `docs/superseded/`**,
+> which is a later, unrelated directory holding four documents that *are* kept.
+> Found by the docs refactor; recorded here because annotating a stale pointer
+> is worth more than deleting the fact that the draft existed.
+
 > **A room owns its outline. Walls are an optional binding onto the edges of that outline.**
 >
 > Delete a wall → the edge's `wall` becomes `null`. The room keeps its shape, area, name, schedule properties and every furnishing it owns.

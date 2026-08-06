@@ -1,3 +1,5 @@
+> **COMPLETED — the work described here shipped; the current plan is [`../V5_MIGRATION_PLAN.md`](../V5_MIGRATION_PLAN.md).** Moved here 2026-08-06. It also raised the repository-root clutter finding that the docs refactor closed on 2026-08-06. Nothing below this line has been edited.
+
 # REFACTOR PLAN — Model layer (#2) then Package split (#1)
 
 Baseline version: **v1.0** (`APP_VERSION`) · file format v3 → v4 (`FILE_VERSION`)

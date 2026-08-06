@@ -1,0 +1,243 @@
+# Progress log — side tasks
+
+> **Work that belongs to no migration phase**: tooling, packaging, the viewer
+> track, documentation structure. Same rules as the phase logs — append one
+> entry per task, newest at the bottom, never revise an entry (a correction is a
+> later entry).
+>
+> **This file starts empty of history on purpose.** The log that was split on
+> 2026-08-06 contained exactly one non-phase entry — the 3D view popup of
+> 2026-08-04 — and it was left where it sits in
+> [`phase-4-part-1.md`](phase-4-part-1.md), because its own text argues that its
+> value is its position between P4.4 and P4.5. Lifting it here would have
+> reordered contemporaneous history to tidy a filing system. See
+> [`README.md`](README.md).
+
+```
+DOCS REFACTOR  2026-08-06  (branch docs-refactor)
+         Requested after Phase 4 closed, with main clean and no task in
+         flight. The register, the working agreement and the progress log
+         come out of the two documents that had absorbed them.
+         Ten steps, one sub-commit each, full-mode gate green at each.
+
+step 0   THE REFERENCE AUDIT, FROZEN IN CODE BEFORE ANYTHING MOVED.
+         tools/ref_audit.py holds the pattern set once, so the count taken
+         now and the count taken at step 9 come from the same code rather
+         than from a grep retyped at the end.
+         baseline  413 references / 143 tracked text files / 53 carrying one
+                   defect=307  row=81  artifact=22  mdlink=3  dnum=0
+                   50 known ids (1-49 consecutive, plus 12a) / 0 unresolved
+         findings  EXACTLY ONE reference in the repo resolved to nothing:
+                   `defect 11a` at CODE_REVIEW_v2.md:76 -- 11a is a HALF
+                   named in row 11's prose, never a row. Resolver now
+                   resolves a lettered id to its numeric parent and SAYS SO.
+                   dnum=0: the permanent-key spelling is used nowhere yet;
+                   this refactor introduces it.
+                   The register holds 50 rows, not 49.
+                   48% of all references sit in the plan; the rest spread
+                   over 51 files including ci.yml, CLAUDE.md, 20 modules
+                   and 21 test files. Moving the register is not a
+                   docs-only edit.
+         evidence  docs/evidence/ref-audit-baseline.json
+
+step 1   docs/README.md -- THE MAP, WRITTEN FIRST so the remaining steps
+         had something to follow. States which documents decide things,
+         which are the record, which are history; that superseded/ holds
+         UNIQUE material; and that superseded/ is excluded from no lint,
+         gate or search -- on this repo's own evidence, P0.1, where a
+         hidden docs/_superseded/ rotted behind a ruff exclusion until it
+         was deleted.
+         measured  413 -> 427 refs, 4 unresolved, all forward references
+                   declared in the document's own opening block.
+
+step 2   FOUR DOCUMENTS TO superseded/, BODIES PROVED UNTOUCHED.
+         CANVAS_ITEM_REFACTOR_PLAN, CODE_REVIEW, REFACTOR_PLAN, TODO --
+         all four recorded by git as 100% renames.
+         receipt   4/4 bodies byte-identical to HEAD's blob
+                   34076 / 10427 / 11404 / 11499 bytes, unchanged
+         Superseded by TWO different mechanisms, so not one header: by a
+         DOCUMENT (the first two say so themselves) and by COMPLETION (the
+         last two name no successor because the work shipped).
+         The root-clutter attribution was corrected against disk: the
+         finding is raised at CODE_REVIEW.md:88, not in TODO.md.
+         One broken link left broken deliberately -- CANVAS's own line 3
+         links relative to its old directory. Repairing it would have cost
+         the 4/4 receipt; the new header carries the working pointer and
+         the historical text stays as written.
+
+step 3   WORKING_AGREEMENT.md EXTRACTED; the plan keeps a pointer.
+         receipt   body vs plan lines 10-291: 38286 bytes / 282 lines,
+                   IDENTICAL. Plan lines 1-8 and 292-end IDENTICAL.
+         ONE CHARACTER changed in moved text, itemised: the heading was
+         promoted from `## Working agreement` to `#`.
+         plan      5,216 -> 4,936 lines
+         SESSION_SNAPSHOT's reading order repaired in the same commit --
+         a pointer and its target must never be split across commits.
+
+step 4   THE PROGRESS LOG TO progress/, SPLIT BY PHASE, VERBATIM.
+         receipt   log reassembled from its seven files and compared to
+                   the plan's blob: 289,297 bytes / 4,351 lines either
+                   way, IDENTICAL. Plan lines 1-579 IDENTICAL.
+         plan      4,936 -> 586 lines (acceptance was ~900)
+         Phases turned out to be CONTIGUOUS blocks, so every cut is at a
+         column-0 task-entry start and nothing was reordered. Phase 3
+         (1,861) and Phase 4 (1,417) exceeded the 1,200-line rule and were
+         split in two; the parts are numbered rather than named for task
+         ranges, because the log's APPEND order is not the phase's task
+         order -- Phase 3 was written P3.1, P3.2, P3.3, P3.5, P3.8, P3.7,
+         P3.6, P3.5-followup, P3.4, and a file called `P3.1-P3.5.md` would
+         imply a range it does not hold.
+         The log's own rule ("append one entry per task, newest at the
+         bottom") lived in the heading block being replaced, and is
+         carried verbatim into progress/README.md rather than dropped.
+         The one non-phase entry in the whole log -- the 3D view popup,
+         2026-08-04 -- was NOT lifted into this file. Its own text says
+         its value is its position between P4.4 and P4.5.
+
+step 5   THE REGISTER SPLIT INTO 50 RECORDS; INDEX.md GENERATED.
+         receipt   150 moved cells (Record/Site/Milestone x 50) compared
+                   byte-for-byte against HEAD's register: 150 IDENTICAL.
+                   Register sections 1-2 and 4-5 IDENTICAL.
+         register  156 -> 103 lines, 107,749 -> 10,891 bytes
+         The body is ## Record, NOT the five specified sections: the
+         register wrote each row as one continuous argument in which
+         symptom, mechanism, evidence, ruling and receipt are
+         interleaved. The five sections are documented as the shape NEW
+         records take and the shape a record takes when NEXT REVISED.
+         38 DEFECTS, NOT 49. Nothing removed, nothing closed -- the
+         categories got honest. 50 records: 38 defect, 6 gap, 1 limit,
+         5 task.
+         State came from the PHASE CELL, not the prose, and finding out
+         why was the substance of the step. Struck-through text is
+         superseded and must not vote (4 rows); the Defect cell is
+         append-only prose that keeps overruled proposals (4 more); and
+         15 terse early rows say nothing at all -- their state lives in
+         the Status table's tick box, in another document.
+         Checked against SESSION_SNAPSHOT: agrees on 49 of 50. The one
+         disagreement is D3, whose cell still reads "is still open" --
+         migrated as the register has it, deferred to step 10.
+         handoff: 0001
+
+step 6   tools/defects_to_github.py -- --dry-run emits 50 valid gh
+         commands and exits 0; flags verified against gh 2.93.0 rather
+         than assumed. Labels and milestones are emitted FIRST because
+         `gh issue create --label X` fails if X does not exist.
+         `--execute` was run BY ACCIDENT and reached the GitHub API,
+         failing on exactly that ordering. Nothing was created (verified:
+         empty issue list, no github_issue written, clean status). The
+         fix is in the tool: --execute now requires --yes.
+
+step 7   gate.py --docs, ITS OWN LANE, plus a CI job.
+         fail-first  8 probes, 8 behaved as required, each PROVED on disk
+                     before its red was believed.
+                     docs/evidence/docs-gate-failfirst.txt + probe
+         The probe-verification column earned itself on the first run:
+         probe 1 reported MISSING while the gate went red -- the mutation
+         had applied and the MARKER was wrong. Without that column the
+         run would have read 8/8 with one probe unverified.
+         Dangling KEYS fail; dangling LINKS do not. A broken key means
+         the register lost a row; a link can be dangling and correct.
+         ruff caught a py3.10 break (a 3.12-only f-string) before CI did.
+
+step 8   .gitignore gains Screenshot*.png -- and nothing else happens.
+         `_tot.png` needed no entry: `_*.png` already covered it, which
+         corrects the read-back. No untracked file was touched. Proved on
+         files that do not exist yet, the only way to test a rule whose
+         subject is absent.
+
+step 9   THE MAILBOX, and the reference count re-run from step 0.
+         reference audit, same frozen module, same pattern set:
+             413 -> 828 references (+415)
+             tokens 55 -> 183:  LOST 0   gained 128   recount 5
+             gained = 50 dnum (the permanent-key form, one per record)
+                    + 78 mdlink (the first dense cross-linking)
+             recount = 5, every one an INCREASE
+             unresolved 0 -> 1: the historical link recorded at step 2
+         NOTHING WAS LOST IN TRANSLATION -- lost=0 is the acceptance
+         condition, and every difference above is an addition.
+         handoff/ opens with 0001, the pair that produced this task.
+
+step 10  TWO RECORDS CORRECTED, IN THEIR OWN COMMIT.
+         The rule this step exists to establish: a content correction
+         discovered during a structural move is NEVER folded into the
+         move. It keeps the move's verbatim receipt intact and makes the
+         correction visible instead of buried in a diff of relocations.
+         Recorded in docs/defects/README.md, not just practised.
+         D40  its condition was met 2026-08-03 and the row was never
+              ticked. It required the message "3D view needs pip install
+              -r requirements-viewer.txt" at the call site; that is
+              mainwindow.py:532 (VIEWER_HINT), asserted at
+              test_viewer_popup.py:139, guarded at app.py:27.
+              closed_by 0a37581 (PR #8).
+         D3   its Phase cell still read "is still open", written before
+              P4.5 closed it -- the ONLY one of 50 records whose derived
+              state disagreed with SESSION_SNAPSHOT.
+              3 tests pass: test_group_survives_roundtrip (flipped
+              xfail -> pass at P4.5, annotated "defect 3"),
+              test_undo_after_grouping_restores_the_plan,
+              test_group_move_undo_restores.
+              closed_by 52a6aed (P4.5(19)).
+         Neither record's Record, Site or Milestone was touched. They
+         were true when written; the new ## Receipt section is the
+         annotation. state_source: receipt marks the two.
+         open records 13 -> 11.
+         FINDING, reported not fixed: tests/test_characterization.py
+         carries a stale comment above test 4 saying test 3 "stays
+         xfail" -- test 3's own header two lines up says it flipped to
+         PASS at P4.5. A contradiction inside one file, in test code
+         rather than the record, so it is reported rather than folded
+         into this commit for exactly the reason above.
+
+POST-PR CORRECTIONS  2026-08-06  (PR #11 open, CI running)
+         Later entries, not revisions -- this log is append-only and a
+         correction is a later entry.
+
+step 11  THE TWO FINDINGS FIXED, as their own commit per step 10's rule.
+         test_characterization.py contradicted itself about test 3
+         ("stays xfail" vs its own header two definitions above).
+         DESIGN_MODEL_v5.md:3 pointed at docs/_superseded/, deleted at
+         P0.1. ANNOTATED, not repointed: the named drafts were never
+         committed, and docs/superseded/ is a different, later directory.
+         Sending a reader there would have been worse than the dangling
+         link.
+
+step 12  THE AUDITOR HAD A BOUNDARY AND ITS DOCSTRING DID NOT SAY SO.
+         Answer to the question asked at the report: NO, DESIGN_MODEL's
+         dangling link was NOT in the pattern set -- it was found by eye.
+         The step-1 commit message claimed the boundary was "stated in
+         the tool"; it was not. That overclaim is corrected at source.
+         docpath added (a backticked path under docs/) and MEASURED
+         before being trusted: 108 refs, 23 targets, 6 unresolved -- and
+         FIVE OF THE SIX ARE CORRECT (the P0.1 log naming the directory
+         it deleted, this refactor's own explanation of that deletion,
+         and two pre-P0.7 schema locations in historical text). So it is
+         REPORTED, NEVER ENFORCED, like mdlink: enforcing would fail five
+         correct records to catch one wrong one.
+         The pattern set is now VERSIONED and --compare REFUSES a
+         cross-version baseline -- a difference between two runs that is
+         really an instrument change is the exact failure this tool
+         exists to prevent. The set-1 baseline is kept byte-unchanged so
+         step 9's lost=0 receipt stays reproducible.
+
+step 13  THE --execute NEAR-MISS, RECORDED CORRECTLY, and the finding it
+         produced.
+         WHAT ACTUALLY PREVENTED IT: a missing-label ordering error. The
+         IDEMPOTENCE GUARD DID NOT FIRE -- it only refuses records that
+         already carry a github_issue, and none did. What stopped 50
+         issues being created was the repository happening to lack a
+         label. That is luck, not design, and attributing it to a guard
+         would teach the wrong lesson.
+         THE FINDING: none of the 15 labels or 20 milestones exist in
+         GitHub, so the real migration would have failed the same way on
+         the day it mattered. --create-labels added; --execute now CHECKS
+         the precondition before creating anything and refuses with the
+         list of missing labels and the remedy; the precondition is
+         documented in docs/defects/README.md.
+         Verified: 15 labels named, rc=1, nothing created.
+
+step 14  THE UNTRACKED ROOT FILES -- observation upgraded to fact.
+         Step 8 recorded that the eleven untracked scratch files were no
+         longer on disk and declined to say why, having no way to see it.
+         PATRICK CONFIRMS HE DELETED THEM, as the ruling anticipated.
+         The earlier entry stands as written; this is the attribution.
+```

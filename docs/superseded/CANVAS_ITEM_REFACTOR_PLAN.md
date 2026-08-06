@@ -1,3 +1,5 @@
+> **SUPERSEDED 2026-08-06 — not the current plan.** Replaced by [`../V5_MIGRATION_PLAN.md`](../V5_MIGRATION_PLAN.md); kept because its group/drag trace and recovered `test_zz*` forensics exist nowhere else (see [`../README.md`](../README.md)). Nothing below this line has been edited.
+
 # Canvas Item Management — Health Review & Refactor Plan
 
 > **Superseded by [`V5_MIGRATION_PLAN.md`](V5_MIGRATION_PLAN.md).** Kept for the group/drag trace and the recovered `test_zz*` forensics it records, which are not duplicated elsewhere. Not the plan of record.

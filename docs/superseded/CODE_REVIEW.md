@@ -1,3 +1,5 @@
+> **SUPERSEDED 2026-08-06 — not the current review.** Replaced by [`../CODE_REVIEW_v2.md`](../CODE_REVIEW_v2.md), which says so at its own line 3; the register it carried now lives one record per file in [`../defects/`](../defects/). It also raised the repository-root clutter finding that the docs refactor closed on 2026-08-06. Nothing below this line has been edited.
+
 # Code Review — FloorPlanner
 
 Baseline version: **v1.0** (`APP_VERSION`) · file format v3 (`FILE_VERSION`)

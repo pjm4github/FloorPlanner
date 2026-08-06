@@ -48,9 +48,10 @@ Everything here was carried out of Phase 4 **deliberately and with a row**, not 
 ## 4. What to read, in order
 
 1. **`CLAUDE.md`** — architecture and house rules.
-2. **`docs/V5_MIGRATION_PLAN.md`** — Working agreement (census doctrine; the P4.5-era rules, of which the newest are **a bug can mask a bug**, the **fifth vacuity shape** (unsatisfiable), **telemetry retires with what it measured**, and **grep for identifiers, parse for shapes**), the Status table with the **Phase 4 complete** mark, and the Progress log's P4.5 blocks ending at the merge entry.
-3. **`docs/CODE_REVIEW_v2.md`** — the register. Rows 3, 11a, 23 and 36 closed at P4.5; **rows 47, 48, 49 are the open queue** and row 11 carries the z rule for the half that did not land.
-4. **The P4.5 sub-commits** — each carries its own differential receipt; the four-guard sequence also carries the row‑36 watch result.
+2. **`docs/WORKING_AGREEMENT.md`** — the Working agreement (census doctrine; the P4.5-era rules, of which the newest are **a bug can mask a bug**, the **fifth vacuity shape** (unsatisfiable), **telemetry retires with what it measured**, and **grep for identifiers, parse for shapes**). *Extracted verbatim from the migration plan on 2026‑08‑06 — the rules outlive the migration.*
+3. **`docs/V5_MIGRATION_PLAN.md`** — the Status table with the **Phase 4 complete** mark, and the Progress log's P4.5 blocks ending at the merge entry.
+4. **`docs/CODE_REVIEW_v2.md`** — the register. Rows 3, 11a, 23 and 36 closed at P4.5; **rows 47, 48, 49 are the open queue** and row 11 carries the z rule for the half that did not land.
+5. **The P4.5 sub-commits** — each carries its own differential receipt; the four-guard sequence also carries the row‑36 watch result.
 
 ---
 

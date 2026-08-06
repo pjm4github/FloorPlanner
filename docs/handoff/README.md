@@ -1,0 +1,65 @@
+# The handoff mailbox — protocol
+
+**Two agents work on this repository: one writes code, one rules on it. This
+directory is where they hand things to each other.** The rule that makes it
+worth having is short:
+
+> **Chat is not the record. A report is complete when it is on disk; a ruling is
+> authoritative only from its file.**
+
+That is not a new rule. It is the Working agreement's *"a checkpoint is not
+complete until its handoff spec is committed"*, given a place to live.
+
+---
+
+## The protocol
+
+1. **Code writes `NNNN-report.md` and commits it.** A read-back, a census, a
+   measurement, a question — anything that needs an answer before work can
+   continue. Reporting it in a terminal is not reporting it.
+2. **The reviewer writes `NNNN-ruling.md` and commits it.** Decisions, with
+   their reasons. A ruling that exists only in a conversation cannot be quoted
+   later, cannot be found by the next session, and cannot be disagreed with on
+   the record.
+3. **The numbering is sequential and shared.** A report and its ruling take the
+   same number. Next free number = highest here plus one, archive included.
+4. **A closed pair moves to [`archive/`](archive/) when its task ticks.** The
+   mailbox shows what is live; the archive keeps what was decided.
+
+## How the rest of the record refers to a pair
+
+**A progress entry CITES its handoff — one line, `handoff: 0042` — and does not
+restate it.** Ruled 2026-08-06, and the reasoning is worth keeping: the progress
+log is *curated* (what happened, why, what proved it) and a handoff file is *raw*
+(the exchange itself). Different genres, different readers. Collapsing them would
+make the log inherit the exchange's verbosity, and the log is already 4,351
+lines. Same relationship the log already has with `docs/evidence/`: cite the
+artifact, do not inline it.
+
+## What belongs here, and what does not
+
+| | |
+|---|---|
+| **here** | read-backs, pre-work censuses, rulings, findings that need a decision, disagreements and how they resolved |
+| **`../progress/`** | what was done, in the order it was done, with its gate |
+| **`../defects/`** | a fault, gap, limit or task that outlives the exchange |
+| **`../evidence/`** | the measurement itself, and the probe that produced it |
+
+A report that turns out to describe a defect gets a record in `../defects/`; the
+report is not the register, and the register is not a conversation.
+
+## Two conventions that keep the pair readable
+
+**Quote the ruling, do not summarise it.** A ruling file carries the reviewer's
+words. A summary of a decision is a second version of it, and this project has
+measured what second versions do.
+
+**A report states what it measured and what it could not.** The instrument's
+boundary belongs in the report, because the ruling depends on it — several
+rulings in `0001` turned on exactly that.
+
+---
+
+| pair | subject |
+|---|---|
+| [`0001-report.md`](0001-report.md) · [`0001-ruling.md`](0001-ruling.md) | The docs refactor: read-back, eleven findings, and the rulings that settled them |

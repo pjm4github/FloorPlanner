@@ -171,7 +171,10 @@ def test_group_survives_roundtrip(win, make_room, first_furnishing):
 # aliases the live properties dict, so group+move can't corrupt it and undo
 # compares equal. This is a durable invariant (the plan must revert) and must
 # not regress. P4.5's other half -- the group itself surviving save/load/redo --
-# is still held by test 3 (test_group_survives_roundtrip), which stays xfail.
+# is held by test 3 (test_group_survives_roundtrip), which FLIPPED xfail -> pass
+# at P4.5 and closed defect 3 with it. The sentence here used to end "which stays
+# xfail", contradicting test 3's own header two definitions above; corrected
+# 2026-08-06 when the docs refactor read the file to find D3's receipt.
 # --------------------------------------------------------------------------
 def test_group_move_undo_restores(win, make_room, first_furnishing):
     # P2.3 moved the yardstick from serialize() to snapshot(). serialize() is

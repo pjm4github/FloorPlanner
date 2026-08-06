@@ -1,0 +1,3909 @@
+{
+  "schema": 1,
+  "rev": "ea958b7325d9f672b4d9f9ee02a71c16fced5a2d",
+  "id_source": "docs/CODE_REVIEW_v2.md (register table)",
+  "known_ids": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "12a",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "37",
+    "38",
+    "39",
+    "40",
+    "41",
+    "42",
+    "43",
+    "44",
+    "45",
+    "46",
+    "47",
+    "48",
+    "49"
+  ],
+  "files_scanned": 143,
+  "files_with_refs": 53,
+  "total": 413,
+  "by_kind": {
+    "artifact": 22,
+    "defect": 307,
+    "mdlink": 3,
+    "row": 81
+  },
+  "by_file": {
+    ".github/workflows/ci.yml": 5,
+    "CLAUDE.md": 1,
+    "README.md": 1,
+    "docs/CANVAS_ITEM_REFACTOR_PLAN.md": 1,
+    "docs/CODE_REVIEW_v2.md": 36,
+    "docs/SANITY_CHECK.md": 6,
+    "docs/SESSION_SNAPSHOT.md": 12,
+    "docs/V5_MIGRATION_PLAN.md": 198,
+    "docs/evidence/defect23-fragment.json": 3,
+    "docs/evidence/defect23_fragment_probe.py": 4,
+    "docs/evidence/defect28-ownership.json": 1,
+    "docs/gallery/README.md": 1,
+    "floorplanner/design/bridge.py": 7,
+    "floorplanner/design/template.py": 1,
+    "floorplanner/design/topology.py": 7,
+    "floorplanner/design/validate.py": 1,
+    "floorplanner/design/verify.py": 1,
+    "floorplanner/dialogs.py": 1,
+    "floorplanner/imageio.py": 1,
+    "floorplanner/items.py": 8,
+    "floorplanner/levels.py": 1,
+    "floorplanner/macro.py": 1,
+    "floorplanner/mainwindow.py": 18,
+    "floorplanner/planio.py": 6,
+    "floorplanner/rooms.py": 4,
+    "floorplanner/vertex.py": 1,
+    "floorplanner/view.py": 4,
+    "floorplanner/viewer/VIEWER_NOTES.md": 1,
+    "floorplanner/walls.py": 14,
+    "tests/conftest.py": 3,
+    "tests/test_characterization.py": 2,
+    "tests/test_coalesce.py": 1,
+    "tests/test_design_bridge.py": 3,
+    "tests/test_extract_join.py": 2,
+    "tests/test_floors.py": 2,
+    "tests/test_groups.py": 7,
+    "tests/test_io.py": 1,
+    "tests/test_load_path.py": 2,
+    "tests/test_openings.py": 1,
+    "tests/test_rooms.py": 9,
+    "tests/test_scaling.py": 1,
+    "tests/test_selection.py": 2,
+    "tests/test_self_intersection.py": 4,
+    "tests/test_shuffle.py": 2,
+    "tests/test_topology.py": 2,
+    "tests/test_topology_ops.py": 3,
+    "tests/test_undo.py": 3,
+    "tests/test_verify_design.py": 1,
+    "tests/test_wall_move.py": 9,
+    "tests/test_walls.py": 2,
+    "tools/gate.py": 2,
+    "tools/qt_excepthook.py": 1,
+    "tools/read_minidump.py": 2
+  },
+  "tokens": {
+    "artifact:23": 18,
+    "artifact:28": 4,
+    "defect:10": 5,
+    "defect:11": 10,
+    "defect:11a": 1,
+    "defect:12": 5,
+    "defect:12a": 7,
+    "defect:13": 16,
+    "defect:14": 4,
+    "defect:15": 1,
+    "defect:16": 5,
+    "defect:17": 20,
+    "defect:18": 9,
+    "defect:19": 11,
+    "defect:2": 3,
+    "defect:20": 1,
+    "defect:21": 6,
+    "defect:22": 17,
+    "defect:23": 17,
+    "defect:24": 8,
+    "defect:25": 18,
+    "defect:26": 23,
+    "defect:27": 10,
+    "defect:28": 20,
+    "defect:29": 6,
+    "defect:3": 14,
+    "defect:30": 17,
+    "defect:32": 2,
+    "defect:34": 11,
+    "defect:35": 5,
+    "defect:4": 3,
+    "defect:5": 2,
+    "defect:6": 8,
+    "defect:7": 3,
+    "defect:8": 9,
+    "defect:9": 10,
+    "mdlink:../macro_language.md": 1,
+    "mdlink:V5_MIGRATION_PLAN.md": 1,
+    "mdlink:docs/macro_language.md": 1,
+    "row:11": 3,
+    "row:13": 4,
+    "row:3": 1,
+    "row:30": 1,
+    "row:34": 1,
+    "row:35": 2,
+    "row:36": 14,
+    "row:37": 10,
+    "row:38": 2,
+    "row:41": 15,
+    "row:42": 3,
+    "row:44": 8,
+    "row:45": 2,
+    "row:47": 12,
+    "row:48": 1,
+    "row:49": 2
+  },
+  "unresolved": [],
+  "via_parent": [
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 76,
+      "kind": "defect",
+      "target": "11a",
+      "resolves": true,
+      "via": "parent",
+      "context": "| 11 | **Four competing z-order systems, two of which run on every wall click.** Re-censused at P4.5 (2026‑08‑05): **20 `setZValue` sites**, not 14 — (i) `geome"
+    }
+  ],
+  "refs": [
+    {
+      "file": ".github/workflows/ci.yml",
+      "line": 87,
+      "kind": "defect",
+      "target": "27",
+      "resolves": true,
+      "via": "direct",
+      "context": "# DEFECT 27, FIRST HALF (P3.8). Until now CI ran only the CHEAP TWELVE"
+    },
+    {
+      "file": ".github/workflows/ci.yml",
+      "line": 93,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "# ABORT the process (defect 26), so this job would have been red-by-design."
+    },
+    {
+      "file": ".github/workflows/ci.yml",
+      "line": 94,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "# Defect 26's boundary guard is what made it possible; defect 28's fixes are"
+    },
+    {
+      "file": ".github/workflows/ci.yml",
+      "line": 94,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "# Defect 26's boundary guard is what made it possible; defect 28's fixes are"
+    },
+    {
+      "file": ".github/workflows/ci.yml",
+      "line": 104,
+      "kind": "defect",
+      "target": "27",
+      "resolves": true,
+      "via": "direct",
+      "context": "# The WINDOWS half of defect 27 stays open as its own task: the app's"
+    },
+    {
+      "file": "CLAUDE.md",
+      "line": 12,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "- **Shared-wall model:** a `WallItem` carries a list `rooms` (the rooms it borders); on a boundary between two rooms there is **one** shared wall, not a duplica"
+    },
+    {
+      "file": "README.md",
+      "line": 241,
+      "kind": "mdlink",
+      "target": "docs/macro_language.md",
+      "resolves": true,
+      "via": "direct",
+      "context": "[`docs/macro_language.md`](docs/macro_language.md)."
+    },
+    {
+      "file": "docs/CANVAS_ITEM_REFACTOR_PLAN.md",
+      "line": 3,
+      "kind": "mdlink",
+      "target": "V5_MIGRATION_PLAN.md",
+      "resolves": true,
+      "via": "direct",
+      "context": "> **Superseded by [`V5_MIGRATION_PLAN.md`](V5_MIGRATION_PLAN.md).** Kept for the group/drag trace and the recovered `test_zz*` forensics it records, which are n"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 68,
+      "kind": "defect",
+      "target": "4",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 3 | Groups not serialized; grouping isn't undoable; undo dissolves groups | `mainwindow.py:1042‑1083` | **P4.5** — *partly closed early: defect 4's fix made g"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 76,
+      "kind": "defect",
+      "target": "11a",
+      "resolves": true,
+      "via": "parent",
+      "context": "| 11 | **Four competing z-order systems, two of which run on every wall click.** Re-censused at P4.5 (2026‑08‑05): **20 `setZValue` sites**, not 14 — (i) `geome"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 76,
+      "kind": "row",
+      "target": "47",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 11 | **Four competing z-order systems, two of which run on every wall click.** Re-censused at P4.5 (2026‑08‑05): **20 `setZValue` sites**, not 14 — (i) `geome"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 78,
+      "kind": "defect",
+      "target": "12",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 12a | ~~**`WallItem._attached` is one of defect 12's unfiltered paths, and P3.3 raises its stakes.**~~ **FIXED at P3.3.** A cross-floor coincident end wrongly"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 84,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 23 | **A group move strands the region of a room it does not fully own.** A rubber band selects only items FULLY inside it, so a wall poking out is left behin"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 85,
+      "kind": "defect",
+      "target": "29",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 28 | **Stale `MainWindow`s verify their own dead scenes during later tests, reporting I11s that belong to whoever left them.** REWRITTEN 2026-07-29: the origi"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 85,
+      "kind": "artifact",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 28 | **Stale `MainWindow`s verify their own dead scenes during later tests, reporting I11s that belong to whoever left them.** REWRITTEN 2026-07-29: the origi"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 85,
+      "kind": "artifact",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 28 | **Stale `MainWindow`s verify their own dead scenes during later tests, reporting I11s that belong to whoever left them.** REWRITTEN 2026-07-29: the origi"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 86,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 30 | **A wall drag strands every room that holds the moved corner but owns no wall in the dragged run — its walls partly follow and its region does not.** Fou"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 87,
+      "kind": "defect",
+      "target": "14",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 31 | **The group selection box stretched as the group was dragged — leading edge at ~2× the mouse, trailing edge static.** Found at **Gate 3** (every file, cl"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 88,
+      "kind": "defect",
+      "target": "34",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 32 | **The unwelded-ends warning gave advice that cannot work, and blamed the wrong cause.** Found at **Gate 3**. The opened-with message said the scene *\"dis"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 89,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 33 | **Stranding on dirty-baseline files — the stated mechanism is REFUTED, and the finding needs the reporter's list to proceed.** Hypothesis: rooms whose ou"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 89,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 33 | **Stranding on dirty-baseline files — the stated mechanism is REFUTED, and the finding needs the reporter's list to proceed.** Hypothesis: rooms whose ou"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 89,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 33 | **Stranding on dirty-baseline files — the stated mechanism is REFUTED, and the finding needs the reporter's list to proceed.** Hypothesis: rooms whose ou"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 90,
+      "kind": "defect",
+      "target": "32",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 34 | **A document gap in the (0.6″, 9.0″) band is reported by nothing and closed by nothing — and the one command that looks like it repairs them only silence"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 92,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 29 | **`MainWindow.close()` leaves the 180 ms dirty timer running**, so a closed window goes on walking the whole document — snapshotting, verifying, and (bef"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 92,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 29 | **`MainWindow.close()` leaves the 180 ms dirty timer running**, so a closed window goes on walking the whole document — snapshotting, verifying, and (bef"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 93,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 27 | **CI never runs the DEEP gate, and runs on Linux only — so the whole `deep` invariant set is unguarded by automation.** From `.github/workflows/ci.yml`, "
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 93,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 27 | **CI never runs the DEEP gate, and runs on Linux only — so the whole `deep` invariant set is unguarded by automation.** From `.github/workflows/ci.yml`, "
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 93,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 27 | **CI never runs the DEEP gate, and runs on Linux only — so the whole `deep` invariant set is unguarded by automation.** From `.github/workflows/ci.yml`, "
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 93,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 27 | **CI never runs the DEEP gate, and runs on Linux only — so the whole `deep` invariant set is unguarded by automation.** From `.github/workflows/ci.yml`, "
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 94,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 26 | **Shadow mode kills the process instead of reporting: a `DesignVerificationError` raised inside a Qt callback becomes `abort()`.** ROOT CAUSE, with a tra"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 95,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 25 | ~~**A gesture can create a door-straddles-junction scene state that the document can only represent as a reported fault; the creating edit should report "
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 95,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 25 | ~~**A gesture can create a door-straddles-junction scene state that the document can only represent as a reported fault; the creating edit should report "
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 105,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 39 | **`viewer/` is a TOP-LEVEL package and should live at `floorplanner/viewer/`.** Filed with the packaging commit (2026‑08‑03), deliberately not built ther"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 105,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 39 | **`viewer/` is a TOP-LEVEL package and should live at `floorplanner/viewer/`.** Filed with the packaging commit (2026‑08‑03), deliberately not built ther"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 106,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 40 | **A missing optional dependency must degrade, not crash — the 3D popup is not built yet, and this row is what keeps it honest when it is.** Filed with th"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 108,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 42 | **The party-wall drag has the same self-intersection exposure as the group bake, and it is unaddressed.** Recorded at P4.5 §2a on Patrick's explicit cond"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 109,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 44 | **The invariants check CONSISTENCY, not HISTORY — a resurrected wall passes all fifteen, and no reachable widening would catch it.** Asked at P4.5 (2026‑"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 109,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 44 | **The invariants check CONSISTENCY, not HISTORY — a resurrected wall passes all fifteen, and no reachable widening would catch it.** Asked at P4.5 (2026‑"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 110,
+      "kind": "row",
+      "target": "44",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 45 | **`_edge_wall` answers \"which wall covers this edge?\" BY GEOMETRY — the last survivor of the detection-from-geometry family this migration exists to cure"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 112,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 47 | **`room_boolean(\"fragment\")` builds duplicate wall loops instead of extracting, so a fragment is not a movable unit — and `duplicate_wall`'s death did no"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 112,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 47 | **`room_boolean(\"fragment\")` builds duplicate wall loops instead of extracting, so a fragment is not a movable unit — and `duplicate_wall`'s death did no"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 113,
+      "kind": "row",
+      "target": "44",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 48 | **The invariants have never checked the scene the user edits — `design_from_scene` WELDS on the way out, so a scene-level identity fault emits a clean do"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 113,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 48 | **The invariants have never checked the scene the user edits — `design_from_scene` WELDS on the way out, so a scene-level identity fault emits a clean do"
+    },
+    {
+      "file": "docs/CODE_REVIEW_v2.md",
+      "line": 123,
+      "kind": "row",
+      "target": "36",
+      "resolves": true,
+      "via": "direct",
+      "context": "**RESOLVED AT P4.4, 2026‑08‑03 — the contingency fired YES and the whole family is gone.** Patrick ruled duplicate onto the extract machinery, so `_copy_spec` ("
+    },
+    {
+      "file": "docs/SANITY_CHECK.md",
+      "line": 11,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "**Gate 1 — PASSED** (2026‑07‑26). **Gate 2 — PASSED** (2026‑07‑27), with **one finding, found and fixed** before Phase 3 branched: commit `d665e06`. **Gate 3 — "
+    },
+    {
+      "file": "docs/SANITY_CHECK.md",
+      "line": 68,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "| **Deleting a wall on a room perimeter appears to do nothing** — no wall removed, no message (defect 17) | **P4.1** |"
+    },
+    {
+      "file": "docs/SANITY_CHECK.md",
+      "line": 122,
+      "kind": "defect",
+      "target": "14",
+      "resolves": true,
+      "via": "direct",
+      "context": "| **31** | The group selection box **stretched during a drag** — leading edge at ~2× the mouse, trailing edge static. Two mechanisms at defect 14's site: `_cont"
+    },
+    {
+      "file": "docs/SANITY_CHECK.md",
+      "line": 124,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "| **33** | **Rooms left behind by a group move** on a dirty-baseline file — once in many cycles. | **CLOSED as a duplicate of defect 23.** The app has no Ctrl+A"
+    },
+    {
+      "file": "docs/SANITY_CHECK.md",
+      "line": 126,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "| **25** | New sighting: drawing a wall that **ends on a doorway** leaves the end unwelded (the join correctly declines to split through the door) and the user "
+    },
+    {
+      "file": "docs/SANITY_CHECK.md",
+      "line": 156,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "| Clipped-band room stranding | **P4.5** (defect 23, semantics ruling pending) |"
+    },
+    {
+      "file": "docs/SESSION_SNAPSHOT.md",
+      "line": 19,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "**The two WIP branches are deleted, local and remote.** Their heads are recorded in the plan's Progress log because that is now the only handle: `p4.5-align-wip"
+    },
+    {
+      "file": "docs/SESSION_SNAPSHOT.md",
+      "line": 27,
+      "kind": "row",
+      "target": "47",
+      "resolves": true,
+      "via": "direct",
+      "context": "1. **Register row 47 — `fragment` must produce floating rooms via `extract`. THE FIRST TASK, ahead of grid snap.** `room_boolean` (`mainwindow.py:982‑996`) buil"
+    },
+    {
+      "file": "docs/SESSION_SNAPSHOT.md",
+      "line": 27,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "1. **Register row 47 — `fragment` must produce floating rooms via `extract`. THE FIRST TASK, ahead of grid snap.** `room_boolean` (`mainwindow.py:982‑996`) buil"
+    },
+    {
+      "file": "docs/SESSION_SNAPSHOT.md",
+      "line": 28,
+      "kind": "defect",
+      "target": "11",
+      "resolves": true,
+      "via": "direct",
+      "context": "2. **Defect 11's RUNTIME z-order collapse — in P4.5's charter and it did NOT land.** Only 11a did. It hangs `test_drag_split_macro_keeps_every_room_rectilinear`"
+    },
+    {
+      "file": "docs/SESSION_SNAPSHOT.md",
+      "line": 29,
+      "kind": "row",
+      "target": "48",
+      "resolves": true,
+      "via": "direct",
+      "context": "3. **Register row 48 — the invariants have never checked the scene the user edits.** `design_from_scene` **welds on the way out**, so a scene whose corners are "
+    },
+    {
+      "file": "docs/SESSION_SNAPSHOT.md",
+      "line": 29,
+      "kind": "row",
+      "target": "44",
+      "resolves": true,
+      "via": "direct",
+      "context": "3. **Register row 48 — the invariants have never checked the scene the user edits.** `design_from_scene` **welds on the way out**, so a scene whose corners are "
+    },
+    {
+      "file": "docs/SESSION_SNAPSHOT.md",
+      "line": 30,
+      "kind": "row",
+      "target": "49",
+      "resolves": true,
+      "via": "direct",
+      "context": "4. **Register row 49 — I11 speaks nowhere in the shipped app.** Deep-only *plus* shadow mode off by default compose into a hole neither has alone, and I11 is th"
+    },
+    {
+      "file": "docs/SESSION_SNAPSHOT.md",
+      "line": 42,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "- **Deform-to-follow** (defect 23, ruled §2a): a room the band only partly took follows the corners that moved — *because the corner moved*, not because anythin"
+    },
+    {
+      "file": "docs/SESSION_SNAPSHOT.md",
+      "line": 52,
+      "kind": "row",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "3. **`docs/CODE_REVIEW_v2.md`** — the register. Rows 3, 11a, 23 and 36 closed at P4.5; **rows 47, 48, 49 are the open queue** and row 11 carries the z rule for "
+    },
+    {
+      "file": "docs/SESSION_SNAPSHOT.md",
+      "line": 52,
+      "kind": "row",
+      "target": "47",
+      "resolves": true,
+      "via": "direct",
+      "context": "3. **`docs/CODE_REVIEW_v2.md`** — the register. Rows 3, 11a, 23 and 36 closed at P4.5; **rows 47, 48, 49 are the open queue** and row 11 carries the z rule for "
+    },
+    {
+      "file": "docs/SESSION_SNAPSHOT.md",
+      "line": 52,
+      "kind": "row",
+      "target": "11",
+      "resolves": true,
+      "via": "direct",
+      "context": "3. **`docs/CODE_REVIEW_v2.md`** — the register. Rows 3, 11a, 23 and 36 closed at P4.5; **rows 47, 48, 49 are the open queue** and row 11 carries the z rule for "
+    },
+    {
+      "file": "docs/SESSION_SNAPSHOT.md",
+      "line": 62,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "Row 41's reproduction stated `python -m floorplanner.viewer.fp3d …`, the form"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 27,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "**A green `check()` is not an acceptance criterion on its own — a task that changes what an operation DOES owes a DIFFERENTIAL RECEIPT — added 2026‑08‑04.** `ch"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 27,
+      "kind": "defect",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "**A green `check()` is not an acceptance criterion on its own — a task that changes what an operation DOES owes a DIFFERENTIAL RECEIPT — added 2026‑08‑04.** `ch"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 27,
+      "kind": "row",
+      "target": "44",
+      "resolves": true,
+      "via": "direct",
+      "context": "**A green `check()` is not an acceptance criterion on its own — a task that changes what an operation DOES owes a DIFFERENTIAL RECEIPT — added 2026‑08‑04.** `ch"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 29,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "**When a defect is found by anything OTHER than the invariants, ask whether the invariants could have caught it — and record the answer either way — added 2026‑"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 29,
+      "kind": "row",
+      "target": "44",
+      "resolves": true,
+      "via": "direct",
+      "context": "**When a defect is found by anything OTHER than the invariants, ask whether the invariants could have caught it — and record the answer either way — added 2026‑"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 37,
+      "kind": "defect",
+      "target": "21",
+      "resolves": true,
+      "via": "direct",
+      "context": "- **Vacuous by PRECONDITION** — the test never reaches the state it means to judge, so the verdict is about nothing. Defect 21's guard *established the very con"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 37,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "- **Vacuous by PRECONDITION** — the test never reaches the state it means to judge, so the verdict is about nothing. Defect 21's guard *established the very con"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 65,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "* **`fragment`** (`p4.5-defect23-wip`, ruled 2026‑08‑05). `_corner_records` split every corner an outsider held, which detached the group's walls from every out"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 65,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "* **`fragment`** (`p4.5-defect23-wip`, ruled 2026‑08‑05). `_corner_records` split every corner an outsider held, which detached the group's walls from every out"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 140,
+      "kind": "defect",
+      "target": "7",
+      "resolves": true,
+      "via": "direct",
+      "context": "correction defect 7 took when it closed by the CONDITION rather than by its four"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 185,
+      "kind": "defect",
+      "target": "12a",
+      "resolves": true,
+      "via": "direct",
+      "context": "(`3d6d32e`) changed exactly two lines — the defect 12a row and the P2.3 regression"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 218,
+      "kind": "row",
+      "target": "45",
+      "resolves": true,
+      "via": "direct",
+      "context": "clothes. Measure the justification before filing the row.** Row 45 justified"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 248,
+      "kind": "row",
+      "target": "44",
+      "resolves": true,
+      "via": "direct",
+      "context": "| what an operation DOES | a **differential receipt** — measured before and after (row 44) |"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 262,
+      "kind": "row",
+      "target": "44",
+      "resolves": true,
+      "via": "direct",
+      "context": "| `check(doc, deep=True)` | is this document CONSISTENT? | its HISTORY — a resurrected wall passes all fifteen (row 44) |"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 267,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "| `validate._seg_cross` | do two edges PROPERLY cross? | a loop that is non-simple by *touching* — deliberate, so it cannot fire on the collinear edges two room"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 269,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "Three of the five are recorded where the defect lives (rows 41 and 44) or at"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 311,
+      "kind": "defect",
+      "target": "18",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P1.3b** Fix defect 18 (`_inner_faces` winding) + corpus diff | ruff + pytest |"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 325,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P3.6** Opening anchors — *ticked 2026-07-30 on the re-certification: **10/10 GREEN** under full-mode `tools/gate.py` trailers (ruff + OFF + ON + DEEP, e"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 327,
+      "kind": "defect",
+      "target": "27",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P3.8** Perf verification vs P0.3 · **+ split-on-write exit survey** — *ticked 2026-07-30; **Phase 3 merged to `main` at `03f3868` on 2026‑07‑31**, all e"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 328,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P4.1** Delete-wall keeps the room — *ticked 2026‑07‑31, accepted at **PR #2** (merge commit; sub-commits `0df3aa5` census + rulings, `a0e1b95` delete_wa"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 329,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P4.1b** Defect 25's gesture-time message — *ticked 2026‑08‑01, accepted at **PR #3** (merge commit `ec5f207`; sub-commits `1d3eaa6` mechanism + tests, `"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 329,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P4.1b** Defect 25's gesture-time message — *ticked 2026‑08‑01, accepted at **PR #3** (merge commit `ec5f207`; sub-commits `1d3eaa6` mechanism + tests, `"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 330,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P4.2** Extract / join — *ticked 2026‑08‑02, accepted at **PR #4** (merge commit; 26 sub-commits, `dfd30af` … `ed9286c` + the record commit: core 1–7, mi"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 330,
+      "kind": "defect",
+      "target": "35",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P4.2** Extract / join — *ticked 2026‑08‑02, accepted at **PR #4** (merge commit; 26 sub-commits, `dfd30af` … `ed9286c` + the record commit: core 1–7, mi"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 331,
+      "kind": "row",
+      "target": "36",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P4.3** Shuffle mode — *ticked 2026‑08‑03 on Patrick's acceptance, merged at **PR #5** (merge commit `4050e44`; 6 sub-commits `a6ded30` … `545b79a`: cens"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 332,
+      "kind": "row",
+      "target": "37",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P4.4** Concept rooms, `nominal_size`, duplicate-as-template — *ticked 2026‑08‑04 on Patrick's acceptance (\"it works perfectly\"), merged at **PR #6** (me"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 333,
+      "kind": "defect",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P4.5** Group semantics + z-order — *ticked 2026‑08‑06 on Patrick's mini-gate (**all ten items run and passed**, including item 10 — Align to grid and Di"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 333,
+      "kind": "defect",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P4.5** Group semantics + z-order — *ticked 2026‑08‑06 on Patrick's mini-gate (**all ten items run and passed**, including item 10 — Align to grid and Di"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 333,
+      "kind": "defect",
+      "target": "11",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P4.5** Group semantics + z-order — *ticked 2026‑08‑06 on Patrick's mini-gate (**all ten items run and passed**, including item 10 — Align to grid and Di"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 333,
+      "kind": "row",
+      "target": "36",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P4.5** Group semantics + z-order — *ticked 2026‑08‑06 on Patrick's mini-gate (**all ten items run and passed**, including item 10 — Align to grid and Di"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 333,
+      "kind": "row",
+      "target": "47",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P4.5** Group semantics + z-order — *ticked 2026‑08‑06 on Patrick's mini-gate (**all ten items run and passed**, including item 10 — Align to grid and Di"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 333,
+      "kind": "row",
+      "target": "47",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P4.5** Group semantics + z-order — *ticked 2026‑08‑06 on Patrick's mini-gate (**all ten items run and passed**, including item 10 — Align to grid and Di"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 333,
+      "kind": "row",
+      "target": "47",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ☑ | **P4.5** Group semantics + z-order — *ticked 2026‑08‑06 on Patrick's mini-gate (**all ten items run and passed**, including item 10 — Align to grid and Di"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 334,
+      "kind": "defect",
+      "target": "11",
+      "resolves": true,
+      "via": "direct",
+      "context": "| | **▲ PHASE 4 COMPLETE — 2026‑08‑06.** P4.1, P4.1b, P4.2, P4.3, P4.4 and P4.5 all merged and ticked (PRs #2, #3, #4, #5, #6, #10). Rooms are movable units, gr"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 334,
+      "kind": "row",
+      "target": "47",
+      "resolves": true,
+      "via": "direct",
+      "context": "| | **▲ PHASE 4 COMPLETE — 2026‑08‑06.** P4.1, P4.1b, P4.2, P4.3, P4.4 and P4.5 all merged and ticked (PRs #2, #3, #4, #5, #6, #10). Rooms are movable units, gr"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 439,
+      "kind": "defect",
+      "target": "5",
+      "resolves": true,
+      "via": "direct",
+      "context": "1. `RoomItem.itemChange` on `ItemSceneChange` unbinds its walls, mirroring `walls.py:496‑504` including the `sip.isdeleted` guard. *(defect 5)*"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 440,
+      "kind": "defect",
+      "target": "4",
+      "resolves": true,
+      "via": "direct",
+      "context": "2. `mainwindow.py:1074` → `properties=dict(it.properties)`. *(defect 4)*"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 441,
+      "kind": "defect",
+      "target": "2",
+      "resolves": true,
+      "via": "direct",
+      "context": "3. `refresh_rooms_cmd` (`mainwindow.py:589‑593`) iterates only active-floor rooms. *(defect 2)*"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 442,
+      "kind": "defect",
+      "target": "10",
+      "resolves": true,
+      "via": "direct",
+      "context": "4. `view.py:445` — `select_in_rect` must not call `synthesize_room_edge`; selection is read-only. *(defect 10)*"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 453,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "| **pre-dates the branch** (surfaced at P3.5, defect 23) | **A rubber band that clips a room's wall set strands that room.** The band takes only items fully ins"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 490,
+      "kind": "defect",
+      "target": "18",
+      "resolves": true,
+      "via": "direct",
+      "context": "**Acceptance.** `trace_faces` on `symmetricP1` recovers every stored room area (**20**, after the P1.3b `_inner_faces` fix; it was 19 while defect 18 dropped th"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 515,
+      "kind": "defect",
+      "target": "19",
+      "resolves": true,
+      "via": "direct",
+      "context": "**Also close defect 19's in-app arm here.** Weld-on-load fixes the PNG extractor's *file* route for free (write a plan, open it, it welds). It does **not** fix "
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 527,
+      "kind": "defect",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "> **Correction (2026‑07‑27): groups do NOT close here.** This task originally read \"Groups now serialize, so defect 3 partially closes here\", with an acceptance"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 571,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "2. **All four exit-survey rows are answered** — by measurement, or explicitly dispositioned to a named task. **No blank rows**, the corpse-table standard applie"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 573,
+      "kind": "defect",
+      "target": "27",
+      "resolves": true,
+      "via": "direct",
+      "context": "4. **Defect 27, first half: a DEEP CI job** (`FP_VERIFY_DESIGN=deep`, ubuntu) **is added and green before merge.** Defect 26's fix removed the crash that made t"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 573,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "4. **Defect 27, first half: a DEEP CI job** (`FP_VERIFY_DESIGN=deep`, ubuntu) **is added and green before merge.** Defect 26's fix removed the crash that made t"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 573,
+      "kind": "defect",
+      "target": "27",
+      "resolves": true,
+      "via": "direct",
+      "context": "4. **Defect 27, first half: a DEEP CI job** (`FP_VERIFY_DESIGN=deep`, ubuntu) **is added and green before merge.** Defect 26's fix removed the crash that made t"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 574,
+      "kind": "defect",
+      "target": "14",
+      "resolves": true,
+      "via": "direct",
+      "context": "5. ~~**Gate 3 passed by Patrick, findings dispositioned**~~ — **DONE, 2026‑07‑31.** Sections A and B re-run clean against the branch head. **Five findings, all "
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 574,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "5. ~~**Gate 3 passed by Patrick, findings dispositioned**~~ — **DONE, 2026‑07‑31.** Sections A and B re-run clean against the branch head. **Five findings, all "
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 595,
+      "kind": "defect",
+      "target": "9",
+      "resolves": true,
+      "via": "direct",
+      "context": "`coalesce_wall`, `coalesce_all`, `_coalesce_*_impl`, `weld_all`, `join_endpoints`, `fracture_delete_wall`, `_WallIndex`, `_WallBBoxIndex`, `_compute_wall_juncti"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 619,
+      "kind": "defect",
+      "target": "9",
+      "resolves": true,
+      "via": "direct",
+      "context": "**4. Rewritten tests get one line each: old op → new op → why the assertion moved.** For **defect 9**, the closing test is **live-editing shaped**: merge two co"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 635,
+      "kind": "defect",
+      "target": "8",
+      "resolves": true,
+      "via": "direct",
+      "context": "`_RoomGrid`, `_WallGraph`, `detect_room`, `_detect_room`, `room_signature`, `refresh_rooms` memoization, `bind_room_walls`, `_wall_along_segment`, `_perimeter_s"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 644,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "**3. Defect 13 — do not tick it on the disappearance of its measuring instrument.** The read-back established that `detach_wall_from_room` contains no detection"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 649,
+      "kind": "defect",
+      "target": "6",
+      "resolves": true,
+      "via": "direct",
+      "context": "`s` → `{from, offset_in}`. Delete the silent clamp in `WallItem.rebuild` (**`walls.py:1004`**, not `:568` — the line moved through P3.3–P3.5) — an out-of-range "
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 653,
+      "kind": "defect",
+      "target": "6",
+      "resolves": true,
+      "via": "direct",
+      "context": "- **\"13\" was never the count of opening drops.** Measured at the migration baseline `841264e`: **13 is the count of *every* `except ValueError` in `floorplanner"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 655,
+      "kind": "defect",
+      "target": "7",
+      "resolves": true,
+      "via": "direct",
+      "context": "- **Defect 7's four cited sites are stale.** The *condition* is verified intact — nothing anywhere re-bases `op.s` — and that condition, not the site list, is w"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 666,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "**R2 — Straddle: the primitive becomes TOTAL, and both pins flip.** P3.4(ii)'s decline was a placeholder pending representability, and `match=\"P3.6\"` was that t"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 672,
+      "kind": "defect",
+      "target": "6",
+      "resolves": true,
+      "via": "direct",
+      "context": "**R5 — One vocabulary, two surfaces.** All 8 sites feed the `rep[\"openings_failed\"]` structure, entries naming wall, opening type and anchor. Surfaced by contex"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 678,
+      "kind": "defect",
+      "target": "24",
+      "resolves": true,
+      "via": "direct",
+      "context": "**Also in scope, found during the read-back: defect 24.** `topology.graph_from_design` and `_reanchor` read and write `offset_in` as a **centre** distance where"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 711,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "**Also: the SPLIT-ON-WRITE EXIT SURVEY** *(added 2026‑07‑28)*. Assigning `p1`/`p2` mints a fresh vertex for that end, and three separate defects have now come f"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 713,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "**And: the OPEN DRAG QUESTIONS.** *(table added 2026‑07‑30.)* Two questions about what a mouse gesture does have now been left explicitly unanswered rather than"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 713,
+      "kind": "row",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "**And: the OPEN DRAG QUESTIONS.** *(table added 2026‑07‑30.)* Two questions about what a mouse gesture does have now been left explicitly unanswered rather than"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 717,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "| **Defect 13's drag half — does a drag's RESULT depend on view zoom?** *(**Status authoritative in register row 13; this row is the exit checkpoint.** One dire"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 717,
+      "kind": "row",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "| **Defect 13's drag half — does a drag's RESULT depend on view zoom?** *(**Status authoritative in register row 13; this row is the exit checkpoint.** One dire"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 718,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "| ~~**Does a real endpoint drag re-point every outline holder, or strand a third room?**~~ **ANSWERED at P3.8 (3): IT STRANDS — registered as defect 30.** A rea"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 729,
+      "kind": "defect",
+      "target": "27",
+      "resolves": true,
+      "via": "direct",
+      "context": "invariant job in CI itself (defect 27's closure), and Phase 4's tasks are"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 744,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "**Defect 17 closes here**, with a coda measured at the read-back: post-P3.7 the"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 749,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "edge, against P0.4-era 4 + 0). Defect 17's silence aged into misinformation —"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 772,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "### P4.1b — Defect 25's gesture-time message"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 803,
+      "kind": "defect",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "Groups move the real items — no `duplicate_wall`, no `coalesce_all` on ungroup. Groups serialize (`Design.groups`). Collapse the four z schemes into one that is"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 808,
+      "kind": "defect",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "1. `test_characterization.py::test_group_survives_roundtrip` flips xfail → pass (defect 3)."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 933,
+      "kind": "defect",
+      "target": "16",
+      "resolves": true,
+      "via": "direct",
+      "context": "went undetected until the canvas was enlarged. Logged as defect 16."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 979,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "xfail->P4.1). Refused deletion with no message = defect 17."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 1211,
+      "kind": "defect",
+      "target": "18",
+      "resolves": true,
+      "via": "direct",
+      "context": "tests/test_topology.py (raises test), docs/CODE_REVIEW_v2.md (defect 18),"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 1231,
+      "kind": "defect",
+      "target": "18",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEFECT 18 -> P3.5 (identify the boundary by winding, not area)."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 1239,
+      "kind": "defect",
+      "target": "18",
+      "resolves": true,
+      "via": "direct",
+      "context": "P1.3b  done   (defect 18 fix + corpus diff, before P1.4)"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 1244,
+      "kind": "defect",
+      "target": "18",
+      "resolves": true,
+      "via": "direct",
+      "context": "behaviour), docs/CODE_REVIEW_v2.md (defect 18 -> fixed), this plan"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 1249,
+      "kind": "defect",
+      "target": "18",
+      "resolves": true,
+      "via": "direct",
+      "context": "by size. Retargeted defect 18 P3.5 -> P1.3b and fixed NOW: P2.1's"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 1304,
+      "kind": "defect",
+      "target": "12",
+      "resolves": true,
+      "via": "direct",
+      "context": "query left to forget to filter -- defect 12 closes structurally."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 1352,
+      "kind": "defect",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "without the Qt scene layer; groups emit [] (defect 3 -- a grouped wall"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 1457,
+      "kind": "defect",
+      "target": "19",
+      "resolves": true,
+      "via": "direct",
+      "context": "(second suite run with the flag on), docs/CODE_REVIEW_v2.md (defect 19)"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 1493,
+      "kind": "defect",
+      "target": "19",
+      "resolves": true,
+      "via": "direct",
+      "context": "FINDING 3 -- defect 19, a real one. extract_from_reference writes"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 1534,
+      "kind": "defect",
+      "target": "19",
+      "resolves": true,
+      "via": "direct",
+      "context": "load_data split, _finish_open, defect 19), tools/migrate_to_design_v5.py"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 1583,
+      "kind": "defect",
+      "target": "19",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEFECT 19 in-app arm closed: extract_from_reference now welds the walls"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 1613,
+      "kind": "defect",
+      "target": "19",
+      "resolves": true,
+      "via": "direct",
+      "context": "floor this small. The extract fixture stays at 0 (defect 19's weld at"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 1617,
+      "kind": "defect",
+      "target": "19",
+      "resolves": true,
+      "via": "direct",
+      "context": "ALSO CONFIRMED, in answer to the P2.1 report's omission: defect 19's"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 1684,
+      "kind": "defect",
+      "target": "19",
+      "resolves": true,
+      "via": "direct",
+      "context": "welds it, which is defect 19's file arm."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2071,
+      "kind": "defect",
+      "target": "12a",
+      "resolves": true,
+      "via": "direct",
+      "context": "only two lines (defect 12a, and the P2.3 regression row). Reported"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2073,
+      "kind": "defect",
+      "target": "12a",
+      "resolves": true,
+      "via": "direct",
+      "context": "disk and are quoted here: the same-level constraint (defect 12a,"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2099,
+      "kind": "defect",
+      "target": "12a",
+      "resolves": true,
+      "via": "direct",
+      "context": "SAME LEVEL ONLY (defect 12a, now closed). Filtered at the LOOP HEAD, so"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2102,
+      "kind": "defect",
+      "target": "12a",
+      "resolves": true,
+      "via": "direct",
+      "context": "unfiltered would have left half of defect 12a alive for no benefit, and"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2298,
+      "kind": "defect",
+      "target": "21",
+      "resolves": true,
+      "via": "direct",
+      "context": "(_CornerIndex.vertex_at), vertex.py (defect 21),"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2307,
+      "kind": "defect",
+      "target": "21",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEFECT 21 -- FOUND BY RIDER 1's OWN TEST, and it is the best kind of find."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2371,
+      "kind": "defect",
+      "target": "16",
+      "resolves": true,
+      "via": "direct",
+      "context": "* DEFECT 16 closes STRUCTURALLY. The grid was sized by `canvas_rect()`"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2383,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEFECT 13 -- REPRODUCED BEFORE THE SUBSTRATE WENT, which rider 3 asked for and"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2424,
+      "kind": "defect",
+      "target": "8",
+      "resolves": true,
+      "via": "direct",
+      "context": "(4) done   commit f07dbdb -- defect 8, the predicates, the privatize ruling."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2427,
+      "kind": "defect",
+      "target": "8",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEFECT 8, and it was TWO faults with ONE cause -- `room_boolean` worked from a"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2521,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "measured. +4: defect 13 (view-independence), defect 16 (no canvas"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2521,
+      "kind": "defect",
+      "target": "16",
+      "resolves": true,
+      "via": "direct",
+      "context": "measured. +4: defect 13 (view-independence), defect 16 (no canvas"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2559,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEFECT 28 -- RULINGS AT THE SESSION BOUNDARY (2026-07-29). Committed here"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2567,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "its 180 ms dirty timer. Registered under DEFECT 28."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2568,
+      "kind": "defect",
+      "target": "29",
+      "resolves": true,
+      "via": "direct",
+      "context": "* DEFECT 29 -- the APP half: `MainWindow.close()` leaves a timer running"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2583,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "been shown to leave that overlap, and until one is, defect 28 is NOT"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2598,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "6. DEFECT 26's `E` SIGHTINGS, one line: they are the same mechanism -- a"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2611,
+      "kind": "defect",
+      "target": "27",
+      "resolves": true,
+      "via": "direct",
+      "context": "90bad2d (defect 27's DEEP half) . 28e6a59 (3 the stranding row) ."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2645,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "* STRANDING: ANSWERED BY A REAL DRAG -- it strands. Defect 30, filed not"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2649,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "* DEFECT 13's DRAG HALF: dispositioned, not re-measured; it needs a ruling,"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2650,
+      "kind": "row",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "not another number. Register row 13 stays authoritative."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2654,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "know about CORNERS.** Defect 30's gather, the four coordinate-assignment"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2686,
+      "kind": "defect",
+      "target": "27",
+      "resolves": true,
+      "via": "direct",
+      "context": "| 4 | defect 27 DEEP CI job added and green | DONE `65c4c02`, `90bad2d` |"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2706,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "NOTE THE COMPANY IT KEEPS: this is the same family as defect 30 and"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2711,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEFECT 13's DRAG HALF: DISPOSITIONED, NOT RE-MEASURED, and that is deliberate."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2720,
+      "kind": "row",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "authoritative in register row 13, per the pointer filed at P3.7."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2740,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "defect 30 names: move CORNERS, not coordinates. UNASSIGNED, argue P4.2."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2759,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "re-shares afterwards); RECORDED, argue P4.2 with defect 30, since it is"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2984,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEFECT 28 -- THE CORPSE TABLE, AND IT IS COMPLETE (2026-07-29). Ruling 3's"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2987,
+      "kind": "artifact",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "`docs/evidence/defect28-ownership.json`; the register row carries the"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 2992,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "leaves_the_outlines_still_holding_their_corners` -- defect 22's own receipt."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3043,
+      "kind": "defect",
+      "target": "21",
+      "resolves": true,
+      "via": "direct",
+      "context": "dirty is exactly defect 21's near-miss. The app is neither cleared nor accused"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3047,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "P3.6-followup  done -- DEFECTS 28 AND 29, AND P3.6 TICKS (branch v5-topology)"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3110,
+      "kind": "defect",
+      "target": "29",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEFECT 29, SEPARATELY per ruling 1: `closeEvent` stops the timer, and only once"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3135,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "P3.6  CODE COMPLETE, NOT TICKED -- blocked by defect 28 (branch v5-topology)"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3137,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEFECT 26 IS FIXED and the diagnosis is worth carrying forward as the"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3145,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "WHAT REMAINS IS DEFECT 28, which the crash was hiding: a group rotation"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3164,
+      "kind": "defect",
+      "target": "24",
+      "resolves": true,
+      "via": "direct",
+      "context": ". 80435c1 (1b R4b/R2b rulings) . 7fe1aa2 (2 defect 24) . 3cdf046 (3"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3191,
+      "kind": "defect",
+      "target": "24",
+      "resolves": true,
+      "via": "direct",
+      "context": "* DEFECT 24 -- `offset_in` read and written as a CENTRE distance in"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3197,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "* DEFECT 25 -- a gesture can create a door-straddles-junction scene"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3236,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "P3.5-followup  done   commit d0ab89d -- DEFECT 22: a group move is a vertex move."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3265,
+      "kind": "defect",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "track\": that is duplicate-on-group (defect 3, P4.5). A rubber band"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3353,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "The detached presentation predates P3.5 and is REGISTERED AS DEFECT 23"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3417,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "that phrase is withdrawn at defect 26 round 2: pytest-randomly is not"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3447,
+      "kind": "defect",
+      "target": "20",
+      "resolves": true,
+      "via": "direct",
+      "context": "· cf7f850 (defect 20) · plus the per-sub-commit doc entries below."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3480,
+      "kind": "defect",
+      "target": "9",
+      "resolves": true,
+      "via": "direct",
+      "context": "redistributed onto the merged span and deduped -- DEFECT 9, closed"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3557,
+      "kind": "defect",
+      "target": "9",
+      "resolves": true,
+      "via": "direct",
+      "context": "bake/ungroup path. That is DEFECT 9 in the wild, inside the code"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3809,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "renamed/replaced), CLAUDE.md, docs/CODE_REVIEW_v2.md (defect 17"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3810,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "closed with coda; defect 25 -> P4.1b ruled; carried census note),"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3822,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "VISIBLE-LIE CODA now in defect 17's closing entry: post-P3.7 the"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3837,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "Defect 25 deliberately NOT touched here: P4.1b branches the moment"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3848,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "test_walls.py (two gui tests), docs/CODE_REVIEW_v2.md (defect 25"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3877,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "4cf67e8 label-drag rewire, 9821571 defect 30, 5c8795e the P2.3"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3878,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "refutation, 7dbd740 defect 13, 216e755 defect 34, + this docs"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3878,
+      "kind": "defect",
+      "target": "34",
+      "resolves": true,
+      "via": "direct",
+      "context": "refutation, 7dbd740 defect 13, 216e755 defect 34, + this docs"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3907,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "clothes); (b) defect 30 fixed as a BUG (holders of the corner via"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3908,
+      "kind": "defect",
+      "target": "34",
+      "resolves": true,
+      "via": "direct",
+      "context": "vertex identity; 23-vs-30 boundary stated for P4.5); (c) defect 34"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3909,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "closed as the review op (list, never auto-close); (d) defect 13's"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3947,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "6. DEFECT 30: body-drag a party wall at a 4-way corner. Expect:"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3950,
+      "kind": "defect",
+      "target": "34",
+      "resolves": true,
+      "via": "direct",
+      "context": "7. DEFECT 34: Edit > Review wall gaps... on planc1TestV5.json."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3958,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "P4.2+ mini-gate finding: DEFECT 30's FIRST CUT CORRECTED (item 6 caught it)"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3964,
+      "kind": "row",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "(pin revised), docs/CODE_REVIEW_v2.md (row 30 corrected), this file."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 3993,
+      "kind": "row",
+      "target": "34",
+      "resolves": true,
+      "via": "direct",
+      "context": "docs/CODE_REVIEW_v2.md (row 34 corrected), this file."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4053,
+      "kind": "defect",
+      "target": "35",
+      "resolves": true,
+      "via": "direct",
+      "context": "P4.2+ mini-gate: DEFECT 35 FILED (residual drag report, shelved), and the"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4056,
+      "kind": "row",
+      "target": "35",
+      "resolves": true,
+      "via": "direct",
+      "context": "fix and shelved them; filed as register row 35 rather than lost."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4190,
+      "kind": "defect",
+      "target": "11",
+      "resolves": true,
+      "via": "direct",
+      "context": "fifth z scheme; defect 11's P4.5 collapse should absorb the"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4200,
+      "kind": "defect",
+      "target": "35",
+      "resolves": true,
+      "via": "direct",
+      "context": "a fresh launch; findings 1-6 all fixed and pinned). Defect 35"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4206,
+      "kind": "defect",
+      "target": "35",
+      "resolves": true,
+      "via": "direct",
+      "context": "P4.2  MINI-GATE PASSED 2026-08-02 -- defect 35 closed, census hygiene,"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4214,
+      "kind": "row",
+      "target": "35",
+      "resolves": true,
+      "via": "direct",
+      "context": "docs/CODE_REVIEW_v2.md (row 35 closed), this file (the tick +"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4220,
+      "kind": "defect",
+      "target": "35",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEFECT 35 CLOSED on the reporter's confirmation, per the row's"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4254,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "RULING 2 (defect 25's deferred policy, all three questions) --"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4262,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "gesture that undoes itself is defect 17's disease). It is"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4285,
+      "kind": "defect",
+      "target": "34",
+      "resolves": true,
+      "via": "direct",
+      "context": "19's import repair; close_gap is defect 34's explicit review"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4396,
+      "kind": "row",
+      "target": "36",
+      "resolves": true,
+      "via": "direct",
+      "context": "docs/CODE_REVIEW_v2.md (row 36), this file."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4400,
+      "kind": "row",
+      "target": "36",
+      "resolves": true,
+      "via": "direct",
+      "context": "links (register row 36 has the full chain): an offset join"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4430,
+      "kind": "row",
+      "target": "36",
+      "resolves": true,
+      "via": "direct",
+      "context": "docs/CODE_REVIEW_v2.md (standing disposition + row 36 carry"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4431,
+      "kind": "row",
+      "target": "37",
+      "resolves": true,
+      "via": "direct",
+      "context": "note + row 37), this file."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4438,
+      "kind": "row",
+      "target": "36",
+      "resolves": true,
+      "via": "direct",
+      "context": "(b) ROW 36's PRODUCER: carried to P4.5 CONDITIONALLY on the CI"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4446,
+      "kind": "row",
+      "target": "37",
+      "resolves": true,
+      "via": "direct",
+      "context": "register row 37 -- a user-facing mode the recorder cannot see"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4454,
+      "kind": "row",
+      "target": "38",
+      "resolves": true,
+      "via": "direct",
+      "context": "P4.3+ Patrick's field report: THE PARKED-FLOAT FURNISHING STEAL (row 38)"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4462,
+      "kind": "row",
+      "target": "38",
+      "resolves": true,
+      "via": "direct",
+      "context": "change), docs/CODE_REVIEW_v2.md (row 38), this file."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4502,
+      "kind": "row",
+      "target": "37",
+      "resolves": true,
+      "via": "direct",
+      "context": "(4) THE SHUFFLE CHORD IS ^H (register row 37's fix, this"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4542,
+      "kind": "row",
+      "target": "37",
+      "resolves": true,
+      "via": "direct",
+      "context": "guard), register (row 37 + the carried census note), this file."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4581,
+      "kind": "row",
+      "target": "37",
+      "resolves": true,
+      "via": "direct",
+      "context": "ROW 37 CLOSED with the ruled ^H chord (sub-commit 2)."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4698,
+      "kind": "row",
+      "target": "49",
+      "resolves": true,
+      "via": "direct",
+      "context": "report merely better-timed. There is no backstop. Row 49 carries"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4702,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "Evidence: docs/evidence/defect23-fragment.json, reproducible with"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4703,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "docs/evidence/defect23_fragment_probe.py."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4706,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "Option (c), a size threshold, is out for defect 13's reason: a"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4778,
+      "kind": "row",
+      "target": "36",
+      "resolves": true,
+      "via": "direct",
+      "context": "degree. And 9-11 are exactly ROW 36's producer path (the"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4806,
+      "kind": "defect",
+      "target": "11",
+      "resolves": true,
+      "via": "direct",
+      "context": "the document and defect 11 closes only its runtime half --"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4814,
+      "kind": "row",
+      "target": "36",
+      "resolves": true,
+      "via": "direct",
+      "context": "RULED (6) ROW 36's WATCH IS A LIVE TRIPWIRE FOR THIS TASK. If"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4838,
+      "kind": "row",
+      "target": "47",
+      "resolves": true,
+      "via": "direct",
+      "context": "* ROOM BOOLEAN \"FRAGMENT\" (register row 47). Fragmenting two"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4845,
+      "kind": "row",
+      "target": "11",
+      "resolves": true,
+      "via": "direct",
+      "context": "* The runtime z-order collapse (row 11's remaining half) is"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4852,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "files:   docs/CODE_REVIEW_v2.md (rows 41 + 42 amended), this file."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4853,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "notes:   ROW 41 NOW CARRIES MEASURED FIXTURES, verified here rather than"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4871,
+      "kind": "row",
+      "target": "42",
+      "resolves": true,
+      "via": "direct",
+      "context": "ROW 42 sharpened as ruled, plus the adjacent finding recorded and"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4875,
+      "kind": "row",
+      "target": "42",
+      "resolves": true,
+      "via": "direct",
+      "context": "three implementations, F2's shape, and the reason row 42 exists"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4942,
+      "kind": "defect",
+      "target": "32",
+      "resolves": true,
+      "via": "direct",
+      "context": "discipline as defect 32's withdrawal and defect 23's."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4942,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "discipline as defect 32's withdrawal and defect 23's."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4962,
+      "kind": "row",
+      "target": "36",
+      "resolves": true,
+      "via": "direct",
+      "context": "* 7b99030 \"P4.5(8) - row 36 re-argued by MEASUREMENT\" -- its third"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4976,
+      "kind": "row",
+      "target": "45",
+      "resolves": true,
+      "via": "direct",
+      "context": "(row 45's latent-divergence amendment) did land and stands."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 4991,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "* DEFECT 13's RULING WAS MEASURED, NOT ARGUED. The conversion does"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 5008,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "notes:   docs/evidence/defect23_fragment_probe.py + defect23-fragment.json."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 5008,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "notes:   docs/evidence/defect23_fragment_probe.py + defect23-fragment.json."
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 5020,
+      "kind": "row",
+      "target": "47",
+      "resolves": true,
+      "via": "direct",
+      "context": "Working-agreement entry at its second instance; rows 47 (fragment ->"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 5183,
+      "kind": "defect",
+      "target": "11",
+      "resolves": true,
+      "via": "direct",
+      "context": "defect 11's RUNTIME z-order collapse was in P4.5's charter and DID"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 5185,
+      "kind": "row",
+      "target": "11",
+      "resolves": true,
+      "via": "direct",
+      "context": "carried forward INTACT in both the status row and register row 11 --"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 5202,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "p4.5-defect23-wip  4e967c0  ABSORBED. Cherry-picked at P4.5(30)"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 5207,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "defect23-wip because a cherry-pick copies content and not the commit"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 5210,
+      "kind": "row",
+      "target": "47",
+      "resolves": true,
+      "via": "direct",
+      "context": "THE OPEN QUEUE, in order, all of it carried deliberately: row 47"
+    },
+    {
+      "file": "docs/V5_MIGRATION_PLAN.md",
+      "line": 5212,
+      "kind": "defect",
+      "target": "11",
+      "resolves": true,
+      "via": "direct",
+      "context": "first task, ahead of grid snap), defect 11's runtime collapse, rows"
+    },
+    {
+      "file": "docs/evidence/defect23-fragment.json",
+      "line": 2,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"what\": \"P4.5 defect 23 -- what room_boolean('fragment') builds, and what a group move does to it under each of the two corner semantics. Reproduce with docs/ev"
+    },
+    {
+      "file": "docs/evidence/defect23-fragment.json",
+      "line": 2,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"what\": \"P4.5 defect 23 -- what room_boolean('fragment') builds, and what a group move does to it under each of the two corner semantics. Reproduce with docs/ev"
+    },
+    {
+      "file": "docs/evidence/defect23-fragment.json",
+      "line": 6,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"red\": \"p4.5-defect23-wip @ 4e967c0 -- deform-to-follow; that split removed\""
+    },
+    {
+      "file": "docs/evidence/defect23_fragment_probe.py",
+      "line": 1,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"Defect 23 / P4.5 -- what `room_boolean(\"fragment\")` actually BUILDS, and what"
+    },
+    {
+      "file": "docs/evidence/defect23_fragment_probe.py",
+      "line": 7,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "python docs/evidence/defect23_fragment_probe.py"
+    },
+    {
+      "file": "docs/evidence/defect23_fragment_probe.py",
+      "line": 24,
+      "kind": "artifact",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "discipline as `defect28-ownership.json` beside it."
+    },
+    {
+      "file": "docs/evidence/defect23_fragment_probe.py",
+      "line": 178,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "p = os.path.join(tempfile.gettempdir(), \"defect23_fragment_probe.json\")"
+    },
+    {
+      "file": "docs/evidence/defect28-ownership.json",
+      "line": 2,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"what\": \"Defect 28 -- ownership of every harvested corpse, established by DIRECT SWEEP rather than by waiting for the race. Written 2026-07-29 at the P3.6 exit "
+    },
+    {
+      "file": "docs/gallery/README.md",
+      "line": 99,
+      "kind": "mdlink",
+      "target": "../macro_language.md",
+      "resolves": true,
+      "via": "direct",
+      "context": "[`docs/macro_language.md`](../macro_language.md)."
+    },
+    {
+      "file": "floorplanner/design/bridge.py",
+      "line": 17,
+      "kind": "defect",
+      "target": "12",
+      "resolves": true,
+      "via": "direct",
+      "context": "another level's. This is what closes defect 12 (ten query paths that ignore the"
+    },
+    {
+      "file": "floorplanner/design/bridge.py",
+      "line": 311,
+      "kind": "defect",
+      "target": "34",
+      "resolves": true,
+      "via": "direct",
+      "context": "closes -- is defect 34, and is not this function's to fix.\"\"\""
+    },
+    {
+      "file": "floorplanner/design/bridge.py",
+      "line": 668,
+      "kind": "defect",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "groups = []                            # P4.5, defect 3"
+    },
+    {
+      "file": "floorplanner/design/bridge.py",
+      "line": 690,
+      "kind": "defect",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "# P4.5 (defect 3): which live item produced which document id, so a"
+    },
+    {
+      "file": "floorplanner/design/bridge.py",
+      "line": 768,
+      "kind": "defect",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "# DEFECT 3 CLOSES AT P4.5. The old note here said a grouped wall"
+    },
+    {
+      "file": "floorplanner/design/bridge.py",
+      "line": 829,
+      "kind": "defect",
+      "target": "16",
+      "resolves": true,
+      "via": "direct",
+      "context": "* the walk is unbounded, so DEFECT 16 closes structurally -- the raster"
+    },
+    {
+      "file": "floorplanner/design/bridge.py",
+      "line": 1103,
+      "kind": "defect",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "# GROUPS (P4.5, defect 3). Rebuilt last, once every member exists, and"
+    },
+    {
+      "file": "floorplanner/design/template.py",
+      "line": 43,
+      "kind": "row",
+      "target": "36",
+      "resolves": true,
+      "via": "direct",
+      "context": "register row 36), the vertices those use, and the furnishings owned by"
+    },
+    {
+      "file": "floorplanner/design/topology.py",
+      "line": 120,
+      "kind": "defect",
+      "target": "18",
+      "resolves": true,
+      "via": "direct",
+      "context": "Do NOT drop by size: the largest interior face can be a real room (defect 18"
+    },
+    {
+      "file": "floorplanner/design/topology.py",
+      "line": 203,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "The scene op no longer declines either, for defect 17's reason: a gesture"
+    },
+    {
+      "file": "floorplanner/design/topology.py",
+      "line": 266,
+      "kind": "defect",
+      "target": "9",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEDUP_TOL = 1.0         # two same-code openings this close are ONE (defect 9)"
+    },
+    {
+      "file": "floorplanner/design/topology.py",
+      "line": 350,
+      "kind": "defect",
+      "target": "9",
+      "resolves": true,
+      "via": "direct",
+      "context": "if dup is not None:                # defect 9: no stacked doors"
+    },
+    {
+      "file": "floorplanner/design/topology.py",
+      "line": 480,
+      "kind": "defect",
+      "target": "24",
+      "resolves": true,
+      "via": "direct",
+      "context": "# DEFECT 24: `offset_in` is the distance from the named end to the"
+    },
+    {
+      "file": "floorplanner/design/topology.py",
+      "line": 537,
+      "kind": "defect",
+      "target": "24",
+      "resolves": true,
+      "via": "direct",
+      "context": "# THE THIRD SITE OF DEFECT 24, and the reason it is a defect and not a"
+    },
+    {
+      "file": "floorplanner/design/topology.py",
+      "line": 613,
+      "kind": "defect",
+      "target": "24",
+      "resolves": true,
+      "via": "direct",
+      "context": "was defect 24, and it is the same half-width `bridge._opening_s` adds back."
+    },
+    {
+      "file": "floorplanner/design/validate.py",
+      "line": 342,
+      "kind": "defect",
+      "target": "34",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"DEFECT 34's listing half (P4.2): the document's near-vertex pairs in"
+    },
+    {
+      "file": "floorplanner/design/verify.py",
+      "line": 96,
+      "kind": "defect",
+      "target": "9",
+      "resolves": true,
+      "via": "direct",
+      "context": "defect 9 exists because it went unnoticed once already.\"\"\""
+    },
+    {
+      "file": "floorplanner/dialogs.py",
+      "line": 18,
+      "kind": "defect",
+      "target": "34",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"DEFECT 34's review (P4.2): LIST the document's near-vertex gaps in the"
+    },
+    {
+      "file": "floorplanner/imageio.py",
+      "line": 174,
+      "kind": "defect",
+      "target": "19",
+      "resolves": true,
+      "via": "direct",
+      "context": "# DEFECT 19, in-app arm.  Pixel-detected ends land near each other but"
+    },
+    {
+      "file": "floorplanner/items.py",
+      "line": 462,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "self._snap_corners = []           # corners a rotation moves (defect 22)"
+    },
+    {
+      "file": "floorplanner/items.py",
+      "line": 528,
+      "kind": "defect",
+      "target": "14",
+      "resolves": true,
+      "via": "direct",
+      "context": "Cached per geometry change (defect 14): boundingRect(), _handle() and"
+    },
+    {
+      "file": "floorplanner/items.py",
+      "line": 634,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "# the corners this gesture will move, resolved ONCE (defect 22): the"
+    },
+    {
+      "file": "floorplanner/items.py",
+      "line": 654,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "# room outline edge holding them comes along (defect 22)"
+    },
+    {
+      "file": "floorplanner/items.py",
+      "line": 717,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEFECT 22, P3.5-followup, and the one mechanism both a bake and a"
+    },
+    {
+      "file": "floorplanner/items.py",
+      "line": 742,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "the group fully owns is what stranded the clipped room (defect 23): its"
+    },
+    {
+      "file": "floorplanner/items.py",
+      "line": 828,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "The move is a VERTEX move (defect 22): the members' corners relocate,"
+    },
+    {
+      "file": "floorplanner/items.py",
+      "line": 872,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "# refused to write -- learning at the wrong moment, defect 17's disease."
+    },
+    {
+      "file": "floorplanner/levels.py",
+      "line": 41,
+      "kind": "defect",
+      "target": "11",
+      "resolves": true,
+      "via": "direct",
+      "context": "# active_floor: not serialized, not undoable. (Defect 11's P4.5 z-order"
+    },
+    {
+      "file": "floorplanner/macro.py",
+      "line": 873,
+      "kind": "row",
+      "target": "37",
+      "resolves": true,
+      "via": "direct",
+      "context": "# replay is absolute however the user flipped it. Row 37's fix --"
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 23,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "from floorplanner.design.validate import check   # defect 28 evidence"
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 111,
+      "kind": "defect",
+      "target": "15",
+      "resolves": true,
+      "via": "direct",
+      "context": "# timer (set up below), not fired on every scene.changed (defect 15:"
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 191,
+      "kind": "row",
+      "target": "37",
+      "resolves": true,
+      "via": "direct",
+      "context": "self.a_shuffle.setShortcut(\"Ctrl+H\")     # row 37: the ruled chord"
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 563,
+      "kind": "defect",
+      "target": "6",
+      "resolves": true,
+      "via": "direct",
+      "context": "# exact family defect 6 spent a phase removing. Only the"
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 770,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "stranded it (defect 22's shape, arriving through a different door).\"\"\""
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 826,
+      "kind": "defect",
+      "target": "2",
+      "resolves": true,
+      "via": "direct",
+      "context": "# deleted (defect 2)."
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 854,
+      "kind": "defect",
+      "target": "8",
+      "resolves": true,
+      "via": "direct",
+      "context": "# `room_boolean` DELETES what it is handed (defect 8)."
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 916,
+      "kind": "defect",
+      "target": "8",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEFECT 8, closed at P3.5, and it was two faults in one operation:"
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 969,
+      "kind": "defect",
+      "target": "8",
+      "resolves": true,
+      "via": "direct",
+      "context": "# forced to interior (defect 8, second half)"
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 982,
+      "kind": "defect",
+      "target": "8",
+      "resolves": true,
+      "via": "direct",
+      "context": "# too; deleting it would break a bystander open (defect 8)"
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 1132,
+      "kind": "defect",
+      "target": "34",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"Edit ▸ Review wall gaps… -- defect 34's REVIEW, deliberately not a"
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 1187,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEFECT 26. `verify()` raises by design, and that is right -- a genuine"
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 1234,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "paths into three call sites (defect 26's audit). The stack says which."
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 1237,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "would be a second defect 26.\"\"\""
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 1258,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "# defect 28: is this window still the LIVE one, or a corpse of"
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 1285,
+      "kind": "defect",
+      "target": "6",
+      "resolves": true,
+      "via": "direct",
+      "context": "# `except ValueError: continue` (defect 6); they now file into one"
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 1293,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "# Defect 25's gesture arm (P4.1b): the same discipline, its own head"
+    },
+    {
+      "file": "floorplanner/mainwindow.py",
+      "line": 1466,
+      "kind": "defect",
+      "target": "29",
+      "resolves": true,
+      "via": "direct",
+      "context": "# DEFECT 29. A closed window went on walking the WHOLE document"
+    },
+    {
+      "file": "floorplanner/planio.py",
+      "line": 185,
+      "kind": "defect",
+      "target": "6",
+      "resolves": true,
+      "via": "direct",
+      "context": "# DEFECT 6's \"incl. on load\" -- this is the v4 site, and it"
+    },
+    {
+      "file": "floorplanner/planio.py",
+      "line": 278,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "# is the plan's arrival state, not a tear an edit made (defect 22)"
+    },
+    {
+      "file": "floorplanner/planio.py",
+      "line": 545,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "# raise becomes abort() (defect 26). The REFUSAL TO WRITE IS UNCHANGED"
+    },
+    {
+      "file": "floorplanner/planio.py",
+      "line": 548,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "# the user can SEE was always the intent (defect 17's lesson)."
+    },
+    {
+      "file": "floorplanner/planio.py",
+      "line": 602,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "# raise becomes abort() (defect 26). The REFUSAL TO WRITE IS UNCHANGED"
+    },
+    {
+      "file": "floorplanner/planio.py",
+      "line": 605,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "# the user can SEE was always the intent (defect 17's lesson)."
+    },
+    {
+      "file": "floorplanner/rooms.py",
+      "line": 144,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "the same disease as defects 17 and 25, learning at the wrong moment. The"
+    },
+    {
+      "file": "floorplanner/rooms.py",
+      "line": 161,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "The gap itself is register row 41, filed not fixed. Returns the rooms"
+    },
+    {
+      "file": "floorplanner/rooms.py",
+      "line": 216,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "Defect 30's lesson, stated once: ask the corner who holds it. Three"
+    },
+    {
+      "file": "floorplanner/rooms.py",
+      "line": 646,
+      "kind": "defect",
+      "target": "11",
+      "resolves": true,
+      "via": "direct",
+      "context": "# value. Re-base into this room's own band instead (defect 11)."
+    },
+    {
+      "file": "floorplanner/vertex.py",
+      "line": 111,
+      "kind": "defect",
+      "target": "21",
+      "resolves": true,
+      "via": "direct",
+      "context": "THE MINT HERE IS FORCED, and it has to be (defect 21, found by P3.5's"
+    },
+    {
+      "file": "floorplanner/view.py",
+      "line": 428,
+      "kind": "defect",
+      "target": "10",
+      "resolves": true,
+      "via": "direct",
+      "context": "SELECTION CREATES NOTHING (defect 10, P0.5). This docstring used to"
+    },
+    {
+      "file": "floorplanner/view.py",
+      "line": 441,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "away. That is defect 23, it is expected until P4.5 decides what a group"
+    },
+    {
+      "file": "floorplanner/view.py",
+      "line": 471,
+      "kind": "defect",
+      "target": "10",
+      "resolves": true,
+      "via": "direct",
+      "context": "# selection is READ-ONLY (defect 10): an edge backed only by a"
+    },
+    {
+      "file": "floorplanner/view.py",
+      "line": 526,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "# defect 25 (P4.1b): a drawn end that came to rest inside"
+    },
+    {
+      "file": "floorplanner/viewer/VIEWER_NOTES.md",
+      "line": 453,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "a `ModuleNotFoundError` into a Qt callback, which is defect 26's failure class."
+    },
+    {
+      "file": "floorplanner/walls.py",
+      "line": 353,
+      "kind": "defect",
+      "target": "9",
+      "resolves": true,
+      "via": "direct",
+      "context": "for op in surv.openings:               # deduped away (defect 9)"
+    },
+    {
+      "file": "floorplanner/walls.py",
+      "line": 359,
+      "kind": "row",
+      "target": "36",
+      "resolves": true,
+      "via": "direct",
+      "context": "# THE OUTLINE DECIDES WHICH WALLS ARE A ROOM'S -- register row 36,"
+    },
+    {
+      "file": "floorplanner/walls.py",
+      "line": 675,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "two policies. Both are retired for the same reason, and it is defect 17's:"
+    },
+    {
+      "file": "floorplanner/walls.py",
+      "line": 828,
+      "kind": "defect",
+      "target": "6",
+      "resolves": true,
+      "via": "direct",
+      "context": "opening in silence -- including on load, which is defect 6's \"incl. on"
+    },
+    {
+      "file": "floorplanner/walls.py",
+      "line": 849,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"File a gesture-time fault, on the SCENE -- defect 25's channel (P4.1b)."
+    },
+    {
+      "file": "floorplanner/walls.py",
+      "line": 878,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "exactly where `JOIN_TOL` is allowed to act (defect 13's ruling -- the"
+    },
+    {
+      "file": "floorplanner/walls.py",
+      "line": 922,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"DEFECT 25's gesture arm (P4.1b): a wall end has come to rest on another"
+    },
+    {
+      "file": "floorplanner/walls.py",
+      "line": 1062,
+      "kind": "defect",
+      "target": "34",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"DEFECT 34's apply half (P4.2): make the two corners at `a` and `b`"
+    },
+    {
+      "file": "floorplanner/walls.py",
+      "line": 1569,
+      "kind": "defect",
+      "target": "12a",
+      "resolves": true,
+      "via": "direct",
+      "context": "# SAME LEVEL ONLY (defect 12a). This scan was one of defect"
+    },
+    {
+      "file": "floorplanner/walls.py",
+      "line": 1697,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "dependent geometry defect 13 measured. The value is the vocabulary's"
+    },
+    {
+      "file": "floorplanner/walls.py",
+      "line": 1941,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "# (defect 30, P4.2 -- and CORRECTED at the P4.2 mini-gate, where the"
+    },
+    {
+      "file": "floorplanner/walls.py",
+      "line": 2023,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "open-side behaviour (defect 30's row draws exactly this line against the"
+    },
+    {
+      "file": "floorplanner/walls.py",
+      "line": 2151,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "# defect 25 (P4.1b): an end dragged into a doorway reports at"
+    },
+    {
+      "file": "floorplanner/walls.py",
+      "line": 2233,
+      "kind": "defect",
+      "target": "7",
+      "resolves": true,
+      "via": "direct",
+      "context": "Absolute `s` survives none of the three, which is the whole of defect 7.\"\"\""
+    },
+    {
+      "file": "tests/conftest.py",
+      "line": 99,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "# DEFECT 28 -- a closed window is not a destroyed one."
+    },
+    {
+      "file": "tests/conftest.py",
+      "line": 117,
+      "kind": "defect",
+      "target": "29",
+      "resolves": true,
+      "via": "direct",
+      "context": "# gone -- is defect 29, fixed separately: a behaviour change in the app has no"
+    },
+    {
+      "file": "tests/conftest.py",
+      "line": 176,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "f\"later test that pumps the event loop (defect 28).\")"
+    },
+    {
+      "file": "tests/test_characterization.py",
+      "line": 94,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "# (defect 17; measured at P0.4: 4 walls in, 4 walls out, 0 open edges; re-"
+    },
+    {
+      "file": "tests/test_characterization.py",
+      "line": 143,
+      "kind": "defect",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "# FLIPPED xfail -> PASS AT P4.5 (defect 3), with ONE declared change: the"
+    },
+    {
+      "file": "tests/test_coalesce.py",
+      "line": 15,
+      "kind": "defect",
+      "target": "9",
+      "resolves": true,
+      "via": "direct",
+      "context": "merge, defect 9 -- that is pinned in test_topology_ops.py, not smuggled in"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "line": 172,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"DEFECT 22, the ergonomics half. The message used to say one thing for"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "line": 241,
+      "kind": "defect",
+      "target": "12",
+      "resolves": true,
+      "via": "direct",
+      "context": "leaked across levels would fuse into one vertex table (defect 12).\"\"\""
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "line": 334,
+      "kind": "defect",
+      "target": "3",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"Groups do not serialize today (defect 3). Emitting a guess would make"
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "line": 339,
+      "kind": "row",
+      "target": "36",
+      "resolves": true,
+      "via": "direct",
+      "context": "# REGISTER ROW 36, CLOSED AT SOURCE (P4.5). This was the WATCH that"
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "line": 362,
+      "kind": "row",
+      "target": "36",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"row 36's producer is back\")"
+    },
+    {
+      "file": "tests/test_floors.py",
+      "line": 172,
+      "kind": "defect",
+      "target": "2",
+      "resolves": true,
+      "via": "direct",
+      "context": "# defect 2 (P0.5): refresh_rooms_cmd tests room_walled against the ACTIVE"
+    },
+    {
+      "file": "tests/test_floors.py",
+      "line": 234,
+      "kind": "defect",
+      "target": "11",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"Defect 11, the half that is independently correct: `raise_to_front`"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "line": 367,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "# DEFECT 22 -- whole-plan group + move, at a scale the rest of this file never"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "line": 484,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"DEFECT 23. A room the band only PARTLY took follows the corners that"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "line": 573,
+      "kind": "defect",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "# verdict is about a plain whole-plan move and says nothing about defect 23"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "line": 582,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"DEFECT 22's receipt. The property the move must PRESERVE, asserted"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "line": 596,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "# DETERMINISTIC PICK (defect 28). `next(w for w in win.scene.items() ...)`"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "line": 636,
+      "kind": "defect",
+      "target": "22",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"The rotation half of defect 22: `_apply_rotation` re-maps every member"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "line": 944,
+      "kind": "row",
+      "target": "44",
+      "resolves": true,
+      "via": "direct",
+      "context": "state -- row 44's measurement proved a parallel/sub-segment pair passes"
+    },
+    {
+      "file": "tests/test_io.py",
+      "line": 140,
+      "kind": "defect",
+      "target": "4",
+      "resolves": true,
+      "via": "direct",
+      "context": "# defect 4 (P0.5): the serialized RoomModel must not alias the room's live"
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "line": 234,
+      "kind": "defect",
+      "target": "19",
+      "resolves": true,
+      "via": "direct",
+      "context": "# ------------------------------------------------------ defect 19, in-app arm"
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "line": 236,
+      "kind": "defect",
+      "target": "19",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"Defect 19's in-app arm. `extract_from_reference` injects walls straight"
+    },
+    {
+      "file": "tests/test_openings.py",
+      "line": 231,
+      "kind": "defect",
+      "target": "6",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"DEFECT 6, and the v4 LOAD site specifically -- \"incl. on load\" is what"
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "line": 166,
+      "kind": "defect",
+      "target": "8",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"DEFECT 8, first half. The op took its inputs' walls from"
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "line": 190,
+      "kind": "defect",
+      "target": "8",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"DEFECT 8, second half: every result wall was built as `\"interior\"`, so a"
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "line": 213,
+      "kind": "row",
+      "target": "47",
+      "resolves": true,
+      "via": "direct",
+      "context": "@pytest.mark.xfail(strict=False, reason=\"register row 47 -- room_boolean builds \""
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "line": 231,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "measurement is in `docs/evidence/defect23-fragment.json`, reproducible"
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "line": 232,
+      "kind": "artifact",
+      "target": "23",
+      "resolves": true,
+      "via": "direct",
+      "context": "with `docs/evidence/defect23_fragment_probe.py` -- and an `xfail` does not"
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "line": 234,
+      "kind": "row",
+      "target": "47",
+      "resolves": true,
+      "via": "direct",
+      "context": "DEEP red for a defect this test is not the owner of. Row 47 owns the"
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "line": 723,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"DEFECT 13, half of it, closed and pinned."
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "line": 749,
+      "kind": "defect",
+      "target": "16",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"DEFECT 16, closed structurally."
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "line": 764,
+      "kind": "defect",
+      "target": "5",
+      "resolves": true,
+      "via": "direct",
+      "context": "# defect 5 (P0.5): a RoomItem removed from the scene must release its walls,"
+    },
+    {
+      "file": "tests/test_scaling.py",
+      "line": 198,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "# DEFECT 28: `win.close()` hides a window and leaves its 180 ms dirty timer"
+    },
+    {
+      "file": "tests/test_selection.py",
+      "line": 3,
+      "kind": "defect",
+      "target": "10",
+      "resolves": true,
+      "via": "direct",
+      "context": "(P0.5 fix 4 / defect 10): an edge backed only by a longer party wall is left"
+    },
+    {
+      "file": "tests/test_selection.py",
+      "line": 55,
+      "kind": "defect",
+      "target": "10",
+      "resolves": true,
+      "via": "direct",
+      "context": "# REWRITTEN at P0.5 fix 4 (defect 10): this test used to assert the defect --"
+    },
+    {
+      "file": "tests/test_self_intersection.py",
+      "line": 12,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "not report. That is register row 41, and it is why the message promises a"
+    },
+    {
+      "file": "tests/test_self_intersection.py",
+      "line": 56,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "refusal (register row 41)."
+    },
+    {
+      "file": "tests/test_self_intersection.py",
+      "line": 82,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"I5b now catches the pinched form -- row 41 is closed, and \""
+    },
+    {
+      "file": "tests/test_self_intersection.py",
+      "line": 109,
+      "kind": "row",
+      "target": "41",
+      "resolves": true,
+      "via": "direct",
+      "context": "# does not (the pinched-loop divergence above, register row 41)"
+    },
+    {
+      "file": "tests/test_shuffle.py",
+      "line": 421,
+      "kind": "row",
+      "target": "37",
+      "resolves": true,
+      "via": "direct",
+      "context": "# register row 37 (P4.4): the shuffle mode has a chord (^H / Ctrl+H) and a"
+    },
+    {
+      "file": "tests/test_shuffle.py",
+      "line": 450,
+      "kind": "row",
+      "target": "37",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"every flip must record its RESULTING state -- row 37's gap\")"
+    },
+    {
+      "file": "tests/test_topology.py",
+      "line": 42,
+      "kind": "defect",
+      "target": "18",
+      "resolves": true,
+      "via": "direct",
+      "context": "# the Garage (largest, was wrongly dropped by defect 18) included. One extra"
+    },
+    {
+      "file": "tests/test_topology.py",
+      "line": 155,
+      "kind": "defect",
+      "target": "24",
+      "resolves": true,
+      "via": "direct",
+      "context": "# which passed only because defect 24 put the planner's idea of every"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "line": 123,
+      "kind": "defect",
+      "target": "24",
+      "resolves": true,
+      "via": "direct",
+      "context": "# 50.0 -> 18.0 AT P3.6 (defect 24): `offset_in` is to the opening's NEAR"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "line": 205,
+      "kind": "defect",
+      "target": "9",
+      "resolves": true,
+      "via": "direct",
+      "context": "# Defect 9 -- merge dedups openings. Live-editing shaped, per the task text:"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "line": 359,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "declining. WHY THE ASSERTION MOVED: it is defect 17's lesson. A gesture that"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "line": 182,
+      "kind": "defect",
+      "target": "29",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"DEFECT 29. `close()` hid the window and left the 180 ms debounce"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "line": 184,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "verify, and (before defect 26's guard) able to abort the process -- forever,"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "line": 188,
+      "kind": "defect",
+      "target": "28",
+      "resolves": true,
+      "via": "direct",
+      "context": "now DESTROYS its window (defect 28) and would hide the app behaviour under"
+    },
+    {
+      "file": "tests/test_verify_design.py",
+      "line": 183,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "ASSERTION CHANGED AT DEFECT 26: `pytest.raises` -> the violation is"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "line": 362,
+      "kind": "defect",
+      "target": "17",
+      "resolves": true,
+      "via": "direct",
+      "context": "defect 17's silent decline -- nothing happened and nothing said so -- and"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "line": 367,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "That the scene can reach this state at all is DEFECT 25: the edit that"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "line": 405,
+      "kind": "defect",
+      "target": "12a",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"Defect 12a. The `_attached` scan was one of defect 12's unfiltered"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "line": 405,
+      "kind": "defect",
+      "target": "12",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"Defect 12a. The `_attached` scan was one of defect 12's unfiltered"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "line": 517,
+      "kind": "defect",
+      "target": "21",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"DEFECT 21, found by P3.5's by-construction test and fixed at P3.5."
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "line": 709,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "# CORRECTED at the P4.2 mini-gate (defect 30, second cut). The first cut made"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "line": 717,
+      "kind": "defect",
+      "target": "30",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"Defect 30's pinned scene, asserting the CORRECTED behaviour."
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "line": 831,
+      "kind": "defect",
+      "target": "13",
+      "resolves": true,
+      "via": "direct",
+      "context": "# defect 13's drag half, RULED at P4.2: a gesture tolerance may pick the"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "line": 1014,
+      "kind": "row",
+      "target": "42",
+      "resolves": true,
+      "via": "direct",
+      "context": "\"\"\"Row 42 names THREE structurally identical corner-appliers as a"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "line": 496,
+      "kind": "defect",
+      "target": "25",
+      "resolves": true,
+      "via": "direct",
+      "context": "# -- defect 25 (P4.1b): a wall end landing inside a doorway says so AT THE"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "line": 656,
+      "kind": "defect",
+      "target": "34",
+      "resolves": true,
+      "via": "direct",
+      "context": "# -- defect 34 (P4.2): the gap REVIEW -- list, never auto-close ---------------"
+    },
+    {
+      "file": "tools/gate.py",
+      "line": 29,
+      "kind": "defect",
+      "target": "27",
+      "resolves": true,
+      "via": "direct",
+      "context": "CI CALLS THIS TOOL RATHER THAN REIMPLEMENTING IT (defect 27, P3.8). The DEEP"
+    },
+    {
+      "file": "tools/gate.py",
+      "line": 177,
+      "kind": "defect",
+      "target": "27",
+      "resolves": true,
+      "via": "direct",
+      "context": "deep_only = \"--deep\" in sys.argv          # CI's DEEP job (defect 27)"
+    },
+    {
+      "file": "tools/qt_excepthook.py",
+      "line": 5,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "then `qFatal()` is called, which aborts the process. The abort is what defect 26"
+    },
+    {
+      "file": "tools/read_minidump.py",
+      "line": 3,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "Written for defect 26 and kept: it is the only way to read a crash on a box"
+    },
+    {
+      "file": "tools/read_minidump.py",
+      "line": 10,
+      "kind": "defect",
+      "target": "26",
+      "resolves": true,
+      "via": "direct",
+      "context": "redistributable DLLs; WinDbg is the Store GUI app). But the two things defect 26"
+    }
+  ]
+}

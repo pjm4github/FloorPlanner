@@ -1,0 +1,24 @@
+FAIL-FIRST RECEIPT -- tools/gate.py --docs
+Each row: break it, verify the break is ON DISK, run the gate, restore.
+
+  BASELINE                                  rc=0  Docs-Verdict: GREEN (records valid, index current, every defect reference resolves, migration dry run clean)
+
+  1  front matter malformed                  probe=ON DISK  rc=1  RED    restored=yes
+       -> Docs-Defects: MALFORMED -- 0023-a-group-move-strands-the-region-of.md: no front matter (must start with ---)
+  2  illegal state/state_reason              probe=ON DISK  rc=1  RED    restored=yes
+       -> 0023-a-group-move-strands-the-region-of.md: a CLOSED record must say completed or not_planned
+  3  label outside the taxonomy              probe=ON DISK  rc=1  RED    restored=yes
+       -> 0023-a-group-move-strands-the-region-of.md: label 'area:plumbing' is outside the fixed taxonomy
+  4  milestone not in the Status table       probe=ON DISK  rc=1  RED    restored=yes
+       -> 0023-a-group-move-strands-the-region-of.md: milestone 'P9.9' names no phase in the Status table
+  5  title over the length limit             probe=ON DISK  rc=1  RED    restored=yes
+       -> 0023-a-group-move-strands-the-region-of.md: title is 144 chars (limit 99)
+  6  closed_by names no commit               probe=ON DISK  rc=1  RED    restored=yes
+       -> 0023-a-group-move-strands-the-region-of.md: closed_by 'deadbee' is not a commit in this repo
+  7  a defect reference resolving to nothing probe=ON DISK  rc=1  RED    restored=yes
+  8  INDEX.md differs from a regeneration    probe=ON DISK  rc=1  RED    restored=yes
+       -> Docs-Index: INDEX.md DIFFERS from a regeneration (run `python tools/defects_index.py`)
+
+  RESTORED                                  rc=0  Docs-Verdict: GREEN (records valid, index current, every defect reference resolves, migration dry run clean)
+
+  8 probes, 8 behaved as required, 0 did not
