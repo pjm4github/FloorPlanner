@@ -53,6 +53,13 @@ notes:   <anything surprising — especially a test you had to change and why>
 
 **A tidy-up pass that outlives the mess it tidied only touches things nobody asked it to — added 2026‑08‑04, as a general rule.** Recorded here rather than beside the function that prompted it, because it is not an observation about that function. A cleanup exists to repair a specific mess; when the mess is designed out, the pass does not become harmless, it becomes an unexplained side effect of whatever gesture still calls it. Found at P4.5: `ungroup` ran a **plan-wide** `merge_all` whose only job was absorbing the copies grouping used to make. **Measured on the pre-P4.5 tree before filing** — the honest answer mattered, because "it deletes geometry" and "it re-decomposes items" are different defects: scene items fell 80→78 / 82→78 / 83→80 on three plans, but the emitted **document was byte-identical in every case**, so nothing was ever lost; wall count is presentation state (P2.3). The cost was that a local gesture silently reshaped the whole plan's item structure. **Phase 6 meets this rule again when `snapshot()` retires** — the debounced full-document snapshot exists to serve snapshot-undo, and once the command stack owns undo, every remaining caller of it needs re-justifying rather than inheriting.
 
+**A BUG CAN MASK A BUG, SO THE CORRECT FIX PRESENTS AS A REGRESSION — added 2026‑08‑05, at two instances, and it is a rule about how to READ a red.** When a broken mechanism's breakage is what was holding a second fault harmless, repairing the first makes the second visible for the first time — and the repair gets the blame, because the red arrived with it. The diagnostic question is therefore never *"what did my change break?"* but **"was this state reachable before, by a path nobody was measuring?"** Both instances are P4.5's and both cost a parked branch:
+
+* **align/distribute** (`p4.5-align-wip`). A and B share a party wall; B moves; A's wall goes to x=150 while A's outline stays at 120. Split-on-write had been *destroying identity*, and destroying identity is what kept the neighbour intact. Fixing align exposed the missing neighbour gather.
+* **`fragment`** (`p4.5-defect23-wip`, ruled 2026‑08‑05). `_corner_records` split every corner an outsider held, which detached the group's walls from every outline, so a group move moved *nothing* and `check(deep=True)` stayed clean — while the gesture stranded the room whole, tore two bystanders open and saved a file recording that nothing had moved. Deform-to-follow did not create that; it made an already-broken product emit a document the invariants can finally see. **Measured both ways before the reading was taken** (`docs/evidence/defect23-fragment.json`), which is the only thing that distinguishes this from a genuine regression.
+
+**The tell, in both cases, is that the pre-change state was WORSE and SILENT.** So a red that arrives with a fix earns a differential receipt on the *pre-change* behaviour before it is treated as a regression — and if the old behaviour turns out to be the worse one, the row that gets filed is against the masked fault, not against the fix.
+
 **A changed test is a red flag, not a detail.** If a task required editing an existing assertion, say so explicitly. Half this migration's risk lives in tests being quietly relaxed to match new behaviour.
 
 **Prompt shape for Claude Code:**
@@ -4648,6 +4655,34 @@ RULED (2a) DEFORM -- RATIFIED AS A CONSEQUENCE, NOT CHOSEN AS A POLICY.
          The operation stays allowed either way -- this is about WHEN the
          document speaks, not whether the gesture is permitted.
 
+         AMENDED 2026-08-05, AND THE AMENDMENT IS TO THIS RULING'S OWN
+         PREMISE. The ordering stated above -- "SILENT AT THE GESTURE and
+         then BLOCKS THE SAVE" -- is FALSE AS SHIPPED, and the error is in
+         the second half. save_path does call _verify_or_report("save",
+         deep=True), but verify() returns None immediately unless shadow
+         mode is on (design/verify.py:210), and app.py:47 sets the env var
+         ONLY for --verify-design. So the refusal is a diagnostic-mode
+         behaviour, never the default launch.
+         MEASURED on one corrupt scene, the fragment case, three ways:
+           FP_VERIFY_DESIGN unset  -> the save WROTE the file, carrying
+                                      I5b x1 and I11 x3
+           FP_VERIFY_DESIGN=1      -> refused
+           FP_VERIFY_DESIGN=deep   -> refused
+         WHAT ACTUALLY SHIPS is therefore neither the ordering feared here
+         nor the one proposed: report_self_intersections DOES fire by
+         default (confirmed with the var unset), so the I5b half speaks at
+         the gesture as ruled -- and the I11 half, room-vs-room overlap,
+         speaks NOWHERE AT ALL. Not while editing (deep-only), not at the
+         save (no refusal without the flag).
+         The proposal above was therefore right for the wrong reason: it
+         treated the save refusal as the backstop that made a gesture-time
+         report merely better-timed. There is no backstop. Row 49 carries
+         the repair; this ruling's own conclusion -- report at the gesture,
+         do not block -- is UNCHANGED, and is now the only thing standing
+         between the user and an unreported overlap.
+         Evidence: docs/evidence/defect23-fragment.json, reproducible with
+         docs/evidence/defect23_fragment_probe.py.
+
 RULED (2b) DO NOT PROMOTE. The band takes exactly what it encloses.
          Option (c), a size threshold, is out for defect 13's reason: a
          tolerance may pick a TARGET, it may not set a semantic RESULT.
@@ -4777,6 +4812,20 @@ RULED (7) MINI-GATE APPROVED, with a NEW ITEM 1 -- the headline number
          nine items, and it catches the class ANYWHERE in the gate rather
          than only where we thought to look -- which is exactly how the
          P4.2 mini-gate's six findings were caught.
+         DELIBERATELY STILL BROKEN -- DO NOT REPORT THESE (added 2026-08-05
+         with the fragment ruling). A gate spends its credibility on the
+         first known defect it is asked to rediscover, so what is knowingly
+         unfixed is named up front:
+           * ROOM BOOLEAN "FRAGMENT" (register row 47). Fragmenting two
+             overlapping rooms and then dragging one piece clear leaves
+             that piece's REGION behind and opens a dashed edge on each
+             neighbour, over walls that are really there. Measured, filed,
+             and argued as the FIRST task after P4.5 merges. The
+             cross-cutting dashed-edge watch above therefore EXEMPTS the
+             fragment gesture and nothing else.
+           * The runtime z-order collapse (row 11's remaining half) is
+             still open; it is not reachable from any gate item, but if
+             the app hangs on a drag, that is it and not a new fault.
 
 P4.5(1a) the three amendments to (1), before the mechanism work
 ruff:    clean
