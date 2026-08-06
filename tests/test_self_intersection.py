@@ -127,20 +127,34 @@ def test_two_and_three_rooms_read_as_english(fp, scene):
 # the wiring: a group bake that deforms a room reports it
 # --------------------------------------------------------------------------
 @pytest.mark.groups
-@pytest.mark.xfail(strict=False, reason=(
-    "RECEIPT FOR THE MECHANISM CHANGE, not a defect. Under today's COPY-based "
-    "grouping, _corner_records deliberately SPLITS any corner an outside wall "
-    "also holds -- 'the group moves, whatever is outside it does not' -- so a "
-    "clipped bake cannot deform a room at all and there is nothing to report. "
-    "The deform case arrives with P4.5's no-copy semantics, where a corner the "
-    "group and a room both hold is the NORMAL case rather than an outsider to "
-    "protect from. This flips when that lands."))
 def test_a_bake_that_crosses_an_outline_reports_at_the_gesture(fp, win):
+    """FLIPPED xfail -> hard pass at P4.5, and it was the receipt it said it
+    was: under copy-based grouping `_corner_records` split any corner an
+    outsider held, so a clipped bake could not deform a room at all and there
+    was nothing to report. It can now.
+
+    THE OLD BODY WOULD NOT HAVE FLIPPED EITHER, and the reason is geometry, not
+    mechanism -- worth stating because "the receipt did not flip" was carried
+    for a day as evidence against the mechanism. Two facts the old body had
+    wrong. (a) It says "move ONE corner": a group holding the two walls that
+    meet at a corner holds THREE corners (2 walls x 2 ends), so three of the
+    four move and one stays. (b) Its delta, (-400, 300), translates those three
+    clear of the fixed corner and yields an ordinary non-crossing quadrilateral
+    -- measured, `outline_self_intersects` is False there, so the silence was
+    correct and the assertion was wrong. A delta that FOLDS the moved part back
+    across the stationary corner is what crosses the outline: measured
+    crossing at (0,150), (0,200), (0,300), (60,240) and (-60,300), non-crossing
+    at (-400,300).
+
+    So the deform is asserted as a PRECONDITION before the message is demanded
+    -- otherwise this is a negative-shaped verdict wearing a positive's
+    clothes, passing whenever the geometry happens not to cross."""
     sc = win.scene
     r = _room(sc, [(0, 0), (120, 0), (120, 96), (0, 96)], "Den")
     fp.drain_gesture_faults(sc)
-    # move ONE corner of the room a long way: the room holds it, so the room
-    # deforms -- the clipped-band case in miniature
+    # a group of the two walls meeting at (120, 0) holds THREE of the room's
+    # four corners; folding them back over the fourth crosses the outline --
+    # the clipped-band case in miniature
     g = fp.GroupItem()
     sc.addItem(g)
     corner = r.outline[1].v                       # (120, 0)
@@ -149,10 +163,23 @@ def test_a_bake_that_crosses_an_outline_reports_at_the_gesture(fp, win):
             if w.end_vertex(attr) is corner:
                 g.adopt(w)
                 break
-    g.setPos(QPointF(-400, 300))
+    g.setPos(QPointF(0, 300))
     g.bake()
+
+    # PRECONDITION -- the bake really did deform the room into a crossing
+    # outline. Without this the verdict is satisfied by a bake that did nothing.
+    assert fp.outline_self_intersects(r), (
+        "the bake did not cross the outline, so there is nothing to report: "
+        f"{[(round(e.p.x()), round(e.p.y())) for e in r.outline]}")
     msgs = fp.drain_gesture_faults(sc)
     assert any("crosses itself" in m for m in msgs), (
         f"the bake deformed a room into a crossing outline and said nothing: "
         f"{msgs}")
     assert any("Den" in m for m in msgs)
+    # The crossed outline is this test's SUBJECT, so declare it as the accepted
+    # baseline -- the same move `_overlapping_rooms` makes for its deliberate
+    # overlap. Placed AFTER the verdicts, so they judge the real state; it only
+    # stops the `win` teardown reporting I5b 0 -> 1 under FP_VERIFY_DESIGN=deep,
+    # which would blame this test for the state it exists to produce.
+    from floorplanner.design.verify import rebase
+    rebase(win)
