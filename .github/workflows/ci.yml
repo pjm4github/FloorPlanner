@@ -25,6 +25,30 @@ jobs:
       - run: pip install ruff
       - run: python -m ruff check .
 
+  docs:
+    name: records (gate --docs)
+    runs-on: ubuntu-latest
+    # No app dependencies: every check in this lane reads FILES -- defect front
+    # matter, the generated index, cross-references, and the gh commands the
+    # migration would emit. It needs no Qt, no display and no pytest, so it is
+    # its own job and finishes in seconds rather than riding on the test matrix.
+    #
+    # `gh` is NOT installed or called: `--dry-run` only PRINTS the commands, and
+    # printing them is the check. That is the point of the dry run -- the claim
+    # "this format is GitHub-ready" is verified on every push instead of on the
+    # day someone finally migrates.
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # closed_by is validated with `git cat-file`, so the commits those
+          # records name have to be in the clone. The default depth of 1 is not
+          # enough and would fail a record that is perfectly correct.
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+      - run: python tools/gate.py --docs
+
   test:
     name: pytest (py${{ matrix.python-version }})
     runs-on: ubuntu-latest

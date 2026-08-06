@@ -25,6 +25,16 @@ rounding difference, so it is treated as red.
     python tools/gate.py --quick    # ruff + OFF only
     python tools/gate.py --deep     # ruff + DEEP only -- what CI's deep job runs
     python tools/gate.py --perf     # the timing lane, explicitly (P3.8)
+    python tools/gate.py --docs     # the record lane: defect front matter,
+                                    # the generated index, every defect
+                                    # reference, and the GitHub dry run
+
+THE DOCS LANE IS ITS OWN LANE, like `--perf`, and deliberately NOT part of the
+default block. The trailer above is pasted verbatim into commit messages, so its
+SHAPE is load-bearing: adding a line to it partway through a branch would make
+that branch's own trailers incomparable, which is the census-discrepancy class
+this tool exists to prevent. `--docs` prints its own verdict, quoted beside the
+full-mode trailer rather than inside it.
 
 CI CALLS THIS TOOL RATHER THAN REIMPLEMENTING IT (defect 27, P3.8). The DEEP
 job runs `--deep`, so the invariant set, the perf exclusion and the census
@@ -66,6 +76,18 @@ def _run(args, env_extra=None):
     env.update(env_extra or {})
     p = subprocess.run([sys.executable, "-m", *args], capture_output=True,
                        text=True, env=env)
+    return p.returncode, (p.stdout + p.stderr)
+
+
+def _run_script(args, env_extra=None):
+    """Run a SCRIPT by path. `_run` prepends `-m` and runs modules; the docs
+    lane's three tools are scripts, and `python -m tools/foo.py` is not a
+    thing."""
+    import os
+    env = dict(os.environ)
+    env.update(env_extra or {})
+    p = subprocess.run([sys.executable, *args], capture_output=True,
+                       text=True, env=env, errors="replace")
     return p.returncode, (p.stdout + p.stderr)
 
 
@@ -170,9 +192,47 @@ def _end_assignments() -> tuple:
     return len(hits), hits
 
 
+def _docs() -> int:
+    """The record lane: are the defect records well-formed and reachable?
+
+    Three tools, each already the single definition of its own question, run in
+    the order that makes a failure readable: the records themselves first (a
+    malformed record makes everything downstream meaningless), then whether the
+    repo's references still find them, then whether they would still migrate.
+
+    Every check here is on DATA, not behaviour, so it costs no test run and can
+    be invoked on its own while editing records.
+    """
+    checks = [
+        ("Docs-Defects", ["tools/defects_index.py", "--validate"]),
+        ("Docs-Index", ["tools/defects_index.py", "--check"]),
+        ("Docs-Refs", ["tools/ref_audit.py", "--strict-ids"]),
+        ("Docs-GitHub", ["tools/defects_to_github.py", "--dry-run"]),
+    ]
+    bad = False
+    for label, cmd in checks:
+        rc, out = _run_script(cmd)
+        bad = bad or rc != 0
+        keep = [ln for ln in out.splitlines()
+                if ln.startswith(("Docs-", "Ref-")) or (rc and ln.strip())]
+        # the GitHub dry run prints a whole script on success; only its verdict
+        # is wanted here
+        if label == "Docs-GitHub" and not rc:
+            keep = [ln.lstrip("# ") for ln in out.splitlines()
+                    if "DRY RUN" in ln]
+        for ln in keep[:12 if rc else 4]:
+            print(ln)
+    note = "" if bad else (" (records valid, index current, every defect "
+                           "reference resolves, migration dry run clean)")
+    print(f"Docs-Verdict: {'RED' if bad else 'GREEN'}{note}")
+    return 1 if bad else 0
+
+
 def main() -> int:
     if "--perf" in sys.argv:
         return _perf()
+    if "--docs" in sys.argv:
+        return _docs()
     quick = "--quick" in sys.argv
     deep_only = "--deep" in sys.argv          # CI's DEEP job (defect 27)
     rc, out = _run(["ruff", "check", "."])

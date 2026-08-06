@@ -262,7 +262,9 @@ def main():
     ap.add_argument("--json", metavar="PATH", help="write the inventory")
     ap.add_argument("--compare", metavar="PATH", help="itemise vs a baseline")
     ap.add_argument("--strict", action="store_true",
-                    help="exit 1 if any reference resolves to nothing")
+                    help="exit 1 if ANY reference resolves to nothing")
+    ap.add_argument("--strict-ids", action="store_true",
+                    help="exit 1 only if a DEFECT reference resolves to nothing")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -278,6 +280,24 @@ def main():
         rc |= compare(inv, args.compare)
     if args.strict and inv["unresolved"]:
         rc |= 1
+    # THE GATE FAILS ON A DANGLING DEFECT REFERENCE, NOT ON A DANGLING LINK, and
+    # the difference is deliberate. A record reference that resolves to no file
+    # is a broken key -- the register has lost a row. A markdown link can be
+    # dangling and CORRECT: `superseded/CANVAS_ITEM_REFACTOR_PLAN.md` links
+    # relative to the directory it was written in, and repairing it would mean
+    # editing history to satisfy a lint. Links are counted and reported so the
+    # number is visible; only keys are enforced.
+    if args.strict_ids:
+        broken = [r for r in inv["unresolved"] if r["kind"] in ID_KINDS]
+        if broken:
+            print(f"\nRef-Strict: {len(broken)} DEFECT reference(s) resolve to "
+                  f"no record")
+            rc |= 1
+        else:
+            n_link = len(inv["unresolved"])
+            tail = (f" ({n_link} markdown link(s) dangling, reported not "
+                    f"enforced)") if n_link else ""
+            print(f"Ref-Strict: every defect reference resolves{tail}")
     return rc
 
 
