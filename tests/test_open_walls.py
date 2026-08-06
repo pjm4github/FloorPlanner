@@ -39,6 +39,8 @@ import json
 import pytest
 from PyQt6.QtCore import QPointF
 
+from floorplanner.vertex import Vertex
+
 pytestmark = pytest.mark.rooms
 
 
@@ -67,12 +69,17 @@ def _open_count(fp, scene):
 
 
 def _shorten(fp, scene, wall, new_far=None):
-    """Pull the wall's far end inward (as a corner drag would)."""
+    """Pull the wall's far end inward, DETACHING it from any corner it shared
+    -- the endpoint drag's semantics, which is what these tests mean.
+
+    Was `wall.p2 = ...` until P4.5. That spelling is gone; this is the same
+    thing said explicitly, and it is production's own (`_drag_end_to` mints a
+    fresh `Vertex` for exactly this reason). `relocated_to` would be the OTHER
+    gesture -- the corner moves and everything on it follows -- and would not
+    leave the room's outline behind, which is the state under test."""
     new_far = new_far or QPointF(120, 60)
-    if abs(wall.p2.y() - 120) < 1:
-        wall.p2 = QPointF(new_far)
-    else:
-        wall.p1 = QPointF(new_far)
+    attr = "p2" if abs(wall.p2.y() - 120) < 1 else "p1"
+    wall.set_end_vertex(attr, Vertex.at(QPointF(new_far)))
     wall.rebuild()
     fp.rebuild_all_walls(scene)
 
@@ -185,10 +192,8 @@ def test_filling_the_gap_recloses_the_room(fp, scene):
     _shorten(fp, scene, wall)
     assert _open_count(fp, scene) == 1
     # extend the wall back to the corner -> gap closes
-    if abs(wall.p2.y() - 60) < 1:
-        wall.p2 = QPointF(120, 120)
-    else:
-        wall.p1 = QPointF(120, 120)
+    attr = "p2" if abs(wall.p2.y() - 60) < 1 else "p1"
+    wall.set_end_vertex(attr, Vertex.at(QPointF(120, 120)))
     wall.rebuild()
     fp.rebuild_all_walls(scene)
     assert _open_count(fp, scene) == 0

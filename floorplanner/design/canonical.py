@@ -47,6 +47,7 @@ def canonicalize(doc):
     walls = doc.get("walls") or []
     rooms = doc.get("rooms") or []
     furnishings = doc.get("furnishings") or []
+    groups = doc.get("groups") or []
 
     lorder = {lv["id"]: i for i, lv in enumerate(levels)}
     vpos = {v["id"]: (v["x"], v["y"]) for v in vertices}
@@ -90,7 +91,19 @@ def canonicalize(doc):
         for e in r["outline"]:
             e["v"] = vid[e["v"]]
             e["wall"] = wid[e["wall"]] if e.get("wall") else None
-    for i, f in enumerate(furnishings, 1):
-        f["id"] = f"f{i}"
+    fid = {f["id"]: f"f{i}" for i, f in enumerate(furnishings, 1)}
+    for f in furnishings:
+        f["id"] = fid[f["id"]]
         f["room"] = rid[f["room"]] if f.get("room") else None
+    # GROUPS (P4.5): a group is a set of MEMBER IDS, so it has to be renumbered
+    # with everything it points at -- otherwise canonicalising a document
+    # silently dangles every membership (I9). Members are sorted so the set is
+    # compared as a set, and the groups themselves are ordered by level and
+    # membership so the form is stable and idempotent.
+    ren = {**wid, **rid, **fid}
+    for g in groups:
+        g["members"] = sorted(ren.get(m, m) for m in g.get("members") or [])
+    groups.sort(key=lambda g: (lorder.get(g.get("level"), 0), g["members"]))
+    for i, g in enumerate(groups, 1):
+        g["id"] = f"g{i}"
     return doc

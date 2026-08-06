@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 from PyQt6.QtCore import QPointF
+from floorplanner.vertex import Vertex
 
 pytestmark = pytest.mark.rooms
 
@@ -252,3 +253,60 @@ def test_room_areas_unchanged_across_the_corpus(fp, win, name):
     for room, sf in areas.items():
         assert after[room] == pytest.approx(sf, abs=0.1), f"{room} moved"
     assert design_from_scene(win).to_dict() == d1
+
+
+def test_a_deliberately_open_edge_survives_a_round_trip(fp, win, tmp_path):
+    """THE TWO NULLS. `wall: null` means "deliberately open, draw it dashed"
+    to the renderer (P3.7) and would mean "unknown, go and find it" to a
+    binder. Measured at P4.5 when guard 4 widened what `_edge_wall` may
+    return: does a load silently close a deliberately open edge?
+
+    NO -- and the reason is that NEITHER FILE PATH CALLS THE BINDER. The v5
+    apply reads the binding straight out of the document
+    (`wmap.get(e["wall"])`), and a legacy file is converted to v5 first and
+    then goes through that same apply. The document carries the binding and
+    the loader READS it, which is F3's cure rather than F3's disease.
+
+    The case is constructed where the two nulls actually diverge: the walk
+    emits null when NO CHAIN SPANS the edge, while `_edge_wall` accepts
+    PARTIAL cover by its own docstring -- so an edge a wall covers only half
+    of is exactly where a re-deriving loader would disagree with the file."""
+    import json
+
+    sc = win.scene
+    cs = [QPointF(0, 0), QPointF(120, 0), QPointF(120, 120), QPointF(0, 120)]
+    for i in range(4):
+        sc.addItem(fp.WallItem(cs[i], cs[(i + 1) % 4], "interior"))
+    fp.rebuild_all_walls(sc)
+    r = fp.detect_room(sc, QPointF(60, 60))
+    room = fp.RoomItem("R", QPointF(60, 60), r[0], r[1], corners=r[2])
+    sc.addItem(room)
+    fp.bind_room_walls(sc, room)
+    assert len(room.open_edges()) == 0            # precondition: closed
+
+    south = next(w for w in room.walls
+                 if abs(w.p1.y() - 120) < 0.5 and abs(w.p2.y() - 120) < 0.5)
+    # DETACH this end (a fresh corner), do not relocate it. The distinction is
+    # load-bearing here: relocating would carry the room's outline corner along
+    # and the edge would never open, which is the very state under test.
+    attr = "p2" if south.p1.x() < south.p2.x() else "p1"
+    south.set_end_vertex(attr, Vertex.at(QPointF(60, 120)))
+    south.rebuild()
+    fp.rebuild_all_walls(sc)
+    # PRECONDITION: an edge that is open WHILE a wall runs along part of it --
+    # otherwise there is nothing for a binder to wrongly find
+    assert len(room.open_edges()) == 1
+    assert south.scene() is sc and south.length() == pytest.approx(60)
+
+    doc = win.design_document()
+    nulls = sum(1 for e in doc["rooms"][0]["outline"] if e.get("wall") is None)
+    assert nulls == 1
+    p = tmp_path / "open.json"
+    p.write_text(json.dumps(doc), encoding="utf-8")
+
+    win.load_path(str(p))
+    r2 = next(x for x in win.scene.items() if isinstance(x, fp.RoomItem))
+    assert len(r2.open_edges()) == 1, "the load closed a deliberate opening"
+    after = win.design_document()
+    assert sum(1 for e in after["rooms"][0]["outline"]
+               if e.get("wall") is None) == 1, "the document lost its null"

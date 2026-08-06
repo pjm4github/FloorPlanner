@@ -61,9 +61,12 @@ def test_ungrouped_walls_survive_gc(fp, win, make_room, first_furnishing,
     assert counts(sc) == before
 
 
-def test_grouping_a_room_duplicates_its_walls(fp, win, make_room, counts):
-    # selecting a ROOM and grouping duplicates its walls into the group; the
-    # original room keeps its own walls (the group is a movable copy)
+def test_grouping_a_room_adopts_its_real_walls(fp, win, make_room, counts):
+    # INTENTIONALLY REPLACED AT P4.5 (was test_grouping_a_room_duplicates_
+    # its_walls). The old name WAS the old contract: grouping a room
+    # duplicated its walls and the group was a movable copy. A group never
+    # copies anything now -- the schema says so in as many words -- so every
+    # assertion here inverts.
     sc = win.scene
     room = make_room(sc, 0, 0, 144, 120, "Den")
     n_walls_before = sum(isinstance(i, fp.WallItem) for i in sc.items())
@@ -73,12 +76,13 @@ def test_grouping_a_room_duplicates_its_walls(fp, win, make_room, counts):
     win.group_selected()
     g = next(i for i in sc.items() if isinstance(i, fp.GroupItem))
     grouped = [c for c in g.childItems() if isinstance(c, fp.WallItem)]
-    assert len(grouped) >= 4                       # the room's 4 walls copied
-    # walls doubled (originals + grouped copies); originals still owned by room
-    assert sum(isinstance(i, fp.WallItem) for i in sc.items()) >= \
-        n_walls_before + 4
+    assert len(grouped) == 4                       # the room's OWN 4 walls
+    assert sum(isinstance(i, fp.WallItem)
+               for i in sc.items()) == n_walls_before, "grouping made a wall"
+    # the very same objects, and the room still owns them
+    assert all(w in grouped for w in orig_walls)
     assert all(w in room.walls for w in orig_walls)
-    assert all(w.group() is None for w in orig_walls)
+    assert all(w.group() is g for w in orig_walls)
 
 
 def test_bake_translates_room_region(fp, win, make_room):
@@ -153,30 +157,30 @@ def test_grouping_room_with_its_walls_makes_no_coincident_copies(fp, win,
     assert room.path.boundingRect().x() == pytest.approx(123, abs=6)  # room rode
 
 
-def test_group_move_room_only_does_not_orphan_walls(fp, win, make_room):
-    # regression (wall leak): grouping a room ALONE makes a movable copy (the
-    # original stays). bake() used to move the ORIGINAL room onto the coincident
-    # copies via walls_cover_room's loop-coverage path, abandoning the room's
-    # own walls -- so orphans piled up every group/move/ungroup cycle
-    # (4 -> 6 -> 7 -> 8...). Now the original stays put and only the copy moves,
-    # so repeated cycles are stable.
+def test_repeated_group_move_ungroup_creates_nothing(fp, win, make_room):
+    # INTENTIONALLY REPLACED AT P4.5 (was test_group_move_room_only_does_not_
+    # orphan_walls). Its premise was the copy semantics -- "grouping a room
+    # ALONE makes a movable copy (the original stays)" -- so the strongest
+    # thing it could assert was that the leak did not COMPOUND. With no
+    # copies there is nothing to leak, so the assertion sharpens: the count
+    # is the FIRST count on every cycle, not merely a stable one.
     sc = win.scene
     make_room(sc, 0, 0, 144, 120, "Den")
+    n0 = _built_walls(fp, sc)
     counts = []
     for _ in range(4):
         room = next(r for r in sc.items() if isinstance(r, fp.RoomItem))
         sc.clearSelection()
-        room.setSelected(True)               # room ONLY -> walls duplicated
+        room.setSelected(True)               # room ONLY -> its OWN walls
         win.group_selected()
         g = next(it for it in sc.items() if isinstance(it, fp.GroupItem))
-        g.setPos(0, 300)                     # move the copy clear of the original
+        g.setPos(0, 300)                     # ...and the room rides with them
         g.bake()
         sc.clearSelection()
         g.setSelected(True)
         win.ungroup_selected()
         counts.append(_built_walls(fp, sc))
-    # stable across cycles (original 4 + one persistent copy) -- not compounding
-    assert counts[1:] == counts[:-1], counts
+    assert counts == [n0] * 4, counts
     assert sum(isinstance(r, fp.RoomItem) for r in sc.items()) == 1
 
 
@@ -476,27 +480,38 @@ def test_whole_plan_group_move_carries_every_room(fp, win):
     assert _unwelded(win) == 0, "the move tore the wall network"
 
 
-@pytest.mark.xfail(strict=False,
-                   reason="defect 23: a band that clips a room's wall set "
-                          "strands that room; the semantics are P4.5's")
 def test_a_clipped_band_leaves_every_room_coherent(fp, win):
-    """DEFECT 23, characterized against the invariant BOTH candidate semantics
-    satisfy, so it flips whichever way P4.5 rules.
+    """DEFECT 23. A room the band only PARTLY took follows the corners that
+    moved: every outline edge whose wall moved has both its corners moved too.
 
-    A rubber band takes only items FULLY inside it, so a wall poking out is left
-    behind and `group_selected` duplicates the rest of that room's walls --
-    `room_owns_walls` is then correctly false and the room is not carried. Its
-    walls walk out from under a region that stays put. Measured: 3 of 20 rooms,
-    Garage at 6/9 walls moved against 0/9 corners.
+    FLIPPED xfail -> hard pass at P4.5, AS A CONSEQUENCE OF THE MECHANISM and
+    not as a fix (ruling 2a). Nothing was built to make this pass: the corner
+    an outside wall also holds simply stopped being SPLIT, so a room holding it
+    follows because the corner moved. That is the same sentence as a party-wall
+    resize.
 
-    PER-ROOM COHERENCE is what both readings agree on. Under deform-to-follow a
-    clipped room's 6 moved walls carry 6 of its corners; under stay-put the
-    grouping would have to take the whole room or none of it, so 0 and 0. Either
-    way the two columns AGREE, and today they do not. Deliberately NOT asserting
-    which -- that is the decision P4.5 owns.
+    THE ASSERTION IS REWRITTEN, and this is the declared change with its
+    reason, because the old one COULD NOT HAVE FLIPPED. It compared two counts
+    -- walls-moved against corners-moved -- and a run of k walls has k+1
+    corners, so an open run never satisfies it however correct the move is.
+    Measured with the mechanism in: Garage 6 walls / 7 corners, PKT Off 4/5,
+    Util 2/3, and WIC 6 walls covering 7 corners while moving WHOLLY. The old
+    equality called all four incoherent. It was written predicting "6 moved
+    walls carry 6 of its corners", and that prediction was simply wrong about
+    the arithmetic; the reading it was neutral between is no longer open
+    anyway, since 2a ruled DEFORM.
 
-    This predates P3.5 and the branch measurably improves it (148.3" of drift
-    before, 46.65" now), so it is a characterization, not a gate."""
+    A SECOND FORMULATION WAS REJECTED FOR BEING VACUOUS, recorded so it is not
+    re-proposed: "the corners that moved are exactly those held by a moved
+    wall" passes on the PRE-fix tree too, because the split meant a moved
+    wall's end was a fresh vertex the outline did not hold -- both sides empty,
+    equal, and silent about the very stranding it was written for. The
+    formulation below asks the question through the OUTLINE's own wall
+    reference instead, which survives the split and so can fail.
+
+    Fail-first receipt, measured in a worktree at `d57a76f`: Garage 0 of 7,
+    PKT Off 0 of 5, Util 0 of 3 -- three rooms stranded. With the mechanism:
+    20 of 20 rooms coherent, none failing."""
     _v5_plan(fp, win)
     dx, dy = 60.0, 36.0
     walls = [it for it in win.scene.items() if isinstance(it, fp.WallItem)]
@@ -506,26 +521,61 @@ def test_a_clipped_band_leaves_every_room_coherent(fp, win):
                                    (max(xs) - min(xs)) * 0.92 + 24,
                                    max(ys) - min(ys) + 48))
     before = _snapshot(fp, win)
+    pre = {r.name: [(round(e.p.x(), 3), round(e.p.y(), 3)) for e in r.outline]
+           for r in win.scene.items()
+           if isinstance(r, fp.RoomItem) and r.name in before}
+    # BOTH ends, not just p1. `_snapshot` records p1 alone, which was enough
+    # while a group move either took a wall whole or not at all -- but a wall
+    # the band left outside now RESIZES, one end riding the shared corner and
+    # the other staying. Judged on p1 only, such a wall reads as "moved" and
+    # this test then demands both its corners move, which is the opposite of
+    # what a resize means.
+    ends0 = {id(w): (round(w.p1.x(), 3), round(w.p1.y(), 3),
+                     round(w.p2.x(), 3), round(w.p2.y(), 3))
+             for w in win.scene.items() if isinstance(w, fp.WallItem)}
     win.group_selected()
     for g in [it for it in win.scene.items() if isinstance(it, fp.GroupItem)]:
         g.setPos(dx, dy)
         g.bake()
 
-    cols = _columns(fp, win, dx, dy, before)
-    # The stranded rooms are this test's SUBJECT, so declare the state it built
-    # as the accepted baseline -- the same move `_overlapping_rooms` makes for
-    # its deliberate overlap. Without it the `win` fixture's teardown verify
-    # fires under FP_VERIFY_DESIGN=deep and the test is reported TWICE (an `E`
-    # in the progress line and a second xfail), which is what the phantom `E`
-    # sighted during the P3.5-followup actually was.
-    from floorplanner.design.verify import rebase
-    rebase(win)
-    incoherent = {n: (wm, wt, cm, ct)
-                  for n, (wm, wt, cm, ct, _i) in cols.items() if wm != cm}
-    assert not incoherent, (
-        "rooms whose walls and outline disagree about the move: "
-        + "; ".join(f"{n} walls {a}/{b} vs corners {c}/{d}"
-                    for n, (a, b, c, d) in sorted(incoherent.items())))
+    def _moved(a, b):
+        return abs(b[0] - a[0] - dx) < 1e-3 and abs(b[1] - a[1] - dy) < 1e-3
+
+    stranded, clipped = {}, []
+    for r in win.scene.items():
+        if not isinstance(r, fp.RoomItem) or r.name not in before:
+            continue
+        def wall_moved(w):
+            """The wall TRANSLATED -- both ends by the same delta. A wall with
+            one end on the moved corner and one off it has resized, and its
+            edge's corners are then judged one at a time."""
+            e0 = ends0.get(id(w))
+            return (e0 is not None and _moved(e0[:2], (round(w.p1.x(), 3),
+                                                       round(w.p1.y(), 3)))
+                    and _moved(e0[2:], (round(w.p2.x(), 3),
+                                        round(w.p2.y(), 3))))
+
+        own = fp.room_walls(r)
+        if 0 < sum(1 for w in own if wall_moved(w)) < len(own):
+            clipped.append(r.name)
+        now = [(round(e.p.x(), 3), round(e.p.y(), 3)) for e in r.outline]
+        n = len(r.outline)
+        # every corner of every edge whose WALL moved must have moved with it
+        need = set()
+        for i, e in enumerate(r.outline):
+            if e.wall is not None and wall_moved(e.wall):
+                need |= {i, (i + 1) % n}
+        got = {i for i in need if _moved(pre[r.name][i], now[i])}
+        if got != need:
+            stranded[r.name] = (len(got), len(need))
+
+    # PRECONDITION -- the band must actually have CLIPPED somebody, or the
+    # verdict is about a plain whole-plan move and says nothing about defect 23
+    assert clipped, "the band took whole rooms only; nothing was clipped"
+    assert not stranded, (
+        "rooms whose outline did not follow their own moved walls: "
+        + "; ".join(f"{n} {a} of {b} corners"
+                    for n, (a, b) in sorted(stranded.items())))
 
 
 def test_a_group_move_leaves_the_outlines_still_holding_their_corners(fp, win):
@@ -599,22 +649,44 @@ def test_a_group_rotation_also_keeps_the_corners(fp, win):
     assert _unwelded(win) == 0
 
 
-def test_a_group_move_never_drags_a_wall_outside_it(fp, win, make_room):
-    """The carve-out the vertex move has to respect: a corner a NON-member wall
-    also holds is SPLIT before the move, so the group goes and the outsider
-    stays. Relocating it wholesale would wire a member to an outside wall --
-    exactly what the `group() is None` guards exist to prevent."""
+def test_a_group_move_stretches_an_outside_wall_it_shares_a_corner_with(
+        fp, win, make_room):
+    """INVERTED AT P4.5, and it is the third test in this phase to be rewritten
+    because it pinned a RATIONALE rather than a behaviour. Its old name was
+    `..._never_drags_a_wall_outside_it` and its docstring said the split
+    happens because "relocating it wholesale would wire a member to an outside
+    wall -- exactly what the `group() is None` guards exist to prevent". All
+    four of those guards were retired earlier in this phase and
+    `duplicate_wall` died with them, so the reason expired and the test could
+    not survive it unchanged. (The smell the Working agreement warns about is
+    the opposite case -- a rewrite when nothing was retired.)
+
+    WHAT REPLACES IT IS NOT "the outsider may now be dragged". A shared corner
+    is ONE `Vertex` (Phase 3), so an outside wall holding it is ON that corner:
+    the corner moves, that end goes with it, and the wall's far end does not.
+    The stub STRETCHES; it does not travel. That is the same sentence as a
+    party-wall resize, and asserting it this way is what distinguishes the new
+    semantics from the bug it would be if the whole stub translated.
+
+    Without this the network tears: the outsider keeps the old vertex while
+    everything else moves, leaving a gap at a corner that used to be welded --
+    measured on the clipped band as `unwelded_ends` rising 0 -> 1."""
     sc = win.scene
     room = make_room(sc, 0, 0, 120, 120, "A")
     stub = fp.WallItem(QPointF(120, 120), QPointF(240, 120), "interior")
     sc.addItem(stub)                       # meets the room's corner, not a member
     fp.rebuild_all_walls(sc)
+    shared = None
     for w in room.walls:                   # weld the stub onto the room corner
         for at in ("p1", "p2"):
             if abs(getattr(w, at).x() - 120) < 1e-9 \
                     and abs(getattr(w, at).y() - 120) < 1e-9:
                 stub.set_end_vertex("p1", w.end_vertex(at))
-    before = (stub.p1.x(), stub.p1.y(), stub.p2.x(), stub.p2.y())
+                shared = w.end_vertex(at)
+    # PRECONDITION -- the stub really does hold the room's corner, by IDENTITY.
+    # Coincident coordinates would not do: the whole claim is about one Vertex.
+    assert shared is not None and stub.end_vertex("p1") is shared
+    far = (stub.p2.x(), stub.p2.y())
 
     sc.clearSelection()
     for w in room.walls:
@@ -624,8 +696,11 @@ def test_a_group_move_never_drags_a_wall_outside_it(fp, win, make_room):
         g.setPos(36.0, 0.0)
         g.bake()
 
-    assert (stub.p1.x(), stub.p1.y(), stub.p2.x(), stub.p2.y()) == before, \
-        "the group dragged a wall that was not in it"
+    assert (round(stub.p1.x(), 6), round(stub.p1.y(), 6)) == (156.0, 120.0), \
+        "the shared end did not follow the corner it IS"
+    assert (stub.p2.x(), stub.p2.y()) == far, \
+        "the far end travelled too -- the group dragged the whole outsider"
+    assert _unwelded(win) == 0, "the move tore the wall network"
     assert room.corners[0].x() != 0 or room.corners[1].x() != 0
 
 
@@ -633,59 +708,81 @@ def _nwalls(fp, sc):
     return sum(isinstance(i, fp.WallItem) for i in sc.items())
 
 
-def test_grouping_twenty_rooms_with_their_walls_creates_no_walls(fp, win):
-    """P3.8's acceptance: 'Grouping 20 rooms creates 0 new walls'.
+def test_grouping_twenty_rooms_creates_no_objects_at_all(fp, win):
+    """P3.8's acceptance, WIDENED AT P4.5 from walls to OBJECTS.
 
-    STATED FOR THE SELECTION A USER ACTUALLY MAKES -- Ctrl+A, or a band over
-    the plan -- which takes the rooms AND their walls. Measured on
-    symmetricP1: 80 walls in, 80 after grouping, 80 after a bake. The room's
-    own selected walls ride in as themselves; nothing is copied.
+    The original counted walls only, and that was the number available while
+    grouping still copied: the review measured **>=106 duplicate walls and
+    >=149 duplicate OPENINGS** on this gesture, so a wall-only count left the
+    larger half unwatched. With `duplicate_wall` dead there is nothing to
+    copy, and the honest assertion is the whole scene: no walls, no openings,
+    no rooms, no furnishings created -- by grouping, by the bake, or by the
+    ungroup that used to merge the copies away.
 
-    The rooms-ONLY selection is a different question and still duplicates; it
-    is the xfail below, and P4.5's."""
+    Both selections are pinned here now, because they are no longer different
+    questions: the rooms-AND-walls selection a band gives you, and the
+    rooms-ONLY selection that used to duplicate."""
     _v5_plan(fp, win)
     sc = win.scene
     assert sum(isinstance(i, fp.RoomItem) for i in sc.items()) == 20
-    before = _nwalls(fp, sc)
+
+    def census():
+        n_open = sum(len(w.openings) for w in sc.items()
+                     if isinstance(w, fp.WallItem))
+        return (_nwalls(fp, sc), n_open,
+                sum(isinstance(i, fp.RoomItem) for i in sc.items()),
+                sum(isinstance(i, fp.FurnishingItem) for i in sc.items()))
+
+    before = census()
+    assert before[1] > 0, "precondition: the plan has openings to duplicate"
     sc.clearSelection()
     for it in sc.items():
         if isinstance(it, (fp.RoomItem, fp.WallItem)) and it.group() is None:
             it.setSelected(True)
     win.group_selected()
-    assert _nwalls(fp, sc) == before, "grouping copied walls"
+    assert census() == before, "grouping created objects"
     for g in [i for i in sc.items() if isinstance(i, fp.GroupItem)]:
         g.setPos(48.0, 0.0)
         g.bake()
-    assert _nwalls(fp, sc) == before, "the bake copied walls"
+    assert census() == before, "the bake created objects"
+    for g in [i for i in sc.items() if isinstance(i, fp.GroupItem)]:
+        sc.clearSelection()
+        g.setSelected(True)
+        win.ungroup_selected()
+    assert census() == before, "the ungroup created objects"
 
 
-@pytest.mark.xfail(strict=False, reason="grouping a room ALONE still copies "
-                   "its walls (duplicate_wall); what a group IS is P4.5's")
-def test_grouping_rooms_without_their_walls_still_copies_them(fp, win,
-                                                              make_room):
-    """The same sentence read literally -- the ROOM items and nothing else.
+def test_grouping_rooms_without_their_walls_copies_nothing(fp, win,
+                                                           make_room):
+    """REWRITTEN INTO ITS OPPOSITE AT P4.5 (was ...still_copies_them, xfail).
 
-    Split from the test above for the reason P0.4's test 2 was split: one
-    assertion cannot tell today's behaviour from P4.5's, and a test that passes
-    in both worlds proves nothing about the change.
+    The old name asserted the old contract: selecting the ROOM items and
+    nothing else duplicated their walls. It was xfail-pinned so that the day
+    `duplicate_wall` died it would flip -- and it did, which is why the name
+    had to go with it. A test called `still_copies_them` that passes because
+    nothing copies is a trap for the next reader.
 
-    THE MECHANISM IS PINNED HERE; THE SCALE IS RECORDED IN THE LOG. Measured at
-    P3.8 on symmetricP1's twenty rooms: +868 walls, and the duplication
-    COMPOUNDS -- the same rooms grouped one at a time sum to only 258, because
-    each room's copy sees the copies the earlier ones made. Pinning that here
-    would cost the suite 40 seconds to rebuild a number the log already states,
-    so this uses two rooms: `duplicate_wall` either copies or it does not, and
-    at P4.5 it dies and this flips."""
+    THE SCALE IT PINNED, kept because it is the number the phase existed for:
+    measured at P3.8 on symmetricP1's twenty rooms, this gesture created
+    **+868 walls**, and the duplication COMPOUNDED -- the same rooms grouped
+    one at a time summed to only 258, because each room's copy saw the copies
+    the earlier ones had made. Two rooms are enough to pin the mechanism;
+    the twenty-room number is the mini-gate's item 1."""
     sc = win.scene
-    make_room(sc, 0, 0, 120, 120, "A")
-    make_room(sc, 120, 0, 120, 120, "B")
+    a = make_room(sc, 0, 0, 120, 120, "A")
+    b = make_room(sc, 120, 0, 120, 120, "B")
     before = _nwalls(fp, sc)
+    own = {id(w) for r in (a, b) for w in r.walls}
     sc.clearSelection()
     for it in sc.items():
         if isinstance(it, fp.RoomItem):
             it.setSelected(True)
     win.group_selected()
-    assert _nwalls(fp, sc) == before
+    assert _nwalls(fp, sc) == before, "grouping rooms alone copied walls"
+    # ...and what the group holds is the rooms' OWN walls, not lookalikes
+    g = next(i for i in sc.items() if isinstance(i, fp.GroupItem))
+    grouped = [c for c in g.childItems() if isinstance(c, fp.WallItem)]
+    assert grouped and all(id(w) in own for w in grouped)
 
 
 def test_the_group_box_does_not_stretch_when_the_group_moves(fp, win,
@@ -728,3 +825,157 @@ def test_the_group_box_does_not_stretch_when_the_group_moves(fp, win,
         assert moved.height() == pytest.approx(at_rest.height(), abs=0.01), (
             f"the box stretched in y at ({dx}, {dy}): "
             f"{at_rest.height():.1f} -> {moved.height():.1f}")
+
+
+# --------------------------------------------------------------------------
+# P4.5: the four `group() is None` guards come down ONE AT A TIME, and
+# VISIBILITY comes down before PERMISSION (working agreement). These pin the
+# boundary between the two so the intermediate states stay coherent.
+# --------------------------------------------------------------------------
+def test_the_planner_can_see_a_grouped_wall(fp, win, make_room):
+    """VISIBILITY guard retired (graph_from_scene). The exclusion was
+    load-bearing only while a grouped wall was a COPY -- admitting it would
+    have doubled every edge the copy shadowed. With nothing duplicated the
+    same line inverts: it hides real geometry from the one view the planner
+    reasons over, and a planner that cannot see a wall produces a plan that
+    disagrees with the scene."""
+    from floorplanner.walls import graph_from_scene
+    sc = win.scene
+    a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    b = fp.WallItem(QPointF(120, 0), QPointF(120, 120), "interior")
+    for w in (a, b):
+        sc.addItem(w)
+        w.setSelected(True)
+    fp.rebuild_all_walls(sc)
+    assert len(graph_from_scene(sc).walls) == 2      # precondition: both seen
+    win.group_selected()
+    assert a.group() is not None and b.group() is not None
+    seen = {id(v.key) for v in graph_from_scene(sc).walls}
+    assert id(a) in seen and id(b) in seen, (
+        "the planner is blind to a grouped wall -- F1/F2 by hand")
+
+
+def test_a_grouped_wall_merges_and_welds_like_any_other(fp, win):
+    """THE BOUNDARY MARKER, RETIRED -- there is no boundary left to mark.
+
+    It moved twice and expired both times exactly where it was declared to:
+    at merge_wall (was ..._is_not_permission_to_merge_it) and again here at
+    weld_scene, on its own words, "the snap half no longer declines -- guard
+    3 expired". All four group exemptions are down, so this is now an
+    ordinary regression test: a grouped wall is a plan wall that happens to
+    be selected, and every topology pass treats it as one.
+
+    Kept rather than deleted because the assertions are the contract -- the
+    thing a future change would break -- even though the marker role is
+    over."""
+    sc = win.scene
+    a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    b = fp.WallItem(QPointF(60, 0), QPointF(180, 0), "interior")  # overlapping
+    for w in (a, b):
+        sc.addItem(w)
+        w.setSelected(True)
+    fp.rebuild_all_walls(sc)
+    win.group_selected()
+    n = _nwalls(fp, sc)
+    fp.merge_wall(sc, a)
+    assert _nwalls(fp, sc) == n - 1, "the grouped run did not merge"
+    assert a.scene() is sc and a.group() is not None, (
+        "the survivor left the group -- a merge must not empty it")
+
+    # ...and welding, BOTH halves. The snap half filtered grouped walls until
+    # guard 3; the share half is `share_coincident_ends`, which scopes itself
+    # by `graph_from_scene` and so opened at the visibility retirement
+    # (measured: (0,0) at 7a00fe1, (0,1) at ac86173 -- which is how the
+    # "grouped ends never weld" census claim was found to be half wrong).
+    c = fp.WallItem(QPointF(400, 0), QPointF(520, 0), "interior")
+    d = fp.WallItem(QPointF(520, 0.4), QPointF(640, 0.4), "interior")
+    for w in (c, d):
+        sc.addItem(w)
+    fp.rebuild_all_walls(sc)
+    sc.clearSelection()
+    for w in (c, d):
+        w.setSelected(True)
+    win.group_selected()
+    moved, shared = fp.weld_scene(sc)
+    assert moved >= 1, "the snap half still declines a grouped end"
+    assert shared >= 1, "the share half still declines a grouped end"
+    # the 0.4" gap really closed -- the ends are one point now
+    assert c.p2.y() == pytest.approx(d.p1.y(), abs=1e-6)
+
+
+def test_a_grouped_wall_can_be_rebound_to_its_own_room(fp, win):
+    """GUARD 4 RETIRED (_edge_wall's group refusal). Its premise was the
+    others': a grouped wall was a COPY, so binding an edge to one risked
+    attaching a room to a transient duplicate. Grouping a room now puts the
+    room's OWN walls in the group, so the refusal inverted into "a room may
+    not re-bind to its own wall while that wall is grouped" -- and the edge
+    read OPEN over a wall that was right there, which is the symptom class
+    P4.2 spent six mini-gate findings killing."""
+    from floorplanner.rooms import _edge_wall
+    sc = win.scene
+    cs = [QPointF(0, 0), QPointF(120, 0), QPointF(120, 120), QPointF(0, 120)]
+    for i in range(4):
+        sc.addItem(fp.WallItem(cs[i], cs[(i + 1) % 4], "interior"))
+    fp.rebuild_all_walls(sc)
+    res = fp.detect_room(sc, QPointF(60, 60))
+    room = fp.RoomItem("R", QPointF(60, 60), res[0], res[1], corners=res[2])
+    sc.addItem(room)
+    fp.bind_room_walls(sc, room)
+    sc.clearSelection()
+    room.setSelected(True)
+    win.group_selected()
+    # PRECONDITION: the wall really is grouped, or there is no refusal to test
+    target = room.outline[0].wall
+    assert target is not None and target.group() is not None
+    assert _edge_wall(sc, room.corners[0], room.corners[1],
+                      room.floor) is target, "the binder cannot see it"
+    # the reachable case: the edge loses its reference and must re-bind
+    room.outline[0].wall = None
+    fp.bind_room_walls(sc, room)
+    assert room.outline[0].wall is target, "the edge could not re-bind"
+    assert len(room.open_edges()) == 0, (
+        "a dashed OPEN edge over a wall that is right there")
+
+
+def test_the_edge_wall_tie_break_is_a_contract(fp, win):
+    """PINNED AS A CONTRACT, not left as an observation.
+
+    Two overlapping-but-not-identical walls on one edge is a LEGAL document
+    state -- row 44's measurement proved a parallel/sub-segment pair passes
+    every invariant -- so the two-candidate case is reachable in a valid plan
+    rather than a corner case. `_edge_wall`'s order is: (1) a wall whose ENDS
+    MATCH the edge beats one that merely runs along it; (2) then the one
+    covering MORE of the edge; (3) then the geometrically smallest, so the
+    pick cannot depend on scene item order. Determinism that is merely
+    observed is determinism that changes silently."""
+    from floorplanner.rooms import _edge_wall
+    sc = win.scene
+    a, b = QPointF(0, 0), QPointF(120, 0)
+
+    # (1) ENDS MATCH beats longer-but-running-along
+    exact = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    longer = fp.WallItem(QPointF(-60, 0), QPointF(240, 0), "interior")
+    for w in (longer, exact):        # added longer FIRST: order must not decide
+        sc.addItem(w)
+    fp.rebuild_all_walls(sc)
+    assert _edge_wall(sc, a, b) is exact, "ends-match must win"
+
+    # (2) with no exact match, MORE COVERAGE wins
+    sc.removeItem(exact)
+    less = fp.WallItem(QPointF(0, 0), QPointF(40, 0), "interior")
+    sc.addItem(less)
+    fp.rebuild_all_walls(sc)
+    assert _edge_wall(sc, a, b) is longer, "more coverage must win"
+
+    # (3) among equals, the pick is deterministic and order-independent
+    sc.removeItem(longer)
+    sc.removeItem(less)
+    twin_a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    twin_b = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    for w in (twin_a, twin_b):
+        sc.addItem(w)
+    fp.rebuild_all_walls(sc)
+    first = _edge_wall(sc, a, b)
+    assert first in (twin_a, twin_b)
+    for _ in range(5):               # repeated queries agree
+        assert _edge_wall(sc, a, b) is first, "the tie-break is not stable"

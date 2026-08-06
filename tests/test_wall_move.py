@@ -27,7 +27,7 @@ import pytest
 from PyQt6.QtCore import QPointF, Qt
 
 from floorplanner.design import validate as VD
-from floorplanner.vertex import Vertex, split_count
+from floorplanner.vertex import Vertex
 
 pytestmark = pytest.mark.walls
 
@@ -210,17 +210,34 @@ def test_a_promoted_corner_follows_the_drag(fp, scene):
     assert a.end_vertex("p2") is c.end_vertex("p1"), "sharing broke mid-drag"
 
 
-def test_moving_a_corner_is_not_counted_as_a_split(fp, scene):
-    """A move is not a split, and the telemetry must agree -- otherwise P3.3's
-    own conversion would show up in the very log that exists to find call sites
-    still needing it."""
-    a, _b, _c = _tee_scene(fp, scene)
+def test_moving_a_corner_keeps_it_the_same_corner(fp, scene):
+    """A MOVE IS NOT A SPLIT: the dragged corner keeps its identity, and the
+    neighbour promoted onto it is still holding the very same object.
+
+    CONVERTED AT P4.5 from `assert split_count() == before`. That watched for
+    the absence of split-on-write; with the mechanism retired it could never
+    have failed again. What it was reaching for is that the corner SURVIVES
+    the drag as one corner, and that is asserted here two ways -- the uid is
+    stable (identity as the document sees it) and the neighbour's end is the
+    same Python object (identity as the scene holds it). Strictly stronger:
+    a fresh corner minted by any route at all fails this."""
+    a, _b, c = _tee_scene(fp, scene)
     a._mode = None
     a.mousePressEvent(_Ev((60, 0)))
-    before = split_count()
+    shared = a.end_vertex("p2")
+    uid = shared.uid
+    # PRECONDITION -- there IS sharing to preserve. The press is what promotes
+    # it, so this is asked after the press; and it is C, the perpendicular, that
+    # may share the corner -- B is the collinear continuation the anti-shear
+    # rule deliberately keeps off it (see `_tee_scene`).
+    assert c.end_vertex("p1") is shared or c.end_vertex("p2") is shared,         "the tee is not shared, so this test would be about nothing"
     for k in (6, 12):
         a.mouseMoveEvent(_Ev((60, k)))
-    assert split_count() == before
+    moved = a.end_vertex("p2")
+    assert (moved.x, moved.y) != (shared.x, shared.y), "the corner never moved"
+
+    assert moved.uid == uid, "the moved corner was renamed -- that is a split"
+    assert c.end_vertex("p1") is moved or c.end_vertex("p2") is moved,         "the neighbour was left on the old corner"
 
 
 # ------------------------------------------------- the split rule: anti-shear
@@ -317,18 +334,25 @@ def test_the_whole_original_span_still_slides_as_one(fp, scene):
     assert ys == [12.0, 12.0], f"the span came apart: {ys}"
 
 
-def test_a_body_landing_costs_no_split_on_writes(fp, scene):
-    """The telemetry point 5 predicted. The tee branch moved its end by
-    coordinate on EVERY mouse event; now the corner is real and the branch is
-    silent."""
+def test_a_body_landing_keeps_one_corner_across_twelve_drags(fp, scene):
+    """The tee branch moved its end by coordinate on EVERY mouse event; now the
+    corner is real, so twelve consecutive landings leave ONE corner, not twelve.
+
+    CONVERTED AT P4.5 from `assert split_count() == before` -- same reasoning
+    as the corner-move test above. Twelve drags is the point: churn per gesture
+    is what the counter was watching for, and a stable uid across twelve of
+    them says it directly."""
     a, _c = _body_tee_scene(fp, scene)
-    before = split_count()
+    uid = a.end_vertex("p1").uid
+    y0 = a.p1.y()
     for _k in range(12):
         a._mode = None
         a.mousePressEvent(_Ev((60, a.p1.y())))
         a.mouseMoveEvent(_Ev((60, a.p1.y() + 6)))
         a.mouseReleaseEvent(_Ev((60, a.p1.y() + 6)))
-    assert split_count() == before
+    # PRECONDITION -- the twelve drags actually moved the end
+    assert a.p1.y() != y0, "nothing moved, so identity was never at risk"
+    assert a.end_vertex("p1").uid == uid,         "the end was renamed during the landings -- one corner became many"
 
 
 def test_a_landing_inside_a_doorway_now_splits_instead_of_declining(fp, scene):
@@ -475,44 +499,6 @@ def test_a_dragged_wall_resizes_the_rooms_it_borders(fp, scene):
     assert sum(after) == pytest.approx(sum(before), abs=0.01)
 
 
-# ------------------------------------------ call-site attribution (telemetry)
-def test_split_telemetry_names_the_call_site(fp, win, monkeypatch):
-    """P3.1 logged that an operation split; it could not say WHERE, and "which
-    call sites should become real vertex moves" is a question about lines of
-    code. P3.3 converts the first of them and attributes the rest."""
-    from floorplanner.design import verify as V
-    monkeypatch.setenv(V.ENV_VAR, "1")
-    V.rebase(win)
-    V.verify(win, "baseline")
-
-    w = fp.WallItem(QPointF(0, 0), QPointF(100, 0), "interior")
-    win.scene.addItem(w)
-    w.p1 = QPointF(5, 5)                                    # <- the call site
-    V.verify(win, "moved an end")
-
-    where, blame = getattr(win, V.SITE_LOG_ATTR)[-1]
-    assert where == "moved an end"
-    assert sum(blame.values()) == 1
-    (path, func, _line), = blame
-    assert func == "test_split_telemetry_names_the_call_site"
-    assert path.endswith("test_wall_move.py")
-    V.rebase(win)
-
-
-def test_attribution_skips_the_property_setter(fp):
-    """Every split arrives through the `p1`/`p2` setters, so blaming those would
-    put all of them on two lines and answer nothing."""
-    from floorplanner import vertex as VX
-    w = fp.WallItem(QPointF(0, 0), QPointF(100, 0), "interior")
-    before = VX.split_sites()
-    w.p2 = QPointF(150, 0)
-    new = {k for k, v in VX.split_sites().items() if v > before.get(k, 0)}
-    assert new, "the split was not attributed at all"
-    for path, func, _line in new:
-        assert func not in ("p1", "p2")
-        assert not path.endswith("vertex.py")
-
-
 def test_relocation_carries_the_vertex_identity():
     """A moved corner is the SAME corner, so it keeps its uid -- otherwise a
     drag would silently rename every corner it touches, and P4.5 serializes
@@ -608,7 +594,9 @@ def test_pressing_every_wall_changes_nothing_across_the_corpus(fp, win, plan):
              if isinstance(w, fp.WallItem)]
     assert walls, "the corpus plan has no walls"
 
-    before, splits = design_from_scene(win).to_dict(), split_count()
+    before = design_from_scene(win).to_dict()
+    # every wall end, by OBJECT identity, before the presses
+    ends = {(id(w), a): w.end_vertex(a) for w in walls for a in ("p1", "p2")}
     for w in walls:
         w._mode = None
         w.mousePressEvent(_Ev(((w.p1.x() + w.p2.x()) / 2,
@@ -617,19 +605,50 @@ def test_pressing_every_wall_changes_nothing_across_the_corpus(fp, win, plan):
     fp.rebuild_all_walls(win.scene)
 
     assert design_from_scene(win).to_dict() == before
-    assert split_count() == splits
+    # CONVERTED AT P4.5 from `assert split_count() == splits`, and TWO drafts
+    # of the conversion were wrong before this one -- both kept, because each
+    # was wrong about something real.
+    #   (a) "every end holds the SAME object afterwards" forbids the PROMOTION
+    #       this test exists to exercise: a press that creates sharing
+    #       re-points one end AT its neighbour's vertex, so the object changes
+    #       by design.
+    #   (b) "every end holds a vertex that already existed" forbids the
+    #       ANTI-SHEAR SPLIT, which mints a stationary twin at press time.
+    #       Measured on sample_plan: 4 ends re-minted, at (216,288) and
+    #       (432,144), every one of them AT THE SAME COORDINATES, and the
+    #       sharing partition re-grouped rather than shrank (8 classes before,
+    #       8 after). The old counter never saw those mints because they go
+    #       through `Vertex.at`, not `moved_to` -- the instrument-boundary
+    #       lesson again, and the reason a conversion cannot be mechanical.
+    # WHAT IS ACTUALLY TRUE, and is the boundary between press and drag: a
+    # press may RE-PARTITION a corner, and may never MOVE one. So every end's
+    # vertex sits where that end's vertex sat before, whatever object it is.
+    # The document comparison above cannot see this: two distinct vertices at
+    # the same coordinates emit an identical document.
+    moved = {(w, a) for w in walls for a in ("p1", "p2")
+             if (w.end_vertex(a).x, w.end_vertex(a).y)
+             != (ends[(id(w), a)].x, ends[(id(w), a)].y)}
+    assert not moved, f"a press moved {len(moved)} wall end(s)"
+    # ...and it must have exercised the re-partition, or it proves nothing
+    assert any(w.end_vertex(a) is not ends[(id(w), a)]
+               for w in walls for a in ("p1", "p2")),         "no end was re-pointed at all, so this says nothing about the press"
 
 
 # --------------------------------------------------------- the group boundary
-def test_a_grouped_neighbour_follows_but_is_never_promoted(fp, win):
-    """Grouping DUPLICATES a room's walls onto the originals, so a grouped end
-    coincident with a dragged wall is the common case, not an exotic one.
+def test_a_grouped_neighbour_is_promoted_like_any_other(fp, win):
+    """REWRITTEN INTO ITS OPPOSITE AT P4.5, with the carve-out it pinned.
 
-    Promoting it would wire a group member to an outside wall permanently, and
-    what a group is topologically is P4.5's question -- so it keeps the old
-    coordinate path and still follows the drag exactly as it does today. The
-    same instinct as the `group() is None` gate that keeps grouped walls out of
-    coalesce, applied one task earlier than the semantics that need it."""
+    It used to assert that a grouped coincident end followed the drag on the
+    old COORDINATE path and was never promoted (`kind == "rigid"`). Its own
+    docstring gave the reason: "grouping DUPLICATES a room's walls onto the
+    originals, so a grouped end coincident with a dragged wall is the common
+    case... promoting it would wire a group member to an outside wall
+    permanently, and what a group is topologically is P4.5's question."
+
+    Both clauses expired here. Nothing is duplicated any more, and a group is
+    a membership list over real items -- so a grouped coincident end is an
+    ordinary coincident end, and it promotes like any other. A corner is one
+    corner regardless of what selection set happens to hold it."""
     sc = win.scene
     grouped = fp.WallItem(QPointF(120, 0), QPointF(120, 120), "interior")
     mate = fp.WallItem(QPointF(120, 120), QPointF(240, 120), "interior")
@@ -645,10 +664,12 @@ def test_a_grouped_neighbour_follows_but_is_never_promoted(fp, win):
     fp.rebuild_all_walls(sc)
     _body_drag(a, 0, 12)
 
-    assert a.end_vertex("p2") is not grouped.end_vertex("p1"), (
-        "a grouped wall was promoted across the group boundary")
-    assert a._promoted == 0
-    assert ("rigid" in [k for *_, k in a._attached]), "not even tracked"
+    assert a.end_vertex("p2") is grouped.end_vertex("p1"), (
+        "a grouped neighbour was still held out of the shared corner")
+    assert a._promoted == 1
+    assert "rigid" not in [k for *_, k in a._attached], "the kind survived"
+    # ...and it follows the drag, which is what the old test also required
+    assert grouped.p1.y() == pytest.approx(12)
 
 
 def _four_room_junction(fp, scene):
@@ -889,3 +910,129 @@ def test_a_partial_side_slide_steps_the_neighbours_outline(fp, scene):
     assert step is not None and step.wall is None, "the step must be OPEN"
     assert [(p.x(), p.y()) for p in rooms["Clst"].corners] == clst_before, \
         "Clst borders only the continuation and must not move"
+
+
+# --------------------------------------------------------------------------
+# P4.5: the endpoint drag joins the vertex ops (the P3.1 shim, writer 4 of 4)
+# --------------------------------------------------------------------------
+def _press_move_release(wall, points, mods=Qt.KeyboardModifier.NoModifier):
+    """Drive one gesture directly on the item, sampling identity per event.
+
+    Direct rather than through the `drag` fixture on purpose: what is under
+    test is what each MOUSE-MOVE EVENT does to identity, so the events have to
+    be individually addressable."""
+    class _Ev:
+        def __init__(self, p):
+            self._p = p
+
+        def scenePos(self):
+            return self._p
+
+        def button(self):
+            return Qt.MouseButton.LeftButton
+
+        def modifiers(self):
+            return mods
+
+        def accept(self):
+            pass
+
+        def ignore(self):
+            pass
+
+    wall.mousePressEvent(_Ev(points[0]))
+    seen = []
+    for p in points[1:]:
+        wall.mouseMoveEvent(_Ev(p))
+        seen.append(wall.end_vertex("p2"))
+    wall.mouseReleaseEvent(_Ev(points[-1]))
+    return seen
+
+
+def _corner_pair(fp, scene):
+    """Two walls welded at (120, 0) -- so there is a shared corner to leave."""
+    a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    b = fp.WallItem(QPointF(120, 0), QPointF(120, 96), "interior")
+    scene.addItem(a)
+    scene.addItem(b)
+    fp.weld_scene(scene)
+    fp.rebuild_all_walls(scene)
+    return a, b
+
+
+def test_an_endpoint_drag_detaches_once_per_gesture_not_once_per_event(
+        fp, scene):
+    """THE SPLIT BELONGS TO THE GESTURE, NOT TO THE EVENT.
+
+    Assigning `p1`/`p2` is split-on-write, so the old endpoint drag minted a
+    fresh `Vertex` -- and a fresh uid -- on every mouse-move event that moved
+    the end, re-seating the end's opening anchors each time. The semantics were
+    right and are unchanged: an endpoint drag DETACHES this end and leaves
+    anything sharing the corner where it was. What is under test is that the
+    detach happens ONCE and the corner is then RELOCATED, identity intact."""
+    a, b = _corner_pair(fp, scene)
+    assert a.end_vertex("p2") is b.end_vertex("p1"), \
+        "precondition: the two walls share the corner being dragged"
+    shared = b.end_vertex("p1")
+
+    seen = _press_move_release(
+        a, [QPointF(120, 0)] + [QPointF(120 + 6 * i, 0) for i in range(1, 8)])
+
+    assert a._mode is None, "the gesture ended"
+    moved = [v for v in seen if v is not shared]
+    assert moved, "precondition: the drag actually moved the end off the corner"
+    # ONE detached corner for the whole gesture, whatever the event count
+    assert len({v.uid for v in moved}) == 1, \
+        f"the end changed identity {len({v.uid for v in moved})} times in one drag"
+    # ...and the neighbour never moved, which is what "detach" means
+    assert b.end_vertex("p1") is shared
+    assert (b.p1.x(), b.p1.y()) == (120.0, 0.0)
+    assert a.end_vertex("p2") is not b.end_vertex("p1")
+    assert a.p2.x() == pytest.approx(162.0)
+
+
+def test_pressing_an_endpoint_without_moving_leaves_the_corner_shared(
+        fp, scene):
+    """The detach is LAZY, and that is behaviour worth keeping rather than an
+    accident of the retired setter, which returned the same vertex unchanged on
+    a zero-length move -- so a press-and-release never took a corner apart. A
+    detach-at-press would have broken a corner on a click."""
+    a, b = _corner_pair(fp, scene)
+    shared = a.end_vertex("p2")
+    assert shared is b.end_vertex("p1"), "precondition: the corner is shared"
+
+    seen = _press_move_release(a, [QPointF(120, 0), QPointF(120, 0)])
+
+    assert a._mode is None
+    assert seen, "precondition: at least one move event was delivered"
+    assert all(v is shared for v in seen), \
+        "a gesture that moved nothing still took the corner apart"
+    assert a.end_vertex("p2") is b.end_vertex("p1")
+
+
+def test_the_endpoint_drag_runs_on_the_same_applier_as_the_body_drag(fp, scene):
+    """Row 42 names THREE structurally identical corner-appliers as a
+    Phase-6 consolidation candidate. This change must not make it four: the
+    endpoint drag now uses `_DragVertex` -- the body drag's applier -- and
+    differs only in WHAT IT GATHERS (one deliberately detached end, rather
+    than every end on the corner). The gather is where body and endpoint
+    drags should differ; the application is not."""
+    from floorplanner.walls import _DragVertex
+    a, _b = _corner_pair(fp, scene)
+    _press_move_release(a, [QPointF(120, 0), QPointF(150, 0), QPointF(162, 0)])
+    # the gesture cleared it on release, so re-run one press+move and look
+    a.mousePressEvent(type("E", (), {
+        "scenePos": lambda s: QPointF(162, 0),
+        "button": lambda s: Qt.MouseButton.LeftButton,
+        "modifiers": lambda s: Qt.KeyboardModifier.NoModifier,
+        "accept": lambda s: None, "ignore": lambda s: None})())
+    assert a._mode in ("p1", "p2"), "precondition: an endpoint drag started"
+    a.mouseMoveEvent(type("E", (), {
+        "scenePos": lambda s: QPointF(180, 0),
+        "button": lambda s: Qt.MouseButton.LeftButton,
+        "modifiers": lambda s: Qt.KeyboardModifier.NoModifier,
+        "accept": lambda s: None, "ignore": lambda s: None})())
+    assert isinstance(a._ep_move, _DragVertex), \
+        "the endpoint drag grew its own applier instead of joining the existing one"
+    assert len(a._ep_move.ends) == 1, \
+        "an endpoint drag must carry exactly the end it grabbed"

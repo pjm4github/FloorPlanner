@@ -743,28 +743,41 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         walls = set()
         for s in shapes:
             walls.update(s["walls"])
-        for w in walls:
-            w.p1 = grid_snap(w.p1, step)
-            w.p2 = grid_snap(w.p2, step)
-        rebuild_all_walls(self.scene)     # rooms re-detect on the new walls
+        # RELOCATE the corners; do not assign coordinates. Assigning `p1`/`p2`
+        # splits on write, so every wall end came away on a fresh vertex and
+        # the outline was left holding the old ones -- measured at P4.5, all
+        # four walls of a room snapped to the grid and its outline stayed
+        # entirely off it. `relocate_corners` also widens the gather to every
+        # room in the scene holding a corner being moved, which is what stops
+        # the party-wall neighbour tearing (it deforms instead, ruling 2a).
+        rooms = [s["room"] for s in shapes if s["room"] is not None]
+        relocate_corners(walls, rooms,
+                         lambda v: grid_snap(v.point(), step), self.scene)
+        rebuild_all_walls(self.scene)
         self.status(f"Aligned {len(shapes)} room(s) to the "
                     f'{step:g}" grid.')
 
-    @staticmethod
-    def _translate_shape(shape, dx, dy):
-        """Rigidly shift a room shape (its walls and, if any, its region)."""
-        for w in shape["walls"]:
-            w.p1 = QPointF(w.p1.x() + dx, w.p1.y() + dy)
-            w.p2 = QPointF(w.p2.x() + dx, w.p2.y() + dy)
+    def _translate_shape(self, shape, dx, dy):
+        """Rigidly shift a room shape (its walls and, if any, its region).
+
+        SAME CORRECTION AS `align_rooms_to_grid`, and it was the more damaging
+        of the two: this used to assign `p1`/`p2` AND rebuild the room's corner
+        list from fresh `QPointF`s, so the two agreed numerically and shared
+        nothing. Measured at P4.5 on a row of three rooms, outline-to-wall
+        corner sharing went 4-of-4 to 0-of-4 on EVERY room -- **while
+        Distribute moved them by zero**, because assigning the same coordinate
+        still mints a vertex. The room looked right and the next wall drag
+        stranded it (defect 22's shape, arriving through a different door)."""
         r = shape["room"]
+        relocate_corners(shape["walls"], [r] if r is not None else [],
+                         lambda v: QPointF(v.x + dx, v.y + dy), self.scene)
         if r is not None:
+            r.prepareGeometryChange()
             r.anchor = QPointF(r.anchor.x() + dx, r.anchor.y() + dy)
-            # region derives from the outline (P3.5): shifting the corners
-            # shifts it. The mapped path is only the outline-less fallback.
-            r.set_region(QTransform.fromTranslate(dx, dy).map(r.path),
-                         r.area_sqft,
-                         [QPointF(c.x() + dx, c.y() + dy) for c in r.corners]
-                         if r.corners else None)
+            if not r.outline:     # outline-less: the stored path IS the region
+                r.set_region(QTransform.fromTranslate(dx, dy).map(r.path),
+                             r.area_sqft, None)
+            r.update()
 
     def distribute_rooms(self, horizontal: bool):
         """Space the selected rooms so the gaps between them are equal,
@@ -1031,7 +1044,17 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         # a room's walls are duplicated EXCEPT any already selected this way, so
         # selecting a room together with its walls doesn't make a coincident
         # copy of every edge (which bloated the wall count until ungroup).
-        direct_walls = {it for it in selected if isinstance(it, WallItem)}
+        # P4.5: A GROUP NEVER COPIES ANYTHING. The schema says so in as many
+        # words -- "moving it translates the vertices its members reference
+        # plus its member furnishings; rooms are the durable unit" -- and
+        # `duplicate_wall` is deleted. A selected room contributes its REAL
+        # walls, so there is nothing to reconcile afterwards: no coincident
+        # copies to merge on ungroup, no `room_owns_walls` reading false
+        # against a group of clones, and no wall count that grows with every
+        # group/move/ungroup cycle. `seen` now guards against adopting one
+        # wall twice (two selected rooms share a party wall) rather than
+        # against copying it twice.
+        seen = {id(it) for it in selected if isinstance(it, WallItem)}
         members, old_groups = [], []
         for it in selected:
             if isinstance(it, GroupItem):
@@ -1039,14 +1062,11 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             elif isinstance(it, (WallItem, FurnishingItem)):
                 members.append(it)
             elif isinstance(it, RoomItem):
-                seen = set()
-                for w in it.bounding_walls() + it.interior_walls():
+                for w in room_walls(it) + it.interior_walls():
                     if not isinstance(w, WallItem) or id(w) in seen:
                         continue
                     seen.add(id(w))
-                    if w in direct_walls:
-                        continue          # already a member; don't copy it
-                    members.append(duplicate_wall(self.scene, w))
+                    members.append(w)
         for g in old_groups:
             g.bake()
             members += g.dissolve()
@@ -1073,11 +1093,24 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             g.bake()                      # members keep their moved spot
             for c in g.dissolve():
                 c.setSelected(True)
-        # P4.5's to REMOVE, not (iii)'s to migrate: once groups move the real
-        # items nothing is duplicated, so nothing needs merging on ungroup.
-        # Wired to the new pass meanwhile so behaviour is unchanged.
-        merge_all(self.scene)             # now-free walls may merge with the plan
-        rebuild_all_walls(self.scene)     # rooms re-detect region/outline
+        # REMOVED AT P4.5, exactly as the task line called for ("no
+        # duplicate_wall, no coalesce_all on ungroup"). The merge existed to
+        # clean up the COPIES grouping used to make; with nothing duplicated
+        # there is nothing to clean.
+        #
+        # WHAT IT ACTUALLY COST, measured on the pre-P4.5 tree rather than
+        # assumed: it is PLAN-WIDE, so it re-decomposed walls no gesture had
+        # touched -- symmetricP1 80 -> 78 items, planc1TestV5 82 -> 78,
+        # planc1.v5 83 -> 80. But the SAVED FILE is byte-identical across it
+        # on all three -- measured on `design_document()`, the producer
+        # `_write_plan` writes, and on the literal `json.dump` output, not
+        # only on `snapshot()`: those are collinear same-type segments the
+        # walk planarises to the same thing, and wall count is presentation
+        # state (P2.3). So NO GEOMETRY WAS EVER LOST -- what was wrong is that a
+        # local gesture silently reshaped the whole plan's item structure,
+        # which breaks "the group moves and nothing else changes" and makes
+        # undo steps that look bigger than the edit.
+        rebuild_all_walls(self.scene)     # rooms re-derive region/outline
         self.status("Ungrouped — items left in place.")
 
     def coalesce_all_now(self):

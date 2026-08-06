@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QVBoxLayout,
                              QWidget)
 
 import FloorPlanner as FP
+from floorplanner.vertex import Vertex
 
 os.environ.setdefault("QT_QPA_FONTDIR", str(FP.FONT_DIR))
 app = QApplication([])
@@ -209,10 +210,10 @@ def build_open_wall():
     bottom = next(w for w in r.walls
                   if abs(w.p1.y() - 168) < 1 and abs(w.p2.y() - 168) < 1)
     FP.detach_wall_from_room(sc, bottom)
-    if abs(bottom.p1.x() - 216) < 1:           # leave the right half open
-        bottom.p1 = QPointF(108, 168)
-    else:
-        bottom.p2 = QPointF(108, 168)
+    # leave the right half open: DETACH the end onto a fresh corner, so the
+    # room's outline stays put and the vacated stretch reads as an open edge
+    attr = "p1" if abs(bottom.p1.x() - 216) < 1 else "p2"
+    bottom.set_end_vertex(attr, Vertex.at(QPointF(108, 168)))
     bottom.rebuild()
     FP.rebuild_all_walls(sc)
     win._update_totals()

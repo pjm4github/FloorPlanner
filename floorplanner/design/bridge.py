@@ -66,7 +66,8 @@ from floorplanner.design.legacy import (
 from floorplanner.design.model import Design
 from floorplanner.geometry import parse_wwhh
 from floorplanner.items import (
-    FurnishingItem, ReferenceImageItem, furnishing_spec, make_furnishing,
+    FurnishingItem, GroupItem, ReferenceImageItem, furnishing_spec,
+    make_furnishing,
 )
 from floorplanner.model import Floor
 from floorplanner.vertex import Vertex
@@ -507,7 +508,7 @@ def _sig(op):
             round(op["anchor"]["offset_in"], 1))
 
 
-def _rooms_of(items, lid, nid, vt, walls, rep):
+def _rooms_of(items, lid, nid, vt, walls, rep, src=None):
     """This level's rooms, outlined from each `RoomItem.corners` -- the scene's
     own belief about its shape.  An edge no run of walls covers is emitted OPEN
     (`wall: null`) rather than invented; the room keeps its exact shape."""
@@ -581,6 +582,8 @@ def _rooms_of(items, lid, nid, vt, walls, rep):
         # was never loaded from a v5 document. (`placement` left the stash at
         # P4.2 -- it is modelled above.)
         rec.update(getattr(r, "_v5_extra", None) or {})
+        if src is not None:               # which scene room (P4.5)
+            src[rec["id"]] = r
         rooms.append(rec)
     return rooms
 
@@ -612,7 +615,7 @@ def _bind_sides(rooms, walls, vt):
     return poly
 
 
-def _furnishings_of(items, lid, nid, rooms, poly):
+def _furnishings_of(items, lid, nid, rooms, poly, src=None):
     """This level's furnishings, each owned by the SMALLEST room containing it
     (a closet inside a bedroom belongs to the closet)."""
     out = []
@@ -630,6 +633,8 @@ def _furnishings_of(items, lid, nid, rooms, poly):
         state = dict(it.extra_state())
         if state:
             rec["state"] = state
+        if src is not None:               # which scene item (P4.5)
+            src[rec["id"]] = it
         out.append(rec)
     return out
 
@@ -660,6 +665,7 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
 
     buckets = _by_floor(scene)
     levels, vertices, walls, rooms, furnishings = [], [], [], [], []
+    groups = []                            # P4.5, defect 3
     for f in roster:                       # LEVELS OUTER -- see the module note
         lid = nid("L")
         levels.append({"id": lid, "name": f.name, "elevation_in": 0.0,
@@ -681,10 +687,29 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         parts += [[r] + [w for w in r.walls if w.scene() is not None]
                   for r in floating]
         lw_all, lr_all, poly_all = [], [], {}
+        # P4.5 (defect 3): which live item produced which document id, so a
+        # GROUP can be emitted as the member ids it actually holds. The wall
+        # map is the `src` out-param that already exists for `face_at` -- one
+        # mechanism, not a second geometric match -- and a live wall may map
+        # to SEVERAL document walls, because the walk splits it at junctions.
+        # That is why membership is a set of document objects rather than a
+        # 1:1 id: the group holds whatever its member became.
+        of_item = {}                       # id(live) -> [document ids]
+
+        def _note(doc_id, live, of_item=of_item):   # bound: B023
+            of_item.setdefault(id(live), []).append(doc_id)
+
         for part in parts:
             vt = VertexTable(lambda: nid("v"))
-            lw = _walls_of(part, lid, nid, vt, rep)
-            lr = _rooms_of(part, lid, nid, vt, lw, rep)
+            wsrc, rsrc = {}, {}
+            lw = _walls_of(part, lid, nid, vt, rep, src=wsrc)
+            lr = _rooms_of(part, lid, nid, vt, lw, rep, src=rsrc)
+            for rec in lw:
+                live = wsrc.get((*sorted((rec["v1"], rec["v2"])),))
+                if live is not None:
+                    _note(rec["id"], live)
+            for rid_, live in rsrc.items():
+                _note(rid_, live)
             poly_all.update(_bind_sides(lr, lw, vt))
             # I10: emit only the vertices some wall or outline actually uses
             used = {v for w in lw for v in (w["v1"], w["v2"])}
@@ -692,7 +717,22 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
             vertices += [row for row in vt.rows if row["id"] in used]
             lw_all += lw
             lr_all += lr
-        lf = _furnishings_of(items, lid, nid, lr_all, poly_all)
+        fsrc = {}
+        lf = _furnishings_of(items, lid, nid, lr_all, poly_all, src=fsrc)
+        for fid_, live in fsrc.items():
+            _note(fid_, live)
+        # ...and the groups themselves: a membership list over what the walk
+        # emitted, per the schema's "a group NEVER copies anything".
+        for g in _ordered(items, GroupItem, lambda g: (id(g),)):
+            members = sorted({d for ch in g.childItems()
+                              for d in of_item.get(id(ch), ())})
+            if not members:                # schema: minItems 1
+                continue
+            rec = {"id": nid("g"), "level": lid, "members": members}
+            rot = float(g.rotation() or 0.0)
+            if rot:
+                rec["rotation"] = rot
+            groups.append(rec)
         walls += lw_all
         rooms += lr_all
         furnishings += lf
@@ -725,12 +765,13 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         "format": "floorplanner-design", "version": 5, "units": "inches",
         "settings": settings, "levels": levels, "vertices": vertices,
         "walls": walls, "rooms": rooms, "furnishings": furnishings,
-        # groups do not survive serialization today (defect 3) and a grouped
-        # wall has no single id here -- it splits into segments.  Both close
-        # together at P4.5, which is also what holds characterization test 3
-        # xfail; emitting a guess now would make that test pass for the wrong
-        # reason.
-        "groups": [],
+        # DEFECT 3 CLOSES AT P4.5. The old note here said a grouped wall
+        # "has no single id -- it splits into segments", and that is still
+        # true: the answer is that membership is a SET of document objects,
+        # so a wall that split contributes every segment it became. The
+        # `src` out-param that `face_at` already uses is what maps live item
+        # to emitted id, so no second (geometric) matcher was invented.
+        "groups": groups,
     }))
 
 
@@ -1007,6 +1048,7 @@ def apply_design_to_scene(target, design, report=None, strict=False,
     # returns at `if not rooms` so no flood-fill can overwrite a stored outline
     rebuild_all_walls(scene)
 
+    rmap, fmap = {}, {}            # P4.5: document id -> live item, for groups
     for rd in doc.get("rooms", []):
         corners = [pos[e["v"]] for e in rd["outline"]]
         cx = sum(c.x() for c in corners) / len(corners)
@@ -1033,6 +1075,7 @@ def apply_design_to_scene(target, design, report=None, strict=False,
                                                           False))
         room.label_offset = QPointF(0.0, 0.0)
         scene.addItem(room)
+        rmap[rd["id"]] = room
         for e in room.outline:                  # the outline IS the binding --
             if e.wall is not None:                       # read, not detected
                 room.bind_wall(e.wall)
@@ -1054,7 +1097,28 @@ def apply_design_to_scene(target, design, report=None, strict=False,
                                fd.get("state") or {})
         item.floor = lname.get(fd["level"], DEFAULT_FLOOR)   # never the global
         scene.addItem(item)
+        fmap[fd["id"]] = item
         rep["furnishings"] += 1
+
+    # GROUPS (P4.5, defect 3). Rebuilt last, once every member exists, and
+    # only from ids the document actually resolved -- a group whose members
+    # all vanished is dropped rather than restored empty. `adopt` keeps each
+    # child's scene position, which is what lets the group sit at (0,0) and
+    # the members keep the absolute coordinates the document gave them.
+    for gd in doc.get("groups", []) or []:
+        members = [m for m in (gd.get("members") or [])
+                   if m in wmap or m in rmap or m in fmap]
+        live = [wmap.get(m) or rmap.get(m) or fmap.get(m) for m in members]
+        live = [x for x in live if x is not None and not isinstance(x, RoomItem)]
+        if len(live) < 2:
+            continue                    # a group of one is not a group
+        grp = GroupItem()
+        grp.floor = lname.get(gd["level"], DEFAULT_FLOOR)
+        scene.addItem(grp)
+        for x in live:
+            grp.adopt(x)
+        if gd.get("rotation"):
+            grp.setRotation(float(gd["rotation"]))
 
     if win is not None:
         win._sync_floor_state()

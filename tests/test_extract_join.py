@@ -334,16 +334,16 @@ def test_fuse_straggler_macro_steals_no_wall(win):
         assert r.area_sqft == pytest.approx(base[r.name], abs=0.5)
 
 
-def test_the_merge_rebind_producer_is_watched(scene):
-    # REGISTER ROW 36's WATCH (ruled 2026-08-03): the producer -- the
-    # release-merge's unconditional rebind of an absorbed wall's rooms onto a
-    # survivor that runs off the room's own edge -- is CARRIED to P4.5
-    # conditionally on this test existing. Its PRECONDITION asserts the
-    # producer still mints binding-without-naming: the day merge semantics
-    # change, the precondition goes red and the row must be re-argued. Its
-    # VERDICT asserts extract's step 1b releases the state: the day the guard
-    # regresses, CI catches it here rather than a field macro catching it in
-    # a stranded wall.
+def test_a_merge_never_binds_a_room_to_a_wall_its_outline_does_not_name(
+        scene):
+    # REGISTER ROW 36, CLOSED AT SOURCE (P4.5). This was the WATCH that
+    # carried the producer -- its preconditions asserted that the release
+    # merge still minted binding-without-naming, so that the day merge
+    # semantics changed the row would be re-argued. They changed, the row was
+    # re-argued, and the producer is fixed rather than carried: the rebind
+    # binds a room to the survivor only when the survivor spans an edge that
+    # room's outline actually names. So this is an ordinary regression test
+    # now, asserting the state is NOT minted.
     room = _make(scene, 0, 0, 120, 120, "R")
     west = next(w for w in room.walls
                 if abs(w.p1.x()) < 0.5 and abs(w.p2.x()) < 0.5)
@@ -353,23 +353,83 @@ def test_the_merge_rebind_producer_is_watched(scene):
     scene.addItem(a)
     fp.rebuild_all_walls(scene)
     fp.merge_wall(scene, a)                      # the release's own pass
-    # -- PRECONDITION: the producer minted binding-without-naming
+    # PRECONDITION: the merge really happened, so the verdict is about
+    # something (the state this test judges cannot arise otherwise)
+    assert west.scene() is None, "precondition: the 5\"-offset merge absorbed"
+    # VERDICT: no binding without naming
+    assert a not in room.walls and room not in a.rooms, (
+        "the merge bound a room to a survivor no outline edge names -- "
+        "row 36's producer is back")
+    # ...and the room says so honestly: that edge now has no wall spanning it.
+    # Asked of `open_edges()`, not of `e.wall is None` -- the outline still
+    # NAMES the absorbed wall, which has left the scene, and "an edge whose
+    # wall is gone is open" is exactly what that predicate is for (P4.1).
+    assert room.open_edges(), "the vacated edge should read OPEN"
+
+
+def test_a_grouped_merge_never_binds_a_room_it_does_not_border(win):
+    # THE SECOND PRODUCER PATH, opened by P4.5(7) when merge_wall stopped
+    # refusing grouped walls, measured minting the state, and closed by the
+    # same source fix. Kept as its own test because it reaches the rebind by
+    # a different route, and a fix at source should close BOTH -- which is
+    # the whole argument for fixing at source.
+    sc = win.scene
+    room = _make(sc, 0, 0, 120, 120, "R")
+    west = next(w for w in room.walls
+                if abs(w.p1.x()) < 0.5 and abs(w.p2.x()) < 0.5)
+    a = fp.WallItem(QPointF(-5, 0), QPointF(-5, 120), "interior")
+    b = fp.WallItem(QPointF(-5, 120), QPointF(-5, 240), "interior")
+    for w in (a, b):
+        sc.addItem(w)
+    fp.rebuild_all_walls(sc)
+    sc.clearSelection()
+    for w in (a, b):
+        w.setSelected(True)
+    win.group_selected()
+    assert a.group() is not None, "precondition: the absorber is grouped"
+
+    fp.merge_wall(sc, a)
+
     assert west.scene() is None, (
-        "precondition lost: the merge no longer absorbs the 5\"-offset "
-        "wall -- re-argue register row 36 before touching this test")
-    assert a in room.walls and room in a.rooms, (
-        "precondition lost: the merge no longer rebinds the absorbed "
-        "wall's room -- the row-36 producer is gone; re-argue the row")
-    assert all(e.wall is not a for e in room.outline), (
-        "precondition lost: the survivor is now NAMED by the room's "
-        "outline -- the binding-without-naming state no longer arises")
-    # -- VERDICT: extract releases the bound-but-unnamed wall (step 1b)
-    p1, p2 = QPointF(a.p1), QPointF(a.p2)
-    fp.extract_room(scene, room)
-    assert a not in room.walls, (
-        "extract took a wall no outline edge names -- the straggler class")
-    assert a.scene() is scene
-    room._translate(0, 300)
-    assert (a.p1.x(), a.p1.y(), a.p2.x(), a.p2.y()) == \
-        (p1.x(), p1.y(), p2.x(), p2.y()), (
-        "the float STOLE the bound-but-unnamed wall -- row 36 regressed")
+        "precondition: the GROUPED merge absorbed (guard 2 permits it)")
+    assert a not in room.walls and room not in a.rooms, (
+        "the grouped merge bound a room to a survivor no outline edge "
+        "names -- the second producer path is back")
+
+
+def test_a_merge_does_not_resurrect_the_absorbed_wall_through_a_group(win):
+    """The rebind fix's own aftermath, measured at P4.5 and fixed with it.
+
+    When the rebind correctly DECLINES, the outline edge goes on naming the
+    absorbed wall -- "dead but not absent": a Python object outside the
+    scene, neither None nor a deleted C++ object. Most predicates that read
+    an edge's wall re-check liveness (5 of them do explicitly); `room_walls`
+    did not, and P4.5(2) made `group_selected` consume it -- so grouping such
+    a room ADOPTED the dead wall, and adoption re-parents it into the scene.
+    A wall the merge had deleted came back.
+
+    Fixed in the predicate rather than at the call site, so every consumer is
+    covered at once."""
+    sc = win.scene
+    room = _make(sc, 0, 0, 120, 120, "R")
+    west = next(w for w in room.walls
+                if abs(w.p1.x()) < 0.5 and abs(w.p2.x()) < 0.5)
+    a = fp.WallItem(QPointF(-5, 0), QPointF(-5, 120), "interior")
+    sc.addItem(a)
+    fp.rebuild_all_walls(sc)
+    fp.merge_wall(sc, a)
+    # PRECONDITION: the state exists -- the edge still names the dead wall
+    assert west.scene() is None
+    assert any(e.wall is west for e in room.outline), (
+        "precondition lost: the edge no longer names the absorbed wall, so "
+        "there is no dangling reference to mishandle")
+    # VERDICT
+    assert west not in fp.room_walls(room), "room_walls handed back a dead wall"
+    n_before = sum(1 for i in sc.items() if isinstance(i, fp.WallItem))
+    sc.clearSelection()
+    room.setSelected(True)
+    win.group_selected()
+    assert sum(1 for i in sc.items()
+               if isinstance(i, fp.WallItem)) == n_before, (
+        "grouping resurrected the absorbed wall into the scene")
+    assert west.scene() is None, "the deleted wall is back in the scene"

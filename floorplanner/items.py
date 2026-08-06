@@ -14,8 +14,10 @@ from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import WallItem, rebuild_all_walls
-from floorplanner.rooms import RoomItem, room_owns_walls, walls_cover_room
-from floorplanner.vertex import Vertex
+from floorplanner.rooms import (
+    RoomItem, report_self_intersections, room_owns_walls, walls_cover_room,
+    rooms_holding,
+)
 
 # Stairs — a dynamic "Framing" furnishing: step count from the room's ceiling
 # height (standard ~7" risers); full or half flight to a landing.
@@ -723,11 +725,23 @@ class GroupItem(QGraphicsItemGroup):
         re-share after every group move, which is why deferring the conversion
         to P4.5 was safe until P3.5 deleted it.
 
-        A CORNER AN OUTSIDE WALL ALSO HOLDS IS SPLIT HERE, before anything
-        moves. That is P3.3's split-before-share discipline, and it preserves
-        today's behaviour exactly: the group moves, whatever is outside it does
-        not. Relocating such a corner wholesale would drag a non-member's end --
-        the very wiring the `group() is None` guards exist to prevent.
+        DEFORM-TO-FOLLOW (P4.5, ruled): A CORNER AN OUTSIDE WALL ALSO HOLDS IS
+        NO LONGER SPLIT. It used to be, before anything moved, so that "the
+        group moves, whatever is outside it does not" -- and the justification
+        given was that relocating it wholesale would drag a non-member's end,
+        "the very wiring the `group() is None` guards exist to prevent". **That
+        justification expired**: P4.5 retired all four of those guards, and
+        `duplicate_wall` died with them, so a group now holds the REAL walls
+        rather than copies. A corner the group and a room both hold is the
+        NORMAL case, not an outsider to protect from.
+
+        So the corner relocates whole, and everything on it comes along: an
+        outside wall end because it IS that corner, and every room whose
+        outline holds it -- gathered SCENE-WIDE BY IDENTITY, the same question
+        `_rooms_holding` and `_DragVertex.ends` ask. Gathering only the rooms
+        the group fully owns is what stranded the clipped room (defect 23): its
+        walls walked out from under a region that had no record telling it to
+        follow.
 
         A carried room whose outline corner is on NO member wall (sharing was
         already broken -- a legacy import, or a group move from before this fix)
@@ -739,29 +753,56 @@ class GroupItem(QGraphicsItemGroup):
                 v = w.end_vertex(a)
                 held.setdefault(id(v), v)
                 ends.append((w, a, v))
-        shared_out = set()
+        # AN OUTSIDE WALL'S END ON ONE OF THESE CORNERS COMES ALONG, and this
+        # is the same scan that used to SPLIT it off -- inverted rather than
+        # deleted, which is the shape of the whole ruling. Without it the
+        # outsider keeps the old vertex while everything else moves, so the
+        # network tears open at that corner: measured on the clipped band as
+        # `unwelded_ends` rising 0 -> 1 after a bake that was otherwise clean.
+        # The room half of this gather widened at P4.5; the wall half is the
+        # same question and had been left behind (found by Align to grid
+        # hitting it first, on a three-room row).
         for it in (sc.items() if sc is not None else ()):
             if isinstance(it, WallItem) and it not in group_walls:
                 for a in ("p1", "p2"):
-                    if id(it.end_vertex(a)) in held:
-                        shared_out.add(id(it.end_vertex(a)))
+                    v = it.end_vertex(a)
+                    if id(v) in held:
+                        ends.append((it, a, v))
         recs = {}
         for k, v in held.items():
-            # split off a corner an outsider also holds; ours becomes a new one
-            keep = Vertex.at(v.point()) if k in shared_out else v
-            recs[k] = [QPointF(v.point()), keep, [], []]
+            recs[k] = [QPointF(v.point()), v, [], []]
         for w, a, v in ends:
-            rec = recs[id(v)]
-            rec[2].append((w, a))
-            w.set_end_vertex(a, rec[1])          # apply the split, if any
+            recs[id(v)][2].append((w, a))
+        # A FULLY-OWNED room moves RIGIDLY, so a corner of its outline that no
+        # member wall holds still gets a record -- that is the legacy-sharing
+        # repair, and it is what makes the room travel whole.
         for r in carry_rooms:
             for e in r.outline:
                 rec = recs.get(id(e.v))
                 if rec is None:
                     rec = recs[id(e.v)] = [QPointF(e.v.point()), e.v, [], []]
                 rec[3].append(e)
-                e.v = rec[1]
+        # A room the group only PARTLY holds must DEFORM, not travel: it follows
+        # exactly the corners that moved and keeps the ones that did not. So it
+        # attaches to EXISTING records only -- minting one for an unheld corner
+        # is what would drag the whole room, which is the rigid case above and
+        # the opposite error to the stranding this fixes.
+        owned = {id(r) for r in carry_rooms}
+        for r in self._rooms_holding(sc, set(held)):
+            if id(r) in owned:
+                continue
+            for e in r.outline:
+                rec = recs.get(id(e.v))
+                if rec is not None:
+                    rec[3].append(e)
         return list(recs.values())
+
+    # THE GATHER LIVES IN `rooms.py` NOW (P4.5). It was defined here first,
+    # then wanted by Align to grid and Distribute, and one concept with three
+    # implementations is F2's disease -- so `rooms_holding` is the single
+    # definition and this stays only as the name `bake` and the rotation
+    # already call.
+    _rooms_holding = staticmethod(rooms_holding)
 
     @staticmethod
     def _apply_corner_records(recs, tr):
@@ -802,8 +843,15 @@ class GroupItem(QGraphicsItemGroup):
         self.prepareGeometryChange()
         self._obox = None                 # child coords change below
         tr = QTransform.fromTranslate(d.x(), d.y())
-        self._apply_corner_records(
-            self._corner_records(group_walls, moved_rooms), tr)
+        recs = self._corner_records(group_walls, moved_rooms)
+        # WHICH ROOMS CAN THIS DEFORM (P4.5 §2a). Not `moved_rooms`: a room the
+        # group fully owns moves RIGIDLY and cannot cross itself. The exposure
+        # is the CLIPPED room -- it holds some corners this bake moves and some
+        # it does not, so its shape changes. Gathered by vertex identity (the
+        # defect-30 gather), and gathered BEFORE the move, because
+        # `relocated_to` hands back a new object.
+        watched = self._rooms_holding(sc, {id(rec[1]) for rec in recs})
+        self._apply_corner_records(recs, tr)
         for ch in self.childItems():
             # a member WALL needs nothing here: its ends moved with the corner,
             # and the `rebuild_all_walls` below rebuilds it. Rebuilding it here
@@ -819,6 +867,10 @@ class GroupItem(QGraphicsItemGroup):
             r.update()
         self.setPos(0.0, 0.0)
         rebuild_all_walls(sc)
+        # ...and say so AT THE GESTURE if the deform crossed an outline. The
+        # document check (I5b) is deep-only and would not speak until the save
+        # refused to write -- learning at the wrong moment, defect 17's disease.
+        report_self_intersections(sc, watched)
 
     def mousePressEvent(self, e):
         if (e.button() == Qt.MouseButton.LeftButton and self.isSelected()

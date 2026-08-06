@@ -258,13 +258,26 @@ def graph_from_scene(scene, floor=None):
 
     `floor=None` views every floor at once. Level is part of the planner's
     grouping key, so floors stay apart there rather than by one pass per floor.
-    Open (dashed) and grouped walls are excluded, exactly as coalesce excluded
-    them."""
+
+    GROUPED WALLS ARE IN THE VIEW SINCE P4.5, and the exclusion that used to
+    sit here was load-bearing for exactly one reason: a grouped wall was a
+    COPY, so admitting it would have doubled every edge the copy shadowed.
+    With `duplicate_wall` dead a grouped wall IS a plan wall, and the same
+    line inverts in meaning -- it stops preventing duplicates and starts
+    hiding real geometry from the one view the planner reasons over. A
+    planner that cannot see a wall produces a plan that disagrees with the
+    scene, which is F1 and F2 rebuilt by hand.
+
+    THIS IS VISIBILITY ONLY. What the planner may DO with a grouped wall is
+    governed separately, by `merge_wall` and `weld_scene`, and those still
+    refuse -- so the state after this change is coherent: complete
+    information, no new action. (Working agreement: retire visibility before
+    permission.)"""
     if scene is None:
         return GraphView([], {}, {})
     walls = sorted((w for w in scene.items()
                     if isinstance(w, WallItem)
-                    and w.group() is None and w.length() > 1e-6
+                    and w.length() > 1e-6
                     and (floor is None or w.floor == floor)),
                    key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y(),
                                   w.wall_type))
@@ -287,7 +300,7 @@ def _adopt_end(wall, attr, vertex, xy):
         if wall.end_vertex(attr) is not vertex:
             wall.set_end_vertex(attr, vertex)
         return
-    setattr(wall, attr, QPointF(xy[0], xy[1]))
+    wall.detach_end(attr, QPointF(xy[0], xy[1]))
 
 
 def apply_merge_plan_to_scene(scene, plan, rebuild=True):
@@ -343,7 +356,31 @@ def apply_merge_plan_to_scene(scene, plan, rebuild=True):
                 if op.scene() is not None:
                     scene.removeItem(op)
         surv.openings = keep
+        # THE OUTLINE DECIDES WHICH WALLS ARE A ROOM'S -- register row 36,
+        # fixed at source at P4.5. This rebind used to be unconditional: every
+        # room that bordered an ABSORBED wall was bound to the survivor,
+        # whether or not the survivor ran along any edge that room actually
+        # has. A room 5" from the survivor's line came away bound to a wall no
+        # outline edge named -- binding without naming -- and the wall then
+        # rode out with the room on the next extract until step 1b started
+        # releasing it.
+        #
+        # That release is a NET UNDER THE HOLE, not a closed hole: every time
+        # the producer's surface widened (a grouped wall may merge since
+        # P4.5(7)) the net's coverage became a fresh question. Closing it here
+        # retires the question. And the condition is not invented for the
+        # occasion -- it is the thesis this phase has enforced everywhere
+        # else (`room_walls()` over `bounding_walls()`, the outline as the
+        # single answer to which walls are a room's). This rebind was the last
+        # site holding a different answer.
+        from floorplanner.rooms import _wall_spans_segment  # late (cycle)
         for r in rooms:
+            corners = r.corners or []
+            n = len(corners)
+            if n and not any(_wall_spans_segment(surv, corners[i],
+                                                 corners[(i + 1) % n])
+                             for i in range(n)):
+                continue                   # spans no edge this room has
             r.bind_wall(surv)
         survivors.append(surv)
         if rebuild:
@@ -452,7 +489,7 @@ def _snap_wall_ends(scene, wall):
         if q is not None:
             if QLineF(q, p).length() > 1e-9:
                 moved += 1
-            setattr(wall, attr, q)
+            wall.detach_end(attr, q)
     return moved
 
 
@@ -498,9 +535,18 @@ def weld_scene(scene, max_passes=6):
         return (0, 0)
     moved = 0
     for _ in range(max_passes):
+        # GROUPED WALLS SNAP SINCE P4.5 -- the last of the four exemptions,
+        # and by then the smallest: this filter only ever covered the SNAP
+        # half. The SHARE half is `share_coincident_ends`, which scopes
+        # itself by `graph_from_scene` and so opened at the visibility
+        # retirement (measured: (0,0) -> (0,1)). The census entry that said
+        # "grouped ends never weld" was therefore half wrong, which is why
+        # behavioural claims get measured like counts. The reason the filter
+        # existed is the reason all four had: a grouped wall was a COPY lying
+        # on its original, and snapping one to the other would have closed a
+        # gap that did not exist between two walls that were the same wall.
         walls = sorted((w for w in scene.items()
-                        if isinstance(w, WallItem)
-                        and w.group() is None),
+                        if isinstance(w, WallItem)),
                        key=lambda w: (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()))
         step = sum(_snap_wall_ends(scene, w) for w in walls)
         moved += step
@@ -537,11 +583,20 @@ def merge_wall(scene, wall, perp_tol=None, force=False):
     `wall` is forced to be the run's SURVIVOR, which is not a detail: the
     caller has just drawn or dragged that item and holds a reference to it,
     and it carries the selection. The planner takes the run's first wall in the
-    caller's own order, so putting `wall` first is all it takes to say so."""
+    caller's own order, so putting `wall` first is all it takes to say so.
+
+    A GROUPED WALL MAY MERGE SINCE P4.5 -- the second of the four exemptions
+    to come down, and the first that grants PERMISSION rather than sight. The
+    refusal existed because a grouped wall was a COPY sitting exactly on the
+    original it was copied from: merging those two would have "fused" a wall
+    with its own shadow and destroyed the group's contents. Nothing is copied
+    now, so a grouped wall is a plan wall that happens to be selected, and
+    refusing it left the plan un-normalised for as long as anything stayed
+    grouped -- which is the state a user works in, not an edge case."""
     if not force and not editing_enabled("auto_coalesce"):
         return wall
     if (scene is None or wall is None or wall.scene() is None
-            or wall.group() is not None or wall.length() < 1e-6):
+            or wall.length() < 1e-6):
         return wall
     if perp_tol is None:
         perp_tol = SETTINGS.get("wall_snap_in", WALL_SNAP_DEFAULT)
@@ -856,7 +911,7 @@ def snap_end_to_doorway_jamb(scene, wall, ends=("p1", "p2")):
                     if best is None or abs(sj - s_p) < abs(best - s_p):
                         best = sj
         if best is not None:
-            setattr(wall, attr, host.point_at(best))
+            wall.detach_end(attr, host.point_at(best))
             moved += 1
     if moved:
         wall.rebuild()
@@ -1135,6 +1190,7 @@ class WallItem(QGraphicsItem):
         self._drawing = False         # True while being rubber-banded
         self._mode = None             # None | 'p1' | 'p2' | 'move'
         self._vmoves = []             # P3.3: the corners a body-drag moves
+        self._ep_move = None          # the ONE corner an endpoint drag detaches
         self._path = QPainterPath()
         self._solid = QPainterPath()     # body footprint, no opening holes
         self._outline_clip = None        # outline-clip so junctions read solid
@@ -1162,40 +1218,42 @@ class WallItem(QGraphicsItem):
     def p1(self) -> QPointF:
         return self._v1.point()
 
-    @p1.setter
-    def p1(self, value):
-        v = getattr(self, "_v1", None)
-        self._v1 = v.moved_to(value) if v is not None else Vertex.at(value)
-        self._carry_anchors(v, self._v1)
-
     @property
     def p2(self) -> QPointF:
         return self._v2.point()
 
-    @p2.setter
-    def p2(self, value):
-        v = getattr(self, "_v2", None)
-        self._v2 = v.moved_to(value) if v is not None else Vertex.at(value)
-        self._carry_anchors(v, self._v2)
+    def detach_end(self, attr: str, p: QPointF):
+        """Land this end at `p` ON A NEW CORNER, leaving every sharer behind.
 
-    def _carry_anchors(self, old, new):
-        """Keep every opening dimensioned off `old` dimensioned off `new`.
+        THE `p1`/`p2` SETTERS' OPERATION, under a name that says which of the
+        two it is. Assignment was ONE SPELLING FOR TWO THINGS -- this, and
+        `relocated_to`'s "the corner moved and everything on it came along" --
+        and a reader could not tell them apart at a call site. The setters went
+        at P4.5; the operation did not, because four call sites genuinely mean
+        this: a merge landing an end where the plan named no corner, a snap, a
+        jamb landing, and the drag's `tee` branch.
 
-        THE END DID NOT CHANGE -- its coordinate did. Assigning `p1`/`p2` is
-        split-on-write, so the same corner comes away on a fresh `Vertex` with a
-        fresh uid, and an anchor still naming the old object is orphaned. An
+        THE ANCHOR CARRY IS WHY THIS IS NOT `set_end_vertex(attr,
+        Vertex.at(p))`, and it is the trap that made this a method rather than
+        two lines at each site. `set_end_vertex` routes through
+        `_fuse_anchors`, which deliberately does NOT move an opening's anchor
+        when the replacement vertex is somewhere ELSE -- that is a swap or a
+        deliberate share, and moving anchors there would shift a wall's
+        openings when it is merely reversed (R1(b)). Here the end really has
+        moved, and an anchor still naming the old vertex is orphaned; an
         orphaned anchor re-seats on `p1`, which for an opening dimensioned off
-        `p2` MIRRORS it down the wall. Measured on `planc1` before this existed:
-        12 of 41 openings changed position on load.
-
-        Deliberately NOT what `set_end_vertex` does for a vertex somewhere else
-        -- that is a swap or an explicit share, where the anchor must go on
-        naming the corner it names. See `_fuse_anchors`."""
-        if old is None or old is new:
-            return
-        for op in getattr(self, "openings", ()):
-            if op.anchor_v is old:
-                op.anchor_v = new
+        `p2` MIRRORS it down the wall. Measured on `planc1` before the carry
+        existed: 12 of 41 openings changed position on load."""
+        old = self.end_vertex(attr)
+        new = Vertex.at(p)
+        if attr == "p1":
+            self._v1 = new
+        else:
+            self._v2 = new
+        if old is not None and old is not new:
+            for op in getattr(self, "openings", ()):
+                if op.anchor_v is old:
+                    op.anchor_v = new
 
     def _fuse_anchors(self, old, new):
         """The WELD case: two ends at one corner fuse onto a single `Vertex`.
@@ -1483,6 +1541,7 @@ class WallItem(QGraphicsItem):
         # want never buries it behind a coincident/crossing room wall
         bring_to_front(self)
 
+        self._ep_move = None               # a fresh gesture detaches nothing yet
         if near_p1:
             self._mode = "p1"
             self._anchor = QPointF(self.p2)
@@ -1526,16 +1585,34 @@ class WallItem(QGraphicsItem):
                             if self._is_continuation(w):
                                 self._continuations.append((w, attr))
                             else:
-                                # a GROUPED neighbour still follows, but on the
-                                # old coordinate path -- grouping duplicates a
-                                # room's walls onto the originals, so promoting
-                                # one would wire a group member to an outside
-                                # wall permanently, and what a group even IS
-                                # topologically is P4.5's question. Same
-                                # instinct as the `group() is None` gate that
-                                # keeps grouped walls out of coalesce.
-                                kind = "corner" if w.group() is None else "rigid"
-                                self._attached.append((w, attr, QPointF(q), kind))
+                                # RETIRED AT P4.5: this used to read
+                                #   kind = "corner" if w.group() is None
+                                #          else "rigid"
+                                # and its justification, verbatim, was:
+                                #
+                                #   "a GROUPED neighbour still follows, but on
+                                #    the old coordinate path -- grouping
+                                #    duplicates a room's walls onto the
+                                #    originals, so promoting one would wire a
+                                #    group member to an outside wall
+                                #    permanently, and what a group even IS
+                                #    topologically is P4.5's question. Same
+                                #    instinct as the `group() is None` gate
+                                #    that keeps grouped walls out of coalesce."
+                                #
+                                # BOTH clauses expired here, in the same task
+                                # the comment named. Grouping no longer
+                                # duplicates anything (`duplicate_wall` is
+                                # deleted), so a grouped coincident end is an
+                                # ordinary coincident end and promoting it
+                                # wires nothing that was not already one
+                                # corner; and what a group IS is now answered
+                                # -- a membership list over real items. A
+                                # carve-out whose stated reason has expired is
+                                # how a workaround becomes folklore, so it goes
+                                # rather than being re-justified by silence.
+                                self._attached.append(
+                                    (w, attr, QPointF(q), "corner"))
                         else:
                             # a body-landing on ANY run wall, not just self
                             # (P4.2, mini-gate finding 5): the run slides as
@@ -1937,16 +2014,49 @@ class WallItem(QGraphicsItem):
                     dv.edges.append(e)
         self._vmoves = moves
 
+    def _drag_end_to(self, attr, p: QPointF):
+        """Stretch ONE end to `p` -- the endpoint drag, on the vertex ops.
+
+        THE SEMANTICS ARE UNCHANGED AND ARE THE POINT: an endpoint drag DETACHES
+        this end from any corner it shared ("this wall's end moved, and anything
+        sharing it did not") -- `Vertex.at`'s contract, and the designed
+        open-side behaviour (defect 30's row draws exactly this line against the
+        BODY drag, where the corner carries everything on it).
+
+        What changes is WHEN the detach happens. Assigning `p1`/`p2` split on
+        every mouse-move event, so one gesture minted a fresh `Vertex` -- and a
+        fresh uid -- several times over, re-seating the end's opening anchors
+        each time. **The split belongs to the GESTURE, not to the event.** So it
+        happens once, lazily, on the first event that actually moves the end;
+        afterwards the detached corner is RELOCATED, which is identity-carrying,
+        exactly as the body drag has done since P3.3.
+
+        Lazily, because a press-and-release that never moves must not take a
+        corner apart. That no-op is behaviour worth keeping, not an accident --
+        it is why `relocated_to` also returns `self` when nothing moved."""
+        dv = self._ep_move
+        if dv is None:
+            cur = self.end_vertex(attr)
+            here = cur.point()
+            if p.x() == here.x() and p.y() == here.y():
+                return                      # not moved yet: stay shared
+            # the one deliberate split of this gesture. `set_end_vertex` carries
+            # any opening anchored to the old corner across, because the
+            # replacement is in the same place (`_fuse_anchors`).
+            fresh = Vertex.at(here)
+            self.set_end_vertex(attr, fresh)
+            dv = self._ep_move = _DragVertex(fresh)
+            dv.ends.append((self, attr))
+        dv.apply(p.x() - dv.orig.x(), p.y() - dv.orig.y())
+
     def mouseMoveEvent(self, e):
         if self._mode is None:
             return
         sp = e.scenePos()
         target = (self._corner_target if self.rooms
                   else self._endpoint_target)
-        if self._mode == "p1":
-            self.p1 = target(sp, e.modifiers())
-        elif self._mode == "p2":
-            self.p2 = target(sp, e.modifiers())
+        if self._mode in ("p1", "p2"):
+            self._drag_end_to(self._mode, target(sp, e.modifiers()))
         elif self._mode == "move":
             delta = QPointF(sp.x() - self._press.x(), sp.y() - self._press.y())
             if e.modifiers() & Qt.KeyboardModifier.ControlModifier:
@@ -1974,17 +2084,17 @@ class WallItem(QGraphicsItem):
                     w.rebuild()
             # what could not be promoted still moves by coordinate. T-joints
             # follow only the sideways part of the slide so they stretch
-            # instead of tilting -- a body-landing has no vertex to share until
-            # P3.4 makes one; a `rigid` corner is a grouped wall, held back
-            # from sharing by the group guard, not by geometry.
+            # instead of tilting -- a body-landing has no vertex to share
+            # until P3.4 makes one. The `rigid` kind retired at P4.5 with the
+            # group carve-out that produced it, so "tee" is the only
+            # coordinate case left here.
             ux, uy = self._slide_u.x(), self._slide_u.y()
             along = dx * ux + dy * uy
             px, py = dx - along * ux, dy - along * uy
             for w, attr, orig, kind in self._attached:
-                if kind == "rigid":
-                    setattr(w, attr, QPointF(orig.x() + dx, orig.y() + dy))
-                elif kind == "tee":
-                    setattr(w, attr, QPointF(orig.x() + px, orig.y() + py))
+                if kind == "tee":
+                    w.detach_end(attr, QPointF(orig.x() + px,
+                                               orig.y() + py))
                 w.rebuild()
         self.rebuild()
         e.accept()
@@ -2061,6 +2171,7 @@ class WallItem(QGraphicsItem):
                 self._corners_unlocked = False
                 self.primary_room.raise_to_front()   # normalise z to siblings
         self._mode = None
+        self._ep_move = None
         e.accept()
 
     def contextMenuEvent(self, e):

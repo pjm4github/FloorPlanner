@@ -13,27 +13,30 @@ Persistence is an in-memory property, canonical form is the interchange
 property, and P2.3's canonical comparison is the bridge between them -- so
 nothing on disk changes because live items carry uids.
 
-**Assignment is SPLIT-ON-WRITE, not shared-move.** Moving one wall's end mints a
-fresh vertex for that end and leaves any sharer on the old one, which preserves
-today's independent-ends semantics exactly -- a shared move would drag a
-neighbour's end and break tests that have nothing to do with this task. Sharing
-is created explicitly (assign one wall's vertex to another's end) and broken
-explicitly (this split). SHARED MOVEMENT ARRIVES AT P3.3, as the wall-move
-operation, never as a side effect of assignment: representation changes first,
-behaviour second, each observable separately.
+**THE TWO OPERATIONS, and P4.5 left exactly these two.** `Vertex.at(p)` makes a
+NEW corner -- a deliberate DETACH, leaving every sharer where it was.
+`v.relocated_to(p)` carries THIS vertex's identity to a new position, so every
+end rebound to it is still the same corner, which is what lets a promoted
+neighbour follow a drag because it IS the corner rather than because a scan
+remembered to drag it. Sharing is created by handing one wall's vertex to
+another's end (`set_end_vertex`) and broken by detaching.
 
-Every split is counted (`split_count`) and ATTRIBUTED TO ITS CALL SITE
-(`split_sites`), so `--verify-design` can report not just how many implicit
-splits an operation caused but WHERE. The bare count told us the drag path
-splits; it could not say which line, and "which call sites should become real
-vertex moves" is a question about lines. P3.3 promotes the first of them --
-the wall-move drag -- and the attribution is how the rest are found.
+**SPLIT-ON-WRITE IS GONE (P4.5).** Until then, assigning a point to a wall's
+`p1` was a third way in: it minted a fresh vertex for that end and left any
+sharer behind. That was P3.1's compatibility shim, and it did its job -- it let
+this store replace the old coordinate pairs underneath a green suite. But it was
+ONE SPELLING FOR BOTH OPERATIONS ABOVE, so a reader could not tell which a call
+site meant, and four separate defects came from something downstream being left
+on the old vertex. Its last caller went at P4.5(33); the setters, the
+split helper and the counter went with it. **The guarantee now lives in
+`tools/gate.py`, which fails on any coordinate assignment to a wall end anywhere
+in this package** -- at source, where it cannot go vacuous, rather than as a
+runtime counter that nothing can increment.
 
-**A MOVE IS NOT A SPLIT** (P3.3). `moved_to` mints a new identity for one
-wall's end; `relocated_to` carries this vertex's identity to a new position, so
-every end rebound to it is still the same corner. The wall-move operation uses
-the latter, which is what lets a promoted neighbour follow a drag because it IS
-the corner rather than because a scan remembered to drag it.
+(That check reads the source TEXT, so it cannot tell code from prose -- which is
+why this paragraph spells the retired form out in words. A false positive in the
+other direction from every boundary in the plan's instrument table, and cheaper
+to write around than to teach a grep about docstrings.)
 
 **A vertex is never mutated in place**, which is what makes the two performance
 decisions below safe. `point()` returns the SAME `QPointF` rather than a copy,
@@ -47,51 +50,10 @@ mutates a `p1`/`p2` in place -- every access is `.x()` / `.y()` or a whole-objec
 read.)
 """
 import itertools
-import sys
 
 from PyQt6.QtCore import QPointF
 
 _UIDS = itertools.count(1)
-_SPLITS = [0]
-_SITES = {}                      # (file, function, line) -> splits caused there
-
-_THIS_FILE = __file__
-
-
-def split_count() -> int:
-    """Total split-on-writes since start. Callers record a delta across an
-    operation rather than reading it absolutely."""
-    return _SPLITS[0]
-
-
-def split_sites() -> dict:
-    """`{(file, function, line): count}` -- cumulative, same convention as
-    `split_count`: callers diff it across an operation.
-
-    Returned as a copy so a caller can keep it as a mark without it moving
-    underneath them."""
-    return dict(_SITES)
-
-
-def _blame() -> tuple:
-    """The call site that caused a split: the first frame outside this module
-    that is not a `p1`/`p2` property setter.
-
-    Skipping the setters is the whole point -- every split arrives through them,
-    so blaming `walls.py: p1` would attribute all of them to one line and answer
-    nothing. Uses `sys._getframe` rather than `traceback`: this runs on genuine
-    coordinate moves (never on a READ, which is the hot path P3.1 had to fix),
-    but a drag still moves several vertices per mouse event."""
-    try:
-        f = sys._getframe(2)
-    except ValueError:                                  # pragma: no cover
-        return ("<unknown>", "<unknown>", 0)
-    while f is not None and (f.f_code.co_filename == _THIS_FILE
-                             or f.f_code.co_name in ("p1", "p2")):
-        f = f.f_back
-    if f is None:                                       # pragma: no cover
-        return ("<unknown>", "<unknown>", 0)
-    return (f.f_code.co_filename, f.f_code.co_name, f.f_lineno)
 
 
 class Vertex:
@@ -131,39 +93,20 @@ class Vertex:
         """The vertex's position. Shared, not copied -- see the module note."""
         return self._pt
 
-    def moved_to(self, p) -> "Vertex":
-        """SPLIT-ON-WRITE. `self` when the position is unchanged -- so a no-op
-        assignment (there are many: every rebuild, every re-set of the same
-        coordinates) keeps identity and keeps any sharing. Otherwise a NEW
-        vertex, leaving every other user of `self` exactly where they were."""
-        mine = self._pt
-        if isinstance(p, QPointF):
-            x, y = p.x(), p.y()
-        else:
-            x, y = p[0], p[1]
-        if x == mine.x() and y == mine.y():
-            return self
-        _SPLITS[0] += 1
-        site = _blame()
-        _SITES[site] = _SITES.get(site, 0) + 1
-        return Vertex(x, y)
-
     def relocated_to(self, p) -> "Vertex":
         """MOVE THIS CORNER (P3.3). Returns a vertex at `p` carrying THIS one's
         identity, so every wall end rebound to it is the same corner in a new
         place -- not a new corner.
 
-        The difference from `moved_to` is the whole of P3.1-vs-P3.3. A split
+        The difference from `Vertex.at` is the whole of P3.1-vs-P3.3. A DETACH
         answers "this wall's end moved, and anything sharing it did not"; a
-        relocation answers "the corner moved, and everything on it came along".
-        Only the explicit wall-move operation may relocate: `p1`/`p2` assignment
-        still splits, because a bare assignment does not know whether the caller
-        meant the end or the corner. Not counted as a split, because it is not
-        one.
+        RELOCATION answers "the corner moved, and everything on it came along".
+        Until P4.5 there was a third way in -- assigning `p1`/`p2` -- which
+        split, because a bare assignment cannot know whether the caller meant
+        the end or the corner. That ambiguity is why it is gone.
 
-        `self` when the position is unchanged, for the same reason `moved_to`
-        does it: the drag re-applies the same delta on every mouse event that
-        does not actually move.
+        `self` when the position is unchanged: the drag re-applies the same
+        delta on every mouse event that does not actually move.
 
         THE MINT HERE IS FORCED, and it has to be (defect 21, found by P3.5's
         by-construction test). Reading `self._uid` instead of `self.uid` looked

@@ -1,12 +1,24 @@
-"""P3.1 -- the live vertex table behind `WallItem.p1` / `p2`.
+"""The vertex operations -- REWRITTEN AT P4.5 as the spec for what replaced the
+P3.1 shim, rather than deleted with it.
 
-The representation changes here; behaviour deliberately does NOT. `p1`/`p2` are
-read-through properties over `Vertex` objects, and assignment is SPLIT-ON-WRITE:
-it mints a fresh vertex for that end and leaves any sharer where it was, which
-is exactly today's independent-ends semantics. Shared movement is P3.3's
-wall-move operation, never a side effect of assignment.
+This file used to pin `p1`/`p2` assignment as SPLIT-ON-WRITE: a coordinate
+written to a wall end minted a fresh `Vertex` and left any sharer behind. That
+was P3.1's compatibility shim, and it did its job -- it let the store change
+underneath a green suite. Its last production caller went at P4.5(33), and the
+setters go with it.
 
-That distinction is the whole point of the task, so it is what these tests pin.
+WHAT SURVIVES IS THE DISTINCTION, not the spelling, and it is now made by two
+NAMED operations instead of by one ambiguous assignment:
+
+    v.relocated_to(p)   THE CORNER MOVED -- identity carried, so every wall end
+                        and outline edge holding it comes along.
+    Vertex.at(p)        A NEW CORNER -- what a deliberate DETACH takes, leaving
+                        every sharer exactly where it was.
+
+`wall.p1 = ...` was one spelling for both, and a reader could not tell which was
+meant. These tests pin the two against each other on the same scene and the same
+movement, plus the read-through they rest on and the round-trip composition the
+original file guarded.
 """
 import json
 from pathlib import Path
@@ -14,7 +26,7 @@ from pathlib import Path
 import pytest
 from PyQt6.QtCore import QPointF
 
-from floorplanner.vertex import Vertex, split_count
+from floorplanner.vertex import Vertex
 
 pytestmark = pytest.mark.walls
 
@@ -41,7 +53,6 @@ def test_uids_are_persistent_across_edits(fp):
     before = w.v1
     w.wall_type = "exterior"
     w.rebuild()
-    w.p1 = QPointF(0, 0)                    # a NO-OP assignment
     assert w.v1 == before, "an unrelated edit renamed the vertex"
 
 
@@ -50,95 +61,85 @@ def test_uid_is_minted_once_not_per_read(fp):
     assert w.v1 == w.v1 == w._v1.uid
 
 
-# --------------------------------------------------- split-on-write semantics
-def test_assignment_splits_and_leaves_the_sharer_alone(fp):
-    """THE ruling. Two walls sharing a corner: moving one end must not drag the
-    other -- that is today's behaviour, and preserving it is what makes 'suite
-    green with no test changes' achievable at all."""
+# ------------------------------------------- the two operations, side by side
+# `wall.p1 = ...` was ONE spelling for BOTH of these, which is why it is gone.
+# The next two tests are deliberately the same scene and the same movement, so
+# the only difference between them is which operation was asked for.
+def _shared_pair(fp):
+    """Two walls holding ONE corner at (100, 0), by identity."""
     a = _wall(fp, 0, 0, 100, 0)
     b = _wall(fp, 100, 0, 100, 80)
-    b._v1 = a._v2                            # EXPLICIT sharing: one corner
-    assert b.p1.x() == a.p2.x() and b.p1.y() == a.p2.y()
-    assert b.v1 == a.v2
+    b.set_end_vertex("p1", a.end_vertex("p2"))
+    assert b.end_vertex("p1") is a.end_vertex("p2"), "precondition: one corner"
+    return a, b
 
-    a.p2 = QPointF(140, 0)                   # move a's end
+
+def test_a_detach_moves_one_end_and_leaves_the_sharer(fp):
+    """`Vertex.at` -- a NEW corner. This wall's end moved; anything sharing the
+    old corner did not. That is the endpoint drag's semantics and the designed
+    open-side behaviour, and it is what the retired assignment used to do."""
+    a, b = _shared_pair(fp)
+    a.set_end_vertex("p2", Vertex.at(QPointF(140, 0)))
+
     assert (a.p2.x(), a.p2.y()) == (140.0, 0.0)
     assert (b.p1.x(), b.p1.y()) == (100.0, 0.0), \
-        "assignment dragged the sharer -- that is P3.3's move, not P3.1's"
-    assert a.v2 != b.v1, "the split did not break the sharing"
+        "the detach dragged the sharer -- that is a relocation, not a detach"
+    assert a.end_vertex("p2") is not b.end_vertex("p1"), \
+        "the detach did not break the sharing"
 
 
-def test_no_op_assignment_keeps_identity_and_sharing(fp):
-    """Re-setting the same coordinates must not churn uids or break sharing --
-    the codebase does this constantly (every rebuild, every settle)."""
-    a = _wall(fp, 0, 0, 100, 0)
-    b = _wall(fp, 100, 0, 100, 80)
-    b._v1 = a._v2
-    uid = a.v2
-    n = split_count()
-    a.p2 = QPointF(100, 0)
-    a.p2 = a.p2
-    assert a.v2 == uid and b.v1 == uid, "a no-op assignment split the vertex"
-    assert split_count() == n, "a no-op assignment was counted as a split"
+def test_a_relocation_moves_the_corner_and_everything_on_it(fp):
+    """`relocated_to` -- the SAME corner in a new place. Identity is carried, so
+    the sharer comes along and the uid does not change: a promoted neighbour
+    follows a drag because it IS the corner, not because a scan remembered
+    it."""
+    a, b = _shared_pair(fp)
+    corner = a.end_vertex("p2")
+    uid = corner.uid
+    moved = corner.relocated_to(QPointF(140, 0))
+    a.set_end_vertex("p2", moved)
+    b.set_end_vertex("p1", moved)
 
-
-def test_a_real_move_is_counted(fp):
-    w = _wall(fp, 0, 0, 100, 0)
-    n = split_count()
-    w.p1 = QPointF(1, 0)
-    w.p2 = QPointF(101, 0)
-    assert split_count() == n + 2
-
-
-def test_moving_a_wall_still_moves_both_ends(fp, scene):
-    """The ordinary case still behaves: nothing about the representation change
-    is visible to a caller that just sets both ends."""
-    w = _wall(fp, 0, 0, 100, 0)
-    scene.addItem(w)
-    w.p1 = QPointF(10, 10)
-    w.p2 = QPointF(110, 10)
-    w.rebuild()
-    assert (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()) == (10.0, 10.0, 110.0, 10.0)
-    assert w.length() == pytest.approx(100.0)
+    assert (a.p2.x(), a.p2.y()) == (140.0, 0.0)
+    assert (b.p1.x(), b.p1.y()) == (140.0, 0.0), "the sharer was left behind"
+    assert a.end_vertex("p2") is b.end_vertex("p1"), "the sharing was broken"
+    assert moved.uid == uid, "a relocation renamed the corner"
 
 
 # ------------------------------------------------------------- the Vertex type
+def test_a_no_op_move_keeps_identity_and_sharing(fp):
+    """A move to where the corner already is returns `self`, and the codebase
+    leans on that constantly -- every rebuild, every settle, and every mouse
+    event of a drag that has not yet moved."""
+    a, b = _shared_pair(fp)
+    corner = a.end_vertex("p2")
+    assert corner.relocated_to(QPointF(100, 0)) is corner
+    assert corner.relocated_to((100, 0)) is corner
+    assert corner.relocated_to(QPointF(100, 0.5)) is not corner
+    assert a.end_vertex("p2") is b.end_vertex("p1"), "sharing was disturbed"
+
+
 def test_vertex_is_never_mutated_in_place(fp):
     """`point()` returns the shared QPointF rather than a copy, which is only
-    safe because a MOVE mints a new vertex. A caller holding an old p1 keeps
-    seeing the old position -- identical to the pre-P3.1 behaviour, where
-    assignment rebound the attribute to a fresh QPointF."""
+    safe because a move mints a NEW vertex rather than editing this one. A
+    caller holding an old `p1` keeps seeing the old position."""
     w = _wall(fp, 0, 0, 100, 0)
     held = w.p1
-    w.p1 = QPointF(50, 50)
-    assert (held.x(), held.y()) == (0.0, 0.0), "a captured p1 moved under the caller"
+    w.set_end_vertex("p1", w.end_vertex("p1").relocated_to(QPointF(50, 50)))
+    assert (held.x(), held.y()) == (0.0, 0.0), \
+        "a captured p1 moved under the caller"
 
 
-def test_vertex_moved_to_returns_self_when_unchanged():
-    v = Vertex(3.0, 4.0)
-    assert v.moved_to(QPointF(3.0, 4.0)) is v
-    assert v.moved_to((3.0, 4.0)) is v
-    assert v.moved_to(QPointF(3.0, 4.5)) is not v
-
-
-# ---------------------------------------------- --verify-design records splits
-def test_verify_logs_splits_per_operation(fp, win, monkeypatch):
-    """P3.3 needs to know WHICH call sites move coordinates when they mean to
-    move corners; the per-operation split count is that data."""
-    from floorplanner.design import verify as V
-    monkeypatch.setenv(V.ENV_VAR, "1")
-    V.rebase(win)
-    V.verify(win, "baseline")                       # establishes the mark
-
+def test_moving_both_ends_moves_the_whole_wall(fp, scene):
+    """The ordinary case: nothing about the representation is visible to a
+    caller that just wants the wall somewhere else."""
     w = _wall(fp, 0, 0, 100, 0)
-    win.scene.addItem(w)
-    w.p1 = QPointF(5, 5)
-    w.p2 = QPointF(105, 5)
-    V.verify(win, "moved a wall")
-
-    log = getattr(win, V.SPLIT_LOG_ATTR)
-    assert ("moved a wall", 2) in log
-    V.rebase(win)
+    scene.addItem(w)
+    for attr, p in (("p1", QPointF(10, 10)), ("p2", QPointF(110, 10))):
+        w.set_end_vertex(attr, w.end_vertex(attr).relocated_to(p))
+    w.rebuild()
+    assert (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()) == (10.0, 10.0, 110.0, 10.0)
+    assert w.length() == pytest.approx(100.0)
 
 
 # ------------------------------------------------------ the COMPOSITION gate

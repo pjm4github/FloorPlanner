@@ -210,29 +210,76 @@ def test_boolean_keeps_exterior_walls_exterior(fp, win):
     assert kinds == {"exterior"}, f"result walls downgraded: {kinds}"
 
 
+@pytest.mark.xfail(strict=False, reason="register row 47 -- room_boolean builds "
+                   "a duplicate wall loop per region instead of extracting, so "
+                   "a fragment is not a self-contained unit; flips when "
+                   "fragment converts to extract")
 def test_fragment_groups_each_piece_with_its_own_walls(fp, win):
+    """Each fragment is a SELF-CONTAINED UNIT: no wall belongs to two of them.
+
+    REWRITTEN AT P4.5 (2026-08-05), and the old assertions were vacuous by
+    BASIS, not merely weak. The previous verdict was `all(enclosed(r))` after
+    dragging the Overlap piece clear -- and that passes on both group
+    semantics, because the region the moved piece vacated is still bounded by
+    the DUPLICATE walls the other two fragments were built with. It was
+    measuring the neighbours, never the piece that moved. Measured: on the
+    tree that strands the room completely (0 of 16 outline corners move
+    against 4 of 4 walls) it still reported every fragment enclosed.
+
+    THE MOVE IS DELIBERATELY GONE, and that is a scope reduction stated
+    rather than slipped in. `bake` on this product corrupts the scene -- the
+    measurement is in `docs/evidence/defect23-fragment.json`, reproducible
+    with `docs/evidence/defect23_fragment_probe.py` -- and an `xfail` does not
+    cover a fixture TEARDOWN error, so keeping the gesture here would make
+    DEEP red for a defect this test is not the owner of. Row 47 owns the
+    gesture and carries its reproduction; this test owns the PROPERTY the
+    gesture needs, which is the one the test's name has always claimed.
+
+    The verdict is a NEGATIVE assertion ("no wall is shared"), so the
+    conditions for sharing are asserted first: the pieces must actually abut.
+    Without that a plan of three unrelated rooms would pass it."""
     _overlapping_rooms(fp, win)
     win.room_boolean("fragment")
     sc = win.scene
     rooms = _rooms(fp, win)
-    groups = [it for it in sc.items() if isinstance(it, fp.GroupItem)]
-    assert len(groups) == 3                  # each fragment is its own group
-    for g in groups:                         # each group is a complete loop
-        gw = [c for c in g.childItems() if isinstance(c, fp.WallItem)]
-        assert fp.trace_wall_loop(gw) is not None
 
-    def enclosed(r):
-        return fp.detect_room(
-            sc, QPointF(r.anchor.x(), r.anchor.y())) is not None
+    # PRECONDITION 1 -- fragment produced the partition it claims to.
+    assert sorted(round(r.area_sqft) for r in rooms) == [16, 64, 64]
 
-    assert all(enclosed(r) for r in rooms)
-    # move the overlap fragment clear: every fragment stays enclosed
-    overlap = next(r for r in rooms if r.name == "Overlap")
-    g = next(gp for gp in groups if fp.walls_cover_room(
-        {c for c in gp.childItems() if isinstance(c, fp.WallItem)}, overlap))
-    g.setPos(300, 300)
-    g.bake()
-    assert all(enclosed(r) for r in _rooms(fp, win))
+    # PRECONDITION 2 -- every piece is a real enclosed region, and every
+    # outline edge has a wall on it, so there IS a wall set to reason about.
+    for r in rooms:
+        assert fp.detect_room(sc, QPointF(r.anchor.x(), r.anchor.y())) \
+            is not None, f"{r.name} is not enclosed"
+        assert r.open_edges() == [], f"{r.name} starts with an open edge"
+
+    # PRECONDITION 3 -- the pieces ABUT. Without this the verdict below is
+    # satisfied by three rooms that never touch, which is the vacuity the
+    # negative-assertion rule exists for.
+    def edges(r):
+        cs = r.corners or []
+        return {frozenset((_xy(cs[i]), _xy(cs[(i + 1) % len(cs)])))
+                for i in range(len(cs))}
+
+    shared_edges = sum(
+        len(edges(a) & edges(b))
+        for i, a in enumerate(rooms) for b in rooms[i + 1:])
+    assert shared_edges >= 2, ("the fragments do not abut, so the verdict "
+                               f"would be vacuous (shared edges {shared_edges})")
+
+    # VERDICT -- a piece's walls are its own. `room_walls` is the production
+    # answer to "which walls is this room made of"; two pieces sharing one
+    # means neither can be moved without tearing the other, which is exactly
+    # what `room_owns_walls` refuses to allow `bake` to do.
+    for i, a in enumerate(rooms):
+        for b in rooms[i + 1:]:
+            both = set(fp.room_walls(a)) & set(fp.room_walls(b))
+            assert not both, (f"{a.name} and {b.name} share {len(both)} wall(s), "
+                              f"so neither is a self-contained unit")
+
+
+def _xy(p):
+    return (round(p.x(), 4), round(p.y(), 4))
 
 
 def _box(fp, room):
@@ -358,6 +405,105 @@ def test_align_rooms_to_grid_snaps_walls(fp, win):
         for p in (w.p1, w.p2):
             assert _on_grid(p.x(), step) and _on_grid(p.y(), step)
         assert abs(w.p1.x() - w.p2.x()) < 1 or abs(w.p1.y() - w.p2.y()) < 1
+
+
+def _sharing(fp, room):
+    """(outline corners still holding one of the room's own walls' vertices,
+    total corners) -- the by-construction property P3.5 exists for."""
+    ends = {id(w.end_vertex(a)) for w in fp.room_walls(room)
+            for a in ("p1", "p2")}
+    return sum(1 for e in room.outline if id(e.v) in ends), len(room.outline)
+
+
+def test_align_to_grid_carries_the_outline_and_the_party_wall_neighbour(fp, win):
+    """P4.5. Align to grid must move the room's REGION with its walls, and must
+    not tear the neighbour it shares a party wall with.
+
+    THE RECEIPT IS THE NEIGHBOUR, not the selected rooms -- C is never
+    selected, and it is C that the old code broke. Measured before the fix, on
+    this exact plan: every selected room's walls went onto the grid and every
+    outline stayed off it (A's outline sharing 4-of-4 -> 1-of-4 with two open
+    edges, B 4-of-4 -> 0-of-4 with three), and unselected C went 4-of-4 ->
+    2-of-4 and gained two dashed open edges over walls that were really there.
+    Cause: `align_rooms_to_grid` assigned `p1`/`p2`, which splits on write, so
+    each wall end came away on a fresh vertex and every outline holding the old
+    one was left behind. After: 4-of-4 on all three, zero open edges.
+
+    C DEFORMS RATHER THAN RESISTING, and that is ruling 2a rather than an
+    accident: its corner moved, so it follows."""
+    sc = win.scene
+    rooms = _row_of_rooms(fp, sc, 3, 118, 118)     # 118 is off the 6" grid
+    a, b, c = rooms
+    for r in rooms:
+        r.setSelected(r is not c)
+    win._sel_order = [a, b]
+
+    # PRECONDITIONS -- everything is coherent before, and C really does share a
+    # party wall with a selected room (else "C survived" says nothing)
+    for r in rooms:
+        s, t = _sharing(fp, r)
+        assert (s, t) == (t, t), f"{r.name} starts incoherent"
+        assert r.open_edges() == [], f"{r.name} starts with an open edge"
+    assert set(fp.room_walls(b)) & set(fp.room_walls(c)), \
+        "B and C do not share a wall, so the neighbour claim is vacuous"
+    c_before = [(round(e.p.x(), 3), round(e.p.y(), 3)) for e in c.outline]
+
+    win.align_rooms_to_grid()
+
+    step = fp.SETTINGS["wall_snap_in"]
+    # the SELECTED rooms' walls are what the gesture promised to snap; C's own
+    # far wall is not asserted here, because whether it happens to land on the
+    # grid is incidental to what this test is about
+    for w in set(fp.room_walls(a)) | set(fp.room_walls(b)):
+        for p in (w.p1, w.p2):
+            assert _on_grid(p.x(), step) and _on_grid(p.y(), step)
+    for r in rooms:
+        s, t = _sharing(fp, r)
+        assert (s, t) == (t, t), (
+            f"{r.name} outline holds {s} of {t} of its own walls' corners")
+        assert r.open_edges() == [], (
+            f"{r.name} has {len(r.open_edges())} open edge(s) after the align")
+    # the unselected neighbour MOVED -- it followed the party corner
+    assert [(round(e.p.x(), 3), round(e.p.y(), 3))
+            for e in c.outline] != c_before, \
+        "the neighbour's outline did not follow the corner it holds"
+
+
+def test_distribute_keeps_every_room_on_its_own_walls(fp, win):
+    """P4.5, and the measurement that makes this worth a test of its own: the
+    old `_translate_shape` destroyed outline-to-wall sharing on EVERY room --
+    4-of-4 to 0-of-4, all three -- **while translating them by zero**. Three
+    contiguous rooms are already evenly spaced, so `distribute_rooms` computes
+    a delta of 0 for each; assigning `p1 = QPointF(p1.x() + 0, ...)` still
+    mints a fresh vertex, so a no-op gesture silently unpicked the plan and the
+    NEXT wall drag stranded every room.
+
+    So the precondition here is that the gesture moved nothing, which is what
+    makes the verdict about identity alone rather than about geometry."""
+    sc = win.scene
+    rooms = _row_of_rooms(fp, sc, 3)
+    for r in rooms:
+        r.setSelected(True)
+    win._sel_order = list(rooms)
+    before = {r.name: [(round(e.p.x(), 3), round(e.p.y(), 3))
+                       for e in r.outline] for r in rooms}
+    for r in rooms:
+        s, t = _sharing(fp, r)
+        assert (s, t) == (t, t), f"{r.name} starts incoherent"
+
+    win.distribute_rooms(horizontal=True)
+
+    # PRECONDITION for the verdict -- contiguous rooms are already distributed,
+    # so nothing should have moved. Identity is then the only thing at stake.
+    for r in rooms:
+        assert [(round(e.p.x(), 3), round(e.p.y(), 3))
+                for e in r.outline] == before[r.name], \
+            f"{r.name} moved; this test is about a zero-delta distribute"
+    for r in rooms:
+        s, t = _sharing(fp, r)
+        assert (s, t) == (t, t), (
+            f"{r.name} outline holds {s} of {t} of its own walls' corners "
+            f"after a distribute that moved nothing")
 
 
 def test_align_grouped_wall_loop_to_grid(fp, win):

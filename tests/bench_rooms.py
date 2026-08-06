@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import QApplication, QGraphicsScene
 
 _app = QApplication.instance() or QApplication([])
 import FloorPlanner as FP
+from floorplanner.vertex import Vertex
 
 
 def build_grid(n, cell=120, off=120):
@@ -72,8 +73,11 @@ def main():
     FP.rebuild_all_walls(sc)
     noop = (time.perf_counter() - t) * 1000
     w = next(it for it in sc.items() if isinstance(it, FP.WallItem))
-    w.p1 = QPointF(w.p1.x() + 6, w.p1.y())     # nudge one wall
-    w.p2 = QPointF(w.p2.x() + 6, w.p2.y())
+    # nudge ONE wall: fresh vertices at both ends, so the grid's neighbours
+    # stay put and this measures a one-wall edit (relocating the corners would
+    # drag the neighbours and measure a different, larger edit)
+    w.set_end_vertex("p1", Vertex.at(QPointF(w.p1.x() + 6, w.p1.y())))
+    w.set_end_vertex("p2", Vertex.at(QPointF(w.p2.x() + 6, w.p2.y())))
     t = time.perf_counter()
     FP.rebuild_all_walls(sc)
     edit = (time.perf_counter() - t) * 1000

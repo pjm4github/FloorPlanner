@@ -200,7 +200,11 @@ def test_the_warning_names_the_cause_and_says_it_once(fp, win):
     (w, a) = next(v[0] for v in at.values() if len(v) >= 2)
     u, p = w.unit(), getattr(w, a)
     back = 1.5 if a == "p1" else -1.5
-    setattr(w, a, QPointF(p.x() + u.x() * back, p.y() + u.y() * back))
+    # DETACH the end -- a fresh corner, sharers left where they are. That is
+    # the tear being built, and it is what `setattr(w, a, ...)` did here until
+    # P4.5 retired the p1/p2 setters. Relocating instead would carry the
+    # neighbour along and there would be no tear to warn about.
+    w.detach_end(a, QPointF(p.x() + u.x() * back, p.y() + u.y() * back))
 
     with pytest.warns(UserWarning, match="NEW") as rec:
         design_from_scene(win)

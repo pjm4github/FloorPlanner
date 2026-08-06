@@ -15,9 +15,11 @@ from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.vertex import Vertex
 from floorplanner.walls import (
-    OpeningItem, WallItem, _CornerIndex, rebuild_all_walls,
-    report_opening_failure,
+    WallItem, _CornerIndex, rebuild_all_walls, report_gesture_fault,
 )
+# `OpeningItem` and `report_opening_failure` left this module with
+# `duplicate_wall` at P4.5: copying a wall's openings into a group was the only
+# reason rooms.py ever built an opening or had one fail to fit.
 
 
 def poly_area_sqft(corners) -> float:
@@ -110,6 +112,71 @@ class OutlineEdge:
         return f"OutlineEdge(({self.p.x():.1f}, {self.p.y():.1f}), {w})"
 
 
+def outline_self_intersects(room) -> bool:
+    """Does this room's OWN outline cross itself? — I5b, asked of the scene.
+
+    THE SAME PREDICATE the document check uses (`validate._seg_cross`), not a
+    second one: one definition of "these two edges cross", per P3.4 point 1.
+    Only the question's *timing* differs — I5b is a deep-only document check,
+    and this asks it of a live room the instant a gesture deformed it."""
+    from floorplanner.design.validate import _seg_cross  # late: design layer
+    pts = [(c.x(), c.y()) for c in (room.corners or [])]
+    n = len(pts)
+    if n < 4:                       # a triangle cannot cross itself
+        return False
+    for i in range(n):
+        for j in range(i + 2, n):
+            if i == 0 and j == n - 1:
+                continue            # adjacent edges share a corner, not a cross
+            if _seg_cross(pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n]):
+                return True
+    return False
+
+
+def report_self_intersections(scene, rooms):
+    """Report any of `rooms` whose outline now crosses itself — P4.5's ruling
+    on §2a, and the point is WHEN it is said.
+
+    I5b already catches this exactly, but it is one of the three DEEP-ONLY
+    checks: shadow mode never runs it while editing, while `save_path` does
+    run it and REFUSES TO WRITE. So without this the user deforms a room,
+    hears nothing, and finds out at the moment they try to keep their work —
+    the same disease as defects 17 and 25, learning at the wrong moment. The
+    save refusal stays exactly as it is (P4.1: do not write a corrupt plan);
+    what changes is that the gesture speaks first.
+
+    SCOPED to the rooms a move actually carried, so the cost is edges² over a
+    handful of rooms rather than the plan. The message names the room AND the
+    remedy, per the 06c2145 standard — a diagnostic the user cannot act on is
+    only half a message.
+
+    IT DOES NOT PROMISE THAT THE SAVE WILL REFUSE, and that omission is
+    deliberate: measured, it sometimes will not. The document walk PLANARISES,
+    so two crossing outline walls are split at their intersection and the room
+    emits as a *pinched* loop that visits that point twice — which `_seg_cross`
+    does not report, because it is a PROPER-crossing test by design (it must
+    not fire on the collinear edges two rooms legitimately share). A message
+    that told the user "you cannot save this" when they demonstrably can is
+    exactly the 06c2145 failure: copy that reads as nonsense at a real value.
+    The gap itself is register row 41, filed not fixed. Returns the rooms
+    reported."""
+    bad = [r for r in rooms if outline_self_intersects(r)]
+    if not bad:
+        return []
+    names = [r.name for r in bad]
+    if len(names) == 1:
+        who = f"{names[0]}'s outline now crosses itself"
+    elif len(names) == 2:
+        who = f"{names[0]} and {names[1]} now have outlines that cross themselves"
+    else:
+        who = (f"{', '.join(names[:-1])} and {names[-1]} now have outlines "
+               f"that cross themselves")
+    report_gesture_fault(
+        scene,
+        f"{who} — undo, or extract the room before moving it.")
+    return bad
+
+
 def make_concept_room(scene, name, width_in, depth_in, at, floor=None):
     """A CONCEPT room (P4.4): a room typed in by dimension rather than drawn.
 
@@ -140,6 +207,95 @@ def make_concept_room(scene, name, width_in, depth_in, at, floor=None):
     scene.addItem(room)
     room.update()
     return room
+
+
+def rooms_holding(scene, vertex_ids):
+    """Every room whose outline holds one of `vertex_ids` — the rooms a corner
+    move will reshape, found by IDENTITY rather than by proximity.
+
+    Defect 30's lesson, stated once: ask the corner who holds it. Three
+    gestures now ask exactly this question — a group bake (`GroupItem`), Align
+    to grid, and Distribute — and before P4.5 each answered it differently or
+    not at all, which is how a room that was never selected ended up with its
+    walls at x=150 and its outline at x=120. Scene-wide is not an oversight:
+    identity makes a floor filter redundant, because a `Vertex` carries exactly
+    one level (I2)."""
+    if scene is None or not vertex_ids:
+        return []
+    return [it for it in scene.items()
+            if isinstance(it, RoomItem)
+            and any(id(e.v) in vertex_ids for e in it.outline)]
+
+
+def relocate_corners(walls, rooms, target, scene=None):
+    """Move each distinct corner of `walls` to `target(vertex)`; the walls AND
+    every room outline holding those corners follow, because they hold the same
+    `Vertex` objects. Returns the number of corners actually moved.
+
+    THE ALTERNATIVE IS THE BUG, and it is measured. Assigning `p1`/`p2` splits
+    on write, so each wall end comes away on a fresh vertex and the outline is
+    left holding the old one — the walls move and the room does not. Measured
+    at P4.5 on a row of three rooms: Align to grid took every selected room's
+    walls onto the grid and left every outline off it (outline-to-wall corner
+    sharing 4-of-4 → 1-of-4 and 0-of-4, two rooms gaining open edges), and
+    Distribute destroyed all four corners' sharing on every room **while moving
+    them by zero** — an assignment of the same coordinate still mints.
+
+    `rooms` IS A STARTING SET, NOT THE GATHER. Every other room in the scene
+    holding one of these corners is added via `rooms_holding`, and that
+    widening is the whole point: the corner being moved is frequently a PARTY
+    corner, so the neighbour that was never selected is holding it too. Passing
+    only the selected rooms is what tore the neighbour — a room that never
+    moved ending up with its wall at x=150 and its outline at x=120. That the
+    neighbour DEFORMS rather than resisting is ruling 2a, not an accident: it
+    follows because its corner moved.
+
+    `target` returns the new point for a corner, or None to leave it."""
+    if scene is None:
+        scene = next((w.scene() for w in walls if w.scene() is not None), None)
+    held = {id(w.end_vertex(a)) for w in walls for a in ("p1", "p2")}
+    # AND THE GATHER WIDENS TO WALLS, NOT ONLY OUTLINES. An outside wall whose
+    # end IS one of these corners must come along, or it is left behind on a
+    # stale vertex and the network tears open at that corner -- measured on a
+    # three-room row: aligning A and B moved the shared corner at (354, 118)
+    # to (354, 120) while unselected C's own wall stayed short of it, giving C
+    # a dashed open edge with genuinely no wall on it. A corner is one Vertex
+    # (Phase 3); everything holding it moves, or it was never one corner.
+    outside = [w for w in (scene.items() if scene is not None else ())
+               if isinstance(w, WallItem) and w not in walls
+               and any(id(w.end_vertex(a)) in held for a in ("p1", "p2"))]
+    every_wall = list(walls) + outside
+    holders = [(w, a) for w in every_wall for a in ("p1", "p2")]
+    seen = {id(r) for r in rooms}
+    every = list(rooms) + [r for r in rooms_holding(scene, held)
+                           if id(r) not in seen]
+    edges = [e for r in every for e in getattr(r, "outline", ()) or ()]
+    # `old` keeps every vertex alive for the whole pass: the map is keyed by
+    # id(), and an id freed mid-pass could be handed back to a new vertex.
+    old = [w.end_vertex(a) for w, a in holders] + [e.v for e in edges]
+    moved, n = {}, 0
+    for v in old:
+        if id(v) in moved:
+            continue
+        p = target(v)
+        if p is None or (p.x() == v.x and p.y() == v.y):
+            moved[id(v)] = v                 # unchanged: do NOT mint
+        else:
+            moved[id(v)] = v.relocated_to(p)
+            n += 1
+    for w, a in holders:
+        w.set_end_vertex(a, moved[id(w.end_vertex(a))])
+    for e in edges:
+        e.v = moved[id(e.v)]
+    for w in every_wall:
+        w.rebuild()                          # repositions its openings too
+    for r in every:
+        # `path`/`area_sqft`/`corners` all DERIVE from the outline (P3.5), so
+        # there is nothing to recompute -- only Qt to tell that the item's
+        # geometry changed under it.
+        r.prepareGeometryChange()
+        r.update()
+    return n
 
 
 def share_outline_vertices(room):
@@ -480,7 +636,16 @@ class RoomItem(QGraphicsItem):
         if win is None or not hasattr(win, "_z_top"):
             return
         win._z_top += 1
-        base = win._z_top * 10
+        order = win._z_top * 10
+        # THE BAND AND THE WITHIN-FLOOR ORDER ARE DIFFERENT QUANTITIES, and z
+        # carries both: `levels._apply_floor_stacking` rides the floor band on
+        # as a DELTA precisely so this running max keeps working. Assigning
+        # `order` alone would drop the band -- and a room raised on a ghost
+        # floor would paint OVER the floor being edited, leaving `_floor_band`
+        # stale so the next re-band added the band again on top of the escaped
+        # value. Re-base into this room's own band instead (defect 11).
+        band = getattr(self, "_floor_band", 0.0)
+        base = order + band
         # the translucent fill + label sit at `base` (above OTHER rooms); the
         # walls/openings sit ABOVE the fill so a wall is never hidden under its
         # own room tint and a 'Bring to front' is not undone on the next click
@@ -490,7 +655,10 @@ class RoomItem(QGraphicsItem):
             # at a shared corner grab IT (to edit) rather than a locked neighbour
             w.setZValue(base + 5 if w._corners_unlocked else base + 4)
         for op in self.room_openings():
-            op.setZValue(base + 6)
+            # an opening is a CHILD of its wall, so its z is relative to that
+            # wall and the band must NOT be applied here -- a banded child
+            # would sink behind the very wall it is cut into.
+            op.setZValue(order + 6)
 
     def opening_stats(self):
         """(window count, window glazing sq ft, door count) on this
@@ -1027,7 +1195,17 @@ def _edge_wall(scene, a: QPointF, b: QPointF, floor=None):
     ux, uy = (b.x() - a.x()) / L, (b.y() - a.y()) / L
     best, best_key = None, None
     for w in scene.items():
-        if (not isinstance(w, WallItem) or w.group() is not None
+        # GROUPED WALLS ARE CANDIDATES SINCE P4.5 -- the last of the four
+        # exemptions. Its premise was the others': a grouped wall was a COPY
+        # lying on the original, so admitting it risked binding a room's edge
+        # to a transient duplicate that vanishes on ungroup. Nothing is copied
+        # now -- grouping a room puts the room's OWN walls in the group -- so
+        # the refusal inverted into "a room may not re-bind to its own wall
+        # while that wall is grouped", and the edge read OPEN over a wall that
+        # was right there. Measured before the change: 307 of 307 live-wall
+        # edges across symmetricP1 / planc1TestV5 / fiveRoomTest could not be
+        # recovered by this search once the plan was grouped.
+        if (not isinstance(w, WallItem)
                 or (floor is not None and w.floor != floor)):
             continue
         ss = []
@@ -1056,16 +1234,27 @@ def room_walls(room) -> list:
     binder; the outline's own `wall` references are the authority now, and
     `room.walls` is the association list walls read back (`WallItem.rooms`).
     Falls back to `room.walls` for a room with no outline at all -- a legacy
-    import whose corners never traced."""
+    import whose corners never traced.
+
+    LIVE WALLS ONLY. An outline edge goes on NAMING a wall that has left the
+    scene -- a merge absorbs the wall but does not clear the reference, so
+    `e.wall` is a Python object outside the scene, "dead but not absent"
+    (measured at P4.5). Handing one back made this predicate lie: a dead wall
+    is not a wall this room has, and every consumer either wants a live one or
+    re-checks liveness itself. It also had a live consequence once
+    `group_selected` began consuming this list (P4.5(2)) -- grouping such a
+    room ADOPTED the dead wall, and adoption re-parents it into the scene, so
+    a wall the merge had deleted came back. Filtering here fixes it for every
+    consumer at once rather than at each call site."""
     seen, out = set(), []
     for e in room.outline:
         w = e.wall
-        if (w is not None and id(w) not in seen):
+        if (w is not None and w.scene() is not None and id(w) not in seen):
             seen.add(id(w))
             out.append(w)
     if not out:
         out = [w for w in room.walls
-               if isinstance(w, WallItem)]
+               if isinstance(w, WallItem) and w.scene() is not None]
     return out
 
 
@@ -1113,25 +1302,6 @@ def walls_cover_room(walls, room) -> bool:
         if not any(_wall_spans_segment(w, a, b) for w in moving):
             return False
     return True
-
-
-def duplicate_wall(scene, w):
-    """A standalone copy of wall `w` (same type + openings), added to the scene
-    and bound to no room.  Used when grouping a room duplicates its walls."""
-    nw = WallItem(QPointF(w.p1), QPointF(w.p2), w.wall_type)
-    nw.floor = w.floor                          # inherit the source wall's floor
-    scene.addItem(nw)
-    for op in w.openings:
-        try:
-            nop = OpeningItem(nw, op.kind, op.code, op.s)
-        except ValueError as exc:
-            report_opening_failure(scene, nw, op.kind, op.code, op.s,
-                                   f"{exc} (copying a wall into a group)")
-            continue
-        nop.door_type, nop.swing = op.door_type, op.swing
-        nw.openings.append(nop)
-    nw.rebuild()
-    return nw
 
 
 def repair_edge_bindings(scene, room):

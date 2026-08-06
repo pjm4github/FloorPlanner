@@ -132,6 +132,44 @@ def _vacuity() -> tuple:
     return len(hits), hits
 
 
+# Coordinate assignment to a wall end. P3.1's split-on-write shim: `wall.p1 =
+# ...` minted a fresh Vertex for that end and left every sharer behind, so the
+# wall moved and the room outline did not. Four writers were retired across
+# P4.5 and the shim itself deleted with them.
+#
+# THIS REPLACES `vertex.split_count()`, AND DELIBERATELY AT A DIFFERENT LAYER.
+# The counter measured RUNTIME CHURN -- how many splits a run caused -- which
+# is a fact about the code paths a test happened to execute. What is wanted
+# permanently is that the MECHANISM CANNOT RETURN, and that is a question about
+# the source text. So this is cheaper (a grep, not bookkeeping in a hot path),
+# stricter (it catches a writer no test exercises), and it cannot go vacuous,
+# because its subject is the file rather than a run. It is the pre-work census
+# made permanent.
+#
+# WHAT IT DOES NOT COVER, stated here per the instrument-boundary rule: it sees
+# the literal assignment shape only. `setattr(w, "p1", v)` and an alias
+# (`end = w; end.p1 = ...`) both pass it, and it says nothing about identity
+# being preserved by any other route. The tests are still where that is
+# asserted; this only guarantees the retired spelling stays retired.
+_END_ASSIGN = re.compile(r"\.p[12]\s*=(?!=)")
+
+
+def _end_assignments() -> tuple:
+    """Coordinate assignments to a wall end anywhere in `floorplanner/`."""
+    import pathlib
+    hits = []
+    for p in sorted(pathlib.Path("floorplanner").rglob("*.py")):
+        try:
+            text = p.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for n, line in enumerate(text.splitlines(), 1):
+            code = line.split("#", 1)[0]
+            if _END_ASSIGN.search(code):
+                hits.append(f"{p.as_posix()}:{n}: {line.strip()}")
+    return len(hits), hits
+
+
 def main() -> int:
     if "--perf" in sys.argv:
         return _perf()
@@ -146,12 +184,18 @@ def main() -> int:
     collected = len([ln for ln in out_c.splitlines() if "::" in ln])
 
     n_vac, vac = _vacuity()
+    n_end, ends = _end_assignments()
     lines = [f"Gate-Census: collected={collected} ruff={ruff} "
-             f"vacuous={n_vac}"]
-    bad = rc != 0 or n_vac > 0
+             f"vacuous={n_vac} end_assign={n_end}"]
+    bad = rc != 0 or n_vac > 0 or n_end > 0
     if vac:
         print("Unfailable assertions (vacuous by tautology):")
         for h in vac:
+            print(f"    {h}")
+    if ends:
+        print("Coordinate assignment to a wall end (split-on-write is retired "
+              "-- use set_end_vertex / relocated_to):")
+        for h in ends:
             print(f"    {h}")
     modes = GATES[:1] if quick else (GATES[2:3] if deep_only else GATES)
     for label, env, extra in modes:
