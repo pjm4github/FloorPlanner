@@ -251,7 +251,8 @@ instances, all found by walking into the boundary rather than by foreseeing it:
 | `check(doc, deep=True)` | is this document CONSISTENT? | its HISTORY — a resurrected wall passes all fifteen (row 44) |
 | `tools/gate.py` | is the CODE green? | the record; it runs ruff and pytest, and neither reads a `.md` |
 | the vacuity grep | does any test match one of FOUR literal unfailable shapes? | a tautology built from the code under test (`assert f(x) == f(x)`) — written once at P4.5(22) and caught by a re-read, not by the grep |
-| `vertex.split_count()` | how many SPLIT-ON-WRITES happened? | identity change as such — P4.5(24)'s deliberate detach goes through `Vertex.at`, so an endpoint drag now reports **0** and still changes identity |
+| ~~`vertex.split_count()`~~ **RETIRED P4.5(40)** | how many SPLIT-ON-WRITES happened? | identity change as such — P4.5(24)'s deliberate detach went through `Vertex.at` and reported **0** while changing identity. It retired *with the mechanism it measured*: with nothing able to split, six watches built on it would have become tautologies. |
+| `tools/gate.py`'s `end_assign` | does the source TEXT contain a coordinate assignment to a wall end? | the same operation spelled any other way — `setattr(w, attr, p)` passes it, and **five real writers were in exactly that shape**, found by the deletion rather than by the check (P4.5(40)). It also cannot tell code from prose, so it is the one instrument here that errs toward FALSE POSITIVES. |
 | `validate._seg_cross` | do two edges PROPERLY cross? | a loop that is non-simple by *touching* — deliberate, so it cannot fire on the collinear edges two rooms share (row 41) |
 
 Three of the five are recorded where the defect lives (rows 41 and 44) or at
@@ -5081,6 +5082,78 @@ notes:   The completeness proof itself is DELIVERED: `grep -rn "\.p1 = \|\.p2
          wanted on whether the counter retires with the setters (converting
          the watches) or the setters stay until Phase 6's command layer owns
          the move.
+
+P4.5(35) THE RULING ON (34): retire the setters AND split_count() together.
+notes:   Recorded before the code. VACUITY GAINS A FIFTH SHAPE -- THE
+         UNSATISFIABLE ASSERTION, the mirror of the first: shapes 1-3 cannot
+         be FALSE, this one cannot be TRUE. A test that cannot fail gives
+         false CONFIDENCE; one that cannot pass gives false DOUBT, and false
+         doubt is worse in one respect because it sends you hunting bugs that
+         are not there. Not machine-detectable. The tell: a red that survives
+         every plausible fix -- at which point try to satisfy the assertion BY
+         HAND, and if you cannot, the test is the bug.
+         AND: MIGRATION TELEMETRY RETIRES WITH THE THING IT MEASURED. Keeping
+         split_count() meaningful means keeping split-on-write reachable,
+         which is KEEPING THE DEFECT TO PRESERVE ITS ALARM -- ungroup's
+         merge_all again. The replacement goes in AT A DIFFERENT LAYER: the
+         counter measured runtime churn, what is wanted is that the MECHANISM
+         CANNOT RETURN, and that is a question about the source text.
+
+P4.5(36) THE CENSUS MADE PERMANENT. Gate-Census gains `end_assign=N`; any
+         `.p1 = ` / `.p2 = ` in floorplanner/ fails the gate. Added BEFORE the
+         deletion, so it passes in both states and protects the deletion
+         rather than following it. Receipt: 0 clean, 1 with a no-op writer
+         reintroduced (named with file and line), 0 after reverting.
+
+P4.5(37) NINE WRITERS SAY WHAT THEY MEAN. Every one turned out to mean DETACH
+         THIS END, not MOVE THIS CORNER; the `if p2 else p1` branches collapse
+         to one line because the choice was always about which end. TWO
+         FIXTURES ARE ONLY CONSTRUCTIBLE VIA THE SPLIT (test_outline's south
+         shorten, test_walls' overhang) -- relocating carries the outline
+         corner and the edge never opens, which is the state they exist to
+         build. Informative, not an obstacle: the split survives as an
+         explicit operation, only the coordinate-assignment spelling dies.
+
+P4.5(38) THE SIX WATCHES CONVERTED to identity assertions. The view one is
+         genuinely RED against 431a761 ("the drawn end took 36 identities
+         across 40 move events"); the other five were green before and after,
+         so they were PROBED instead -- make set_end_vertex fabricate rather
+         than adopt, and four fail, one on its precondition (reported as the
+         weaker shape it is). THREE DRAFTS were wrong before the corpus one
+         was right: "same object" forbids PROMOTION, "already existed" forbids
+         the ANTI-SHEAR SPLIT (measured: 4 ends re-minted at (216,288) and
+         (432,144), all AT THE SAME COORDINATES, 8 sharing classes before and
+         after). THE OLD COUNTER NEVER SAW THOSE MINTS -- they go through
+         Vertex.at, not moved_to -- so a watch cannot be converted
+         mechanically: what it measured and what it appeared to measure are
+         different sets.
+
+P4.5(39) test_vertices.py REWRITTEN as the spec for the operations that
+         replaced the shim, pinning `Vertex.at` against `relocated_to` on the
+         SAME scene and the SAME movement, so the only difference is which was
+         asked for.
+
+P4.5(40) THE SHIM RETIRES. Setters, _carry_anchors, moved_to, _SPLITS,
+         _SITES, _blame, split_count, split_sites, note_vertex_splits and its
+         two logs. 178 lines out, 73 in.
+notes:   THE CENSUS THAT OPENED THIS PIECE WAS WRONG, and that is the finding.
+         It counted 22 writers by grepping `.p1 = `. It MISSED FIVE, all
+         `setattr(wall, attr, <point>)` with attr a variable -- four in
+         walls.py, one in a test -- which surfaced as AttributeErrors the
+         moment the setters went. EXACTLY the boundary P4.5(36) had written
+         into the new check's own comment, crossed within the hour by the
+         person who wrote it. A CENSUS BY SPELLING FINDS ONLY THAT SPELLING;
+         the deletion is what made the true count visible, and it is now its
+         own enforcement for that shape (setattr raises, and no grep can be
+         fooled by that).
+         THE OPERATION SURVIVES AS `WallItem.detach_end`, because those five
+         sites genuinely mean it -- and it could NOT be
+         `set_end_vertex(attr, Vertex.at(p))`: that routes through
+         _fuse_anchors, which deliberately does not move an opening's anchor
+         to a vertex somewhere ELSE (R1(b)). Here the end really moved, so the
+         anchor must follow, which is what _carry_anchors did. 12 of 41
+         openings on planc1 mirrored down their wall before that carry
+         existed, so it is folded into the operation rather than deleted.
 
 
 ```
