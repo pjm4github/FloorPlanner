@@ -1,0 +1,85 @@
+# Progress log — index
+
+*Append one entry per task. Newest at the bottom.*
+
+> The line above is the log's own rule, carried here verbatim from the heading
+> block it lived in (`V5_MIGRATION_PLAN.md:582`) when the log was split out on
+> 2026-08-06. It still governs: **append, never revise.** A later correction is
+> a later entry, and several entries here exist only to correct an earlier one.
+
+**4,351 lines across seven files, moved verbatim.** Nothing was reworded,
+reordered, tidied or reformatted. The whole log was reassembled from these files
+and compared byte-for-byte against the plan's blob before the move — identical,
+289,297 bytes either way. That receipt is in the commit that made the split.
+
+---
+
+## The files
+
+| file | source lines | lines | dates in the entries | tasks |
+|---|---|---|---|---|
+| [`phase-0.md`](phase-0.md) | 585–828 | 244 | 2026-07-26 | P0.0 · P0.1 · P0.2 · P0.3 · P0.3b · P0.3b-step3 · P0.4 · P0.5 · P0.6 · P0.7 |
+| [`phase-1.md`](phase-1.md) | 829–1246 | 418 | *none stated* | P1.1 · P1.2 · P1.3 · P1.3-followup · P1.3b · P1.4 · P1.4-followup · P1.5 · P1.6 |
+| [`phase-2.md`](phase-2.md) | 1247–1657 | 411 | *none stated* | P2.1 · P2.2 · P2.3 · P2.4 · P2.4-followup · P2.5 |
+| [`phase-3-part-1.md`](phase-3-part-1.md) | 1658–2649 | 992 | 2026-07-29 → 07-31 | P3.1 · P3.2 · P3.3 · P3.5 · P3.8 (and its numbered riders) |
+| [`phase-3-part-2.md`](phase-3-part-2.md) | 2650–3518 | 869 | 2026-07-29 → 07-30 | P3.7 · P3.6-followup · P3.6 · P3.5-followup (×3) · P3.4 · exit check 3 |
+| [`phase-4-part-1.md`](phase-4-part-1.md) | 3519–4360 | 842 | 2026-08-01 → 08-04 | P4.1 · P4.1b · P4.2 (+6 mini-gate findings) · P4.3 · P4.4 |
+| [`phase-4-part-2.md`](phase-4-part-2.md) | 4361–4935 | 575 | 2026-08-04 → 08-06 | P4.5, entries (0) through (40) and the merge |
+| [`side-tasks.md`](side-tasks.md) | — | — | 2026-08-06 → | work belonging to no phase |
+
+Source line numbers are into `V5_MIGRATION_PLAN.md` **as of commit `2f232bd`**,
+the last commit before the split.
+
+**Two files state no dates.** P1 and P2's entries record commits, counts and
+gate lines but never a calendar date. That is left as it is rather than filled
+in from `git log`: a date derived afterwards would date the *commit*, not the
+work, and would look authoritative while being a reconstruction.
+
+---
+
+## Why Phase 3 and Phase 4 are split into parts, and why the parts are not ranges
+
+Both exceeded the 1,200-line limit (1,861 and 1,417). Every cut is at a
+**column-0 task-entry start**, never inside an entry.
+
+The parts are numbered rather than named for the tasks they hold, and that is
+deliberate: **the log's append order is not the phase's task order.** Phase 3
+was written down as P3.1, P3.2, P3.3, P3.5, P3.8, P3.7, P3.6, P3.5-followup,
+P3.4 — because entries were appended as work finished and as earlier tasks were
+returned to. Naming a file `P3.1-P3.5.md` would imply a numeric range the file
+does not contain. The `tasks` column above says what is actually in each.
+
+## The one out-of-sequence entry stays where it is
+
+`phase-4-part-1.md` contains a non-phase entry — **the 3D view popup, branch
+`viewer-popup`, 2026-08-04** — sitting between the P4.4 entry and P4.5. It was
+not lifted into `side-tasks.md`, because the entry's own text is an argument
+against moving it:
+
+> NOT migration work, and recorded here precisely BECAUSE it is not: it landed
+> between P4.4 and P4.5 rather than as a phase task, and it TOUCHES THE APP
+> STARTUP PATH — floorplanner/app.py, which no Phase-4 task has needed to open.
+> A change to the first ten lines the process runs deserves a row in the
+> sequence it stepped outside of, or the next person reading this log will find
+> app.py changed by nobody.
+
+Its value *is* its position. `side-tasks.md` is therefore the destination for
+non-phase work recorded from 2026-08-06 onward, not a re-filing of what came
+before.
+
+---
+
+## Conventions
+
+**Cite, do not restate.** An entry names its evidence file and the command that
+reproduces it (`docs/evidence/…`), rather than inlining the measurement.
+
+**An entry cites its handoff when one exists** — one line, `handoff: 0042`,
+pointing into [`../handoff/`](../handoff/). The log is curated: what happened,
+why, and what proved it. The mailbox is raw: the exchange itself. Different
+genres and different readers, so they are linked rather than merged.
+
+**The log lives inside a code fence**, as it always has, so its column-aligned
+`ruff:` / `pytest:` / `files:` / `notes:` fields render as written. Each file
+reopens the fence and closes it at the end; a fence cannot be split across
+files, and that is the only formatting a split file adds.
