@@ -399,9 +399,20 @@ class PlanView(QGraphicsView):
             return
 
         if self._temp_wall is not None:
-            self._temp_wall.p2 = self._wall_end_point(self._temp_wall, sp,
-                                                      e.modifiers())
-            self._temp_wall.rebuild()
+            # RELOCATE, do not assign. This was the last `p1`/`p2` writer in
+            # `floorplanner/` (the P3.1 split-on-write shim's final call site),
+            # and it fired on EVERY mouse-move of the draw gesture -- a fresh
+            # `Vertex` per event for an end nobody else was holding yet.
+            # Nothing observable changes here, because the drawn end is not
+            # shared until release welds it; what changes is that the shim now
+            # has no production caller at all, which is what lets the setters
+            # go. `relocated_to` carries the identity, so a moving end is the
+            # same corner throughout the gesture rather than a new one 60
+            # times a second.
+            w = self._temp_wall
+            w.set_end_vertex("p2", w.end_vertex("p2").relocated_to(
+                self._wall_end_point(w, sp, e.modifiers())))
+            w.rebuild()
             e.accept()
             return
 

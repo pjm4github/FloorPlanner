@@ -5,7 +5,7 @@ Applying scale() (and a full-viewport repaint) per event stalls a large plan for
 seconds.  The view accumulates the delta and applies it once on the next frame.
 """
 import pytest
-from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtCore import QPoint, QPointF, Qt
 from PyQt6.QtGui import QWheelEvent
 
 pytestmark = pytest.mark.gui
@@ -53,3 +53,39 @@ def test_zoom_is_clamped(win):
         _wheel(view, -120)
         view._apply_zoom()
     assert view.transform().m11() >= 0.03
+
+
+def test_drawing_a_wall_splits_no_vertices(fp, win, drag):
+    """P4.5: the draw gesture RELOCATES the moving end instead of assigning it.
+
+    `view.py`'s `_temp_wall.p2 = ...` was the last `p1`/`p2` writer left in
+    `floorplanner/` -- the P3.1 split-on-write shim's final production call
+    site -- and it fired once per mouse-move event, minting a fresh `Vertex`
+    for an end nobody else was holding yet.
+
+    Differential receipt, one gesture of 40 move events: 40 split-on-writes
+    before, 0 after, with the drawn wall byte-identical at (0,0)-(240,0). The
+    wall is what makes this a regression test rather than a counter-watch: a
+    "0 splits" that also drew nothing would pass an assertion about the
+    counter alone.
+
+    `split_count` answers "how many SPLIT-ON-WRITES happened", not "did
+    identity change" -- a `relocated_to` changes the object and reports zero,
+    deliberately (the instrument-boundary table). That is exactly the
+    distinction being asserted: the drawn end stays ONE corner for the whole
+    gesture."""
+    from floorplanner import vertex as V
+    win.tool = fp.TOOL_WALL_INT
+    before = V.split_count()
+    n0 = sum(1 for it in win.scene.items() if isinstance(it, fp.WallItem))
+
+    drag(win, QPointF(0, 0), 240, 0, steps=40)
+
+    walls = [it for it in win.scene.items() if isinstance(it, fp.WallItem)]
+    # PRECONDITION -- the gesture actually drew something, so "0 splits" is a
+    # statement about a draw and not about an event stream that did nothing
+    assert len(walls) == n0 + 1, "the drag drew no wall"
+    w = walls[-1]
+    assert w.length() > 0
+    assert V.split_count() == before, (
+        f"the draw gesture split {V.split_count() - before} vertices")
