@@ -15,9 +15,19 @@ floorplan*.json
 layout_*.csv
 CLAUDE.local.md
 
-# root-clutter scratch artifacts (flagged by the 2026-06 review)
+# root-clutter scratch artifacts (flagged by the 2026-06 review; the review
+# itself is now docs/superseded/CODE_REVIEW.md:88, which is where the finding
+# was raised). `_tot.png` needs no entry -- `_*.png` above already covers it.
 snip.png
 trial-export-rooms.csv
+
+# Screenshots dropped in the root by the Windows snipping tool while testing.
+# They are EVIDENCE of a session, not of the project: several are cited by name
+# in the progress log (e.g. "Screenshot 2026-08-01 175022.png" in D35's record),
+# so they are worth keeping locally and never worth committing. Ignoring the
+# class is the only part of this with git value -- the existing files are
+# scratch and are left exactly where they are.
+Screenshot*.png
 
 # transfer buffer for staging files for deletion — always meant to be empty,
 # so it is not part of the project (keeps it out of the tree and the ruff gate)
