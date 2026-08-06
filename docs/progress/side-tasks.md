@@ -187,4 +187,57 @@ step 10  TWO RECORDS CORRECTED, IN THEIR OWN COMMIT.
          PASS at P4.5. A contradiction inside one file, in test code
          rather than the record, so it is reported rather than folded
          into this commit for exactly the reason above.
+
+POST-PR CORRECTIONS  2026-08-06  (PR #11 open, CI running)
+         Later entries, not revisions -- this log is append-only and a
+         correction is a later entry.
+
+step 11  THE TWO FINDINGS FIXED, as their own commit per step 10's rule.
+         test_characterization.py contradicted itself about test 3
+         ("stays xfail" vs its own header two definitions above).
+         DESIGN_MODEL_v5.md:3 pointed at docs/_superseded/, deleted at
+         P0.1. ANNOTATED, not repointed: the named drafts were never
+         committed, and docs/superseded/ is a different, later directory.
+         Sending a reader there would have been worse than the dangling
+         link.
+
+step 12  THE AUDITOR HAD A BOUNDARY AND ITS DOCSTRING DID NOT SAY SO.
+         Answer to the question asked at the report: NO, DESIGN_MODEL's
+         dangling link was NOT in the pattern set -- it was found by eye.
+         The step-1 commit message claimed the boundary was "stated in
+         the tool"; it was not. That overclaim is corrected at source.
+         docpath added (a backticked path under docs/) and MEASURED
+         before being trusted: 108 refs, 23 targets, 6 unresolved -- and
+         FIVE OF THE SIX ARE CORRECT (the P0.1 log naming the directory
+         it deleted, this refactor's own explanation of that deletion,
+         and two pre-P0.7 schema locations in historical text). So it is
+         REPORTED, NEVER ENFORCED, like mdlink: enforcing would fail five
+         correct records to catch one wrong one.
+         The pattern set is now VERSIONED and --compare REFUSES a
+         cross-version baseline -- a difference between two runs that is
+         really an instrument change is the exact failure this tool
+         exists to prevent. The set-1 baseline is kept byte-unchanged so
+         step 9's lost=0 receipt stays reproducible.
+
+step 13  THE --execute NEAR-MISS, RECORDED CORRECTLY, and the finding it
+         produced.
+         WHAT ACTUALLY PREVENTED IT: a missing-label ordering error. The
+         IDEMPOTENCE GUARD DID NOT FIRE -- it only refuses records that
+         already carry a github_issue, and none did. What stopped 50
+         issues being created was the repository happening to lack a
+         label. That is luck, not design, and attributing it to a guard
+         would teach the wrong lesson.
+         THE FINDING: none of the 15 labels or 20 milestones exist in
+         GitHub, so the real migration would have failed the same way on
+         the day it mattered. --create-labels added; --execute now CHECKS
+         the precondition before creating anything and refuses with the
+         list of missing labels and the remedy; the precondition is
+         documented in docs/defects/README.md.
+         Verified: 15 labels named, rc=1, nothing created.
+
+step 14  THE UNTRACKED ROOT FILES -- observation upgraded to fact.
+         Step 8 recorded that the eleven untracked scratch files were no
+         longer on disk and declined to say why, having no way to see it.
+         PATRICK CONFIRMS HE DELETED THEM, as the ruling anticipated.
+         The earlier entry stands as written; this is the attribution.
 ```

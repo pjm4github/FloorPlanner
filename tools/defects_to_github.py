@@ -28,8 +28,24 @@ LABELS AND MILESTONES ARE EMITTED FIRST, and that is not padding: `gh issue
 create --label X` FAILS if label X does not exist in the repo, and the same goes
 for `--milestone`. A script that emitted only the issue creates would die on its
 first line.
+
+    python tools/defects_to_github.py --create-labels --yes   # the precondition
+
+NONE OF THE LABELS OR MILESTONES EXIST IN THIS REPOSITORY YET, and that is a
+finding rather than a footnote. It was discovered the hard way: `--execute` was
+run by accident during development and reached the GitHub API, where it died on
+`could not add label: 'type:defect' not found`.
+
+  WHAT STOPPED IT WAS NOT A SAFEGUARD. The idempotence guard did NOT fire --
+  it only refuses records that already carry a `github_issue`, and none did.
+  What stopped it was the repository happening to lack a label. That is luck,
+  not design, and recording it as "the guard caught it" would teach the wrong
+  lesson entirely. Two things were changed BECAUSE the luck is not repeatable:
+  `--execute` now requires `--yes`, and it now CHECKS the precondition and
+  refuses with the remedy instead of discovering it mid-run, half-migrated.
 """
 import argparse
+import json
 import pathlib
 import re
 import subprocess
@@ -134,9 +150,51 @@ def commands(recs, gh, body_dir):
     return out
 
 
+def existing_labels(gh):
+    """Labels already in the repo, or None if the question cannot be asked."""
+    p = subprocess.run([gh, "label", "list", "--limit", "200", "--json", "name"],
+                       capture_output=True, text=True, cwd=ROOT)
+    if p.returncode:
+        return None
+    try:
+        return {x["name"] for x in json.loads(p.stdout)}
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+def create_labels(recs, gh):
+    """Create every label and milestone the records name. Idempotent: label
+    create uses --force, and a milestone that exists returns non-zero and is
+    ignored, which is why the emitted script says `|| true` there."""
+    labels, milestones = set(), set()
+    for _, d, _ in recs:
+        labels.update(d.get("labels") or [])
+        if d.get("milestone"):
+            milestones.add(d["milestone"])
+    made = 0
+    for lb in sorted(labels):
+        kind = lb.split(":", 1)[0]
+        colour = {"type": "d73a4a", "area": "0075ca",
+                  "status": "fbca04"}.get(kind, "cccccc")
+        p = subprocess.run(
+            [gh, "label", "create", lb, "--color", colour, "--force",
+             "--description", f"{kind} label, fixed taxonomy"],
+            capture_output=True, text=True, cwd=ROOT)
+        if p.returncode:
+            print(f"Docs-GitHub: label {lb!r} failed: {p.stderr.strip()[:200]}")
+            return 1, 0
+        made += 1
+    for ms in sorted(milestones):
+        subprocess.run([gh, "api", "repos/:owner/:repo/milestones",
+                        "-f", f"title={ms}"], capture_output=True, cwd=ROOT)
+    print(f"Docs-GitHub: {made} label(s) and {len(milestones)} milestone(s) "
+          f"ensured")
+    return 0, made
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    g = ap.add_mutually_exclusive_group(required=True)
+    g = ap.add_mutually_exclusive_group(required=False)
     g.add_argument("--dry-run", action="store_true")
     g.add_argument("--execute", action="store_true")
     ap.add_argument("--gh", help="path to the gh executable")
@@ -145,7 +203,12 @@ def main():
                     help="re-create issues for records that already have one")
     ap.add_argument("--yes", action="store_true",
                     help="required with --execute; confirms creating issues")
+    ap.add_argument("--create-labels", action="store_true",
+                    help="create the labels and milestones the records need "
+                         "(the precondition for --execute)")
     a = ap.parse_args()
+    if not (a.dry_run or a.execute or a.create_labels):
+        ap.error("one of --dry-run, --execute or --create-labels is required")
 
     # --execute REACHES GITHUB, and creating fifty issues is not undoable by
     # any command here -- issues can be closed but not deleted. It is therefore
@@ -181,6 +244,30 @@ def main():
             return 1
 
     gh = gh_path(a.gh)
+
+    if a.create_labels:
+        rc, _ = create_labels(recs, gh)
+        if rc or not a.execute:
+            return rc
+
+    if a.execute:
+        # THE PRECONDITION, CHECKED BEFORE THE FIRST ISSUE RATHER THAN
+        # DISCOVERED AT IT. Finding this mid-run leaves the tracker half
+        # migrated, which is the state that is hardest to reason about.
+        have = existing_labels(gh)
+        want = {lb for _, d, _ in recs for lb in (d.get("labels") or [])}
+        if have is not None and not want <= have:
+            missing = sorted(want - have)
+            print(f"Docs-GitHub: {len(missing)} label(s) the records need do "
+                  f"not exist in this repository:")
+            print(f"             {', '.join(missing)}")
+            print("             `gh issue create --label X` FAILS on a label "
+                  "that does not exist, so this")
+            print("             would die partway through, leaving the tracker "
+                  "half migrated.")
+            print("             Run `--create-labels --yes` first.")
+            return 1
+
     body_dir = pathlib.Path(a.body_dir) if a.body_dir else pathlib.Path(
         tempfile.mkdtemp(prefix="fp-defect-bodies-"))
     body_dir.mkdir(parents=True, exist_ok=True)

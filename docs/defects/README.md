@@ -179,6 +179,35 @@ the mapping survives either answer. Nothing else about the question is settled.
 
 ---
 
+## Migrating to GitHub Issues — the precondition
+
+**None of the 15 labels and 20 milestones these records name exist in the
+repository yet.** `gh issue create --label X` fails on a label that does not
+exist, so a migration that starts with the issues dies partway through and
+leaves the tracker half populated.
+
+```
+python tools/defects_to_github.py --create-labels --yes   # 1. the precondition
+python tools/defects_to_github.py --dry-run               # 2. read what it will do
+python tools/defects_to_github.py --execute --yes         # 3. only then
+```
+
+`--execute` **checks** this before creating anything and refuses with the list
+of missing labels and the remedy. That check exists because the failure was met
+in practice: `--execute` was run by accident during development, reached the
+GitHub API and died on `could not add label: 'type:defect' not found`.
+
+**What stopped it was not a safeguard.** The idempotence guard did not fire — it
+only refuses records that already carry a `github_issue`, and none did. What
+stopped it was the repository happening to lack a label. That is luck, and luck
+is not repeatable, so both halves were fixed: `--execute` now requires `--yes`,
+and the precondition is checked up front rather than discovered mid-run.
+
+Nothing was created in that incident — verified immediately: empty issue list,
+no `github_issue` written, clean working tree.
+
+---
+
 ## A content correction is never folded into a structural move
 
 **Ruled 2026-08-06, and it is general.** When a move discovers that a record is
