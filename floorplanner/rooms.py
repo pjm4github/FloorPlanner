@@ -209,6 +209,95 @@ def make_concept_room(scene, name, width_in, depth_in, at, floor=None):
     return room
 
 
+def rooms_holding(scene, vertex_ids):
+    """Every room whose outline holds one of `vertex_ids` — the rooms a corner
+    move will reshape, found by IDENTITY rather than by proximity.
+
+    Defect 30's lesson, stated once: ask the corner who holds it. Three
+    gestures now ask exactly this question — a group bake (`GroupItem`), Align
+    to grid, and Distribute — and before P4.5 each answered it differently or
+    not at all, which is how a room that was never selected ended up with its
+    walls at x=150 and its outline at x=120. Scene-wide is not an oversight:
+    identity makes a floor filter redundant, because a `Vertex` carries exactly
+    one level (I2)."""
+    if scene is None or not vertex_ids:
+        return []
+    return [it for it in scene.items()
+            if isinstance(it, RoomItem)
+            and any(id(e.v) in vertex_ids for e in it.outline)]
+
+
+def relocate_corners(walls, rooms, target, scene=None):
+    """Move each distinct corner of `walls` to `target(vertex)`; the walls AND
+    every room outline holding those corners follow, because they hold the same
+    `Vertex` objects. Returns the number of corners actually moved.
+
+    THE ALTERNATIVE IS THE BUG, and it is measured. Assigning `p1`/`p2` splits
+    on write, so each wall end comes away on a fresh vertex and the outline is
+    left holding the old one — the walls move and the room does not. Measured
+    at P4.5 on a row of three rooms: Align to grid took every selected room's
+    walls onto the grid and left every outline off it (outline-to-wall corner
+    sharing 4-of-4 → 1-of-4 and 0-of-4, two rooms gaining open edges), and
+    Distribute destroyed all four corners' sharing on every room **while moving
+    them by zero** — an assignment of the same coordinate still mints.
+
+    `rooms` IS A STARTING SET, NOT THE GATHER. Every other room in the scene
+    holding one of these corners is added via `rooms_holding`, and that
+    widening is the whole point: the corner being moved is frequently a PARTY
+    corner, so the neighbour that was never selected is holding it too. Passing
+    only the selected rooms is what tore the neighbour — a room that never
+    moved ending up with its wall at x=150 and its outline at x=120. That the
+    neighbour DEFORMS rather than resisting is ruling 2a, not an accident: it
+    follows because its corner moved.
+
+    `target` returns the new point for a corner, or None to leave it."""
+    if scene is None:
+        scene = next((w.scene() for w in walls if w.scene() is not None), None)
+    held = {id(w.end_vertex(a)) for w in walls for a in ("p1", "p2")}
+    # AND THE GATHER WIDENS TO WALLS, NOT ONLY OUTLINES. An outside wall whose
+    # end IS one of these corners must come along, or it is left behind on a
+    # stale vertex and the network tears open at that corner -- measured on a
+    # three-room row: aligning A and B moved the shared corner at (354, 118)
+    # to (354, 120) while unselected C's own wall stayed short of it, giving C
+    # a dashed open edge with genuinely no wall on it. A corner is one Vertex
+    # (Phase 3); everything holding it moves, or it was never one corner.
+    outside = [w for w in (scene.items() if scene is not None else ())
+               if isinstance(w, WallItem) and w not in walls
+               and any(id(w.end_vertex(a)) in held for a in ("p1", "p2"))]
+    every_wall = list(walls) + outside
+    holders = [(w, a) for w in every_wall for a in ("p1", "p2")]
+    seen = {id(r) for r in rooms}
+    every = list(rooms) + [r for r in rooms_holding(scene, held)
+                           if id(r) not in seen]
+    edges = [e for r in every for e in getattr(r, "outline", ()) or ()]
+    # `old` keeps every vertex alive for the whole pass: the map is keyed by
+    # id(), and an id freed mid-pass could be handed back to a new vertex.
+    old = [w.end_vertex(a) for w, a in holders] + [e.v for e in edges]
+    moved, n = {}, 0
+    for v in old:
+        if id(v) in moved:
+            continue
+        p = target(v)
+        if p is None or (p.x() == v.x and p.y() == v.y):
+            moved[id(v)] = v                 # unchanged: do NOT mint
+        else:
+            moved[id(v)] = v.relocated_to(p)
+            n += 1
+    for w, a in holders:
+        w.set_end_vertex(a, moved[id(w.end_vertex(a))])
+    for e in edges:
+        e.v = moved[id(e.v)]
+    for w in every_wall:
+        w.rebuild()                          # repositions its openings too
+    for r in every:
+        # `path`/`area_sqft`/`corners` all DERIVE from the outline (P3.5), so
+        # there is nothing to recompute -- only Qt to tell that the item's
+        # geometry changed under it.
+        r.prepareGeometryChange()
+        r.update()
+    return n
+
+
 def share_outline_vertices(room):
     """Make `room`'s outline reference the SAME `Vertex` objects its walls do.
 

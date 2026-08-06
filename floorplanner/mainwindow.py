@@ -743,28 +743,41 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         walls = set()
         for s in shapes:
             walls.update(s["walls"])
-        for w in walls:
-            w.p1 = grid_snap(w.p1, step)
-            w.p2 = grid_snap(w.p2, step)
-        rebuild_all_walls(self.scene)     # rooms re-detect on the new walls
+        # RELOCATE the corners; do not assign coordinates. Assigning `p1`/`p2`
+        # splits on write, so every wall end came away on a fresh vertex and
+        # the outline was left holding the old ones -- measured at P4.5, all
+        # four walls of a room snapped to the grid and its outline stayed
+        # entirely off it. `relocate_corners` also widens the gather to every
+        # room in the scene holding a corner being moved, which is what stops
+        # the party-wall neighbour tearing (it deforms instead, ruling 2a).
+        rooms = [s["room"] for s in shapes if s["room"] is not None]
+        relocate_corners(walls, rooms,
+                         lambda v: grid_snap(v.point(), step), self.scene)
+        rebuild_all_walls(self.scene)
         self.status(f"Aligned {len(shapes)} room(s) to the "
                     f'{step:g}" grid.')
 
-    @staticmethod
-    def _translate_shape(shape, dx, dy):
-        """Rigidly shift a room shape (its walls and, if any, its region)."""
-        for w in shape["walls"]:
-            w.p1 = QPointF(w.p1.x() + dx, w.p1.y() + dy)
-            w.p2 = QPointF(w.p2.x() + dx, w.p2.y() + dy)
+    def _translate_shape(self, shape, dx, dy):
+        """Rigidly shift a room shape (its walls and, if any, its region).
+
+        SAME CORRECTION AS `align_rooms_to_grid`, and it was the more damaging
+        of the two: this used to assign `p1`/`p2` AND rebuild the room's corner
+        list from fresh `QPointF`s, so the two agreed numerically and shared
+        nothing. Measured at P4.5 on a row of three rooms, outline-to-wall
+        corner sharing went 4-of-4 to 0-of-4 on EVERY room -- **while
+        Distribute moved them by zero**, because assigning the same coordinate
+        still mints a vertex. The room looked right and the next wall drag
+        stranded it (defect 22's shape, arriving through a different door)."""
         r = shape["room"]
+        relocate_corners(shape["walls"], [r] if r is not None else [],
+                         lambda v: QPointF(v.x + dx, v.y + dy), self.scene)
         if r is not None:
+            r.prepareGeometryChange()
             r.anchor = QPointF(r.anchor.x() + dx, r.anchor.y() + dy)
-            # region derives from the outline (P3.5): shifting the corners
-            # shifts it. The mapped path is only the outline-less fallback.
-            r.set_region(QTransform.fromTranslate(dx, dy).map(r.path),
-                         r.area_sqft,
-                         [QPointF(c.x() + dx, c.y() + dy) for c in r.corners]
-                         if r.corners else None)
+            if not r.outline:     # outline-less: the stored path IS the region
+                r.set_region(QTransform.fromTranslate(dx, dy).map(r.path),
+                             r.area_sqft, None)
+            r.update()
 
     def distribute_rooms(self, horizontal: bool):
         """Space the selected rooms so the gaps between them are equal,

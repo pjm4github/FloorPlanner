@@ -524,6 +524,15 @@ def test_a_clipped_band_leaves_every_room_coherent(fp, win):
     pre = {r.name: [(round(e.p.x(), 3), round(e.p.y(), 3)) for e in r.outline]
            for r in win.scene.items()
            if isinstance(r, fp.RoomItem) and r.name in before}
+    # BOTH ends, not just p1. `_snapshot` records p1 alone, which was enough
+    # while a group move either took a wall whole or not at all -- but a wall
+    # the band left outside now RESIZES, one end riding the shared corner and
+    # the other staying. Judged on p1 only, such a wall reads as "moved" and
+    # this test then demands both its corners move, which is the opposite of
+    # what a resize means.
+    ends0 = {id(w): (round(w.p1.x(), 3), round(w.p1.y(), 3),
+                     round(w.p2.x(), 3), round(w.p2.y(), 3))
+             for w in win.scene.items() if isinstance(w, fp.WallItem)}
     win.group_selected()
     for g in [it for it in win.scene.items() if isinstance(it, fp.GroupItem)]:
         g.setPos(dx, dy)
@@ -536,12 +545,15 @@ def test_a_clipped_band_leaves_every_room_coherent(fp, win):
     for r in win.scene.items():
         if not isinstance(r, fp.RoomItem) or r.name not in before:
             continue
-        w0 = before[r.name][0]
-
-        def wall_moved(w, w0=w0):
-            return (id(w) in w0
-                    and _moved(w0[id(w)], (round(w.p1.x(), 3),
-                                           round(w.p1.y(), 3))))
+        def wall_moved(w):
+            """The wall TRANSLATED -- both ends by the same delta. A wall with
+            one end on the moved corner and one off it has resized, and its
+            edge's corners are then judged one at a time."""
+            e0 = ends0.get(id(w))
+            return (e0 is not None and _moved(e0[:2], (round(w.p1.x(), 3),
+                                                       round(w.p1.y(), 3)))
+                    and _moved(e0[2:], (round(w.p2.x(), 3),
+                                        round(w.p2.y(), 3))))
 
         own = fp.room_walls(r)
         if 0 < sum(1 for w in own if wall_moved(w)) < len(own):
@@ -637,22 +649,44 @@ def test_a_group_rotation_also_keeps_the_corners(fp, win):
     assert _unwelded(win) == 0
 
 
-def test_a_group_move_never_drags_a_wall_outside_it(fp, win, make_room):
-    """The carve-out the vertex move has to respect: a corner a NON-member wall
-    also holds is SPLIT before the move, so the group goes and the outsider
-    stays. Relocating it wholesale would wire a member to an outside wall --
-    exactly what the `group() is None` guards exist to prevent."""
+def test_a_group_move_stretches_an_outside_wall_it_shares_a_corner_with(
+        fp, win, make_room):
+    """INVERTED AT P4.5, and it is the third test in this phase to be rewritten
+    because it pinned a RATIONALE rather than a behaviour. Its old name was
+    `..._never_drags_a_wall_outside_it` and its docstring said the split
+    happens because "relocating it wholesale would wire a member to an outside
+    wall -- exactly what the `group() is None` guards exist to prevent". All
+    four of those guards were retired earlier in this phase and
+    `duplicate_wall` died with them, so the reason expired and the test could
+    not survive it unchanged. (The smell the Working agreement warns about is
+    the opposite case -- a rewrite when nothing was retired.)
+
+    WHAT REPLACES IT IS NOT "the outsider may now be dragged". A shared corner
+    is ONE `Vertex` (Phase 3), so an outside wall holding it is ON that corner:
+    the corner moves, that end goes with it, and the wall's far end does not.
+    The stub STRETCHES; it does not travel. That is the same sentence as a
+    party-wall resize, and asserting it this way is what distinguishes the new
+    semantics from the bug it would be if the whole stub translated.
+
+    Without this the network tears: the outsider keeps the old vertex while
+    everything else moves, leaving a gap at a corner that used to be welded --
+    measured on the clipped band as `unwelded_ends` rising 0 -> 1."""
     sc = win.scene
     room = make_room(sc, 0, 0, 120, 120, "A")
     stub = fp.WallItem(QPointF(120, 120), QPointF(240, 120), "interior")
     sc.addItem(stub)                       # meets the room's corner, not a member
     fp.rebuild_all_walls(sc)
+    shared = None
     for w in room.walls:                   # weld the stub onto the room corner
         for at in ("p1", "p2"):
             if abs(getattr(w, at).x() - 120) < 1e-9 \
                     and abs(getattr(w, at).y() - 120) < 1e-9:
                 stub.set_end_vertex("p1", w.end_vertex(at))
-    before = (stub.p1.x(), stub.p1.y(), stub.p2.x(), stub.p2.y())
+                shared = w.end_vertex(at)
+    # PRECONDITION -- the stub really does hold the room's corner, by IDENTITY.
+    # Coincident coordinates would not do: the whole claim is about one Vertex.
+    assert shared is not None and stub.end_vertex("p1") is shared
+    far = (stub.p2.x(), stub.p2.y())
 
     sc.clearSelection()
     for w in room.walls:
@@ -662,8 +696,11 @@ def test_a_group_move_never_drags_a_wall_outside_it(fp, win, make_room):
         g.setPos(36.0, 0.0)
         g.bake()
 
-    assert (stub.p1.x(), stub.p1.y(), stub.p2.x(), stub.p2.y()) == before, \
-        "the group dragged a wall that was not in it"
+    assert (round(stub.p1.x(), 6), round(stub.p1.y(), 6)) == (156.0, 120.0), \
+        "the shared end did not follow the corner it IS"
+    assert (stub.p2.x(), stub.p2.y()) == far, \
+        "the far end travelled too -- the group dragged the whole outsider"
+    assert _unwelded(win) == 0, "the move tore the wall network"
     assert room.corners[0].x() != 0 or room.corners[1].x() != 0
 
 

@@ -16,6 +16,7 @@ from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import WallItem, rebuild_all_walls
 from floorplanner.rooms import (
     RoomItem, report_self_intersections, room_owns_walls, walls_cover_room,
+    rooms_holding,
 )
 
 # Stairs — a dynamic "Framing" furnishing: step count from the room's ceiling
@@ -752,6 +753,21 @@ class GroupItem(QGraphicsItemGroup):
                 v = w.end_vertex(a)
                 held.setdefault(id(v), v)
                 ends.append((w, a, v))
+        # AN OUTSIDE WALL'S END ON ONE OF THESE CORNERS COMES ALONG, and this
+        # is the same scan that used to SPLIT it off -- inverted rather than
+        # deleted, which is the shape of the whole ruling. Without it the
+        # outsider keeps the old vertex while everything else moves, so the
+        # network tears open at that corner: measured on the clipped band as
+        # `unwelded_ends` rising 0 -> 1 after a bake that was otherwise clean.
+        # The room half of this gather widened at P4.5; the wall half is the
+        # same question and had been left behind (found by Align to grid
+        # hitting it first, on a three-room row).
+        for it in (sc.items() if sc is not None else ()):
+            if isinstance(it, WallItem) and it not in group_walls:
+                for a in ("p1", "p2"):
+                    v = it.end_vertex(a)
+                    if id(v) in held:
+                        ends.append((it, a, v))
         recs = {}
         for k, v in held.items():
             recs[k] = [QPointF(v.point()), v, [], []]
@@ -781,16 +797,12 @@ class GroupItem(QGraphicsItemGroup):
                     rec[3].append(e)
         return list(recs.values())
 
-    @staticmethod
-    def _rooms_holding(scene, vertex_ids):
-        """Every room whose outline holds one of `vertex_ids` — the rooms a
-        corner move will reshape, found by identity rather than by proximity
-        (defect 30's lesson: ask the corner who holds it)."""
-        if scene is None or not vertex_ids:
-            return []
-        return [it for it in scene.items()
-                if isinstance(it, RoomItem)
-                and any(id(e.v) in vertex_ids for e in it.outline)]
+    # THE GATHER LIVES IN `rooms.py` NOW (P4.5). It was defined here first,
+    # then wanted by Align to grid and Distribute, and one concept with three
+    # implementations is F2's disease -- so `rooms_holding` is the single
+    # definition and this stays only as the name `bake` and the rotation
+    # already call.
+    _rooms_holding = staticmethod(rooms_holding)
 
     @staticmethod
     def _apply_corner_records(recs, tr):
