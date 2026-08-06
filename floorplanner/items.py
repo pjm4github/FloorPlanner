@@ -17,7 +17,6 @@ from floorplanner.walls import WallItem, rebuild_all_walls
 from floorplanner.rooms import (
     RoomItem, report_self_intersections, room_owns_walls, walls_cover_room,
 )
-from floorplanner.vertex import Vertex
 
 # Stairs — a dynamic "Framing" furnishing: step count from the room's ceiling
 # height (standard ~7" risers); full or half flight to a landing.
@@ -725,11 +724,23 @@ class GroupItem(QGraphicsItemGroup):
         re-share after every group move, which is why deferring the conversion
         to P4.5 was safe until P3.5 deleted it.
 
-        A CORNER AN OUTSIDE WALL ALSO HOLDS IS SPLIT HERE, before anything
-        moves. That is P3.3's split-before-share discipline, and it preserves
-        today's behaviour exactly: the group moves, whatever is outside it does
-        not. Relocating such a corner wholesale would drag a non-member's end --
-        the very wiring the `group() is None` guards exist to prevent.
+        DEFORM-TO-FOLLOW (P4.5, ruled): A CORNER AN OUTSIDE WALL ALSO HOLDS IS
+        NO LONGER SPLIT. It used to be, before anything moved, so that "the
+        group moves, whatever is outside it does not" -- and the justification
+        given was that relocating it wholesale would drag a non-member's end,
+        "the very wiring the `group() is None` guards exist to prevent". **That
+        justification expired**: P4.5 retired all four of those guards, and
+        `duplicate_wall` died with them, so a group now holds the REAL walls
+        rather than copies. A corner the group and a room both hold is the
+        NORMAL case, not an outsider to protect from.
+
+        So the corner relocates whole, and everything on it comes along: an
+        outside wall end because it IS that corner, and every room whose
+        outline holds it -- gathered SCENE-WIDE BY IDENTITY, the same question
+        `_rooms_holding` and `_DragVertex.ends` ask. Gathering only the rooms
+        the group fully owns is what stranded the clipped room (defect 23): its
+        walls walked out from under a region that had no record telling it to
+        follow.
 
         A carried room whose outline corner is on NO member wall (sharing was
         already broken -- a legacy import, or a group move from before this fix)
@@ -741,28 +752,33 @@ class GroupItem(QGraphicsItemGroup):
                 v = w.end_vertex(a)
                 held.setdefault(id(v), v)
                 ends.append((w, a, v))
-        shared_out = set()
-        for it in (sc.items() if sc is not None else ()):
-            if isinstance(it, WallItem) and it not in group_walls:
-                for a in ("p1", "p2"):
-                    if id(it.end_vertex(a)) in held:
-                        shared_out.add(id(it.end_vertex(a)))
         recs = {}
         for k, v in held.items():
-            # split off a corner an outsider also holds; ours becomes a new one
-            keep = Vertex.at(v.point()) if k in shared_out else v
-            recs[k] = [QPointF(v.point()), keep, [], []]
+            recs[k] = [QPointF(v.point()), v, [], []]
         for w, a, v in ends:
-            rec = recs[id(v)]
-            rec[2].append((w, a))
-            w.set_end_vertex(a, rec[1])          # apply the split, if any
+            recs[id(v)][2].append((w, a))
+        # A FULLY-OWNED room moves RIGIDLY, so a corner of its outline that no
+        # member wall holds still gets a record -- that is the legacy-sharing
+        # repair, and it is what makes the room travel whole.
         for r in carry_rooms:
             for e in r.outline:
                 rec = recs.get(id(e.v))
                 if rec is None:
                     rec = recs[id(e.v)] = [QPointF(e.v.point()), e.v, [], []]
                 rec[3].append(e)
-                e.v = rec[1]
+        # A room the group only PARTLY holds must DEFORM, not travel: it follows
+        # exactly the corners that moved and keeps the ones that did not. So it
+        # attaches to EXISTING records only -- minting one for an unheld corner
+        # is what would drag the whole room, which is the rigid case above and
+        # the opposite error to the stranding this fixes.
+        owned = {id(r) for r in carry_rooms}
+        for r in self._rooms_holding(sc, set(held)):
+            if id(r) in owned:
+                continue
+            for e in r.outline:
+                rec = recs.get(id(e.v))
+                if rec is not None:
+                    rec[3].append(e)
         return list(recs.values())
 
     @staticmethod

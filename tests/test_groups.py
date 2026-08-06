@@ -480,27 +480,38 @@ def test_whole_plan_group_move_carries_every_room(fp, win):
     assert _unwelded(win) == 0, "the move tore the wall network"
 
 
-@pytest.mark.xfail(strict=False,
-                   reason="defect 23: a band that clips a room's wall set "
-                          "strands that room; the semantics are P4.5's")
 def test_a_clipped_band_leaves_every_room_coherent(fp, win):
-    """DEFECT 23, characterized against the invariant BOTH candidate semantics
-    satisfy, so it flips whichever way P4.5 rules.
+    """DEFECT 23. A room the band only PARTLY took follows the corners that
+    moved: every outline edge whose wall moved has both its corners moved too.
 
-    A rubber band takes only items FULLY inside it, so a wall poking out is left
-    behind and `group_selected` duplicates the rest of that room's walls --
-    `room_owns_walls` is then correctly false and the room is not carried. Its
-    walls walk out from under a region that stays put. Measured: 3 of 20 rooms,
-    Garage at 6/9 walls moved against 0/9 corners.
+    FLIPPED xfail -> hard pass at P4.5, AS A CONSEQUENCE OF THE MECHANISM and
+    not as a fix (ruling 2a). Nothing was built to make this pass: the corner
+    an outside wall also holds simply stopped being SPLIT, so a room holding it
+    follows because the corner moved. That is the same sentence as a party-wall
+    resize.
 
-    PER-ROOM COHERENCE is what both readings agree on. Under deform-to-follow a
-    clipped room's 6 moved walls carry 6 of its corners; under stay-put the
-    grouping would have to take the whole room or none of it, so 0 and 0. Either
-    way the two columns AGREE, and today they do not. Deliberately NOT asserting
-    which -- that is the decision P4.5 owns.
+    THE ASSERTION IS REWRITTEN, and this is the declared change with its
+    reason, because the old one COULD NOT HAVE FLIPPED. It compared two counts
+    -- walls-moved against corners-moved -- and a run of k walls has k+1
+    corners, so an open run never satisfies it however correct the move is.
+    Measured with the mechanism in: Garage 6 walls / 7 corners, PKT Off 4/5,
+    Util 2/3, and WIC 6 walls covering 7 corners while moving WHOLLY. The old
+    equality called all four incoherent. It was written predicting "6 moved
+    walls carry 6 of its corners", and that prediction was simply wrong about
+    the arithmetic; the reading it was neutral between is no longer open
+    anyway, since 2a ruled DEFORM.
 
-    This predates P3.5 and the branch measurably improves it (148.3" of drift
-    before, 46.65" now), so it is a characterization, not a gate."""
+    A SECOND FORMULATION WAS REJECTED FOR BEING VACUOUS, recorded so it is not
+    re-proposed: "the corners that moved are exactly those held by a moved
+    wall" passes on the PRE-fix tree too, because the split meant a moved
+    wall's end was a fresh vertex the outline did not hold -- both sides empty,
+    equal, and silent about the very stranding it was written for. The
+    formulation below asks the question through the OUTLINE's own wall
+    reference instead, which survives the split and so can fail.
+
+    Fail-first receipt, measured in a worktree at `d57a76f`: Garage 0 of 7,
+    PKT Off 0 of 5, Util 0 of 3 -- three rooms stranded. With the mechanism:
+    20 of 20 rooms coherent, none failing."""
     _v5_plan(fp, win)
     dx, dy = 60.0, 36.0
     walls = [it for it in win.scene.items() if isinstance(it, fp.WallItem)]
@@ -510,26 +521,49 @@ def test_a_clipped_band_leaves_every_room_coherent(fp, win):
                                    (max(xs) - min(xs)) * 0.92 + 24,
                                    max(ys) - min(ys) + 48))
     before = _snapshot(fp, win)
+    pre = {r.name: [(round(e.p.x(), 3), round(e.p.y(), 3)) for e in r.outline]
+           for r in win.scene.items()
+           if isinstance(r, fp.RoomItem) and r.name in before}
     win.group_selected()
     for g in [it for it in win.scene.items() if isinstance(it, fp.GroupItem)]:
         g.setPos(dx, dy)
         g.bake()
 
-    cols = _columns(fp, win, dx, dy, before)
-    # The stranded rooms are this test's SUBJECT, so declare the state it built
-    # as the accepted baseline -- the same move `_overlapping_rooms` makes for
-    # its deliberate overlap. Without it the `win` fixture's teardown verify
-    # fires under FP_VERIFY_DESIGN=deep and the test is reported TWICE (an `E`
-    # in the progress line and a second xfail), which is what the phantom `E`
-    # sighted during the P3.5-followup actually was.
-    from floorplanner.design.verify import rebase
-    rebase(win)
-    incoherent = {n: (wm, wt, cm, ct)
-                  for n, (wm, wt, cm, ct, _i) in cols.items() if wm != cm}
-    assert not incoherent, (
-        "rooms whose walls and outline disagree about the move: "
-        + "; ".join(f"{n} walls {a}/{b} vs corners {c}/{d}"
-                    for n, (a, b, c, d) in sorted(incoherent.items())))
+    def _moved(a, b):
+        return abs(b[0] - a[0] - dx) < 1e-3 and abs(b[1] - a[1] - dy) < 1e-3
+
+    stranded, clipped = {}, []
+    for r in win.scene.items():
+        if not isinstance(r, fp.RoomItem) or r.name not in before:
+            continue
+        w0 = before[r.name][0]
+
+        def wall_moved(w, w0=w0):
+            return (id(w) in w0
+                    and _moved(w0[id(w)], (round(w.p1.x(), 3),
+                                           round(w.p1.y(), 3))))
+
+        own = fp.room_walls(r)
+        if 0 < sum(1 for w in own if wall_moved(w)) < len(own):
+            clipped.append(r.name)
+        now = [(round(e.p.x(), 3), round(e.p.y(), 3)) for e in r.outline]
+        n = len(r.outline)
+        # every corner of every edge whose WALL moved must have moved with it
+        need = set()
+        for i, e in enumerate(r.outline):
+            if e.wall is not None and wall_moved(e.wall):
+                need |= {i, (i + 1) % n}
+        got = {i for i in need if _moved(pre[r.name][i], now[i])}
+        if got != need:
+            stranded[r.name] = (len(got), len(need))
+
+    # PRECONDITION -- the band must actually have CLIPPED somebody, or the
+    # verdict is about a plain whole-plan move and says nothing about defect 23
+    assert clipped, "the band took whole rooms only; nothing was clipped"
+    assert not stranded, (
+        "rooms whose outline did not follow their own moved walls: "
+        + "; ".join(f"{n} {a} of {b} corners"
+                    for n, (a, b) in sorted(stranded.items())))
 
 
 def test_a_group_move_leaves_the_outlines_still_holding_their_corners(fp, win):
