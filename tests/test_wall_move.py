@@ -499,44 +499,6 @@ def test_a_dragged_wall_resizes_the_rooms_it_borders(fp, scene):
     assert sum(after) == pytest.approx(sum(before), abs=0.01)
 
 
-# ------------------------------------------ call-site attribution (telemetry)
-def test_split_telemetry_names_the_call_site(fp, win, monkeypatch):
-    """P3.1 logged that an operation split; it could not say WHERE, and "which
-    call sites should become real vertex moves" is a question about lines of
-    code. P3.3 converts the first of them and attributes the rest."""
-    from floorplanner.design import verify as V
-    monkeypatch.setenv(V.ENV_VAR, "1")
-    V.rebase(win)
-    V.verify(win, "baseline")
-
-    w = fp.WallItem(QPointF(0, 0), QPointF(100, 0), "interior")
-    win.scene.addItem(w)
-    w.p1 = QPointF(5, 5)                                    # <- the call site
-    V.verify(win, "moved an end")
-
-    where, blame = getattr(win, V.SITE_LOG_ATTR)[-1]
-    assert where == "moved an end"
-    assert sum(blame.values()) == 1
-    (path, func, _line), = blame
-    assert func == "test_split_telemetry_names_the_call_site"
-    assert path.endswith("test_wall_move.py")
-    V.rebase(win)
-
-
-def test_attribution_skips_the_property_setter(fp):
-    """Every split arrives through the `p1`/`p2` setters, so blaming those would
-    put all of them on two lines and answer nothing."""
-    from floorplanner import vertex as VX
-    w = fp.WallItem(QPointF(0, 0), QPointF(100, 0), "interior")
-    before = VX.split_sites()
-    w.p2 = QPointF(150, 0)
-    new = {k for k, v in VX.split_sites().items() if v > before.get(k, 0)}
-    assert new, "the split was not attributed at all"
-    for path, func, _line in new:
-        assert func not in ("p1", "p2")
-        assert not path.endswith("vertex.py")
-
-
 def test_relocation_carries_the_vertex_identity():
     """A moved corner is the SAME corner, so it keeps its uid -- otherwise a
     drag would silently rename every corner it touches, and P4.5 serializes
@@ -1032,8 +994,8 @@ def test_an_endpoint_drag_detaches_once_per_gesture_not_once_per_event(
 def test_pressing_an_endpoint_without_moving_leaves_the_corner_shared(
         fp, scene):
     """The detach is LAZY, and that is behaviour worth keeping rather than an
-    accident of the old setter: `moved_to` returned `self` unchanged on a
-    zero-length move, so a press-and-release never took a corner apart. A
+    accident of the retired setter, which returned the same vertex unchanged on
+    a zero-length move -- so a press-and-release never took a corner apart. A
     detach-at-press would have broken a corner on a click."""
     a, b = _corner_pair(fp, scene)
     shared = a.end_vertex("p2")

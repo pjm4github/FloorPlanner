@@ -300,7 +300,7 @@ def _adopt_end(wall, attr, vertex, xy):
         if wall.end_vertex(attr) is not vertex:
             wall.set_end_vertex(attr, vertex)
         return
-    setattr(wall, attr, QPointF(xy[0], xy[1]))
+    wall.detach_end(attr, QPointF(xy[0], xy[1]))
 
 
 def apply_merge_plan_to_scene(scene, plan, rebuild=True):
@@ -489,7 +489,7 @@ def _snap_wall_ends(scene, wall):
         if q is not None:
             if QLineF(q, p).length() > 1e-9:
                 moved += 1
-            setattr(wall, attr, q)
+            wall.detach_end(attr, q)
     return moved
 
 
@@ -911,7 +911,7 @@ def snap_end_to_doorway_jamb(scene, wall, ends=("p1", "p2")):
                     if best is None or abs(sj - s_p) < abs(best - s_p):
                         best = sj
         if best is not None:
-            setattr(wall, attr, host.point_at(best))
+            wall.detach_end(attr, host.point_at(best))
             moved += 1
     if moved:
         wall.rebuild()
@@ -1218,40 +1218,42 @@ class WallItem(QGraphicsItem):
     def p1(self) -> QPointF:
         return self._v1.point()
 
-    @p1.setter
-    def p1(self, value):
-        v = getattr(self, "_v1", None)
-        self._v1 = v.moved_to(value) if v is not None else Vertex.at(value)
-        self._carry_anchors(v, self._v1)
-
     @property
     def p2(self) -> QPointF:
         return self._v2.point()
 
-    @p2.setter
-    def p2(self, value):
-        v = getattr(self, "_v2", None)
-        self._v2 = v.moved_to(value) if v is not None else Vertex.at(value)
-        self._carry_anchors(v, self._v2)
+    def detach_end(self, attr: str, p: QPointF):
+        """Land this end at `p` ON A NEW CORNER, leaving every sharer behind.
 
-    def _carry_anchors(self, old, new):
-        """Keep every opening dimensioned off `old` dimensioned off `new`.
+        THE `p1`/`p2` SETTERS' OPERATION, under a name that says which of the
+        two it is. Assignment was ONE SPELLING FOR TWO THINGS -- this, and
+        `relocated_to`'s "the corner moved and everything on it came along" --
+        and a reader could not tell them apart at a call site. The setters went
+        at P4.5; the operation did not, because four call sites genuinely mean
+        this: a merge landing an end where the plan named no corner, a snap, a
+        jamb landing, and the drag's `tee` branch.
 
-        THE END DID NOT CHANGE -- its coordinate did. Assigning `p1`/`p2` is
-        split-on-write, so the same corner comes away on a fresh `Vertex` with a
-        fresh uid, and an anchor still naming the old object is orphaned. An
+        THE ANCHOR CARRY IS WHY THIS IS NOT `set_end_vertex(attr,
+        Vertex.at(p))`, and it is the trap that made this a method rather than
+        two lines at each site. `set_end_vertex` routes through
+        `_fuse_anchors`, which deliberately does NOT move an opening's anchor
+        when the replacement vertex is somewhere ELSE -- that is a swap or a
+        deliberate share, and moving anchors there would shift a wall's
+        openings when it is merely reversed (R1(b)). Here the end really has
+        moved, and an anchor still naming the old vertex is orphaned; an
         orphaned anchor re-seats on `p1`, which for an opening dimensioned off
-        `p2` MIRRORS it down the wall. Measured on `planc1` before this existed:
-        12 of 41 openings changed position on load.
-
-        Deliberately NOT what `set_end_vertex` does for a vertex somewhere else
-        -- that is a swap or an explicit share, where the anchor must go on
-        naming the corner it names. See `_fuse_anchors`."""
-        if old is None or old is new:
-            return
-        for op in getattr(self, "openings", ()):
-            if op.anchor_v is old:
-                op.anchor_v = new
+        `p2` MIRRORS it down the wall. Measured on `planc1` before the carry
+        existed: 12 of 41 openings changed position on load."""
+        old = self.end_vertex(attr)
+        new = Vertex.at(p)
+        if attr == "p1":
+            self._v1 = new
+        else:
+            self._v2 = new
+        if old is not None and old is not new:
+            for op in getattr(self, "openings", ()):
+                if op.anchor_v is old:
+                    op.anchor_v = new
 
     def _fuse_anchors(self, old, new):
         """The WELD case: two ends at one corner fuse onto a single `Vertex`.
@@ -2017,9 +2019,9 @@ class WallItem(QGraphicsItem):
 
         THE SEMANTICS ARE UNCHANGED AND ARE THE POINT: an endpoint drag DETACHES
         this end from any corner it shared ("this wall's end moved, and anything
-        sharing it did not"), which is `vertex.moved_to`'s contract and the
-        designed open-side behaviour (defect 30's row draws exactly this line
-        against the BODY drag, where the corner carries everything on it).
+        sharing it did not") -- `Vertex.at`'s contract, and the designed
+        open-side behaviour (defect 30's row draws exactly this line against the
+        BODY drag, where the corner carries everything on it).
 
         What changes is WHEN the detach happens. Assigning `p1`/`p2` split on
         every mouse-move event, so one gesture minted a fresh `Vertex` -- and a
@@ -2030,8 +2032,8 @@ class WallItem(QGraphicsItem):
         exactly as the body drag has done since P3.3.
 
         Lazily, because a press-and-release that never moves must not take a
-        corner apart: `moved_to` returned `self` unchanged on a zero-length
-        move, and that no-op is behaviour worth keeping, not an accident."""
+        corner apart. That no-op is behaviour worth keeping, not an accident --
+        it is why `relocated_to` also returns `self` when nothing moved."""
         dv = self._ep_move
         if dv is None:
             cur = self.end_vertex(attr)
@@ -2091,7 +2093,8 @@ class WallItem(QGraphicsItem):
             px, py = dx - along * ux, dy - along * uy
             for w, attr, orig, kind in self._attached:
                 if kind == "tee":
-                    setattr(w, attr, QPointF(orig.x() + px, orig.y() + py))
+                    w.detach_end(attr, QPointF(orig.x() + px,
+                                               orig.y() + py))
                 w.rebuild()
         self.rebuild()
         e.accept()
