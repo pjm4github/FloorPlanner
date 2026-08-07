@@ -21,7 +21,9 @@ from pathlib import Path
 import pytest
 from PyQt6.QtCore import QPointF
 
-from floorplanner.design.bridge import apply_design_to_scene, design_from_scene
+from floorplanner.design.bridge import (
+    apply_design_to_scene, design_from_scene, scene_identity_report,
+)
 from floorplanner.design.validate import check
 
 pytestmark = [pytest.mark.io, pytest.mark.rooms]
@@ -549,3 +551,94 @@ def test_a_v5_plan_does_not_warn_about_its_own_decomposition(fp, win):
     # the finding is still COUNTED -- it is telemetry, not a secret
     assert rep["unwelded_ends"] == 5, \
         "the count itself must survive; only the user-facing warning is silent"
+
+
+# ---------------------------------------------------------------------------
+# D48 (G2) -- the SCENE-level identity check.  `design_from_scene` welds on the
+# way out, so a scene whose corners are not shared at all emits a document all
+# fifteen invariants accept.  These two pin the instrument that looks at the
+# difference: loud on the known-bad product, silent on a clean plan.
+# REPORT-ONLY -- it gates nothing and no operation calls it.
+# ---------------------------------------------------------------------------
+def test_scene_identity_is_silent_on_a_clean_plan(fp, win):
+    """A plan whose corners ARE shared reports nothing.
+
+    The verdict is negative ("no split points"), so its precondition is
+    asserted first -- and it is the precondition that matters here, because an
+    EMPTY scene reports nothing just as loudly.  D43's own lesson, applied on
+    the day it was measured.
+    """
+    _load(fp, win, "sample_plan.json")
+    rep = scene_identity_report(win)
+
+    # PRECONDITION -- there are ends to disagree about, and points to share.
+    assert rep["ends"] > 0, "no wall ends: the verdict below would be vacuous"
+    assert rep["points"] < rep["ends"], \
+        "no point carries two ends: nothing here could be shared or split"
+
+    assert rep["split"] == []
+    assert rep["extra_vertices"] == 0
+
+
+def test_scene_identity_reports_the_fragment_product(fp, win):
+    """The known-bad case: `fragment` builds a wall loop per region with no
+    dedup, so coincident corners are NOT the same `Vertex` (D47).
+
+    The register's measurement is 20 distinct vertices on 10 geometric points.
+    This asserts the SHAPE that measurement describes -- more vertices than
+    points, at points shared by several walls -- rather than the two integers,
+    which belong to D47's own probe and change when D47 lands.
+    """
+    _overlapping_rooms_for_identity(fp, win)
+    win.room_boolean("fragment")
+
+    rep = scene_identity_report(win)
+
+    # PRECONDITION -- the product exists and has coincident corners at all.
+    assert rep["ends"] > 0
+    assert rep["points"] > 0
+
+    assert rep["split"], "the fragment product's corners are not shared, " \
+                         "so the check must report them"
+    assert rep["extra_vertices"] > 0
+    worst = rep["split"][0]
+    assert worst["vertices"] > 1
+    assert worst["walls"] > 1, "a split point should be claimed by several walls"
+
+    # and the document the walk emits from that same scene is still clean --
+    # which is the whole point of D48: check() never saw this.
+    doc, _rep = _walk(win)
+    assert check(doc, deep=True) == [], \
+        "if this ever fails, the document check has grown teeth and D48's " \
+        "premise needs re-reading"
+
+
+def _overlapping_rooms_for_identity(fp, win):
+    """Two 10x8 rooms overlapping by 4x4 -- the input `fragment` exists to
+    resolve.  A local copy of test_rooms.py's helper: sharing it across test
+    modules would couple two files that pin different properties, and the
+    overlap is three lines."""
+    sc = win.scene
+
+    def mk(x, y, w, h, name):
+        corners = [QPointF(x, y), QPointF(x + w, y),
+                   QPointF(x + w, y + h), QPointF(x, y + h)]
+        r = fp.RoomItem(name, QPointF(x + w / 2, y + h / 2),
+                        fp.room_path_from_corners(corners),
+                        fp.poly_area_sqft(corners), corners=corners)
+        sc.addItem(r)
+        return r
+
+    r1 = mk(0, 0, 120, 96, "Room 1")
+    r2 = mk(72, 48, 120, 96, "Room 2")
+    # The overlap is the POINT of this fixture, so declare it as the accepted
+    # baseline for shadow mode -- otherwise the scene trips I11 "two placed
+    # rooms overlap" at teardown, which would be true but useless: the overlap
+    # was constructed here, not introduced by anything under test.
+    from floorplanner.design.verify import rebase
+    rebase(win)
+    # the selection order `room_boolean` consumes. Without it the op has no
+    # input and silently does nothing -- which is exactly how the first draft
+    # of this fixture produced a scene with zero walls.
+    win._sel_order = [r1, r2]
+    return r1, r2

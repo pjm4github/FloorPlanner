@@ -1,0 +1,53 @@
+{
+  "scene": {
+    "walls": 16,
+    "distinct_vertices": 20,
+    "geometric_points": 10
+  },
+  "report": {
+    "ends": 32,
+    "points": 10,
+    "split": [
+      {
+        "floor": "default",
+        "x": 72.0,
+        "y": 96.0,
+        "vertices": 4,
+        "ends": 6,
+        "walls": 6
+      },
+      {
+        "floor": "default",
+        "x": 120.0,
+        "y": 48.0,
+        "vertices": 4,
+        "ends": 6,
+        "walls": 6
+      },
+      {
+        "floor": "default",
+        "x": 72.0,
+        "y": 48.0,
+        "vertices": 3,
+        "ends": 4,
+        "walls": 4
+      },
+      {
+        "floor": "default",
+        "x": 120.0,
+        "y": 96.0,
+        "vertices": 3,
+        "ends": 4,
+        "walls": 4
+      }
+    ],
+    "extra_vertices": 10
+  },
+  "walk": {
+    "vertices": 10,
+    "walls": 12,
+    "merged": 4,
+    "unwelded_ends": 0,
+    "check_deep_errors": []
+  }
+}
