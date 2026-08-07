@@ -362,6 +362,37 @@ A FABRICATED TRAILER, AND THE FIX  2026-08-07
          three it was built for, because a tool's failure history belongs
          at the tool.
 
+G1 -- D43 NEGATIVE-ASSERTION COUNT  2026-08-07  (GREEN batch, item 1)
+         The measurement the record asked for, and only the measurement.
+         tools/negative_assertions.py, ast-based, evidence at
+         docs/evidence/d43-negative-assertions.json.
+             45 test files, 1598 assertions
+             287 NEGATIVE (17% of all assertions)
+             157 have a positive assertion earlier in the same test
+             HIT RATE 54%
+             130 bare assertions across 98 tests -- the read-first list
+             shapes: not X=71 == empty=64 == 0=41 not in=36 == before=33 is None=30 !==12
+         A CLASSIFIER FAULT FOUND BY SPOT-CHECKING BEFORE ANY NUMBER WAS
+         QUOTED. The first draft counted `assert r.returncode == 0` as
+         negative. `== 0` is two claims -- "this count is zero" (absence)
+         and "this process exited zero" (success). test_model_imports_
+         zero_qt was flagged for the success check while its REAL
+         negative assertion lives in a string run in a subprocess, where
+         no AST pass over that file can see it. Success probes excluded:
+         291 -> 287 negative, 135 -> 130 bare.
+         BOTH PROXY ERROR DIRECTIONS SPOT-CHECKED rather than asserted.
+         Overcount NOT observed (3 of 3 sampled "established" rows
+         asserted about the same subject as their negative claim).
+         Undercount observed: test_ungrouped_walls_survive_gc establishes
+         its precondition entirely BY CONSTRUCTION, which is not an
+         assert, so the proxy calls it bare. The bare list is therefore a
+         SUPERSET of the suspect ones -- the right error direction for
+         sizing a read.
+         PROPOSAL, sized by the number: read 130 assertions in 98
+         tests, ~2 min each, a half-day; leave the other 157 alone.
+         The list is enumerated, so it is a work-list, not a search.
+         Still argued Phase 6. Nothing remediated here, by design.
+
 G3 -- D27 WINDOWS CI LEG  2026-08-07  (GREEN batch, item 2)
          ci.yml gains a `windows` job: windows-latest, py3.13,
          QT_QPA_PLATFORM=offscreen, running the suite and the shadow-mode
@@ -384,4 +415,45 @@ G3 -- D27 WINDOWS CI LEG  2026-08-07  (GREEN batch, item 2)
              FP_VERIFY_DESIGN=1 pytest -m "not perf" 625 passed, 7 desel, 1 xfail
          Per the roadmap: a red Windows leg is A FINDING, not a failure of
          this task -- report and stop.
+G2 -- D48 SCENE IDENTITY CHECK  2026-08-07  (GREEN batch, item 3)
+         design.bridge.scene_identity_report -- REPORT-ONLY. It gates
+         nothing, raises nothing, and no operation calls it.
+         The question is the one WallItem.end_vertex already states: two
+         ends are the same corner iff that returns the same OBJECT for
+         both. For every pair of ends within WELD_TOL, are they?
+         IT REPRODUCES THE REGISTER'S MEASUREMENT INDEPENDENTLY, from the
+         live scene rather than from the walk:
+             scene   16 walls, 20 distinct Vertex objects, 10 points
+             split   4 points, carrying 4/4/3/3 vertices
+             walk    20 -> 10 vertices, 16 -> 12 walls, merged=4,
+                     unwelded_ends=0, check(deep) == []
+         The register said 20 on 10 with corners of 3,4,4,3 and exactly
+         that collapse. Same numbers, different instrument.
+         The last two lines are the whole point: the corners are not
+         shared AT ALL, the weld hides it, and all fifteen accept it.
+         SCOPED THE WAY THE WALK IS SCOPED. Per floor, then per vertex
+         namespace. A floating room has deliberately broken its sharing
+         with the plan (I12), so its coincidences are correct, not
+         faults -- a checker ignorant of that would report every parked
+         float as broken. _partitions() was EXTRACTED from
+         design_from_scene and is now called by both, so the walk and the
+         check cannot disagree about which ends may be compared. One
+         definition, not a second.
+         differential  two walls meeting at (120,0), ends not shared ->
+                       extra_vertices=1; after set_end_vertex -> 0.
+         Two tests. The negative one ("silent on a clean plan") asserts
+         its preconditions FIRST -- ends>0 and points<ends -- because an
+         EMPTY scene is silent just as loudly. G1's finding applied on
+         the day it was measured.
+         A BUG THE FIXTURE HID: the first draft of the local fragment
+         helper omitted win._sel_order, so room_boolean had no input and
+         silently produced a scene with ZERO walls -- and the test failed
+         on its own precondition rather than on its verdict, which is
+         what a precondition is for.
+         STILL OPEN. This record proposed running the check where
+         --verify-design already runs. NOT done here: that changes what
+         an operation produces (AMBER), and the corpus consequence the
+         record names -- legacy loads arrive unwelded BY DESIGN, P2.1 --
+         is the scoping question that must be answered first. G2 delivers
+         the instrument; where it runs is a separate ruling.
 ```
