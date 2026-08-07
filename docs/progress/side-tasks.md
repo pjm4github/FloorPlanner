@@ -392,4 +392,42 @@ G1 -- D43 NEGATIVE-ASSERTION COUNT  2026-08-07  (GREEN batch, item 1)
          tests, ~2 min each, a half-day; leave the other 157 alone.
          The list is enumerated, so it is a work-list, not a search.
          Still argued Phase 6. Nothing remediated here, by design.
+
+G4 -- D42 DRAG-SIDE SELF-INTERSECTION REPORT  2026-08-07  (GREEN batch, item 4)
+         WallItem._report_deformed_rooms, called at drag release. The
+         SAME report_self_intersections the group bake calls -- same
+         predicate, same words, same remedy. No new semantics; one new
+         caller.
+         AT RELEASE, NOT IN _DragVertex.apply. The record names the
+         applier as the site and the applier is the wrong place: it runs
+         on every mouse-move event, the view repaints everything on each,
+         so an edges-squared check there is the per-event cost the drag
+         was built to avoid -- and the message would fire and clear
+         dozens of times inside one gesture. A fault is worth saying
+         once, when the gesture ends.
+         SCOPED BY IDENTITY (defect 30's lesson): rooms_holding over the
+         corners this drag moved, from _vmoves (body) and _ep_move
+         (endpoint), each holding its CURRENT vertex because apply
+         rebinds it. self.rooms would have been the wrong gather -- a
+         room can hold a moved corner while owning no wall in the run,
+         and that room is exactly the one that deforms.
+         measured  L-room (0,0)(200,0)(200,100)(100,100)(100,200)(0,200),
+                   inner edge slid 150" left:
+                   outline (100,100)(100,200) -> (-50,100)(-50,200)
+                   edge (200,100)-(-50,100) now crosses (0,200)-(0,0)
+                   "Ell's outline now crosses itself - undo, or extract
+                    the room before moving it."
+         A BODY drag, not an endpoint drag, and not incidentally: a wall
+         bound to a room has LOCKED ENDS (_ends_editable), so sliding the
+         run is the gesture actually available -- which is why the
+         exposure was real rather than theoretical.
+         THE SECOND TEST IS THE ONE WORTH HAVING. A wall drag is the
+         commonest gesture in the app; a check that fired on ordinary
+         work would be worse than no check. test_an_ordinary_drag_says_
+         nothing asserts silence WITH the precondition that the drag
+         really moved the room -- silence is otherwise satisfied by a
+         gesture that did nothing.
+         STILL OPEN, scope unchanged: three appliers are still three.
+         This adds a caller, it does not unify them. The consolidation is
+         the Phase 6 task the record argues for; MoveVertices is the seam.
 ```
