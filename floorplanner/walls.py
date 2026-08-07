@@ -2170,9 +2170,55 @@ class WallItem(QGraphicsItem):
                     and not any(r.open_edges() for r in self.rooms)):
                 self._corners_unlocked = False
                 self.primary_room.raise_to_front()   # normalise z to siblings
+            # D42 (G4): the SAME report the group bake gives, at a second
+            # caller. P4.5 §2a put the gesture-time self-intersection check in
+            # at bake and recorded that the drag was knowingly uncovered,
+            # because there is no shared vertex-translation applier to attach
+            # it to -- three structurally identical ones exist. This does NOT
+            # unify them (that is the Phase 6 applier task, and D42 stays open
+            # for it); it adds the missing caller.
+            #
+            # AT RELEASE, NOT IN `_DragVertex.apply`. The applier runs on every
+            # mouse-move event, and the view repaints the whole scene on each
+            # one -- an edges-squared check there would be the per-event cost
+            # the drag was built to avoid, and the message would fire and clear
+            # dozens of times mid-gesture. A fault is worth saying once, when
+            # the gesture ends.
+            #
+            # SCOPED BY IDENTITY, which is defect 30's lesson: ask the corner
+            # who holds it. `self.rooms` is the wrong gather -- a room can hold
+            # a moved corner while owning no wall in the dragged run, and that
+            # room is exactly the one that deforms.
+            self._report_deformed_rooms()
         self._mode = None
         self._ep_move = None
         e.accept()
+
+    def _report_deformed_rooms(self):
+        """Say so if this drag left a room's outline crossing itself (D42).
+
+        The rooms this gesture CARRIED, by identity: the corners a body drag
+        moved (`_vmoves`) plus the one an endpoint drag detached (`_ep_move`),
+        each holding its CURRENT vertex -- `apply` relocates the vertex and
+        rebinds `dv.v`, so this is the corner as it now stands, not as it
+        started. `rooms_holding` then asks which outlines hold those corners.
+
+        Returns the rooms reported, so a caller (and a test) can see what it
+        said rather than inferring it from a status line.
+        """
+        sc = self.scene()
+        if sc is None:
+            return []
+        from floorplanner.rooms import (  # late (cycle)
+            report_self_intersections, rooms_holding,
+        )
+        moved = [dv.v for dv in (self._vmoves or [])]
+        if self._ep_move is not None:
+            moved.append(self._ep_move.v)
+        if not moved:
+            return []
+        return report_self_intersections(
+            sc, rooms_holding(sc, {id(v) for v in moved}))
 
     def contextMenuEvent(self, e):
         from floorplanner.rooms import detach_wall_from_room  # late (cycle)

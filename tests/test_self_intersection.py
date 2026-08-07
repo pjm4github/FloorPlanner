@@ -183,3 +183,79 @@ def test_a_bake_that_crosses_an_outline_reports_at_the_gesture(fp, win):
     # which would blame this test for the state it exists to produce.
     from floorplanner.design.verify import rebase
     rebase(win)
+
+
+# --------------------------------------------------------------------------
+# D42 (G4) -- THE SECOND CALLER. §2a put this check in at the group bake and
+# recorded that the party-wall drag was knowingly uncovered: there is no shared
+# vertex-translation applier to attach it to, and unifying the three that exist
+# is the Phase 6 task. These pin the missing caller -- the same report, the same
+# words, a different gesture -- and the second one pins that it stays QUIET,
+# because a message that fires on ordinary work is worse than no message.
+# --------------------------------------------------------------------------
+def _px(win, inches):
+    """Scene inches as viewport pixels, at whatever zoom the fixture opens at."""
+    return int(inches * win.view.transform().m11())
+
+
+def test_a_drag_that_crosses_an_outline_says_so(fp, win, drag):
+    """An L-shaped room whose inner edge is slid past the far wall.
+
+    A body drag, not an endpoint drag, and that is not incidental: a wall bound
+    to a room has LOCKED ENDS (`_ends_editable`), so sliding the run is the
+    gesture actually available here -- which is why the exposure is real.
+    """
+    sc = win.scene
+    r = _room(sc, [(0, 0), (200, 0), (200, 100), (100, 100),
+                   (100, 200), (0, 200)], "Ell")
+    fp.drain_gesture_faults(sc)
+    before = [(round(e.p.x()), round(e.p.y())) for e in r.outline]
+
+    drag(win, QPointF(100, 150), _px(win, -150), 0, steps=3)
+
+    after = [(round(e.p.x()), round(e.p.y())) for e in r.outline]
+    # PRECONDITION 1 -- the drag moved the room's corners at all. Without this
+    # a drag that did nothing satisfies everything below by doing nothing.
+    assert after != before, f"the drag moved no outline corner: {after}"
+    # PRECONDITION 2 -- and it moved them into a crossing, which is the state
+    # the message is about. Same guard the bake test states.
+    assert fp.outline_self_intersects(r), \
+        f"the drag did not cross the outline, so there is nothing to report: {after}"
+
+    msgs = fp.drain_gesture_faults(sc)
+    assert any("crosses itself" in m for m in msgs), \
+        f"the drag deformed a room into a crossing outline and said nothing: {msgs}"
+    assert any("Ell" in m for m in msgs), f"the message names no room: {msgs}"
+    # the remedy, not just the diagnosis -- the 06c2145 standard
+    assert any("undo" in m for m in msgs), f"no remedy offered: {msgs}"
+
+    # this crossed outline is the test's SUBJECT; declare it so the win
+    # teardown does not report I5b 0 -> 1 against the state it exists to make
+    from floorplanner.design.verify import rebase
+    rebase(win)
+
+
+def test_an_ordinary_drag_says_nothing(fp, win, drag):
+    """The anti-nagging half, and it is the one worth having.
+
+    A wall drag is the commonest gesture in the app. A check attached to it
+    that fires on ordinary work would be worse than no check, so this asserts
+    silence -- with the precondition that the drag REALLY MOVED the room,
+    because silence is otherwise satisfied by a gesture that did nothing.
+    """
+    sc = win.scene
+    r = _room(sc, [(0, 0), (200, 0), (200, 100), (100, 100),
+                   (100, 200), (0, 200)], "Ell")
+    fp.drain_gesture_faults(sc)
+    before = [(round(e.p.x()), round(e.p.y())) for e in r.outline]
+
+    drag(win, QPointF(100, 150), _px(win, 40), 0, steps=3)   # a modest slide
+
+    after = [(round(e.p.x()), round(e.p.y())) for e in r.outline]
+    # PRECONDITION -- the gesture did something, and left a sane room.
+    assert after != before, f"the drag moved no outline corner: {after}"
+    assert not fp.outline_self_intersects(r), \
+        f"this drag was supposed to leave a simple outline: {after}"
+
+    assert fp.drain_gesture_faults(sc) == [], \
+        "an ordinary wall drag must not report a self-intersection"

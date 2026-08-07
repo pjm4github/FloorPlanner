@@ -41,3 +41,45 @@ github_issue: null
 ## Milestone
 
 **unassigned — the applier-unification task, argued Phase 6**
+
+## Evidence
+
+**The missing caller landed 2026-08-07 (G4): `WallItem._report_deformed_rooms`,
+called at drag release.** The same `report_self_intersections` the group bake
+calls — same predicate, same words, same remedy. No new semantics.
+
+**AT RELEASE, NOT IN `_DragVertex.apply`.** This record names the applier as the
+site, and the applier is the wrong place: it runs on *every mouse-move event*,
+and the view repaints the whole scene on each one, so an edges² check there
+would be exactly the per-event cost the drag was built to avoid — and the
+message would fire and clear dozens of times inside one gesture. A fault is
+worth saying once, when the gesture ends.
+
+**Scoped by identity, which is defect 30's lesson.** The rooms the gesture
+carried = `rooms_holding(scene, {ids of the corners this drag moved})`, taken
+from `_vmoves` (a body drag) and `_ep_move` (an endpoint drag), each holding its
+*current* vertex because `apply` rebinds it. `self.rooms` would have been the
+wrong gather: a room can hold a moved corner while owning no wall in the dragged
+run, and that room is exactly the one that deforms.
+
+**Measured.** An L-shaped room `(0,0) (200,0) (200,100) (100,100) (100,200)
+(0,200)`, inner edge slid 150″ left:
+
+    outline  (100,100) (100,200)  ->  (-50,100) (-50,200)
+    crossing  edge (200,100)-(-50,100) now crosses edge (0,200)-(0,0) at (0,100)
+    message   "Ell's outline now crosses itself - undo, or extract the room
+               before moving it."
+
+**A BODY drag, and that is not incidental**: a wall bound to a room has locked
+ends (`_ends_editable`), so sliding the run is the gesture actually available —
+which is why this exposure was real rather than theoretical.
+
+**The second test is the one worth having.** A wall drag is the commonest
+gesture in the app, so a check attached to it that fired on ordinary work would
+be worse than no check. `test_an_ordinary_drag_says_nothing` asserts silence,
+with the precondition that the drag really moved the room — silence is otherwise
+satisfied by a gesture that did nothing.
+
+**STILL OPEN, and unchanged in scope.** The three appliers are still three; this
+adds a caller, it does not unify them. That consolidation is the Phase 6 task
+this record argues for, and `MoveVertices` in the command layer is the seam.
