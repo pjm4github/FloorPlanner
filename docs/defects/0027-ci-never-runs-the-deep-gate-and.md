@@ -4,21 +4,20 @@ id: 27
 title: "CI never runs the DEEP gate, and runs on Linux only - so the whole deep invariant set is unguarded"
 
 # maps directly onto GitHub Issues fields
-state: open
-state_reason: null
+state: closed
+state_reason: completed
 labels:
   - type:gap
   - area:tooling
-  - status:partial
 milestone: null
 
 # ours; becomes body prose after migration
 opened: null
-closed: null
-closed_by: 65c4c02
+closed: 2026-08-07
+closed_by: 10e13c0
 rank: 28
 related: [26, 28]
-state_source: row
+state_source: receipt
 github_issue: null
 ---
 
@@ -55,7 +54,7 @@ developed and used on** — every job in the workflow was `ubuntu-latest`.
 | | |
 |---|---|
 | deep half | closed at `65c4c02` (P3.8); CI calls `tools/gate.py --deep` rather than reimplementing it |
-| Windows half | this job — **state stays `open` until a green run exists** |
+| Windows half | this job — **green on 2026-08-07**, `pytest (windows)` passed in 1m52s on run `31140126308` |
 
 **One Python version, deliberately.** The Linux matrix already covers the 3.10
 floor and 3.13; what was missing is the *platform*, not another interpreter.
@@ -66,3 +65,14 @@ which is why the Linux jobs install six apt packages and this one installs none.
 Evidence before the job ran anywhere: both of its commands were run on this
 Windows machine, `625 passed, 7 deselected, 1 xfailed` each. Per the roadmap, a
 red Windows leg is **a finding, not a failure of this task**.
+
+**Both halves are now closed, so the record is.** The green run is the closing
+evidence, not the writing of the job — the same distinction this record's own
+first draft got wrong and corrected before merge.
+
+`closed_by` names `10e13c0`, the commit that adds the job. The deep half's sha
+(`65c4c02`, P3.8) is kept in the Milestone cell above, where the register wrote
+it; a record has one `closed_by` and this one closes on its later half.
+
+`status:partial` is dropped: it exists to say "open BECAUSE one half remains",
+and no half remains.
