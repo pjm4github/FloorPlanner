@@ -61,6 +61,50 @@ Seven phases. Every task is small enough to finish and verify in one sitting, an
 
 ---
 
+## Autonomy tiers
+
+**Assigned by Patrick in [`ROADMAP.md`](ROADMAP.md), 2026‑08‑07, and recorded here so the
+classification is on disk rather than in a conversation.** `ROADMAP.md` is the source; where
+this table and that document disagree, read it — and where either disagrees with this plan,
+the register or the snapshot, **those are authoritative and both are wrong.**
+
+**Code does not self-classify.** The tier decides what happens at the end of the work, not how
+carefully it is done.
+
+| tier | criteria | what happens at the end |
+|---|---|---|
+| **GREEN** | a ruling exists on disk · no user-visible behaviour change · no format or schema change · acceptance is stated | PR, **merge on green CI**, report at the end of the batch |
+| **AMBER** | a ruling exists, but the task changes what the user sees or what an operation produces | PR, then **stop** — Patrick's manual check is the merge condition |
+| **RED** | a ruling is missing | **do not start** |
+
+| tier | items |
+|---|---|
+| **GREEN** | **G1** D43 negative-assertion count · **G3** D27 Windows CI leg · **G2** D48 scene identity check (report-only) · **G4** D42 drag-side self-intersection report. Order: G1, G3, G2, G4 |
+| **AMBER** | **A1** D47 fragment→extract · **A2** D11 runtime z collapse · **A3** D11 serialization half (unblocked by R‑B) · **A4** D49 deep checks at document boundaries · **A5** D41 simple-ring invariant (ruled at R‑A; read-back required) · **A6** grid snap |
+| **RED** | grid snap's three sub-rulings · Phase 5 yard catalog and settable wall types · Phase 6 command undo · Phase 7 (7.1/7.2 `level.kind`, 7.3 roof) · D44 (an accepted limit — nothing to do) · D45, D46 (carried) |
+
+**Two rulings issued with the tiers**, both recorded in full in `ROADMAP.md` §2:
+
+* **R‑A — D41 gets a NEW invariant, not a widening of I5b.** `_seg_cross` tests *proper
+  crossing* and must keep not firing on the collinear edges two rooms legitimately share. A
+  ring that visits a vertex twice is a **degeneracy, not a crossing**, so it gets its own
+  invariant: *a room outline is a simple ring; no vertex appears in it twice.* `symmetricP1`
+  contains an instance, so the spur is fixed and the freeze re-cut **with its justification in
+  the same commit**; `planc1.v5` keeps its instances, which are the point of that fixture.
+* **R‑B — an ADDITIVE OPTIONAL field or enum value does not bump the document version.**
+  `version: 5` describes the *model* — rooms own outlines, vertices are identity, walls are
+  bindings — and an optional stacking index does not change it. What an addition breaks is an
+  **old validator**, not an old reader, and the only validator ships with the app. The schema
+  gains a revision marker, every addition is dated and reasoned, `additionalProperties: false`
+  stays, and a **breaking** change (removing a field, changing a type, changing what a value
+  means) bumps to **v6** with its own migration. This unblocks D11's serialization half.
+
+**A GREEN item becomes RED mid-flight** if a measurement changes its scope, a finding
+contradicts something decided, a ruling is needed that `ROADMAP.md` does not contain, or a
+watch trips. Stopping is the mechanism working.
+
+---
+
 # Phase 0 — Baseline, safety net, free wins
 
 *No file-format change. No user-visible behaviour change except the bug fixes.*

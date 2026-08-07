@@ -27,6 +27,7 @@
 | document | what it is |
 |---|---|
 | [`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md) | The standing rules: census doctrine, gate discipline, what a receipt is, how vacuity is detected, what a green signal is evidence of. **Extracted from the migration plan because it outlives the migration** — these rules bind Phase 5, Phase 6 and whatever follows. |
+| [`ROADMAP.md`](ROADMAP.md) | **What may proceed without Patrick, and what may not.** Tiers every remaining item GREEN / AMBER / RED, and carries the rulings issued with them. Code does not self-classify; the tiers are also recorded in the plan. |
 | [`V5_MIGRATION_PLAN.md`](V5_MIGRATION_PLAN.md) | The Status table (every task and its tick), the phase specifications, the risk register and the sequencing rationale. **What is planned and what is done.** |
 | [`DESIGN_MODEL_v5.md`](DESIGN_MODEL_v5.md) | Why the room is the durable unit and walls are an optional binding onto its outline. The rationale behind the schema. |
 | [`design-schema.v5.md`](design-schema.v5.md) | A **pointer**, not a stub. The schema itself was vendored into the package at P0.7 and lives at `floorplanner/design/design-schema.v5.json`; this file remains so references to the old location still resolve. |
