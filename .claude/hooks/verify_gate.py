@@ -43,6 +43,12 @@ about it:
     approved against the pre-edit state -- measured, by exactly that command
     landing an empty commit while the guard watched. Splitting edit and commit
     into separate calls (the normal working shape) is fully covered.
+
+    THE MOST COMMON SHAPE OF THIS IS NOW BLOCKED OUTRIGHT: a command containing
+    BOTH a gate invocation and a commit. See `GATE_RUN_RE` below. It does not
+    close the general case -- nothing at PreToolUse can -- but it closes the one
+    that actually happens, which was writing this very boundary note and then
+    walking into it within the hour.
   * `xargs`-fed commits, shell aliases, and any commit made outside these
     tools.
   * WHETHER THE COMMIT MESSAGE DESCRIBES THE RUN. This hook closes exactly one
@@ -73,6 +79,21 @@ GATE_CMD = "python tools/gate.py"
 # so a heredoc-bearing command still anchors per line. See the note at the call
 # site for what this deliberately misses.
 COMMIT_RE = re.compile(r"(?:^|[;&|])\s*(?:\S+\s+)?git\s+commit\b", re.M)
+
+# A RUN OF THE GATE, in the same command line as a commit.
+#
+# Why this is enforced rather than left to discipline: `PreToolUse` fires BEFORE
+# the command runs, so when one call does `gate.py` and then commits, the hook
+# judges the tree AS IT WAS BEFORE THE GATE EVEN RAN. The verdict it reads is
+# the PREVIOUS run's. On 2026-08-07 that let a commit through on a RED gate --
+# in the same session, and within the hour, as the note above documenting the
+# hole was written. Three times that session a rule was written and then broken
+# by its author; the answer to that is a check, not more resolve.
+#
+# Deliberately matches the TOOL, not the word "gate": `tools/gate.py` in any
+# spelling (`python tools/gate.py`, `py -m ...`, a bare path), which is the only
+# thing that writes the result file the commit is about to be judged against.
+GATE_RUN_RE = re.compile(r"tools[/\\]gate\.py")
 
 
 def block(msg):
@@ -108,6 +129,22 @@ def main():
     # point -- an unstated boundary reads as coverage.
     if not COMMIT_RE.search(cmd):
         sys.exit(0)
+
+    # ONE CALL CANNOT BOTH RUN THE GATE AND COMMIT. Checked before the result
+    # file is even read, because in this shape the result file is guaranteed to
+    # be the WRONG one: this hook runs before the command, so it would be
+    # judging the previous run's verdict against the pre-command tree, and
+    # whatever the gate is about to say would never be consulted at all.
+    if GATE_RUN_RE.search(cmd):
+        block("this command runs the gate AND commits.\n"
+              "         PreToolUse fires BEFORE the command, so the verdict "
+              "checked here is the\n"
+              "         PREVIOUS run's -- the gate you are about to run cannot "
+              "affect it. On\n"
+              "         2026-08-07 exactly this let a commit through on a RED "
+              "gate.\n"
+              "         Run the gate and commit in SEPARATE calls: read the "
+              "verdict, then commit.")
 
     if not os.path.exists(RESULT):
         block(f"no {os.path.basename(RESULT)} -- the gate has not been run.\n"
