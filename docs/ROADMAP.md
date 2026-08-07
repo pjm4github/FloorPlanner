@@ -65,6 +65,8 @@ is the mechanism working.
 they were not three weeks ago. The reviewer's remaining job is rulings and the questions no
 checklist encodes.
 
+**A precondition on running agents CONCURRENTLY, measured in the GREEN batch:** the only merge conflicts the whole batch produced were in `docs/progress/side-tasks.md`, where all four tasks appended entries — the source files never collided at all. An append-only shared file serialises parallel branches, so **before two agents run at once, progress entries move to per-task files**, for the same reason defect records did. The finding and the proposed shape are recorded at [`progress/README.md`](progress/README.md).
+
 **What must never be autonomous, regardless of tier:** creating GitHub issues, force-pushing,
 rewriting history, touching untracked files, changing the frozen corpus without a declared
 justification, and merging anything with an AMBER tier.

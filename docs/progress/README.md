@@ -69,6 +69,52 @@ before.
 
 ---
 
+
+## An append-only shared file serialises parallel branches — measured 2026-08-07
+
+**Every conflict in the GREEN batch was in this one file, and there were no
+others.** Four independent tasks — a test-suite census, a CI job, a bridge
+function, a walls-side report — touched four disjoint sets of source files and
+never collided. They collided here, because each appended one entry to
+`side-tasks.md`:
+
+| branch | merge of `main` | conflict |
+|---|---|---|
+| G1 | — (merged first) | none |
+| G2 | — (branched after G1 landed) | none |
+| G3 | needed | **`side-tasks.md`** |
+| G4 | needed | **`side-tasks.md`** |
+| G4 | again, after G3 landed | none |
+
+Two hand resolutions, both the same shape: two sides each appending different
+entries to the same tail. Nothing was lost and nothing was hard — the entries are
+independent paragraphs — but **git cannot know that**, because "append-only" is a
+convention about the file, not a property git can see. Every parallel branch pays
+it, and the cost grows with the square of how many run at once.
+
+**Resolved by BATCH order, not merge order.** The entries label themselves item
+1 through 4, so a reader following them should not have to know which pull
+request landed first. Merge order is a fact about pull requests; the log records
+the work.
+
+### The consequence, for whenever agents run concurrently
+
+**Progress entries go in per-task files, for the same reason defect records
+became per-file.** That refactor's argument was that a table with unbounded prose
+in its cells "diffs badly, guarantees merge conflicts between agents, and cannot
+migrate to a tracker without transcription" — the first two clauses are exactly
+this finding, one directory over, and they were written before anything had
+measured it. Now something has.
+
+The shape would be `progress/tasks/<task>.md` with `README.md` generated from
+them, mirroring `defects/INDEX.md`: one writer per file, no shared tail, and the
+index derived rather than maintained.
+
+**Not done now, deliberately.** With one agent working one branch at a time the
+conflict is two minutes of hand-merging per batch, and the log's readability as
+a single narrative is worth more than that. This is a **precondition on
+concurrency, not a debt**: the day two agents run at once, this changes first.
+
 ## Conventions
 
 **Cite, do not restate.** An entry names its evidence file and the command that
