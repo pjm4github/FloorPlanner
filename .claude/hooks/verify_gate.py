@@ -31,6 +31,23 @@ tests it explicitly by touching a source file and retrying.
 Exit codes: 0 lets the command through, 2 blocks it and shows stderr to the
 model. Any other failure mode here (unreadable JSON, no git) also blocks, on the
 principle that a guard which cannot verify must not approve.
+
+WHAT THIS CANNOT SEE, stated here because an unstated boundary reads as
+coverage -- and this one was found by testing the hook rather than by reasoning
+about it:
+
+  * A COMMAND THAT EDITS TRACKED FILES AND THEN COMMITS, IN ONE INVOCATION, is
+    not covered by the freshness check. `PreToolUse` fires BEFORE the command
+    runs, so the tree the hook inspects is the tree as it was at approval time.
+    A single Bash call that touches a source file and then commits will be
+    approved against the pre-edit state -- measured, by exactly that command
+    landing an empty commit while the guard watched. Splitting edit and commit
+    into separate calls (the normal working shape) is fully covered.
+  * `xargs`-fed commits, shell aliases, and any commit made outside these
+    tools.
+
+It raises the floor. It is not a sandbox, and treating it as one is the failure
+mode it exists to prevent.
 """
 import json
 import os

@@ -293,4 +293,30 @@ COMMIT GATE ENFORCED  2026-08-06  (on main, after PR #11)
          -- verified by firing the hook and watching it block, not by
          assuming. The settings file records the absolute-venv fallback
          for a machine where that stops being true.
+
+COMMIT GATE -- A BOUNDARY MEASURED, 2026-08-06 (later entry, not a revision)
+         Testing the LIVE hook end-to-end found a limit that reasoning
+         about it had not. The check ran, approved, and an empty commit
+         landed anyway -- because PreToolUse fires BEFORE the command
+         runs, so the tree the hook inspects is the tree at APPROVAL
+         time. The test command touched a source file and committed in
+         ONE invocation; the touch happened after the verdict.
+         So: a single call that edits tracked files and then commits is
+         NOT covered by the freshness check. Splitting edit and commit
+         into separate calls -- the normal working shape, and what every
+         commit on this branch did -- is fully covered.
+         NOT FIXED, and deliberately. Detecting "this command will modify
+         the tree" means guessing which shell words write, which is
+         fragile in both directions; and blocking compound commands
+         outright would break `git add -A` followed by a commit, where
+         staging changes no mtime. The honest move is the one the
+         standing rule already prescribes: state the boundary at the
+         instrument. It is in the hook's docstring beside the two limits
+         already recorded there.
+         The junk commit was local-only (the push had already happened),
+         removed with `reset --soft`, tree clean, local and remote both
+         at 7c628ba.
+         The lesson is the rule this whole session keeps re-earning: a
+         guard is only evidence about what it measures, and finding out
+         what it measures takes a probe, not an argument.
 ```
