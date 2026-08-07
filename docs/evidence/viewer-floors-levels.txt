@@ -1,0 +1,35 @@
+VIEWER / FLOORS -- step 1, the measurement.  2026-08-07
+Command: python floorplanner/viewer/fp3d.py <plan> --list-levels
+
+== Patrick's multi-floor plan: examples/farmplaceBIGmultifloor.json ==
+L1     default          elev      0.0"  height   96.0"  storey
+L2     second           elev      0.0"  height   96.0"  storey
+   (79 walls on L1, 30 on L2; 19 rooms, all on L1)
+
+== a three-floor plan built and saved BY THE APP (fixture) ==
+L1     Ground           elev      0.0"  height   96.0"  storey
+L2     Upper            elev      0.0"  height   96.0"  storey
+L3     Attic            elev      0.0"  height   96.0"  storey
+
+== every other v5 file in examples/ ==
+fiveRoomTest.json                L1 default elev 0.0" height 96.0" storey|
+planc1.v5.json                   L1 default elev 0.0" height 96.0" storey|
+planc1TestV5.json                L1 default elev 0.0" height 96.0" storey|
+sample_plan.v5.json              L1 default elev 0.0" height 96.0" storey|
+site_demo.json                   LS Site elev 0.0" height 96.0" site|
+symmetricP1.json                 L1 default elev 0.0" height 96.0" storey|
+
+== legacy files: no levels[] at all, the viewer warns and lists nothing ==
+   planc1.json  planc1TestV4.json  sample_plan.json   (format=floorplanner-json)
+
+== DIFFERENTIAL: can a non-zero elevation survive the editor at all? ==
+   farmplace L2 hand-set to elevation_in=108.0 height_in=108.0, then
+   load_path -> save_path through MainWindow:
+     IN : [('default', 0.0, 96.0), ('second', 108.0, 108.0)]
+     OUT: [('default', 0.0, 96.0), ('second',   0.0,  96.0)]
+   model.Floor fields: name, reference.  There is no elevation field.
+
+== where the zeros come from (three writers, all literal) ==
+   floorplanner/design/bridge.py:796:        levels.append({"id": lid, "name": f.name, "elevation_in": 0.0,
+   floorplanner/design/bridge.py:976:        "levels": [{"id": lid, "name": "detect", "elevation_in": 0.0,
+   floorplanner/design/importer.py:184:                       "elevation_in": 0.0, "height_in": 96.0,

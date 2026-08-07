@@ -489,7 +489,8 @@ and it sits inside an `except ImportError`.
 ## 7. Known gaps
 
 * No ceilings, roofs, or floor-to-floor structure; multi-level plans stack by
-  `elevation_in` but nothing spans between them.
+  `elevation_in` but nothing spans between them. **And `elevation_in` is always
+  0.0 — see the ruling below, which makes this line true and empty.**
 * ~~Furniture *elevation* is not honoured.~~ **Closed.** Each catalog entry
   carries `elevation_in`, the height of the item's underside above the level's
   floor, and `build_solid` builds a wall-hung item exactly like a
@@ -517,3 +518,48 @@ and it sits inside an `except ImportError`.
   `floorplanner.viewer.fp3d` would drag in the whole editor and quietly test
   something else. **Still unpinned, and still the obvious next assertions:**
   outline degeneracy handling and `opening_span`'s three anchor cases.
+
+---
+
+## 8. `--stack` is REFUSED — ruled 2026-08-07
+
+**Measured first.** `--list-levels` over every plan available — Patrick's
+two-storey `farmplaceBIGmultifloor.json`, a three-floor plan built by the app,
+and the six other v5 examples — reports `elevation_in 0.0` and `height_in 96.0`
+on **every level of every file**. The full reading is
+`docs/evidence/viewer-floors-levels.txt`.
+
+That is not a data accident. `model.Floor` carries `name` and `reference` and no
+elevation at all, and all three writers emit literals (`bridge.py:796`,
+`bridge.py:976`, `importer.py:184`). A non-zero elevation placed in a file by
+hand is **destroyed** by a load/save round trip: in `108.0 / 108.0`, out
+`0.0 / 96.0`. That is register **D50**.
+
+**So the viewer is correct and stays as it is.** `fp3d` stacks levels by
+`elevation_in`; every value it is handed is 0.0; every level therefore renders at
+the same height. The renderer is faithfully drawing what the document says. The
+fault is upstream, in the editor's floor model.
+
+### Why a `--stack` flag is refused rather than deferred
+
+A flag that spaces levels by an assumed storey height would have the viewer
+**invent a number the document does not contain**. Three things follow, and the
+third is the one that settles it:
+
+1. It is a decision about the **model** wearing a renderer's clothes. What a
+   storey height *is* belongs in `Floor` and in the document, where every
+   consumer can see it — not in one renderer's argument list.
+2. It would make the picture **stop being evidence**. §4's whole argument for
+   `--dump` is that the viewer reads the same documents the editor does and
+   fails differently; a viewer that supplies its own geometry can no longer be a
+   second opinion about the first one's.
+3. **The moment elevations are real, the flag becomes a way to disagree with
+   them.** A plan whose storeys are 108″ apart, rendered with `--stack 96`,
+   would be wrong in a way that looks deliberate.
+
+### `--explode` is not refused — it is waiting
+
+Separating levels along z for inspection is a legitimate *view* of a real
+geometry: it exaggerates a distance rather than inventing one. It has nothing to
+exaggerate until D50 closes, so it waits. When it lands, its argument is a
+multiplier on real elevations, never a substitute for absent ones.
