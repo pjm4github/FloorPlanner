@@ -361,4 +361,27 @@ A FABRICATED TRAILER, AND THE FIX  2026-08-07
          The incident is recorded in gate.py's own docstring beside the
          three it was built for, because a tool's failure history belongs
          at the tool.
+
+G3 -- D27 WINDOWS CI LEG  2026-08-07  (GREEN batch, item 2)
+         ci.yml gains a `windows` job: windows-latest, py3.13,
+         QT_QPA_PLATFORM=offscreen, running the suite and the shadow-mode
+         pass. The deep half closed at 65c4c02 (P3.8); this is the other
+         one. UNTIL NOW NOTHING AUTOMATED HAD EVER RUN THIS SUITE ON THE
+         PLATFORM THE APP IS PRIMARILY DEVELOPED AND USED ON -- every job
+         in the workflow was ubuntu-latest. The register's own wording:
+         the severity of a Windows-only fault does not drop with the
+         repro environment, only the audience that sees it.
+         ONE PYTHON VERSION, deliberately: the Linux matrix already
+         covers the 3.10 floor and 3.13. What was missing is the
+         PLATFORM, not another interpreter, and a second Windows entry
+         would double the slowest job to re-test what is already tested.
+         No Qt system libraries -- the PyQt6 wheels are self-contained on
+         Windows, which is why the Linux jobs need six apt packages and
+         this one needs none.
+         Local evidence taken BEFORE the job ran anywhere, on this
+         Windows machine, using the job's own two commands:
+             pytest -m "not perf"                    625 passed, 7 desel, 1 xfail
+             FP_VERIFY_DESIGN=1 pytest -m "not perf" 625 passed, 7 desel, 1 xfail
+         Per the roadmap: a red Windows leg is A FINDING, not a failure of
+         this task -- report and stop.
 ```
