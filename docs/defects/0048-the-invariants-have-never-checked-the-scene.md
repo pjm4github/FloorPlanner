@@ -41,3 +41,48 @@ github_issue: null
 ## Milestone
 
 **unassigned — argue at the invariant's own read-back, with row 41**
+
+## Evidence
+
+**The instrument exists as of 2026-08-07 (G2): `design.bridge.scene_identity_report`.
+REPORT-ONLY — it gates nothing, raises nothing, and no operation calls it.**
+
+It asks the question `WallItem.end_vertex` already states: *two ends are the same
+corner iff this returns the same object for both (`is`, never `==`)*. For every
+pair of wall ends within `WELD_TOL`, are they the same `Vertex`?
+
+**It reproduces this record's measurement independently**, from the live scene
+rather than from the walk — `docs/evidence/d48-scene-identity.json`:
+
+| | this record said | measured by the instrument |
+|---|---|---|
+| distinct `Vertex` objects | 20 | **20** |
+| geometric points | 10 | **10** |
+| corners carrying duplicates | 3, 4, 4, 3 | **4, 4, 3, 3** |
+| walk collapse | 20 → 10 vertices, 16 → 12 walls | **20 → 10, 16 → 12** |
+| `merged` | 4 | **4** |
+| `unwelded_ends` | 0 | **0** |
+| `check(doc, deep=True)` | CLEAN | **`[]`** |
+
+The last two rows are the point: the scene's corners are not shared at all, the
+weld hides it, and every one of the fifteen accepts the result.
+
+**Scoped the way the walk is scoped, which is what keeps it quiet on correct
+scenes.** Per floor, then per vertex namespace. A floating room has deliberately
+broken its sharing with the plan (I12, P4.2), so its coincidences with plan walls
+are correct rather than faults — a checker that did not know this would report
+every parked float as broken. The partition rule was **extracted from
+`design_from_scene` into `_partitions()` and is now called by both**, so the walk
+and the check cannot disagree about which ends may be compared.
+
+**Differential receipt** — same two walls, one corner shared and not:
+
+    two walls meeting at (120, 0), ends NOT shared   extra_vertices = 1
+    after `w2.set_end_vertex("p1", w1.end_vertex("p2"))`  extra_vertices = 0
+
+**STILL OPEN, and deliberately.** This record proposed running the check *where
+`--verify-design` already runs*. That is **not** done here: wiring it would change
+what an operation produces, which is an AMBER decision, and the corpus
+consequence this record already names — legacy loads arrive unwelded **by
+design** (P2.1) — is exactly the scoping question that has to be answered first.
+G2 delivers the instrument; where it runs is a separate ruling.

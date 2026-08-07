@@ -172,6 +172,131 @@ def _by_floor(scene):
     return out
 
 
+def _partitions(items):
+    """One level's items split into VERTEX NAMESPACES: the plan, then each
+    floating room with its own walls.
+
+    Extracted from `design_from_scene` at G2 so the walk and
+    `scene_identity_report` share ONE definition of "these ends may be compared
+    with each other". They must agree: a floating room has EXPLICITLY broken its
+    sharing with the plan (I12, P4.2), so two coincident ends across that
+    boundary are correct rather than a fault, and a checker that did not know it
+    would report every parked float as broken. A second copy of this rule would
+    drift, and this project has measured what that costs.
+    """
+    floating = [r for r in items if isinstance(r, RoomItem)
+                and getattr(r, "placement_state", "placed") == "floating"]
+    fids = {id(r) for r in floating}
+    fids |= {id(w) for r in floating for w in r.walls}
+    parts = [[it for it in items if id(it) not in fids]]
+    parts += [[r] + [w for w in r.walls if w.scene() is not None]
+              for r in floating]
+    return parts
+
+
+def scene_identity_report(source, floors=None, tol=WELD_TOL):
+    """D48: does geometric coincidence imply IDENTITY in the live scene?
+
+    REPORT-ONLY. It gates nothing, raises nothing, and no operation calls it.
+
+    THE HOLE IT MEASURES. `design_from_scene` WELDS on the way out, so a scene
+    whose corners are not shared at all emits a document every one of the
+    fifteen invariants accepts. Measured on the `fragment` product: 20 distinct
+    `Vertex` objects on 10 geometric points, collapsing to 20 -> 10 vertices and
+    16 -> 12 walls in the walk, with `check(doc, deep=True)` CLEAN throughout.
+    So a green `check()` never meant "the scene is sound" -- only "the WELDED
+    PROJECTION of the scene is sound", and nothing had ever looked at the
+    difference. This looks at the difference.
+
+    THE PROPERTY, in `WallItem.end_vertex`'s own words: *two ends are the same
+    corner iff this returns the same object for both (`is`, never `==`)*. So for
+    every pair of wall ends within `tol`, the check asks whether they are the
+    same object -- identity, never coordinates.
+
+    SCOPED THE WAY THE WALK IS SCOPED, and this is what keeps it quiet on
+    correct scenes: per floor, then per vertex namespace via `_partitions`. A
+    floating room has deliberately broken its sharing with the plan, so its
+    coincidences are not faults; comparing across that boundary would report
+    every parked float.
+
+    Returns a dict. `split` is the finding list -- one entry per geometric point
+    that more than one `Vertex` object claims:
+
+        {"ends": N, "points": N, "split": [{"floor", "x", "y",
+                                            "vertices", "ends", "walls"}],
+         "extra_vertices": N}
+
+    `extra_vertices` is the honest headline: how many `Vertex` objects exist
+    beyond one per point. Zero on a scene whose corners are shared.
+    """
+    scene, roster = _resolve(source, floors)
+    buckets = _by_floor(scene)
+    split, n_ends, n_points = [], 0, 0
+
+    for f in roster:
+        for part in _partitions(buckets.get(f.name, [])):
+            ends = []
+            for w in part:
+                if isinstance(w, WallItem):
+                    ends.append((w.end_vertex("p1"), w))
+                    ends.append((w.end_vertex("p2"), w))
+            n_ends += len(ends)
+
+            # Cluster by proximity. A grid of cell `tol` plus its eight
+            # neighbours keeps this local instead of O(n^2) over the plan; the
+            # union-find then makes the clustering order-independent, which a
+            # naive sweep is not.
+            cells = defaultdict(list)
+            for i, (v, _w) in enumerate(ends):
+                cells[(int(v.x // tol), int(v.y // tol))].append(i)
+            parent = list(range(len(ends)))
+
+            def find(i, parent=parent):
+                while parent[i] != i:
+                    parent[i] = parent[parent[i]]
+                    i = parent[i]
+                return i
+
+            def union(a, b, parent=parent):
+                ra, rb = find(a), find(b)
+                if ra != rb:
+                    parent[rb] = ra
+
+            for (cx, cy), idxs in cells.items():
+                near = []
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        near += cells.get((cx + dx, cy + dy), [])
+                for i in idxs:
+                    vi = ends[i][0]
+                    for j in near:
+                        if j <= i:
+                            continue
+                        vj = ends[j][0]
+                        if math.hypot(vi.x - vj.x, vi.y - vj.y) <= tol:
+                            union(i, j)
+
+            groups = defaultdict(list)
+            for i in range(len(ends)):
+                groups[find(i)].append(i)
+            n_points += len(groups)
+
+            for members in groups.values():
+                objs = {id(ends[i][0]) for i in members}
+                if len(objs) > 1:
+                    v0 = ends[members[0]][0]
+                    split.append({
+                        "floor": f.name,
+                        "x": round(v0.x, 3), "y": round(v0.y, 3),
+                        "vertices": len(objs), "ends": len(members),
+                        "walls": len({id(ends[i][1]) for i in members}),
+                    })
+
+    split.sort(key=lambda d: (-d["vertices"], d["floor"], d["x"], d["y"]))
+    return {"ends": n_ends, "points": n_points, "split": split,
+            "extra_vertices": sum(d["vertices"] - 1 for d in split)}
+
+
 def _ordered(items, kind, key):
     """This level's items of one type, in a GEOMETRIC order.
 
@@ -679,13 +804,7 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         # emits private vertices instead of being silently re-welded to the
         # plan, and a floating room a gesture-width from a wall is not an
         # "unwelded end" (the weld check runs per partition too).
-        floating = [r for r in items if isinstance(r, RoomItem)
-                    and getattr(r, "placement_state", "placed") == "floating"]
-        fids = {id(r) for r in floating}
-        fids |= {id(w) for r in floating for w in r.walls}
-        parts = [[it for it in items if id(it) not in fids]]
-        parts += [[r] + [w for w in r.walls if w.scene() is not None]
-                  for r in floating]
+        parts = _partitions(items)
         lw_all, lr_all, poly_all = [], [], {}
         # P4.5 (defect 3): which live item produced which document id, so a
         # GROUP can be emitted as the member ids it actually holds. The wall

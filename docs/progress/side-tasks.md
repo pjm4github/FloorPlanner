@@ -392,4 +392,46 @@ G1 -- D43 NEGATIVE-ASSERTION COUNT  2026-08-07  (GREEN batch, item 1)
          tests, ~2 min each, a half-day; leave the other 157 alone.
          The list is enumerated, so it is a work-list, not a search.
          Still argued Phase 6. Nothing remediated here, by design.
+
+G2 -- D48 SCENE IDENTITY CHECK  2026-08-07  (GREEN batch, item 3)
+         design.bridge.scene_identity_report -- REPORT-ONLY. It gates
+         nothing, raises nothing, and no operation calls it.
+         The question is the one WallItem.end_vertex already states: two
+         ends are the same corner iff that returns the same OBJECT for
+         both. For every pair of ends within WELD_TOL, are they?
+         IT REPRODUCES THE REGISTER'S MEASUREMENT INDEPENDENTLY, from the
+         live scene rather than from the walk:
+             scene   16 walls, 20 distinct Vertex objects, 10 points
+             split   4 points, carrying 4/4/3/3 vertices
+             walk    20 -> 10 vertices, 16 -> 12 walls, merged=4,
+                     unwelded_ends=0, check(deep) == []
+         The register said 20 on 10 with corners of 3,4,4,3 and exactly
+         that collapse. Same numbers, different instrument.
+         The last two lines are the whole point: the corners are not
+         shared AT ALL, the weld hides it, and all fifteen accept it.
+         SCOPED THE WAY THE WALK IS SCOPED. Per floor, then per vertex
+         namespace. A floating room has deliberately broken its sharing
+         with the plan (I12), so its coincidences are correct, not
+         faults -- a checker ignorant of that would report every parked
+         float as broken. _partitions() was EXTRACTED from
+         design_from_scene and is now called by both, so the walk and the
+         check cannot disagree about which ends may be compared. One
+         definition, not a second.
+         differential  two walls meeting at (120,0), ends not shared ->
+                       extra_vertices=1; after set_end_vertex -> 0.
+         Two tests. The negative one ("silent on a clean plan") asserts
+         its preconditions FIRST -- ends>0 and points<ends -- because an
+         EMPTY scene is silent just as loudly. G1's finding applied on
+         the day it was measured.
+         A BUG THE FIXTURE HID: the first draft of the local fragment
+         helper omitted win._sel_order, so room_boolean had no input and
+         silently produced a scene with ZERO walls -- and the test failed
+         on its own precondition rather than on its verdict, which is
+         what a precondition is for.
+         STILL OPEN. This record proposed running the check where
+         --verify-design already runs. NOT done here: that changes what
+         an operation produces (AMBER), and the corpus consequence the
+         record names -- legacy loads arrive unwelded BY DESIGN, P2.1 --
+         is the scoping question that must be answered first. G2 delivers
+         the instrument; where it runs is a separate ruling.
 ```
