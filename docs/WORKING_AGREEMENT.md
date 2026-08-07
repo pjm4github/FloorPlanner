@@ -161,6 +161,47 @@ output, which is exactly the manual step the gate exists to replace.
 output, keeps `$?`, echoes the tail and returns the status; or simply
 `set -o pipefail`. Never `... | tail -N && <next step>`.
 
+### Truncation invites fabrication — settled 2026-08-07
+
+**`| tail` has now caused two different failures, and they are not the same
+failure.** The first was mechanical: `pytest -q | tail -1 && git commit` tested
+`tail`'s exit status, so the gate enforced nothing (above). The second was
+human, and it is the one worth naming separately.
+
+`tools/gate.py | tail -3` shows the DEEP line and the verdict. It hides the
+OFF and ON lines. At `47f9675` the trailer pasted into the commit message
+therefore had two lines that had **never been on screen**, and they were filled
+in from an earlier run: `17.28s` / `20.55s` quoted, `17.14s` / `19.79s`
+recorded.
+
+**The mechanism is the point. A truncated output does not read as incomplete —
+it reads as output.** Nothing prompts for the missing part, so the gap is closed
+from memory, and memory supplies something plausible. That is the identical
+disease as "515 collected" quoted after two more tests landed, arriving through
+a different door: the transcription class is *a number carried between two
+moments*, and this is *a number invented to fill a hole the tool never showed
+you*.
+
+It is also why the harm looks small and is not. The fabricated values were two
+wall-clock durations — the least consequential figures in the block, which is
+exactly why nobody would check them. Everything that decides anything was
+correct and the gate had genuinely passed. **A trailer that is right about
+everything that matters and wrong about two numbers is still not a verbatim
+trailer**, and the whole value of that block is that it can be trusted without
+re-deriving it.
+
+**So: never truncate a gate, a census or any output you are about to quote.**
+Read it whole, or have the tool hand you the text — `tools/gate.py --trailer`
+reprints the stored block for redirection into a message file, which removes the
+human from the copy entirely. `--quick` and `--deep` deliberately do not write
+that block, so neither can be quoted as a full-mode run.
+
+**AND STATE WHAT THE GUARDS DO NOT COVER.** The commit hook closes *did the gate
+run, green, on this tree*. It does **not** close *does the message describe the
+run* — it never reads the message. Two guards, two questions; the second one was
+open until `--trailer` existed. An unstated boundary reads as coverage, which is
+how a gap survives behind two working instruments.
+
 ### Destructive experiments run in a worktree, or after a WIP commit — settled at P3.5
 
 **Never against uncommitted work.** `git checkout <file>` has no undo. At P3.5 it

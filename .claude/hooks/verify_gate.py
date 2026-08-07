@@ -45,6 +45,14 @@ about it:
     into separate calls (the normal working shape) is fully covered.
   * `xargs`-fed commits, shell aliases, and any commit made outside these
     tools.
+  * WHETHER THE COMMIT MESSAGE DESCRIBES THE RUN. This hook closes exactly one
+    question -- *did the gate run, green, on this tree* -- and it never reads
+    the message. A message can quote a trailer that is wrong, or invented, or
+    from an earlier run, and this will approve it. That second question is
+    closed by `python tools/gate.py --trailer`, which reprints the stored block
+    for redirection into the message file so the numbers never pass through a
+    human. It went unclosed until 2026-08-07, behind two instruments that were
+    both working correctly.
 
 It raises the floor. It is not a sandbox, and treating it as one is the failure
 mode it exists to prevent.
