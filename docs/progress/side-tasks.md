@@ -319,4 +319,46 @@ COMMIT GATE -- A BOUNDARY MEASURED, 2026-08-06 (later entry, not a revision)
          The lesson is the rule this whole session keeps re-earning: a
          guard is only evidence about what it measures, and finding out
          what it measures takes a probe, not an argument.
+
+A FABRICATED TRAILER, AND THE FIX  2026-08-07
+         One commit into the GREEN batch (47f9675), two numbers in the
+         gate trailer were WRONG. The gate had been run as
+         `python tools/gate.py | tail -3`, so only the DEEP line and the
+         verdict were ever on screen; the OFF and ON lines were typed
+         into the commit message from an earlier run.
+             quoted   OFF 17.28s   ON 20.55s
+             recorded OFF 17.14s   ON 19.79s
+         Everything that decides anything was correct -- collected=633,
+         625/7/1 in all three modes, every sum reconciling, verdict
+         GREEN, ruff clean, vacuous=0, end_assign=0 -- and the gate had
+         genuinely passed. The fabricated part was two wall-clock
+         durations, the least consequential figures in the block.
+         THAT IS PRECISELY WHY IT IS THE SAME FAILURE as "515
+         collected": a number copied from one moment into a sentence
+         written at another, inside the one block whose whole purpose is
+         to be beyond retyping. A trailer that is right about everything
+         that matters and wrong about two numbers is still not a
+         verbatim trailer, and the doctrine does not have a
+         "close enough" clause.
+         NEITHER EXISTING GUARD COULD CATCH IT. The commit hook checks
+         that a fresh GREEN gate exists FOR THIS TREE; it does not read
+         the message, and it was working correctly -- the gate really was
+         green. gate.py printed the true block; it was truncated before a
+         human read it. The hole was between the tool and the message,
+         and nothing was watching there.
+         FIX: `python tools/gate.py --trailer` re-prints the stored
+         trailer verbatim from .gate-result.json, to be REDIRECTED into
+         the message file rather than retyped:
+             python tools/gate.py
+             python tools/gate.py --trailer >> msg.txt
+             git commit -F msg.txt
+         The numbers stop passing through a human at all. This entry and
+         the commit that carries it are the first to use it.
+         NOT REWRITTEN: 47f9675 is pushed, and rewriting history is on
+         the never-autonomous list. The commit stands and this is the
+         correction, which is the same rule the register has always used
+         -- annotate, do not rewrite.
+         The incident is recorded in gate.py's own docstring beside the
+         three it was built for, because a tool's failure history belongs
+         at the tool.
 ```

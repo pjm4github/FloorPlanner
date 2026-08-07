@@ -10,6 +10,16 @@ came from the same failure, and none of them was a typo:
   * "516 collected" quoted the same way, with a reconciliation ASSERTED against
     it that was never performed -- 512 + 6 is 518.
 
+A FOURTH, on 2026-08-07, with this tool and the commit hook both in place: the
+gate was run as `python tools/gate.py | tail -3`, so only the DEEP line and the
+verdict were ever seen, and the OFF and ON lines were typed into the commit
+message from an earlier run (17.28s / 20.55s quoted; 17.14s / 19.79s recorded).
+The verdict, counts and sums were right and the gate was genuinely green -- the
+fabricated part was two wall-clock durations, which is the least consequential
+thing in the block and exactly why it is the same failure. The hook cannot catch
+it: the hook checks that a green gate EXISTS for this tree, not that the message
+quotes it. `--trailer` closes it by removing the human from the copy.
+
 The common cause is a human copying a number from one moment into a sentence
 written at another. So the numbers stop being copied: this runs the gate,
 computes the census, checks that every gate's outcomes SUM to what
@@ -28,6 +38,9 @@ rounding difference, so it is treated as red.
     python tools/gate.py --docs     # the record lane: defect front matter,
                                     # the generated index, every defect
                                     # reference, and the GitHub dry run
+    python tools/gate.py --trailer  # re-print the last full-mode trailer,
+                                    # verbatim, for redirection into a commit
+                                    # message file -- NEVER retype it
 
 THE DOCS LANE IS ITS OWN LANE, like `--perf`, and deliberately NOT part of the
 default block. The trailer above is pasted verbatim into commit messages, so its
@@ -271,11 +284,48 @@ def _write_result(bad, collected, ruff, n_vac, n_end, lines) -> None:
     print(f"Gate-Result: {RESULT} written ({payload['verdict']})")
 
 
+def _trailer() -> int:
+    """Print the LAST full-mode trailer, verbatim, from the result file.
+
+    Added 2026-08-07 after the failure this whole tool exists to prevent
+    happened anyway, one commit into the GREEN batch: the gate was run with
+    `| tail -3`, so only the DEEP line and the verdict were ever seen, and the
+    OFF and ON lines were typed into the commit message from an earlier run.
+    Wall-clock times 17.28s / 20.55s were quoted; the run recorded 17.14s /
+    19.79s. Outcomes, sums and verdict were correct -- the fabricated part was
+    only the durations -- and that is exactly what makes it the same class as
+    "515 collected": a number copied from one moment into a sentence written at
+    another, in the one block that is supposed to be beyond retyping.
+
+    Printing the trailer TO BE REDIRECTED INTO THE MESSAGE FILE closes it. The
+    numbers stop passing through a human at all.
+
+        python tools/gate.py                       # run it
+        python tools/gate.py --trailer >> msg.txt  # quote it, verbatim
+        git commit -F msg.txt
+
+    Exits non-zero if there is no result file, so a missing trailer is loud
+    rather than an empty append.
+    """
+    import json
+    try:
+        with open(RESULT, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as e:
+        print(f"Gate-Trailer: no usable {RESULT} ({e}); run the gate first",
+              file=sys.stderr)
+        return 1
+    print("\n".join(data.get("trailer") or []))
+    return 0
+
+
 def main() -> int:
     if "--perf" in sys.argv:
         return _perf()
     if "--docs" in sys.argv:
         return _docs()
+    if "--trailer" in sys.argv:
+        return _trailer()
     quick = "--quick" in sys.argv
     deep_only = "--deep" in sys.argv          # CI's DEEP job (defect 27)
     rc, out = _run(["ruff", "check", "."])
