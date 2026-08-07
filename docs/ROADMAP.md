@@ -20,9 +20,34 @@ item, by tier, and the tier is assigned **here** — Code does not self-classify
 
 | tier | criteria | what Code does |
 |---|---|---|
-| **GREEN** | a ruling exists on disk · no user-visible behaviour change · no format or schema change · acceptance is stated | run it, gate it, PR it, **merge on green CI**, report at the end of the batch |
+| **GREEN** | a ruling exists on disk · **no new semantics, and nothing the user must learn** · no format or schema change · acceptance is stated | run it, gate it, PR it, **merge on green CI**, report at the end of the batch |
 | **AMBER** | a ruling exists, but the task changes what the user sees or what an operation produces | run it, gate it, PR it, **stop** — Patrick's manual check is the merge condition |
 | **RED** | a ruling is missing | **do not start.** Read-back first |
+
+
+**The GREEN criterion was amended on 2026-08-07, and the amendment is Patrick's,
+not a reading Code arrived at.** It first read *"no user-visible behaviour
+change"*. That was inconsistent with this document's own G4 acceptance, which
+asked in as many words for *"the same actionable message [to fire] on a drag as
+on a bake"* — a message the user can see, on the commonest gesture in the app.
+
+Code surfaced the contradiction before building G4, measured the change, and
+proceeded on the grounds that the tier had been assigned with knowledge of the
+visible effect. **Both halves of that were right**: surfacing it was correct,
+and so was not treating an author's explicit acceptance as a scope change.
+Recorded because a criterion that contradicts its own worked example teaches
+people to ignore the criterion.
+
+**What the amended wording keeps out is unchanged in spirit and clearer in
+practice:** a report that fires *only when something is already wrong*, reusing
+*an existing message*, adds no semantics and nothing to learn — the user meets it
+in a state they already needed to know about. A new mode, a new gesture, a
+changed default, or a message that can fire on correct work all fail the test,
+whether or not they are "behaviour changes" in the abstract.
+
+**Which is why G4 shipped with `test_an_ordinary_drag_says_nothing`.** Under the
+old wording that test was a courtesy; under the new one it is the criterion
+itself, expressed as an assertion.
 
 **What revokes autonomy automatically** — the existing stop conditions, unchanged:
 

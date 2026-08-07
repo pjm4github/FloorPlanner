@@ -73,7 +73,7 @@ carefully it is done.
 
 | tier | criteria | what happens at the end |
 |---|---|---|
-| **GREEN** | a ruling exists on disk · no user-visible behaviour change · no format or schema change · acceptance is stated | PR, **merge on green CI**, report at the end of the batch |
+| **GREEN** | a ruling exists on disk · **no new semantics, and nothing the user must learn** (amended 2026‑08‑07) · no format or schema change · acceptance is stated | PR, **merge on green CI**, report at the end of the batch |
 | **AMBER** | a ruling exists, but the task changes what the user sees or what an operation produces | PR, then **stop** — Patrick's manual check is the merge condition |
 | **RED** | a ruling is missing | **do not start** |
 
