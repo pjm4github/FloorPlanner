@@ -361,4 +361,35 @@ A FABRICATED TRAILER, AND THE FIX  2026-08-07
          The incident is recorded in gate.py's own docstring beside the
          three it was built for, because a tool's failure history belongs
          at the tool.
+
+G1 -- D43 NEGATIVE-ASSERTION COUNT  2026-08-07  (GREEN batch, item 1)
+         The measurement the record asked for, and only the measurement.
+         tools/negative_assertions.py, ast-based, evidence at
+         docs/evidence/d43-negative-assertions.json.
+             45 test files, 1598 assertions
+             287 NEGATIVE (17% of all assertions)
+             157 have a positive assertion earlier in the same test
+             HIT RATE 54%
+             130 bare assertions across 98 tests -- the read-first list
+             shapes: not X=71 == empty=64 == 0=41 not in=36 == before=33 is None=30 !==12
+         A CLASSIFIER FAULT FOUND BY SPOT-CHECKING BEFORE ANY NUMBER WAS
+         QUOTED. The first draft counted `assert r.returncode == 0` as
+         negative. `== 0` is two claims -- "this count is zero" (absence)
+         and "this process exited zero" (success). test_model_imports_
+         zero_qt was flagged for the success check while its REAL
+         negative assertion lives in a string run in a subprocess, where
+         no AST pass over that file can see it. Success probes excluded:
+         291 -> 287 negative, 135 -> 130 bare.
+         BOTH PROXY ERROR DIRECTIONS SPOT-CHECKED rather than asserted.
+         Overcount NOT observed (3 of 3 sampled "established" rows
+         asserted about the same subject as their negative claim).
+         Undercount observed: test_ungrouped_walls_survive_gc establishes
+         its precondition entirely BY CONSTRUCTION, which is not an
+         assert, so the proxy calls it bare. The bare list is therefore a
+         SUPERSET of the suspect ones -- the right error direction for
+         sizing a read.
+         PROPOSAL, sized by the number: read 130 assertions in 98
+         tests, ~2 min each, a half-day; leave the other 157 alone.
+         The list is enumerated, so it is a work-list, not a search.
+         Still argued Phase 6. Nothing remediated here, by design.
 ```

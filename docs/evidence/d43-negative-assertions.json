@@ -1,0 +1,2740 @@
+{
+  "files": 45,
+  "asserts": 1598,
+  "negative": 287,
+  "established": 157,
+  "hit_rate_pct": 54,
+  "bare": 130,
+  "bare_tests": [
+    "tests/test_characterization.py::test_group_move_undo_restores",
+    "tests/test_concept_rooms.py::test_a_concept_room_may_sit_over_the_plan",
+    "tests/test_concept_rooms.py::test_a_concept_room_round_trips_through_the_document",
+    "tests/test_concept_rooms.py::test_i13_holds_by_construction",
+    "tests/test_concept_rooms.py::test_the_category_heuristic_is_only_a_fallback",
+    "tests/test_corpus_freeze.py::test_macro_open_of_a_legacy_plan_converts_without_a_modal",
+    "tests/test_corpus_freeze.py::test_macro_open_of_a_v5_plan_is_silent_and_clean",
+    "tests/test_design_bridge.py::test_apply_reports_an_opening_it_cannot_place",
+    "tests/test_design_bridge.py::test_document_is_schema_valid",
+    "tests/test_design_bridge.py::test_fixture_scene_walks_clean",
+    "tests/test_design_bridge.py::test_groups_are_not_emitted_yet",
+    "tests/test_design_bridge.py::test_ids_are_canonical_not_stacking_order",
+    "tests/test_design_bridge.py::test_sample_plan_is_clean",
+    "tests/test_extract.py::test_undo_keeps_the_reference_image",
+    "tests/test_extract_join.py::test_a_merge_does_not_resurrect_the_absorbed_wall_through_a_group",
+    "tests/test_extract_join.py::test_a_merge_never_binds_a_room_to_a_wall_its_outline_does_not_name",
+    "tests/test_floors.py::test_apply_floor_visibility",
+    "tests/test_floors.py::test_floor_roster_edit_is_dirty",
+    "tests/test_floors.py::test_switch_floor_is_not_undoable_or_dirty",
+    "tests/test_groups.py::test_drag_group_by_wall_preserves_items",
+    "tests/test_groups.py::test_group_move_ungroup_preserves_items",
+    "tests/test_groups.py::test_group_rotation_ctrl_snaps_to_increment",
+    "tests/test_groups.py::test_grouping_rooms_without_their_walls_copies_nothing",
+    "tests/test_groups.py::test_ungrouped_walls_survive_gc",
+    "tests/test_inventory.py::test_cars_and_garage_items_are_yard",
+    "tests/test_io.py::test_csv_import_creates_room",
+    "tests/test_io.py::test_csv_import_grows_canvas_for_outside_room",
+    "tests/test_io.py::test_csv_roundtrip",
+    "tests/test_io.py::test_json_roundtrip",
+    "tests/test_load_path.py::test_converted_document_is_valid",
+    "tests/test_load_path.py::test_no_sliver_walls_in_the_converted_document",
+    "tests/test_load_path.py::test_save_reopen_is_clean_and_not_dirty",
+    "tests/test_load_path.py::test_the_legacy_file_on_disk_is_never_modified",
+    "tests/test_load_path.py::test_v5_opens_clean_and_not_dirty",
+    "tests/test_macro.py::test_ctrl_s_with_no_file_skips_instead_of_failing",
+    "tests/test_macro.py::test_place_rejects_unknown_kind",
+    "tests/test_macro.py::test_recorder_ignores_when_not_started_or_paused",
+    "tests/test_macro.py::test_recorder_replay_enabled_only_with_selection",
+    "tests/test_macro.py::test_recorder_suppresses_raw_click_for_dialog_tools",
+    "tests/test_macro.py::test_recorder_tool_dialog_not_double_captured",
+    "tests/test_macro.py::test_unknown_token_is_recorded_not_fatal",
+    "tests/test_open_walls.py::test_the_outline_does_not_move_when_a_wall_pulls_away",
+    "tests/test_outline.py::test_a_deliberately_open_edge_survives_a_round_trip",
+    "tests/test_outline.py::test_copying_a_room_does_not_carry_its_geometry",
+    "tests/test_outline.py::test_corners_is_none_not_empty_when_there_is_no_outline",
+    "tests/test_outline.py::test_the_live_mirror_is_gone",
+    "tests/test_room_walls.py::test_delete_shared_wall_keeps_both_rooms",
+    "tests/test_room_walls.py::test_deleting_wall_unbinds_it",
+    "tests/test_room_walls.py::test_moving_a_room_does_not_distort_its_neighbour",
+    "tests/test_rooms.py::test_boolean_spares_a_bystander_room_and_other_floors",
+    "tests/test_rooms.py::test_no_room_in_open_space",
+    "tests/test_schema.py::test_clean_design_validates",
+    "tests/test_schema.py::test_corrupt_fixture_passes_schema_but_fails_I6",
+    "tests/test_schema.py::test_deep_flag_gates_the_quadratic_checks",
+    "tests/test_self_intersection.py::test_a_clean_move_says_nothing",
+    "tests/test_shuffle.py::test_a_parked_float_never_absorbs_furnishings",
+    "tests/test_shuffle.py::test_acceptance_shuffle_drag_across_the_plan",
+    "tests/test_template.py::test_a_template_inserts_repeatedly",
+    "tests/test_template.py::test_a_template_is_a_valid_one_room_design",
+    "tests/test_template.py::test_duplicate_room_lands_a_floating_copy",
+    "tests/test_template.py::test_merge_lands_the_room_floating_on_the_target_level",
+    "tests/test_template.py::test_save_template_is_live_only_for_a_selected_floating_room",
+    "tests/test_template.py::test_templating_a_placed_room_leaves_the_plan_byte_identical",
+    "tests/test_topology.py::test_design_module_source_is_qt_free",
+    "tests/test_topology_ops.py::test_a_third_wall_at_the_corner_blocks_the_merge",
+    "tests/test_topology_ops.py::test_different_types_never_merge",
+    "tests/test_topology_ops.py::test_floors_are_planned_apart",
+    "tests/test_topology_ops.py::test_normalize_walls_ignores_the_auto_coalesce_switch",
+    "tests/test_topology_ops.py::test_scene_does_not_merge_walls_off_the_grid",
+    "tests/test_topology_ops.py::test_scene_leaves_a_real_t_junction_alone",
+    "tests/test_topology_ops.py::test_scene_split_declines_at_an_endpoint",
+    "tests/test_topology_ops.py::test_the_scene_applier_leaves_the_design_applier_nothing_to_do",
+    "tests/test_undo.py::test_snapshot_excludes_view_state",
+    "tests/test_undo.py::test_undo_after_grouping_restores_the_plan",
+    "tests/test_undo.py::test_undo_buttons_reflect_history",
+    "tests/test_undo.py::test_undo_does_not_dirty_a_saved_plan",
+    "tests/test_undo.py::test_undo_with_empty_history_is_noop",
+    "tests/test_verify_design.py::test_deep_invariants_are_gated",
+    "tests/test_verify_design.py::test_introduced_corruption_raises",
+    "tests/test_verify_design.py::test_save_verifies_deep",
+    "tests/test_vertices.py::test_round_trip_through_the_converting_apply",
+    "tests/test_vertices.py::test_uids_are_persistent_across_edits",
+    "tests/test_view.py::test_wheel_burst_is_deferred_then_coalesced",
+    "tests/test_viewer_model.py::test_an_unknown_form_falls_back_visibly_and_is_reported",
+    "tests/test_viewer_model.py::test_every_catalog_form_is_one_the_viewer_knows",
+    "tests/test_viewer_model.py::test_load_catalog_reports_rather_than_raises_when_assets_are_absent",
+    "tests/test_viewer_model.py::test_the_viewer_finds_the_catalog_the_app_ships",
+    "tests/test_viewer_popup.py::test_it_degrades_when_the_optional_stack_is_missing",
+    "tests/test_viewer_popup.py::test_the_3d_view_changes_nothing",
+    "tests/test_wall_move.py::test_a_body_landing_keeps_one_corner_across_twelve_drags",
+    "tests/test_wall_move.py::test_a_dragged_wall_resizes_the_rooms_it_borders",
+    "tests/test_wall_move.py::test_a_moved_wall_survives_the_converting_apply",
+    "tests/test_wall_move.py::test_the_roomless_seam_heals_and_then_drags_as_one",
+    "tests/test_walls.py::test_coalesce_merges_free_wall_into_room_wall",
+    "tests/test_walls.py::test_delete_free_wall_removes_whole",
+    "tests/test_walls.py::test_delete_overhanging_wall_goes_whole_room_keeps_area",
+    "tests/test_walls.py::test_draw_ignores_fully_joined_wall",
+    "tests/test_walls.py::test_floating_room_distance_is_not_a_gap"
+  ],
+  "by_shape": {
+    "!=": 12,
+    "== 0": 41,
+    "== before": 33,
+    "== empty": 64,
+    "is None": 30,
+    "not X": 71,
+    "not in": 36
+  },
+  "by_file": {
+    "tests/test_ai_pricing.py": 1,
+    "tests/test_characterization.py": 2,
+    "tests/test_concept_rooms.py": 8,
+    "tests/test_corpus_freeze.py": 3,
+    "tests/test_design_bridge.py": 15,
+    "tests/test_design_model.py": 1,
+    "tests/test_extract.py": 5,
+    "tests/test_extract_join.py": 15,
+    "tests/test_floors.py": 8,
+    "tests/test_framing.py": 1,
+    "tests/test_groups.py": 19,
+    "tests/test_inventory.py": 1,
+    "tests/test_io.py": 5,
+    "tests/test_load_path.py": 17,
+    "tests/test_macro.py": 15,
+    "tests/test_model.py": 1,
+    "tests/test_open_walls.py": 5,
+    "tests/test_openings.py": 3,
+    "tests/test_outline.py": 6,
+    "tests/test_room_walls.py": 4,
+    "tests/test_rooms.py": 9,
+    "tests/test_schema.py": 5,
+    "tests/test_selection.py": 5,
+    "tests/test_self_intersection.py": 5,
+    "tests/test_shuffle.py": 9,
+    "tests/test_template.py": 19,
+    "tests/test_topology.py": 6,
+    "tests/test_topology_ops.py": 12,
+    "tests/test_undo.py": 16,
+    "tests/test_verify_design.py": 4,
+    "tests/test_vertices.py": 5,
+    "tests/test_view.py": 2,
+    "tests/test_viewer_model.py": 12,
+    "tests/test_viewer_popup.py": 6,
+    "tests/test_wall_move.py": 20,
+    "tests/test_walls.py": 17
+  },
+  "rows": [
+    {
+      "file": "tests/test_ai_pricing.py",
+      "test": "test_apply_prices_writes_config_not_manifest",
+      "line": 68,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert manifest.read_text(encoding=\"utf-8\") == before      # manifest untouched"
+    },
+    {
+      "file": "tests/test_characterization.py",
+      "test": "test_group_move_undo_restores",
+      "line": 197,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert win.snapshot() == before, \"undo did not restore the pre-group plan\""
+    },
+    {
+      "file": "tests/test_characterization.py",
+      "test": "test_group_move_undo_restores",
+      "line": 201,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert after_poly == before_poly, \"the room polygon itself changed\""
+    },
+    {
+      "file": "tests/test_concept_rooms.py",
+      "test": "test_a_concept_room_is_wall_less_and_floating",
+      "line": 32,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 9,
+      "src": "assert room.walls == [], \"a concept room is WALL-LESS\""
+    },
+    {
+      "file": "tests/test_concept_rooms.py",
+      "test": "test_a_concept_room_round_trips_through_the_document",
+      "line": 46,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 10,
+      "src": "assert schema_errors(doc) == [], schema_errors(doc)"
+    },
+    {
+      "file": "tests/test_concept_rooms.py",
+      "test": "test_a_concept_room_round_trips_through_the_document",
+      "line": 47,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 10,
+      "src": "assert check(doc, deep=True) == [], check(doc, deep=True)"
+    },
+    {
+      "file": "tests/test_concept_rooms.py",
+      "test": "test_i13_holds_by_construction",
+      "line": 68,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert check(doc, deep=True) == []"
+    },
+    {
+      "file": "tests/test_concept_rooms.py",
+      "test": "test_a_concept_room_may_sit_over_the_plan",
+      "line": 90,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert check(_walk(win), deep=True) == [], \"a concept overlap was flagged\""
+    },
+    {
+      "file": "tests/test_concept_rooms.py",
+      "test": "test_the_category_heuristic_is_only_a_fallback",
+      "line": 118,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert room.category is None                  # never told"
+    },
+    {
+      "file": "tests/test_concept_rooms.py",
+      "test": "test_a_concept_room_templates_and_inserts",
+      "line": 131,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 7,
+      "src": "assert tmpl[\"walls\"] == []"
+    },
+    {
+      "file": "tests/test_concept_rooms.py",
+      "test": "test_a_concept_room_templates_and_inserts",
+      "line": 136,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 7,
+      "src": "assert check(_walk(win), deep=True) == []"
+    },
+    {
+      "file": "tests/test_corpus_freeze.py",
+      "test": "test_macro_open_of_a_legacy_plan_converts_without_a_modal",
+      "line": 85,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 7,
+      "src": "assert modals == [], f\"a modal opened during a macro: {modals}\""
+    },
+    {
+      "file": "tests/test_corpus_freeze.py",
+      "test": "test_macro_open_of_a_v5_plan_is_silent_and_clean",
+      "line": 100,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert win._conversion is None"
+    },
+    {
+      "file": "tests/test_corpus_freeze.py",
+      "test": "test_macro_open_of_a_v5_plan_is_silent_and_clean",
+      "line": 101,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert not win._is_dirty()"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_sample_plan_is_clean",
+      "line": 88,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert check(doc, deep=True) == []"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_sample_plan_is_clean",
+      "line": 89,
+      "shape": "== 0",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert rep[\"unwelded_ends\"] == 0"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_sample_plan_is_clean",
+      "line": 90,
+      "shape": "== 0",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert rep[\"open_edges\"] == 0"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_sample_plan_is_clean",
+      "line": 91,
+      "shape": "== 0",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert rep[\"rooms_without_outline\"] == 0"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_walk_is_level_scoped",
+      "line": 273,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 6,
+      "src": "assert not (a & b), \"two levels share a vertex -- the walk leaked\""
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_walk_is_level_scoped",
+      "line": 274,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 6,
+      "src": "assert check(doc, deep=True) == []"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_fixture_scene_walks_clean",
+      "line": 299,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 6,
+      "src": "assert check(doc, deep=True) == []"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_fixture_scene_walks_clean",
+      "line": 300,
+      "shape": "== 0",
+      "positive_before": false,
+      "n_asserts_in_test": 6,
+      "src": "assert rep[\"unwelded_ends\"] == 0"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_openings_are_reanchored_to_a_named_end",
+      "line": 330,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 7,
+      "src": "assert check(doc, deep=True) == []"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_groups_are_not_emitted_yet",
+      "line": 338,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert doc[\"groups\"] == []"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_document_is_schema_valid",
+      "line": 347,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert schema_errors(doc) == []"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_ids_are_canonical_not_stacking_order",
+      "line": 360,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert before == after"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_openings_invert_exactly",
+      "line": 444,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert rep[\"openings_failed\"] == []"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_apply_reports_an_opening_it_cannot_place",
+      "line": 487,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert rep[\"openings_failed\"] == []"
+    },
+    {
+      "file": "tests/test_design_bridge.py",
+      "test": "test_apply_from_a_bare_scene_round_trips",
+      "line": 508,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert check(d2, deep=True) == []"
+    },
+    {
+      "file": "tests/test_design_model.py",
+      "test": "test_present_null_vs_absent_are_distinguished",
+      "line": 42,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert \"area_accounting\" not in plain_room.to_dict()   # absent, not null"
+    },
+    {
+      "file": "tests/test_extract.py",
+      "test": "test_gui_import_from_image_adds_walls",
+      "line": 89,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert getattr(win, \"_wall_ghost\", None) is None   # preview ghost cleared"
+    },
+    {
+      "file": "tests/test_extract.py",
+      "test": "test_gui_import_ghost_overlay_shows_and_clears",
+      "line": 104,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert not [it for it in win.scene.items()"
+    },
+    {
+      "file": "tests/test_extract.py",
+      "test": "test_reference_image_lock_blocks_move_and_scale",
+      "line": 140,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert item.locked is True and not (item.flags() & movable)"
+    },
+    {
+      "file": "tests/test_extract.py",
+      "test": "test_reference_image_lock_blocks_move_and_scale",
+      "line": 145,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert item._scaling is None"
+    },
+    {
+      "file": "tests/test_extract.py",
+      "test": "test_undo_keeps_the_reference_image",
+      "line": 158,
+      "shape": "== 0",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert sum(1 for i in win.scene.items()"
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_extract_move_join_acceptance",
+      "line": 85,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 16,
+      "src": "assert len(a.walls) == 4 and len(a.open_edges()) == 0"
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_extract_move_join_acceptance",
+      "line": 93,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 16,
+      "src": "assert not (_vertex_ids(a) & plan_vids), \"floating room shares a vertex\""
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_extract_move_join_acceptance",
+      "line": 111,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 16,
+      "src": "assert a.extracted_from is None"
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_extract_then_rejoin_at_origin_restores_the_party_wall",
+      "line": 133,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 6,
+      "src": "assert sum(isinstance(i, fp.WallItem) for i in sc.items()) == walls_before"
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_five_room_macro_round_trip_leaves_no_open_edges",
+      "line": 187,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 6,
+      "src": "assert not [w for w in walls if min(w.p1.x(), w.p2.x()) > 850], \\"
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_five_room_macro_round_trip_leaves_no_open_edges",
+      "line": 191,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 6,
+      "src": "assert len(r.open_edges()) == 0, \\"
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_fuse_straggler_macro_steals_no_wall",
+      "line": 333,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 7,
+      "src": "assert len(r.open_edges()) == 0, f\"{r.name} still open\""
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_a_merge_never_binds_a_room_to_a_wall_its_outline_does_not_name",
+      "line": 358,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert west.scene() is None, \"precondition: the 5\\\"-offset merge absorbed\""
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_a_merge_never_binds_a_room_to_a_wall_its_outline_does_not_name",
+      "line": 360,
+      "shape": "not in",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert a not in room.walls and room not in a.rooms, ("
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_a_grouped_merge_never_binds_a_room_it_does_not_border",
+      "line": 393,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert west.scene() is None, ("
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_a_grouped_merge_never_binds_a_room_it_does_not_border",
+      "line": 395,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert a not in room.walls and room not in a.rooms, ("
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_a_merge_does_not_resurrect_the_absorbed_wall_through_a_group",
+      "line": 422,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 5,
+      "src": "assert west.scene() is None"
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_a_merge_does_not_resurrect_the_absorbed_wall_through_a_group",
+      "line": 427,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert west not in fp.room_walls(room), \"room_walls handed back a dead wall\""
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_a_merge_does_not_resurrect_the_absorbed_wall_through_a_group",
+      "line": 432,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert sum(1 for i in sc.items()"
+    },
+    {
+      "file": "tests/test_extract_join.py",
+      "test": "test_a_merge_does_not_resurrect_the_absorbed_wall_through_a_group",
+      "line": 435,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert west.scene() is None, \"the deleted wall is back in the scene\""
+    },
+    {
+      "file": "tests/test_floors.py",
+      "test": "test_apply_floor_visibility",
+      "line": 49,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert not wd.isVisible() and not wd.isEnabled()    # other floor: hidden"
+    },
+    {
+      "file": "tests/test_floors.py",
+      "test": "test_apply_floor_visibility",
+      "line": 53,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert wd.isVisible() and not wd.isEnabled()        # reference: visible, off"
+    },
+    {
+      "file": "tests/test_floors.py",
+      "test": "test_serialize_round_trip_two_floors",
+      "line": 103,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 8,
+      "src": "assert \"active_floor\" not in data                  # view state, not serialized"
+    },
+    {
+      "file": "tests/test_floors.py",
+      "test": "test_switch_floor_is_not_undoable_or_dirty",
+      "line": 133,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert win.serialize() == before                   # snapshot unchanged"
+    },
+    {
+      "file": "tests/test_floors.py",
+      "test": "test_switch_floor_is_not_undoable_or_dirty",
+      "line": 135,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert not win._is_dirty()                         # not dirty"
+    },
+    {
+      "file": "tests/test_floors.py",
+      "test": "test_floor_roster_edit_is_dirty",
+      "line": 140,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert not win._is_dirty()"
+    },
+    {
+      "file": "tests/test_floors.py",
+      "test": "test_raising_a_ghost_room_keeps_it_inside_its_floor_band",
+      "line": 258,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 9,
+      "src": "assert getattr(top, \"_floor_band\", 0.0) == 0, \\"
+    },
+    {
+      "file": "tests/test_floors.py",
+      "test": "test_raising_a_ghost_room_keeps_it_inside_its_floor_band",
+      "line": 279,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 9,
+      "src": "assert ghost._floor_band == 0"
+    },
+    {
+      "file": "tests/test_framing.py",
+      "test": "test_factory_returns_right_types",
+      "line": 25,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert isinstance(el, fp.FurnishingItem) and not isinstance(el,"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_group_move_ungroup_preserves_items",
+      "line": 39,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert counts(sc) == before"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_ungrouped_walls_survive_gc",
+      "line": 61,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert counts(sc) == before"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_grouping_a_room_adopts_its_real_walls",
+      "line": 80,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert sum(isinstance(i, fp.WallItem)"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_grouped_furnishing_hides_its_own_handle",
+      "line": 272,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert not furn._handle_visible()     # but shows no individual handle"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_group_rotation_ctrl_snaps_to_increment",
+      "line": 310,
+      "shape": "== 0",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert round(furn.rotation()) % int(step) == 0"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_drag_group_by_wall_preserves_items",
+      "line": 363,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert counts(sc) == before"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_whole_plan_group_move_carries_every_room",
+      "line": 468,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert _unwelded(win) == 0, \"the fixture did not open clean\""
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_whole_plan_group_move_carries_every_room",
+      "line": 480,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert _unwelded(win) == 0, \"the move tore the wall network\""
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_a_clipped_band_leaves_every_room_coherent",
+      "line": 575,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert not stranded, ("
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_a_group_move_leaves_the_outlines_still_holding_their_corners",
+      "line": 627,
+      "shape": "!=",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert (a.area_sqft, b.area_sqft) != (a0, b0), \\"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_a_group_move_leaves_the_outlines_still_holding_their_corners",
+      "line": 631,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert not left_behind, \\"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_a_group_rotation_also_keeps_the_corners",
+      "line": 649,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert _unwelded(win) == 0"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_a_group_move_stretches_an_outside_wall_it_shares_a_corner_with",
+      "line": 703,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert _unwelded(win) == 0, \"the move tore the wall network\""
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_a_group_move_stretches_an_outside_wall_it_shares_a_corner_with",
+      "line": 704,
+      "shape": "!=",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert room.corners[0].x() != 0 or room.corners[1].x() != 0"
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_grouping_twenty_rooms_creates_no_objects_at_all",
+      "line": 743,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert census() == before, \"grouping created objects\""
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_grouping_twenty_rooms_creates_no_objects_at_all",
+      "line": 747,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert census() == before, \"the bake created objects\""
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_grouping_twenty_rooms_creates_no_objects_at_all",
+      "line": 752,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert census() == before, \"the ungroup created objects\""
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_grouping_rooms_without_their_walls_copies_nothing",
+      "line": 781,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert _nwalls(fp, sc) == before, \"grouping rooms alone copied walls\""
+    },
+    {
+      "file": "tests/test_groups.py",
+      "test": "test_a_grouped_wall_can_be_rebound_to_its_own_room",
+      "line": 936,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert len(room.open_edges()) == 0, ("
+    },
+    {
+      "file": "tests/test_inventory.py",
+      "test": "test_cars_and_garage_items_are_yard",
+      "line": 41,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert interior == []"
+    },
+    {
+      "file": "tests/test_io.py",
+      "test": "test_json_roundtrip",
+      "line": 44,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert counts(w2.scene) == before"
+    },
+    {
+      "file": "tests/test_io.py",
+      "test": "test_csv_import_creates_room",
+      "line": 63,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert win._import_errors == []"
+    },
+    {
+      "file": "tests/test_io.py",
+      "test": "test_csv_import_grows_canvas_for_outside_room",
+      "line": 84,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert win._import_errors == []"
+    },
+    {
+      "file": "tests/test_io.py",
+      "test": "test_csv_import_rejects_typo_beyond_max",
+      "line": 114,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert not [i for i in win.scene.items() if isinstance(i, fp.RoomItem)]"
+    },
+    {
+      "file": "tests/test_io.py",
+      "test": "test_csv_roundtrip",
+      "line": 124,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert win._import_errors == []"
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_conversion_reports_ends_moved_not_weld_ops",
+      "line": 60,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert \"31 wall ends\" not in text"
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_the_legacy_file_on_disk_is_never_modified",
+      "line": 67,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert (EXAMPLES / \"planc1.json\").read_bytes() == before"
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_converted_document_is_valid",
+      "line": 75,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert check(design.to_dict(), deep=True) == []"
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_v5_opens_clean_and_not_dirty",
+      "line": 97,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert win._conversion is None, \"a v5 file must not be converted\""
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_v5_opens_clean_and_not_dirty",
+      "line": 98,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert not win._is_dirty(), \"a v5 file opened dirty\""
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_two_rooms_one_face_keeps_both",
+      "line": 222,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 10,
+      "src": "assert check(doc, deep=True) == [], \"the fallback must produce a VALID doc\""
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_extracted_walls_are_welded",
+      "line": 251,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert rep[\"unwelded_ends\"] == 0, \"extracted walls were left unwelded\""
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_save_writes_v5",
+      "line": 265,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert check(doc, deep=True) == []"
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_save_reopen_is_clean_and_not_dirty",
+      "line": 274,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert check(doc, deep=True) == []"
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_save_reopen_is_clean_and_not_dirty",
+      "line": 277,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert win._conversion is None, \"a v5 file must not be converted on open\""
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_save_reopen_is_clean_and_not_dirty",
+      "line": 278,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert not win._is_dirty(), \"reopening our own save came up dirty\""
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_converted_plan_saves_and_reopens_clean",
+      "line": 290,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert check(doc, deep=True) == []"
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_converted_plan_saves_and_reopens_clean",
+      "line": 293,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert not win._is_dirty()"
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_legacy_export_round_trips_through_the_old_loader",
+      "line": 379,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert after == before"
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_legacy_export_reopens_without_repair",
+      "line": 410,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert win._conversion[\"ends_moved\"] == 0, \\"
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_legacy_export_reopens_without_repair",
+      "line": 412,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert win._conversion[\"weld_ops\"] == 0, \"...and the weld found work to do\""
+    },
+    {
+      "file": "tests/test_load_path.py",
+      "test": "test_no_sliver_walls_in_the_converted_document",
+      "line": 444,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert slivers == [], f\"weld-ghost slivers survived: {slivers}\""
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_place_rejects_unknown_kind",
+      "line": 36,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert not res[\"ok\"]"
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_place_rejects_unknown_kind",
+      "line": 38,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert _counts(win)[2] == 0"
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_rotate_and_delete",
+      "line": 109,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert _counts(win)[2] == 0"
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_recorder_captures_modal_text_on_one_line",
+      "line": 236,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert \"\\n\" not in text               # the whole interaction on one line"
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_recorder_tool_dialog_not_double_captured",
+      "line": 274,
+      "shape": "not in",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert \"TYPE\" not in text             # dialog text not double-captured"
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_unknown_token_is_recorded_not_fatal",
+      "line": 310,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert not res[\"ok\"]"
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_export_canvas_png_dimensions",
+      "line": 342,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert not img.isNull()"
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_recorder_tool_and_place_hooks",
+      "line": 419,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert win._recorder is None                   # stop unhooks the recorder"
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_recorder_ignores_when_not_started_or_paused",
+      "line": 425,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert dlg.edit.toPlainText() == \"\""
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_recorder_ignores_when_not_started_or_paused",
+      "line": 429,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert dlg.edit.toPlainText() == \"\""
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_recorder_ctrl_click_emits_caret_click",
+      "line": 480,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert \"DRAG\" not in text                        # no movement -> plain click"
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_recorder_short_click_is_click_not_drag",
+      "line": 493,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert \"DRAG\" not in dlg.edit.toPlainText()"
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_recorder_replay_enabled_only_with_selection",
+      "line": 512,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert not dlg.b_replay.isEnabled()            # no selection yet"
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_recorder_suppresses_raw_click_for_dialog_tools",
+      "line": 560,
+      "shape": "not in",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert \"CLICK\" not in dlg.edit.toPlainText()"
+    },
+    {
+      "file": "tests/test_macro.py",
+      "test": "test_ctrl_s_with_no_file_skips_instead_of_failing",
+      "line": 709,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert res[\"ok\"] and not res[\"errors\"], res"
+    },
+    {
+      "file": "tests/test_model.py",
+      "test": "test_floors_emitted_but_active_floor_is_not",
+      "line": 123,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert \"active_floor\" not in out"
+    },
+    {
+      "file": "tests/test_open_walls.py",
+      "test": "test_detach_unlocks_corners_without_unbinding",
+      "line": 153,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert _open_count(fp, scene) == 0                # nothing open yet"
+    },
+    {
+      "file": "tests/test_open_walls.py",
+      "test": "test_the_outline_does_not_move_when_a_wall_pulls_away",
+      "line": 184,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert [(e.p.x(), e.p.y()) for e in room.outline] == before"
+    },
+    {
+      "file": "tests/test_open_walls.py",
+      "test": "test_filling_the_gap_recloses_the_room",
+      "line": 199,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert _open_count(fp, scene) == 0"
+    },
+    {
+      "file": "tests/test_open_walls.py",
+      "test": "test_closing_gap_refuses_and_relocks",
+      "line": 306,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert len(room.open_edges()) == 0                       # gap closed"
+    },
+    {
+      "file": "tests/test_open_walls.py",
+      "test": "test_undo_restores_closed_room",
+      "line": 320,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert _open_count(fp, sc) == 0"
+    },
+    {
+      "file": "tests/test_openings.py",
+      "test": "test_a_reported_I7_is_expected_but_an_unreported_one_is_not",
+      "line": 191,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert \"I7\" not in fault_profile(scene, doc=doc, walk_report=rep)"
+    },
+    {
+      "file": "tests/test_openings.py",
+      "test": "test_an_opening_that_cannot_be_placed_is_reported_not_dropped",
+      "line": 252,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert walls[0].openings == [], \"the impossible opening was placed anyway\""
+    },
+    {
+      "file": "tests/test_openings.py",
+      "test": "test_the_edit_surface_names_the_edit_and_says_it_once",
+      "line": 278,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert drain_opening_failures(sc) == []"
+    },
+    {
+      "file": "tests/test_outline.py",
+      "test": "test_corners_is_none_not_empty_when_there_is_no_outline",
+      "line": 41,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert room.corners is None and room.outline == []"
+    },
+    {
+      "file": "tests/test_outline.py",
+      "test": "test_the_live_mirror_is_gone",
+      "line": 182,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert not hasattr(room, \"_sync_corner_props\")"
+    },
+    {
+      "file": "tests/test_outline.py",
+      "test": "test_the_live_mirror_is_gone",
+      "line": 183,
+      "shape": "not in",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert \"perimeter_corners\" not in room.properties"
+    },
+    {
+      "file": "tests/test_outline.py",
+      "test": "test_load_strips_the_stale_mirror",
+      "line": 204,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert \"perimeter_corners\" not in room.properties"
+    },
+    {
+      "file": "tests/test_outline.py",
+      "test": "test_copying_a_room_does_not_carry_its_geometry",
+      "line": 233,
+      "shape": "not in",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert \"perimeter_corners\" not in props"
+    },
+    {
+      "file": "tests/test_outline.py",
+      "test": "test_a_deliberately_open_edge_survives_a_round_trip",
+      "line": 285,
+      "shape": "== 0",
+      "positive_before": false,
+      "n_asserts_in_test": 6,
+      "src": "assert len(room.open_edges()) == 0            # precondition: closed"
+    },
+    {
+      "file": "tests/test_room_walls.py",
+      "test": "test_delete_shared_wall_keeps_both_rooms",
+      "line": 77,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 6,
+      "src": "assert shared.scene() is None"
+    },
+    {
+      "file": "tests/test_room_walls.py",
+      "test": "test_delete_shared_wall_keeps_both_rooms",
+      "line": 78,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 6,
+      "src": "assert not [w for w in scene.items() if isinstance(w, fp.WallItem)"
+    },
+    {
+      "file": "tests/test_room_walls.py",
+      "test": "test_moving_a_room_does_not_distort_its_neighbour",
+      "line": 112,
+      "shape": "not in",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert shared not in fp.room_walls(a)"
+    },
+    {
+      "file": "tests/test_room_walls.py",
+      "test": "test_deleting_wall_unbinds_it",
+      "line": 171,
+      "shape": "not in",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert w not in room.walls"
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "test": "test_boolean_spares_a_bystander_room_and_other_floors",
+      "line": 184,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert c.scene() is not None and not c.open_edges(), \"C was broken open\""
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "test": "test_fragment_groups_each_piece_with_its_own_walls",
+      "line": 254,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert r.open_edges() == [], f\"{r.name} starts with an open edge\""
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "test": "test_fragment_groups_each_piece_with_its_own_walls",
+      "line": 277,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert not both, (f\"{a.name} and {b.name} share {len(both)} wall(s), \""
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "test": "test_align_to_grid_carries_the_outline_and_the_party_wall_neighbour",
+      "line": 446,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 7,
+      "src": "assert r.open_edges() == [], f\"{r.name} starts with an open edge\""
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "test": "test_align_to_grid_carries_the_outline_and_the_party_wall_neighbour",
+      "line": 464,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 7,
+      "src": "assert r.open_edges() == [], ("
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "test": "test_align_to_grid_carries_the_outline_and_the_party_wall_neighbour",
+      "line": 467,
+      "shape": "!=",
+      "positive_before": true,
+      "n_asserts_in_test": 7,
+      "src": "assert [(round(e.p.x(), 3), round(e.p.y(), 3))"
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "test": "test_room_op_resolves_grouped_rooms",
+      "line": 592,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert len(groups) == 0                      # source groups dissolved"
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "test": "test_room_op_resolves_grouped_wall_loops",
+      "line": 619,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert len(groups) == 0"
+    },
+    {
+      "file": "tests/test_rooms.py",
+      "test": "test_no_room_in_open_space",
+      "line": 662,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert fp.detect_room(scene, QPointF(60, 60)) is None"
+    },
+    {
+      "file": "tests/test_schema.py",
+      "test": "test_clean_design_validates",
+      "line": 50,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert schema_errors(doc) == [], f\"{path.name} fails the JSON Schema\""
+    },
+    {
+      "file": "tests/test_schema.py",
+      "test": "test_clean_design_validates",
+      "line": 51,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert check(doc) == [], f\"{path.name} fails a referential invariant\""
+    },
+    {
+      "file": "tests/test_schema.py",
+      "test": "test_corrupt_fixture_passes_schema_but_fails_I6",
+      "line": 56,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert schema_errors(doc) == []            # it IS schema-valid"
+    },
+    {
+      "file": "tests/test_schema.py",
+      "test": "test_deep_flag_gates_the_quadratic_checks",
+      "line": 77,
+      "shape": "not in",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert \"I11\" in codes(deep) and \"I11\" not in codes(cheap)   # gated out"
+    },
+    {
+      "file": "tests/test_schema.py",
+      "test": "test_negative_I14_fires_on_a_drifted_shared_vertex",
+      "line": 96,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert not any(e.startswith(\"I14\") for e in check(d, deep=False)), \\"
+    },
+    {
+      "file": "tests/test_selection.py",
+      "test": "test_selects_only_fully_enclosed_walls",
+      "line": 23,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert not crossing.isSelected()        # one end sticks out -> excluded"
+    },
+    {
+      "file": "tests/test_selection.py",
+      "test": "test_selects_only_fully_enclosed_furnishings",
+      "line": 36,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert not far.isSelected()"
+    },
+    {
+      "file": "tests/test_selection.py",
+      "test": "test_room_edge_on_party_wall_is_not_duplicated",
+      "line": 78,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert not party.isSelected()             # the long wall is left alone"
+    },
+    {
+      "file": "tests/test_selection.py",
+      "test": "test_room_edge_on_party_wall_is_not_duplicated",
+      "line": 82,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert dup == []                          # no synthesized duplicate edge"
+    },
+    {
+      "file": "tests/test_selection.py",
+      "test": "test_party_wall_edge_selection_leaves_the_door_intact",
+      "line": 113,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert dup == []"
+    },
+    {
+      "file": "tests/test_self_intersection.py",
+      "test": "test_the_gesture_check_catches_what_i5b_can_miss",
+      "line": 80,
+      "shape": "!=",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert len(loop) != len(set(loop)), \"the emitted loop is not pinched\""
+    },
+    {
+      "file": "tests/test_self_intersection.py",
+      "test": "test_the_gesture_check_catches_what_i5b_can_miss",
+      "line": 81,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert not [e for e in check(doc, deep=True) if e.startswith(\"I5b\")], ("
+    },
+    {
+      "file": "tests/test_self_intersection.py",
+      "test": "test_a_clean_move_says_nothing",
+      "line": 97,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert _report(fp, scene, [r]) == []"
+    },
+    {
+      "file": "tests/test_self_intersection.py",
+      "test": "test_one_room_names_the_room_and_the_remedy",
+      "line": 110,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert \"cannot be saved\" not in m"
+    },
+    {
+      "file": "tests/test_self_intersection.py",
+      "test": "test_two_and_three_rooms_read_as_english",
+      "line": 123,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert \" and Hall and \" not in three           # not a naive join"
+    },
+    {
+      "file": "tests/test_shuffle.py",
+      "test": "test_shuffle_implies_every_auto_pass_off",
+      "line": 20,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert not fp.editing_enabled(\"auto_weld\")"
+    },
+    {
+      "file": "tests/test_shuffle.py",
+      "test": "test_shuffle_implies_every_auto_pass_off",
+      "line": 25,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert not fp.editing_enabled(flag), \"shuffle implies all off\""
+    },
+    {
+      "file": "tests/test_shuffle.py",
+      "test": "test_editing_block_emits_from_live_settings",
+      "line": 43,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert key not in doc[\"settings\"], f\"{key} duplicated at the top level\""
+    },
+    {
+      "file": "tests/test_shuffle.py",
+      "test": "test_toolbar_toggle_flips_the_setting",
+      "line": 63,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert not win.a_shuffle.isChecked()             # default off"
+    },
+    {
+      "file": "tests/test_shuffle.py",
+      "test": "test_merge_gates_respect_shuffle",
+      "line": 114,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert fp.merge_all(scene) == 0"
+    },
+    {
+      "file": "tests/test_shuffle.py",
+      "test": "test_acceptance_shuffle_drag_across_the_plan",
+      "line": 216,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 11,
+      "src": "assert errs == [], f\"check() not clean {label}: {errs}\""
+    },
+    {
+      "file": "tests/test_shuffle.py",
+      "test": "test_a_parked_float_never_absorbs_furnishings",
+      "line": 317,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert a._floating_furnishings == []         # captured-and-empty, not None"
+    },
+    {
+      "file": "tests/test_shuffle.py",
+      "test": "test_a_parked_float_never_absorbs_furnishings",
+      "line": 324,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert f not in (a._floating_furnishings or [])"
+    },
+    {
+      "file": "tests/test_shuffle.py",
+      "test": "test_rebaseline_keeps_carried_and_excludes_claimed",
+      "line": 412,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert theirs not in a._floating_furnishings, ("
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_a_template_is_a_valid_one_room_design",
+      "line": 57,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 7,
+      "src": "assert check(tmpl, deep=True) == [], check(tmpl, deep=True)"
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_a_template_is_a_valid_one_room_design",
+      "line": 69,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 7,
+      "src": "assert e.get(\"wall\") is None or e[\"wall\"] in wids"
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_templating_a_placed_room_leaves_the_plan_byte_identical",
+      "line": 80,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert check(tmpl, deep=True) == []"
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_templating_a_placed_room_leaves_the_plan_byte_identical",
+      "line": 82,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert win.snapshot() == before, ("
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_a_template_of_a_placed_room_takes_only_its_own_share",
+      "line": 102,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert sum(1 for w in win.scene.items()"
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_merge_lands_the_room_floating_on_the_target_level",
+      "line": 112,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 5,
+      "src": "assert check(merged, deep=True) == [], check(merged, deep=True)"
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_merge_lands_the_room_floating_on_the_target_level",
+      "line": 117,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert copy[\"placement\"][\"extracted_from\"] is None"
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_duplicate_room_lands_a_floating_copy",
+      "line": 151,
+      "shape": "!=",
+      "positive_before": false,
+      "n_asserts_in_test": 10,
+      "src": "assert copy is not None and copy.name != \"Den\""
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_duplicate_room_lands_a_floating_copy",
+      "line": 163,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 10,
+      "src": "assert check(_walk(win), deep=True) == []"
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_copy_paste_round_trip",
+      "line": 176,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert check(_walk(win), deep=True) == []"
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_save_and_load_template_room",
+      "line": 193,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 11,
+      "src": "assert schema_errors(doc) == [], schema_errors(doc)"
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_save_and_load_template_room",
+      "line": 194,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 11,
+      "src": "assert check(doc, deep=True) == []"
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_save_and_load_template_room",
+      "line": 209,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 11,
+      "src": "assert check(_walk(win2), deep=True) == []"
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_save_template_is_live_only_for_a_selected_floating_room",
+      "line": 222,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 8,
+      "src": "assert not win.a_save_template.isEnabled(), \"nothing selected\""
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_save_template_is_live_only_for_a_selected_floating_room",
+      "line": 225,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 8,
+      "src": "assert not win.a_save_template.isEnabled(), \"PLACED: still not offered\""
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_save_template_is_live_only_for_a_selected_floating_room",
+      "line": 240,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 8,
+      "src": "assert not win.a_save_template.isEnabled()"
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_save_template_is_live_only_for_a_selected_floating_room",
+      "line": 241,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 8,
+      "src": "assert win.selected_floating_room() is None"
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_a_template_inserts_repeatedly",
+      "line": 249,
+      "shape": "!=",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert a is not None and b is not None and a.name != b.name"
+    },
+    {
+      "file": "tests/test_template.py",
+      "test": "test_a_template_inserts_repeatedly",
+      "line": 251,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert check(_walk(win), deep=True) == []"
+    },
+    {
+      "file": "tests/test_topology.py",
+      "test": "test_trace_faces_recovers_every_room_area",
+      "line": 54,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert unmatched == []                           # no room lost (Garage back)"
+    },
+    {
+      "file": "tests/test_topology.py",
+      "test": "test_trace_faces_recovers_every_room_area",
+      "line": 61,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert not any(topology._pip(ecen, _poly(d, r)) for r in d.rooms)  # unclaimed"
+    },
+    {
+      "file": "tests/test_topology.py",
+      "test": "test_split_edge_redistributes_the_openings_it_used_to_refuse",
+      "line": 171,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert sum(len(x.openings or ()) for x in d2.walls) == before"
+    },
+    {
+      "file": "tests/test_topology.py",
+      "test": "test_split_edge_is_total_and_reports_the_cut_it_runs_through",
+      "line": 199,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert sum(len(x.openings or ()) for x in d2.walls) == before, \"a door was lost\""
+    },
+    {
+      "file": "tests/test_topology.py",
+      "test": "test_design_module_source_is_qt_free",
+      "line": 225,
+      "shape": "not in",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert \"PyQt6\" not in src and \"from PyQt\" not in src, f\"{mod} references Qt\""
+    },
+    {
+      "file": "tests/test_topology.py",
+      "test": "test_design_module_source_is_qt_free",
+      "line": 229,
+      "shape": "not in",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert \"floorplanner\" not in s or \"floorplanner.design\" in s, \\"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "test": "test_a_third_wall_at_the_corner_blocks_the_merge",
+      "line": 82,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert topology.plan_merge_collinear(topology.graph_from_design(d)) == []"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "test": "test_different_types_never_merge",
+      "line": 89,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert topology.plan_merge_collinear(topology.graph_from_design(d)) == []"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "test": "test_scene_leaves_a_real_t_junction_alone",
+      "line": 162,
+      "shape": "== 0",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert merge_collinear_scene(scene) == 0"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "test": "test_scene_does_not_merge_walls_off_the_grid",
+      "line": 178,
+      "shape": "== 0",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert merge_collinear_scene(scene) == 0"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "test": "test_scene_merge_is_idempotent",
+      "line": 187,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert merge_collinear_scene(scene) == 0      # nothing left to do"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "test": "test_scene_merge_unions_the_rooms_the_walls_border",
+      "line": 201,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert free not in _walls(scene, fp) or free is survivor"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "test": "test_floors_are_planned_apart",
+      "line": 305,
+      "shape": "== 0",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert merge_collinear_scene(scene) == 0"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "test": "test_floors_are_planned_apart",
+      "line": 307,
+      "shape": "!=",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert a.floor != b.floor"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "test": "test_scene_split_declines_at_an_endpoint",
+      "line": 375,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert split_wall_at(scene, a, QPointF(0, 0)) is None"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "test": "test_scene_split_declines_at_an_endpoint",
+      "line": 376,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert split_wall_at(scene, a, QPointF(240, 0)) is None"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "test": "test_normalize_walls_ignores_the_auto_coalesce_switch",
+      "line": 452,
+      "shape": "== 0",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert merge_all(scene) == 0              # the gated entry declines"
+    },
+    {
+      "file": "tests/test_topology_ops.py",
+      "test": "test_the_scene_applier_leaves_the_design_applier_nothing_to_do",
+      "line": 544,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert topology.plan_merge_collinear(topology.graph_from_design(d)) == []"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_undo_redo_add_furnishing",
+      "line": 28,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert _nfurn(win, fp) == 0"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_undo_buttons_reflect_history",
+      "line": 34,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 6,
+      "src": "assert not win.a_undo.isEnabled()"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_undo_buttons_reflect_history",
+      "line": 35,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 6,
+      "src": "assert not win.a_redo.isEnabled()"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_undo_buttons_reflect_history",
+      "line": 39,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 6,
+      "src": "assert not win.a_redo.isEnabled()"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_undo_buttons_reflect_history",
+      "line": 41,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 6,
+      "src": "assert not win.a_undo.isEnabled()"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_new_change_clears_redo",
+      "line": 87,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert not win.a_redo.isEnabled()      # a fresh change drops the redo tail"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_reset_undo_clears_history",
+      "line": 95,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert not win.a_undo.isEnabled()"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_reset_undo_clears_history",
+      "line": 96,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert not win.a_redo.isEnabled()"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_undo_with_empty_history_is_noop",
+      "line": 102,
+      "shape": "== 0",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert _nfurn(win, fp) == 0"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_snapshot_excludes_view_state",
+      "line": 125,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert win.snapshot() == before, \"switching floors changed the document\""
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_snapshot_excludes_view_state",
+      "line": 126,
+      "shape": "not in",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert \"active_floor\" not in before[\"settings\"]"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_snapshot_excludes_view_state",
+      "line": 127,
+      "shape": "not in",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert \"provenance\" not in before"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_undo_does_not_dirty_a_saved_plan",
+      "line": 155,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert not win._is_dirty()"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_undo_does_not_dirty_a_saved_plan",
+      "line": 161,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert not win._is_dirty(), \"undo back to the saved plan still reads dirty\""
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_closing_a_window_stops_its_dirty_timer",
+      "line": 201,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert not w._dirty_timer.isActive(), \\"
+    },
+    {
+      "file": "tests/test_undo.py",
+      "test": "test_undo_after_grouping_restores_the_plan",
+      "line": 227,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert win.snapshot() == before, \"undo did not restore the pre-group plan\""
+    },
+    {
+      "file": "tests/test_verify_design.py",
+      "test": "test_off_by_default",
+      "line": 52,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert V.verify(scene, \"test\") is None"
+    },
+    {
+      "file": "tests/test_verify_design.py",
+      "test": "test_introduced_corruption_raises",
+      "line": 92,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert getattr(win, V.BASELINE_ATTR) == {}"
+    },
+    {
+      "file": "tests/test_verify_design.py",
+      "test": "test_deep_invariants_are_gated",
+      "line": 119,
+      "shape": "not in",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert \"I11\" not in V.fault_profile(win, deep=False)"
+    },
+    {
+      "file": "tests/test_verify_design.py",
+      "test": "test_save_verifies_deep",
+      "line": 194,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert not (tmp_path / \"p.json\").exists(), \"a corrupt plan was written\""
+    },
+    {
+      "file": "tests/test_vertices.py",
+      "test": "test_p1_p2_read_through_to_vertices",
+      "line": 46,
+      "shape": "!=",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert w.v1 != w.v2"
+    },
+    {
+      "file": "tests/test_vertices.py",
+      "test": "test_uids_are_persistent_across_edits",
+      "line": 56,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert w.v1 == before, \"an unrelated edit renamed the vertex\""
+    },
+    {
+      "file": "tests/test_vertices.py",
+      "test": "test_round_trip_through_the_converting_apply",
+      "line": 168,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert not win._is_dirty()"
+    },
+    {
+      "file": "tests/test_vertices.py",
+      "test": "test_round_trip_through_the_converting_apply",
+      "line": 169,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert check(json.loads(p.read_text(encoding=\"utf-8\")), deep=True) == []"
+    },
+    {
+      "file": "tests/test_vertices.py",
+      "test": "test_round_trip_through_the_converting_apply",
+      "line": 174,
+      "shape": "== 0",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert win._conversion[\"ends_moved\"] == 0, \"our own export needed repair\""
+    },
+    {
+      "file": "tests/test_view.py",
+      "test": "test_wheel_burst_is_deferred_then_coalesced",
+      "line": 32,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 5,
+      "src": "assert view.transform().m11() == start      # nothing applied synchronously"
+    },
+    {
+      "file": "tests/test_view.py",
+      "test": "test_wheel_burst_is_deferred_then_coalesced",
+      "line": 42,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert view._zoom_accum == 0"
+    },
+    {
+      "file": "tests/test_viewer_model.py",
+      "test": "test_every_catalog_entry_carries_a_solid",
+      "line": 81,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert not missing, f\"catalog entries with no 3D data: {missing}\""
+    },
+    {
+      "file": "tests/test_viewer_model.py",
+      "test": "test_every_catalog_entry_carries_a_solid",
+      "line": 86,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert not bad, f\"height_in must be a positive number: {bad}\""
+    },
+    {
+      "file": "tests/test_viewer_model.py",
+      "test": "test_every_catalog_entry_carries_a_solid",
+      "line": 91,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert not bad, f\"elevation_in must be >= 0: {bad}\""
+    },
+    {
+      "file": "tests/test_viewer_model.py",
+      "test": "test_every_material_named_resolves",
+      "line": 100,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 6,
+      "src": "assert not unresolved, f\"materials named but not defined: {unresolved}\""
+    },
+    {
+      "file": "tests/test_viewer_model.py",
+      "test": "test_every_catalog_form_is_one_the_viewer_knows",
+      "line": 119,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert not unknown, f\"catalog names form(s) the viewer cannot build: \" \\"
+    },
+    {
+      "file": "tests/test_viewer_model.py",
+      "test": "test_the_viewer_finds_the_catalog_the_app_ships",
+      "line": 128,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert problems == [], f\"the catalog did not load cleanly: {problems}\""
+    },
+    {
+      "file": "tests/test_viewer_model.py",
+      "test": "test_elevation_places_an_item_off_the_floor",
+      "line": 145,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert standing[\"elevation_in\"] == 0, \\"
+    },
+    {
+      "file": "tests/test_viewer_model.py",
+      "test": "test_an_unknown_form_falls_back_visibly_and_is_reported",
+      "line": 170,
+      "shape": "not in",
+      "positive_before": false,
+      "n_asserts_in_test": 6,
+      "src": "assert FORM not in fp3d.KNOWN_FORMS, \"precondition: the form is unknown\""
+    },
+    {
+      "file": "tests/test_viewer_model.py",
+      "test": "test_a_form_awaiting_its_generator_is_info_not_a_fault",
+      "line": 208,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert not any(form in n for n in model.notes), \\"
+    },
+    {
+      "file": "tests/test_viewer_model.py",
+      "test": "test_slab_is_a_top_on_legs",
+      "line": 234,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert not covering, \\"
+    },
+    {
+      "file": "tests/test_viewer_model.py",
+      "test": "test_load_catalog_reports_rather_than_raises_when_assets_are_absent",
+      "line": 263,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert specs == {} and materials == {}"
+    },
+    {
+      "file": "tests/test_viewer_model.py",
+      "test": "test_build_model_imports_neither_qt_nor_floorplanner",
+      "line": 295,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert json.loads(out.stdout.strip()) == [], \\"
+    },
+    {
+      "file": "tests/test_viewer_popup.py",
+      "test": "test_the_3d_view_changes_nothing",
+      "line": 75,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 5,
+      "src": "assert not win._is_dirty()               # precondition: saved == clean"
+    },
+    {
+      "file": "tests/test_viewer_popup.py",
+      "test": "test_the_3d_view_changes_nothing",
+      "line": 85,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 5,
+      "src": "assert not win._is_dirty(), \"the 3D view dirtied the document\""
+    },
+    {
+      "file": "tests/test_viewer_popup.py",
+      "test": "test_the_3d_view_changes_nothing",
+      "line": 86,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 5,
+      "src": "assert win.snapshot() == before_doc, \"the 3D view changed the document\""
+    },
+    {
+      "file": "tests/test_viewer_popup.py",
+      "test": "test_the_3d_view_changes_nothing",
+      "line": 87,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 5,
+      "src": "assert _counts(win) == before_counts, \"the 3D view changed the scene\""
+    },
+    {
+      "file": "tests/test_viewer_popup.py",
+      "test": "test_the_3d_view_changes_nothing",
+      "line": 93,
+      "shape": "== before",
+      "positive_before": false,
+      "n_asserts_in_test": 5,
+      "src": "assert msg == before_status or msg.startswith(\"3D view\"), ("
+    },
+    {
+      "file": "tests/test_viewer_popup.py",
+      "test": "test_it_degrades_when_the_optional_stack_is_missing",
+      "line": 137,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert win.show_3d_view() is None        # returns, does not raise"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_moving_a_wall_edits_exactly_two_vertices",
+      "line": 101,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert VD.check(doc, deep=True) == []"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_moving_a_corner_keeps_it_the_same_corner",
+      "line": 237,
+      "shape": "!=",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert (moved.x, moved.y) != (shared.x, shared.y), \"the corner never moved\""
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_a_body_landing_keeps_one_corner_across_twelve_drags",
+      "line": 354,
+      "shape": "!=",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert a.p1.y() != y0, \"nothing moved, so identity was never at risk\""
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_a_press_that_splits_leaves_the_document_unchanged",
+      "line": 400,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert design_from_scene(win).to_dict() == before"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_a_dragged_wall_resizes_the_rooms_it_borders",
+      "line": 485,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 6,
+      "src": "assert not hasattr(fp, \"refresh_rooms\"), \\"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_a_moved_wall_survives_the_converting_apply",
+      "line": 563,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert not win._is_dirty()"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_a_moved_wall_survives_the_converting_apply",
+      "line": 564,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert check(json.loads(p.read_text(encoding=\"utf-8\")), deep=True) == []"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_a_moved_wall_survives_the_converting_apply",
+      "line": 569,
+      "shape": "== 0",
+      "positive_before": false,
+      "n_asserts_in_test": 4,
+      "src": "assert win._conversion[\"ends_moved\"] == 0, \"our own export needed repair\""
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_pressing_every_wall_changes_nothing_across_the_corpus",
+      "line": 607,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert design_from_scene(win).to_dict() == before"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_pressing_every_wall_changes_nothing_across_the_corpus",
+      "line": 631,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert not moved, f\"a press moved {len(moved)} wall end(s)\""
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_a_grouped_neighbour_is_promoted_like_any_other",
+      "line": 670,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert \"rigid\" not in [k for *_, k in a._attached], \"the kind survived\""
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_a_dragged_corner_splits_by_each_rooms_own_boundary",
+      "line": 747,
+      "shape": "!=",
+      "positive_before": true,
+      "n_asserts_in_test": 7,
+      "src": "assert (moved.x, moved.y) != before, \\"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_a_dragged_corner_splits_by_each_rooms_own_boundary",
+      "line": 755,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 7,
+      "src": "assert not any(e.v is moved for e in r.outline), \\"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_a_roomless_body_drag_moves_the_grabbed_segment_only",
+      "line": 794,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 8,
+      "src": "assert not w.rooms and not seg.rooms         # precondition: room-less"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_the_roomless_seam_heals_and_then_drags_as_one",
+      "line": 817,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 7,
+      "src": "assert seg is not None and not w.rooms       # the undo-shaped seam"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_orthogonal_stick_is_zoom_independent",
+      "line": 852,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert results[1] is None"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_a_partial_side_slide_steps_the_neighbours_outline",
+      "line": 910,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 7,
+      "src": "assert step is not None and step.wall is None, \"the step must be OPEN\""
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_a_partial_side_slide_steps_the_neighbours_outline",
+      "line": 911,
+      "shape": "== before",
+      "positive_before": true,
+      "n_asserts_in_test": 7,
+      "src": "assert [(p.x(), p.y()) for p in rooms[\"Clst\"].corners] == clst_before, \\"
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_an_endpoint_drag_detaches_once_per_gesture_not_once_per_event",
+      "line": 981,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 8,
+      "src": "assert a._mode is None, \"the gesture ended\""
+    },
+    {
+      "file": "tests/test_wall_move.py",
+      "test": "test_pressing_an_endpoint_without_moving_leaves_the_corner_shared",
+      "line": 1006,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 5,
+      "src": "assert a._mode is None"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_draw_ignores_fully_joined_wall",
+      "line": 80,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert not fp.wall_endpoint_open(sc, QPointF(200, 0))  # corner, not open"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_draw_ignores_fully_joined_wall",
+      "line": 82,
+      "shape": "!=",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert end.x() != pytest.approx(200)         # no snap to the joined wall"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_coincident_plain_wall_opens_for_neighbor_door",
+      "line": 145,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert not b._path.contains(QPointF(120, 100))   # opened at the door"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_coincident_plain_wall_opens_for_neighbor_door",
+      "line": 147,
+      "shape": "== 0",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert len(b.openings) == 0                       # never a stacked door"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_coincident_void_follows_slide_and_clears_on_delete",
+      "line": 155,
+      "shape": "not X",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert not b._path.contains(QPointF(120, 150))    # new spot opened"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_coalesce_merges_free_wall_into_room_wall",
+      "line": 325,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 3,
+      "src": "assert rw.scene() is None                     # rw was absorbed"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_junction_outline_is_clipped_so_walls_read_solid",
+      "line": 372,
+      "shape": "is None",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert lone._outline_clip is None                          # nothing to clip"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_delete_free_wall_removes_whole",
+      "line": 445,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert w.scene() is None"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_delete_free_wall_removes_whole",
+      "line": 446,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 2,
+      "src": "assert not [x for x in scene.items() if isinstance(x, fp.WallItem)]"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_delete_overhanging_wall_goes_whole_room_keeps_area",
+      "line": 465,
+      "shape": "is None",
+      "positive_before": false,
+      "n_asserts_in_test": 5,
+      "src": "assert edge.scene() is None"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_delete_overhanging_wall_goes_whole_room_keeps_area",
+      "line": 466,
+      "shape": "not X",
+      "positive_before": false,
+      "n_asserts_in_test": 5,
+      "src": "assert not [w for w in scene.items() if isinstance(w, fp.WallItem)"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_a_drawn_end_near_a_jamb_snaps_to_it",
+      "line": 585,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert \"door 3280\" not in win.statusBar().currentMessage(), ("
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_a_dragged_end_near_a_jamb_snaps_to_it",
+      "line": 609,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert \"door 3280\" not in win.statusBar().currentMessage()"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_auto_weld_off_leaves_the_end_alone_and_says_nothing",
+      "line": 630,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 3,
+      "src": "assert \"door 3280\" not in win.statusBar().currentMessage(), ("
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_shuffle_suppresses_the_doorway_message",
+      "line": 653,
+      "shape": "not in",
+      "positive_before": true,
+      "n_asserts_in_test": 2,
+      "src": "assert \"door 3280\" not in win.statusBar().currentMessage()"
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_floating_room_distance_is_not_a_gap",
+      "line": 730,
+      "shape": "== empty",
+      "positive_before": false,
+      "n_asserts_in_test": 1,
+      "src": "assert gaps == [], f\"a floating room's position listed as a gap: {gaps}\""
+    },
+    {
+      "file": "tests/test_walls.py",
+      "test": "test_close_gap_leaves_outlines_holding_their_walls_corners",
+      "line": 751,
+      "shape": "== empty",
+      "positive_before": true,
+      "n_asserts_in_test": 4,
+      "src": "assert near_vertex_gaps(_gap_doc(win)) == []"
+    }
+  ]
+}
