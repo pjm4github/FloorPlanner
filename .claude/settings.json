@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+
+  "_comment_hooks": [
+    "COMMITTED ON PURPOSE, so the rule binds the PROJECT rather than one",
+    "machine. Personal overrides belong in .claude/settings.local.json, which",
+    "is gitignored and is not touched by this file.",
+
+    "WHY: 'a green signal is only evidence about what it measures' is a",
+    "standing rule here, and this is its enforcement half. The gate has always",
+    "measured the right thing; nothing ever made running it unskippable. Four",
+    "incidents are behind that gap, and THREE OF THE FOUR were a claim about a",
+    "gate rather than a gate -- which is why the hook reads .gate-result.json,",
+    "written by tools/gate.py from the numbers it just computed, and never the",
+    "commit message.",
+
+    "NO 'if' FILTER, DELIBERATELY. The schema offers if: 'Bash(git commit*)'",
+    "to avoid spawning the hook for non-matching commands, but a prefix rule",
+    "would miss the compound form this project actually uses",
+    "(`git add -A && git commit ...`) and would not cover the PowerShell tool.",
+    "A guard that is cheap and wrong is worse than one that costs 200ms. The",
+    "script itself decides, on the whole command line.",
+
+    "PYTHON RESOLUTION (Windows): plain `python` is used because it resolves",
+    "on the PATH this hook inherits -- verified by firing the hook and",
+    "watching it block, not by assuming. If that ever stops being true on a",
+    "machine, replace the command with the absolute interpreter path, e.g.",
+    "  .venv/Scripts/python.exe .claude/hooks/verify_gate.py",
+    "and leave this note saying which machine needed it and why."
+  ],
+
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/verify_gate.py",
+            "timeout": 30,
+            "statusMessage": "Checking the gate result before committing"
+          }
+        ]
+      }
+    ]
+  }
+}

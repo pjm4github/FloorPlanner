@@ -1,0 +1,24 @@
+FAIL-FIRST RECEIPT -- .claude/hooks/verify_gate.py
+Each probe proves its state is ON DISK before the hook's answer is believed.
+
+  1  no .gate-result.json               proof=absent                 BLOCKS  as required
+       -> BLOCKED: no .gate-result.json -- the gate has not been run.
+  2  verdict RED                        proof=verdict=RED            BLOCKS  as required
+       -> BLOCKED: the last full-mode gate was RED.
+
+     running the REAL gate for probe 3 (full mode, ~80s)...
+  3  real green gate                    proof=gate wrote GREEN       PASSES  as required
+  4  touch a source file, retry         proof=config.py newer=True   BLOCKS  as required
+       -> BLOCKED: the gate result is STALE -- 1 tracked file(s) have changed since it was written 0.0 min ago:
+
+  4 probes, 4 behaved as required, 0 did not
+  NOTE: the tree is deliberately left stale by probe 4 -- re-run `python tools/gate.py` before committing.
+COMMAND-POSITION MATCHING  (2 = blocks, 0 = allowed through)
+  rc=2 want=2 ok   bare invocation            git commit -m x
+  rc=2 want=2 ok   compound with &&           git add -A docs && git commit -q -F -
+  rc=2 want=2 ok   after a semicolon, --amend cd /tmp; git commit --amend
+  rc=2 want=2 ok   one prefix token           sudo git commit -m x
+  rc=0 want=0 ok   mention in a quoted arg    echo 'see git commit in the docs'
+  rc=0 want=0 ok   grep for the phrase        grep -rn 'git commit' docs/
+  rc=0 want=0 ok   unrelated command          python tools/gate.py
+  7/7 correct

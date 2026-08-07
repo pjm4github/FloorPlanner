@@ -32,3 +32,9 @@ Screenshot*.png
 # transfer buffer for staging files for deletion — always meant to be empty,
 # so it is not part of the project (keeps it out of the tree and the ruff gate)
 _to_delete/
+
+# the gate's own verdict, written by tools/gate.py at the end of a full-mode
+# run and read by .claude/hooks/verify_gate.py before any commit. It is a fact
+# about ONE working tree at ONE moment -- committing it would make a stale
+# verdict travel to other machines as though it were current.
+.gate-result.json

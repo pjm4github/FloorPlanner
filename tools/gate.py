@@ -228,6 +228,49 @@ def _docs() -> int:
     return 1 if bad else 0
 
 
+RESULT = ".gate-result.json"             # gitignored; see _write_result
+
+
+def _write_result(bad, collected, ruff, n_vac, n_end, lines) -> None:
+    """Leave the verdict ON DISK, for the commit hook to read.
+
+    THE HOOK CHECKS THIS FILE, NEVER THE COMMIT MESSAGE, and that is the whole
+    design. Three of the four incidents behind the hook were a CLAIM about a
+    gate rather than a gate: a trailer transcribed without its ", 2 errors";
+    "515 collected" quoted after two more tests had landed; a reconciliation
+    asserted against a number that was never computed. A guard that read the
+    message would have passed all three.
+
+    Written on RED as well as GREEN. A missing file and a red file mean
+    different things -- "you did not run it" and "you ran it and it failed" --
+    and a guard that cannot tell them apart teaches people to delete the file.
+
+    Only a FULL-MODE run writes it. `--quick` skips two of the three gates and
+    `--deep` skips two others; letting either satisfy the hook would make the
+    guard weaker than the thing it guards.
+    """
+    import json
+    import time
+    payload = {
+        "verdict": "RED" if bad else "GREEN",
+        "collected": collected,
+        "ruff": ruff,
+        "vacuous": n_vac,
+        "end_assign": n_end,
+        "timestamp": time.time(),
+        "written_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "trailer": lines,
+    }
+    try:
+        with open(RESULT, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2)
+            fh.write("\n")
+    except OSError as e:                       # never fail a green gate on this
+        print(f"Gate-Result: could not write {RESULT}: {e}")
+        return
+    print(f"Gate-Result: {RESULT} written ({payload['verdict']})")
+
+
 def main() -> int:
     if "--perf" in sys.argv:
         return _perf()
@@ -274,6 +317,8 @@ def main() -> int:
                  f"{'' if bad else ' (every sum reconciles against --collect-only)'}")
 
     print("\n".join(lines))
+    if not quick and not deep_only:      # full mode only -- see the docstring
+        _write_result(bad, collected, ruff, n_vac, n_end, lines)
     return 1 if bad else 0
 
 

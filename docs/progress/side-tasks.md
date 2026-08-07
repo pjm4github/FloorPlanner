@@ -240,4 +240,57 @@ step 14  THE UNTRACKED ROOT FILES -- observation upgraded to fact.
          longer on disk and declined to say why, having no way to see it.
          PATRICK CONFIRMS HE DELETED THEM, as the ruling anticipated.
          The earlier entry stands as written; this is the attribution.
+
+COMMIT GATE ENFORCED  2026-08-06  (on main, after PR #11)
+         THE ENFORCEMENT HALF OF "a green signal is only evidence about
+         what it measures". The gate has always measured the right thing;
+         nothing ever made RUNNING it unskippable. Four incidents sit
+         behind that gap, and THREE OF THE FOUR were a claim ABOUT a gate
+         rather than a gate -- a trailer transcribed without its
+         ", 2 errors"; "515 collected" quoted after two more tests had
+         landed; a reconciliation asserted against a number never
+         computed. A guard reading the commit MESSAGE would have passed
+         all three. So the hook reads the RESULT FILE.
+         tools/gate.py now writes .gate-result.json (gitignored) at the
+         end of a FULL-mode run -- verdict, census fields, timestamp and
+         the trailer. --quick and --deep do not write it: each skips two
+         of the three gates, and letting either satisfy the hook would
+         make the guard weaker than the thing it guards. RED is written
+         too, because "you did not run it" and "you ran it and it failed"
+         are different states, and a guard that cannot tell them apart
+         teaches people to delete the file.
+         .claude/hooks/verify_gate.py blocks (exit 2) unless that file
+         EXISTS, reads GREEN, and is NEWER THAN EVERY TRACKED FILE. The
+         third condition is the one that matters: without it, a green
+         result from an hour and six edits ago waves through the fourth
+         incident.
+         .claude/settings.json is COMMITTED, so the rule binds the
+         project rather than one machine. No `if` filter: a prefix rule
+         would miss the compound form (`git add -A` then git commit) and
+         would not cover the PowerShell tool.
+         fail-first  4 probes, 4 as required, each proved on disk first:
+                     absent -> BLOCKS; RED -> BLOCKS; real green gate ->
+                     PASSES; touch a source file -> BLOCKS (stale).
+                     docs/evidence/commit-gate-failfirst.txt + 2 probes
+         FINDING, found by the guard biting its own validation command:
+         the first draft matched the phrase ANYWHERE in the command line,
+         so an `echo` mentioning it was blocked -- and a `grep` for it
+         would have been, in a repo whose documents are full of it. The
+         match is now anchored to a COMMAND POSITION (start of line, or
+         after ; && || |, optionally behind one prefix token). 7/7 on
+         both classes: every real invocation form blocks, every mention
+         passes.
+         COST, recorded because it will surprise someone: a Bash command
+         whose TEXT contains a command-position invocation -- a heredoc
+         writing this very entry, for instance -- is itself blocked. It
+         fails closed and the workaround is to put the content in a file,
+         which is what produced this one.
+         Stated boundary, because an unstated one reads as coverage: it
+         does not catch `xargs`-fed commits, shell aliases, or a commit
+         made outside these tools. It raises the floor; it is not a
+         sandbox.
+         Windows: plain `python` resolves on the PATH the hook inherits
+         -- verified by firing the hook and watching it block, not by
+         assuming. The settings file records the absolute-venv fallback
+         for a machine where that stops being true.
 ```
