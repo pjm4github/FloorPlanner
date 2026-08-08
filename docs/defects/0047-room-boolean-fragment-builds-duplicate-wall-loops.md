@@ -41,3 +41,53 @@ github_issue: null
 ## Milestone
 
 **the first task after P4.5**
+
+## Receipt
+
+**Landed at A1, 2026-08-07.** A fragment is now a **floating room**, not a group
+of walls. `room_boolean("fragment")` calls `extract_room` on each piece instead
+of wrapping its walls in a `GroupItem`.
+
+The op's own comment — *"so it moves as a self-contained, fully-enclosed unit"* —
+already named the right property. It was written before `extract` existed, so it
+reached for the only mechanism there was. `extract_room` is the mechanism it
+wanted: every edge's wall becomes the room's own, the corners an outside wall
+touches are privatised, outline and walls fold onto one vertex per corner, and
+the state flips. The piece is self-contained because nothing else references its
+geometry — **I12 by construction** — rather than because a group says so.
+
+**Differential, on this record's own two-overlapping-rooms case:**
+
+| | before | after |
+|---|---|---|
+| `room_owns_walls` | **false for all nine** (group, room) pairs | **true for all three** rooms |
+| walls shared between pieces | the defect | **0** for all three pairs |
+| drag a piece +300/+300 | **4 of 4 walls, 0 of 16 outline corners** — stranded whole | **4 of 4 corners and 4 of 4 walls** — the region rides |
+| `open_edges` after the drag | `{Overlap 2, Room 1 1, Room 2 1}`, each dashed edge with a real wall on it | **`{0, 0, 0}`** |
+| groups created | 3 | **0** |
+| walls bound to no room | 4 orphans | **0** |
+| distinct `Vertex` objects | 20 over 10 points | 18 over 16 points |
+| `check(doc, deep=True)` | CLEAN | CLEAN |
+
+**`test_fragment_groups_each_piece_with_its_own_walls` is a hard pass.** Its
+`xfail` said "flips when fragment converts to extract"; it has, and the marker
+is gone, so the property can regress. It was **the suite's last xfail** — the
+census now reads `632 passed` with no xfailed at all.
+
+**One thing the naive change did not fix, and how it was found.** Replacing the
+group with `extract_room` alone left **4 orphan walls**: `bind_room_walls` binds
+by GEOMETRY, and `fragment` builds one wall per region, so on a shared edge a
+room could be bound to a neighbour's coincident copy — which extraction then
+correctly copy-trimmed, minting a copy and leaving the original bound to nobody.
+`_claim_region_walls` fixes it by narrowing the candidate set: each outline edge
+is matched to the wall spanning it **from this region's own list only**.
+Geometry still decides which wall covers which edge; the candidate set is what
+changed.
+
+**A no-op was written and removed rather than shipped.** A `_weld_region_loop`
+pass folded each region's freshly built loop onto one vertex per corner —
+measured 12 → 6 on a six-wall loop, so it did what it claimed. It made **no
+difference to the final state** (8/7/4 wall-vertices either way), because
+`bind_room_walls` re-splits a corner downstream. Code that demonstrably does
+nothing is worse than none, so it went; the residual is recorded against D48
+instead, where the mechanism actually lives.

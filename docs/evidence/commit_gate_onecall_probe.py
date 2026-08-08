@@ -28,6 +28,11 @@ CASES = [
     (f"{GATE}\\n{CC} -F msg.txt", 2, True, True, "same, newline-separated"),
     (f"{GATE} --docs ; {CC} -q -F -", 2, True, True, "docs lane AND commit"),
     (f"{GATE}", 0, True, False, "gate alone -- must stay ALLOWED"),
+    # --trailer runs nothing and writes nothing; it reprints the stored
+    # verdict so a message file can quote it. It must NOT count as a run, or
+    # the intended workflow (build message, append trailer, commit) is blocked.
+    (f"{GATE} --trailer >> msg.txt\n{CC} -F msg.txt", None, True, True,
+     "--trailer beside a commit -- never refused AS A RUN"),
     (f"{CC} -m x", None, False, True, "commit alone -- judged on the verdict"),
     ("python -m pytest -q", 0, False, False, "neither -- untouched"),
 ]
@@ -68,6 +73,11 @@ for cmd, want, has_gate, has_commit, label in CASES:
              f"{'!' if got_commit != has_commit else ' '}")
     rc, why = run(real)
     good = (rc == want) if want is not None else True
+    # The --trailer case is verdict-dependent (it may still be refused for
+    # STALENESS) but must NEVER be refused AS A RUN. Asserting the REASON, not
+    # just the code, is what makes that case mean anything.
+    if "AS A RUN" in label and "runs the gate AND commits" in why:
+        good = False
     ok += good
     shown = "BLOCKS" if rc == 2 else ("allows" if rc == 0 else f"rc={rc}")
     note = "" if want is not None else "  (verdict-dependent, not asserted)"

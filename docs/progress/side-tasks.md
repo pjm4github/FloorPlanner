@@ -493,4 +493,60 @@ G4 -- D42 DRAG-SIDE SELF-INTERSECTION REPORT  2026-08-07  (GREEN batch, item 4)
          STILL OPEN, scope unchanged: three appliers are still three.
          This adds a caller, it does not unify them. The consolidation is
          the Phase 6 task the record argues for; MoveVertices is the seam.
+
+A1 -- D47 FRAGMENT PRODUCES FLOATING ROOMS  2026-08-07  (AMBER, awaiting the
+         manual check)
+         room_boolean("fragment") now EXTRACTS each piece instead of
+         wrapping its walls in a GroupItem. The op's own comment already
+         named the property -- "moves as a self-contained, fully-enclosed
+         unit" -- and was written before extract existed.
+         differential, on the record's own two-room case:
+             room_owns_walls   false for all 9 pairs -> true for all 3
+             shared walls      the defect            -> 0 for all pairs
+             drag +300/+300    4/4 walls, 0/16 corners -> 4/4 and 4/4
+             open_edges after  {Ov 2, R1 1, R2 1}    -> {0, 0, 0}
+             groups            3                     -> 0
+             orphan walls      4                     -> 0
+             vertices          20 on 10 points       -> 18 on 16
+             check(deep)       CLEAN                 -> CLEAN
+         THE SUITE'S LAST XFAIL IS GONE. The marker promised "flips when
+         fragment converts to extract"; it flipped, and it is a hard pass
+         now so it can regress. Census reads 632 passed, no xfailed.
+         TWO THINGS THE FIRST CUT GOT WRONG, both found by measuring:
+         (1) extract alone left 4 ORPHAN WALLS -- bind_room_walls binds by
+         geometry and fragment builds one wall per region, so a room could
+         be bound to a neighbour's coincident copy, which extraction then
+         copy-trimmed, leaving the original bound to nobody.
+         _claim_region_walls narrows the candidate set to the region's own
+         list; geometry still decides which wall covers which edge.
+         (2) a _weld_region_loop pass was written, measured (12 -> 6 on a
+         six-wall loop, so it worked), and REMOVED -- it made no
+         difference to the final state because bind_room_walls re-splits a
+         corner downstream. Code that demonstrably does nothing is worse
+         than none. The residual (18 vertices on 16 points, inside one
+         floating room's own namespace) is recorded against D48, where the
+         mechanism lives.
+         AMBER: stops at the PR. The manual check is Patrick's --
+         fragment a room, move a piece, confirm it carries its region and
+         that no dashed edge lies over a real wall.
+
+THE ONE-CALL RULE, REFINED BY USE  2026-08-08
+         It blocked the intended workflow within a day of shipping.
+         `gate.py --trailer` matched GATE_RUN_RE, so building a commit
+         message and committing in one call was refused as "runs the gate
+         AND commits" -- but --trailer RUNS NOTHING and WRITES NOTHING. It
+         reprints the stored verdict so a message can quote it verbatim,
+         which is the very mechanism that closed the fabricated-trailer
+         hole, and it is exactly the command that BELONGS beside a commit.
+         Exempted: GATE_RUN_RE now ignores an invocation carrying
+         --trailer. Same shape of fault as the command-position fix a day
+         earlier -- a guard right in principle and one case too broad --
+         and found the same way, by the guard biting real work.
+         The probe gains a seventh case, and it asserts the REASON rather
+         than the exit code: --trailer beside a commit is still
+         verdict-dependent (it can be refused for STALENESS, and was, on
+         a tree edited after the last run), but it must NEVER be refused
+         AS A RUN. A case that only checked rc would have passed while
+         the exemption was broken.
+         7 probes, 7 as required.
 ```

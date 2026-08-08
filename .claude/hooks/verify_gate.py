@@ -93,7 +93,16 @@ COMMIT_RE = re.compile(r"(?:^|[;&|])\s*(?:\S+\s+)?git\s+commit\b", re.M)
 # Deliberately matches the TOOL, not the word "gate": `tools/gate.py` in any
 # spelling (`python tools/gate.py`, `py -m ...`, a bare path), which is the only
 # thing that writes the result file the commit is about to be judged against.
-GATE_RUN_RE = re.compile(r"tools[/\\]gate\.py")
+#
+# `--trailer` IS EXEMPT, and the exemption is the rule working rather than a
+# hole in it. That mode runs nothing and writes nothing -- it reprints the
+# stored trailer so a message file can quote it verbatim -- so it cannot
+# invalidate the verdict this hook just read. It is also exactly the command
+# that BELONGS beside a commit: build the message, append the trailer, commit.
+# The first draft matched it and blocked the intended workflow within minutes
+# of shipping, which is the same "too broad by one case" the command-position
+# fix already corrected once.
+GATE_RUN_RE = re.compile(r"tools[/\\]gate\.py(?!\s+--trailer)")
 
 
 def block(msg):

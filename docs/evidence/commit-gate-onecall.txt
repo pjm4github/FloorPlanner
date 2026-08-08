@@ -1,5 +1,5 @@
 FAIL-FIRST RECEIPT -- the one-call rule
-(.gate-result.json currently reads RED; the 'commit alone' case is judged against it)
+(.gate-result.json currently reads GREEN; the 'commit alone' case is judged against it)
 
   gate AND commit, one call              gate=Y commit=Y   BLOCKS  as required
        -> BLOCKED: this command runs the gate AND commits.
@@ -8,8 +8,10 @@ FAIL-FIRST RECEIPT -- the one-call rule
   docs lane AND commit                   gate=Y commit=Y   BLOCKS  as required
        -> BLOCKED: this command runs the gate AND commits.
   gate alone -- must stay ALLOWED        gate=Y commit=n   allows  as required
+  --trailer beside a commit -- never refused AS A RUN gate=Y commit=Y   BLOCKS  as required  (verdict-dependent, not asserted)
+       -> BLOCKED: the gate result is STALE -- 3 tracked file(s) have changed since it was written 1127.8 min 
   commit alone -- judged on the verdict  gate=n commit=Y   BLOCKS  as required  (verdict-dependent, not asserted)
-       -> BLOCKED: the last full-mode gate was RED.
+       -> BLOCKED: the gate result is STALE -- 3 tracked file(s) have changed since it was written 1127.8 min 
   neither -- untouched                   gate=n commit=n   allows  as required
 
-  6 probes, 6 behaved as required, 0 did not
+  7 probes, 7 behaved as required, 0 did not
