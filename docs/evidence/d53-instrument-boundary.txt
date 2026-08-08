@@ -1,0 +1,61 @@
+D53 -- WHICH TEST WOULD HAVE CAUGHT IT?  Two mutations, run 2026-08-08 on
+a1-d47-fragment-extract @ 5a22a7f, each in its own `git worktree --detach`
+so the working tree was never at risk.  Both mutations were grep-verified
+present on disk before the run (the fail-first rule: an instrument that
+silently did nothing produces a result about the wrong tree).
+
+MUTATION 1 -- no click can hit a room at all.
+  floorplanner/rooms.py, RoomItem.shape():
+      -   p = QPainterPath(); p.addRect(self._label_rect()); return p
+      +   return QPainterPath()
+
+  RESULT: 3 failed, 636 passed in 20.07s
+      tests/test_rooms.py::test_room_plain_drag_moves_whole_room
+      tests/test_rooms.py::test_room_label_ctrl_drag_nudges_label
+      tests/test_extract_join.py::test_fuse_straggler_macro_steals_no_wall
+
+  READING: the suite is NOT blind to room hit-testing -- it pins the hit
+  area THAT EXISTS.  All three failures are LABEL gestures, because the
+  label rect is the whole of what shape() has ever returned.  None of them
+  is a selection assertion; they are drag assertions that happen to need a
+  press to land.
+
+MUTATION 2 -- the selection seam is severed.
+  floorplanner/mainwindow.py, MainWindow._update_edit_actions():
+      -   for it in sel:
+      -       if it not in order:
+      -           order.append(it)
+          self._sel_order = order
+
+  This is the ONLY path by which a Qt selection reaches a room operation:
+  _update_edit_actions runs on selectionChanged and maintains _sel_order,
+  and _selected_room_shapes() -- the input to every room_boolean op --
+  iterates _sel_order and nothing else.  With this cut, NO selection made
+  by any gesture can reach any room operation.
+
+  RESULT: 639 passed, 0 failed in 17.94s.  THE WHOLE SUITE IS GREEN.
+
+WHY THE FRAGMENT TESTS DID NOT CATCH IT.  tests/test_rooms.py's
+_overlapping_rooms helper ends:
+
+      win._sel_order = [r1, r2]
+
+It assigns the selection list DIRECTLY.  It never calls setSelected(), never
+sends a mouse event, and never lets _update_edit_actions run.  Every
+combine / intersect / subtract / fragment test therefore starts DOWNSTREAM
+of the entire selection mechanism.  They establish that the operation is
+correct given its input; they assert nothing whatever about whether a user
+can produce that input.
+
+THE BOUNDARY, STATED.  639 tests and six green CI jobs cover what a room
+operation DOES.  Nothing covers HOW A ROOM COMES TO BE SELECTED.  That is
+vacuity by precondition at the integration seam: the precondition
+(_sel_order holds two rooms) is established by the test itself rather than
+by the mechanism under test -- the same shape as defect 21's guard, one
+layer up, at a seam instead of inside a function.
+
+WHAT THIS DOES NOT SAY.  It does not say the tests are wrong.  A unit test
+of a polygon operation SHOULD start from a constructed input.  What is
+missing is any test at the other altitude -- one that selects by gesture and
+asserts the selection -- and the absence is invisible from either side,
+because each layer's tests are individually correct.

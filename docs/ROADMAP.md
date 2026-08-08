@@ -136,6 +136,7 @@ Order: G1, G3, G2, G4. G1 and G3 are independent; G2 informs G4.
 | # | item | ruling status | the manual check |
 |---|---|---|---|
 | A1 | **D47** — `fragment` produces floating rooms via `extract` | direction ruled; it is the second duplication site `duplicate_wall`'s death never reached | fragment a room, move a piece, confirm it carries its region and no dashed edge lies over a real wall |
+| **A1b** | **D53** — a room cannot be selected by clicking its region. **INSERTED 2026‑08‑08, ahead of A2, and the position is ruled**: room click-selection is the most common gesture in the application; the z collapse can wait behind it. Lettered rather than renumbered so `A2` keeps meaning D11 everywhere it is already referenced | scope ruled in full — **(a)** a region click selects the room and the selection persists after release **with a visible selected state** ("a selection nobody can see is not a selection"); **(b)** shift-click toggles membership, and ctrl-click does the same; **(c)** rubber-band behaviour unchanged, do not touch it while fixing (a) | click a room's body — it selects and stays selected, visibly; shift-click and ctrl-click each add and remove a room; a press on a room no longer clears the current selection; rubber-band selects exactly what it did before |
 | A2 | **D11** — the runtime z collapse | rule fully specified (§2 of the snapshot). **Instrument the hang with a bounded event counter first — do not choose constants to avoid a symptom** | bring-to-front sticks; ghost floors stay behind the active floor; multi-floor banding unchanged |
 | A3 | **D11** — the serialization half | unblocked by R‑B | bring-to-front survives save/reload and an unrelated undo |
 | A4 | **D49** — deep checks at document boundaries | **AMENDED 2026‑08‑07 — see the record.** CHECK YES, FIX NO (no auto-repair; welding on load already fixes the one repairable cause). **SAVE ASKS, IT DOES NOT REFUSE** — a deform-to-follow drag can transiently overlap, and a refusal traps the user with unsaveable work. The report must be ACTIONABLE: rooms **and overlap area**, plus select-and-zoom | a corrupt plan now **reports and asks** on save, naming the rooms and the area and offering a way to reach them; the user may still save. A clean plan saves unchanged and says nothing. **Acceptance case is `planc1`, not the driving case** — on `farmplace` the true intersection is **0.0 sf** and I11 is misreporting, so that file is the SILENCE case once D52's half 1 lands. Real behaviour change; will be felt |
@@ -175,8 +176,16 @@ Order: G1, G3, G2, G4. G1 and G3 are independent; G2 informs G4.
 Run the GREEN batch — **G1, G3, G2, G4** — as one sequence. Sub-commit per piece, full gate
 each, push each, one report at the end. Merge each on green CI without waiting.
 
-Then stop, and take AMBER items **one at a time**, in order A1 → A6, each ending at a PR with
-its manual check scripted Gate-3 style: stated expectations, not a rediscovery exercise.
+Then stop, and take AMBER items **one at a time**, in order A1 → **A1b** → A2 → A6, each
+ending at a PR with its manual check scripted Gate-3 style: stated expectations, not a
+rediscovery exercise.
+
+**Updated 2026‑08‑08, at A1's manual check.** A1 passed and merged; **A1b (D53) was inserted
+ahead of A2 by ruling**, and it arrived the way the AMBER gate is supposed to work — the
+manual check found two things no automated signal had, one of which (D53) is a capability the
+suite could not have missed, because **you cannot write a regression test for something that
+never worked**. The instrument boundary that let it hide is recorded in
+[`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md) and does not retire with the fix.
 
 Record this document's tiers in the plan so the classification is on disk rather than in a
 conversation. If a tier looks wrong once measured, that is stop-condition (b) — say so rather
