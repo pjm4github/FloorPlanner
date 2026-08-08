@@ -327,6 +327,62 @@ is `related: [11]`. The one precedent already in the tree — `_cmd_select`'s
 *"prefer an editable item over a room"* — answers it by **type priority** rather
 than by z, and that is the shape worth costing first.
 
+## THE MANUAL CHECK FOUND A REGRESSION — 2026‑08‑08, PR #18 held
+
+**Six items passed; one caught what 646 green tests and six green CI jobs did
+not.** The right-click context menu on a room — *Extract room (float it)*,
+*Join room into plan*, Properties, Inventory, Rename, Copy, Delete — was gone.
+
+### The cause, measured before anything was changed
+
+**`docs/evidence/d53-menu-route.txt`**, from
+`d53_menu_route_probe.py` run against both trees:
+
+| right-click at | `main` `bcffa08` | branch `170ea03` |
+|---|---|---|
+| the **label** | `PlanView` → **`RoomItem`** | `PlanView` *(stops)* |
+| the **region** | `PlanView` | `PlanView` |
+
+**Candidate one is confirmed: the menu still exists and is unreachable.**
+`_menu_target_is_canvas` answers `True` for a `RoomItem` target, so the view
+accepts the event and `RoomItem.contextMenuEvent` — present and unchanged on
+both trees — is never reached. **Candidate two is refuted**: nothing about the
+room's own menu resolves differently.
+
+**And a fact neither candidate predicted, which changes the fix:** the room menu
+was **only ever reachable from the LABEL**. On `main` a right-click on a room's
+*region* already went to the floor popup, because the region was not in
+`shape()`. So the regression is confined to the label — and widening `shape()`
+makes the room menu reachable from the whole room *for the first time*, which is
+a gain to keep rather than a side effect to undo.
+
+### The ruling this came from was mine to check and I did not
+
+The premise was *"a room context menu does not exist; inventing one would expand
+scope."* It was asserted, never measured — **and the fact was already in my own
+census output**, whose items table listed `contextMenuEvent` among `RoomItem`'s
+handlers, one section above the part I was reading. Recorded as a standing rule
+in [`../WORKING_AGREEMENT.md`](../WORKING_AGREEMENT.md): *a census inherits the
+blindness of the predicate that scopes it*, and **a census may never establish
+that something does not exist unless its question was "does this exist?"**
+
+Re-run without a predicate, the question *"what shows a menu on a right-click?"*
+finds **eight** `contextMenuEvent` overrides where the earlier census reported
+two sites — including **`StairItem`**, a ninth path with its own 47-line menu
+that neither party had named *(it subclasses `FurnishingItem`, so the hit
+resolver already covers it — a menu gap, not a priority gap)* — and one clean
+negative worth having: **this application uses the `customContextMenuRequested`
+signal route nowhere at all.** `docs/evidence/d53-menu-census.txt`.
+
+### The amended rule, ruled 2026‑08‑08 — TO BE IMPLEMENTED IN ITS OWN PASS
+
+**A right-click resolves through the same type-priority resolver as a left-click,
+and each type answers with its own menu; the blank-canvas menu fires only on
+`on_blank_canvas`.** The `None OR a room` clause was a workaround for a menu
+believed absent and **is to be deleted, not tuned**.
+
+*No fix in this pass — the measurement was ruled to come first, and it has.*
+
 ## Receipt
 
 **IMPLEMENTED at A1b, `957792c` on `a1b-d53-readback`. AWAITING THE MANUAL

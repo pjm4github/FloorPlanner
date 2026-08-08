@@ -278,6 +278,14 @@ because it is written precisely to explain why nobody needs to look further.
 
 **The corollary is the cheaper half:** the deletion found what the census could not. Removing the thing and reading the failures is a census, and often the only complete one — which is an argument for retiring a mechanism *before* believing you have enumerated its callers, not after.
 
+**A CENSUS INHERITS THE BLINDNESS OF THE PREDICATE THAT SCOPES IT — added 2026‑08‑08, at a regression a manual check caught and 646 green tests did not.** The census rule already said *grep for identifiers, parse for shapes*. This is the next layer up and it is about the QUESTION, not the instrument: A1b's hit census was scoped to *"sites where `itemAt(...) is None` stands for blank canvas"*, answered that completely and correctly — and was therefore structurally incapable of reporting a menu reached by any other route. A ruling asserted that no room context menu existed; the census could not contradict it, because contradicting it was outside the question. `RoomItem.contextMenuEvent` is **68 lines** and offers *Extract room* and *Join room into plan*.
+
+**AND THE SHARPER HALF, WHICH IS WORSE AND IS THE REASON THIS IS A RULE.** The fact was not actually absent from the output. The same census's *items* table listed `contextMenuEvent` among `RoomItem`'s handlers, one section above. **It was on the page, under a heading that answered a different question, and was read for the question that had been asked.** So the failure is not only "the scope excluded it" — it is that a scoped reading makes you blind to material already in front of you. Re-deriving the scope is not enough; the tell is a *claim of absence*.
+
+**SO: A CENSUS MAY NEVER ESTABLISH THAT SOMETHING DOES NOT EXIST unless its question was "does this exist?"** Absence claims need their own census, scoped by the thing claimed absent and by every mechanism that could provide it — for a menu that means `contextMenuEvent` overrides, `QMenu` construction, `.exec` sites, `setContextMenuPolicy` / `customContextMenuRequested`, and shared builders. Run that way it found **eight** overrides where the predicate-scoped census had reported two sites, plus a ninth path (`StairItem`, its own 47-line menu) neither party had named, and one clean negative worth having: **this application uses the signal route nowhere at all.** `docs/evidence/d53_menu_census.py`.
+
+**The counterpart, and it is cheap: a census cannot tell you a handler is REACHABLE.** It proved `RoomItem.contextMenuEvent` exists; only a runtime probe showed the view above it was accepting the event first. Existence is a parse question, reachability is a run question, and they are different files here on purpose.
+
 **A GREEN SIGNAL IS ONLY EVIDENCE ABOUT WHAT IT MEASURES — added 2026-08-04, as
 the rule above three instances.** `tools/gate.py` has never made a claim about
 `docs/V5_MIGRATION_PLAN.md`: it runs ruff and pytest, and neither reads this
