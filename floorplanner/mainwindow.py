@@ -992,9 +992,17 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                 corners = simplify_corners(poly)
                 if len(corners) >= 3 and poly_area_sqft(corners) >= 1.0:
                     regions.append((corners, base, props))
-        # build a COMPLETE wall loop for every region -- shared edges get a
-        # wall per region (no dedup), tracked per region, so each fragment
-        # owns all its walls
+        # A COMPLETE WALL LOOP FOR EVERY REGION -- shared edges deliberately
+        # get a wall per region, with no dedup. That was written to make each
+        # fragment "own all its walls" and, on its own, it did not: ownership
+        # is a binding question, and `bind_room_walls` binds by geometry, so a
+        # room could end up bound to a neighbour's coincident copy (D47).
+        #
+        # It is KEPT, because it is exactly the shape `extract_room` wants. A
+        # private loop per region means extraction finds nothing shared and
+        # nothing over-long, so it keeps every wall whole and copies none --
+        # the loops stop being duplicates the moment each one belongs to a
+        # floating room that is the only thing referencing it.
         region_walls = []
         for corners, _, _ in regions:
             ws, n = [], len(corners)
@@ -1009,9 +1017,9 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             region_walls.append(ws)
         rebuild_all_walls(sc)
 
-        # detect + create the result rooms; for fragment, group each
-        # fragment with its own walls so it moves as a self-contained,
-        # fully-enclosed unit (coincident neighbour walls stay put)
+        # detect + create the result rooms; for fragment, EXTRACT each piece
+        # so it is a floating, self-contained unit (D47)
+        from floorplanner.extract import extract_room   # late: higher layer
         sc.clearSelection()
         created = 0
         for (corners, base, props), ws in zip(regions, region_walls,
@@ -1024,15 +1032,72 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                             res[0], res[1], corners=res[2], properties=props)
             sc.addItem(room)
             bind_room_walls(sc, room)
+            if op == "fragment":
+                self._claim_region_walls(room, ws)
             created += 1
-            if op == "fragment" and len(ws) >= 2:
-                grp = GroupItem()
-                sc.addItem(grp)
-                for w in ws:
-                    grp.adopt(w)
+            if op == "fragment":
+                # D47: A FRAGMENT IS A FLOATING ROOM, NOT A GROUP OF WALLS.
+                #
+                # This used to build a `GroupItem` over the region's own walls
+                # so the piece "moves as a self-contained, fully-enclosed
+                # unit". That comment describes P4.2's floating room, and it
+                # was written before `extract` existed -- so it named the right
+                # property and reached for the only mechanism there was.
+                #
+                # The group could never deliver it. `bind_room_walls` binds by
+                # GEOMETRY, and every shared edge here carries one wall per
+                # region, so a room could be bound to a NEIGHBOUR's coincident
+                # copy: `room_owns_walls` was false for all nine (group, room)
+                # pairs, and dragging a piece moved 4 of 4 walls and 0 of 16
+                # outline corners -- the room stranded whole, with dashed
+                # "open" edges that each had a real wall lying on them.
+                #
+                # `extract_room` is the mechanism that was missing: it makes
+                # every edge's wall the room's OWN (copy-trimming anything
+                # shared), privatises the corners an outside wall still
+                # touches, folds outline and walls onto one vertex per corner,
+                # and flips the state. The result is I12 by construction -- a
+                # unit that is self-contained because nothing else references
+                # its geometry, rather than because a group says so.
+                extract_room(sc, room)
             else:
                 room.setSelected(True)
         self.status(f"{op.title()}: {name1} + {name2} -> {created} room(s).")
+
+    @staticmethod
+    def _claim_region_walls(room, ws):
+        """Point every outline edge at the wall THIS region built for it.
+
+        D47. `bind_room_walls` binds by GEOMETRY, and `fragment` deliberately
+        builds one wall per region, so on a shared edge there are two or three
+        coincident candidates and the room can be bound to a NEIGHBOUR's copy.
+        That is the whole mechanism of the defect, and it survives extraction:
+        `extract_room` then sees a wall it must copy-trim (another room is on
+        it), mints a copy, and leaves the original bound to nobody -- measured,
+        4 orphan walls on the two-room case.
+
+        So the region's own loop is asserted here, before extraction, by
+        matching each outline edge to the wall spanning it FROM THIS REGION'S
+        LIST ONLY. Geometry still decides which wall covers which edge -- the
+        candidate set is what narrows.
+        """
+        tol = 0.01
+        for e, nxt in zip(room.outline, room.outline[1:] + room.outline[:1],
+                          strict=True):
+            a, b = e.p, nxt.p
+            for w in ws:
+                p1, p2 = w.p1, w.p2
+                fwd = (QLineF(p1, a).length() < tol
+                       and QLineF(p2, b).length() < tol)
+                rev = (QLineF(p1, b).length() < tol
+                       and QLineF(p2, a).length() < tol)
+                if fwd or rev:
+                    if e.wall is not w:
+                        if e.wall is not None:
+                            room.unbind_wall(e.wall)
+                        e.wall = w
+                        room.bind_wall(w)
+                    break
 
     def group_selected(self):
         """Group the selected walls/furnishings (existing groups merge).  When a

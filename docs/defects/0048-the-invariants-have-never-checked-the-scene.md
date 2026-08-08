@@ -86,3 +86,21 @@ what an operation produces, which is an AMBER decision, and the corpus
 consequence this record already names — legacy loads arrive unwelded **by
 design** (P2.1) — is exactly the scoping question that has to be answered first.
 G2 delivers the instrument; where it runs is a separate ruling.
+
+### Residual measured at A1 (2026-08-07), and it is this record's family
+
+A freshly fragmented product leaves **18 distinct `Vertex` objects on 16
+geometric points** — three corners inside a single floating room's own namespace
+that are coincident but not identical. Per room: `Room 1` 6 walls / 8
+wall-vertices, `Room 2` 6 / 7, `Overlap` 4 / 4.
+
+It is not caused by the fragment op. Traced: each region's loop is built with
+one vertex per corner (12 → 6 on a six-wall loop, measured), and the split
+reappears between `rebuild_all_walls` and the room being claimed — i.e. inside
+`bind_room_walls` / `share_outline_vertices`, which re-points some wall ends
+onto the detected outline's vertices and not others.
+
+It costs nothing today: `check(deep=True)` is clean, `room_owns_walls` holds,
+the drag carries the region, and no edge reads as open. It is recorded because
+it is exactly what this record exists to make visible — a coincidence the
+document walk welds away, so no invariant will ever report it.
