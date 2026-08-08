@@ -273,6 +273,34 @@ def drag(qapp):
 
 
 @pytest.fixture
+def click(qapp):
+    """A press+release at ONE scene point, with no movement between.
+
+    The gesture `drag` cannot express, and the one D53 is about: a CLICK.
+    `drag` always moves, so every gesture-level test in this suite until now
+    exercised the drag path and none exercised the press-and-let-go path --
+    which is part of why a room that could not be clicked went unnoticed.
+
+    Modifiers pass through, so shift/ctrl toggling is testable.
+    """
+    def _click(win, scene_pt, mods=Qt.KeyboardModifier.NoModifier):
+        vp = win.view.viewport()
+        pt = QPointF(win.view.mapFromScene(QPointF(scene_pt)))
+
+        def send(etype, button, buttons):
+            ev = QMouseEvent(etype, pt, vp.mapToGlobal(pt), button, buttons,
+                             mods)
+            QApplication.sendEvent(vp, ev)
+            qapp.processEvents()
+
+        send(QEvent.Type.MouseButtonPress, Qt.MouseButton.LeftButton,
+             Qt.MouseButton.LeftButton)
+        send(QEvent.Type.MouseButtonRelease, Qt.MouseButton.LeftButton,
+             Qt.MouseButton.NoButton)
+    return _click
+
+
+@pytest.fixture
 def counts(fp):
     """(#walls, #furnishings, #rooms) currently in a scene."""
     def _counts(scene):

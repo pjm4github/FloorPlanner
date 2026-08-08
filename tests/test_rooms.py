@@ -2,7 +2,7 @@
 import json
 
 import pytest
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import QPointF, Qt
 
 
 pytestmark = pytest.mark.rooms
@@ -772,3 +772,55 @@ def test_removing_room_unbinds_its_walls(fp, scene, make_room):
     scene.removeItem(room)
     assert all(room not in w.rooms for w in walls), \
         "walls still reference the removed room"
+
+
+@pytest.mark.gui
+def test_selecting_two_rooms_BY_CLICKING_them_feeds_a_room_operation(
+        fp, win, make_room, click):
+    """THE SEAM TEST -- A1b's first acceptance item, and the reason D53's
+    instrument-boundary finding was recorded at all.
+
+    EVERY OTHER ROOM-OPERATION TEST IN THIS FILE ASSIGNS `win._sel_order`
+    DIRECTLY (see `_overlapping_rooms`, which ends `win._sel_order = [r1, r2]`).
+    That is correct at the unit altitude -- a polygon operation should be tested
+    from a constructed input -- but it means the whole family starts DOWNSTREAM
+    of the selection mechanism, proving the operation right given its input and
+    asserting nothing about whether a user can produce that input.
+
+    Measured 2026-08-08, before A1b: severing `_update_edit_actions` from
+    `_sel_order`, so that no selection made by any gesture could reach any room
+    operation, left ALL 639 TESTS PASSING. This test is what makes that
+    mutation fail, and re-running it is A1b's receipt.
+
+    It therefore goes the whole way through: click one room, ctrl-click the
+    other, and run the operation on what the CLICKS produced.
+    """
+    r1, r2 = _overlapping_rooms(fp, win)
+    win.set_tool(fp.TOOL_SELECT)
+    win.show()
+    win.zoom_fit()
+    # discard the helper's hand-fed selection: this test must build it itself,
+    # or it inherits exactly the shortcut it exists to stop taking.
+    win._sel_order = []
+    win.scene.clearSelection()
+
+    p1, p2 = QPointF(20, 80), QPointF(170, 130)
+    # PRECONDITIONS: each point is inside ONE room, off its label, and clear of
+    # the overlap -- otherwise the clicks below are not the clicks described.
+    assert r1.shape().contains(p1) and not r2.shape().contains(p1)
+    assert r2.shape().contains(p2) and not r1.shape().contains(p2)
+    assert not r1._label_rect().contains(p1)
+    assert not r2._label_rect().contains(p2)
+
+    click(win, p1)
+    click(win, p2, mods=Qt.KeyboardModifier.ControlModifier)
+
+    # THE SEAM ITSELF: the gesture reached the room operations' input.
+    assert set(win.scene.selectedItems()) == {r1, r2}
+    assert set(win._sel_order) == {r1, r2}, \
+        "clicking two rooms did not reach _sel_order -- the seam is cut"
+
+    win.room_boolean("combine")
+    rooms = _rooms(fp, win)
+    assert len(rooms) == 1, "the op did not run on the clicked selection"
+    assert rooms[0].area_sqft == pytest.approx(144, abs=2)   # 80 + 80 - 16

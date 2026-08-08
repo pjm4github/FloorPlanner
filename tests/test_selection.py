@@ -111,3 +111,162 @@ def test_party_wall_edge_selection_leaves_the_door_intact(fp, win):
            if isinstance(w, fp.WallItem) and w is not party
            and abs(w.p1.x() - 120) < 1 and abs(w.p2.x() - 120) < 1]
     assert dup == []
+
+
+# -- D53: a room is selected by CLICKING IT -------------------------------------
+#
+# These three are A1b's mechanical acceptance. The fourth item is Patrick's
+# manual check and cannot live here.
+
+@pytest.mark.gui
+def test_clicking_a_room_selects_it_and_the_selection_survives_release(
+        fp, win, make_room, click):
+    """D53(a). The gesture the application is most often given, finally pinned.
+
+    Before A1b this passed nowhere: `RoomItem.shape()` returned only the label
+    rect, so a press on the region reached no item, and `PlanView` read that as
+    blank canvas -- it panned and CLEARED the selection.
+    """
+    sc = win.scene
+    room = make_room(sc, 0, 0, 240, 180, "Den")
+    win.set_tool(fp.TOOL_SELECT)
+    win.show()
+    win.zoom_fit()
+    pt = QPointF(120, 150)                       # inside the region...
+    assert not room._label_rect().contains(pt)   # ...and NOT on the label
+    assert room.shape().contains(pt)             # precondition: it is a target
+    sc.clearSelection()
+
+    click(win, pt)
+
+    assert room.isSelected(), "a click inside the room did not select it"
+    assert sc.selectedItems() == [room]
+
+
+@pytest.mark.gui
+def test_pressing_a_room_does_not_clear_the_selection(fp, win, make_room, click):
+    """The other half of D53(a), and the half that was ACTIVE harm: pressing a
+    room's region used to run `clearSelection()` via the empty-canvas pan."""
+    sc = win.scene
+    a = make_room(sc, 0, 0, 200, 160, "A")
+    b = make_room(sc, 400, 0, 200, 160, "B")
+    win.set_tool(fp.TOOL_SELECT)
+    win.show()
+    win.zoom_fit()
+    b.setSelected(True)
+    assert b.isSelected()                        # precondition
+
+    click(win, QPointF(100, 130))                # press inside A's region
+
+    assert a.isSelected(), "the clicked room is not selected"
+    assert not b.isSelected(), "a plain click should replace the selection"
+    assert sc.selectedItems() == [a]
+
+
+@pytest.mark.gui
+@pytest.mark.parametrize("mod", ["shift", "ctrl"], ids=["shift", "ctrl"])
+def test_shift_and_ctrl_click_each_toggle_room_membership(
+        fp, win, make_room, click, mod):
+    """D53(b). BOTH modifiers, because users try both -- parametrized rather
+    than duplicated so neither can be fixed while the other rots."""
+    from PyQt6.QtCore import Qt
+    sc = win.scene
+    a = make_room(sc, 0, 0, 200, 160, "A")
+    b = make_room(sc, 400, 0, 200, 160, "B")
+    win.set_tool(fp.TOOL_SELECT)
+    win.show()
+    win.zoom_fit()
+    mods = (Qt.KeyboardModifier.ShiftModifier if mod == "shift"
+            else Qt.KeyboardModifier.ControlModifier)
+    sc.clearSelection()
+
+    click(win, QPointF(100, 130))                       # plain: A only
+    assert sc.selectedItems() == [a]
+
+    click(win, QPointF(500, 130), mods=mods)            # modified: ADD B
+    assert set(sc.selectedItems()) == {a, b}, f"{mod}-click did not add"
+
+    click(win, QPointF(500, 130), mods=mods)            # modified again: DROP B
+    assert sc.selectedItems() == [a], f"{mod}-click did not toggle off"
+
+
+@pytest.mark.gui
+def test_hit_target_ranks_by_TYPE_and_ignores_z(fp, win, make_room,
+                                                first_furnishing):
+    """D53's design ruling, asserted DIRECTLY: type priority, not z-order.
+
+    A stacked point -- furnishing on wall on room -- resolves to the
+    furnishing, and it keeps resolving to the furnishing when the z values are
+    set ADVERSARIALLY. That second half is the whole assertion: `raise_to_front`
+    puts a touched room at `_z_top * 10 + band` while furnishings stay at 3, so
+    any scheme whose hit outcome depends on z is one room interaction from
+    breaking.
+    """
+    from floorplanner.items import hit_target
+    sc = win.scene
+    room = make_room(sc, 0, 0, 240, 180, "Den")
+    pt = QPointF(120, 140)
+    wall = fp.WallItem(QPointF(60, 140), QPointF(180, 140), "interior")
+    sc.addItem(wall)
+    fp.rebuild_all_walls(sc)
+    furn = fp.make_furnishing(first_furnishing, pt)
+    sc.addItem(furn)
+
+    # PRECONDITION: all three really are under the one point. Without this the
+    # verdict below is about a stack that was never built (defect 21's lesson).
+    under = set(sc.items(pt))
+    assert {room, wall, furn} <= under, f"the stack is not stacked: {under}"
+
+    assert hit_target(sc, pt) is furn
+
+    # ADVERSARIAL Z: put the room on top of everything, exactly as
+    # raise_to_front would, and the answer must not move.
+    room.setZValue(9999)
+    wall.setZValue(9998)
+    assert hit_target(sc, pt) is furn, "z changed the answer -- it must not"
+
+    sc.removeItem(furn)
+    assert hit_target(sc, pt) is wall, "wall must outrank the room"
+    sc.removeItem(wall)
+    assert hit_target(sc, pt) is room, "the room is the FALLBACK target"
+
+
+def test_rubber_band_is_independent_of_a_room_s_shape(fp, win, make_room):
+    """D53's third acceptance: PIN `select_in_rect`'s independence.
+
+    The census found it safe BY ACCIDENT -- the first loop type-filters to
+    (WallItem, FurnishingItem, GroupItem) so a room in the results is dropped,
+    and the room half uses a full scan plus `item_fully_inside`, which reads
+    `item.corners` and never consults `shape()`. Accidental safety is the kind
+    a later refactor removes without noticing, so it is asserted here.
+
+    The band below INTERSECTS the room's (now region-wide) shape and does not
+    contain its corners. Under `IntersectsItemShape` the room would be caught;
+    under `item_fully_inside` it is not. That difference is the assertion.
+    """
+    sc = win.scene
+    room = make_room(sc, 0, 0, 240, 180, "Den")
+    band = QRectF(60, 60, 60, 60)                    # wholly INSIDE the room
+
+    # PRECONDITION: the band really does intersect the room's shape, so a
+    # shape-based implementation would select it. Without this the negative
+    # verdict below is vacuous.
+    assert room.shape().intersects(QPainterPath_from_rect(band)), \
+        "the band does not touch the room's shape -- nothing is being tested"
+    assert not all(band.contains(c) for c in room.corners)
+
+    sc.clearSelection()
+    win.view.select_in_rect(band)
+    assert not room.isSelected(), \
+        "select_in_rect picked a room the band merely INTERSECTS"
+
+    sc.clearSelection()
+    win.view.select_in_rect(QRectF(-40, -40, 320, 260))   # contains the room
+    assert room.isSelected(), "a band containing the room must still select it"
+
+
+def QPainterPath_from_rect(r):
+    from PyQt6.QtGui import QPainterPath
+    p = QPainterPath()
+    p.addRect(r)
+    return p

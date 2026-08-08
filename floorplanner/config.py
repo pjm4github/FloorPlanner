@@ -20,7 +20,7 @@ __all__ = [
     "DEFAULT_SETTINGS", "SETTINGS", "editing_enabled", "JOIN_TOL",
     "MIN_WALL_LEN",
     "WALL_PROJECT_STICK", "WALL_PROJECT_NEAR", "ROOM_SIG_MARGIN",
-    "WALL_Z", "OPENING_Z", "canvas_rect",
+    "WALL_Z", "CLICK_SLOP", "OPENING_Z", "canvas_rect",
     "TOOL_SELECT", "TOOL_WALL_EXT", "TOOL_WALL_INT", "TOOL_DOOR",
     "TOOL_WINDOW", "TOOL_ROOM", "DOOR_TYPES", "GARAGE_DEFAULTS", "ROOM_CELL",
     "ROOM_TYPES", "CEILING_TYPES", "FLOOR_FINISHES", "WALL_FINISHES",
@@ -86,6 +86,10 @@ WALL_PROJECT_NEAR = 48.0  # ...only when that wall actually passes within 4'
 ROOM_SIG_MARGIN = 18.0    # walls within 18" of a room's bbox can affect it
 # default stacking: furnishing (3) < translucent room fill/label (4) < wall < opening
 WALL_Z = 5.0              # walls sit above the room fill so they stay crisp
+# A press that moved no further than this is a CLICK, not a drag (D53).
+# In VIEWPORT pixels, so it is a hand steadiness threshold and does not
+# scale with zoom -- a real click jitters by a pixel or two.
+CLICK_SLOP = 3
 OPENING_Z = 6.0           # doors/windows sit above their wall
 
 
