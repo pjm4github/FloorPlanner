@@ -329,7 +329,44 @@ than by z, and that is the shape worth costing first.
 
 ## Receipt
 
-*(Open.)* Acceptance:
+**IMPLEMENTED at A1b, `957792c` on `a1b-d53-readback`. AWAITING THE MANUAL
+CHECK — the fourth acceptance item, which is the merge condition.** Census
+639 → **646 collected**, seven new tests, gate GREEN in all three modes.
+
+**THE MUTATION RECEIPT — the item that decides whether the boundary CLOSED or
+merely MOVED.** `docs/evidence/d53-mutation-receipt.txt`. Severing
+`_update_edit_actions` from `_sel_order`, in a throwaway worktree, mutation
+grep-verified on disk before each run:
+
+| tree | result |
+|---|---|
+| before A1b, `5a22a7f` | **639 passed, 0 failed — the whole suite green** |
+| after A1b, `957792c` | **1 failed**, 645 passed — and it is exactly `test_selecting_two_rooms_BY_CLICKING_them_feeds_a_room_operation` |
+
+**DIFFERENTIAL RECEIPT — Patrick's `dragWallFuseStraggler` macro, per line, on
+three trees.** `docs/evidence/d53-macro-differential.txt`. The first cut of this
+fix **broke it**: line 4's plain `CLICK 338 236` went from selecting the
+interior column and fusing it (18 → 16 walls) to selecting R2 with the count
+stuck at 18, because the two preceding label-drags had run `raise_to_front` and
+lifted R2 above `WALL_Z`, and **Qt routes a press to the topmost item by z**.
+The ruling foresaw it — *"any scheme where hit outcomes depend on z is one room
+interaction away from breaking"* — and Qt's own delivery was that scheme, which
+is why `RoomItem.mousePressEvent` now declines a press another item outranks.
+**After that, the replay is identical to `main` at every line**, wall counts
+`[18, 18, 16, 16, 18, 15, 17, 16]`.
+
+**Two deviations from the ruling, both forced by measurement**, both argued at
+the code: `OpeningItem` is ranked (above `WallItem`) because a door is a Qt
+child of its wall and both answer one point; `ReferenceImageItem` ranks *below*
+the room, the one place "room always last" is not literal — the backdrop is a
+full-canvas tracing aid, and above rooms it would make no room selectable while
+an image was loaded, inverting this very defect. **And the Ctrl band could not
+be made unconditional**: Ctrl is already an item-level modifier here (the label
+nudge, the wall corner-drags), and six tests failed before any reasoning did —
+so `_band_may_start` allows it on blank canvas and over a room's *region*,
+which is what the ruling was for, and not on a room's label or another item.
+
+*(Open — the manual check.)* Original acceptance, for the record:
 
 * the probe's four **region** cases flip from `False` to `True` while the four
   **label** cases stay `True`;

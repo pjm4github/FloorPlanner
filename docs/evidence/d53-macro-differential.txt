@@ -1,0 +1,35 @@
+D53 / A1b -- MACRO DIFFERENTIAL.  Patrick's dragWallFuseStraggler
+replayed line by line on three trees.  Reproduce with the probe in
+this session's notes: load examples/fiveRoomTest.json, run each .fpm
+line through win.run_macro, and record the wall count and selection.
+
+WHY IT EXISTS.  A verbatim macro pin is a recorded GESTURE, and D53
+deliberately changes what a click means -- so the pin is the sharpest
+instrument for whether that change reached gestures it should not.
+
+  main    bcffa08   baseline walls 16
+  A1b v1  32cecb0   the FIRST cut -- room won a wall's click
+  A1b v2  32cecb0   after the room DECLINES an outranked press
+
+macro line                      main    v1    v2   selection on main -> v1 -> v2
+CLICK 625 201 DRAG 712 102        18    18    18   RoomItem:R2 -> RoomItem:R2 -> RoomItem:R2
+CLICK 717 102 DRAG 626 204        18    18    18   RoomItem:R2 -> RoomItem:R2 -> RoomItem:R2
+CLICK 338 236                     16    18    16   WallItem: -> RoomItem:R2 -> WallItem:
+CLICK 340 268 DRAG 340 425        16    18    16   WallItem: -> WallItem: -> WallItem:
+CLICK 236 374 DRAG 91 418         18    21    18   RoomItem:R3,WallItem: -> RoomItem:R3,WallItem: -> RoomItem:R3,WallItem:
+CLICK 86 419 DRAG 228 380         15    18    15   RoomItem:R3 -> RoomItem:R3,WallItem: -> RoomItem:R3
+CLICK 627 205 DRAG 1152 284       17    20    17   RoomItem:R2,RoomItem:R3 -> RoomItem:R2,RoomItem:R3,WallItem: -> RoomItem:R2,RoomItem:R3
+CLICK 1149 283 DRAG 635 205       16    18    16   RoomItem:R2,RoomItem:R3 -> RoomItem:R2,RoomItem:R3,WallItem: -> RoomItem:R2,RoomItem:R3
+
+READING IT.  Line 4 is where v1 diverged: a plain CLICK 338 236 went
+from selecting the interior column AND FUSING IT (18 -> 16 walls,
+which is the gesture this macro exists to pin) to selecting R2, with
+the count stuck at 18.  Cause: the two preceding label-drags ran
+raise_to_front, lifting R2 to _z_top*10 + band -- ABOVE the wall at
+WALL_Z 5.0 -- and Qt routes a press to the topmost item BY Z.  The
+ruling predicted exactly this: 'any scheme where hit outcomes depend
+on z is one room interaction away from breaking.'  Qt's own delivery
+was that scheme.
+
+v2 IS IDENTICAL TO MAIN AT EVERY LINE: True
+  wall counts [18, 18, 16, 16, 18, 15, 17, 16]
