@@ -189,6 +189,120 @@ to learn than one modifier and a wrong guess.
 **(c) Rubber-band selection keeps its current behaviour. Do not change it while
 fixing (a).**
 
+### THREE CONSTRAINTS, ruled 2026‑08‑08, BEFORE ANY CODE
+
+**Constraint 1 — `shape()` has a blast radius, and it is not the one-line fix it
+appears to be.** Qt hit-tests `shape()`, so widening it changes what is under
+the cursor for every gesture over a room's interior. **Walls and vertices must
+stay above the region in hit priority; a fix that makes rooms selectable and
+vertices unreachable trades one defect for a worse one.** The census is below.
+
+**Constraint 2 — panning must survive.** `view.py:359‑365` pans when the press
+finds nothing. Make the region hit-testable and you cannot pan by dragging
+inside a room — on a plan that fills the canvas, that is most of it. **The fix
+must state what replaces it. Middle-mouse drag pans anywhere, unconditionally,
+including over rooms**; that is conventional, collides with nothing, and does
+not depend on what is under the cursor. Panning from empty canvas may stay as
+it is.
+
+**Constraint 3 — selection and floating must not share a visual channel.** A
+floating room already paints a **dashed** orange boundary and selection would
+paint **dashed** blue over the same path. **Dashed already carries two meanings
+in this application** — the manual check's item 5 exists because a dashed edge
+over a real wall is a fault signature. **Do not add a third.** Floating-ness is
+a property of the *room*; selection is a property of the *view*; they get
+different channels. Selection may tint the fill, add corner handles, or thicken
+to a solid stroke — anything but a second dash on the same path.
+
+### The census constraint 1 asks for — parsed, not grepped
+
+`docs/evidence/d53-hit-census.txt`, produced by `docs/evidence/d53_hit_census.py`
+(an `ast` walk of all 33 files in `floorplanner/`: every `QGraphicsItem`
+subclass with whether it overrides `shape()`, every `setZValue` argument as
+written, every `setFlag` with its enum, and every hit query with its enclosing
+function). Grep finds the word; the parse finds the `setZValue` in a helper that
+never names the class.
+
+**Qt picks the topmost item whose `shape()` contains the point, so z is the
+deciding term.** There are six item classes and the whole answer is here:
+
+| item | z | vs `RoomItem` (z **4**) |
+|---|---:|---|
+| `OpeningItem` | `OPENING_Z` = **6.0** | **above — safe** |
+| `WallItem` | `WALL_Z` = **5.0** | **above — safe** |
+| **`RoomItem`** | **4** | — |
+| `FurnishingItem` | **3** | **BELOW — loses its hit target** |
+| `GroupItem` | **1** | **BELOW — loses its hit target** |
+| `ReferenceImageItem` | **−1e9** | below (the backdrop; D11/A2 turns this into a type term) |
+
+**Finding 1 — the constraint's wall half is already satisfied, by construction
+and on purpose.** `config.py:88` reads `WALL_Z = 5.0  # walls sit above the room
+fill so they stay crisp`, and `RoomItem.raise_to_front` re-establishes it after
+every raise: room at `base`, its walls at `base + 4` / `base + 5`, its openings
+at `order + 6`, with the comment *"the walls/openings sit ABOVE the fill so a
+wall is never hidden under its own room tint"*. Widening `shape()` does not
+endanger walls or openings.
+
+**Finding 2 — THERE IS NO VERTEX ITEM.** The parse finds six `QGraphicsItem`
+subclasses and none of them is a vertex or a handle: `Vertex` (`vertex.py:59`)
+is a plain object — the model corner — and `_DragVertex` (`walls.py:27`) is not
+a graphics item either. **Corner grabs are handled inside `WallItem`'s own press
+handler, within the wall's own shape.** So "walls and vertices must stay above
+the region" is **one condition, not two**, and `WALL_Z > 4` already holds it.
+`raise_to_front` even lifts an unlocked wall to `base + 5` over its siblings'
+`base + 4` precisely *"so corner clicks at a shared corner grab IT"*.
+
+**Finding 3 — and this is the one that matters: FURNISHINGS ARE BELOW ROOMS.**
+`FurnishingItem` is z **3** against `RoomItem`'s **4**. Widening a room's
+`shape()` to its outline makes every room contain every furnishing inside it,
+**above** it, so **every furnishing in the plan becomes unclickable and
+undraggable**. That is precisely the trade constraint 1 forbids. And it is worse
+after any room interaction: `raise_to_front` sets the room to `_z_top * 10 + band`
+while furnishings stay at 3, so the gap widens permanently the first time a user
+touches the room.
+
+**`GroupItem` at z 1 has the same exposure** — and it is the object that was
+masking this defect in the first place, which is a neat trap: the naive fix
+would break the very item whose disappearance exposed the bug.
+
+**Finding 4 — the "empty canvas" idiom has FOUR consumers, not one.** Constraint
+2 names the pan. The parse finds `itemAt(...) is None` standing for *"the user
+pressed blank canvas"* at **four** sites, and all four change meaning if a room
+becomes hit-testable over its interior:
+
+| site | what it does today | what breaks |
+|---|---|---|
+| `view.py:321` | Ctrl+drag rubber-band requires empty space | no additive band started from inside a room |
+| `view.py:360` | pan, **and `clearSelection()`** | constraint 2's case |
+| `view.py:540` | Room tool right-click → Paste room / New concept room | menu no longer offered inside a room |
+| `view.py:557` | any other tool right-click → floor popup | popup no longer offered inside a room |
+
+**Middle-mouse pan already exists, unconditionally, and is already first.**
+`view.py:310‑314` handles `MiddleButton` *before* any tool or `itemAt` test. So
+constraint 2's stated replacement is **already implemented** — the work is to
+keep it and to decide what happens to the other three sites, not to build it.
+
+**Finding 5 — constraint 3's rubber-band clause is safe, and for two reasons
+worth knowing rather than trusting.** `select_in_rect` (`view.py:449`) does use
+`IntersectsItemShape`, but (i) its first loop type-filters to
+`(WallItem, FurnishingItem, GroupItem)`, so a room appearing in the results is
+discarded; and (ii) it gathers rooms from a **full scan** — `scene.items()` with
+no arguments — and decides with `item_fully_inside`, which for a `RoomItem`
+tests `item.corners` (`items.py:937‑940`) and never consults `shape()`.
+**Rubber-band selection is therefore independent of `shape()` in both halves**,
+so constraint 3's "keep its current behaviour" costs nothing — but it must be
+*pinned*, because nothing currently asserts that independence.
+
+**Finding 6 — the app already contains one hand-rolled answer to this problem.**
+The macro layer's `_cmd_select` (`macro.py:433`) picks from `scene.items(pt)`
+with an explicit comment: *"prefer an editable item (furnishing / wall / group)
+over a room, whose label can sit on top of what you meant to grab."* A
+type-priority rule, written because the room's **label** already steals hits.
+Widening the region makes that same problem general — and this is the precedent
+for solving it by priority rather than by z alone. `_place_opening`
+(`view.py:623`) is immune for the same reason: it type-filters to
+`WallItem` / `OpeningItem`.
+
 ### Two findings that bear on (a), measured while filing
 
 **The selected-state painting already exists and is simply never reached.**
@@ -205,13 +319,13 @@ same path. Two dashed outlines on one shape is exactly where "a selection nobody
 can see" would survive the fix. Worth deciding as part of (a) rather than
 discovering at the manual check.
 
-**Why not simply widen `shape()` to the region.** A room sits above the walls at
-`z=4` (`rooms.py:411`), so a region-wide `shape()` trades one click-through
-problem for another: clicks meant for the walls, openings and furnishings
-*inside* the room would start landing on the room. "What is on top at this
-point" is the same question **D11 / A2** is asking, which is the reason this
-record is `related: [11]` and the reason (c) fences the rubber band off — one
-selection change at a time.
+**Why widening `shape()` is not by itself the fix.** The census settles the
+walls half in its favour (`WALL_Z` 5.0 > 4, and there is no vertex item) and
+against it for **furnishings** (z 3) and **groups** (z 1). "What is on top at
+this point" is the same question **D11 / A2** is asking, which is why this record
+is `related: [11]`. The one precedent already in the tree — `_cmd_select`'s
+*"prefer an editable item over a room"* — answers it by **type priority** rather
+than by z, and that is the shape worth costing first.
 
 ## Receipt
 
@@ -221,7 +335,25 @@ selection change at a time.
   **label** cases stay `True`;
 * a press on a room's region no longer clears an existing selection;
 * shift-click and ctrl-click each toggle membership;
-* rubber-band behaviour is unchanged — pinned by a test, since (c) is a
-  boundary marker and a boundary marker with no assertion is dead weight;
-* **and a test exists at the gesture altitude**, so the seam measured above
-  stops being green under mutation 2.
+* **furnishings and groups inside a room remain clickable and draggable** —
+  constraint 1's real exposure, measured by the census, and the one a naive
+  `shape()` widening breaks;
+* **panning still works over a room** by the stated replacement, and the other
+  three "empty canvas" sites (Ctrl-band, both context menus) each have a decided
+  outcome rather than an accidental one;
+* **a selected floating room is distinguishable at a glance from an unselected
+  floating room and from a selected ordinary room** — constraint 3's acceptance,
+  as ruled;
+* rubber-band behaviour is unchanged — **pinned by a test**, since (c) is a
+  boundary marker and a boundary marker with no assertion is dead weight, and
+  since the census shows the independence currently holds by accident of two
+  type filters rather than by any assertion;
+
+**AND THE MUTATION IS PART OF THE RECEIPT, NOT AN EXTRA.** *"The fix is not done
+when clicking selects a room. It is done when severing `_update_edit_actions`
+from `_sel_order` breaks the suite."* Re-run **that exact mutation** in a
+throwaway worktree as part of the receipt. **If it still yields 639 green, the
+seam remains untested and the fix has only MOVED the boundary rather than closed
+it.** You cannot write a regression test for something that never worked — but
+you can write the test that *would* have caught it, and the mutation is how you
+prove you did.

@@ -35,17 +35,36 @@ CORRUPT = "planc1.v5.json"
 # `test_known_unclean_still_fails` below asserts each one really is unclean, so
 # an entry that gets quietly fixed stops being tolerated and has to be removed.
 KNOWN_UNCLEAN = {
-    # D52 -- ROOM-INSIDE-A-ROOM, deferred as a FEATURE rather than filed as a
-    # bug to fix now. Toi is a closet fully enclosed by Lounge; a single-ring
-    # outline cannot express a hole, so the drawing carves it out with a
-    # zero-width slit, and I11's vertex-average centroid then lands in the
-    # closet and reports an overlap the geometry does not have.
+    # farmplaceBIGmultifloor.json -- EXEMPT FROM THE CLEAN ASSERTION FOR
+    # EXACTLY ONE FAULT: `I11 rooms 'Lounge' and 'Toi' overlap`, and only that
+    # string. Every other invariant still binds this file, deep set included;
+    # `test_clean_design_validates` is the only assertion it is out of, and
+    # `test_known_unclean_still_fails` below asserts it is STILL schema-valid
+    # and STILL trips exactly this code.
     #
-    # roundedMultifloor.json was on this list and CAME OFF IT on 2026-08-07,
-    # when Patrick reshaped the two rooms so they no longer nest -- which is
-    # the list working as intended: an entry leaves the moment its file is
-    # clean, and `test_known_unclean_still_fails` below is what forces that.
+    # WHAT IS ACTUALLY WRONG (D52): Toi is a WC fully ENCLOSED by Lounge. A
+    # single-ring outline cannot express a hole, so the drawing carves the
+    # closet out with a zero-width slit -- and I11's centroid is a VERTEX
+    # AVERAGE, which for that slit ring lands inside the closet. Measured:
+    # _pip(Toi centre, Lounge) False, edge crossings 0, _pip(Lounge "centre",
+    # Toi) True. The rooms DO NOT OVERLAP; the true polygon intersection is
+    # 0.0 sf. So this exemption tolerates a MISREPORT, not a real fault.
+    #
+    # WHAT THIS EXEMPTION RESTS ON: a REVIEWER RULING dated 2026-08-08, in
+    # D52's Ruling section, and not on the 2026-08-07 "deferred as a feature"
+    # note -- which was Code's, unratified, and is STRUCK. Overlapping rooms
+    # are an UNMODELLED STATE, not a feature; calling them a feature would let
+    # a reader treat the area double-count (D55) as intended.
+    #
+    # WHY THE FILE IS KEPT RATHER THAN REPAIRED: it is the only plan in the
+    # tree that exercises overlapping rooms, and A1 (D47) has demonstrated
+    # that overlap is a state the app genuinely reaches. Repairing the drawing
+    # would delete the only evidence of a state the model cannot express.
     "farmplaceBIGmultifloor.json": "I11",
+    # roundedMultifloor.json was on this list and CAME OFF IT on 2026-08-07,
+    # when Patrick reshaped the two rooms so they no longer nest -- the list
+    # working as intended: an entry leaves the moment its file is clean, and
+    # `test_known_unclean_still_fails` below is what forces that.
 }
 
 
