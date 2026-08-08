@@ -16,7 +16,7 @@ opened: 2026-08-07
 closed: null
 closed_by: null
 rank: 53
-related: [41, 48]
+related: [41, 48, 49]
 state_source: row
 github_issue: null
 ---
@@ -85,6 +85,22 @@ Every repair attempted, and what each produced:
 detector cannot separate them either.
 
 ## Ruling
+
+> **ATTRIBUTION, added 2026‑08‑08 because the ruling below named no author and
+> was asked to.** Traced on disk rather than assumed: the record and its ruling
+> arrived in `83a3ccc`, whose own message says the five attempted repairs "each
+> change what the plan MEANS, **which is the author's call**" — i.e. Code
+> deliberately declined to choose a repair. **So the deferral is CODE's, made
+> from measurement, and it has never been ratified by Patrick.** The only act in
+> this file recorded as his is the `roundedMultifloor.json` reshape, which
+> `83a3ccc` names him for explicitly. Git authorship settles nothing either way
+> — every commit in this repository carries his git identity, including the ones
+> Code writes.
+>
+> **It therefore reads as ruled and is not.** Deciding that room-in-room is a
+> deferred feature rather than a bug is a scheduling call about a plan someone
+> drew, and it is his. **Treat the paragraph below as a PROPOSAL awaiting
+> ratification**, and the exemption in `KNOWN_UNCLEAN` as resting on it.
 
 **Deferred as a FEATURE, 2026-08-07.** Not scheduled, not a bug to fix now: the
 one plan that still needs it is exempted and named, and the workaround

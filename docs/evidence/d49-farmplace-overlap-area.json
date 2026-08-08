@@ -1,0 +1,30 @@
+{
+  "plan": "farmplaceBIGmultifloor.json",
+  "pair": [
+    "Lounge",
+    "Toi"
+  ],
+  "rings": {
+    "Lounge": {
+      "points": 18,
+      "area_sqft": 366.8
+    },
+    "Toi": {
+      "points": 4,
+      "area_sqft": 28.1
+    }
+  },
+  "true_intersection": {
+    "points": 0,
+    "area_sqft": 0.0
+  },
+  "i11_terms": {
+    "pip_b_centre_in_a": false,
+    "pip_a_centre_in_b": true,
+    "edge_crossings": 0
+  },
+  "i11_reports": [
+    "I11 rooms 'Lounge' and 'Toi' overlap"
+  ],
+  "check_cheap": []
+}

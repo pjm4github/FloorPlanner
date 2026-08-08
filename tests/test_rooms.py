@@ -210,12 +210,15 @@ def test_boolean_keeps_exterior_walls_exterior(fp, win):
     assert kinds == {"exterior"}, f"result walls downgraded: {kinds}"
 
 
-@pytest.mark.xfail(strict=False, reason="register row 47 -- room_boolean builds "
-                   "a duplicate wall loop per region instead of extracting, so "
-                   "a fragment is not a self-contained unit; flips when "
-                   "fragment converts to extract")
 def test_fragment_groups_each_piece_with_its_own_walls(fp, win):
     """Each fragment is a SELF-CONTAINED UNIT: no wall belongs to two of them.
+
+    XFAIL REMOVED AT A1 (D47, 2026-08-07), which is what the marker promised:
+    "flips when fragment converts to extract". It has. A fragment is now a
+    FLOATING room -- `extract_room` makes every edge's wall the room's own and
+    privatises the corners -- so the pieces abut without sharing a single wall
+    object, and the verdict below holds by construction rather than by luck.
+    It is a hard pass now, so it can regress.
 
     REWRITTEN AT P4.5 (2026-08-05), and the old assertions were vacuous by
     BASIS, not merely weak. The previous verdict was `all(enclosed(r))` after

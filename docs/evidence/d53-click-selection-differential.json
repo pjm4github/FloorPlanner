@@ -1,0 +1,188 @@
+{
+  "gesture": "press+release, zero movement, SELECT tool",
+  "plan": "fixtures/fragment2room.json (A 255.8 sf, B 249.8 sf, true overlap 81.0 sf)",
+  "main": {
+    "head": "a1172be",
+    "groups_after_fragment": 3
+  },
+  "branch": {
+    "head": "5a22a7f",
+    "groups_after_fragment": 0
+  },
+  "cases": {
+    "placed/label": {
+      "main": {
+        "top_item": "RoomItem",
+        "hit_room": true,
+        "sel_press": true,
+        "sel_release": true,
+        "scene_sel": [
+          "A"
+        ]
+      },
+      "branch": {
+        "top_item": "RoomItem",
+        "hit_room": true,
+        "sel_press": true,
+        "sel_release": true,
+        "scene_sel": [
+          "A"
+        ]
+      },
+      "identical": true
+    },
+    "placed/region0": {
+      "main": {
+        "top_item": null,
+        "hit_room": false,
+        "sel_press": false,
+        "sel_release": false,
+        "scene_sel": []
+      },
+      "branch": {
+        "top_item": null,
+        "hit_room": false,
+        "sel_press": false,
+        "sel_release": false,
+        "scene_sel": []
+      },
+      "identical": true
+    },
+    "placed/region1": {
+      "main": {
+        "top_item": null,
+        "hit_room": false,
+        "sel_press": false,
+        "sel_release": false,
+        "scene_sel": []
+      },
+      "branch": {
+        "top_item": null,
+        "hit_room": false,
+        "sel_press": false,
+        "sel_release": false,
+        "scene_sel": []
+      },
+      "identical": true
+    },
+    "piece/label": {
+      "main": {
+        "top_item": "RoomItem",
+        "hit_room": true,
+        "sel_press": true,
+        "sel_release": true,
+        "scene_sel": [
+          "A"
+        ]
+      },
+      "branch": {
+        "top_item": "RoomItem",
+        "hit_room": true,
+        "sel_press": true,
+        "sel_release": true,
+        "scene_sel": [
+          "A"
+        ]
+      },
+      "identical": true
+    },
+    "piece/region0": {
+      "main": {
+        "top_item": "GroupItem",
+        "hit_room": false,
+        "sel_press": false,
+        "sel_release": false,
+        "scene_sel": [
+          "GroupItem"
+        ]
+      },
+      "branch": {
+        "top_item": null,
+        "hit_room": false,
+        "sel_press": false,
+        "sel_release": false,
+        "scene_sel": []
+      },
+      "identical": false
+    },
+    "piece/region1": {
+      "main": {
+        "top_item": "GroupItem",
+        "hit_room": false,
+        "sel_press": false,
+        "sel_release": false,
+        "scene_sel": [
+          "GroupItem"
+        ]
+      },
+      "branch": {
+        "top_item": null,
+        "hit_room": false,
+        "sel_press": false,
+        "sel_release": false,
+        "scene_sel": []
+      },
+      "identical": false
+    }
+  },
+  "labels": {
+    "main": [
+      {
+        "name": "A",
+        "state": "placed",
+        "rect_w": 58.0,
+        "name_advance_14px": 14.0,
+        "subtitle": "175 sq ft",
+        "subtitle_advance_9px": 81.0,
+        "overflow_px": 23.0
+      },
+      {
+        "name": "B",
+        "state": "placed",
+        "rect_w": 58.0,
+        "name_advance_14px": 14.0,
+        "subtitle": "169 sq ft",
+        "subtitle_advance_9px": 81.0,
+        "overflow_px": 23.0
+      },
+      {
+        "name": "Overlap",
+        "state": "placed",
+        "rect_w": 108.0,
+        "name_advance_14px": 98.0,
+        "subtitle": "81 sq ft",
+        "subtitle_advance_9px": 72.0,
+        "overflow_px": -36.0
+      }
+    ],
+    "branch": [
+      {
+        "name": "A",
+        "state": "floating",
+        "rect_w": 58.0,
+        "name_advance_14px": 14.0,
+        "subtitle": "175 sq ft (floating)",
+        "subtitle_advance_9px": 180.0,
+        "overflow_px": 122.0
+      },
+      {
+        "name": "B",
+        "state": "floating",
+        "rect_w": 58.0,
+        "name_advance_14px": 14.0,
+        "subtitle": "169 sq ft (floating)",
+        "subtitle_advance_9px": 180.0,
+        "overflow_px": 122.0
+      },
+      {
+        "name": "Overlap",
+        "state": "floating",
+        "rect_w": 108.0,
+        "name_advance_14px": 98.0,
+        "subtitle": "81 sq ft (floating)",
+        "subtitle_advance_9px": 171.0,
+        "overflow_px": 63.0
+      }
+    ]
+  }
+}
