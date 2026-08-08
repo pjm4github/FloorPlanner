@@ -311,12 +311,16 @@ class PlanView(QGraphicsView):
     def _band_may_start(self, pos) -> bool:
         """May a Ctrl+drag start a selection band here?
 
-        RULED "unconditional" at A1b; MEASURED, that breaks three existing
-        gestures, so it is "canvas-like" instead and the deviation is recorded
-        rather than taken quietly. **CTRL IS ALREADY AN ITEM-LEVEL MODIFIER in
-        this application** -- it is the label-only nudge on a room's label, and
-        it drives the wall corner-drags -- so arming the band on every ctrl
-        press means the press never reaches those items. Six tests said so:
+        A REFUTED PREMISE, not a compromise -- and it is recorded that way
+        because the two read differently to whoever changes this next.
+
+        The ruling was: "an explicit modifier gesture should never depend on
+        what happens to sit under the press point." Sound in general. FALSE
+        HERE, and the premise it rests on is what fails: **CTRL IS ALREADY AN
+        ITEM-LEVEL MODIFIER IN THIS APPLICATION** -- it is the label-only nudge
+        on a room's label, and it drives the wall corner-drags. An unconditional
+        Ctrl band eats gestures older than this record, because the press never
+        reaches those items at all. Six tests said so before any reasoning did:
         `test_room_label_ctrl_drag_nudges_label`,
         `test_a_dragged_end_near_a_jamb_snaps_to_it`,
         `test_dragging_an_end_into_a_doorway_names_the_doorway_at_release`,

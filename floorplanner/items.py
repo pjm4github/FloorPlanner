@@ -1235,20 +1235,24 @@ class ReferenceImageItem(QGraphicsItem):
 # Two priority rules in one codebase would drift, and the drift presents as
 # "sometimes clicking picks the wrong thing", which is close to undebuggable.
 
-#: Hit priority, most specific first. A ROOM IS ALWAYS LAST among the items a
-#: user selects, which is the whole point: a room is the FALLBACK target, never
-#: the winner. Consequences worth stating rather than leaving to be re-derived:
+#: PRIORITY RUNS FROM MOST SPECIFIC TO LEAST SPECIFIC. That is the whole rule,
+#: stated as the principle rather than as a list with exceptions -- ruled
+#: 2026-08-08, after a first draft said "a room is always last" and two entries
+#: promptly needed explaining away. They do not: both follow from specificity.
 #:
-#:  * `OpeningItem` outranks `WallItem` because a door IS on its wall (it is a
-#:    Qt CHILD of it, and both are returned for the same point). Today it wins
-#:    by OPENING_Z 6.0 > WALL_Z 5.0; ranking it here keeps that outcome when z
-#:    stops deciding. It is not in the ruling's four-name list because the list
-#:    named the contested cases; this one was never contested.
-#:  * `ReferenceImageItem` ranks BELOW the room, which is the one place "room
-#:    always last" is deliberately not literal. The backdrop is a full-canvas
-#:    tracing aid at z -1e9; if it outranked rooms, no room would be selectable
-#:    while an image was loaded -- inverting the defect this record exists to
-#:    fix. Reported as a deviation rather than taken silently.
+#:  * `OpeningItem` outranks `WallItem` because THE CONTAINING THING MUST NEVER
+#:    OUTRANK THE CONTAINED THING. A door is a Qt CHILD of its wall and both are
+#:    returned for the same point, so the door is the more specific answer. Not
+#:    a deviation -- the same rule, one level deeper. (It wins by OPENING_Z 6.0 >
+#:    WALL_Z 5.0 today; ranking it keeps that outcome once z stops deciding.)
+#:  * `ReferenceImageItem` ranks below `RoomItem` for the same reason and not as
+#:    a carve-out: a full-canvas TRACING BACKDROP is LESS specific than a room,
+#:    not more. The proof is what the opposite would do -- above rooms, no room
+#:    would be selectable while an image was loaded, inverting the very defect
+#:    D53 closes.
+#:
+#: A room still comes last among the things a user ordinarily selects, which is
+#: the property D53 needed; it just is not the axiom.
 HIT_PRIORITY = (OpeningItem, FurnishingItem, WallItem, GroupItem, RoomItem,
                 ReferenceImageItem)
 

@@ -355,16 +355,42 @@ is why `RoomItem.mousePressEvent` now declines a press another item outranks.
 **After that, the replay is identical to `main` at every line**, wall counts
 `[18, 18, 16, 16, 18, 15, 17, 16]`.
 
-**Two deviations from the ruling, both forced by measurement**, both argued at
-the code: `OpeningItem` is ranked (above `WallItem`) because a door is a Qt
-child of its wall and both answer one point; `ReferenceImageItem` ranks *below*
-the room, the one place "room always last" is not literal — the backdrop is a
-full-canvas tracing aid, and above rooms it would make no room selectable while
-an image was loaded, inverting this very defect. **And the Ctrl band could not
-be made unconditional**: Ctrl is already an item-level modifier here (the label
-nudge, the wall corner-drags), and six tests failed before any reasoning did —
-so `_band_may_start` allows it on blank canvas and over a room's *region*,
-which is what the ruling was for, and not on a room's label or another item.
+### The three deviations, RULED 2026‑08‑08 — two refine the rule, one refutes it
+
+**1. `OpeningItem` above `WallItem` — not a deviation at all.** *"A door is
+contained by the wall that answers the same point, and the containing thing must
+never outrank the contained thing. That is the same rule, applied one level
+deeper than I stated it."*
+
+**2. `ReferenceImageItem` below `RoomItem` — the WORDING was wrong, not the
+placement.** *"'Room always last' was shorthand; the actual principle is that
+PRIORITY RUNS FROM MOST SPECIFIC TO LEAST SPECIFIC, and a tracing backdrop is
+less specific than a room, not more."* **Restated at the code as the principle**
+(`items.HIT_PRIORITY`) so the next reader does not read it as a carve-out. The
+proof is what the opposite does: above rooms, no room would be selectable while
+an image is loaded — inverting the very defect this record closes. A room still
+comes last among the things a user ordinarily selects; that is a *consequence*,
+not the axiom.
+
+**3. The Ctrl band — A REFUTED PREMISE, recorded as one rather than as a
+compromise.** The ruling was *"an explicit modifier gesture should never depend
+on what sits under the press point."* Sound in general; **false here**, because
+**Ctrl was already an item-level modifier in this codebase** — the label nudge
+and the wall corner-drags — so an unconditional Ctrl band would have eaten
+gestures older than this record.
+
+**The measurement that refuted it**, and it arrived before any reasoning did —
+six tests, on the first cut:
+
+    test_room_label_ctrl_drag_nudges_label
+    test_a_dragged_end_near_a_jamb_snaps_to_it
+    test_dragging_an_end_into_a_doorway_names_the_doorway_at_release
+    test_closing_gap_refuses_and_relocks
+    test_fuse_straggler_macro_steals_no_wall
+    test_drag_split2_macro_keeps_every_room_rectilinear
+
+`_band_may_start` keeps the purpose, which was **banding from inside a room** —
+impossible before, because the band was gated on `itemAt(pos) is None`.
 
 *(Open — the manual check.)* Original acceptance, for the record:
 
