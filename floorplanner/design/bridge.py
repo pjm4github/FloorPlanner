@@ -465,6 +465,30 @@ def _warn_unwelded(scene, n):
 
 
 # ------------------------------------------------------------------ level walk
+def _new_walk_report() -> dict:
+    """THE shape of the walk's report. One definition, because there were two.
+
+    `_walls_of` does not merely count into this: it `append`s to
+    `openings_failed` and `add`s to `openings_failed_ids`, so the VALUE TYPES
+    are part of the contract and a bare counter will not do. `design_from_scene`
+    built the right shape; `face_at` passed `defaultdict(int)`, which made
+    `rep["openings_failed"]` the integer 0 -- and the first plan to reach the
+    `if straddles:` branch died there with `'int' object has no attribute
+    'append'`, taking the process with it (D57).
+
+    Writing the shape out a second time is what caused that, so it is written
+    out ONCE. A `try/except` at the append would have silenced the crash and
+    left both spellings free to drift again.
+    """
+    return {"levels": 0, "segments": 0, "merged": 0,
+            "open_edges": 0, "openings_dropped": 0, "openings_deduped": 0,
+            "rooms_without_outline": 0, "unwelded_ends": 0,
+            # R5's one vocabulary. Strings for a human; ids for `verify`,
+            # which exempts an I7 only for openings that were actually
+            # filed -- an unreported I7 stays a full regression.
+            "openings_failed": [], "openings_failed_ids": set()}
+
+
 def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
     """This level's walls, split at every junction and room corner, as v5 wall
     dicts.  Openings are re-anchored from absolute `s` to {from, offset_in} on
@@ -780,13 +804,8 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         return f"{prefix}{seq[prefix]}"
 
     rep = report if report is not None else {}
-    rep.update({"levels": len(roster), "segments": 0, "merged": 0,
-                "open_edges": 0, "openings_dropped": 0, "openings_deduped": 0,
-                "rooms_without_outline": 0, "unwelded_ends": 0,
-                # R5's one vocabulary. Strings for a human; ids for `verify`,
-                # which exempts an I7 only for openings that were actually
-                # filed -- an unreported I7 stays a full regression.
-                "openings_failed": [], "openings_failed_ids": set()})
+    rep.update(_new_walk_report())
+    rep["levels"] = len(roster)
 
     buckets = _by_floor(scene)
     levels, vertices, walls, rooms, furnishings = [], [], [], [], []
@@ -967,7 +986,11 @@ def face_at(scene, point, floor=None):
 
     vt = VertexTable(lambda: nid("v"))
     src = {}
-    walls = _walls_of(items, lid, nid, vt, defaultdict(int), src,
+    # D57: the report SHAPE is a contract, not a counter -- `_walls_of` appends
+    # to it. This used to pass `defaultdict(int)` and died on the first plan
+    # whose opening no segment could hold. `face_at` still discards the report;
+    # that a straddler is recorded here and thrown away is filed separately.
+    walls = _walls_of(items, lid, nid, vt, _new_walk_report(), src,
                       weld_check=False)
     if not walls:
         return None

@@ -642,3 +642,82 @@ def _overlapping_rooms_for_identity(fp, win):
     # of this fixture produced a scene with zero walls.
     win._sel_order = [r1, r2]
     return r1, r2
+
+
+# -- D57: face_at handed _walls_of a report of the wrong shape -----------------
+
+WISCAWAY = Path(__file__).resolve().parent.parent / "fixtures" / "wiscaway2026-08-08.json"
+
+
+def _plan_with_a_straddling_opening(fp, win):
+    """Load the plan that actually reaches `_walls_of`'s `if straddles:` branch.
+
+    A REAL PLAN, deliberately. Three synthetic constructions were tried first --
+    two welded collinear walls with the door overhanging the first; one long run
+    with a door and then a T forced through the doorway; and both went through
+    `rebuild_all_walls`, which re-seats the opening so no straddler survives to
+    the walk. Building a straddler by hand builds the SYMPTOM. This plan has the
+    cause: a 48" pocket door drawn on a continuous 210" run that a junction
+    later landed inside.
+
+    `rebase` because the plan carries a known I7 -- that fault IS the trigger,
+    and shadow mode would otherwise fail the test for the very condition it
+    exists to exercise (the same declaration `_overlapping_rooms` makes).
+    """
+    from floorplanner.design.verify import rebase
+    win.load_path(str(WISCAWAY))
+    rebase(win)
+    return win.scene
+
+
+@pytest.mark.geometry
+def test_face_at_survives_an_opening_no_segment_can_hold(fp, win):
+    """D57. FAIL-FIRST: before the fix this raises
+
+        AttributeError: 'int' object has no attribute 'append'
+
+    at `bridge.py:589`, because `face_at` passed `defaultdict(int)` where
+    `_walls_of` needs `openings_failed` to be a LIST.
+
+    IN THE APP THAT ABORTS THE PROCESS -- PyQt6 calls `qFatal` on an unhandled
+    exception inside a Qt virtual, so the window vanishes with no traceback and
+    the user reports "it crashed". This calls the production function directly,
+    one level below the virtual, so the failure is an ordinary red rather than a
+    dead runner: a receipt a silent abort can pass through is not a receipt.
+    """
+    sc = _plan_with_a_straddling_opening(fp, win)
+
+    # PRECONDITION, established through the caller that WORKS: the scene really
+    # does contain an opening no segment can hold. Without this the verdict
+    # below is about a branch that was never entered.
+    rep = {}
+    design_from_scene(win, report=rep)
+    assert rep["openings_failed"],         "no opening straddles a junction -- the branch under test is unreached"
+
+    # THE VERDICT: detection must not raise. Returning None would be fine; the
+    # defect is the AttributeError, not the answer.
+    fp.detect_room(sc, QPointF(1059, 555))
+
+
+@pytest.mark.geometry
+def test_both_walls_of_callers_pass_the_same_report_shape(fp, win):
+    """The cause, asserted directly rather than only through its symptom.
+
+    `_walls_of` needs a report whose `openings_failed` is a LIST and whose
+    `openings_failed_ids` is a SET. There were two spellings of that shape, one
+    of them wrong; there is now ONE initialiser and both callers use it.
+
+    Worth pinning rather than trusting: writing this test produced a THIRD
+    hand-written spelling of the same dict, which promptly failed on a key it
+    had not thought to include. That is the drift the single definition exists
+    to stop.
+    """
+    from floorplanner.design.bridge import _new_walk_report
+    rep = _new_walk_report()
+    assert isinstance(rep["openings_failed"], list)
+    assert isinstance(rep["openings_failed_ids"], set)
+
+    report = {}
+    design_from_scene(win, report=report)
+    assert isinstance(report["openings_failed"], list)
+    assert isinstance(report["openings_failed_ids"], set)

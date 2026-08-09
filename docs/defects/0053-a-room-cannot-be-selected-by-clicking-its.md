@@ -420,6 +420,45 @@ at z 10, they at 5, 6 and 3 — still reaches each item's own menu. A test on a
 freshly loaded plan passes while the real gesture fails, which is exactly how
 the first cut of A1b broke `dragWallFuseStraggler`.
 
+### THE FOUR BLANK-CANVAS AFFORDANCES — two covered, TWO GAPS
+
+Ordered before the context-menu pass, because if one affordance was resting on
+the blank-canvas path others might be. Four were.
+`docs/evidence/d53-blank-canvas-routes.txt`.
+
+| affordance | route outside the blank-canvas path | |
+|---|---|---|
+| floor popup | `Floors ▸ Select…` **Ctrl+F** (the *identical* popup), Next/Previous, `Edit this floor` | **covered** |
+| New concept room… | `Rooms ▸ New concept room…` | **covered** |
+| **Paste room** | **none** | **GAP** |
+| **3D view…** | **none** | **GAP** |
+
+**`Edit ▸ Paste` is not a route to Paste room.** There are two clipboards and
+they are not connected: `item_clipboard` (written by cut/copy, read by
+`paste_clipboard` = Ctrl+V) and `room_clipboard` (written by the room menu's
+*Copy room*, read **only** by `paste_room`, whose only caller is the
+blank-canvas menu). **Ctrl+V does not paste a room.** And the pair is now split
+across the two menus — *Copy room* sits on the room's own menu, which this pass
+makes reachable from the whole region, while its partner sits on the canvas
+menu. Copy got easier to reach; paste got harder.
+
+**`show_3d_view` has exactly two call sites, both blank-canvas right-clicks** —
+`levels.py:239` (appended to the floor popup, and only when `scene_menu=True`;
+the Ctrl+F route deliberately excludes it) and `view.py:674`. **No menu-bar
+entry, no shortcut, no toolbar button.** The 3D viewer is reachable only by
+right-clicking empty canvas, and a plan that fills the canvas may offer none.
+
+It was already fragile before A1b — it always needed blank canvas. What A1b
+removed is the *region* route, which existed only because a right-click inside a
+room returned `None`. **So the viewer, too, was reachable through the
+hit-testing defect** — the same shape as the naming affordance, and another
+instance of the pattern below.
+
+**Closing both gaps is part of the context-menu pass, not a follow-up.** 3D view
+is a whole-document view rather than a per-item action, so a menu-bar entry is
+the natural home; Paste room wants a *location*, which is why it sat on the
+canvas menu, so where it goes is a design call rather than a mechanical one.
+
 ### THE REGION ROUTE IS A GAIN, NOT A RESTORATION — do not "restore" the old one
 
 The room menu was **only ever reachable from the LABEL**. Before A1b, a

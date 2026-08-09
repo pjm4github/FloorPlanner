@@ -1,0 +1,67 @@
+THE FOUR BLANK-CANVAS AFFORDANCES -- is there a route outside that path?
+
+Measured 2026-08-08 by walking the live menu bar (every QAction and its
+shortcut) and by parsing every call site of the underlying method.  Parse for
+existence, run for reachability -- the two questions are asked separately, and
+by different instruments, for the reason D53 already paid for.
+
+  affordance          alternative route                          verdict
+  ------------------  ----------------------------------------  ----------
+  floor popup         Floors > Select...        Ctrl+F           COVERED
+                      Floors > Next / Previous  Ctrl+PgDn/PgUp
+                      Floors > <name> > Edit this floor
+                      (Select... opens THE IDENTICAL popup)
+
+  New concept room    Rooms > New concept room...   (no key)     COVERED
+
+  Paste room          NONE                                       *** GAP ***
+  3D view             NONE                                       *** GAP ***
+
+-- PASTE ROOM: WHY Edit > Paste IS NOT IT -----------------------------------
+
+There are TWO clipboards and they are not connected:
+
+  item_clipboard   written by cut_selected / copy_selected
+                   read by paste_clipboard  <- Edit > Paste, Ctrl+V
+  room_clipboard   written by rooms.py:1270 (the ROOM menu's "Copy room")
+                   read by mainwindow.py:1582 (paste_room) ONLY
+
+paste_room's only caller is view.py's blank-canvas Room-tool menu, gated on
+`a_paste.setEnabled(self.win.room_clipboard is not None)`.  So Ctrl+V does NOT
+paste a room, and "Copy room" has exactly one partner.
+
+  AND THE PAIR IS SPLIT ACROSS THE TWO MENUS: "Copy room" is on the ROOM's own
+  context menu -- which A1b has just made reachable from the whole region --
+  while its "Paste room" partner is on the BLANK-CANVAS menu.  Copy is now
+  easier to reach than it was and paste is harder.
+
+-- 3D VIEW: TWO CALL SITES, BOTH BLANK-CANVAS -------------------------------
+
+  levels.py:239   the floor popup's appended "3D view..." -- and ONLY when
+                  scene_menu=True, i.e. the RIGHT-CLICK route.  The keyboard
+                  route (Ctrl+F) deliberately excludes it; select_floor_popup's
+                  own docstring says so: "a chord named 'select a floor' should
+                  not offer a renderer".
+  view.py:674     the Room-tool blank-canvas menu.
+
+No menu-bar entry.  No shortcut.  No toolbar button.  THE 3D VIEWER IS
+REACHABLE ONLY BY RIGHT-CLICKING EMPTY CANVAS -- and on a plan that fills the
+canvas there may be no empty canvas to right-click.
+
+  This was ALREADY fragile before A1b: it always required blank canvas.  What
+  A1b removed is the region route -- on main a right-click inside a room
+  returned None, so the room's own area counted as "empty canvas" and offered
+  it.  The viewer was reachable through a hit-testing defect, which is the same
+  shape as the naming affordance and the fourth instance of that pattern.
+
+-- WHAT THIS ADDS TO THE CONTEXT-MENU PASS ----------------------------------
+
+Two of the four are covered and the pass need only preserve them.  Two are
+gaps, and closing them is part of the pass rather than a follow-up:
+
+  * 3D view needs a first-class route.  A menu-bar entry is the obvious one --
+    it is a whole-document view, not a per-item action, so it belongs beside
+    the other document-level commands rather than on any context menu.
+  * Paste room needs to be reachable where Copy room is, or to share Ctrl+V's
+    key with a modifier.  Where exactly is a design call: paste wants a
+    LOCATION, which is why it sat on the canvas menu in the first place.

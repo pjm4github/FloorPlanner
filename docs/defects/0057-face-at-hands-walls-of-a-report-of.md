@@ -159,9 +159,74 @@ acceptance below therefore asserts the gesture *completes*, not merely that a
 test does not fail: with the process aborting, a test that never runs its
 assertions can look like a pass.
 
+## WHICH INVARIANT I7 IS, AND WHETHER A BOUNDARY CHECK WOULD HAVE CAUGHT IT
+
+**Asked directly, answered by measurement, and the answer is yes — with a
+detail that makes it stronger than expected.**
+
+    check(deep=True)  -> ['I7  opening o29 runs off wall w90 (68.0..116.0 of 72.0)']
+    check(deep=False) -> ['I7  opening o29 runs off wall w90 (68.0..116.0 of 72.0)']
+
+**I7 IS ONE OF THE CHEAP TWELVE, not one of the deep three.** (`validate.check`'s
+own docstring: deep-only is I5b, I11, I14; always-on is I1–I10, I12, I13.)
+
+So a document-boundary check would have surfaced this **before the user ever
+reached the crash** — and it would **not have needed the deep set to do it**.
+That is the part worth having: [D49](0049-i11-overlapping-placed-rooms-the-corruption-this.md)
+is framed around running the DEEP set at load and save, and the cost objection
+to it has always been the O(n²) sweep. **This instance is caught by the cheap
+half**, which the O(n²) argument does not touch at all.
+
+**This is direct, measured evidence for D49, and it is not a preference.** The
+chain is: the plan was saved carrying an I7 → nothing said so → the fault sat in
+the file → the user later clicked to name a room → the app died with no message.
+A check at the save boundary breaks that chain at its first link, and a check at
+the load boundary breaks it at the second. Recorded here and cited from D49 so
+the argument lives with its evidence.
+
+**What it does NOT establish**, because the boundary matters: it says a boundary
+check would have *reported* this fault. It does not say the user would have
+acted on the report, and it says nothing about the deep three, whose cost
+argument is untouched by this instance.
+
 ## Receipt
 
-*(Open.)* Acceptance:
+**FIXED, 2026‑08‑08.** One definition: `_new_walk_report()` in `bridge.py`, used
+by `design_from_scene` and by `face_at`. No `try/except` at the append — that was
+forbidden and would have been wrong anyway, since it silences the crash and
+leaves two spellings free to drift.
+
+**FAIL-FIRST, on a plan that actually reaches `if straddles:`.** Three synthetic
+constructions were tried first and **all three failed to reach the branch** —
+`rebuild_all_walls` re-seats the opening, so a hand-built straddler does not
+survive to the walk. Building one directly would have built the *symptom*. The
+test therefore loads `fixtures/wiscaway2026-08-08.json`, which has the *cause*:
+
+| | |
+|---|---|
+| before the fix | `AttributeError: 'int' object has no attribute 'append'`, with `rep = defaultdict(int, {'segments': 91, 'openings_failed': 0})` in the traceback |
+| after | **2 passed** |
+
+**And the precondition earned its keep**: the first draft of the test asserted a
+straddler existed, and that assertion **failed** on all three synthetic scenes —
+so without it the test would have gone green after the fix while exercising
+nothing.
+
+**The reported gesture, end to end** (`docs/evidence/d57-kitchen-crash.txt`):
+load the plan, delete `KITCHEN`, Room tool, click the enclosed space →
+**completes, and the room is named** — `Kitchen` is back in the room list.
+Asserted by the room existing, not by the absence of a failure, because a
+process that aborts runs no assertions and can look like a pass.
+
+**`fixtures/wiscaway2026-08-08.json` still fails I7 afterwards** — verified. The
+fix is to the crash, not to the plan; laundering the fixture would hide the
+trigger.
+
+*(The second half — that `face_at` discards the report it is now correctly
+given — is [D58](0058-face-at-discards-the-walk-report-so-a.md), filed and not
+fixed here.)*
+
+### Original acceptance, for the record
 
 * the reported gesture — load the plan, delete `KITCHEN`, Room tool, click the
   enclosed space — **completes and names the room**, asserted by the room
