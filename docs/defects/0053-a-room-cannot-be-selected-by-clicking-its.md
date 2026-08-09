@@ -4,8 +4,8 @@ id: 53
 title: "A room cannot be selected by clicking its region - a MISSING CAPABILITY, not a regression"
 
 # maps directly onto GitHub Issues fields
-state: open
-state_reason: null
+state: closed
+state_reason: completed
 labels:
   - type:task
   - area:ui
@@ -591,3 +591,28 @@ seam remains untested and the fix has only MOVED the boundary rather than closed
 it.** You cannot write a regression test for something that never worked — but
 you can write the test that *would* have caught it, and the mutation is how you
 prove you did.
+
+## CLOSED — 2026‑08‑09, PR #18 (`eae9b77`)
+
+Patrick's manual check passed on every item, **including the
+label-drag-then-right-click sequence** — the gesture that broke the first cut of
+this fix through the *left*-click virtual. Passing it through the *right*-click
+virtual is the evidence that one resolver governs both: `_outranked_at` is
+called by `mousePressEvent` and `contextMenuEvent` alike.
+
+Shipped: type priority rather than z-order (`items.best_by_priority`); the
+region in `shape()`; solid selection leaving the dashed channel to
+floating-ness; shift- and ctrl-click toggling; the four blank-canvas sites
+decided individually; and the two reach gaps the affordance census found —
+`View ▸ 3D view…` (Ctrl+3) and `Edit ▸ Paste room` (Ctrl+Shift+V) — closed in
+the same merge rather than deferred.
+
+**The mutation receipt is what says the seam closed rather than moved**: before
+A1b, severing `_update_edit_actions` from `_sel_order` left all 639 tests green;
+after, exactly one fails, and it is the test written to cross it.
+
+**Left open deliberately:** [D54](0054-a-room-label-is-sized-from-its-name.md)
+(clipped labels — never in scope, untouched here),
+[D58](0058-face-at-discards-the-walk-report-so-a.md),
+[D59](0059-the-cheap-twelve-never-run-at-a-document.md) and
+[D60](0060-copy-room-and-paste-room-use-a-clipboard.md).

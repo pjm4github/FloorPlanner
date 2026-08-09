@@ -4,8 +4,8 @@ id: 57
 title: "face_at hands _walls_of a report of the WRONG SHAPE, so naming a room CRASHES the app"
 
 # maps directly onto GitHub Issues fields
-state: open
-state_reason: null
+state: closed
+state_reason: completed
 labels:
   - type:defect
   - area:geometry
@@ -237,3 +237,23 @@ fixed here.)*
   asserted directly;
 * `fixtures/wiscaway2026-08-08.json` still fails `I7` afterwards — the fix is to
   the crash, not to the plan, and laundering the fixture would hide the trigger.
+
+## CLOSED — 2026‑08‑09, PR #18 (`eae9b77`)
+
+Fixed at cause: `_new_walk_report()` is the single definition of the walk
+report's shape, used by `design_from_scene` and `face_at`. No `try/except` at
+the append.
+
+Fail-first on a plan that actually reaches `if straddles:` — three synthetic
+scenes were tried and none of them got there, because `rebuild_all_walls`
+re-seats a hand-built straddler. The reported gesture now completes **and names
+the room**.
+
+**The fixture is frozen and its dirtiness declared**
+(`test_the_wiscaway_fixture_is_still_dirty_in_exactly_the_way_that_matters`),
+verified by repairing the door and watching both that test and this one's
+precondition go red.
+
+**Left open:** [D58](0058-face-at-discards-the-walk-report-so-a.md) — `face_at`
+still discards the report it is now correctly given. The I7 in the plan is
+untouched by design.
