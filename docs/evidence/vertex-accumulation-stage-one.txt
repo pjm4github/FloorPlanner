@@ -1,0 +1,93 @@
+VERTEX ACCUMULATION -- STAGE ONE: THE PRODUCER, MEASURED.
+
+Reproduce:
+    python docs/evidence/vertex_accumulation_probe.py examples/fiveRoomTest.json
+    PLAN_ONLY=1 python docs/evidence/vertex_accumulation_probe.py fixtures/wiscaway2026-08-08.json
+
+Gestures are driven as REAL label-drags through the view, so the whole
+extract -> translate -> join path runs. Nothing is cleaned; a leak a cleaner
+hides is worse than a leak that shows.
+
+-- PATRICK'S OWN FILE, AS IT LOADS ------------------------------------------
+
+    walls 103   rooms 19   vertex objects 101   distinct points 100
+    degree-2 vertices 60
+    DEGREE-2 COLLINEAR 26      <- what a coalesce would dissolve
+
+26 is the direct measure of "a straight run carrying more than a dozen
+handles". They are already in the file; nothing needs to be done to produce
+them.
+
+-- THE GROWTH LAW, ON A CLEAN PLAN (examples/fiveRoomTest.json, room R4) ----
+
+    gesture                 walls   vtx  deg2  coll   delta
+    (loaded)                   16    12     5     0
+    move #1 (out)              20    17    12     0   (+4 walls, +5 vtx)
+    move #2 (back)             16    12     5     0   (-4 walls, -5 vtx)
+    walk #1                    20    17     8     0   (+4 walls, +5 vtx)
+    walk #2                    22    19    10     2   (+2 walls, +2 vtx)
+    walk #3                    24    21    12     4   (+2 walls, +2 vtx)
+    walk #4                    26    23    14     6   (+2 walls, +2 vtx)
+    walk #5                    28    25    16     8   (+2 walls, +2 vtx)
+    walk #6                    30    27    18    10   (+2 walls, +2 vtx)
+    shuffle walk #1            32    31    22    12   (+2 walls, +4 vtx)
+    shuffle walk #2            32    31    22    12   (+0 walls, +0 vtx)
+    shuffle walk #3            32    31    22    12   (+0 walls, +0 vtx)
+
+-- READING IT ---------------------------------------------------------------
+
+A MOVE THAT RETURNS THE ROOM WHENCE IT CAME IS BALANCED. move #1 out is
++4 walls / +5 vertices; move #2 back is -4 / -5, exactly to baseline. That is
+why "move a room and move it back" shows nothing, and why the accumulation is
+invisible to any test that does it.
+
+A MOVE THAT LANDS THE ROOM SOMEWHERE NEW COSTS +2 WALLS AND +2 VERTICES, EVERY
+TIME, PERMANENTLY -- and both new vertices are DEGREE-2 COLLINEAR. The collinear
+count runs 0, 0, 2, 4, 6, 8, 10 across six walks. It is linear, monotonic, and
+it never comes back down.
+
+SHUFFLE IS NOT THE PRODUCER. A shuffled room stays floating (P4.3: "leaving
+shuffle joins nothing automatically"), so join never runs -- the first shuffled
+move pays the extract cost once and every later one is +0/+0. Repeated
+shuffling does not accumulate.
+
+-- THE CALL SITE ------------------------------------------------------------
+
+Per walk gesture, measured:
+
+    walls.split_wall_at   from extract.py:232, inside join_room
+    Vertex.at         x4  from walls.py:1184  WallItem.__init__
+    Vertex.at         x4  from walls.py:1185  WallItem.__init__
+    Vertex.at         x4  from extract.py:178 _private
+    walls.merge_wall  x6  from extract.py:254, inside join_room
+
+Twelve corners are minted per gesture and ten are reabsorbed. THE TWO THAT
+REMAIN ARE THE SPLITS: join_room splits every plan wall a landing room corner
+rests on (extract.py:232), which is correct -- that is how the corner becomes a
+real junction. The vertex is created BY DESIGN.
+
+WAS IT EVER INTENDED TO BE REMOVED AGAIN? NO -- and that is the finding.
+join_room's own docstring says coalescing "touches only the runs the room's own
+walls sit in (merge_wall is per-run and refuses through degree-3 vertices),
+never the whole plan". merge_wall runs six times per gesture and does reabsorb
+the room's own privatised walls. But when the room LEAVES that spot on a later
+gesture, the split it caused is in a run the room no longer occupies, so
+nothing revisits it. THE SPLIT IS PLACED BY A JOIN AND OWNED BY NOBODY
+AFTERWARDS.
+
+So this is not a bug in split_wall_at, and not a leak in extract/join taken as
+a pair. It is an ASYMMETRY: the join splits, and no gesture un-splits.
+
+-- ONE INSTRUMENT ERROR, RECORDED BECAUSE IT ALMOST SHIPPED ------------------
+
+The first run reported degree-2 = 0 on a 103-wall plan. Cause: `WallItem.v1`
+returns the vertex's UID STRING, not the object; `_v1` holds the Vertex. An
+isinstance filter then silently dropped every wall corner. 206 ends over 97
+objects should average 2.1, and a zero was not credible -- which is what caught
+it.
+
+The second run reported no split at all. Cause: `extract.py:29` does
+`from floorplanner.walls import split_wall_at`, so wrapping
+`walls.split_wall_at` left extract's own name bound to the original. THE
+WRAPPER WAS BOUND TO THE WRONG REFERENCE. Both are the "grep for identifiers,
+parse for shapes" family, arriving in an instrument rather than in a census.
