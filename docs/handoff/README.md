@@ -63,3 +63,4 @@ rulings in `0001` turned on exactly that.
 | pair | subject |
 |---|---|
 | [`0001-report.md`](0001-report.md) · [`0001-ruling.md`](0001-ruling.md) | The docs refactor: read-back, eleven findings, and the rulings that settled them |
+| [`0002-report.md`](0002-report.md) | Repository state at 2026‑08‑09: `main` @ `a604d40`, the vertex-accumulation programme, and what is owed before 2b |
