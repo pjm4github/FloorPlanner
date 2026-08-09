@@ -95,3 +95,30 @@ one.**
 
 So the parasitic surface for the collapse is the viewer, which D50 has already
 ruled correct and not to be changed — and **A2 touches neither quantity**.
+
+### PARKED AS NOT REPRODUCIBLE — ruled 2026‑08‑09
+
+**The HANG is parked. The record is not closed.**
+
+What is parked is the specific symptom: *"it hangs
+`test_drag_split_macro_keeps_every_room_rectilinear` at the first drag, and the
+trigger is the magnitude of the z step."* That does not reproduce on this tree,
+by the measurement above, and chasing it further would have meant changing
+things until something hung — which is the same error as choosing constants to
+make a symptom go away, pointed the other way.
+
+**What survives the parking, and is still open:**
+
+* **the four competing z-order systems**, which is what this record is actually
+  named for and which the measurement did not touch;
+* **ruling 4's scheme** — z = `floor_term + stack_term + type_term`, the
+  backdrop's −1e9 becoming a **type term** rather than a magic number,
+  `bring_to_front`'s full-scene max scan dying with it, and the band arithmetic
+  becoming named constants with `max(type_term) < STACK_BAND` and
+  `max(stack_term) < FLOOR_BAND` pinned by a test;
+* **the serialization half**, unblocked by R‑B and queued separately as A3.
+
+**If the hang returns**, the instrument is on disk and takes one command:
+`docs/evidence/d11_a2_z_step_counter.py`, which parametrises both z steps and
+bounds the run so a hang yields tallies rather than a wedged process. **Do not
+re-derive it.**
