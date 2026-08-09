@@ -1,0 +1,27 @@
+BLANK-CANVAS AFFORDANCES -- parsed from floorplanner/**.py
+Every branch gated on 'is there nothing under the cursor?', and what a
+user can reach inside it.
+==============================================================================
+
+floorplanner/view.py:660  in contextMenuEvent()
+    gate: self.win.tool == TOOL_ROOM and self.blank(e.pos())
+    spelled via: blank
+      - menu item "Paste room"
+      - menu item "New concept room…"
+      - menu item "3D view…"
+      - calls paste_room()
+      - calls new_concept_room()
+      - calls show_3d_view()
+
+floorplanner/view.py:677  in contextMenuEvent()
+    gate: self.blank(e.pos())
+    spelled via: blank
+      - calls select_floor_popup()
+
+floorplanner/view.py:439  in mousePressEvent()
+    gate: self.blank(pos)
+    spelled via: blank
+      - calls setCursor()
+      - CLEARS THE SELECTION
+
+3 blank-canvas-gated branch(es).

@@ -1,0 +1,48 @@
+D57 -- THE KITCHEN CRASH, CAPTURED.  Reproduce:
+
+    python docs/evidence/d57_kitchen_crash_probe.py <repo-root> \
+        fixtures/wiscaway2026-08-08.json <logfile>
+
+The probe replaces sys.excepthook so the fault is WRITTEN AND FSYNCED
+before PyQt6 aborts.  In the real app the abort wins and the user sees
+the window vanish with no traceback -- which is why this is captured
+rather than inferred.
+
+======== branch 8a6751d ========
+step 4: LEFT-CLICK the enclosed space that was the kitchen
+   sending MouseButtonPress
+!!! UNHANDLED EXCEPTION IN A QT VIRTUAL -- PyQt6 will abort after this
+Traceback (most recent call last):
+  File "C:\dev\GitHub\FloorPlanner\floorplanner\view.py", line 419, in mousePressEvent
+    res = detect_room(self.scene(), sp)
+  File "C:\dev\GitHub\FloorPlanner\floorplanner\rooms.py", line 51, in detect_room
+    edges = face_at(scene, anchor, floor)
+  File "C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py", line 970, in face_at
+    walls = _walls_of(items, lid, nid, vt, defaultdict(int), src,
+                      weld_check=False)
+  File "C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py", line 589, in _walls_of
+    rep["openings_failed"].append(
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'int' object has no attribute 'append'
+   ...survived
+   sending MouseButtonRelease
+   ...survived
+step 5: SURVIVED THE WHOLE GESTURE -- no crash
+   rooms now: ['BKF NOOK', 'CLST', 'Dining', 'Foyer', 'Front Porch', 'GREAT RM', 'HALL', 'Lounge', 'M Bath', 'MBR', 'MUD', 'PKT Off', 'PWDR', 'Pan', 'Rear Porch', 'SAFE', 'Util', 'WIC']
+
+======== main bcffa08 -- IDENTICAL ========
+!!! UNHANDLED EXCEPTION IN A QT VIRTUAL -- PyQt6 will abort after this
+floorplanner\view.py", line 348, in mousePressEvent
+floorplanner\rooms.py", line 51, in detect_room
+floorplanner\design\bridge.py", line 970, in face_at
+floorplanner\design\bridge.py", line 589, in _walls_of
+AttributeError: 'int' object has no attribute 'append'
+
+======== a1172be, before D47/A1 landed -- IDENTICAL ========
+AttributeError: 'int' object has no attribute 'append'
+
+So it is PRE-EXISTING on every tree tested, and the prediction that it
+would not reproduce on main is REFUTED.  The Room tool's naming route is
+handled in PlanView.mousePressEvent BEFORE any hit test, so shape() never
+participates; and the room is DELETED, not renamed, so there is no room
+to click in the first place.
