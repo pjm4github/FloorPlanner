@@ -16,7 +16,7 @@ opened: 2026-08-09
 closed: null
 closed_by: null
 rank: 62
-related: [41, 52]
+related: [41, 52, 62]
 state_source: report
 github_issue: null
 ---
@@ -34,6 +34,31 @@ Measured on his own plan as it loads (`fixtures/wiscaway2026-08-08.json`):
     walls 103   rooms 19   vertex objects 101   distinct points 100
     degree-2 vertices 60
     DEGREE-2 COLLINEAR 26        <- what a coalesce would dissolve
+
+**THE SIZE OF THE COMPLAINT IS 69, NOT 26, AND IT IS AN OUTLINE FACT.** Measured
+at `a604d40` and re-measured at stage 2a's follow-up. `normalize_walls` — Edit ▸
+Coalesce all walls now, on the menu since P3.4 — coalesces the WALL GRAPH and
+leaves the outlines exactly as they were: on `wiscaway`, walls 103 → 81 and
+wall-graph collinear 26 → 3, while **outline corners stay 159 and the redundant
+ones stay 69, before and after**. So the thing Patrick is looking at — "a
+straight run carrying more than a dozen handles" — was never what the wall
+coalesce touched.
+
+    KITCHEN       9 outline corners, 5 redundant
+    Rear Porch   13 outline corners, 9 redundant
+    Dining       11 outline corners, 7 redundant
+
+**THREE COUNTS, AND THEY ARE NOT THE SAME COUNT** — they sat one paragraph apart
+in `a604d40`'s message with nothing joining them, which is what sent stage 2a's
+follow-up to measure all three with one instrument
+(`evidence/d61-normalize-outline-arrow.txt`):
+
+| | on `wiscaway` | predicate |
+|---|---:|---|
+| **the COMPLAINT** | **69** slots | this room's ring runs straight through the corner. No wall test, no agreement between co-holding rooms |
+| **what 2a VACATES** | **40** slots | the strict predicate below |
+| **what 2a DISSOLVES** | **28** vertices | the same set, counted as objects rather than slots |
+| **what 2a LEAVES** | **29** slots | looks redundant to a person; refused because a wall needs the corner or a co-holding room turns at it |
 
 ## Mechanism
 
@@ -84,7 +109,33 @@ join splits and no gesture un-splits.
 `docs/evidence/vertex-accumulation-stage-one.txt` ·
 `docs/evidence/vertex_accumulation_probe.py` ·
 `docs/evidence/coalesce-safety-check.json` ·
-`docs/evidence/coalesce_safety_check.py`
+`docs/evidence/coalesce_safety_check.py` ·
+`docs/evidence/d61-normalize-outline-arrow.txt` ·
+`docs/evidence/d61-normalize-outline-arrow.json` ·
+`docs/evidence/d61_normalize_outline_arrow.py` ·
+`docs/evidence/d61_divorce_behaviour.py`
+
+### THE SECOND PRODUCER — measured after 2a shipped, on five plans
+
+Ordered before 2b, because a producer 2b does not close changes what 2b is.
+**`normalize_walls` DOES raise the redundant-outline-corner count, and by very
+little: +2 vertices on two of five plans (`wiscaway` 26 → 28, `rounded`
+11 → 13), never down, and 0 on the other three.** The producer inside it is
+**`weld_scene`**, on both plans where it moved; `merge_collinear_scene` and
+`split_body_landings` change it by 0 everywhere.
+
+**Against the 69 it accounts for NOTHING.** The complaint count is 69 → 69 on
+`wiscaway` and unmoved on all five plans. So D61's mechanism story stands:
+`join_room`'s split is the producer that matters, and 2b closes it. The wall
+pass contributes 2 of 28, which is not a reason to re-scope 2b.
+
+**And the 28-versus-40 reconciliation is closed, measured rather than
+explained:** the 28 dissolved vertices are **16 held by one room and 12 held by
+two**, so 16 + 24 = **40 slots exactly, residue 0** — the same on all five plans
+(`rounded` 6×1 + 7×2 = 20; `symmetricP1` 2×2 = 4; `farmplace` 1×2 = 2;
+`planc1.v5` 0). **There is no cascade**: a second dry run after applying reports
+0 removable on every plan, so the preview does not under-report and does not
+need to iterate.
 
 ### THE PRE-IMPLEMENTATION CHECK — and it changes the predicate
 
@@ -159,7 +210,16 @@ a second run that is a no-op and a plan total against the toolbar's 3,3XX.
 
 ## Receipt
 
-*(Open — stage one complete, stage two not started.)* Acceptance for **2b** is
+*(Open — stage one and stage **2a** are on `main`; **2b** has not started.)*
+
+**2a shipped at `a604d40`**: `rooms.coalesce_outline_corners(scene, rooms=None,
+dry_run=True)` — the scoped form is the primitive — plus
+`MainWindow.coalesce_all_now(interactive=…)` and five tests in
+`tests/test_rooms.py`. On `wiscaway`: dry run **28 removable, 28 exact / 0 by
+angle**; applied, outline corners **159 → 119** and walls **103 → 81**; **no
+room's area moves**, total **3870.5 → 3870.5**; a second run is a no-op.
+
+Acceptance for **2b** is
 the growth law stated as a test: **a walk of six moves ends with the same wall,
 vertex and collinear counts it started with.** It fails today by construction
 (0, 2, 4, 6, 8, 10), so it is fail-first without contrivance — and it is the

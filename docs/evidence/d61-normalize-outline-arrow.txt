@@ -1,0 +1,182 @@
+D61 ITEM 2 -- DOES normalize_walls MANUFACTURE REDUNDANT OUTLINE CORNERS?
+=========================================================================
+
+Instrument : docs/evidence/d61_normalize_outline_arrow.py
+Result     : docs/evidence/d61-normalize-outline-arrow.json
+Consequence: docs/evidence/d61_divorce_behaviour.py
+Tree       : main @ cbb0c7d (code identical to a604d40)
+Plans      : fixtures/wiscaway2026-08-08.json (Patrick's) + four from examples/
+
+
+THE CONTROLS, NAMED BESIDE THE RESULT
+-------------------------------------
+Ordered before the result was read, because the interesting answer here was
+expected to be a zero.
+
+CONTROL A -- the ordered one. After normalize_walls the instrument MUST report
+(1062, 684) and (750, 684) as outline corners at wall-degree 0 still named by
+Dining/KITCHEN and Foyer/GREAT RM/HALL, from a604d40's own measurement.
+    VERDICT: PASS. Both found, degree 2 -> 0, holders exactly as recorded.
+
+CONTROL B -- stricter than was asked: are those two also in the set the
+PRODUCTION predicate would dissolve?
+    VERDICT: FAIL, and it is not a fault. "No wall needs this corner" and
+    "every holder runs straight through it" are different questions. Those two
+    are orphaned but not dissolvable. Only A gates belief in a zero.
+
+SELF-TEST of the divorce counter (a number this probe invented, so it had no
+prior instance to lean on): detaching ONE wall from a shared corner must raise
+PARTIAL by exactly 1; detaching the rest must raise FULL by exactly 1, using
+production's own Vertex.at + set_end_vertex.
+    VERDICT: PASS (0/1 -> 0/2 -> 1/1).
+
+Three instrument faults were found by these controls, not by the results:
+  1. the drag in the consequence probe pressed a wall's MIDPOINT, which on a
+     real plan is a door -- it selected the OpeningItem and the wall never
+     moved. Arm A caught it; without arm A, arm B's "did not follow" would
+     have been reported as evidence.
+  2. the divorce counter only fired when EVERY wall had left the corner, so a
+     half-carried corner was invisible. The two-armed self-test found it.
+  3. the by-point test was not scoped by FLOOR and did not exempt FLOATING
+     rooms. Unscoped it read 62 on wiscaway; scoped and exempted, 49. The 13
+     are four floating rooms (MUD, PWDR, Pan, Util), whose sharing is broken
+     by design -- the same exemption scene_identity_report makes.
+A fourth was found by reading: "areas_unchanged" compared a key that
+coalesce_outline_corners does not set when nothing is doomed, and reported a
+false area change on planc1.
+
+
+THE ANSWER: THE ARROW POINTS UP, AND IT IS SMALL
+------------------------------------------------
+Three counts are in play and the record conflates them. Measured with one
+instrument so they can be reconciled:
+
+  COMPLAINT   outline corner slots whose OWN ring runs straight through.
+              No wall test, no agreement between co-holding rooms. This is
+              what a person sees. == 69 on wiscaway.
+  REDUNDANT   what coalesce_outline_corners will actually dissolve, strict
+              predicate. == 26 vertices / 38 slots before, 28 / 40 after.
+
+                          walls   COMPLAINT   REDUNDANT vtx / slots   coll
+  wiscaway      before      103          69          26  /  38          26
+                after        81          69          28  /  40           3
+                DELTA       -22           0          +2  /  +2         -23
+  planc1.v5     before       83          38           0  /   0           3
+                after        81          38           0  /   0           0
+  farmplace     before      109          28           1  /   2          10
+                after       115          28           1  /   2          16
+  roundedMulti  before      122          61          11  /  17          13
+                after       128          61          13  /  20          19
+  symmetricP1   before       80          35           2  /   4           2
+                after        78          35           2  /   4           0
+
+  Every plan: room areas unchanged to the cent, outline corner slots unchanged.
+
+DOES normalize_walls RAISE THE REDUNDANT COUNT?  YES, ON 2 OF 5 PLANS, BY +2
+VERTICES EACH. Never down. It is a real second producer and a small one.
+
+HOW MUCH OF THE 69 DOES IT ACCOUNT FOR?  NONE. The COMPLAINT count is 69 -> 69
+on wiscaway and unmoved on all five plans. normalize_walls does not add to what
+Patrick is looking at. It adds 2 to the strict removable set, which is 2 of 28.
+
+ATTRIBUTED TO A SUB-PASS (a second load, each pass run alone):
+
+  wiscaway    merge_collinear_scene  merged 22   REDUN +0   truly-orphaned +22
+              weld_scene             shared 91   REDUN +2   DIVORCED +49
+              split_body_landings    split   0   REDUN +0
+
+THE PRODUCER IS weld_scene, ON BOTH PLANS WHERE THE COUNT ROSE (+2 wiscaway,
++2 rounded). merge dissolves wall junctions and orphans the outline corners
+that named them, but changes the redundant count by 0 on all five plans --
+merging cannot make a ring straighter than it was. split_body_landings changes
+it by 0 everywhere.
+
+
+WHAT THE MEASUREMENT TURNED UP THAT WAS NOT ASKED FOR
+-----------------------------------------------------
+Validating the orphan count split it in two, and the second half is the larger
+finding:
+
+  TRULY ORPHANED  no wall end lies at this outline corner at all.
+                  wiscaway 7 -> 29 across normalize_walls.
+  DIVORCED        a wall end IS here, and holds a DIFFERENT Vertex object than
+                  the outline does. Under the Phase 3 model -- "a corner is one
+                  Vertex the walls and the outlines both hold" -- this state
+                  should not exist.
+                  wiscaway 0 -> 49, planc1 0 -> 56, farmplace 0 -> 24,
+                  rounded 0 -> 78, symmetricP1 0 -> 57.
+
+  ZERO ON EVERY PLAN AS LOADED; LARGE ON EVERY PLAN AFTER Edit > Coalesce all
+  walls now. Attributed to weld_scene on all five. The mechanism is visible in
+  the counts: weld folds coincident wall ends onto one surviving Vertex and
+  does not rebind the room outlines holding the loser.
+
+  THE SHIPPED INSTRUMENT CANNOT SEE IT. scene_identity_report (D48/G2) reports
+  extra_vertices 0 on four of the five plans after normalize_walls, and 6 on
+  planc1 -- because it compares WALL ENDS TO WALL ENDS. An outline corner
+  holding a vertex no wall holds is outside the question it asks. Its zero is
+  not evidence that the scene's corners are shared.
+
+  THE CONSEQUENCE IS NOT ESTABLISHED, AND IS NOT CLAIMED. WallItem gathers the
+  outline edges a corner drag must carry with by_id.get(id(e.v)) at
+  walls.py:1979 -- by identity -- so a divorced edge is skipped. Read that way
+  it is stranding. Measured, ONE sampled drag on a divorced corner (Lounge,
+  (456, 768)) moved the wall, left that corner where it was, and the room's
+  area did not change: consistent BOTH with stranding and with the designed
+  step-insertion at walls.py:1999-2014. One sample does not separate them.
+  Filed as D62 with the consequence open.
+
+
+ITEM 1, ANSWERED IN THE SAME RUN
+--------------------------------
+28 dissolved VERTICES against 40 vacated SLOTS, per-vertex holder counts:
+
+  wiscaway      28 vertices = 16 held by 1 room + 12 held by 2 rooms
+                            = 16 + 24 = 40 slots.  Outline corners 159 -> 119.
+                            RESIDUE 0.
+  rounded       13 vertices = 6x1 + 7x2 = 20 slots.  187 -> 167.  RESIDUE 0.
+  symmetricP1    2 vertices = 2x2       =  4 slots.  140 -> 136.  RESIDUE 0.
+  farmplace      1 vertex   = 1x2       =  2 slots.  136 -> 134.  RESIDUE 0.
+  planc1.v5      0                          0 slots.  175 -> 175.  RESIDUE 0.
+
+  RESIDUE IS ZERO ON ALL FIVE. The multiplicity account was correct; it is now
+  measured rather than asserted.
+
+  AND THERE IS NO CASCADE: a second dry run after applying reports 0 removable
+  on all five plans. The preview does not under-report, so it does not need to
+  iterate to a fixpoint.
+
+
+WHERE THE 69 COMES FROM
+-----------------------
+a604d40 quotes 69 and its docstring repeats it. Reproduced here exactly, and
+its predicate identified: the LOOSE per-room count above. Cross-checked against
+the three per-room figures in that commit message --
+    Rear Porch 13 corners of which 9   MEASURED 13 / 9
+    Dining     11 corners of which 7   MEASURED 11 / 7
+    KITCHEN     9 corners of which 5   MEASURED  9 / 5
+-- so the number is sound and only its MEANING was unstated. It is not the
+number the primitive removes, and the two sat one paragraph apart with nothing
+saying so.
+
+  69 the user's complaint
+  40 slots the strict predicate vacates
+  28 vertices behind those slots
+  29 slots that LOOK redundant to a person and which the predicate refuses --
+     because a wall needs the corner, or a co-holding room turns at it.
+
+THAT 29 IS WHAT 2a LEAVES ON PATRICK'S PLAN, and it appears nowhere on disk
+before this file.
+
+
+WHAT THIS DOES NOT ANSWER
+-------------------------
+* whether the divorce is reachable other than through Edit > Coalesce all
+  walls now -- join_room and the drag paths call weld_scene's relatives, and
+  they were not measured here.
+* whether a divorced corner strands in practice (one sample, both readings
+  open).
+* farmplace and rounded reach a CYCLE rather than a fixpoint under repeated
+  normalize_walls: run two returns merged 16 / split 16 and merged 19 / split
+  19, with every count unchanged. Stable in aggregate, churning identity each
+  run. Noticed, not investigated.

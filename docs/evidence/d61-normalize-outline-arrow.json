@@ -1,0 +1,2517 @@
+{
+ "question": "does normalize_walls RAISE the redundant-outline-corner count -- i.e. is it a SECOND PRODUCER for D61?",
+ "control_named_at": "see CONTROL in the wiscaway entry, and the docstring",
+ "DIVORCE_DETECTOR_SELFTEST": {
+  "statement": "THE CONTROL IS THE TRANSITION, NOT THE BASELINE: detaching ONE wall from a shared corner must raise PARTIAL by exactly 1, and then detaching the rest must raise FULL by exactly 1 -- using production's own `Vertex.at` + `set_end_vertex`",
+  "why_not_a_zero_baseline": "the first version demanded 0 on the loaded plan and FAILED at PARTIAL=2. That 2 is real and pre-existing, so the assertion was UNSATISFIABLE on this fixture -- a control must test that the instrument MOVES, not that the world is empty",
+  "why_two_arms": "the first draft detached one of two walls and read 0 -- the detector only saw FULL divorce, so a half-carried corner was invisible to it. The self-test found that, not the result",
+  "detached": {
+   "room": "BKF NOOK",
+   "at": [
+    894.0,
+    312.0
+   ],
+   "walls_on_this_corner": 2,
+   "detached": 1
+  },
+  "steps": {
+   "as_loaded": {
+    "FULL": 0,
+    "PARTIAL": 1
+   },
+   "after_detaching_ONE_of_them": {
+    "FULL": 0,
+    "PARTIAL": 2
+   },
+   "after_detaching_ALL_of_them": {
+    "FULL": 1,
+    "PARTIAL": 1
+   }
+  },
+  "verdict": "PASS"
+ },
+ "plans": [
+  {
+   "plan": "wiscaway2026-08-08.json",
+   "A_arrow": {
+    "normalize_walls_returned": {
+     "merged": 22,
+     "moved": 0,
+     "shared": 91,
+     "split": 0
+    },
+    "second_run_returned": {
+     "merged": 0,
+     "moved": 0,
+     "shared": 91,
+     "split": 0
+    },
+    "BEFORE": {
+     "label": "as loaded (merge_all has already run -- planio:204)",
+     "walls": 103,
+     "rooms": 19,
+     "outline_corner_slots": 159,
+     "outline_corner_objects": 97,
+     "COMPLAINT_ring_runs_straight_slots": 69,
+     "REDUNDANT_vertices": 26,
+     "REDUNDANT_slots": 38,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 7,
+     "TRULY_orphaned_no_wall_end_here": 7,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 1,
+     "wall_degree2": 60,
+     "wall_degree2_collinear": 26,
+     "total_area_sqft": 3870.5
+    },
+    "AFTER": {
+     "label": "after normalize_walls",
+     "walls": 81,
+     "rooms": 19,
+     "outline_corner_slots": 159,
+     "outline_corner_objects": 97,
+     "COMPLAINT_ring_runs_straight_slots": 69,
+     "REDUNDANT_vertices": 28,
+     "REDUNDANT_slots": 40,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 91,
+     "TRULY_orphaned_no_wall_end_here": 29,
+     "DIVORCED_wall_here_but_not_this_object": 49,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 37,
+     "wall_degree2_collinear": 3,
+     "total_area_sqft": 3870.5
+    },
+    "DELTA": {
+     "walls": -22,
+     "outline_corner_slots": 0,
+     "outline_corner_objects": 0,
+     "COMPLAINT_ring_runs_straight_slots": 0,
+     "REDUNDANT_vertices": 2,
+     "REDUNDANT_slots": 2,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 84,
+     "TRULY_orphaned_no_wall_end_here": 22,
+     "DIVORCED_wall_here_but_not_this_object": 49,
+     "PARTLY_DIVORCED_some_walls_left_the_object": -1,
+     "wall_degree2_collinear": -23,
+     "total_area_sqft": 0.0
+    },
+    "AFTER_A_SECOND_RUN": {
+     "label": "after a SECOND normalize_walls",
+     "walls": 81,
+     "rooms": 19,
+     "outline_corner_slots": 159,
+     "outline_corner_objects": 97,
+     "COMPLAINT_ring_runs_straight_slots": 69,
+     "REDUNDANT_vertices": 28,
+     "REDUNDANT_slots": 40,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 91,
+     "TRULY_orphaned_no_wall_end_here": 29,
+     "DIVORCED_wall_here_but_not_this_object": 49,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 37,
+     "wall_degree2_collinear": 3,
+     "total_area_sqft": 3870.5
+    },
+    "DELTA_of_second_run": {
+     "walls": 0,
+     "outline_corner_slots": 0,
+     "outline_corner_objects": 0,
+     "COMPLAINT_ring_runs_straight_slots": 0,
+     "REDUNDANT_vertices": 0,
+     "REDUNDANT_slots": 0,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 0,
+     "TRULY_orphaned_no_wall_end_here": 0,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2_collinear": 0,
+     "total_area_sqft": 0.0
+    },
+    "outline_corner_objects_that_changed_identity": 0,
+    "per_room_removable_BEFORE": {
+     "BKF NOOK": 3,
+     "CLST": 1,
+     "Dining": 3,
+     "Foyer": 5,
+     "Front Porch": 1,
+     "GREAT RM": 1,
+     "HALL": 1,
+     "KITCHEN": 1,
+     "Lounge": 3,
+     "M Bath": 0,
+     "MBR": 3,
+     "MUD": 3,
+     "PKT Off": 1,
+     "PWDR": 1,
+     "Pan": 1,
+     "Rear Porch": 3,
+     "SAFE": 3,
+     "Util": 2,
+     "WIC": 2
+    },
+    "per_room_removable_AFTER": {
+     "Dining": 3,
+     "BKF NOOK": 3,
+     "CLST": 1,
+     "WIC": 2,
+     "KITCHEN": 3,
+     "MBR": 3,
+     "Util": 2,
+     "SAFE": 3,
+     "Foyer": 5,
+     "Lounge": 3,
+     "MUD": 3,
+     "PKT Off": 1,
+     "PWDR": 1,
+     "Pan": 1,
+     "GREAT RM": 1,
+     "M Bath": 0,
+     "Rear Porch": 3,
+     "Front Porch": 1,
+     "HALL": 1
+    },
+    "per_room_COMPLAINT_BEFORE": {
+     "BKF NOOK": 4,
+     "CLST": 1,
+     "Dining": 7,
+     "Foyer": 6,
+     "Front Porch": 1,
+     "GREAT RM": 5,
+     "HALL": 4,
+     "KITCHEN": 5,
+     "Lounge": 6,
+     "M Bath": 1,
+     "MBR": 6,
+     "MUD": 3,
+     "PKT Off": 1,
+     "PWDR": 1,
+     "Pan": 1,
+     "Rear Porch": 9,
+     "SAFE": 4,
+     "Util": 2,
+     "WIC": 2
+    },
+    "per_room_COMPLAINT_AFTER": {
+     "Dining": 7,
+     "BKF NOOK": 4,
+     "CLST": 1,
+     "WIC": 2,
+     "KITCHEN": 5,
+     "MBR": 6,
+     "Util": 2,
+     "SAFE": 4,
+     "Foyer": 6,
+     "Lounge": 6,
+     "MUD": 3,
+     "PKT Off": 1,
+     "PWDR": 1,
+     "Pan": 1,
+     "GREAT RM": 5,
+     "M Bath": 1,
+     "Rear Porch": 9,
+     "Front Porch": 1,
+     "HALL": 4
+    },
+    "per_room_outline_corners": {
+     "Dining": 11,
+     "BKF NOOK": 8,
+     "CLST": 5,
+     "WIC": 6,
+     "KITCHEN": 9,
+     "MBR": 10,
+     "Util": 6,
+     "SAFE": 8,
+     "Foyer": 10,
+     "Lounge": 10,
+     "MUD": 7,
+     "PKT Off": 7,
+     "PWDR": 5,
+     "Pan": 5,
+     "GREAT RM": 9,
+     "M Bath": 9,
+     "Rear Porch": 13,
+     "Front Porch": 13,
+     "HALL": 8
+    }
+   },
+   "B_attribution": {
+    "start": {
+     "label": "as loaded",
+     "walls": 103,
+     "rooms": 19,
+     "outline_corner_slots": 159,
+     "outline_corner_objects": 97,
+     "COMPLAINT_ring_runs_straight_slots": 69,
+     "REDUNDANT_vertices": 26,
+     "REDUNDANT_slots": 38,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 7,
+     "TRULY_orphaned_no_wall_end_here": 7,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 1,
+     "wall_degree2": 60,
+     "wall_degree2_collinear": 26,
+     "total_area_sqft": 3870.5
+    },
+    "steps": [
+     {
+      "pass": "merge_collinear_scene",
+      "returned": {
+       "merged": 22
+      },
+      "DELTA": {
+       "walls": -22,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 0,
+       "REDUNDANT_slots": 0,
+       "D48_scene_identity_extra_vertices": 0,
+       "orphaned_named_corners": 22,
+       "TRULY_orphaned_no_wall_end_here": 22,
+       "DIVORCED_wall_here_but_not_this_object": 0,
+       "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+       "wall_degree2_collinear": -22,
+       "total_area_sqft": 0.0
+      }
+     },
+     {
+      "pass": "weld_scene",
+      "returned": {
+       "moved": 0,
+       "shared": 91
+      },
+      "DELTA": {
+       "walls": 0,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 2,
+       "REDUNDANT_slots": 2,
+       "D48_scene_identity_extra_vertices": 0,
+       "orphaned_named_corners": 62,
+       "TRULY_orphaned_no_wall_end_here": 0,
+       "DIVORCED_wall_here_but_not_this_object": 49,
+       "PARTLY_DIVORCED_some_walls_left_the_object": -1,
+       "wall_degree2_collinear": -1,
+       "total_area_sqft": 0.0
+      }
+     },
+     {
+      "pass": "split_body_landings",
+      "returned": {
+       "split": 0
+      },
+      "DELTA": {
+       "walls": 0,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 0,
+       "REDUNDANT_slots": 0,
+       "D48_scene_identity_extra_vertices": 0,
+       "orphaned_named_corners": 0,
+       "TRULY_orphaned_no_wall_end_here": 0,
+       "DIVORCED_wall_here_but_not_this_object": 0,
+       "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+       "wall_degree2_collinear": 0,
+       "total_area_sqft": 0.0
+      }
+     }
+    ],
+    "end": {
+     "label": "after split_body_landings",
+     "walls": 81,
+     "rooms": 19,
+     "outline_corner_slots": 159,
+     "outline_corner_objects": 97,
+     "COMPLAINT_ring_runs_straight_slots": 69,
+     "REDUNDANT_vertices": 28,
+     "REDUNDANT_slots": 40,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 91,
+     "TRULY_orphaned_no_wall_end_here": 29,
+     "DIVORCED_wall_here_but_not_this_object": 49,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 37,
+     "wall_degree2_collinear": 3,
+     "total_area_sqft": 3870.5
+    }
+   },
+   "C_identified": {
+    "production_dry_run_removed": 28,
+    "identified_by_applying_and_diffing": 28,
+    "AGREES": true,
+    "slots_vacated": 40,
+    "areas_unchanged": true,
+    "nothing_to_dissolve": false,
+    "ITEM_1_slots_before": 159,
+    "ITEM_1_slots_after": 119,
+    "ITEM_1_slots_vacated": 40,
+    "ITEM_1_holders_per_dissolved_vertex": {
+     "1": 16,
+     "2": 12
+    },
+    "ITEM_1_sum_of_holder_counts": 40,
+    "ITEM_1_RESIDUE": 0,
+    "ITEM_1_second_dry_run_removed": 0,
+    "ITEM_1_IS_A_FIXPOINT": true,
+    "dissolved": [
+     {
+      "at": [
+       894.0,
+       330.0
+      ],
+      "holders": [
+       "BKF NOOK",
+       "Rear Porch"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974283168
+     },
+     {
+      "at": [
+       894.0,
+       372.0
+      ],
+      "holders": [
+       "BKF NOOK",
+       "Rear Porch"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974283216
+     },
+     {
+      "at": [
+       582.0,
+       426.0
+      ],
+      "holders": [
+       "Rear Porch"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974281776
+     },
+     {
+      "at": [
+       912.0,
+       426.0
+      ],
+      "holders": [
+       "BKF NOOK",
+       "GREAT RM"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974283312
+     },
+     {
+      "at": [
+       1170.0,
+       486.0
+      ],
+      "holders": [
+       "KITCHEN"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 3,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974284080
+     },
+     {
+      "at": [
+       1170.0,
+       522.0
+      ],
+      "holders": [
+       "KITCHEN"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 3,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974284128
+     },
+     {
+      "at": [
+       1308.0,
+       522.0
+      ],
+      "holders": [
+       "MUD"
+      ],
+      "floating": true,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974284944
+     },
+     {
+      "at": [
+       1452.0,
+       564.0
+      ],
+      "holders": [
+       "Pan"
+      ],
+      "floating": true,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974285376
+     },
+     {
+      "at": [
+       1278.0,
+       576.0
+      ],
+      "holders": [
+       "PWDR"
+      ],
+      "floating": true,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974284656
+     },
+     {
+      "at": [
+       1296.0,
+       576.0
+      ],
+      "holders": [
+       "MUD"
+      ],
+      "floating": true,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974284800
+     },
+     {
+      "at": [
+       696.0,
+       582.0
+      ],
+      "holders": [
+       "SAFE"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974282400
+     },
+     {
+      "at": [
+       1296.0,
+       594.0
+      ],
+      "holders": [
+       "MUD"
+      ],
+      "floating": true,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974284848
+     },
+     {
+      "at": [
+       1170.0,
+       612.0
+      ],
+      "holders": [
+       "KITCHEN"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 3,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974284272
+     },
+     {
+      "at": [
+       534.0,
+       624.0
+      ],
+      "holders": [
+       "MBR",
+       "WIC"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974281536
+     },
+     {
+      "at": [
+       630.0,
+       624.0
+      ],
+      "holders": [
+       "SAFE",
+       "WIC"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974281872
+     },
+     {
+      "at": [
+       696.0,
+       624.0
+      ],
+      "holders": [
+       "CLST",
+       "SAFE"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974282496
+     },
+     {
+      "at": [
+       348.0,
+       648.0
+      ],
+      "holders": [
+       "MBR"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974281056
+     },
+     {
+      "at": [
+       1476.0,
+       660.0
+      ],
+      "holders": [
+       "Util"
+      ],
+      "floating": true,
+      "wall_degree": 0,
+      "wall_degree_by_point": 2,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974285568
+     },
+     {
+      "at": [
+       516.0,
+       684.0
+      ],
+      "holders": [
+       "Lounge",
+       "MBR"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974281392
+     },
+     {
+      "at": [
+       696.0,
+       684.0
+      ],
+      "holders": [
+       "Foyer",
+       "HALL"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974282592
+     },
+     {
+      "at": [
+       1428.0,
+       732.0
+      ],
+      "holders": [
+       "Util"
+      ],
+      "floating": true,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974285232
+     },
+     {
+      "at": [
+       666.0,
+       762.0
+      ],
+      "holders": [
+       "Foyer",
+       "Lounge"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974282112
+     },
+     {
+      "at": [
+       852.0,
+       762.0
+      ],
+      "holders": [
+       "Dining",
+       "Foyer"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 2,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974282880
+     },
+     {
+      "at": [
+       666.0,
+       774.0
+      ],
+      "holders": [
+       "Foyer",
+       "Lounge"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974282160
+     },
+     {
+      "at": [
+       852.0,
+       774.0
+      ],
+      "holders": [
+       "Dining",
+       "Foyer"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974282928
+     },
+     {
+      "at": [
+       1062.0,
+       774.0
+      ],
+      "holders": [
+       "Dining"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 2,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974283648
+     },
+     {
+      "at": [
+       1092.0,
+       786.0
+      ],
+      "holders": [
+       "Front Porch"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974283840
+     },
+     {
+      "at": [
+       1242.0,
+       786.0
+      ],
+      "holders": [
+       "PKT Off"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525974284560
+     }
+    ]
+   },
+   "CONTROL": {
+    "statement": "after normalize_walls, both known corners must be reported at wall-degree 0 with their named holders; CONTROL A gates belief in any zero this instrument reports on any plan",
+    "A_verdict": "PASS",
+    "B_verdict": "FAIL",
+    "checks": [
+     {
+      "at": [
+       1062.0,
+       684.0
+      ],
+      "expected_holders": [
+       "Dining",
+       "KITCHEN"
+      ],
+      "BEFORE_normalize": [
+       {
+        "at": [
+         1062.0,
+         684.0
+        ],
+        "holders": [
+         "Dining",
+         "KITCHEN"
+        ],
+        "floating": false,
+        "wall_degree": 2,
+        "wall_degree_by_point": 2,
+        "DIVORCED": false,
+        "PARTLY_DIVORCED": false,
+        "vid": 1525974283552
+       }
+      ],
+      "AFTER_normalize": [
+       {
+        "at": [
+         1062.0,
+         684.0
+        ],
+        "holders": [
+         "Dining",
+         "KITCHEN"
+        ],
+        "floating": false,
+        "wall_degree": 0,
+        "wall_degree_by_point": 0,
+        "DIVORCED": false,
+        "PARTLY_DIVORCED": false,
+        "vid": 1525974283552
+       }
+      ],
+      "CONTROL_A_orphaned_and_still_named": "PASS",
+      "CONTROL_B_in_the_dissolvable_set": "FAIL"
+     },
+     {
+      "at": [
+       750.0,
+       684.0
+      ],
+      "expected_holders": [
+       "Foyer",
+       "GREAT RM",
+       "HALL"
+      ],
+      "BEFORE_normalize": [
+       {
+        "at": [
+         750.0,
+         684.0
+        ],
+        "holders": [
+         "Foyer",
+         "GREAT RM",
+         "HALL"
+        ],
+        "floating": false,
+        "wall_degree": 2,
+        "wall_degree_by_point": 2,
+        "DIVORCED": false,
+        "PARTLY_DIVORCED": false,
+        "vid": 1525974282784
+       }
+      ],
+      "AFTER_normalize": [
+       {
+        "at": [
+         750.0,
+         684.0
+        ],
+        "holders": [
+         "Foyer",
+         "GREAT RM",
+         "HALL"
+        ],
+        "floating": false,
+        "wall_degree": 0,
+        "wall_degree_by_point": 0,
+        "DIVORCED": false,
+        "PARTLY_DIVORCED": false,
+        "vid": 1525974282784
+       }
+      ],
+      "CONTROL_A_orphaned_and_still_named": "PASS",
+      "CONTROL_B_in_the_dissolvable_set": "FAIL"
+     }
+    ]
+   }
+  },
+  {
+   "plan": "planc1.v5.json",
+   "A_arrow": {
+    "normalize_walls_returned": {
+     "merged": 3,
+     "moved": 4,
+     "shared": 96,
+     "split": 1
+    },
+    "second_run_returned": {
+     "merged": 0,
+     "moved": 0,
+     "shared": 98,
+     "split": 0
+    },
+    "BEFORE": {
+     "label": "as loaded (merge_all has already run -- planio:204)",
+     "walls": 83,
+     "rooms": 20,
+     "outline_corner_slots": 175,
+     "outline_corner_objects": 65,
+     "COMPLAINT_ring_runs_straight_slots": 38,
+     "REDUNDANT_vertices": 0,
+     "REDUNDANT_slots": 0,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 1,
+     "TRULY_orphaned_no_wall_end_here": 1,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 23,
+     "wall_degree2_collinear": 3,
+     "total_area_sqft": 5066.15
+    },
+    "AFTER": {
+     "label": "after normalize_walls",
+     "walls": 81,
+     "rooms": 20,
+     "outline_corner_slots": 175,
+     "outline_corner_objects": 65,
+     "COMPLAINT_ring_runs_straight_slots": 38,
+     "REDUNDANT_vertices": 0,
+     "REDUNDANT_slots": 0,
+     "D48_scene_identity_extra_vertices": 6,
+     "orphaned_named_corners": 64,
+     "TRULY_orphaned_no_wall_end_here": 8,
+     "DIVORCED_wall_here_but_not_this_object": 56,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 20,
+     "wall_degree2_collinear": 0,
+     "total_area_sqft": 5066.15
+    },
+    "DELTA": {
+     "walls": -2,
+     "outline_corner_slots": 0,
+     "outline_corner_objects": 0,
+     "COMPLAINT_ring_runs_straight_slots": 0,
+     "REDUNDANT_vertices": 0,
+     "REDUNDANT_slots": 0,
+     "D48_scene_identity_extra_vertices": 6,
+     "orphaned_named_corners": 63,
+     "TRULY_orphaned_no_wall_end_here": 7,
+     "DIVORCED_wall_here_but_not_this_object": 56,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2_collinear": -3,
+     "total_area_sqft": 0.0
+    },
+    "AFTER_A_SECOND_RUN": {
+     "label": "after a SECOND normalize_walls",
+     "walls": 81,
+     "rooms": 20,
+     "outline_corner_slots": 175,
+     "outline_corner_objects": 65,
+     "COMPLAINT_ring_runs_straight_slots": 38,
+     "REDUNDANT_vertices": 0,
+     "REDUNDANT_slots": 0,
+     "D48_scene_identity_extra_vertices": 6,
+     "orphaned_named_corners": 64,
+     "TRULY_orphaned_no_wall_end_here": 8,
+     "DIVORCED_wall_here_but_not_this_object": 56,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 20,
+     "wall_degree2_collinear": 0,
+     "total_area_sqft": 5066.15
+    },
+    "DELTA_of_second_run": {
+     "walls": 0,
+     "outline_corner_slots": 0,
+     "outline_corner_objects": 0,
+     "COMPLAINT_ring_runs_straight_slots": 0,
+     "REDUNDANT_vertices": 0,
+     "REDUNDANT_slots": 0,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 0,
+     "TRULY_orphaned_no_wall_end_here": 0,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2_collinear": 0,
+     "total_area_sqft": 0.0
+    },
+    "outline_corner_objects_that_changed_identity": 0,
+    "per_room_removable_BEFORE": {
+     "Clst": 0,
+     "Craft": 0,
+     "Dining": 0,
+     "Foyer": 0,
+     "Front Porch": 0,
+     "Garage": 0,
+     "Great Room": 0,
+     "Hall": 0,
+     "Kitchen": 0,
+     "Lounge": 0,
+     "M Bath": 0,
+     "Master Suite": 0,
+     "Mud": 0,
+     "PKT Off": 0,
+     "PWDR": 0,
+     "Pan": 0,
+     "Rear Porch": 0,
+     "Toi": 0,
+     "Util": 0,
+     "WIC": 0
+    },
+    "per_room_removable_AFTER": {
+     "Front Porch": 0,
+     "Garage": 0,
+     "Great Room": 0,
+     "Hall": 0,
+     "Kitchen": 0,
+     "Lounge": 0,
+     "Clst": 0,
+     "Craft": 0,
+     "Dining": 0,
+     "Foyer": 0,
+     "Toi": 0,
+     "PWDR": 0,
+     "Mud": 0,
+     "PKT Off": 0,
+     "M Bath": 0,
+     "WIC": 0,
+     "Rear Porch": 0,
+     "Master Suite": 0,
+     "Pan": 0,
+     "Util": 0
+    },
+    "per_room_COMPLAINT_BEFORE": {
+     "Clst": 0,
+     "Craft": 2,
+     "Dining": 2,
+     "Foyer": 0,
+     "Front Porch": 1,
+     "Garage": 3,
+     "Great Room": 5,
+     "Hall": 5,
+     "Kitchen": 2,
+     "Lounge": 2,
+     "M Bath": 5,
+     "Master Suite": 1,
+     "Mud": 0,
+     "PKT Off": 1,
+     "PWDR": 1,
+     "Pan": 1,
+     "Rear Porch": 5,
+     "Toi": 0,
+     "Util": 2,
+     "WIC": 0
+    },
+    "per_room_COMPLAINT_AFTER": {
+     "Front Porch": 1,
+     "Garage": 3,
+     "Great Room": 5,
+     "Hall": 5,
+     "Kitchen": 2,
+     "Lounge": 2,
+     "Clst": 0,
+     "Craft": 2,
+     "Dining": 2,
+     "Foyer": 0,
+     "Toi": 0,
+     "PWDR": 1,
+     "Mud": 0,
+     "PKT Off": 1,
+     "M Bath": 5,
+     "WIC": 0,
+     "Rear Porch": 5,
+     "Master Suite": 1,
+     "Pan": 1,
+     "Util": 2
+    },
+    "per_room_outline_corners": {
+     "Front Porch": 13,
+     "Garage": 9,
+     "Great Room": 11,
+     "Hall": 23,
+     "Kitchen": 6,
+     "Lounge": 8,
+     "Clst": 4,
+     "Craft": 8,
+     "Dining": 6,
+     "Foyer": 4,
+     "Toi": 4,
+     "PWDR": 5,
+     "Mud": 6,
+     "PKT Off": 7,
+     "M Bath": 29,
+     "WIC": 7,
+     "Rear Porch": 9,
+     "Master Suite": 5,
+     "Pan": 5,
+     "Util": 6
+    }
+   },
+   "B_attribution": {
+    "start": {
+     "label": "as loaded",
+     "walls": 83,
+     "rooms": 20,
+     "outline_corner_slots": 175,
+     "outline_corner_objects": 65,
+     "COMPLAINT_ring_runs_straight_slots": 38,
+     "REDUNDANT_vertices": 0,
+     "REDUNDANT_slots": 0,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 1,
+     "TRULY_orphaned_no_wall_end_here": 1,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 23,
+     "wall_degree2_collinear": 3,
+     "total_area_sqft": 5066.15
+    },
+    "steps": [
+     {
+      "pass": "merge_collinear_scene",
+      "returned": {
+       "merged": 3
+      },
+      "DELTA": {
+       "walls": -3,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 0,
+       "REDUNDANT_slots": 0,
+       "D48_scene_identity_extra_vertices": 0,
+       "orphaned_named_corners": 3,
+       "TRULY_orphaned_no_wall_end_here": 3,
+       "DIVORCED_wall_here_but_not_this_object": 0,
+       "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+       "wall_degree2_collinear": -3,
+       "total_area_sqft": 0.0
+      }
+     },
+     {
+      "pass": "weld_scene",
+      "returned": {
+       "moved": 4,
+       "shared": 96
+      },
+      "DELTA": {
+       "walls": 0,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 0,
+       "REDUNDANT_slots": 0,
+       "D48_scene_identity_extra_vertices": 6,
+       "orphaned_named_corners": 60,
+       "TRULY_orphaned_no_wall_end_here": 4,
+       "DIVORCED_wall_here_but_not_this_object": 56,
+       "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+       "wall_degree2_collinear": 0,
+       "total_area_sqft": 0.0
+      }
+     },
+     {
+      "pass": "split_body_landings",
+      "returned": {
+       "split": 1
+      },
+      "DELTA": {
+       "walls": 1,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 0,
+       "REDUNDANT_slots": 0,
+       "D48_scene_identity_extra_vertices": 0,
+       "orphaned_named_corners": 0,
+       "TRULY_orphaned_no_wall_end_here": 0,
+       "DIVORCED_wall_here_but_not_this_object": 0,
+       "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+       "wall_degree2_collinear": 0,
+       "total_area_sqft": 0.0
+      }
+     }
+    ],
+    "end": {
+     "label": "after split_body_landings",
+     "walls": 81,
+     "rooms": 20,
+     "outline_corner_slots": 175,
+     "outline_corner_objects": 65,
+     "COMPLAINT_ring_runs_straight_slots": 38,
+     "REDUNDANT_vertices": 0,
+     "REDUNDANT_slots": 0,
+     "D48_scene_identity_extra_vertices": 6,
+     "orphaned_named_corners": 64,
+     "TRULY_orphaned_no_wall_end_here": 8,
+     "DIVORCED_wall_here_but_not_this_object": 56,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 20,
+     "wall_degree2_collinear": 0,
+     "total_area_sqft": 5066.15
+    }
+   },
+   "C_identified": {
+    "production_dry_run_removed": 0,
+    "identified_by_applying_and_diffing": 0,
+    "AGREES": true,
+    "slots_vacated": 0,
+    "areas_unchanged": true,
+    "nothing_to_dissolve": true,
+    "ITEM_1_slots_before": 175,
+    "ITEM_1_slots_after": 175,
+    "ITEM_1_slots_vacated": 0,
+    "ITEM_1_holders_per_dissolved_vertex": {},
+    "ITEM_1_sum_of_holder_counts": 0,
+    "ITEM_1_RESIDUE": 0,
+    "ITEM_1_second_dry_run_removed": 0,
+    "ITEM_1_IS_A_FIXPOINT": true,
+    "dissolved": []
+   }
+  },
+  {
+   "plan": "farmplaceBIGmultifloor.json",
+   "A_arrow": {
+    "normalize_walls_returned": {
+     "merged": 10,
+     "moved": 13,
+     "shared": 77,
+     "split": 16
+    },
+    "second_run_returned": {
+     "merged": 16,
+     "moved": 0,
+     "shared": 77,
+     "split": 16
+    },
+    "BEFORE": {
+     "label": "as loaded (merge_all has already run -- planio:204)",
+     "walls": 109,
+     "rooms": 19,
+     "outline_corner_slots": 136,
+     "outline_corner_objects": 58,
+     "COMPLAINT_ring_runs_straight_slots": 28,
+     "REDUNDANT_vertices": 1,
+     "REDUNDANT_slots": 2,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 0,
+     "TRULY_orphaned_no_wall_end_here": 0,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 39,
+     "wall_degree2_collinear": 10,
+     "total_area_sqft": 4460.17
+    },
+    "AFTER": {
+     "label": "after normalize_walls",
+     "walls": 115,
+     "rooms": 19,
+     "outline_corner_slots": 136,
+     "outline_corner_objects": 58,
+     "COMPLAINT_ring_runs_straight_slots": 28,
+     "REDUNDANT_vertices": 1,
+     "REDUNDANT_slots": 2,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 29,
+     "TRULY_orphaned_no_wall_end_here": 5,
+     "DIVORCED_wall_here_but_not_this_object": 24,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 45,
+     "wall_degree2_collinear": 16,
+     "total_area_sqft": 4460.17
+    },
+    "DELTA": {
+     "walls": 6,
+     "outline_corner_slots": 0,
+     "outline_corner_objects": 0,
+     "COMPLAINT_ring_runs_straight_slots": 0,
+     "REDUNDANT_vertices": 0,
+     "REDUNDANT_slots": 0,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 29,
+     "TRULY_orphaned_no_wall_end_here": 5,
+     "DIVORCED_wall_here_but_not_this_object": 24,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2_collinear": 6,
+     "total_area_sqft": 0.0
+    },
+    "AFTER_A_SECOND_RUN": {
+     "label": "after a SECOND normalize_walls",
+     "walls": 115,
+     "rooms": 19,
+     "outline_corner_slots": 136,
+     "outline_corner_objects": 58,
+     "COMPLAINT_ring_runs_straight_slots": 28,
+     "REDUNDANT_vertices": 1,
+     "REDUNDANT_slots": 2,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 29,
+     "TRULY_orphaned_no_wall_end_here": 5,
+     "DIVORCED_wall_here_but_not_this_object": 24,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 45,
+     "wall_degree2_collinear": 16,
+     "total_area_sqft": 4460.17
+    },
+    "DELTA_of_second_run": {
+     "walls": 0,
+     "outline_corner_slots": 0,
+     "outline_corner_objects": 0,
+     "COMPLAINT_ring_runs_straight_slots": 0,
+     "REDUNDANT_vertices": 0,
+     "REDUNDANT_slots": 0,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 0,
+     "TRULY_orphaned_no_wall_end_here": 0,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2_collinear": 0,
+     "total_area_sqft": 0.0
+    },
+    "outline_corner_objects_that_changed_identity": 0,
+    "per_room_removable_BEFORE": {
+     "Clst": 0,
+     "Craft": 1,
+     "Dining": 0,
+     "Foyer": 0,
+     "Front Porch": 0,
+     "Garage": 0,
+     "Great Room": 0,
+     "Hall": 0,
+     "Kitchen": 1,
+     "Lounge": 0,
+     "Master Suite": 0,
+     "Mud": 0,
+     "PKT Off": 0,
+     "PWDR": 0,
+     "Pan": 0,
+     "Rear Porch": 0,
+     "Toi": 0,
+     "Util": 0,
+     "WIC": 0
+    },
+    "per_room_removable_AFTER": {
+     "Mud": 0,
+     "Craft": 1,
+     "PKT Off": 0,
+     "Rear Porch": 0,
+     "Pan": 0,
+     "Lounge": 0,
+     "Front Porch": 0,
+     "Garage": 0,
+     "Toi": 0,
+     "PWDR": 0,
+     "Clst": 0,
+     "Kitchen": 1,
+     "Great Room": 0,
+     "Foyer": 0,
+     "Hall": 0,
+     "Dining": 0,
+     "Util": 0,
+     "WIC": 0,
+     "Master Suite": 0
+    },
+    "per_room_COMPLAINT_BEFORE": {
+     "Clst": 0,
+     "Craft": 3,
+     "Dining": 2,
+     "Foyer": 0,
+     "Front Porch": 0,
+     "Garage": 2,
+     "Great Room": 2,
+     "Hall": 2,
+     "Kitchen": 2,
+     "Lounge": 6,
+     "Master Suite": 2,
+     "Mud": 0,
+     "PKT Off": 1,
+     "PWDR": 0,
+     "Pan": 1,
+     "Rear Porch": 2,
+     "Toi": 0,
+     "Util": 2,
+     "WIC": 1
+    },
+    "per_room_COMPLAINT_AFTER": {
+     "Mud": 0,
+     "Craft": 3,
+     "PKT Off": 1,
+     "Rear Porch": 2,
+     "Pan": 1,
+     "Lounge": 6,
+     "Front Porch": 0,
+     "Garage": 2,
+     "Toi": 0,
+     "PWDR": 0,
+     "Clst": 0,
+     "Kitchen": 2,
+     "Great Room": 2,
+     "Foyer": 0,
+     "Hall": 2,
+     "Dining": 2,
+     "Util": 2,
+     "WIC": 1,
+     "Master Suite": 2
+    },
+    "per_room_outline_corners": {
+     "Mud": 6,
+     "Craft": 9,
+     "PKT Off": 7,
+     "Rear Porch": 8,
+     "Pan": 5,
+     "Lounge": 18,
+     "Front Porch": 13,
+     "Garage": 9,
+     "Toi": 4,
+     "PWDR": 5,
+     "Clst": 4,
+     "Kitchen": 7,
+     "Great Room": 8,
+     "Foyer": 4,
+     "Hall": 6,
+     "Dining": 6,
+     "Util": 6,
+     "WIC": 5,
+     "Master Suite": 6
+    }
+   },
+   "B_attribution": {
+    "start": {
+     "label": "as loaded",
+     "walls": 109,
+     "rooms": 19,
+     "outline_corner_slots": 136,
+     "outline_corner_objects": 58,
+     "COMPLAINT_ring_runs_straight_slots": 28,
+     "REDUNDANT_vertices": 1,
+     "REDUNDANT_slots": 2,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 0,
+     "TRULY_orphaned_no_wall_end_here": 0,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 39,
+     "wall_degree2_collinear": 10,
+     "total_area_sqft": 4460.17
+    },
+    "steps": [
+     {
+      "pass": "merge_collinear_scene",
+      "returned": {
+       "merged": 10
+      },
+      "DELTA": {
+       "walls": -10,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 0,
+       "REDUNDANT_slots": 0,
+       "D48_scene_identity_extra_vertices": 0,
+       "orphaned_named_corners": 1,
+       "TRULY_orphaned_no_wall_end_here": 1,
+       "DIVORCED_wall_here_but_not_this_object": 0,
+       "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+       "wall_degree2_collinear": -10,
+       "total_area_sqft": 0.0
+      }
+     },
+     {
+      "pass": "weld_scene",
+      "returned": {
+       "moved": 13,
+       "shared": 77
+      },
+      "DELTA": {
+       "walls": 0,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 0,
+       "REDUNDANT_slots": 0,
+       "D48_scene_identity_extra_vertices": 0,
+       "orphaned_named_corners": 28,
+       "TRULY_orphaned_no_wall_end_here": 5,
+       "DIVORCED_wall_here_but_not_this_object": 23,
+       "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+       "wall_degree2_collinear": 0,
+       "total_area_sqft": 0.0
+      }
+     },
+     {
+      "pass": "split_body_landings",
+      "returned": {
+       "split": 16
+      },
+      "DELTA": {
+       "walls": 16,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 0,
+       "REDUNDANT_slots": 0,
+       "D48_scene_identity_extra_vertices": 0,
+       "orphaned_named_corners": 0,
+       "TRULY_orphaned_no_wall_end_here": -1,
+       "DIVORCED_wall_here_but_not_this_object": 1,
+       "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+       "wall_degree2_collinear": 16,
+       "total_area_sqft": 0.0
+      }
+     }
+    ],
+    "end": {
+     "label": "after split_body_landings",
+     "walls": 115,
+     "rooms": 19,
+     "outline_corner_slots": 136,
+     "outline_corner_objects": 58,
+     "COMPLAINT_ring_runs_straight_slots": 28,
+     "REDUNDANT_vertices": 1,
+     "REDUNDANT_slots": 2,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 29,
+     "TRULY_orphaned_no_wall_end_here": 5,
+     "DIVORCED_wall_here_but_not_this_object": 24,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 45,
+     "wall_degree2_collinear": 16,
+     "total_area_sqft": 4460.17
+    }
+   },
+   "C_identified": {
+    "production_dry_run_removed": 1,
+    "identified_by_applying_and_diffing": 1,
+    "AGREES": true,
+    "slots_vacated": 2,
+    "areas_unchanged": true,
+    "nothing_to_dissolve": false,
+    "ITEM_1_slots_before": 136,
+    "ITEM_1_slots_after": 134,
+    "ITEM_1_slots_vacated": 2,
+    "ITEM_1_holders_per_dissolved_vertex": {
+     "2": 1
+    },
+    "ITEM_1_sum_of_holder_counts": 2,
+    "ITEM_1_RESIDUE": 0,
+    "ITEM_1_second_dry_run_removed": 0,
+    "ITEM_1_IS_A_FIXPOINT": true,
+    "dissolved": [
+     {
+      "at": [
+       1482.0,
+       732.0
+      ],
+      "holders": [
+       "Craft",
+       "Kitchen"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 2,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525956776032
+     }
+    ]
+   }
+  },
+  {
+   "plan": "roundedMultifloor.json",
+   "A_arrow": {
+    "normalize_walls_returned": {
+     "merged": 13,
+     "moved": 10,
+     "shared": 130,
+     "split": 19
+    },
+    "second_run_returned": {
+     "merged": 19,
+     "moved": 0,
+     "shared": 130,
+     "split": 19
+    },
+    "BEFORE": {
+     "label": "as loaded (merge_all has already run -- planio:204)",
+     "walls": 122,
+     "rooms": 25,
+     "outline_corner_slots": 187,
+     "outline_corner_objects": 90,
+     "COMPLAINT_ring_runs_straight_slots": 61,
+     "REDUNDANT_vertices": 11,
+     "REDUNDANT_slots": 17,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 0,
+     "TRULY_orphaned_no_wall_end_here": 0,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 42,
+     "wall_degree2_collinear": 13,
+     "total_area_sqft": 5438.45
+    },
+    "AFTER": {
+     "label": "after normalize_walls",
+     "walls": 128,
+     "rooms": 25,
+     "outline_corner_slots": 187,
+     "outline_corner_objects": 90,
+     "COMPLAINT_ring_runs_straight_slots": 61,
+     "REDUNDANT_vertices": 13,
+     "REDUNDANT_slots": 20,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 85,
+     "TRULY_orphaned_no_wall_end_here": 7,
+     "DIVORCED_wall_here_but_not_this_object": 78,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 48,
+     "wall_degree2_collinear": 19,
+     "total_area_sqft": 5438.45
+    },
+    "DELTA": {
+     "walls": 6,
+     "outline_corner_slots": 0,
+     "outline_corner_objects": 0,
+     "COMPLAINT_ring_runs_straight_slots": 0,
+     "REDUNDANT_vertices": 2,
+     "REDUNDANT_slots": 3,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 85,
+     "TRULY_orphaned_no_wall_end_here": 7,
+     "DIVORCED_wall_here_but_not_this_object": 78,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2_collinear": 6,
+     "total_area_sqft": 0.0
+    },
+    "AFTER_A_SECOND_RUN": {
+     "label": "after a SECOND normalize_walls",
+     "walls": 128,
+     "rooms": 25,
+     "outline_corner_slots": 187,
+     "outline_corner_objects": 90,
+     "COMPLAINT_ring_runs_straight_slots": 61,
+     "REDUNDANT_vertices": 13,
+     "REDUNDANT_slots": 20,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 85,
+     "TRULY_orphaned_no_wall_end_here": 7,
+     "DIVORCED_wall_here_but_not_this_object": 78,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 48,
+     "wall_degree2_collinear": 19,
+     "total_area_sqft": 5438.45
+    },
+    "DELTA_of_second_run": {
+     "walls": 0,
+     "outline_corner_slots": 0,
+     "outline_corner_objects": 0,
+     "COMPLAINT_ring_runs_straight_slots": 0,
+     "REDUNDANT_vertices": 0,
+     "REDUNDANT_slots": 0,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 0,
+     "TRULY_orphaned_no_wall_end_here": 0,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2_collinear": 0,
+     "total_area_sqft": 0.0
+    },
+    "outline_corner_objects_that_changed_identity": 0,
+    "per_room_removable_BEFORE": {
+     "Clst": 0,
+     "Craft": 0,
+     "Dining": 0,
+     "Foyer": 0,
+     "Front Porch": 0,
+     "Garage": 0,
+     "Great Room": 0,
+     "Hall": 0,
+     "Kitchen": 0,
+     "LOUNGE": 0,
+     "MBATH": 1,
+     "Master Suite": 2,
+     "Mud": 0,
+     "PKT Off": 0,
+     "PWDR": 0,
+     "Pan": 0,
+     "Rear Porch": 1,
+     "Toi": 0,
+     "Util": 0,
+     "WIC": 0,
+     "BONUS1": 3,
+     "BR2": 3,
+     "BR3": 4,
+     "Hall2": 2,
+     "UPBATH": 1
+    },
+    "per_room_removable_AFTER": {
+     "Dining": 0,
+     "Foyer": 0,
+     "Front Porch": 0,
+     "Garage": 0,
+     "Great Room": 0,
+     "Clst": 0,
+     "Craft": 0,
+     "Kitchen": 0,
+     "LOUNGE": 0,
+     "MBATH": 2,
+     "Hall": 0,
+     "Master Suite": 2,
+     "Mud": 0,
+     "Util": 0,
+     "PKT Off": 0,
+     "PWDR": 0,
+     "BR2": 3,
+     "Rear Porch": 1,
+     "BR3": 4,
+     "Hall2": 3,
+     "WIC": 1,
+     "Pan": 0,
+     "UPBATH": 1,
+     "BONUS1": 3,
+     "Toi": 0
+    },
+    "per_room_COMPLAINT_BEFORE": {
+     "Clst": 0,
+     "Craft": 4,
+     "Dining": 2,
+     "Foyer": 0,
+     "Front Porch": 1,
+     "Garage": 3,
+     "Great Room": 2,
+     "Hall": 2,
+     "Kitchen": 4,
+     "LOUNGE": 2,
+     "MBATH": 5,
+     "Master Suite": 4,
+     "Mud": 0,
+     "PKT Off": 1,
+     "PWDR": 1,
+     "Pan": 1,
+     "Rear Porch": 5,
+     "Toi": 0,
+     "Util": 2,
+     "WIC": 1,
+     "BONUS1": 4,
+     "BR2": 3,
+     "BR3": 5,
+     "Hall2": 7,
+     "UPBATH": 2
+    },
+    "per_room_COMPLAINT_AFTER": {
+     "Dining": 2,
+     "Foyer": 0,
+     "Front Porch": 1,
+     "Garage": 3,
+     "Great Room": 2,
+     "Clst": 0,
+     "Craft": 4,
+     "Kitchen": 4,
+     "LOUNGE": 2,
+     "MBATH": 5,
+     "Hall": 2,
+     "Master Suite": 4,
+     "Mud": 0,
+     "Util": 2,
+     "PKT Off": 1,
+     "PWDR": 1,
+     "BR2": 3,
+     "Rear Porch": 5,
+     "BR3": 5,
+     "Hall2": 7,
+     "WIC": 1,
+     "Pan": 1,
+     "UPBATH": 2,
+     "BONUS1": 4,
+     "Toi": 0
+    },
+    "per_room_outline_corners": {
+     "Dining": 6,
+     "Foyer": 4,
+     "Front Porch": 13,
+     "Garage": 9,
+     "Great Room": 8,
+     "Clst": 4,
+     "Craft": 10,
+     "Kitchen": 8,
+     "LOUNGE": 8,
+     "MBATH": 11,
+     "Hall": 6,
+     "Master Suite": 8,
+     "Mud": 6,
+     "Util": 6,
+     "PKT Off": 7,
+     "PWDR": 5,
+     "BR2": 9,
+     "Rear Porch": 9,
+     "BR3": 11,
+     "Hall2": 11,
+     "WIC": 5,
+     "Pan": 5,
+     "UPBATH": 6,
+     "BONUS1": 8,
+     "Toi": 4
+    }
+   },
+   "B_attribution": {
+    "start": {
+     "label": "as loaded",
+     "walls": 122,
+     "rooms": 25,
+     "outline_corner_slots": 187,
+     "outline_corner_objects": 90,
+     "COMPLAINT_ring_runs_straight_slots": 61,
+     "REDUNDANT_vertices": 11,
+     "REDUNDANT_slots": 17,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 0,
+     "TRULY_orphaned_no_wall_end_here": 0,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 42,
+     "wall_degree2_collinear": 13,
+     "total_area_sqft": 5438.45
+    },
+    "steps": [
+     {
+      "pass": "merge_collinear_scene",
+      "returned": {
+       "merged": 13
+      },
+      "DELTA": {
+       "walls": -13,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 0,
+       "REDUNDANT_slots": 0,
+       "D48_scene_identity_extra_vertices": 0,
+       "orphaned_named_corners": 11,
+       "TRULY_orphaned_no_wall_end_here": 11,
+       "DIVORCED_wall_here_but_not_this_object": 0,
+       "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+       "wall_degree2_collinear": -13,
+       "total_area_sqft": 0.0
+      }
+     },
+     {
+      "pass": "weld_scene",
+      "returned": {
+       "moved": 10,
+       "shared": 130
+      },
+      "DELTA": {
+       "walls": 0,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 2,
+       "REDUNDANT_slots": 3,
+       "D48_scene_identity_extra_vertices": 0,
+       "orphaned_named_corners": 74,
+       "TRULY_orphaned_no_wall_end_here": 4,
+       "DIVORCED_wall_here_but_not_this_object": 70,
+       "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+       "wall_degree2_collinear": 0,
+       "total_area_sqft": 0.0
+      }
+     },
+     {
+      "pass": "split_body_landings",
+      "returned": {
+       "split": 19
+      },
+      "DELTA": {
+       "walls": 19,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 0,
+       "REDUNDANT_slots": 0,
+       "D48_scene_identity_extra_vertices": 0,
+       "orphaned_named_corners": 0,
+       "TRULY_orphaned_no_wall_end_here": -8,
+       "DIVORCED_wall_here_but_not_this_object": 8,
+       "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+       "wall_degree2_collinear": 19,
+       "total_area_sqft": 0.0
+      }
+     }
+    ],
+    "end": {
+     "label": "after split_body_landings",
+     "walls": 128,
+     "rooms": 25,
+     "outline_corner_slots": 187,
+     "outline_corner_objects": 90,
+     "COMPLAINT_ring_runs_straight_slots": 61,
+     "REDUNDANT_vertices": 13,
+     "REDUNDANT_slots": 20,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 85,
+     "TRULY_orphaned_no_wall_end_here": 7,
+     "DIVORCED_wall_here_but_not_this_object": 78,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 48,
+     "wall_degree2_collinear": 19,
+     "total_area_sqft": 5438.45
+    }
+   },
+   "C_identified": {
+    "production_dry_run_removed": 13,
+    "identified_by_applying_and_diffing": 13,
+    "AGREES": true,
+    "slots_vacated": 20,
+    "areas_unchanged": true,
+    "nothing_to_dissolve": false,
+    "ITEM_1_slots_before": 187,
+    "ITEM_1_slots_after": 167,
+    "ITEM_1_slots_vacated": 20,
+    "ITEM_1_holders_per_dissolved_vertex": {
+     "1": 6,
+     "2": 7
+    },
+    "ITEM_1_sum_of_holder_counts": 20,
+    "ITEM_1_RESIDUE": 0,
+    "ITEM_1_second_dry_run_removed": 0,
+    "ITEM_1_IS_A_FIXPOINT": true,
+    "dissolved": [
+     {
+      "at": [
+       888.0,
+       534.0
+      ],
+      "holders": [
+       "Master Suite",
+       "Rear Porch"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 2,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525992859456
+     },
+     {
+      "at": [
+       1032.0,
+       708.0
+      ],
+      "holders": [
+       "BONUS1"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 2,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525992850288
+     },
+     {
+      "at": [
+       798.0,
+       732.0
+      ],
+      "holders": [
+       "MBATH",
+       "WIC"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 3,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525992851296
+     },
+     {
+      "at": [
+       888.0,
+       732.0
+      ],
+      "holders": [
+       "MBATH",
+       "Master Suite"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 2,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525992857728
+     },
+     {
+      "at": [
+       948.0,
+       732.0
+      ],
+      "holders": [
+       "BONUS1",
+       "BR2"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 2,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525992857920
+     },
+     {
+      "at": [
+       972.0,
+       732.0
+      ],
+      "holders": [
+       "BONUS1",
+       "BR2"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525992860080
+     },
+     {
+      "at": [
+       1080.0,
+       732.0
+      ],
+      "holders": [
+       "Hall2"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 3,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525992854752
+     },
+     {
+      "at": [
+       1098.0,
+       732.0
+      ],
+      "holders": [
+       "Hall2"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 2,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525992864496
+     },
+     {
+      "at": [
+       1386.0,
+       732.0
+      ],
+      "holders": [
+       "BR3",
+       "UPBATH"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525975148688
+     },
+     {
+      "at": [
+       1032.0,
+       786.0
+      ],
+      "holders": [
+       "BR2",
+       "Hall2"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525992859360
+     },
+     {
+      "at": [
+       1494.0,
+       792.0
+      ],
+      "holders": [
+       "BR3"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 2,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525975139472
+     },
+     {
+      "at": [
+       1284.0,
+       864.0
+      ],
+      "holders": [
+       "BR3"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 2,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525975148160
+     },
+     {
+      "at": [
+       1494.0,
+       864.0
+      ],
+      "holders": [
+       "BR3"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 2,
+      "DIVORCED": true,
+      "PARTLY_DIVORCED": false,
+      "vid": 1525975149264
+     }
+    ]
+   }
+  },
+  {
+   "plan": "symmetricP1.json",
+   "A_arrow": {
+    "normalize_walls_returned": {
+     "merged": 2,
+     "moved": 0,
+     "shared": 98,
+     "split": 0
+    },
+    "second_run_returned": {
+     "merged": 0,
+     "moved": 0,
+     "shared": 98,
+     "split": 0
+    },
+    "BEFORE": {
+     "label": "as loaded (merge_all has already run -- planio:204)",
+     "walls": 80,
+     "rooms": 20,
+     "outline_corner_slots": 140,
+     "outline_corner_objects": 60,
+     "COMPLAINT_ring_runs_straight_slots": 35,
+     "REDUNDANT_vertices": 2,
+     "REDUNDANT_slots": 4,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 0,
+     "TRULY_orphaned_no_wall_end_here": 0,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 22,
+     "wall_degree2_collinear": 2,
+     "total_area_sqft": 4474.53
+    },
+    "AFTER": {
+     "label": "after normalize_walls",
+     "walls": 78,
+     "rooms": 20,
+     "outline_corner_slots": 140,
+     "outline_corner_objects": 60,
+     "COMPLAINT_ring_runs_straight_slots": 35,
+     "REDUNDANT_vertices": 2,
+     "REDUNDANT_slots": 4,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 59,
+     "TRULY_orphaned_no_wall_end_here": 2,
+     "DIVORCED_wall_here_but_not_this_object": 57,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 20,
+     "wall_degree2_collinear": 0,
+     "total_area_sqft": 4474.53
+    },
+    "DELTA": {
+     "walls": -2,
+     "outline_corner_slots": 0,
+     "outline_corner_objects": 0,
+     "COMPLAINT_ring_runs_straight_slots": 0,
+     "REDUNDANT_vertices": 0,
+     "REDUNDANT_slots": 0,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 59,
+     "TRULY_orphaned_no_wall_end_here": 2,
+     "DIVORCED_wall_here_but_not_this_object": 57,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2_collinear": -2,
+     "total_area_sqft": 0.0
+    },
+    "AFTER_A_SECOND_RUN": {
+     "label": "after a SECOND normalize_walls",
+     "walls": 78,
+     "rooms": 20,
+     "outline_corner_slots": 140,
+     "outline_corner_objects": 60,
+     "COMPLAINT_ring_runs_straight_slots": 35,
+     "REDUNDANT_vertices": 2,
+     "REDUNDANT_slots": 4,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 59,
+     "TRULY_orphaned_no_wall_end_here": 2,
+     "DIVORCED_wall_here_but_not_this_object": 57,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 20,
+     "wall_degree2_collinear": 0,
+     "total_area_sqft": 4474.53
+    },
+    "DELTA_of_second_run": {
+     "walls": 0,
+     "outline_corner_slots": 0,
+     "outline_corner_objects": 0,
+     "COMPLAINT_ring_runs_straight_slots": 0,
+     "REDUNDANT_vertices": 0,
+     "REDUNDANT_slots": 0,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 0,
+     "TRULY_orphaned_no_wall_end_here": 0,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2_collinear": 0,
+     "total_area_sqft": 0.0
+    },
+    "outline_corner_objects_that_changed_identity": 0,
+    "per_room_removable_BEFORE": {
+     "Clst": 0,
+     "Craft": 0,
+     "Dining": 0,
+     "Foyer": 0,
+     "Front Porch": 0,
+     "Garage": 0,
+     "Great Room": 2,
+     "Hall": 1,
+     "Kitchen": 0,
+     "Lounge": 0,
+     "M Bath": 0,
+     "Master Suite": 0,
+     "Mud": 0,
+     "PKT Off": 0,
+     "PWDR": 0,
+     "Pan": 0,
+     "Rear Porch": 1,
+     "Toi": 0,
+     "Util": 0,
+     "WIC": 0
+    },
+    "per_room_removable_AFTER": {
+     "Dining": 0,
+     "Lounge": 0,
+     "Mud": 0,
+     "PWDR": 0,
+     "PKT Off": 0,
+     "Pan": 0,
+     "Foyer": 0,
+     "Great Room": 2,
+     "M Bath": 0,
+     "Util": 0,
+     "Craft": 0,
+     "Master Suite": 0,
+     "Hall": 1,
+     "Clst": 0,
+     "Front Porch": 0,
+     "Rear Porch": 1,
+     "Kitchen": 0,
+     "WIC": 0,
+     "Garage": 0,
+     "Toi": 0
+    },
+    "per_room_COMPLAINT_BEFORE": {
+     "Clst": 0,
+     "Craft": 2,
+     "Dining": 2,
+     "Foyer": 0,
+     "Front Porch": 1,
+     "Garage": 3,
+     "Great Room": 4,
+     "Hall": 3,
+     "Kitchen": 2,
+     "Lounge": 2,
+     "M Bath": 4,
+     "Master Suite": 2,
+     "Mud": 0,
+     "PKT Off": 1,
+     "PWDR": 1,
+     "Pan": 1,
+     "Rear Porch": 5,
+     "Toi": 0,
+     "Util": 2,
+     "WIC": 0
+    },
+    "per_room_COMPLAINT_AFTER": {
+     "Dining": 2,
+     "Lounge": 2,
+     "Mud": 0,
+     "PWDR": 1,
+     "PKT Off": 1,
+     "Pan": 1,
+     "Foyer": 0,
+     "Great Room": 4,
+     "M Bath": 4,
+     "Util": 2,
+     "Craft": 2,
+     "Master Suite": 2,
+     "Hall": 3,
+     "Clst": 0,
+     "Front Porch": 1,
+     "Rear Porch": 5,
+     "Kitchen": 2,
+     "WIC": 0,
+     "Garage": 3,
+     "Toi": 0
+    },
+    "per_room_outline_corners": {
+     "Dining": 6,
+     "Lounge": 8,
+     "Mud": 6,
+     "PWDR": 5,
+     "PKT Off": 7,
+     "Pan": 5,
+     "Foyer": 4,
+     "Great Room": 10,
+     "M Bath": 10,
+     "Util": 6,
+     "Craft": 8,
+     "Master Suite": 6,
+     "Hall": 7,
+     "Clst": 4,
+     "Front Porch": 13,
+     "Rear Porch": 9,
+     "Kitchen": 6,
+     "WIC": 7,
+     "Garage": 9,
+     "Toi": 4
+    }
+   },
+   "B_attribution": {
+    "start": {
+     "label": "as loaded",
+     "walls": 80,
+     "rooms": 20,
+     "outline_corner_slots": 140,
+     "outline_corner_objects": 60,
+     "COMPLAINT_ring_runs_straight_slots": 35,
+     "REDUNDANT_vertices": 2,
+     "REDUNDANT_slots": 4,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 0,
+     "TRULY_orphaned_no_wall_end_here": 0,
+     "DIVORCED_wall_here_but_not_this_object": 0,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 22,
+     "wall_degree2_collinear": 2,
+     "total_area_sqft": 4474.53
+    },
+    "steps": [
+     {
+      "pass": "merge_collinear_scene",
+      "returned": {
+       "merged": 2
+      },
+      "DELTA": {
+       "walls": -2,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 0,
+       "REDUNDANT_slots": 0,
+       "D48_scene_identity_extra_vertices": 0,
+       "orphaned_named_corners": 2,
+       "TRULY_orphaned_no_wall_end_here": 2,
+       "DIVORCED_wall_here_but_not_this_object": 0,
+       "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+       "wall_degree2_collinear": -2,
+       "total_area_sqft": 0.0
+      }
+     },
+     {
+      "pass": "weld_scene",
+      "returned": {
+       "moved": 0,
+       "shared": 98
+      },
+      "DELTA": {
+       "walls": 0,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 0,
+       "REDUNDANT_slots": 0,
+       "D48_scene_identity_extra_vertices": 0,
+       "orphaned_named_corners": 57,
+       "TRULY_orphaned_no_wall_end_here": 0,
+       "DIVORCED_wall_here_but_not_this_object": 57,
+       "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+       "wall_degree2_collinear": 0,
+       "total_area_sqft": 0.0
+      }
+     },
+     {
+      "pass": "split_body_landings",
+      "returned": {
+       "split": 0
+      },
+      "DELTA": {
+       "walls": 0,
+       "outline_corner_slots": 0,
+       "outline_corner_objects": 0,
+       "COMPLAINT_ring_runs_straight_slots": 0,
+       "REDUNDANT_vertices": 0,
+       "REDUNDANT_slots": 0,
+       "D48_scene_identity_extra_vertices": 0,
+       "orphaned_named_corners": 0,
+       "TRULY_orphaned_no_wall_end_here": 0,
+       "DIVORCED_wall_here_but_not_this_object": 0,
+       "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+       "wall_degree2_collinear": 0,
+       "total_area_sqft": 0.0
+      }
+     }
+    ],
+    "end": {
+     "label": "after split_body_landings",
+     "walls": 78,
+     "rooms": 20,
+     "outline_corner_slots": 140,
+     "outline_corner_objects": 60,
+     "COMPLAINT_ring_runs_straight_slots": 35,
+     "REDUNDANT_vertices": 2,
+     "REDUNDANT_slots": 4,
+     "D48_scene_identity_extra_vertices": 0,
+     "orphaned_named_corners": 59,
+     "TRULY_orphaned_no_wall_end_here": 2,
+     "DIVORCED_wall_here_but_not_this_object": 57,
+     "PARTLY_DIVORCED_some_walls_left_the_object": 0,
+     "wall_degree2": 20,
+     "wall_degree2_collinear": 0,
+     "total_area_sqft": 4474.53
+    }
+   },
+   "C_identified": {
+    "production_dry_run_removed": 2,
+    "identified_by_applying_and_diffing": 2,
+    "AGREES": true,
+    "slots_vacated": 4,
+    "areas_unchanged": true,
+    "nothing_to_dissolve": false,
+    "ITEM_1_slots_before": 140,
+    "ITEM_1_slots_after": 136,
+    "ITEM_1_slots_vacated": 4,
+    "ITEM_1_holders_per_dissolved_vertex": {
+     "2": 2
+    },
+    "ITEM_1_sum_of_holder_counts": 4,
+    "ITEM_1_RESIDUE": 0,
+    "ITEM_1_second_dry_run_removed": 0,
+    "ITEM_1_IS_A_FIXPOINT": true,
+    "dissolved": [
+     {
+      "at": [
+       385.38,
+       456.0
+      ],
+      "holders": [
+       "Great Room",
+       "Rear Porch"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1526011517136
+     },
+     {
+      "at": [
+       385.38,
+       654.0
+      ],
+      "holders": [
+       "Great Room",
+       "Hall"
+      ],
+      "floating": false,
+      "wall_degree": 0,
+      "wall_degree_by_point": 0,
+      "DIVORCED": false,
+      "PARTLY_DIVORCED": false,
+      "vid": 1526011517088
+     }
+    ]
+   }
+  }
+ ]
+}
