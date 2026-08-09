@@ -430,15 +430,27 @@ class MacroRunner:
 
     def _cmd_select(self, toks, i):
         (x, y), i = self._take(toks, i, 2)
-        hits = list(self.win.scene.items(QPointF(self._num(x), self._num(y))))
+        pt = QPointF(self._num(x), self._num(y))
         self.win.scene.clearSelection()
-        # prefer an editable item (furnishing / wall / group) over a room,
-        # whose label can sit on top of what you meant to grab
-        pick = next((it for it in hits
-                     if isinstance(it, (FurnishingItem, WallItem, GroupItem))),
-                    None)
-        if pick is None:
-            pick = next((it for it in hits if it.flags()
+        # THE PRIORITY RULE LIVES IN ONE PLACE NOW (D53, 2026-08-08). This
+        # function used to carry its own: "prefer an editable item (furnishing
+        # / wall / group) over a room, whose label can sit on top of what you
+        # meant to grab" -- written long before that record, for exactly its
+        # reason, and quietly correct all along. `items.hit_target` GENERALISES
+        # it, so this calls it rather than restating it. Two priority rules in
+        # one codebase drift, and the drift presents as "sometimes clicking
+        # picks the wrong thing", which is close to undebuggable.
+        #
+        # DIFFERENTIAL, since this is not a pure refactor: the old rule took
+        # the FIRST hit (topmost by z) that was one of three types; the new one
+        # ranks by TYPE first and uses z only to break ties within a type. Where
+        # a wall paints over a furnishing, this now picks the furnishing. That
+        # is the intended generalisation -- the specific item wins -- and it is
+        # the same answer the UI gives, which it previously did not.
+        pick = hit_target(self.win.scene, pt)
+        if pick is not None and not (
+                pick.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsSelectable):
+            pick = next((it for it in self.win.scene.items(pt) if it.flags()
                          & QGraphicsItem.GraphicsItemFlag.ItemIsSelectable),
                         None)
         if pick is not None:

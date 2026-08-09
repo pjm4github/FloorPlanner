@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import *  # noqa: F401
 from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
-from floorplanner.walls import WallItem, rebuild_all_walls
+from floorplanner.walls import OpeningItem, WallItem, rebuild_all_walls
 from floorplanner.rooms import (
     RoomItem, report_self_intersections, room_owns_walls, walls_cover_room,
     rooms_holding,
@@ -1206,3 +1206,115 @@ class ReferenceImageItem(QGraphicsItem):
         elif chosen is a_rem and self.scene() is not None:
             self.scene().removeItem(self)
         e.accept()
+
+
+# -- HIT RESOLUTION ------------------------------------------------------------
+#
+# RULED 2026-08-08 at A1b (D53): TYPE PRIORITY, NOT Z-ORDER.
+#
+# Qt resolves hits by z, so z-order has been carrying TWO jobs at once: painting
+# (walls crisp above the room fill -- a real requirement, WALL_Z's comment says
+# so) and hit resolution (which item did I mean). Those two agree only while a
+# room's `shape()` is small. Widen it to the region and they diverge
+# permanently, and NO z assignment satisfies both -- which is exactly what the
+# furnishing exposure was telling us: `FurnishingItem` sits at z 3 under a
+# room's 4, deliberately (`items.py:58`, "under the room fill/label and walls"),
+# because the fill is translucent and furnishings are MEANT to show through it.
+# Raising rooms to win hits would either bury furnishings or un-tint them.
+#
+# `raise_to_front` settles it. It sets a touched room to `_z_top * 10 + band`
+# while furnishings stay at 3, so any scheme whose hit outcomes depend on z is
+# ONE ROOM INTERACTION away from breaking. Painting and hitting are separated
+# here instead: **z stays a painting concern and does not change.**
+#
+# THE RULE IS NOT NEW. `macro.py`'s `_cmd_select` has preferred "an editable
+# item (furnishing / wall / group) over a room, whose label can sit on top of
+# what you meant to grab" since long before this record -- written for this
+# exact reason and quietly correct all along. This GENERALISES that rule rather
+# than building a second answer beside it, and `_cmd_select` calls this now.
+# Two priority rules in one codebase would drift, and the drift presents as
+# "sometimes clicking picks the wrong thing", which is close to undebuggable.
+
+#: PRIORITY RUNS FROM MOST SPECIFIC TO LEAST SPECIFIC. That is the whole rule,
+#: stated as the principle rather than as a list with exceptions -- ruled
+#: 2026-08-08, after a first draft said "a room is always last" and two entries
+#: promptly needed explaining away. They do not: both follow from specificity.
+#:
+#:  * `OpeningItem` outranks `WallItem` because THE CONTAINING THING MUST NEVER
+#:    OUTRANK THE CONTAINED THING. A door is a Qt CHILD of its wall and both are
+#:    returned for the same point, so the door is the more specific answer. Not
+#:    a deviation -- the same rule, one level deeper. (It wins by OPENING_Z 6.0 >
+#:    WALL_Z 5.0 today; ranking it keeps that outcome once z stops deciding.)
+#:  * `ReferenceImageItem` ranks below `RoomItem` for the same reason and not as
+#:    a carve-out: a full-canvas TRACING BACKDROP is LESS specific than a room,
+#:    not more. The proof is what the opposite would do -- above rooms, no room
+#:    would be selectable while an image was loaded, inverting the very defect
+#:    D53 closes.
+#:
+#: A room still comes last among the things a user ordinarily selects, which is
+#: the property D53 needed; it just is not the axiom.
+HIT_PRIORITY = (OpeningItem, FurnishingItem, WallItem, GroupItem, RoomItem,
+                ReferenceImageItem)
+
+
+def _hit_rank(item) -> int:
+    for i, cls in enumerate(HIT_PRIORITY):
+        if isinstance(item, cls):
+            return i
+    return len(HIT_PRIORITY)          # unknown types sort last, ahead of nothing
+
+
+def hit_candidates(scene, scene_pos, transform=None):
+    """Every item under `scene_pos`, in the scene's own stacking order.
+
+    Built on `items(pos)`, NOT `itemAt(pos)`: `itemAt` returns only the topmost,
+    which is the z-decides-everything answer this module exists to stop using.
+    """
+    if scene is None:
+        return []
+    if transform is None:
+        return list(scene.items(scene_pos))
+    return list(scene.items(scene_pos, Qt.ItemSelectionMode.IntersectsItemShape,
+                            Qt.SortOrder.DescendingOrder, transform))
+
+
+def best_by_priority(candidates):
+    """THE resolver. Choose by TYPE PRIORITY, breaking ties by the order given.
+
+    Callers supply their own candidate list because the right way to ASK
+    differs -- and getting that wrong cost a debugging session here. A view
+    must ask the way Qt does, with a 1x1 pixel RECT (`QGraphicsView.items`),
+    because a viewport coordinate is an integer and round-tripping it through
+    `mapToScene` lands a fraction off a wall's edge; a macro asks with an exact
+    scene point, which is what its coordinates mean. The PRIORITY RULE is the
+    part that must not be duplicated, so it lives here alone and both call it.
+
+    Ties keep the first candidate, so two walls under one point still resolve
+    by stacking order: only the CROSS-TYPE question is taken away from z.
+    """
+    best, best_rank = None, len(HIT_PRIORITY) + 1
+    for it in candidates:
+        r = _hit_rank(it)
+        if r < best_rank:
+            best, best_rank = it, r
+    return best
+
+
+def hit_target(scene, scene_pos, transform=None):
+    """The item meant at an exact SCENE point (the macro's question).
+
+    This makes `raise_to_front` irrelevant to selection BY CONSTRUCTION rather
+    than by careful ordering, which is the property being bought.
+    """
+    return best_by_priority(hit_candidates(scene, scene_pos, transform))
+
+
+def on_blank_canvas(scene, scene_pos, transform=None) -> bool:
+    """True when there is NO item of any type under `scene_pos` -- rooms included.
+
+    A separate predicate on purpose. The four `itemAt(...) is None` sites were
+    not testing the wrong thing; `itemAt(...) is None` had been STANDING IN for
+    a question nobody ever wrote down. This writes it down, so widening a room's
+    shape changes what those sites see only where that is intended.
+    """
+    return not hit_candidates(scene, scene_pos, transform)

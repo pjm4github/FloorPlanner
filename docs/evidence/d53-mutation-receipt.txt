@@ -1,0 +1,43 @@
+D53 / A1b -- THE MUTATION RECEIPT.  "The fix is not done when clicking selects
+a room. It is done when severing _update_edit_actions from _sel_order BREAKS
+the suite."  Ruled 2026-08-08; taken 2026-08-08.
+
+THE MUTATION, identical both times, applied in a throwaway `git worktree
+--detach` so the working tree was never at risk:
+
+    floorplanner/mainwindow.py, MainWindow._update_edit_actions()
+      -   for it in sel:
+      -       if it not in order:
+      -           order.append(it)
+          self._sel_order = order
+
+This is the ONLY path by which a Qt selection reaches a room operation:
+_update_edit_actions runs on selectionChanged and maintains _sel_order, and
+_selected_room_shapes() -- the input to every room_boolean op -- iterates
+_sel_order and nothing else.  With this cut, NO selection made by ANY gesture
+can reach ANY room operation.
+
+VERIFIED ON DISK BEFORE EACH RUN, not trusted to an exit code (the fail-first
+rule: an instrument that silently did nothing produces a result about the wrong
+tree).  Both times: the marker line was grepped and found, and the appending
+loop was grepped and found ABSENT (0 occurrences).
+
+  BEFORE A1b   a1-d47-fragment-extract @ 5a22a7f
+               639 passed, 0 failed.  THE WHOLE SUITE GREEN.
+               639 tests and six green CI jobs coexisted with a room that
+               could not be selected by clicking it.
+
+  AFTER  A1b   a1b-d53-readback @ 957792c
+               1 failed, 645 passed.
+               FAILED tests/test_rooms.py::
+                   test_selecting_two_rooms_BY_CLICKING_them_feeds_a_room_operation
+
+THE VERDICT.  The seam is now covered.  Exactly one test fails, and it is the
+one written to cross it -- click a room, ctrl-click another, run the operation
+on what the CLICKS produced.  A fix that had only MOVED the boundary would have
+left this green, which is why the receipt is the mutation and not the feature.
+
+WHAT THIS RECEIPT DOES NOT SAY.  It says the selection SEAM is crossed by at
+least one test.  It does not say every gesture is covered, and it is not a
+claim about the four view-level sites, the paint channel, or the manual check.
+Those have their own acceptance items.

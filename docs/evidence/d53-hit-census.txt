@@ -1,0 +1,66 @@
+D53 -- HIT-TARGET CENSUS, parsed from the AST of floorplanner/**.py
+    33 files, 6 QGraphicsItem subclasses
+==============================================================================
+
+1. THE ITEMS -- who can be hit, and who decides their own hit shape
+
+   class                 shape()     boundingRect()  site
+   FurnishingItem        OVERRIDDEN  OVERRIDDEN      floorplanner/items.py:30
+                         mouse: contextMenuEvent, hoverMoveEvent, mouseMoveEvent, mousePressEvent, mouseReleaseEvent
+   GroupItem             inherited   OVERRIDDEN      floorplanner/items.py:439
+                         mouse: contextMenuEvent, hoverMoveEvent, mouseMoveEvent, mousePressEvent, mouseReleaseEvent
+   OpeningItem           OVERRIDDEN  OVERRIDDEN      floorplanner/walls.py:2258
+                         mouse: contextMenuEvent, mouseDoubleClickEvent, mouseMoveEvent, mousePressEvent
+   ReferenceImageItem    inherited   OVERRIDDEN      floorplanner/items.py:998
+                         mouse: contextMenuEvent, mouseMoveEvent, mousePressEvent, mouseReleaseEvent
+   RoomItem              OVERRIDDEN  OVERRIDDEN      floorplanner/rooms.py:341
+                         mouse: contextMenuEvent, mouseDoubleClickEvent, mouseMoveEvent, mousePressEvent, mouseReleaseEvent
+   WallItem              OVERRIDDEN  OVERRIDDEN      floorplanner/walls.py:1170
+                         mouse: contextMenuEvent, mouseMoveEvent, mousePressEvent, mouseReleaseEvent
+
+2. Z-ORDER -- every setZValue, with the value as written
+   (Qt picks the TOPMOST item whose shape() contains the point, so this
+    is the term that decides whether a widened room WINS the press.)
+
+   floorplanner/geometry.py:138   bring_to_front               item.setZValue(top + 1.0)
+   floorplanner/geometry.py:148   send_to_back                 item.setZValue(bot - 1.0)
+   floorplanner/imageio.py:98    _show_wall_ghost             item.setZValue(1000000)
+   floorplanner/items.py:58    __init__                     self.setZValue(3)
+   floorplanner/items.py:457   __init__                     self.setZValue(1)
+   floorplanner/items.py:1021  __init__                     self.setZValue(self.Z)
+   floorplanner/levels.py:112   _apply_floor_stacking        it.setZValue(it.zValue() - old + new)
+   floorplanner/rooms.py:411   __init__                     self.setZValue(4)
+   floorplanner/rooms.py:652   raise_to_front               self.setZValue(base)
+   floorplanner/rooms.py:656   raise_to_front               w.setZValue(base + 5 if w._corners_unlocked else base + 4)
+   floorplanner/rooms.py:661   raise_to_front               op.setZValue(order + 6)
+   floorplanner/rooms.py:1492  detach_wall_from_room        wall.setZValue(wall.zValue() + 1)
+   floorplanner/walls.py:1200  __init__                     self.setZValue(WALL_Z)
+   floorplanner/walls.py:2292  __init__                     self.setZValue(OPENING_Z)
+
+3. ITEM FLAGS -- selectable / movable, which gate what a hit can DO
+
+   floorplanner/items.py:53    __init__                     self: ItemIsMovable = True
+   floorplanner/items.py:54    __init__                     self: ItemIsSelectable = True
+   floorplanner/items.py:55    __init__                     self: ItemSendsGeometryChanges = True
+   floorplanner/items.py:452   __init__                     self: ItemIsMovable = True
+   floorplanner/items.py:453   __init__                     self: ItemIsSelectable = True
+   floorplanner/items.py:454   __init__                     self: ItemSendsGeometryChanges = True
+   floorplanner/items.py:1017  __init__                     self: ItemIsMovable = True
+   floorplanner/items.py:1018  __init__                     self: ItemIsSelectable = True
+   floorplanner/items.py:1019  __init__                     self: ItemSendsGeometryChanges = True
+   floorplanner/items.py:1028  set_locked                   self: ItemIsMovable = not self.locked
+   floorplanner/rooms.py:408   __init__                     self: ItemIsSelectable = True
+   floorplanner/walls.py:1199  __init__                     self: ItemIsSelectable = True
+   floorplanner/walls.py:2291  __init__                     self: ItemIsSelectable = True
+
+4. THE ASKERS -- every hit query. These are the call sites whose ANSWER
+   changes when a room's shape widens.
+
+   floorplanner/macro.py:407   _opening                     self.win.scene.items(pt)
+   floorplanner/macro.py:433   _cmd_select                  self.win.scene.items(QPointF(self._num(x), self._num(y)))
+   floorplanner/view.py:321   mousePressEvent              self.itemAt(pos)
+   floorplanner/view.py:360   mousePressEvent              self.itemAt(pos)
+   floorplanner/view.py:449   select_in_rect               scene.items(area, Qt.ItemSelectionMode.IntersectsItemShape)
+   floorplanner/view.py:540   contextMenuEvent             self.itemAt(e.pos())
+   floorplanner/view.py:557   contextMenuEvent             self.itemAt(e.pos())
+   floorplanner/view.py:623   _place_opening               self.scene().items(sp)

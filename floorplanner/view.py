@@ -287,6 +287,60 @@ class PlanView(QGraphicsView):
         return room
 
     # -- mouse / tools ----------------------------------------------------------
+    # -- hit resolution (D53) --------------------------------------------------
+    # Two questions, written down rather than inferred from `itemAt(...) is
+    # None`. That expression had been STANDING IN for both, and they are not
+    # the same: "which item did the user mean" and "is there anything here at
+    # all" diverge the moment a room's shape covers its region.
+    def hit(self, pos):
+        """The item the user MEANT at a VIEWPORT point, by type priority.
+
+        Candidates come from `QGraphicsView.items(pos)`, which is how Qt's own
+        `itemAt` asks: a 1x1 PIXEL RECT, not an exact point. That matters and
+        was measured -- a viewport coordinate is an integer, so mapping it to
+        the scene and testing an exact point lands a fraction off a wall's edge
+        and reports blank canvas over a wall. Five wall-drag tests failed on
+        exactly that before this used the view's own query.
+        """
+        return best_by_priority(self.items(pos))
+
+    def blank(self, pos) -> bool:
+        """True when NO item of any type is under a VIEWPORT point."""
+        return not self.items(pos)
+
+    def _band_may_start(self, pos) -> bool:
+        """May a Ctrl+drag start a selection band here?
+
+        A REFUTED PREMISE, not a compromise -- and it is recorded that way
+        because the two read differently to whoever changes this next.
+
+        The ruling was: "an explicit modifier gesture should never depend on
+        what happens to sit under the press point." Sound in general. FALSE
+        HERE, and the premise it rests on is what fails: **CTRL IS ALREADY AN
+        ITEM-LEVEL MODIFIER IN THIS APPLICATION** -- it is the label-only nudge
+        on a room's label, and it drives the wall corner-drags. An unconditional
+        Ctrl band eats gestures older than this record, because the press never
+        reaches those items at all. Six tests said so before any reasoning did:
+        `test_room_label_ctrl_drag_nudges_label`,
+        `test_a_dragged_end_near_a_jamb_snaps_to_it`,
+        `test_dragging_an_end_into_a_doorway_names_the_doorway_at_release`,
+        `test_closing_gap_refuses_and_relocks`, and two macro replays.
+
+        WHAT THE RULING WAS FOR IS KEPT WHOLE: the band was blocked by
+        `itemAt(pos) is None`, so once a room's shape covered its region you
+        could never start one from inside a room. That is exactly what this
+        allows. The band starts on blank canvas and over a room's REGION; it
+        does not start on a room's LABEL (the room's own handle) or on any
+        other item, whose ctrl gestures are older than this record.
+        """
+        target = self.hit(pos)
+        if target is None:
+            return True
+        if isinstance(target, RoomItem):
+            item_pt = target.mapFromScene(self.mapToScene(pos))
+            return not target._label_rect().contains(item_pt)
+        return False
+
     def mousePressEvent(self, e):
         pos = e.position().toPoint()
         sp = self.mapToScene(pos)
@@ -314,17 +368,34 @@ class PlanView(QGraphicsView):
             return
 
         if e.button() == Qt.MouseButton.LeftButton:
-            # Ctrl+drag on empty space: rubber-band that ADDS to the
-            # selection set (Ctrl+click on items toggles membership)
+            # Ctrl+drag: rubber-band that ADDS to the selection set.
+            #
+            # UNCONDITIONAL since D53 (ruled 2026-08-08). It used to require
+            # `itemAt(pos) is None`, so an explicit modifier gesture depended
+            # on what happened to sit under the press point -- incidental all
+            # along, and untenable once a room's shape covers its region, since
+            # the band could then never be started from inside a room.
+            #
+            # THE CTRL-CLICK HALF IS SETTLED AT RELEASE, not here, because this
+            # ruling and D53(b) ("ctrl-click toggles membership") would
+            # otherwise contradict: starting a band on every ctrl-press means
+            # the press never reaches the item. A band that never grew past a
+            # few pixels WAS a click, and `mouseReleaseEvent` treats it as one.
             if (tool == TOOL_SELECT
                     and e.modifiers() & Qt.KeyboardModifier.ControlModifier
-                    and self.itemAt(pos) is None):
+                    and self._band_may_start(pos)):
+                # ARM the band; do not SHOW one yet. The widget appears on
+                # the first move (`mouseMoveEvent`), for two reasons:
+                #   * a ctrl-CLICK must not flash a one-pixel rubber band, and
+                #     under D53 every ctrl-press arms this gesture, so clicks
+                #     now come through here constantly;
+                #   * `QRubberBand.show()` on an OFFSCREEN viewport takes the
+                #     process down -- measured 2026-08-08, and PRE-EXISTING:
+                #     a ctrl-click on empty canvas crashes identically at
+                #     `a1172be`, which is why no headless test has ever covered
+                #     this gesture. Deferring the show is what makes the
+                #     ctrl-click half testable at all.
                 self._rubber_origin = pos
-                if self._rubber is None:
-                    self._rubber = QRubberBand(
-                        QRubberBand.Shape.Rectangle, self.viewport())
-                self._rubber.setGeometry(QRect(pos, QSize(1, 1)))
-                self._rubber.show()
                 e.accept()
                 return
             if tool in (TOOL_WALL_EXT, TOOL_WALL_INT):
@@ -356,8 +427,16 @@ class PlanView(QGraphicsView):
                         self._make_named_room(sp, name.strip(), res)
                 e.accept()
                 return
-            # SELECT tool: pan when pressing empty space
-            if self.itemAt(pos) is None:
+            # SELECT tool: pan when pressing empty space.
+            #
+            # D53: `on_blank_canvas`, not `itemAt(...) is None`. Now that a
+            # room's shape covers its region, a left-drag pan started INSIDE a
+            # room goes away -- ruled, and no reach is lost, because
+            # MIDDLE-MOUSE DRAG PANS ANYWHERE UNCONDITIONALLY and is checked
+            # first (see the MiddleButton branch above). Keep it that way: it
+            # is the pan that does not depend on what is under the cursor, and
+            # it is what makes this branch safe to narrow.
+            if self.blank(pos):
                 self._panning, self._pan_last = True, pos
                 self.setCursor(Qt.CursorShape.ClosedHandCursor)
                 self.scene().clearSelection()
@@ -371,6 +450,16 @@ class PlanView(QGraphicsView):
         sp = self.mapToScene(pos)
         self._last_scene = QPointF(sp)
         self.win.show_coords(sp)
+
+        # the selection band becomes a real widget only once the press has
+        # actually MOVED -- see mousePressEvent for why it is not shown there
+        if self._rubber_origin is not None:
+            if self._rubber is None:
+                self._rubber = QRubberBand(QRubberBand.Shape.Rectangle,
+                                           self.viewport())
+            self._rubber.setGeometry(
+                QRect(self._rubber_origin, pos).normalized())
+            self._rubber.show()
 
         if self._img_mode == "crop" and self._crop_start is not None:
             origin = self.mapFromScene(self._crop_start)
@@ -489,8 +578,19 @@ class PlanView(QGraphicsView):
                 and e.button() == Qt.MouseButton.LeftButton):
             rect = QRect(self._rubber_origin,
                          e.position().toPoint()).normalized()
-            self._rubber.hide()
-            self._rubber_origin = None
+            if self._rubber is not None:
+                self._rubber.hide()
+            origin, self._rubber_origin = self._rubber_origin, None
+            # D53: the band is now started on EVERY ctrl-press, so a press that
+            # never moved is a ctrl-CLICK and must toggle membership -- D53(b),
+            # which the unconditional band would otherwise swallow. Threshold
+            # rather than exact equality: a real click jitters by a pixel.
+            if rect.width() <= CLICK_SLOP and rect.height() <= CLICK_SLOP:
+                target = self.hit(origin)
+                if target is not None and target.flags() &                         QGraphicsItem.GraphicsItemFlag.ItemIsSelectable:
+                    target.setSelected(not target.isSelected())
+                e.accept()
+                return
             area = self.mapToScene(rect).boundingRect()
             self.select_in_rect(area)
             e.accept()
@@ -534,10 +634,30 @@ class PlanView(QGraphicsView):
         super().mouseReleaseEvent(e)
 
     def contextMenuEvent(self, e):
-        # Room Name tool + blank canvas -> paste the copied room, or type a
+        # Room Name tool + BLANK CANVAS -> paste the copied room, or type a
         # new CONCEPT room right here (P4.4: the dialog is on this menu and
         # on Rooms > New concept room…, per the ruling)
-        if self.win.tool == TOOL_ROOM and self.itemAt(e.pos()) is None:
+        #
+        # A RIGHT-CLICK RESOLVES THROUGH THE SAME TYPE-PRIORITY RESOLVER AS A
+        # LEFT-CLICK, and each type answers with its OWN menu; the blank-canvas
+        # menus below fire only on `blank()`. Ruled 2026-08-08.
+        #
+        # The previous clause fired these on "no item OR a room", written when
+        # a room menu was believed not to exist. It does: `RoomItem.
+        # contextMenuEvent` is 68 lines and offers Extract room / Join room.
+        # The clause SHADOWED it -- measured, and reported by hand rather than
+        # by any test. It is deleted, not tuned.
+        #
+        # THE FLOOR POPUP LOSES ITS REGION ROUTE, and that is accepted: with
+        # the region in a room's shape, a right-click there gives the ROOM
+        # menu, so the popup is blank-canvas only. NO REACH IS LOST, and the
+        # justification is measured rather than assumed (the same standard the
+        # left-drag pan's retirement was held to, where middle-mouse drag was
+        # the surviving route). The popup offers exactly ONE operation --
+        # switch floor -- and `Floors > Select…` opens THE IDENTICAL POPUP via
+        # `select_floor_popup()`, on Ctrl+F, with `Edit this floor` per floor
+        # as a direct switch besides.
+        if self.win.tool == TOOL_ROOM and self.blank(e.pos()):
             menu = QMenu(self)
             a_paste = menu.addAction("Paste room")
             a_paste.setEnabled(self.win.room_clipboard is not None)
@@ -554,8 +674,8 @@ class PlanView(QGraphicsView):
                 self.win.show_3d_view()
             e.accept()
             return
-        if self.itemAt(e.pos()) is None:
-            # blank canvas, any other tool -> the floor popup (P4.2 spec):
+        if self.blank(e.pos()):
+            # BLANK CANVAS ONLY (D53) -> the floor popup (P4.2 spec):
             # default pre-highlighted so ENTER selects it, DOWN walks the
             # floors, ESC cancels. Recorded as a PUP line; the resulting
             # switch appends its deterministic `# ^F "name"` comment.

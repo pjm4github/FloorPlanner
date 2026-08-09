@@ -354,6 +354,9 @@ class RoomItem(QGraphicsItem):
         self.anchor = QPointF(anchor)
         self.label_offset = QPointF(0.0, 0.0)   # label drag, relative to anchor
         self._dragging_label = False
+        self._label_moved = False        # D53(b): distinguishes ctrl-click
+        self._was_selected = False       #         from ctrl-drag at release
+        self._toggled_on_press = False   # a modified click owns its release
         # geometry FALLBACKS, used only by a room with no outline (a legacy
         # import whose corners never traced).  A room that HAS an outline
         # derives both -- see the `path` / `area_sqft` properties.
@@ -755,6 +758,59 @@ class RoomItem(QGraphicsItem):
                     self.unbind_wall(w)
         return super().itemChange(change, value)
 
+    def _outranked_at(self, scene_pos, item_pos):
+        """The item that OUTRANKS this room at a point, or None.
+
+        ONE RULE FOR BOTH VIRTUALS, and that is the whole point of its being a
+        method rather than two inline blocks. `mousePressEvent` and
+        `contextMenuEvent` are SEPARATE Qt deliveries, each routed to the
+        topmost item BY Z. With the region in `shape()` a room that
+        `raise_to_front` has lifted above `WALL_Z` swallows that wall's events
+        -- and if the decline lived in one virtual and not the other,
+        left-click and right-click would resolve DIFFERENTLY. That divergence
+        presents as "right-click sometimes picks the wrong thing" long after
+        anyone remembers this pass, so both routes ask here.
+
+        THE LABEL IS EXEMPT: it is the room's own handle and routinely sits
+        over its walls, so an event there belongs to the room whatever is
+        underneath.
+
+        ASKS THE WAY QT ASKS -- through the view, with a 1x1 PIXEL RECT. An
+        exact scene point lands a fraction off a wall's edge and reports the
+        wall absent; measured, that made this check silently never fire.
+        """
+        if self._label_rect().contains(item_pos):
+            return None
+        sc = self.scene()
+        if sc is None:
+            return None
+        from floorplanner.items import best_by_priority   # late: higher layer
+        v = self._view()
+        cands = (v.items(v.mapFromScene(scene_pos)) if v is not None
+                 else sc.items(scene_pos))
+        best = best_by_priority(cands)
+        return None if best is self or best is None else best
+
+    def _paint_selection_handles(self, painter):
+        """Square handles at the room's corners -- the second half of D53's
+        solid selection channel, and the half that survives a zoom-out where a
+        2 px stroke starts to look like any other line.
+
+        Sized in DEVICE pixels off the painter's own transform, so they stay
+        grabbable-looking at any zoom (same reasoning as `FurnishingItem`'s
+        rotator handle, which reads the view scale for the same purpose).
+        """
+        pts = self.corners or [self.path.pointAtPercent(t / 8.0)
+                               for t in range(8)]
+        if not pts:
+            return
+        scale = max(abs(painter.transform().m11()), 1e-6)
+        h = 3.0 / scale                  # half-side, ~3 device px
+        painter.setPen(QPen(QColor(0, 110, 255), 0))
+        painter.setBrush(QBrush(QColor(255, 255, 255)))
+        for c in pts:
+            painter.drawRect(QRectF(c.x() - h, c.y() - h, h * 2, h * 2))
+
     def _label_centre(self) -> QPointF:
         return QPointF(self.anchor.x() + self.label_offset.x(),
                        self.anchor.y() + self.label_offset.y())
@@ -773,7 +829,30 @@ class RoomItem(QGraphicsItem):
         return r.adjusted(-24, -24, 24, 24)
 
     def shape(self) -> QPainterPath:
+        """The REGION plus the label -- D53, widened 2026-08-08 at A1b.
+
+        It returned only the label rect, which made the largest visible object
+        in the plan a click-through hole: `PlanView` read `itemAt(...) is None`
+        as "blank canvas", so pressing a room's fill panned and CLEARED the
+        selection. The room was reachable only by its label.
+
+        The label rect stays in the shape: it is the drag handle, and
+        `label_offset` can carry it outside the outline.
+
+        WINDING fill rule, deliberately. Two sub-paths under the default
+        odd-even rule would turn their INTERSECTION into a hole -- so a label
+        sitting over its own room would punch out exactly the middle of the
+        region, which is where people click.
+
+        THIS LINE IS ONLY SAFE BECAUSE HIT RESOLUTION NO LONGER READS Z.
+        `items.hit_target` ranks a room LAST, so a furnishing (z 3, under the
+        room's 4 on purpose) or a wall inside the room still wins its own
+        clicks. Widen this while Qt's topmost-by-z answer still decides and
+        every furnishing in the plan becomes unclickable.
+        """
         p = QPainterPath()
+        p.setFillRule(Qt.FillRule.WindingFill)
+        p.addPath(self.path)
         p.addRect(self._label_rect())
         return p
 
@@ -804,15 +883,28 @@ class RoomItem(QGraphicsItem):
             painter.setPen(Qt.PenStyle.NoPen)
         self._paint_open_edges(painter, option, ghost=False)
         if self.isSelected():
-            painter.setPen(QPen(QColor(0, 122, 255), 0, Qt.PenStyle.DashLine))
+            # D53 CONSTRAINT 3: SELECTION AND FLOATING MUST NOT SHARE A VISUAL
+            # CHANNEL. A floating room already paints a DASHED orange boundary
+            # (just above), and dashed carries a third meaning already -- an
+            # open edge, which over a real wall is the fault signature A1's
+            # manual check looks for at item 5. Selection used to be a second
+            # dash on the very same path, in blue, which on a floating room is
+            # two dashes on one shape.
+            #
+            # So selection is SOLID and additive: a stronger fill tint, a
+            # thicker solid stroke, and square corner handles. Floating-ness is
+            # a property of the ROOM; selection is a property of the VIEW; they
+            # now read as different things rather than as two colours of the
+            # same thing.
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(QColor(0, 122, 255, 30)))
+            painter.drawPath(self.path)
+            pen = QPen(QColor(0, 110, 255), 2.0, Qt.PenStyle.SolidLine)
+            pen.setCosmetic(True)        # 2 device px, so it reads at any zoom
+            painter.setPen(pen)
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawPath(self.path)
-
-        if self.corners and self.isSelected():
-            # perimeter along wall centrelines, shown while selected
-            painter.setPen(QPen(QColor(0, 110, 255), 0, Qt.PenStyle.DashLine))
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawPolygon(QPolygonF(self.corners))
+            self._paint_selection_handles(painter)
 
         r = self._label_rect()
         painter.setFont(self._font)
@@ -969,11 +1061,50 @@ class RoomItem(QGraphicsItem):
         # left-drag on the name moves the WHOLE room (walls, doors/windows and
         # region) when the room owns walls; Ctrl-drag keeps the legacy
         # label-only nudge (and unbound rooms always nudge the label).
-        if (e.button() == Qt.MouseButton.LeftButton
-                and self._label_rect().contains(e.pos())):
+        on_label = self._label_rect().contains(e.pos())
+        mods = e.modifiers()
+        shift = bool(mods & Qt.KeyboardModifier.ShiftModifier)
+        ctrl_mod = bool(mods & Qt.KeyboardModifier.ControlModifier)
+        # D53(b): SHIFT-CLICK AND CTRL-CLICK EACH TOGGLE MEMBERSHIP. Users try
+        # both, and two modifiers doing one obvious thing is cheaper to learn
+        # than one modifier and a wrong guess. Done here rather than left to
+        # Qt, which toggles on Ctrl only -- and because the label branch below
+        # would otherwise start a room DRAG on a modified click.
+        #
+        # CTRL ON THE LABEL IS CARVED OUT, because Ctrl+label-DRAG is the
+        # legacy label-only nudge and is pinned by
+        # `test_room_label_ctrl_drag_nudges_label`. A ctrl press there keeps
+        # the nudge; a ctrl press that turns out NOT to have moved toggles at
+        # RELEASE instead (see `mouseReleaseEvent`), so the gesture is honoured
+        # either way and nothing is taken from the drag.
+        # A ROOM DECLINES A PRESS ANOTHER ITEM OUTRANKS (D53). Measured on
+        # Patrick's `dragWallFuseStraggler` macro: after two label-drags raise
+        # R2 to `_z_top * 10 + band`, line 4's plain `CLICK 338 236` went from
+        # selecting the interior column -- and FUSING it, the gesture that
+        # macro exists to pin -- to selecting R2. `_outranked_at` is the same
+        # rule `contextMenuEvent` uses; see it for why they share one.
+        if self._outranked_at(e.scenePos(), e.pos()) is not None:
+            e.ignore()                # fall through to the item that outranks
+            return
+        if e.button() == Qt.MouseButton.LeftButton and (
+                shift or (ctrl_mod and not on_label)):
+            self.setSelected(not self.isSelected())
+            # AND THE RELEASE MUST BE SWALLOWED TOO. `QGraphicsItem`'s default
+            # `mouseReleaseEvent` runs its OWN click-selection when the press
+            # and release land on the same point: without Ctrl it calls
+            # `clearSelection()` and selects this item (so a shift-click would
+            # REPLACE the selection instead of adding to it), and with Ctrl it
+            # toggles a second time (so a ctrl-click would cancel itself).
+            # Measured both ways before this line existed.
+            self._toggled_on_press = True
+            e.accept()
+            return
+        if e.button() == Qt.MouseButton.LeftButton and on_label:
+            self._was_selected = self.isSelected()
+            self._label_moved = False
             self.setSelected(True)
             self.raise_to_front()
-            ctrl = bool(e.modifiers() & Qt.KeyboardModifier.ControlModifier)
+            ctrl = ctrl_mod
             self._dragging_label = True
             # `or self.corners`: a WALL-LESS room (a P4.4 concept room, or one
             # whose walls were all deleted) still moves as a unit -- it has an
@@ -1030,6 +1161,7 @@ class RoomItem(QGraphicsItem):
             e.accept()
             return
         if self._dragging_label:
+            self._label_moved = True          # a real nudge, not a ctrl-click
             self.prepareGeometryChange()
             nx = e.scenePos().x() - self._label_grab.x()
             ny = e.scenePos().y() - self._label_grab.y()
@@ -1041,7 +1173,23 @@ class RoomItem(QGraphicsItem):
         super().mouseMoveEvent(e)
 
     def mouseReleaseEvent(self, e):
+        if getattr(self, "_toggled_on_press", False):
+            self._toggled_on_press = False      # see mousePressEvent
+            e.accept()
+            return
         if self._dragging_label:
+            # D53(b), the carved-out half: a CTRL press on the label keeps the
+            # legacy nudge, so the toggle it also owes the user is settled here
+            # -- if the label never actually moved, this was a ctrl-CLICK and
+            # it toggles, restoring whatever the press's unconditional
+            # `setSelected(True)` overwrote.
+            if (e.modifiers() & Qt.KeyboardModifier.ControlModifier
+                    and not getattr(self, "_moving_room", False)
+                    and not getattr(self, "_label_moved", True)):
+                self._dragging_label = False
+                self.setSelected(not getattr(self, "_was_selected", False))
+                e.accept()
+                return
             moved, self._dragging_label, self._moving_room = (
                 self._moving_room, False, False)
             sc = self.scene()
@@ -1078,6 +1226,15 @@ class RoomItem(QGraphicsItem):
         e.accept()
 
     def contextMenuEvent(self, e):
+        # THE SAME DECLINE RULE AS `mousePressEvent`, through the same helper
+        # (D53, ruled 2026-08-08). `contextMenuEvent` is a SEPARATE Qt virtual
+        # with its own delivery, also routed by z -- so without this, a room
+        # lifted by `raise_to_front` would answer a right-click meant for a
+        # wall inside it, while the LEFT-click on that same point resolved
+        # correctly. One rule, both routes, or they drift apart.
+        if self._outranked_at(e.scenePos(), e.pos()) is not None:
+            e.ignore()
+            return
         from floorplanner.dialogs import (  # late: dialogs imports rooms at top
             RoomInventoryDialog, RoomPropertiesDialog)  # noqa: F401
         menu = QMenu()

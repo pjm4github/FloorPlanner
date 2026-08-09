@@ -1,0 +1,61 @@
+D53 / A1b -- THE MACRO DIFFERENTIAL, AND A CORRECTION TO IT.
+
+*** THE EARLIER VERSION OF THIS FILE WAS TAKEN FROM ONE RUN AND ITS HEADLINE
+*** CLAIM -- 'identical to main at every line' -- IS NOT SOUND AS STATED.
+*** Corrected 2026-08-08. The wall-count half stands; the SELECTION half was
+*** measured with a comparator that is NONDETERMINISTIC.
+
+Reproduce: replay examples/dragWallFuseStraggler.fpm line by line over
+examples/fiveRoomTest.json, recording the wall count and the selection after
+each line. Run it MORE THAN ONCE.
+
+-- WHAT IS STABLE ----------------------------------------------------------
+
+The per-line WALL COUNT sequence. One outcome in 12 runs on each tree, and
+the same sequence on both:
+
+    main   [18, 18, 16, 16, 18, 15, 17, 16]
+    branch [18, 18, 16, 16, 18, 15, 17, 16]
+
+That is the half the fix is about -- line 4's CLICK 338 236 fusing the
+interior column, 18 -> 16 -- and it is solid.
+
+-- WHAT IS NOT -------------------------------------------------------------
+
+The per-line SELECTION. Twelve consecutive runs on ONE UNCHANGED TREE:
+
+    main    bcffa08   2 distinct selection outcomes, split [6, 6]
+    branch  (fix)     2 distinct selection outcomes, split [8, 4]
+
+    the two outcomes are THE SAME TWO on both trees: True
+
+The last three lines sometimes end with an extra WallItem in the selection
+and sometimes do not. IT FLAPS ON MAIN TOO, at 6/6, so the nondeterminism is
+PRE-EXISTING and is not something A1b introduced. Filed as its own record.
+
+-- HOW THE BAD CLAIM HAPPENED, because that is the reusable part ------------
+
+A single run of the probe showed every line matching, and it was written up
+as 'identical to main at every line'. On a comparator that flaps roughly half
+the time, one matching run is close to a coin landing heads: the reading was
+true of that run and says almost nothing about the tree.
+
+This is VACUOUS BY BASIS -- the third shape in the working agreement -- one
+layer up from where that rule was first written. P3.8's ratio tests flapped on
+machine load, so a green meant 'the runner was quiet'. Here a DIFFERENTIAL
+RECEIPT flapped, so a match meant 'this run agreed'. A differential is only as
+good as the stability of the field it compares, and the fix is the same one
+the suite already applies to timings: repeat the measurement, or compare a
+field that does not move.
+
+It was caught by re-running the probe after an unrelated refactor and getting
+a DIFFERENT answer on a tree whose behaviour could not have changed -- then
+bisecting, reaching an impossible conclusion (a context-menu handler that is
+entered ZERO times during the replay), and testing the instrument instead of
+believing the bisect.
+
+-- THE SOUND VERSION OF THE CLAIM ------------------------------------------
+
+The wall-count sequence is deterministic, identical on both trees, and shows
+line 4's fuse restored. The selection field flaps identically on both trees,
+produces the same two outcomes on each, and is not evidence either way.

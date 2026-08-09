@@ -301,6 +301,20 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             a.setShortcut(QKeySequence(keys))
             a.triggered.connect(slot)
             m_edit.addAction(a)
+        # PASTE ROOM, beside Paste (D53). "Copy room" lives on the ROOM's own
+        # context menu; its partner used to live ONLY on the blank-canvas menu,
+        # so on a plan that fills the canvas there was nowhere to invoke it --
+        # and A1b widening the room menu made copy easier to reach while paste
+        # stayed put. It is here so both halves sit on surfaces a user already
+        # associates with copy and paste.
+        #
+        # DELIBERATELY NOT MERGED WITH Ctrl+V. `item_clipboard` and
+        # `room_clipboard` are separate stores and joining them is a design
+        # question this pass does not own -- filed as its own record.
+        self.a_paste_room = QAction("Paste &room", self)
+        self.a_paste_room.setShortcut(QKeySequence("Ctrl+Shift+V"))
+        self.a_paste_room.triggered.connect(self.paste_room_here)
+        m_edit.addAction(self.a_paste_room)
         m_edit.addSeparator()
         self.a_group = QAction("&Group", self)
         self.a_group.setShortcut(QKeySequence("Ctrl+G"))
@@ -317,6 +331,20 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         a_gaps = QAction("Review wall gaps…", self)
         a_gaps.triggered.connect(self.review_wall_gaps)
         m_edit.addAction(a_gaps)
+
+        # A VIEW MENU, and 3D view is its first item (D53). It had NO menu-bar
+        # entry, no shortcut and no toolbar button: `show_3d_view`'s only two
+        # call sites were blank-canvas right-clicks, so on a plan that fills
+        # the canvas the renderer was unreachable. It is NOT hung under Floors
+        # -- `select_floor_popup`'s docstring is right that "a chord named
+        # 'select a floor' should not offer a renderer", and that reasoning
+        # applies to a menu as much as to a chord. Putting a renderer wherever
+        # there was space is how it came to live on blank canvas.
+        m_view = self.menuBar().addMenu("&View")
+        self.a_3d = QAction("&3D view…", self)
+        self.a_3d.setShortcut(QKeySequence("Ctrl+3"))
+        self.a_3d.triggered.connect(self.show_3d_view)
+        m_view.addAction(self.a_3d)
 
         m_rooms = self.menuBar().addMenu("&Rooms")
         a_concept = QAction("&New concept room…", self)      # P4.4
@@ -1567,6 +1595,24 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
 
 
 
+
+    def paste_room_here(self):
+        """Edit ▸ Paste room (Ctrl+Shift+V) -- paste at the mouse, or the centre.
+
+        `paste_room` wants a LOCATION, which is why it lived on the canvas menu:
+        a right-click carries a point and a menu-bar action does not. This
+        resolves one the same way `paste_clipboard` does -- the last scene
+        position the view saw, falling back to the viewport centre -- so the
+        keyboard route lands where the user is looking.
+        """
+        if not self.room_clipboard:
+            self.status("No room copied -- right-click a room and Copy room "
+                        "first.")
+            return
+        at = self.view._last_scene
+        if at is None:
+            at = self.view.mapToScene(self.view.viewport().rect().center())
+        self.paste_room(grid_snap(at))
 
     def paste_room(self, sp: QPointF):
         """Paste the copied room, centred on `sp`, as a FLOATING room.

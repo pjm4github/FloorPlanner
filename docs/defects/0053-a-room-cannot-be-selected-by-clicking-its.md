@@ -189,6 +189,120 @@ to learn than one modifier and a wrong guess.
 **(c) Rubber-band selection keeps its current behaviour. Do not change it while
 fixing (a).**
 
+### THREE CONSTRAINTS, ruled 2026‑08‑08, BEFORE ANY CODE
+
+**Constraint 1 — `shape()` has a blast radius, and it is not the one-line fix it
+appears to be.** Qt hit-tests `shape()`, so widening it changes what is under
+the cursor for every gesture over a room's interior. **Walls and vertices must
+stay above the region in hit priority; a fix that makes rooms selectable and
+vertices unreachable trades one defect for a worse one.** The census is below.
+
+**Constraint 2 — panning must survive.** `view.py:359‑365` pans when the press
+finds nothing. Make the region hit-testable and you cannot pan by dragging
+inside a room — on a plan that fills the canvas, that is most of it. **The fix
+must state what replaces it. Middle-mouse drag pans anywhere, unconditionally,
+including over rooms**; that is conventional, collides with nothing, and does
+not depend on what is under the cursor. Panning from empty canvas may stay as
+it is.
+
+**Constraint 3 — selection and floating must not share a visual channel.** A
+floating room already paints a **dashed** orange boundary and selection would
+paint **dashed** blue over the same path. **Dashed already carries two meanings
+in this application** — the manual check's item 5 exists because a dashed edge
+over a real wall is a fault signature. **Do not add a third.** Floating-ness is
+a property of the *room*; selection is a property of the *view*; they get
+different channels. Selection may tint the fill, add corner handles, or thicken
+to a solid stroke — anything but a second dash on the same path.
+
+### The census constraint 1 asks for — parsed, not grepped
+
+`docs/evidence/d53-hit-census.txt`, produced by `docs/evidence/d53_hit_census.py`
+(an `ast` walk of all 33 files in `floorplanner/`: every `QGraphicsItem`
+subclass with whether it overrides `shape()`, every `setZValue` argument as
+written, every `setFlag` with its enum, and every hit query with its enclosing
+function). Grep finds the word; the parse finds the `setZValue` in a helper that
+never names the class.
+
+**Qt picks the topmost item whose `shape()` contains the point, so z is the
+deciding term.** There are six item classes and the whole answer is here:
+
+| item | z | vs `RoomItem` (z **4**) |
+|---|---:|---|
+| `OpeningItem` | `OPENING_Z` = **6.0** | **above — safe** |
+| `WallItem` | `WALL_Z` = **5.0** | **above — safe** |
+| **`RoomItem`** | **4** | — |
+| `FurnishingItem` | **3** | **BELOW — loses its hit target** |
+| `GroupItem` | **1** | **BELOW — loses its hit target** |
+| `ReferenceImageItem` | **−1e9** | below (the backdrop; D11/A2 turns this into a type term) |
+
+**Finding 1 — the constraint's wall half is already satisfied, by construction
+and on purpose.** `config.py:88` reads `WALL_Z = 5.0  # walls sit above the room
+fill so they stay crisp`, and `RoomItem.raise_to_front` re-establishes it after
+every raise: room at `base`, its walls at `base + 4` / `base + 5`, its openings
+at `order + 6`, with the comment *"the walls/openings sit ABOVE the fill so a
+wall is never hidden under its own room tint"*. Widening `shape()` does not
+endanger walls or openings.
+
+**Finding 2 — THERE IS NO VERTEX ITEM.** The parse finds six `QGraphicsItem`
+subclasses and none of them is a vertex or a handle: `Vertex` (`vertex.py:59`)
+is a plain object — the model corner — and `_DragVertex` (`walls.py:27`) is not
+a graphics item either. **Corner grabs are handled inside `WallItem`'s own press
+handler, within the wall's own shape.** So "walls and vertices must stay above
+the region" is **one condition, not two**, and `WALL_Z > 4` already holds it.
+`raise_to_front` even lifts an unlocked wall to `base + 5` over its siblings'
+`base + 4` precisely *"so corner clicks at a shared corner grab IT"*.
+
+**Finding 3 — and this is the one that matters: FURNISHINGS ARE BELOW ROOMS.**
+`FurnishingItem` is z **3** against `RoomItem`'s **4**. Widening a room's
+`shape()` to its outline makes every room contain every furnishing inside it,
+**above** it, so **every furnishing in the plan becomes unclickable and
+undraggable**. That is precisely the trade constraint 1 forbids. And it is worse
+after any room interaction: `raise_to_front` sets the room to `_z_top * 10 + band`
+while furnishings stay at 3, so the gap widens permanently the first time a user
+touches the room.
+
+**`GroupItem` at z 1 has the same exposure** — and it is the object that was
+masking this defect in the first place, which is a neat trap: the naive fix
+would break the very item whose disappearance exposed the bug.
+
+**Finding 4 — the "empty canvas" idiom has FOUR consumers, not one.** Constraint
+2 names the pan. The parse finds `itemAt(...) is None` standing for *"the user
+pressed blank canvas"* at **four** sites, and all four change meaning if a room
+becomes hit-testable over its interior:
+
+| site | what it does today | what breaks |
+|---|---|---|
+| `view.py:321` | Ctrl+drag rubber-band requires empty space | no additive band started from inside a room |
+| `view.py:360` | pan, **and `clearSelection()`** | constraint 2's case |
+| `view.py:540` | Room tool right-click → Paste room / New concept room | menu no longer offered inside a room |
+| `view.py:557` | any other tool right-click → floor popup | popup no longer offered inside a room |
+
+**Middle-mouse pan already exists, unconditionally, and is already first.**
+`view.py:310‑314` handles `MiddleButton` *before* any tool or `itemAt` test. So
+constraint 2's stated replacement is **already implemented** — the work is to
+keep it and to decide what happens to the other three sites, not to build it.
+
+**Finding 5 — constraint 3's rubber-band clause is safe, and for two reasons
+worth knowing rather than trusting.** `select_in_rect` (`view.py:449`) does use
+`IntersectsItemShape`, but (i) its first loop type-filters to
+`(WallItem, FurnishingItem, GroupItem)`, so a room appearing in the results is
+discarded; and (ii) it gathers rooms from a **full scan** — `scene.items()` with
+no arguments — and decides with `item_fully_inside`, which for a `RoomItem`
+tests `item.corners` (`items.py:937‑940`) and never consults `shape()`.
+**Rubber-band selection is therefore independent of `shape()` in both halves**,
+so constraint 3's "keep its current behaviour" costs nothing — but it must be
+*pinned*, because nothing currently asserts that independence.
+
+**Finding 6 — the app already contains one hand-rolled answer to this problem.**
+The macro layer's `_cmd_select` (`macro.py:433`) picks from `scene.items(pt)`
+with an explicit comment: *"prefer an editable item (furnishing / wall / group)
+over a room, whose label can sit on top of what you meant to grab."* A
+type-priority rule, written because the room's **label** already steals hits.
+Widening the region makes that same problem general — and this is the precedent
+for solving it by priority rather than by z alone. `_place_opening`
+(`view.py:623`) is immune for the same reason: it type-filters to
+`WallItem` / `OpeningItem`.
+
 ### Two findings that bear on (a), measured while filing
 
 **The selected-state painting already exists and is simply never reached.**
@@ -205,23 +319,275 @@ same path. Two dashed outlines on one shape is exactly where "a selection nobody
 can see" would survive the fix. Worth deciding as part of (a) rather than
 discovering at the manual check.
 
-**Why not simply widen `shape()` to the region.** A room sits above the walls at
-`z=4` (`rooms.py:411`), so a region-wide `shape()` trades one click-through
-problem for another: clicks meant for the walls, openings and furnishings
-*inside* the room would start landing on the room. "What is on top at this
-point" is the same question **D11 / A2** is asking, which is the reason this
-record is `related: [11]` and the reason (c) fences the rubber band off — one
-selection change at a time.
+**Why widening `shape()` is not by itself the fix.** The census settles the
+walls half in its favour (`WALL_Z` 5.0 > 4, and there is no vertex item) and
+against it for **furnishings** (z 3) and **groups** (z 1). "What is on top at
+this point" is the same question **D11 / A2** is asking, which is why this record
+is `related: [11]`. The one precedent already in the tree — `_cmd_select`'s
+*"prefer an editable item over a room"* — answers it by **type priority** rather
+than by z, and that is the shape worth costing first.
+
+## THE MANUAL CHECK FOUND A REGRESSION — 2026‑08‑08, PR #18 held
+
+**Six items passed; one caught what 646 green tests and six green CI jobs did
+not.** The right-click context menu on a room — *Extract room (float it)*,
+*Join room into plan*, Properties, Inventory, Rename, Copy, Delete — was gone.
+
+### The cause, measured before anything was changed
+
+**`docs/evidence/d53-menu-route.txt`**, from
+`d53_menu_route_probe.py` run against both trees:
+
+| right-click at | `main` `bcffa08` | branch `170ea03` |
+|---|---|---|
+| the **label** | `PlanView` → **`RoomItem`** | `PlanView` *(stops)* |
+| the **region** | `PlanView` | `PlanView` |
+
+**Candidate one is confirmed: the menu still exists and is unreachable.**
+`_menu_target_is_canvas` answers `True` for a `RoomItem` target, so the view
+accepts the event and `RoomItem.contextMenuEvent` — present and unchanged on
+both trees — is never reached. **Candidate two is refuted**: nothing about the
+room's own menu resolves differently.
+
+**And a fact neither candidate predicted, which changes the fix:** the room menu
+was **only ever reachable from the LABEL**. On `main` a right-click on a room's
+*region* already went to the floor popup, because the region was not in
+`shape()`. So the regression is confined to the label — and widening `shape()`
+makes the room menu reachable from the whole room *for the first time*, which is
+a gain to keep rather than a side effect to undo.
+
+### The ruling this came from was mine to check and I did not
+
+The premise was *"a room context menu does not exist; inventing one would expand
+scope."* It was asserted, never measured — **and the fact was already in my own
+census output**, whose items table listed `contextMenuEvent` among `RoomItem`'s
+handlers, one section above the part I was reading. Recorded as a standing rule
+in [`../WORKING_AGREEMENT.md`](../WORKING_AGREEMENT.md): *a census inherits the
+blindness of the predicate that scopes it*, and **a census may never establish
+that something does not exist unless its question was "does this exist?"**
+
+Re-run without a predicate, the question *"what shows a menu on a right-click?"*
+finds **eight** `contextMenuEvent` overrides where the earlier census reported
+two sites — including **`StairItem`**, a ninth path with its own 47-line menu
+that neither party had named *(it subclasses `FurnishingItem`, so the hit
+resolver already covers it — a menu gap, not a priority gap)* — and one clean
+negative worth having: **this application uses the `customContextMenuRequested`
+signal route nowhere at all.** `docs/evidence/d53-menu-census.txt`.
+
+### THE FIX, and its eight-row receipt — 2026‑08‑08
+
+**The clause is deleted, not tuned.** `_menu_target_is_canvas` is gone;
+`PlanView.contextMenuEvent` fires the blank-canvas menus only on `blank()`, and
+a right-click otherwise resolves through the same type-priority resolver as a
+left-click, each type answering with its own menu.
+
+**ONE RULE GOVERNS BOTH VIRTUALS.** `mousePressEvent` and `contextMenuEvent` are
+separate Qt deliveries, each routed by z, so the decline is factored into
+`RoomItem._outranked_at` and both call it. Had it lived in one and not the
+other, left-click and right-click would have resolved differently — a
+divergence that presents as *"right-click sometimes picks the wrong thing"* long
+after anyone remembers this pass.
+
+**The receipt is the whole table, because the room row is the reported one and
+the other rows are where an unreported change would hide.**
+`docs/evidence/d53-menu-matrix.txt`; probe stable across 6 runs on one tree
+(checked, after the lesson below).
+
+| right-click on | main answers | after |
+|---|---|---|
+| room **label** | `RoomItem` | `RoomItem` |
+| room **region** | `PlanView` (floor popup) | **`RoomItem`** ← the only change |
+| wall | `WallItem` | `WallItem` |
+| **door** | `OpeningItem` | `OpeningItem` |
+| furnishing | `FurnishingItem` | `FurnishingItem` |
+| **stair** | `StairItem` | `StairItem` |
+| group | `GroupItem` | `GroupItem` |
+| reference image | `ReferenceImageItem` | `ReferenceImageItem` |
+| blank canvas | `PlanView` | `PlanView` |
+| wall / door / furnishing **after `raise_to_front`** | each own menu | each own menu |
+
+**`OpeningItem` — the row flagged as most likely to change behaviour silently —
+is UNCHANGED.** A door already won by z (`OPENING_Z` 6.0 > `WALL_Z` 5.0), so
+ranking it above `WallItem` preserves the existing answer rather than
+introducing one. **`StairItem` is measured, not reasoned**: MRO reaches its
+menu, as predicted. **No type was untestable** — `ReferenceImageItem` needs only
+a `QImage`, so nothing was skipped quietly and nothing goes to the boundary
+table on that account.
+
+**The `raise_to_front` rows are the ones that would have bitten.** Right-clicking
+a wall, door or furnishing *inside* a room whose label has been dragged — room
+at z 10, they at 5, 6 and 3 — still reaches each item's own menu. A test on a
+freshly loaded plan passes while the real gesture fails, which is exactly how
+the first cut of A1b broke `dragWallFuseStraggler`.
+
+### THE FOUR BLANK-CANVAS AFFORDANCES — two covered, TWO GAPS
+
+Ordered before the context-menu pass, because if one affordance was resting on
+the blank-canvas path others might be. Four were.
+`docs/evidence/d53-blank-canvas-routes.txt`.
+
+| affordance | route outside the blank-canvas path | |
+|---|---|---|
+| floor popup | `Floors ▸ Select…` **Ctrl+F** (the *identical* popup), Next/Previous, `Edit this floor` | **covered** |
+| New concept room… | `Rooms ▸ New concept room…` | **covered** |
+| **Paste room** | **none** | **GAP** |
+| **3D view…** | **none** | **GAP** |
+
+**`Edit ▸ Paste` is not a route to Paste room.** There are two clipboards and
+they are not connected: `item_clipboard` (written by cut/copy, read by
+`paste_clipboard` = Ctrl+V) and `room_clipboard` (written by the room menu's
+*Copy room*, read **only** by `paste_room`, whose only caller is the
+blank-canvas menu). **Ctrl+V does not paste a room.** And the pair is now split
+across the two menus — *Copy room* sits on the room's own menu, which this pass
+makes reachable from the whole region, while its partner sits on the canvas
+menu. Copy got easier to reach; paste got harder.
+
+**`show_3d_view` has exactly two call sites, both blank-canvas right-clicks** —
+`levels.py:239` (appended to the floor popup, and only when `scene_menu=True`;
+the Ctrl+F route deliberately excludes it) and `view.py:674`. **No menu-bar
+entry, no shortcut, no toolbar button.** The 3D viewer is reachable only by
+right-clicking empty canvas, and a plan that fills the canvas may offer none.
+
+It was already fragile before A1b — it always needed blank canvas. What A1b
+removed is the *region* route, which existed only because a right-click inside a
+room returned `None`. **So the viewer, too, was reachable through the
+hit-testing defect** — the same shape as the naming affordance, and another
+instance of the pattern below.
+
+**Closing both gaps is part of the context-menu pass, not a follow-up.** 3D view
+is a whole-document view rather than a per-item action, so a menu-bar entry is
+the natural home; Paste room wants a *location*, which is why it sat on the
+canvas menu, so where it goes is a design call rather than a mechanical one.
+
+### THE REGION ROUTE IS A GAIN, NOT A RESTORATION — do not "restore" the old one
+
+The room menu was **only ever reachable from the LABEL**. Before A1b, a
+right-click on a room's region gave the floor popup, because the region was not
+in `shape()`. Widening it makes the room menu reachable **from the whole room
+for the first time**. That is the one row that differs from `main`, and it is an
+improvement. A later reader finding it and "fixing it back" would be restoring a
+limitation, not a design.
+
+**The floor popup loses its region route, and that is accepted — with the
+justification measured, not assumed** (the standard the left-drag pan's
+retirement was held to). The popup offers exactly **one** operation, switch
+floor; `Floors ▸ Select…` opens **the identical popup** via
+`select_floor_popup()` on **Ctrl+F**, with `Edit this floor` per floor as a
+direct switch besides. No reach is lost.
+
+### A CORRECTION TO THIS RECORD'S OWN EARLIER RECEIPT
+
+The macro differential previously read *"identical to `main` at every line"*,
+from **one run**. Measured afterwards, that comparison's **selection** field is
+nondeterministic — two outcomes on an unchanged tree, **6/6 on `main`**, 8/4 on
+the branch — so a single matching run was close to a coin landing heads. Filed
+as [D56](0056-a-macro-replay-s-final-selection-is.md); pre-existing, not
+introduced here. **The sound claim is the stable half**: the per-line wall-count
+sequence is deterministic, identical on both trees, and shows line 4's fuse
+restored. The rule it produced is in
+[`../WORKING_AGREEMENT.md`](../WORKING_AGREEMENT.md) — *a differential is only as
+good as the stability of the field it compares; run the comparator twice on one
+tree before quoting it.*
+
+### The amended rule, ruled 2026‑08‑08 — NOW IMPLEMENTED
+
+**A right-click resolves through the same type-priority resolver as a left-click,
+and each type answers with its own menu; the blank-canvas menu fires only on
+`on_blank_canvas`.** The `None OR a room` clause was a workaround for a menu
+believed absent and **is to be deleted, not tuned**.
+
+*No fix in this pass — the measurement was ruled to come first, and it has.*
 
 ## Receipt
 
-*(Open.)* Acceptance:
+**IMPLEMENTED at A1b, `957792c` on `a1b-d53-readback`. AWAITING THE MANUAL
+CHECK — the fourth acceptance item, which is the merge condition.** Census
+639 → **646 collected**, seven new tests, gate GREEN in all three modes.
+
+**THE MUTATION RECEIPT — the item that decides whether the boundary CLOSED or
+merely MOVED.** `docs/evidence/d53-mutation-receipt.txt`. Severing
+`_update_edit_actions` from `_sel_order`, in a throwaway worktree, mutation
+grep-verified on disk before each run:
+
+| tree | result |
+|---|---|
+| before A1b, `5a22a7f` | **639 passed, 0 failed — the whole suite green** |
+| after A1b, `957792c` | **1 failed**, 645 passed — and it is exactly `test_selecting_two_rooms_BY_CLICKING_them_feeds_a_room_operation` |
+
+**DIFFERENTIAL RECEIPT — Patrick's `dragWallFuseStraggler` macro, per line, on
+three trees.** `docs/evidence/d53-macro-differential.txt`. The first cut of this
+fix **broke it**: line 4's plain `CLICK 338 236` went from selecting the
+interior column and fusing it (18 → 16 walls) to selecting R2 with the count
+stuck at 18, because the two preceding label-drags had run `raise_to_front` and
+lifted R2 above `WALL_Z`, and **Qt routes a press to the topmost item by z**.
+The ruling foresaw it — *"any scheme where hit outcomes depend on z is one room
+interaction away from breaking"* — and Qt's own delivery was that scheme, which
+is why `RoomItem.mousePressEvent` now declines a press another item outranks.
+**After that, the replay is identical to `main` at every line**, wall counts
+`[18, 18, 16, 16, 18, 15, 17, 16]`.
+
+### The three deviations, RULED 2026‑08‑08 — two refine the rule, one refutes it
+
+**1. `OpeningItem` above `WallItem` — not a deviation at all.** *"A door is
+contained by the wall that answers the same point, and the containing thing must
+never outrank the contained thing. That is the same rule, applied one level
+deeper than I stated it."*
+
+**2. `ReferenceImageItem` below `RoomItem` — the WORDING was wrong, not the
+placement.** *"'Room always last' was shorthand; the actual principle is that
+PRIORITY RUNS FROM MOST SPECIFIC TO LEAST SPECIFIC, and a tracing backdrop is
+less specific than a room, not more."* **Restated at the code as the principle**
+(`items.HIT_PRIORITY`) so the next reader does not read it as a carve-out. The
+proof is what the opposite does: above rooms, no room would be selectable while
+an image is loaded — inverting the very defect this record closes. A room still
+comes last among the things a user ordinarily selects; that is a *consequence*,
+not the axiom.
+
+**3. The Ctrl band — A REFUTED PREMISE, recorded as one rather than as a
+compromise.** The ruling was *"an explicit modifier gesture should never depend
+on what sits under the press point."* Sound in general; **false here**, because
+**Ctrl was already an item-level modifier in this codebase** — the label nudge
+and the wall corner-drags — so an unconditional Ctrl band would have eaten
+gestures older than this record.
+
+**The measurement that refuted it**, and it arrived before any reasoning did —
+six tests, on the first cut:
+
+    test_room_label_ctrl_drag_nudges_label
+    test_a_dragged_end_near_a_jamb_snaps_to_it
+    test_dragging_an_end_into_a_doorway_names_the_doorway_at_release
+    test_closing_gap_refuses_and_relocks
+    test_fuse_straggler_macro_steals_no_wall
+    test_drag_split2_macro_keeps_every_room_rectilinear
+
+`_band_may_start` keeps the purpose, which was **banding from inside a room** —
+impossible before, because the band was gated on `itemAt(pos) is None`.
+
+*(Open — the manual check.)* Original acceptance, for the record:
 
 * the probe's four **region** cases flip from `False` to `True` while the four
   **label** cases stay `True`;
 * a press on a room's region no longer clears an existing selection;
 * shift-click and ctrl-click each toggle membership;
-* rubber-band behaviour is unchanged — pinned by a test, since (c) is a
-  boundary marker and a boundary marker with no assertion is dead weight;
-* **and a test exists at the gesture altitude**, so the seam measured above
-  stops being green under mutation 2.
+* **furnishings and groups inside a room remain clickable and draggable** —
+  constraint 1's real exposure, measured by the census, and the one a naive
+  `shape()` widening breaks;
+* **panning still works over a room** by the stated replacement, and the other
+  three "empty canvas" sites (Ctrl-band, both context menus) each have a decided
+  outcome rather than an accidental one;
+* **a selected floating room is distinguishable at a glance from an unselected
+  floating room and from a selected ordinary room** — constraint 3's acceptance,
+  as ruled;
+* rubber-band behaviour is unchanged — **pinned by a test**, since (c) is a
+  boundary marker and a boundary marker with no assertion is dead weight, and
+  since the census shows the independence currently holds by accident of two
+  type filters rather than by any assertion;
+
+**AND THE MUTATION IS PART OF THE RECEIPT, NOT AN EXTRA.** *"The fix is not done
+when clicking selects a room. It is done when severing `_update_edit_actions`
+from `_sel_order` breaks the suite."* Re-run **that exact mutation** in a
+throwaway worktree as part of the receipt. **If it still yields 639 green, the
+seam remains untested and the fix has only MOVED the boundary rather than closed
+it.** You cannot write a regression test for something that never worked — but
+you can write the test that *would* have caught it, and the mutation is how you
+prove you did.

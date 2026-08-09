@@ -86,26 +86,40 @@ detector cannot separate them either.
 
 ## Ruling
 
-> **ATTRIBUTION, added 2026‑08‑08 because the ruling below named no author and
-> was asked to.** Traced on disk rather than assumed: the record and its ruling
-> arrived in `83a3ccc`, whose own message says the five attempted repairs "each
-> change what the plan MEANS, **which is the author's call**" — i.e. Code
-> deliberately declined to choose a repair. **So the deferral is CODE's, made
-> from measurement, and it has never been ratified by Patrick.** The only act in
-> this file recorded as his is the `roundedMultifloor.json` reshape, which
-> `83a3ccc` names him for explicitly. Git authorship settles nothing either way
-> — every commit in this repository carries his git identity, including the ones
-> Code writes.
->
-> **It therefore reads as ruled and is not.** Deciding that room-in-room is a
-> deferred feature rather than a bug is a scheduling call about a plan someone
-> drew, and it is his. **Treat the paragraph below as a PROPOSAL awaiting
-> ratification**, and the exemption in `KNOWN_UNCLEAN` as resting on it.
+### RULED BY PATRICK, 2026‑08‑08. Outcome ratified, FRAMING REJECTED.
 
-**Deferred as a FEATURE, 2026-08-07.** Not scheduled, not a bug to fix now: the
-one plan that still needs it is exempted and named, and the workaround
-(reshaping so rooms do not nest) is available and was used once already. Two
-independent halves, worth separating when it is picked up.
+**The outcome stands: `farmplaceBIGmultifloor.json` is NOT to be repaired, and
+the exemption stays.** But the reason it stays is not the one recorded on
+2026‑08‑07, and the difference matters enough to strike the old wording rather
+than annotate around it.
+
+**~~Deferred as a FEATURE, 2026‑08‑07.~~ STRUCK.** *Overlapping rooms are an
+**UNMODELLED STATE**, not a feature.* Calling them a feature would let the next
+reader treat the **area double-count** as intended behaviour — and it is not
+intended by anything; it is [D55](0055-area-totals-double-count-overlapping.md),
+filed the same day off exactly this plan's arithmetic. A "deferred feature" is
+something the product has decided to do later. This is something the model
+cannot currently say, which a drawing works around with a slit, and which the
+totals bar then silently miscounts.
+
+**And the file is VALUABLE, not merely tolerated.** It is now the **only plan
+in the tree that exercises overlapping rooms**, and A1 has just demonstrated
+that overlap is a state the app genuinely reaches — `room_boolean` exists to
+resolve it, `fragment` is the operation that does, and
+`fixtures/fragment2room.json` reaches it by ordinary drawing. A plan holding a
+state the app can produce and the model cannot express is the most useful input
+this validator has. **Repairing it would delete the only evidence.**
+
+*(Provenance, since the previous ruling named no author and was asked to: the
+2026‑08‑07 deferral arrived in `83a3ccc`, whose own message says the five
+attempted repairs "each change what the plan MEANS, **which is the author's
+call**" — Code declined to choose a repair and then deferred the whole question
+anyway. Git authorship settles nothing; every commit here carries Patrick's
+identity. That deferral was therefore Code's and unratified. **This section
+replaces it and is Patrick's, dated 2026‑08‑08.**)*
+
+**The two halves below survive the reframing unchanged**, and are worth
+separating when picked up.
 
 1. **I11's centroid is wrong regardless of this plan.** A vertex average is
    cheap and not a centroid; a true area centroid, or a real polygon-overlap
@@ -122,6 +136,12 @@ independent halves, worth separating when it is picked up.
 Both were left alone on 2026-08-07 rather than guessed at: the repairs above
 each change what the plan *means*, which is the author's call and not a
 tool's.
+
+**Half 1 has a second consumer as of 2026‑08‑08.** [D49](0049-i11-overlapping-placed-rooms-the-corruption-this.md)'s
+amendment requires a save-time report naming the rooms **and the overlap area**.
+I11 emits a boolean from three terms and no number, and on *this* file the true
+polygon intersection is **0.0 sf** — so the honest report and the correct
+predicate are the same piece of work, and it is half 1.
 
 ## Receipt
 

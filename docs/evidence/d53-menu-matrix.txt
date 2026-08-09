@@ -1,0 +1,59 @@
+D53 / A1b -- THE MENU MATRIX.  Which menu does a right-click open, for
+EVERY item type, before and after?  Reproduce:
+
+    python docs/evidence/d53_menu_matrix_probe.py <repo-root>
+
+(point it at a `git worktree` for the main side).  QMenu.exec is neutered;
+the ROUTE is real.  A class that ENTERS and declines still appears in the
+chain, so the ANSWER is the last name in it.
+
+  main bcffa08   ->   branch acaafa2
+
+right-click on                    main answers        branch answers      
+--------------------------------------------------------------------------
+RoomItem (label)                  RoomItem            RoomItem            
+RoomItem (region)                 PlanView            RoomItem               <<< CHANGED
+WallItem                          WallItem            WallItem            
+OpeningItem (door)                OpeningItem         OpeningItem         
+FurnishingItem                    FurnishingItem      FurnishingItem      
+StairItem                         StairItem           StairItem           
+GroupItem                         GroupItem           GroupItem           
+ReferenceImageItem                ReferenceImageItem  ReferenceImageItem  
+blank canvas                      PlanView            PlanView            
+WallItem AFTER raise_to_front     WallItem            WallItem            
+OpeningItem AFTER raise_to_front  OpeningItem         OpeningItem         
+FurnishingItem AFTER raise_to_frontFurnishingItem      FurnishingItem      
+
+room z after raise_to_front: 10.0   unowned wall z: 5.0
+
+READING IT.
+
+EXACTLY 1 ROW DIFFERS, and it is a GAIN, not a restoration:
+the room's REGION now opens the ROOM menu where it opened the floor
+popup.  The room menu was ONLY EVER REACHABLE FROM THE LABEL -- before
+A1b the region was not in shape(), so itemAt returned None there.  Nobody
+should later 'restore' the label-only behaviour: it was a limitation, not
+a design.
+
+OpeningItem IS THE ROW TO READ SECOND, and it is UNCHANGED.  Ranking a
+door above its wall in the resolver was the deviation most likely to
+alter behaviour nobody asked about -- and it does not, because a door
+ALREADY won by z (OPENING_Z 6.0 > WALL_Z 5.0).  The ranking preserves the
+existing answer rather than introducing one.
+
+StairItem IS MEASURED, NOT REASONED.  It subclasses FurnishingItem, the
+resolver returns the instance, and Python's MRO reaches
+StairItem.contextMenuEvent.  That was the prediction; this is the
+measurement, and they agree.
+
+THE raise_to_front ROWS ARE THE ONES THAT WOULD HAVE BITTEN.  Right-
+clicking a wall, a door or a furnishing INSIDE a room whose label has
+been dragged -- so the room sits at z 10 above their 5, 6 and 3 -- still
+reaches each item's own menu, because `RoomItem.contextMenuEvent` asks
+the same `_outranked_at` helper that `mousePressEvent` does.  A test on a
+freshly loaded plan would pass while the real gesture failed.
+
+NO TYPE WAS UNTESTABLE.  ReferenceImageItem was expected to need a file;
+a QImage needs none, so it is measured too -- which matters because it is
+the one type ranked BELOW the room, and the row confirms a right-click on
+the backdrop still reaches it.  Nothing was skipped quietly.

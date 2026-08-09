@@ -1,0 +1,59 @@
+D53 / A1b -- CONTEXT-MENU CENSUS, parsed from the AST of floorplanner/**.py
+Scoped by the QUESTION, not by a predicate. See the module docstring.
+==============================================================================
+
+1. `contextMenuEvent` OVERRIDES -- the item/widget route
+   This is the set the earlier census could not see, because it asked
+   about `itemAt(...) is None` sites instead.
+
+   class                 shows a menu?   lines   site
+   FurnishingItem        YES             18      floorplanner/items.py:190
+   GroupItem             YES             29      floorplanner/items.py:902
+   OpeningItem           YES             36      floorplanner/walls.py:2602
+   PlanView              YES             40      floorplanner/view.py:647
+   ReferenceImageItem    YES             28      floorplanner/items.py:1181
+   RoomItem              YES             68      floorplanner/rooms.py:1218
+   StairItem             YES             47      floorplanner/items.py:376
+   WallItem              YES             33      floorplanner/walls.py:2223
+
+2. `QMenu(...)` CONSTRUCTION -- who builds one
+
+   floorplanner/items.py:191   FurnishingItem.contextMenuEvent
+   floorplanner/items.py:377   StairItem.contextMenuEvent
+   floorplanner/items.py:907   GroupItem.contextMenuEvent
+   floorplanner/items.py:1182  ReferenceImageItem.contextMenuEvent
+   floorplanner/levels.py:215   LevelsMixin._build_floor_popup
+   floorplanner/rooms.py:1221  RoomItem.contextMenuEvent
+   floorplanner/view.py:662   PlanView.contextMenuEvent
+   floorplanner/walls.py:2225  WallItem.contextMenuEvent
+   floorplanner/walls.py:2603  OpeningItem.contextMenuEvent
+
+3. MENU `.exec(...)` -- who actually SHOWS one
+
+   floorplanner/items.py:197   FurnishingItem.contextMenuEvent  ->  menu.exec(...)
+   floorplanner/items.py:405   StairItem.contextMenuEvent  ->  menu.exec(...)
+   floorplanner/items.py:914   GroupItem.contextMenuEvent  ->  menu.exec(...)
+   floorplanner/items.py:1193  ReferenceImageItem.contextMenuEvent  ->  menu.exec(...)
+   floorplanner/levels.py:243   LevelsMixin.select_floor_popup  ->  menu.exec(...)
+   floorplanner/rooms.py:1237  RoomItem.contextMenuEvent  ->  menu.exec(...)
+   floorplanner/view.py:668   PlanView.contextMenuEvent  ->  menu.exec(...)
+   floorplanner/walls.py:2239  WallItem.contextMenuEvent  ->  menu.exec(...)
+   floorplanner/walls.py:2620  OpeningItem.contextMenuEvent  ->  menu.exec(...)
+
+4. THE SIGNAL ROUTE -- setContextMenuPolicy / customContextMenuRequested
+
+   (none -- this application does not use the signal route at all)
+
+5. SHARED MENU BUILDERS -- addAction on a menu passed in
+
+   floorplanner/geometry.py:154   -.add_front_back_actions
+   floorplanner/items.py:192   FurnishingItem.contextMenuEvent
+   floorplanner/items.py:400   StairItem.contextMenuEvent
+   floorplanner/items.py:908   GroupItem.contextMenuEvent
+   floorplanner/items.py:1183  ReferenceImageItem.contextMenuEvent
+   floorplanner/levels.py:220   LevelsMixin._build_floor_popup
+   floorplanner/levels.py:238   LevelsMixin.select_floor_popup
+   floorplanner/rooms.py:1222  RoomItem.contextMenuEvent
+   floorplanner/view.py:663   PlanView.contextMenuEvent
+   floorplanner/walls.py:2226  WallItem.contextMenuEvent
+   floorplanner/walls.py:2608  OpeningItem.contextMenuEvent

@@ -1,0 +1,36 @@
+D53 / A1b -- THE MENU ROUTE, MEASURED.  Which handler receives a right-click
+over a room?  Reproduce:
+
+    python docs/evidence/d53_menu_route_probe.py <repo-root> fixtures/fragment2room.json
+
+(point it at a `git worktree` for the main side).  QMenu.exec is neutered for
+the run -- it is modal and would hang a headless process -- so the ROUTE is
+real and only the blocking show is removed.
+
+  main    bcffa08        branch  170ea03
+  RoomItem.contextMenuEvent exists on both: True / True
+
+right-click at  main                              branch                            
+the LABEL       PlanView -> RoomItem              PlanView                          
+the REGION      PlanView                          PlanView                          
+
+READING IT.
+
+CANDIDATE ONE IS CONFIRMED: the menu still exists and is UNREACHABLE.  On
+main a right-click on the LABEL entered PlanView.contextMenuEvent, which
+declined (itemAt found the room, so it was not None), and fell through to
+RoomItem.contextMenuEvent -- the room menu.  On the branch the same click
+enters PlanView and STOPS there, because `_menu_target_is_canvas` answers
+True for a RoomItem target and the view accepts the event.
+
+CANDIDATE TWO IS REFUTED: nothing about the room's own menu resolves
+differently.  The handler is present and unchanged on both trees; it is
+simply never reached.
+
+AND A FACT NEITHER CANDIDATE PREDICTED, which matters for the fix: THE ROOM
+MENU WAS ONLY EVER REACHABLE FROM THE LABEL.  On main, a right-click on a
+room's REGION already went to the floor popup -- because the region was not
+in `shape()`, so `itemAt` returned None.  So the fix is not 'restore what the
+region did'; the region never had it.  Widening shape() makes the room menu
+reachable from the whole room FOR THE FIRST TIME, which is a gain, and the
+regression is confined to the label.
