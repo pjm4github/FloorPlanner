@@ -1,0 +1,120 @@
+A2 / D11 -- THE BOUNDED EVENT COUNTER, AND A NEGATIVE RESULT.
+
+Ruled: "instrument the hang with a bounded event counter to find the consumer
+of the z step.  Do not choose constants that make the symptom go away.  First
+deliverable is the measurement, not a fix."
+
+This is that measurement.  IT DID NOT FIND A CONSUMER, BECAUSE ON THIS TREE
+THERE DOES NOT APPEAR TO BE ONE -- and the hang does not reproduce at all.
+
+-- WHAT WAS RECONSTRUCTED, AND WHY IT IS A READING ---------------------------
+
+The z work was REVERTED, so nothing of it is on disk and `Z_STACK_BAND` -- the
+name the record uses -- exists nowhere in the tree.  What does exist:
+
+    levels.py:43     FLOOR_Z_BAND = 100_000.0        the floor band
+    geometry.py      bring_to_front: setZValue(max(scene) + 1.0)
+    rooms.py:645     raise_to_front: order = win._z_top * 10
+
+The record says the trigger is "the MAGNITUDE of the z step (x1.0 completes,
+xZ_STACK_BAND hangs)".  Two things in the tree answer to "the z step", so BOTH
+were parametrised rather than guessing which:
+
+    _A2_STEP         bring_to_front's  + 1.0
+    _A2_STACK_BAND   raise_to_front's  * 10
+
+THIS IS A READING OF THE DESCRIPTION, NOT THE ORIGINAL CHANGE.  Ruling 4's full
+scheme (z = floor_term + stack_term + type_term, the backdrop's -1e9 becoming a
+type term, bring_to_front's full-scene max scan dying with it) is NOT
+reconstructed here -- only the magnitudes, because magnitude is what the record
+names as the trigger.
+
+-- THE COUNTER ---------------------------------------------------------------
+
+Wraps the producers (bring_to_front, send_to_back, raise_to_front,
+_apply_floor_stacking), the plausible consumers (rebuild_all_walls, RoomItem
+and WallItem itemChange / mousePressEvent / paint) and every setZValue, and
+ABORTS at a bound so a hang becomes a finite report instead of a wedged
+process.  Replays examples/fiveRoomDragSplit.fpm -- the macro the named test
+drives.
+
+-- RESULT 1: THE EVENT COUNTS ARE INVARIANT UNDER THE MAGNITUDE --------------
+
+    step        stack       TOTAL events   max |z|      completed
+    1.0         10             545            67.0        yes
+    100000.0    10             545        200056.0        yes
+    1.0         100000         545          6007.0        yes
+
+  and the per-consumer breakdown is IDENTICAL in all three runs:
+
+    WallItem.paint            251     RoomItem.itemChange        26
+    WallItem.itemChange       133     RoomItem.raise_to_front      6
+    RoomItem.paint             70     RoomItem.mousePressEvent     2
+    setZValue                  55     WallItem.mousePressEvent     2
+
+  Five orders of magnitude on either term changes NOTHING except the z values
+  themselves.  NOTHING ON THIS TREE CONSUMES THE Z STEP.
+
+-- RESULT 2: THE NAMED TEST DOES NOT HANG, AT ANY MAGNITUDE ------------------
+
+tests/test_extract_join.py::test_drag_split_macro_keeps_every_room_rectilinear,
+run in the reconstructed worktree, four configurations:
+
+    STEP=1       STACK=10        1 passed in 0.32s
+    STEP=100000  STACK=10        1 passed in 0.28s
+    STEP=1       STACK=100000    1 passed in 0.27s
+    STEP=100000  STACK=100000    1 passed in 0.27s
+
+-- WHAT THIS ESTABLISHES, AND WHAT IT DOES NOT -------------------------------
+
+ESTABLISHED: on today's tree, changing the magnitude of either z step by 100000x
+neither hangs the named test nor changes any event count.  The record's stated
+trigger -- magnitude -- IS NOT CONFIRMED HERE, and cannot be acted on as
+written.
+
+NOT ESTABLISHED, and these are the reasons a negative result is not a refutation:
+
+  * The reverted change is not on disk.  This reconstructs the MAGNITUDES the
+    record names; it does not reconstruct ruling 4's scheme.  A hang could
+    require the type term, or the removal of bring_to_front's full-scene max
+    scan, neither of which is reproduced.
+  * The tree has moved a long way since the revert -- all of P4.5, A1 and A1b.
+    Something that hung then may simply not be reachable now.
+  * A negative result on ONE macro is not a negative result on every gesture.
+
+-- THE PARASITIC-REACH QUESTION, AND A DISTINCTION IT NEEDS -----------------
+
+Asked: "what currently works BECAUSE all floors collapse to one height?"
+
+THERE ARE TWO DIFFERENT Z's IN THIS APPLICATION AND THE QUESTION LANDS ON THE
+OTHER ONE:
+
+  SCENE STACKING ORDER -- D11 / A2's actual subject.  _apply_floor_stacking
+    bands every item by -depth * FLOOR_Z_BAND (100_000), so ghosts paint behind
+    the active floor.  THIS WORKS AND IS VISIBLY WORKING.  It is not a
+    capability that has never worked, so it is not a parasitic-reach
+    precondition.
+
+  DOCUMENT ELEVATION -- D50's subject.  Every level's elevation_in is the
+    literal 0.0, written at bridge.py:815, bridge.py:999 and importer.py:184.
+    THIS is the thing that has never worked.
+
+  Its consumers are enumerable, and there is essentially ONE:
+
+    fp3d.py:448   _level_elev -- the 3D viewer stacks levels by elevation_in
+    fp3d.py:228   a wall-hung item's height is "the level's floor plus the
+                  catalog's elevation_in"
+
+  Nothing in the editor reads elevation_in at all; every other occurrence
+  WRITES the literal.  So the parasitic surface for the elevation collapse is
+  the viewer, and D50 has already ruled that the viewer is CORRECT and is not
+  to be changed.
+
+  What would visibly change the day elevations become real: a multi-floor plan
+  stops rendering as one superimposed storey, and every wall-hung furnishing on
+  an upper floor rises by that floor's elevation.  Both are the point of the
+  feature rather than losses -- but the second is the one a user would notice
+  without being told, and it is worth naming before it happens.
+
+  AND A2 DOES NOT TOUCH EITHER.  Scene z and document elevation are separate
+  quantities; nothing in ruling 4's scheme reads or writes elevation_in.

@@ -43,3 +43,55 @@ github_issue: null
 ## Milestone
 
 **P4.5 (11a done) · runtime half CARRIED OUT of Phase 4, queued second after row 47**
+
+## A2's FIRST MEASUREMENT — 2026‑08‑09, and it is a NEGATIVE RESULT
+
+**Ruled: instrument the hang with a bounded event counter, find the consumer of
+the z step, and do not choose constants that make the symptom go away. The
+measurement was the deliverable, not a fix.** It is done, and it did not find a
+consumer — because on this tree there does not appear to be one, and the hang
+does not reproduce.
+
+`docs/evidence/d11-a2-z-step-measurement.txt`, probe at
+`docs/evidence/d11_a2_z_step_counter.py`.
+
+**The reconstruction is a READING, and is labelled as one.** The work was
+reverted, so `Z_STACK_BAND` exists nowhere in the tree. Two things answer to
+"the z step" and **both** were parametrised rather than guessing:
+`bring_to_front`'s `+ 1.0` and `raise_to_front`'s `* 10`.
+
+| step | stack | TOTAL events | max abs z | completed |
+|---:|---:|---:|---:|---|
+| 1.0 | 10 | **545** | 67.0 | yes |
+| 100000.0 | 10 | **545** | 200056.0 | yes |
+| 1.0 | 100000 | **545** | 6007.0 | yes |
+
+**The per-consumer breakdown is identical in all three runs.** Five orders of
+magnitude on either term changes nothing but the z values. And the named test —
+`test_drag_split_macro_keeps_every_room_rectilinear` — **passes in ~0.3 s at all
+four combinations**, including both terms at 100 000 together.
+
+**So the record's stated trigger — magnitude — is not confirmed on today's tree
+and cannot be acted on as written.** What that does *not* establish is set out
+in the evidence: the reverted change is not on disk, ruling 4's type term and
+the death of `bring_to_front`'s full-scene scan are not reconstructed, and the
+tree has moved through all of P4.5, A1 and A1b since.
+
+### The parasitic-reach question needs a distinction before it can be answered
+
+Carried into A2: *what currently works because all floors collapse to one
+height?* **There are two different z's here and the question lands on the other
+one.**
+
+* **Scene stacking order — this record's subject.** `_apply_floor_stacking`
+  bands items by `-depth * FLOOR_Z_BAND` (100 000) and ghosts do paint behind
+  the active floor. **It works.** Not a never-worked capability, so not a
+  parasitic-reach precondition.
+* **Document elevation — [D50](0050-a-level-s-elevation-is-destroyed-by.md)'s
+  subject.** Every `elevation_in` is the literal `0.0`. *That* is what has never
+  worked, and its consumers are enumerable: **`fp3d.py:448`** (the viewer stacks
+  levels by it) and **`fp3d.py:228`** (a wall-hung item sits at the level's
+  floor plus its catalog elevation). **Nothing in the editor reads it at all.**
+
+So the parasitic surface for the collapse is the viewer, which D50 has already
+ruled correct and not to be changed — and **A2 touches neither quantity**.
