@@ -758,6 +758,39 @@ class RoomItem(QGraphicsItem):
                     self.unbind_wall(w)
         return super().itemChange(change, value)
 
+    def _outranked_at(self, scene_pos, item_pos):
+        """The item that OUTRANKS this room at a point, or None.
+
+        ONE RULE FOR BOTH VIRTUALS, and that is the whole point of its being a
+        method rather than two inline blocks. `mousePressEvent` and
+        `contextMenuEvent` are SEPARATE Qt deliveries, each routed to the
+        topmost item BY Z. With the region in `shape()` a room that
+        `raise_to_front` has lifted above `WALL_Z` swallows that wall's events
+        -- and if the decline lived in one virtual and not the other,
+        left-click and right-click would resolve DIFFERENTLY. That divergence
+        presents as "right-click sometimes picks the wrong thing" long after
+        anyone remembers this pass, so both routes ask here.
+
+        THE LABEL IS EXEMPT: it is the room's own handle and routinely sits
+        over its walls, so an event there belongs to the room whatever is
+        underneath.
+
+        ASKS THE WAY QT ASKS -- through the view, with a 1x1 PIXEL RECT. An
+        exact scene point lands a fraction off a wall's edge and reports the
+        wall absent; measured, that made this check silently never fire.
+        """
+        if self._label_rect().contains(item_pos):
+            return None
+        sc = self.scene()
+        if sc is None:
+            return None
+        from floorplanner.items import best_by_priority   # late: higher layer
+        v = self._view()
+        cands = (v.items(v.mapFromScene(scene_pos)) if v is not None
+                 else sc.items(scene_pos))
+        best = best_by_priority(cands)
+        return None if best is self or best is None else best
+
     def _paint_selection_handles(self, painter):
         """Square handles at the room's corners -- the second half of D53's
         solid selection channel, and the half that survives a zoom-out where a
@@ -1044,38 +1077,15 @@ class RoomItem(QGraphicsItem):
         # the nudge; a ctrl press that turns out NOT to have moved toggles at
         # RELEASE instead (see `mouseReleaseEvent`), so the gesture is honoured
         # either way and nothing is taken from the drag.
-        # A ROOM DECLINES A PRESS ANOTHER ITEM OUTRANKS -- D53, and this is
-        # what makes type priority govern Qt's DELIVERY and not just the view's
-        # questions. Qt still routes a press to the topmost item BY Z, so with
-        # the region in `shape()` a room that `raise_to_front` has lifted above
-        # a wall would swallow that wall's clicks.
-        #
-        # MEASURED, on Patrick's `dragWallFuseStraggler` macro: after two
-        # label-drags raise R2 to `_z_top * 10 + band`, line 4's plain
-        # `CLICK 338 236` went from selecting the interior column (and fusing
-        # it, which is the gesture that macro exists to pin) to selecting R2.
-        # The ruling foresaw exactly this -- "any scheme where hit outcomes
-        # depend on z is one room interaction away from breaking" -- so the
-        # answer is the same single rule, applied here.
-        #
-        # The LABEL is exempt: it is the room's own handle and routinely sits
-        # over its walls, so a press there belongs to the room whatever is
-        # underneath.
-        if not on_label and self.scene() is not None:
-            from floorplanner.items import best_by_priority   # late: higher layer
-            # ASK THE WAY QT ASKS -- through the view, which uses a 1x1 PIXEL
-            # RECT. An exact scene point lands a fraction off a wall's edge and
-            # reports the wall absent, so the room would keep a press Qt had
-            # only offered it because the wall declined. Measured: with the
-            # exact-point query this check never fired on the macro's line 4.
-            v = self._view()
-            if v is not None:
-                cands = v.items(v.mapFromScene(e.scenePos()))
-            else:
-                cands = self.scene().items(e.scenePos())
-            if best_by_priority(cands) not in (self, None):
-                e.ignore()            # fall through to the item that outranks
-                return
+        # A ROOM DECLINES A PRESS ANOTHER ITEM OUTRANKS (D53). Measured on
+        # Patrick's `dragWallFuseStraggler` macro: after two label-drags raise
+        # R2 to `_z_top * 10 + band`, line 4's plain `CLICK 338 236` went from
+        # selecting the interior column -- and FUSING it, the gesture that
+        # macro exists to pin -- to selecting R2. `_outranked_at` is the same
+        # rule `contextMenuEvent` uses; see it for why they share one.
+        if self._outranked_at(e.scenePos(), e.pos()) is not None:
+            e.ignore()                # fall through to the item that outranks
+            return
         if e.button() == Qt.MouseButton.LeftButton and (
                 shift or (ctrl_mod and not on_label)):
             self.setSelected(not self.isSelected())
@@ -1216,6 +1226,15 @@ class RoomItem(QGraphicsItem):
         e.accept()
 
     def contextMenuEvent(self, e):
+        # THE SAME DECLINE RULE AS `mousePressEvent`, through the same helper
+        # (D53, ruled 2026-08-08). `contextMenuEvent` is a SEPARATE Qt virtual
+        # with its own delivery, also routed by z -- so without this, a room
+        # lifted by `raise_to_front` would answer a right-click meant for a
+        # wall inside it, while the LEFT-click on that same point resolved
+        # correctly. One rule, both routes, or they drift apart.
+        if self._outranked_at(e.scenePos(), e.pos()) is not None:
+            e.ignore()
+            return
         from floorplanner.dialogs import (  # late: dialogs imports rooms at top
             RoomInventoryDialog, RoomPropertiesDialog)  # noqa: F401
         menu = QMenu()

@@ -374,7 +374,83 @@ resolver already covers it — a menu gap, not a priority gap)* — and one clea
 negative worth having: **this application uses the `customContextMenuRequested`
 signal route nowhere at all.** `docs/evidence/d53-menu-census.txt`.
 
-### The amended rule, ruled 2026‑08‑08 — TO BE IMPLEMENTED IN ITS OWN PASS
+### THE FIX, and its eight-row receipt — 2026‑08‑08
+
+**The clause is deleted, not tuned.** `_menu_target_is_canvas` is gone;
+`PlanView.contextMenuEvent` fires the blank-canvas menus only on `blank()`, and
+a right-click otherwise resolves through the same type-priority resolver as a
+left-click, each type answering with its own menu.
+
+**ONE RULE GOVERNS BOTH VIRTUALS.** `mousePressEvent` and `contextMenuEvent` are
+separate Qt deliveries, each routed by z, so the decline is factored into
+`RoomItem._outranked_at` and both call it. Had it lived in one and not the
+other, left-click and right-click would have resolved differently — a
+divergence that presents as *"right-click sometimes picks the wrong thing"* long
+after anyone remembers this pass.
+
+**The receipt is the whole table, because the room row is the reported one and
+the other rows are where an unreported change would hide.**
+`docs/evidence/d53-menu-matrix.txt`; probe stable across 6 runs on one tree
+(checked, after the lesson below).
+
+| right-click on | main answers | after |
+|---|---|---|
+| room **label** | `RoomItem` | `RoomItem` |
+| room **region** | `PlanView` (floor popup) | **`RoomItem`** ← the only change |
+| wall | `WallItem` | `WallItem` |
+| **door** | `OpeningItem` | `OpeningItem` |
+| furnishing | `FurnishingItem` | `FurnishingItem` |
+| **stair** | `StairItem` | `StairItem` |
+| group | `GroupItem` | `GroupItem` |
+| reference image | `ReferenceImageItem` | `ReferenceImageItem` |
+| blank canvas | `PlanView` | `PlanView` |
+| wall / door / furnishing **after `raise_to_front`** | each own menu | each own menu |
+
+**`OpeningItem` — the row flagged as most likely to change behaviour silently —
+is UNCHANGED.** A door already won by z (`OPENING_Z` 6.0 > `WALL_Z` 5.0), so
+ranking it above `WallItem` preserves the existing answer rather than
+introducing one. **`StairItem` is measured, not reasoned**: MRO reaches its
+menu, as predicted. **No type was untestable** — `ReferenceImageItem` needs only
+a `QImage`, so nothing was skipped quietly and nothing goes to the boundary
+table on that account.
+
+**The `raise_to_front` rows are the ones that would have bitten.** Right-clicking
+a wall, door or furnishing *inside* a room whose label has been dragged — room
+at z 10, they at 5, 6 and 3 — still reaches each item's own menu. A test on a
+freshly loaded plan passes while the real gesture fails, which is exactly how
+the first cut of A1b broke `dragWallFuseStraggler`.
+
+### THE REGION ROUTE IS A GAIN, NOT A RESTORATION — do not "restore" the old one
+
+The room menu was **only ever reachable from the LABEL**. Before A1b, a
+right-click on a room's region gave the floor popup, because the region was not
+in `shape()`. Widening it makes the room menu reachable **from the whole room
+for the first time**. That is the one row that differs from `main`, and it is an
+improvement. A later reader finding it and "fixing it back" would be restoring a
+limitation, not a design.
+
+**The floor popup loses its region route, and that is accepted — with the
+justification measured, not assumed** (the standard the left-drag pan's
+retirement was held to). The popup offers exactly **one** operation, switch
+floor; `Floors ▸ Select…` opens **the identical popup** via
+`select_floor_popup()` on **Ctrl+F**, with `Edit this floor` per floor as a
+direct switch besides. No reach is lost.
+
+### A CORRECTION TO THIS RECORD'S OWN EARLIER RECEIPT
+
+The macro differential previously read *"identical to `main` at every line"*,
+from **one run**. Measured afterwards, that comparison's **selection** field is
+nondeterministic — two outcomes on an unchanged tree, **6/6 on `main`**, 8/4 on
+the branch — so a single matching run was close to a coin landing heads. Filed
+as [D56](0056-a-macro-replay-s-final-selection-is.md); pre-existing, not
+introduced here. **The sound claim is the stable half**: the per-line wall-count
+sequence is deterministic, identical on both trees, and shows line 4's fuse
+restored. The rule it produced is in
+[`../WORKING_AGREEMENT.md`](../WORKING_AGREEMENT.md) — *a differential is only as
+good as the stability of the field it compares; run the comparator twice on one
+tree before quoting it.*
+
+### The amended rule, ruled 2026‑08‑08 — NOW IMPLEMENTED
 
 **A right-click resolves through the same type-priority resolver as a left-click,
 and each type answers with its own menu; the blank-canvas menu fires only on

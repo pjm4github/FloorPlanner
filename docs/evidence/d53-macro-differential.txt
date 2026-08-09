@@ -1,35 +1,61 @@
-D53 / A1b -- MACRO DIFFERENTIAL.  Patrick's dragWallFuseStraggler
-replayed line by line on three trees.  Reproduce with the probe in
-this session's notes: load examples/fiveRoomTest.json, run each .fpm
-line through win.run_macro, and record the wall count and selection.
+D53 / A1b -- THE MACRO DIFFERENTIAL, AND A CORRECTION TO IT.
 
-WHY IT EXISTS.  A verbatim macro pin is a recorded GESTURE, and D53
-deliberately changes what a click means -- so the pin is the sharpest
-instrument for whether that change reached gestures it should not.
+*** THE EARLIER VERSION OF THIS FILE WAS TAKEN FROM ONE RUN AND ITS HEADLINE
+*** CLAIM -- 'identical to main at every line' -- IS NOT SOUND AS STATED.
+*** Corrected 2026-08-08. The wall-count half stands; the SELECTION half was
+*** measured with a comparator that is NONDETERMINISTIC.
 
-  main    bcffa08   baseline walls 16
-  A1b v1  32cecb0   the FIRST cut -- room won a wall's click
-  A1b v2  32cecb0   after the room DECLINES an outranked press
+Reproduce: replay examples/dragWallFuseStraggler.fpm line by line over
+examples/fiveRoomTest.json, recording the wall count and the selection after
+each line. Run it MORE THAN ONCE.
 
-macro line                      main    v1    v2   selection on main -> v1 -> v2
-CLICK 625 201 DRAG 712 102        18    18    18   RoomItem:R2 -> RoomItem:R2 -> RoomItem:R2
-CLICK 717 102 DRAG 626 204        18    18    18   RoomItem:R2 -> RoomItem:R2 -> RoomItem:R2
-CLICK 338 236                     16    18    16   WallItem: -> RoomItem:R2 -> WallItem:
-CLICK 340 268 DRAG 340 425        16    18    16   WallItem: -> WallItem: -> WallItem:
-CLICK 236 374 DRAG 91 418         18    21    18   RoomItem:R3,WallItem: -> RoomItem:R3,WallItem: -> RoomItem:R3,WallItem:
-CLICK 86 419 DRAG 228 380         15    18    15   RoomItem:R3 -> RoomItem:R3,WallItem: -> RoomItem:R3
-CLICK 627 205 DRAG 1152 284       17    20    17   RoomItem:R2,RoomItem:R3 -> RoomItem:R2,RoomItem:R3,WallItem: -> RoomItem:R2,RoomItem:R3
-CLICK 1149 283 DRAG 635 205       16    18    16   RoomItem:R2,RoomItem:R3 -> RoomItem:R2,RoomItem:R3,WallItem: -> RoomItem:R2,RoomItem:R3
+-- WHAT IS STABLE ----------------------------------------------------------
 
-READING IT.  Line 4 is where v1 diverged: a plain CLICK 338 236 went
-from selecting the interior column AND FUSING IT (18 -> 16 walls,
-which is the gesture this macro exists to pin) to selecting R2, with
-the count stuck at 18.  Cause: the two preceding label-drags ran
-raise_to_front, lifting R2 to _z_top*10 + band -- ABOVE the wall at
-WALL_Z 5.0 -- and Qt routes a press to the topmost item BY Z.  The
-ruling predicted exactly this: 'any scheme where hit outcomes depend
-on z is one room interaction away from breaking.'  Qt's own delivery
-was that scheme.
+The per-line WALL COUNT sequence. One outcome in 12 runs on each tree, and
+the same sequence on both:
 
-v2 IS IDENTICAL TO MAIN AT EVERY LINE: True
-  wall counts [18, 18, 16, 16, 18, 15, 17, 16]
+    main   [18, 18, 16, 16, 18, 15, 17, 16]
+    branch [18, 18, 16, 16, 18, 15, 17, 16]
+
+That is the half the fix is about -- line 4's CLICK 338 236 fusing the
+interior column, 18 -> 16 -- and it is solid.
+
+-- WHAT IS NOT -------------------------------------------------------------
+
+The per-line SELECTION. Twelve consecutive runs on ONE UNCHANGED TREE:
+
+    main    bcffa08   2 distinct selection outcomes, split [6, 6]
+    branch  (fix)     2 distinct selection outcomes, split [8, 4]
+
+    the two outcomes are THE SAME TWO on both trees: True
+
+The last three lines sometimes end with an extra WallItem in the selection
+and sometimes do not. IT FLAPS ON MAIN TOO, at 6/6, so the nondeterminism is
+PRE-EXISTING and is not something A1b introduced. Filed as its own record.
+
+-- HOW THE BAD CLAIM HAPPENED, because that is the reusable part ------------
+
+A single run of the probe showed every line matching, and it was written up
+as 'identical to main at every line'. On a comparator that flaps roughly half
+the time, one matching run is close to a coin landing heads: the reading was
+true of that run and says almost nothing about the tree.
+
+This is VACUOUS BY BASIS -- the third shape in the working agreement -- one
+layer up from where that rule was first written. P3.8's ratio tests flapped on
+machine load, so a green meant 'the runner was quiet'. Here a DIFFERENTIAL
+RECEIPT flapped, so a match meant 'this run agreed'. A differential is only as
+good as the stability of the field it compares, and the fix is the same one
+the suite already applies to timings: repeat the measurement, or compare a
+field that does not move.
+
+It was caught by re-running the probe after an unrelated refactor and getting
+a DIFFERENT answer on a tree whose behaviour could not have changed -- then
+bisecting, reaching an impossible conclusion (a context-menu handler that is
+entered ZERO times during the replay), and testing the instrument instead of
+believing the bisect.
+
+-- THE SOUND VERSION OF THE CLAIM ------------------------------------------
+
+The wall-count sequence is deterministic, identical on both trees, and shows
+line 4's fuse restored. The selection field flaps identically on both trees,
+produces the same two outcomes on each, and is not evidence either way.

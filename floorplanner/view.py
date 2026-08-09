@@ -341,17 +341,6 @@ class PlanView(QGraphicsView):
             return not target._label_rect().contains(item_pt)
         return False
 
-    def _menu_target_is_canvas(self, pos) -> bool:
-        """True when a right-click should be treated as "on the canvas".
-
-        D53: that means NOTHING under the cursor, or a ROOM -- because a room
-        has no context menu of its own yet, so falling through would remove
-        both canvas menus from every room's interior. Preserves the pre-D53
-        outcome at both call sites.
-        """
-        target = self.hit(pos)
-        return target is None or isinstance(target, RoomItem)
-
     def mousePressEvent(self, e):
         pos = e.position().toPoint()
         sp = self.mapToScene(pos)
@@ -645,20 +634,30 @@ class PlanView(QGraphicsView):
         super().mouseReleaseEvent(e)
 
     def contextMenuEvent(self, e):
-        # Room Name tool + blank canvas -> paste the copied room, or type a
+        # Room Name tool + BLANK CANVAS -> paste the copied room, or type a
         # new CONCEPT room right here (P4.4: the dialog is on this menu and
         # on Rooms > New concept room…, per the ruling)
-        # D53: "no item" became "no item, OR a room". Widening a room's shape
-        # would otherwise take both of these menus away inside every room,
-        # which is a silent loss of two features for a selection fix. Firing on
-        # a room PRESERVES TODAY'S BEHAVIOUR EXACTLY.
         #
-        # DEFERRED, and this is the line that changes: a right-click over a
-        # room should eventually offer a ROOM menu. That menu does not exist,
-        # and inventing it here would expand A1b's scope after its read-back.
-        # When a room context menu is specified, these two tests are where it
-        # branches.
-        if self.win.tool == TOOL_ROOM and self._menu_target_is_canvas(e.pos()):
+        # A RIGHT-CLICK RESOLVES THROUGH THE SAME TYPE-PRIORITY RESOLVER AS A
+        # LEFT-CLICK, and each type answers with its OWN menu; the blank-canvas
+        # menus below fire only on `blank()`. Ruled 2026-08-08.
+        #
+        # The previous clause fired these on "no item OR a room", written when
+        # a room menu was believed not to exist. It does: `RoomItem.
+        # contextMenuEvent` is 68 lines and offers Extract room / Join room.
+        # The clause SHADOWED it -- measured, and reported by hand rather than
+        # by any test. It is deleted, not tuned.
+        #
+        # THE FLOOR POPUP LOSES ITS REGION ROUTE, and that is accepted: with
+        # the region in a room's shape, a right-click there gives the ROOM
+        # menu, so the popup is blank-canvas only. NO REACH IS LOST, and the
+        # justification is measured rather than assumed (the same standard the
+        # left-drag pan's retirement was held to, where middle-mouse drag was
+        # the surviving route). The popup offers exactly ONE operation --
+        # switch floor -- and `Floors > Select…` opens THE IDENTICAL POPUP via
+        # `select_floor_popup()`, on Ctrl+F, with `Edit this floor` per floor
+        # as a direct switch besides.
+        if self.win.tool == TOOL_ROOM and self.blank(e.pos()):
             menu = QMenu(self)
             a_paste = menu.addAction("Paste room")
             a_paste.setEnabled(self.win.room_clipboard is not None)
@@ -675,8 +674,8 @@ class PlanView(QGraphicsView):
                 self.win.show_3d_view()
             e.accept()
             return
-        if self._menu_target_is_canvas(e.pos()):
-            # blank canvas OR a room (D53) -> the floor popup (P4.2 spec):
+        if self.blank(e.pos()):
+            # BLANK CANVAS ONLY (D53) -> the floor popup (P4.2 spec):
             # default pre-highlighted so ENTER selects it, DOWN walks the
             # floors, ESC cancels. Recorded as a PUP line; the resulting
             # switch appends its deterministic `# ^F "name"` comment.

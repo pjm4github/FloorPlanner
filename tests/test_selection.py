@@ -270,3 +270,146 @@ def QPainterPath_from_rect(r):
     p = QPainterPath()
     p.addRect(r)
     return p
+
+
+# -- D53: WHICH MENU does a right-click open? ----------------------------------
+#
+# A1b's fifth acceptance item, and the pin whose ABSENCE is why 646 green tests
+# and six green CI jobs said nothing when the room menu became unreachable.
+# Per TYPE, not just for the room: the room row is the one a human reported,
+# and the other rows are where an unreported change would hide.
+
+def _menu_scene(fp, win):
+    """A scene holding one of every right-clickable type, and the points."""
+    sc = win.scene
+    cs = [QPointF(0, 0), QPointF(400, 0), QPointF(400, 300), QPointF(0, 300)]
+    for i in range(4):
+        sc.addItem(fp.WallItem(cs[i], cs[(i + 1) % 4], "interior"))
+    fp.rebuild_all_walls(sc)
+    centre = QPointF(200, 150)
+    res = fp.detect_room(sc, centre)
+    room = fp.RoomItem(fp.unique_room_name(sc, "Den"), centre, res[0], res[1],
+                       corners=res[2])
+    sc.addItem(room)
+    fp.bind_room_walls(sc, room)
+
+    inner = fp.WallItem(QPointF(100, 240), QPointF(300, 240), "interior")
+    sc.addItem(inner)
+    fp.rebuild_all_walls(sc)
+    sc.addItem(fp.OpeningItem(inner, "door", "3280", 100.0))   # -> scene x=200
+    fp.rebuild_all_walls(sc)
+
+    furn = fp.make_furnishing(fp.furnishing_catalog()[0]["id"], QPointF(70, 70))
+    sc.addItem(furn)
+    sc.addItem(fp.StairItem(QPointF(330, 70)))
+    grp = fp.GroupItem()
+    sc.addItem(grp)
+    gw = fp.WallItem(QPointF(60, 200), QPointF(140, 200), "interior")
+    sc.addItem(gw)
+    grp.adopt(gw)
+
+    win.set_tool(fp.TOOL_SELECT)
+    win.show()
+    win.zoom_fit()
+    return room, {
+        "room label": room.mapToScene(room._label_rect().center()),
+        "room region": QPointF(200, 60),
+        "wall": QPointF(280, 240),          # AWAY from the door at x=200
+        "door": QPointF(200, 240),
+        "furnishing": QPointF(70, 70),
+        "stair": QPointF(330, 70),
+        "group": QPointF(100, 200),
+        "blank canvas": QPointF(-160, -160),
+    }
+
+
+def _menu_answered_by(fp, win, monkeypatch, scene_pt):
+    """Send a real right-click; return the class that ANSWERED it."""
+    from PyQt6.QtCore import QPoint
+    from PyQt6.QtGui import QContextMenuEvent
+    from PyQt6.QtWidgets import QApplication, QMenu
+    seen = []
+    monkeypatch.setattr(QMenu, "exec", lambda self, *a, **k: None)
+    for cls in (fp.RoomItem, fp.WallItem, fp.OpeningItem, fp.FurnishingItem,
+                fp.StairItem, fp.GroupItem, type(win.view)):
+        if "contextMenuEvent" not in cls.__dict__:
+            continue
+        orig = cls.__dict__["contextMenuEvent"]
+
+        def spy(self, e, _o=orig, _n=cls.__name__):
+            seen.append(_n)
+            return _o(self, e)
+        monkeypatch.setattr(cls, "contextMenuEvent", spy)
+
+    vp = win.view.viewport()
+    p = win.view.mapFromScene(QPointF(scene_pt))
+    QApplication.sendEvent(vp, QContextMenuEvent(
+        QContextMenuEvent.Reason.Mouse, QPoint(p), vp.mapToGlobal(QPoint(p))))
+    QApplication.processEvents()
+    # a class that ENTERS and declines still logs, so the answer is the LAST
+    return seen[-1] if seen else None
+
+
+@pytest.mark.gui
+@pytest.mark.parametrize("where,answered_by", [
+    ("room label", "RoomItem"),
+    ("room region", "RoomItem"),      # NEW at A1b -- see the note below
+    ("wall", "WallItem"),
+    ("door", "OpeningItem"),
+    ("furnishing", "FurnishingItem"),
+    ("stair", "StairItem"),           # subclasses FurnishingItem; MRO, measured
+    ("group", "GroupItem"),
+    ("blank canvas", "PlanView"),
+])
+def test_right_click_opens_the_menu_of_the_item_under_it(
+        fp, win, monkeypatch, where, answered_by):
+    """One row per type. THE ROOM ROW IS THE ONE THAT REGRESSED; the others are
+    where an unreported change would hide.
+
+    `room region` is the only row that DIFFERS from pre-A1b behaviour, and it
+    is a GAIN, not a restoration: before A1b a right-click on a room's region
+    gave the floor popup, because the region was not in `shape()`. The room
+    menu was only ever reachable from the LABEL. Do not "restore" that.
+    """
+    _room, pts = _menu_scene(fp, win)
+    assert _menu_answered_by(fp, win, monkeypatch, pts[where]) == answered_by
+
+
+@pytest.mark.gui
+@pytest.mark.parametrize("where,answered_by", [
+    ("wall", "WallItem"), ("door", "OpeningItem"),
+    ("furnishing", "FurnishingItem"),
+])
+def test_right_click_still_resolves_after_raise_to_front(
+        fp, win, monkeypatch, where, answered_by):
+    """THE ROW MOST LIKELY TO BITE, and it has bitten once already through the
+    other virtual.
+
+    `raise_to_front` runs on every label-drag and lifts the room to
+    `_z_top * 10 + band` -- well above `WALL_Z` -- and Qt routes a context-menu
+    event to the topmost item BY Z, exactly as it routes a press. A test that
+    right-clicks on a freshly loaded plan passes while the real gesture fails,
+    which is precisely how the first cut of A1b broke
+    `dragWallFuseStraggler`. So the room is raised FIRST here.
+    """
+    from floorplanner.items import best_by_priority
+    room, pts = _menu_scene(fp, win)
+    room.raise_to_front()
+
+    # PRECONDITION, and getting it right matters more than it looks:
+    # `raise_to_front` DELIBERATELY lifts the room's OWN walls ABOVE the room
+    # (`base + 4` / `base + 5`, so a wall is never hidden under its own room's
+    # tint). The hazard is therefore NOT "the room outranks every wall" -- it
+    # is the items the room does NOT own, which stay at their base z while the
+    # room climbs to `_z_top * 10 + band`. A first draft compared against
+    # max(all walls), failed on the room's own perimeter, and would have hidden
+    # the real case behind a precondition that was simply wrong.
+    pt = pts[where]
+    target = best_by_priority(win.view.items(win.view.mapFromScene(pt)))
+    assert target is not None and not isinstance(target, fp.RoomItem), \
+        f"nothing outranking the room is under {where}"
+    assert room.zValue() > target.zValue(), (
+        f"the room ({room.zValue()}) is not above the {where} "
+        f"({target.zValue()}) -- this test would be about nothing")
+
+    assert _menu_answered_by(fp, win, monkeypatch, pt) == answered_by
