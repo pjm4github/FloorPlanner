@@ -280,6 +280,21 @@ because it is written precisely to explain why nobody needs to look further.
 
 **The corollary is the cheaper half:** the deletion found what the census could not. Removing the thing and reading the failures is a census, and often the only complete one — which is an argument for retiring a mechanism *before* believing you have enumerated its callers, not after.
 
+**EVERY INSTRUMENT IS VALIDATED AGAINST A CASE KNOWN TO BE NON-ZERO BEFORE ITS ZERO IS BELIEVED — added 2026‑08‑09, as a REQUIRED PRACTICE rather than a caution.**
+
+**A zero from an instrument earns the same suspicion as a green from a test that may not have run.** Both are the absence of a signal, and absence is what a broken instrument produces most readily. The mechanism is a **positive control**: before trusting that an instrument reports nothing, point it at a case that MUST report something and confirm it does.
+
+**Two instruments failed this way within one measurement**, and both produced a confident zero:
+
+* a vertex census reported **degree-2 = 0 on a 103-wall plan**. `WallItem.v1` returns the vertex's **UID string**, not the object; `_v1` holds the `Vertex`. An `isinstance` filter then silently dropped every wall corner. 206 ends over 97 objects averages 2.1, and *that* implausibility is what caught it — not the instrument.
+* a call counter reported **no split at all** during a gesture that provably splits. `extract.py` does `from floorplanner.walls import split_wall_at`, so wrapping `walls.split_wall_at` left extract's own name bound to the original. **The wrapper was bound to the wrong reference.**
+
+**Both are "grep for identifiers, parse for shapes" arriving INSIDE THE MEASURING APPARATUS**, which is the worst place for it: the apparatus is what the rest of the reasoning rests on, so its error propagates into every conclusion drawn with it rather than being one wrong number among many. A census with a blind spot yields a wrong count; an *instrument* with a blind spot yields a wrong **story**.
+
+**A positive control would have killed both instantly** — a plan with a known junction must report degree-2 > 0; a gesture known to split must report a split. Neither needed insight, only a case with a known non-zero answer.
+
+**So: name the control when the instrument is written, not after it disagrees with you.** And when an instrument reports zero, the question is never *"is the code clean?"* but **"would this instrument have reported the thing if it were there?"**
+
 **PARASITIC REACH: WHEN YOU REPAIR A CAPABILITY THAT NEVER WORKED, BUDGET FOR THE AFFORDANCES RESTING ON THE FAULT — added 2026‑08‑08 at the FIFTH instance, and it is named so it can be cited.**
 
 A defect that has been in a product a long time stops being only a defect. Things come to depend on it — some of them code nobody exercises, and some of them **features the user learned as the way the application works**. Repair the fault and those go with it. **The second kind is reported as a regression, by the person who depended on it, and they are not wrong to call it one.**

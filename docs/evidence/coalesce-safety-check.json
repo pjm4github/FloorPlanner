@@ -1,0 +1,179 @@
+[
+ {
+  "plan": "wiscaway2026-08-08.json",
+  "walls": 103,
+  "vertices": 101,
+  "degree2_collinear_total": 26,
+  "TRUE_MIDPOINTS (safe to dissolve)": 26,
+  "SPUR_TIPS (same direction -- NOT safe)": 0,
+  "spur_tip_detail": [],
+  "OUTLINE_TURNS_AT_A_COLLINEAR_VERTEX (unsafe)": [
+   {
+    "room": "Dining",
+    "vertex": "v55",
+    "outline_dot": 0.0
+   },
+   {
+    "room": "GREAT RM",
+    "vertex": "v39",
+    "outline_dot": 0.0
+   },
+   {
+    "room": "HALL",
+    "vertex": "v39",
+    "outline_dot": -0.0
+   }
+  ],
+  "OUTLINE_SPUR_AT_A_COLLINEAR_VERTEX (unsafe)": [],
+  "collinear_vertex_on_an_open_outline_edge": [
+   {
+    "room": "Dining",
+    "vertex": "v55",
+    "outline_dot": 0.0
+   },
+   {
+    "room": "GREAT RM",
+    "vertex": "v39",
+    "outline_dot": 0.0
+   }
+  ],
+  "rooms_with_a_repeated_outline_vertex": [],
+  "dissolves_that_would_make_a_weld_pair": []
+ },
+ {
+  "plan": "farmplaceBIGmultifloor.json",
+  "walls": 109,
+  "vertices": 85,
+  "degree2_collinear_total": 10,
+  "TRUE_MIDPOINTS (safe to dissolve)": 10,
+  "SPUR_TIPS (same direction -- NOT safe)": 0,
+  "spur_tip_detail": [],
+  "OUTLINE_TURNS_AT_A_COLLINEAR_VERTEX (unsafe)": [],
+  "OUTLINE_SPUR_AT_A_COLLINEAR_VERTEX (unsafe)": [],
+  "collinear_vertex_on_an_open_outline_edge": [],
+  "rooms_with_a_repeated_outline_vertex": [
+   {
+    "room": "Lounge",
+    "repeated": [
+     "v12",
+     "v14",
+     "v17"
+    ]
+   }
+  ],
+  "dissolves_that_would_make_a_weld_pair": []
+ },
+ {
+  "plan": "roundedMultifloor.json",
+  "walls": 122,
+  "vertices": 96,
+  "degree2_collinear_total": 13,
+  "TRUE_MIDPOINTS (safe to dissolve)": 13,
+  "SPUR_TIPS (same direction -- NOT safe)": 0,
+  "spur_tip_detail": [],
+  "OUTLINE_TURNS_AT_A_COLLINEAR_VERTEX (unsafe)": [],
+  "OUTLINE_SPUR_AT_A_COLLINEAR_VERTEX (unsafe)": [],
+  "collinear_vertex_on_an_open_outline_edge": [],
+  "rooms_with_a_repeated_outline_vertex": [],
+  "dissolves_that_would_make_a_weld_pair": []
+ },
+ {
+  "plan": "planc1.v5.json",
+  "walls": 83,
+  "vertices": 65,
+  "degree2_collinear_total": 3,
+  "TRUE_MIDPOINTS (safe to dissolve)": 3,
+  "SPUR_TIPS (same direction -- NOT safe)": 0,
+  "spur_tip_detail": [],
+  "OUTLINE_TURNS_AT_A_COLLINEAR_VERTEX (unsafe)": [
+   {
+    "room": "M Bath",
+    "vertex": "v28",
+    "outline_dot": 0.0
+   },
+   {
+    "room": "M Bath",
+    "vertex": "v28",
+    "outline_dot": 0.0
+   },
+   {
+    "room": "M Bath",
+    "vertex": "v28",
+    "outline_dot": 0.0
+   },
+   {
+    "room": "M Bath",
+    "vertex": "v27",
+    "outline_dot": 0.0
+   }
+  ],
+  "OUTLINE_SPUR_AT_A_COLLINEAR_VERTEX (unsafe)": [
+   {
+    "room": "M Bath",
+    "vertex": "v31",
+    "outline_dot": 1.0
+   }
+  ],
+  "collinear_vertex_on_an_open_outline_edge": [
+   {
+    "room": "M Bath",
+    "vertex": "v28",
+    "outline_dot": 0.0
+   },
+   {
+    "room": "M Bath",
+    "vertex": "v28",
+    "outline_dot": 0.0
+   }
+  ],
+  "rooms_with_a_repeated_outline_vertex": [
+   {
+    "room": "Hall",
+    "repeated": [
+     "v18",
+     "v21",
+     "v25",
+     "v5"
+    ]
+   },
+   {
+    "room": "M Bath",
+    "repeated": [
+     "v18",
+     "v21",
+     "v28",
+     "v32",
+     "v5"
+    ]
+   },
+   {
+    "room": "WIC",
+    "repeated": [
+     "v5"
+    ]
+   }
+  ],
+  "dissolves_that_would_make_a_weld_pair": []
+ },
+ {
+  "plan": "symmetricP1.json",
+  "walls": 80,
+  "vertices": 60,
+  "degree2_collinear_total": 2,
+  "TRUE_MIDPOINTS (safe to dissolve)": 2,
+  "SPUR_TIPS (same direction -- NOT safe)": 0,
+  "spur_tip_detail": [],
+  "OUTLINE_TURNS_AT_A_COLLINEAR_VERTEX (unsafe)": [],
+  "OUTLINE_SPUR_AT_A_COLLINEAR_VERTEX (unsafe)": [],
+  "collinear_vertex_on_an_open_outline_edge": [],
+  "rooms_with_a_repeated_outline_vertex": [
+   {
+    "room": "WIC",
+    "repeated": [
+     "v5"
+    ]
+   }
+  ],
+  "dissolves_that_would_make_a_weld_pair": []
+ }
+]
