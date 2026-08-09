@@ -1515,6 +1515,149 @@ def repair_edge_bindings(scene, room):
 rebind_dead_edges = repair_edge_bindings
 
 
+def _corner_path(a, p, b, step, tol_deg):
+    """Is the outline STRAIGHT through `p`, and by which comparison?
+
+    Returns `(straight, path)` with `path` in {"exact", "tolerance"}.
+
+    EXACT WHEN EVERY COORDINATE IS ON THE LATTICE, which is Patrick's design
+    argument for snap-by-default made operational: three lattice points are
+    collinear exactly when an integer cross product is zero, so the test is a
+    comparison rather than a tolerance question. The tolerance path is not
+    removed -- it is what an ANGLED wall gets, by ruling -- and each dissolve
+    reports which path decided it.
+    """
+    ux, uy = a.x() - p.x(), a.y() - p.y()
+    wx, wy = b.x() - p.x(), b.y() - p.y()
+    on_lattice = all(abs(c / step - round(c / step)) < 1e-9
+                     for c in (a.x(), a.y(), p.x(), p.y(), b.x(), b.y()))
+    if on_lattice:
+        # integers after scaling: cross == 0 is exact, and dot < 0 keeps it a
+        # STRAIGHT-THROUGH corner rather than a zero-width spur tip (dot > 0),
+        # which is the distinction the pre-implementation check found the
+        # wall-only predicate could not make.
+        ia, ib = round(ux / step), round(uy / step)
+        ic, idd = round(wx / step), round(wy / step)
+        return (ia * idd - ib * ic == 0 and ia * ic + ib * idd < 0), "exact"
+    nu = math.hypot(ux, uy) or 1e-9
+    nw = math.hypot(wx, wy) or 1e-9
+    dot = (ux * wx + uy * wy) / (nu * nw)
+    return (dot < -math.cos(math.radians(tol_deg))), "tolerance"
+
+
+def coalesce_outline_corners(scene, rooms=None, dry_run=True, tol_deg=0.05):
+    """Dissolve REDUNDANT OUTLINE CORNERS -- a corner the ring runs straight
+    through, which no wall needs.
+
+    THE SCOPED FORM IS THE PRIMITIVE. `rooms=None` means every room, so the
+    plan-wide pass is this called with everything -- one implementation, two
+    callers. A global sweep built first is one nobody dares run inside a
+    gesture, and D61's stage 2b needs the scoped form for the leave path.
+
+    WHY THIS EXISTS BESIDE `normalize_walls` RATHER THAN INSIDE IT. Measured on
+    Patrick's plan: `normalize_walls` takes the WALL graph from 103 walls / 26
+    collinear degree-2 vertices to 81 / 3, idempotently and with every room
+    area unchanged -- and leaves the OUTLINES exactly as they were, 159 corners
+    of which 69 are redundant, before and after. The wall pass dissolves a
+    vertex and the outline goes on naming it: measured at (1062, 684), wall
+    degree 2 -> 0 while Dining and KITCHEN still hold the corner. **69, not 26,
+    is the size of the complaint**, and this is the half that addresses it.
+
+    THE PREDICATE, as corrected by the pre-implementation check:
+
+      * EVERY room outline holding the corner runs straight through it --
+        opposite-directed, not merely collinear. A wall-graph test alone cannot
+        see this: an outline's other edge there may be OPEN (`wall: null`), so
+        a vertex can be degree-2 collinear among walls while a ring turns 90
+        degrees at it. On Patrick's plan that was 3 of 26.
+      * no wall NEEDS it -- degree 0, or degree 2 with its two walls
+        opposite-directed collinear (which `normalize_walls` will merge).
+
+    Returns a report and, with `dry_run=True`, CHANGES NOTHING. The report is
+    the thing Patrick reads before anything is touched.
+    """
+    from floorplanner.walls import WallItem                   # late: cycle
+    if scene is None:
+        return {"rooms": {}, "removed": 0, "paths": {"exact": 0, "tolerance": 0},
+                "areas": {}, "dry_run": dry_run}
+    all_rooms = [i for i in scene.items() if isinstance(i, RoomItem)]
+    targets = all_rooms if rooms is None else [r for r in rooms
+                                               if isinstance(r, RoomItem)]
+    step = float(SETTINGS.get("wall_snap_in", WALL_SNAP_DEFAULT)) or 6.0
+
+    deg = {}
+    for w in scene.items():
+        if isinstance(w, WallItem):
+            for v in (w._v1, w._v2):
+                deg.setdefault(id(v), []).append(w)
+
+    def wall_ok(vid):
+        ws = deg.get(vid, [])
+        if not ws:
+            return True
+        if len(ws) != 2:
+            return False
+        a, b = ws
+        ua = math.atan2(a.p2.y() - a.p1.y(), a.p2.x() - a.p1.x())
+        ub = math.atan2(b.p2.y() - b.p1.y(), b.p2.x() - b.p1.x())
+        d = abs((ua - ub) % math.pi)
+        return min(d, math.pi - d) < math.radians(tol_deg)
+
+    # a corner may be held by SEVERAL rooms; it may only go if every one of
+    # them runs straight through it, so the decision is per VERTEX not per room
+    holders = {}
+    for r in all_rooms:
+        for i, e in enumerate(r.outline):
+            if e.v is not None:
+                holders.setdefault(id(e.v), []).append((r, i))
+
+    doomed, paths = {}, {"exact": 0, "tolerance": 0}
+    for vid, hs in holders.items():
+        if not any(r in targets for r, _ in hs):
+            continue
+        if not wall_ok(vid):
+            continue
+        ok, path = True, "exact"
+        for r, i in hs:
+            n = len(r.outline)
+            if n < 4:                       # never reduce a ring below a triangle
+                ok = False
+                break
+            straight, pth = _corner_path(r.outline[(i - 1) % n].p,
+                                         r.outline[i].p,
+                                         r.outline[(i + 1) % n].p, step, tol_deg)
+            if pth == "tolerance":
+                path = "tolerance"
+            if not straight:
+                ok = False
+                break
+        if ok:
+            doomed[vid] = path
+            paths[path] += 1
+
+    per_room, areas = {}, {}
+    for r in all_rooms:
+        n = sum(1 for e in r.outline if e.v is not None and id(e.v) in doomed)
+        if n or r in targets:
+            per_room[r.name] = {"corners": len(r.outline), "removable": n}
+        areas[r.name] = round(r.area_sqft, 2)
+
+    report = {"rooms": per_room, "removed": len(doomed), "paths": paths,
+              "areas_before": areas, "dry_run": dry_run}
+    if dry_run or not doomed:
+        return report
+
+    for r in all_rooms:
+        keep = [e for e in r.outline
+                if e.v is None or id(e.v) not in doomed]
+        if len(keep) != len(r.outline):
+            r.prepareGeometryChange()
+            r.outline = keep
+            r._derived = None               # path/area re-derive from the outline
+    report["areas_after"] = {x.name: round(x.area_sqft, 2) for x in all_rooms}
+    return report
+
+
 def split_partially_covered_edges(scene, room, tol=0.75):
     """Split an outline edge at the END of a live wall that covers only PART
     of it (P4.2, mini-gate finding 5 -- Patrick's fiveRoomDragSplit macro).

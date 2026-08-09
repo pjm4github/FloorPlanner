@@ -1,5 +1,6 @@
 """Room detection, area, inventory, naming, and region-follows-walls."""
 import json
+import pathlib
 
 import pytest
 from PyQt6.QtCore import QPointF, Qt
@@ -824,3 +825,116 @@ def test_selecting_two_rooms_BY_CLICKING_them_feeds_a_room_operation(
     rooms = _rooms(fp, win)
     assert len(rooms) == 1, "the op did not run on the clicked selection"
     assert rooms[0].area_sqft == pytest.approx(144, abs=2)   # 80 + 80 - 16
+
+
+# -- D61 stage 2a: dissolving redundant OUTLINE corners -------------------------
+
+WISCAWAY = pathlib.Path(__file__).resolve().parent.parent / "fixtures" \
+    / "wiscaway2026-08-08.json"
+
+
+def _areas(win, fp):
+    return {r.name: round(r.area_sqft, 2)
+            for r in win.scene.items() if isinstance(r, fp.RoomItem)}
+
+
+def _corners(win, fp):
+    return sum(len(r.outline)
+               for r in win.scene.items() if isinstance(r, fp.RoomItem))
+
+
+@pytest.mark.gui
+def test_the_dry_run_changes_nothing(fp, win):
+    """THE NON-NEGOTIABLE SAFETY CONDITION: he sees the numbers first.
+
+    Asserted as a NEGATIVE with its precondition established -- the plan must
+    actually have something to remove, or "nothing changed" is a verdict about
+    nothing.
+    """
+    from floorplanner.design.verify import rebase
+    from floorplanner.rooms import coalesce_outline_corners
+    win.load_path(str(WISCAWAY))
+    rebase(win)
+    before, corners = _areas(win, fp), _corners(win, fp)
+
+    rep = coalesce_outline_corners(win.scene, dry_run=True)
+
+    assert rep["removed"] > 0, "nothing to remove -- this test is about nothing"
+    assert _corners(win, fp) == corners          # the dry run touched no outline
+    assert _areas(win, fp) == before
+
+
+@pytest.mark.gui
+def test_coalescing_outlines_never_moves_a_room_s_area(fp, win):
+    """THE RECEIPT PATRICK READS. An area that moves means the outline changed
+    shape, which means a corner was taken that had no right to be taken."""
+    from floorplanner.design.verify import rebase
+    win.load_path(str(WISCAWAY))
+    rebase(win)
+    fp.SETTINGS["auto_coalesce"] = True
+    before, c0 = _areas(win, fp), _corners(win, fp)
+
+    win.coalesce_all_now(interactive=False)
+
+    after, c1 = _areas(win, fp), _corners(win, fp)
+    assert c1 < c0, "no outline corner was dissolved -- nothing was exercised"
+    assert after == before, f"a room's area moved: " \
+        f"{ {k: (before[k], after[k]) for k in before if before[k] != after[k]} }"
+
+
+@pytest.mark.gui
+def test_a_second_coalesce_is_a_no_op(fp, win):
+    """Idempotence, asserted after a first run that PROVABLY did something."""
+    from floorplanner.design.verify import rebase
+    win.load_path(str(WISCAWAY))
+    rebase(win)
+    fp.SETTINGS["auto_coalesce"] = True
+    c0 = _corners(win, fp)
+    win.coalesce_all_now(interactive=False)
+    c1 = _corners(win, fp)
+    assert c1 < c0                               # precondition: it did something
+    win.coalesce_all_now(interactive=False)
+    assert _corners(win, fp) == c1
+
+
+@pytest.mark.gui
+def test_the_coalesce_is_one_undoable_operation(fp, win):
+    """One undo restores the plan -- not a sequence that leaves it half-cleaned.
+
+    Undo here is snapshot-based (`_commit_state`), so an operation that runs to
+    completion without yielding is naturally ONE step. That is a property of
+    the mechanism rather than of this call, which is exactly why it is pinned:
+    a future version that yields mid-way would break it silently.
+    """
+    from floorplanner.design.verify import rebase
+    win.load_path(str(WISCAWAY))
+    rebase(win)
+    fp.SETTINGS["auto_coalesce"] = True
+    win._commit_if_changed()
+    c0, a0 = _corners(win, fp), _areas(win, fp)
+
+    win.coalesce_all_now(interactive=False)
+    win._commit_if_changed()
+    assert _corners(win, fp) < c0
+
+    win.undo()
+
+    assert _corners(win, fp) == c0, "one undo did not restore every corner"
+    assert _areas(win, fp) == a0
+
+
+@pytest.mark.gui
+def test_a_corner_a_room_turns_at_is_never_dissolved(fp, win, make_room):
+    """The predicate's whole point, on a scene built to have exactly one of each.
+
+    A square room's four corners TURN; nothing may be taken. This is the
+    negative half, and its precondition is that the room is there at all.
+    """
+    from floorplanner.rooms import coalesce_outline_corners
+    sc = win.scene
+    room = make_room(sc, 0, 0, 240, 180, "Den")
+    assert len(room.outline) == 4                # precondition
+
+    rep = coalesce_outline_corners(sc, dry_run=True)
+
+    assert rep["removed"] == 0, "a turning corner was marked removable"

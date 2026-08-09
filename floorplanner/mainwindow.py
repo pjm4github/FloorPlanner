@@ -1206,7 +1206,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         rebuild_all_walls(self.scene)     # rooms re-derive region/outline
         self.status("Ungrouped — items left in place.")
 
-    def coalesce_all_now(self):
+    def coalesce_all_now(self, interactive=True):
         """Edit ▸ Coalesce all walls now: the explicit plan-wide normalization.
 
         The COMMAND outlives the implementation it was named after (P3.4 (iii)).
@@ -1214,11 +1214,47 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         merge every collinear run, then weld the junctions into shared
         vertices. Still forced even when auto-coalesce is switched off."""
         merged, _moved, _shared, split = normalize_walls(self.scene)
+
+        # THE OUTLINE HALF (D61 stage 2a). The wall pass above dissolves a
+        # vertex and the ROOM OUTLINE goes on naming it -- measured on a real
+        # plan, 103 walls / 26 collinear -> 81 / 3 while the outlines stayed at
+        # 159 corners, 69 of them redundant, before and after. That is the half
+        # the user sees as "a straight run carrying a dozen handles".
+        #
+        # DRY RUN FIRST, ALWAYS. The numbers are shown before anything is
+        # touched; `interactive=False` takes the applied path without a modal,
+        # for tests and macros.
+        from floorplanner.rooms import coalesce_outline_corners   # late
+        plan = coalesce_outline_corners(self.scene, dry_run=True)
+        removed = 0
+        if plan["removed"]:
+            worst = sorted(((v["removable"], k) for k, v in plan["rooms"].items()
+                            if v["removable"]), reverse=True)[:4]
+            detail = ", ".join(f"{name} {n}" for n, name in worst)
+            ok = True
+            if interactive:
+                ok = QMessageBox.question(
+                    self, "Coalesce room outlines",
+                    f"Remove {plan['removed']} redundant outline corner(s) "
+                    f"from {len(worst)}+ room(s)?\n\n{detail}\n\n"
+                    f"({plan['paths']['exact']} exact on the grid, "
+                    f"{plan['paths']['tolerance']} by angle.) "
+                    "No room's area changes; Undo restores the plan.",
+                    QMessageBox.StandardButton.Yes
+                    | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes
+                ) == QMessageBox.StandardButton.Yes
+            if ok:
+                removed = coalesce_outline_corners(
+                    self.scene, dry_run=False)["removed"]
+
         rebuild_all_walls(self.scene)
         msg = (f"Coalesced {merged} overlapping wall(s) and welded junctions."
                if merged else "Welded wall junctions.")
         if split:
             msg += f" Split {split} wall(s) at junctions."
+        if removed:
+            msg += f" Dissolved {removed} redundant outline corner(s)."
         self.status(msg)
 
     def review_wall_gaps(self):
