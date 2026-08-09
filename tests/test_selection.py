@@ -413,3 +413,74 @@ def test_right_click_still_resolves_after_raise_to_front(
         f"({target.zValue()}) -- this test would be about nothing")
 
     assert _menu_answered_by(fp, win, monkeypatch, pt) == answered_by
+
+
+# -- D53: the two affordances that had NO route off the blank canvas -----------
+
+def _menu_route(win, menu_name, needle):
+    """The (text, shortcut) of a menu-bar item, or None. Reads the LIVE menu."""
+    for m in win.menuBar().actions():
+        if m.menu() is None or m.text().replace("&", "") != menu_name:
+            continue
+        for a in m.menu().actions():
+            if a.isSeparator():
+                continue
+            if needle.lower() in a.text().replace("&", "").lower():
+                return a.text().replace("&", ""), a.shortcut().toString()
+    return None
+
+
+@pytest.mark.gui
+def test_the_3d_viewer_is_reachable_without_blank_canvas(fp, win):
+    """D53. `show_3d_view` had TWO call sites and both were blank-canvas
+    right-clicks, so on a plan that fills the canvas the renderer could not be
+    opened at all. It was reachable only through the hit-testing defect --
+    PARASITIC REACH, the fifth instance.
+
+    Deliberately NOT under Floors: `select_floor_popup`'s own docstring argues
+    that "a chord named 'select a floor' should not offer a renderer", and that
+    reasoning applies to a menu as much as to a chord.
+    """
+    route = _menu_route(win, "View", "3D view")
+    assert route is not None, "no View menu route to the 3D viewer"
+    text, key = route
+    assert key == "Ctrl+3", f"expected Ctrl+3, got {key!r}"
+    assert win.a_3d.isEnabled()
+
+
+@pytest.mark.gui
+def test_paste_room_is_reachable_beside_paste(fp, win, make_room):
+    """D53. `room_clipboard` was written by the room menu's Copy room and read
+    by ONE caller, reached only from the blank-canvas menu -- so Ctrl+V does not
+    paste a room and there was no other way in. A1b widening the room menu made
+    Copy easier to reach while Paste stayed put; this closes the asymmetry it
+    created.
+
+    The two clipboards stay SEPARATE -- joining them is a design question and
+    is filed rather than answered here.
+    """
+    route = _menu_route(win, "Edit", "Paste room")
+    assert route is not None, "no Edit menu route to Paste room"
+    assert route[1] == "Ctrl+Shift+V", f"expected Ctrl+Shift+V, got {route[1]!r}"
+
+    sc = win.scene
+    room = make_room(sc, 0, 0, 240, 180, "Den")
+    win.room_clipboard = win.room_template(room)
+    before = sum(1 for i in sc.items() if isinstance(i, fp.RoomItem))
+
+    win.paste_room_here()          # the menu action's slot, no click point
+
+    after = sum(1 for i in sc.items() if isinstance(i, fp.RoomItem))
+    assert after == before + 1, "Paste room from the menu pasted nothing"
+
+
+@pytest.mark.gui
+def test_paste_room_with_an_empty_clipboard_says_so_and_does_not_raise(fp, win):
+    """The negative half, with its precondition asserted first: the clipboard
+    really is empty, so "nothing was pasted" is a verdict and not an accident."""
+    sc = win.scene
+    win.room_clipboard = None                       # PRECONDITION
+    before = sum(1 for i in sc.items() if isinstance(i, fp.RoomItem))
+    win.paste_room_here()
+    after = sum(1 for i in sc.items() if isinstance(i, fp.RoomItem))
+    assert after == before

@@ -280,6 +280,29 @@ because it is written precisely to explain why nobody needs to look further.
 
 **The corollary is the cheaper half:** the deletion found what the census could not. Removing the thing and reading the failures is a census, and often the only complete one — which is an argument for retiring a mechanism *before* believing you have enumerated its callers, not after.
 
+**PARASITIC REACH: WHEN YOU REPAIR A CAPABILITY THAT NEVER WORKED, BUDGET FOR THE AFFORDANCES RESTING ON THE FAULT — added 2026‑08‑08 at the FIFTH instance, and it is named so it can be cited.**
+
+A defect that has been in a product a long time stops being only a defect. Things come to depend on it — some of them code nobody exercises, and some of them **features the user learned as the way the application works**. Repair the fault and those go with it. **The second kind is reported as a regression, by the person who depended on it, and they are not wrong to call it one.**
+
+The five, all downstream of one thing — `RoomItem.shape()` returning only the label rect, so a click inside a room reached no item and the view called it blank canvas:
+
+| # | what was resting on it | record |
+|---|---|---|
+| 1 | **room selection** — a room could not be selected by its region at all | [D53](defects/0053-a-room-cannot-be-selected-by-clicking-its.md) |
+| 2 | **the room context menu** — reachable only from the label; deleting the blank-canvas clause made it unreachable entirely for one commit | D53 |
+| 3 | **room naming** — the Room tool's *"click the enclosed space"* route, which the reporter had learned as the way to name a region | D53, and the account in [D57](defects/0057-face-at-hands-walls-of-a-report-of.md) |
+| 4 | **a crash that turned out not to be A1b's** — four hypotheses were built on the assumption that it was | [D57](defects/0057-face-at-hands-walls-of-a-report-of.md) |
+| 5 | **the 3D viewer** — `show_3d_view` had two call sites, both blank-canvas right-clicks, no menu entry, no shortcut, no button | D53's affordance report, `evidence/d53-blank-canvas-routes.txt` |
+
+**The first three are the ordinary shape: dead code and unreachable paths, found by fixing the thing.** The fourth is a warning about diagnosis — a defect *adjacent* to the repair attracts blame for it. **The fifth is the expensive one**, and it is the reason this has a name: a whole feature, reachable *only* through the fault, with no other route. On a plan that fills the canvas the renderer could not be opened at all, and nothing said so, because the fault was providing the reach.
+
+**The consequences, in the order they bite:**
+
+1. **Expect the census to be incomplete.** The blank-canvas affordance census found **four** features on that path where the question had been asked about one. Ask what is REACHED through a fault, not only what is BROKEN by it.
+2. **A fix that removes reach must restore it in the same merge.** Not a follow-up. A user who loses a route does not care that the record says it was accidental.
+3. **The replacement is a design question, not a mechanical one.** *Where* the 3D viewer belongs is not "wherever it used to appear" — it got onto blank canvas by being put where there was space, and repeating that is how the next instance is made. It got a View menu; **"there was room for it" is not a reason, and it was not accepted as one.**
+4. **Expect the report to arrive as a regression**, and expect the reporter to be describing a real loss in the vocabulary they have.
+
 **A REPORTED REPRO IS TESTIMONY, NOT MEASUREMENT — added 2026‑08‑08 at D57, and it cost four hypotheses.** A user's account of what they did is a **hypothesis about what happened**, and it earns exactly the scrutiny any other premise does. It arrives sounding like data because it comes from the person who was there — but they are reporting an intention and a memory, not an instrument reading.
 
 **THE FIRST QUESTION TO ASK OF ANY REPORTED REPRO: can the application even reach the state described?** It is nearly always the cheapest check available, and it is the one that gets skipped.

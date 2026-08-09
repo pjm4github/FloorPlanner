@@ -123,6 +123,14 @@ the save boundary and at its second by one at load. Full account:
     check(deep=True)  -> ['I7  opening o29 runs off wall w90 ...']
     check(deep=False) -> ['I7  opening o29 runs off wall w90 ...']
 
+**SO THIS RECORD SPLIT ON 2026‑08‑08.** The cheap-twelve half is
+[D59](0059-the-cheap-twelve-never-run-at-a-document.md) — actionable, with a
+worked example that reached a user as a crash and **no cost objection standing
+against it**, because the cheap twelve are already deemed affordable per
+mutation under shadow mode. **This record keeps the DEEP half**, whose cost
+question stays open and whose report needs an overlap area that D52's half 1
+must supply first.
+
 **I7 is one of the CHEAP TWELVE.** This record is framed around the DEEP set,
 and the standing objection to boundary checking has been the O(n²) sweep — an
 objection that **does not apply to this instance at all**. Worth separating when

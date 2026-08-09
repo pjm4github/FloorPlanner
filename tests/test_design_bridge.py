@@ -24,7 +24,7 @@ from PyQt6.QtCore import QPointF
 from floorplanner.design.bridge import (
     apply_design_to_scene, design_from_scene, scene_identity_report,
 )
-from floorplanner.design.validate import check
+from floorplanner.design.validate import check, schema_errors
 
 pytestmark = [pytest.mark.io, pytest.mark.rooms]
 
@@ -668,6 +668,33 @@ def _plan_with_a_straddling_opening(fp, win):
     win.load_path(str(WISCAWAY))
     rebase(win)
     return win.scene
+
+
+def test_the_wiscaway_fixture_is_still_dirty_in_exactly_the_way_that_matters():
+    """THE FIXTURE IS RETAINED **BECAUSE** IT FAILS, and this is what says so.
+
+    `fixtures/wiscaway2026-08-08.json` carries `I7 opening o29 runs off wall
+    w90` -- a 48" pocket door straddling the welded junction at `v90`. That
+    fault is the ONLY reason the plan reaches `_walls_of`'s `if straddles:`
+    branch, and reaching that branch is the whole point of the D57 test below.
+    Three synthetic scenes were tried and none of them got there.
+
+    So the fixture is load-bearing, and a good-faith repair of the door would
+    leave the D57 test GREEN WHILE EXERCISING NOTHING. This is the same shape
+    as `KNOWN_UNCLEAN` in `test_schema.py` -- an exemption that names its fault
+    and fails if the fault is fixed -- written here because `fixtures/` sits
+    outside the corpus tests by construction, so that list cannot cover it.
+
+    IF THIS TEST FAILS, DO NOT "FIX" IT. Either the door was repaired (restore
+    it, or find another plan that reaches the branch and re-point both tests) or
+    `check` changed. Laundering the fixture hides the trigger.
+    """
+    doc = json.loads(WISCAWAY.read_text(encoding="utf-8"))
+    assert schema_errors(doc) == [], "the fixture must stay schema-VALID"
+    errs = check(doc, deep=True)
+    assert [e for e in errs if e.startswith("I7")], (
+        f"wiscaway no longer trips I7 -- the D57 test's branch is now "
+        f"unreachable and that test is vacuous. Now reports: {errs}")
 
 
 @pytest.mark.geometry
