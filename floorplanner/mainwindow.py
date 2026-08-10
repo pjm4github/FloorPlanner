@@ -1238,8 +1238,11 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                     f"Remove {plan['removed']} redundant outline corner(s) "
                     f"from {len(worst)}+ room(s)?\n\n{detail}\n\n"
                     f"({plan['paths']['exact']} exact on the grid, "
-                    f"{plan['paths']['tolerance']} by angle.) "
-                    "No room's area changes; Undo restores the plan.",
+                    f"{plan['paths']['tolerance']} by angle.)\n"
+                    f"Largest area change: {plan['max_area_delta_sqft']:.4f} "
+                    f"sq ft (bound {plan['area_bound_sqft']} — "
+                    f"{plan['refused']['area_would_move']} refused for "
+                    f"exceeding it).\nUndo restores the plan.",
                     QMessageBox.StandardButton.Yes
                     | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.Yes

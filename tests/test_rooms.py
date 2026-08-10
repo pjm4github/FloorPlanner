@@ -938,3 +938,46 @@ def test_a_corner_a_room_turns_at_is_never_dissolved(fp, win, make_room):
     rep = coalesce_outline_corners(sc, dry_run=True)
 
     assert rep["removed"] == 0, "a turning corner was marked removable"
+
+
+def test_a_coalesced_corner_stays_gone_across_a_save(fp, win, tmp_path):
+    """D63 producer 1: the outline coalesce must not remove a corner the
+    DOCUMENT requires, because the next save puts it straight back.
+
+    `design/bridge._walk` emits one outline edge per wall (invariant I5), so a
+    room edge crossing a T-junction is several edges however few corners the
+    scene holds. The predicate therefore refuses a corner where any wall ENDS,
+    and refuses a degree-2 pair whose walls cannot MERGE (different type).
+
+    MEASURED BEFORE THE FIX, on `fixtures/wiscaway2026-08-08.json`: 40 corners
+    removed, 7 back after a save -- 33 durable. After: 33 removed, 33 durable,
+    REBOUND 0. The assertion is that last number, because it is the only one
+    that means the user's plan actually got simpler.
+    """
+    from pathlib import Path
+    from floorplanner.rooms import coalesce_outline_corners
+    from floorplanner.walls import normalize_walls
+
+    plan = Path(__file__).resolve().parent.parent / "fixtures" \
+        / "wiscaway2026-08-08.json"
+    win.load_path(str(plan))
+
+    def slots():
+        return sum(len(r.outline) for r in win.scene.items()
+                   if isinstance(r, fp.RoomItem))
+
+    normalize_walls(win.scene)
+    before = slots()
+    rep = coalesce_outline_corners(win.scene, dry_run=False)
+    # precondition: the pass must actually have removed something, or "nothing
+    # came back" is true of a run that did nothing
+    assert rep["removed"] > 0, "nothing was dissolved -- the test is vacuous"
+    in_session = slots()
+    assert in_session < before
+
+    out = tmp_path / "roundtrip.json"
+    win.save_path(str(out))
+    win.load_path(str(out))
+    assert slots() == in_session, (
+        "a coalesced corner came back on save: the pass removed a corner "
+        "invariant I5 requires")
