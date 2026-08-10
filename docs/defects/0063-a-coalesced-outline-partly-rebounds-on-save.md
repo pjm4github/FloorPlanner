@@ -232,6 +232,78 @@ holds neither D63 term (`grep -c` → 0 and 0) while the current tree holds both
 (→ 2), and the probe reported at runtime which module it had loaded, with both
 terms confirmed absent from the loaded source.
 
+## PRODUCER 2 — measured 2026‑08‑10, and MY LOOSE THREAD WAS AN ARTIFACT
+
+**The thread was mine and it does not exist.** I reported that on `08‑09R` the
+coalesce lane inserts **1** where the wall-pass lane inserts **3**, one-sided,
+and concluded *"removing a corner can PREVENT a producer-2 insertion"* — a causal
+link between the lanes. The reviewer, reasonably, made that the starting point.
+**Measured, two of those three are not insertions at all.**
+
+| | the 2 "prevented" | the 10 that FIRE |
+|---|---|---|
+| wall ends at the point | **0** before *and* after the wall pass | **3 – 6** |
+| lies inside an outline edge | **no** | **yes**, every one, at a real fraction |
+| nearest dissolved corner | **0.08″ / 0.38″, same room** | 6″ – 166″, or none |
+
+**They are the SAME CORNER AT A RECOMPUTED COORDINATE.** The scene holds a point
+**0.0778″** and **0.3802″** away; the save wrote it slightly moved, and the
+pairing tolerance (0.05″) scored the move as a fresh insertion. Dissolve that
+corner and the ghost has nothing to be a ghost of — which is the whole of the
+"prevention". **So the 3-versus-1 asymmetry is an artifact of my instrument, not
+a mechanism**, and the one-sidedness has no causal content.
+
+### The safety check this forced, and it matters more than the thread
+
+If the save can move a corner by 0.38″, then a corner that *rebounded* 0.08″ from
+where it left would be scored **not the same corner** — counted as `durable` and
+as a producer-2 `insertion`, understating rebound twice. **So producer 1's
+closure was re-run across four pairing tolerances:**
+
+| tolerance | 0.05″ | 0.25″ | 0.75″ | 2.0″ |
+|---|---|---|---|---|
+| **total rebound, five plans** | **0** | **0** | **0** | **0** |
+
+Every column identical, every plan. **The closure is robust, not
+tolerance-dependent.** (Both modules' `TOL` had to be set — `d63_rounded_rebound`
+does `from d63_producer_one import TOL`, so it holds its own binding; setting one
+is not setting the other, which is the *wrapper bound to the wrong reference*
+trap, and the sweep asserts both moved.)
+
+### Producer 2, with the ghosts removed — one shape, two origins
+
+Every remaining insertion is the same thing: **a room edge crossing a point where
+walls end, that the outline never named.** I5 requires a hop there. The two lanes
+then agree exactly — `rounded` 6, `planc1` 3, `08‑09R` **1**.
+
+They differ only in **where the wall end came from**:
+
+| origin | count | plans |
+|---|---:|---|
+| the **wall pass created it** (a new end mid-edge) | 6 | `planc1` 3/3, `rounded` 2/6, `08‑09R` 1/1 |
+| the end was **already there** and the outline never named it | 4 | `rounded` 4/6 |
+
+The second is the more interesting half: **the plan arrives with a room edge
+crossing an unnamed T-junction**, so the save is correcting the *stored* outline
+rather than reacting to anything the session did.
+
+### A separate finding, flagged not chased
+
+**The save moves a corner on two of five plans**: zero on all three axis-aligned
+plans, **2 corners at ≤0.3802″** on the angled `08‑09R`, and **2 corners at up to
+1.5290″** on `planc1`. Rare and isolated rather than general drift — but 1.5″ is
+too large to leave as a footnote here, and it belongs to whichever pass owns
+`split_params`' projection, not to D63.
+
+**Evidence:** `d63_producer_two.py` → `d63-producer-two.json` ·
+`d63_tolerance_sweep.py` → `d63-tolerance-and-drift.json`.
+
+**Controls:** the recorded per-lane table is reproduced before any attribute is
+read (`3/1`, `6/6`, `3/3`, `0/0`, `0/0`); one-sidedness is asserted per plan and
+**PASSES everywhere** (nothing in the coalesce lane the wall pass does not also
+produce); and the PREVENTED set is asserted non-empty, because an instrument
+reporting "nothing in common" across an empty set has measured nothing.
+
 ## Ruling
 
 *(Open — **producer 1 is CLOSED**, producer 2 remains.)*
