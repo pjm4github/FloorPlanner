@@ -507,13 +507,20 @@ def divorce_selftest(path):
     }
 
 
-plans = [os.path.abspath(p) for p in sys.argv[1:]]
-out = {
-    "question": ("does normalize_walls RAISE the redundant-outline-corner "
-                 "count -- i.e. is it a SECOND PRODUCER for D61?"),
-    "control_named_at": "see CONTROL in the wiscaway entry, and the docstring",
-    "DIVORCE_DETECTOR_SELFTEST": divorce_selftest(plans[0]) if plans else None,
-    "plans": [run_plan(p) for p in plans],
-}
-json.dump(out, sys.stdout, indent=1)
-sys.stdout.write(chr(10))
+# Importable: `corner_map` is the ONE definition of the divorce predicate, and
+# `d61_leave_path_weld.py` reads it from here rather than restating it. The
+# QApplication above is created at import, which is what any Qt probe needs
+# anyway; only the measurement below is guarded.
+if __name__ == "__main__":
+    plans = [os.path.abspath(p) for p in sys.argv[1:]]
+    out = {
+        "question": ("does normalize_walls RAISE the redundant-outline-corner "
+                     "count -- i.e. is it a SECOND PRODUCER for D61?"),
+        "control_named_at": ("see CONTROL in the wiscaway entry, and the "
+                             "docstring"),
+        "DIVORCE_DETECTOR_SELFTEST": (divorce_selftest(plans[0]) if plans
+                                      else None),
+        "plans": [run_plan(p) for p in plans],
+    }
+    json.dump(out, sys.stdout, indent=1)
+    sys.stdout.write(chr(10))

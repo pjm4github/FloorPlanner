@@ -1,0 +1,161 @@
+{
+ "plan": "wiscaway2026-08-08.json",
+ "question": "does 2b's leave path reach the welding D62 attributes the divorce to, and does a room move divorce anything?",
+ "WALK_six_moves_shuffle_off": {
+  "room": "Rear Porch",
+  "joins_run": 6,
+  "welds_in_the_LEAVE_phase": 0,
+  "welds_total": 6,
+  "per_step": [
+   {
+    "step": 0,
+    "FULL": 0,
+    "PARTIAL": 1,
+    "outline_corner_objects": 97,
+    "walls": 103
+   },
+   {
+    "step": 1,
+    "FULL": 0,
+    "PARTIAL": 0,
+    "outline_corner_objects": 107,
+    "walls": 105,
+    "state": "placed"
+   },
+   {
+    "step": 2,
+    "FULL": 0,
+    "PARTIAL": 0,
+    "outline_corner_objects": 107,
+    "walls": 105,
+    "state": "placed"
+   },
+   {
+    "step": 3,
+    "FULL": 2,
+    "PARTIAL": 0,
+    "outline_corner_objects": 108,
+    "walls": 108,
+    "state": "placed"
+   },
+   {
+    "step": 4,
+    "FULL": 0,
+    "PARTIAL": 0,
+    "outline_corner_objects": 110,
+    "walls": 109,
+    "state": "placed"
+   },
+   {
+    "step": 5,
+    "FULL": 0,
+    "PARTIAL": 0,
+    "outline_corner_objects": 111,
+    "walls": 109,
+    "state": "placed"
+   },
+   {
+    "step": 6,
+    "FULL": 0,
+    "PARTIAL": 0,
+    "outline_corner_objects": 111,
+    "walls": 109,
+    "state": "placed"
+   }
+  ],
+  "FULL_divorce_ever_above_zero": true
+ },
+ "CONTROL_1_wrapper_bound": {
+  "statement": "normalize_walls provably welds; with the wrappers installed it MUST record one. A zero here means the wrapper is bound to the wrong reference, not that the code is quiet",
+  "welds_recorded": 2,
+  "verdict": "PASS",
+  "calls": [
+   {
+    "fn": "weld_scene",
+    "via": "walls",
+    "caller": "walls.py:571 normalize_walls",
+    "phase": "control: normalize_walls"
+   },
+   {
+    "fn": "share_coincident_ends",
+    "via": "walls",
+    "caller": "walls.py:555 weld_scene",
+    "phase": "control: normalize_walls"
+   }
+  ]
+ },
+ "NOTE_on_the_fixture": "fixtures/wiscaway2026-08-08.json carries settings.editing.shuffle: true, so as it loads a label-drag leaves the room FLOATING and join_room never runs. Both states are measured; the shuffle_OFF arm is the one that answers the question",
+ "arms": {
+  "shuffle_OFF (the ordinary drag 2b targets)": {
+   "shuffle": false,
+   "room_moved": "Rear Porch",
+   "room_state_after": "placed",
+   "CONTROL_2_ops_actually_ran": {
+    "extract_room": 1,
+    "join_room": 1
+   },
+   "CONTROL_2_verdict": "PASS",
+   "welds": [
+    {
+     "fn": "share_coincident_ends",
+     "via": "extract",
+     "caller": "extract.py:238 join_room",
+     "phase": "join (the return)"
+    }
+   ],
+   "weld_count_by_phase": {
+    "join (the return)": 1
+   },
+   "LEAVE_PATH_WELDS": false,
+   "GESTURE_WELDS_AT_ALL": true,
+   "divorced_before": {
+    "FULL": 0,
+    "PARTIAL": 1,
+    "outline_corner_objects": 97
+   },
+   "divorced_after": {
+    "FULL": 0,
+    "PARTIAL": 0,
+    "outline_corner_objects": 107
+   },
+   "DELTA_full": 0,
+   "DELTA_partial": -1,
+   "walls_before": 103,
+   "walls_after": 107,
+   "areas_changed": [],
+   "verdict": "the gesture WELDS but divorces nothing"
+  },
+  "shuffle_ON (as the fixture loads)": {
+   "shuffle": true,
+   "room_moved": "Rear Porch",
+   "room_state_after": "floating",
+   "CONTROL_2_ops_actually_ran": {
+    "extract_room": 1,
+    "join_room": 0
+   },
+   "CONTROL_2_verdict": "N/A -- join_room does not run under shuffle, which is P4.3's design, not a probe fault",
+   "welds": [],
+   "weld_count_by_phase": {
+    "(none)": 0
+   },
+   "LEAVE_PATH_WELDS": false,
+   "GESTURE_WELDS_AT_ALL": false,
+   "divorced_before": {
+    "FULL": 0,
+    "PARTIAL": 1,
+    "outline_corner_objects": 97
+   },
+   "divorced_after": {
+    "FULL": 0,
+    "PARTIAL": 1,
+    "outline_corner_objects": 107
+   },
+   "DELTA_full": 0,
+   "DELTA_partial": 0,
+   "walls_before": 103,
+   "walls_after": 110,
+   "areas_changed": [],
+   "verdict": "the gesture does not weld at all"
+  }
+ }
+}

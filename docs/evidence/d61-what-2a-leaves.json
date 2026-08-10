@@ -1,0 +1,670 @@
+{
+ "question": "what does 2a leave, per room -- and does the wall+outline pair need to iterate?",
+ "plans": [
+  {
+   "plan": "wiscaway2026-08-08.json",
+   "COMPLAINT_total": 69,
+   "CLASSIFICATION_CHECK": {
+    "production_removable_vertices": 28,
+    "my_classification_removable_slots": 40,
+    "production_removable_slots": 40,
+    "AGREES": true
+   },
+   "per_room": {
+    "MUD": {
+     "corners": 7,
+     "complaint": 3,
+     "removable": 3,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "PWDR": {
+     "corners": 5,
+     "complaint": 1,
+     "removable": 1,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "M Bath": {
+     "corners": 9,
+     "complaint": 1,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 1,
+     "left_C_triangle": 0
+    },
+    "PKT Off": {
+     "corners": 7,
+     "complaint": 1,
+     "removable": 1,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "Dining": {
+     "corners": 11,
+     "complaint": 7,
+     "removable": 3,
+     "left_A_a_wall_needs_it": 1,
+     "left_B_a_co_holder_turns": 3,
+     "left_C_triangle": 0
+    },
+    "Lounge": {
+     "corners": 10,
+     "complaint": 6,
+     "removable": 3,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 3,
+     "left_C_triangle": 0
+    },
+    "MBR": {
+     "corners": 10,
+     "complaint": 6,
+     "removable": 3,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 3,
+     "left_C_triangle": 0
+    },
+    "HALL": {
+     "corners": 8,
+     "complaint": 4,
+     "removable": 1,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 3,
+     "left_C_triangle": 0
+    },
+    "GREAT RM": {
+     "corners": 9,
+     "complaint": 5,
+     "removable": 1,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 4,
+     "left_C_triangle": 0
+    },
+    "BKF NOOK": {
+     "corners": 8,
+     "complaint": 4,
+     "removable": 3,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 1,
+     "left_C_triangle": 0
+    },
+    "CLST": {
+     "corners": 5,
+     "complaint": 1,
+     "removable": 1,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "Front Porch": {
+     "corners": 13,
+     "complaint": 1,
+     "removable": 1,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "Pan": {
+     "corners": 5,
+     "complaint": 1,
+     "removable": 1,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "Util": {
+     "corners": 6,
+     "complaint": 2,
+     "removable": 2,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "WIC": {
+     "corners": 6,
+     "complaint": 2,
+     "removable": 2,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "KITCHEN": {
+     "corners": 9,
+     "complaint": 5,
+     "removable": 3,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "Foyer": {
+     "corners": 10,
+     "complaint": 6,
+     "removable": 5,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 1,
+     "left_C_triangle": 0
+    },
+    "Rear Porch": {
+     "corners": 13,
+     "complaint": 9,
+     "removable": 3,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 6,
+     "left_C_triangle": 0
+    },
+    "SAFE": {
+     "corners": 8,
+     "complaint": 4,
+     "removable": 3,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 1,
+     "left_C_triangle": 0
+    }
+   },
+   "PAIR_FIXPOINT": {
+    "round_1": {
+     "walls": 81,
+     "slots": 119,
+     "removed": 28
+    },
+    "round_2": {
+     "walls": 81,
+     "slots": 119,
+     "removed": 0,
+     "normalize_returned": {
+      "merged": 0,
+      "moved": 0,
+      "shared": 91,
+      "split": 0
+     }
+    },
+    "round_3_dry": {
+     "walls": 81,
+     "slots": 119,
+     "would_remove": 0,
+     "normalize_returned": {
+      "merged": 0,
+      "moved": 0,
+      "shared": 91,
+      "split": 0
+     }
+    },
+    "round_2_removed_more": false,
+    "IS_A_FIXPOINT_AFTER_ONE_ROUND": true
+   },
+   "DURABILITY": {
+    "as_loaded": 159,
+    "after_the_command": 119,
+    "after_save_and_reopen": 126,
+    "removed_in_session": 40,
+    "still_removed_after_a_save": 33,
+    "REBOUND": 7
+   }
+  },
+  {
+   "plan": "roundedMultifloor.json",
+   "COMPLAINT_total": 61,
+   "CLASSIFICATION_CHECK": {
+    "production_removable_vertices": 13,
+    "my_classification_removable_slots": 20,
+    "production_removable_slots": 20,
+    "AGREES": true
+   },
+   "per_room": {
+    "Great Room": {
+     "corners": 8,
+     "complaint": 2,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "Hall": {
+     "corners": 6,
+     "complaint": 2,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "Clst": {
+     "corners": 4,
+     "complaint": 0,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "LOUNGE": {
+     "corners": 8,
+     "complaint": 2,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "Mud": {
+     "corners": 6,
+     "complaint": 0,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "PWDR": {
+     "corners": 5,
+     "complaint": 1,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 1,
+     "left_C_triangle": 0
+    },
+    "PKT Off": {
+     "corners": 7,
+     "complaint": 1,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 1,
+     "left_C_triangle": 0
+    },
+    "Pan": {
+     "corners": 5,
+     "complaint": 1,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 1,
+     "left_C_triangle": 0
+    },
+    "Master Suite": {
+     "corners": 8,
+     "complaint": 4,
+     "removable": 2,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "Craft": {
+     "corners": 10,
+     "complaint": 4,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 2,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "Kitchen": {
+     "corners": 8,
+     "complaint": 4,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 2,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "Front Porch": {
+     "corners": 13,
+     "complaint": 1,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 1,
+     "left_C_triangle": 0
+    },
+    "MBATH": {
+     "corners": 11,
+     "complaint": 5,
+     "removable": 2,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 3,
+     "left_C_triangle": 0
+    },
+    "Rear Porch": {
+     "corners": 9,
+     "complaint": 5,
+     "removable": 1,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 4,
+     "left_C_triangle": 0
+    },
+    "WIC": {
+     "corners": 5,
+     "complaint": 1,
+     "removable": 1,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "Foyer": {
+     "corners": 4,
+     "complaint": 0,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "Dining": {
+     "corners": 6,
+     "complaint": 2,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "Toi": {
+     "corners": 4,
+     "complaint": 0,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "Util": {
+     "corners": 6,
+     "complaint": 2,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "Garage": {
+     "corners": 9,
+     "complaint": 3,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 3,
+     "left_C_triangle": 0
+    },
+    "BR2": {
+     "corners": 9,
+     "complaint": 3,
+     "removable": 3,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "UPBATH": {
+     "corners": 6,
+     "complaint": 2,
+     "removable": 1,
+     "left_A_a_wall_needs_it": 1,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "Hall2": {
+     "corners": 11,
+     "complaint": 7,
+     "removable": 3,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 4,
+     "left_C_triangle": 0
+    },
+    "BR3": {
+     "corners": 11,
+     "complaint": 5,
+     "removable": 4,
+     "left_A_a_wall_needs_it": 1,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "BONUS1": {
+     "corners": 8,
+     "complaint": 4,
+     "removable": 3,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 1,
+     "left_C_triangle": 0
+    }
+   },
+   "PAIR_FIXPOINT": {
+    "round_1": {
+     "walls": 128,
+     "slots": 167,
+     "removed": 13
+    },
+    "round_2": {
+     "walls": 128,
+     "slots": 167,
+     "removed": 0,
+     "normalize_returned": {
+      "merged": 19,
+      "moved": 0,
+      "shared": 130,
+      "split": 19
+     }
+    },
+    "round_3_dry": {
+     "walls": 128,
+     "slots": 167,
+     "would_remove": 0,
+     "normalize_returned": {
+      "merged": 19,
+      "moved": 0,
+      "shared": 130,
+      "split": 19
+     }
+    },
+    "round_2_removed_more": false,
+    "IS_A_FIXPOINT_AFTER_ONE_ROUND": true
+   },
+   "DURABILITY": {
+    "as_loaded": 187,
+    "after_the_command": 167,
+    "after_save_and_reopen": 186,
+    "removed_in_session": 20,
+    "still_removed_after_a_save": 1,
+    "REBOUND": 19
+   }
+  },
+  {
+   "plan": "symmetricP1.json",
+   "COMPLAINT_total": 35,
+   "CLASSIFICATION_CHECK": {
+    "production_removable_vertices": 2,
+    "my_classification_removable_slots": 4,
+    "production_removable_slots": 4,
+    "AGREES": true
+   },
+   "per_room": {
+    "Lounge": {
+     "corners": 8,
+     "complaint": 2,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "M Bath": {
+     "corners": 10,
+     "complaint": 4,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 4,
+     "left_C_triangle": 0
+    },
+    "Master Suite": {
+     "corners": 6,
+     "complaint": 2,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "Mud": {
+     "corners": 6,
+     "complaint": 0,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "Toi": {
+     "corners": 4,
+     "complaint": 0,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "Dining": {
+     "corners": 6,
+     "complaint": 2,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "Util": {
+     "corners": 6,
+     "complaint": 2,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "Hall": {
+     "corners": 7,
+     "complaint": 3,
+     "removable": 1,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "PKT Off": {
+     "corners": 7,
+     "complaint": 1,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 1,
+     "left_C_triangle": 0
+    },
+    "PWDR": {
+     "corners": 5,
+     "complaint": 1,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 1,
+     "left_C_triangle": 0
+    },
+    "Foyer": {
+     "corners": 4,
+     "complaint": 0,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "Front Porch": {
+     "corners": 13,
+     "complaint": 1,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 1,
+     "left_C_triangle": 0
+    },
+    "Pan": {
+     "corners": 5,
+     "complaint": 1,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 1,
+     "left_C_triangle": 0
+    },
+    "Rear Porch": {
+     "corners": 9,
+     "complaint": 5,
+     "removable": 1,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 4,
+     "left_C_triangle": 0
+    },
+    "WIC": {
+     "corners": 7,
+     "complaint": 0,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "Craft": {
+     "corners": 8,
+     "complaint": 2,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "Great Room": {
+     "corners": 10,
+     "complaint": 4,
+     "removable": 2,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    },
+    "Garage": {
+     "corners": 9,
+     "complaint": 3,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 3,
+     "left_C_triangle": 0
+    },
+    "Clst": {
+     "corners": 4,
+     "complaint": 0,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 0,
+     "left_C_triangle": 0
+    },
+    "Kitchen": {
+     "corners": 6,
+     "complaint": 2,
+     "removable": 0,
+     "left_A_a_wall_needs_it": 0,
+     "left_B_a_co_holder_turns": 2,
+     "left_C_triangle": 0
+    }
+   },
+   "PAIR_FIXPOINT": {
+    "round_1": {
+     "walls": 78,
+     "slots": 136,
+     "removed": 2
+    },
+    "round_2": {
+     "walls": 78,
+     "slots": 136,
+     "removed": 0,
+     "normalize_returned": {
+      "merged": 0,
+      "moved": 0,
+      "shared": 98,
+      "split": 0
+     }
+    },
+    "round_3_dry": {
+     "walls": 78,
+     "slots": 136,
+     "would_remove": 0,
+     "normalize_returned": {
+      "merged": 0,
+      "moved": 0,
+      "shared": 98,
+      "split": 0
+     }
+    },
+    "round_2_removed_more": false,
+    "IS_A_FIXPOINT_AFTER_ONE_ROUND": true
+   },
+   "DURABILITY": {
+    "as_loaded": 140,
+    "after_the_command": 136,
+    "after_save_and_reopen": 136,
+    "removed_in_session": 4,
+    "still_removed_after_a_save": 4,
+    "REBOUND": 0
+   }
+  }
+ ]
+}

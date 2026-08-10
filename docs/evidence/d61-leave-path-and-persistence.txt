@@ -1,0 +1,203 @@
+D61 / D62 -- THE FOUR ORDERED MEASUREMENTS
+===========================================
+
+Instruments : d61_leave_path_weld.py      -> d61-leave-path-weld.json
+              d61_divorce_persistence.py  -> d61-divorce-persistence.json
+              d61_what_2a_leaves.py       -> d61-what-2a-leaves.json
+Tree        : main @ 0791f42 (no code change since a604d40)
+Plans       : fixtures/wiscaway2026-08-08.json + examples/
+
+
+1. DOES 2b's LEAVE PATH REACH weld_scene?  NO. THE JOIN DOES.
+-------------------------------------------------------------
+CONTROL 1: with the wrappers installed, normalize_walls must record a weld.
+           PASS -- 2 recorded. A zero would have meant a mis-bound wrapper.
+CONTROL 2: extract_room AND join_room must both have run, or a zero weld count
+           is about nothing. This one FIRED, and it changed the answer:
+
+  fixtures/wiscaway2026-08-08.json carries settings.editing.shuffle: TRUE.
+  As the file loads, a label-drag leaves the room FLOATING and join_room never
+  runs (P4.3). Measured against that state alone the gesture welds nothing --
+  true of the SHUFFLE path, and silent about the ordinary drag 2b targets.
+  Both states are therefore measured.
+
+                                    extract  join  welds  where     divorce
+  shuffle OFF (the ordinary drag)         1     1      1  JOIN            +0
+  shuffle ON  (as the fixture loads)      1     0      0  --              +0
+
+  THE LEAVE NEVER WELDS. 0 welds in the extract phase, in either arm, and 0
+  across a six-move walk. The single weld is share_coincident_ends at
+  extract.py:238, inside join_room.
+
+A WALK OF SIX MOVES, shuffle off, Rear Porch:
+
+  step   FULL divorce   outline objs   walls
+     0              0             97     103
+     1              0            107     105
+     2              0            107     105
+     3              2            108     108     <-- transient
+     4              0            110     109
+     5              0            111     109
+     6              0            111     109
+
+  So a room move CAN divorce -- 2 corners at one step of six -- and it cleared
+  on the next move. NOT "every move", and not persistent within the session.
+
+  READING: 2b hooks the LEAVE, which does not weld, and 2b's own addition is a
+  DISSOLVE, not a weld. It does not increase D62 exposure. But D62 is not a
+  menu-only phenomenon either: the join half reaches it at a low rate today,
+  with no 2b in the tree.
+
+
+2. DOES THE DIVORCE SURVIVE A SAVE?  NO -- IT IS RUNTIME-ONLY.
+--------------------------------------------------------------
+CONTROL 1 (something to persist)   PASS on all four plans
+CONTROL 2 (round trip lossless)    PASS -- room count and every area identical
+CONTROL 3 (the file was readable)  FIRED FIRST TIME. The v5 document is FLAT --
+    vertices/walls/rooms are TOP-LEVEL and `levels` is only the storey roster.
+    The first reader walked levels[*].walls, found nothing, and reported a
+    confident "0 orphan refs" off 0 walls and 0 rooms. Denominators are now
+    printed beside the count so that zero cannot be read again on its own.
+
+  plan            divorced in scene   after save+reload
+  wiscaway                       49                   0
+  planc1.v5                      56                   0
+  roundedMultifloor              78                   0
+  symmetricP1                    57                   0
+
+  THE HARM WINDOW IS BOUNDED BY THE SESSION. D62 drops in severity.
+
+  And the pairing is exact: design_from_scene's weld is BOTH the thing that
+  makes the state harmless across a save AND the thing that makes it invisible
+  to check(deep=True). One mechanism, two effects, opposite signs.
+
+
+3. BUT 2a's FIX DOES NOT FULLY SURVIVE A SAVE
+----------------------------------------------
+Not asked for; found by measuring the same round trip.
+
+  plan            loaded   after cmd   after save+reopen   DURABLE   rebound
+  wiscaway           159         119                 126     33/40         7
+  roundedMultifloor  187         167                 186      1/20        19
+  symmetricP1        140         136                 136       4/4         0
+
+  A PURE ROUND TRIP IS STABLE -- 159, 159, 159, 159 with no command at all, on
+  every plan. So saving is not a producer. The rebound is a ONE-TIME partial
+  undo of the coalesce, and it settles immediately: 119 -> 126 -> 126 -> 126.
+
+  ON PATRICK'S PLAN 2a's durable benefit is 33 corners, not 40. ON
+  roundedMultifloor IT IS 1 OF 20 -- nearly total loss. The durability varies
+  enormously by plan and nothing on disk said so before this run.
+
+
+4. WHAT 2a LEAVES, PER ROOM -- AND THE PAIR IS ALREADY A FIXPOINT
+------------------------------------------------------------------
+THE PAIR DOES NOT NEED TO ITERATE. Running normalize_walls + the outline pass,
+then running the PAIR AGAIN, removes 0 more on all three plans; a third round
+is also 0. The unlock the ruling anticipated -- a wall coalesce freeing a
+corner a wall needed -- does not occur on these plans.
+
+  round 1  wiscaway 103->81 walls, 159->119 slots, 28 dissolved
+  round 2  0 dissolved, walls unchanged, slots unchanged
+  round 3  0 would be dissolved
+
+THE 29, PER ROOM (wiscaway, after the wall pass). CLASSIFICATION CHECKED
+against production: my removable count is 40 and production's is 40 on this
+plan, 20/20 on rounded, 4/4 on symmetricP1 -- so the reasons below partition
+exactly the set production refused.
+
+  room          corners  complaint  removed  left  wall needs it  co-holder turns
+  Rear Porch         13          9        3     6              0                6
+  Dining             11          7        3     4              1                3
+  MBR                10          6        3     3              0                3
+  Lounge             10          6        3     3              0                3
+  Foyer              10          6        5     1              0                1
+  GREAT RM            9          5        1     4              0                4
+  KITCHEN             9          5        3     2              0                2
+  BKF NOOK            8          4        3     1              0                1
+  SAFE                8          4        3     1              0                1
+  HALL                8          4        1     3              0                3
+  MUD                 7          3        3     0              0                0
+  Util                6          2        2     0              0                0
+  WIC                 6          2        2     0              0                0
+  CLST                5          1        1     0              0                0
+  Front Porch        13          1        1     0              0                0
+  PWDR                5          1        1     0              0                0
+  M Bath              9          1        0     1              0                1
+  PKT Off             7          1        1     0              0                0
+  Pan                 5          1        1     0              0                0
+  TOTAL             159         69       40    29              1               28
+
+  28 OF THE 29 ARE ONE REASON: this room's ring runs straight through the
+  corner and ANOTHER ROOM SHARING IT TURNS THERE. Dissolving it would change
+  the other room's shape and area -- the failure the area receipt exists to
+  catch. Exactly one corner in the whole plan is held by a wall that needs it.
+
+  So the honest reading is that the 29 are REAL corners, not redundant ones,
+  and Patrick can check that per room: KITCHEN shows 5 straight-through
+  corners, 3 go, 2 stay because a neighbour turns at them.
+
+
+5. THE CONSUMERS OF AN OUTLINE VERTEX -- AND THE ONE THAT MISBEHAVES
+---------------------------------------------------------------------
+By AST, not grep: 55 reads of `.outline` and 5 writes, across 6 files and 20
+functions --
+
+  rooms.py     36 reads / 5 writes  _derive, area_sqft, path, corners,
+                                    bind_room_walls, open_edges,
+                                    open_edge_segments, room_walls,
+                                    rooms_holding, share_outline_vertices,
+                                    repair_edge_bindings, export_properties,
+                                    split_partially_covered_edges,
+                                    walls_cover_room, coalesce_outline_corners,
+                                    _translate
+  extract.py    6   extract_room, join_room
+  walls.py      5   _plan_vertex_moves, collapse_degenerate_outline_edges
+  mainwindow.py 4   _claim_region_walls, _translate_shape
+  items.py      3   _corner_records, bake
+  bridge.py     1   apply_design_to_scene
+
+MOST ARE INDIFFERENT. `path`, `area_sqft`, `_derive` and `corners` read the
+vertex's POSITION, and a divorced vertex is at the right position -- which is
+why every area in every measurement above is unchanged to the cent, and why
+the state is invisible to a user until something moves.
+
+THE ONE THAT MISBEHAVES IS `walls._plan_vertex_moves`, the drag gather, at
+walls.py:1979: `dv = by_id.get(id(e.v))` -- BY IDENTITY. A divorced edge is not
+found and is left where it is while its wall moves.
+
+AND THE REPO ALREADY KNEW. `close_gap` (walls.py:1061-1119) calls
+share_coincident_ends and then repairs every room on the floor, with this
+comment:
+
+    RESTORE THE P3.5 INVARIANT: the fold above re-binds WALL ends onto one
+    anchor vertex per corner, and an outline left holding a
+    coincident-but-distinct twin is a stranding the NEXT drag turns into a
+    diagonal tear (found at the P4.2 mini-gate: close the gaps, drag a wall,
+    and M Bath / Hall / Lounge drew dashed diagonals to corners their walls no
+    longer held).
+
+That is D62, named, with its symptom, found by a manual check at P4.2 -- so the
+harm is established by precedent in this repository, not only by my one
+ambiguous sample.
+
+THE MECHANISM, EXACTLY: `share_coincident_ends` has three callers.
+
+    close_gap        walls.py:1101   -> repairs EVERY room on the floor
+    join_room        extract.py:238  -> repairs the JOINED room only (:239)
+    weld_scene       walls.py:556    -> DOES NOT REPAIR
+
+The repair already exists, is named `share_outline_vertices`, is idempotent,
+and its necessity is already documented at the one site that does it. The two
+gaps are weld_scene (all of it) and join_room (the neighbours it does not
+touch, which is what the walk's step 3 caught).
+
+
+WHAT IS STILL NOT MEASURED
+--------------------------
+* whether a divorced corner strands on a drag ON THESE PLANS. The P4.2
+  mini-gate says yes for close_gap's case; my one sampled drag was ambiguous
+  and I did not repeat it, because the mechanism question is now answered by
+  the call-site table above and the fix is not mine to choose.
+* why the save/reload rebound is 7 on one plan and 19 on another.
+* whether the shuffle flag saved in Patrick's fixture is deliberate.

@@ -113,7 +113,17 @@ join splits and no gesture un-splits.
 `docs/evidence/d61-normalize-outline-arrow.txt` ·
 `docs/evidence/d61-normalize-outline-arrow.json` ·
 `docs/evidence/d61_normalize_outline_arrow.py` ·
-`docs/evidence/d61_divorce_behaviour.py`
+`docs/evidence/d61_divorce_behaviour.py` ·
+`docs/evidence/d61-leave-path-and-persistence.txt` ·
+`docs/evidence/d61-what-2a-leaves.json` · `docs/evidence/d61_what_2a_leaves.py` ·
+`docs/evidence/d61-leave-path-weld.json` · `docs/evidence/d61_leave_path_weld.py`
+
+**AND A FACT ABOUT THE FIXTURE THAT CHANGES WHAT IT MEASURES:**
+`fixtures/wiscaway2026-08-08.json` carries `settings.editing.shuffle: true`. As
+it loads, a label-drag leaves the room **floating** and `join_room` never runs
+(P4.3), so D61's producer does not fire on Patrick's own file under an ordinary
+drag until he leaves shuffle or joins explicitly. Every gesture measurement here
+states which shuffle state it used.
 
 ### THE SECOND PRODUCER — measured after 2a shipped, on five plans
 
@@ -128,6 +138,66 @@ little: +2 vertices on two of five plans (`wiscaway` 26 → 28, `rounded`
 `wiscaway` and unmoved on all five plans. So D61's mechanism story stands:
 `join_room`'s split is the producer that matters, and 2b closes it. The wall
 pass contributes 2 of 28, which is not a reason to re-scope 2b.
+
+### 2a's FIX DOES NOT FULLY SURVIVE A SAVE — and that is the headline for the user
+
+Measured on the same round trip that cleared D62. A pure open/save/reopen cycle
+with **no command at all is stable** (159, 159, 159, 159 on `wiscaway`), so
+saving is not a producer. But a coalesce partially rebounds across one save,
+and then settles:
+
+| plan | as loaded | after the command | after save + reopen | **durable** | rebound |
+|---|---:|---:|---:|---:|---:|
+| **`wiscaway`** | 159 | 119 | **126** | **33 of 40** | 7 |
+| `roundedMultifloor` | 187 | 167 | **186** | **1 of 20** | 19 |
+| `symmetricP1` | 140 | 136 | 136 | 4 of 4 | 0 |
+
+`119 → 126 → 126 → 126`: a **one-time** partial undo, not compounding. **On
+Patrick's plan 2a's durable benefit is 33 corners of the 69, not 40** — and on
+`roundedMultifloor` it is 1 of 20, near-total loss. Nothing on disk said so
+before, and the cause of the variation is not yet measured.
+
+### THE PAIR IS ALREADY A FIXPOINT — one round is enough
+
+The anticipated unlock — a wall coalesce removing a wall, freeing a corner a
+wall needed — **does not occur**. Running `normalize_walls` + the outline pass,
+then running the **pair** again, dissolves **0** more on all three plans; a third
+round is also 0. So `Edit ▸ Coalesce all walls now` does not need to iterate.
+
+### WHAT 2a LEAVES: 28 OF THE 29 ARE A NEIGHBOUR'S CORNER
+
+Per room on `wiscaway`, after the wall pass. The classification was **checked
+against production** — it reproduces production's removable count exactly
+(40/40 here, 20/20 and 4/4 on the other two plans), so the reasons partition the
+refused set rather than approximating it.
+
+| room | corners | complaint | removed | left | a wall needs it | a co-holder turns |
+|---|---:|---:|---:|---:|---:|---:|
+| Rear Porch | 13 | 9 | 3 | 6 | 0 | 6 |
+| Dining | 11 | 7 | 3 | 4 | 1 | 3 |
+| MBR | 10 | 6 | 3 | 3 | 0 | 3 |
+| Lounge | 10 | 6 | 3 | 3 | 0 | 3 |
+| Foyer | 10 | 6 | 5 | 1 | 0 | 1 |
+| GREAT RM | 9 | 5 | 1 | 4 | 0 | 4 |
+| KITCHEN | 9 | 5 | 3 | 2 | 0 | 2 |
+| BKF NOOK | 8 | 4 | 3 | 1 | 0 | 1 |
+| SAFE | 8 | 4 | 3 | 1 | 0 | 1 |
+| HALL | 8 | 4 | 1 | 3 | 0 | 3 |
+| MUD | 7 | 3 | 3 | 0 | 0 | 0 |
+| Util · WIC | 6 · 6 | 2 · 2 | 2 · 2 | 0 | 0 | 0 |
+| CLST · PWDR · Pan | 5 each | 1 each | 1 each | 0 | 0 | 0 |
+| Front Porch · PKT Off | 13 · 7 | 1 · 1 | 1 · 1 | 0 | 0 | 0 |
+| M Bath | 9 | 1 | 0 | 1 | 0 | 1 |
+| **TOTAL** | **159** | **69** | **40** | **29** | **1** | **28** |
+
+**28 of the 29 are one reason: this room's ring runs straight through the
+corner and another room sharing it TURNS there.** Dissolving it would move the
+neighbour's area — the failure the area receipt exists to catch. Exactly **one**
+corner in the whole plan is held by a wall that needs it.
+
+**So the honest reading is that the 29 are REAL corners, not redundant ones**,
+and it is checkable per room: KITCHEN shows 5 straight-through corners, 3 go, 2
+stay because a neighbour turns at them.
 
 **And the 28-versus-40 reconciliation is closed, measured rather than
 explained:** the 28 dissolved vertices are **16 held by one room and 12 held by

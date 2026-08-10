@@ -1,0 +1,447 @@
+{
+ "question": "does a divorced outline corner survive a save and reload -- and does 2a's outline fix survive one?",
+ "wall_pass_only": [
+  {
+   "plan": "wiscaway2026-08-08.json",
+   "ran": "normalize_walls only",
+   "CONTROL_3_saved_file_was_READABLE": {
+    "walls": 103,
+    "rooms": 19,
+    "verdict": "PASS"
+   },
+   "OUTLINE_SLOTS_the_number_Patrick_sees": {
+    "as_loaded": 159,
+    "after_the_command": 159,
+    "in_the_saved_file": 159,
+    "after_reload": 159,
+    "SURVIVES_THE_ROUND_TRIP": true
+   },
+   "CONTROL_1_scene_divorced_before_save": {
+    "value": 49,
+    "verdict": "PASS"
+   },
+   "CONTROL_2_round_trip_preserved_the_plan": {
+    "rooms": [
+     19,
+     19
+    ],
+    "areas_identical": true,
+    "verdict": "PASS"
+   },
+   "divorced_as_loaded": {
+    "FULL": 0,
+    "PARTIAL": 1,
+    "corners": 97
+   },
+   "divorced_after_the_command": {
+    "FULL": 49,
+    "PARTIAL": 0,
+    "corners": 97
+   },
+   "divorced_after_save_and_reload": {
+    "FULL": 0,
+    "PARTIAL": 1,
+    "corners": 97
+   },
+   "the_saved_FILE": {
+    "levels": 1,
+    "vertices": 101,
+    "walls": 103,
+    "rooms": 19,
+    "outline_slots": 159,
+    "outline_vertices_no_wall_names": 7,
+    "READABLE": true
+   },
+   "walls_before_save": 81,
+   "walls_after_reload": 103,
+   "VERDICT": "RUNTIME ONLY -- the divorce does not survive a save/reload"
+  },
+  {
+   "plan": "planc1.v5.json",
+   "ran": "normalize_walls only",
+   "CONTROL_3_saved_file_was_READABLE": {
+    "walls": 82,
+    "rooms": 20,
+    "verdict": "PASS"
+   },
+   "OUTLINE_SLOTS_the_number_Patrick_sees": {
+    "as_loaded": 175,
+    "after_the_command": 175,
+    "in_the_saved_file": 178,
+    "after_reload": 178,
+    "SURVIVES_THE_ROUND_TRIP": false
+   },
+   "CONTROL_1_scene_divorced_before_save": {
+    "value": 56,
+    "verdict": "PASS"
+   },
+   "CONTROL_2_round_trip_preserved_the_plan": {
+    "rooms": [
+     20,
+     20
+    ],
+    "areas_identical": true,
+    "verdict": "PASS"
+   },
+   "divorced_as_loaded": {
+    "FULL": 0,
+    "PARTIAL": 0,
+    "corners": 65
+   },
+   "divorced_after_the_command": {
+    "FULL": 56,
+    "PARTIAL": 0,
+    "corners": 65
+   },
+   "divorced_after_save_and_reload": {
+    "FULL": 0,
+    "PARTIAL": 0,
+    "corners": 66
+   },
+   "the_saved_FILE": {
+    "levels": 1,
+    "vertices": 66,
+    "walls": 82,
+    "rooms": 20,
+    "outline_slots": 178,
+    "outline_vertices_no_wall_names": 6,
+    "READABLE": true
+   },
+   "walls_before_save": 81,
+   "walls_after_reload": 82,
+   "VERDICT": "RUNTIME ONLY -- the divorce does not survive a save/reload"
+  },
+  {
+   "plan": "roundedMultifloor.json",
+   "ran": "normalize_walls only",
+   "CONTROL_3_saved_file_was_READABLE": {
+    "walls": 132,
+    "rooms": 25,
+    "verdict": "PASS"
+   },
+   "OUTLINE_SLOTS_the_number_Patrick_sees": {
+    "as_loaded": 187,
+    "after_the_command": 187,
+    "in_the_saved_file": 193,
+    "after_reload": 193,
+    "SURVIVES_THE_ROUND_TRIP": false
+   },
+   "CONTROL_1_scene_divorced_before_save": {
+    "value": 78,
+    "verdict": "PASS"
+   },
+   "CONTROL_2_round_trip_preserved_the_plan": {
+    "rooms": [
+     25,
+     25
+    ],
+    "areas_identical": true,
+    "verdict": "PASS"
+   },
+   "divorced_as_loaded": {
+    "FULL": 0,
+    "PARTIAL": 0,
+    "corners": 90
+   },
+   "divorced_after_the_command": {
+    "FULL": 78,
+    "PARTIAL": 0,
+    "corners": 90
+   },
+   "divorced_after_save_and_reload": {
+    "FULL": 0,
+    "PARTIAL": 0,
+    "corners": 94
+   },
+   "the_saved_FILE": {
+    "levels": 2,
+    "vertices": 109,
+    "walls": 132,
+    "rooms": 25,
+    "outline_slots": 193,
+    "outline_vertices_no_wall_names": 6,
+    "READABLE": true
+   },
+   "walls_before_save": 128,
+   "walls_after_reload": 132,
+   "VERDICT": "RUNTIME ONLY -- the divorce does not survive a save/reload"
+  },
+  {
+   "plan": "symmetricP1.json",
+   "ran": "normalize_walls only",
+   "CONTROL_3_saved_file_was_READABLE": {
+    "walls": 80,
+    "rooms": 20,
+    "verdict": "PASS"
+   },
+   "OUTLINE_SLOTS_the_number_Patrick_sees": {
+    "as_loaded": 140,
+    "after_the_command": 140,
+    "in_the_saved_file": 140,
+    "after_reload": 140,
+    "SURVIVES_THE_ROUND_TRIP": true
+   },
+   "CONTROL_1_scene_divorced_before_save": {
+    "value": 57,
+    "verdict": "PASS"
+   },
+   "CONTROL_2_round_trip_preserved_the_plan": {
+    "rooms": [
+     20,
+     20
+    ],
+    "areas_identical": true,
+    "verdict": "PASS"
+   },
+   "divorced_as_loaded": {
+    "FULL": 0,
+    "PARTIAL": 0,
+    "corners": 60
+   },
+   "divorced_after_the_command": {
+    "FULL": 57,
+    "PARTIAL": 0,
+    "corners": 60
+   },
+   "divorced_after_save_and_reload": {
+    "FULL": 0,
+    "PARTIAL": 0,
+    "corners": 60
+   },
+   "the_saved_FILE": {
+    "levels": 1,
+    "vertices": 60,
+    "walls": 80,
+    "rooms": 20,
+    "outline_slots": 140,
+    "outline_vertices_no_wall_names": 0,
+    "READABLE": true
+   },
+   "walls_before_save": 78,
+   "walls_after_reload": 80,
+   "VERDICT": "RUNTIME ONLY -- the divorce does not survive a save/reload"
+  }
+ ],
+ "the_whole_menu_command": [
+  {
+   "plan": "wiscaway2026-08-08.json",
+   "ran": "normalize_walls + coalesce_outline_corners",
+   "CONTROL_3_saved_file_was_READABLE": {
+    "walls": 83,
+    "rooms": 19,
+    "verdict": "PASS"
+   },
+   "OUTLINE_SLOTS_the_number_Patrick_sees": {
+    "as_loaded": 159,
+    "after_the_command": 119,
+    "in_the_saved_file": 126,
+    "after_reload": 126,
+    "SURVIVES_THE_ROUND_TRIP": false
+   },
+   "CONTROL_1_scene_divorced_before_save": {
+    "value": 44,
+    "verdict": "PASS"
+   },
+   "CONTROL_2_round_trip_preserved_the_plan": {
+    "rooms": [
+     19,
+     19
+    ],
+    "areas_identical": true,
+    "verdict": "PASS"
+   },
+   "divorced_as_loaded": {
+    "FULL": 0,
+    "PARTIAL": 1,
+    "corners": 97
+   },
+   "divorced_after_the_command": {
+    "FULL": 44,
+    "PARTIAL": 0,
+    "corners": 69
+   },
+   "divorced_after_save_and_reload": {
+    "FULL": 0,
+    "PARTIAL": 1,
+    "corners": 75
+   },
+   "the_saved_FILE": {
+    "levels": 1,
+    "vertices": 79,
+    "walls": 83,
+    "rooms": 19,
+    "outline_slots": 126,
+    "outline_vertices_no_wall_names": 5,
+    "READABLE": true
+   },
+   "walls_before_save": 81,
+   "walls_after_reload": 83,
+   "VERDICT": "RUNTIME ONLY -- the divorce does not survive a save/reload"
+  },
+  {
+   "plan": "planc1.v5.json",
+   "ran": "normalize_walls + coalesce_outline_corners",
+   "CONTROL_3_saved_file_was_READABLE": {
+    "walls": 82,
+    "rooms": 20,
+    "verdict": "PASS"
+   },
+   "OUTLINE_SLOTS_the_number_Patrick_sees": {
+    "as_loaded": 175,
+    "after_the_command": 175,
+    "in_the_saved_file": 178,
+    "after_reload": 178,
+    "SURVIVES_THE_ROUND_TRIP": false
+   },
+   "CONTROL_1_scene_divorced_before_save": {
+    "value": 56,
+    "verdict": "PASS"
+   },
+   "CONTROL_2_round_trip_preserved_the_plan": {
+    "rooms": [
+     20,
+     20
+    ],
+    "areas_identical": true,
+    "verdict": "PASS"
+   },
+   "divorced_as_loaded": {
+    "FULL": 0,
+    "PARTIAL": 0,
+    "corners": 65
+   },
+   "divorced_after_the_command": {
+    "FULL": 56,
+    "PARTIAL": 0,
+    "corners": 65
+   },
+   "divorced_after_save_and_reload": {
+    "FULL": 0,
+    "PARTIAL": 0,
+    "corners": 66
+   },
+   "the_saved_FILE": {
+    "levels": 1,
+    "vertices": 66,
+    "walls": 82,
+    "rooms": 20,
+    "outline_slots": 178,
+    "outline_vertices_no_wall_names": 6,
+    "READABLE": true
+   },
+   "walls_before_save": 81,
+   "walls_after_reload": 82,
+   "VERDICT": "RUNTIME ONLY -- the divorce does not survive a save/reload"
+  },
+  {
+   "plan": "roundedMultifloor.json",
+   "ran": "normalize_walls + coalesce_outline_corners",
+   "CONTROL_3_saved_file_was_READABLE": {
+    "walls": 130,
+    "rooms": 25,
+    "verdict": "PASS"
+   },
+   "OUTLINE_SLOTS_the_number_Patrick_sees": {
+    "as_loaded": 187,
+    "after_the_command": 167,
+    "in_the_saved_file": 186,
+    "after_reload": 186,
+    "SURVIVES_THE_ROUND_TRIP": false
+   },
+   "CONTROL_1_scene_divorced_before_save": {
+    "value": 68,
+    "verdict": "PASS"
+   },
+   "CONTROL_2_round_trip_preserved_the_plan": {
+    "rooms": [
+     25,
+     25
+    ],
+    "areas_identical": true,
+    "verdict": "PASS"
+   },
+   "divorced_as_loaded": {
+    "FULL": 0,
+    "PARTIAL": 0,
+    "corners": 90
+   },
+   "divorced_after_the_command": {
+    "FULL": 68,
+    "PARTIAL": 0,
+    "corners": 77
+   },
+   "divorced_after_save_and_reload": {
+    "FULL": 0,
+    "PARTIAL": 0,
+    "corners": 90
+   },
+   "the_saved_FILE": {
+    "levels": 2,
+    "vertices": 106,
+    "walls": 130,
+    "rooms": 25,
+    "outline_slots": 186,
+    "outline_vertices_no_wall_names": 4,
+    "READABLE": true
+   },
+   "walls_before_save": 128,
+   "walls_after_reload": 130,
+   "VERDICT": "RUNTIME ONLY -- the divorce does not survive a save/reload"
+  },
+  {
+   "plan": "symmetricP1.json",
+   "ran": "normalize_walls + coalesce_outline_corners",
+   "CONTROL_3_saved_file_was_READABLE": {
+    "walls": 78,
+    "rooms": 20,
+    "verdict": "PASS"
+   },
+   "OUTLINE_SLOTS_the_number_Patrick_sees": {
+    "as_loaded": 140,
+    "after_the_command": 136,
+    "in_the_saved_file": 136,
+    "after_reload": 136,
+    "SURVIVES_THE_ROUND_TRIP": true
+   },
+   "CONTROL_1_scene_divorced_before_save": {
+    "value": 57,
+    "verdict": "PASS"
+   },
+   "CONTROL_2_round_trip_preserved_the_plan": {
+    "rooms": [
+     20,
+     20
+    ],
+    "areas_identical": true,
+    "verdict": "PASS"
+   },
+   "divorced_as_loaded": {
+    "FULL": 0,
+    "PARTIAL": 0,
+    "corners": 60
+   },
+   "divorced_after_the_command": {
+    "FULL": 57,
+    "PARTIAL": 0,
+    "corners": 58
+   },
+   "divorced_after_save_and_reload": {
+    "FULL": 0,
+    "PARTIAL": 0,
+    "corners": 58
+   },
+   "the_saved_FILE": {
+    "levels": 1,
+    "vertices": 58,
+    "walls": 78,
+    "rooms": 20,
+    "outline_slots": 136,
+    "outline_vertices_no_wall_names": 0,
+    "READABLE": true
+   },
+   "walls_before_save": 78,
+   "walls_after_reload": 78,
+   "VERDICT": "RUNTIME ONLY -- the divorce does not survive a save/reload"
+  }
+ ]
+}

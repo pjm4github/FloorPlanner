@@ -65,6 +65,65 @@ on naming a corner where **no wall end lies at all** (`wiscaway` 7 → 29).
 That is D61's territory. This record is about the corner where a wall **is**
 present and is no longer the same object.
 
+## It is RUNTIME-ONLY — measured, not assumed
+
+**The divorce does not survive a save and reload.** Applied the command, saved,
+reloaded, counted: **49 → 0, 56 → 0, 78 → 0, 57 → 0** on the four plans, with
+the round trip preserving every room and every area to the cent.
+
+**So the harm window is bounded by the session**, and that lowers this record's
+severity. It does not close it: the state is reachable inside a session by an
+ordinary gesture (below), and everything a user does between opening a plan and
+saving it happens inside that window.
+
+**AND THE PAIRING IS WORTH STATING PLAINLY, because it is the sharpest
+instrument boundary in the table so far.** `design_from_scene`'s weld on the way
+out is **both** the mechanism that makes this state harmless across a save
+**and** the mechanism that makes it invisible to `check(deep=True)`. One
+mechanism, two effects, opposite signs — which is exactly why "legal under v5
+and unreachable by two separate checks" is not a synonym for harmless.
+
+## The mechanism, exactly: three callers, two of which repair
+
+`share_coincident_ends` has three call sites, and the repair already exists:
+
+| caller | what it does afterwards |
+|---|---|
+| `close_gap` — `walls.py:1101` | **repairs EVERY room on the floor** via `share_outline_vertices` |
+| `join_room` — `extract.py:238` | repairs the **joined room only** (`:239`) |
+| **`weld_scene` — `walls.py:556`** | **nothing** |
+
+**And this repository already knew.** `close_gap` carries the reason in a
+comment written at the P4.2 mini-gate:
+
+> RESTORE THE P3.5 INVARIANT: … an outline left holding a
+> coincident-but-distinct twin is a stranding the NEXT drag turns into a
+> diagonal tear (found at the P4.2 mini-gate: close the gaps, drag a wall, and
+> M Bath / Hall / Lounge drew dashed diagonals to corners their walls no longer
+> held).
+
+That is this defect, named, with its symptom, found by a manual check — so the
+**harm is established by precedent in this tree**, not only by the one ambiguous
+drag below. What P4.2 fixed at one call site was never applied at the other two.
+
+`share_outline_vertices` is idempotent and is the repair. **Which sites should
+call it is still a ruling, not a foregone conclusion** — `weld_scene`'s
+docstring is explicit that it declines to do things that are "an edit to a wall
+the user did not touch", and a plan-wide outline re-adoption may or may not fall
+under that principle.
+
+## Reachable from an ordinary gesture, at a low rate
+
+A six-move label-drag walk on `wiscaway` with shuffle off (`extract → move →
+join`, six joins, six welds, **zero welds in the extract phase**):
+
+    step   0   1   2   3   4   5   6
+    FULL   0   0   0   2   0   0   0
+
+**Two divorced corners at one step of six, cleared by the next move.** Not every
+move, and not persistent — consistent with `join_room` repairing the joined room
+and not its neighbours.
+
 ## What it is NOT known to do
 
 **The consequence is open, and is deliberately not claimed here.** `WallItem`
@@ -79,9 +138,24 @@ stranding **and** with the designed step-insertion at `walls.py:1999-2014`,
 which exists precisely to leave a jog where a run moves and its neighbour does
 not. Separating them needs more than one sample and it has not been done.
 
-So: **the STATE is measured, the HARM is not.** `evidence/d61_divorce_behaviour.py`
-is the probe, and its arm A is a positive control that had to be fixed twice
-before its arm B meant anything.
+So: **the STATE is measured; the harm on THESE plans is not.** The P4.2
+precedent above establishes the harm for `close_gap`'s case, which is why this
+is filed rather than shelved. `evidence/d61_divorce_behaviour.py` is the probe,
+and its arm A is a positive control that had to be fixed twice before its arm B
+meant anything.
+
+## The consumers of an outline vertex
+
+By AST: **55 reads of `.outline` and 5 writes**, across 6 files and 20
+functions. **Most are indifferent** — `path`, `area_sqft`, `_derive` and
+`corners` read the vertex's POSITION, and a divorced vertex is at the right
+position. That is why every area in every measurement is unchanged to the cent,
+and why nothing shows the user anything until something moves.
+
+**The one that misbehaves is `walls._plan_vertex_moves`** — the drag gather at
+`walls.py:1979`, `by_id.get(id(e.v))`, keyed on identity. A divorced edge is not
+found, so it stays where it is while its wall moves. Every other consumer either
+reads a position or rebuilds the binding from scratch.
 
 ## Why nothing caught it
 
@@ -107,7 +181,11 @@ answerable at scene level, and D48 already built the layer to answer it.
 `docs/evidence/d61-normalize-outline-arrow.txt` ·
 `docs/evidence/d61-normalize-outline-arrow.json` ·
 `docs/evidence/d61_normalize_outline_arrow.py` ·
-`docs/evidence/d61_divorce_behaviour.py`
+`docs/evidence/d61_divorce_behaviour.py` ·
+`docs/evidence/d61-leave-path-and-persistence.txt` ·
+`docs/evidence/d61-leave-path-weld.json` · `docs/evidence/d61_leave_path_weld.py` ·
+`docs/evidence/d61-divorce-persistence.json` ·
+`docs/evidence/d61_divorce_persistence.py`
 
 **Three instrument faults were found by controls before any of the above was
 believed**, and they are recorded in the evidence file rather than here: a drag
@@ -117,8 +195,15 @@ exemption, which read 62 where the scoped answer is 49.
 
 ## Ruling
 
-*(None yet. Reported, not directed.)* What is owed before anything is built:
-whether a divorced corner strands in practice, on more than one sample and on
-both readings; and whether the fix belongs in `share_coincident_ends` (rebind
-the outlines as the ends fold) or in a widening of `scene_identity_report` to
-ask the outline question too. **Both are Patrick's to direct.**
+*(None yet. Reported, not directed.)* The measurements ordered at handoff 0003
+are done and they narrow it: the state is **runtime-only**, the repair
+(`share_outline_vertices`) **already exists and is already applied at two of the
+three sites**, and the harm has a **precedent in this tree** (the P4.2
+mini-gate's diagonal tears).
+
+What is still a ruling: whether `weld_scene` should call the repair — its own
+docstring declines to make "an edit to a wall the user did not touch", and a
+plan-wide outline re-adoption may or may not sit under that principle — and
+whether `join_room` should repair the neighbours it currently skips. Widening
+`scene_identity_report` to ask the outline question is a separate call.
+**Severity, given runtime-only: below D61's 2b, not above it.**

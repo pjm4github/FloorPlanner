@@ -65,3 +65,4 @@ rulings in `0001` turned on exactly that.
 | [`0001-report.md`](0001-report.md) · [`0001-ruling.md`](0001-ruling.md) | The docs refactor: read-back, eleven findings, and the rulings that settled them |
 | [`0002-report.md`](0002-report.md) | Repository state at 2026‑08‑09: `main` @ `a604d40`, the vertex-accumulation programme, and what is owed before 2b |
 | [`0003-report.md`](0003-report.md) | D61's three owed items measured — the arrow points up by +2, none of the 69; 28 = 40 slots, residue 0; `normalize_walls` has one caller. **D62 filed** |
+| [`0004-report.md`](0004-report.md) | The leave path does not weld, D62 is runtime-only, the pair is already a fixpoint, 28 of the 29 are a neighbour's corner — **and 2a's fix partly evaporates on save** |
