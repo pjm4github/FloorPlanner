@@ -1633,11 +1633,16 @@ def coalesce_outline_corners(scene, rooms=None, dry_run=True, tol_deg=0.05,
                 # wall ending at this corner.
                 # HONEST NOTE ON WHY IT IS HERE: it was written to explain
                 # `roundedMultifloor`, the only two-level plan in the set and
-                # the only one where every dissolved corner still comes back.
-                # It did NOT explain it -- the result is byte-identical with
-                # and without this scoping, on all four plans. It stays because
-                # the floor rule is right, not because it fixed anything, and
-                # rounded's rebound is still unexplained (D63).
+                # the only one that appeared to lose every dissolved corner on
+                # save. It did NOT explain it -- the result is byte-identical
+                # with and without this scoping, on all four plans. It stays
+                # because the floor rule is right, not because it fixed
+                # anything.
+                # AND THERE WAS NOTHING TO EXPLAIN (D63, 2026-08-10): measured
+                # per corner rather than by slot total, all six dissolved
+                # corners on that plan STAY gone across a save. The six in the
+                # saved file are six different corners -- producer 2, which the
+                # wall pass alone inserts at exactly the same places.
                 ends.setdefault(w.floor, []).append((p.x(), p.y()))
 
     def _ends_at(pt, floor, tol=0.05):

@@ -326,6 +326,21 @@ because it is written precisely to explain why nobody needs to look further.
 
 **So: name the control when the instrument is written, not after it disagrees with you.** And when an instrument reports zero, the question is never *"is the code clean?"* but **"would this instrument have reported the thing if it were there?"**
 
+**AN ACCEPTANCE STATED AS A COUNT IS SATISFIED BY REPLACEMENT — added 2026‑08‑10, and the error being recorded is the REVIEWER'S OWN.**
+
+**When the question is whether a specific thing PERSISTED, the measure must be an identity, not a total.** A count cannot distinguish *forty survivors* from *forty removals and forty fresh insertions at other points*. Both read as forty.
+
+**The instance, and it is not a near-miss.** D63's durability acceptance was issued as *"40 of 40 survive a save"* and implemented as `assert slots() == in_session` — the total of every room's outline length. On `roundedMultifloor` that total goes **187 → 181 → 187**, returning exactly to where it started, so six corners removed and six inserted **elsewhere** read as *nothing survived*. The record then carried `6 removed / 0 durable / 6 rebound — UNRESOLVED` for that plan across two handoffs, and a floor-scoping hypothesis was written and refuted against a failure that had never happened. Re-measured per `(room, point)`: all six are durable, rebound is **0**, and the six in the file are producer 2 — which the wall-pass-alone lane inserts at exactly the same places.
+
+**So the whole rebound investigation — two producers, an exact arithmetic identity, a refuted causal hypothesis — rested on a metric that could not answer the question it was asked.** The identity and the two producers survive re-measurement; what does not survive is the row that sent a session hunting a cause.
+
+**THE PAIR IS MORE INSTRUCTIVE THAN EITHER HALF, which is why both are cited here.** This project has met this distinction twice, and caught it once:
+
+* **CAUGHT — the 28-versus-40 case.** D61 stage 2a reported *69* corners a person can see, *40* slots the strict predicate vacated, and *28* vertices behind them. Those three numbers were deliberately kept apart and reconciled with **one instrument**, precisely because a slot and a vertex and a complaint are different objects and summing them would have hidden which was which. The reconciliation was the point.
+* **NOT CAUGHT — this one.** The same instrument family, the same session, one measure taken as a total instead of a reconciliation — and the damage was a *reported failure that had not occurred*, which is the direction nobody audits. A false red is not the safe kind of error: it is the kind that gets investigated.
+
+**The cheap form of the rule is a SET EQUALITY IN BOTH DIRECTIONS** — nothing in A that is not in B, and nothing in B that is not in A. That is what separated `rounded`'s producer 2 from its supposed rebound: two lanes each inserting six could otherwise have been two different sixes. **Ask of any surviving-count acceptance: would it read the same if every item were replaced?** If yes, it is not measuring persistence.
+
 **PARASITIC REACH: WHEN YOU REPAIR A CAPABILITY THAT NEVER WORKED, BUDGET FOR THE AFFORDANCES RESTING ON THE FAULT — added 2026‑08‑08 at the FIFTH instance, and it is named so it can be cited.**
 
 A defect that has been in a product a long time stops being only a defect. Things come to depend on it — some of them code nobody exercises, and some of them **features the user learned as the way the application works**. Repair the fault and those go with it. **The second kind is reported as a regression, by the person who depended on it, and they are not wrong to call it one.**
