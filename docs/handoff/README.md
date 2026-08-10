@@ -66,3 +66,4 @@ rulings in `0001` turned on exactly that.
 | [`0002-report.md`](0002-report.md) | Repository state at 2026‑08‑09: `main` @ `a604d40`, the vertex-accumulation programme, and what is owed before 2b |
 | [`0003-report.md`](0003-report.md) | D61's three owed items measured — the arrow points up by +2, none of the 69; 28 = 40 slots, residue 0; `normalize_walls` has one caller. **D62 filed** |
 | [`0004-report.md`](0004-report.md) | The leave path does not weld, D62 is runtime-only, the pair is already a fixpoint, 28 of the 29 are a neighbour's corner — **and 2a's fix partly evaporates on save** |
+| [`0005-report.md`](0005-report.md) | **Reboot state 2026‑08‑10.** `main` @ `175c474` pushed; branch `d62-weld-and-fixture-layout` @ `5f5cd3e` in **PR #19**, unreviewed. The rebound's two producers, the weld repair, the 0.005 sq ft area bound, the `fixtures/incoming/` contract, and the queue |
