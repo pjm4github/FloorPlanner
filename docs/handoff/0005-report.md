@@ -40,7 +40,12 @@ identical copy of the record and a regenerated index, so the merge is clean.
 
 ---
 
-## 2. `fixtures/incoming/` — and a placement conflict, flagged not resolved
+## 2. `fixtures/incoming/` — and a placement conflict, SINCE RULED
+
+> **RULED in [`0005-ruling.md`](0005-ruling.md): *"fixtures/ stands, as you had
+> it."*** The question below is closed and the tree is already in the ruled
+> state — nothing to do. The reasoning is kept because the precedent is: a
+> characterised failure does not pass back through the intake.
 
 **The intake directory, its README and its enforcement test are on the BRANCH,
 not on `main`.** `main`'s `fixtures/` holds `README.md`, `fragment2room.json`
