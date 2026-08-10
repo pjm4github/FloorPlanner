@@ -1,6 +1,10 @@
 # Session snapshot — read this first
 
-**Re-cut 2026‑08‑09 on `main` @ `eae9b77`, immediately after PR #18 merged.** **PHASE 4 IS COMPLETE; the GREEN batch merged; A1 AND A1b ARE BOTH DONE, each having passed its manual check. THE NEXT ITEM IS A2 — D11's runtime z collapse — and its FIRST DELIVERABLE IS A MEASUREMENT, NOT A FIX.** This file exists so a fresh session can start from disk instead of from a chat summary. It is an **index and a state marker, not a second copy of the record** — where it points at another document, that document is authoritative and this one must not be trusted over it.
+**Re-cut 2026‑08‑10 on `main` @ `74449d2`.** **PHASE 4 IS COMPLETE; the GREEN batch merged; A1 AND A1b ARE BOTH DONE. A2 IS PARKED, NOT NEXT — the work in flight is D61/D62/D63 on an open branch, and the queue below starts there.** This file exists so a fresh session can start from disk instead of from a chat summary. It is an **index and a state marker, not a second copy of the record** — where it points at another document, that document is authoritative and this one must not be trusted over it.
+
+> **THE LIVE QUEUE IS [`handoff/0005-report.md`](handoff/0005-report.md) §7, and it is authoritative over §2 below.** This file is re-cut per session boundary; the handoff is written per session. When they disagree, the handoff is newer.
+>
+> **Why that warning is here in bold:** the previous re-cut sat five commits stale with a §1 that told a fresh session the next item was A2. The pointer rule kept it *safe* — but a reader followed the wrong queue for several minutes before finding out, and that cost is paid at every reset.
 
 > **[`README.md`](README.md) is the map** — what each document is, which decide things, which are history. **[`ROADMAP.md`](ROADMAP.md) is the autonomy charter** — which items may proceed without Patrick and which may not. Read §4 below for the short version, and the map for the whole.
 
@@ -10,13 +14,13 @@
 
 | | |
 |---|---|
-| **Branch** | none open. `a1-d47-fragment-extract` and `a1b-d53-readback` are both merged and deleted, local and remote. |
-| **`main`** | **`eae9b77`** — PR #18 (A1b). CI green on all six jobs. `origin/main` is the same commit. |
-| **Merged since the last re-cut** | **PR #17** (A1 / D47 — a fragment is a floating room) and **PR #18** (A1b / D53 — type priority, not z-order; carrying D57's crash fix, the fixture freeze, the `View` and `Edit` reach routes, and four filed records). Both as **merge commits, not squashes**: the sequence is the record. |
-| **The two manual checks** | **A1**: three floating pieces, no group boxes, each carrying its region, no dashed edge, undo restoring both rooms — and totals 505 → 424 sq ft holding at 424, which is independent evidence the pieces are disjoint. **A1b**: every item, **including drag-a-room's-label-then-right-click-a-wall-inside-it** — the gesture that broke A1b's first cut through the *left*-click virtual, so passing it through the *right*-click virtual is the evidence one resolver governs both. |
-| **Census** (full mode, `main`, 2026‑08‑09) | `collected=663 ruff=clean vacuous=0 end_assign=0`; OFF / ON / DEEP each **656 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** |
-| **Records** | **61 records — 19 open, 42 closed.** `python tools/gate.py --docs` **GREEN**. `Ref-Audit: unresolved=10` — dangling *links and paths*, reported and never enforced; dangling *keys* would fail. |
-| **Working tree** | clean, including untracked. **`fixtures/`** holds manual-check plans, deliberately outside `examples/` so the corpus glob never sees them (see §6 and D51) — and one of them is **load-bearing and frozen**: `wiscaway2026-08-08.json` is retained *because* it fails I7. |
+| **`main`** | **`74449d2`** — *Ruling 0005: fixtures/ stands*. `origin/main` is the same commit. `main` carries **evidence, register, handoff and rulings only** since `175c474`; all code work is on the branch. |
+| **Branch OPEN** | **`d62-weld-and-fixture-layout`** — pushed, tracking. Holds D62's `weld_scene` repair, **D63 producer 1 (closed)**, the area bound, the `fixtures/incoming` contract, and the identity guard. `a1-d47-fragment-extract` and `a1b-d53-readback` are merged and deleted. |
+| **PR #19 — OPEN AND UNMERGED** | *"D62's weld_scene repair, D63 producer 1, the area bound, and the fixtures/incoming contract"*, base `main`. **Patrick's read of the probe control and the `rooms.py` justification is the merge condition.** `main` has been merged **into** it, so it is no longer behind. |
+| **Census** (full mode, `main` @ `74449d2`, 2026‑08‑10) | `collected=668 ruff=clean vacuous=0 end_assign=0`; OFF / ON / DEEP each **661 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE**, excluded from every mode by the standing P3.8 flap-class ruling (`tools/gate.py:66`) — not an ad-hoc deselection. |
+| **Records** | **64 records — 22 open, 42 closed.** `python tools/gate.py --docs` **GREEN**. `Ref-Audit: unresolved=10` — dangling *links and paths*, reported and never enforced; dangling *keys* would fail. |
+| **Working tree** | clean, including untracked. **`fixtures/`** holds manual-check plans, deliberately outside `examples/` so the corpus glob never sees them (see §6 and D51) — and one is **load-bearing and frozen**: `wiscaway2026-08-08.json` is retained *because* it fails I7. **`fixtures/incoming/`** (on the branch) is the uncharacterised intake; **no test may reference a file there**. |
+| **The two manual checks already passed** | **A1**: three floating pieces, no group boxes, each carrying its region, no dashed edge, undo restoring both rooms — and totals 505 → 424 sq ft holding at 424, independent evidence the pieces are disjoint. **A1b**: every item, **including drag-a-room's-label-then-right-click-a-wall-inside-it** — the gesture that broke A1b's first cut through the *left*-click virtual, so passing it through the *right*-click virtual is the evidence one resolver governs both. |
 
 **A commit gate is enforced, not merely available.** `tools/gate.py` writes `.gate-result.json`; a `PreToolUse` hook blocks any `git commit` unless that file exists, reads GREEN, and is **newer than every tracked file** — every tracked file, `.md` included, so a document edit made after the gate ran makes it stale. See §6.
 
@@ -28,9 +32,21 @@
 
 **The GREEN batch is done and merged.** What remains is AMBER and RED.
 
-**A1 (D47) and A1b (D53) are DONE** — merged at PRs #17 and #18, each with its manual check passed and recorded verbatim on the PR. The queue now starts at A2.
+**A1 (D47) and A1b (D53) are DONE** — merged at PRs #17 and #18, each with its manual check passed and recorded verbatim on the PR.
 
-1. **A2 — D11's runtime z collapse. THE HANG IS PARKED AS NOT REPRODUCIBLE, ruled 2026‑08‑09.** The bounded event counter found no consumer of the z step: five orders of magnitude on either term (`bring_to_front`'s `+1.0`, `raise_to_front`'s `*10`) leaves the event breakdown **identical at 545**, and `test_drag_split_macro_keeps_every_room_rectilinear` passes in ~0.3 s at all four combinations. `docs/evidence/d11-a2-z-step-measurement.txt`. **What survives, still open:** the four competing z systems, and ruling 4's scheme (z = `floor_term + stack_term + type_term`, the backdrop's −1e9 as a **type term**, `bring_to_front`'s full-scene scan dying, named constants pinned by a test). The instrument is kept at `evidence/d11_a2_z_step_counter.py` — do not re-derive it.
+> ### THE QUEUE BELOW IS THE TIER CHARTER'S ORDER, NOT THE WORK IN FLIGHT
+>
+> **Read [`handoff/0005-report.md`](handoff/0005-report.md) §7 first.** A2 is **⏸ parked** — the *hang* is parked as not reproducible; the record is not closed — and the items actually being worked are the D61/D62/D63 family on PR #19, which the charter never tiered because they were filed after it was written. In order, as of 2026‑08‑10:
+>
+> 1. **D63 producer 1 — CLOSED**, 2026‑08‑10, on five plans measured by identity: rebound **0** everywhere. `roundedMultifloor`'s `6 removed / 0 durable / 6 rebound — UNRESOLVED` was **an artifact of a slot-total measure**, not a fault; all six are durable and the six in the saved file are producer 2. The instrument's own zero is controlled against pre-fix code (17 pre-fix / 0 post-fix, same binary). See [D63](defects/0063-a-coalesced-outline-partly-rebounds-on-save.md) and the new rule *"an acceptance stated as a count is satisfied by replacement"* in [`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md).
+> 2. **D63 producer 2 — NEXT, and now a narrow target.** It is the whole of `rounded`'s six, one of `08‑09R`'s and three of `planc1`'s, and **on every plan the wall-pass-alone lane accounts for it exactly**, by set equality in both directions.
+> 3. **D61 stage 2b** — not started. Acceptance is **taken across a save**. AMBER.
+> 4. **Grid snap** — five read-backs owed; earlier partial measurements are **not on disk and must be re-taken**.
+> 5. **The step‑3 divorce** — a six-move walk shows two divorced corners appear at step 3 and clear at step 4. **Not `join_room`'s neighbour gap.** Producer unknown.
+>
+> Everything from **A2 onward below** stands as the charter wrote it.
+
+1. **A2 — D11's runtime z collapse. ⏸ PARKED. THE HANG IS NOT REPRODUCIBLE, ruled 2026‑08‑09.** The bounded event counter found no consumer of the z step: five orders of magnitude on either term (`bring_to_front`'s `+1.0`, `raise_to_front`'s `*10`) leaves the event breakdown **identical at 545**, and `test_drag_split_macro_keeps_every_room_rectilinear` passes in ~0.3 s at all four combinations. `docs/evidence/d11-a2-z-step-measurement.txt`. **What survives, still open:** the four competing z systems, and ruling 4's scheme (z = `floor_term + stack_term + type_term`, the backdrop's −1e9 as a **type term**, `bring_to_front`'s full-scene scan dying, named constants pinned by a test). The instrument is kept at `evidence/d11_a2_z_step_counter.py` — do not re-derive it.
 2. **A3 — D11's SERIALIZATION half.** No longer blocked: **ruling R‑B** (roadmap §2) decided that an *additive optional* field or enum value does not bump the document version, so a stacking index can be added at `schema_revision` without a v6. Still AMBER.
 3. **D59 — the CHEAP TWELVE at document boundaries. SPLIT OUT OF D49 on 2026‑08‑09, on measured grounds.** A real plan was saved carrying an `I7`, nothing reported it, and the user met it later as a silent crash (D57). **I7 is one of the cheap twelve**, so a boundary check would have caught it *without* the deep set — and P1.2's O(n²)-per-edit cost objection, which has kept D49 unscheduled, does not touch this half at all: the cheap twelve are already deemed affordable per mutation under shadow mode. Its only open question is what the app does with the result, and D49's amendment already answers that for overlap in reasoning that carries. **AMBER, and it moves up the queue on evidence rather than preference.**
 4. **A4 — D49, the deep checks at document boundaries. AMENDED 2026‑08‑07 — read the amendment, not the 2026‑08‑05 proposal it supersedes.** I11 speaks nowhere in the shipped app: deep-only *plus* shadow mode off by default compose into a hole neither has alone. Measured on one corrupt scene: `FP_VERIFY_DESIGN` unset → **the save wrote the file** with I5b ×1 and I11 ×3; `=1` → refused; `=deep` → refused. The ruling: **CHECK YES, FIX NO** (overlap's causes vary and every auto-repair silently changes drawn geometry; the one repairable cause is already fixed by welding on load — same reasoning as **D34**); **SAVE ASKS, IT DOES NOT REFUSE** (a deform-to-follow drag can transiently overlap, and a hard refusal traps the user with unsaveable work); and **the report must be ACTIONABLE** — rooms *and overlap area*, plus select-and-zoom. **Sequencing, measured:** the area does not exist in I11 today (a boolean from three terms, no number), computing it honestly **is D52's half 1**, and on the amendment's own driving case the true intersection is **0.0 sf** — so `planc1` is the acceptance case and `farmplace` is the silence case. Real behaviour change; will be felt.
@@ -38,7 +54,9 @@
 6. **A6 — Grid snap.** Three sub-rulings still RED (see §4 of the roadmap).
 7. **Phase 5 — Landscape** (P5.1 site levels/categories/area accounting, P5.2 landscape wall types + gates, P5.3 site schedule fields + reports).
 
-### The three records filed since the last re-cut — all on disk, none merely discussed
+### The three records filed at the 2026‑08‑09 re-cut — all on disk, none merely discussed
+
+*(Kept as written. D61, D62 and D63 were filed after it; they are in the register and in Handoff 0005, not restated here.)*
 
 * **D50 — a level's elevation is DESTROYED by a load/save round trip.** `model.Floor` has only `name` and `reference`, so all three writers emit literals (`bridge.py:796`, `bridge.py:976`, `importer.py:184`). **The SCHEMA is not at fault** — `level` has carried `elevation_in` and `height_in` since P0.7. **The fault is destruction, not absence**, which is what makes it a defect rather than an unbuilt feature: `IN [('default',0.0,96.0), ('second',108.0,108.0)]` → `OUT [('default',0.0,96.0), ('second',0.0,96.0)]`. Nothing reports the loss; `check()` is clean either way. **Blocks Phase 7's Build Floor**, which must produce exactly this field. AMBER.
 * **D51 — the census depends on the WORKING TREE, not the repository.** `tests/test_schema.py` globs `examples/*.json` off the filesystem and parametrizes `test_clean_design_validates` over what it finds, so an untracked or merely staged file changes `collected=`. Measured: 638 / RED with an uncommitted file present, 637 / green without. **Sharper form: with the commit hook in place, a file that is in no commit can block every commit in the repository** — which it did, for several hours. Committing the two plans closed that instance; **the hole itself remains open**, and three fixes are proposed with none implemented.
@@ -54,7 +72,7 @@
 
 * **D52 — room-inside-a-room has no representation, and I11 misreports the workaround.** `Toi` is a WC fully enclosed by `Lounge`; a single-ring outline cannot express a hole, so the drawing carves it out with a **zero-width slit**, and I11's **vertex-average** centroid then lands inside the closet — `_pip(Toi centre, Lounge)` False, edge crossings none, `_pip(Lounge "centre", Toi)` **True**, which is the entire failure. Two independent halves: **I11's centroid is wrong regardless of this plan** (same family as D41 — an invariant meeting a non-simple ring and reporting the wrong thing), and **room-in-room has no representation** (`holes` exists in the schema and is implemented nowhere). Five repairs were attempted and measured; each changes what the plan *means*, which is the author's call.
 
-**The other open records**, not queued as tasks but live: **D44** (an accepted limit), **D45**, **D46**. **Thirteen open in total: D11, D41–D52** *(D43, D48 and D42 have shipped their first steps and remain open for the rest; D27 closed with the Windows CI leg)*.
+**The other open records**, not queued as tasks but live: **D44** (an accepted limit), **D45**, **D46**. **TWENTY-TWO open as of 2026‑08‑10: D11, D41–D52, D54–D56, D58–D63** *(D43, D48 and D42 have shipped their first steps and remain open for the rest; D27 closed with the Windows CI leg; D53 and D57 closed after PR #18)*. [`defects/INDEX.md`](defects/INDEX.md) is generated and is authoritative over this line.
 
 **Patrick will ask separately for the consolidated feature-and-phase document. Do not start it unprompted.**
 
@@ -100,6 +118,7 @@ Unchanged, and all in [`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md): **a green 
 
 **Added since the docs refactor:**
 
+- **AN ACCEPTANCE STATED AS A COUNT IS SATISFIED BY REPLACEMENT — added 2026‑08‑10, and the error recorded is the reviewer's own.** *"40 of 40 survive a save"* cannot distinguish forty survivors from forty removals and forty fresh insertions elsewhere. When the question is whether a specific thing **persisted**, the measure must be an **identity**, not a total — and the cheap form is a **set equality in both directions**. It cost D63 a phantom `UNRESOLVED` row that survived two handoffs and drew a refuted hypothesis. The rule cites the **pair**: D61 stage 2a's 69 / 40 / 28 is the same distinction *caught*.
 - **A content correction discovered during a structural move is NEVER folded into the move** — it is the next commit, with its own receipt.
 - **A lint that fails on correctly-recorded history is a lint that gets disabled.** Dangling *keys* fail the gate; dangling *links and paths* are reported and never enforced.
 - **A boundary belongs at the instrument.** **Annotate, do not rewrite** — applied to documents, not just code.
