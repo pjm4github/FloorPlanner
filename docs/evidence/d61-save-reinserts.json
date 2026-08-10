@@ -1,0 +1,489 @@
+{
+ "question": "does the save-side weld re-insert the very corners the outline coalesce removed?",
+ "plans": [
+  {
+   "plan": "wiscaway2026-08-08.json",
+   "NEGATIVE_CONTROL_pure_round_trip": {
+    "slots": 159,
+    "inserted_by_the_save": 0,
+    "verdict": "PASS"
+   },
+   "slots_after_the_wall_pass": 159,
+   "slots_after_the_outline_pass": 119,
+   "slots_in_the_saved_file": 126,
+   "POSITIVE_CONTROL_identification_matches_the_count": {
+    "count_delta": 7,
+    "identified": 7,
+    "verdict": "PASS"
+   },
+   "PRODUCER_B_inserted_after_the_WALL_pass_alone": 0,
+   "DECOMPOSITION": {
+    "claim": "inserted-after-the-pair minus inserted-after-the-wall-pass should equal the overlap: what is left over is exactly the coalesce coming undone",
+    "inserted_after_the_pair": 7,
+    "inserted_after_the_wall_pass": 0,
+    "difference": 7,
+    "overlap": 7,
+    "HOLDS": true
+   },
+   "REMOVED_by_2a": 40,
+   "INSERTED_by_the_save": 7,
+   "OVERLAP_inserted_that_2a_had_removed": 7,
+   "OVERLAP_share_of_inserted": 1.0,
+   "per_room": {
+    "BKF NOOK": {
+     "removed": 3,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "CLST": {
+     "removed": 1,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "Dining": {
+     "removed": 3,
+     "inserted_by_the_save": 2,
+     "inserted_that_2a_had_REMOVED": 2,
+     "points": [
+      [
+       1062.0,
+       774.0
+      ],
+      [
+       852.0,
+       762.0
+      ]
+     ]
+    },
+    "Foyer": {
+     "removed": 5,
+     "inserted_by_the_save": 1,
+     "inserted_that_2a_had_REMOVED": 1,
+     "points": [
+      [
+       852.0,
+       762.0
+      ]
+     ]
+    },
+    "Front Porch": {
+     "removed": 1,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "GREAT RM": {
+     "removed": 1,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "HALL": {
+     "removed": 1,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "KITCHEN": {
+     "removed": 3,
+     "inserted_by_the_save": 3,
+     "inserted_that_2a_had_REMOVED": 3,
+     "points": [
+      [
+       1170.0,
+       486.0
+      ],
+      [
+       1170.0,
+       522.0
+      ],
+      [
+       1170.0,
+       612.0
+      ]
+     ]
+    },
+    "Lounge": {
+     "removed": 3,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "MBR": {
+     "removed": 3,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "MUD": {
+     "removed": 3,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "PKT Off": {
+     "removed": 1,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "PWDR": {
+     "removed": 1,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "Pan": {
+     "removed": 1,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "Rear Porch": {
+     "removed": 3,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "SAFE": {
+     "removed": 3,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "Util": {
+     "removed": 2,
+     "inserted_by_the_save": 1,
+     "inserted_that_2a_had_REMOVED": 1,
+     "points": [
+      [
+       1476.0,
+       660.0
+      ]
+     ]
+    },
+    "WIC": {
+     "removed": 2,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    }
+   },
+   "VERDICT": "CONFIRMED -- every corner the save puts back is one 2a removed"
+  },
+  {
+   "plan": "roundedMultifloor.json",
+   "NEGATIVE_CONTROL_pure_round_trip": {
+    "slots": 187,
+    "inserted_by_the_save": 0,
+    "verdict": "PASS"
+   },
+   "slots_after_the_wall_pass": 187,
+   "slots_after_the_outline_pass": 167,
+   "slots_in_the_saved_file": 186,
+   "POSITIVE_CONTROL_identification_matches_the_count": {
+    "count_delta": 19,
+    "identified": 19,
+    "verdict": "PASS"
+   },
+   "PRODUCER_B_inserted_after_the_WALL_pass_alone": 6,
+   "DECOMPOSITION": {
+    "claim": "inserted-after-the-pair minus inserted-after-the-wall-pass should equal the overlap: what is left over is exactly the coalesce coming undone",
+    "inserted_after_the_pair": 19,
+    "inserted_after_the_wall_pass": 6,
+    "difference": 13,
+    "overlap": 13,
+    "HOLDS": true
+   },
+   "REMOVED_by_2a": 20,
+   "INSERTED_by_the_save": 19,
+   "OVERLAP_inserted_that_2a_had_removed": 13,
+   "OVERLAP_share_of_inserted": 0.684,
+   "per_room": {
+    "BONUS1": {
+     "removed": 3,
+     "inserted_by_the_save": 2,
+     "inserted_that_2a_had_REMOVED": 2,
+     "points": [
+      [
+       1032.0,
+       708.0
+      ],
+      [
+       948.0,
+       732.0
+      ]
+     ]
+    },
+    "BR2": {
+     "removed": 3,
+     "inserted_by_the_save": 3,
+     "inserted_that_2a_had_REMOVED": 1,
+     "points": [
+      [
+       948.0,
+       732.0
+      ]
+     ]
+    },
+    "BR3": {
+     "removed": 4,
+     "inserted_by_the_save": 2,
+     "inserted_that_2a_had_REMOVED": 2,
+     "points": [
+      [
+       1494.0,
+       792.0
+      ],
+      [
+       1494.0,
+       864.0
+      ]
+     ]
+    },
+    "Hall": {
+     "removed": 0,
+     "inserted_by_the_save": 2,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "Hall2": {
+     "removed": 3,
+     "inserted_by_the_save": 2,
+     "inserted_that_2a_had_REMOVED": 2,
+     "points": [
+      [
+       1080.0,
+       732.0
+      ],
+      [
+       1098.0,
+       732.0
+      ]
+     ]
+    },
+    "LOUNGE": {
+     "removed": 0,
+     "inserted_by_the_save": 1,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "MBATH": {
+     "removed": 2,
+     "inserted_by_the_save": 2,
+     "inserted_that_2a_had_REMOVED": 2,
+     "points": [
+      [
+       798.0,
+       732.0
+      ],
+      [
+       888.0,
+       732.0
+      ]
+     ]
+    },
+    "Master Suite": {
+     "removed": 2,
+     "inserted_by_the_save": 3,
+     "inserted_that_2a_had_REMOVED": 2,
+     "points": [
+      [
+       888.0,
+       534.0
+      ],
+      [
+       888.0,
+       732.0
+      ]
+     ]
+    },
+    "Rear Porch": {
+     "removed": 1,
+     "inserted_by_the_save": 1,
+     "inserted_that_2a_had_REMOVED": 1,
+     "points": [
+      [
+       888.0,
+       534.0
+      ]
+     ]
+    },
+    "UPBATH": {
+     "removed": 1,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "WIC": {
+     "removed": 1,
+     "inserted_by_the_save": 1,
+     "inserted_that_2a_had_REMOVED": 1,
+     "points": [
+      [
+       798.0,
+       732.0
+      ]
+     ]
+    }
+   },
+   "VERDICT": "PARTLY CONFIRMED -- some inserted corners are 2a's, some are not"
+  },
+  {
+   "plan": "symmetricP1.json",
+   "NEGATIVE_CONTROL_pure_round_trip": {
+    "slots": 140,
+    "inserted_by_the_save": 0,
+    "verdict": "PASS"
+   },
+   "slots_after_the_wall_pass": 140,
+   "slots_after_the_outline_pass": 136,
+   "slots_in_the_saved_file": 136,
+   "POSITIVE_CONTROL_identification_matches_the_count": {
+    "count_delta": 0,
+    "identified": 0,
+    "verdict": "PASS"
+   },
+   "PRODUCER_B_inserted_after_the_WALL_pass_alone": 0,
+   "DECOMPOSITION": {
+    "claim": "inserted-after-the-pair minus inserted-after-the-wall-pass should equal the overlap: what is left over is exactly the coalesce coming undone",
+    "inserted_after_the_pair": 0,
+    "inserted_after_the_wall_pass": 0,
+    "difference": 0,
+    "overlap": 0,
+    "HOLDS": true
+   },
+   "REMOVED_by_2a": 4,
+   "INSERTED_by_the_save": 0,
+   "OVERLAP_inserted_that_2a_had_removed": 0,
+   "OVERLAP_share_of_inserted": null,
+   "per_room": {
+    "Great Room": {
+     "removed": 2,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "Hall": {
+     "removed": 1,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "Rear Porch": {
+     "removed": 1,
+     "inserted_by_the_save": 0,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    }
+   },
+   "VERDICT": "no rebound on this plan -- says nothing either way"
+  },
+  {
+   "plan": "planc1.v5.json",
+   "NEGATIVE_CONTROL_pure_round_trip": {
+    "slots": 175,
+    "inserted_by_the_save": 0,
+    "verdict": "PASS"
+   },
+   "slots_after_the_wall_pass": 175,
+   "slots_after_the_outline_pass": 175,
+   "slots_in_the_saved_file": 178,
+   "POSITIVE_CONTROL_identification_matches_the_count": {
+    "count_delta": 3,
+    "identified": 3,
+    "verdict": "PASS"
+   },
+   "PRODUCER_B_inserted_after_the_WALL_pass_alone": 3,
+   "DECOMPOSITION": {
+    "claim": "inserted-after-the-pair minus inserted-after-the-wall-pass should equal the overlap: what is left over is exactly the coalesce coming undone",
+    "inserted_after_the_pair": 3,
+    "inserted_after_the_wall_pass": 3,
+    "difference": 0,
+    "overlap": 0,
+    "HOLDS": true
+   },
+   "REMOVED_by_2a": 0,
+   "INSERTED_by_the_save": 3,
+   "OVERLAP_inserted_that_2a_had_removed": 0,
+   "OVERLAP_share_of_inserted": 0.0,
+   "per_room": {
+    "Hall": {
+     "removed": 0,
+     "inserted_by_the_save": 1,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "M Bath": {
+     "removed": 0,
+     "inserted_by_the_save": 1,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    },
+    "Master Suite": {
+     "removed": 0,
+     "inserted_by_the_save": 1,
+     "inserted_that_2a_had_REMOVED": 0,
+     "points": []
+    }
+   },
+   "VERDICT": "REFUTED -- the save inserts corners 2a never touched"
+  },
+  {
+   "plan": "farmplaceBIGmultifloor.json",
+   "NEGATIVE_CONTROL_pure_round_trip": {
+    "slots": 136,
+    "inserted_by_the_save": 0,
+    "verdict": "PASS"
+   },
+   "slots_after_the_wall_pass": 136,
+   "slots_after_the_outline_pass": 134,
+   "slots_in_the_saved_file": 136,
+   "POSITIVE_CONTROL_identification_matches_the_count": {
+    "count_delta": 2,
+    "identified": 2,
+    "verdict": "PASS"
+   },
+   "PRODUCER_B_inserted_after_the_WALL_pass_alone": 0,
+   "DECOMPOSITION": {
+    "claim": "inserted-after-the-pair minus inserted-after-the-wall-pass should equal the overlap: what is left over is exactly the coalesce coming undone",
+    "inserted_after_the_pair": 2,
+    "inserted_after_the_wall_pass": 0,
+    "difference": 2,
+    "overlap": 2,
+    "HOLDS": true
+   },
+   "REMOVED_by_2a": 2,
+   "INSERTED_by_the_save": 2,
+   "OVERLAP_inserted_that_2a_had_removed": 2,
+   "OVERLAP_share_of_inserted": 1.0,
+   "per_room": {
+    "Craft": {
+     "removed": 1,
+     "inserted_by_the_save": 1,
+     "inserted_that_2a_had_REMOVED": 1,
+     "points": [
+      [
+       1482.0,
+       732.0
+      ]
+     ]
+    },
+    "Kitchen": {
+     "removed": 1,
+     "inserted_by_the_save": 1,
+     "inserted_that_2a_had_REMOVED": 1,
+     "points": [
+      [
+       1482.0,
+       732.0
+      ]
+     ]
+    }
+   },
+   "VERDICT": "CONFIRMED -- every corner the save puts back is one 2a removed"
+  }
+ ]
+}

@@ -552,7 +552,20 @@ def weld_scene(scene, max_passes=6):
         moved += step
         if not step:
             break
-    return moved, share_coincident_ends(scene)
+    shared = share_coincident_ends(scene)
+    if shared:
+        # RESTORE THE P3.5 INVARIANT -- the same repair `close_gap` makes, at
+        # the site that never got it (D62). The fold above re-binds WALL ends
+        # onto one anchor per corner and leaves every room outline holding
+        # whichever twin lost; a drag then gathers by `id(e.v)` and skips it.
+        # Measured before this line existed: 0 re-adoptions needed on a plan
+        # as loaded, 146 straight after this call on Patrick's -- and the
+        # second call returns 0, so it converges in one pass.
+        from floorplanner.rooms import share_outline_vertices   # late (cycle)
+        for room in scene.items():
+            if getattr(room, "outline", None):
+                share_outline_vertices(room)
+    return moved, shared
 
 
 def normalize_walls(scene):

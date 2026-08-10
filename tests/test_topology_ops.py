@@ -7,6 +7,8 @@ checked once on a `Design` and once on the live scene. The scene half is the
 new code; the `Design` half is the guard that the rebuild did not change what
 the pure op means.
 """
+from pathlib import Path
+
 import pytest
 from PyQt6.QtCore import QPointF
 
@@ -20,6 +22,8 @@ from floorplanner.walls import (
 )
 
 pytestmark = pytest.mark.walls
+
+EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 
 
 # --------------------------------------------------------------------------
@@ -413,6 +417,35 @@ def test_welding_makes_a_corner_topology_not_just_coordinates(fp, scene):
     assert a.end_vertex("p2") is not b.end_vertex("p1")
     weld_scene(scene)
     assert a.end_vertex("p2") is b.end_vertex("p1")
+
+
+def test_weld_scene_leaves_every_room_outline_holding_its_walls_corners(
+        fp, win):
+    """D62: the fold re-binds WALL ends onto one anchor per corner, and until
+    this was fixed it left every room outline holding whichever twin lost.
+
+    THE ORACLE IS THE PRODUCTION REPAIR, not a restatement of it.
+    `share_outline_vertices` returns the number of edges it had to re-point,
+    so "nothing needed repairing" is exactly `== 0` — and the same call is
+    what `close_gap` has always made after its own weld.
+
+    FAIL-FIRST RECEIPT, measured on this file before the fix: 0 re-adoptions
+    needed on the plan as loaded, **139 straight after `weld_scene`**. The
+    plan is loaded rather than built because the state needs coincident ends
+    that distinct vertices already hold, which is what a real file has.
+    """
+    from floorplanner.rooms import share_outline_vertices
+    win.run_macro(f'open "{EXAMPLES / "symmetricP1.json"}"')
+    rooms = [i for i in win.scene.items() if isinstance(i, fp.RoomItem)]
+    assert rooms, "precondition: the plan must have rooms to strand"
+    # the precondition, asserted rather than assumed: the scene is COHERENT
+    # before the weld, so a zero afterwards is about the weld and not about a
+    # scene that never had shared corners in the first place
+    assert sum(share_outline_vertices(r) for r in rooms) == 0
+
+    weld_scene(win.scene)
+
+    assert sum(share_outline_vertices(r) for r in rooms) == 0
 
 
 def test_weld_scene_does_not_split_a_body_landing(fp, scene):

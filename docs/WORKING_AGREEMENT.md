@@ -79,6 +79,37 @@ notes:   <anything surprising — especially a test you had to change and why>
 
 **P0.0 first** (below) adds a pointer in `CLAUDE.md` so Claude Code finds this plan without being told each time.
 
+### WHERE A PLAN FILE GOES — three tiers, settled 2026‑08‑09
+
+**A plan dropped in the wrong directory blocks every commit in the repository.**
+`tests/test_schema.py` parametrizes over a filesystem glob of `examples/*.json`,
+so an imperfect plan there changes the collected count and, if it trips an
+invariant, turns the gate red — and the commit hook then refuses everything.
+That is [D51](defects/0051-the-census-depends-on-the-working-tree.md), and it
+has now happened **twice**: `fragment2room.json` on 2026‑08‑08, and
+`wiscaway2026-08-09R.json` on 2026‑08‑09, which arrived with seven real
+violations and stopped the gate dead.
+
+| | |
+|---|---|
+| **`examples/`** | the frozen **clean** corpus. **Nothing imperfect enters it.** Changing a file needs a declared justification and a re-cut freeze |
+| **`fixtures/`** | **characterised** failures. Each one named in `fixtures/README.md` with exactly what it violates and why it is retained; a fixture a test depends on carries a guard test that fails when the dirt is cleaned |
+| **`fixtures/incoming/`** | **uncharacterised** intake. Patrick drops plans here that break or look wrong. **No test may reference a file here and no parametrized test may sweep the directory** |
+
+**The intake exists because requiring characterisation at drop time puts the
+work on the wrong person at the moment they are least able to do it** — and
+because the moment a broken plan costs someone a working tree, people stop
+reporting broken plans. Triage moves a file **out**: to `fixtures/` with its
+README entry, or deleted once its finding is closed.
+
+**AND THE CONTRACT IS ENFORCED, NOT ASSERTED.** `tests/test_fixture_layout.py`
+plants a deliberately invalid plan in `incoming/` and fails if any corpus
+collector picks it up. Measured when the directory was created: the full gate
+ran **GREEN** with a seven-violation plan sitting there, against `1 failed` for
+the same file in `examples/`. A structural claim — "the glob is scoped to
+`examples/`" — passes whether or not the directory exists or holds anything;
+only a plant that MUST be reported if seen makes it a measurement.
+
 ### The gate is `ruff check .` over the whole tree — settled 2026‑07‑26
 
 P0.1 found the gate red at baseline: 23 findings, all in `tools/` and `docs/_superseded/` scaffolding committed during the design sessions, **0 in `floorplanner/` or `tests/`**. Four responses were on the table; the deciding fact is that **`.github/workflows/ci.yml:26` runs `python -m ruff check .` over the whole tree**. Narrowing the local gate to `floorplanner tests`, or excluding `tools/`, would make the local gate disagree with CI and leave CI red on the next push — a local gate that is greener than CI is worse than no gate.
