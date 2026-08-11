@@ -1,5 +1,6 @@
 """Room detection, area, inventory, naming, and region-follows-walls."""
 import json
+import math
 import pathlib
 
 import pytest
@@ -938,3 +939,100 @@ def test_a_corner_a_room_turns_at_is_never_dissolved(fp, win, make_room):
     rep = coalesce_outline_corners(sc, dry_run=True)
 
     assert rep["removed"] == 0, "a turning corner was marked removable"
+
+
+@pytest.mark.parametrize("where,plan", [
+    ("fixtures", "wiscaway2026-08-08.json"),
+    # THE SECOND CASE IS WHY THIS TEST COUNTS CORNERS AND NOT SLOTS. On
+    # `roundedMultifloor` the slot total returns to exactly where it started, so
+    # the count form below passed as "nothing was dissolved durably" and the
+    # record carried `6 removed / 0 durable / 6 rebound -- UNRESOLVED` for it.
+    # Measured by identity, all 6 removed corners STAY GONE and the 6 in the
+    # saved file are six DIFFERENT corners -- producer 2, which the wall pass
+    # alone inserts at exactly the same places (D63, evidence
+    # `d63-rounded-rebound.json`). Two opposite readings of one number.
+    ("examples", "roundedMultifloor.json"),
+])
+def test_a_coalesced_corner_stays_gone_across_a_save(fp, win, tmp_path,
+                                                     where, plan):
+    """D63 producer 1: the outline coalesce must not remove a corner the
+    DOCUMENT requires, because the next save puts it straight back.
+
+    `design/bridge._walk` emits one outline edge per wall (invariant I5), so a
+    room edge crossing a T-junction is several edges however few corners the
+    scene holds. The predicate therefore refuses a corner where any wall ENDS,
+    and refuses a degree-2 pair whose walls cannot MERGE (different type).
+
+    MEASURED BEFORE THE FIX, on `fixtures/wiscaway2026-08-08.json`: 40 corners
+    removed, 7 back after a save -- 33 durable. After: 33 removed, 33 durable,
+    REBOUND 0.
+
+    THE ASSERTION IS ON IDENTITY, NOT ON A TOTAL, and that is the whole point:
+    "the corner I removed came back" and "a different corner was added
+    somewhere else" are producer 1 and producer 2, which the record already
+    holds to be separate investigations. A slot count cannot tell them apart,
+    and on `roundedMultifloor` it read the second as the first.
+
+    PRODUCER 2 IS DELIBERATELY NOT ASSERTED HERE. It is open, it is measured
+    elsewhere, and pinning its residue in producer 1's guard would make this
+    test fail when something unrelated to it is fixed.
+    """
+    from pathlib import Path
+    from floorplanner.rooms import coalesce_outline_corners
+    from floorplanner.walls import normalize_walls
+
+    path = Path(__file__).resolve().parent.parent / where / plan
+    win.load_path(str(path))
+
+    def corners():
+        """Each room's outline points, as a BAG per room. Per room because a
+        corner vacated in one room and added in another is not the same corner
+        coming back; a whole-plan bag would score it as one."""
+        out = {}
+        for r in win.scene.items():
+            if isinstance(r, fp.RoomItem):
+                out.setdefault(r.name, []).extend(
+                    (round(e.p.x(), 3), round(e.p.y(), 3)) for e in r.outline)
+        return out
+
+    def bag_diff(a, b, tol=0.05):
+        """What is in bag `a` and not in bag `b`, pairing each point at most
+        once -- a bag difference, so a room holding one corner twice (D52's
+        zero-width slit) is not collapsed to one."""
+        rest, gone = list(b), []
+        for p in a:
+            hit = next((q for q in rest if math.dist(p, q) <= tol), None)
+            if hit is None:
+                gone.append(p)
+            else:
+                rest.remove(hit)
+        return gone
+
+    normalize_walls(win.scene)
+    before = corners()
+    rep = coalesce_outline_corners(win.scene, dry_run=False)
+    # precondition: the pass must actually have removed something, or "nothing
+    # came back" is true of a run that did nothing
+    assert rep["removed"] > 0, "nothing was dissolved -- the test is vacuous"
+    after = corners()
+    removed = {rm: bag_diff(before.get(rm, []), after.get(rm, []))
+               for rm in before}
+    assert sum(len(v) for v in removed.values()) > 0    # precondition
+
+    out = tmp_path / "roundtrip.json"
+    win.save_path(str(out))
+    win.load_path(str(out))
+    reloaded = corners()
+
+    rebound = []
+    for rm, gone in removed.items():
+        extra = bag_diff(reloaded.get(rm, []), after.get(rm, []))
+        rest = list(gone)
+        for p in extra:
+            hit = next((q for q in rest if math.dist(p, q) <= 0.05), None)
+            if hit is not None:                 # this very corner is back
+                rest.remove(hit)
+                rebound.append((rm, p))
+    assert not rebound, (
+        f"a coalesced corner came back on save ({len(rebound)}): the pass "
+        f"removed a corner invariant I5 requires -- {rebound[:5]}")

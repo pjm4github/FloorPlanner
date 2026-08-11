@@ -697,6 +697,43 @@ def test_the_wiscaway_fixture_is_still_dirty_in_exactly_the_way_that_matters():
         f"unreachable and that test is vacuous. Now reports: {errs}")
 
 
+WISCAWAY_R = (Path(__file__).resolve().parent.parent / "fixtures"
+              / "wiscaway2026-08-09R.json")
+
+
+def test_the_2026_08_09R_fixture_is_still_dirty_in_all_seven_ways():
+    """THE SECOND FIXTURE RETAINED **BECAUSE** IT FAILS.
+
+    `fixtures/wiscaway2026-08-09R.json` is Patrick's own plan one day after
+    `wiscaway2026-08-08.json`, worked on with SHUFFLE OFF -- which is why it is
+    D61's field evidence: walls 103 -> 134, vertex objects 101 -> 201, outline
+    corner slots 159 -> 241. Under shuffle a label-drag leaves the room
+    floating and `join_room` never runs, so the producer never fires; with
+    shuffle off it fires on every move.
+
+    It is retained for the DAMAGE, and this pins the damage. Seven referential
+    violations, counted by CLASS rather than by message text so a reworded
+    report does not fail this test:
+
+        I7  x3   two openings running off their wall, one overlapping pair
+        I11 x1   'Dining' and 'Front Porch' overlap
+        I14 x3   three unwelded T-junctions
+
+    IF THIS TEST FAILS, DO NOT "FIX" IT. Either the fixture was laundered
+    (restore it) or `check` changed and the record needs re-measuring. This
+    plan's value is that nobody curated it -- it is what ordinary use did.
+    """
+    doc = json.loads(WISCAWAY_R.read_text(encoding="utf-8"))
+    assert schema_errors(doc) == [], "the fixture must stay schema-VALID"
+    errs = check(doc, deep=True)
+    counts = {}
+    for e in errs:
+        counts[e.split()[0]] = counts.get(e.split()[0], 0) + 1
+    assert counts.get("I7") == 3, f"I7 count moved: {errs}"
+    assert counts.get("I11") == 1, f"I11 count moved: {errs}"
+    assert counts.get("I14") == 3, f"I14 count moved: {errs}"
+
+
 @pytest.mark.geometry
 def test_face_at_survives_an_opening_no_segment_can_hold(fp, win):
     """D57. FAIL-FIRST: before the fix this raises

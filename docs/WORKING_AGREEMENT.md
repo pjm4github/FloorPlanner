@@ -79,6 +79,37 @@ notes:   <anything surprising — especially a test you had to change and why>
 
 **P0.0 first** (below) adds a pointer in `CLAUDE.md` so Claude Code finds this plan without being told each time.
 
+### WHERE A PLAN FILE GOES — three tiers, settled 2026‑08‑09
+
+**A plan dropped in the wrong directory blocks every commit in the repository.**
+`tests/test_schema.py` parametrizes over a filesystem glob of `examples/*.json`,
+so an imperfect plan there changes the collected count and, if it trips an
+invariant, turns the gate red — and the commit hook then refuses everything.
+That is [D51](defects/0051-the-census-depends-on-the-working-tree.md), and it
+has now happened **twice**: `fragment2room.json` on 2026‑08‑08, and
+`wiscaway2026-08-09R.json` on 2026‑08‑09, which arrived with seven real
+violations and stopped the gate dead.
+
+| | |
+|---|---|
+| **`examples/`** | the frozen **clean** corpus. **Nothing imperfect enters it.** Changing a file needs a declared justification and a re-cut freeze |
+| **`fixtures/`** | **characterised** failures. Each one named in `fixtures/README.md` with exactly what it violates and why it is retained; a fixture a test depends on carries a guard test that fails when the dirt is cleaned |
+| **`fixtures/incoming/`** | **uncharacterised** intake. Patrick drops plans here that break or look wrong. **No test may reference a file here and no parametrized test may sweep the directory** |
+
+**The intake exists because requiring characterisation at drop time puts the
+work on the wrong person at the moment they are least able to do it** — and
+because the moment a broken plan costs someone a working tree, people stop
+reporting broken plans. Triage moves a file **out**: to `fixtures/` with its
+README entry, or deleted once its finding is closed.
+
+**AND THE CONTRACT IS ENFORCED, NOT ASSERTED.** `tests/test_fixture_layout.py`
+plants a deliberately invalid plan in `incoming/` and fails if any corpus
+collector picks it up. Measured when the directory was created: the full gate
+ran **GREEN** with a seven-violation plan sitting there, against `1 failed` for
+the same file in `examples/`. A structural claim — "the glob is scoped to
+`examples/`" — passes whether or not the directory exists or holds anything;
+only a plant that MUST be reported if seen makes it a measurement.
+
 ### The gate is `ruff check .` over the whole tree — settled 2026‑07‑26
 
 P0.1 found the gate red at baseline: 23 findings, all in `tools/` and `docs/_superseded/` scaffolding committed during the design sessions, **0 in `floorplanner/` or `tests/`**. Four responses were on the table; the deciding fact is that **`.github/workflows/ci.yml:26` runs `python -m ruff check .` over the whole tree**. Narrowing the local gate to `floorplanner tests`, or excluding `tools/`, would make the local gate disagree with CI and leave CI red on the next push — a local gate that is greener than CI is worse than no gate.
@@ -300,6 +331,21 @@ because it is written precisely to explain why nobody needs to look further.
 **A positive control would have killed both instantly** — a plan with a known junction must report degree-2 > 0; a gesture known to split must report a split. Neither needed insight, only a case with a known non-zero answer.
 
 **So: name the control when the instrument is written, not after it disagrees with you.** And when an instrument reports zero, the question is never *"is the code clean?"* but **"would this instrument have reported the thing if it were there?"**
+
+**AN ACCEPTANCE STATED AS A COUNT IS SATISFIED BY REPLACEMENT — added 2026‑08‑10, and the error being recorded is the REVIEWER'S OWN.**
+
+**When the question is whether a specific thing PERSISTED, the measure must be an identity, not a total.** A count cannot distinguish *forty survivors* from *forty removals and forty fresh insertions at other points*. Both read as forty.
+
+**The instance, and it is not a near-miss.** D63's durability acceptance was issued as *"40 of 40 survive a save"* and implemented as `assert slots() == in_session` — the total of every room's outline length. On `roundedMultifloor` that total goes **187 → 181 → 187**, returning exactly to where it started, so six corners removed and six inserted **elsewhere** read as *nothing survived*. The record then carried `6 removed / 0 durable / 6 rebound — UNRESOLVED` for that plan across two handoffs, and a floor-scoping hypothesis was written and refuted against a failure that had never happened. Re-measured per `(room, point)`: all six are durable, rebound is **0**, and the six in the file are producer 2 — which the wall-pass-alone lane inserts at exactly the same places.
+
+**So the whole rebound investigation — two producers, an exact arithmetic identity, a refuted causal hypothesis — rested on a metric that could not answer the question it was asked.** The identity and the two producers survive re-measurement; what does not survive is the row that sent a session hunting a cause.
+
+**THE PAIR IS MORE INSTRUCTIVE THAN EITHER HALF, which is why both are cited here.** This project has met this distinction twice, and caught it once:
+
+* **CAUGHT — the 28-versus-40 case.** D61 stage 2a reported *69* corners a person can see, *40* slots the strict predicate vacated, and *28* vertices behind them. Those three numbers were deliberately kept apart and reconciled with **one instrument**, precisely because a slot and a vertex and a complaint are different objects and summing them would have hidden which was which. The reconciliation was the point.
+* **NOT CAUGHT — this one.** The same instrument family, the same session, one measure taken as a total instead of a reconciliation — and the damage was a *reported failure that had not occurred*, which is the direction nobody audits. A false red is not the safe kind of error: it is the kind that gets investigated.
+
+**The cheap form of the rule is a SET EQUALITY IN BOTH DIRECTIONS** — nothing in A that is not in B, and nothing in B that is not in A. That is what separated `rounded`'s producer 2 from its supposed rebound: two lanes each inserting six could otherwise have been two different sixes. **Ask of any surviving-count acceptance: would it read the same if every item were replaced?** If yes, it is not measuring persistence.
 
 **PARASITIC REACH: WHEN YOU REPAIR A CAPABILITY THAT NEVER WORKED, BUDGET FOR THE AFFORDANCES RESTING ON THE FAULT — added 2026‑08‑08 at the FIFTH instance, and it is named so it can be cited.**
 

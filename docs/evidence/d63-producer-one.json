@@ -1,0 +1,376 @@
+{
+ "question": "is producer 1 the save inventing corners, or the coalesce removing corners invariant I5 requires?",
+ "plans": [
+  {
+   "plan": "wiscaway2026-08-08.json",
+   "removed_by_the_coalesce": 33,
+   "REINSERTED_by_the_save": 0,
+   "stayed_removed": 33,
+   "of_the_REINSERTED_how_many_have_a_wall_END_there": 0,
+   "of_those_that_STAYED_how_many_have_a_wall_END_there": 0,
+   "POSITIVE_CONTROL_the_predicate_discriminates": {
+    "claim": "if a wall end explains re-insertion, the corners that STAYED removed must mostly NOT have one -- otherwise the predicate is true of everything and explains nothing",
+    "reinserted_with_a_wall_end": "0/0",
+    "stayed_with_a_wall_end": "0/33",
+    "verdict": "no re-insertions on this plan"
+   },
+   "reinserted_detail": [],
+   "stayed_detail": [
+    {
+     "room": "BKF NOOK",
+     "at": [
+      912.0,
+      426.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "BKF NOOK",
+     "at": [
+      894.0,
+      372.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "BKF NOOK",
+     "at": [
+      894.0,
+      330.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "CLST",
+     "at": [
+      696.0,
+      624.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "Dining",
+     "at": [
+      852.0,
+      774.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "Foyer",
+     "at": [
+      696.0,
+      684.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "Foyer",
+     "at": [
+      852.0,
+      774.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "Foyer",
+     "at": [
+      666.0,
+      774.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    }
+   ],
+   "VERDICT": "no rebound on this plan"
+  },
+  {
+   "plan": "wiscaway2026-08-09R.json",
+   "removed_by_the_coalesce": 94,
+   "REINSERTED_by_the_save": 1,
+   "stayed_removed": 94,
+   "of_the_REINSERTED_how_many_have_a_wall_END_there": 1,
+   "of_those_that_STAYED_how_many_have_a_wall_END_there": 0,
+   "POSITIVE_CONTROL_the_predicate_discriminates": {
+    "claim": "if a wall end explains re-insertion, the corners that STAYED removed must mostly NOT have one -- otherwise the predicate is true of everything and explains nothing",
+    "reinserted_with_a_wall_end": "1/1",
+    "stayed_with_a_wall_end": "0/94",
+    "verdict": "PASS"
+   },
+   "reinserted_detail": [
+    {
+     "room": "OFFICE",
+     "at": [
+      1269.728,
+      387.728
+     ],
+     "wall_ends_here": 3,
+     "wall_bodies_crossing": 0
+    }
+   ],
+   "stayed_detail": [
+    {
+     "room": "CLST",
+     "at": [
+      696.0,
+      624.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "Dining",
+     "at": [
+      954.0,
+      684.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "Dining",
+     "at": [
+      852.0,
+      774.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "Foyer",
+     "at": [
+      696.0,
+      684.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 0
+    },
+    {
+     "room": "Foyer",
+     "at": [
+      852.0,
+      774.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "Foyer",
+     "at": [
+      666.0,
+      774.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "Foyer",
+     "at": [
+      666.0,
+      762.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "Front Porch",
+     "at": [
+      1092.0,
+      786.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    }
+   ],
+   "VERDICT": "I5 REQUIRES THE HOP -- the coalesce removed a corner a wall ends at, and the save must split the edge there"
+  },
+  {
+   "plan": "roundedMultifloor.json",
+   "removed_by_the_coalesce": 6,
+   "REINSERTED_by_the_save": 6,
+   "stayed_removed": 6,
+   "of_the_REINSERTED_how_many_have_a_wall_END_there": 6,
+   "of_those_that_STAYED_how_many_have_a_wall_END_there": 0,
+   "POSITIVE_CONTROL_the_predicate_discriminates": {
+    "claim": "if a wall end explains re-insertion, the corners that STAYED removed must mostly NOT have one -- otherwise the predicate is true of everything and explains nothing",
+    "reinserted_with_a_wall_end": "6/6",
+    "stayed_with_a_wall_end": "0/6",
+    "verdict": "PASS"
+   },
+   "reinserted_detail": [
+    {
+     "room": "BR2",
+     "at": [
+      888.0,
+      876.0
+     ],
+     "wall_ends_here": 6,
+     "wall_bodies_crossing": 0
+    },
+    {
+     "room": "BR2",
+     "at": [
+      888.0,
+      792.0
+     ],
+     "wall_ends_here": 4,
+     "wall_bodies_crossing": 0
+    },
+    {
+     "room": "Hall",
+     "at": [
+      978.0,
+      732.0
+     ],
+     "wall_ends_here": 5,
+     "wall_bodies_crossing": 0
+    },
+    {
+     "room": "Hall",
+     "at": [
+      978.0,
+      792.0
+     ],
+     "wall_ends_here": 4,
+     "wall_bodies_crossing": 0
+    },
+    {
+     "room": "LOUNGE",
+     "at": [
+      978.0,
+      792.0
+     ],
+     "wall_ends_here": 4,
+     "wall_bodies_crossing": 0
+    },
+    {
+     "room": "Master Suite",
+     "at": [
+      978.0,
+      732.0
+     ],
+     "wall_ends_here": 5,
+     "wall_bodies_crossing": 0
+    }
+   ],
+   "stayed_detail": [
+    {
+     "room": "BONUS1",
+     "at": [
+      972.0,
+      732.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 2
+    },
+    {
+     "room": "BR2",
+     "at": [
+      972.0,
+      732.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 2
+    },
+    {
+     "room": "BR2",
+     "at": [
+      1032.0,
+      786.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 0
+    },
+    {
+     "room": "BR3",
+     "at": [
+      1386.0,
+      732.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "Hall2",
+     "at": [
+      1032.0,
+      786.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 0
+    },
+    {
+     "room": "UPBATH",
+     "at": [
+      1386.0,
+      732.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    }
+   ],
+   "VERDICT": "I5 REQUIRES THE HOP -- the coalesce removed a corner a wall ends at, and the save must split the edge there"
+  },
+  {
+   "plan": "symmetricP1.json",
+   "removed_by_the_coalesce": 4,
+   "REINSERTED_by_the_save": 0,
+   "stayed_removed": 4,
+   "of_the_REINSERTED_how_many_have_a_wall_END_there": 0,
+   "of_those_that_STAYED_how_many_have_a_wall_END_there": 0,
+   "POSITIVE_CONTROL_the_predicate_discriminates": {
+    "claim": "if a wall end explains re-insertion, the corners that STAYED removed must mostly NOT have one -- otherwise the predicate is true of everything and explains nothing",
+    "reinserted_with_a_wall_end": "0/0",
+    "stayed_with_a_wall_end": "0/4",
+    "verdict": "no re-insertions on this plan"
+   },
+   "reinserted_detail": [],
+   "stayed_detail": [
+    {
+     "room": "Great Room",
+     "at": [
+      385.38,
+      456.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "Great Room",
+     "at": [
+      385.38,
+      654.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "Hall",
+     "at": [
+      385.38,
+      654.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    },
+    {
+     "room": "Rear Porch",
+     "at": [
+      385.38,
+      456.0
+     ],
+     "wall_ends_here": 0,
+     "wall_bodies_crossing": 1
+    }
+   ],
+   "VERDICT": "no rebound on this plan"
+  }
+ ]
+}

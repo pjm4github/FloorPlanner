@@ -36,6 +36,21 @@ make the log inherit the exchange's verbosity, and the log is already 4,351
 lines. Same relationship the log already has with `docs/evidence/`: cite the
 artifact, do not inline it.
 
+## Every handoff lists `fixtures/incoming/`, with the age of each file
+
+**Ruled 2026‑08‑09.** The intake directory
+([`../../fixtures/incoming/README.md`](../../fixtures/incoming/README.md)) is
+where Patrick drops plans that break or look wrong, uncharacterised and
+unreferenced by any test. It is invisible to the gate **by design**, which means
+nothing else will ever mention it.
+
+So a report **names every file in it and how old each one is**. And **a file
+that has sat there across two handoffs without triage is itself a finding** —
+evidence arriving faster than it is being read — and it is stated out loud
+rather than left to accumulate. The three exits (promote with a fail-first test,
+delete as a duplicate naming its cover, delete as no-defect-found naming what
+was checked) are in that README.
+
 ## What belongs here, and what does not
 
 | | |

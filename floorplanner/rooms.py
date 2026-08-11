@@ -1545,7 +1545,42 @@ def _corner_path(a, p, b, step, tol_deg):
     return (dot < -math.cos(math.radians(tol_deg))), "tolerance"
 
 
-def coalesce_outline_corners(scene, rooms=None, dry_run=True, tol_deg=0.05):
+AREA_BOUND_SQFT = 0.005
+"""The most area a single dissolve may move, in square feet — ruled 2026‑08‑09,
+at half the 2‑dp display resolution.
+
+**"No room's area moves" was never a property of the operation; it was a
+property of one plan.** It was validated on `wiscaway2026-08-08`, where the dry
+run reports `28 exact / 0 by angle` — the angular path never fired. On
+`wiscaway2026-08-09R` it is `24 exact / 60 by angle`, and **dissolving a
+NEAR-collinear vertex must change area: that is arithmetic, not a bug.**
+
+So the guarantee is a BOUND, enforced by REFUSAL rather than by avoidance: a
+dissolve that would move any holding room by more than this is refused and
+counted.
+
+**THE DISPLAY CAVEAT, stated because the arithmetic cannot keep the other
+promise.** No positive bound stops a *displayed* figure flipping its last digit:
+a value sitting on a rounding boundary moves at any epsilon. `Garage` went
+4868.36 → 4868.35 on a **2e‑5** change. **The MODEL is bounded; the display is
+not**, and pretending otherwise would be a promise this cannot keep.
+
+**A prediction on the record, to be checked rather than assumed:** the angular
+path's share should collapse once grid-snap-by-default lands — Patrick's on-grid
+argument predicts it. Re-measure the exact/angle split then."""
+
+
+def _corner_area_sqft(a, b, c):
+    """Area (sq ft) the ring loses by dropping corner `b` — the triangle
+    `a,b,c`. Exact: removing one vertex of a polygon changes its area by
+    exactly that triangle, so no re-derivation is needed to answer 'how much
+    would this move?'."""
+    return abs((b.x() - a.x()) * (c.y() - a.y())
+               - (c.x() - a.x()) * (b.y() - a.y())) / 2.0 / 144.0
+
+
+def coalesce_outline_corners(scene, rooms=None, dry_run=True, tol_deg=0.05,
+                             area_bound_sqft=AREA_BOUND_SQFT):
     """Dissolve REDUNDANT OUTLINE CORNERS -- a corner the ring runs straight
     through, which no wall needs.
 
@@ -1579,25 +1614,79 @@ def coalesce_outline_corners(scene, rooms=None, dry_run=True, tol_deg=0.05):
     from floorplanner.walls import WallItem                   # late: cycle
     if scene is None:
         return {"rooms": {}, "removed": 0, "paths": {"exact": 0, "tolerance": 0},
-                "areas": {}, "dry_run": dry_run}
+                "areas": {}, "dry_run": dry_run, "max_area_delta_sqft": 0.0,
+                "area_bound_sqft": area_bound_sqft,
+                "refused": {"a_wall_needs_it": 0, "a_holder_turns": 0,
+                            "triangle": 0, "area_would_move": 0}}
     all_rooms = [i for i in scene.items() if isinstance(i, RoomItem)]
     targets = all_rooms if rooms is None else [r for r in rooms
                                                if isinstance(r, RoomItem)]
     step = float(SETTINGS.get("wall_snap_in", WALL_SNAP_DEFAULT)) or 6.0
 
-    deg = {}
+    deg, ends = {}, {}
     for w in scene.items():
         if isinstance(w, WallItem):
-            for v in (w._v1, w._v2):
+            for v, p in ((w._v1, w.p1), (w._v2, w.p2)):
                 deg.setdefault(id(v), []).append(w)
+                # SCOPED BY FLOOR, like every geometry path in this codebase --
+                # unscoped, a wall end on the storey above would count as a
+                # wall ending at this corner.
+                # HONEST NOTE ON WHY IT IS HERE: it was written to explain
+                # `roundedMultifloor`, the only two-level plan in the set and
+                # the only one that appeared to lose every dissolved corner on
+                # save. It did NOT explain it -- the result is byte-identical
+                # with and without this scoping, on all four plans. It stays
+                # because the floor rule is right, not because it fixed
+                # anything.
+                # AND THERE WAS NOTHING TO EXPLAIN (D63, 2026-08-10): measured
+                # per corner rather than by slot total, all six dissolved
+                # corners on that plan STAY gone across a save. The six in the
+                # saved file are six different corners -- producer 2, which the
+                # wall pass alone inserts at exactly the same places.
+                ends.setdefault(w.floor, []).append((p.x(), p.y()))
 
-    def wall_ok(vid):
+    def _ends_at(pt, floor, tol=0.05):
+        return sum(1 for x, y in ends.get(floor, ())
+                   if math.hypot(x - pt[0], y - pt[1]) <= tol)
+
+    def wall_ok(vid, pt, floor):
+        """Does any wall NEED this corner?
+
+        TWO QUESTIONS, and the second was missing until D63. The first is
+        whether the walls HOLDING this vertex need it: none, or exactly two
+        that are collinear and about to merge. The second is whether any OTHER
+        wall ENDS at this coordinate -- a T-junction whose stem is not on the
+        run at all, so it holds a different vertex and is invisible to a
+        degree count.
+
+        THE DOCUMENT REQUIRES THE SECOND. `design/bridge._walk` emits one
+        outline edge per wall (invariant I5), so a room edge crossing a
+        T-junction is several edges however few corners the scene holds. Remove
+        the corner and the next save puts it straight back.
+
+        MEASURED, and this is what makes it a rule rather than a guess: of the
+        corners the save re-inserted, 4/4 on `wiscaway`, 4/4 on the 08-09R
+        plan and 16/16 on `roundedMultifloor` had a wall end at them -- while
+        of those that stayed removed, 0/33, 0/94 and 1/7 did.
+        """
         ws = deg.get(vid, [])
+        if _ends_at(pt, floor) != len(ws):
+            return False              # a wall ends here that does not hold it
         if not ws:
             return True
         if len(ws) != 2:
             return False
         a, b = ws
+        # AND THEY MUST BE ABLE TO MERGE. Two COLLINEAR walls of different
+        # type do not fuse -- `merge_wall` is same-type only -- so they stay
+        # two walls and I5 still needs an outline edge each. Measured: every
+        # corner that survived the wall-end test above and still came back on
+        # save was exactly this, a 6" `exterior` meeting a 4.5" `interior`
+        # head-on at 90.0 degrees ((1062, 774), (852, 762), (1476, 660) on
+        # `wiscaway`). Without this the run merges in the WALL pass or not at
+        # all, and "not at all" is a corner the document requires.
+        if a.wall_type != b.wall_type:
+            return False
         ua = math.atan2(a.p2.y() - a.p1.y(), a.p2.x() - a.p1.x())
         ub = math.atan2(b.p2.y() - b.p1.y(), b.p2.x() - b.p1.x())
         d = abs((ua - ub) % math.pi)
@@ -1612,16 +1701,26 @@ def coalesce_outline_corners(scene, rooms=None, dry_run=True, tol_deg=0.05):
                 holders.setdefault(id(e.v), []).append((r, i))
 
     doomed, paths = {}, {"exact": 0, "tolerance": 0}
+    refused = {"a_wall_needs_it": 0, "a_holder_turns": 0, "triangle": 0,
+               "area_would_move": 0}
+    worst = 0.0
     for vid, hs in holders.items():
         if not any(r in targets for r, _ in hs):
             continue
-        if not wall_ok(vid):
+        pt, fl = None, None
+        for r, i in hs:
+            q = r.outline[i].p
+            pt, fl = (q.x(), q.y()), getattr(r, "floor", None)
+            break
+        if not wall_ok(vid, pt, fl):
+            refused["a_wall_needs_it"] += 1
             continue
-        ok, path = True, "exact"
+        ok, path, delta = True, "exact", 0.0
         for r, i in hs:
             n = len(r.outline)
             if n < 4:                       # never reduce a ring below a triangle
                 ok = False
+                refused["triangle"] += 1
                 break
             straight, pth = _corner_path(r.outline[(i - 1) % n].p,
                                          r.outline[i].p,
@@ -1630,8 +1729,19 @@ def coalesce_outline_corners(scene, rooms=None, dry_run=True, tol_deg=0.05):
                 path = "tolerance"
             if not straight:
                 ok = False
+                refused["a_holder_turns"] += 1
                 break
+            # THE AREA THIS DISSOLVE WOULD MOVE, per holding room. Removing a
+            # ring vertex changes the polygon's area by the triangle it cuts
+            # off, so the answer is exact and cheap -- no re-derivation needed.
+            delta = max(delta, _corner_area_sqft(r.outline[(i - 1) % n].p,
+                                                 r.outline[i].p,
+                                                 r.outline[(i + 1) % n].p))
+        if ok and delta > area_bound_sqft:
+            ok = False
+            refused["area_would_move"] += 1
         if ok:
+            worst = max(worst, delta)
             doomed[vid] = path
             paths[path] += 1
 
@@ -1643,7 +1753,9 @@ def coalesce_outline_corners(scene, rooms=None, dry_run=True, tol_deg=0.05):
         areas[r.name] = round(r.area_sqft, 2)
 
     report = {"rooms": per_room, "removed": len(doomed), "paths": paths,
-              "areas_before": areas, "dry_run": dry_run}
+              "areas_before": areas, "dry_run": dry_run,
+              "refused": refused, "area_bound_sqft": area_bound_sqft,
+              "max_area_delta_sqft": round(worst, 6)}
     if dry_run or not doomed:
         return report
 

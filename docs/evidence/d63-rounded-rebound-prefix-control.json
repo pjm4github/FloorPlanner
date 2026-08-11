@@ -1,0 +1,2493 @@
+{
+ "question": "why does the corrected wall_ok say YES to six corners on roundedMultifloor that the save then puts straight back?",
+ "plans": [
+  {
+   "plan": "roundedMultifloor.json",
+   "coalesce_removed_vertices": 11,
+   "coalesce_removed_SLOTS": 17,
+   "DURABLE_slots": 7,
+   "REBOUND_slots_producer_1": 10,
+   "INSERTED_slots_producer_2_never_removed": 6,
+   "CONTROL_inserted_by_the_WALL_PASS_ALONE": 6,
+   "PRODUCER_2_IS_THE_WALL_PASS_same_corners_not_just_same_count": {
+    "EQUAL": true,
+    "in_the_coalesce_lane_only": [],
+    "in_the_wall_pass_lane_only": []
+   },
+   "THE_COUNT_MEASURE_the_shipped_test_uses": {
+    "note": "slots after the coalesce vs slots in the saved file -- what `test_a_coalesced_corner_stays_gone_across_a_save` asserts. It cannot separate the two producers.",
+    "net_slot_change_across_the_save": 16,
+    "would_read_durable_as": 1
+   },
+   "inserted_detail_producer_2": [
+    {
+     "room": "BR2",
+     "at": [
+      888.0,
+      876.0
+     ]
+    },
+    {
+     "room": "BR2",
+     "at": [
+      888.0,
+      792.0
+     ]
+    },
+    {
+     "room": "Hall",
+     "at": [
+      978.0,
+      732.0
+     ]
+    },
+    {
+     "room": "Hall",
+     "at": [
+      978.0,
+      792.0
+     ]
+    },
+    {
+     "room": "LOUNGE",
+     "at": [
+      978.0,
+      792.0
+     ]
+    },
+    {
+     "room": "Master Suite",
+     "at": [
+      978.0,
+      732.0
+     ]
+    }
+   ],
+   "POSITIVE_CONTROL_cross_floor_discriminates": {
+    "claim": "if cross-floor holders explain the rebound, the corners that STAYED removed must mostly NOT have them",
+    "rebound_with_cross_floor_holders": "10/10",
+    "stayed_with_cross_floor_holders": "1/7",
+    "rebound_sharing_ONE_object_across_storeys": "0/10",
+    "verdict": "PARTIAL"
+   },
+   "REBOUND_detail": [
+    {
+     "at": [
+      1032.0,
+      708.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Clst",
+       "floor": "default",
+       "slot": 0,
+       "vid": 2512217476496
+      },
+      {
+       "room": "Master Suite",
+       "floor": "default",
+       "slot": 3,
+       "vid": 2512217476496
+      },
+      {
+       "room": "BONUS1",
+       "floor": "second",
+       "slot": 2,
+       "vid": 2512244798368
+      }
+     ],
+     "distinct_vertex_objects_here": 2,
+     "holder_floors": [
+      "default",
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": true,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 3,
+      "second": 2
+     },
+     "wall_ends_TOTAL": 5,
+     "walls_HOLDING_each_object": {
+      "2512217476496": [
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         1032.0,
+         708.0
+        ],
+        "to": [
+         1080.0,
+         708.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         1032.0,
+         708.0
+        ],
+        "to": [
+         1032.0,
+         732.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         1032.0,
+         534.0
+        ],
+        "to": [
+         1032.0,
+         708.0
+        ]
+       }
+      ],
+      "2512244798368": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 3,
+      "len(deg[vid])  walls holding the object": {
+       "2512217476496": 3,
+       "2512244798368": 0
+      }
+     }
+    },
+    {
+     "at": [
+      948.0,
+      732.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Hall",
+       "floor": "default",
+       "slot": 0,
+       "vid": 2512227222768
+      },
+      {
+       "room": "Master Suite",
+       "floor": "default",
+       "slot": 5,
+       "vid": 2512227222768
+      },
+      {
+       "room": "BONUS1",
+       "floor": "second",
+       "slot": 6,
+       "vid": 2512244798128
+      },
+      {
+       "room": "BR2",
+       "floor": "second",
+       "slot": 1,
+       "vid": 2512244798128
+      },
+      {
+       "room": "MBATH",
+       "floor": "default",
+       "slot": 4,
+       "vid": 2512227222768
+      }
+     ],
+     "distinct_vertex_objects_here": 2,
+     "holder_floors": [
+      "default",
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": true,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 3,
+      "second": 2
+     },
+     "wall_ends_TOTAL": 5,
+     "walls_HOLDING_each_object": {
+      "2512227222768": [
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         948.0,
+         792.0
+        ],
+        "to": [
+         948.0,
+         732.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         948.0,
+         732.0
+        ],
+        "to": [
+         978.0,
+         732.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         888.0,
+         732.0
+        ],
+        "to": [
+         948.0,
+         732.0
+        ]
+       }
+      ],
+      "2512244798128": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 3,
+      "len(deg[vid])  walls holding the object": {
+       "2512227222768": 3,
+       "2512244798128": 0
+      }
+     }
+    },
+    {
+     "at": [
+      948.0,
+      732.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Hall",
+       "floor": "default",
+       "slot": 0,
+       "vid": 2512227222768
+      },
+      {
+       "room": "Master Suite",
+       "floor": "default",
+       "slot": 5,
+       "vid": 2512227222768
+      },
+      {
+       "room": "BONUS1",
+       "floor": "second",
+       "slot": 6,
+       "vid": 2512244798128
+      },
+      {
+       "room": "BR2",
+       "floor": "second",
+       "slot": 1,
+       "vid": 2512244798128
+      },
+      {
+       "room": "MBATH",
+       "floor": "default",
+       "slot": 4,
+       "vid": 2512227222768
+      }
+     ],
+     "distinct_vertex_objects_here": 2,
+     "holder_floors": [
+      "default",
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": true,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 3,
+      "second": 2
+     },
+     "wall_ends_TOTAL": 5,
+     "walls_HOLDING_each_object": {
+      "2512227222768": [
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         948.0,
+         792.0
+        ],
+        "to": [
+         948.0,
+         732.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         948.0,
+         732.0
+        ],
+        "to": [
+         978.0,
+         732.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         888.0,
+         732.0
+        ],
+        "to": [
+         948.0,
+         732.0
+        ]
+       }
+      ],
+      "2512244798128": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 3,
+      "len(deg[vid])  walls holding the object": {
+       "2512227222768": 3,
+       "2512244798128": 0
+      }
+     }
+    },
+    {
+     "at": [
+      1494.0,
+      792.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Dining",
+       "floor": "default",
+       "slot": 1,
+       "vid": 2512217478080
+      },
+      {
+       "room": "BR3",
+       "floor": "second",
+       "slot": 6,
+       "vid": 2512244799472
+      },
+      {
+       "room": "Kitchen",
+       "floor": "default",
+       "slot": 6,
+       "vid": 2512217478080
+      },
+      {
+       "room": "Craft",
+       "floor": "default",
+       "slot": 7,
+       "vid": 2512217478080
+      }
+     ],
+     "distinct_vertex_objects_here": 2,
+     "holder_floors": [
+      "default",
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": true,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 3,
+      "second": 2
+     },
+     "wall_ends_TOTAL": 5,
+     "walls_HOLDING_each_object": {
+      "2512217478080": [
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         1284.0,
+         792.0
+        ],
+        "to": [
+         1494.0,
+         792.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         1494.0,
+         732.0
+        ],
+        "to": [
+         1494.0,
+         792.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         1494.0,
+         792.0
+        ],
+        "to": [
+         1494.0,
+         864.0
+        ]
+       }
+      ],
+      "2512244799472": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 3,
+      "len(deg[vid])  walls holding the object": {
+       "2512217478080": 3,
+       "2512244799472": 0
+      }
+     }
+    },
+    {
+     "at": [
+      1494.0,
+      864.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Dining",
+       "floor": "default",
+       "slot": 2,
+       "vid": 2512227933184
+      },
+      {
+       "room": "BR3",
+       "floor": "second",
+       "slot": 7,
+       "vid": 2512244799520
+      },
+      {
+       "room": "Front Porch",
+       "floor": "default",
+       "slot": 8,
+       "vid": 2512227933184
+      },
+      {
+       "room": "Craft",
+       "floor": "default",
+       "slot": 6,
+       "vid": 2512227933184
+      }
+     ],
+     "distinct_vertex_objects_here": 2,
+     "holder_floors": [
+      "default",
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": true,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 3,
+      "second": 2
+     },
+     "wall_ends_TOTAL": 5,
+     "walls_HOLDING_each_object": {
+      "2512227933184": [
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         1494.0,
+         792.0
+        ],
+        "to": [
+         1494.0,
+         864.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "exterior",
+        "deg_from": [
+         1494.0,
+         936.0
+        ],
+        "to": [
+         1494.0,
+         864.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "exterior",
+        "deg_from": [
+         1494.0,
+         864.0
+        ],
+        "to": [
+         1524.0,
+         864.0
+        ]
+       }
+      ],
+      "2512244799520": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 3,
+      "len(deg[vid])  walls holding the object": {
+       "2512227933184": 3,
+       "2512244799520": 0
+      }
+     }
+    },
+    {
+     "at": [
+      1098.0,
+      732.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Hall",
+       "floor": "default",
+       "slot": 3,
+       "vid": 2512217480144
+      },
+      {
+       "room": "Great Room",
+       "floor": "default",
+       "slot": 5,
+       "vid": 2512217480144
+      },
+      {
+       "room": "Hall2",
+       "floor": "second",
+       "slot": 3,
+       "vid": 2512244798656
+      }
+     ],
+     "distinct_vertex_objects_here": 2,
+     "holder_floors": [
+      "default",
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": true,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 2,
+      "second": 2
+     },
+     "wall_ends_TOTAL": 4,
+     "walls_HOLDING_each_object": {
+      "2512217480144": [
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         1098.0,
+         792.0
+        ],
+        "to": [
+         1098.0,
+         732.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         1080.0,
+         732.0
+        ],
+        "to": [
+         1098.0,
+         732.0
+        ]
+       }
+      ],
+      "2512244798656": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 2,
+      "len(deg[vid])  walls holding the object": {
+       "2512217480144": 2,
+       "2512244798656": 0
+      }
+     }
+    },
+    {
+     "at": [
+      888.0,
+      732.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Master Suite",
+       "floor": "default",
+       "slot": 6,
+       "vid": 2512217318464
+      },
+      {
+       "room": "BONUS1",
+       "floor": "second",
+       "slot": 7,
+       "vid": 2512227227616
+      },
+      {
+       "room": "BR2",
+       "floor": "second",
+       "slot": 0,
+       "vid": 2512227227616
+      },
+      {
+       "room": "MBATH",
+       "floor": "default",
+       "slot": 3,
+       "vid": 2512217318464
+      }
+     ],
+     "distinct_vertex_objects_here": 2,
+     "holder_floors": [
+      "default",
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": true,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 2,
+      "second": 3
+     },
+     "wall_ends_TOTAL": 5,
+     "walls_HOLDING_each_object": {
+      "2512217318464": [],
+      "2512227227616": [
+       {
+        "floor": "second",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         948.0,
+         732.0
+        ],
+        "to": [
+         888.0,
+         732.0
+        ]
+       },
+       {
+        "floor": "second",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         888.0,
+         732.0
+        ],
+        "to": [
+         888.0,
+         534.0
+        ]
+       },
+       {
+        "floor": "second",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         888.0,
+         732.0
+        ],
+        "to": [
+         888.0,
+         792.0
+        ]
+       }
+      ]
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 2,
+      "len(deg[vid])  walls holding the object": {
+       "2512217318464": 0,
+       "2512227227616": 3
+      }
+     }
+    },
+    {
+     "at": [
+      888.0,
+      534.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Master Suite",
+       "floor": "default",
+       "slot": 1,
+       "vid": 2512217324416
+      },
+      {
+       "room": "BONUS1",
+       "floor": "second",
+       "slot": 0,
+       "vid": 2512227223344
+      },
+      {
+       "room": "Rear Porch",
+       "floor": "default",
+       "slot": 7,
+       "vid": 2512217324416
+      }
+     ],
+     "distinct_vertex_objects_here": 2,
+     "holder_floors": [
+      "default",
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": true,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 2,
+      "second": 2
+     },
+     "wall_ends_TOTAL": 4,
+     "walls_HOLDING_each_object": {
+      "2512217324416": [],
+      "2512227223344": [
+       {
+        "floor": "second",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         888.0,
+         732.0
+        ],
+        "to": [
+         888.0,
+         534.0
+        ]
+       },
+       {
+        "floor": "second",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         888.0,
+         534.0
+        ],
+        "to": [
+         1032.0,
+         534.0
+        ]
+       }
+      ]
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 2,
+      "len(deg[vid])  walls holding the object": {
+       "2512217324416": 0,
+       "2512227223344": 2
+      }
+     }
+    },
+    {
+     "at": [
+      888.0,
+      732.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Master Suite",
+       "floor": "default",
+       "slot": 6,
+       "vid": 2512217318464
+      },
+      {
+       "room": "BONUS1",
+       "floor": "second",
+       "slot": 7,
+       "vid": 2512227227616
+      },
+      {
+       "room": "BR2",
+       "floor": "second",
+       "slot": 0,
+       "vid": 2512227227616
+      },
+      {
+       "room": "MBATH",
+       "floor": "default",
+       "slot": 3,
+       "vid": 2512217318464
+      }
+     ],
+     "distinct_vertex_objects_here": 2,
+     "holder_floors": [
+      "default",
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": true,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 2,
+      "second": 3
+     },
+     "wall_ends_TOTAL": 5,
+     "walls_HOLDING_each_object": {
+      "2512217318464": [],
+      "2512227227616": [
+       {
+        "floor": "second",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         948.0,
+         732.0
+        ],
+        "to": [
+         888.0,
+         732.0
+        ]
+       },
+       {
+        "floor": "second",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         888.0,
+         732.0
+        ],
+        "to": [
+         888.0,
+         534.0
+        ]
+       },
+       {
+        "floor": "second",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         888.0,
+         732.0
+        ],
+        "to": [
+         888.0,
+         792.0
+        ]
+       }
+      ]
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 2,
+      "len(deg[vid])  walls holding the object": {
+       "2512217318464": 0,
+       "2512227227616": 3
+      }
+     }
+    },
+    {
+     "at": [
+      888.0,
+      534.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Master Suite",
+       "floor": "default",
+       "slot": 1,
+       "vid": 2512217324416
+      },
+      {
+       "room": "BONUS1",
+       "floor": "second",
+       "slot": 0,
+       "vid": 2512227223344
+      },
+      {
+       "room": "Rear Porch",
+       "floor": "default",
+       "slot": 7,
+       "vid": 2512217324416
+      }
+     ],
+     "distinct_vertex_objects_here": 2,
+     "holder_floors": [
+      "default",
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": true,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 2,
+      "second": 2
+     },
+     "wall_ends_TOTAL": 4,
+     "walls_HOLDING_each_object": {
+      "2512217324416": [],
+      "2512227223344": [
+       {
+        "floor": "second",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         888.0,
+         732.0
+        ],
+        "to": [
+         888.0,
+         534.0
+        ]
+       },
+       {
+        "floor": "second",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         888.0,
+         534.0
+        ],
+        "to": [
+         1032.0,
+         534.0
+        ]
+       }
+      ]
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 2,
+      "len(deg[vid])  walls holding the object": {
+       "2512217324416": 0,
+       "2512227223344": 2
+      }
+     }
+    }
+   ],
+   "STAYED_detail": [
+    {
+     "at": [
+      972.0,
+      732.0
+     ],
+     "holder_slots": [
+      {
+       "room": "BONUS1",
+       "floor": "second",
+       "slot": 5,
+       "vid": 2512244798176
+      },
+      {
+       "room": "BR2",
+       "floor": "second",
+       "slot": 2,
+       "vid": 2512244798176
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512244798176": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "second",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512244798176": 0
+      }
+     }
+    },
+    {
+     "at": [
+      972.0,
+      732.0
+     ],
+     "holder_slots": [
+      {
+       "room": "BONUS1",
+       "floor": "second",
+       "slot": 5,
+       "vid": 2512244798176
+      },
+      {
+       "room": "BR2",
+       "floor": "second",
+       "slot": 2,
+       "vid": 2512244798176
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512244798176": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "second",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512244798176": 0
+      }
+     }
+    },
+    {
+     "at": [
+      1032.0,
+      786.0
+     ],
+     "holder_slots": [
+      {
+       "room": "BR2",
+       "floor": "second",
+       "slot": 5,
+       "vid": 2512244798464
+      },
+      {
+       "room": "Hall2",
+       "floor": "second",
+       "slot": 9,
+       "vid": 2512244798464
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512244798464": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "second",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512244798464": 0
+      }
+     }
+    },
+    {
+     "at": [
+      1386.0,
+      732.0
+     ],
+     "holder_slots": [
+      {
+       "room": "BR3",
+       "floor": "second",
+       "slot": 3,
+       "vid": 2512244799232
+      },
+      {
+       "room": "UPBATH",
+       "floor": "second",
+       "slot": 3,
+       "vid": 2512244799232
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512244799232": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "second",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512244799232": 0
+      }
+     }
+    },
+    {
+     "at": [
+      1284.0,
+      864.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Dining",
+       "floor": "default",
+       "slot": 5,
+       "vid": 2512217477696
+      },
+      {
+       "room": "BR3",
+       "floor": "second",
+       "slot": 10,
+       "vid": 2512244798992
+      },
+      {
+       "room": "Foyer",
+       "floor": "default",
+       "slot": 2,
+       "vid": 2512217477696
+      },
+      {
+       "room": "Front Porch",
+       "floor": "default",
+       "slot": 5,
+       "vid": 2512217477696
+      }
+     ],
+     "distinct_vertex_objects_here": 2,
+     "holder_floors": [
+      "default",
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": true,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 3,
+      "second": 2
+     },
+     "wall_ends_TOTAL": 5,
+     "walls_HOLDING_each_object": {
+      "2512217477696": [
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "exterior",
+        "deg_from": [
+         1098.0,
+         864.0
+        ],
+        "to": [
+         1284.0,
+         864.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "exterior",
+        "deg_from": [
+         1284.0,
+         864.0
+        ],
+        "to": [
+         1284.0,
+         936.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         1284.0,
+         864.0
+        ],
+        "to": [
+         1284.0,
+         792.0
+        ]
+       }
+      ],
+      "2512244798992": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 3,
+      "len(deg[vid])  walls holding the object": {
+       "2512217477696": 3,
+       "2512244798992": 0
+      }
+     }
+    },
+    {
+     "at": [
+      1032.0,
+      786.0
+     ],
+     "holder_slots": [
+      {
+       "room": "BR2",
+       "floor": "second",
+       "slot": 5,
+       "vid": 2512244798464
+      },
+      {
+       "room": "Hall2",
+       "floor": "second",
+       "slot": 9,
+       "vid": 2512244798464
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "second"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512244798464": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "second",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512244798464": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "plan": "wiscaway2026-08-08.json",
+   "coalesce_removed_vertices": 25,
+   "coalesce_removed_SLOTS": 37,
+   "DURABLE_slots": 33,
+   "REBOUND_slots_producer_1": 4,
+   "INSERTED_slots_producer_2_never_removed": 0,
+   "CONTROL_inserted_by_the_WALL_PASS_ALONE": 0,
+   "PRODUCER_2_IS_THE_WALL_PASS_same_corners_not_just_same_count": {
+    "EQUAL": true,
+    "in_the_coalesce_lane_only": [],
+    "in_the_wall_pass_lane_only": []
+   },
+   "THE_COUNT_MEASURE_the_shipped_test_uses": {
+    "note": "slots after the coalesce vs slots in the saved file -- what `test_a_coalesced_corner_stays_gone_across_a_save` asserts. It cannot separate the two producers.",
+    "net_slot_change_across_the_save": 4,
+    "would_read_durable_as": 33
+   },
+   "inserted_detail_producer_2": [],
+   "POSITIVE_CONTROL_cross_floor_discriminates": {
+    "claim": "if cross-floor holders explain the rebound, the corners that STAYED removed must mostly NOT have them",
+    "rebound_with_cross_floor_holders": "0/4",
+    "stayed_with_cross_floor_holders": "0/33",
+    "rebound_sharing_ONE_object_across_storeys": "0/4",
+    "verdict": "FAIL -- does not discriminate"
+   },
+   "REBOUND_detail": [
+    {
+     "at": [
+      1062.0,
+      774.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Dining",
+       "floor": "default",
+       "slot": 4,
+       "vid": 2512263174016
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 2
+     },
+     "wall_ends_TOTAL": 2,
+     "walls_HOLDING_each_object": {
+      "2512263174016": [
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "interior",
+        "deg_from": [
+         1062.0,
+         762.0
+        ],
+        "to": [
+         1062.0,
+         774.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "exterior",
+        "deg_from": [
+         1062.0,
+         786.0
+        ],
+        "to": [
+         1062.0,
+         774.0
+        ]
+       }
+      ]
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 2,
+      "len(deg[vid])  walls holding the object": {
+       "2512263174016": 2
+      }
+     }
+    },
+    {
+     "at": [
+      852.0,
+      762.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Dining",
+       "floor": "default",
+       "slot": 10,
+       "vid": 2512245329248
+      },
+      {
+       "room": "Foyer",
+       "floor": "default",
+       "slot": 4,
+       "vid": 2512245329248
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 2
+     },
+     "wall_ends_TOTAL": 2,
+     "walls_HOLDING_each_object": {
+      "2512245329248": [
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         852.0,
+         762.0
+        ],
+        "to": [
+         852.0,
+         684.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "exterior",
+        "deg_from": [
+         852.0,
+         762.0
+        ],
+        "to": [
+         852.0,
+         786.0
+        ]
+       }
+      ]
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 2,
+      "len(deg[vid])  walls holding the object": {
+       "2512245329248": 2
+      }
+     }
+    },
+    {
+     "at": [
+      852.0,
+      762.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Dining",
+       "floor": "default",
+       "slot": 10,
+       "vid": 2512245329248
+      },
+      {
+       "room": "Foyer",
+       "floor": "default",
+       "slot": 4,
+       "vid": 2512245329248
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 2
+     },
+     "wall_ends_TOTAL": 2,
+     "walls_HOLDING_each_object": {
+      "2512245329248": [
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         852.0,
+         762.0
+        ],
+        "to": [
+         852.0,
+         684.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "exterior",
+        "deg_from": [
+         852.0,
+         762.0
+        ],
+        "to": [
+         852.0,
+         786.0
+        ]
+       }
+      ]
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 2,
+      "len(deg[vid])  walls holding the object": {
+       "2512245329248": 2
+      }
+     }
+    },
+    {
+     "at": [
+      1476.0,
+      660.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Util",
+       "floor": "default",
+       "slot": 1,
+       "vid": 2512263170224
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 2
+     },
+     "wall_ends_TOTAL": 2,
+     "walls_HOLDING_each_object": {
+      "2512263170224": [
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         1476.0,
+         660.0
+        ],
+        "to": [
+         1428.0,
+         660.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "exterior",
+        "deg_from": [
+         1524.0,
+         660.0
+        ],
+        "to": [
+         1476.0,
+         660.0
+        ]
+       }
+      ]
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 2,
+      "len(deg[vid])  walls holding the object": {
+       "2512263170224": 2
+      }
+     }
+    }
+   ],
+   "STAYED_detail": [
+    {
+     "at": [
+      912.0,
+      426.0
+     ],
+     "holder_slots": [
+      {
+       "room": "BKF NOOK",
+       "floor": "default",
+       "slot": 4,
+       "vid": 2512228042208
+      },
+      {
+       "room": "GREAT RM",
+       "floor": "default",
+       "slot": 2,
+       "vid": 2512228042208
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512228042208": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512228042208": 0
+      }
+     }
+    },
+    {
+     "at": [
+      894.0,
+      372.0
+     ],
+     "holder_slots": [
+      {
+       "room": "BKF NOOK",
+       "floor": "default",
+       "slot": 6,
+       "vid": 2512228042784
+      },
+      {
+       "room": "Rear Porch",
+       "floor": "default",
+       "slot": 4,
+       "vid": 2512228042784
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512228042784": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512228042784": 0
+      }
+     }
+    },
+    {
+     "at": [
+      894.0,
+      330.0
+     ],
+     "holder_slots": [
+      {
+       "room": "BKF NOOK",
+       "floor": "default",
+       "slot": 7,
+       "vid": 2512228042688
+      },
+      {
+       "room": "Rear Porch",
+       "floor": "default",
+       "slot": 3,
+       "vid": 2512228042688
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512228042688": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512228042688": 0
+      }
+     }
+    },
+    {
+     "at": [
+      696.0,
+      624.0
+     ],
+     "holder_slots": [
+      {
+       "room": "CLST",
+       "floor": "default",
+       "slot": 4,
+       "vid": 2512228042016
+      },
+      {
+       "room": "SAFE",
+       "floor": "default",
+       "slot": 4,
+       "vid": 2512228042016
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512228042016": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512228042016": 0
+      }
+     }
+    },
+    {
+     "at": [
+      852.0,
+      774.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Dining",
+       "floor": "default",
+       "slot": 9,
+       "vid": 2512228042496
+      },
+      {
+       "room": "Foyer",
+       "floor": "default",
+       "slot": 5,
+       "vid": 2512228042496
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512228042496": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512228042496": 0
+      }
+     }
+    },
+    {
+     "at": [
+      696.0,
+      684.0
+     ],
+     "holder_slots": [
+      {
+       "room": "HALL",
+       "floor": "default",
+       "slot": 5,
+       "vid": 2512228042256
+      },
+      {
+       "room": "Foyer",
+       "floor": "default",
+       "slot": 1,
+       "vid": 2512228042256
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512228042256": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512228042256": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "plan": "symmetricP1.json",
+   "coalesce_removed_vertices": 2,
+   "coalesce_removed_SLOTS": 4,
+   "DURABLE_slots": 4,
+   "REBOUND_slots_producer_1": 0,
+   "INSERTED_slots_producer_2_never_removed": 0,
+   "CONTROL_inserted_by_the_WALL_PASS_ALONE": 0,
+   "PRODUCER_2_IS_THE_WALL_PASS_same_corners_not_just_same_count": {
+    "EQUAL": true,
+    "in_the_coalesce_lane_only": [],
+    "in_the_wall_pass_lane_only": []
+   },
+   "THE_COUNT_MEASURE_the_shipped_test_uses": {
+    "note": "slots after the coalesce vs slots in the saved file -- what `test_a_coalesced_corner_stays_gone_across_a_save` asserts. It cannot separate the two producers.",
+    "net_slot_change_across_the_save": 0,
+    "would_read_durable_as": 4
+   },
+   "inserted_detail_producer_2": [],
+   "POSITIVE_CONTROL_cross_floor_discriminates": {
+    "claim": "if cross-floor holders explain the rebound, the corners that STAYED removed must mostly NOT have them",
+    "rebound_with_cross_floor_holders": "0/0",
+    "stayed_with_cross_floor_holders": "0/4",
+    "rebound_sharing_ONE_object_across_storeys": "0/0",
+    "verdict": "no rebound on this plan"
+   },
+   "REBOUND_detail": [],
+   "STAYED_detail": [
+    {
+     "at": [
+      385.38,
+      456.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Great Room",
+       "floor": "default",
+       "slot": 1,
+       "vid": 2512281358048
+      },
+      {
+       "room": "Rear Porch",
+       "floor": "default",
+       "slot": 5,
+       "vid": 2512281358048
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512281358048": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512281358048": 0
+      }
+     }
+    },
+    {
+     "at": [
+      385.38,
+      654.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Hall",
+       "floor": "default",
+       "slot": 3,
+       "vid": 2512281357280
+      },
+      {
+       "room": "Great Room",
+       "floor": "default",
+       "slot": 7,
+       "vid": 2512281357280
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512281357280": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512281357280": 0
+      }
+     }
+    },
+    {
+     "at": [
+      385.38,
+      654.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Hall",
+       "floor": "default",
+       "slot": 3,
+       "vid": 2512281357280
+      },
+      {
+       "room": "Great Room",
+       "floor": "default",
+       "slot": 7,
+       "vid": 2512281357280
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512281357280": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512281357280": 0
+      }
+     }
+    },
+    {
+     "at": [
+      385.38,
+      456.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Great Room",
+       "floor": "default",
+       "slot": 1,
+       "vid": 2512281358048
+      },
+      {
+       "room": "Rear Porch",
+       "floor": "default",
+       "slot": 5,
+       "vid": 2512281358048
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512281358048": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512281358048": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "plan": "wiscaway2026-08-09R.json",
+   "coalesce_removed_vertices": 86,
+   "coalesce_removed_SLOTS": 97,
+   "DURABLE_slots": 94,
+   "REBOUND_slots_producer_1": 3,
+   "INSERTED_slots_producer_2_never_removed": 1,
+   "CONTROL_inserted_by_the_WALL_PASS_ALONE": 3,
+   "PRODUCER_2_IS_THE_WALL_PASS_same_corners_not_just_same_count": {
+    "EQUAL": false,
+    "in_the_coalesce_lane_only": [],
+    "in_the_wall_pass_lane_only": [
+     {
+      "room": "OFFICE",
+      "at": [
+       1273.525,
+       314.996
+      ]
+     },
+     {
+      "room": "PWDR",
+      "at": [
+       1151.988,
+       785.62
+      ]
+     }
+    ]
+   },
+   "THE_COUNT_MEASURE_the_shipped_test_uses": {
+    "note": "slots after the coalesce vs slots in the saved file -- what `test_a_coalesced_corner_stays_gone_across_a_save` asserts. It cannot separate the two producers.",
+    "net_slot_change_across_the_save": 4,
+    "would_read_durable_as": 93
+   },
+   "inserted_detail_producer_2": [
+    {
+     "room": "OFFICE",
+     "at": [
+      1269.728,
+      387.728
+     ]
+    }
+   ],
+   "POSITIVE_CONTROL_cross_floor_discriminates": {
+    "claim": "if cross-floor holders explain the rebound, the corners that STAYED removed must mostly NOT have them",
+    "rebound_with_cross_floor_holders": "0/3",
+    "stayed_with_cross_floor_holders": "0/94",
+    "rebound_sharing_ONE_object_across_storeys": "0/3",
+    "verdict": "FAIL -- does not discriminate"
+   },
+   "REBOUND_detail": [
+    {
+     "at": [
+      1062.0,
+      774.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Dining",
+       "floor": "default",
+       "slot": 4,
+       "vid": 2512282772640
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 2
+     },
+     "wall_ends_TOTAL": 2,
+     "walls_HOLDING_each_object": {
+      "2512282772640": [
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         1062.0,
+         774.0
+        ],
+        "to": [
+         1062.0,
+         684.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p2",
+        "type": "exterior",
+        "deg_from": [
+         1062.0,
+         786.0
+        ],
+        "to": [
+         1062.0,
+         774.0
+        ]
+       }
+      ]
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 2,
+      "len(deg[vid])  walls holding the object": {
+       "2512282772640": 2
+      }
+     }
+    },
+    {
+     "at": [
+      852.0,
+      762.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Foyer",
+       "floor": "default",
+       "slot": 4,
+       "vid": 2512282770864
+      },
+      {
+       "room": "Dining",
+       "floor": "default",
+       "slot": 10,
+       "vid": 2512282770864
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 2
+     },
+     "wall_ends_TOTAL": 2,
+     "walls_HOLDING_each_object": {
+      "2512282770864": [
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         852.0,
+         762.0
+        ],
+        "to": [
+         852.0,
+         684.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "exterior",
+        "deg_from": [
+         852.0,
+         762.0
+        ],
+        "to": [
+         852.0,
+         786.0
+        ]
+       }
+      ]
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 2,
+      "len(deg[vid])  walls holding the object": {
+       "2512282770864": 2
+      }
+     }
+    },
+    {
+     "at": [
+      852.0,
+      762.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Foyer",
+       "floor": "default",
+       "slot": 4,
+       "vid": 2512282770864
+      },
+      {
+       "room": "Dining",
+       "floor": "default",
+       "slot": 10,
+       "vid": 2512282770864
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {
+      "default": 2
+     },
+     "wall_ends_TOTAL": 2,
+     "walls_HOLDING_each_object": {
+      "2512282770864": [
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "interior",
+        "deg_from": [
+         852.0,
+         762.0
+        ],
+        "to": [
+         852.0,
+         684.0
+        ]
+       },
+       {
+        "floor": "default",
+        "end": "p1",
+        "type": "exterior",
+        "deg_from": [
+         852.0,
+         762.0
+        ],
+        "to": [
+         852.0,
+         786.0
+        ]
+       }
+      ]
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 2,
+      "len(deg[vid])  walls holding the object": {
+       "2512282770864": 2
+      }
+     }
+    }
+   ],
+   "STAYED_detail": [
+    {
+     "at": [
+      696.0,
+      624.0
+     ],
+     "holder_slots": [
+      {
+       "room": "CLST",
+       "floor": "default",
+       "slot": 4,
+       "vid": 2512281442128
+      },
+      {
+       "room": "SAFE",
+       "floor": "default",
+       "slot": 4,
+       "vid": 2512281442128
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512281442128": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512281442128": 0
+      }
+     }
+    },
+    {
+     "at": [
+      954.0,
+      684.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Dining",
+       "floor": "default",
+       "slot": 2,
+       "vid": 2512281439296
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512281439296": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512281439296": 0
+      }
+     }
+    },
+    {
+     "at": [
+      852.0,
+      774.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Foyer",
+       "floor": "default",
+       "slot": 5,
+       "vid": 2512281440688
+      },
+      {
+       "room": "Dining",
+       "floor": "default",
+       "slot": 9,
+       "vid": 2512281440688
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512281440688": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512281440688": 0
+      }
+     }
+    },
+    {
+     "at": [
+      696.0,
+      684.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Foyer",
+       "floor": "default",
+       "slot": 1,
+       "vid": 2512281451776
+      },
+      {
+       "room": "HALL",
+       "floor": "default",
+       "slot": 5,
+       "vid": 2512281451776
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512281451776": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512281451776": 0
+      }
+     }
+    },
+    {
+     "at": [
+      852.0,
+      774.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Foyer",
+       "floor": "default",
+       "slot": 5,
+       "vid": 2512281440688
+      },
+      {
+       "room": "Dining",
+       "floor": "default",
+       "slot": 9,
+       "vid": 2512281440688
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512281440688": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512281440688": 0
+      }
+     }
+    },
+    {
+     "at": [
+      666.0,
+      774.0
+     ],
+     "holder_slots": [
+      {
+       "room": "Foyer",
+       "floor": "default",
+       "slot": 8,
+       "vid": 2512281452016
+      },
+      {
+       "room": "Lounge",
+       "floor": "default",
+       "slot": 5,
+       "vid": 2512281452016
+      }
+     ],
+     "distinct_vertex_objects_here": 1,
+     "holder_floors": [
+      "default"
+     ],
+     "CROSS_FLOOR_HOLDERS": false,
+     "SHARED_ACROSS_FLOORS_one_object_two_storeys": false,
+     "wall_ends_at_this_point_BY_FLOOR": {},
+     "wall_ends_TOTAL": 0,
+     "walls_HOLDING_each_object": {
+      "2512281452016": []
+     },
+     "what_wall_ok_compared": {
+      "floor_it_scoped_to (first holder)": "default",
+      "_ends_at(pt, floor)": 0,
+      "len(deg[vid])  walls holding the object": {
+       "2512281452016": 0
+      }
+     }
+    }
+   ]
+  },
+  {
+   "plan": "planc1.v5.json",
+   "coalesce_removed_vertices": 0,
+   "coalesce_removed_SLOTS": 0,
+   "DURABLE_slots": 0,
+   "REBOUND_slots_producer_1": 0,
+   "INSERTED_slots_producer_2_never_removed": 3,
+   "CONTROL_inserted_by_the_WALL_PASS_ALONE": 3,
+   "PRODUCER_2_IS_THE_WALL_PASS_same_corners_not_just_same_count": {
+    "EQUAL": true,
+    "in_the_coalesce_lane_only": [],
+    "in_the_wall_pass_lane_only": []
+   },
+   "THE_COUNT_MEASURE_the_shipped_test_uses": {
+    "note": "slots after the coalesce vs slots in the saved file -- what `test_a_coalesced_corner_stays_gone_across_a_save` asserts. It cannot separate the two producers.",
+    "net_slot_change_across_the_save": 3,
+    "would_read_durable_as": -3
+   },
+   "inserted_detail_producer_2": [
+    {
+     "room": "Hall",
+     "at": [
+      248.43,
+      654.0
+     ]
+    },
+    {
+     "room": "M Bath",
+     "at": [
+      248.43,
+      654.0
+     ]
+    },
+    {
+     "room": "Master Suite",
+     "at": [
+      248.43,
+      654.0
+     ]
+    }
+   ],
+   "POSITIVE_CONTROL_cross_floor_discriminates": {
+    "claim": "if cross-floor holders explain the rebound, the corners that STAYED removed must mostly NOT have them",
+    "rebound_with_cross_floor_holders": "0/0",
+    "stayed_with_cross_floor_holders": "0/0",
+    "rebound_sharing_ONE_object_across_storeys": "0/0",
+    "verdict": "no rebound on this plan"
+   },
+   "REBOUND_detail": [],
+   "STAYED_detail": []
+  }
+ ]
+}
