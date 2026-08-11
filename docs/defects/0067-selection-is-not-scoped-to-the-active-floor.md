@@ -101,6 +101,18 @@ which is far more expensive to remove later.
 Applied at `floorplanner/commands.py` on the same day this was filed. **That is
 not a fix for this defect** and does not close it.
 
+## IT MAY BLOCK P6.d — pre-committed 2026‑08‑11
+
+**If undo of a cross-floor drag comes back PARTIAL, this defect BLOCKS the Phase
+6 cutover.** The question — whether a `GestureCommand` records the *operation* or
+the *affected entities* — is pre-committed to P6.d's read-back with its
+consequence decided in advance, so the answer cannot be argued with afterwards.
+The test is one gesture on `roundedMultifloor`: drag across floors, undo, compare
+floor 1 to pristine.
+
+**A lossy undo is worse than the defect it fails to reverse.** This drag is
+visible and correctable; a half-restoring undo is neither.
+
 ## Ruling
 
 *(Open — filed 2026‑08‑11, reported by Patrick.)* **Filed, not fixed**, on the

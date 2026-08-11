@@ -56,6 +56,15 @@ is presentation: it sets `build_model`'s parameters and **re-builds**; it does
 not reach into meshes. Building it as a mesh filter is the obvious wrong turn and
 this paragraph exists to prevent it.
 
+**THE GENERAL FORM, which decides any toggle without re-arguing this:**
+
+> **If turning it off would change the TRIANGLE COUNT, it is a parameter.**
+
+So **openings are geometry** — they cut wall meshes, and hiding them changes what
+`build_model` must produce, not what the shell draws. **Floors and furnishings
+are geometry** and are already parameters (`levels`, `furnishings`). **A
+wireframe or palette switch is view-side** — same triangles, drawn differently.
+
 ## 2. Conventions
 
 * **Units are inches** throughout, per the v5 schema.

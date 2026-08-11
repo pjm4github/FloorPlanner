@@ -658,6 +658,37 @@ rather than silently equivalent to "the default floor".
 **`Extract`/`Join` and `MoveVertices` do NOT appear**, deliberately: they are
 inside `DragGesture`, and naming them as commands is the mistake this re-cut
 exists to prevent.
+### P6.d — the cutover. AMBER, and it comes as a READ-BACK before it is wired
+
+**One question is pre-committed to that read-back, with its consequence decided
+in advance so the answer cannot be argued with after the fact.**
+
+> **Does a `GestureCommand` record the OPERATION or the AFFECTED ENTITIES?**
+>
+> * **If entities** — a cross-floor drag's shared vertices come back on undo **by
+>   identity**, and the exposure is **nil**.
+> * **If the operation** — undo restores the **scoped floor only** and leaves the
+>   other displaced **with no route back**.
+
+**THE TEST, and it is the whole test.** On `examples/roundedMultifloor.json`:
+perform the cross-floor drag [D67](defects/0067-selection-is-not-scoped-to-the-active-floor.md)
+describes, **undo**, and compare **floor 1's geometry to pristine**.
+
+**PRE-COMMITTED CONSEQUENCE:**
+
+| result | what happens |
+|---|---|
+| **undo comes back PARTIAL** | **D67 BLOCKS P6.d.** The cutover does not ship while selection is unscoped |
+| **undo comes back COMPLETE** | D67 stays deferred as Patrick ruled, and the cutover proceeds |
+
+**The reason the block is pre-committed rather than judged later:** *a lossy undo
+is worse than the defect it fails to reverse.* The cross-floor drag is **visible
+and correctable**; an undo that **silently half-restores** is neither — the user
+has no signal that anything is left behind and no gesture that would fix it.
+
+**Not measured yet, deliberately.** It belongs in the read-back where it will be
+acted on, not in a note nobody is reading when the answer matters.
+
 ### P6.2 — Retire snapshot undo
 ### P6.3 — Scene index + viewport update final pass
 Revisit `FullViewportUpdate` now that bounding rects are trustworthy.

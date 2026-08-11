@@ -594,7 +594,37 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             # channel and will say so within a frame.
             warnings.filterwarnings("ignore", message="design_from_scene:")
             doc = self.design_document()
-        model = build_model(doc)
+        # D68: THE ACTIVE FLOOR ONLY, and the floor is read from the WINDOW,
+        # not from `doc`. `active_floor` is deliberately VIEW STATE -- kept out
+        # of `serialize()` so switching floors is neither undoable nor dirtying
+        # -- so the document does not carry it and looking there is the wrong
+        # path a fixer would take.
+        #
+        # THIS REMOVES A REACHABLE CAPABILITY, and that is acceptable HERE and
+        # only here, because the capability is BROKEN. D11's z collapse means
+        # every floor currently renders at ONE HEIGHT, so "see the whole
+        # building" has never actually worked -- it produced a pile, not a
+        # building. **This removes a misleading view, not a working one**, which
+        # is the distinction PARASITIC REACH exists to make: the rule says
+        # budget for what rests on a fault, and what rested on this one was an
+        # image that lied.
+        #
+        # THE ESCAPE EXISTS MEANWHILE: the `fp3d` and `fp3dq` CLIs keep
+        # `--level` and can still render everything. D69's control panel is
+        # what restores the choice in the UI, and it restores it as a
+        # `build_model` parameter (VIEWER_NOTES.md section 1), never as a mesh
+        # filter.
+        #
+        # AND THE ID IS NOT THE NAME. `build_model(levels=…)` filters by level
+        # **id** (`L1`, `L2`); `active_floor` is the level **name**
+        # (`default`, `second`). Passing the name straight through matches
+        # nothing and `build_model` renders an EMPTY MODEL with a note nobody
+        # reads -- a silent blank window, which is worse than the defect. The
+        # mapping is done here, and a floor with no matching level falls back to
+        # the whole document rather than to nothing.
+        want = [lv["id"] for lv in doc.get("levels", [])
+                if lv.get("name") == self.active_floor] or None
+        model = build_model(doc, levels=want)
         dlg = QDialog(self)
         dlg.setWindowTitle("3D view")
         lay = QVBoxLayout(dlg)
