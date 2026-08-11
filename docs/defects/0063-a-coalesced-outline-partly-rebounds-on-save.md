@@ -384,3 +384,15 @@ It bears directly on **D61 stage 2b**, whose acceptance is now *taken across a
 save*: a six-move walk must end with the counts it started with **after save and
 reload**, not in session. In-session-only would measure the wrong thing, and this
 record is why.
+
+## PARKED (2026‑08‑11)
+
+**Register entry, no work.** Patrick's ruling: bug cleanup circles back after
+features. **Not to be reopened without a new instruction.** Parked alongside
+[D63](0063-a-coalesced-outline-partly-rebounds-on-save.md)'s remaining halves,
+[D64](0064-the-save-writes-an-outline-corner-at-a.md),
+[D65](0065-weld-scene-is-implicated-in-three-separate.md) and
+[D66](0066-a-departing-room-carries-its-neighbours-walls.md).
+
+**What is parked here is PRODUCER 2** — both origins, the wall-pass-created
+and the already-there half. Producer 1 is closed and stays closed.

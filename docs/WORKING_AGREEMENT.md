@@ -353,6 +353,14 @@ because it is written precisely to explain why nobody needs to look further.
 
 **So an acceptance states its driver, not only its assertion.** *"A six-move walk"* names neither what moves the room nor what shape the counts take; *"a six-move walk driven by `_translate`, whose counts return to baseline whenever the room lands back on its berth"* can only be satisfied by reaching the code. **The two rules together:** ask whether the assertion could pass with every item replaced (the count rule), and whether it could pass without the mechanism ever running (this one).
 
+**A REVIEWER'S INSTRUCTION RESTING ON A PREMISE THE IMPLEMENTER HAS ALREADY MEASURED IS REFUSED WITH THE MEASUREMENT — added 2026‑08‑11 at the reviewer's own instruction, about the reviewer's own instruction.**
+
+**The instance.** The reviewer ordered a correction to `defects/0061`: *"it records `0, 2, 4, 6, 8, 10` as linear and monotonic and the producer does not behave that way — a record that misstates its own measurement is worse than one that is merely incomplete."* **The instruction was refused, and the refusal was right.** The record's own line reads *"walk ×6 (**each to a NEW spot**)"*, and measured that way the producer **does** behave that way — 4, 6, 6, 6, 7, 10 walls; −1, 1, 4, 5, 5, 8 collinear. The premise came from the implementer's earlier report, which had measured an **oscillating** walk and called it the record's. **Obeying would have written an error into the register in the name of correcting one.**
+
+**THE RULE IS THE SAME ONE AS NO-RECEIPT-NO-CHANGE, POINTED UPWARD.** Downward it says: do not change code without evidence. Upward it says: **do not change the record on an instruction whose premise your own measurement contradicts** — bring the measurement back instead. An instruction is not evidence, whoever issues it, and a ruling built on a figure the implementer has already disproved is exactly the *laundered measurement* the criterion rule names, arriving from the other direction.
+
+**And the refusal is stated, not silent.** *"I did not do this, and here is the number"* is the whole content of the rule; quietly skipping the instruction would leave the reviewer believing the record was corrected. Both parties then hold the same wrong belief, which is worse than either holding it alone.
+
 **PARASITIC REACH: WHEN YOU REPAIR A CAPABILITY THAT NEVER WORKED, BUDGET FOR THE AFFORDANCES RESTING ON THE FAULT — added 2026‑08‑08 at the FIFTH instance, and it is named so it can be cited.**
 
 A defect that has been in a product a long time stops being only a defect. Things come to depend on it — some of them code nobody exercises, and some of them **features the user learned as the way the application works**. Repair the fault and those go with it. **The second kind is reported as a regression, by the person who depended on it, and they are not wrong to call it one.**

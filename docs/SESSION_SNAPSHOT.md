@@ -1,5 +1,7 @@
 # Session snapshot — read this first
 
+**THE v5 MIGRATION IS CLOSED (2026‑08‑11)** — phases 1–4 merged, the planar model in, `duplicate_wall` dead, the P3.1 shim retired, `end_assign=0` enforced at the gate. The closing statement with its evidence is in [`ROADMAP.md`](ROADMAP.md). **Everything after this is features or cleanup, not migration.**
+
 **Re-cut 2026‑08‑10 on `main`, after PR #19 merged.** **PHASE 4 IS COMPLETE; the GREEN batch merged; A1 AND A1b ARE BOTH DONE. A2 IS PARKED, NOT NEXT — PR #19 IS MERGED, D63's PRODUCER 1 IS CLOSED, and the queue below starts at producer 2.** This file exists so a fresh session can start from disk instead of from a chat summary. It is an **index and a state marker, not a second copy of the record** — where it points at another document, that document is authoritative and this one must not be trusted over it.
 
 > **THE LIVE QUEUE IS [`handoff/0005-report.md`](handoff/0005-report.md) §7, and it is authoritative over §2 below.** This file is re-cut per session boundary; the handoff is written per session. When they disagree, the handoff is newer.
@@ -34,17 +36,18 @@
 
 **A1 (D47) and A1b (D53) are DONE** — merged at PRs #17 and #18, each with its manual check passed and recorded verbatim on the PR.
 
-> ### THE QUEUE BELOW IS THE TIER CHARTER'S ORDER, NOT THE WORK IN FLIGHT
+> ### THE VERTEX-ACCUMULATION FAMILY IS CLOSED OR PARKED (2026‑08‑11)
 >
-> **Read [`handoff/0005-report.md`](handoff/0005-report.md) §7 first.** A2 is **⏸ parked** — the *hang* is parked as not reproducible; the record is not closed — and the items actually being worked are the D61/D62/D63 family on PR #19, which the charter never tiered because they were filed after it was written. In order, as of 2026‑08‑10:
+> **Six measurement passes ended here, on Patrick's ruling.** Nothing below is
+> live work; all of it is register state.
 >
-> 1. **D63 producer 1 — CLOSED**, 2026‑08‑10, on five plans measured by identity: rebound **0** everywhere, and **robust across pairing tolerances 0.05″ → 2.0″**. `roundedMultifloor`'s `6 removed / 0 durable / 6 rebound — UNRESOLVED` was **an artifact of a slot-total measure**, not a fault. The instrument's own zero is controlled against pre-fix code (17 pre-fix / 0 post-fix, same binary). See [D63](defects/0063-a-coalesced-outline-partly-rebounds-on-save.md) and the rule *"an acceptance stated as a count is satisfied by replacement"* in [`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md).
-> 2. **D63 producer 2 — NEXT.** One shape: **a room edge crossing a point where walls END, that the outline never named** — I5 requires a hop there. `rounded` 6, `planc1` 3, `08‑09R` 1, and the wall-pass-alone lane accounts for it exactly, by set equality in both directions. Two origins: the wall pass created the end (6), or **the end was already there and the stored outline never named it** (4). **Ruled: the already-there half first.**
->    * **It is NOT an I14 repair, and I14 could not see it anyway** — two of the three producing plans have **zero** I14 failures, and I14 compares **wall ends to walls**, never an outline (`validate.py:283`). So the state is **invisible to the invariant set**: unreportable by I14 (wrong subject) and unable to fail I5 on a *saved* document (the walk emits one edge per wall by construction). **The fault lives only in the stored-versus-emitted difference.**
-> 3. **[D64](defects/0064-the-save-writes-an-outline-corner-at-a.md) — the save writes a corner at a recomputed coordinate.** ACCURACY, not data integrity: largest genuine move **0.3802″** against a 0.6″ weld radius, nearest other wall end **5.998″**, so no identity is at risk. **Angled geometry only** — zero on all three axis-aligned plans. A **prediction for grid snap to check**.
-> 4. **D61 stage 2b** — not started. Acceptance is **taken across a save**. AMBER.
-> 5. **Grid snap** — five read-backs owed; earlier partial measurements are **not on disk and must be re-taken**. Two predictions now wait on it: the exact/angle dissolve split, and D64.
-> 6. **The step‑3 divorce** — a six-move walk shows two divorced corners appear at step 3 and clear at step 4. **Not `join_room`'s neighbour gap.** Producer unknown.
+> * **[D61](defects/0061-a-room-move-permanently-adds-two-walls.md) — ACCEPTED LIMITATION**, `type:limit` on D44's precedent. `Edit ▸ Coalesce all walls now` is the documented mitigation and the accumulation is **obvious in the scene**, so it is self-announcing and user-correctable. **Reopens if it becomes invisible, or if the mitigation stops sufficing on a larger plan.**
+> * **2b — CLOSED as NOT ISOLATED, not as fixed.** The producer of the *corner* accumulation was never isolated; the stashed implementation targeted a shape the three-state baseline disproved, and was deleted.
+> * **[D66](defects/0066-a-departing-room-carries-its-neighbours-walls.md) — the one real finding** six passes produced: a departing room **carries its neighbours' walls**, because `extract` does not sever the binding `join` welded. Parked.
+> * **PARKED, register entries only:** [D63](defects/0063-a-coalesced-outline-partly-rebounds-on-save.md)'s producer 2 (both origins), [D64](defects/0064-the-save-writes-an-outline-corner-at-a.md)'s corner drift, [D65](defects/0065-weld-scene-is-implicated-in-three-separate.md)'s `weld_scene` repair. **Not to be reopened without a new instruction.**
+> * **D63 producer 1 stays CLOSED** — rebound 0 on five plans, robust across four pairing tolerances.
+>
+> **THE LIVE QUEUE IS PHASE 6**, tiered at [`handoff/0008-readback-phase-6-deep.md`](handoff/0008-readback-phase-6-deep.md): **P6.a** re-host the invariant hook (GREEN) · **P6.b** the command classes at the gesture boundary (GREEN while dormant) · **P6.c** the dirty-tracking replacement (GREEN) · **P6.d** the cutover (AMBER).
 >
 > Everything from **A2 onward below** stands as the charter wrote it.
 

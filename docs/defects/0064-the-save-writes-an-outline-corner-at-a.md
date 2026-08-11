@@ -131,3 +131,14 @@ was raised correctly and does not apply here — these are two findings, and the
 counting is honest.
 
 **Re-measure after grid snap**, per the prediction above.
+
+## PARKED (2026‑08‑11)
+
+**Register entry, no work.** Patrick's ruling: bug cleanup circles back after
+features. **Not to be reopened without a new instruction.** Parked alongside
+[D63](0063-a-coalesced-outline-partly-rebounds-on-save.md)'s remaining halves,
+[D65](0065-weld-scene-is-implicated-in-three-separate.md) and
+[D66](0066-a-departing-room-carries-its-neighbours-walls.md).
+
+**What is parked here is the corner drift** — 2 corners at <= 0.3802 in on
+the angled plan, accuracy only, no identity at risk.

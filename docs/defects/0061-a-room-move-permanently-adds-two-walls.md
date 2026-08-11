@@ -7,8 +7,9 @@ title: "A room move permanently adds two walls and two collinear vertices, and n
 state: open
 state_reason: null
 labels:
-  - type:defect
+  - type:limit
   - area:geometry
+
 milestone: null
 
 # ours; becomes body prose after migration
@@ -16,7 +17,7 @@ opened: 2026-08-09
 closed: null
 closed_by: null
 rank: 62
-related: [41, 52, 62]
+related: [66, 41, 52, 62]
 state_source: report
 github_issue: null
 ---
@@ -277,6 +278,85 @@ sequence that can leave a half-cleaned plan.
 **The receipt Patrick reads is the room areas** — Kitchen 441, Great Rm 346,
 M Bath 144, Hall 72, WIC 60, Safe 41, Sun 159 — unchanged before and after, plus
 a second run that is a no-op and a plan total against the toolbar's 3,3XX.
+
+## ACCEPTED LIMITATION WITH A DOCUMENTED MITIGATION — Patrick, 2026‑08‑11
+
+**This is no longer an open defect awaiting a fix.** Reclassified `type:limit` on
+D44's precedent, on Patrick's acceptance, in his terms:
+
+> **`Edit ▸ Coalesce all walls now` is effective in his testing, and the
+> accumulation is OBVIOUS IN THE SCENE rather than hidden.**
+
+**That second clause is what makes deferring it safe, and it is the whole
+reason** — the fault is **self-announcing and user-correctable**. A person
+looking at a straight run sees the handles; the mitigation is one menu command
+away; and 2a's dry run reports what it will remove before it removes anything.
+A hidden accumulation with a working workaround would not qualify.
+
+### WHAT REOPENS IT
+
+An accepted limit needs its expiry written down, or it quietly becomes a
+permanent one nobody re-examines. **This returns to `type:defect` and open if
+either holds:**
+
+1. **The accumulation stops being visible** — if any future change makes the
+   redundant corners invisible in the scene, the self-announcing property is
+   gone and with it the reason for accepting.
+2. **The mitigation stops being sufficient on a larger plan** — if
+   `Edit ▸ Coalesce all walls now` no longer clears it, or clears too little of
+   it to matter, on a plan bigger than the ones measured here.
+
+### WHAT SIX PASSES PRODUCED
+
+Stated so the next reader sees the real ledger rather than nothing:
+
+* **one real finding** — [D66](0066-a-departing-room-carries-its-neighbours-walls.md),
+  a departing room **carrying its neighbours' walls**, because `extract` does not
+  sever the binding `join` welded. Found while hunting this, real, and recorded.
+* **one honest non-closure** — the producer of the **corner** accumulation is
+  still **unknown**, and D66 does not explain it: a neighbour wall carried 24″ is
+  not a degree-2 collinear vertex on a straight run.
+
+---
+
+## 2b CLOSES — NOT AS FIXED, AS **NOT ISOLATED** (ruled 2026‑08‑11)
+
+**Stated plainly, because the implied close would be a lie.**
+
+* Patrick's original complaint is real and measured: **26 degree-2 collinear
+  vertices and 69 redundant outline corners** on one plan.
+* **2a removes 40 of them and remains the mitigation he has** — `Edit ▸ Coalesce
+  all walls now`, with the area bound and the refusal counts.
+* **2b was to stop the recurrence. Six measurement passes have not isolated the
+  producer of the CORNER accumulation.**
+
+**What the passes found instead is a DIFFERENT defect** —
+[D66](0066-a-departing-room-carries-its-neighbours-walls.md), a departing room
+carrying its neighbours' walls, because `extract` does not sever the binding
+`join` welded. **That is real, is recorded, and does not explain redundant
+collinear corners.** A neighbour wall carried 24″ is not a degree-2 collinear
+vertex on a straight run.
+
+**So the producer of the corner accumulation is UNKNOWN**, and this record says
+so rather than implying a fix. The stashed 2b implementation was **deleted**: it
+targeted the *coalesce the vacated run* shape, and the three-state baseline
+disproved that shape — an unverified change aimed at a refuted premise gets
+deleted, the same rule as a green that was never red.
+
+**The growth law itself is not in doubt and its SHAPE is now named.** Measured
+on one fixture, driven by `_translate` (a floating room's walls do not move with
+`setPos`, which never reaches the producer at all):
+
+| walk | walls | collinear |
+|---|---|---|
+| **a NEW spot each move** | 4, 6, 6, 6, 7, 10 | −1, 1, **4, 5, 5, 8** — accumulates |
+| oscillating ±6″ | 4, 0, 2, 0, 2, 0 | −1, −1, −3, −1, −3, −1 — **self-heals** |
+
+**A return trip self-heals; only a walk that keeps landing somewhere new
+accumulates.** Any future acceptance for this must name both its driver and its
+walk, per the sibling rule in `WORKING_AGREEMENT.md`.
+
+---
 
 ## Receipt
 

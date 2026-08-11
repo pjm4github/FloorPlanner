@@ -107,3 +107,17 @@ reviewer's ruling**, because three findings on one function is a statement about
 the function. **Cross-referenced rather than merged**, and explicitly marked as
 one mechanism seen three ways so the register cannot be read as three
 independent confirmations.
+
+## PARKED (2026‑08‑11)
+
+**Register entry, no work.** Patrick's ruling: bug cleanup circles back after
+features. **Not to be reopened without a new instruction.** Parked alongside
+[D63](0063-a-coalesced-outline-partly-rebounds-on-save.md)'s remaining halves,
+[D64](0064-the-save-writes-an-outline-corner-at-a.md) and
+[D66](0066-a-departing-room-carries-its-neighbours-walls.md).
+
+**What is parked here is the REPAIR** — the fault is now reported at both
+document boundaries by I15, which was the precondition for fixing it, not the
+fix. And [D66](0066-a-departing-room-carries-its-neighbours-walls.md) is the
+fourth instance of the same asymmetry this record names: the join does
+something and no gesture un-does it.

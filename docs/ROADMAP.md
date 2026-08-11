@@ -190,3 +190,45 @@ never worked**. The instrument boundary that let it hide is recorded in
 Record this document's tiers in the plan so the classification is on disk rather than in a
 conversation. If a tier looks wrong once measured, that is stop-condition (b) — say so rather
 than proceeding on it.
+
+---
+
+## THE v5 MIGRATION IS CLOSED — 2026‑08‑11
+
+**Phases 1 through 4 are merged. Everything after this is FEATURES OR CLEANUP,
+not migration, and the documents stop implying otherwise.**
+
+**What it set out to do:** move the file format and the domain model to v5 —
+rooms own outlines, **a corner is one `Vertex` that walls and outlines both
+hold**, walls are bindings — and to do it without the app quietly rewriting
+anyone's plan on the way.
+
+**What it achieved, with the measured evidence:**
+
+| | |
+|---|---|
+| **the planar model is in** | a corner is one `Vertex` (Phase 3, `03f3868`). No re-detection pass, no coalesce family — a wall move updates the rooms it borders **by construction** |
+| **`duplicate_wall` is dead** (P4.5) | group the whole 20-room plan, move it, ungroup: **189 → 189 scene items, zero new objects**, against **106+ duplicate walls** on the original design |
+| **the P3.1 split-on-write shim is retired** | 178 lines; the operation survives as `WallItem.detach_end` |
+| **the guarantee moved to the gate** | `end_assign=0` — no coordinate assignment to a wall end anywhere in `floorplanner/`, enforced on the source text, which cannot go vacuous |
+| **rooms are movable units** (P4.2) | `extract_room` / `join_room`; a placed room's label-drag **is** extract → move → join |
+| **detection left the edit path** (P3.5) | `bake` 299 ms → **28 ms** at 64 rooms; `rebuild` 3.7 ms → **2.4 ms** |
+| **the invariant set** | 17 checks — the twelve cheap, the deep three, and **I15/I16** at document boundaries |
+
+**What it did NOT achieve, said here rather than left to be discovered:** the
+vertex-accumulation family is not closed. [D61](defects/0061-a-room-move-permanently-adds-two-walls.md)
+is an **accepted limitation with a documented mitigation**, and
+[D63](defects/0063-a-coalesced-outline-partly-rebounds-on-save.md)'s producer 2,
+[D64](defects/0064-the-save-writes-an-outline-corner-at-a.md),
+[D65](defects/0065-weld-scene-is-implicated-in-three-separate.md) and
+[D66](defects/0066-a-departing-room-carries-its-neighbours-walls.md) are parked
+register entries. **A migration that closes with four parked records and one
+accepted limit is closing honestly**; one that closed with none would be hiding
+them.
+
+**Phase 5 (landscape), Phase 6 (command undo) and Phase 7 (build) are FEATURE
+WORK.** Phase 6 is no longer RED — see
+[`handoff/0008-readback-phase-6-deep.md`](handoff/0008-readback-phase-6-deep.md)
+and its tiering: **P6.a** re-host the invariant hook, **P6.b** the command
+classes at the gesture boundary, **P6.c** the dirty-tracking replacement,
+**P6.d** the cutover.
