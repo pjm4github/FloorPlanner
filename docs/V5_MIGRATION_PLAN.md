@@ -643,6 +643,18 @@ mutators that exist now (`docs/evidence/phase6-readback-census.json`):
 | `CutItems` / `PasteItems` | `cut_selected`, `paste_clipboard` |
 | **`DragGesture`** | **the drag — absent from the Phase 0 list, and the commonest mutation in the app.** It is not a `MainWindow` method; it lives in the items' event handlers, which is exactly why a menu-shaped list missed it |
 
+**AND EVERY COMMAND CARRIES THE ACTIVE FLOOR** — added 2026‑08‑11 at
+[D67](defects/0067-selection-is-not-scoped-to-the-active-floor.md), as a design
+requirement on this phase rather than a fix for that defect.
+
+Selection is **not** currently scoped to the active floor: a drag on the second
+floor can collect first-floor vertices and move both. **A command recorded
+without floor scope would replay that faithfully, and undo would undo it on both
+floors** — at which point a selection bug has become **a property of the command
+model**, which is far more expensive to remove later than to exclude now. `floor`
+is a required constructor argument, not a defaulted one, so an omission is loud
+rather than silently equivalent to "the default floor".
+
 **`Extract`/`Join` and `MoveVertices` do NOT appear**, deliberately: they are
 inside `DragGesture`, and naming them as commands is the mistake this re-cut
 exists to prevent.

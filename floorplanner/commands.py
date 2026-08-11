@@ -54,13 +54,27 @@ class GestureCommand(QUndoCommand):
     happened by the time the debounce settles and the command is built. That is
     the standard `QUndoCommand` contract and the trap in it; it is handled here
     once rather than in ten subclasses.
+
+    THE ACTIVE FLOOR IS PART OF THE BOUNDARY, NOT METADATA -- added 2026-08-11
+    at D67, as a DESIGN REQUIREMENT rather than a fix for it. Selection is not
+    currently scoped to the active floor: grouping and dragging on the second
+    floor collects vertices belonging to the first, and the drag moves both. A
+    command recorded WITHOUT floor scope would faithfully replay that cross-floor
+    drag, and undo would faithfully undo it on both floors -- at which point a
+    selection bug has become a PROPERTY OF THE COMMAND MODEL, which is far more
+    expensive to remove later than to exclude now.
+
+    So a gesture records the floor it was made on. `floor` is required, not
+    defaulted: a command that forgot it would be indistinguishable from one made
+    on the default floor, and the whole point is that the omission must be loud.
     """
 
-    def __init__(self, win, before, after, text=""):
+    def __init__(self, win, before, after, floor, text=""):
         super().__init__(text or self.__class__.__name__)
         self.win = win
         self.before = before
         self.after = after
+        self.floor = floor            # D67: the boundary includes WHICH floor
         self._applied = True          # the gesture already ran -- see above
 
     def undo(self):

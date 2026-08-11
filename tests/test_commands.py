@@ -69,7 +69,7 @@ def test_redo_is_a_noop_when_the_gesture_already_ran(fp, win):
     gesture, so the contract is handled once in the base class and pinned here.
     """
     applied = []
-    cmd = GestureCommand(win, {"before": 1}, {"after": 1}, "test")
+    cmd = GestureCommand(win, {"before": 1}, {"after": 1}, "default", "test")
     win._restore_state = lambda state: applied.append(state)
 
     cmd.redo()                                   # the push
@@ -80,3 +80,36 @@ def test_redo_is_a_noop_when_the_gesture_already_ran(fp, win):
 
     cmd.redo()                                   # a real redo
     assert applied == [{"before": 1}, {"after": 1}]
+
+
+def test_a_gesture_command_records_the_floor_it_was_made_on():
+    """D67: THE ACTIVE FLOOR IS PART OF THE SETTLED-GESTURE BOUNDARY.
+
+    Selection is not currently scoped to the active floor -- a drag on the
+    second floor can collect first-floor vertices and move both. A command
+    recorded WITHOUT floor scope would replay that faithfully, and undo would
+    undo it on both floors, at which point a selection bug has become a property
+    of the command model.
+
+    `floor` is REQUIRED, not defaulted: a command that forgot it would be
+    indistinguishable from one made on the default floor, so the omission has to
+    be loud. This asserts the constructor refuses without it -- the design
+    requirement, not the fix, which is D67's and is not done.
+    """
+    import pytest as _pytest
+    with _pytest.raises(TypeError):
+        GestureCommand(None, {}, {})            # no floor -> refused
+
+    cmd = GestureCommand(None, {}, {}, "second")
+    assert cmd.floor == "second"
+
+
+def test_every_gesture_command_inherits_the_floor_requirement():
+    """Asserted across the ROSTER, not on a sample: a subclass that grew its own
+    __init__ and dropped the floor would otherwise slip through."""
+    import inspect
+    for cls in GESTURE_COMMANDS:
+        sig = inspect.signature(cls.__init__)
+        assert "floor" in sig.parameters, (
+            f"{cls.__name__} does not take `floor` -- D67's constraint is that "
+            f"the settled-gesture boundary INCLUDES which floor it was made on")
