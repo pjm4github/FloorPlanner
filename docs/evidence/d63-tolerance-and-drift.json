@@ -1,0 +1,243 @@
+{
+ "Q1_is_producer_1_closure_tolerance_dependent": {
+  "claim_under_test": "rebound 0 on five plans, measured at TOL=0.05 inches",
+  "sweep": [
+   {
+    "tolerance_in": 0.05,
+    "plans": {
+     "roundedMultifloor.json": {
+      "removed": 6,
+      "durable": 6,
+      "REBOUND": 0,
+      "inserted_p2": 6
+     },
+     "wiscaway2026-08-08.json": {
+      "removed": 33,
+      "durable": 33,
+      "REBOUND": 0,
+      "inserted_p2": 0
+     },
+     "symmetricP1.json": {
+      "removed": 4,
+      "durable": 4,
+      "REBOUND": 0,
+      "inserted_p2": 0
+     },
+     "wiscaway2026-08-09R.json": {
+      "removed": 94,
+      "durable": 94,
+      "REBOUND": 0,
+      "inserted_p2": 1
+     },
+     "planc1.v5.json": {
+      "removed": 0,
+      "durable": 0,
+      "REBOUND": 0,
+      "inserted_p2": 3
+     }
+    },
+    "TOTAL_REBOUND": 0
+   },
+   {
+    "tolerance_in": 0.25,
+    "plans": {
+     "roundedMultifloor.json": {
+      "removed": 6,
+      "durable": 6,
+      "REBOUND": 0,
+      "inserted_p2": 6
+     },
+     "wiscaway2026-08-08.json": {
+      "removed": 33,
+      "durable": 33,
+      "REBOUND": 0,
+      "inserted_p2": 0
+     },
+     "symmetricP1.json": {
+      "removed": 4,
+      "durable": 4,
+      "REBOUND": 0,
+      "inserted_p2": 0
+     },
+     "wiscaway2026-08-09R.json": {
+      "removed": 94,
+      "durable": 94,
+      "REBOUND": 0,
+      "inserted_p2": 1
+     },
+     "planc1.v5.json": {
+      "removed": 0,
+      "durable": 0,
+      "REBOUND": 0,
+      "inserted_p2": 3
+     }
+    },
+    "TOTAL_REBOUND": 0
+   },
+   {
+    "tolerance_in": 0.75,
+    "plans": {
+     "roundedMultifloor.json": {
+      "removed": 6,
+      "durable": 6,
+      "REBOUND": 0,
+      "inserted_p2": 6
+     },
+     "wiscaway2026-08-08.json": {
+      "removed": 33,
+      "durable": 33,
+      "REBOUND": 0,
+      "inserted_p2": 0
+     },
+     "symmetricP1.json": {
+      "removed": 4,
+      "durable": 4,
+      "REBOUND": 0,
+      "inserted_p2": 0
+     },
+     "wiscaway2026-08-09R.json": {
+      "removed": 94,
+      "durable": 94,
+      "REBOUND": 0,
+      "inserted_p2": 1
+     },
+     "planc1.v5.json": {
+      "removed": 0,
+      "durable": 0,
+      "REBOUND": 0,
+      "inserted_p2": 3
+     }
+    },
+    "TOTAL_REBOUND": 0
+   },
+   {
+    "tolerance_in": 2.0,
+    "plans": {
+     "roundedMultifloor.json": {
+      "removed": 6,
+      "durable": 6,
+      "REBOUND": 0,
+      "inserted_p2": 6
+     },
+     "wiscaway2026-08-08.json": {
+      "removed": 33,
+      "durable": 33,
+      "REBOUND": 0,
+      "inserted_p2": 0
+     },
+     "symmetricP1.json": {
+      "removed": 4,
+      "durable": 4,
+      "REBOUND": 0,
+      "inserted_p2": 0
+     },
+     "wiscaway2026-08-09R.json": {
+      "removed": 94,
+      "durable": 94,
+      "REBOUND": 0,
+      "inserted_p2": 1
+     },
+     "planc1.v5.json": {
+      "removed": 0,
+      "durable": 0,
+      "REBOUND": 0,
+      "inserted_p2": 3
+     }
+    },
+    "TOTAL_REBOUND": 0
+   }
+  ],
+  "VERDICT": "ROBUST -- rebound is 0 at every tolerance tried"
+ },
+ "Q2_what_the_prevented_points_are": {
+  "rows": [
+   {
+    "room": "OFFICE",
+    "point_in_the_saved_file": [
+     1273.525,
+     314.996
+    ],
+    "nearest_point_the_SCENE_holds_in_this_room": [
+     1273.578,
+     315.053
+    ],
+    "distance_in": 0.0778,
+    "nearest_point_in_ANY_room": {
+     "room": "OFFICE",
+     "at": [
+      1273.578,
+      315.053
+     ],
+     "distance_in": 0.0778
+    }
+   },
+   {
+    "room": "PWDR",
+    "point_in_the_saved_file": [
+     1151.988,
+     785.62
+    ],
+    "nearest_point_the_SCENE_holds_in_this_room": [
+     1152.0,
+     786.0
+    ],
+    "distance_in": 0.3802,
+    "nearest_point_in_ANY_room": {
+     "room": "PWDR",
+     "at": [
+      1152.0,
+      786.0
+     ],
+     "distance_in": 0.3802
+    }
+   }
+  ],
+  "VERDICT": "THEY ARE MOVED CORNERS, NOT NEW ONES -- the scene holds a point under an inch away, so the save wrote the same corner at a recomputed coordinate and the pairing tolerance called it an insertion"
+ },
+ "Q3_how_general_is_the_moved_corner_effect": {
+  "census": [
+   {
+    "plan": "roundedMultifloor.json",
+    "corners_in_the_saved_file": 193,
+    "corners_the_save_MOVED": 0,
+    "max_move_in": 0.0,
+    "moves": []
+   },
+   {
+    "plan": "wiscaway2026-08-08.json",
+    "corners_in_the_saved_file": 159,
+    "corners_the_save_MOVED": 0,
+    "max_move_in": 0.0,
+    "moves": []
+   },
+   {
+    "plan": "symmetricP1.json",
+    "corners_in_the_saved_file": 140,
+    "corners_the_save_MOVED": 0,
+    "max_move_in": 0.0,
+    "moves": []
+   },
+   {
+    "plan": "wiscaway2026-08-09R.json",
+    "corners_in_the_saved_file": 242,
+    "corners_the_save_MOVED": 2,
+    "max_move_in": 0.3802,
+    "moves": [
+     0.3802,
+     0.0778
+    ]
+   },
+   {
+    "plan": "planc1.v5.json",
+    "corners_in_the_saved_file": 178,
+    "corners_the_save_MOVED": 2,
+    "max_move_in": 1.529,
+    "moves": [
+     1.529,
+     1.529
+    ]
+   }
+  ],
+  "READING": "zero on every axis-aligned plan; it appears only on the ANGLED plan (08-09R) and on the corruption fixture. Rare and isolated, not a general drift -- but planc1's 1.53 inch move is large enough to want its own record rather than a footnote in this one"
+ }
+}

@@ -1,0 +1,394 @@
+{
+ "question": "producer 2: what separates the insertions the coalesce PREVENTS from the ones that still FIRE?",
+ "plans": [
+  {
+   "plan": "wiscaway2026-08-09R.json",
+   "wall_pass_lane_inserted": 3,
+   "coalesce_lane_inserted": 1,
+   "PREVENTED": 2,
+   "FIRED": 1,
+   "CONTROL_one_sided_coalesce_lane_only": 0,
+   "CONTROL_one_sided_VERDICT": "PASS -- nothing appears that the wall pass does not also produce",
+   "H1_created_by_the_wall_pass": {
+    "PREVENTED": "0/2",
+    "FIRED": "1/1"
+   },
+   "H3_the_room_lost_a_corner": {
+    "PREVENTED": "2/2",
+    "FIRED": "1/1"
+   },
+   "rows": [
+    {
+     "group": "PREVENTED",
+     "room": "OFFICE",
+     "at": [
+      1273.525,
+      314.996
+     ],
+     "wall_ends_here_AFTER_the_wall_pass": 0,
+     "wall_ends_here_BEFORE_the_wall_pass": 0,
+     "H1_CREATED_BY_THE_WALL_PASS": false,
+     "nearest_dissolved_corner_in": "OFFICE",
+     "nearest_dissolved_corner_dist": 0.08,
+     "H3_this_room_lost_a_corner": true,
+     "dist_to_this_rooms_nearest_dissolve": 0.08,
+     "inside_an_outline_edge": null
+    },
+    {
+     "group": "PREVENTED",
+     "room": "PWDR",
+     "at": [
+      1151.988,
+      785.62
+     ],
+     "wall_ends_here_AFTER_the_wall_pass": 0,
+     "wall_ends_here_BEFORE_the_wall_pass": 0,
+     "H1_CREATED_BY_THE_WALL_PASS": false,
+     "nearest_dissolved_corner_in": "PWDR",
+     "nearest_dissolved_corner_dist": 0.38,
+     "H3_this_room_lost_a_corner": true,
+     "dist_to_this_rooms_nearest_dissolve": 0.38,
+     "inside_an_outline_edge": null
+    },
+    {
+     "group": "FIRED",
+     "room": "OFFICE",
+     "at": [
+      1269.728,
+      387.728
+     ],
+     "wall_ends_here_AFTER_the_wall_pass": 3,
+     "wall_ends_here_BEFORE_the_wall_pass": 0,
+     "H1_CREATED_BY_THE_WALL_PASS": true,
+     "nearest_dissolved_corner_in": "UTILITY",
+     "nearest_dissolved_corner_dist": 12.51,
+     "H3_this_room_lost_a_corner": true,
+     "dist_to_this_rooms_nearest_dissolve": 18.0,
+     "inside_an_outline_edge": {
+      "from": [
+       1344.0,
+       462.0
+      ],
+      "to": [
+       1257.0,
+       375.0
+      ],
+      "at_fraction": 0.854
+     }
+    }
+   ]
+  },
+  {
+   "plan": "roundedMultifloor.json",
+   "wall_pass_lane_inserted": 6,
+   "coalesce_lane_inserted": 6,
+   "PREVENTED": 0,
+   "FIRED": 6,
+   "CONTROL_one_sided_coalesce_lane_only": 0,
+   "CONTROL_one_sided_VERDICT": "PASS -- nothing appears that the wall pass does not also produce",
+   "H1_created_by_the_wall_pass": {
+    "PREVENTED": "0/0",
+    "FIRED": "2/6"
+   },
+   "H3_the_room_lost_a_corner": {
+    "PREVENTED": "0/0",
+    "FIRED": "2/6"
+   },
+   "rows": [
+    {
+     "group": "FIRED",
+     "room": "BR2",
+     "at": [
+      888.0,
+      876.0
+     ],
+     "wall_ends_here_AFTER_the_wall_pass": 6,
+     "wall_ends_here_BEFORE_the_wall_pass": 4,
+     "H1_CREATED_BY_THE_WALL_PASS": false,
+     "nearest_dissolved_corner_in": "BONUS1",
+     "nearest_dissolved_corner_dist": 166.71,
+     "H3_this_room_lost_a_corner": true,
+     "dist_to_this_rooms_nearest_dissolve": 166.71,
+     "inside_an_outline_edge": {
+      "from": [
+       888.0,
+       936.0
+      ],
+      "to": [
+       888.0,
+       732.0
+      ],
+      "at_fraction": 0.294
+     }
+    },
+    {
+     "group": "FIRED",
+     "room": "BR2",
+     "at": [
+      888.0,
+      792.0
+     ],
+     "wall_ends_here_AFTER_the_wall_pass": 4,
+     "wall_ends_here_BEFORE_the_wall_pass": 2,
+     "H1_CREATED_BY_THE_WALL_PASS": false,
+     "nearest_dissolved_corner_in": "BONUS1",
+     "nearest_dissolved_corner_dist": 103.23,
+     "H3_this_room_lost_a_corner": true,
+     "dist_to_this_rooms_nearest_dissolve": 103.23,
+     "inside_an_outline_edge": {
+      "from": [
+       888.0,
+       936.0
+      ],
+      "to": [
+       888.0,
+       732.0
+      ],
+      "at_fraction": 0.706
+     }
+    },
+    {
+     "group": "FIRED",
+     "room": "Hall",
+     "at": [
+      978.0,
+      732.0
+     ],
+     "wall_ends_here_AFTER_the_wall_pass": 5,
+     "wall_ends_here_BEFORE_the_wall_pass": 3,
+     "H1_CREATED_BY_THE_WALL_PASS": false,
+     "nearest_dissolved_corner_in": "BONUS1",
+     "nearest_dissolved_corner_dist": 6.0,
+     "H3_this_room_lost_a_corner": false,
+     "dist_to_this_rooms_nearest_dissolve": null,
+     "inside_an_outline_edge": {
+      "from": [
+       948.0,
+       732.0
+      ],
+      "to": [
+       1032.0,
+       732.0
+      ],
+      "at_fraction": 0.357
+     }
+    },
+    {
+     "group": "FIRED",
+     "room": "Hall",
+     "at": [
+      978.0,
+      792.0
+     ],
+     "wall_ends_here_AFTER_the_wall_pass": 4,
+     "wall_ends_here_BEFORE_the_wall_pass": 0,
+     "H1_CREATED_BY_THE_WALL_PASS": true,
+     "nearest_dissolved_corner_in": "Hall2",
+     "nearest_dissolved_corner_dist": 54.33,
+     "H3_this_room_lost_a_corner": false,
+     "dist_to_this_rooms_nearest_dissolve": null,
+     "inside_an_outline_edge": {
+      "from": [
+       1098.0,
+       792.0
+      ],
+      "to": [
+       948.0,
+       792.0
+      ],
+      "at_fraction": 0.8
+     }
+    },
+    {
+     "group": "FIRED",
+     "room": "LOUNGE",
+     "at": [
+      978.0,
+      792.0
+     ],
+     "wall_ends_here_AFTER_the_wall_pass": 4,
+     "wall_ends_here_BEFORE_the_wall_pass": 0,
+     "H1_CREATED_BY_THE_WALL_PASS": true,
+     "nearest_dissolved_corner_in": "Hall2",
+     "nearest_dissolved_corner_dist": 54.33,
+     "H3_this_room_lost_a_corner": false,
+     "dist_to_this_rooms_nearest_dissolve": null,
+     "inside_an_outline_edge": {
+      "from": [
+       948.0,
+       792.0
+      ],
+      "to": [
+       1098.0,
+       792.0
+      ],
+      "at_fraction": 0.2
+     }
+    },
+    {
+     "group": "FIRED",
+     "room": "Master Suite",
+     "at": [
+      978.0,
+      732.0
+     ],
+     "wall_ends_here_AFTER_the_wall_pass": 5,
+     "wall_ends_here_BEFORE_the_wall_pass": 3,
+     "H1_CREATED_BY_THE_WALL_PASS": false,
+     "nearest_dissolved_corner_in": "BONUS1",
+     "nearest_dissolved_corner_dist": 6.0,
+     "H3_this_room_lost_a_corner": false,
+     "dist_to_this_rooms_nearest_dissolve": null,
+     "inside_an_outline_edge": {
+      "from": [
+       1032.0,
+       732.0
+      ],
+      "to": [
+       948.0,
+       732.0
+      ],
+      "at_fraction": 0.643
+     }
+    }
+   ]
+  },
+  {
+   "plan": "planc1.v5.json",
+   "wall_pass_lane_inserted": 3,
+   "coalesce_lane_inserted": 3,
+   "PREVENTED": 0,
+   "FIRED": 3,
+   "CONTROL_one_sided_coalesce_lane_only": 0,
+   "CONTROL_one_sided_VERDICT": "PASS -- nothing appears that the wall pass does not also produce",
+   "H1_created_by_the_wall_pass": {
+    "PREVENTED": "0/0",
+    "FIRED": "3/3"
+   },
+   "H3_the_room_lost_a_corner": {
+    "PREVENTED": "0/0",
+    "FIRED": "0/3"
+   },
+   "rows": [
+    {
+     "group": "FIRED",
+     "room": "Hall",
+     "at": [
+      248.43,
+      654.0
+     ],
+     "wall_ends_here_AFTER_the_wall_pass": 3,
+     "wall_ends_here_BEFORE_the_wall_pass": 0,
+     "H1_CREATED_BY_THE_WALL_PASS": true,
+     "nearest_dissolved_corner_in": null,
+     "nearest_dissolved_corner_dist": null,
+     "H3_this_room_lost_a_corner": false,
+     "dist_to_this_rooms_nearest_dissolve": null,
+     "inside_an_outline_edge": {
+      "from": [
+       144.0,
+       654.0
+      ],
+      "to": [
+       330.0,
+       654.0
+      ],
+      "at_fraction": 0.562
+     }
+    },
+    {
+     "group": "FIRED",
+     "room": "M Bath",
+     "at": [
+      248.43,
+      654.0
+     ],
+     "wall_ends_here_AFTER_the_wall_pass": 3,
+     "wall_ends_here_BEFORE_the_wall_pass": 0,
+     "H1_CREATED_BY_THE_WALL_PASS": true,
+     "nearest_dissolved_corner_in": null,
+     "nearest_dissolved_corner_dist": null,
+     "H3_this_room_lost_a_corner": false,
+     "dist_to_this_rooms_nearest_dissolve": null,
+     "inside_an_outline_edge": {
+      "from": [
+       144.0,
+       654.0
+      ],
+      "to": [
+       330.0,
+       654.0
+      ],
+      "at_fraction": 0.562
+     }
+    },
+    {
+     "group": "FIRED",
+     "room": "Master Suite",
+     "at": [
+      248.43,
+      654.0
+     ],
+     "wall_ends_here_AFTER_the_wall_pass": 3,
+     "wall_ends_here_BEFORE_the_wall_pass": 0,
+     "H1_CREATED_BY_THE_WALL_PASS": true,
+     "nearest_dissolved_corner_in": null,
+     "nearest_dissolved_corner_dist": null,
+     "H3_this_room_lost_a_corner": false,
+     "dist_to_this_rooms_nearest_dissolve": null,
+     "inside_an_outline_edge": {
+      "from": [
+       330.0,
+       654.0
+      ],
+      "to": [
+       144.0,
+       654.0
+      ],
+      "at_fraction": 0.438
+     }
+    }
+   ]
+  },
+  {
+   "plan": "wiscaway2026-08-08.json",
+   "wall_pass_lane_inserted": 0,
+   "coalesce_lane_inserted": 0,
+   "PREVENTED": 0,
+   "FIRED": 0,
+   "CONTROL_one_sided_coalesce_lane_only": 0,
+   "CONTROL_one_sided_VERDICT": "PASS -- nothing appears that the wall pass does not also produce",
+   "H1_created_by_the_wall_pass": {
+    "PREVENTED": "0/0",
+    "FIRED": "0/0"
+   },
+   "H3_the_room_lost_a_corner": {
+    "PREVENTED": "0/0",
+    "FIRED": "0/0"
+   },
+   "rows": []
+  },
+  {
+   "plan": "symmetricP1.json",
+   "wall_pass_lane_inserted": 0,
+   "coalesce_lane_inserted": 0,
+   "PREVENTED": 0,
+   "FIRED": 0,
+   "CONTROL_one_sided_coalesce_lane_only": 0,
+   "CONTROL_one_sided_VERDICT": "PASS -- nothing appears that the wall pass does not also produce",
+   "H1_created_by_the_wall_pass": {
+    "PREVENTED": "0/0",
+    "FIRED": "0/0"
+   },
+   "H3_the_room_lost_a_corner": {
+    "PREVENTED": "0/0",
+    "FIRED": "0/0"
+   },
+   "rows": []
+  }
+ ],
+ "POSITIVE_CONTROL_prevented_set_is_non_empty": {
+  "total_prevented_across_all_plans": 2,
+  "verdict": "PASS"
+ }
+}
