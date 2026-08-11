@@ -40,6 +40,22 @@ repo root so relative paths like `examples/foo.json` resolve.
 
 ---
 
+### The toggle boundary — settled 2026‑08‑11, before the control panel exists
+
+**A toggle that changes WHICH GEOMETRY EXISTS is a `build_model` parameter. A
+toggle that changes what is DRAWN from geometry already built is view-side.**
+**Floor scope is the first kind** — `build_model` already takes `levels`, exactly
+as it already takes `furnishings=False`, so the pattern is established rather
+than invented.
+
+**This is recorded here, beside the seam, because a filter written into either
+shell would be wrong**: there are two renderers and **both import `build_model`
+unchanged**, so a shell-side filter would scope one renderer and not the other.
+The control panel ([D69](../../docs/defects/0069-an-auxiliary-control-panel-on-the-3d-view.md))
+is presentation: it sets `build_model`'s parameters and **re-builds**; it does
+not reach into meshes. Building it as a mesh filter is the obvious wrong turn and
+this paragraph exists to prevent it.
+
 ## 2. Conventions
 
 * **Units are inches** throughout, per the v5 schema.
