@@ -16,13 +16,13 @@
 
 | | |
 |---|---|
-| **`main`** | **PR #19 merged at `c9e85f0`** (merge commit, not squash — Patrick's smoke check passed: nothing visible changed, every room area held), then the producer-2 measurement merged. `origin/main` is the same commit. |
-| **Branches** | **none open.** `d62-weld-and-fixture-layout` and `d63-producer-two` are both merged; `a1-d47-fragment-extract` and `a1b-d53-readback` were merged and deleted earlier. |
-| **What #19 brought** | D62's `weld_scene` repair · **D63 producer 1, CLOSED on five plans by identity** · the area bound (`AREA_BOUND_SQFT`, refusal not avoidance) · the `fixtures/incoming` intake contract · the identity guard replacing a slot-count assertion. |
-| **Census** (full mode, `main`, 2026‑08‑10) | `collected=675 ruff=clean vacuous=0 end_assign=0`; OFF / ON / DEEP each **668 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE**, excluded from every mode by the standing P3.8 flap-class ruling (`tools/gate.py:66`) — not an ad-hoc deselection. |
-| **Records** | **65 records — 23 open, 42 closed.** `python tools/gate.py --docs` **GREEN**. `Ref-Audit: unresolved=10` — dangling *links and paths*, reported and never enforced; dangling *keys* would fail. **D64 is new** — the save writes an outline corner at a recomputed coordinate, angled geometry only. |
-| **Working tree** | clean, including untracked. **`fixtures/`** holds manual-check plans, deliberately outside `examples/` so the corpus glob never sees them (see §6 and D51) — and one is **load-bearing and frozen**: `wiscaway2026-08-08.json` is retained *because* it fails I7. **`fixtures/incoming/`** (on the branch) is the uncharacterised intake; **no test may reference a file there**. |
-| **The two manual checks already passed** | **A1**: three floating pieces, no group boxes, each carrying its region, no dashed edge, undo restoring both rooms — and totals 505 → 424 sq ft holding at 424, independent evidence the pieces are disjoint. **A1b**: every item, **including drag-a-room's-label-then-right-click-a-wall-inside-it** — the gesture that broke A1b's first cut through the *left*-click virtual, so passing it through the *right*-click virtual is the evidence one resolver governs both. |
+| **`main`** | **`4e08191`** — PR #23 (P6.b). PRs #19–#23 all merged as merge commits. |
+| **Branches** | **none open.** |
+| **Census** (full mode, `main`, 2026‑08‑11) | `collected=686 ruff=clean vacuous=0 end_assign=0`; OFF / ON / DEEP each **679 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling, `tools/gate.py:66`). |
+| **Records** | **67 records.** `python tools/gate.py --docs` **GREEN**. **D61 is now `type:limit`** — an accepted limitation with a documented mitigation; **D66 is new** — a departing room carries its neighbours' walls. |
+| **Working tree** | clean, including untracked. |
+| **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
+| **PHASE 6, in flight** | **P6.a merged** (PR #22) — the per-mutation invariant hook has its own name, `verify_settled`, off the snapshot path, so retiring snapshot undo cannot silently take `FP_VERIFY_DESIGN` with it. **P6.b merged** (PR #23) — twelve command classes at the settled-gesture boundary, **dormant**, with a test pinning that `mainwindow` does not import them. **P6.c next** (dirty-tracking replacement, GREEN). **P6.d is the cutover — AMBER, and comes as a READ-BACK before it is wired.** |
 
 **A commit gate is enforced, not merely available.** `tools/gate.py` writes `.gate-result.json`; a `PreToolUse` hook blocks any `git commit` unless that file exists, reads GREEN, and is **newer than every tracked file** — every tracked file, `.md` included, so a document edit made after the gate ran makes it stale. See §6.
 
