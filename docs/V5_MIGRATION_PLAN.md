@@ -596,7 +596,56 @@ Groups move the real items — no `duplicate_wall`, no `coalesce_all` on ungroup
 # Phase 6 — Command undo and final perf
 
 ### P6.1 — `QUndoStack` + commands
-`AddItems`, `DeleteItems`, `MoveVertices`, `EditOpening`, `EditRoomProps`, `Group`/`Ungroup`, `Extract`/`Join`, `ChangeSettings`, level ops. Each references items by id and re-runs a scoped rebuild.
+
+**RE-CUT 2026‑08‑11, and the original list is kept below because the reason it
+was wrong is the reason the boundary sits where it does.**
+
+**Superseded list:** `AddItems`, `DeleteItems`, `MoveVertices`, `EditOpening`,
+`EditRoomProps`, `Group`/`Ungroup`, `Extract`/`Join`, `ChangeSettings`, level
+ops — *"each references items by id and re-runs a scoped rebuild"*. Written in
+Phase 0, before extract/join, floors, shuffle, the outline coalesce and
+align/distribute existed.
+
+**IT IMPLIES SUB-OPERATION COMMANDS, AND THAT IS REFUTED.** `MoveVertices`,
+`Extract` and `Join` are the *inside* of one gesture, not three gestures.
+
+> **A COMMAND THAT UNDID TO A MID-GESTURE STATE WOULD RESTORE SOMETHING NO
+> INVARIANT SET DESCRIBES. Mid-gesture the room is FLOATING and I12 governs
+> where I14 would.**
+
+That is the whole argument, and it is written here in those words because
+**someone will later propose finer commands without it**. A placed room's
+label-drag *is* `extract_room` → move → `join_room` (P4.2): six sub-operations —
+copy-trim, privatise vertices, translate, split landings, weld, merge — and the
+states between them are not documents. I12 exempts a floating room from the very
+sharing I14 demands, so a stack that could stop between them would be offering
+the user a state the validator would reject if it were saved.
+
+**THE 180 ms DEBOUNCE ALREADY DRAWS THE BOUNDARY.** `scene.changed` →
+`_mark_dirty` → a single-shot timer → `_commit_if_changed`: one undo step per
+*settled* gesture, whatever happened inside it. **Phase 6 adopts that boundary
+rather than re-deciding it.** The classes follow the settled gesture, not the
+operations inside it.
+
+**THE RE-CUT LIST — one class per settled gesture**, taken from the 14 public
+mutators that exist now (`docs/evidence/phase6-readback-census.json`):
+
+| command | the gesture |
+|---|---|
+| `DeleteItems` | `delete_selected` |
+| `NudgeItems` | `nudge_selected` |
+| `AlignToGrid` | `align_rooms_to_grid` |
+| `DistributeRooms` | `distribute_rooms` |
+| `RedetectRooms` | `refresh_rooms_cmd` |
+| `RoomBoolean` | `room_boolean` — combine / intersect / subtract / fragment |
+| `Group` / `Ungroup` | `group_selected`, `ungroup_selected` |
+| `CoalesceAll` | `coalesce_all_now` — **absent from the Phase 0 list entirely** |
+| `CutItems` / `PasteItems` | `cut_selected`, `paste_clipboard` |
+| **`DragGesture`** | **the drag — absent from the Phase 0 list, and the commonest mutation in the app.** It is not a `MainWindow` method; it lives in the items' event handlers, which is exactly why a menu-shaped list missed it |
+
+**`Extract`/`Join` and `MoveVertices` do NOT appear**, deliberately: they are
+inside `DragGesture`, and naming them as commands is the mistake this re-cut
+exists to prevent.
 ### P6.2 — Retire snapshot undo
 ### P6.3 — Scene index + viewport update final pass
 Revisit `FullViewportUpdate` now that bounding rects are trustworthy.
