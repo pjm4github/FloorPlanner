@@ -1,0 +1,65 @@
+{
+ "plan": "fixtures/wiscaway2026-08-08.json",
+ "room": "WIC",
+ "offset_in": 240.0,
+ "mover": "_translate",
+ "walls_before": 103,
+ "walls_after": 107,
+ "net_delta": 4,
+ "PRECONDITION_new_walls": 4,
+ "SEPARABLE_gap_between_the_two_polygons_in": 144.0,
+ "attribution": {
+  "VACATED": 0,
+  "DESTINATION": 4,
+  "AMBIGUOUS": 0
+ },
+ "walls_ON_the_vacated_boundary_after": 6,
+ "walls_ON_the_vacated_boundary_before": 6,
+ "rows": [
+  {
+   "where": "DESTINATION",
+   "mid": [
+    774.0,
+    591.0
+   ],
+   "to_vacated": 144.0,
+   "to_destination": 0.0,
+   "type": "interior",
+   "length": 90.0
+  },
+  {
+   "where": "DESTINATION",
+   "mid": [
+    822.0,
+    546.0
+   ],
+   "to_vacated": 192.0,
+   "to_destination": 0.0,
+   "type": "interior",
+   "length": 96.0
+  },
+  {
+   "where": "DESTINATION",
+   "mid": [
+    870.0,
+    591.0
+   ],
+   "to_vacated": 240.0,
+   "to_destination": 0.0,
+   "type": "interior",
+   "length": 90.0
+  },
+  {
+   "where": "DESTINATION",
+   "mid": [
+    822.0,
+    636.0
+   ],
+   "to_vacated": 192.0,
+   "to_destination": 0.0,
+   "type": "interior",
+   "length": 96.0
+  }
+ ],
+ "VERDICT": "0 at the VACATED site (2b's target), 4 at the DESTINATION (legitimate landing splits), 0 ambiguous"
+}
