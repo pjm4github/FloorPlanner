@@ -442,3 +442,56 @@ def test_no_sliver_walls_in_the_converted_document(fp):
                for w in doc["walls"]
                if math.dist(v[w["v1"]], v[w["v2"]]) < 2.0]
     assert slivers == [], f"weld-ghost slivers survived: {slivers}"
+
+
+# --------------------------------------------------------------------------
+# I15 at the two DOCUMENT BOUNDARIES (load reports, save asks)
+# --------------------------------------------------------------------------
+def test_i15_save_asks_and_still_writes(fp, win, tmp_path):
+    """SAVE ASKS, IT DOES NOT REFUSE -- D49's amended shape, applied to I15.
+
+    The producer is measured rather than constructed: `normalize_walls` writes
+    I15 violations on `roundedMultifloor` (attributed to `weld_scene`), which is
+    why a load-only check would miss exactly the files this application makes.
+
+    THE ASSERTION IS BOTH HALVES. The findings must be recorded -- otherwise the
+    check is not running -- AND the file must exist afterwards, because a
+    refusal here would trap the user with unsaveable work. A test that only
+    checked the report would pass on a refusal, which is the outcome the ruling
+    forbids.
+    """
+    from floorplanner.walls import normalize_walls
+
+    win.load_path(str(EXAMPLES / "roundedMultifloor.json"))
+    assert not getattr(win, "_boundary_findings", []), \
+        "precondition: this plan is clean of I15 as it arrives"
+
+    normalize_walls(win.scene)
+    out = tmp_path / "asked.json"
+    win.save_path(str(out))                      # non-interactive: never blocks
+
+    found = win._boundary_findings
+    assert found and all(e.startswith("I15") for e in found), \
+        f"normalize_walls must produce I15 findings here -- got {found}"
+    assert out.exists(), "SAVE MUST NOT REFUSE -- the file has to be written"
+    assert json.loads(out.read_text(encoding="utf-8"))["rooms"], \
+        "the written file must be a real plan, not a stub"
+
+
+def test_i15_load_reports_and_opens_the_file_unchanged(fp, win):
+    """CHECK YES, FIX NO. The dirty fixture opens, is reported, and is not
+    repaired on the way in -- `fixtures/wiscaway2026-08-09R.json` is retained
+    BECAUSE it fails, so silently welding it would destroy the evidence."""
+    from floorplanner.design.validate import check as _check
+
+    path = Path(__file__).resolve().parent.parent / "fixtures" \
+        / "wiscaway2026-08-09R.json"
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    before = [e for e in _check(raw, deep=True, boundary=True)
+              if e.startswith("I15")]
+    assert before, "precondition: the fixture carries I15 violations"
+
+    win.load_path(str(path))
+    assert win.statusBar().currentMessage(), "the load said nothing at all"
+    # not repaired: the bytes on disk are untouched
+    assert json.loads(path.read_text(encoding="utf-8")) == raw
