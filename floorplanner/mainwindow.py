@@ -1437,10 +1437,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         # double the per-edit cost for nothing.
         rep = {}
         state = self.snapshot(report=rep)
-        # P1.6 shadow mode: a settled operation is exactly where the document
-        # must be consistent, so this is the per-mutation hook.  Cheap twelve
-        # only -- an O(n^2) sweep per edit would make the app unusable.
-        self._verify_or_report("operation", doc=state, walk_report=rep)
+        self.verify_settled(doc=state, walk_report=rep)
         if state == self._committed_state:
             return
         self._undo_stack.append(self._committed_state)
@@ -1449,6 +1446,35 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self._redo_stack.clear()
         self._committed_state = state
         self._update_undo_actions()
+
+    def verify_settled(self, doc=None, walk_report=None):
+        """P6.a — THE PER-MUTATION INVARIANT HOOK, ON ITS OWN NAME.
+
+        **P1.6 shadow mode: a settled operation is exactly where the document
+        must be consistent, so this is the per-mutation hook.** Cheap twelve
+        only — an O(n^2) sweep per edit would make the app unusable.
+
+        WHY IT IS A METHOD RATHER THAN THREE LINES INSIDE `_commit_if_changed`,
+        which is where it lived until 2026‑08‑11. Read-back 0008 measured what
+        `snapshot()`'s eight callers actually protect, and found that
+        `_commit_if_changed` **is not an undo function**: it is this
+        application's ONLY per-mutation invariant trigger, wearing undo's
+        clothes. Phase 6 retires snapshot undo — and retiring it naively would
+        have taken `FP_VERIFY_DESIGN` down with it, silently, because nothing in
+        the plan said the two were the same call site.
+
+        **So the hook is separated FIRST and ALONE, before any command exists.**
+        It is the thing that dies quietly, and doing it first means the cutover
+        cannot take it with it. The debounce still calls it — that is the
+        settled-operation boundary and P6.b keeps it — but the dependency now
+        runs the other way: shadow mode does not need undo to exist.
+
+        `doc` and `walk_report` are passed when the caller has already walked
+        the scene, so the shared-walk saving that motivated the original
+        inlining is kept. A caller with nothing to share may pass neither.
+        """
+        return self._verify_or_report("operation", doc=doc,
+                                      walk_report=walk_report)
 
     def _restore_state(self, state):
         self._dirty_timer.stop()
