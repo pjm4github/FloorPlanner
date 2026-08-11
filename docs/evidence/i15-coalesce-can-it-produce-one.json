@@ -1,0 +1,131 @@
+{
+ "question": "can the outline coalesce produce an I15 violation -- in the scene, and in a file?",
+ "POSITIVE_CONTROL_predicate_sees_the_known_case": {
+  "plan": "fixtures/wiscaway2026-08-09R.json (as it arrives)",
+  "violations": 2,
+  "expected_from_readback_0006": 2,
+  "verdict": "PASS"
+ },
+ "PRECONDITION_plans_where_the_coalesce_removed_NOTHING": [
+  "planc1.v5.json"
+ ],
+ "plans": [
+  {
+   "plan": "roundedMultifloor.json",
+   "PRECONDITION_corners_the_coalesce_removed": 3,
+   "A_scene_violations_BEFORE_the_coalesce": 9,
+   "A_scene_violations_AFTER_the_coalesce": 9,
+   "A_produced_by_the_coalesce": 0,
+   "B_document_violations_after_saving_that_scene": 3,
+   "sample_scene": [
+    {
+     "room": "BR3",
+     "at": [
+      1284.0,
+      792.0
+     ]
+    },
+    {
+     "room": "Hall",
+     "at": [
+      978.0,
+      732.0
+     ]
+    },
+    {
+     "room": "Hall",
+     "at": [
+      978.0,
+      792.0
+     ]
+    },
+    {
+     "room": "Master Suite",
+     "at": [
+      978.0,
+      732.0
+     ]
+    }
+   ],
+   "sample_document": [
+    "IOC room r22 edge v81->v84 passes through wall endpoint v82 without naming it",
+    "IOC room r22 edge v81->v84 passes through wall endpoint v83 without naming it",
+    "IOC room r23 edge v91->v89 passes through wall endpoint v90 without naming it"
+   ]
+  },
+  {
+   "plan": "wiscaway2026-08-08.json",
+   "PRECONDITION_corners_the_coalesce_removed": 22,
+   "A_scene_violations_BEFORE_the_coalesce": 0,
+   "A_scene_violations_AFTER_the_coalesce": 0,
+   "A_produced_by_the_coalesce": 0,
+   "B_document_violations_after_saving_that_scene": 0,
+   "sample_scene": [],
+   "sample_document": []
+  },
+  {
+   "plan": "symmetricP1.json",
+   "PRECONDITION_corners_the_coalesce_removed": 2,
+   "A_scene_violations_BEFORE_the_coalesce": 0,
+   "A_scene_violations_AFTER_the_coalesce": 0,
+   "A_produced_by_the_coalesce": 0,
+   "B_document_violations_after_saving_that_scene": 0,
+   "sample_scene": [],
+   "sample_document": []
+  },
+  {
+   "plan": "wiscaway2026-08-09R.json",
+   "PRECONDITION_corners_the_coalesce_removed": 84,
+   "A_scene_violations_BEFORE_the_coalesce": 1,
+   "A_scene_violations_AFTER_the_coalesce": 1,
+   "A_produced_by_the_coalesce": 0,
+   "B_document_violations_after_saving_that_scene": 1,
+   "sample_scene": [
+    {
+     "room": "OFFICE",
+     "at": [
+      1269.728,
+      387.728
+     ]
+    }
+   ],
+   "sample_document": [
+    "IOC room r13 edge v103->v97 passes through wall endpoint v99 without naming it"
+   ]
+  },
+  {
+   "plan": "planc1.v5.json",
+   "PRECONDITION_corners_the_coalesce_removed": 0,
+   "A_scene_violations_BEFORE_the_coalesce": 3,
+   "A_scene_violations_AFTER_the_coalesce": 3,
+   "A_produced_by_the_coalesce": 0,
+   "B_document_violations_after_saving_that_scene": 0,
+   "sample_scene": [
+    {
+     "room": "Hall",
+     "at": [
+      248.43,
+      654.0
+     ]
+    },
+    {
+     "room": "Master Suite",
+     "at": [
+      248.43,
+      654.0
+     ]
+    },
+    {
+     "room": "M Bath",
+     "at": [
+      248.43,
+      654.0
+     ]
+    }
+   ],
+   "sample_document": []
+  }
+ ],
+ "VERDICT_A_scene": "the coalesce produces NO scene-level violation",
+ "VERDICT_B_document": "LOAD-ONLY IS WRONG -- 4 violation(s) reached a saved file"
+}

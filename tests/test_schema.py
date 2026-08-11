@@ -167,6 +167,102 @@ def test_negative_I14_fires_on_a_drifted_shared_vertex():
         "I14 is a deep check -- it must not run under deep=False"
 
 
+def test_negative_I15_fires_when_an_outline_edge_crosses_a_wall_endpoint():
+    """I15 OUTLINE COMPLETENESS, constructed rather than borrowed.
+
+    A room's outline edge is stretched to run PAST an existing wall endpoint
+    without naming it -- the state the record calls "a room edge crossing an
+    unnamed T". Built by DELETING an outline slot whose vertex a wall still
+    ends at, which is exactly what the fault looks like on disk: the wall is
+    untouched, only the outline stops mentioning the corner.
+
+    IT IS A BOUNDARY CHECK: it fires under `deep=False` when `boundary=True`
+    and is silent otherwise, which is the opposite of I14 above and is asserted
+    here so the two cannot be confused.
+    """
+    d = _load("symmetricP1.json")
+    assert not [e for e in check(d, deep=True, boundary=True)
+                if e.startswith("I15")]                        # precondition
+
+    # find an outline slot whose vertex is a wall endpoint AND whose neighbours
+    # stay collinear through it once it is dropped -- otherwise the edge does
+    # not pass through the point and there is nothing to detect
+    V = {v["id"]: v for v in d["vertices"]}
+    ends = {w[k] for w in d["walls"] for k in ("v1", "v2")}
+    target = None
+    for r in d["rooms"]:
+        ring = r["outline"]
+        n = len(ring)
+        for i in range(n):
+            vid = ring[i]["v"]
+            if vid not in ends:
+                continue
+            a = V[ring[(i - 1) % n]["v"]]
+            b = V[ring[(i + 1) % n]["v"]]
+            p = V[vid]
+            cross = ((b["x"] - a["x"]) * (p["y"] - a["y"])
+                     - (b["y"] - a["y"]) * (p["x"] - a["x"]))
+            dot = ((p["x"] - a["x"]) * (b["x"] - a["x"])
+                   + (p["y"] - a["y"]) * (b["y"] - a["y"]))
+            ll = (b["x"] - a["x"]) ** 2 + (b["y"] - a["y"]) ** 2
+            if abs(cross) < 1e-9 and 0 < dot < ll:
+                target = (r, i, vid)
+                break
+        if target:
+            break
+    assert target, "no collinear outline corner at a wall end -- test is vacuous"
+    room, idx, vid = target
+    del room["outline"][idx]
+
+    errs = check(d, deep=False, boundary=True)
+    assert any(e.startswith("I15") and vid in e for e in errs), (
+        f"I15 must fire on the dropped corner {vid} -- got {errs[:4]}")
+    # and it is a BOUNDARY check: silent unless asked, because a mid-drag scene
+    # legitimately has an outline edge running through a wall end it does not
+    # name -- measured, that is what turned the gate red when I15 first landed
+    # in the always-on lane (test_acceptance_shuffle_drag_across_the_plan)
+    assert not [e for e in check(d, deep=True) if e.startswith("I15")],         "I15 must not run per-mutation -- a mid-drag transient is not a fault"
+
+
+def test_i15_stays_in_the_cheap_lane(fp):
+    """I15's place in the cheap twelve is a fact about ONE IMPLEMENTATION.
+
+    Measured at `handoff/0006-readback-outline-invariants.md`: naive, every
+    outline edge against every wall endpoint costs 36 ms on the largest corpus
+    plan against the whole deep set's 49 -- honestly DEEP. Behind the grid index
+    it is 0.917 ms against the cheap lane's 0.447 -- honestly CHEAP. A refactor
+    to something clearer and slower would move a 40x cost into the per-mutation
+    path with nothing objecting.
+
+    SO THE WORK IS BOUNDED, AND COUNTED RATHER THAN TIMED. A wall-clock
+    assertion flaps on a busy CI runner and would be disabled inside a month; a
+    comparison count is deterministic and fails on exactly the change that
+    matters.
+
+    THE BOUND IS STATED AGAINST THE NAIVE COST, not against the measured one, so
+    it has room for an honest implementation change and none for an accidental
+    quadratic: `symmetricP1` has 80 walls and 20 rooms, so edges x endpoints is
+    ~140 x 120 = 16,800 comparisons. Measured with the index: 10.
+    """
+    from floorplanner.design.validate import (check, i15_probes,
+                                              reset_i15_probes)
+    d = _load("symmetricP1.json")
+    edges = sum(len(r["outline"]) for r in d["rooms"])
+    endpoints = len({w[k] for w in d["walls"] for k in ("v1", "v2")})
+    naive = edges * endpoints
+
+    reset_i15_probes()
+    check(d, deep=False, boundary=True)
+    used = i15_probes()
+
+    assert used > 0, "I15 did no work at all -- the counter is not wired"
+    assert used < naive / 20, (
+        f"I15 performed {used} point-on-segment comparisons; the naive bound is "
+        f"{naive} and this check belongs in the cheap lane only while it stays "
+        f"far below that. If the index was removed or defeated, I15 is now a "
+        f"DEEP check and must be moved, not re-baselined.")
+
+
 def test_negative_I6_fires_on_a_mislabelled_wall_side():
     # point a wall's `left` at a room whose outline does not name that wall
     d = _load("symmetricP1.json")
