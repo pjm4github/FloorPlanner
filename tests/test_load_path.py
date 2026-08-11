@@ -546,3 +546,47 @@ def test_shadow_mode_still_fires_without_the_snapshot_undo_path(fp, win,
     win.verify_settled(doc=doc, walk_report=rep)
     assert seen[0][1]["doc"] is doc and seen[0][1]["walk_report"] is rep, \
         "the shared walk must be passed through, not dropped"
+
+
+def test_the_3d_view_renders_only_the_active_floor(fp, win, monkeypatch):
+    """D68: the 3D popup renders the ACTIVE FLOOR, not every level.
+
+    THE ID IS NOT THE NAME, and that is the trap this pins. `build_model`
+    filters by level **id** (`L1`, `L2`); `active_floor` is the level **name**
+    (`default`, `second`). Passing the name straight through matches nothing and
+    renders an EMPTY model with a note nobody reads -- a silent blank window,
+    worse than the defect. So the assertion is on the RESOLVED ids, and it fails
+    both ways: if the filter is dropped (every level) and if it is wrong (none).
+    """
+    from pathlib import Path
+
+    plan = Path(__file__).resolve().parent.parent / "examples" \
+        / "roundedMultifloor.json"
+    win.load_path(str(plan))
+
+    doc = win.design_document()
+    ids = {lv["id"] for lv in doc["levels"]}
+    names = {lv["name"] for lv in doc["levels"]}
+    assert len(ids) > 1, "precondition: this fixture must be multi-floor"
+    assert not (ids & names), \
+        "precondition: ids and names must differ, or this pins nothing"
+
+    seen = {}
+
+    def _capture(d, levels=None, **kw):
+        seen["levels"] = levels
+        raise ImportError                     # stop before any GL/QML work
+
+    import floorplanner.viewer.fp3d as fp3d
+    monkeypatch.setattr(fp3d, "build_model", _capture)
+    try:
+        win.show_3d_view()
+    except ImportError:
+        pass
+
+    want = [lv["id"] for lv in doc["levels"]
+            if lv["name"] == win.active_floor]
+    assert seen.get("levels") == want, (
+        f"the 3D view must be scoped to the active floor {win.active_floor!r} "
+        f"-> {want}, got {seen.get('levels')!r}")
+    assert seen["levels"], "an empty filter renders a BLANK view, not all floors"
