@@ -1,0 +1,274 @@
+{
+ "Q1_which_files_fail": {
+  "outline_completeness": [
+   "wiscaway2026-08-09R.json"
+  ],
+  "simple_ring_D41": [
+   "farmplaceBIGmultifloor.json",
+   "planc1.v5.json",
+   "planc1TestV5.json",
+   "symmetricP1.json",
+   "wiscaway2026-08-09R.json"
+  ],
+  "symmetricP1": {
+   "outline_completeness": 0,
+   "simple_ring": 1
+  },
+  "totals": {
+   "completeness": 2,
+   "simple_ring": 7
+  }
+ },
+ "Q3_tolerance": {
+  "declared": 0.05,
+  "NOT_vertex_weld_in": "0.6 inches is a COINCIDENCE radius -- do two points name one corner. This is a point-on-SEGMENT question and needs a perpendicular distance, so the two must not share a number",
+  "failures_at_each_perpendicular_tolerance": {
+   "0.0": 1,
+   "0.001": 2,
+   "0.01": 2,
+   "0.05": 2,
+   "0.25": 3,
+   "0.6": 3
+  },
+  "hits_decided_by_the_TOLERANCE_path": 2,
+  "perp_distances_on_that_path": [
+   0.0,
+   0.0
+  ]
+ },
+ "Q4_one_pass_or_two": {
+  "note": "both share the outline traversal; the endpoint test is edges x endpoints and the duplicate test is edges x 1",
+  "CAVEAT_the_combined_pass_is_NAIVE": "`both_one_pass` was written against the unindexed inner loop, so its total is NOT comparable to `completeness_indexed`. It is left that way and labelled rather than quietly re-timed: the answer to Q4 does not depend on it, because simple_ring costs 0.157 ms across the whole corpus against the indexed check's 4.2 ms -- sharing the traversal can save at most that 3.7 percent, and the two checks have DIFFERENT corpus consequences, which is the argument that actually decides it",
+  "totals_ms": {
+   "completeness_naive": 126.044,
+   "completeness_indexed": 4.2,
+   "simple_ring_alone": 0.154,
+   "run_separately_sum_indexed": 4.354,
+   "one_combined_pass": 301.417
+  }
+ },
+ "per_plan": [
+  {
+   "plan": "farmplaceBIGmultifloor.json",
+   "walls": 109,
+   "vertices": 85,
+   "rooms": 19,
+   "OUTLINE_COMPLETENESS_failures": 0,
+   "SIMPLE_RING_failures": 1,
+   "sample_completeness": [],
+   "sample_simple_ring": [
+    "ISR room r10 vertex v14 appears twice in its outline"
+   ],
+   "ms_cheap_twelve_check_deep_False": 0.316,
+   "ms_deep_fifteen_check_deep_True": 20.598,
+   "ms_outline_completeness_NAIVE": 8.166,
+   "ms_outline_completeness_INDEXED": 0.443,
+   "INDEX_AGREES_WITH_NAIVE": true,
+   "ms_simple_ring": 0.017,
+   "ms_BOTH_in_one_pass": 21.859
+  },
+  {
+   "plan": "fiveRoomTest.json",
+   "walls": 16,
+   "vertices": 12,
+   "rooms": 5,
+   "OUTLINE_COMPLETENESS_failures": 0,
+   "SIMPLE_RING_failures": 0,
+   "sample_completeness": [],
+   "sample_simple_ring": [],
+   "ms_cheap_twelve_check_deep_False": 0.062,
+   "ms_deep_fifteen_check_deep_True": 0.681,
+   "ms_outline_completeness_NAIVE": 0.212,
+   "ms_outline_completeness_INDEXED": 0.088,
+   "INDEX_AGREES_WITH_NAIVE": true,
+   "ms_simple_ring": 0.004,
+   "ms_BOTH_in_one_pass": 0.542
+  },
+  {
+   "plan": "planc1.v5.json",
+   "walls": 83,
+   "vertices": 65,
+   "rooms": 20,
+   "OUTLINE_COMPLETENESS_failures": 0,
+   "SIMPLE_RING_failures": 3,
+   "sample_completeness": [],
+   "sample_simple_ring": [
+    "ISR room r8 vertex v5 appears twice in its outline",
+    "ISR room r11 vertex v5 appears twice in its outline",
+    "ISR room r20 vertex v5 appears twice in its outline"
+   ],
+   "ms_cheap_twelve_check_deep_False": 0.338,
+   "ms_deep_fifteen_check_deep_True": 26.91,
+   "ms_outline_completeness_NAIVE": 12.758,
+   "ms_outline_completeness_INDEXED": 0.55,
+   "INDEX_AGREES_WITH_NAIVE": true,
+   "ms_simple_ring": 0.017,
+   "ms_BOTH_in_one_pass": 32.803
+  },
+  {
+   "plan": "planc1TestV5.json",
+   "walls": 82,
+   "vertices": 62,
+   "rooms": 20,
+   "OUTLINE_COMPLETENESS_failures": 0,
+   "SIMPLE_RING_failures": 1,
+   "sample_completeness": [],
+   "sample_simple_ring": [
+    "ISR room r20 vertex v5 appears twice in its outline"
+   ],
+   "ms_cheap_twelve_check_deep_False": 0.295,
+   "ms_deep_fifteen_check_deep_True": 21.145,
+   "ms_outline_completeness_NAIVE": 10.39,
+   "ms_outline_completeness_INDEXED": 0.447,
+   "INDEX_AGREES_WITH_NAIVE": true,
+   "ms_simple_ring": 0.017,
+   "ms_BOTH_in_one_pass": 27.329
+  },
+  {
+   "plan": "roundedMultifloor.json",
+   "walls": 122,
+   "vertices": 96,
+   "rooms": 25,
+   "OUTLINE_COMPLETENESS_failures": 0,
+   "SIMPLE_RING_failures": 0,
+   "sample_completeness": [],
+   "sample_simple_ring": [],
+   "ms_cheap_twelve_check_deep_False": 0.387,
+   "ms_deep_fifteen_check_deep_True": 24.306,
+   "ms_outline_completeness_NAIVE": 20.832,
+   "ms_outline_completeness_INDEXED": 0.617,
+   "INDEX_AGREES_WITH_NAIVE": true,
+   "ms_simple_ring": 0.023,
+   "ms_BOTH_in_one_pass": 54.259
+  },
+  {
+   "plan": "sample_plan.v5.json",
+   "walls": 10,
+   "vertices": 8,
+   "rooms": 3,
+   "OUTLINE_COMPLETENESS_failures": 0,
+   "SIMPLE_RING_failures": 0,
+   "sample_completeness": [],
+   "sample_simple_ring": [],
+   "ms_cheap_twelve_check_deep_False": 0.037,
+   "ms_deep_fifteen_check_deep_True": 0.248,
+   "ms_outline_completeness_NAIVE": 0.178,
+   "ms_outline_completeness_INDEXED": 0.059,
+   "INDEX_AGREES_WITH_NAIVE": true,
+   "ms_simple_ring": 0.002,
+   "ms_BOTH_in_one_pass": 0.419
+  },
+  {
+   "plan": "site_demo.json",
+   "walls": 14,
+   "vertices": 14,
+   "rooms": 5,
+   "OUTLINE_COMPLETENESS_failures": 0,
+   "SIMPLE_RING_failures": 0,
+   "sample_completeness": [],
+   "sample_simple_ring": [],
+   "ms_cheap_twelve_check_deep_False": 0.056,
+   "ms_deep_fifteen_check_deep_True": 0.393,
+   "ms_outline_completeness_NAIVE": 0.463,
+   "ms_outline_completeness_INDEXED": 0.094,
+   "INDEX_AGREES_WITH_NAIVE": true,
+   "ms_simple_ring": 0.004,
+   "ms_BOTH_in_one_pass": 0.953
+  },
+  {
+   "plan": "symmetricP1.json",
+   "walls": 80,
+   "vertices": 60,
+   "rooms": 20,
+   "OUTLINE_COMPLETENESS_failures": 0,
+   "SIMPLE_RING_failures": 1,
+   "sample_completeness": [],
+   "sample_simple_ring": [
+    "ISR room r20 vertex v5 appears twice in its outline"
+   ],
+   "ms_cheap_twelve_check_deep_False": 0.294,
+   "ms_deep_fifteen_check_deep_True": 19.951,
+   "ms_outline_completeness_NAIVE": 9.645,
+   "ms_outline_completeness_INDEXED": 0.421,
+   "INDEX_AGREES_WITH_NAIVE": true,
+   "ms_simple_ring": 0.017,
+   "ms_BOTH_in_one_pass": 26.358
+  },
+  {
+   "plan": "fragment2room.json",
+   "walls": 12,
+   "vertices": 10,
+   "rooms": 2,
+   "OUTLINE_COMPLETENESS_failures": 0,
+   "SIMPLE_RING_failures": 0,
+   "sample_completeness": [],
+   "sample_simple_ring": [],
+   "ms_cheap_twelve_check_deep_False": 0.04,
+   "ms_deep_fifteen_check_deep_True": 0.295,
+   "ms_outline_completeness_NAIVE": 0.214,
+   "ms_outline_completeness_INDEXED": 0.04,
+   "INDEX_AGREES_WITH_NAIVE": true,
+   "ms_simple_ring": 0.002,
+   "ms_BOTH_in_one_pass": 0.485
+  },
+  {
+   "plan": "wiscaway2026-08-08.json",
+   "walls": 103,
+   "vertices": 101,
+   "rooms": 19,
+   "OUTLINE_COMPLETENESS_failures": 0,
+   "SIMPLE_RING_failures": 0,
+   "sample_completeness": [],
+   "sample_simple_ring": [],
+   "ms_cheap_twelve_check_deep_False": 0.392,
+   "ms_deep_fifteen_check_deep_True": 21.497,
+   "ms_outline_completeness_NAIVE": 25.804,
+   "ms_outline_completeness_INDEXED": 0.505,
+   "INDEX_AGREES_WITH_NAIVE": true,
+   "ms_simple_ring": 0.02,
+   "ms_BOTH_in_one_pass": 56.693
+  },
+  {
+   "plan": "wiscaway2026-08-09R.json",
+   "walls": 134,
+   "vertices": 201,
+   "rooms": 21,
+   "OUTLINE_COMPLETENESS_failures": 2,
+   "SIMPLE_RING_failures": 1,
+   "sample_completeness": [
+    "IOC room r15 edge v81->v79 passes through wall endpoint v80 without naming it",
+    "IOC room r19 edge v107->v98 passes through wall endpoint v100 without naming it"
+   ],
+   "sample_simple_ring": [
+    "ISR room r19 vertex v124 appears twice in its outline"
+   ],
+   "ms_cheap_twelve_check_deep_False": 0.439,
+   "ms_deep_fifteen_check_deep_True": 48.005,
+   "ms_outline_completeness_NAIVE": 37.382,
+   "ms_outline_completeness_INDEXED": 0.936,
+   "INDEX_AGREES_WITH_NAIVE": true,
+   "ms_simple_ring": 0.031,
+   "ms_BOTH_in_one_pass": 79.717
+  }
+ ],
+ "SKIPPED_not_v5": [
+  {
+   "plan": "planc1.json",
+   "version": 3,
+   "format": "floorplanner-json",
+   "why": "not a v5 document -- check() cannot read it"
+  },
+  {
+   "plan": "planc1TestV4.json",
+   "version": 4,
+   "format": "floorplanner-json",
+   "why": "not a v5 document -- check() cannot read it"
+  },
+  {
+   "plan": "sample_plan.json",
+   "version": 1,
+   "format": "floorplanner-json",
+   "why": "not a v5 document -- check() cannot read it"
+  }
+ ]
+}

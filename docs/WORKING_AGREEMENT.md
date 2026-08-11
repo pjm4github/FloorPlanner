@@ -435,6 +435,19 @@ instances, all found by walking into the boundary rather than by foreseeing it:
 
 | the **whole suite**, for one gesture family | everything it does cover | **THE Ctrl+DRAG SELECTION BAND, which it cannot reach at all.** `QRubberBand.show()` on an OFFSCREEN viewport takes the process down — measured 2026‑08‑08 and **pre-existing on `main`**, so no headless test has ever covered that gesture or could. |
 
+**AN INSTRUMENT THAT REPAIRS WHAT IT MEASURES REPORTS HEALTH IT MANUFACTURED — added 2026‑08‑10, and it has no precedent in the table above.** Every other entry is *"this instrument answers less than its name suggests"*. This one **answers a question it has already made true**.
+
+The occasion is D63's producer 2 — a stored room outline crossing a point where walls end without naming it. **Two instruments miss it, and they miss it in two DIFFERENT ways**, which is why the pair is recorded rather than either half:
+
+| instrument | why it cannot see it |
+|---|---|
+| **I14** | compares **wall ends to WALLS** (`validate.py:283`). A room OUTLINE is outside its subject entirely. **WRONG SUBJECT** — the ordinary boundary, the same shape as `scene_identity_report` being blind to whether an outline shares a wall's vertex |
+| **I5** | cannot fail on a **saved** document, because `bridge._walk` emits one outline edge per wall **BY CONSTRUCTION**. Asking repairs it. **A QUESTION THAT DESTROYS ITS OWN EVIDENCE** |
+
+**The second is the dangerous one, because its silence is indistinguishable from correctness and no amount of running it more often helps.** A normalising step between the fault and the check launders the fault: the state is real, the file on disk carries it, and the check is answering about a *different document* — the one the walk just built. **Ask of any check that runs downstream of a canonicalisation: is it reading the artifact, or the canonical form of the artifact?** Where those differ, the check has an opinion only about the second.
+
+**The corollary is the reason the ruling paired the detector with the reclassification.** A fault only visible in a stored-versus-emitted difference has no home in an invariant set that only sees emitted documents — so it must be restated as **a direct property of the bytes** before it can be checked at all (`handoff/0006-readback-outline-invariants.md`). *"The files were always non-compliant"* is a diagnosis when a detector exists and an excuse when one does not.
+
 **THE MECHANISM THAT MAKES A FAULT HARMLESS CAN BE THE SAME MECHANISM THAT MAKES IT INVISIBLE — added 2026‑08‑09 at D62, and it is the sharpest entry in the table.** The boundaries above are all *"this instrument answers less than its name suggests"*. This one is a **coincidence of mechanism**, and it is the reason "legal under v5 and unreachable by two separate checks" must never be read as "harmless".
 
 `weld_scene` leaves 49–78 room outline corners holding a `Vertex` no wall holds. **`check(deep=True)` cannot fire on it**, because `design_from_scene` welds on the way out and the emitted document has one vertex per point whatever the scene holds. **And the divorce does not survive a save** — 49 → 0, 56 → 0, 78 → 0, 57 → 0, measured — *for exactly the same reason*. **One mechanism, two effects, opposite signs:** the weld bounds the harm to the session and hides it from the only check that could have reported it.
