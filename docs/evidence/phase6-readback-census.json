@@ -1,0 +1,1279 @@
+{
+ "Q1_snapshot_and_undo_call_sites": {
+  "total": 43,
+  "by_name": {
+   "_committed_state": 10,
+   "_redo_stack": 7,
+   "_restore_state": 2,
+   "_saved_state": 7,
+   "_undo_stack": 9,
+   "snapshot": 8
+  },
+  "by_file": {
+   "floorplanner/mainwindow.py": 35,
+   "floorplanner/planio.py": 8
+  },
+  "sites": [
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 121,
+    "in_function": "__init__",
+    "name": "_undo_stack",
+    "source": "self._undo_stack = []"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 122,
+    "in_function": "__init__",
+    "name": "_redo_stack",
+    "source": "self._redo_stack = []"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 124,
+    "in_function": "__init__",
+    "name": "_committed_state",
+    "source": "self._committed_state = self.snapshot()"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 124,
+    "in_function": "__init__",
+    "name": "snapshot",
+    "source": "self._committed_state = self.snapshot()"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 125,
+    "in_function": "__init__",
+    "name": "_saved_state",
+    "source": "self._saved_state = self._committed_state   # last on-disk/new baseline"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 125,
+    "in_function": "__init__",
+    "name": "_committed_state",
+    "source": "self._saved_state = self._committed_state   # last on-disk/new baseline"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1381,
+    "in_function": "_persist_verify_corpse",
+    "name": "snapshot",
+    "source": "doc = self.snapshot()"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1439,
+    "in_function": "_commit_if_changed",
+    "name": "snapshot",
+    "source": "state = self.snapshot(report=rep)"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1444,
+    "in_function": "_commit_if_changed",
+    "name": "_committed_state",
+    "source": "if state == self._committed_state:"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1446,
+    "in_function": "_commit_if_changed",
+    "name": "_undo_stack",
+    "source": "self._undo_stack.append(self._committed_state)"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1446,
+    "in_function": "_commit_if_changed",
+    "name": "_committed_state",
+    "source": "self._undo_stack.append(self._committed_state)"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1447,
+    "in_function": "_commit_if_changed",
+    "name": "_undo_stack",
+    "source": "if len(self._undo_stack) > self.UNDO_LIMIT:"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1448,
+    "in_function": "_commit_if_changed",
+    "name": "_undo_stack",
+    "source": "self._undo_stack.pop(0)"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1449,
+    "in_function": "_commit_if_changed",
+    "name": "_redo_stack",
+    "source": "self._redo_stack.clear()"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1450,
+    "in_function": "_commit_if_changed",
+    "name": "_committed_state",
+    "source": "self._committed_state = state"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1460,
+    "in_function": "_restore_state",
+    "name": "_committed_state",
+    "source": "self._committed_state = self.snapshot()"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1460,
+    "in_function": "_restore_state",
+    "name": "snapshot",
+    "source": "self._committed_state = self.snapshot()"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1468,
+    "in_function": "_reset_undo",
+    "name": "_undo_stack",
+    "source": "self._undo_stack.clear()"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1469,
+    "in_function": "_reset_undo",
+    "name": "_redo_stack",
+    "source": "self._redo_stack.clear()"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1470,
+    "in_function": "_reset_undo",
+    "name": "_committed_state",
+    "source": "self._committed_state = self.snapshot()"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1470,
+    "in_function": "_reset_undo",
+    "name": "snapshot",
+    "source": "self._committed_state = self.snapshot()"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1471,
+    "in_function": "_reset_undo",
+    "name": "_saved_state",
+    "source": "self._saved_state = self._committed_state    # fresh New/Open is clean"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1471,
+    "in_function": "_reset_undo",
+    "name": "_committed_state",
+    "source": "self._saved_state = self._committed_state    # fresh New/Open is clean"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1476,
+    "in_function": "undo",
+    "name": "_undo_stack",
+    "source": "if not self._undo_stack:"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1479,
+    "in_function": "undo",
+    "name": "_redo_stack",
+    "source": "self._redo_stack.append(self._committed_state)"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1479,
+    "in_function": "undo",
+    "name": "_committed_state",
+    "source": "self._redo_stack.append(self._committed_state)"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1480,
+    "in_function": "undo",
+    "name": "_restore_state",
+    "source": "self._restore_state(self._undo_stack.pop())"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1480,
+    "in_function": "undo",
+    "name": "_undo_stack",
+    "source": "self._restore_state(self._undo_stack.pop())"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1485,
+    "in_function": "redo",
+    "name": "_redo_stack",
+    "source": "if not self._redo_stack:"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1488,
+    "in_function": "redo",
+    "name": "_undo_stack",
+    "source": "self._undo_stack.append(self._committed_state)"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1488,
+    "in_function": "redo",
+    "name": "_committed_state",
+    "source": "self._undo_stack.append(self._committed_state)"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1489,
+    "in_function": "redo",
+    "name": "_restore_state",
+    "source": "self._restore_state(self._redo_stack.pop())"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1489,
+    "in_function": "redo",
+    "name": "_redo_stack",
+    "source": "self._restore_state(self._redo_stack.pop())"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1494,
+    "in_function": "_update_undo_actions",
+    "name": "_undo_stack",
+    "source": "self.a_undo.setEnabled(bool(self._undo_stack))"
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1495,
+    "in_function": "_update_undo_actions",
+    "name": "_redo_stack",
+    "source": "self.a_redo.setEnabled(bool(self._redo_stack))"
+   },
+   {
+    "file": "floorplanner/planio.py",
+    "line": 205,
+    "in_function": "_finish_open",
+    "name": "_saved_state",
+    "source": "self._saved_state = None             # nothing on disk matches this"
+   },
+   {
+    "file": "floorplanner/planio.py",
+    "line": 614,
+    "in_function": "_write_plan",
+    "name": "snapshot",
+    "source": "state = self.snapshot()"
+   },
+   {
+    "file": "floorplanner/planio.py",
+    "line": 627,
+    "in_function": "_write_plan",
+    "name": "_saved_state",
+    "source": "self._saved_state = state            # plan now matches what's on disk"
+   },
+   {
+    "file": "floorplanner/planio.py",
+    "line": 675,
+    "in_function": "save_path",
+    "name": "snapshot",
+    "source": "state = self.snapshot()"
+   },
+   {
+    "file": "floorplanner/planio.py",
+    "line": 686,
+    "in_function": "save_path",
+    "name": "_saved_state",
+    "source": "self._saved_state = state"
+   },
+   {
+    "file": "floorplanner/planio.py",
+    "line": 727,
+    "in_function": "_is_dirty",
+    "name": "_saved_state",
+    "source": "if self._saved_state is None:"
+   },
+   {
+    "file": "floorplanner/planio.py",
+    "line": 729,
+    "in_function": "_is_dirty",
+    "name": "snapshot",
+    "source": "return self.snapshot() != canonicalize(copy.deepcopy(self._saved_state))"
+   },
+   {
+    "file": "floorplanner/planio.py",
+    "line": 729,
+    "in_function": "_is_dirty",
+    "name": "_saved_state",
+    "source": "return self.snapshot() != canonicalize(copy.deepcopy(self._saved_state))"
+   }
+  ]
+ },
+ "Q2_mutating_methods": {
+  "total": 82,
+  "public": 57,
+  "private": 25,
+  "by_file": {
+   "floorplanner/csvio.py": 1,
+   "floorplanner/design/bridge.py": 1,
+   "floorplanner/dialogs.py": 3,
+   "floorplanner/extract.py": 3,
+   "floorplanner/imageio.py": 5,
+   "floorplanner/items.py": 10,
+   "floorplanner/levels.py": 2,
+   "floorplanner/macro.py": 5,
+   "floorplanner/mainwindow.py": 21,
+   "floorplanner/planio.py": 2,
+   "floorplanner/rooms.py": 9,
+   "floorplanner/view.py": 8,
+   "floorplanner/viewer/fp3d.py": 1,
+   "floorplanner/walls.py": 11
+  },
+  "BOUNDARY": "an AST walk finds what the SOURCE says. A method that mutates only through a helper it calls indirectly is counted at the helper, so this is a LOWER BOUND on the command surface",
+  "methods": [
+   {
+    "file": "floorplanner/csvio.py",
+    "line": 37,
+    "method": "_import_rooms",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem",
+     "rebuild_all_walls"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/design/bridge.py",
+    "line": 1045,
+    "method": "apply_design_to_scene",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem",
+     "bind_wall",
+     "rebuild_all_walls",
+     "removeItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/dialogs.py",
+    "line": 47,
+    "method": "refresh",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/dialogs.py",
+    "line": 498,
+    "method": "__init__",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/dialogs.py",
+    "line": 632,
+    "method": "__init__",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/extract.py",
+    "line": 36,
+    "method": "_copy_edge_stretch",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/extract.py",
+    "line": 98,
+    "method": "extract_room",
+    "dirty_marks": [],
+    "scene_calls": [
+     "bind_wall",
+     "rebuild_all_walls",
+     "unbind_wall"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/extract.py",
+    "line": 200,
+    "method": "join_room",
+    "dirty_marks": [],
+    "scene_calls": [
+     "rebuild_all_walls"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/imageio.py",
+    "line": 30,
+    "method": "import_from_image",
+    "dirty_marks": [
+     "_commit_if_changed"
+    ],
+    "scene_calls": [
+     "addItem",
+     "rebuild_all_walls"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/imageio.py",
+    "line": 86,
+    "method": "_show_wall_ghost",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/imageio.py",
+    "line": 104,
+    "method": "_clear_wall_ghost",
+    "dirty_marks": [],
+    "scene_calls": [
+     "removeItem"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/imageio.py",
+    "line": 111,
+    "method": "start_image_import",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem",
+     "setPos"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/imageio.py",
+    "line": 149,
+    "method": "extract_from_reference",
+    "dirty_marks": [
+     "_commit_if_changed"
+    ],
+    "scene_calls": [
+     "addItem",
+     "rebuild_all_walls",
+     "weld_scene"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/items.py",
+    "line": 41,
+    "method": "__init__",
+    "dirty_marks": [],
+    "scene_calls": [
+     "setPos"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/items.py",
+    "line": 190,
+    "method": "contextMenuEvent",
+    "dirty_marks": [],
+    "scene_calls": [
+     "removeItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/items.py",
+    "line": 376,
+    "method": "contextMenuEvent",
+    "dirty_marks": [],
+    "scene_calls": [
+     "removeItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/items.py",
+    "line": 640,
+    "method": "_apply_rotation",
+    "dirty_marks": [],
+    "scene_calls": [
+     "setPos"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/items.py",
+    "line": 676,
+    "method": "adopt",
+    "dirty_marks": [],
+    "scene_calls": [
+     "setPos"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/items.py",
+    "line": 692,
+    "method": "dissolve",
+    "dirty_marks": [],
+    "scene_calls": [
+     "removeItem",
+     "setPos"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/items.py",
+    "line": 821,
+    "method": "bake",
+    "dirty_marks": [],
+    "scene_calls": [
+     "rebuild_all_walls",
+     "setPos"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/items.py",
+    "line": 1116,
+    "method": "mouseMoveEvent",
+    "dirty_marks": [],
+    "scene_calls": [
+     "setPos"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/items.py",
+    "line": 1142,
+    "method": "crop_to_scene_rect",
+    "dirty_marks": [],
+    "scene_calls": [
+     "setPos"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/items.py",
+    "line": 1181,
+    "method": "contextMenuEvent",
+    "dirty_marks": [],
+    "scene_calls": [
+     "removeItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/levels.py",
+    "line": 334,
+    "method": "delete_floor",
+    "dirty_marks": [],
+    "scene_calls": [
+     "rebuild_all_walls",
+     "removeItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/levels.py",
+    "line": 365,
+    "method": "_commit_floor_change",
+    "dirty_marks": [
+     "_commit_if_changed"
+    ],
+    "scene_calls": [],
+    "public": false
+   },
+   {
+    "file": "floorplanner/macro.py",
+    "line": 369,
+    "method": "_cmd_place",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/macro.py",
+    "line": 384,
+    "method": "_cmd_wall",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem",
+     "rebuild_all_walls"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/macro.py",
+    "line": 404,
+    "method": "_opening",
+    "dirty_marks": [],
+    "scene_calls": [
+     "rebuild_all_walls"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/macro.py",
+    "line": 420,
+    "method": "_cmd_room",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/macro.py",
+    "line": 476,
+    "method": "_cmd_moveto",
+    "dirty_marks": [],
+    "scene_calls": [
+     "setPos"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 61,
+    "method": "__init__",
+    "dirty_marks": [
+     "_commit_if_changed",
+     "_dirty_timer",
+     "_mark_dirty"
+    ],
+    "scene_calls": [],
+    "public": false
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 530,
+    "method": "_set_shuffle",
+    "dirty_marks": [
+     "_mark_dirty"
+    ],
+    "scene_calls": [],
+    "public": false
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 680,
+    "method": "delete_selected",
+    "dirty_marks": [],
+    "scene_calls": [
+     "delete_wall",
+     "rebuild_all_walls",
+     "removeItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 745,
+    "method": "nudge_selected",
+    "dirty_marks": [],
+    "scene_calls": [
+     "setPos"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 761,
+    "method": "align_rooms_to_grid",
+    "dirty_marks": [],
+    "scene_calls": [
+     "rebuild_all_walls"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 810,
+    "method": "distribute_rooms",
+    "dirty_marks": [],
+    "scene_calls": [
+     "rebuild_all_walls"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 840,
+    "method": "refresh_rooms_cmd",
+    "dirty_marks": [],
+    "scene_calls": [
+     "rebuild_all_walls",
+     "removeItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 935,
+    "method": "room_boolean",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem",
+     "extract_room",
+     "rebuild_all_walls",
+     "removeItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1096,
+    "method": "_claim_region_walls",
+    "dirty_marks": [],
+    "scene_calls": [
+     "bind_wall",
+     "unbind_wall"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1130,
+    "method": "group_selected",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1179,
+    "method": "ungroup_selected",
+    "dirty_marks": [],
+    "scene_calls": [
+     "rebuild_all_walls"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1209,
+    "method": "coalesce_all_now",
+    "dirty_marks": [],
+    "scene_calls": [
+     "coalesce_outline_corners",
+     "normalize_walls",
+     "rebuild_all_walls"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1310,
+    "method": "_mark_dirty",
+    "dirty_marks": [
+     "_dirty_timer"
+    ],
+    "scene_calls": [],
+    "public": false
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1353,
+    "method": "_persist_verify_corpse",
+    "dirty_marks": [
+     "_dirty_timer"
+    ],
+    "scene_calls": [],
+    "public": false
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1453,
+    "method": "_restore_state",
+    "dirty_marks": [
+     "_dirty_timer"
+    ],
+    "scene_calls": [],
+    "public": false
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1463,
+    "method": "_reset_undo",
+    "dirty_marks": [
+     "_dirty_timer"
+    ],
+    "scene_calls": [],
+    "public": false
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1474,
+    "method": "undo",
+    "dirty_marks": [
+     "_commit_if_changed"
+    ],
+    "scene_calls": [],
+    "public": true
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1483,
+    "method": "redo",
+    "dirty_marks": [
+     "_commit_if_changed"
+    ],
+    "scene_calls": [],
+    "public": true
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1497,
+    "method": "cut_selected",
+    "dirty_marks": [],
+    "scene_calls": [
+     "rebuild_all_walls",
+     "removeItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1522,
+    "method": "paste_clipboard",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem",
+     "rebuild_all_walls"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/mainwindow.py",
+    "line": 1593,
+    "method": "closeEvent",
+    "dirty_marks": [
+     "_dirty_timer"
+    ],
+    "scene_calls": [],
+    "public": true
+   },
+   {
+    "file": "floorplanner/planio.py",
+    "line": 207,
+    "method": "apply_project_to_scene",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem",
+     "merge_all",
+     "rebuild_all_walls",
+     "removeItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/planio.py",
+    "line": 442,
+    "method": "room_template",
+    "dirty_marks": [],
+    "scene_calls": [
+     "extract_room",
+     "join_room"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/rooms.py",
+    "line": 180,
+    "method": "make_concept_room",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/rooms.py",
+    "line": 562,
+    "method": "clear_walls",
+    "dirty_marks": [],
+    "scene_calls": [
+     "unbind_wall"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/rooms.py",
+    "line": 750,
+    "method": "itemChange",
+    "dirty_marks": [],
+    "scene_calls": [
+     "unbind_wall"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/rooms.py",
+    "line": 1060,
+    "method": "mousePressEvent",
+    "dirty_marks": [],
+    "scene_calls": [
+     "extract_room"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/rooms.py",
+    "line": 1175,
+    "method": "mouseReleaseEvent",
+    "dirty_marks": [],
+    "scene_calls": [
+     "join_room",
+     "rebuild_all_walls"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/rooms.py",
+    "line": 1228,
+    "method": "contextMenuEvent",
+    "dirty_marks": [],
+    "scene_calls": [
+     "extract_room",
+     "join_room",
+     "removeItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/rooms.py",
+    "line": 1464,
+    "method": "repair_edge_bindings",
+    "dirty_marks": [],
+    "scene_calls": [
+     "bind_wall",
+     "unbind_wall"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/rooms.py",
+    "line": 1773,
+    "method": "split_partially_covered_edges",
+    "dirty_marks": [],
+    "scene_calls": [
+     "bind_wall"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/rooms.py",
+    "line": 1858,
+    "method": "bind_room_walls",
+    "dirty_marks": [],
+    "scene_calls": [
+     "bind_wall",
+     "rebuild_all_walls"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/view.py",
+    "line": 22,
+    "method": "__init__",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/view.py",
+    "line": 92,
+    "method": "__init__",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/view.py",
+    "line": 273,
+    "method": "_make_named_room",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/view.py",
+    "line": 344,
+    "method": "mousePressEvent",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/view.py",
+    "line": 564,
+    "method": "mouseReleaseEvent",
+    "dirty_marks": [],
+    "scene_calls": [
+     "rebuild_all_walls",
+     "removeItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/view.py",
+    "line": 700,
+    "method": "dropEvent",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/view.py",
+    "line": 735,
+    "method": "cancel_temp",
+    "dirty_marks": [],
+    "scene_calls": [
+     "removeItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/view.py",
+    "line": 741,
+    "method": "_place_opening",
+    "dirty_marks": [],
+    "scene_calls": [
+     "rebuild_all_walls"
+    ],
+    "public": false
+   },
+   {
+    "file": "floorplanner/viewer/fp3d.py",
+    "line": 748,
+    "method": "make_view",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/walls.py",
+    "line": 306,
+    "method": "apply_merge_plan_to_scene",
+    "dirty_marks": [],
+    "scene_calls": [
+     "bind_wall",
+     "removeItem",
+     "unbind_wall"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/walls.py",
+    "line": 571,
+    "method": "normalize_walls",
+    "dirty_marks": [],
+    "scene_calls": [
+     "split_body_landings",
+     "weld_scene"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/walls.py",
+    "line": 635,
+    "method": "apply_split_plan_to_scene",
+    "dirty_marks": [],
+    "scene_calls": [
+     "addItem",
+     "bind_wall",
+     "removeItem"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/walls.py",
+    "line": 715,
+    "method": "delete_wall",
+    "dirty_marks": [],
+    "scene_calls": [
+     "rebuild_all_walls",
+     "removeItem",
+     "unbind_wall"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/walls.py",
+    "line": 990,
+    "method": "collapse_degenerate_outline_edges",
+    "dirty_marks": [],
+    "scene_calls": [
+     "unbind_wall"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/walls.py",
+    "line": 1074,
+    "method": "close_gap",
+    "dirty_marks": [],
+    "scene_calls": [
+     "rebuild_all_walls"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/walls.py",
+    "line": 1313,
+    "method": "itemChange",
+    "dirty_marks": [],
+    "scene_calls": [
+     "unbind_wall"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/walls.py",
+    "line": 2115,
+    "method": "mouseReleaseEvent",
+    "dirty_marks": [],
+    "scene_calls": [
+     "rebuild_all_walls"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/walls.py",
+    "line": 2236,
+    "method": "contextMenuEvent",
+    "dirty_marks": [],
+    "scene_calls": [
+     "delete_wall"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/walls.py",
+    "line": 2416,
+    "method": "sync",
+    "dirty_marks": [],
+    "scene_calls": [
+     "setPos"
+    ],
+    "public": true
+   },
+   {
+    "file": "floorplanner/walls.py",
+    "line": 2615,
+    "method": "contextMenuEvent",
+    "dirty_marks": [],
+    "scene_calls": [
+     "removeItem"
+    ],
+    "public": true
+   }
+  ]
+ },
+ "Q3_what_the_record_says_phase_6_absorbs": [
+  {
+   "file": "docs/V5_MIGRATION_PLAN.md",
+   "line": 58,
+   "text": "| \u2610 | **P6.1** `QUndoStack` + commands | ruff + pytest |"
+  },
+  {
+   "file": "docs/V5_MIGRATION_PLAN.md",
+   "line": 59,
+   "text": "| \u2610 | **P6.2** Retire snapshot undo | ruff + pytest |"
+  },
+  {
+   "file": "docs/V5_MIGRATION_PLAN.md",
+   "line": 60,
+   "text": "| \u2610 | **P6.3** Scene index + viewport update final pass | ratios recorded |"
+  },
+  {
+   "file": "docs/V5_MIGRATION_PLAN.md",
+   "line": 84,
+   "text": "| **RED** | grid snap's three sub-rulings \u00b7 Phase 5 yard catalog and settable wall types \u00b7 Phase 6 command undo \u00b7 Phase 7 (7.1/7.2 `level.kind`, 7.3 roof) \u00b7 D44 (an accepted limit \u2014 nothing to do) \u00b7 D"
+  },
+  {
+   "file": "docs/V5_MIGRATION_PLAN.md",
+   "line": 294,
+   "text": "**Acceptance.** `test_undo.py` green. Undo after grouping restores the plan (the group dissolving is expected until P4.5). Undo with a reference image loaded keeps the image. **Record undo latency on "
+  },
+  {
+   "file": "docs/V5_MIGRATION_PLAN.md",
+   "line": 372,
+   "text": "*Bonus, and it is not incidental:* **a delta plus an applier is a command in all but name.** **P6.1** (`QUndoStack` + `MoveVertices`/`EditOpening`/\u2026) inherits this shape for free rather than inventing"
+  },
+  {
+   "file": "docs/V5_MIGRATION_PLAN.md",
+   "line": 596,
+   "text": "# Phase 6 \u2014 Command undo and final perf"
+  },
+  {
+   "file": "docs/V5_MIGRATION_PLAN.md",
+   "line": 598,
+   "text": "### P6.1 \u2014 `QUndoStack` + commands"
+  },
+  {
+   "file": "docs/V5_MIGRATION_PLAN.md",
+   "line": 600,
+   "text": "### P6.2 \u2014 Retire snapshot undo"
+  },
+  {
+   "file": "docs/V5_MIGRATION_PLAN.md",
+   "line": 601,
+   "text": "### P6.3 \u2014 Scene index + viewport update final pass"
+  },
+  {
+   "file": "docs/V5_MIGRATION_PLAN.md",
+   "line": 620,
+   "text": "Phase 0 before anything: without the scaling harness and the characterization tests, no later phase can be shown to have worked. Phase 1 before Phase 2 so the document is proven against the live scene"
+  },
+  {
+   "file": "docs/ROADMAP.md",
+   "line": 153,
+   "text": "| **Phase 6 \u2014 command undo** | the largest remaining task; retires `snapshot()`. D42's applier consolidation and D45's `_edge_wall` fold in here |"
+  },
+  {
+   "file": "docs/ROADMAP.md",
+   "line": 157,
+   "text": "| **D45, D46** | carried to Phase 6 and Phase 5 respectively |"
+  }
+ ]
+}
