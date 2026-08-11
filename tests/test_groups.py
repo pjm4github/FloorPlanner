@@ -585,13 +585,21 @@ def test_a_group_move_leaves_the_outlines_still_holding_their_corners(fp, win):
     room. Measured before the fix: 140/140 shared corners -> 0/140, and a
     party-wall drag then resized nothing."""
     _v5_plan(fp, win)
-    assert _corner_sharing(fp, win) == (140, 140)
+    assert _corner_sharing(fp, win) == (138, 138), (
+        "138, not the 140 this pinned until 2026-08-11: symmetricP1 was RE-CUT "
+        "under R-A to remove WIC's zero-width spur (D41/I16), which drops two "
+        "outline slots. The PROPERTY is unchanged -- every shared corner is "
+        "still shared -- and only the fixture's size moved.")
     for g in _group_everything(fp, win):
         g.setPos(48.0, 0.0)
         g.bake()
         g.dissolve()
     fp.rebuild_all_walls(win.scene)
-    assert _corner_sharing(fp, win) == (140, 140)
+    assert _corner_sharing(fp, win) == (138, 138), (
+        "138, not the 140 this pinned until 2026-08-11: symmetricP1 was RE-CUT "
+        "under R-A to remove WIC's zero-width spur (D41/I16), which drops two "
+        "outline slots. The PROPERTY is unchanged -- every shared corner is "
+        "still shared -- and only the fixture's size moved.")
 
     # DETERMINISTIC PICK (defect 28). `next(w for w in win.scene.items() ...)`
     # took whichever party wall the scene happened to list first, and scene item
@@ -645,7 +653,11 @@ def test_a_group_rotation_also_keeps_the_corners(fp, win):
     g._apply_rotation(QPointF(c.x(), c.y() + 100), False)      # 90 degrees
     g._finish_rotation()
     fp.rebuild_all_walls(win.scene)
-    assert _corner_sharing(fp, win) == (140, 140)
+    assert _corner_sharing(fp, win) == (138, 138), (
+        "138, not the 140 this pinned until 2026-08-11: symmetricP1 was RE-CUT "
+        "under R-A to remove WIC's zero-width spur (D41/I16), which drops two "
+        "outline slots. The PROPERTY is unchanged -- every shared corner is "
+        "still shared -- and only the fixture's size moved.")
     assert _unwelded(win) == 0
 
 
