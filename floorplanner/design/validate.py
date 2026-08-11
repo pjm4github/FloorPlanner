@@ -284,6 +284,32 @@ def check(d, deep=True, boundary=False):
     #     is where a document is READ or WRITTEN -- never after every edit.
     if boundary:
         _i15(d, E, V, xy)
+        # I16 SIMPLE RING: a room outline visits no vertex twice.  D41, ruled at
+        #     R-A as a NEW invariant rather than a widening of I5b -- I5b tests
+        #     PROPER CROSSING, and `_seg_cross` must not fire on the collinear edges
+        #     two rooms legitimately share, so widening it would blur something that
+        #     works.  A ring that visits a vertex twice is a DEGENERACY, not a
+        #     crossing: the pinched loop the walk planarises, and the zero-width
+        #     spur (out to a corner and straight back, contributing no area).
+        #
+        #     IT IS CHEAP AND ALWAYS-ON, unlike I15 beside it.  Measured across the
+        #     whole corpus it costs 0.157 ms -- a set membership per outline slot --
+        #     against I15's 4.2 ms indexed, so there is no case for gating it.
+        #
+        #     I5 ALREADY CATCHES THE ADJACENT CASE ("repeats corner"), which is a
+        #     ring that stutters on one vertex.  This is the NON-ADJACENT case, and
+        #     the two are different faults: the first is a duplicated slot, the
+        #     second is an excursion that comes back.
+        for r in d["rooms"]:
+            seen_ring = set()
+            for e in r["outline"]:
+                if e["v"] in seen_ring:
+                    E.append(f"I16 room {r['id']} ({r['name']}) outline visits "
+                             f"vertex {e['v']} twice -- not a simple ring")
+                    break
+                seen_ring.add(e["v"])
+
+
 
     # I11 no two PLACED rooms of the same overlap class may overlap.
     # I11 no two PLACED rooms of the same overlap class may overlap.

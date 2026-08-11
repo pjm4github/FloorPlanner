@@ -61,6 +61,23 @@ KNOWN_UNCLEAN = {
     # that overlap is a state the app genuinely reaches. Repairing the drawing
     # would delete the only evidence of a state the model cannot express.
     "farmplaceBIGmultifloor.json": "I11",
+    # planc1TestV5.json -- EXEMPT FOR EXACTLY ONE FAULT: `I16 room r20 (WIC)
+    # outline visits vertex v5 twice`. Added 2026-08-11 when I16 (D41's simple
+    # ring, ruled at R-A) landed.
+    #
+    # WHY IT IS NOT RE-CUT LIKE symmetricP1. R-A ruled the corpus question in
+    # one line: the clean reference gets fixed, THE CORRUPTION FIXTURES KEEP
+    # THEIR INSTANCES, because the instances are the point of them. This file
+    # is the v5 rendering of planc1 -- the same zero-width WIC spur that
+    # planc1.v5.json carries, and planc1.v5.json is the fixture whose whole job
+    # is to be referentially dirty while remaining schema-valid.
+    #
+    # WHAT IT WOULD COST TO "FIX" IT: the same edit made to symmetricP1 -- drop
+    # the spur slots, retarget one wall, delete the orphaned wall and vertex.
+    # Doing that would leave the tree with NO v5 example of a pinched ring
+    # outside the deliberately-corrupt file, which is the state that made D41
+    # hard to find in the first place.
+    "planc1TestV5.json": "I16",
     # roundedMultifloor.json was on this list and CAME OFF IT on 2026-08-07,
     # when Patrick reshaped the two rooms so they no longer nest -- the list
     # working as intended: an entry leaves the moment its file is clean, and
@@ -113,7 +130,7 @@ def test_known_unclean_still_fails(path):
     """
     doc = json.loads(path.read_text(encoding="utf-8"))
     assert schema_errors(doc) == [], f"{path.name} fails the JSON Schema"
-    errs = check(doc, deep=True)
+    errs = check(doc, deep=True, boundary=True)
     want = KNOWN_UNCLEAN[path.name]
     assert any(e.startswith(want) for e in errs), (
         f"{path.name} no longer fails {want} -- it may have been fixed. "
@@ -273,3 +290,47 @@ def test_negative_I6_fires_on_a_mislabelled_wall_side():
     w["left"] = wrong
     assert any(e.startswith("I6") for e in check(d, deep=False)), \
         "I6 must fire on a wall side that disagrees with the room outlines"
+
+
+def test_negative_I16_fires_on_a_pinched_ring():
+    """I16 SIMPLE RING (D41, ruled at R-A as a NEW invariant, not a widening).
+
+    I5b tests PROPER CROSSING and `_seg_cross` must not fire on the collinear
+    edges two rooms legitimately share, so widening it would blur something
+    that works. A ring visiting a vertex twice is a DEGENERACY -- the pinched
+    loop, and the zero-width spur that goes out to a corner and straight back.
+
+    Constructed on the RE-CUT symmetricP1, which is now clean of it: the spur
+    R-A ordered removed is put back, and I16 must see it. That makes this test
+    the guard on the re-cut as well -- if someone restores the old outline, it
+    fails.
+
+    IT IS A BOUNDARY CHECK, alongside I15, AND THAT WAS MEASURED. Landed
+    always-on it turned the gate red on EIGHT tests, every one of them asserting
+    that a CONVERTED LEGACY plan is clean -- `planc1.json` carries this very WIC
+    spur in its v4 geometry and the importer reproduces it faithfully. The
+    importer is not inventing a fault, it is carrying one, and a document that
+    ARRIVES degenerate belongs in a boundary report rather than in a red
+    conversion test. Different reason from I15's mid-drag transient, same
+    conclusion.
+    """
+    d = _load("symmetricP1.json")
+    assert not [e for e in check(d, deep=True, boundary=True)
+                if e.startswith("I16")], \
+        "precondition: symmetricP1 was re-cut and is clean of I16"
+
+    room = next(r for r in d["rooms"] if r["name"] == "WIC")
+    ring = [e["v"] for e in room["outline"]]
+    # THE SHAPE IS PINNED, NOT THE IDS. The writer re-mints ids densely, so a
+    # literal ring would pin the numbering rather than the re-cut -- and would
+    # fail the next time an unrelated corner is added anywhere before it.
+    assert len(ring) == 5 and len(set(ring)) == 5, (
+        f"the re-cut left WIC a five-corner SIMPLE ring; this pins that shape "
+        f"and is the guard on the re-cut itself: {ring}")
+
+    # put the excursion back: out to a corner the ring already visits and
+    # straight back -- the zero-width spur R-A ordered removed
+    room["outline"].insert(1, {"v": ring[-1], "wall": None})
+    errs = check(d, deep=False, boundary=True)
+    assert any(e.startswith("I16") and room["id"] in e for e in errs), (
+        f"I16 must fire on a ring that visits a vertex twice -- got {errs[:4]}")

@@ -98,7 +98,12 @@ class PlanIOMixin:
             # provenance is written ONCE at import and never mutated; a v5 file
             # that carries one keeps it across a re-save (P2.2)
             self._provenance = data.get("provenance")
-            errs = check(data, deep=True)
+            # boundary=True adds I15 (outline completeness), which is a
+            # DOCUMENT-BOUNDARY check by measurement: it fires on correct
+            # mid-drag transients if run per mutation, so a load is exactly
+            # where it belongs. CHECK YES, FIX NO (D49's amended shape) -- the
+            # file opens unchanged and the user is told.
+            errs = check(data, deep=True, boundary=True)
             if errs:
                 bad = [e for e in errs if e.startswith("I14")]
                 head = ("This v5 file is malformed: it is not welded at "
@@ -126,6 +131,62 @@ class PlanIOMixin:
         self._report(conversion_report(rep, int(data.get("version", 0))),
                      interactive, "Converted to the v5 format")
         return rep
+
+    # the codes the SAVE boundary asks about. One tuple, because D59 widens
+    # this to the cheap twelve by ADDING TO IT rather than by growing a second
+    # call site beside `_write_plan`.
+    BOUNDARY_ASK_CODES = ("I15",)
+
+    def _boundary_ask(self, doc, interactive=True):
+        """THE SAVE BOUNDARY: ask, do not refuse. Returns True to go on writing.
+
+        D49's amended shape, applied to I15. **SAVE ASKS, IT DOES NOT REFUSE** --
+        a deform-to-follow drag can transiently produce geometry the user has
+        not finished with, and a hard refusal traps them with unsaveable work.
+        The existing refusal in `_write_plan` above is a different and older
+        decision about a different fault class, and this deliberately does not
+        touch it.
+
+        **AND THE REPORT MUST BE ACTIONABLE**, so it names the ROOM and the
+        POINT rather than an id: `r15` and `v80` tell a user nothing, while
+        "OFFICE at (1273.5, 315.0)" is somewhere they can look.
+
+        WHY I15 IS ASKED HERE AT ALL, given the load check. Measured: the app
+        produces violations itself -- `normalize_walls` writes seven across two
+        corpus plans, attributed to `weld_scene` -- so a load-only check would
+        miss exactly the files this application creates. Both boundaries, and
+        the reason is a measurement rather than symmetry.
+
+        Headless callers pass `interactive=False`: the findings land on
+        `self._boundary_findings` and the save proceeds, the `_import_rooms`
+        convention.
+        """
+        errs = [e for e in check(doc, deep=True, boundary=True)
+                if e.startswith(self.BOUNDARY_ASK_CODES)]
+        self._boundary_findings = errs
+        if not errs:
+            return True
+        V = {v["id"]: v for v in doc.get("vertices", ())}
+        R = {r["id"]: r for r in doc.get("rooms", ())}
+        lines = []
+        for e in errs[:6]:
+            room = next((R[t]["name"] for t in e.split() if t in R), "?")
+            pt = next((V[t] for t in e.split() if t in V), None)
+            where = f"({pt['x']:.1f}, {pt['y']:.1f})" if pt else "?"
+            lines.append(f"  • {room} at {where}")
+        more = "" if len(errs) <= 6 else f"\n  … and {len(errs) - 6} more"
+        text = (f"{len(errs)} room edge(s) run through a wall corner without "
+                f"naming it:\n\n" + "\n".join(lines) + more +
+                "\n\nThe plan can still be saved. Save anyway?")
+        self.status(f"Outline completeness: {len(errs)} finding(s).")
+        if not interactive:
+            return True
+        return QMessageBox.question(
+            self, "Outline completeness", text,
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save
+        ) == QMessageBox.StandardButton.Save
 
     def _report(self, text, interactive, title):
         """Tell the user. A modal hangs headless, so scripted/test callers pass
@@ -552,6 +613,10 @@ class PlanIOMixin:
             return
         state = self.snapshot()
         on_disk = self.design_document()     # P2.2: the FILE is v5 now
+        if not self._boundary_ask(on_disk, interactive=True):
+            self.status("Not saved: cancelled at the outline-completeness "
+                        "report.")
+            return
         try:
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(on_disk, f, indent=1)
@@ -609,6 +674,12 @@ class PlanIOMixin:
             return
         state = self.snapshot()
         on_disk = self.design_document()     # P2.2: the FILE is v5 now
+        # the boundary report runs here too -- non-interactively, so it records
+        # and never blocks. A scripted save that silently skipped the check
+        # would make the macro path quieter than the UI one, which is how a
+        # class of fault comes to be invisible to exactly the tooling that
+        # produces it most often.
+        self._boundary_ask(on_disk, interactive=False)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(on_disk, f, indent=1)
         self.current_path = path
