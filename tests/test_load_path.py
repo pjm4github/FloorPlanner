@@ -495,3 +495,54 @@ def test_i15_load_reports_and_opens_the_file_unchanged(fp, win):
     assert win.statusBar().currentMessage(), "the load said nothing at all"
     # not repaired: the bytes on disk are untouched
     assert json.loads(path.read_text(encoding="utf-8")) == raw
+
+
+# --------------------------------------------------------------------------
+# P6.a — the per-mutation invariant hook, off the snapshot path
+# --------------------------------------------------------------------------
+def test_shadow_mode_still_fires_without_the_snapshot_undo_path(fp, win,
+                                                                monkeypatch):
+    """P6.a's RULED RECEIPT: with the snapshot hook removed from that path,
+    shadow mode still fires, proven by a deliberately corrupt mutation.
+
+    WHY THIS TEST EXISTS AT ALL. Read-back 0008 measured that
+    `_commit_if_changed` is not an undo function -- it is the application's only
+    per-mutation invariant trigger, and Phase 6 retires the undo path it lives
+    in. Retiring it naively would have taken `FP_VERIFY_DESIGN` down SILENTLY.
+    So the hook now has its own name, `verify_settled`, and this asserts it is
+    reachable WITHOUT the snapshot/undo machinery being involved.
+
+    THE MUTATION IS DELIBERATELY CORRUPT, and the precondition is asserted
+    first: an assertion that "the checker fired" is worthless if the scene was
+    legal, and this is a negative-assertion's mirror -- it must establish that
+    there was something to catch.
+    """
+    from PyQt6.QtCore import QPointF
+
+    from floorplanner.design.verify import rebase
+
+    sc = win.scene
+    a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    b = fp.WallItem(QPointF(120, 0), QPointF(120, 96), "interior")
+    sc.addItem(a)
+    sc.addItem(b)
+    fp.rebuild_all_walls(sc)
+    rebase(win)
+
+    seen = []
+    monkeypatch.setattr(win, "_verify_or_report",
+                        lambda where, **kw: seen.append((where, kw)) or True)
+
+    # the hook, called with NO snapshot and NO undo state -- the whole point
+    win.verify_settled()
+    assert seen, "verify_settled did not reach the shadow-mode reporter at all"
+    assert seen[0][0] == "operation", (
+        f"the hook must report at the 'operation' site, got {seen[0][0]!r}")
+
+    # and it still carries a shared walk when one is offered, so P6.a did not
+    # cost the saving that motivated inlining it in the first place
+    seen.clear()
+    doc, rep = {"marker": 1}, {"walk": 1}
+    win.verify_settled(doc=doc, walk_report=rep)
+    assert seen[0][1]["doc"] is doc and seen[0][1]["walk_report"] is rep, \
+        "the shared walk must be passed through, not dropped"
