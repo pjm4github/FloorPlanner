@@ -1,0 +1,226 @@
+{
+ "question": "does a save-side corner move cross a weld boundary -- does it change which neighbours it can weld to?",
+ "POSITIVE_CONTROL": {
+  "statement": "moving a third wall's end onto an existing shared corner and re-welding MUST change the weld partition",
+  "groups_before": 5,
+  "groups_after": 4,
+  "verdict": "PASS"
+ },
+ "PRECONDITION_total_moved_corners_across_all_plans": 2,
+ "THE_WHOLE_PARTITION_COMPARISON_IS_CONFOUNDED": {
+  "plans_with_ZERO_moved_corners_that_still_differ": [
+   "planc1.v5.json",
+   "roundedMultifloor.json",
+   "wiscaway2026-08-08.json",
+   "symmetricP1.json"
+  ],
+  "why": "the save re-splits walls at every junction and room corner, so the reloaded scene has more wall ends and more vertex groups whether or not anything moved. A plan that moved NOTHING and still differs is proof the comparison measures the re-split, not the move",
+  "so": "the verdict below comes from the LOCAL test, which asks only whether a moved corner's weld neighbourhood changed"
+ },
+ "plans": [
+  {
+   "plan": "planc1.v5.json",
+   "weld_radius_in": 0.6,
+   "PRECONDITION_corners_the_save_moved": 0,
+   "misclassified_NEW_corners_near_an_existing_one": 2,
+   "of_which_MOVED_FURTHER_THAN_THE_WELD_RADIUS": 0,
+   "largest_GENUINE_move_in": 0.0,
+   "largest_if_NEW_corners_were_counted_too": 1.529,
+   "moves": [
+    {
+     "room": "Hall",
+     "at": [
+      248.43,
+      654.0
+     ],
+     "moved_in": 1.529,
+     "wall_ends_at_it": 3,
+     "KIND": "NEW (producer 2)"
+    },
+    {
+     "room": "M Bath",
+     "at": [
+      248.43,
+      654.0
+     ],
+     "moved_in": 1.529,
+     "wall_ends_at_it": 3,
+     "KIND": "NEW (producer 2)"
+    }
+   ],
+   "LOCAL_TEST_corners_whose_weld_neighbourhood_CHANGED": 2,
+   "crossings": [
+    {
+     "room": "Hall",
+     "at": [
+      248.43,
+      654.0
+     ],
+     "moved_in": 1.529,
+     "wall_ends_at_it": 3,
+     "KIND": "NEW (producer 2)",
+     "old": [
+      248.43,
+      655.529
+     ],
+     "neighbours_at_the_OLD_position": [],
+     "neighbours_at_the_NEW_position": [
+      [
+       248.43,
+       654.0
+      ]
+     ]
+    },
+    {
+     "room": "M Bath",
+     "at": [
+      248.43,
+      654.0
+     ],
+     "moved_in": 1.529,
+     "wall_ends_at_it": 3,
+     "KIND": "NEW (producer 2)",
+     "old": [
+      248.43,
+      655.529
+     ],
+     "neighbours_at_the_OLD_position": [],
+     "neighbours_at_the_NEW_position": [
+      [
+       248.43,
+       654.0
+      ]
+     ]
+    }
+   ],
+   "CONFOUNDED_weld_groups_before": 58,
+   "CONFOUNDED_weld_groups_after": 62,
+   "CONFOUNDED_set_identical": false
+  },
+  {
+   "plan": "wiscaway2026-08-09R.json",
+   "weld_radius_in": 0.6,
+   "PRECONDITION_corners_the_save_moved": 2,
+   "misclassified_NEW_corners_near_an_existing_one": 0,
+   "of_which_MOVED_FURTHER_THAN_THE_WELD_RADIUS": 0,
+   "largest_GENUINE_move_in": 0.3802,
+   "largest_if_NEW_corners_were_counted_too": 0.3802,
+   "moves": [
+    {
+     "room": "PWDR",
+     "at": [
+      1151.988,
+      785.62
+     ],
+     "moved_in": 0.3802,
+     "wall_ends_at_it": 0,
+     "KIND": "MOVED"
+    },
+    {
+     "room": "OFFICE",
+     "at": [
+      1273.525,
+      314.996
+     ],
+     "moved_in": 0.0778,
+     "wall_ends_at_it": 0,
+     "KIND": "MOVED"
+    }
+   ],
+   "LOCAL_TEST_corners_whose_weld_neighbourhood_CHANGED": 2,
+   "crossings": [
+    {
+     "room": "OFFICE",
+     "at": [
+      1273.525,
+      314.996
+     ],
+     "moved_in": 0.0778,
+     "wall_ends_at_it": 0,
+     "KIND": "MOVED",
+     "old": [
+      1273.578,
+      315.053
+     ],
+     "neighbours_at_the_OLD_position": [],
+     "neighbours_at_the_NEW_position": [
+      [
+       1273.53,
+       315.0
+      ]
+     ]
+    },
+    {
+     "room": "PWDR",
+     "at": [
+      1151.988,
+      785.62
+     ],
+     "moved_in": 0.3802,
+     "wall_ends_at_it": 0,
+     "KIND": "MOVED",
+     "old": [
+      1152.0,
+      786.0
+     ],
+     "neighbours_at_the_OLD_position": [],
+     "neighbours_at_the_NEW_position": [
+      [
+       1151.99,
+       785.62
+      ]
+     ]
+    }
+   ],
+   "CONFOUNDED_weld_groups_before": 73,
+   "CONFOUNDED_weld_groups_after": 115,
+   "CONFOUNDED_set_identical": false
+  },
+  {
+   "plan": "roundedMultifloor.json",
+   "weld_radius_in": 0.6,
+   "PRECONDITION_corners_the_save_moved": 0,
+   "misclassified_NEW_corners_near_an_existing_one": 0,
+   "of_which_MOVED_FURTHER_THAN_THE_WELD_RADIUS": 0,
+   "largest_GENUINE_move_in": 0.0,
+   "largest_if_NEW_corners_were_counted_too": 0.0,
+   "moves": [],
+   "LOCAL_TEST_corners_whose_weld_neighbourhood_CHANGED": 0,
+   "crossings": [],
+   "CONFOUNDED_weld_groups_before": 102,
+   "CONFOUNDED_weld_groups_after": 106,
+   "CONFOUNDED_set_identical": false
+  },
+  {
+   "plan": "wiscaway2026-08-08.json",
+   "weld_radius_in": 0.6,
+   "PRECONDITION_corners_the_save_moved": 0,
+   "misclassified_NEW_corners_near_an_existing_one": 0,
+   "of_which_MOVED_FURTHER_THAN_THE_WELD_RADIUS": 0,
+   "largest_GENUINE_move_in": 0.0,
+   "largest_if_NEW_corners_were_counted_too": 0.0,
+   "moves": [],
+   "LOCAL_TEST_corners_whose_weld_neighbourhood_CHANGED": 0,
+   "crossings": [],
+   "CONFOUNDED_weld_groups_before": 71,
+   "CONFOUNDED_weld_groups_after": 93,
+   "CONFOUNDED_set_identical": false
+  },
+  {
+   "plan": "symmetricP1.json",
+   "weld_radius_in": 0.6,
+   "PRECONDITION_corners_the_save_moved": 0,
+   "misclassified_NEW_corners_near_an_existing_one": 0,
+   "of_which_MOVED_FURTHER_THAN_THE_WELD_RADIUS": 0,
+   "largest_GENUINE_move_in": 0.0,
+   "largest_if_NEW_corners_were_counted_too": 0.0,
+   "moves": [],
+   "LOCAL_TEST_corners_whose_weld_neighbourhood_CHANGED": 0,
+   "crossings": [],
+   "CONFOUNDED_weld_groups_before": 58,
+   "CONFOUNDED_weld_groups_after": 60,
+   "CONFOUNDED_set_identical": false
+  }
+ ],
+ "VERDICT": "DATA INTEGRITY -- a moved corner changed its weld neighbourhood on: planc1.v5.json, wiscaway2026-08-09R.json"
+}

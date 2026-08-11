@@ -1,0 +1,197 @@
+{
+ "question": "are producer 2's already-there insertions the same points as the I14 unwelded-T failures?",
+ "PRECONDITION": {
+  "already_there_insertions_total": 10,
+  "I14_failures_total": 3,
+  "verdict": "PASS"
+ },
+ "plans": [
+  {
+   "plan": "roundedMultifloor.json",
+   "producer2_ALREADY_THERE": 6,
+   "producer2_created_by_the_wall_pass": 0,
+   "I14_failures": 0,
+   "I14_of_which_unwelded_T": 0,
+   "already_there_points": [
+    [
+     888.0,
+     876.0
+    ],
+    [
+     888.0,
+     792.0
+    ],
+    [
+     978.0,
+     732.0
+    ],
+    [
+     978.0,
+     792.0
+    ],
+    [
+     978.0,
+     792.0
+    ],
+    [
+     978.0,
+     732.0
+    ]
+   ],
+   "I14_points": [],
+   "SET_EQUALITY": {
+    "in_producer2_only": [
+     [
+      888.0,
+      876.0
+     ],
+     [
+      888.0,
+      792.0
+     ],
+     [
+      978.0,
+      732.0
+     ],
+     [
+      978.0,
+      792.0
+     ],
+     [
+      978.0,
+      792.0
+     ],
+     [
+      978.0,
+      732.0
+     ]
+    ],
+    "in_I14_only": [],
+    "EQUAL": false
+   },
+   "VERDICT": "DISJOINT -- producer 2's already-there half is NOT the I14 failures"
+  },
+  {
+   "plan": "wiscaway2026-08-09R.json",
+   "producer2_ALREADY_THERE": 1,
+   "producer2_created_by_the_wall_pass": 2,
+   "I14_failures": 3,
+   "I14_of_which_unwelded_T": 3,
+   "already_there_points": [
+    [
+     1269.728,
+     387.728
+    ]
+   ],
+   "I14_points": [
+    [
+     1148.627,
+     406.863
+    ],
+    [
+     1148.627,
+     406.863
+    ],
+    [
+     1234.13,
+     352.352
+    ]
+   ],
+   "SET_EQUALITY": {
+    "in_producer2_only": [
+     [
+      1269.728,
+      387.728
+     ]
+    ],
+    "in_I14_only": [
+     [
+      1148.627,
+      406.863
+     ],
+     [
+      1148.627,
+      406.863
+     ],
+     [
+      1234.13,
+      352.352
+     ]
+    ],
+    "EQUAL": false
+   },
+   "VERDICT": "DISJOINT -- producer 2's already-there half is NOT the I14 failures"
+  },
+  {
+   "plan": "planc1.v5.json",
+   "producer2_ALREADY_THERE": 3,
+   "producer2_created_by_the_wall_pass": 0,
+   "I14_failures": 0,
+   "I14_of_which_unwelded_T": 0,
+   "already_there_points": [
+    [
+     248.43,
+     654.0
+    ],
+    [
+     248.43,
+     654.0
+    ],
+    [
+     248.43,
+     654.0
+    ]
+   ],
+   "I14_points": [],
+   "SET_EQUALITY": {
+    "in_producer2_only": [
+     [
+      248.43,
+      654.0
+     ],
+     [
+      248.43,
+      654.0
+     ],
+     [
+      248.43,
+      654.0
+     ]
+    ],
+    "in_I14_only": [],
+    "EQUAL": false
+   },
+   "VERDICT": "DISJOINT -- producer 2's already-there half is NOT the I14 failures"
+  },
+  {
+   "plan": "wiscaway2026-08-08.json",
+   "producer2_ALREADY_THERE": 0,
+   "producer2_created_by_the_wall_pass": 0,
+   "I14_failures": 0,
+   "I14_of_which_unwelded_T": 0,
+   "already_there_points": [],
+   "I14_points": [],
+   "SET_EQUALITY": {
+    "in_producer2_only": [],
+    "in_I14_only": [],
+    "EQUAL": true
+   },
+   "VERDICT": "no already-there insertions on this plan"
+  },
+  {
+   "plan": "symmetricP1.json",
+   "producer2_ALREADY_THERE": 0,
+   "producer2_created_by_the_wall_pass": 0,
+   "I14_failures": 0,
+   "I14_of_which_unwelded_T": 0,
+   "already_there_points": [],
+   "I14_points": [],
+   "SET_EQUALITY": {
+    "in_producer2_only": [],
+    "in_I14_only": [],
+    "EQUAL": true
+   },
+   "VERDICT": "no already-there insertions on this plan"
+  }
+ ]
+}

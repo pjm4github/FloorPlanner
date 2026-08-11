@@ -287,6 +287,53 @@ The second is the more interesting half: **the plan arrives with a room edge
 crossing an unnamed T-junction**, so the save is correcting the *stored* outline
 rather than reacting to anything the session did.
 
+### IS THE ALREADY-THERE HALF AN I14 REPAIR? — NO, and I14 could not see it anyway
+
+The question ruled worth asking first: *if the stored outline genuinely violates
+I5 — a room edge crossing a T-junction it never named — then the save's insertion
+is a **repair**, and counting it as a producer was our category error rather than
+a fault in the code.* `wiscaway2026-08-09R` fails I14 three times with exactly
+that wording.
+
+**Measured, and it is disjoint — decisively, without needing a distance:**
+
+| plan | producer-2 insertions | I14 failures | of which unwelded-T |
+|---|---:|---:|---:|
+| `roundedMultifloor` | **6** | **0** | 0 |
+| `planc1.v5` | **3** | **0** | 0 |
+| `wiscaway2026-08-09R` | 1 | **3** | **3** |
+| `wiscaway2026-08-08` | 0 | 0 | 0 |
+| `symmetricP1` | 0 | 0 | 0 |
+
+**Two of the three plans that produce insertions have no I14 at all**, so there is
+nothing for the insertions to coincide *with*. On the plan that has both, the
+single insertion at `(1269.728, 387.728)` is **122.6″ from `v92`** and **50.2″
+from `v148`** — the two vertices the I14 messages name. Not the same points, in
+either direction.
+
+**AND THE STRUCTURAL REASON IS THE STRONGER ANSWER: I14 CANNOT SEE THIS SHAPE.**
+`validate.py:283` — *"no wall end sits within `vertex_weld_in` of another wall's
+body or end without being that same vertex"*. It compares **wall ends to walls**.
+A **room outline** crossing a point where walls end is outside its question
+entirely, exactly as `scene_identity_report` is blind to whether an outline
+shares a wall's vertex ([D62](0062-weld-scene-leaves-room-outlines-holding-a.md)).
+So the coincidence could not have held however the geometry fell, and a *"no"*
+here is a boundary rather than a measurement.
+
+**Which leaves the state genuinely unreported.** A stored outline crossing an
+unnamed T is invisible to I14 (wrong subject) and cannot fail I5 on a *saved*
+document (the walk emits one edge per wall **by construction**, so the emitted
+form is always compliant). **The fault is only visible in the stored-versus-emitted
+difference** — which is what producer 2 is. That is a gap in the invariant set,
+not merely a defect, and it is the honest place the target moves to.
+
+**One correction on the way, recorded because it changed an answer.** The first
+run of this comparison asked I14 of the **re-saved** document and reported *2
+failures, 0 unwelded-T* on a fixture whose README names three. The save welds and
+re-splits, so it had already repaired what was being looked for. Asked of the
+bytes on disk: **7 violations, 3 I14, all three the unwelded-T shape**, matching
+the fixture's characterisation exactly.
+
 ### A separate finding, flagged not chased
 
 **The save moves a corner on two of five plans**: zero on all three axis-aligned
@@ -294,6 +341,16 @@ plans, **2 corners at ≤0.3802″** on the angled `08‑09R`, and **2 corners a
 1.5290″** on `planc1`. Rare and isolated rather than general drift — but 1.5″ is
 too large to leave as a footnote here, and it belongs to whichever pass owns
 `split_params`' projection, not to D63.
+
+> **FILED AS [D64](0064-the-save-writes-an-outline-corner-at-a.md), and the
+> 1.5290″ HALF OF THIS PARAGRAPH IS WRONG.** Re-measured: `planc1`'s pair are not
+> moves at all but **producer-2 insertions** that happen to sit 1.5290″ from an
+> unrelated neighbour — the 2.0″ threshold in this census could not tell a moved
+> corner from a new one. **The largest genuine move is 0.3802″, below the 0.6″
+> weld radius**, and neither moved corner has another wall end nearer than
+> **5.998″**, so no identity is at risk. Accuracy, not data integrity. The
+> paragraph is left standing with this annotation rather than rewritten, because
+> the wrong figure is what the escalation was issued on.
 
 **Evidence:** `d63_producer_two.py` → `d63-producer-two.json` ·
 `d63_tolerance_sweep.py` → `d63-tolerance-and-drift.json`.
