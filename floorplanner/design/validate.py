@@ -70,7 +70,7 @@ def _seg_cross(a, b, c, d, tol=1e-4):
             and sgn(o(c, d, a)) * sgn(o(c, d, b)) < 0)
 
 
-def check(d, deep=True):
+def check(d, deep=True, boundary=False):
     """Referential-invariant errors for a v5 design, as a list of strings ([] is
     valid). There are 15 named checks; three are O(n^2) and gated behind `deep`:
 
@@ -236,6 +236,56 @@ def check(d, deep=True):
         if v["id"] not in live:
             E.append(f"I10 orphan vertex {v['id']}")
 
+    # I15 OUTLINE COMPLETENESS: no outline edge passes through a wall endpoint
+    #     without naming it.  For every outline edge from one vertex to the
+    #     next, no vertex that is a wall endpoint may lie strictly between them.
+    #
+    #     WHY IT EXISTS, and it is a gap NEITHER of its neighbours can close.
+    #     I14 compares wall ends to WALLS -- a room outline is outside its
+    #     subject entirely.  I5 cannot fail on a saved document, because
+    #     `bridge._walk` emits one outline edge per wall BY CONSTRUCTION, so the
+    #     violation is repaired in the act of asking: an instrument that repairs
+    #     what it measures reports health it manufactured.  Stated here as a
+    #     DIRECT PROPERTY OF THE STORED DOCUMENT, never as a difference between
+    #     two representations, which is what makes it checkable on bytes nobody
+    #     has loaded.
+    #
+    #     THE TOLERANCE IS NOT `vertex_weld_in`.  That is a COINCIDENCE radius
+    #     -- do two points name one corner.  This is a point-on-SEGMENT
+    #     question and needs a PERPENDICULAR distance, so the two must not share
+    #     a number.  Exact on the lattice (three lattice points are collinear
+    #     exactly when an integer cross product is zero, so no tolerance is
+    #     consulted at all), declared tolerance off it -- the same shape as
+    #     `rooms._corner_path`, deliberately, so there is one rule for "is this
+    #     point on this run" rather than two.  0.05" was chosen off a measured
+    #     plateau: the corpus reports the same 2 violations at 0.001, 0.01 and
+    #     0.05, while 0.0 drops a genuine hit to float exactness and 0.25 pulls
+    #     in a different question (`handoff/0006-readback-outline-invariants.md`).
+    #
+    #     ITS PLACE IN THE CHEAP LANE IS A FACT ABOUT THIS IMPLEMENTATION, NOT
+    #     ABOUT THE INVARIANT, and that is why `_i15_probes` exists.  Measured:
+    #     naive (every edge against every endpoint) costs 36 ms on the largest
+    #     corpus plan against the whole deep set's 49 -- honestly DEEP.  Behind
+    #     the grid index below it costs 0.917 ms against the cheap lane's 0.447
+    #     -- honestly CHEAP.  A later refactor to something clearer and slower
+    #     would silently move a 40x cost into the per-mutation path, so the work
+    #     is COUNTED and pinned by a test rather than left to a wall-clock
+    #     timing assertion, which flaps in CI and gets disabled.
+    #
+    #     IT IS A BOUNDARY CHECK, NOT A PER-MUTATION ONE, AND THAT WAS MEASURED
+    #     RATHER THAN CHOSEN.  Landed first in the always-on lane, it turned the
+    #     gate RED on exactly one test -- `test_acceptance_shuffle_drag_across_
+    #     the_plan`, at "mid-drag step 1 (over the plan)".  A room being dragged
+    #     across the plan TRANSIENTLY has outline edges running through wall
+    #     endpoints it does not name, and that state is legitimate: it is the
+    #     same class D49 was amended for, where a deform-to-follow drag may
+    #     transiently overlap and a hard refusal would trap the user with
+    #     unsaveable work.  So I15 runs only when asked (`boundary=True`), which
+    #     is where a document is READ or WRITTEN -- never after every edit.
+    if boundary:
+        _i15(d, E, V, xy)
+
+    # I11 no two PLACED rooms of the same overlap class may overlap.
     # I11 no two PLACED rooms of the same overlap class may overlap.
     #     interior + exterior form one class (a porch may not overlap a bedroom);
     #     `site` is its own class (a lawn zone may run under a deck);
@@ -378,6 +428,101 @@ def near_vertex_gaps(d, lo=None, hi=None):
                 out.append((a.get("level"), (a["x"], a["y"]),
                             (b["x"], b["y"]), dd))
     return sorted(out, key=lambda t: t[3])
+
+
+def _i15(d, E, V, xy):
+    """I15's body, lifted out of `check` so the invariant reads as one thing."""
+    tol_perp = float((d.get("settings") or {}).get("outline_on_edge_in", 0.05))
+    step = float((d.get("settings") or {}).get("wall_snap_in", 6.0)) or 6.0
+    cell = max(step * 4.0, 24.0)
+    grid, placed = {}, set()
+    for w in d["walls"]:
+        for k in ("v1", "v2"):
+            vid = w[k]
+            if vid in placed or vid not in V:
+                continue
+            placed.add(vid)                 # one entry per VERTEX, never per wall
+            v = V[vid]
+            grid.setdefault((v["level"], int(v["x"] // cell),
+                             int(v["y"] // cell)), []).append(vid)
+    for r in d["rooms"]:
+        # a FLOATING room deliberately breaks its sharing with the plan (P4.2),
+        # the same exemption I11 and I14 grant, and for the same reason
+        if (r.get("placement") or {}).get("state") == "floating":
+            continue
+        ring = [e["v"] for e in r["outline"] if e["v"] in V]
+        n = len(ring)
+        if n < 3:
+            continue
+        for i in range(n):
+            va, vb = ring[i], ring[(i + 1) % n]
+            a, b = xy(va), xy(vb)
+            lo_x, hi_x = min(a[0], b[0]) - tol_perp, max(a[0], b[0]) + tol_perp
+            lo_y, hi_y = min(a[1], b[1]) - tol_perp, max(a[1], b[1]) + tol_perp
+            for cx in range(int(lo_x // cell), int(hi_x // cell) + 1):
+                for cy in range(int(lo_y // cell), int(hi_y // cell) + 1):
+                    for vid in grid.get((r["level"], cx, cy), ()):
+                        if vid == va or vid == vb:
+                            continue
+                        if _between(a, xy(vid), b, step, tol_perp):
+                            E.append(f"I15 room {r['id']} edge {va}->{vb} "
+                                     f"passes through wall endpoint {vid} "
+                                     f"without naming it")
+
+
+def _between(a, p, b, step, tol_perp):
+    """Does `p` lie STRICTLY between `a` and `b`? I15's one predicate.
+
+    EXACT WHEN EVERY COORDINATE IS ON THE LATTICE -- three lattice points are
+    collinear exactly when an integer cross product is zero, so the test is a
+    comparison rather than a tolerance question, and `tol_perp` is not consulted
+    at all. Off the lattice it falls back to a perpendicular distance. Same
+    shape as `rooms._corner_path`: one rule for "is this point on this run".
+
+    EVERY CALL IS COUNTED (`_i15_probes`), because I15's place in the cheap lane
+    is a property of the grid index above and not of the invariant -- see the
+    note at I15 and `test_i15_stays_in_the_cheap_lane`.
+    """
+    global _i15_probes
+    _i15_probes += 1
+    if all(abs(c / step - round(c / step)) < 1e-9
+           for c in (a[0], a[1], p[0], p[1], b[0], b[1])):
+        ax, ay = round(a[0] / step), round(a[1] / step)
+        bx, by = round(b[0] / step), round(b[1] / step)
+        px, py = round(p[0] / step), round(p[1] / step)
+        cross = (bx - ax) * (py - ay) - (by - ay) * (px - ax)
+        dot = (px - ax) * (bx - ax) + (py - ay) * (by - ay)
+        ll = (bx - ax) ** 2 + (by - ay) ** 2
+        return cross == 0 and 0 < dot < ll
+    L = math.dist(a, b)
+    if L < 1e-9:
+        return False
+    ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+    s = (p[0] - a[0]) * ux + (p[1] - a[1]) * uy
+    perp = abs((p[0] - a[0]) * uy - (p[1] - a[1]) * ux)
+    return perp <= tol_perp and 1e-6 < s < L - 1e-6
+
+
+_i15_probes = 0
+"""Point-on-segment comparisons I15 has performed since `reset_i15_probes()`.
+
+A BOUNDED-WORK COUNTER, NOT A TIMER. I15 sits in the cheap twelve only because
+the grid index keeps it near-linear; measured, the naive form costs 36 ms on the
+largest corpus plan against the deep set's 49, and a refactor to something
+clearer and slower would move a 40x cost into the per-mutation path with nothing
+objecting. A wall-clock assertion would catch that and would also flap on a busy
+CI runner, so it would be disabled inside a month. A comparison count is
+DETERMINISTIC: it fails loudly on exactly the change that matters and never on
+machine load."""
+
+
+def reset_i15_probes():
+    global _i15_probes
+    _i15_probes = 0
+
+
+def i15_probes():
+    return _i15_probes
 
 
 def report(d):
