@@ -9,6 +9,15 @@ specification has twice been written describing code already in the tree.
 
 ---
 
+## A THIRD OF THE CATALOG RENDERS AS A BOX
+
+**28 of 95 items** name a 3D form that is recognised and **not built**, so they
+are drawn as a default box. Two of nine forms exist. **That is the number that
+sizes this work**, and the rulings in [`0010-ruling.md`](0010-ruling.md) are
+ordered by it.
+
+---
+
 ## THE FINDING — the cost of one new item is **TWO EDITS IN ONE FILE, PLUS ONE COMMAND**
 
 Measured by **adding a real furnishing and counting what had to be touched**, not

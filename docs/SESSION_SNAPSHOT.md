@@ -14,6 +14,23 @@
 
 ## 0. NEXT SESSION'S FIRST TWO TASKS
 
+**FURNISHINGS — CENSUS DONE, RULINGS ISSUED, NOTHING STARTED.**
+[`handoff/0010-census-furnishings.md`](handoff/0010-census-furnishings.md) +
+[`0010-ruling.md`](handoff/0010-ruling.md). **A THIRD OF THE CATALOG RENDERS AS A
+BOX — 28 of 95** name a form that is recognised and not built. Order of value,
+ruled: **(1) the `prism` generator** — extrude the symbol's real SVG outline,
+largest uplift per unit of work, needs no new authoring, and **opens with a
+measurement: how many of the 28 have a usable outline** · **(2) the remaining
+generators in descending item count** (`vehicle` 10, `enclosure` 7, `seat` 6,
+`bed` 4, `basin` 1) · **(3) parameterisation — a READ-BACK first**, it touches
+the catalog format and every consumer · **(4) AI symbol drafting, last**, because
+the mechanical floor is already two edits and one command. **THE AI RULING:
+AUTHORING TIME ONLY** — draft, review, commit as data, deterministic thereafter;
+it does not run at plan time. **Nothing starts until Patrick's Phase 6
+park-or-finish answer.**
+
+*(The census below is DONE — kept for the questions it answered.)*
+
 **1. THE FURNISHINGS CENSUS — measurement only, no design, no code.** Patrick
 wants to author new furnishings *including their 3D forms* and asked whether that
 belongs in the AI tool set. **Nothing is specified until the current path is
