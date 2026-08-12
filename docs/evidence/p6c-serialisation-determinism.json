@@ -1,0 +1,47 @@
+{
+ "question": "is serialisation deterministic enough for a serialise-and-compare dirty check to mean anything?",
+ "plans": [
+  {
+   "plan": "roundedMultifloor.json",
+   "A_same_window_twice": true,
+   "B_across_a_reload": true,
+   "C_two_windows_same_file": true,
+   "CONTROL_an_edit_is_visible": true,
+   "bytes": 68732
+  },
+  {
+   "plan": "wiscaway2026-08-08.json",
+   "A_same_window_twice": true,
+   "B_across_a_reload": true,
+   "C_two_windows_same_file": true,
+   "CONTROL_an_edit_is_visible": true,
+   "bytes": 61063
+  },
+  {
+   "plan": "symmetricP1.json",
+   "A_same_window_twice": true,
+   "B_across_a_reload": true,
+   "C_two_windows_same_file": true,
+   "CONTROL_an_edit_is_visible": true,
+   "bytes": 52447
+  },
+  {
+   "plan": "planc1.v5.json",
+   "A_same_window_twice": true,
+   "B_across_a_reload": true,
+   "C_two_windows_same_file": true,
+   "CONTROL_an_edit_is_visible": true,
+   "bytes": 55187
+  },
+  {
+   "plan": "farmplaceBIGmultifloor.json",
+   "A_same_window_twice": true,
+   "B_across_a_reload": true,
+   "C_two_windows_same_file": true,
+   "CONTROL_an_edit_is_visible": true,
+   "bytes": 58404
+  }
+ ],
+ "POSITIVE_CONTROL_the_comparator_sees_an_edit": true,
+ "VERDICT": "DETERMINISTIC -- A, B and C all identical on every plan; a serialise-and-compare dirty check is meaningful"
+}
