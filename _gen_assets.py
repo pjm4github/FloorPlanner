@@ -2,6 +2,7 @@
 # (top-view furniture symbol library, CC0).  Furnishing SVGs use a viewBox
 # in INCHES so the app can render them at true scale (1 scene unit = 1").
 import json
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent / "assets"
@@ -17,6 +18,33 @@ FILL = "#f8fafc"
 def svg(w, d, body):
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {d}" '
             f'width="{w}" height="{d}">\n' + "\n".join(body) + "\n</svg>\n")
+
+
+def svg_error(text):
+    """D70: is this SVG WELL-FORMED?  Returns a message, or None if it parses.
+
+    THE FAILURE THIS CATCHES, and it is the one that produced the record.
+    `svg()` does a join over `body`, so `body` must be a SEQUENCE OF ELEMENT
+    STRINGS.  Pass a single string and it is joined CHARACTER BY CHARACTER --
+    the generator reports success and writes a file with one character per
+    line.  The item still reaches the catalog, still draws a correct footprint
+    and still builds a 3D mesh, because all three read the MANIFEST; only the
+    plan SYMBOL is silently blank, because only it reads the SVG.
+
+    WHY AN XML PARSE AND NOT A RENDERER.  `QSvgRenderer` would be stronger --
+    it would also reject an SVG that parses but draws nothing -- and it would
+    drag Qt into an asset build that is deliberately Qt-free.  Ruled: parse,
+    and refuse.  **The limit is stated rather than hidden: this proves the file
+    is well-formed XML, not that it renders.**
+
+    The string case is named in the caller's message because it is the known
+    cause and the fix is one character -- brackets round the body.
+    """
+    try:
+        ET.fromstring(text)
+    except ET.ParseError as exc:
+        return str(exc)
+    return None
 
 
 def R(x, y, w, h, rx=0.0, fill=FILL, sw=1.0, dash=None):
@@ -842,14 +870,31 @@ except (OSError, ValueError, KeyError, TypeError):
     _prev_price = {}
 
 manifest = []
+_pending, _malformed = [], []
 for fid, name, cat, w, d, body in FURNISHINGS:
-    (FURN / f"{fid}.svg").write_text(svg(w, d, body), encoding="utf-8")
+    _text = svg(w, d, body)
+    _err = svg_error(_text)
+    if _err:
+        _malformed.append((f"{fid}.svg", _err,
+                           "body is a str, not a list of elements"
+                           if isinstance(body, str) else "malformed element"))
+    _pending.append((FURN / f"{fid}.svg", _text))
     height, elevation, form, material = SOLIDS[fid]
     manifest.append({"id": fid, "name": name, "category": cat,
                      "file": f"{fid}.svg", "width_in": w, "depth_in": d,
                      "height_in": height, "elevation_in": elevation,
                      "form": form, "material": material,
                      "price": _prev_price.get(fid, 0.0)})
+# D70: REFUSE BEFORE WRITING ANYTHING, the same shape as the data-model gate
+# above -- a half-written asset tree is worse than none, and this generator is
+# the only thing between a bad symbol and a silently blank item.
+if _malformed:
+    raise SystemExit(
+        f"assets not written -- {len(_malformed)} malformed SVG(s):\n"
+        + "".join(f"  {n}: {why} ({err})\n" for n, err, why in _malformed))
+for _path, _text in _pending:
+    _path.write_text(_text, encoding="utf-8")
+
 (FURN / "manifest.json").write_text(
     json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 (FURN / "materials.json").write_text(
@@ -1017,11 +1062,24 @@ TOOL_ICONS = {
         '<circle cx="12" cy="12" r="7" fill="#dc2626" stroke="#991b1b" '
         'stroke-width="1.4"/>'],
 }
+# the icons build their SVG inline rather than through `svg()`, so the D70
+# check is applied here too -- one writer skipped is the whole gap.
+_icons, _bad_icons = [], []
 for name, body in TOOL_ICONS.items():
-    (ICONS / f"{name}.svg").write_text(
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
-        'width="24" height="24">\n' + "\n".join(body) + "\n</svg>\n",
-        encoding="utf-8")
+    _text = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+             'width="24" height="24">\n' + "\n".join(body) + "\n</svg>\n")
+    _err = svg_error(_text)
+    if _err:
+        _bad_icons.append((f"{name}.svg", _err,
+                           "body is a str, not a list of elements"
+                           if isinstance(body, str) else "malformed element"))
+    _icons.append((ICONS / f"{name}.svg", _text))
+if _bad_icons:
+    raise SystemExit(
+        f"icons not written -- {len(_bad_icons)} malformed SVG(s):\n"
+        + "".join(f"  {n}: {why} ({err})\n" for n, err, why in _bad_icons))
+for _path, _text in _icons:
+    _path.write_text(_text, encoding="utf-8")
 (ICONS / "README.md").write_text(
     "# Toolbar icons\n\nSVG icons for the Floor Planner toolbar, drawn for "
     "this project (CC0).\n", encoding="utf-8")
