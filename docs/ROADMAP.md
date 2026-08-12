@@ -226,6 +226,14 @@ register entries. **A migration that closes with four parked records and one
 accepted limit is closing honestly**; one that closed with none would be hiding
 them.
 
+**CORRECTION 2026‑08‑11:** an earlier draft of this statement said Phase 6 would
+close **D42 and D45**. **It does not** — both were argued against an
+*operation-based* command layer, and what P6.b built is a **memento stack**
+(documents before/after), which subsumes neither. `snapshot()` **survives**
+Phase 6. See `V5_MIGRATION_PLAN.md` §P6.2. **The honest tally for Phase 6 is
+ZERO records closed by subsumption**, and saying so is cheaper than a reader
+discovering it.
+
 **Phase 5 (landscape), Phase 6 (command undo) and Phase 7 (build) are FEATURE
 WORK.** Phase 6 is no longer RED — see
 [`handoff/0008-readback-phase-6-deep.md`](handoff/0008-readback-phase-6-deep.md)

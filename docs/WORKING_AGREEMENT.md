@@ -317,6 +317,24 @@ because it is written precisely to explain why nobody needs to look further.
 
 **The corollary is the cheaper half:** the deletion found what the census could not. Removing the thing and reading the failures is a census, and often the only complete one — which is an argument for retiring a mechanism *before* believing you have enumerated its callers, not after.
 
+**EVERY CENSUS IS SHAPED BY ITS ENUMERATION SOURCE, AND THE SOURCE IS THE BLIND SPOT — added 2026‑08‑11, at the THIRD instance, and the third was committed by the same hand that had just recorded the second.**
+
+**Enumerate from the PROPERTY being asked about, not from a place things are kept.** A container census — a class's public surface, a menu, a directory, a module — can only ever return **its own contents**, and it returns them with the confident shape of a complete answer. The question *"what mutates the document?"* is a property; `MainWindow`'s methods are a container.
+
+**Three instances, same disease, escalating:**
+
+| # | the census | what it enumerated | what it missed |
+|---|---|---|---|
+| 1 | P3.6 / P4.5(40)'s split-on-write survey | the **spelling** `.p1 = ` / `.p2 = ` | **five** `setattr(w, attr, p)` writers — survived two censuses and the whole of Phase 4 |
+| 2 | A1b's hit census | *"sites where `itemAt(...) is None` stands for blank canvas"* | `RoomItem.contextMenuEvent`, **68 lines**, on the page under a different heading |
+| 3 | P6.b's command roster | **`MainWindow`'s public mutators** | the **drag** (it lives in item event handlers), and then `EditRoomProps` / `EditOpening` / `ChangeSettings` / level ops — **four that P6.1's own older list already had** |
+
+**The third is the instructive one because the trap was already named.** The drag's omission was caught, recorded, and fixed — and then the *same census method* dropped four more, because the method was never the problem's shape: a `MainWindow`-shaped census misses what is not on `MainWindow`, exactly as a menu-shaped one misses what is not on the menu. **Fixing the instance does not fix the source.**
+
+**The tell is the preposition.** *"Every mutator **in** `MainWindow`"* and *"every path that **writes to** the document"* sound like the same census and are not. The first names a place; the second names the property. **When a census is scoped by a location, ask what the location excludes** — and if the answer is "things of the very kind I am counting", the census is the wrong shape however carefully it is run.
+
+**And it composes with the instrument rule below:** a census with a blind spot yields a wrong count; a census whose *source* is the blind spot yields a wrong count **that looks structurally complete**, because everything in the container really was found.
+
 **EVERY INSTRUMENT IS VALIDATED AGAINST A CASE KNOWN TO BE NON-ZERO BEFORE ITS ZERO IS BELIEVED — added 2026‑08‑09, as a REQUIRED PRACTICE rather than a caution.**
 
 **A zero from an instrument earns the same suspicion as a green from a test that may not have run.** Both are the absence of a signal, and absence is what a broken instrument produces most readily. The mechanism is a **positive control**: before trusting that an instrument reports nothing, point it at a case that MUST report something and confirm it does.

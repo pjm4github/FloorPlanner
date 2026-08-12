@@ -689,7 +689,44 @@ has no signal that anything is left behind and no gesture that would fix it.
 **Not measured yet, deliberately.** It belongs in the read-back where it will be
 acted on, not in a note nobody is reading when the answer matters.
 
-### P6.2 — Retire snapshot undo
+### P6.2 — PHASE 6 DOES NOT RETIRE `snapshot()`. It gives undo a BOUNDARY and a NAME while keeping the mechanism.
+
+**Corrected 2026‑08‑11, on measurement, because a phase whose stated purpose is
+not what it does misleads every future reader — and this one was already
+misleading the record about what it closes.**
+
+**What P6.b actually built is a MEMENTO STACK.** `GestureCommand` holds the
+`snapshot()` document **before** and **after**, and `undo()` restores one. It is
+not a command stack in the operation-inverse sense: nothing records *what was
+done*, only *what the document was on either side*.
+
+**That is very probably the right choice, and Q1 is why** — memento undo is far
+safer than diff-based undo, and it is exactly why the cross-floor restore came
+back **complete** rather than partial (`handoff/0009-readback-p6d-cutover.md`).
+An operation-inverse design would need every gesture to grow a correct inverse,
+which this codebase has measured itself not to have four times over (D61, D62,
+D65, D66: the join does something and no gesture un-does it).
+
+**So `snapshot()` SURVIVES.** What Phase 6 changes is *when* it is taken (per
+settled gesture, named) rather than *whether* it exists. **P6.a already separated
+the one caller that had nothing to do with undo** — the per-mutation invariant
+hook, now `verify_settled`.
+
+### AND THE TWO RECORDS QUEUED TO DIE WITH IT DO NOT DIE
+
+Both were argued against an **operation-based** command layer. Against a memento
+stack, neither follows:
+
+| record | why it was argued to die | **does it?** |
+|---|---|---|
+| [D45](defects/0045-edge-wall-answers-which-wall-covers-this.md) — `_edge_wall` by geometry | *"the document states the binding"* replaces the search | **NO.** That is a **load-path/format** change — the record itself calls it *"a format question"*. A memento stack stores documents; it does not make the loader carry a binding it does not already carry. |
+| [D42](defects/0042-the-party-wall-drag-has-the-same.md) — the three appliers | *"`MoveVertices` is exactly that seam"* | **NO.** The re-cut has **no `MoveVertices`** — the drag is one `DragGesture` memento, which **wraps** the three appliers rather than unifying them. The applier-consolidation task is independent of the undo mechanism. |
+
+**Both remain open and are re-argued off Phase 6.** The subsumption claim in the
+migration closing statement — *"two records closed"* — is **wrong and is
+corrected there**.
+
+### P6.2 — Retire snapshot undo *(superseded by the heading above)*
 ### P6.3 — Scene index + viewport update final pass
 Revisit `FullViewportUpdate` now that bounding rects are trustworthy.
 **Acceptance.** P0.3 numbers improve again; undo cost is independent of plan size (assert: undo time on a 20-room plan ≈ undo time on an 80-room plan).

@@ -12,6 +12,44 @@
 
 ---
 
+## 0. NEXT SESSION'S FIRST TWO TASKS
+
+**1. THE FURNISHINGS CENSUS — measurement only, no design, no code.** Patrick
+wants to author new furnishings *including their 3D forms* and asked whether that
+belongs in the AI tool set. **Nothing is specified until the current path is
+visible** — this is the area where a specification has twice been written
+describing code already in the tree.
+
+Parsed rather than grepped, six questions: **how a furnishing is defined today**
+(catalog file or code per item; if a catalog, its format and fields) · **the 2D
+symbol** (SVG assets, drawing code, or something else — and whether adding one
+item touches one place or several) · **the 3D form** (what `build_model`
+actually emits per furnishing: real geometry per kind, or **one box per item**?
+If boxes, say so plainly — it changes *"add the 3D components"* from authoring to
+building) · **parameterisation** (can a furnishing take dimensions, or is each
+size its own entry? *"Gas Fireplace 4'"* being a panel item suggests the second)
+· **the AI menu** (what is behind it now; does anything already generate or
+import furnishings) · **THE COST OF ONE NEW ITEM** — trace what a developer must
+touch end to end for one furnishing that appears in the panel, draws in plan and
+renders in 3D. **That number is the finding; everything else is context for it.**
+
+> **AND ONE CLAIM THE CENSUS TESTS RATHER THAN QUOTES.** `CLAUDE.md` says the app
+> loads catalogs dynamically so *"adding a symbol needs no app-code change"*.
+> That is a **survival justification**, the class the working agreement says to
+> measure rather than repeat — and the way to test it is to **add a symbol and
+> count what had to be touched**.
+
+**2. WIDEN THE COMMAND ROSTER, DERIVED FROM THE PROPERTY.** Enumerate **every
+code path that WRITES TO THE DOCUMENT**, by parsing writes to the model — **not**
+`MainWindow`'s methods, not the menu, not any class's public surface. Those are
+containers, and *a container census can only return its own contents*
+([`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md), the enumeration-source rule).
+The seed set is in [`handoff/0009-readback-p6d-cutover.md`](handoff/0009-readback-p6d-cutover.md)
+§Q2. **Until the roster covers it, the cutover would leave document changes
+outside undo — worse than the false positive it replaces.**
+
+---
+
 ## 1. Where the work stands
 
 | | |
