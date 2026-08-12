@@ -782,10 +782,22 @@ class PlanView(QGraphicsView):
                         "or the wall coincident with it). Move or resize that "
                         "one instead.")
                     return
+        # A GATE IS A DOOR IN A LANDSCAPE WALL (Phase 5). Invariant I7 has
+        # required this since P0.7 -- "only gates are allowed" in a railing,
+        # fence, hedge or retaining wall -- and nothing could produce one, so
+        # the rule guarded a state the editor could not reach.
+        #
+        # DERIVED, NOT CHOSEN: the user places a door and gets a gate because
+        # of what they placed it IN. That adds no mode, no tool and nothing to
+        # learn, and it makes I7 true by construction rather than by a check
+        # the user can fail. A separate gate tool would let someone put a gate
+        # in a bedroom wall and then be told off for it.
+        if kind == "door" and wall.wall_type in LANDSCAPE_TYPES:
+            kind = "gate"
         op = OpeningItem(wall, kind, code.strip(), s)
         wall.openings.append(op)
         rebuild_all_walls(self.scene())   # coincident walls open for the new one
-        if kind == "door":
+        if kind in ("door", "gate"):
             self.win.last_door = code.strip()
         else:
             self.win.last_window = code.strip()

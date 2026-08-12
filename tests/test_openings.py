@@ -276,3 +276,125 @@ def test_the_edit_surface_names_the_edit_and_says_it_once(fp, win):
     assert win.statusBar().currentMessage() == "something else entirely", \
         "the report repeated itself with nothing new to say"
     assert drain_opening_failures(sc) == []
+
+
+# --------------------------------------------------------------------------
+# Phase 5 — settable wall types, railings and gates
+# --------------------------------------------------------------------------
+def test_a_railing_draws_thinner_than_a_wall(fp, scene):
+    """THINNESS IS THE CHANNEL. A railing is 2" against an exterior wall's 6",
+    and the plan drawing follows because `paint` reads `self.t`.
+
+    Asserted against the MODEL's table rather than literals, so this cannot
+    drift from what the app will actually draw (D73)."""
+    from floorplanner.design.validate import STD_T
+    from PyQt6.QtCore import QPointF
+
+    wall = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "exterior")
+    rail = fp.WallItem(QPointF(0, 60), QPointF(120, 60), "railing")
+    scene.addItem(wall)
+    scene.addItem(rail)
+    assert wall.t == STD_T["exterior"]
+    assert rail.t == STD_T["railing"]
+    assert rail.t < wall.t, "a railing must be thinner than a wall"
+
+
+def test_a_thickness_override_beats_the_type_default(fp, scene):
+    """OVERRIDE IF PRESENT, ELSE THE TYPE'S NORMATIVE DEFAULT.
+
+    A type lookup that discarded the override would turn a display divergence
+    into a DATA one: the document carries `wall.thickness_in`, it survives a
+    round trip in `_v5_extra`, and the editor would draw one number while the
+    file said another and then keep saving the file's.
+    """
+    from floorplanner.design.validate import STD_T
+    from PyQt6.QtCore import QPointF
+
+    w = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "hedge")
+    scene.addItem(w)
+    assert w.t == STD_T["hedge"]                 # precondition: the default
+    w._v5_extra = {"thickness_in": 24.0}
+    assert w.t == 24.0, "the document's override must win"
+    w._v5_extra = {"thickness_in": 0}            # nonsense value
+    assert w.t == STD_T["hedge"], "a bad override falls back, it does not zero"
+
+
+def test_every_settable_wall_type_is_in_the_schema_enum():
+    """The menu names and orders types; it must never DEFINE one. A type the
+    menu offers that the schema rejects would produce documents the validator
+    refuses, from a click."""
+    import json
+    from pathlib import Path
+
+    from floorplanner.walls import WALL_TYPE_LABELS
+
+    schema = json.loads(
+        (Path(__file__).resolve().parent.parent / "floorplanner" / "design"
+         / "design-schema.v5.json").read_text(encoding="utf-8"))
+    enum = set(schema["$defs"]["wall"]["properties"]["type"]["enum"])
+    offered = {k for k, _ in WALL_TYPE_LABELS}
+    assert offered <= enum, f"menu offers types the schema rejects: {offered - enum}"
+    assert "railing" in offered, "the point of the feature"
+
+
+def test_a_door_placed_in_a_railing_becomes_a_gate(fp, win):
+    """I7 has required this since P0.7 -- only gates in a landscape wall -- and
+    nothing could produce one, so the rule guarded an unreachable state.
+
+    THE GATE IS DERIVED, NOT CHOSEN: the user places a door and gets a gate
+    because of what they placed it in, so I7 is true by construction rather
+    than by a check the user can fail.
+
+    Asserted through `check()` rather than on the kind string alone, because
+    the invariant is the thing that cares.
+    """
+    from PyQt6.QtCore import QPointF
+
+    from floorplanner.design.bridge import design_from_scene
+    from floorplanner.design.validate import check
+    from floorplanner.walls import LANDSCAPE_TYPES
+
+    assert "railing" in LANDSCAPE_TYPES                      # precondition
+
+    sc = win.scene
+    rail = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "railing")
+    sc.addItem(rail)
+    op = fp.OpeningItem(rail, "gate", "3068", 60)
+    rail.openings.append(op)
+    fp.rebuild_all_walls(sc)
+
+    doc = design_from_scene(win).to_dict()
+    kinds = {o["kind"] for w in doc["walls"] for o in w.get("openings", [])}
+    assert "gate" in kinds, f"the gate did not reach the document: {kinds}"
+    assert not [e for e in check(doc, deep=True) if e.startswith("I7")], \
+        "a gate in a railing must satisfy I7"
+
+
+def test_a_door_in_a_railing_would_fail_I7(fp, win):
+    """The precondition that makes the test above mean something: the SAME
+    scene with a `door` instead of a `gate` must be rejected. Without this,
+    'I7 is clean' could be true of an invariant that never fires."""
+    from PyQt6.QtCore import QPointF
+
+    from floorplanner.design.bridge import design_from_scene
+    from floorplanner.design.validate import check
+
+    sc = win.scene
+    rail = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "railing")
+    sc.addItem(rail)
+    op = fp.OpeningItem(rail, "door", "3068", 60)
+    rail.openings.append(op)
+    fp.rebuild_all_walls(sc)
+
+    doc = design_from_scene(win).to_dict()
+    assert [e for e in check(doc, deep=True) if e.startswith("I7")], \
+        "I7 must reject a door in a railing, or the gate test proves nothing"
+
+    # THE VIOLATION IS THE POINT OF THIS TEST, so it is declared as the
+    # accepted baseline -- otherwise shadow mode (FP_VERIFY_DESIGN) raises at
+    # `win` teardown for a fault this test built on purpose, and the ON/DEEP
+    # gate lanes go red while the plain suite passes. Same mechanism
+    # `_overlapping_rooms` uses in test_rooms.py, and the same reasoning: a
+    # deliberately-constructed fault is not a regression.
+    from floorplanner.design.verify import rebase
+    rebase(win)
