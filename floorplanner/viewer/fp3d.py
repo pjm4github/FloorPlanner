@@ -48,10 +48,36 @@ import numpy as np
 # defaults -- overridden by anything the document actually states
 # --------------------------------------------------------------------------
 
-WALL_T = {                       # thickness by type, inches
-    "exterior": 6.0, "interior": 4.5, "partition": 3.5,
-    "railing": 2.0, "fence": 2.0, "hedge": 12.0, "retaining": 8.0,
-}
+def _load_wall_thickness():
+    """The MODEL's thickness table, read rather than copied (D73).
+
+    This file used to carry its own `WALL_T`, and it had drifted: `hedge` was
+    12.0 here against 18.0 in the model. Two tables that are synced become two
+    tables that disagree, so this one is deleted and the model's is read.
+
+    LOADED BY PATH, NOT IMPORTED, and the reason is measured: `import
+    floorplanner.design.validate` pulls in PyQt6, because
+    `floorplanner/__init__.py` star-imports the editor -- and this module is
+    deliberately Qt-free (numpy only; `--dump`, `--obj` and `--list-levels` run
+    headless in CI). `validate.py` itself imports only `json`, `math` and
+    `pathlib`, which is what makes loading it standalone safe.
+
+    Falls back to the building types if the model cannot be found, because a
+    viewer that cannot draw is worse than one drawing a partition at 3.5.
+    """
+    import importlib.util
+    here = os.path.dirname(os.path.abspath(__file__))
+    cand = os.path.join(os.path.dirname(here), "design", "validate.py")
+    try:
+        spec = importlib.util.spec_from_file_location("_fp_wall_thickness", cand)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return dict(mod.STD_T)
+    except (OSError, AttributeError, ImportError):
+        return {"exterior": 6.0, "interior": 4.5, "partition": 3.5}
+
+
+WALL_T = _load_wall_thickness()  # thickness by type, inches -- the MODEL's
 WALL_H = {                       # height by type; None = full level height
     "exterior": None, "interior": None, "partition": None,
     "railing": 36.0, "fence": 72.0, "hedge": 48.0, "retaining": 24.0,

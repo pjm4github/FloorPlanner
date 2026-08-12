@@ -13,12 +13,27 @@ from PyQt6.QtGui import *  # noqa: F401
 from PyQt6.QtWidgets import *  # noqa: F401
 
 from floorplanner.config import *  # noqa: F401
+from floorplanner.design.validate import STD_T   # D73: the one thickness table
+
 from floorplanner.design.topology import (
     ON_SEG_TOL, GraphView, OpeningView, WallView, bucket_reach, line_bucket,
     plan_merge_collinear, plan_split_edge,
 )
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.vertex import Vertex
+
+#: The wall types a user may set, in menu order, with their labels.  The KEYS
+#: are the document's `wall.type` enum (P0.7) -- this list exists to order and
+#: name them, never to define them, so a type added to the schema and left out
+#: here is unsettable rather than silently renamed.
+#: The landscape types: they carry no finishes and admit only gates (I7).
+LANDSCAPE_TYPES = ("railing", "fence", "hedge", "retaining")
+
+WALL_TYPE_LABELS = [
+    ("exterior", "Exterior wall"), ("interior", "Interior wall"),
+    ("partition", "Partition"), ("railing", "Railing"),
+    ("fence", "Fence"), ("hedge", "Hedge"), ("retaining", "Retaining wall"),
+]
 
 
 SHARE_TOL = 0.6        # two ends this close ARE one corner (== vertex_weld_in)
@@ -1323,7 +1338,32 @@ class WallItem(QGraphicsItem):
     # -- basic geometry ------------------------------------------------------
     @property
     def t(self) -> float:
-        return EXTERIOR_T if self.wall_type == "exterior" else INTERIOR_T
+        """This wall's thickness: THE OVERRIDE IF PRESENT, ELSE THE TYPE'S
+        NORMATIVE DEFAULT.
+
+        Resolved in that order deliberately. A type lookup that discarded the
+        override would turn a display divergence into a DATA one -- the document
+        carries `wall.thickness_in` ("Override; omitted = the standard for
+        `type`"), it survives an editor round trip in `_v5_extra`, and a `t`
+        that ignored it would draw one number while the file says another and
+        then keep saving the file's.
+
+        MEASURED BEFORE THIS WAS WRITTEN: `site_demo.json` carries six
+        overrides; a load/save round trip preserves all six; and the scene drew
+        a `retaining` wall of 8.0 at **4.5**, because this property used to be
+        `EXTERIOR_T if exterior else INTERIOR_T` -- two answers for seven types.
+
+        `STD_T` is the model's table and the one definition (D73); the
+        `INTERIOR_T` fallback survives only for a type the model does not name.
+        """
+        extra = getattr(self, "_v5_extra", None) or {}
+        try:
+            over = float(extra.get("thickness_in"))
+        except (TypeError, ValueError):
+            over = None
+        if over and over > 0:
+            return over
+        return STD_T.get(self.wall_type, INTERIOR_T)
 
     def length(self) -> float:
         return math.hypot(self.p2.x() - self.p1.x(), self.p2.y() - self.p1.y())
@@ -2236,12 +2276,17 @@ class WallItem(QGraphicsItem):
     def contextMenuEvent(self, e):
         from floorplanner.rooms import detach_wall_from_room  # late (cycle)
         menu = QMenu()
-        a_ext = menu.addAction("Exterior wall (6\")")
-        a_ext.setCheckable(True)
-        a_ext.setChecked(self.wall_type == "exterior")
-        a_int = menu.addAction("Interior wall (4 1/2\")")
-        a_int.setCheckable(True)
-        a_int.setChecked(self.wall_type == "interior")
+        # SETTABLE WALL TYPES (Phase 5). The seven the document already knows,
+        # not the two this menu used to offer -- `wall.type` has carried the
+        # landscape types since P0.7 and nothing could set them. Labels carry
+        # the thickness from the model's table (D73) rather than a literal, so
+        # a menu entry cannot drift from what the wall will actually be.
+        a_types = {}
+        for _k, _label in WALL_TYPE_LABELS:
+            _act = menu.addAction(f"{_label} ({fmt_in(STD_T[_k])})")
+            _act.setCheckable(True)
+            _act.setChecked(self.wall_type == _k)
+            a_types[_act] = _k
         a_detach = None
         if self.rooms:
             menu.addSeparator()
@@ -2254,11 +2299,8 @@ class WallItem(QGraphicsItem):
             e.accept()
             return
         sc = self.scene()
-        if chosen is a_ext:
-            self.wall_type = "exterior"
-            self.rebuild()
-        elif chosen is a_int:
-            self.wall_type = "interior"
+        if chosen in a_types:
+            self.wall_type = a_types[chosen]
             self.rebuild()
         elif a_detach is not None and chosen is a_detach and sc is not None:
             self.setSelected(True)
@@ -2269,8 +2311,16 @@ class WallItem(QGraphicsItem):
 
 
 class OpeningItem(QGraphicsItem):
-    """A door or window.  Child of its wall; local x runs along the wall,
-    local y across the thickness.
+    """A door, window or GATE.  Child of its wall; local x runs along the
+    wall, local y across the thickness.
+
+    A GATE is constructed exactly as a door and paints exactly as a door; the
+    only thing that differs is the wall it is in, and therefore its THICKNESS
+    -- a railing is 2" against an exterior wall's 6", so the gate is drawn at
+    2" without a single line of gate-specific drawing code. **Thinness is the
+    channel, because thinness is what is actually different**, and it costs no
+    dash and no new colour -- both of which already carry other meanings here
+    (a floating room's boundary, and the P4.5 fault signature).
 
     **ANCHORED TO A NAMED END (P3.6), not measured from `p1`.** The opening
     holds the `Vertex` it is dimensioned off and `offset_in`, the distance from
@@ -2478,7 +2528,8 @@ class OpeningItem(QGraphicsItem):
         painter.setFont(f)
         painter.setPen(QPen(QColor(70, 70, 90) if not self.isSelected()
                             else QColor(0, 122, 255), 0))
-        label = self.code if self.kind == "window" else f"{self.code} {self.door_type}"
+        label = (self.code if self.kind in ("window", "gate")
+                 else f"{self.code} {self.door_type}")
         if self.kind == "door" and self.swing < 0:
             ty = t / 2 + 9
         else:

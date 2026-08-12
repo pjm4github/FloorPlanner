@@ -65,6 +65,28 @@ So **openings are geometry** — they cut wall meshes, and hiding them changes w
 are geometry** and are already parameters (`levels`, `furnishings`). **A
 wireframe or palette switch is view-side** — same triangles, drawn differently.
 
+### The 2D/3D colour asymmetry is DELIBERATE — ruled 2026‑08‑11
+
+**In PLAN, a wall type is carried by THICKNESS and nothing else. In 3D, it is
+carried by COLOUR (`WALL_C`). Both are correct and neither is to be "fixed" into
+agreement with the other.**
+
+**The reason is that the two media have different channels to spend.** A plan
+drawing has line weight and thickness: a railing at 2″ beside a wall at 6″ reads
+as a railing without a legend. **A 3D scene has no line weight to spend** — every
+solid is the same kind of surface — so colour is the only channel available
+there.
+
+**And in plan the other channels are already taken**, which is why thickness is
+not merely convenient but forced: **dashed already means two things** — a
+floating room's boundary, and the P4.5 watch's fault signature — and this project
+has already ruled once that state and selection may not share a visual channel.
+A third meaning would collide with both.
+
+**So: no dash and no new colour in plan; colour in 3D.** If someone later gives
+plan symbols a colour dimension, that is a design decision to take on its own
+merits, not a consistency repair.
+
 ## 2. Conventions
 
 * **Units are inches** throughout, per the v5 schema.

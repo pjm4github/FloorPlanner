@@ -16,6 +16,38 @@ from pathlib import Path
 
 STD_T = {"exterior": 6.0, "interior": 4.5, "partition": 3.5,
          "railing": 2.0, "fence": 2.0, "hedge": 18.0, "retaining": 8.0}
+"""THE NORMATIVE wall thickness by type, in inches -- ONE TABLE (D73).
+
+The schema calls this a contract: `wall.thickness_in` is documented as
+*"Override; omitted = the standard for `type`"*, so **"the standard for `type`"
+has to be somewhere**, and the model layer is where a contract the schema names
+belongs.
+
+**IT USED TO BE THREE TABLES.** `viewer/fp3d.py` carried its own `WALL_T` and the
+scene carried a two-branch conditional over `EXTERIOR_T`/`INTERIOR_T` that knew
+none of the landscape types -- and the two tables DISAGREED on `hedge`, 18.0 here
+against 12.0 there, while this one was **never read by anything**. Both duplicates
+are now readers of this dict rather than copies of it, because three tables that
+are synced become three tables that disagree again.
+
+**`hedge` is 18.0 BECAUSE IT IS THE MODEL'S VALUE, not because 18 is a better
+number for a hedge.** Nothing was measured to depend on 12.0: the corpus holds
+one hedge wall, no test asserts its thickness, and the only consumer was the
+viewer's renderer. The visible effect is that one wall in `site_demo` renders
+50% thicker.
+
+**A Qt-free consumer must NOT `import floorplanner.design.validate` to read
+this.** Measured: that import drags in the Qt bindings, because
+`floorplanner/__init__.py` star-imports the editor -- so `viewer/fp3d.py`, which
+runs headless in CI on numpy alone, loads this module BY PATH instead. This
+module itself imports only `json`, `math` and `pathlib`, which is what makes
+that safe.
+
+(The name of those bindings is deliberately not written here: this file is
+guarded by a SOURCE-TEXT check, `test_design_module_source_is_qt_free`, which
+cannot tell code from prose -- the same boundary the gate's `end_assign` check
+has. Tripping it with a comment would be a false positive in the one file whose
+Qt-freeness is load-bearing.)"""
 
 SCHEMA_PATH = Path(__file__).with_name("design-schema.v5.json")
 
