@@ -210,7 +210,7 @@ def _send_context_menu(win, sx, sy):
 
 
 def test_pup_type_resizes_a_door(fp, win):
-    # navigate the door menu to "Set size", type a new WWHH, accept — no
+    # navigate the door menu to "Properties…", type a new WWHH, accept — no
     # dialog interaction needed beyond the macro tokens
     win.prepare_headless()
     win.run_macro("WALL 0 0 240 0 ext  DOOR 120 0 3680")

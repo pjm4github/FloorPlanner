@@ -1,10 +1,12 @@
-<!-- SNAPSHOT-HEAD: a187c45 -->
+<!-- SNAPSHOT-HEAD: 92a8813 -->
 
 # Session snapshot — read this first
 
-**Re-cut 2026‑08‑12 on `main`, at `b4d8ea4`.** The previous cut sat **eight
-commits stale**: it pinned `main` at `4e08191`, and its §0 named the furnishings
-census as the next task when that census was done, ruled and committed. This file
+**Re-cut 2026‑08‑12, and kept current by the gate ever since — see the box
+below.** The cut before it sat **eight commits stale**: it pinned `main` at
+`4e08191`, and its §0 named the furnishings census as the next task when that
+census was done, ruled and committed. **That is the last time this file was
+allowed to drift.** This file
 exists so a fresh session can start from disk instead of from a chat summary. It
 is an **index and a state marker, not a second copy of the record** — where it
 points at another document, that document is authoritative and this one must not
@@ -80,8 +82,13 @@ it.** Two parts, both his judgement:
    as **read-only text with its reason**. **Deriving a property is not a licence
    to hide it.**
 
-**His check: at working zoom, tell a fence from a railing without clicking, and
-find the gate in a run of rail.**
+**AND ONE THING THE BUILD FOUND, which is worth more than the feature:** the
+first cut of the channel **passed every test and would still have failed the
+check.** Fence and railing rendered at working zoom as *the same ladder*,
+differing only in how fine it was — a distinction you make by comparing, not one
+you make at a glance. **No test was going to say so.** It took a render at the
+zoom a person actually works at. See D74's *"the form was already adjusted once,
+by looking"*.
 
 **THEN FURNISHINGS — UNBLOCKED as of 2026‑08‑12** by the Phase 6 park below,
 which was the answer [`handoff/0010-ruling.md`](handoff/0010-ruling.md) was
@@ -126,9 +133,9 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`a187c45`** — the snapshot gate condition + two rules, on `9bddf21` (the prism read-back), on `be2cb95` (the Phase 6 park, the documentation debt, D74 filed), on `b4d8ea4` (PR #26). PRs #19–#26 all merged. |
+| **`main`** | **`cb3e6e6`** — the snapshot gate condition and its red-at-rest fix, on `9bddf21` (the prism read-back), on `be2cb95` (the Phase 6 park, the documentation debt, D74 filed), on `b4d8ea4` (PR #26). PRs #19–#26 all merged. **This branch is cut against `92a8813`**, its own tip, with `main` merged in. |
 | **Branches** | **`d74-decoration-channel` — [PR #27](https://github.com/pjm4github/FloorPlanner/pull/27), AMBER, waiting on Patrick's check.** `i15-outline-completeness` was a stale local branch (PR #20, merged, 0 ahead) and was deleted 2026‑08‑12. |
-| **Gate** | on `main`: `collected=698 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **691 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. On the D74 branch: **704 / 697**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Gate** | on this branch (`main` merged in): `collected=711 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **704 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **75 records**, 30 open. **D74 is new** — the PR #26 follow-up. **D73 closed** with the wall-types work. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
@@ -183,7 +190,7 @@ DONE**, merged at PRs #17 and #18.
 > * **PARKED, register entries only:** [D63](defects/0063-a-coalesced-outline-partly-rebounds-on-save.md)'s producer 2, [D64](defects/0064-the-save-writes-an-outline-corner-at-a.md), [D65](defects/0065-weld-scene-is-implicated-in-three-separate.md). **Not to be reopened without a new instruction.**
 > * **D63 producer 1 stays CLOSED** — rebound 0 on five plans, robust across four pairing tolerances.
 
-1. **D74 — the PR #26 follow-up. THE LIVE ITEM. AMBER.** See §0.
+1. **D74 — the PR #26 follow-up. BUILT, at [PR #27](https://github.com/pjm4github/FloorPlanner/pull/27), AMBER — waiting on the check.** See §0.
 2. **Furnishings — BUILD `prism`, THEN RE-MEASURE, THEN DECIDE.** Measured and
    ruled ([`handoff/0012`](handoff/0012-readback-prism-outlines.md) ·
    [`0012-ruling.md`](handoff/0012-ruling.md)); **the build has not started, and

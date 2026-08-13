@@ -6,6 +6,7 @@ rebuild_all_walls() refreshes rooms and a couple of WallItem actions touch
 room binding; those are LATE imports from floorplanner.rooms so this module
 stays importable before rooms (which imports this one)."""
 import math
+from collections import namedtuple
 
 from PyQt6 import sip
 from PyQt6.QtCore import *  # noqa: F401
@@ -34,6 +35,64 @@ WALL_TYPE_LABELS = [
     ("partition", "Partition"), ("railing", "Railing"),
     ("fence", "Fence"), ("hedge", "Hedge"), ("retaining", "Retaining wall"),
 ]
+
+#: DECORATION ALONG THE RUN -- the second channel (D74).
+#:
+#: THICKNESS CANNOT CARRY IDENTITY, and the first cut of settable wall types
+#: asked it to. A fence and a railing are BOTH 2.0" because both really are
+#: about two inches thick, so at working zoom they are the same drawing and no
+#: amount of care in the table fixes that: **a channel committed to representing
+#: a real quantity cannot also carry identity.** Thickness is spent on real
+#: thickness -- `wall.thickness_in` is a document contract (D73) -- and `hedge`
+#: and `retaining` only appeared to work because they genuinely ARE fatter.
+#:
+#: So the identity moves to what is drawn ALONG the run. Not colour and not
+#: dash: dash is spoken for twice already (a floating room's boundary, and the
+#: P4.5 fault signature) and colour is spoken for in 3D (`WALL_C`, a deliberate
+#: 2D/3D asymmetry recorded in VIEWER_NOTES).
+#:
+#: `pitch` is the spacing along the run and `reach` the half-height of a tick or
+#: the radius of a scallop, both in inches; `grey` is the ink level.
+#:
+#: THESE ARE DRAFTING CONVENTIONS, NOT A STANDARD. The numbers are meant to be
+#: adjusted once they have been seen at working zoom -- **the channel is the
+#: ruling, the values are not.** A type absent from this table draws plain,
+#: which is why `retaining` is not here: it keeps thickness, and thickness
+#: already works for it.
+#:
+#: THE VALUES WERE ALREADY ADJUSTED ONCE, BY LOOKING (`evidence/d74-*.png`, and
+#: the render is why they exist). The first cut gave fence 12"/4.0 and railing
+#: 6"/2.5, and at working zoom the two rendered as THE SAME LADDER differing
+#: only in how fine it was -- a distinction you make by comparing, not one you
+#: make at a glance. The check is "tell a fence from a railing WITHOUT
+#: CLICKING", so the two axes the ruling names (closer, lighter) are pushed
+#: until the textures separate, and the fence gains a FILLED POST at each tick:
+#: which is what a post IS in plan, and what makes the two read as different
+#: things rather than as two densities of the same thing.
+#:
+#: THE POST IS THE PART THAT ACTUALLY WORKS, and it is ruled IN (D74):
+#: **IDENTITY NEEDS A CATEGORICAL CHANNEL, NOT A SCALAR ONE.** Pitch and weight
+#: are scalars, and a scalar cannot separate two similar things -- which is the
+#: same reason thickness failed one level up. Two ladders at different pitches
+#: are one ladder at any zoom a person actually works at. Fill-versus-stroke has
+#: no intermediate values, so it survives the glance. **Adjust the numbers
+#: freely; do not remove the post.**
+WallDecor = namedtuple("WallDecor", "form pitch reach grey post")
+
+WALL_DECOR = {
+    # regular perpendicular POST TICKS, each carrying its post
+    "fence":   WallDecor("ticks", 16.0, 5.0, 45, 3.0),
+    # closer and lighter, reading as RELATED BUT LIGHTER -- which is correct,
+    # a railing and a fence are related and the drawing should say so
+    "railing": WallDecor("ticks", 4.0, 2.0, 130, 0.0),
+    # a SCALLOPED EDGE, bulging out along both sides
+    "hedge":   WallDecor("scallop", 9.0, 4.5, 70, 0.0),
+}
+
+#: A GATE'S SWING ARC, lighter than a door's (D74).  A door's ink is
+#: `QColor(20, 20, 20)`; the jambs stay that dark either way, so what separates
+#: the two symbols is the WEIGHT OF THE ARC, which is the drafting convention.
+GATE_INK = QColor(105, 105, 105)
 
 
 SHARE_TOL = 0.6        # two ends this close ARE one corner (== vertex_weld_in)
@@ -1221,6 +1280,7 @@ class WallItem(QGraphicsItem):
         self._ep_move = None          # the ONE corner an endpoint drag detaches
         self._path = QPainterPath()
         self._solid = QPainterPath()     # body footprint, no opening holes
+        self._decor = None               # D74: decoration along the run, or None
         self._outline_clip = None        # outline-clip so junctions read solid
         self._hit = QPainterPath()
         self._bounds = QRectF()
@@ -1410,6 +1470,94 @@ class WallItem(QGraphicsItem):
                     return True
         return False
 
+    def _opening_spans(self, index=None):
+        """Where this wall's run is cut open, as `(s0, s1)` intervals in local
+        coords -- its own openings, plus those of any coincident party wall.
+
+        ONE DEFINITION, and it has two consumers on purpose (D74): the body's
+        holes, and the break in the decoration along the run. A gate's break
+        must land exactly where the gap in the wall is, and the cheap way to
+        guarantee that is for both to be the same list rather than two
+        computations that agree today.
+
+        NO CLAMP (P3.6). This used to read
+            op.s = min(max(op.s, half), max(half, length - half))
+        which silently SLID a door back onto a wall that had shrunk under it --
+        repairing stored data on the render path, where nobody could see it
+        happen. An opening that no longer fits is a fact about the plan
+        (`op.fits()`), reported, not corrected in passing.
+        """
+        length = self.length()
+        spans = [(op.s - op.width / 2, op.s + op.width / 2)
+                 for op in self.openings]
+        # open the body where a coincident wall carries a door/window, so a
+        # plain party wall doesn't cover the opening on the wall next to it
+        u = self.unit()
+        for w in coincident_walls(self.scene(), self, index):
+            for op in w.openings:
+                p = w.point_at(op.s)
+                sl = ((p.x() - self.p1.x()) * u.x()
+                      + (p.y() - self.p1.y()) * u.y())
+                half = op.width / 2
+                if -half < sl < length + half:
+                    spans.append((sl - half, sl + half))
+        return spans
+
+    def _build_decor(self, length, t, spans):
+        """The decoration along the run for this wall's type, in local coords --
+        or `None` for a type that draws plain.
+
+        Built HERE rather than in `paint` for the reason the junction clip is:
+        the view repaints every item on every change, so path work per repaint
+        stalls a big plan. Costs nothing at all on an ordinary plan -- a type
+        absent from `WALL_DECOR` returns before the first loop.
+        """
+        spec = WALL_DECOR.get(self.wall_type)
+        if spec is None or length < 1e-6:
+            return None
+
+        def open_at(x):
+            """True where the wall is cut -- the tick or scallop is SKIPPED,
+            which is what gives a gate its break either side."""
+            return any(s0 - 1.0 <= x <= s1 + 1.0 for s0, s1 in spans)
+
+        path = QPainterPath()
+        pitch, reach = spec.pitch, spec.reach
+        if spec.form == "ticks":
+            # centred on the run, so the decoration reads as regular from both
+            # ends rather than crowding whichever end it was started from
+            n = int(length // pitch)
+            x0 = (length - n * pitch) / 2.0
+            half_post = spec.post / 2.0
+            for i in range(n + 1):
+                x = x0 + i * pitch
+                if open_at(x):
+                    continue
+                path.moveTo(x, -reach)
+                path.lineTo(x, reach)
+                if half_post > 0:
+                    # the POST itself, filled at paint time. A tick line has no
+                    # area, so filling the whole path leaves the ticks alone and
+                    # solidifies only these.
+                    path.addRect(QRectF(x - half_post, -half_post,
+                                        spec.post, spec.post))
+        elif spec.form == "scallop":
+            half = t / 2.0
+            n = int(length // pitch)
+            x0 = (length - n * pitch) / 2.0
+            for i in range(n):
+                x = x0 + i * pitch
+                if open_at(x + pitch / 2.0):
+                    continue
+                for side, start in ((-1.0, 0.0), (1.0, 180.0)):
+                    # Qt's arc angles run counterclockwise on a y-DOWN axis, so
+                    # 0..180 is the visually upper half and 180..360 the lower:
+                    # each bulges AWAY from the body, which is the scallop.
+                    box = QRectF(x, side * half - reach, pitch, 2 * reach)
+                    path.arcMoveTo(box, start)
+                    path.arcTo(box, start, 180.0)
+        return path if not path.isEmpty() else None
+
     def rebuild(self, cascade=True, index=None):
         """Recompute the painted path (with openings cut out) and hit shape.
 
@@ -1427,27 +1575,9 @@ class WallItem(QGraphicsItem):
         body.addRect(QRectF(-ext1, -t / 2, length + ext1 + ext2, t))
         solid_local = QPainterPath(body)   # footprint before openings are cut
         holes = QPainterPath()
-        for op in self.openings:
-            # NO CLAMP (P3.6). This used to read
-            #     op.s = min(max(op.s, half), max(half, length - half))
-            # which silently SLID a door back onto a wall that had shrunk under
-            # it -- repairing stored data on the render path, where nobody could
-            # see it happen. An opening that no longer fits is a fact about the
-            # plan (`op.fits()`), reported, not corrected in passing.
-            half = op.width / 2
-            holes.addRect(QRectF(op.s - half, -t / 2 - 0.5, op.width, t + 1.0))
-        # open the body where a coincident wall carries a door/window, so a
-        # plain party wall doesn't cover the opening on the wall next to it
-        u = self.unit()
-        for w in coincident_walls(self.scene(), self, index):
-            for op in w.openings:
-                p = w.point_at(op.s)
-                sl = ((p.x() - self.p1.x()) * u.x()
-                      + (p.y() - self.p1.y()) * u.y())
-                half = op.width / 2
-                if -half < sl < length + half:
-                    holes.addRect(QRectF(sl - half, -t / 2 - 0.5,
-                                         op.width, t + 1.0))
+        spans = self._opening_spans(index)
+        for s0, s1 in spans:
+            holes.addRect(QRectF(s0, -t / 2 - 0.5, s1 - s0, t + 1.0))
         if not holes.isEmpty():
             body = body.subtracted(holes)
 
@@ -1456,6 +1586,8 @@ class WallItem(QGraphicsItem):
         tr.rotateRadians(ang)
         self._path = tr.map(body)
         self._solid = tr.map(solid_local)
+        decor = self._build_decor(length, t, spans)      # D74: the 2nd channel
+        self._decor = None if decor is None else tr.map(decor)
         # cleared here; rebuild_all_walls' junction pass recomputes the clip so
         # neighbouring wall bodies hide this wall's inner seams (T/cross joints)
         self._outline_clip = None
@@ -1472,6 +1604,8 @@ class WallItem(QGraphicsItem):
             self._hit.addEllipse(self.p1, t, t)
 
         b = self._path.boundingRect().united(self._hit.boundingRect())
+        if self._decor is not None:                   # ticks/scallops overhang
+            b = b.united(self._decor.boundingRect())
         self._bounds = b.adjusted(-24, -24, 24, 24)   # room for handles/label
 
         for op in self.openings:
@@ -1510,6 +1644,24 @@ class WallItem(QGraphicsItem):
         painter.setPen(QPen(outline, 0))
         painter.drawPath(self._path)
         painter.restore()
+
+        # DECORATION ALONG THE RUN (D74) -- what says which type this is, now
+        # that thickness has been ruled unable to. Drawn OUTSIDE the junction
+        # clip: the clip exists to hide seams between wall BODIES, and a post
+        # tick is not a seam. Ghosted with the rest of a non-active floor, but
+        # still drawn -- it is what the wall IS, not a piece of UI, and a ghost
+        # fence that stopped being a fence would be a worse ghost.
+        if self._decor is not None:
+            spec = WALL_DECOR[self.wall_type]
+            g = spec.grey
+            ink = FLOOR_GHOST if ghost else QColor(g, g, g)
+            # the brush solidifies the posts; the tick lines have no area, so
+            # they are unaffected by it
+            painter.setBrush(QBrush(ink) if spec.post
+                             else Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(ink, 0))
+            painter.drawPath(self._decor)
+
         if ghost:                            # skip selection knobs + length label
             return
 
@@ -2520,7 +2672,19 @@ class OpeningItem(QGraphicsItem):
             painter.drawRect(QRectF(-w / 2, -t / 2, w, t))
             painter.drawLine(QPointF(-w / 2, 0), QPointF(w / 2, 0))   # glazing
         else:
+            # A GATE IS DRAWN LIGHTER THAN A DOOR (D74). The conventional gate
+            # is a break in the run plus a quarter-circle swing arc, lighter
+            # than a door's -- and the BREAK now comes for free, because the
+            # wall's decoration skips its opening spans, so the ticks stop
+            # either side of this opening and resume after it.
+            #
+            # Thinness used to be asked to carry the whole difference and could
+            # not: it is a real quantity (the railing's 2"), so it says how
+            # thick the gate is and nothing about what it is.
+            if self.kind == "gate":
+                painter.setPen(QPen(GATE_INK, 0))
             self._paint_door(painter, w, t)
+            painter.setPen(ink)
 
         # WWHH label, kept clear of the swing side
         f = QFont()
@@ -2652,14 +2816,18 @@ class OpeningItem(QGraphicsItem):
         return sc.views()[0] if sc and sc.views() else None
 
     def _prompt_size(self):
+        """The opening's property sheet.  NAMES THE KIND (D74) -- it used to be
+        a bare size prompt with the kind in the title bar, so a user who placed
+        a door in a railing and got a GATE was never told."""
+        from floorplanner.dialogs import (  # late (dialogs is above walls)
+            OpeningPropertiesDialog,
+        )
         v = self._view()
-        code, ok = QInputDialog.getText(
-            v, f"{self.kind.title()} size",
-            'Size WWHH (width inches, height inches):', text=self.code)
-        if not ok:
+        dlg = OpeningPropertiesDialog(self, v)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         try:
-            self.set_code(code)
+            self.set_code(dlg.code())
         except ValueError as ex:
             QMessageBox.warning(v, "Invalid size", str(ex))
 
@@ -2676,7 +2844,10 @@ class OpeningItem(QGraphicsItem):
             a_flip = menu.addAction("Flip swing side")
         else:
             a_flip = None
-        a_size = menu.addAction("Set size (WWHH)\u2026")
+        # renamed with D74: the sheet behind it now names the KIND as well as
+        # taking the size, and "Set size" would go on hiding the half that was
+        # the whole complaint
+        a_size = menu.addAction("Properties\u2026")
         menu.addSeparator()
         a_del = menu.addAction(f"Delete {self.kind}")
         a_front, a_back = add_front_back_actions(menu)

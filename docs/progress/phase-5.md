@@ -107,4 +107,75 @@ P5.2-FOLLOWUP -- THE THICKNESS RULING IS REFUTED BY THE MANUAL CHECK
          being communicated, and the two coincide there by accident.
          Filed as its own record with the second channel and the gate
          symbol; see the entry that lands with the fix.
+
+P5.2b -- THE SECOND CHANNEL, AND THE GATE GETS A SYMBOL  2026-08-12  (AMBER,
+         stops at the PR; the check is Patrick's judgement)
+         record:  D74
+         branch:  d74-decoration-channel
+         files:   floorplanner/walls.py  floorplanner/dialogs.py
+                  tests/test_openings.py  tests/test_macro.py
+                  docs/evidence/d74_decoration_render.py + two PNGs
+                  fixtures/d74-wall-decoration.json
+         gate:    704 collected / 697 passed, OFF/ON/DEEP all reconciling
+                  ruff=clean vacuous=0 end_assign=0  Gate-Verdict: GREEN
+
+         DECORATION ALONG THE RUN. fence: perpendicular post ticks, each
+         carrying a filled post. railing: closer, lighter cross-ticks.
+         hedge: a scalloped edge. retaining: keeps thickness, which
+         already works -- so it is ABSENT FROM THE TABLE ON PURPOSE, and a
+         test asserts the precondition that makes that safe (its
+         thickness really is different from an interior wall's).
+         Not colour and not dash: dash is spoken for twice already and
+         colour is spoken for in 3D.
+
+         THE BREAK IS NOT DRAWN BY THE GATE. _opening_spans is now ONE
+         definition of where the run is cut, and it feeds both the body's
+         holes and the decoration -- so the ticks stop either side of a
+         gate and resume after it, and the break CANNOT drift away from
+         the gap in the wall, because there is nothing to drift from.
+         The gate's arc is lighter than a door's (GATE_INK); the jambs
+         stay dark, so what separates the two symbols is the weight of
+         the arc, which is the drafting convention.
+
+         THE SHEET NAMES THE KIND. OpeningPropertiesDialog replaces a bare
+         QInputDialog that asked for a size and put the kind in a title
+         bar, so a user who placed a door in a railing and got a GATE was
+         never told. Read-only, because the kind is DERIVED and offering
+         it as a choice would re-introduce the mode the derivation
+         removed. The reason line appears only for the derived kind: a
+         door is a door because it was asked for, and explaining that
+         would be noise. Menu item renamed Set size -> Properties, since
+         the sheet now does more than size.
+
+         THE FORM WAS ADJUSTED ONCE, BY LOOKING, AND THAT IS THE FINDING.
+         The first cut (fence 12"/4.0, railing 6"/2.5) PASSED EVERY TEST
+         and would still have failed the check: at working zoom the two
+         rendered as the same ladder differing only in how fine it was,
+         which is a distinction you make by comparing and not one you
+         make at a glance. No test was going to say so. It took a render
+         at the zoom a person actually works at. Both axes the ruling
+         names were then pushed -- fence 16"/5.0 darker, railing 4"/2.0
+         lighter -- and the fence gained a FILLED POST, which is what
+         stopped them reading as two densities of one thing. The post is
+         beyond the letter of the ruling and is flagged as the adjustable
+         part: strike it and the channel survives.
+
+         SIX TESTS, THREE OF THEM PRECONDITIONS. The fence/railing test
+         asserts FIRST that the two thicknesses are equal -- without it
+         "the two differ" is satisfied by the thickness that was already
+         there and the test passes on the code it was written to reject.
+         The gate-break test measures the same wall WITHOUT the gate
+         first, because "no tick inside the span" is also true of a wall
+         with no ticks anywhere. The dialog test asserts a door gets NO
+         reason line. Both mechanisms fail-first checked by breaking them
+         (open_at -> False, railing's spec set equal to fence's); both
+         went red.
+
+         ONE DIAGNOSIS MEASURED RATHER THAN ASSUMED. A new test tripped
+         I7 in the ON/DEEP lanes only. The cause is that two COINCIDENT
+         walls fold to one wall in the document carrying both openings,
+         which then overlap -- confirmed against the alternative (the
+         missing rebuild) on all four combinations: stacked reports it
+         rebuilt or not, separated is clean either way. The comment in
+         the test states the measured mechanism, not the first guess.
 ```
