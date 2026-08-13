@@ -178,4 +178,45 @@ P5.2b -- THE SECOND CHANNEL, AND THE GATE GETS A SYMBOL  2026-08-12  (AMBER,
          missing rebuild) on all four combinations: stacked reports it
          rebuilt or not, separated is clean either way. The comment in
          the test states the measured mechanism, not the first guess.
+
+P5.2 -- SETTABLE WALL TYPES AND PORCH RAILINGS: COMPLETE  2026-08-13
+         merged: PR #27 (3864f38); D73 and D74 both closed
+         Patrick's manual check, recorded verbatim because the AMBER
+         gate's whole value is that the sentence is his and not a
+         paraphrase of his:
+             "PATRICK'S PR #27 CHECK PASSES - fence distinguishable from
+             railing at working zoom without clicking, gate findable in a
+             run of rail, properties sheet names the kind."
+         WHAT THE FEATURE IS, now that it is done:
+             types      all seven the schema has carried since P0.7 are
+                        settable from the wall menu, ordered and named by
+                        WALL_TYPE_LABELS, which never DEFINES one -- a
+                        type added to the schema and omitted there is
+                        unsettable rather than silently renamed
+             thickness  ONE normative table (validate.py's STD_T, D73).
+                        The viewer's copy and the scene's two-branch
+                        conditional are deleted, not synced. Resolution
+                        is override -> type default -> fallback, so the
+                        document's thickness_in wins where it exists
+             identity   DECORATION ALONG THE RUN, not thickness and not
+                        fineness (D74). Fence posts, railing cross-ticks,
+                        hedge scallops; retaining keeps thickness because
+                        thickness genuinely works for it
+             gates      DERIVED, not chosen: a door in a landscape wall
+                        IS a gate, so I7 is true by construction rather
+                        than by a check the user can fail. Its break in
+                        the run falls out of _opening_spans being one
+                        definition; its arc is lighter than a door's
+             the sheet  names the kind, read-only, with its reason where
+                        there is one
+         THE AMBER GATE RETURNED A FINDING TWICE ON ONE FEATURE, IN
+         OPPOSITE DIRECTIONS, and that is the argument for the tier
+         rather than a complaint about it. It REFUTED the thickness
+         ruling at PR #26 while every automated signal was green, and it
+         CONFIRMED the decoration channel at PR #27 where no automated
+         signal could have. The suite had neither judgement available to
+         it, and the second is the one that lets a feature close.
+         WHAT PHASE 5 STILL OWES: P5.1 (site levels, categories, area
+         accounting) and P5.3 (site schedule fields + reports). The Yard
+         catalog stays RED on artwork scope; D46 closes with it.
 ```

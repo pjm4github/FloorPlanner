@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 92a8813 -->
+<!-- SNAPSHOT-HEAD: 3864f38 -->
 
 # Session snapshot — read this first
 
@@ -6,11 +6,12 @@
 below.** The cut before it sat **eight commits stale**: it pinned `main` at
 `4e08191`, and its §0 named the furnishings census as the next task when that
 census was done, ruled and committed. **That is the last time this file was
-allowed to drift.** This file
-exists so a fresh session can start from disk instead of from a chat summary. It
-is an **index and a state marker, not a second copy of the record** — where it
-points at another document, that document is authoritative and this one must not
-be trusted over it.
+allowed to drift.**
+
+This file exists so a fresh session can start from disk instead of from a chat
+summary. It is an **index and a state marker, not a second copy of the record** —
+where it points at another document, that document is authoritative and this one
+must not be trusted over it.
 
 > ### THIS FILE'S STALENESS IS NOW A GATE CONDITION — 2026‑08‑12, Patrick's ruling
 >
@@ -57,14 +58,27 @@ be trusted over it.
 
 ## 0. WHERE THE WORK IS
 
-**[D74](defects/0074-thickness-cannot-carry-wall-identity-and-the.md) — the PR #26 follow-up — IS BUILT AND WAITING ON PATRICK'S CHECK, at [PR #27](https://github.com/pjm4github/FloorPlanner/pull/27). AMBER.**
-**His check: at working zoom, tell a fence from a railing without clicking, and
-find the gate in a run of rail.** The plan is `fixtures/d74-wall-decoration.json`;
-the renders are `evidence/d74-decoration-working-zoom.png` (and `-zoomed`).
-**Nothing else starts on that surface until he has looked.**
+**THE LIVE ITEM IS `prism` — BUILD IT, THEN RE-MEASURE, THEN DECIDE.** See the
+furnishings block below. **Nothing else in the furnishings queue is scheduled
+work** until that re-measurement exists.
 
-Settable wall types shipped (PR #26) and **Patrick's manual check refuted part of
-it.** Two parts, both his judgement:
+**SETTABLE WALL TYPES AND PORCH RAILINGS ARE COMPLETE — 2026‑08‑13, PR #27
+(`3864f38`).** D73 and **D74 both closed**; Patrick's manual check passed and is
+recorded verbatim in [D74](defects/0074-thickness-cannot-carry-wall-identity-and-the.md)
+and [`progress/phase-5.md`](progress/phase-5.md). Types settable, thicknesses
+from **one** normative table, identity carried by **decoration along the run**,
+gates **derived** rather than chosen, and the opening sheet naming what it made.
+**Phase 5 still owes P5.1 and P5.3.**
+
+> **THE AMBER GATE RETURNED A FINDING TWICE ON THIS ONE FEATURE, IN OPPOSITE
+> DIRECTIONS**, and that is the argument for the tier rather than a complaint
+> about it: it **refuted** the thickness ruling at PR #26 while every automated
+> signal was green, and it **confirmed** the decoration channel at PR #27 where
+> no automated signal could have.
+
+*(The two parts of D74's ruling are kept below — the reasoning outlives the
+feature, and §5 carries the general form.)* Settable wall types shipped at PR #26
+and **Patrick's manual check refuted part of it.** Two parts, both his judgement:
 
 1. **THICKNESS CANNOT CARRY IDENTITY.** He cannot tell a fence from a railing at
    working zoom and never will — both are physically ~2 inches, and thickness is
@@ -90,9 +104,9 @@ you make at a glance. **No test was going to say so.** It took a render at the
 zoom a person actually works at. See D74's *"the form was already adjusted once,
 by looking"*.
 
-**THEN FURNISHINGS — UNBLOCKED as of 2026‑08‑12** by the Phase 6 park below,
-which was the answer [`handoff/0010-ruling.md`](handoff/0010-ruling.md) was
-waiting on. **A third of the catalog renders as a box — 28 of 95.** Ruled order:
+**FURNISHINGS — THE LIVE WORK**, unblocked by the Phase 6 park below, which was
+the answer [`handoff/0010-ruling.md`](handoff/0010-ruling.md) was waiting on.
+**A third of the catalog renders as a box — 28 of 95.** Ruled order:
 **(1) the `prism` generator, and it OPENS WITH A MEASUREMENT** · **(2) the
 remaining generators by item count** · **(3) parameterisation — a READ-BACK
 first** · **(4) AI symbol drafting, last, and AUTHORING TIME ONLY.**
@@ -110,6 +124,12 @@ first** · **(4) AI symbol drafting, last, and AUTHORING TIME ONLY.**
 > already its answer, and that is a better reason than item count ever was. **The
 > three NONE items are AUTHORING work and stay separate, so a code task does not
 > acquire an artwork dependency.**
+>
+> **PRISM'S RECEIPT IS A RE-MEASUREMENT, NOT A CLAIM** (Patrick, 2026‑08‑13):
+> after it lands, **how many of the 28 box-fallback items still fall back, and
+> which.** That number decides whether any further generator is written, and
+> ***"a third of the catalog renders as a box"*** is the sentence it either
+> falsifies or does not.
 
 **STILL OPEN AND NOT STARTED: WIDEN THE COMMAND ROSTER, DERIVED FROM THE
 PROPERTY.** Pre-committed at `2557e32` and never done. Enumerate every code path
@@ -133,14 +153,14 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`cb3e6e6`** — the snapshot gate condition and its red-at-rest fix, on `9bddf21` (the prism read-back), on `be2cb95` (the Phase 6 park, the documentation debt, D74 filed), on `b4d8ea4` (PR #26). PRs #19–#26 all merged. **This branch is cut against `92a8813`**, its own tip, with `main` merged in. |
-| **Branches** | **`d74-decoration-channel` — [PR #27](https://github.com/pjm4github/FloorPlanner/pull/27), AMBER, waiting on Patrick's check.** `i15-outline-completeness` was a stale local branch (PR #20, merged, 0 ahead) and was deleted 2026‑08‑12. |
-| **Gate** | on this branch (`main` merged in): `collected=711 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **704 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **75 records**, 30 open. **D74 is new** — the PR #26 follow-up. **D73 closed** with the wall-types work. `python tools/gate.py --docs` GREEN. |
+| **`main`** | **`3864f38`** — PR #27 (D74, the decoration channel). PRs #19–#27 all merged. |
+| **Branches** | **none open.** |
+| **Gate** | `collected=711 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **704 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Records** | **75 records**, 29 open. **D73 and D74 both closed** with the wall-types feature. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |
-| **PHASE 5** | **P5.2 (settable wall types) DONE**, merged at PR #26, with D74 outstanding against it. Progress entry at [`progress/phase-5.md`](progress/phase-5.md). **P5.1 and P5.3 not started.** |
+| **PHASE 5** | **P5.2 (settable wall types + porch railings) COMPLETE**, PR #26 then PR #27, D73 and D74 closed. Progress entry at [`progress/phase-5.md`](progress/phase-5.md). **P5.1 and P5.3 not started**; the Yard catalog stays RED on artwork scope, and D46 closes with it. |
 
 **A commit gate is enforced, not merely available.** `tools/gate.py` writes
 `.gate-result.json`; a `PreToolUse` hook blocks any `git commit` unless that file
@@ -190,38 +210,37 @@ DONE**, merged at PRs #17 and #18.
 > * **PARKED, register entries only:** [D63](defects/0063-a-coalesced-outline-partly-rebounds-on-save.md)'s producer 2, [D64](defects/0064-the-save-writes-an-outline-corner-at-a.md), [D65](defects/0065-weld-scene-is-implicated-in-three-separate.md). **Not to be reopened without a new instruction.**
 > * **D63 producer 1 stays CLOSED** — rebound 0 on five plans, robust across four pairing tolerances.
 
-1. **D74 — the PR #26 follow-up. BUILT, at [PR #27](https://github.com/pjm4github/FloorPlanner/pull/27), AMBER — waiting on the check.** See §0.
-2. **Furnishings — BUILD `prism`, THEN RE-MEASURE, THEN DECIDE.** Measured and
+1. **Furnishings — BUILD `prism`, THEN RE-MEASURE, THEN DECIDE.** Measured and
    ruled ([`handoff/0012`](handoff/0012-readback-prism-outlines.md) ·
    [`0012-ruling.md`](handoff/0012-ruling.md)); **the build has not started, and
    it is the next code task.** The four furniture generators are **not**
    scheduled work — they are a question to re-ask after prism, against a
    re-measurement. `vehicle` does not wait on it. The three NONE items are
    **authoring**, filed separately.
-3. **The command-roster census, derived from the property.** See §0.
-4. **A2 — D11's runtime z collapse. ⏸ PARKED, twice over.** The hang is **not
+2. **The command-roster census, derived from the property.** See §0.
+3. **A2 — D11's runtime z collapse. ⏸ PARKED, twice over.** The hang is **not
    reproducible** (2026‑08‑09): five orders of magnitude on either z step leaves
    the event breakdown identical at 545, `docs/evidence/d11-a2-z-step-measurement.txt`.
    And it was **DROPPED BEHIND D68** (2026‑08‑11) — the viewer now renders the
    active floor, which makes the z collapse stop mattering for the common case.
    The instrument is kept at `evidence/d11_a2_z_step_counter.py`; **do not
    re-derive it.**
-5. **A3 — D11's SERIALIZATION half.** Unblocked by **ruling R‑B**: an *additive
+4. **A3 — D11's SERIALIZATION half.** Unblocked by **ruling R‑B**: an *additive
    optional* field or enum value does not bump the document version, so a
    stacking index can be added at `schema_revision` without a v6. AMBER.
-6. **D59 — the CHEAP TWELVE at document boundaries.** A real plan was saved
+5. **D59 — the CHEAP TWELVE at document boundaries.** A real plan was saved
    carrying an `I7`, nothing reported it, and the user met it later as a silent
    crash (D57). P1.2's O(n²)-per-edit cost objection does not touch this half.
    **AMBER, and it moves up on evidence rather than preference.**
-7. **A4 — D49, the deep checks at document boundaries. AMENDED 2026‑08‑07 — read
+6. **A4 — D49, the deep checks at document boundaries. AMENDED 2026‑08‑07 — read
    the amendment, not the proposal it supersedes.** The ruling: **CHECK YES, FIX
    NO**; **SAVE ASKS, IT DOES NOT REFUSE**; the report must be **ACTIONABLE**
    (rooms *and overlap area*, plus select-and-zoom). Acceptance case is `planc1`;
    `farmplace` is the silence case once D52's half 1 lands.
-8. **A5 — D41, the new simple-ring invariant.** Ruled at **R‑A**. **A read-back
+7. **A5 — D41, the new simple-ring invariant.** Ruled at **R‑A**. **A read-back
    is required before starting.**
-9. **A6 — Grid snap.** Three sub-rulings still RED.
-10. **Phase 5 — the rest:** P5.1 site levels/categories/area accounting, P5.3
+8. **A6 — Grid snap.** Three sub-rulings still RED.
+9. **Phase 5 — the rest:** P5.1 site levels/categories/area accounting, P5.3
     site schedule fields + reports. **P5.2 is what shipped.** The Yard catalog is
     RED on artwork scope; **D46** closes with it.
 

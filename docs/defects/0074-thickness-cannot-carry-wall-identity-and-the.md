@@ -4,8 +4,8 @@ id: 74
 title: "Thickness cannot carry wall identity, and the gate is invisible and unnamed"
 
 # maps directly onto GitHub Issues fields
-state: open
-state_reason: null
+state: closed
+state_reason: completed
 labels:
   - type:defect
   - area:ui
@@ -13,7 +13,7 @@ milestone: null
 
 # ours; becomes body prose after migration
 opened: 2026-08-12
-closed: null
+closed: 2026-08-13
 closed_by: null
 rank: 75
 related: [73]
@@ -212,3 +212,19 @@ red.
 item rather than a reopening: D73's tables were genuinely wrong and are genuinely
 fixed. What is refuted is a **design ruling made on top of them**, and conflating
 the two would make a closed measurement look unsafe when it is not.
+
+## CLOSED 2026‑08‑13 — the manual check passed, verbatim
+
+> **PATRICK'S PR #27 CHECK PASSES** — fence distinguishable from railing at
+> working zoom without clicking, gate findable in a run of rail, properties sheet
+> names the kind.
+
+Merged at **PR #27** (`3864f38`). **This closes the wall-types feature with it**
+— see [`../progress/phase-5.md`](../progress/phase-5.md).
+
+**The AMBER gate has now returned a finding twice on this one feature, in
+opposite directions**, and that is worth keeping as the argument for the tier
+rather than as a complaint about it: it **refuted** the thickness ruling at PR
+#26 when every automated signal was green, and it **confirmed** the decoration
+channel at PR #27 when no automated signal could have. Neither judgement was
+available to the suite, and the second is the one that lets a feature close.
