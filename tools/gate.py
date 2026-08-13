@@ -248,26 +248,46 @@ def _snapshot_head() -> int:
     except OSError as e:
         print(f"Docs-Snapshot: RED -- cannot read {SNAPSHOT} ({e})")
         return 1
-    try:
-        p = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
-                           text=True)
-        head = p.stdout.strip() if p.returncode == 0 else ""
-    except OSError:
-        head = ""
-    rc, msg = snapshot_verdict(text, head)
+    tips = []
+    for rev in ("HEAD", "HEAD~1"):
+        try:
+            p = subprocess.run(["git", "rev-parse", rev], capture_output=True,
+                               text=True)
+        except OSError:
+            break
+        if p.returncode == 0 and p.stdout.strip():
+            tips.append(p.stdout.strip())
+    rc, msg = snapshot_verdict(text, tips)
     print(msg)
     return rc
 
 
-def snapshot_verdict(text: str, head: str):
-    """The check itself, as a PURE function of (file text, HEAD) -> (rc, msg).
+def snapshot_verdict(text: str, tips):
+    """The check itself, as a PURE function of (file text, tips) -> (rc, msg).
+
+    `tips` is [HEAD, HEAD~1] -- see ONE COMMIT OF SLACK below for why it is two.
 
     Split out from the IO so it can be tested, and it is: `tests/test_gate.py`
-    drives all five outcomes. A staleness check nobody can demonstrate failing
-    would be the same species as the convention it replaces -- something that
-    looks like a guarantee and has never been asked to prove it.
+    drives every outcome. A staleness check nobody can demonstrate failing would
+    be the same species as the convention it replaces -- something that looks
+    like a guarantee and has never been asked to prove it.
+
+    ONE COMMIT OF SLACK, AND IT IS NOT LENIENCY -- IT IS THE DIFFERENCE BETWEEN
+    A GATE AND A NUISANCE. The first cut of this check accepted only HEAD, and
+    it was wrong in a way worth recording: **the gate runs BEFORE a commit**, so
+    the marker it approves names the tip at that moment; the instant the commit
+    lands, the marker is one behind. Requiring an exact match would leave the
+    repository RED AT REST -- red immediately after every correct commit, red
+    for CI on every push (CI calls this tool with `--deep`, which runs this
+    check), and red for the next session before it had done anything wrong.
+
+    **A gate that is red in the resting state trains people to ignore it**,
+    which would have rebuilt the very problem this closes, in a louder form.
+
+    So the marker may name HEAD or its parent. Worst-case drift is TWO commits
+    -- one of slack plus the pending one -- against the EIGHT it reached.
     """
-    if not head:
+    if not tips:
         return 1, ("Docs-Snapshot: RED -- cannot read HEAD (git unavailable). "
                    "A guard that cannot verify must not approve.")
     m = SNAPSHOT_MARK.search(text)
@@ -275,10 +295,11 @@ def snapshot_verdict(text: str, head: str):
         return 1, (f"Docs-Snapshot: RED -- {SNAPSHOT} carries no "
                    f"`<!-- SNAPSHOT-HEAD: <sha> -->` marker.")
     recorded = m.group(1)
-    if not head.startswith(recorded):
+    if not any(t.startswith(recorded) for t in tips):
         return 1, (
-            f"Docs-Snapshot: RED -- {SNAPSHOT} was cut against {recorded}, but "
-            f"HEAD is {head[:len(recorded)]}.\n"
+            f"Docs-Snapshot: RED -- {SNAPSHOT} was cut against {recorded}, "
+            f"which is neither HEAD ({tips[0][:len(recorded)]}) nor its "
+            f"parent.\n"
             f"               Re-cut it (sections 0 and 1 at least) and "
             f"re-point the marker. The snapshot records the commit it was cut "
             f"AGAINST, which is the tip at gate time.")
@@ -289,7 +310,8 @@ def snapshot_verdict(text: str, head: str):
             f"row does not carry that hash.\n"
             f"               The marker and the prose must agree, or the "
             f"marker is a number nobody means.")
-    return 0, f"Docs-Snapshot: cut against {recorded}, which is HEAD"
+    where = "HEAD" if tips[0].startswith(recorded) else "HEAD~1 (one of slack)"
+    return 0, f"Docs-Snapshot: cut against {recorded}, which is {where}"
 
 
 def _docs() -> int:

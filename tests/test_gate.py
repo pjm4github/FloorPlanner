@@ -33,6 +33,8 @@ def _gate():
 
 
 HEAD = "9bddf21ffeed0000000000000000000000000000"
+PARENT = "be2cb95aaaa00000000000000000000000000000"
+TIPS = [HEAD, PARENT]
 
 
 def _snapshot(marker="9bddf21", row="9bddf21"):
@@ -43,26 +45,45 @@ def _snapshot(marker="9bddf21", row="9bddf21"):
             f"| **Branches** | none. |\n")
 
 
-def test_a_current_snapshot_passes():
-    """The positive control. Without it the four RED cases below could all be
-    satisfied by a check that refuses everything."""
-    rc, msg = _gate().snapshot_verdict(_snapshot(), HEAD)
+def test_a_snapshot_cut_against_the_tip_passes():
+    """The positive control. Without it every RED case below could be satisfied
+    by a check that simply refuses everything."""
+    rc, msg = _gate().snapshot_verdict(_snapshot(), TIPS)
     assert rc == 0, msg
     assert "which is HEAD" in msg
 
 
-def test_a_stale_snapshot_is_RED():
-    """The case that produced the ruling: the marker names an older commit."""
+def test_a_snapshot_ONE_COMMIT_BEHIND_passes_and_that_is_deliberate():
+    """ONE COMMIT OF SLACK, and it is not leniency.
+
+    The gate runs BEFORE a commit, so the marker it approves names the tip at
+    that moment -- and the instant that commit lands, the marker is one behind.
+    An exact-match rule would leave the repository RED AT REST: red after every
+    correct commit, red for CI on every push, red for the next session before it
+    had done anything wrong. **A gate that is red in the resting state trains
+    people to ignore it**, which would rebuild the problem it closes.
+
+    This is the resting state, so it must be GREEN."""
+    rc, msg = _gate().snapshot_verdict(_snapshot(marker="be2cb95",
+                                                 row="be2cb95"), TIPS)
+    assert rc == 0, msg
+    assert "HEAD~1" in msg, "the message must not claim this is HEAD when it is not"
+
+
+def test_TWO_commits_behind_is_RED():
+    """The drift bound. One behind is the resting state; two is neglect -- and
+    the case that produced the ruling was EIGHT."""
     rc, msg = _gate().snapshot_verdict(_snapshot(marker="b4d8ea4",
-                                                 row="b4d8ea4"), HEAD)
+                                                 row="b4d8ea4"), TIPS)
     assert rc == 1
-    assert "cut against b4d8ea4" in msg and "HEAD is 9bddf21" in msg
+    assert "cut against b4d8ea4" in msg
+    assert "neither HEAD" in msg
 
 
 def test_a_missing_marker_is_RED():
     """Deleting the marker must not be a way to pass. A check that can be
     turned off by removing its input is advisory again."""
-    rc, msg = _gate().snapshot_verdict("# Session snapshot\n\nno marker\n", HEAD)
+    rc, msg = _gate().snapshot_verdict("# Session snapshot\n\nno marker\n", TIPS)
     assert rc == 1
     assert "no `<!-- SNAPSHOT-HEAD" in msg
 
@@ -74,7 +95,7 @@ def test_a_marker_the_PROSE_CONTRADICTS_is_RED():
     beside it goes on naming an older commit -- the same convention failing in a
     smaller font, and undetectable by a check that only reads the marker."""
     rc, msg = _gate().snapshot_verdict(_snapshot(marker="9bddf21",
-                                                 row="b4d8ea4"), HEAD)
+                                                 row="b4d8ea4"), TIPS)
     assert rc == 1
     assert "does not carry that hash" in msg
 
@@ -82,7 +103,7 @@ def test_a_marker_the_PROSE_CONTRADICTS_is_RED():
 def test_no_HEAD_is_RED_rather_than_waved_through():
     """A guard that cannot verify must not approve -- the same principle the
     commit hook states for unreadable JSON."""
-    rc, msg = _gate().snapshot_verdict(_snapshot(), "")
+    rc, msg = _gate().snapshot_verdict(_snapshot(), [])
     assert rc == 1
     assert "cannot read HEAD" in msg
 

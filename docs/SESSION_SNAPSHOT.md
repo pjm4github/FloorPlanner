@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 9bddf21 -->
+<!-- SNAPSHOT-HEAD: a187c45 -->
 
 # Session snapshot — read this first
 
@@ -30,9 +30,15 @@ be trusted over it.
 > **The semantics, which are not the obvious ones.** The marker records the
 > commit this file was cut **against** — the tip at gate time, which is what the
 > pending work is built on, not the commit about to be made (which has no hash
-> yet). So **any commit that changes the state above re-points the marker**, and
-> the file reads one behind between the gate and the commit landing. That is the
-> treadmill working: **it caps drift at one commit, where it reached eight.**
+> yet). **The marker may name HEAD or its parent**, and that one commit of slack
+> is not leniency: the gate runs *before* a commit, so the instant that commit
+> lands the marker is one behind. **An exact-match rule would leave the
+> repository RED AT REST** — red after every correct commit, red for CI on every
+> push (CI calls this tool with `--deep`, which runs the check), red for the next
+> session before it had done anything wrong. **A gate that is red in its resting
+> state trains people to ignore it**, which would rebuild this very problem in a
+> louder form. Worst-case drift is **two** commits, against the **eight** it
+> reached.
 >
 > **What it does not do:** it cannot check that anyone re-read the content. It
 > makes this file impossible to ignore, not impossible to update carelessly —
@@ -120,7 +126,7 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`9bddf21`** — the prism read-back, on `be2cb95` (the Phase 6 park, the documentation debt, D74 filed), on `b4d8ea4` (PR #26). PRs #19–#26 all merged. |
+| **`main`** | **`a187c45`** — the snapshot gate condition + two rules, on `9bddf21` (the prism read-back), on `be2cb95` (the Phase 6 park, the documentation debt, D74 filed), on `b4d8ea4` (PR #26). PRs #19–#26 all merged. |
 | **Branches** | **`d74-decoration-channel` — [PR #27](https://github.com/pjm4github/FloorPlanner/pull/27), AMBER, waiting on Patrick's check.** `i15-outline-completeness` was a stale local branch (PR #20, merged, 0 ahead) and was deleted 2026‑08‑12. |
 | **Gate** | on `main`: `collected=698 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **691 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. On the D74 branch: **704 / 697**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **75 records**, 30 open. **D74 is new** — the PR #26 follow-up. **D73 closed** with the wall-types work. `python tools/gate.py --docs` GREEN. |

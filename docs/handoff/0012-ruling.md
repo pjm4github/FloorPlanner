@@ -112,6 +112,28 @@ carries `snapshot=current|stale`.
 `main` row must carry the same hash — otherwise the marker becomes a number
 bumped mechanically while the prose beside it goes on lying.
 
+### THE FIRST CUT WAS RED AT REST, and that is recorded rather than quietly fixed
+
+**It accepted only an exact match with HEAD, and shipped that way.** The flaw
+surfaced on the very next gate run: **the gate runs BEFORE a commit**, so the
+marker it approves names the tip at that moment, and **the instant the commit
+lands the marker is one behind.** Exact-match therefore meant:
+
+* **red immediately after every correct commit**;
+* **red for CI on every push** — CI calls this tool with `--deep`, which runs
+  this check;
+* **red for the next session before it had done anything wrong.**
+
+> **A gate that is red in its resting state trains people to ignore it** — which
+> would have rebuilt the exact problem this closes, in a louder form. A check
+> whose failure carries no information is not a stricter check.
+
+**Fixed by allowing the marker to name HEAD or its parent.** Worst-case drift is
+**two** commits (one of slack, plus the pending one) against the **eight** it
+reached. The success line distinguishes the two cases rather than reporting
+*"which is HEAD"* when it is not — a message that misstates what it checked is
+the same failure in miniature.
+
 **What it cannot do, stated because an unstated boundary reads as coverage:** it
 cannot check that anyone re-read the content. **It makes the file impossible to
 ignore, not impossible to update carelessly.** And it puts every commit that
