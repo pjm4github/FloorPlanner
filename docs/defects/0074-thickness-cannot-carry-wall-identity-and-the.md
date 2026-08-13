@@ -94,6 +94,28 @@ adjustable after Patrick sees it — the channel is not.** Tick spacing, weight 
 scallop radius are all open to a second look; *"decoration along the run"* is the
 ruling.
 
+### The form was already adjusted once, BY LOOKING — and that is the finding
+
+**The first cut passed every test and would still have failed the check.**
+Fence 12″/4.0, railing 6″/2.5: both rendered at working zoom as **the same
+ladder**, differing only in how *fine* it was. That is a distinction you make by
+comparing two walls, not one you make at a glance — and *"tell a fence from a
+railing without clicking"* is a glance.
+
+**No test was going to say so**, which is the point worth keeping: every
+assertion about the channel was true, and the drawing was still wrong. It took a
+render at the zoom a person actually works at
+(`evidence/d74-decoration-working-zoom.png`, produced by
+`evidence/d74_decoration_render.py`).
+
+**What changed:** both axes the ruling names were pushed — fence to 16″/5.0 and
+darker, railing to 4″/2.0 and lighter — and **the fence gained a filled POST at
+each tick**, which is what a post *is* in plan. That is what stopped the two
+reading as two densities of one thing and made them read as two different
+things. It is beyond the letter of *"perpendicular post ticks"* and is flagged
+here as the adjustable part: **strike the post if it is too much, and the
+channel survives it.**
+
 ---
 
 ## Part 2 — THE GATE HAS NO SYMBOL, AND THE DIALOG NEVER NAMES THE KIND
@@ -133,6 +155,33 @@ from a value that was ignored.
 
 1. **At working zoom, tell a fence from a railing without clicking.**
 2. **Find the gate in a run of rail.**
+
+**The plan to check it on is `fixtures/d74-wall-decoration.json`** — five runs
+side by side (an ordinary wall for reference, then railing with a gate, fence,
+hedge, retaining), rebuilt by `evidence/d74_decoration_render.py`. It is in
+`fixtures/`, not `examples/`: a check plan is edited freely and may be as dirty
+as the check needs, and the corpus is frozen.
+
+## What landed
+
+| | |
+|---|---|
+| `WALL_DECOR` in `walls.py` | the table — form, pitch, reach, grey, post — with `retaining` deliberately absent |
+| `WallItem._build_decor` | builds the path in `rebuild`, **not** in `paint`: the view repaints every item on every change, so path work per repaint stalls a big plan. An ordinary wall returns before the first loop and pays nothing |
+| `WallItem._opening_spans` | **one definition** of where the run is cut, feeding both the body's holes and the decoration's break — so a gate's break cannot drift away from the gap in the wall |
+| `GATE_INK` | the lighter arc |
+| `OpeningPropertiesDialog` | the sheet that names the kind, replacing a bare `QInputDialog`; the menu item is now **Properties…** rather than *Set size (WWHH)…*, since the sheet does more than size |
+
+**Six tests**, and three of them exist to stop the others being vacuous: the
+fence/railing test asserts **first** that the two thicknesses are equal (without
+it, "the two differ" is satisfied by the thickness that was already there, and
+the test passes on the code it was written to reject); the gate-break test
+measures the **same wall without the gate first**, because *"no tick inside the
+span"* is also true of a wall with no ticks anywhere; and the dialog test asserts
+a **door gets no reason line**, because a reason invented for a chosen kind is
+noise. Both mechanisms were **fail-first checked** by breaking them —
+`open_at → False` and railing's spec set equal to fence's — and both tests went
+red.
 
 ## Ruling
 

@@ -442,6 +442,76 @@ class RoomPropertiesDialog(QDialog):
         })
 
 
+class OpeningPropertiesDialog(QDialog):
+    """Property sheet for a door, window or GATE.
+
+    It exists because the size prompt it replaces **never said what the user had
+    made** (D74). Placing a door in a railing produces a GATE — derived, not
+    chosen, which is the right design: it adds no mode, no tool and nothing to
+    learn, and it makes I7 true by construction rather than by a check the user
+    can fail. But the derivation was invisible. The kind lived in a
+    `QInputDialog`'s title bar, next to a field asking for a number.
+
+    > **DERIVING A PROPERTY IS NOT A LICENCE TO HIDE IT.**
+
+    A derived value the user cannot see is indistinguishable, from where they
+    sit, from a value that was ignored.
+
+    So the kind is shown as **read-only text with its reason** — read-only
+    because it is derived and offering it as a choice would re-introduce exactly
+    the mode the derivation removed (a gate placed in a bedroom wall, and then
+    an invariant telling them off for it). The reason is stated only where there
+    IS one: a door is a door because it was asked for, and inventing an
+    explanation for that would be noise."""
+
+    #: What made this kind what it is.  Keyed by kind; absent = chosen directly,
+    #: and nothing is claimed.
+    REASONS = {
+        "gate": ("Derived: an opening in a {type} is a gate.\n"
+                 "Only gates may open a landscape wall (invariant I7)."),
+    }
+
+    def __init__(self, opening, parent=None):
+        super().__init__(parent)
+        self.opening = opening
+        kind = opening.kind
+        self.setWindowTitle(f"{kind.title()} properties")
+        form = QFormLayout(self)
+
+        lab_kind = QLabel(kind.title())
+        f = lab_kind.font()
+        f.setBold(True)
+        lab_kind.setFont(f)
+        form.addRow("Kind", lab_kind)
+
+        reason = self.REASONS.get(kind)
+        if reason is not None:
+            wall = getattr(opening, "wall", None)
+            wtype = getattr(wall, "wall_type", "landscape wall")
+            note = QLabel(reason.format(type=wtype))
+            note.setStyleSheet("color: #666;")
+            note.setWordWrap(True)
+            form.addRow("", note)
+
+        self.ed_code = QLineEdit(opening.code)
+        self.ed_code.selectAll()
+        form.addRow("Size WWHH", self.ed_code)
+        hint = QLabel("Width inches, then height inches — e.g. 3280 is 32″ "
+                      "wide by 80″ high.")
+        hint.setStyleSheet("color: #666;")
+        hint.setWordWrap(True)
+        form.addRow("", hint)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        form.addRow(buttons)
+
+    def code(self) -> str:
+        return self.ed_code.text().strip()
+
+
 class ConceptRoomDialog(QDialog):
     """New concept room… (P4.4): a room typed in BY DIMENSION rather than
     drawn — the "12 x 14 bedroom" the schema's `nominal_size` describes.

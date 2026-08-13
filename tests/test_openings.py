@@ -398,3 +398,190 @@ def test_a_door_in_a_railing_would_fail_I7(fp, win):
     # deliberately-constructed fault is not a regression.
     from floorplanner.design.verify import rebase
     rebase(win)
+
+
+# --------------------------------------------------------------------------
+# D74 — decoration along the run, and the gate's symbol
+# --------------------------------------------------------------------------
+def _marks(wall):
+    """The x of every point in a wall's decoration path, in scene coords.
+
+    Read off the path rather than recomputed, so these tests measure what will
+    actually be drawn instead of restating the generator."""
+    p = wall._decor
+    return [] if p is None else [p.elementAt(i).x
+                                 for i in range(p.elementCount())]
+
+
+def _ticks(wall):
+    """The x of each TICK, found by its top edge -- which the table's `reach`
+    locates for this type.
+
+    Distinguished from `_marks` because a fence tick carries a filled POST, so
+    counting raw path elements would count one tick several times and a
+    "closer" assertion would silently become an "is decorated more elaborately"
+    one."""
+    from floorplanner.walls import WALL_DECOR
+
+    spec = WALL_DECOR.get(wall.wall_type)
+    p = wall._decor
+    if p is None or spec is None:
+        return []
+    top = wall.p1.y() - spec.reach                 # the path is in scene coords
+    return sorted(p.elementAt(i).x for i in range(p.elementCount())
+                  if abs(p.elementAt(i).y - top) < 1e-6)
+
+
+def test_a_fence_and_a_railing_are_distinguishable(fp, scene):
+    """THE FINDING THAT PRODUCED D74, as an assertion.
+
+    The first cut asked THICKNESS to say which type a wall is, and it cannot:
+    a fence and a railing are both 2.0" because both really are about two
+    inches thick. **A channel committed to representing a real quantity cannot
+    also carry identity.**
+
+    THE FIRST ASSERTION IS THE PRECONDITION AND IT IS NOT DECORATION: without
+    it, "the two differ" would be satisfied by the thickness that was already
+    there, and this test would pass on the code it was written to reject.
+    """
+    from floorplanner.design.validate import STD_T
+    from floorplanner.walls import WALL_DECOR
+    from PyQt6.QtCore import QPointF
+
+    assert STD_T["fence"] == STD_T["railing"], (
+        "PRECONDITION: if these ever differ, thickness alone might carry the "
+        "distinction and this test stops measuring the second channel")
+
+    fence = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "fence")
+    rail = fp.WallItem(QPointF(0, 60), QPointF(120, 60), "railing")
+    scene.addItem(fence)
+    scene.addItem(rail)
+
+    assert fence.t == rail.t                      # the channel that cannot
+    assert fence._decor is not None, "a fence must be decorated"
+    assert rail._decor is not None, "a railing must be decorated"
+
+    # "closer, lighter cross-ticks, reading as related-but-lighter"
+    assert len(_ticks(rail)) > len(_ticks(fence)), \
+        "the railing's ticks must be closer along the same run"
+    assert WALL_DECOR["railing"].reach < WALL_DECOR["fence"].reach, \
+        "the railing's ticks are shorter"
+    assert WALL_DECOR["railing"].grey > WALL_DECOR["fence"].grey, \
+        "the railing's ticks are lighter ink (higher grey = paler)"
+
+    # and the two are different KINDS of mark, not two densities of one -- the
+    # fence carries a post, which is what stopped them reading as one ladder
+    # at working zoom (evidence/d74-decoration-working-zoom.png)
+    assert WALL_DECOR["fence"].post > 0, "a fence draws its posts"
+    assert WALL_DECOR["railing"].post == 0, "a railing does not"
+
+
+def test_a_retaining_wall_draws_plain_because_thickness_works_for_it(fp, scene):
+    """The exemption is deliberate, and it is the other half of the ruling:
+    thickness fails as an identity channel for the two that share a value, and
+    keeps working for the two that genuinely ARE fatter. So `retaining` is
+    absent from the table on purpose rather than by omission -- and the second
+    assertion is what makes that claim mean something."""
+    from floorplanner.design.validate import STD_T
+    from PyQt6.QtCore import QPointF
+
+    w = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "retaining")
+    scene.addItem(w)
+    assert w._decor is None, "retaining keeps thickness; it is not decorated"
+    assert STD_T["retaining"] != STD_T["interior"], (
+        "PRECONDITION: retaining is legible only because its thickness really "
+        "is different -- if that stopped being true it would need the channel")
+
+
+def test_an_ordinary_wall_is_not_decorated_at_all(fp, scene):
+    """The channel is for the types that need it. An interior wall builds no
+    decoration path, so the edit path of an ordinary plan pays nothing for
+    this -- the generator returns before its first loop."""
+    from PyQt6.QtCore import QPointF
+
+    for kind in ("exterior", "interior", "partition"):
+        w = fp.WallItem(QPointF(0, 0), QPointF(120, 0), kind)
+        scene.addItem(w)
+        assert w._decor is None, f"{kind} must draw plain"
+
+
+def test_a_gate_breaks_the_decoration_either_side(fp, win):
+    """A gate is a BREAK IN THE RUN plus a light swing arc. The break is not
+    drawn by the opening: the wall's decoration skips its opening spans, so the
+    ticks stop either side and resume after -- one definition
+    (`_opening_spans`) feeding both the body's holes and the decoration, so the
+    break cannot drift away from the gap.
+
+    THE PRECONDITION IS THE HALF THAT COULD GO VACUOUS: "no tick inside the
+    span" is also true of a wall with no ticks anywhere, so the same wall
+    WITHOUT the gate is measured first and must have ticks exactly there.
+    """
+    from PyQt6.QtCore import QPointF
+
+    sc = win.scene
+    fence = fp.WallItem(QPointF(0, 0), QPointF(240, 0), "fence")
+    sc.addItem(fence)
+    fp.rebuild_all_walls(sc)
+
+    op_lo, op_hi = 120 - 16.0, 120 + 16.0          # a 3068 gate at s=120
+    before = [x for x in _marks(fence) if op_lo <= x <= op_hi]
+    assert before, "PRECONDITION: undecorated here, and the test proves nothing"
+
+    op = fp.OpeningItem(fence, "gate", "3068", 120)
+    fence.openings.append(op)
+    fp.rebuild_all_walls(sc)
+
+    after = [x for x in _marks(fence) if op_lo <= x <= op_hi]
+    assert not after, f"the gate must break the decoration, found marks at {after}"
+    assert _marks(fence), "it breaks the run, it does not erase it"
+
+
+def test_the_gates_arc_is_lighter_than_a_doors(fp, scene):
+    """"Lighter than a door's" is the drafting convention, and it is the only
+    thing that separates the two symbols now that thinness has been ruled
+    unable to carry it -- thinness says how thick the gate is, which is a real
+    quantity, and nothing about what it is."""
+    from floorplanner.walls import GATE_INK
+
+    door_ink = 20                                  # OpeningItem.paint's ink
+    assert GATE_INK.red() > door_ink, "the gate's arc must be the lighter line"
+    assert GATE_INK.red() < 255, "...and must still be visible"
+
+
+def test_the_properties_sheet_names_a_derived_gate(fp, win):
+    """DERIVING A PROPERTY IS NOT A LICENCE TO HIDE IT. The sheet this replaces
+    asked for a size and put the kind in a title bar, so a user who placed a
+    door in a railing and got a GATE was never told.
+
+    The door case is asserted too, and it is not padding: the reason line must
+    appear only where there IS one. A door is a door because it was asked for,
+    and explaining that would be noise."""
+    from PyQt6.QtCore import QPointF
+    from PyQt6.QtWidgets import QLabel
+
+    from floorplanner.dialogs import OpeningPropertiesDialog
+
+    def sheet_text(wall_type, kind, y):
+        # y keeps the two runs APART, and the reason was MEASURED rather than
+        # guessed at: stacked, the two walls fold to ONE wall in the document
+        # carrying BOTH openings, which then overlap --
+        #     "I7  openings o1/o2 overlap on w1"
+        # It is the coincidence that does it, not the missing rebuild: both
+        # rebuilt and unrebuilt stacked scenes report it, and both separated
+        # ones are clean. Nothing to do with what this test is about.
+        w = fp.WallItem(QPointF(0, y), QPointF(120, y), wall_type)
+        win.scene.addItem(w)
+        op = fp.OpeningItem(w, kind, "3068", 60)
+        w.openings.append(op)
+        fp.rebuild_all_walls(win.scene)
+        dlg = OpeningPropertiesDialog(op)
+        return " ".join(lb.text() for lb in dlg.findChildren(QLabel))
+
+    gate = sheet_text("railing", "gate", 0.0)
+    assert "Gate" in gate, "the sheet must say what the user made"
+    assert "railing" in gate, "...and why it is one"
+    assert "I7" in gate, "...naming the rule, so the reason is checkable"
+
+    door = sheet_text("interior", "door", 240.0)
+    assert "Door" in door, "the kind is always shown"
+    assert "Derived" not in door, "a chosen kind gets no invented explanation"

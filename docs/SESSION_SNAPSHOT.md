@@ -32,7 +32,13 @@ be trusted over it.
 
 ## 0. WHERE THE WORK IS
 
-**THE LIVE ITEM IS [D74](defects/0074-thickness-cannot-carry-wall-identity-and-the.md) — the PR #26 follow-up. AMBER.**
+**[D74](defects/0074-thickness-cannot-carry-wall-identity-and-the.md) — the PR #26 follow-up — IS BUILT AND WAITING ON PATRICK'S CHECK. AMBER, at a PR.**
+**His check: at working zoom, tell a fence from a railing without clicking, and
+find the gate in a run of rail.** The plan to do it on is
+`fixtures/d74-wall-decoration.json`; the renders are
+`evidence/d74-decoration-working-zoom.png` (and `-zoomed`). **Nothing else starts
+on this surface until he has looked.**
+
 Settable wall types shipped (PR #26) and **Patrick's manual check refuted part of
 it.** Two parts, both his judgement:
 
@@ -51,8 +57,13 @@ it.** Two parts, both his judgement:
    as **read-only text with its reason**. **Deriving a property is not a licence
    to hide it.**
 
-**His check: at working zoom, tell a fence from a railing without clicking, and
-find the gate in a run of rail.**
+**AND ONE THING THE BUILD FOUND, which is worth more than the feature:** the
+first cut of the channel **passed every test and would still have failed the
+check.** Fence and railing rendered at working zoom as *the same ladder*,
+differing only in how fine it was — a distinction you make by comparing, not one
+you make at a glance. **No test was going to say so.** It took a render at the
+zoom a person actually works at. See D74's *"the form was already adjusted once,
+by looking"*.
 
 **THEN FURNISHINGS — UNBLOCKED as of 2026‑08‑12** by the Phase 6 park below,
 which was the answer [`handoff/0010-ruling.md`](handoff/0010-ruling.md) was
@@ -85,9 +96,9 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`b4d8ea4`** — PR #26 (Phase 5 wall types). PRs #19–#26 all merged. |
-| **Branches** | **none open.** `i15-outline-completeness` was a stale local branch (PR #20, merged, 0 ahead) and was deleted 2026‑08‑12. |
-| **Gate** | `collected=698 ruff=clean vacuous=0 end_assign=0`; OFF / ON / DEEP each **691 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling, `tools/gate.py:66`). |
+| **`main`** | **`be2cb95`** — the Phase 6 park, the documentation debt, D74 filed. PRs #19–#26 all merged. |
+| **Branches** | **`d74-decoration-channel`** — D74's fix, at a PR, **AMBER: waiting on Patrick's check**. `i15-outline-completeness` was a stale local branch (PR #20, merged, 0 ahead) and was deleted 2026‑08‑12. |
+| **Gate** | on the D74 branch: `collected=704 ruff=clean vacuous=0 end_assign=0`; OFF / ON / DEEP each **697 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling, `tools/gate.py:66`). |
 | **Records** | **75 records**, 30 open. **D74 is new** — the PR #26 follow-up. **D73 closed** with the wall-types work. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
@@ -142,7 +153,8 @@ DONE**, merged at PRs #17 and #18.
 > * **PARKED, register entries only:** [D63](defects/0063-a-coalesced-outline-partly-rebounds-on-save.md)'s producer 2, [D64](defects/0064-the-save-writes-an-outline-corner-at-a.md), [D65](defects/0065-weld-scene-is-implicated-in-three-separate.md). **Not to be reopened without a new instruction.**
 > * **D63 producer 1 stays CLOSED** — rebound 0 on five plans, robust across four pairing tolerances.
 
-1. **D74 — the PR #26 follow-up. THE LIVE ITEM. AMBER.** See §0.
+1. **D74 — the PR #26 follow-up. BUILT, at a PR, AMBER — waiting on the check.**
+   See §0.
 2. **Furnishings — the prism generator, measurement first.** Unblocked by the
    Phase 6 park. [`handoff/0010-census-furnishings.md`](handoff/0010-census-furnishings.md)
    + [`0010-ruling.md`](handoff/0010-ruling.md).
