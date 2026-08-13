@@ -1,27 +1,52 @@
+<!-- SNAPSHOT-HEAD: 92a8813 -->
+
 # Session snapshot — read this first
 
-**Re-cut 2026‑08‑12 on `main`, at `b4d8ea4`.** The previous cut sat **eight
-commits stale**: it pinned `main` at `4e08191`, and its §0 named the furnishings
-census as the next task when that census was done, ruled and committed. This file
+**Re-cut 2026‑08‑12, and kept current by the gate ever since — see the box
+below.** The cut before it sat **eight commits stale**: it pinned `main` at
+`4e08191`, and its §0 named the furnishings census as the next task when that
+census was done, ruled and committed. **That is the last time this file was
+allowed to drift.** This file
 exists so a fresh session can start from disk instead of from a chat summary. It
 is an **index and a state marker, not a second copy of the record** — where it
 points at another document, that document is authoritative and this one must not
 be trusted over it.
 
-> ### A WARNING INSIDE A DOCUMENT DOES NOT MAINTAIN THE DOCUMENT — 2026‑08‑12
+> ### THIS FILE'S STALENESS IS NOW A GATE CONDITION — 2026‑08‑12, Patrick's ruling
 >
-> The previous cut carried, in bold, at its line 9, a note saying that a stale
-> §1 had once sent a reader down the wrong queue and that *"the cost is paid at
-> every reset."* **It then went stale itself, in the same section, in the same
-> way, and the warning did nothing.** It cost this session an archaeology pass
-> across eight commits to establish what was actually true.
+> **`tools/gate.py` fails if the `SNAPSHOT-HEAD` marker above is not the current
+> tip**, in **full mode** as well as `--docs` — full mode, because that is the
+> only one that writes `.gate-result.json`, which is the only thing the commit
+> hook reads. A check living only in the docs lane would be one more thing
+> nobody runs, which is the exact failure it exists to close.
 >
-> **The lesson is not "warn harder."** A warning is a note to a reader; staleness
-> is a property of the file. The only things that have ever fixed this class here
-> are **generation** (`defects/INDEX.md`, `--check`) and **a gate that fails**.
-> Until this file is one of those, **re-cutting it is a task with an owner, and
-> it goes in the same commit as the work that stales it** — which is what the
-> two-line rule at the bottom of §0 now says.
+> **Why it took a gate.** The previous cut carried, in bold at its line 9, a
+> note saying a stale §1 had once sent a reader down the wrong queue and that
+> *"the cost is paid at every reset."* **It then went stale itself, in the same
+> section, in the same way, and the warning did nothing** — eight commits, and
+> an archaeology pass to establish what was true. **A warning is a note to a
+> reader; staleness is a property of the file.** The only two things that have
+> ever fixed this class here are **generation** (`defects/INDEX.md`, `--check`)
+> and **a gate that fails**. This is now the second.
+>
+> **The semantics, which are not the obvious ones.** The marker records the
+> commit this file was cut **against** — the tip at gate time, which is what the
+> pending work is built on, not the commit about to be made (which has no hash
+> yet). **The marker may name HEAD or its parent**, and that one commit of slack
+> is not leniency: the gate runs *before* a commit, so the instant that commit
+> lands the marker is one behind. **An exact-match rule would leave the
+> repository RED AT REST** — red after every correct commit, red for CI on every
+> push (CI calls this tool with `--deep`, which runs the check), red for the next
+> session before it had done anything wrong. **A gate that is red in its resting
+> state trains people to ignore it**, which would rebuild this very problem in a
+> louder form. Worst-case drift is **two** commits, against the **eight** it
+> reached.
+>
+> **What it does not do:** it cannot check that anyone re-read the content. It
+> makes this file impossible to ignore, not impossible to update carelessly —
+> which is why the gate asserts the marker and the `main` row in §1 carry the
+> **same** hash, so the marker cannot be bumped while the prose beside it goes
+> on lying.
 
 > **[`README.md`](README.md) is the map** — what each document is, which decide
 > things, which are history. **[`ROADMAP.md`](ROADMAP.md) is the autonomy
@@ -32,12 +57,11 @@ be trusted over it.
 
 ## 0. WHERE THE WORK IS
 
-**[D74](defects/0074-thickness-cannot-carry-wall-identity-and-the.md) — the PR #26 follow-up — IS BUILT AND WAITING ON PATRICK'S CHECK. AMBER, at a PR.**
+**[D74](defects/0074-thickness-cannot-carry-wall-identity-and-the.md) — the PR #26 follow-up — IS BUILT AND WAITING ON PATRICK'S CHECK, at [PR #27](https://github.com/pjm4github/FloorPlanner/pull/27). AMBER.**
 **His check: at working zoom, tell a fence from a railing without clicking, and
-find the gate in a run of rail.** The plan to do it on is
-`fixtures/d74-wall-decoration.json`; the renders are
-`evidence/d74-decoration-working-zoom.png` (and `-zoomed`). **Nothing else starts
-on this surface until he has looked.**
+find the gate in a run of rail.** The plan is `fixtures/d74-wall-decoration.json`;
+the renders are `evidence/d74-decoration-working-zoom.png` (and `-zoomed`).
+**Nothing else starts on that surface until he has looked.**
 
 Settable wall types shipped (PR #26) and **Patrick's manual check refuted part of
 it.** Two parts, both his judgement:
@@ -50,8 +74,9 @@ it.** Two parts, both his judgement:
    CARRY IDENTITY.** The second channel is **decoration along the run** — not
    colour, not dash, both spoken for. Fence: perpendicular post ticks. Railing:
    closer, lighter cross-ticks. Hedge: scalloped edge. Retaining: keeps
-   thickness. **Drafting conventions, so the exact form is adjustable after he
-   sees it — the channel is not.**
+   thickness. **Drafting conventions, so the exact form is adjustable — the
+   channel is not.** **The fence's FILLED POST is ruled IN** (2026‑08‑12): it is
+   not beyond the ruling, it completes it — see §5's categorical-channel rule.
 2. **THE GATE NEEDS A SYMBOL AND THE DIALOG MUST NAME THE KIND.** Break in the
    run plus a thin quarter-circle swing arc; the properties dialog shows the kind
    as **read-only text with its reason**. **Deriving a property is not a licence
@@ -68,11 +93,23 @@ by looking"*.
 **THEN FURNISHINGS — UNBLOCKED as of 2026‑08‑12** by the Phase 6 park below,
 which was the answer [`handoff/0010-ruling.md`](handoff/0010-ruling.md) was
 waiting on. **A third of the catalog renders as a box — 28 of 95.** Ruled order:
-**(1) the `prism` generator, and it OPENS WITH A MEASUREMENT** — how many of the
-28 have a usable SVG outline · **(2) the remaining generators by item count**
-(`vehicle` 10, `enclosure` 7, `seat` 6, `bed` 4, `basin` 1) · **(3)
-parameterisation — a READ-BACK first** · **(4) AI symbol drafting, last, and
-AUTHORING TIME ONLY** — draft, review, commit as data, deterministic thereafter.
+**(1) the `prism` generator, and it OPENS WITH A MEASUREMENT** · **(2) the
+remaining generators by item count** · **(3) parameterisation — a READ-BACK
+first** · **(4) AI symbol drafting, last, and AUTHORING TIME ONLY.**
+
+> **ITEM (1)'s MEASUREMENT IS DONE AND RULED — [`handoff/0012-readback-prism-outlines.md`](handoff/0012-readback-prism-outlines.md) · [`0012-ruling.md`](handoff/0012-ruling.md).**
+> Of the 28: **19 BODY** (prism extrudes something recognisable), **6 PARTIAL**
+> (body kept, line-drawn structure lost), **3 NONE** (fragments floating in
+> space — worse than the box). **The split is by form and it is stark:** the four
+> furniture forms are **16 BODY of 18**; `vehicle` is **3 of 10**.
+>
+> **THE RULING: BUILD PRISM, THEN RE-MEASURE, THEN DECIDE.** Do **not** build the
+> four furniture generators first — if prism covers 16 of 18 on those forms, most
+> may never need writing, and building them first **guarantees work prism would
+> have made redundant**. `vehicle` does not wait on that decision: 3 of 10 is
+> already its answer, and that is a better reason than item count ever was. **The
+> three NONE items are AUTHORING work and stay separate, so a code task does not
+> acquire an artwork dependency.**
 
 **STILL OPEN AND NOT STARTED: WIDEN THE COMMAND ROSTER, DERIVED FROM THE
 PROPERTY.** Pre-committed at `2557e32` and never done. Enumerate every code path
@@ -96,9 +133,9 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`be2cb95`** — the Phase 6 park, the documentation debt, D74 filed. PRs #19–#26 all merged. |
-| **Branches** | **`d74-decoration-channel`** — D74's fix, at a PR, **AMBER: waiting on Patrick's check**. `i15-outline-completeness` was a stale local branch (PR #20, merged, 0 ahead) and was deleted 2026‑08‑12. |
-| **Gate** | on the D74 branch: `collected=704 ruff=clean vacuous=0 end_assign=0`; OFF / ON / DEEP each **697 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling, `tools/gate.py:66`). |
+| **`main`** | **`cb3e6e6`** — the snapshot gate condition and its red-at-rest fix, on `9bddf21` (the prism read-back), on `be2cb95` (the Phase 6 park, the documentation debt, D74 filed), on `b4d8ea4` (PR #26). PRs #19–#26 all merged. **This branch is cut against `92a8813`**, its own tip, with `main` merged in. |
+| **Branches** | **`d74-decoration-channel` — [PR #27](https://github.com/pjm4github/FloorPlanner/pull/27), AMBER, waiting on Patrick's check.** `i15-outline-completeness` was a stale local branch (PR #20, merged, 0 ahead) and was deleted 2026‑08‑12. |
+| **Gate** | on this branch (`main` merged in): `collected=711 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **704 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **75 records**, 30 open. **D74 is new** — the PR #26 follow-up. **D73 closed** with the wall-types work. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
@@ -153,11 +190,14 @@ DONE**, merged at PRs #17 and #18.
 > * **PARKED, register entries only:** [D63](defects/0063-a-coalesced-outline-partly-rebounds-on-save.md)'s producer 2, [D64](defects/0064-the-save-writes-an-outline-corner-at-a.md), [D65](defects/0065-weld-scene-is-implicated-in-three-separate.md). **Not to be reopened without a new instruction.**
 > * **D63 producer 1 stays CLOSED** — rebound 0 on five plans, robust across four pairing tolerances.
 
-1. **D74 — the PR #26 follow-up. BUILT, at a PR, AMBER — waiting on the check.**
-   See §0.
-2. **Furnishings — the prism generator, measurement first.** Unblocked by the
-   Phase 6 park. [`handoff/0010-census-furnishings.md`](handoff/0010-census-furnishings.md)
-   + [`0010-ruling.md`](handoff/0010-ruling.md).
+1. **D74 — the PR #26 follow-up. BUILT, at [PR #27](https://github.com/pjm4github/FloorPlanner/pull/27), AMBER — waiting on the check.** See §0.
+2. **Furnishings — BUILD `prism`, THEN RE-MEASURE, THEN DECIDE.** Measured and
+   ruled ([`handoff/0012`](handoff/0012-readback-prism-outlines.md) ·
+   [`0012-ruling.md`](handoff/0012-ruling.md)); **the build has not started, and
+   it is the next code task.** The four furniture generators are **not**
+   scheduled work — they are a question to re-ask after prism, against a
+   re-measurement. `vehicle` does not wait on it. The three NONE items are
+   **authoring**, filed separately.
 3. **The command-roster census, derived from the property.** See §0.
 4. **A2 — D11's runtime z collapse. ⏸ PARKED, twice over.** The hang is **not
    reproducible** (2026‑08‑09): five orders of magnitude on either z step leaves
@@ -261,11 +301,26 @@ only touches things nobody asked it to**.
   more after the trap had just been named. **The tell is the preposition** —
   *"every mutator IN MainWindow"* and *"every path that WRITES TO the document"*
   sound like one census and are not.
-- **A CHANNEL COMMITTED TO REPRESENTING A REAL QUANTITY CANNOT ALSO CARRY
-  IDENTITY — added 2026‑08‑12, from D74.** Thickness represents real thickness,
-  so it cannot also mean *"railing"*; the two types that seemed to work only did
-  so because they genuinely are fatter. Sits with the project's other channel
-  rulings: dashed is spoken for twice, colour is spoken for in 3D.
+- **IDENTITY NEEDS A CATEGORICAL CHANNEL, NOT A SCALAR ONE — added 2026‑08‑12,
+  and it has TWO INSTANCES one level apart.** **Thickness** failed because two
+  types share a real thickness (*a channel committed to representing a real
+  quantity cannot also carry identity* — the narrower form, which came first).
+  **Fineness** then failed the same way inside the fix: tick spacing and weight
+  are scalars too, and the render showed one ladder at two pitches. What worked
+  was **categorical** — the fence's ticks carry a filled post, the railing's do
+  not. **Ask of any identity channel: are its values points on an axis, or
+  different kinds of mark?** A scalar holds in a side-by-side comparison and
+  fails at a glance, and a glance is what the user gives it. Sits with the
+  project's other channel rulings: dashed is spoken for twice, colour in 3D.
+- **A CRITERION THAT SPLITS TWO STRUCTURALLY IDENTICAL CASES IS MEASURING THE
+  WRONG THING, AND THE AGGREGATE NEVER SHOWS IT — added 2026‑08‑12, beside the
+  positive control; same family, different failure.** The positive control
+  catches an instrument reporting **nothing**; this catches one reporting a
+  **plausible something**. One 25% line called `lawnmower` usable and
+  `snowblower` not — identical symbols — while **21-of-28 looked perfectly
+  respectable from above**. **The practice: inspect the items either side of the
+  line, not the count**, and print every raw value so a different cut needs no
+  re-run.
 - **AN ACCEPTANCE STATED AS A COUNT IS SATISFIED BY REPLACEMENT.** *"40 of 40
   survive a save"* cannot distinguish forty survivors from forty removals and
   forty fresh insertions. When the question is whether a specific thing

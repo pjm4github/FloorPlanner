@@ -205,6 +205,115 @@ def _end_assignments() -> tuple:
     return len(hits), hits
 
 
+SNAPSHOT = "docs/SESSION_SNAPSHOT.md"
+SNAPSHOT_MARK = re.compile(r"<!--\s*SNAPSHOT-HEAD:\s*([0-9a-f]{7,40})\s*-->")
+SNAPSHOT_ROW = re.compile(r"^\|\s*\*\*`main`\*\*\s*\|(.*)$", re.M)
+
+
+def _snapshot_head() -> int:
+    """Does `docs/SESSION_SNAPSHOT.md` name the commit it was cut against?
+
+    THIS IS THE ONE CONVENTION IN THIS REPOSITORY THAT HAS FAILED THREE TIMES,
+    and it is now a condition rather than a note. The snapshot is the file a
+    fresh session reads first; when it is stale it does not merely go unread, it
+    actively misdirects. The last cut sat EIGHT COMMITS behind with a "where the
+    work stands" table pinning a head that had moved and a "next task" naming a
+    census already done and ruled.
+
+    It had a warning about exactly that, in bold, at its own line 9. The warning
+    did not maintain the file -- **a warning is a note to a reader; staleness is
+    a property of the file.** The only two things that have ever fixed this
+    class here are GENERATION (`defects/INDEX.md` and its `--check`) and A GATE
+    THAT FAILS. This is the second.
+
+    THE SEMANTICS, because they are not the obvious ones. The snapshot records
+    the commit it was cut AGAINST -- the tip at gate time, which is the commit
+    the pending work is built on, NOT the commit about to be made (which has no
+    hash yet). So a commit that changes anything must re-point the marker at the
+    current tip, and the file is "one behind" between the gate and the commit
+    landing. That is the treadmill working: it caps drift at ONE commit, where
+    it reached eight.
+
+    TWO ASSERTIONS, not one. The marker must match the tip, AND the human-
+    readable `main` row must carry the same hash -- otherwise the marker becomes
+    a number that is bumped mechanically while the prose beside it goes on
+    lying, which is the same convention failing in a smaller font.
+
+    IT DOES NOT CHECK THAT THE CONTENT WAS RE-READ. Nothing can. It makes the
+    file impossible to ignore, not impossible to update carelessly.
+    """
+    try:
+        with open(SNAPSHOT, encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError as e:
+        print(f"Docs-Snapshot: RED -- cannot read {SNAPSHOT} ({e})")
+        return 1
+    tips = []
+    for rev in ("HEAD", "HEAD~1"):
+        try:
+            p = subprocess.run(["git", "rev-parse", rev], capture_output=True,
+                               text=True)
+        except OSError:
+            break
+        if p.returncode == 0 and p.stdout.strip():
+            tips.append(p.stdout.strip())
+    rc, msg = snapshot_verdict(text, tips)
+    print(msg)
+    return rc
+
+
+def snapshot_verdict(text: str, tips):
+    """The check itself, as a PURE function of (file text, tips) -> (rc, msg).
+
+    `tips` is [HEAD, HEAD~1] -- see ONE COMMIT OF SLACK below for why it is two.
+
+    Split out from the IO so it can be tested, and it is: `tests/test_gate.py`
+    drives every outcome. A staleness check nobody can demonstrate failing would
+    be the same species as the convention it replaces -- something that looks
+    like a guarantee and has never been asked to prove it.
+
+    ONE COMMIT OF SLACK, AND IT IS NOT LENIENCY -- IT IS THE DIFFERENCE BETWEEN
+    A GATE AND A NUISANCE. The first cut of this check accepted only HEAD, and
+    it was wrong in a way worth recording: **the gate runs BEFORE a commit**, so
+    the marker it approves names the tip at that moment; the instant the commit
+    lands, the marker is one behind. Requiring an exact match would leave the
+    repository RED AT REST -- red immediately after every correct commit, red
+    for CI on every push (CI calls this tool with `--deep`, which runs this
+    check), and red for the next session before it had done anything wrong.
+
+    **A gate that is red in the resting state trains people to ignore it**,
+    which would have rebuilt the very problem this closes, in a louder form.
+
+    So the marker may name HEAD or its parent. Worst-case drift is TWO commits
+    -- one of slack plus the pending one -- against the EIGHT it reached.
+    """
+    if not tips:
+        return 1, ("Docs-Snapshot: RED -- cannot read HEAD (git unavailable). "
+                   "A guard that cannot verify must not approve.")
+    m = SNAPSHOT_MARK.search(text)
+    if not m:
+        return 1, (f"Docs-Snapshot: RED -- {SNAPSHOT} carries no "
+                   f"`<!-- SNAPSHOT-HEAD: <sha> -->` marker.")
+    recorded = m.group(1)
+    if not any(t.startswith(recorded) for t in tips):
+        return 1, (
+            f"Docs-Snapshot: RED -- {SNAPSHOT} was cut against {recorded}, "
+            f"which is neither HEAD ({tips[0][:len(recorded)]}) nor its "
+            f"parent.\n"
+            f"               Re-cut it (sections 0 and 1 at least) and "
+            f"re-point the marker. The snapshot records the commit it was cut "
+            f"AGAINST, which is the tip at gate time.")
+    row = SNAPSHOT_ROW.search(text)
+    if row is None or recorded not in row.group(1):
+        return 1, (
+            f"Docs-Snapshot: RED -- the marker says {recorded} but the `main` "
+            f"row does not carry that hash.\n"
+            f"               The marker and the prose must agree, or the "
+            f"marker is a number nobody means.")
+    where = "HEAD" if tips[0].startswith(recorded) else "HEAD~1 (one of slack)"
+    return 0, f"Docs-Snapshot: cut against {recorded}, which is {where}"
+
+
 def _docs() -> int:
     """The record lane: are the defect records well-formed and reachable?
 
@@ -222,7 +331,7 @@ def _docs() -> int:
         ("Docs-Refs", ["tools/ref_audit.py", "--strict-ids"]),
         ("Docs-GitHub", ["tools/defects_to_github.py", "--dry-run"]),
     ]
-    bad = False
+    bad = bool(_snapshot_head())
     for label, cmd in checks:
         rc, out = _run_script(cmd)
         bad = bad or rc != 0
@@ -235,8 +344,9 @@ def _docs() -> int:
                     if "DRY RUN" in ln]
         for ln in keep[:12 if rc else 4]:
             print(ln)
-    note = "" if bad else (" (records valid, index current, every defect "
-                           "reference resolves, migration dry run clean)")
+    note = "" if bad else (" (snapshot current, records valid, index current, "
+                           "every defect reference resolves, migration dry run "
+                           "clean)")
     print(f"Docs-Verdict: {'RED' if bad else 'GREEN'}{note}")
     return 1 if bad else 0
 
@@ -338,9 +448,17 @@ def main() -> int:
 
     n_vac, vac = _vacuity()
     n_end, ends = _end_assignments()
+    # THE SNAPSHOT CHECK RUNS IN FULL MODE, NOT ONLY IN `--docs`, AND THE
+    # DIFFERENCE IS THE WHOLE POINT. The commit hook reads `.gate-result.json`,
+    # which only a full-mode run writes; `--docs` prints its own verdict and
+    # writes nothing. A staleness check living only in the docs lane would be
+    # one more thing nobody runs -- which is the exact failure it exists to
+    # close. It costs one file read and one `git rev-parse`.
+    n_snap = _snapshot_head()
     lines = [f"Gate-Census: collected={collected} ruff={ruff} "
-             f"vacuous={n_vac} end_assign={n_end}"]
-    bad = rc != 0 or n_vac > 0 or n_end > 0
+             f"vacuous={n_vac} end_assign={n_end} snapshot="
+             f"{'stale' if n_snap else 'current'}"]
+    bad = rc != 0 or n_vac > 0 or n_end > 0 or n_snap > 0
     if vac:
         print("Unfailable assertions (vacuous by tautology):")
         for h in vac:

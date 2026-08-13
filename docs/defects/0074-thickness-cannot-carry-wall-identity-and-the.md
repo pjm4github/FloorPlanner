@@ -110,11 +110,34 @@ render at the zoom a person actually works at
 
 **What changed:** both axes the ruling names were pushed — fence to 16″/5.0 and
 darker, railing to 4″/2.0 and lighter — and **the fence gained a filled POST at
-each tick**, which is what a post *is* in plan. That is what stopped the two
-reading as two densities of one thing and made them read as two different
-things. It is beyond the letter of *"perpendicular post ticks"* and is flagged
-here as the adjustable part: **strike the post if it is too much, and the
-channel survives it.**
+each tick**, which is what a post *is* in plan.
+
+### THE POST IS RULED IN — it does not go beyond the ruling, it COMPLETES it
+
+*(Patrick, 2026‑08‑12. It was submitted as the strikeable part; the ruling
+rejects that framing, and the reason generalises well past this feature.)*
+
+> **My ruling named decoration as the channel but said nothing about decoration
+> having AXES, and your first cut showed why that mattered: fence and railing as
+> the same ladder differing only in FINENESS. Fineness is a scalar, and a scalar
+> cannot carry identity between two similar things — which is exactly the reason
+> thickness failed one level up. Fill versus stroke is CATEGORICAL, and
+> categorical distinctions survive at working zoom while scalar ones dissolve
+> into it.**
+
+> **IDENTITY NEEDS A CATEGORICAL CHANNEL, NOT A SCALAR ONE.**
+
+**Two instances, one level apart.** **Thickness** failed because two types share
+a real thickness. **Fineness** then failed *inside the fix*: tick spacing and
+weight are scalars too, so the channel had changed and the **kind** of channel
+had not. A scalar has no gaps in it, and a viewer's eye normalises a continuum
+away; fill-versus-stroke has no intermediate values and survives a glance.
+
+**So the tick spacing, the weights and the scallop radius remain adjustable — the
+post is not one of them.** It is the categorical half of the channel, and
+striking it would put the drawing back exactly where the render found it. The
+general form is in [`../WORKING_AGREEMENT.md`](../WORKING_AGREEMENT.md) with both
+instances, and in [`../handoff/0012-ruling.md`](../handoff/0012-ruling.md).
 
 ---
 

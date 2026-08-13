@@ -69,6 +69,14 @@ WALL_TYPE_LABELS = [
 #: until the textures separate, and the fence gains a FILLED POST at each tick:
 #: which is what a post IS in plan, and what makes the two read as different
 #: things rather than as two densities of the same thing.
+#:
+#: THE POST IS THE PART THAT ACTUALLY WORKS, and it is ruled IN (D74):
+#: **IDENTITY NEEDS A CATEGORICAL CHANNEL, NOT A SCALAR ONE.** Pitch and weight
+#: are scalars, and a scalar cannot separate two similar things -- which is the
+#: same reason thickness failed one level up. Two ladders at different pitches
+#: are one ladder at any zoom a person actually works at. Fill-versus-stroke has
+#: no intermediate values, so it survives the glance. **Adjust the numbers
+#: freely; do not remove the post.**
 WallDecor = namedtuple("WallDecor", "form pitch reach grey post")
 
 WALL_DECOR = {
