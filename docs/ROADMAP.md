@@ -149,12 +149,12 @@ Order: G1, G3, G2, G4. G1 and G3 are independent; G2 informs G4.
 |---|---|
 | **Grid snap's sub-rulings** | snap reference point per item class; spacing values; whether grid spacing is a document property (R‑B now permits it, but the *decision* is Patrick's) |
 | **Phase 5 — Yard catalog** | artwork scope: which kinds, drawn by whom. D46 closes with it |
-| **Phase 5 — settable wall types** | small, but it is the porch-railing feature and the 2D symbol is a design choice |
-| **Phase 6 — command undo** | the largest remaining task; retires `snapshot()`. D42's applier consolidation and D45's `_edge_wall` fold in here |
+| ~~**Phase 5 — settable wall types**~~ | **DONE — merged 2026‑08‑11 (PR #26).** The 2D symbol was indeed the design choice, and the first answer was wrong: see the PR #26 follow-up, which refutes thickness as the identity channel |
+| **Phase 6 — command undo** | **PARKED 2026‑08‑12 — see the park record below.** It does **not** retire `snapshot()`, and neither D42's applier consolidation nor D45's `_edge_wall` folds in here; both claims were refuted by measurement. P6.a/P6.b stay merged and dormant. Two named conditions reopen it |
 | **Phase 7 — Build menu 7.1 / 7.2** | 7.2 needs `level.kind` additions, now permitted by R‑B but not yet specified |
 | **Phase 7 — 7.3 roof** | needs its own design pass. Ridge, eave and pitch are over-determined; the UI must decide which two the user sets. **AND THE 3D VIEW IS WHAT MAKES THAT PASS TRACTABLE AT ALL — noted 2026‑08‑11:** Patrick wants roof and foundation shown **solid** in 3D, and choosing which two of three over-determined parameters a user sets is very hard to decide **without seeing the result**. **7.2's `level.kind` additions — `foundation` and `roof` — are already permitted as additive by R‑B** and do not bump the document version, so the schema is not in the way |
 | **D44** | an accepted limit. Nothing to do — it exists so the boundary of `check()` is known |
-| **D45, D46** | carried to Phase 6 and Phase 5 respectively |
+| **D45, D46** | D46 carried to Phase 5. **D45 is NOT carried to Phase 6** — it was never subsumed by it, and Phase 6 is parked; it stands on its own as a load-path/format change |
 
 ---
 
@@ -235,8 +235,48 @@ ZERO records closed by subsumption**, and saying so is cheaper than a reader
 discovering it.
 
 **Phase 5 (landscape), Phase 6 (command undo) and Phase 7 (build) are FEATURE
-WORK.** Phase 6 is no longer RED — see
+WORK.** Phase 6 was tiered at
 [`handoff/0008-readback-phase-6-deep.md`](handoff/0008-readback-phase-6-deep.md)
-and its tiering: **P6.a** re-host the invariant hook, **P6.b** the command
-classes at the gesture boundary, **P6.c** the dirty-tracking replacement,
-**P6.d** the cutover.
+— **P6.a** re-host the invariant hook, **P6.b** the command classes at the
+gesture boundary, **P6.c** the dirty-tracking replacement, **P6.d** the cutover.
+**It is now PARKED — see below.**
+
+---
+
+## PHASE 6 IS PARKED — Patrick's ruling, 2026‑08‑12
+
+**P6.a and P6.b stay MERGED AND DORMANT. P6.c and P6.d are NOT WIRED.** This
+also settles the open question in
+[`handoff/0010-ruling.md`](handoff/0010-ruling.md) — the furnishings work was
+gated on this answer and is unblocked by it.
+
+**The reason, and it is a measurement rather than a preference: the subsumption
+case was REFUTED.** Phase 6 was justified in part by what it would close. It
+closes nothing:
+
+* **`snapshot()` survives.** Retiring snapshot *undo* does not retire
+  `snapshot()` — 4 of its 8 callers die, and the rest are dirty tracking and
+  diagnostics (`handoff/0007`).
+* **D42 does not die with it.** Its "`MoveVertices` is exactly that seam"
+  argument has no `MoveVertices` to point at: the re-cut makes the drag one
+  `DragGesture` memento that **wraps** the three appliers rather than unifying
+  them. Applier consolidation is independent of the undo mechanism.
+* **D45 does not die with it.** "`_edge_wall` dies when the document states the
+  binding" is a **load-path/format** change. A memento stack stores documents;
+  it does not make the loader carry a binding it does not already carry.
+
+**So what remains buys a better undo and closes no records.** That is a real
+benefit and an honest one — it is simply not worth the cutover's cost against
+the rest of the queue, and P6.d is AMBER besides.
+
+**WHAT WOULD REOPEN IT — stated now, so the park has an exit that is not a mood:**
+
+1. **An undo defect the memento stack cannot fix.** The dormant classes are a
+   memento stack; if a fault is found that whole-document restore cannot
+   express, the park is over and the operation-based layer is back on the table.
+2. **A feature that needs semantic replay rather than whole-document restore** —
+   anything that must know *what changed* rather than *what it became*
+   (collaborative edit, a scripted redo, a diff-based audit trail).
+
+**Neither is speculative work today.** Until one of them arrives, Phase 6 is
+register state, not queue state.

@@ -26,6 +26,14 @@ and compared byte-for-byte against the plan's blob before the move — identical
 | [`phase-4-part-1.md`](phase-4-part-1.md) | 3519–4360 | 842 | 2026-08-01 → 08-04 | P4.1 · P4.1b · P4.2 (+6 mini-gate findings) · P4.3 · P4.4 |
 | [`phase-4-part-2.md`](phase-4-part-2.md) | 4361–4935 | 575 | 2026-08-04 → 08-06 | P4.5, entries (0) through (40) and the merge |
 | [`side-tasks.md`](side-tasks.md) | — | — | 2026-08-06 → | work belonging to no phase |
+| [`phase-5.md`](phase-5.md) | — | — | 2026-08-11 → | P5.2 · P5.2-followup |
+
+**`phase-5.md` was opened on 2026‑08‑12, a day after its first entry's work
+merged**, and its header says so. P5.2 shipped at PR #26 with a defect record and
+a handoff but no progress entry, so the entry is a reconstruction from the
+commit, the handoff and the diff. It is marked as one. The same rule as the two
+undated files above: a reconstruction that looks contemporaneous is worse than
+one that admits its provenance.
 
 Source line numbers are into `V5_MIGRATION_PLAN.md` **as of commit `2f232bd`**,
 the last commit before the split.
