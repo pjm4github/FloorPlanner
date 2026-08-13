@@ -350,6 +350,32 @@ because it is written precisely to explain why nobody needs to look further.
 
 **So: name the control when the instrument is written, not after it disagrees with you.** And when an instrument reports zero, the question is never *"is the code clean?"* but **"would this instrument have reported the thing if it were there?"**
 
+**A CRITERION THAT SPLITS TWO STRUCTURALLY IDENTICAL CASES IS MEASURING THE WRONG THING — AND THE AGGREGATE NEVER SHOWS IT. Added 2026‑08‑12, Patrick's ruling. Same family as the positive control above, different failure.**
+
+The positive control catches an instrument that reports **nothing**. This catches one that reports a **plausible something**. A threshold does not fail loudly: it returns a number that looks like an answer, and the number is the only thing anyone reads.
+
+**The instance.** The prism read-back classified 28 furnishing symbols by one threshold — *is the largest filled shape ≥ 25% of the viewBox?* — and reported **21 of 28 usable**. That is a perfectly respectable-looking result. It also called **`lawnmower` usable at 36.7% and `snowblower` unusable at 20.8%**, and those two symbols are **structurally identical**: a filled body rect, filled wheels, and a handle drawn in lines. The only difference between them is how much of each viewBox the handle happens to occupy.
+
+**The threshold was a proxy — for *"is the body drawn as a fill?"* — and the proxy failed wherever an item's envelope is mostly empty air.** Which is exactly what a vehicle's envelope is, so the error was concentrated in the very form the ruling most needed to be right about.
+
+> **THE PRACTICE: inspect the items either side of the line, not the count.**
+
+**A threshold's own error is invisible from above.** 21-of-28 carries no trace of it; the two counter-examples were **adjacent rows in the table the instrument itself printed**. Nothing about the aggregate could have prompted the question — only reading the boundary cases as *cases* did.
+
+**So a measurement that turns on a threshold owes two things beside its number:** the boundary items named, and the threshold stated as the **judgement it is** — with every item's raw value printed, so a different cut can be applied to the same data without re-running anything. **The corrected read-back reports three tiers and every coverage figure**, which is what that costs.
+
+**IDENTITY NEEDS A CATEGORICAL CHANNEL, NOT A SCALAR ONE — added 2026‑08‑12, Patrick's ruling, and it already has TWO INSTANCES one level apart.**
+
+**A drawing tells the user what a thing *is* through some channel.** The rule is about which channels can carry that load: **a scalar channel cannot distinguish two similar things, because a scalar has no gaps in it.** Two values on one axis are two points on a continuum, and a continuum is exactly what a viewer's eye normalises away. A **categorical** channel — present or absent, filled or stroked, this mark or that mark — survives the same glance, because there is nothing between its values to dissolve into.
+
+**Instance one — thickness, refuted at PR #26's manual check.** Wall type was drawn by its real thickness. `fence` and `railing` are **both 2.0″**, because both really are about two inches, so at working zoom they are the same drawing. `hedge` and `retaining` only *appeared* to work because they genuinely **are** fatter — the quantity being read correctly, not identity being communicated. Thickness is a scalar **and** it is already spent on a real measurement, which is the narrower rule that came first: *a channel committed to representing a real quantity cannot also carry identity.*
+
+**Instance two — fineness, refuted at D74's own first cut, one level down.** The fix moved identity to **decoration along the run**, which is the right channel — but the first cut distinguished fence from railing by **tick spacing and weight**, and those are scalars too. The render at working zoom showed **the same ladder, differing only in how fine it was**. The channel had changed; the *kind* of channel had not.
+
+**What fixed it was categorical: the fence's ticks carry a FILLED POST and the railing's do not.** Fill-versus-stroke has no intermediate values, so it reads at any zoom. **That is why the post is ruled IN rather than tolerated** — it is not decoration on top of the ruling, it is the part that makes the ruling work.
+
+> **The two instances together:** thickness failed because two types share a real thickness; fineness failed because two ladders at different pitches are one ladder at any zoom you actually work at. **Ask of any identity channel: are its values points on an axis, or different kinds of mark?** If the former, it will hold in a side-by-side comparison and fail at a glance — and a glance is what the user gives it.
+
 **AN ACCEPTANCE STATED AS A COUNT IS SATISFIED BY REPLACEMENT — added 2026‑08‑10, and the error being recorded is the REVIEWER'S OWN.**
 
 **When the question is whether a specific thing PERSISTED, the measure must be an identity, not a total.** A count cannot distinguish *forty survivors* from *forty removals and forty fresh insertions at other points*. Both read as forty.
