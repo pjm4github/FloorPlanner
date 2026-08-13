@@ -57,11 +57,19 @@ find the gate in a run of rail.**
 **THEN FURNISHINGS — UNBLOCKED as of 2026‑08‑12** by the Phase 6 park below,
 which was the answer [`handoff/0010-ruling.md`](handoff/0010-ruling.md) was
 waiting on. **A third of the catalog renders as a box — 28 of 95.** Ruled order:
-**(1) the `prism` generator, and it OPENS WITH A MEASUREMENT** — how many of the
-28 have a usable SVG outline · **(2) the remaining generators by item count**
-(`vehicle` 10, `enclosure` 7, `seat` 6, `bed` 4, `basin` 1) · **(3)
-parameterisation — a READ-BACK first** · **(4) AI symbol drafting, last, and
-AUTHORING TIME ONLY** — draft, review, commit as data, deterministic thereafter.
+**(1) the `prism` generator, and it OPENS WITH A MEASUREMENT** · **(2) the
+remaining generators by item count** · **(3) parameterisation — a READ-BACK
+first** · **(4) AI symbol drafting, last, and AUTHORING TIME ONLY.**
+
+> **ITEM (1)'s MEASUREMENT IS DONE — [`handoff/0012-readback-prism-outlines.md`](handoff/0012-readback-prism-outlines.md), and it changes item (2).**
+> Of the 28: **19 BODY** (prism extrudes something recognisable), **6 PARTIAL**
+> (body kept, line-drawn structure lost), **3 NONE** (fragments floating in
+> space — worse than the box). **The split is by form and it is stark:** the four
+> furniture forms are **16 BODY of 18**; `vehicle` is **3 of 10**. So **prism may
+> retire four of the five pending generators**, leaving `vehicle` — which keeps
+> ruling TWO's vehicle-first order but for a stronger reason than item count.
+> **The three NONE items are an AUTHORING fix, not a code one.** Nothing is
+> implemented and nothing is ruled; the decisions it enables are Patrick's.
 
 **STILL OPEN AND NOT STARTED: WIDEN THE COMMAND ROSTER, DERIVED FROM THE
 PROPERTY.** Pre-committed at `2557e32` and never done. Enumerate every code path
@@ -143,9 +151,12 @@ DONE**, merged at PRs #17 and #18.
 > * **D63 producer 1 stays CLOSED** — rebound 0 on five plans, robust across four pairing tolerances.
 
 1. **D74 — the PR #26 follow-up. THE LIVE ITEM. AMBER.** See §0.
-2. **Furnishings — the prism generator, measurement first.** Unblocked by the
-   Phase 6 park. [`handoff/0010-census-furnishings.md`](handoff/0010-census-furnishings.md)
-   + [`0010-ruling.md`](handoff/0010-ruling.md).
+2. **Furnishings — the prism generator. THE MEASUREMENT IS DONE
+   ([`handoff/0012`](handoff/0012-readback-prism-outlines.md)); the BUILD has not
+   started.** Unblocked by the Phase 6 park.
+   [`handoff/0010-census-furnishings.md`](handoff/0010-census-furnishings.md)
+   + [`0010-ruling.md`](handoff/0010-ruling.md). See §0 for what the measurement
+   changed.
 3. **The command-roster census, derived from the property.** See §0.
 4. **A2 — D11's runtime z collapse. ⏸ PARKED, twice over.** The hang is **not
    reproducible** (2026‑08‑09): five orders of magnitude on either z step leaves
