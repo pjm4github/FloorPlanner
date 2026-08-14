@@ -1,0 +1,97 @@
+{
+ "format": "floorplanner-design",
+ "version": 5,
+ "levels": [
+  {
+   "id": "L0",
+   "name": "default",
+   "elevation_in": 0.0,
+   "height_in": 96.0
+  }
+ ],
+ "vertices": [],
+ "walls": [],
+ "rooms": [],
+ "furnishings": [
+  {
+   "id": "f0",
+   "level": "L0",
+   "kind": "sofa",
+   "pos": [
+    0.0,
+    0.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f1",
+   "level": "L0",
+   "kind": "armchair",
+   "pos": [
+    124.0,
+    0.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f2",
+   "level": "L0",
+   "kind": "loveseat",
+   "pos": [
+    197.0,
+    0.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f3",
+   "level": "L0",
+   "kind": "dining_chair",
+   "pos": [
+    295.0,
+    0.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f4",
+   "level": "L0",
+   "kind": "bathtub",
+   "pos": [
+    353.0,
+    0.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f5",
+   "level": "L0",
+   "kind": "bed_king",
+   "pos": [
+    423.0,
+    0.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f6",
+   "level": "L0",
+   "kind": "kitchen_sink",
+   "pos": [
+    539.0,
+    0.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f7",
+   "level": "L0",
+   "kind": "whirlpool",
+   "pos": [
+    612.0,
+    0.0
+   ],
+   "rotation": 0.0
+  }
+ ]
+}

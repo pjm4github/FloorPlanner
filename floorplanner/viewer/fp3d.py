@@ -42,6 +42,7 @@ import os
 import re
 import sys
 import xml.etree.ElementTree as ET
+from collections import namedtuple
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -286,12 +287,30 @@ def _ellipse_ring(cx, cy, rx, ry, n=24):
              cy + ry * math.sin(2 * math.pi * i / n)) for i in range(n)]
 
 
-def svg_outlines(path):
-    """(rings, (vw, vh)) for one furnishing symbol, in viewBox units.
+#: One extrudable piece of a symbol.
+#:
+#: `h` is the piece's TOP HEIGHT IN INCHES above the item's base, read from a
+#: `data-h` attribute on the element, or `None` when it carries none.
+#:
+#: THE ANNOTATION CARRIES A HEIGHT AND NOTHING ELSE, and that boundary is the
+#: ruling (2026-08-14): **the region's POSITION comes from the artwork; only its
+#: HEIGHT is annotated.** The moment `data-h` could also say *where*, there are
+#: two sources of truth about where a pillow is and they will disagree. Same
+#: discipline as the thickness table (D73): one normative source per fact.
+Part = namedtuple("Part", "ring h nested")
 
-    `rings` are the FILLED CLOSED shapes, largest first, with any ring nested
-    inside another dropped. Empty when the symbol is line art -- the caller
-    falls back to a box and says so.
+
+def svg_outlines(path):
+    """(parts, (vw, vh)) for one furnishing symbol, in viewBox units.
+
+    `parts` are the FILLED CLOSED shapes, largest first, each with the height
+    its element annotates (or `None`). Empty when the symbol is line art -- the
+    caller falls back to a box and says so.
+
+    A ring NESTED inside a larger one is marked rather than dropped: with a
+    height it is a region (a tub's well, a bed's pillow), and without one it is
+    decoration that would z-fight the face it sits on, so the extruder skips
+    it. Before regions existed this function dropped them here.
 
     A `transform` on any element makes the file UNUSABLE here rather than
     silently mis-placed: this reader does not apply transforms, and a shape
@@ -306,44 +325,47 @@ def svg_outlines(path):
     vb = _nums(root.get("viewBox") or "")
     if len(vb) < 4 or vb[2] <= 0 or vb[3] <= 0:
         return [], (0.0, 0.0)
-    rings = []
+    found = []                                   # (ring, annotated height)
     for el in root.iter():
         if el.get("transform"):
             return [], (vb[2], vb[3])
         tag = el.tag.replace(SVG_NS, "")
         if tag in ("svg", "g", "defs", "title", "desc") or not _is_filled(el):
             continue
+        try:
+            ah = float(el.get("data-h")) if el.get("data-h") else None
+        except ValueError:
+            ah = None                            # a bad height is no height
         if tag == "rect":
             x, y = float(el.get("x", 0)), float(el.get("y", 0))
             w, h = float(el.get("width", 0)), float(el.get("height", 0))
             if w > 0 and h > 0:
-                rings.append([(x, y), (x + w, y), (x + w, y + h), (x, y + h)])
-        elif tag == "circle":
-            r = float(el.get("r", 0))
-            if r > 0:
-                rings.append(_ellipse_ring(float(el.get("cx", 0)),
-                                           float(el.get("cy", 0)), r, r))
-        elif tag == "ellipse":
-            rx, ry = float(el.get("rx", 0)), float(el.get("ry", 0))
+                found.append(([(x, y), (x + w, y), (x + w, y + h), (x, y + h)],
+                              ah))
+        elif tag in ("circle", "ellipse"):
+            rx = float(el.get("rx", el.get("r", 0)))
+            ry = float(el.get("ry", el.get("r", 0)))
             if rx > 0 and ry > 0:
-                rings.append(_ellipse_ring(float(el.get("cx", 0)),
-                                           float(el.get("cy", 0)), rx, ry))
+                found.append((_ellipse_ring(float(el.get("cx", 0)),
+                                            float(el.get("cy", 0)), rx, ry), ah))
         elif tag in ("polygon", "polyline"):
             p = _nums(el.get("points", ""))
             if len(p) >= 6:
-                rings.append(list(zip(p[0::2], p[1::2], strict=False)))
+                found.append((list(zip(p[0::2], p[1::2], strict=False)), ah))
         elif tag == "path":
-            rings.extend(_path_rings(el.get("d", "")))
-    rings = [r for r in rings if _ring_area(r) > 1e-9]
-    rings.sort(key=_ring_area, reverse=True)
-    # drop anything nested in a bigger ring: it extrudes to the same height and
-    # would z-fight the face it sits on
-    keep = []
-    for r in rings:
-        c = (sum(p[0] for p in r) / len(r), sum(p[1] for p in r) / len(r))
-        if not any(_pip(c, k) for k in keep):
-            keep.append(r)
-    return keep, (vb[2], vb[3])
+            for r in _path_rings(el.get("d", "")):
+                found.append((r, ah))
+    found = [(r, h) for r, h in found if _ring_area(r) > 1e-9]
+    found.sort(key=lambda rh: _ring_area(rh[0]), reverse=True)
+    parts, outer = [], []
+    for ring, ah in found:
+        c = (sum(p[0] for p in ring) / len(ring),
+             sum(p[1] for p in ring) / len(ring))
+        nested = any(_pip(c, o) for o in outer)
+        if not nested:
+            outer.append(ring)
+        parts.append(Part(ring, ah, nested))
+    return parts, (vb[2], vb[3])
 
 
 def _ear_clip(ring):
@@ -386,6 +408,88 @@ def _ear_clip(ring):
     if len(idx) == 3:
         tris.append(tuple(idx))
     return tris
+
+
+def _segments_cross(a, b, c, d):
+    """Do open segments ab and cd properly cross? Shared endpoints do not."""
+    def side(p, q, r):
+        return ((q[0] - p[0]) * (r[1] - p[1])
+                - (q[1] - p[1]) * (r[0] - p[0]))
+    if (a == c or a == d or b == c or b == d):
+        return False
+    d1, d2 = side(a, b, c), side(a, b, d)
+    d3, d4 = side(c, d, a), side(c, d, b)
+    return (d1 * d2 < 0) and (d3 * d4 < 0)
+
+
+def _bridge_holes(outer, holes):
+    """Splice each hole into `outer` with a two-way bridge -> one ring.
+
+    THE STANDARD TRICK, and the reason it is here: a cap with a hole in it
+    cannot be ear-clipped, but a cap whose boundary walks IN along a bridge,
+    round the hole and back OUT along the same bridge can be -- the two bridge
+    edges are coincident and enclose no area, so they vanish visually while
+    making the polygon simply-connected.
+
+    Bridges are chosen as the shortest outer-vertex/hole-vertex pair whose
+    segment crosses no edge already in play. Returns `None` if any hole cannot
+    be bridged, and the CALLER FALLS BACK TO A SOLID BODY AND REPORTS -- a
+    wrong hole is worse than a missing one, and a silent wrong hole is worst.
+    """
+    ring = list(outer)
+    for hole in sorted(holes, key=_ring_area, reverse=True):
+        edges = ([(ring[i], ring[(i + 1) % len(ring)])
+                  for i in range(len(ring))]
+                 + [(hole[i], hole[(i + 1) % len(hole)])
+                    for i in range(len(hole))])
+        best = None
+        for i, o in enumerate(ring):
+            for j, hpt in enumerate(hole):
+                d2 = (o[0] - hpt[0]) ** 2 + (o[1] - hpt[1]) ** 2
+                if best is not None and d2 >= best[0]:
+                    continue
+                if any(_segments_cross(o, hpt, e0, e1) for e0, e1 in edges):
+                    continue
+                best = (d2, i, j)
+        if best is None:
+            return None
+        _, i, j = best
+        # ...out along the bridge, round the hole the OTHER way, back in
+        loop = hole[j:] + hole[:j + 1]
+        loop.reverse()
+        ring = ring[:i + 1] + loop + ring[i:]
+    return ring
+
+
+def _cap(ring, holes, z, up):
+    """A horizontal face over `ring` minus `holes`, or None if it cannot be
+    triangulated."""
+    poly = ring if not holes else _bridge_holes(ring, holes)
+    if poly is None:
+        return None
+    tris = _ear_clip(poly)
+    if not tris:
+        return None
+    v = np.array([(x, y, z) for x, y in poly], dtype=float)
+    f = [[a, b, c] if up else [a, c, b] for a, b, c in tris]
+    return v, np.array(f, dtype=int)
+
+
+def _wall(ring, z0, z1, outward):
+    """The vertical band swept by a ring between two heights."""
+    n = len(ring)
+    ccw = sum(ring[i][0] * ring[(i + 1) % n][1]
+              - ring[(i + 1) % n][0] * ring[i][1] for i in range(n)) > 0
+    v = np.array([(x, y, z0) for x, y in ring] + [(x, y, z1) for x, y in ring],
+                 dtype=float)
+    f = []
+    for i in range(n):
+        j = (i + 1) % n
+        if ccw == outward:
+            f += [[i, j, j + n], [i, j + n, i + n]]
+        else:
+            f += [[i, j + n, j], [i, i + n, j + n]]
+    return v, np.array(f, dtype=int)
 
 
 def _extrude(ring_world, z0, z1):
@@ -522,18 +626,60 @@ def build_prism(place, w, d, h, z0, outline):
 
     Returns [] when nothing could be extruded, which the caller reports.
     """
-    rings, (vw, vh) = outline
-    if not rings or vw <= 0 or vh <= 0:
+    shapes, (vw, vh) = outline
+    if not shapes or vw <= 0 or vh <= 0:
         return []
     sx, sy = w / vw, d / vh
-    parts = []
-    for ring in rings:
-        world = [place((x - vw / 2.0) * sx, (vh / 2.0 - y) * sy)
-                 for x, y in ring]
-        part = _extrude(world, z0, z0 + h)
-        if part is not None:
-            parts.append(part)
-    return parts
+
+    def to_world(ring):
+        return [place((x - vw / 2.0) * sx, (vh / 2.0 - y) * sy)
+                for x, y in ring]
+
+    # THE BODY may state its own height. A sofa's catalog `height_in` is 32 --
+    # the BACK -- so a body that used it extruded the whole seat to back height
+    # and read as a slab. `height_in` stays the item's OVERALL height, which is
+    # what the box fallback needs; the body says how far IT rises.
+    body = shapes[0]
+    body_h = body.h if body.h is not None else h
+
+    wells, raised, beside = [], [], []
+    for p in shapes[1:]:
+        if not p.nested:
+            beside.append(p)
+        elif p.h is None:
+            continue                 # decoration: it would z-fight the face
+        elif p.h < body_h:
+            wells.append(p)          # a tub's well, a sink's bowl
+        else:
+            raised.append(p)         # a pillow, a bench, a headrest
+
+    out, well_rings = [], [to_world(p.ring) for p in wells]
+    body_ring = to_world(body.ring)
+
+    if well_rings:
+        top = _cap(body_ring, well_rings, z0 + body_h, up=True)
+        if top is None:
+            # A hole that will not bridge falls back to a SOLID body rather
+            # than to a wrong one, and the caller reports it.
+            out.append(_extrude(body_ring, z0, z0 + body_h))
+            well_rings = []
+        else:
+            out.append(top)
+            out.append(_cap(body_ring, [], z0, up=False))
+            out.append(_wall(body_ring, z0, z0 + body_h, outward=True))
+            for p, wr in zip(wells, well_rings, strict=True):
+                out.append(_wall(wr, z0 + p.h, z0 + body_h, outward=False))
+                out.append(_cap(wr, [], z0 + p.h, up=True))
+    else:
+        out.append(_extrude(body_ring, z0, z0 + body_h))
+
+    for p in raised:                 # sits ON the body
+        out.append(_extrude(to_world(p.ring), z0 + body_h, z0 + p.h))
+    for p in beside:                 # its own column, from the floor
+        top = z0 + (p.h if p.h is not None else h)
+        out.append(_extrude(to_world(p.ring), z0, top))
+
+    return [o for o in out if o is not None]
 
 
 def build_solid(form, place, w, d, h, z0, outline=None):

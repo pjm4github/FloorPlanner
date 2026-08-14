@@ -156,4 +156,84 @@ PRISM MERGED, AND THE FURNITURE HALF NARROWED  2026-08-14
          seat rather than nested inside it, and the criterion only
          counted nested shapes. Caught by opening the four files. Third
          time on this feature that looking has overturned counting.
+
+REGION EXTRUSION -- ONE GENERATOR, NOT FOUR  2026-08-14  (AMBER, at a PR)
+         handoff: 0014 (report + ruling)
+         branch:  region-extrusion
+         files:   floorplanner/viewer/fp3d.py  _gen_assets.py
+                  assets/furnishings/*.svg (13 regenerated)
+                  tests/test_viewer_model.py
+                  docs/evidence/seat-check.png, seat-plan-symbols.png,
+                  prism-check-regions.png
+         Patrick's check is ONE QUESTION: does a sofa read as a sofa.
+
+         WHAT A REGION IS: a closed shape in the plan symbol carrying a
+         data-h -- its TOP HEIGHT, in inches above the ITEM'S BASE, the
+         same datum as the catalog's height_in. Three rules, and they are
+         the whole generator:
+             h > body   a raised region: extruded FROM the body's top
+                        (a pillow, a bench, a chair back on its seat)
+             h < body   a WELL: the body's top cap is opened for it and
+                        the region gets walls and a floor (a tub's
+                        inside, a sink bowl)
+             not nested a column of its own from the floor
+         An unannotated nested shape is still DROPPED -- it would z-fight
+         the face it sits on, which is why prism dropped it before.
+
+         THE BODY MAY STATE ITS OWN HEIGHT, and that is what fixed the
+         seats. A sofa's catalog height_in is 32 -- the BACK -- so a body
+         using it extruded the whole footprint to back height and read as
+         a slab. height_in stays the item's OVERALL height, which the box
+         fallback needs; the body now says how far IT rises (17").
+
+         THE ANNOTATION CARRIES A HEIGHT AND NOTHING ELSE. The artwork
+         says WHERE a region is and never WHAT it is; a parser cannot
+         tell a pillow from a drain. An ordinal rule would break silently
+         when artwork is re-ordered, and a geometric heuristic would
+         INVENT A NUMBER THE DOCUMENT DOES NOT CONTAIN -- the same
+         objection that already refused --stack for the viewer, quoted in
+         the ruling so the repetition is visible. A test walks every SVG
+         and fails on any data- attribute that is not data-h, or any
+         value that is not one number.
+
+         THE THREE SEATS WERE AN ARTWORK FIX, NOT A LIMIT. dining_chair
+         and office_chair draw their backs as closed rects IN THE SAME
+         FORM, so sofa, armchair and loveseat were three symbols drawn
+         inconsistently with their neighbours. seat() now draws the back
+         and arms as closed regions. THE TELL THAT IT IS THE RIGHT FIX:
+         it improves the PLAN symbol on its own terms -- a sofa back has
+         thickness and a line says it does not -- and the 3D follows.
+         Checked before shipping: evidence/seat-plan-symbols.png.
+
+         THE COSTING SAID "ONE LOOP" AND THE WELL NEEDED MORE, which is
+         reported rather than absorbed. A region BELOW the body is only a
+         well if the body is OPENED for it, and a cap with a hole cannot
+         be ear-clipped -- so _bridge_holes splices each hole into the
+         outer ring with a two-way bridge, and the two coincident bridge
+         edges enclose no area. A hole that will not bridge falls back to
+         a SOLID body and the item is reported: a wrong hole is worse
+         than a missing one, and a silent wrong hole is worst.
+
+         ONE TEST WAS VACUOUS AND IS RECORDED RATHER THAN REPLACED. The
+         first tub test asserted that the well's height appears among the
+         solid's z values and that there are more than twelve triangles.
+         BOTH ARE TRUE OF A SOLID BODY WITH A BLOCK INSIDE IT, which is
+         exactly what the broken version built -- it PASSED against code
+         with the well branch disabled. The assertion is now the thing
+         the eye checks: IS THERE A ROOF OVER THE WELL. A hollow tub has
+         no horizontal face at rim height above its centre, and a block
+         cannot satisfy that. Its precondition asserts the rim still
+         exists, or "no roof" would be satisfied by building nothing.
+
+         AND ONE CLARIFICATION A RED TEST PRODUCED: data-h is measured
+         from the ITEM'S BASE, so kitchen_sink's data-h="2" is 2" above
+         the counter (elevation 26), not above the floor. The test had
+         assumed world z; the test was wrong and the extruder right. An
+         annotation measured from the floor would have to know where the
+         counter is -- which is a coordinate, which is the boundary.
+
+         AUTHORING LIST NOW FIVE, THREE OF THEM DONE HERE: sofa, armchair
+         and loveseat are redrawn. glass_shower (no fill at all) and
+         boat_trailer (fills, but no body) remain, and stay separate from
+         the generators.
 ```

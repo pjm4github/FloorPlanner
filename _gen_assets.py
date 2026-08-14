@@ -47,10 +47,31 @@ def svg_error(text):
     return None
 
 
-def R(x, y, w, h, rx=0.0, fill=FILL, sw=1.0, dash=None):
+# THE REGION HEIGHT ANNOTATION -- `data-h`, and it carries a HEIGHT AND NOTHING
+# ELSE.  Ruled 2026-08-14:
+#
+#     The region's POSITION comes from the artwork; only its HEIGHT is
+#     annotated. The moment the annotation could also say WHERE, there are two
+#     sources of truth about where a pillow is, and they will disagree.
+#
+# Same discipline as the thickness table (D73): ONE NORMATIVE SOURCE PER FACT.
+# The drawing already states where every region is, to the inch, because it has
+# to draw it; what it cannot state is what the region IS -- and a height is the
+# smallest thing that says so.  A parser cannot tell a pillow from a drain.
+#
+# The value is the piece's TOP, in inches above the item's base -- the same
+# datum as the catalog's `height_in`, which stays the item's OVERALL height.
+# So a value BELOW the body's height is a well (a tub's inside, a sink bowl)
+# and one above it is a raised region (a pillow, a bench, a chair back).
+def _h(h):
+    return f' data-h="{h}"' if h is not None else ""
+
+
+def R(x, y, w, h, rx=0.0, fill=FILL, sw=1.0, dash=None, top=None):
     extra = f' stroke-dasharray="{dash}"' if dash else ""
     return (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" '
-            f'fill="{fill}" stroke="{INK}" stroke-width="{sw}"{extra}/>')
+            f'fill="{fill}" stroke="{INK}" stroke-width="{sw}"'
+            f'{extra}{_h(top)}/>')
 
 
 def L(x1, y1, x2, y2, sw=0.7, dash=None):
@@ -59,14 +80,14 @@ def L(x1, y1, x2, y2, sw=0.7, dash=None):
             f'stroke="{INK}" stroke-width="{sw}"{extra}/>')
 
 
-def Ci(cx, cy, r, fill="none", sw=0.7):
+def Ci(cx, cy, r, fill="none", sw=0.7, top=None):
     return (f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="{fill}" '
-            f'stroke="{INK}" stroke-width="{sw}"/>')
+            f'stroke="{INK}" stroke-width="{sw}"{_h(top)}/>')
 
 
-def El(cx, cy, rx, ry, fill="#ffffff", sw=0.8):
+def El(cx, cy, rx, ry, fill="#ffffff", sw=0.8, top=None):
     return (f'<ellipse cx="{cx}" cy="{cy}" rx="{rx}" ry="{ry}" '
-            f'fill="{fill}" stroke="{INK}" stroke-width="{sw}"/>')
+            f'fill="{fill}" stroke="{INK}" stroke-width="{sw}"{_h(top)}/>')
 
 
 def Pth(d, fill="none", sw=0.8):
@@ -78,20 +99,41 @@ def Pth(d, fill="none", sw=0.8):
 def bed(w, d, pillows):
     parts = [R(0.75, 0.75, w - 1.5, d - 1.5, 2, sw=1.2)]
     if pillows == 1:
-        parts.append(R(w * 0.18, 3, w * 0.64, 10, 2.5, "#ffffff", 0.8))
+        parts.append(R(w * 0.18, 3, w * 0.64, 10, 2.5, "#ffffff", 0.8, top=30))
     else:
         pw = (w - 13) / 2
-        parts.append(R(4.5, 3, pw, 10, 2.5, "#ffffff", 0.8))
-        parts.append(R(w - 4.5 - pw, 3, pw, 10, 2.5, "#ffffff", 0.8))
+        parts.append(R(4.5, 3, pw, 10, 2.5, "#ffffff", 0.8, top=30))
+        parts.append(R(w - 4.5 - pw, 3, pw, 10, 2.5, "#ffffff", 0.8, top=30))
     parts.append(L(0.75, 19, w - 0.75, 19, 0.8))      # blanket fold line
     return parts
 
 
-def seat(w, d, cushions, arm=7.0):
-    parts = [R(0.75, 0.75, w - 1.5, d - 1.5, 3, sw=1.2),
-             L(0.75, 7, w - 0.75, 7, 0.7),            # back band
-             L(arm, 7, arm, d - 0.75, 0.7),           # arms
-             L(w - arm, 7, w - arm, d - 0.75, 0.7)]
+def seat(w, d, cushions, arm=7.0, seat_h=17, arm_h=24, back_h=32):
+    """Upholstered seat: body, BACK and ARMS as closed regions.
+
+    THE BACK AND ARMS USED TO BE LINES -- `L(0.75, 7, w - 0.75, 7)` for the
+    back band, one more per arm -- and a line has no inside. Two consequences,
+    and the second is why this changed:
+
+      * IN 3D there was no region to extrude, so the whole footprint rose to
+        the catalog height (32", the BACK height) and a sofa rendered as a
+        32-inch slab. `dining_chair` and `office_chair` drew their backs as
+        closed rects and came out right, IN THE SAME FORM -- so the three
+        upholstered seats were not a limit of the approach, they were three
+        symbols drawn inconsistently with their own neighbours.
+      * IN PLAN it was simply less true. A sofa back HAS thickness, and a line
+        says it does not.
+
+    That second point is the tell that this is the right fix rather than a
+    workaround: it improves the drawing on its own terms, and the 3D follows.
+
+    Heights are the item's real ones -- seat 17", arms 24", back 32" -- and the
+    catalog's `height_in` stays 32, the overall height.
+    """
+    parts = [R(0.75, 0.75, w - 1.5, d - 1.5, 3, sw=1.2, top=seat_h),
+             R(0.75, 0.75, w - 1.5, 6.25, 3, FILL, 0.7, top=back_h),
+             R(0.75, 7, arm - 0.75, d - 7.75, 2, FILL, 0.7, top=arm_h),
+             R(w - arm, 7, arm - 0.75, d - 7.75, 2, FILL, 0.7, top=arm_h)]
     for i in range(1, cushions):
         x = arm + (w - 2 * arm) * i / cushions
         parts.append(L(x, 7, x, d - 0.75, 0.55))
@@ -237,8 +279,8 @@ FURNISHINGS = [
     ("dining_table_round", "Round Table 4'", "Dining", 48, 48,
      [Ci(24, 24, 23.25, FILL, 1.2), Ci(24, 24, 20.5, "none", 0.5)]),
     ("dining_chair", "Dining Chair", "Dining", 18, 18,
-     [R(1, 0.75, 16, 2.8, 1.4, "#ffffff", 0.8),
-      R(1.4, 3.8, 15.2, 13.4, 2.5)]),
+     [R(1, 0.75, 16, 2.8, 1.4, "#ffffff", 0.8, top=34),   # back
+      R(1.4, 3.8, 15.2, 13.4, 2.5, top=18)]),             # seat
     ("buffet", "Buffet 5'", "Dining", 60, 18,
      [R(0.75, 0.75, 58.5, 16.5, 1, sw=1.2),
       L(2, 5, 58, 5, 0.45),                                 # top drawer band
@@ -267,8 +309,9 @@ FURNISHINGS = [
       R(2.5, 2.5, 19, 19, 1, "none", 0.5), L(2.5, 2.5, 21.5, 21.5, 0.5)]),
     ("kitchen_sink", "Kitchen Sink", "Kitchen", 33, 22,
      [R(0.75, 0.75, 31.5, 20.5, 1, sw=1.2),
-      R(3, 4, 12, 14, 2.5, "#ffffff", 0.8),
-      R(18, 4, 12, 14, 2.5, "#ffffff", 0.8), Ci(16.5, 2.2, 1, "none", 0.6)]),
+      R(3, 4, 12, 14, 2.5, "#ffffff", 0.8, top=2),     # bowls, 8" deep
+      R(18, 4, 12, 14, 2.5, "#ffffff", 0.8, top=2),
+      Ci(16.5, 2.2, 1, "none", 0.6)]),
     # kitchen base cabinets (standard 24" deep)
     ("base_cab_24", "Base Cabinet 24\"", "Kitchen", 24, 24,
      base_unit(24, 24, 2)),
@@ -308,7 +351,8 @@ FURNISHINGS = [
 
     ("bathtub", "Bathtub 5'", "Bathroom", 30, 60,
      [R(0.75, 0.75, 28.5, 58.5, 2.5, sw=1.2),
-      R(3.5, 3.5, 23, 53, 8, "#ffffff", 0.8), Ci(15, 10, 1.5, "none", 0.6)]),
+      R(3.5, 3.5, 23, 53, 8, "#ffffff", 0.8, top=4),   # the well
+      Ci(15, 10, 1.5, "none", 0.6)]),
     ("shower", "Shower 36\"", "Bathroom", 36, 36,
      [R(0.75, 0.75, 34.5, 34.5, 1, sw=1.2), R(3, 3, 30, 30, 1, "none", 0.6),
       L(3, 3, 33, 33, 0.4), L(33, 3, 3, 33, 0.4),
@@ -320,7 +364,8 @@ FURNISHINGS = [
       L(45, 0.75, 45, 41.25, 0.3),
       L(0.75, 14, 59.25, 14, 0.3), L(0.75, 28, 59.25, 28, 0.3),
       # built-in bench seat at the left end
-      R(2.5, 2.5, 11, 37, 1.2, "#ffffff", 0.8), L(13.5, 2.5, 13.5, 39.5, 0.5),
+      R(2.5, 2.5, 11, 37, 1.2, "#ffffff", 0.8, top=18),
+      L(13.5, 2.5, 13.5, 39.5, 0.5),
       # ceiling rainfall head (centre) plus a hand shower and valve trim
       Ci(37, 21, 7.5, "none", 0.7), Ci(37, 21, 2.2, "none", 0.5),
       Ci(24, 6.5, 1.6, "none", 0.6), Ci(30, 6.5, 1.1, "none", 0.6),
@@ -518,15 +563,15 @@ FURNISHINGS = [
       Ci(12, 2, 1.4, "none", 0.7)]),                   # height crank
 
     ("lounge_chair", "Lounge Chair", "Sunroom", 27, 78,
-     [R(0.75, 0.75, 25.5, 76.5, 4, sw=1.2),
-      R(4, 3.5, 19, 9, 2.5, "#ffffff", 0.8),           # headrest
+     [R(0.75, 0.75, 25.5, 76.5, 4, sw=1.2, top=16),    # the seat
+      R(4, 3.5, 19, 9, 2.5, "#ffffff", 0.8, top=30),   # headrest
       L(2, 28, 25, 28, 0.8),                           # backrest hinge
       L(2, 56, 25, 56, 0.6)]),                         # leg hinge
     ("sauna", "Sauna 6'", "Sunroom", 72, 72,
      [R(0.75, 0.75, 70.5, 70.5, 1.5, sw=1.5),
       R(4, 4, 64, 14, 1, "none", 0.7),                 # bench (back)
       R(4, 18, 14, 50, 1, "none", 0.7),                # bench (side)
-      R(52, 52, 14, 14, 1, FILL, 1),                   # heater
+      R(52, 52, 14, 14, 1, FILL, 1, top=30),           # heater
       Ci(59, 59, 3.5, "none", 0.6),                    # rocks
       L(30, 71.25, 46, 71.25, 1.8)]),                  # door
     ("umbrella_table", "Umbrella Table", "Sunroom", 96, 96,
@@ -540,14 +585,14 @@ FURNISHINGS = [
       R(17, 41, 14, 18, 3, FILL, 0.9), R(65, 41, 14, 18, 3, FILL, 0.9)]),
     ("swim_spa", "Swim Spa", "Sunroom", 90, 180,
      [R(0.75, 0.75, 88.5, 178.5, 6, sw=1.5),
-      R(7, 7, 76, 166, 5, "#ffffff", 0.9),             # water line
+      R(7, 7, 76, 166, 5, "#ffffff", 0.9, top=34),     # water line
       Ci(25, 16, 2.2, "none", 0.8), Ci(45, 16, 2.2, "none", 0.8),
       Ci(65, 16, 2.2, "none", 0.8),                    # swim jets
       L(45, 30, 45, 140, 0.6, "5,4"),                  # swim lane
       R(13, 148, 64, 20, 4, "none", 0.7)]),            # bench seat
     ("whirlpool", "Whirlpool", "Sunroom", 84, 84,
      [R(0.75, 0.75, 82.5, 82.5, 9, sw=1.5),
-      Ci(42, 42, 32, "#ffffff", 1),                    # water
+      Ci(42, 42, 32, "#ffffff", 1, top=30),            # water
       Ci(42, 14.5, 2, "none", 0.7), Ci(42, 69.5, 2, "none", 0.7),
       Ci(14.5, 42, 2, "none", 0.7), Ci(69.5, 42, 2, "none", 0.7),
       Ci(22.5, 22.5, 2, "none", 0.7), Ci(61.5, 61.5, 2, "none", 0.7),
@@ -556,7 +601,8 @@ FURNISHINGS = [
     ("desk", "Desk 5'", "Office / Storage", 60, 30,
      [R(0.75, 0.75, 58.5, 28.5, 1, sw=1.2), L(2, 4, 58, 4, 0.5)]),
     ("office_chair", "Office Chair", "Office / Storage", 24, 24,
-     [R(4, 1, 16, 4, 2, "#ffffff", 0.8), Ci(12, 13, 8.5, FILL, 1),
+     [R(4, 1, 16, 4, 2, "#ffffff", 0.8, top=40),          # back
+      Ci(12, 13, 8.5, FILL, 1, top=19),                   # seat
       Ci(12, 13, 3, "none", 0.5)]),
     ("office_set", "Office Desk & Chair", "Office / Storage", 54, 36,
      [R(0.75, 0.75, 52.5, 23.5, 1, sw=1.2),                 # desk top

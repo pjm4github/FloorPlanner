@@ -77,7 +77,7 @@ def look(fp3d, specs, kinds, out):
     for n, kind in enumerate(kinds):
         ox = pad + (n % cols) * (cell + pad)
         oy = pad + (n // cols) * (cell + pad)
-        rings, (vw, vh) = fp3d.svg_outlines(str(FURN / specs[kind]["file"]))
+        parts, (vw, vh) = fp3d.svg_outlines(str(FURN / specs[kind]["file"]))
         if vw <= 0:
             continue
         s = min(cell / vw, cell / vh)
@@ -87,9 +87,9 @@ def look(fp3d, specs, kinds, out):
         p.drawRect(QRectF(fx, fy, vw * s, vh * s))
         p.setPen(QPen(QColor(20, 60, 130), 0))          # what PRISM extrudes
         p.setBrush(QBrush(QColor(70, 110, 200, 190)))
-        for r in rings:
+        for part in parts:
             p.drawPolygon(QPolygonF([QPointF(fx + x * s, fy + y * s)
-                                     for x, y in r]))
+                                     for x, y in part.ring]))
     p.end()
     img.save(str(out))
     print(f"wrote {out}  (order: {', '.join(kinds)})")

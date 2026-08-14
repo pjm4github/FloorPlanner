@@ -329,6 +329,12 @@ because it is written precisely to explain why nobody needs to look further.
 | 2 | A1b's hit census | *"sites where `itemAt(...) is None` stands for blank canvas"* | `RoomItem.contextMenuEvent`, **68 lines**, on the page under a different heading |
 | 3 | P6.b's command roster | **`MainWindow`'s public mutators** | the **drag** (it lives in item event handlers), and then `EditRoomProps` / `EditOpening` / `ChangeSettings` / level ops — **four that P6.1's own older list already had** |
 
+| 4 | the furniture region census | **shapes NESTED inside the outline** | **`dining_chair`'s back panel**, a closed rect drawn *beside* the seat rather than within it — the exact case the census was run to find |
+
+**THE FOURTH IS THE STRONGEST VERSION, and it is the reviewer's ruling that it belongs here.** The question was *"do the furniture symbols contain internal closed paths?"*, and the criterion written to answer it counted **only shapes nested inside the outer outline** — so it was shaped by an assumption about **how a region would be drawn**, and returned exactly what that assumption admitted. `dining_chair` draws its back as a sibling rectangle adjacent to the seat; the census reported it as having none.
+
+**What makes it the strongest instance is that the shaping assumption was invisible to the person who wrote it.** The first three were containers a reader could name — a spelling, a predicate, `MainWindow` — and the trap is visible once pointed at. Here the assumption was *geometric*, embedded in a `_pip` call, and nothing in the code or the question said "nested". **That is the case the rule exists for**, and it was caught only by opening the four SVG files and reading them.
+
 **The third is the instructive one because the trap was already named.** The drag's omission was caught, recorded, and fixed — and then the *same census method* dropped four more, because the method was never the problem's shape: a `MainWindow`-shaped census misses what is not on `MainWindow`, exactly as a menu-shaped one misses what is not on the menu. **Fixing the instance does not fix the source.**
 
 **The tell is the preposition.** *"Every mutator **in** `MainWindow`"* and *"every path that **writes to** the document"* sound like the same census and are not. The first names a place; the second names the property. **When a census is scoped by a location, ask what the location excludes** — and if the answer is "things of the very kind I am counting", the census is the wrong shape however carefully it is run.

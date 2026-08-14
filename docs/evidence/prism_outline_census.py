@@ -109,8 +109,9 @@ def _fp3d():
 
 def measure(fp3d, path):
     """(best_ring_area, viewbox_area) for one SVG, via the viewer's reader."""
-    rings, (vw, vh) = fp3d.svg_outlines(str(path))
-    best = max((fp3d._ring_area(r) for r in rings), default=0.0)
+    parts, (vw, vh) = fp3d.svg_outlines(str(path))
+    best = max((fp3d._ring_area(p.ring) for p in parts
+                if not p.nested), default=0.0)
     return best, (vw * vh)
 
 

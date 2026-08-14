@@ -5,7 +5,7 @@
 <line x1="45" y1="0.75" x2="45" y2="41.25" stroke="#374151" stroke-width="0.3"/>
 <line x1="0.75" y1="14" x2="59.25" y2="14" stroke="#374151" stroke-width="0.3"/>
 <line x1="0.75" y1="28" x2="59.25" y2="28" stroke="#374151" stroke-width="0.3"/>
-<rect x="2.5" y="2.5" width="11" height="37" rx="1.2" fill="#ffffff" stroke="#374151" stroke-width="0.8"/>
+<rect x="2.5" y="2.5" width="11" height="37" rx="1.2" fill="#ffffff" stroke="#374151" stroke-width="0.8" data-h="18"/>
 <line x1="13.5" y1="2.5" x2="13.5" y2="39.5" stroke="#374151" stroke-width="0.5"/>
 <circle cx="37" cy="21" r="7.5" fill="none" stroke="#374151" stroke-width="0.7"/>
 <circle cx="37" cy="21" r="2.2" fill="none" stroke="#374151" stroke-width="0.5"/>
