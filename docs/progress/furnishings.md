@@ -236,4 +236,39 @@ REGION EXTRUSION -- ONE GENERATOR, NOT FOUR  2026-08-14  (AMBER, at a PR)
          and loveseat are redrawn. glass_shower (no fill at all) and
          boat_trailer (fills, but no body) remain, and stay separate from
          the generators.
+
+         MERGED 2026-08-14, PR #29 (6fc9a29). Patrick's check, verbatim:
+             "I looked - a sofa reads as a sofa, merge it - that looks
+             fantastic."
+
+WHERE THE FURNISHINGS WORK STANDS AFTER IT  2026-08-14
+         The ruled order was: (1) prism, (2) the remaining generators by
+         item count, (3) parameterisation after a read-back, (4) AI
+         symbol drafting last and at authoring time only.
+
+         (1) IS DONE and (2) HAS BEEN ANSWERED WITHOUT BEING BUILT, which
+         is what the "build prism, re-measure, then decide" sequence was
+         for. The four furniture generators -- seat, bed, basin,
+         enclosure -- WERE NEVER WRITTEN. Region extrusion covers what
+         they were wanted for, from artwork already on disk, with ONE
+         generator that generalises to every form instead of four that
+         each know one kind. THE FORMAL RULING ON RETIRING THEM IS
+         PATRICK'S AND IS NOT RECORDED AS TAKEN.
+
+         vehicle is the one form with a case left, and it is the LOFT
+         design in VIEWER_NOTES section 5 -- a car-shaped slab against a
+         car. That design predates all of this, still stands, and its
+         urgency is what changed: vehicles now extrude at the right
+         footprint with real outlines.
+
+         STILL OPEN, and both are ARTWORK, deliberately kept apart from
+         code so a code task cannot acquire an artwork dependency:
+             glass_shower   drawn entirely in strokes; no closed shape at
+                            all, so it still falls back to a box
+             boat_trailer   frame, rails and tongue are all <line>; only
+                            fenders, coupler and lights are filled, so it
+                            extrudes five disconnected slabs and no
+                            trailer
+         The other three on that list -- sofa, armchair, loveseat -- were
+         done with the region work.
 ```

@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: bf12498 -->
+<!-- SNAPSHOT-HEAD: 6fc9a29 -->
 
 # Session snapshot — read this first
 
@@ -58,39 +58,41 @@ must not be trusted over it.
 
 ## 0. WHERE THE WORK IS
 
-**REGION EXTRUSION IS BUILT AND AT A PR — AMBER, waiting on Patrick's check,
-which is ONE QUESTION: does a sofa read as a sofa.** Branch
-`region-extrusion`; renders at `evidence/seat-check.png` (3D) and
-`evidence/seat-plan-symbols.png` (plan).
+**THE FURNISHINGS 3D WORK IS DONE, and the four furniture generators were never
+written.** Region extrusion merged at PR #29 (`6fc9a29`) after Patrick's check:
+*"I looked - a sofa reads as a sofa, merge it - that looks fantastic."*
 
-**What it is:** a closed shape in a plan symbol may carry `data-h` — its top
-height above the item's base. Above the body it is a **raised region** (a pillow,
-a bench, a chair back); below it, a **well** (a tub's inside, a sink bowl) and
-the body's top cap is opened for it; not nested, a column of its own. **One
-generator, not four**, and it generalises to every form.
+**ONE THING IS OPEN AND IT IS PATRICK'S:** the ruled order's item (2) was *"the
+remaining generators by item count"*, and **it has been answered without being
+built**. `seat`, `bed`, `basin` and `enclosure` never got a generator — region
+extrusion covers what they were wanted for, from artwork already on disk, with
+**one** generator that generalises to every form instead of four that each know
+one kind. **The formal ruling to retire them is not recorded as taken.**
 
-**THE ANNOTATION CARRIES A HEIGHT AND NOTHING ELSE.** The artwork says *where* a
-region is and never *what* it is. A heuristic would **invent a number the
-document does not contain** — the same objection that refused `--stack`. A test
-walks every SVG and fails on any `data-` attribute that is not `data-h`.
+**How a furnishing gets its 3D form now**, in one place:
 
-**The three seats were an ARTWORK fix, not a limit** — `dining_chair` and
-`office_chair` draw their backs as closed rects *in the same form*, so `sofa`,
-`armchair` and `loveseat` were three symbols drawn inconsistently with their
-neighbours. Redrawn. **The tell that it is the right fix: it improves the plan
-symbol on its own terms** — a sofa back has thickness, and a line says it does
-not.
+| | |
+|---|---|
+| `box`, `slab` | their own generators, as before |
+| everything else | **the plan symbol, extruded** — and where a closed shape carries `data-h`, its own height: **above** the body a raised region (pillow, bench, chair back), **below** it a well with the body's cap opened (tub, sink bowl), **not nested** a column of its own |
+| a symbol with nothing closed to extrude | still a box, and **named** in the model's report |
 
-**THE AUTHORING LIST STANDS AT FIVE, three of them done here.** Remaining:
-**`glass_shower`** (no fill at all, still a box) and **`boat_trailer`** (fills,
-but no body — five disconnected slabs). Artwork tasks, kept separate from the
-generators.
+**`data-h` CARRIES A HEIGHT AND NOTHING ELSE** — position comes from the
+artwork, and a test walks every SVG and fails on any other `data-` attribute. It
+is measured **from the item's base**, the same datum as `height_in`.
 
-**The earlier prism receipt and its correction are in [`handoff/0013`](handoff/0013-report-prism-receipt.md)
-· [`0014`](handoff/0014-report-furniture-regions.md).** The 28 → 1 figure is
-superseded by the honest one: **the outer outline was a plain rectangle for 17 of
-18 furniture symbols**, so prism gave the furniture a box by a different route —
-which is what regions now fix.
+**STILL OPEN — both ARTWORK, kept apart from code so a code task cannot acquire
+an artwork dependency:** **`glass_shower`** (drawn entirely in strokes; no closed
+shape at all, still a box) and **`boat_trailer`** (only fenders, coupler and
+lights are filled, so it extrudes five disconnected slabs and no trailer).
+
+**`vehicle` is the one form with a case left**, and it is the **loft** design in
+[`../floorplanner/viewer/VIEWER_NOTES.md`](../floorplanner/viewer/VIEWER_NOTES.md)
+§5 — a car-shaped slab against a car. That design predates all of this and still
+stands; only its urgency changed.
+
+**Furnishings items (3) and (4) are untouched:** parameterisation (a READ-BACK
+first) and AI symbol drafting (last, **authoring time only, never plan time**).
 
 **SETTABLE WALL TYPES AND PORCH RAILINGS ARE COMPLETE — 2026‑08‑13, PR #27
 (`3864f38`).** D73 and **D74 both closed**; Patrick's manual check passed and is
@@ -185,8 +187,8 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`bf12498`** — the furniture-region measurement, on `33043ed` (PR #28, prism), on `72e49cb` (the revert), on PR #27. PRs #19–#28 all merged. |
-| **Branches** | **`region-extrusion` — at a PR, AMBER, waiting on Patrick's check.** |
+| **`main`** | **`6fc9a29`** — PR #29 (region extrusion), on PR #28 (prism), on PR #27. PRs #19–#29 all merged. |
+| **Branches** | **none open.** |
 | **Gate** | `collected=711 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **704 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **75 records**, 29 open. **D73 and D74 both closed** with the wall-types feature. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
@@ -242,13 +244,17 @@ DONE**, merged at PRs #17 and #18.
 > * **PARKED, register entries only:** [D63](defects/0063-a-coalesced-outline-partly-rebounds-on-save.md)'s producer 2, [D64](defects/0064-the-save-writes-an-outline-corner-at-a.md), [D65](defects/0065-weld-scene-is-implicated-in-three-separate.md). **Not to be reopened without a new instruction.**
 > * **D63 producer 1 stays CLOSED** — rebound 0 on five plans, robust across four pairing tolerances.
 
-1. **Furnishings — `prism` IS BUILT; the re-measurement is in and the next step
-   is Patrick's DECISION.** ([`handoff/0012`](handoff/0012-readback-prism-outlines.md)
-   · [`0012-ruling.md`](handoff/0012-ruling.md) ·
-   [`0013`](handoff/0013-report-prism-receipt.md);
-   log at [`progress/furnishings.md`](progress/furnishings.md).) See §0. The four
-   furniture generators remain **unscheduled** — now with the evidence that says
-   most may never be written.
+1. **Furnishings — 3D FORMS DONE.** Prism and region extrusion both merged
+   (PRs #28, #29). Trail:
+   [`handoff/0012`](handoff/0012-readback-prism-outlines.md) ·
+   [`0012-ruling`](handoff/0012-ruling.md) ·
+   [`0013`](handoff/0013-report-prism-receipt.md) ·
+   [`0013-ruling`](handoff/0013-ruling.md) ·
+   [`0014`](handoff/0014-report-furniture-regions.md) ·
+   [`0014-ruling`](handoff/0014-ruling.md); log at
+   [`progress/furnishings.md`](progress/furnishings.md). **What is left is in §0
+   and is not code:** one ruling for Patrick (retire the four generators, which
+   were never written), two artwork items, and items (3) and (4) untouched.
 2. **The command-roster census, derived from the property.** See §0.
 3. **A2 — D11's runtime z collapse. ⏸ PARKED, twice over.** The hang is **not
    reproducible** (2026‑08‑09): five orders of magnitude on either z step leaves
