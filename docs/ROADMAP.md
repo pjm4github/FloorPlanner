@@ -141,13 +141,12 @@ Order: G1, G3, G2, G4. G1 and G3 are independent; G2 informs G4.
 | A3 | **D11** — the serialization half | unblocked by R‑B | bring-to-front survives save/reload and an unrelated undo |
 | A4 | **D49** — deep checks at document boundaries | **AMENDED 2026‑08‑07 — see the record.** CHECK YES, FIX NO (no auto-repair; welding on load already fixes the one repairable cause). **SAVE ASKS, IT DOES NOT REFUSE** — a deform-to-follow drag can transiently overlap, and a refusal traps the user with unsaveable work. The report must be ACTIONABLE: rooms **and overlap area**, plus select-and-zoom | a corrupt plan now **reports and asks** on save, naming the rooms and the area and offering a way to reach them; the user may still save. A clean plan saves unchanged and says nothing. **Acceptance case is `planc1`, not the driving case** — on `farmplace` the true intersection is **0.0 sf** and I11 is misreporting, so that file is the SILENCE case once D52's half 1 lands. Real behaviour change; will be felt |
 | A5 | **D41** — the new simple-ring invariant | ruled at R‑A; read-back required | the corpus still validates, `symmetricP1` re-cut with its justification |
-| A6 | **Grid snap** | three sub-rulings still open — see §4 | the acceptance already written: shared vertex carries both walls; two coincident ends meet on the grid and weld; a 6″ reveal untouched; identical landing at every zoom |
+| A6 | **Grid snap — THE INVERSION. Ruled and fully specified 2026‑08‑14; it is now #2 on the queue, behind one small batch.** A **read-back comes first** and is owed: the clause-by-clause reconciliation (**EXISTS / PARTIAL / ABSENT** per clause), the thresholds with their reasons, the modifier audit for shift, the angle convention already in the geometry code, and **Ctrl's disposition once snapping is the default** | **the sub-rulings are ANSWERED.** Snap-by-default; **shift means unconstrained** across both gestures; the angled-wall rule **quantises length along the ray**; intersection joins with their two refusals; the live readout shows **snapped values, not cursor position** | the acceptance already written: shared vertex carries both walls; two coincident ends meet on the grid and weld; a 6″ reveal untouched; identical landing at every zoom |
 
 ### RED — do not start
 
 | item | what it needs |
 |---|---|
-| **Grid snap's sub-rulings** | snap reference point per item class; spacing values; whether grid spacing is a document property (R‑B now permits it, but the *decision* is Patrick's) |
 | **Phase 5 — Yard catalog** | artwork scope: which kinds, drawn by whom. D46 closes with it |
 | ~~**Phase 5 — settable wall types**~~ | **DONE — merged 2026‑08‑11 (PR #26).** The 2D symbol was indeed the design choice, and the first answer was wrong: see the PR #26 follow-up, which refutes thickness as the identity channel |
 | **Phase 6 — command undo** | **PARKED 2026‑08‑12 — see the park record below.** It does **not** retire `snapshot()`, and neither D42's applier consolidation nor D45's `_edge_wall` folds in here; both claims were refuted by measurement. P6.a/P6.b stay merged and dormant. Two named conditions reopen it |
@@ -160,8 +159,9 @@ Order: G1, G3, G2, G4. G1 and G3 are independent; G2 informs G4.
 
 ## 4. Still needing Patrick
 
-1. **Grid snap's three sub-rulings** (§3 RED) — these are the cheapest unlock left: answering
-   them moves a whole feature from RED to AMBER.
+1. ~~**Grid snap's three sub-rulings**~~ — **ANSWERED 2026‑08‑14.** The feature is specified
+   and has moved to AMBER, second on the queue. Its **read-back is still owed before any
+   code**; see the A6 row in §3.
 2. **Every AMBER manual check** — six of them, each ten to fifteen minutes.
 3. **Phase 5's artwork scope** — how many Yard kinds, and who draws the SVGs.
 4. **The GitHub Issues migration**, when he wants it. Precondition already recorded: none of

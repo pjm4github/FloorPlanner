@@ -370,6 +370,21 @@ The positive control catches an instrument that reports **nothing**. This catche
 
 **So a measurement that turns on a threshold owes two things beside its number:** the boundary items named, and the threshold stated as the **judgement it is** — with every item's raw value printed, so a different cut can be applied to the same data without re-running anything. **The corrected read-back reports three tiers and every coverage figure**, which is what that costs.
 
+**BUILD THE CHEAP GENERAL MECHANISM, RE-MEASURE, THEN DECIDE WHETHER THE SPECIFIC ONES ARE STILL WANTED — added 2026‑08‑14, Patrick's ruling. The receipt is FOUR FUNCTIONS UNWRITTEN.**
+
+**The plan was to build five form generators in descending item count**, with the stopping rule *"stop when the remainder is not worth a function"*. That asks for a judgement **in advance**, on counts, about work whose results nobody has seen. What replaced it was three steps: build **`prism`** (extrude the plan symbol — no new authoring, the data already existed for every item) → **re-measure** which items still fell back and what the survivors looked like → **decide**. Region extrusion then covered the rest, and `seat`, `bed`, `basin` and `enclosure` were **retired without ever being written**.
+
+**Why the order is the whole content:** building the specific ones first **guarantees** work the general mechanism would have made redundant, and *how much* is unknowable until the general one exists. The sequence costs one extra measurement and can save an arbitrary amount of building.
+
+**Two conditions, so it is not applied where it does not fit:**
+
+* **The general mechanism must be genuinely cheap.** Prism consumed data already on disk. A general mechanism costing more than the specific ones is not this pattern.
+* **The re-measurement must be real, with its receipt FIXED IN ADVANCE.** *"Build it and see"* is not this. The measure was ruled before the work started — *"prism's receipt is a re-measurement, not a claim"* — which is why the number could not be replaced by an impression afterwards.
+
+**And the correction it needed is part of the pattern, not a blemish on it:** the first re-measurement reported **28 → 1** and overstated the win, because it counted items that *extrude* and could not tell *extrudes something* from *extrudes a rectangle*. The honest number was **17 of 18 outlines still a plain rectangle**. **The re-measurement step is only as good as what it measures** — and it took looking at a real plan to find the sofa was still a slab.
+
+**A COROLLARY ABOUT THE REGISTER: *"NOT NEEDED"* IS A MEASUREMENT AND *"RETIRED"* IS A DECISION.** A measurement can make a decision obvious without making it. The register holds both kinds of entry and they read alike on the page, so the line is kept by whoever writes the entry — **an inferred ruling is indistinguishable from a taken one a month later.**
+
 **IDENTITY NEEDS A CATEGORICAL CHANNEL, NOT A SCALAR ONE — added 2026‑08‑12, Patrick's ruling, and it already has TWO INSTANCES one level apart.**
 
 **A drawing tells the user what a thing *is* through some channel.** The rule is about which channels can carry that load: **a scalar channel cannot distinguish two similar things, because a scalar has no gaps in it.** Two values on one axis are two points on a continuum, and a continuum is exactly what a viewer's eye normalises away. A **categorical** channel — present or absent, filled or stroked, this mark or that mark — survives the same glance, because there is nothing between its values to dissolve into.

@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 6fc9a29 -->
+<!-- SNAPSHOT-HEAD: d10d02c -->
 
 # Session snapshot — read this first
 
@@ -58,16 +58,16 @@ must not be trusted over it.
 
 ## 0. WHERE THE WORK IS
 
-**THE FURNISHINGS 3D WORK IS DONE, and the four furniture generators were never
-written.** Region extrusion merged at PR #29 (`6fc9a29`) after Patrick's check:
-*"I looked - a sofa reads as a sofa, merge it - that looks fantastic."*
+**THE FURNISHINGS 3D WORK IS CLOSED.** Prism (PR #28) and region extrusion
+(PR #29) merged, each on Patrick's check. **The four furniture generators —
+`seat`, `bed`, `basin`, `enclosure` — are RETIRED, formally, and were never
+written** ([`handoff/0015-ruling.md`](handoff/0015-ruling.md)).
 
-**ONE THING IS OPEN AND IT IS PATRICK'S:** the ruled order's item (2) was *"the
-remaining generators by item count"*, and **it has been answered without being
-built**. `seat`, `bed`, `basin` and `enclosure` never got a generator — region
-extrusion covers what they were wanted for, from artwork already on disk, with
-**one** generator that generalises to every form instead of four that each know
-one kind. **The formal ruling to retire them is not recorded as taken.**
+> **THE REUSABLE PART IS THE SEQUENCE, NOT THE OUTCOME:** build the cheap
+> general mechanism, **re-measure**, then decide whether the specific ones are
+> still wanted. **Four functions unwritten is the receipt.** Full form, with its
+> two conditions and the correction it needed, in
+> [`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md).
 
 **How a furnishing gets its 3D form now**, in one place:
 
@@ -81,18 +81,42 @@ one kind. **The formal ruling to retire them is not recorded as taken.**
 artwork, and a test walks every SVG and fails on any other `data-` attribute. It
 is measured **from the item's base**, the same datum as `height_in`.
 
-**STILL OPEN — both ARTWORK, kept apart from code so a code task cannot acquire
-an artwork dependency:** **`glass_shower`** (drawn entirely in strokes; no closed
-shape at all, still a box) and **`boat_trailer`** (only fenders, coupler and
-lights are filled, so it extrudes five disconnected slabs and no trailer).
+---
 
-**`vehicle` is the one form with a case left**, and it is the **loft** design in
-[`../floorplanner/viewer/VIEWER_NOTES.md`](../floorplanner/viewer/VIEWER_NOTES.md)
-§5 — a car-shaped slab against a car. That design predates all of this and still
-stands; only its urgency changed.
+## THE QUEUE: ONE SMALL BATCH, THEN GRID SNAP — ruled 2026‑08‑14
 
-**Furnishings items (3) and (4) are untouched:** parameterisation (a READ-BACK
-first) and AI symbol drafting (last, **authoring time only, never plan time**).
+**The batch is deliberately small, because the artwork wave it was meant to
+protect has mostly already passed.** In order:
+
+1. **[D72](defects/0072-gen-assets-writes-the-asset-tree-at-import.md) — the
+   import-time asset write.** Small, and **it blocks any future authoring
+   tool**: there is currently no way to ask that module a question without
+   making it do all of its work. **Main guard, byte-comparison receipt.**
+2. **[D71](defects/0071-renderability-is-checkable-in-a-test-where-qt.md) — the
+   `QSvgRenderer` check in a test.** The generator **stays Qt-free**; the suite
+   asserts renderability where Qt is already paid for. **It catches exactly what
+   the generator structurally cannot — a symbol that parses and draws nothing.**
+3. **The two artwork items, with D71 now standing behind them.**
+   **`glass_shower`**, drawn entirely in strokes, and **`boat_trailer`**, whose
+   five filled fragments extrude as five slabs and no trailer. **Both are
+   redraws, not code.**
+
+**THEN GRID SNAP — the inversion.** The largest daily-use improvement left on
+the board, and **fully specified**: snap-by-default; **shift means
+unconstrained** across both gestures; the angled-wall rule **quantising length
+along the ray**; intersection joins with their two refusals; and the live
+length-and-angle readout showing **snapped values rather than cursor position**.
+
+> **ITS READ-BACK IS STILL OWED AND UNCHANGED**, and it comes before any code:
+> the **clause-by-clause reconciliation** marking each **EXISTS / PARTIAL /
+> ABSENT**; the **thresholds with their reasons**; the **modifier audit** for
+> shift; the **angle convention already in the geometry code**; and **Ctrl's
+> disposition** once snapping is the default.
+
+**Not in this queue, and where they were left:** the **vehicle loft**
+(`VIEWER_NOTES` §5 — the design stands, only its urgency changed), then
+**parameterisation** and **AI symbol drafting**, third and fourth, **both behind
+a read-back**.
 
 **SETTABLE WALL TYPES AND PORCH RAILINGS ARE COMPLETE — 2026‑08‑13, PR #27
 (`3864f38`).** D73 and **D74 both closed**; Patrick's manual check passed and is
@@ -187,7 +211,7 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`6fc9a29`** — PR #29 (region extrusion), on PR #28 (prism), on PR #27. PRs #19–#29 all merged. |
+| **`main`** | **`d10d02c`** — the furnishings close-out, on PR #29 (region extrusion), PR #28 (prism), PR #27. PRs #19–#29 all merged. |
 | **Branches** | **none open.** |
 | **Gate** | `collected=711 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **704 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **75 records**, 29 open. **D73 and D74 both closed** with the wall-types feature. `python tools/gate.py --docs` GREEN. |
@@ -244,41 +268,48 @@ DONE**, merged at PRs #17 and #18.
 > * **PARKED, register entries only:** [D63](defects/0063-a-coalesced-outline-partly-rebounds-on-save.md)'s producer 2, [D64](defects/0064-the-save-writes-an-outline-corner-at-a.md), [D65](defects/0065-weld-scene-is-implicated-in-three-separate.md). **Not to be reopened without a new instruction.**
 > * **D63 producer 1 stays CLOSED** — rebound 0 on five plans, robust across four pairing tolerances.
 
-1. **Furnishings — 3D FORMS DONE.** Prism and region extrusion both merged
-   (PRs #28, #29). Trail:
+1. **THE SMALL BATCH — D72, then D71, then the two artwork redraws.** See §0
+   for the order and why the batch is small.
+2. **GRID SNAP — the inversion. THE READ-BACK COMES FIRST.** Fully specified;
+   §0 carries the five things the read-back owes. Was A6; it moves up because
+   the furnishings work is done and this is the largest daily-use improvement
+   left.
+3. **Furnishings — 3D FORMS DONE, generators RETIRED.** Prism and region
+   extrusion merged (PRs #28, #29). Trail:
    [`handoff/0012`](handoff/0012-readback-prism-outlines.md) ·
    [`0012-ruling`](handoff/0012-ruling.md) ·
    [`0013`](handoff/0013-report-prism-receipt.md) ·
    [`0013-ruling`](handoff/0013-ruling.md) ·
    [`0014`](handoff/0014-report-furniture-regions.md) ·
-   [`0014-ruling`](handoff/0014-ruling.md); log at
-   [`progress/furnishings.md`](progress/furnishings.md). **What is left is in §0
-   and is not code:** one ruling for Patrick (retire the four generators, which
-   were never written), two artwork items, and items (3) and (4) untouched.
-2. **The command-roster census, derived from the property.** See §0.
-3. **A2 — D11's runtime z collapse. ⏸ PARKED, twice over.** The hang is **not
+   [`0014-ruling`](handoff/0014-ruling.md) ·
+   [`0015-ruling`](handoff/0015-ruling.md); log at
+   [`progress/furnishings.md`](progress/furnishings.md). **What remains is the
+   vehicle loft, then parameterisation and AI drafting — both behind a
+   read-back.**
+4. **The command-roster census, derived from the property.** See §0.
+5. **A2 — D11's runtime z collapse. ⏸ PARKED, twice over.** The hang is **not
    reproducible** (2026‑08‑09): five orders of magnitude on either z step leaves
    the event breakdown identical at 545, `docs/evidence/d11-a2-z-step-measurement.txt`.
    And it was **DROPPED BEHIND D68** (2026‑08‑11) — the viewer now renders the
    active floor, which makes the z collapse stop mattering for the common case.
    The instrument is kept at `evidence/d11_a2_z_step_counter.py`; **do not
    re-derive it.**
-4. **A3 — D11's SERIALIZATION half.** Unblocked by **ruling R‑B**: an *additive
+6. **A3 — D11's SERIALIZATION half.** Unblocked by **ruling R‑B**: an *additive
    optional* field or enum value does not bump the document version, so a
    stacking index can be added at `schema_revision` without a v6. AMBER.
-5. **D59 — the CHEAP TWELVE at document boundaries.** A real plan was saved
+7. **D59 — the CHEAP TWELVE at document boundaries.** A real plan was saved
    carrying an `I7`, nothing reported it, and the user met it later as a silent
    crash (D57). P1.2's O(n²)-per-edit cost objection does not touch this half.
    **AMBER, and it moves up on evidence rather than preference.**
-6. **A4 — D49, the deep checks at document boundaries. AMENDED 2026‑08‑07 — read
+8. **A4 — D49, the deep checks at document boundaries. AMENDED 2026‑08‑07 — read
    the amendment, not the proposal it supersedes.** The ruling: **CHECK YES, FIX
    NO**; **SAVE ASKS, IT DOES NOT REFUSE**; the report must be **ACTIONABLE**
    (rooms *and overlap area*, plus select-and-zoom). Acceptance case is `planc1`;
    `farmplace` is the silence case once D52's half 1 lands.
-7. **A5 — D41, the new simple-ring invariant.** Ruled at **R‑A**. **A read-back
+9. **A5 — D41, the new simple-ring invariant.** Ruled at **R‑A**. **A read-back
    is required before starting.**
-8. **A6 — Grid snap.** Three sub-rulings still RED.
-9. **Phase 5 — the rest:** P5.1 site levels/categories/area accounting, P5.3
+10. ~~**A6 — Grid snap.**~~ **MOVED TO #2 and no longer RED** — the sub-rulings are answered and the feature is fully specified (2026‑08‑14). Kept as a row so `A6` still resolves where it is referenced.
+11. **Phase 5 — the rest:** P5.1 site levels/categories/area accounting, P5.3
     site schedule fields + reports. **P5.2 is what shipped.** The Yard catalog is
     RED on artwork scope; **D46** closes with it.
 

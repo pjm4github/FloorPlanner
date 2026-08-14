@@ -271,4 +271,47 @@ WHERE THE FURNISHINGS WORK STANDS AFTER IT  2026-08-14
                             trailer
          The other three on that list -- sofa, armchair, loveseat -- were
          done with the region work.
+
+THE FOUR GENERATORS ARE RETIRED -- Patrick's ruling  2026-08-14
+         handoff: 0015 (ruling only, no report)
+         seat, bed, basin and enclosure are NOT DEFERRED, NOT PENDING,
+         RETIRED. They were never written; what closes is the
+         EXPECTATION that they would be, live since 0010's item TWO.
+         vehicle is NOT retired with them -- the loft design in
+         VIEWER_NOTES section 5 stands, and only its urgency changed.
+
+         "NOT NEEDED" IS A MEASUREMENT AND "RETIRED" IS A DECISION, and
+         the register should not blur them. The ruling was left to be
+         taken rather than inferred from the fact that the generators
+         had turned out unnecessary -- an inferred ruling is
+         indistinguishable from a taken one a month later.
+
+         THE REUSABLE PART IS THE SEQUENCE, NOT THE OUTCOME:
+
+             BUILD THE CHEAP GENERAL MECHANISM, RE-MEASURE, THEN DECIDE
+             WHETHER THE SPECIFIC ONES ARE STILL WANTED.
+
+         It replaced "build five generators in descending item count,
+         stopping when the remainder is not worth a function" -- which
+         asks for a judgement IN ADVANCE, on counts, about work nobody
+         has seen the results of. Building the specific ones first
+         GUARANTEES work the general mechanism would have made
+         redundant, and how much is unknowable until the general one
+         exists.
+
+         FOUR FUNCTIONS UNWRITTEN IS THE RECEIPT. Not deleted, not
+         deprecated: never written, with the plan that called for them
+         closing without them.
+
+         Two conditions, so it is not applied where it does not fit: the
+         general mechanism must be GENUINELY CHEAP (prism needed no new
+         authoring at all), and the re-measurement must be real with its
+         receipt FIXED IN ADVANCE -- "build it and see" is not this.
+
+         And one correction that is part of the pattern rather than a
+         blemish on it: the first re-measurement said 28 -> 1 and
+         overstated the win. The honest number was 17 of 18 outlines
+         still a plain rectangle. THE RE-MEASUREMENT STEP IS ONLY AS
+         GOOD AS WHAT IT MEASURES, and it took Patrick looking at a real
+         plan to find the sofa was still a slab.
 ```
