@@ -1,0 +1,373 @@
+{
+ "format": "floorplanner-design",
+ "version": 5,
+ "schema_revision": 1,
+ "levels": [
+  {
+   "id": "L0",
+   "name": "default",
+   "elevation_in": 0.0,
+   "height_in": 96.0
+  }
+ ],
+ "vertices": [
+  {
+   "id": "v0",
+   "x": 0.0,
+   "y": 0.0
+  },
+  {
+   "id": "v1",
+   "x": 900.0,
+   "y": 0.0
+  },
+  {
+   "id": "v2",
+   "x": 900.0,
+   "y": 1110.0
+  },
+  {
+   "id": "v3",
+   "x": 0.0,
+   "y": 1110.0
+  }
+ ],
+ "walls": [
+  {
+   "id": "w0",
+   "level": "L0",
+   "type": "exterior",
+   "v1": "v0",
+   "v2": "v1",
+   "openings": []
+  },
+  {
+   "id": "w1",
+   "level": "L0",
+   "type": "exterior",
+   "v1": "v1",
+   "v2": "v2",
+   "openings": []
+  },
+  {
+   "id": "w2",
+   "level": "L0",
+   "type": "exterior",
+   "v1": "v2",
+   "v2": "v3",
+   "openings": []
+  },
+  {
+   "id": "w3",
+   "level": "L0",
+   "type": "exterior",
+   "v1": "v3",
+   "v2": "v0",
+   "openings": []
+  }
+ ],
+ "rooms": [
+  {
+   "id": "r0",
+   "level": "L0",
+   "name": "Prism check",
+   "category": "other",
+   "outline": [
+    {
+     "v": "v0"
+    },
+    {
+     "v": "v1"
+    },
+    {
+     "v": "v2"
+    },
+    {
+     "v": "v3"
+    }
+   ]
+  }
+ ],
+ "furnishings": [
+  {
+   "id": "f_kitchen_sink",
+   "level": "L0",
+   "kind": "kitchen_sink",
+   "pos": [
+    60.0,
+    60.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_bed_full",
+   "level": "L0",
+   "kind": "bed_full",
+   "pos": [
+    60.0,
+    210.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_bed_king",
+   "level": "L0",
+   "kind": "bed_king",
+   "pos": [
+    190.0,
+    210.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_bed_queen",
+   "level": "L0",
+   "kind": "bed_queen",
+   "pos": [
+    320.0,
+    210.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_bed_twin",
+   "level": "L0",
+   "kind": "bed_twin",
+   "pos": [
+    450.0,
+    210.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_bathtub",
+   "level": "L0",
+   "kind": "bathtub",
+   "pos": [
+    60.0,
+    360.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_glass_shower",
+   "level": "L0",
+   "kind": "glass_shower",
+   "pos": [
+    190.0,
+    360.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_sauna",
+   "level": "L0",
+   "kind": "sauna",
+   "pos": [
+    320.0,
+    360.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_shower",
+   "level": "L0",
+   "kind": "shower",
+   "pos": [
+    450.0,
+    360.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_swim_spa",
+   "level": "L0",
+   "kind": "swim_spa",
+   "pos": [
+    580.0,
+    360.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_walk_in_shower",
+   "level": "L0",
+   "kind": "walk_in_shower",
+   "pos": [
+    710.0,
+    360.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_whirlpool",
+   "level": "L0",
+   "kind": "whirlpool",
+   "pos": [
+    60.0,
+    510.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_armchair",
+   "level": "L0",
+   "kind": "armchair",
+   "pos": [
+    60.0,
+    660.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_dining_chair",
+   "level": "L0",
+   "kind": "dining_chair",
+   "pos": [
+    190.0,
+    660.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_lounge_chair",
+   "level": "L0",
+   "kind": "lounge_chair",
+   "pos": [
+    320.0,
+    660.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_loveseat",
+   "level": "L0",
+   "kind": "loveseat",
+   "pos": [
+    450.0,
+    660.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_office_chair",
+   "level": "L0",
+   "kind": "office_chair",
+   "pos": [
+    580.0,
+    660.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_sofa",
+   "level": "L0",
+   "kind": "sofa",
+   "pos": [
+    710.0,
+    660.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_bicycle",
+   "level": "L0",
+   "kind": "bicycle",
+   "pos": [
+    60.0,
+    810.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_boat",
+   "level": "L0",
+   "kind": "boat",
+   "pos": [
+    190.0,
+    810.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_boat_trailer",
+   "level": "L0",
+   "kind": "boat_trailer",
+   "pos": [
+    320.0,
+    810.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_car",
+   "level": "L0",
+   "kind": "car",
+   "pos": [
+    450.0,
+    810.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_garden_tractor",
+   "level": "L0",
+   "kind": "garden_tractor",
+   "pos": [
+    580.0,
+    810.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_lawnmower",
+   "level": "L0",
+   "kind": "lawnmower",
+   "pos": [
+    710.0,
+    810.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_motorcycle",
+   "level": "L0",
+   "kind": "motorcycle",
+   "pos": [
+    60.0,
+    960.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_riding_mower_snow",
+   "level": "L0",
+   "kind": "riding_mower_snow",
+   "pos": [
+    190.0,
+    960.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_snowblower",
+   "level": "L0",
+   "kind": "snowblower",
+   "pos": [
+    320.0,
+    960.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f_suv",
+   "level": "L0",
+   "kind": "suv",
+   "pos": [
+    450.0,
+    960.0
+   ],
+   "rotation": 0.0
+  }
+ ]
+}
