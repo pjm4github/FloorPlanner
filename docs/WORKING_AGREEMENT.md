@@ -279,6 +279,52 @@ that cannot be found on disk is not quoted back as though it were — at P3.3 th
 "72 splits" figure appeared nowhere in the repo, and saying so is what surfaced the
 gap rather than papering over it.
 
+### THE HANDOFF DIRECTORY IS THE CHANNEL — Patrick's standing change, 2026‑08‑14
+
+**This supersedes the paste-back loop this file opened with** (the "*paste the
+result back here*" instruction at the top), not by rewording it but because the
+premise under it changed: Patrick's Cowork session reads this repository
+directly now. He no longer relays reports by hand, so a report written *for a
+terminal* is written for a reader who no longer exists.
+
+**The rule, in full:**
+
+* **Every report, census, read-back and receipt goes to
+  `docs/handoff/NNNN-<kind>.md` and is committed.** The terminal gets **one
+  short paragraph**: what was done, what is needed, and the file number.
+  Nothing else — the long form lives on disk or it does not exist, exactly as
+  [`handoff/README.md`](handoff/README.md) already required; what changes is
+  that the terminal summary shrinks to a pointer, because the reader now goes
+  to the file directly rather than reading a relay of it.
+* **Code does not author `-ruling.md` files.** The reviewer writes
+  `docs/handoff/NNNN-ruling.md` directly, on disk. Code **reads** it, acts on
+  it, and cites it — it does not transcribe a ruling into a file of its own,
+  which is what "record this ruling" meant before this change and must not
+  mean after it.
+* **Never edit a file the other side wrote; never expect the other side to edit
+  one of yours.** Each side only **creates new numbered files**. A correction
+  is the next number, not an edit to an earlier one — the same append-only
+  discipline the Progress log already keeps, extended to the mailbox.
+
+**THE COLLISION RULE IS THE REASON FOR THE NAMING SPLIT, not a convention
+alongside it.** Two writers touching the same file — even at different times —
+is exactly the shape that has cost this project real sessions: the append-only
+`side-tasks.md` conflict this file already records above, and the *"a reviewer's
+instruction resting on a premise the implementer has already measured"* case a
+few rules below, where a correction very nearly got written into the wrong
+party's words. Splitting by **suffix** (`-report.md` is Code's file forever,
+`-ruling.md` is the reviewer's forever) makes the collision structurally
+impossible rather than merely discouraged: there is no file either side is ever
+tempted to open in place.
+
+**Auto-commit is permitted for GREEN-tier work**, per the autonomy policy this
+file already states (§ROADMAP's tier table): Code commits, pushes and merges
+GREEN work without asking. **The pre-commit hook — a fresh green gate on disk,
+newer than every tracked file — is the only bar**, and it is unchanged by this
+rule. **AMBER still stops for Patrick's manual check before merge; nothing
+merges on a red gate or a failed check**, and this rule does not touch that
+line either. What it changes is *reporting*, not *authority*.
+
 ### The pre-work census is a phase of the task, not a virtue — settled 2026‑07‑31 at the P4.1 read-back
 
 Task-line deletion figures have now failed checking three times: P3.4's estimate

@@ -26,6 +26,44 @@ complete until its handoff spec is committed"*, given a place to live.
 4. **A closed pair moves to [`archive/`](archive/) when its task ticks.** The
    mailbox shows what is live; the archive keeps what was decided.
 
+## THE CHANNEL CONTRACT — Patrick's standing change, 2026‑08‑14
+
+**This directory is the channel, not a record kept alongside one.** Patrick's
+Cowork session reads this repository directly; he no longer relays reports by
+hand. So a report written *for a terminal to carry to him* is written for a
+reader who no longer exists, and the protocol above is now stricter than its
+first sentence suggested — this is what it means in full:
+
+* **The terminal gets one short paragraph**: what was done, what is needed, and
+  the file number. **Nothing else.** The report, census, read-back or receipt
+  itself goes to `docs/handoff/NNNN-<kind>.md`, committed, in full.
+* **Code does not write `-ruling.md` files, ever.** The reviewer writes
+  `docs/handoff/NNNN-ruling.md` directly, on disk. Code's job is to **read it,
+  act on it, and cite it** — not to transcribe it into a file of its own.
+  "Record this ruling" means *cite the file the reviewer wrote*, not *author a
+  copy of it*.
+* **Never edit a file the other side wrote. Never expect the other side to edit
+  one of yours.** Each side only *creates new numbered files*. A correction is
+  the **next number**, in the open — not a silent edit to an earlier one.
+
+**THE SUFFIX SPLIT (`-report.md` vs. `-ruling.md`) IS NOT A NAMING CONVENTION —
+IT IS THE MECHANISM THAT MAKES THE COLLISION IMPOSSIBLE.** Two writers touching
+the same file, even at different times, is exactly the shape that has already
+cost sessions here: the append-only `side-tasks.md` conflict this project
+measured and fixed by moving to per-file logs, and the case where a reviewer's
+correction very nearly got written into the wrong party's words on the strength
+of a premise the implementer had already disproved. **If each side owns its
+suffix absolutely, there is no file either side is ever tempted to open in
+place of the other's** — the split removes the failure mode rather than asking
+either party to remember not to trigger it.
+
+**Auto-commit is permitted for GREEN-tier work** — Code commits, pushes and
+merges without asking, per the autonomy policy. **The pre-commit hook (a fresh
+green gate, newer than every tracked file) is the only bar**, unchanged by this
+rule. **AMBER still stops for Patrick's manual check before merge**; nothing
+merges on a red gate or a failed check. This rule changes *reporting*, not
+*authority*.
+
 ## How the rest of the record refers to a pair
 
 **A progress entry CITES its handoff — one line, `handoff: 0042` — and does not
