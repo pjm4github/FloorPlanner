@@ -39,9 +39,7 @@ import argparse
 import json
 import math
 import os
-import re
 import sys
-import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -172,263 +170,6 @@ def load_catalog(assets_dir=None):
     return specs, materials, problems
 
 
-# --------------------------------------------------------------------------
-# the plan symbol's outline -- what `prism` extrudes
-# --------------------------------------------------------------------------
-# THE DATA ALREADY EXISTS FOR EVERY ITEM. Each furnishing has a generated SVG
-# whose viewBox is in inches and equals its real footprint, so the plan symbol
-# IS a measured outline of the thing. `prism` extrudes it instead of guessing a
-# rectangle, and needs no new authoring.
-#
-# ONLY FILLED CLOSED SHAPES COUNT. A stroke has no area and nothing to extrude,
-# and a symbol drawn entirely in lines yields nothing -- which is a real answer
-# ("this symbol cannot say what shape the object is"), not a failure to parse.
-# Measured before this was written: of the 28 items that fall back, 19 carry a
-# filled body, 6 carry a body plus line-art structure, and 3 carry no body at
-# all (handoff 0012).
-
-SVG_NS = "{http://www.w3.org/2000/svg}"
-_NUM_RE = re.compile(r"-?\d*\.?\d+(?:[eE]-?\d+)?")
-_CMD_RE = re.compile(r"([MmLlHhVvCcSsQqTtAaZz])([^MmLlHhVvCcSsQqTtAaZz]*)")
-_CURVE_STEP = {"C": 6, "S": 4, "Q": 4, "A": 7}
-
-
-def _nums(s):
-    return [float(v) for v in _NUM_RE.findall(s or "")]
-
-
-def _ring_area(pts):
-    """Twice-signed area / 2 -- magnitude only; winding is normalised later."""
-    if len(pts) < 3:
-        return 0.0
-    a = 0.0
-    for i, (x0, y0) in enumerate(pts):
-        x1, y1 = pts[(i + 1) % len(pts)]
-        a += x0 * y1 - x1 * y0
-    return abs(a) / 2.0
-
-
-def _pip(pt, poly):
-    """Point in polygon, ray cast. Used only to drop shapes NESTED inside
-    another -- a cushion line inside a sofa body, a deck circle inside a mower
-    -- which would otherwise extrude to exactly the same height and z-fight
-    with the face they sit on."""
-    x, y = pt
-    inside = False
-    for i, (x0, y0) in enumerate(poly):
-        x1, y1 = poly[(i + 1) % len(poly)]
-        if (y0 > y) != (y1 > y):
-            t = (y - y0) / (y1 - y0)
-            if x < x0 + t * (x1 - x0):
-                inside = not inside
-    return inside
-
-
-def _path_rings(d):
-    """Closed subpaths of a path's `d`, as anchor-point rings.
-
-    ANCHOR POINTS ONLY -- a curve contributes its endpoint, not its control
-    points, so a rounded outline is extruded as its inscribed polygon. That is
-    a deliberate under-approximation: the solid is never larger than the symbol
-    drawn, which is the safe direction for something standing in a room.
-
-    A subpath that never closes is a stroke and is dropped."""
-    rings, cur, pos, start = [], [], (0.0, 0.0), (0.0, 0.0)
-    for cmd, args in _CMD_RE.findall(d or ""):
-        n, rel, up = _nums(args), cmd.islower(), cmd.upper()
-        if up == "Z":
-            if len(cur) >= 3:
-                rings.append(cur)
-            cur, pos = [], start
-        elif up == "M":
-            for i in range(0, len(n) - 1, 2):
-                p = ((pos[0] + n[i], pos[1] + n[i + 1]) if rel
-                     else (n[i], n[i + 1]))
-                if i == 0:
-                    if len(cur) >= 3:
-                        rings.append(cur)
-                    cur, start = [p], p
-                else:
-                    cur.append(p)
-                pos = p
-        elif up in ("L", "T"):
-            for i in range(0, len(n) - 1, 2):
-                pos = ((pos[0] + n[i], pos[1] + n[i + 1]) if rel
-                       else (n[i], n[i + 1]))
-                cur.append(pos)
-        elif up == "H":
-            for v in n:
-                pos = (pos[0] + v if rel else v, pos[1])
-                cur.append(pos)
-        elif up == "V":
-            for v in n:
-                pos = (pos[0], pos[1] + v if rel else v)
-                cur.append(pos)
-        elif up in _CURVE_STEP:
-            step = _CURVE_STEP[up]
-            for i in range(0, len(n) - step + 1, step):
-                ex, ey = n[i + step - 2], n[i + step - 1]
-                pos = (pos[0] + ex, pos[1] + ey) if rel else (ex, ey)
-                cur.append(pos)
-    if len(cur) >= 3:
-        rings.append(cur)
-    return rings
-
-
-def _is_filled(el):
-    fill = (el.get("fill") or "").strip().lower()
-    style = (el.get("style") or "").replace(" ", "").lower()
-    return not (fill == "none" or "fill:none" in style)
-
-
-def _ellipse_ring(cx, cy, rx, ry, n=24):
-    return [(cx + rx * math.cos(2 * math.pi * i / n),
-             cy + ry * math.sin(2 * math.pi * i / n)) for i in range(n)]
-
-
-def svg_outlines(path):
-    """(rings, (vw, vh)) for one furnishing symbol, in viewBox units.
-
-    `rings` are the FILLED CLOSED shapes, largest first, with any ring nested
-    inside another dropped. Empty when the symbol is line art -- the caller
-    falls back to a box and says so.
-
-    A `transform` on any element makes the file UNUSABLE here rather than
-    silently mis-placed: this reader does not apply transforms, and a shape
-    extruded at the wrong place is worse than a box at the right one. No
-    generated symbol carries one (measured, handoff 0012); if one ever does,
-    the item falls back and the report names it.
-    """
-    try:
-        root = ET.parse(path).getroot()
-    except (OSError, ET.ParseError):
-        return [], (0.0, 0.0)
-    vb = _nums(root.get("viewBox") or "")
-    if len(vb) < 4 or vb[2] <= 0 or vb[3] <= 0:
-        return [], (0.0, 0.0)
-    rings = []
-    for el in root.iter():
-        if el.get("transform"):
-            return [], (vb[2], vb[3])
-        tag = el.tag.replace(SVG_NS, "")
-        if tag in ("svg", "g", "defs", "title", "desc") or not _is_filled(el):
-            continue
-        if tag == "rect":
-            x, y = float(el.get("x", 0)), float(el.get("y", 0))
-            w, h = float(el.get("width", 0)), float(el.get("height", 0))
-            if w > 0 and h > 0:
-                rings.append([(x, y), (x + w, y), (x + w, y + h), (x, y + h)])
-        elif tag == "circle":
-            r = float(el.get("r", 0))
-            if r > 0:
-                rings.append(_ellipse_ring(float(el.get("cx", 0)),
-                                           float(el.get("cy", 0)), r, r))
-        elif tag == "ellipse":
-            rx, ry = float(el.get("rx", 0)), float(el.get("ry", 0))
-            if rx > 0 and ry > 0:
-                rings.append(_ellipse_ring(float(el.get("cx", 0)),
-                                           float(el.get("cy", 0)), rx, ry))
-        elif tag in ("polygon", "polyline"):
-            p = _nums(el.get("points", ""))
-            if len(p) >= 6:
-                rings.append(list(zip(p[0::2], p[1::2], strict=False)))
-        elif tag == "path":
-            rings.extend(_path_rings(el.get("d", "")))
-    rings = [r for r in rings if _ring_area(r) > 1e-9]
-    rings.sort(key=_ring_area, reverse=True)
-    # drop anything nested in a bigger ring: it extrudes to the same height and
-    # would z-fight the face it sits on
-    keep = []
-    for r in rings:
-        c = (sum(p[0] for p in r) / len(r), sum(p[1] for p in r) / len(r))
-        if not any(_pip(c, k) for k in keep):
-            keep.append(r)
-    return keep, (vb[2], vb[3])
-
-
-def _ear_clip(ring):
-    """Triangulate a simple polygon by ear clipping -> [(i, j, k), ...].
-
-    Rings here are tens of points at most (a rect is 4, an ellipse 24), so the
-    O(n^2) shape costs nothing and avoids a dependency. Returns [] rather than
-    raising on a ring it cannot clip -- a furnishing that will not triangulate
-    falls back to a box and is reported, which is this file's rule for
-    everything it cannot draw."""
-    n = len(ring)
-    if n < 3:
-        return []
-    idx = list(range(n))
-    if sum(ring[i][0] * ring[(i + 1) % n][1] - ring[(i + 1) % n][0] * ring[i][1]
-           for i in range(n)) < 0:
-        idx.reverse()                                # work counter-clockwise
-
-    def cross(o, a, b):
-        return ((ring[a][0] - ring[o][0]) * (ring[b][1] - ring[o][1])
-                - (ring[a][1] - ring[o][1]) * (ring[b][0] - ring[o][0]))
-
-    tris, guard = [], 0
-    while len(idx) > 3 and guard < 4 * n:
-        guard += 1
-        for k in range(len(idx)):
-            prev, cur, nxt = (idx[k - 1], idx[k], idx[(k + 1) % len(idx)])
-            if cross(prev, cur, nxt) <= 0:           # reflex
-                continue
-            others = [i for i in idx if i not in (prev, cur, nxt)]
-            if any(_pip(ring[i], [ring[prev], ring[cur], ring[nxt]])
-                   for i in others):
-                continue
-            tris.append((prev, cur, nxt))
-            idx.pop(k)
-            guard = 0
-            break
-        else:
-            return []                                # not a simple polygon
-    if len(idx) == 3:
-        tris.append(tuple(idx))
-    return tris
-
-
-def _extrude(ring_world, z0, z1):
-    """One closed ring -> a solid prism between two heights."""
-    tris = _ear_clip(ring_world)
-    if not tris:
-        return None
-    n = len(ring_world)
-    v = np.array([(x, y, z0) for x, y in ring_world]
-                 + [(x, y, z1) for x, y in ring_world], dtype=float)
-    f = [[a, c, b] for a, b, c in tris]              # bottom, normal -z
-    f += [[a + n, b + n, c + n] for a, b, c in tris]  # top, normal +z
-    ccw = sum(ring_world[i][0] * ring_world[(i + 1) % n][1]
-              - ring_world[(i + 1) % n][0] * ring_world[i][1]
-              for i in range(n)) > 0
-    for i in range(n):
-        j = (i + 1) % n
-        f += ([[i, j, j + n], [i, j + n, i + n]] if ccw
-              else [[i, j + n, j], [i, i + n, j + n]])
-    return v, np.array(f, dtype=int)
-
-
-def load_outline(kind, specs, assets_dir=None, _cache=None):
-    """`svg_outlines()` for a catalog kind, memoised per run.
-
-    A plan can hold forty of the same chair; parsing its symbol forty times
-    would be forty identical XML parses on the model-build path."""
-    if _cache is None:
-        _cache = _OUTLINE_CACHE
-    if kind in _cache:
-        return _cache[kind]
-    spec = specs.get(kind) or {}
-    d = assets_dir or _assets_dir()
-    out = ([], (0.0, 0.0))
-    if d and spec.get("file"):
-        out = svg_outlines(os.path.join(d, spec["file"]))
-    _cache[kind] = out
-    return out
-
-
-_OUTLINE_CACHE = {}
-
-
 def _colour(materials, name):
     """(r, g, b, a) for a material name, or None if the catalog lacks it."""
     m = materials.get(name)
@@ -493,12 +234,11 @@ def _box(corners_xy, z0, z1):
 # report -- a known gap that announces itself is a different thing from a
 # silent guess, which is what the deleted FURN table was.
 #
-# `prism` -- extruding the symbol's true SVG outline -- IS NOW BUILT, and it is
-# also THE FALLBACK: a form whose own generator does not exist yet is drawn from
-# its plan symbol rather than as a rectangle. See PRISM IS THE FALLBACK below.
+# `prism` -- extruding the symbol's true SVG outline -- is the second pass and
+# is recorded as a follow-up in VIEWER_NOTES.md section 5.
 KNOWN_FORMS = ("box", "slab", "seat", "bed", "basin", "enclosure", "vehicle",
                "planting", "prism")
-BUILT_FORMS = ("box", "slab", "prism")
+BUILT_FORMS = ("box", "slab")
 
 
 def _plan_quad(place, x0, x1, y0, y1):
@@ -506,53 +246,14 @@ def _plan_quad(place, x0, x1, y0, y1):
     return [place(x0, y0), place(x1, y0), place(x1, y1), place(x0, y1)]
 
 
-def build_prism(place, w, d, h, z0, outline):
-    """The plan symbol, extruded. `outline` is `svg_outlines()`'s return.
-
-    THE MAPPING, and the y flip in it is not cosmetic. A symbol point `(sx, sy)`
-    sits at `(px - W/2 + sx, py - H/2 + sy)` in the EDITOR's scene, where y
-    grows downward; this viewer's world has y growing the other way (`cy` is
-    `-pos[1]`). So local y is `H/2 - sy`, not `sy - H/2`. Get it wrong and every
-    asymmetric item renders mirrored -- which is exactly the class of fault the
-    deleted furniture table shipped for months (three kinds rotated 90 degrees
-    because width and depth were transposed).
-
-    Scaled by `w/W`, `d/H` rather than assumed equal, so an item whose document
-    size differs from its symbol's viewBox still comes out the right size.
-
-    Returns [] when nothing could be extruded, which the caller reports.
-    """
-    rings, (vw, vh) = outline
-    if not rings or vw <= 0 or vh <= 0:
-        return []
-    sx, sy = w / vw, d / vh
-    parts = []
-    for ring in rings:
-        world = [place((x - vw / 2.0) * sx, (vh / 2.0 - y) * sy)
-                 for x, y in ring]
-        part = _extrude(world, z0, z0 + h)
-        if part is not None:
-            parts.append(part)
-    return parts
-
-
-def build_solid(form, place, w, d, h, z0, outline=None):
+def build_solid(form, place, w, d, h, z0):
     """[(verts, faces), ...] for one furnishing, in its own local frame.
 
     `place(lx, ly) -> (x, y)` carries rotation and position, so a generator
     only has to think in the item's own axes.  `z0` is the UNDERSIDE (the
     level's floor plus the catalog's elevation_in), so a wall-hung item is
-    built exactly like a floor-standing one, higher up.
-
-    `outline` is the item's plan symbol when one could be read; `prism` needs
-    it and every other generator ignores it."""
+    built exactly like a floor-standing one, higher up."""
     z1 = z0 + h
-    if form == "prism":
-        parts = build_prism(place, w, d, h, z0, outline or ([], (0.0, 0.0)))
-        if parts:
-            return parts
-        # falls through to the box -- the CALLER reports it, because only the
-        # caller knows which kind this was
     if form == "slab":
         # A top on legs: table, desk, workbench, machine table.  The top is a
         # real thickness rather than a plane, because a zero-thickness top
@@ -781,7 +482,6 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         return (float(v["x"]), -float(v["y"]))      # y flips: plan y is down
 
     n_wall = n_open = n_floor = n_furn = 0
-    by_prism, still_box = set(), set()      # which kinds got which solid
 
     # ---- floor slabs -----------------------------------------------------
     if floors:
@@ -945,8 +645,6 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         parts = {}
         unknown_kind, unknown_mat, unknown_form, pending_form = (
             set(), set(), set(), set())
-        outline_dir = _assets_dir()
-        _OUTLINE_CACHE.clear()      # per build, so a test can swap the catalog
         for fu in doc.get("furnishings", []):
             if fu.get("level") not in lv:
                 continue
@@ -963,30 +661,13 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             elev = float(spec.get("elevation_in", 0.0) or 0.0)
             mat = spec.get("material") or "unknown"
             form = spec.get("form") or "box"
-            outline = None
             if form not in KNOWN_FORMS:
                 # A form nothing recognises is a catalog the viewer cannot
                 # read, so it is loud, exactly like an unknown kind.
                 unknown_form.add(form)
                 form, mat = "box", "unknown"
             elif form not in BUILT_FORMS:
-                # PRISM IS THE FALLBACK, in place of the box (handoff 0012's
-                # ruling). A form whose own generator is not written yet is
-                # drawn from the item's PLAN SYMBOL -- data that already exists
-                # for every item, at its true footprint -- rather than as a
-                # rectangle that is merely the right size.
-                #
-                # The box is still there behind it, for a symbol drawn entirely
-                # in strokes: those have no outline to extrude, and a prism
-                # would have to invent one. Which items land where is REPORTED,
-                # because "a third of the catalog renders as a box" is a claim
-                # that has to stay checkable.
                 pending_form.add(form)
-                outline = load_outline(kind, specs, outline_dir)
-                if outline[0]:
-                    form = "prism"
-                else:
-                    still_box.add(kind)
             if _colour(materials, mat) is None:
                 unknown_mat.add(mat)
                 mat = "unknown"
@@ -1001,26 +682,8 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             # anything floor-bearing, non-zero for the wall-hung and
             # counter-mounted items, which used to sit on the floor.
             z = base(fu.get("level")) + elev
-            if form == "prism" and outline is None:      # an explicit `prism`
-                outline = load_outline(kind, specs, outline_dir)
-            # THE PRISM IS ATTEMPTED HERE RATHER THAN INSIDE `build_solid`, so
-            # the bookkeeping can never claim a prism that is really a box.
-            # `build_solid` falls back silently by design (it does not know the
-            # kind, so it cannot name it), which means its return is non-empty
-            # either way and tells the caller nothing.
-            solid = None
-            if form == "prism":
-                solid = build_prism(place, fw, fd, fh, z,
-                                    outline or ([], (0.0, 0.0)))
-                if solid:
-                    by_prism.add(kind)
-                else:                    # a ring that would not triangulate
-                    form = "box"
-                    by_prism.discard(kind)
-                    still_box.add(kind)
-            if not solid:
-                solid = build_solid(form, place, fw, fd, fh, z, outline)
-            parts.setdefault(mat, []).extend(solid)
+            parts.setdefault(mat, []).extend(
+                build_solid(form, place, fw, fd, fh, z))
             n_furn += 1
         for mat, plist in parts.items():
             v, f = _merge(plist)
@@ -1043,22 +706,8 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             # INFO, not a note: a recognised form whose generator is a later
             # pass is a known gap, not a document that could not be drawn.
             model.info.append(
-                "furnishing form(s) recognised but not yet built, drawn from "
-                "the plan symbol where there is one: "
-                + ", ".join(sorted(pending_form)))
-        if by_prism:
-            model.info.append(
-                f"{len(by_prism)} kind(s) EXTRUDED FROM THEIR PLAN SYMBOL "
-                f"(prism): " + ", ".join(sorted(by_prism)))
-        if still_box:
-            # NAMED, not counted. "A third of the catalog renders as a box" was
-            # the sentence that sized this work, and the only way it stays
-            # checkable is if the survivors are listed rather than totalled --
-            # a count cannot be argued with and cannot be acted on.
-            model.info.append(
-                f"{len(still_box)} kind(s) STILL DRAWN AS A BOX -- the plan "
-                f"symbol has no closed filled shape to extrude: "
-                + ", ".join(sorted(still_box)))
+                "furnishing form(s) recognised but not yet built, drawn as a "
+                "box: " + ", ".join(sorted(pending_form)))
 
     # ---- bounds ----------------------------------------------------------
     allv = [m.verts for m in model.meshes if len(m.verts)]
@@ -1067,12 +716,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         model.bbox = (a.min(axis=0), a.max(axis=0))
     model.stats = {"levels": list(lv), "walls": n_wall, "openings": n_open,
                    "rooms": n_floor, "furnishings": n_furn,
-                   "triangles": int(sum(len(m.faces) for m in model.meshes)),
-                   # WHICH kinds, not how many: the sentence this work is
-                   # measured against ("a third of the catalog renders as a
-                   # box") can only be falsified by a list
-                   "prism_kinds": sorted(by_prism),
-                   "box_fallback_kinds": sorted(still_box)}
+                   "triangles": int(sum(len(m.faces) for m in model.meshes))}
     return model
 
 

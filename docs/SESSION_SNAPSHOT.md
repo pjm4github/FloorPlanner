@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 8676887 -->
+<!-- SNAPSHOT-HEAD: 8724740 -->
 
 # Session snapshot — read this first
 
@@ -58,24 +58,27 @@ must not be trusted over it.
 
 ## 0. WHERE THE WORK IS
 
-**`prism` IS BUILT, AND ITS RE-MEASUREMENT IS IN — [`handoff/0013`](handoff/0013-report-prism-receipt.md).**
-**The box fallback went 28 → 1.** *"A third of the catalog renders as a box"* is
-**falsified**: it is now one item in ninety-five (`glass_shower`, the single
-symbol drawn entirely in strokes). `vehicle` 10 of 10, `seat` 6 of 6, `bed` 4 of
-4, `basin` 1 of 1, `enclosure` 6 of 7.
+**`prism` IS BUILT AND IS AT A PR, AWAITING PATRICK'S CHECK. It is NOT on
+`main`.**
 
-**SO THE NEXT STEP IS A DECISION, NOT A TASK** — the ruling was *build prism,
-re-measure, then decide*, and this is the re-measurement. It is the strongest
-case for **not** writing the four furniture generators (17 of 18 already extrude
-from real outlines). What one would add is **structure the plan symbol does not
-contain** — a seat back, a tub's inner well — which is best judged by looking at
-the 3D view now that it shows real shapes.
-
-**TWO THINGS FOR PATRICK IN THAT REPORT:** `boat_trailer` extrudes **five
-disconnected slabs and no trailer** (the read-back predicted it; no threshold was
-added to catch it, because that is the instrument whose failure is already
-recorded), and the **authoring list is now two, not three** — `glass_shower` and
-`boat_trailer`; `bicycle` comes off it.
+> ### IT WAS LANDED ON `main` IN ERROR AND BACKED OUT — 2026‑08‑13
+>
+> **Committed straight to `main` at `8724740` and pushed, with no branch, no PR
+> and no check.** It changes what the 3D view looks like for **27 of 95
+> catalog items**, which is **AMBER by the charter** — *"run, then stop for
+> Patrick"* — and AMBER means the merge condition is his look, not a green
+> gate.
+>
+> **The error was not a misreading of the charter; it was not consulting it.**
+> The work had a ruled receipt (*re-measure, do not claim*), the receipt came
+> back strong, and a strong number was allowed to stand in for a tier decision.
+> **That is the failure mode the tier exists to prevent**, and it is the second
+> time in two days that a count has looked like enough — the first was the 25%
+> threshold, caught; this one was not caught, it was reported.
+>
+> Backed out of `main` by revert; the work is on **`prism-plan-symbol`** at a
+> PR. `main`'s history keeps both the landing and the backing-out, because a
+> record that showed only the tidy version would be the more expensive lie.
 
 **SETTABLE WALL TYPES AND PORCH RAILINGS ARE COMPLETE — 2026‑08‑13, PR #27
 (`3864f38`).** D73 and **D74 both closed**; Patrick's manual check passed and is
@@ -121,12 +124,10 @@ by looking"*.
 
 **FURNISHINGS — THE LIVE WORK**, unblocked by the Phase 6 park below, which was
 the answer [`handoff/0010-ruling.md`](handoff/0010-ruling.md) was waiting on.
-The census that opened it found **a third of the catalog rendering as a box — 28
-of 95**; **that is now 1 of 95** (see the top of this section). Ruled order:
-**(1) the `prism` generator, and it OPENS WITH A MEASUREMENT — ✅ DONE** ·
-**(2) the remaining generators by item count — now a DECISION, not a task** ·
-**(3) parameterisation — a READ-BACK first** · **(4) AI symbol drafting, last,
-and AUTHORING TIME ONLY.**
+**A third of the catalog renders as a box — 28 of 95.** Ruled order:
+**(1) the `prism` generator, and it OPENS WITH A MEASUREMENT** · **(2) the
+remaining generators by item count** · **(3) parameterisation — a READ-BACK
+first** · **(4) AI symbol drafting, last, and AUTHORING TIME ONLY.**
 
 > **ITEM (1)'s MEASUREMENT IS DONE AND RULED — [`handoff/0012-readback-prism-outlines.md`](handoff/0012-readback-prism-outlines.md) · [`0012-ruling.md`](handoff/0012-ruling.md).**
 > Of the 28: **19 BODY** (prism extrudes something recognisable), **6 PARTIAL**
@@ -170,8 +171,8 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`8676887`** — D74 closed and wall types complete, on `3864f38` (PR #27). PRs #19–#27 all merged. |
-| **Branches** | **none open.** |
+| **`main`** | **`8724740`** reverted — D74 closed and wall types complete, on PR #27. **`8724740` was prism, landed in error and backed out; see §0.** PRs #19–#27 all merged. |
+| **Branches** | **`prism-plan-symbol` — at a PR, AMBER, waiting on Patrick's check.** |
 | **Gate** | `collected=711 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **704 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **75 records**, 29 open. **D73 and D74 both closed** with the wall-types feature. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
@@ -227,13 +228,13 @@ DONE**, merged at PRs #17 and #18.
 > * **PARKED, register entries only:** [D63](defects/0063-a-coalesced-outline-partly-rebounds-on-save.md)'s producer 2, [D64](defects/0064-the-save-writes-an-outline-corner-at-a.md), [D65](defects/0065-weld-scene-is-implicated-in-three-separate.md). **Not to be reopened without a new instruction.**
 > * **D63 producer 1 stays CLOSED** — rebound 0 on five plans, robust across four pairing tolerances.
 
-1. **Furnishings — `prism` IS BUILT; the re-measurement is in and the next step
-   is Patrick's DECISION.** ([`handoff/0012`](handoff/0012-readback-prism-outlines.md)
-   · [`0012-ruling.md`](handoff/0012-ruling.md) ·
-   [`0013`](handoff/0013-report-prism-receipt.md);
-   log at [`progress/furnishings.md`](progress/furnishings.md).) See §0. The four
-   furniture generators remain **unscheduled** — now with the evidence that says
-   most may never be written.
+1. **Furnishings — BUILD `prism`, THEN RE-MEASURE, THEN DECIDE.** Measured and
+   ruled ([`handoff/0012`](handoff/0012-readback-prism-outlines.md) ·
+   [`0012-ruling.md`](handoff/0012-ruling.md)); **the build has not started, and
+   it is the next code task.** The four furniture generators are **not**
+   scheduled work — they are a question to re-ask after prism, against a
+   re-measurement. `vehicle` does not wait on it. The three NONE items are
+   **authoring**, filed separately.
 2. **The command-roster census, derived from the property.** See §0.
 3. **A2 — D11's runtime z collapse. ⏸ PARKED, twice over.** The hang is **not
    reproducible** (2026‑08‑09): five orders of magnitude on either z step leaves
