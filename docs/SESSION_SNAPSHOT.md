@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 72e49cb -->
+<!-- SNAPSHOT-HEAD: 33043ed -->
 
 # Session snapshot — read this first
 
@@ -58,34 +58,34 @@ must not be trusted over it.
 
 ## 0. WHERE THE WORK IS
 
-**`prism` IS ON THIS BRANCH, AT A PR, AWAITING PATRICK'S CHECK — AMBER.** It
-changes the 3D view for **27 of 95 catalog items**, so the merge condition is his
-look, not the gate. **It was landed on `main` in error and backed out** (`72e49cb`
-reverts `8724740`); this branch re-applies it as a clean forward change.
+**`prism` IS MERGED — PR #28 (`33043ed`), Patrick's check passed:** *"I looked -
+prism ships, merge it"*. It changes the 3D view for 27 of 95 items; it was landed
+on `main` in error first, backed out at `72e49cb`, and re-landed through its
+check. **A green gate and a strong number are evidence about the code, neither is
+evidence about the tier.**
 
-**His look serves twice:** it is the AMBER check, *and* it is the input to the
-reserved decision about the four furniture generators. **The plan is
-`fixtures/prism-check.json`** — one of every affected kind, grouped by form — and
-the renders are `evidence/prism-check-before.png` and `-after.png`.
+**THE LIVE ITEM IS THE RESERVED DECISION, and it is Patrick's — [`handoff/0014`](handoff/0014-report-furniture-regions.md)
+narrows it to one fact.**
 
-**The re-measurement — [`handoff/0013`](handoff/0013-report-prism-receipt.md).**
-**The box fallback went 28 → 1.** *"A third of the catalog renders as a box"* is
-**falsified**: it is now one item in ninety-five (`glass_shower`, the single
-symbol drawn entirely in strokes). `vehicle` 10 of 10, `seat` 6 of 6, `bed` 4 of
-4, `basin` 1 of 1, `enclosure` 6 of 7.
-
-**SO THE NEXT STEP IS A DECISION, NOT A TASK** — the ruling was *build prism,
-re-measure, then decide*, and this is the re-measurement. It is the strongest
-case for **not** writing the four furniture generators (17 of 18 already extrude
-from real outlines). What one would add is **structure the plan symbol does not
-contain** — a seat back, a tub's inner well — which is best judged by looking at
-the 3D view now that it shows real shapes.
-
-**TWO THINGS FOR PATRICK IN THAT REPORT:** `boat_trailer` extrudes **five
-disconnected slabs and no trailer** (the read-back predicted it; no threshold was
-added to catch it, because that is the instrument whose failure is already
-recorded), and the **authoring list is now two, not three** — `glass_shower` and
-`boat_trailer`; `bicycle` comes off it.
+* **The VEHICLE half is settled BY EYE and is not to be re-measured.** Patrick,
+  on a real plan: **tractor, lawn mower and snowblower visibly changed shape;
+  the sofa and the bed in the same view are still slabs.** That is vehicle
+  gaining real geometry and furniture gaining nothing.
+* **THE OUTER OUTLINE IS A PLAIN RECTANGLE FOR 17 OF 18 furniture symbols** —
+  `office_chair` (a circle, 24 vertices) is the only exception. **A 4-vertex
+  prism is a box**, so prism gave the furniture a box by a different route. That
+  number is the honest replacement for 28 → 1, which could not tell *extrudes
+  something* from *extrudes a rectangle*.
+* **CLOSED INTERNAL PATHS EXIST — BUT NOT WHERE IT MATTERS MOST.** Beds carry
+  pillows, `bathtub` its well, `kitchen_sink` its bowls: **13 of 18 items carry
+  at least one filled region, 17 regions in all.** But **`sofa`, `armchair` and
+  `loveseat` draw the back as ONE LINE** — no region, nothing to give a height
+  to — and those are the three seats a room is fullest of. `dining_chair` and
+  `office_chair` draw theirs as a real rect, which is why this is per item and
+  not per form.
+* **The cheap answer costs 17 annotations** in `_gen_assets.py` (where the
+  artwork is already drawn) plus one loop in `build_prism`, which already
+  returns a list of parts. **Costed, not built.**
 
 **SETTABLE WALL TYPES AND PORCH RAILINGS ARE COMPLETE — 2026‑08‑13, PR #27
 (`3864f38`).** D73 and **D74 both closed**; Patrick's manual check passed and is
@@ -180,8 +180,8 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`72e49cb`** — the prism revert, on `8676887` (D74 closed, wall types complete), on `3864f38` (PR #27). PRs #19–#27 all merged. |
-| **Branches** | **`prism-plan-symbol` — this one. At a PR, AMBER, waiting on Patrick's check.** |
+| **`main`** | **`33043ed`** — PR #28 (prism), on `72e49cb` (the revert), on PR #27. PRs #19–#28 all merged. |
+| **Branches** | **none open.** |
 | **Gate** | `collected=711 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **704 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **75 records**, 29 open. **D73 and D74 both closed** with the wall-types feature. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |

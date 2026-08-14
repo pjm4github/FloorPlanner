@@ -106,4 +106,54 @@ PRISM -- THE PLAN SYMBOL, EXTRUDED  2026-08-13  (the ruled first item)
          all) and boat_trailer (fills, but no body). bicycle comes off it.
          Still separate from the generators, per the ruling that a code
          task must not acquire an artwork dependency.
+
+PRISM MERGED, AND THE FURNITURE HALF NARROWED  2026-08-14
+         handoff: 0013 (receipt + ruling), 0014 (the furniture parse)
+         merged:  PR #28 (33043ed), after Patrick's check:
+             "I looked - prism ships, merge it"
+         It went to main FIRST WITHOUT ITS CHECK (8724740), was backed
+         out (72e49cb) and re-landed through the PR. Prism is AMBER --
+         it changes the 3D view for 27 of 95 items -- and a strong
+         receipt was allowed to stand in for a tier decision. A GREEN
+         GATE AND A STRONG NUMBER ARE EVIDENCE ABOUT THE CODE; NEITHER
+         IS EVIDENCE ABOUT THE TIER.
+
+         THE VEHICLE HALF IS SETTLED BY EYE AND WAS NOT RE-MEASURED.
+         Patrick, on prism-live code on a real plan: TRACTOR, LAWN MOWER
+         AND SNOWBLOWER have visibly changed shape, while THE SOFA AND
+         THE BED in the same view are still slabs. Vehicle gained real
+         geometry; furniture gained nothing. Recorded as the receipt,
+         naming the three items, on instruction.
+
+         AND THE NUMBER THAT REPLACES 28 -> 1: THE OUTER OUTLINE IS A
+         PLAIN RECTANGLE FOR 17 OF 18 furniture symbols, office_chair
+         (a circle, 24 vertices) being the only exception. A 4-VERTEX
+         PRISM IS A BOX. 28 -> 1 counted items that EXTRUDE; it could
+         not tell "extrudes something" from "extrudes a rectangle", and
+         that gap is exactly what Patrick saw.
+
+         THE DECIDING QUESTION, ANSWERED PER ITEM: closed internal paths
+         EXIST, but not where it matters most.
+             beds        1-2 filled pillows each
+             bathtub     the WELL, a filled rect inside the rim
+             kitchen_sink two bowls
+             13 of 18 items carry at least one filled region, 17 in all
+             BUT sofa, armchair and loveseat draw the BACK AS ONE LINE,
+             and the arms as lines. No region, nothing to give a height
+             to -- and those are the three seats a room is fullest of.
+             dining_chair and office_chair draw theirs as a real rect,
+             which is why this is reported PER ITEM and not per form.
+
+         COST OF THE CHEAP ANSWER, COUNTED NOT ESTIMATED: 17 filled
+         regions to annotate in _gen_assets.py, where the artwork is
+         already drawn, plus ONE LOOP in build_prism, which already
+         returns a list of parts and already extrudes a ring between two
+         heights. Not built -- the decision is Patrick's.
+
+         ONE CORRECTION MADE BY READING RATHER THAN PARSING: the first
+         cut reported dining_chair as having no internal closed paths.
+         It has a back panel drawn as a closed rect, sitting BESIDE the
+         seat rather than nested inside it, and the criterion only
+         counted nested shapes. Caught by opening the four files. Third
+         time on this feature that looking has overturned counting.
 ```
