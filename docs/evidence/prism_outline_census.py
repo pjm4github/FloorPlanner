@@ -10,6 +10,13 @@ The ruling that asks for this:
   > line art, some are several disjoint shapes. THAT NUMBER SIZES THE WIN
   > BEFORE ANYTHING IS BUILT.
 
+**SUPERSEDED AS A PREDICTION, 2026-08-13 — prism is built, and the receipt is
+now `prism_remeasure.py`, which reads the answer off `build_model` itself.**
+This file is kept because the pre-build measurement is what the ruling was made
+on, and because its own error is recorded in the working agreement. Its parser
+has been REPLACED by a call to the viewer's `svg_outlines`, so it can no longer
+disagree with what the viewer actually reads.
+
 MEASUREMENT ONLY. Nothing is built here and nothing is decided; the output is a
 count and a per-item table.
 
@@ -48,20 +55,18 @@ THE INSTRUMENT'S BOUNDARY, which the ruling depends on:
     sampled, so a rounded shape's area is slightly understated -- it makes
     coverage a LOWER bound, which is the safe direction for a "can we use it"
     question.
-  * `transform` attributes are not applied. Every generated symbol is authored
-    in viewBox units (see `_gen_assets.py`), and the census REPORTS any
-    transform it meets rather than silently mis-measuring it.
+  * `transform` attributes are not applied -- and `svg_outlines` REFUSES a
+    file carrying one rather than mis-placing it, so such an item reads as
+    NONE and falls back to a box. No generated symbol carries one.
 """
+import importlib.util
 import json
 import re
 import sys
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT))
-
-SVG_NS = "{http://www.w3.org/2000/svg}"
 
 # from floorplanner/viewer/fp3d.py -- imported rather than restated so this
 # census cannot drift from the viewer's own idea of what is built
@@ -85,121 +90,32 @@ def _known_and_built():
     return out
 
 
-def _num(s):
-    return [float(v) for v in re.findall(r"-?\d*\.?\d+(?:e-?\d+)?", s)]
+def _fp3d():
+    """The VIEWER's module, loaded by path.
+
+    THE PARSER IS NO LONGER THIS FILE'S. `svg_outlines` is production code in
+    fp3d.py, so this census measures what the viewer will actually read rather
+    than a second implementation that agrees with it today. Loaded by path
+    because fp3d is deliberately Qt-free and importing the package would drag
+    in the bindings (D73).
+    """
+    spec = importlib.util.spec_from_file_location(
+        "fp3d_census", ROOT / "floorplanner" / "viewer" / "fp3d.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod
 
 
-def _poly_area(pts):
-    if len(pts) < 3:
-        return 0.0
-    a = 0.0
-    for i in range(len(pts)):
-        x0, y0 = pts[i]
-        x1, y1 = pts[(i + 1) % len(pts)]
-        a += x0 * y1 - x1 * y0
-    return abs(a) / 2.0
-
-
-def _path_shapes(d):
-    """Closed subpaths of a path's `d`, as anchor-point polygons.
-
-    Only a subpath ending in Z counts: an unclosed subpath is a stroke, and a
-    prism cannot extrude a stroke."""
-    tokens = re.findall(r"([MmLlHhVvCcSsQqTtAaZz])([^MmLlHhVvCcSsQqTtAaZz]*)",
-                        d)
-    shapes, cur, pos, start = [], [], (0.0, 0.0), (0.0, 0.0)
-    for cmd, args in tokens:
-        n = _num(args)
-        rel = cmd.islower()
-        up = cmd.upper()
-        if up == "Z":
-            if len(cur) >= 3:
-                shapes.append(cur)
-            cur, pos = [], start
-            continue
-        if up == "M":
-            for i in range(0, len(n) - 1, 2):
-                p = ((pos[0] + n[i], pos[1] + n[i + 1]) if rel
-                     else (n[i], n[i + 1]))
-                if i == 0:
-                    if len(cur) >= 3:
-                        shapes.append(cur)
-                    cur, start = [p], p
-                else:
-                    cur.append(p)
-                pos = p
-        elif up in ("L", "T"):
-            for i in range(0, len(n) - 1, 2):
-                pos = ((pos[0] + n[i], pos[1] + n[i + 1]) if rel
-                       else (n[i], n[i + 1]))
-                cur.append(pos)
-        elif up == "H":
-            for v in n:
-                pos = (pos[0] + v if rel else v, pos[1])
-                cur.append(pos)
-        elif up == "V":
-            for v in n:
-                pos = (pos[0], pos[1] + v if rel else v)
-                cur.append(pos)
-        elif up in ("C", "S", "Q", "A"):
-            # ANCHOR ONLY -- the endpoint of each segment, control points
-            # ignored. Understates a curved area, which is the safe direction.
-            step = {"C": 6, "S": 4, "Q": 4, "A": 7}[up]
-            for i in range(0, len(n) - step + 1, step):
-                ex, ey = n[i + step - 2], n[i + step - 1]
-                pos = (pos[0] + ex, pos[1] + ey) if rel else (ex, ey)
-                cur.append(pos)
-    if len(cur) >= 3:
-        shapes.append(cur)
-    return shapes
-
-
-def _filled(el):
-    """A shape counts only if it is FILLED. `fill="none"` is line art."""
-    fill = (el.get("fill") or "").strip().lower()
-    style = (el.get("style") or "").lower()
-    if fill == "none" or "fill:none" in style.replace(" ", ""):
-        return False
-    return True
-
-
-def measure(path):
-    """(best_area, viewbox_area, kinds, transforms) for one SVG."""
-    root = ET.parse(path).getroot()
-    vb = _num(root.get("viewBox") or "0 0 1 1")
-    vb_area = abs(vb[2] * vb[3]) if len(vb) >= 4 else 0.0
-    best, kinds, xf = 0.0, set(), 0
-    for el in root.iter():
-        tag = el.tag.replace(SVG_NS, "")
-        if tag in ("svg", "g", "title", "desc", "defs"):
-            if el.get("transform"):
-                xf += 1
-            continue
-        kinds.add(tag)
-        if el.get("transform"):
-            xf += 1
-        if not _filled(el):
-            continue
-        area = 0.0
-        if tag == "rect":
-            area = abs(float(el.get("width", 0)) * float(el.get("height", 0)))
-        elif tag == "circle":
-            r = float(el.get("r", 0))
-            area = 3.141592653589793 * r * r
-        elif tag == "ellipse":
-            area = (3.141592653589793 * float(el.get("rx", 0))
-                    * float(el.get("ry", 0)))
-        elif tag in ("polygon", "polyline"):
-            pts = _num(el.get("points", ""))
-            area = _poly_area(list(zip(pts[0::2], pts[1::2], strict=False)))
-        elif tag == "path":
-            shapes = _path_shapes(el.get("d", ""))
-            area = max((_poly_area(s) for s in shapes), default=0.0)
-        best = max(best, area)
-    return best, vb_area, kinds, xf
+def measure(fp3d, path):
+    """(best_ring_area, viewbox_area) for one SVG, via the viewer's reader."""
+    rings, (vw, vh) = fp3d.svg_outlines(str(path))
+    best = max((fp3d._ring_area(r) for r in rings), default=0.0)
+    return best, (vw * vh)
 
 
 def main():
+    fp3d = _fp3d()
     known, built = _known_and_built()
     pending = tuple(f for f in known if f not in built)
     manifest = json.loads(
@@ -221,7 +137,7 @@ def main():
             rows.append((it["id"], form, -1.0, "MISSING SVG", 0))
             continue
         try:
-            best, vb, kinds, xf = measure(svg)
+            best, vb = measure(fp3d, svg)
         except Exception as ex:                        # noqa: BLE001
             rows.append((it["id"], form, -1.0, f"UNPARSEABLE {ex}", 0))
             continue
@@ -232,7 +148,7 @@ def main():
             verdict = "PARTIAL"
         else:
             verdict = "NONE"
-        rows.append((it["id"], form, cov, verdict, xf))
+        rows.append((it["id"], form, cov, verdict, 0))
         per_form.setdefault(form, []).append(verdict)
 
     print(f"\nfallback items (form recognised, generator not built): {len(rows)}")
