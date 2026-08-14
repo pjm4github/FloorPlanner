@@ -420,3 +420,161 @@ def test_every_catalog_symbol_either_extrudes_or_is_reported(fp3d, manifest):
     got = set(model.stats["prism_kinds"]) | set(model.stats["box_fallback_kinds"])
     assert got == pending, f"unaccounted: {pending ^ got}"
     assert model.stats["furnishings"] == len(manifest)
+
+
+# --------------------------------------------------------------------------
+# region extrusion -- a region's height is annotated, its position is not
+# --------------------------------------------------------------------------
+def _zs(fp3d, model):
+    return sorted({round(v[2], 3) for v in _furn_verts(fp3d, model)})
+
+
+def test_a_pillow_RISES_ABOVE_the_mattress(fp3d, manifest):
+    """A raised region sits ON the body. The bed's own height is the mattress;
+    the pillows state 30, and the solid must reach it."""
+    spec = next(i for i in manifest if i["id"] == "bed_king")
+    zs = _zs(fp3d, fp3d.build_model(_doc("bed_king")))
+    assert spec["height_in"] in zs, "the mattress top must still be there"
+    assert max(zs) > spec["height_in"], \
+        f"nothing rises above the mattress: {zs}"
+    assert max(zs) == 30.0, f"the pillows' annotated height, not another: {zs}"
+
+
+def _roof_over(model, x, y, z):
+    """Is there a horizontal face at height `z` covering the point (x, y)?"""
+    def inside(p, a, b, c):
+        def s(u, v):
+            return ((v[0] - u[0]) * (p[1] - u[1])
+                    - (v[1] - u[1]) * (p[0] - u[0]))
+        d1, d2, d3 = s(a, b), s(b, c), s(c, a)
+        return not ((d1 < 0 or d2 < 0 or d3 < 0)
+                    and (d1 > 0 or d2 > 0 or d3 > 0))
+
+    for m in model.meshes:
+        if not m.name.startswith("furnishings:"):
+            continue
+        for tri in m.faces:
+            vs = [m.verts[i] for i in tri]
+            if all(abs(v[2] - z) < 1e-6 for v in vs) and inside((x, y), *vs):
+                return True
+    return False
+
+
+def test_a_tub_is_HOLLOW(fp3d, manifest):
+    """A region BELOW the body is a WELL, and a well is only a well if the body
+    is OPENED for it.
+
+    THE FIRST CUT OF THIS TEST WAS VACUOUS and is recorded rather than quietly
+    replaced. It asserted that the well's height appears among the solid's z
+    values and that there are more than twelve triangles -- both of which are
+    ALSO true of a body left solid with a block sitting inside it, which is
+    exactly what the broken version produced. It passed against code with the
+    well branch disabled.
+
+    So the assertion is now the thing the eye checks: IS THERE A ROOF OVER THE
+    WELL? A hollow tub has no horizontal face at rim height above its centre; a
+    solid one does. That cannot be satisfied by a block."""
+    spec = next(i for i in manifest if i["id"] == "bathtub")
+    rim = float(spec["height_in"])
+    model = fp3d.build_model(_doc("bathtub"))
+    zs = _zs(fp3d, model)
+    assert rim in zs, "the rim must be at the catalog height"
+    assert 4.0 in zs, f"the well floor must be at its annotated 4in: {zs}"
+
+    assert not _roof_over(model, 0.0, 0.0, rim), \
+        "there is a face at rim height over the tub's centre -- it is not hollow"
+    # the precondition: the rim itself must still be there, or "no roof" is
+    # satisfied by an item that built nothing at all
+    edge_y = spec["depth_in"] / 2 - 1.0
+    assert _roof_over(model, 0.0, edge_y, rim), \
+        "the rim vanished -- the tub has no top at all"
+
+
+def test_a_sofa_is_a_SEAT_WITH_A_BACK_not_a_slab(fp3d, manifest):
+    """THE CHECK, as far as a test can carry it.
+
+    `height_in` for a sofa is 32 -- the BACK height -- so a body that used it
+    extruded the whole footprint to 32 and rendered as a slab. The body now
+    states its own 17, and the back rises to 32.
+
+    THE PRECONDITION IS THE HALF THAT MATTERS: without asserting that most of
+    the footprint stops at the seat, "something reaches 32" is satisfied by the
+    slab this replaces."""
+    spec = next(i for i in manifest if i["id"] == "sofa")
+    assert spec["height_in"] == 32, "PRECONDITION: the catalog states the back"
+    model = fp3d.build_model(_doc("sofa"))
+    zs = _zs(fp3d, model)
+    assert 17.0 in zs, f"the seat must stop at its own height: {zs}"
+    assert 32.0 in zs, f"the back must still reach the overall height: {zs}"
+    assert 24.0 in zs, f"the arms must be between the two: {zs}"
+
+    # and the 32 must be a BACK, not the whole item: the vertices at full
+    # height must span far less depth than those at seat height
+    vs = _furn_verts(fp3d, model)
+    at_seat = [v for v in vs if abs(v[2] - 17.0) < 1e-6]
+    at_back = [v for v in vs if abs(v[2] - 32.0) < 1e-6]
+    depth_seat = max(v[1] for v in at_seat) - min(v[1] for v in at_seat)
+    depth_back = max(v[1] for v in at_back) - min(v[1] for v in at_back)
+    assert depth_back < depth_seat / 2, (
+        f"the full-height part is {depth_back:.1f}in deep against the seat's "
+        f"{depth_seat:.1f}in -- that is a slab, not a back")
+
+
+def test_an_unannotated_nested_shape_is_still_DROPPED(fp3d):
+    """Decoration that states no height would extrude to the body's own height
+    and z-fight the face it sits on. `shower`'s inner shapes are unfilled and
+    unannotated, so the solid stays a plain enclosure."""
+    model = fp3d.build_model(_doc("shower"))
+    tris = sum(len(m.faces) for m in model.meshes
+               if m.name.startswith("furnishings:"))
+    assert tris == 12, f"expected a plain prism, got {tris} triangles"
+
+
+def test_the_annotation_carries_A_HEIGHT_AND_NOTHING_ELSE(manifest):
+    """THE BOUNDARY, asserted on the artwork rather than trusted.
+
+    Ruled: the region's POSITION comes from the artwork; only its HEIGHT is
+    annotated. The moment the annotation could also say WHERE, there are two
+    sources of truth about where a pillow is and they will disagree -- the same
+    discipline as the one thickness table.
+
+    So: every `data-` attribute in the asset tree is `data-h`, and every value
+    is a single number."""
+    import re
+    bad_attr, bad_value = [], []
+    for it in manifest:
+        text = (FURN_DIR / it["file"]).read_text(encoding="utf-8")
+        for name, value in re.findall(r'(data-[a-z-]+)="([^"]*)"', text):
+            if name != "data-h":
+                bad_attr.append(f"{it['id']}: {name}")
+            elif not re.fullmatch(r"-?\d+(\.\d+)?", value):
+                bad_value.append(f"{it['id']}: data-h={value!r}")
+    assert not bad_attr, f"annotations beyond a height: {bad_attr}"
+    assert not bad_value, f"a height that is not one number: {bad_value}"
+
+
+def test_every_annotated_region_reaches_its_stated_height(fp3d, manifest):
+    """THE WHOLE ANNOTATED SET, not a sample. Every `data-h` in the catalog
+    must appear as a real z in the built solid -- an annotation the extruder
+    silently ignored would be invisible in every other test here.
+
+    `elevation_in` IS ADDED, and the first cut of this test forgot it and went
+    red on `kitchen_sink`. That was the test being wrong and the extruder being
+    right, and the distinction is worth keeping: **`data-h` is measured from the
+    ITEM'S BASE, the same datum as `height_in`** -- so a counter-mounted sink's
+    `data-h="2"` is 2in above the counter, not 2in above the floor. An
+    annotation measured from the floor would have to know where the counter is,
+    which is a coordinate, which is the boundary this must not cross."""
+    import re
+    checked = 0
+    for it in manifest:
+        text = (FURN_DIR / it["file"]).read_text(encoding="utf-8")
+        wanted = {float(v) for v in re.findall(r'data-h="([^"]+)"', text)}
+        if not wanted:
+            continue
+        base = float(it.get("elevation_in", 0) or 0)
+        zs = set(_zs(fp3d, fp3d.build_model(_doc(it["id"]))))
+        missing = {h for h in wanted if (h + base) not in zs}
+        assert not missing, f"{it['id']}: annotated {missing}, built {sorted(zs)}"
+        checked += 1
+    assert checked >= 10, f"only {checked} annotated items -- did they vanish?"

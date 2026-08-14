@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 33043ed -->
+<!-- SNAPSHOT-HEAD: bf12498 -->
 
 # Session snapshot — read this first
 
@@ -58,34 +58,39 @@ must not be trusted over it.
 
 ## 0. WHERE THE WORK IS
 
-**`prism` IS MERGED — PR #28 (`33043ed`), Patrick's check passed:** *"I looked -
-prism ships, merge it"*. It changes the 3D view for 27 of 95 items; it was landed
-on `main` in error first, backed out at `72e49cb`, and re-landed through its
-check. **A green gate and a strong number are evidence about the code, neither is
-evidence about the tier.**
+**REGION EXTRUSION IS BUILT AND AT A PR — AMBER, waiting on Patrick's check,
+which is ONE QUESTION: does a sofa read as a sofa.** Branch
+`region-extrusion`; renders at `evidence/seat-check.png` (3D) and
+`evidence/seat-plan-symbols.png` (plan).
 
-**THE LIVE ITEM IS THE RESERVED DECISION, and it is Patrick's — [`handoff/0014`](handoff/0014-report-furniture-regions.md)
-narrows it to one fact.**
+**What it is:** a closed shape in a plan symbol may carry `data-h` — its top
+height above the item's base. Above the body it is a **raised region** (a pillow,
+a bench, a chair back); below it, a **well** (a tub's inside, a sink bowl) and
+the body's top cap is opened for it; not nested, a column of its own. **One
+generator, not four**, and it generalises to every form.
 
-* **The VEHICLE half is settled BY EYE and is not to be re-measured.** Patrick,
-  on a real plan: **tractor, lawn mower and snowblower visibly changed shape;
-  the sofa and the bed in the same view are still slabs.** That is vehicle
-  gaining real geometry and furniture gaining nothing.
-* **THE OUTER OUTLINE IS A PLAIN RECTANGLE FOR 17 OF 18 furniture symbols** —
-  `office_chair` (a circle, 24 vertices) is the only exception. **A 4-vertex
-  prism is a box**, so prism gave the furniture a box by a different route. That
-  number is the honest replacement for 28 → 1, which could not tell *extrudes
-  something* from *extrudes a rectangle*.
-* **CLOSED INTERNAL PATHS EXIST — BUT NOT WHERE IT MATTERS MOST.** Beds carry
-  pillows, `bathtub` its well, `kitchen_sink` its bowls: **13 of 18 items carry
-  at least one filled region, 17 regions in all.** But **`sofa`, `armchair` and
-  `loveseat` draw the back as ONE LINE** — no region, nothing to give a height
-  to — and those are the three seats a room is fullest of. `dining_chair` and
-  `office_chair` draw theirs as a real rect, which is why this is per item and
-  not per form.
-* **The cheap answer costs 17 annotations** in `_gen_assets.py` (where the
-  artwork is already drawn) plus one loop in `build_prism`, which already
-  returns a list of parts. **Costed, not built.**
+**THE ANNOTATION CARRIES A HEIGHT AND NOTHING ELSE.** The artwork says *where* a
+region is and never *what* it is. A heuristic would **invent a number the
+document does not contain** — the same objection that refused `--stack`. A test
+walks every SVG and fails on any `data-` attribute that is not `data-h`.
+
+**The three seats were an ARTWORK fix, not a limit** — `dining_chair` and
+`office_chair` draw their backs as closed rects *in the same form*, so `sofa`,
+`armchair` and `loveseat` were three symbols drawn inconsistently with their
+neighbours. Redrawn. **The tell that it is the right fix: it improves the plan
+symbol on its own terms** — a sofa back has thickness, and a line says it does
+not.
+
+**THE AUTHORING LIST STANDS AT FIVE, three of them done here.** Remaining:
+**`glass_shower`** (no fill at all, still a box) and **`boat_trailer`** (fills,
+but no body — five disconnected slabs). Artwork tasks, kept separate from the
+generators.
+
+**The earlier prism receipt and its correction are in [`handoff/0013`](handoff/0013-report-prism-receipt.md)
+· [`0014`](handoff/0014-report-furniture-regions.md).** The 28 → 1 figure is
+superseded by the honest one: **the outer outline was a plain rectangle for 17 of
+18 furniture symbols**, so prism gave the furniture a box by a different route —
+which is what regions now fix.
 
 **SETTABLE WALL TYPES AND PORCH RAILINGS ARE COMPLETE — 2026‑08‑13, PR #27
 (`3864f38`).** D73 and **D74 both closed**; Patrick's manual check passed and is
@@ -180,8 +185,8 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`33043ed`** — PR #28 (prism), on `72e49cb` (the revert), on PR #27. PRs #19–#28 all merged. |
-| **Branches** | **none open.** |
+| **`main`** | **`bf12498`** — the furniture-region measurement, on `33043ed` (PR #28, prism), on `72e49cb` (the revert), on PR #27. PRs #19–#28 all merged. |
+| **Branches** | **`region-extrusion` — at a PR, AMBER, waiting on Patrick's check.** |
 | **Gate** | `collected=711 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **704 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **75 records**, 29 open. **D73 and D74 both closed** with the wall-types feature. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
