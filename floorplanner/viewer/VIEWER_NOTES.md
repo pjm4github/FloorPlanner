@@ -419,6 +419,30 @@ inset from the body ring at mid-height, the same discriminating shape as
 is this same machinery with **one** ring, for the flat-topped kinds: planters,
 islands, L-shaped desks, round tables.
 
+> ### STATUS 2026‑08‑13 — `prism` WENT FIRST, and the order above is superseded
+>
+> **`prism` is built and is now THE FALLBACK**, in place of the box, for any
+> form whose own generator does not exist yet. The box fallback went **28 → 1**
+> across the catalog (only `glass_shower`, the one symbol drawn entirely in
+> strokes). Receipt: [`../../docs/handoff/0013-report-prism-receipt.md`](../../docs/handoff/0013-report-prism-receipt.md).
+>
+> **Why the order inverted.** This section put `prism` last, as *"the same
+> machinery with one ring"* for a handful of flat-topped kinds — a tidy-up after
+> the lofts. A census then measured what the symbols actually contain and the
+> ruling reversed it: prism **needs no new authoring at all**, consumes data
+> that already exists for every item, and reaches **every** pending form rather
+> than a few flat ones. Building the lofts first would have guaranteed work
+> prism made redundant.
+>
+> **The loft design above still stands, unchanged and still correct** — it is
+> the difference between a car-shaped slab and a car. What changed is its
+> **urgency**: `vehicle` is now 10 of 10 extruded at the right footprint, so the
+> loft buys silhouette rather than presence. The ruling is **re-measure, then
+> decide**, and *"extruded"* and *"looks right"* are different claims.
+>
+> **The one thing here that prism confirmed:** *"the symbol already carries the
+> geometry"*. It does. That finding is what made prism worth doing first.
+
 #### (b) SMOOTH models — glTF chairs and sofas. This one does change the vertex format.
 
 Separated from (a) deliberately: the two look like one task and are not. Here
