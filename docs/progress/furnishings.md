@@ -314,4 +314,67 @@ THE FOUR GENERATORS ARE RETIRED -- Patrick's ruling  2026-08-14
          still a plain rectangle. THE RE-MEASUREMENT STEP IS ONLY AS
          GOOD AS WHAT IT MEASURES, and it took Patrick looking at a real
          plan to find the sofa was still a slab.
+
+THE ENCLOSURE CHECK -- ONE BOX WEARING THREE NAMES  2026-08-15
+         (AMBER, nothing merges; measurement only, no fix)
+         handoff: 0016 (ruling, landed on disk 2026-08-15 after arriving
+         uncommitted), 0017 (the owed measurement, report only)
+         Patrick's check on a real render found what the receipts had
+         been silent about: shower, walk_in_shower and glass_shower are
+         near-identical footprints at the SAME 78" height, so nothing
+         about the extruder's correctness tells them apart. IDENTITY
+         NEEDS A CATEGORICAL CHANNEL, NOT A SCALAR ONE -- the third
+         instance of the rule, the first in 3D. Recorded in
+         WORKING_AGREEMENT.md alongside the first two (thickness,
+         fineness).
+         AND A SEPARATE FINDING, RECEIPT-SHAPED RATHER THAN CHANNEL-
+         SHAPED: "enclosure 6 of 7", the number that helped retire the
+         four furniture generators, counted items that EXTRUDED A BODY
+         -- not items that read as their kind. shower and walk_in_shower
+         both extrude successfully to a box with no internal feature, so
+         the model's own report (which names only items with NOTHING to
+         extrude) cannot see them. Third time this exact substitution has
+         happened on prism's own receipts; recorded as its own entry in
+         WORKING_AGREEMENT.md, a sibling of the surviving-count rule.
+         A FIRST VERDICT WAS WITHDRAWN, NOT OVERRULED: "the boat trailer
+         is chunky" was said about a render that did not contain
+         boat_trailer at all (1 room / 4 walls / 28 furnishings vs the
+         render's 23 rooms / 106 walls / 49 openings). VACUOUS BY
+         PRECONDITION, arriving at a person instead of at code -- the
+         same class the negative-assertion rule already names. Standing
+         fix, recorded in WORKING_AGREEMENT.md: a check request names the
+         plan and lists the items it contains, so the reviewer can verify
+         the subject was in frame before reading the verdict.
+         THE OWED MEASUREMENT (0016 SS5, Code's -- explicitly not a
+         ruling): for walk_in_shower, sauna and whirlpool, does the
+         internal region come out RAISED or as an OPENED CAP (a well)?
+         Answered black-box -- calling only build_model, unmodified, and
+         asking whether a face exists at the body's full height over the
+         region's centre, rather than re-deriving build_prism's own
+         classification lines in a second copy that could drift.
+         Positive control run first (bathtub, a known-correct well, must
+         still read as one -- it does).
+             walk_in_shower  18in region, 78in body  ->  WELL
+             sauna           30in region, 84in body  ->  WELL
+             whirlpool       30in region, 36in body  ->  WELL
+         whirlpool's well is the CORRECT outcome for a vessel. The other
+         two confirm the inference by measurement: form="enclosure"
+         conflates a VESSEL (recess-into-top, right) and a ROOM (a tall
+         hollow volume where a low internal feature should stand on the
+         floor, not recess into the ceiling) -- a defect only Patrick can
+         rule on, per his own instruction not to infer past the picture.
+         AUTHORING LIST, RECONCILED: glass_shower and boat_trailer carry
+         forward. shower and walk_in_shower join it (0016 SS4) for the
+         featureless-box reason above -- both artwork, not code. sauna
+         and whirlpool are NOT on it: their question is the form split,
+         not the artwork. boat_trailer's own verdict is SEPARATED OUT
+         (0016 SS5c): its form is vehicle, the one generator 0015 did not
+         retire, and its failure -- five disconnected filled fragments --
+         is what an open-frame plan symbol gives you; the likely fix is
+         the loft design already in VIEWER_NOTES SS5, not a redraw. It is
+         not sent for a redraw until that is decided.
+         ORDER, AS RULED: the SS5 measurement first (done, this entry),
+         since redrawing an artwork item the extruder would still punch
+         a hole in is work done twice. The redraws wait on Patrick's
+         ruling on the form split.
 ```
