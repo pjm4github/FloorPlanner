@@ -630,3 +630,35 @@ never landed, because one script skipped silently on a conditional and the
 other raised and was committed through anyway. The gate was green both times —
 **a green gate says nothing about whether a document edit applied.** Grep for
 the added text before writing the commit message that claims it.
+
+### A STATUS BOARD IS GENERATED, OR IT LIES — settled 2026‑08‑15
+
+**Three instances, and the third is why this is a rule rather than an
+observation.** `SESSION_SNAPSHOT.md` went **eight commits** stale while
+carrying a warning about staleness in the same section. `defects/INDEX.md` was
+fixed by **generation plus a `--check` that fails the gate**, and has not
+drifted since. **`V5_MIGRATION_PLAN.md`'s Status table showed `☐` beside P5.2
+for two days after it shipped** — nobody was watching it, because **ticking a
+box feels like recording rather than like authoring**, and it is the second.
+
+**NO PERSON AND NO AGENT OWNS A STATUS TABLE. The generator owns it and the
+gate enforces it.** Assigning it to the implementer makes it a step skipped
+under pressure; to the reviewer, a relay; to Patrick, clerking his own
+project. All three are only as fresh as the last time someone remembered.
+
+**IF A FACT CANNOT BE DERIVED FROM THE RECORD, MAKE THE RECORD CARRY IT —
+DO NOT HAND-TICK A BOX.** A tick that the record does not support is a claim
+outrunning its evidence.
+
+**AND A CLOSED DOCUMENT'S STATUS TABLE IS HISTORY: IT FREEZES AT THE
+CLOSURE.** Forward status inside a closed document is how P5.2's row came to
+lie. The acceptance archive and the live board are different genres with
+different readers — **the same reason a progress entry cites its handoff
+instead of restating it.**
+
+*(Landed verbatim per [`handoff/0019-ruling.md`](handoff/0019-ruling.md) §5,
+which is explicit that Code writes this text in and the reviewer does not edit
+this file. The generator, the freeze, and the read-back that must precede
+building either are §§1–4 of that ruling, not repeated here — this file keeps
+the durable rule, the handoff keeps the mechanism. Ordered behind the
+vessel/enclosure split, `0018`, per the ruling's own §6.)*
