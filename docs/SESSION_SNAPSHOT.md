@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: d7db1d8 -->
+<!-- SNAPSHOT-HEAD: c214619 -->
 
 # Session snapshot — read this first
 
@@ -105,10 +105,10 @@ protect has mostly already passed.**
    control then caught a second bug in its own first draft: `sip.voidptr[i]`
    is a truthy `bytes` regardless of value, so the first cut reported every
    pixel painted. `tests/test_furnishings.py`, three tests, fail-first checked.
-3. **The two artwork items remain, with D71 now standing behind them.**
+3. **THE LIVE ITEM: the two artwork redraws, with D71 now standing behind them.**
    **`glass_shower`**, drawn entirely in strokes, and **`boat_trailer`**, whose
    five filled fragments extrude as five slabs and no trailer. **Both are
-   redraws, not code — the live item.**
+   redraws, not code.**
 
 **THEN GRID SNAP — the inversion.** The largest daily-use improvement left on
 the board, and **fully specified**: snap-by-default; **shift means
@@ -220,8 +220,8 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`d7db1d8`** — the channel-contract change, on `4c69013` (generators retired), on `d10d02c` (furnishings close-out), on PR #29/#28/#27. PRs #19–#29 all merged. This branch (`batch-d72-d71`) is cut against its own uncommitted tip, D72+D71 done. |
-| **Branches** | **`batch-d72-d71`** — D72 and D71 done, not yet committed/merged; the two artwork redraws remain on it. |
+| **`main`** | **`c214619`** — PR #30 (D72+D71), on `d7db1d8` (channel contract), on `4c69013` (generators retired), on `d10d02c` (furnishings close-out). PRs #19–#30 all merged. |
+| **Branches** | **none open.** |
 | **Gate** | `collected=727 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **720 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **75 records**, **27 open**. **D71 and D72 both closed**, 2026‑08‑15. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
