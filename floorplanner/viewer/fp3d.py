@@ -600,8 +600,8 @@ def _box(corners_xy, z0, z1):
 # `prism` -- extruding the symbol's true SVG outline -- IS NOW BUILT, and it is
 # also THE FALLBACK: a form whose own generator does not exist yet is drawn from
 # its plan symbol rather than as a rectangle. See PRISM IS THE FALLBACK below.
-KNOWN_FORMS = ("box", "slab", "seat", "bed", "basin", "enclosure", "vehicle",
-               "planting", "prism")
+KNOWN_FORMS = ("box", "slab", "seat", "bed", "basin", "enclosure", "vessel",
+               "vehicle", "planting", "prism")
 BUILT_FORMS = ("box", "slab", "prism")
 
 
@@ -610,8 +610,16 @@ def _plan_quad(place, x0, x1, y0, y1):
     return [place(x0, y0), place(x1, y0), place(x1, y1), place(x0, y1)]
 
 
-def build_prism(place, w, d, h, z0, outline):
+def build_prism(place, w, d, h, z0, outline, form="prism"):
     """The plan symbol, extruded. `outline` is `svg_outlines()`'s return.
+
+    `form` is the item's CATALOG form (`"vessel"`, `"enclosure"`, ...), not the
+    generic `"prism"` dispatch tag `build_model` reassigns once it decides to
+    fall back here -- the caller must pass the real one through, or this
+    cannot tell a tub from a shower stall. Defaults to `"prism"`, which is
+    deliberately not `"enclosure"`: an item whose catalog form literally is
+    `prism` was never a room, so it keeps the general (vessel-shaped) rule
+    below rather than needing a special case of its own.
 
     THE MAPPING, and the y flip in it is not cosmetic. A symbol point `(sx, sy)`
     sits at `(px - W/2 + sx, py - H/2 + sy)` in the EDITOR's scene, where y
@@ -624,11 +632,18 @@ def build_prism(place, w, d, h, z0, outline):
     Scaled by `w/W`, `d/H` rather than assumed equal, so an item whose document
     size differs from its symbol's viewBox still comes out the right size.
 
-    Returns [] when nothing could be extruded, which the caller reports.
+    RETURNS (body_parts, region_parts) -- TWO LISTS, NOT ONE (handoff 0018
+    SS6: "materials attach to PARTS, not to ITEMS"). `region_parts` is the
+    well or the raised region -- a vessel's water, an enclosure's bench or
+    stove -- which the caller may colour differently from the body. A
+    "beside" part (a chair back beside its seat, not covered by this
+    ruling's table) stays grouped with the body, so every item this ruling
+    does not touch keeps today's one-material behaviour unchanged. Both
+    lists are `[]` when nothing could be extruded, which the caller reports.
     """
     shapes, (vw, vh) = outline
     if not shapes or vw <= 0 or vh <= 0:
-        return []
+        return [], []
     sx, sy = w / vw, d / vh
 
     def to_world(ring):
@@ -642,18 +657,44 @@ def build_prism(place, w, d, h, z0, outline):
     body = shapes[0]
     body_h = body.h if body.h is not None else h
 
-    wells, raised, beside = [], [], []
+    # A VESSEL'S INTERNAL REGION IS A RECESS; AN ENCLOSURE'S IS A SOLID
+    # STANDING ON THE FLOOR (handoff 0018 SS4) -- and "ON THE FLOOR" IS THE
+    # PART THAT CHANGES THE EXTRUSION, NOT JUST THE CLASSIFICATION.
+    #
+    # "on_body" (a pillow on a mattress, a back on a seat) sits ON TOP of the
+    # body: it extrudes from body_h up to its own height, and that formula
+    # ONLY makes sense when body_h is the item's own surface -- furniture,
+    # where the region genuinely rests on something.
+    #
+    # An enclosure's body_h is the WALL height, not a surface anything rests
+    # on, so a bench or a stove must extrude from THE FLOOR (z0) to its own
+    # height -- THE SAME FORMULA "beside" already uses. The first cut of this
+    # fix reused the on_body formula for enclosures too and built walk_in_
+    # shower's bench spanning 18in TO 78in -- a column hanging near the
+    # ceiling -- instead of 0 to 18in standing on the floor. Caught by
+    # dumping the mesh's own bounding box, not by the roof-over signal, which
+    # only ever asked about the CAP and had nothing to say about where the
+    # bench itself ended up.
+    #
+    # NOT A HEIGHT THRESHOLD: the split is categorical, on the catalog's own
+    # form, not on body_h -- a threshold here would repeat the
+    # lawnmower/snowblower mistake (0012-ruling.md) one level up.
+    is_enclosure = form == "enclosure"
+    wells, on_body, grounded, beside = [], [], [], []
     for p in shapes[1:]:
         if not p.nested:
             beside.append(p)
         elif p.h is None:
             continue                 # decoration: it would z-fight the face
+        elif is_enclosure:
+            grounded.append(p)       # a bench, a stove -- stands on the floor
         elif p.h < body_h:
             wells.append(p)          # a tub's well, a sink's bowl
         else:
-            raised.append(p)         # a pillow, a bench, a headrest
+            on_body.append(p)        # a pillow, a headrest -- sits ON the body
 
-    out, well_rings = [], [to_world(p.ring) for p in wells]
+    body_parts, region_parts = [], []
+    well_rings = [to_world(p.ring) for p in wells]
     body_ring = to_world(body.ring)
 
     if well_rings:
@@ -661,25 +702,29 @@ def build_prism(place, w, d, h, z0, outline):
         if top is None:
             # A hole that will not bridge falls back to a SOLID body rather
             # than to a wrong one, and the caller reports it.
-            out.append(_extrude(body_ring, z0, z0 + body_h))
+            body_parts.append(_extrude(body_ring, z0, z0 + body_h))
             well_rings = []
         else:
-            out.append(top)
-            out.append(_cap(body_ring, [], z0, up=False))
-            out.append(_wall(body_ring, z0, z0 + body_h, outward=True))
+            body_parts.append(top)
+            body_parts.append(_cap(body_ring, [], z0, up=False))
+            body_parts.append(_wall(body_ring, z0, z0 + body_h, outward=True))
             for p, wr in zip(wells, well_rings, strict=True):
-                out.append(_wall(wr, z0 + p.h, z0 + body_h, outward=False))
-                out.append(_cap(wr, [], z0 + p.h, up=True))
+                region_parts.append(_wall(wr, z0 + p.h, z0 + body_h,
+                                          outward=False))
+                region_parts.append(_cap(wr, [], z0 + p.h, up=True))
     else:
-        out.append(_extrude(body_ring, z0, z0 + body_h))
+        body_parts.append(_extrude(body_ring, z0, z0 + body_h))
 
-    for p in raised:                 # sits ON the body
-        out.append(_extrude(to_world(p.ring), z0 + body_h, z0 + p.h))
-    for p in beside:                 # its own column, from the floor
+    for p in on_body:                 # sits ON the body -- a region
+        region_parts.append(_extrude(to_world(p.ring), z0 + body_h, z0 + p.h))
+    for p in grounded:                 # stands on the FLOOR -- also a region
+        region_parts.append(_extrude(to_world(p.ring), z0, z0 + p.h))
+    for p in beside:                 # its own column, from the floor -- BODY
         top = z0 + (p.h if p.h is not None else h)
-        out.append(_extrude(to_world(p.ring), z0, top))
+        body_parts.append(_extrude(to_world(p.ring), z0, top))
 
-    return [o for o in out if o is not None]
+    return ([o for o in body_parts if o is not None],
+            [o for o in region_parts if o is not None])
 
 
 def build_solid(form, place, w, d, h, z0, outline=None):
@@ -691,10 +736,19 @@ def build_solid(form, place, w, d, h, z0, outline=None):
     built exactly like a floor-standing one, higher up.
 
     `outline` is the item's plan symbol when one could be read; `prism` needs
-    it and every other generator ignores it."""
+    it and every other generator ignores it.
+
+    THIS FUNCTION'S CONTRACT STAYS A SINGLE FLAT LIST -- `build_prism`'s own
+    body/region split (0018 SS6) is flattened back together here, because
+    `build_solid` has no `region_material` parameter to route a second list
+    to. Only `build_model`'s direct call to `build_prism` uses the split;
+    every other caller of THIS function keeps one material per item, exactly
+    as before."""
     z1 = z0 + h
     if form == "prism":
-        parts = build_prism(place, w, d, h, z0, outline or ([], (0.0, 0.0)))
+        body, region = build_prism(place, w, d, h, z0,
+                                   outline or ([], (0.0, 0.0)))
+        parts = body + region
         if parts:
             return parts
         # falls through to the box -- the CALLER reports it, because only the
@@ -1109,6 +1163,12 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             elev = float(spec.get("elevation_in", 0.0) or 0.0)
             mat = spec.get("material") or "unknown"
             form = spec.get("form") or "box"
+            # PRESERVED BEFORE `form` GETS OVERWRITTEN TO THE GENERIC "prism"
+            # DISPATCH TAG BELOW -- `build_prism` needs the real catalog form
+            # ("vessel" vs "enclosure") to decide whether an internal region
+            # may recess (handoff 0018 SS4), and by the time `form == "prism"`
+            # is checked further down, this is the only place that still knows.
+            catalog_form = form
             outline = None
             if form not in KNOWN_FORMS:
                 # A form nothing recognises is a catalog the viewer cannot
@@ -1154,19 +1214,32 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             # `build_solid` falls back silently by design (it does not know the
             # kind, so it cannot name it), which means its return is non-empty
             # either way and tells the caller nothing.
-            solid = None
+            # BODY and REGION may carry DIFFERENT materials (0018 SS6): a
+            # vessel's region is its declared contents (water, translucent);
+            # an enclosure's is a solid standing on the floor (a bench, a
+            # stove). Falls back to the body's own material when the catalog
+            # states none, which is every item this ruling does not touch.
+            region_mat = spec.get("region_material") or mat
+            if _colour(materials, region_mat) is None:
+                unknown_mat.add(region_mat)
+                region_mat = "unknown"
+
+            body_solid, region_solid = None, None
             if form == "prism":
-                solid = build_prism(place, fw, fd, fh, z,
-                                    outline or ([], (0.0, 0.0)))
-                if solid:
+                body_solid, region_solid = build_prism(
+                    place, fw, fd, fh, z, outline or ([], (0.0, 0.0)),
+                    form=catalog_form)
+                if body_solid or region_solid:
                     by_prism.add(kind)
                 else:                    # a ring that would not triangulate
                     form = "box"
                     by_prism.discard(kind)
                     still_box.add(kind)
-            if not solid:
-                solid = build_solid(form, place, fw, fd, fh, z, outline)
-            parts.setdefault(mat, []).extend(solid)
+            if not body_solid and not region_solid:
+                body_solid = build_solid(form, place, fw, fd, fh, z, outline)
+            parts.setdefault(mat, []).extend(body_solid or [])
+            if region_solid:
+                parts.setdefault(region_mat, []).extend(region_solid)
             n_furn += 1
         for mat, plist in parts.items():
             v, f = _merge(plist)

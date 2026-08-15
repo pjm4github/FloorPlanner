@@ -53,6 +53,31 @@ answers: **floors and furnishings are geometry** (both are already
 `build_model` parameters); **openings are probably geometry too**, since they cut
 wall meshes; a future *wireframe* or *palette* switch would be view-side.
 
+## A MANUAL CHECK HAS NOW WANTED IT — noted 2026‑08‑15, handoff 0018 §7
+
+**The instance is `walk_in_shower`'s bench.** [`handoff/0018-ruling.md`](../handoff/0018-ruling.md)'s
+check named it as the row that carries the verdict — *"its body is translucent
+glass, so the interior is visible from outside… the only one of the three where
+the correct state can be seen."* **Measured, and it is not**: the bench's
+geometry is correct (confirmed by dumping the mesh directly — the right
+position, the right size, the right material bucket), but the `fp3d.py` CLI
+viewer does not visibly composite an opaque interior mesh through a translucent
+body, at any glass alpha tested (0.35 and 0.12 both tried; the bench is equally
+invisible at both).
+
+**`sauna`'s interior was already named as unobservable** at the ruling's own
+§7 — an OPAQUE enclosure hides its interior structurally, by design, which is
+a different and unavoidable limit. `walk_in_shower`'s case is sharper: its body
+is deliberately translucent *so that* the interior would be visible, and it
+still is not — a **renderer** limit, not a **material-choice** limit.
+
+**Not built here — still not scope for this task.** Recorded because two
+manual checks in one ruling have now individually reached for exactly this
+requirement, which is worth knowing when this record's design pass is finally
+taken: **"reveal an opaque interior mesh behind/inside a translucent body" is
+not a hypothetical use case invented for the panel — it is the second real
+check that needed it.**
+
 ## Ruling
 
 *(Open — filed 2026‑08‑11.)* **Requirement filed, design deferred.** The

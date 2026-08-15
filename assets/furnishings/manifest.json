@@ -10,6 +10,7 @@
     "elevation_in": 0,
     "form": "seat",
     "material": "soft",
+    "region_material": null,
     "price": 650.0
   },
   {
@@ -23,6 +24,7 @@
     "elevation_in": 0,
     "form": "seat",
     "material": "soft",
+    "region_material": null,
     "price": 480.0
   },
   {
@@ -36,6 +38,7 @@
     "elevation_in": 0,
     "form": "seat",
     "material": "soft",
+    "region_material": null,
     "price": 300.0
   },
   {
@@ -49,6 +52,7 @@
     "elevation_in": 0,
     "form": "slab",
     "material": "wood",
+    "region_material": null,
     "price": 120.0
   },
   {
@@ -62,6 +66,7 @@
     "elevation_in": 0,
     "form": "slab",
     "material": "wood",
+    "region_material": null,
     "price": 80.0
   },
   {
@@ -75,6 +80,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 180.0
   },
   {
@@ -88,6 +94,7 @@
     "elevation_in": 42,
     "form": "box",
     "material": "screen",
+    "region_material": null,
     "price": 300.0
   },
   {
@@ -101,6 +108,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "stone",
+    "region_material": null,
     "price": 2000.0
   },
   {
@@ -114,6 +122,7 @@
     "elevation_in": 0,
     "form": "slab",
     "material": "wood",
+    "region_material": null,
     "price": 450.0
   },
   {
@@ -127,6 +136,7 @@
     "elevation_in": 0,
     "form": "slab",
     "material": "wood",
+    "region_material": null,
     "price": 400.0
   },
   {
@@ -140,6 +150,7 @@
     "elevation_in": 0,
     "form": "seat",
     "material": "wood",
+    "region_material": null,
     "price": 50.0
   },
   {
@@ -153,6 +164,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 350.0
   },
   {
@@ -166,6 +178,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 400.0
   },
   {
@@ -179,6 +192,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 825.0
   },
   {
@@ -192,6 +206,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 710.0
   },
   {
@@ -205,6 +220,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 385.0
   },
   {
@@ -218,6 +234,7 @@
     "elevation_in": 26,
     "form": "basin",
     "material": "metal",
+    "region_material": null,
     "price": 240.0
   },
   {
@@ -231,6 +248,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 290.0
   },
   {
@@ -244,6 +262,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 360.0
   },
   {
@@ -257,6 +276,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 360.0
   },
   {
@@ -270,6 +290,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 440.0
   },
   {
@@ -283,6 +304,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 585.0
   },
   {
@@ -296,6 +318,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 610.0
   },
   {
@@ -309,6 +332,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 720.0
   },
   {
@@ -322,6 +346,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 825.0
   },
   {
@@ -335,6 +360,7 @@
     "elevation_in": 54,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 250.0
   },
   {
@@ -348,6 +374,7 @@
     "elevation_in": 54,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 340.0
   },
   {
@@ -361,6 +388,7 @@
     "elevation_in": 54,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 425.0
   },
   {
@@ -374,6 +402,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 1450.0
   },
   {
@@ -387,6 +416,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 2100.0
   },
   {
@@ -400,6 +430,7 @@
     "elevation_in": 0,
     "form": "bed",
     "material": "soft",
+    "region_material": null,
     "price": 650.0
   },
   {
@@ -413,6 +444,7 @@
     "elevation_in": 0,
     "form": "bed",
     "material": "soft",
+    "region_material": null,
     "price": 500.0
   },
   {
@@ -426,6 +458,7 @@
     "elevation_in": 0,
     "form": "bed",
     "material": "soft",
+    "region_material": null,
     "price": 400.0
   },
   {
@@ -439,6 +472,7 @@
     "elevation_in": 0,
     "form": "bed",
     "material": "soft",
+    "region_material": null,
     "price": 300.0
   },
   {
@@ -452,6 +486,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 100.0
   },
   {
@@ -465,6 +500,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 150.0
   },
   {
@@ -476,8 +512,9 @@
     "depth_in": 60,
     "height_in": 20,
     "elevation_in": 0,
-    "form": "enclosure",
+    "form": "vessel",
     "material": "porcelain",
+    "region_material": "water",
     "price": 500.0
   },
   {
@@ -491,6 +528,7 @@
     "elevation_in": 0,
     "form": "enclosure",
     "material": "glass",
+    "region_material": null,
     "price": 700.0
   },
   {
@@ -504,6 +542,7 @@
     "elevation_in": 0,
     "form": "enclosure",
     "material": "glass",
+    "region_material": "stone",
     "price": 2500.0
   },
   {
@@ -517,6 +556,7 @@
     "elevation_in": 0,
     "form": "enclosure",
     "material": "glass",
+    "region_material": null,
     "price": 3000.0
   },
   {
@@ -530,6 +570,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "porcelain",
+    "region_material": null,
     "price": 175.0
   },
   {
@@ -543,6 +584,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 600.0
   },
   {
@@ -556,6 +598,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 450.0
   },
   {
@@ -569,6 +612,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 750.0
   },
   {
@@ -582,6 +626,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 950.0
   },
   {
@@ -595,6 +640,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 500.0
   },
   {
@@ -608,6 +654,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 500.0
   },
   {
@@ -621,6 +668,7 @@
     "elevation_in": 0,
     "form": "vehicle",
     "material": "vehicle",
+    "region_material": null,
     "price": 16000.0
   },
   {
@@ -634,6 +682,7 @@
     "elevation_in": 0,
     "form": "vehicle",
     "material": "vehicle",
+    "region_material": null,
     "price": 12000.0
   },
   {
@@ -647,6 +696,7 @@
     "elevation_in": 0,
     "form": "vehicle",
     "material": "vehicle",
+    "region_material": null,
     "price": 6000.0
   },
   {
@@ -660,6 +710,7 @@
     "elevation_in": 0,
     "form": "vehicle",
     "material": "vehicle",
+    "region_material": null,
     "price": 250.0
   },
   {
@@ -673,6 +724,7 @@
     "elevation_in": 0,
     "form": "vehicle",
     "material": "vehicle",
+    "region_material": null,
     "price": 4500.0
   },
   {
@@ -686,6 +738,7 @@
     "elevation_in": 0,
     "form": "slab",
     "material": "wood",
+    "region_material": null,
     "price": 150.0
   },
   {
@@ -699,6 +752,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 150.0
   },
   {
@@ -712,6 +766,7 @@
     "elevation_in": 0,
     "form": "vehicle",
     "material": "vehicle",
+    "region_material": null,
     "price": 150.0
   },
   {
@@ -725,6 +780,7 @@
     "elevation_in": 0,
     "form": "vehicle",
     "material": "vehicle",
+    "region_material": null,
     "price": 13000.0
   },
   {
@@ -738,6 +794,7 @@
     "elevation_in": 0,
     "form": "vehicle",
     "material": "vehicle",
+    "region_material": null,
     "price": 1200.0
   },
   {
@@ -751,6 +808,7 @@
     "elevation_in": 0,
     "form": "vehicle",
     "material": "vehicle",
+    "region_material": null,
     "price": 1100.0
   },
   {
@@ -764,6 +822,7 @@
     "elevation_in": 0,
     "form": "vehicle",
     "material": "vehicle",
+    "region_material": null,
     "price": 500.0
   },
   {
@@ -777,6 +836,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 70.0
   },
   {
@@ -790,6 +850,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 35.0
   },
   {
@@ -803,6 +864,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 300.0
   },
   {
@@ -816,6 +878,7 @@
     "elevation_in": 0,
     "form": "slab",
     "material": "metal",
+    "region_material": null,
     "price": 500.0
   },
   {
@@ -829,6 +892,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 2500.0
   },
   {
@@ -842,6 +906,7 @@
     "elevation_in": 0,
     "form": "slab",
     "material": "metal",
+    "region_material": null,
     "price": 2000.0
   },
   {
@@ -855,6 +920,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 200.0
   },
   {
@@ -868,6 +934,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 1000.0
   },
   {
@@ -881,6 +948,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 180.0
   },
   {
@@ -894,6 +962,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 300.0
   },
   {
@@ -907,6 +976,7 @@
     "elevation_in": 0,
     "form": "seat",
     "material": "soft",
+    "region_material": null,
     "price": 150.0
   },
   {
@@ -920,6 +990,7 @@
     "elevation_in": 0,
     "form": "enclosure",
     "material": "wood",
+    "region_material": "metal",
     "price": 3500.0
   },
   {
@@ -933,6 +1004,7 @@
     "elevation_in": 0,
     "form": "slab",
     "material": "wood",
+    "region_material": null,
     "price": 1500.0
   },
   {
@@ -944,8 +1016,9 @@
     "depth_in": 180,
     "height_in": 40,
     "elevation_in": 0,
-    "form": "enclosure",
-    "material": "water",
+    "form": "vessel",
+    "material": "porcelain",
+    "region_material": "water",
     "price": 15000.0
   },
   {
@@ -957,8 +1030,9 @@
     "depth_in": 84,
     "height_in": 36,
     "elevation_in": 0,
-    "form": "enclosure",
-    "material": "water",
+    "form": "vessel",
+    "material": "porcelain",
+    "region_material": "water",
     "price": 6500.0
   },
   {
@@ -972,6 +1046,7 @@
     "elevation_in": 0,
     "form": "slab",
     "material": "wood",
+    "region_material": null,
     "price": 350.0
   },
   {
@@ -985,6 +1060,7 @@
     "elevation_in": 0,
     "form": "seat",
     "material": "soft",
+    "region_material": null,
     "price": 120.0
   },
   {
@@ -998,6 +1074,7 @@
     "elevation_in": 0,
     "form": "slab",
     "material": "wood",
+    "region_material": null,
     "price": 450.0
   },
   {
@@ -1011,6 +1088,7 @@
     "elevation_in": 0,
     "form": "slab",
     "material": "wood",
+    "region_material": null,
     "price": 400.0
   },
   {
@@ -1024,6 +1102,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 180.0
   },
   {
@@ -1037,6 +1116,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 250.0
   },
   {
@@ -1050,6 +1130,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 1200.0
   },
   {
@@ -1063,6 +1144,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 1500.0
   },
   {
@@ -1076,6 +1158,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 2400.0
   },
   {
@@ -1089,6 +1172,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 700.0
   },
   {
@@ -1102,6 +1186,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 600.0
   },
   {
@@ -1115,6 +1200,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 700.0
   },
   {
@@ -1128,6 +1214,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 1500.0
   },
   {
@@ -1141,6 +1228,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 1200.0
   },
   {
@@ -1154,6 +1242,7 @@
     "elevation_in": 48,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 500.0
   },
   {
@@ -1167,6 +1256,7 @@
     "elevation_in": 42,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 550.0
   },
   {
@@ -1180,6 +1270,7 @@
     "elevation_in": 24,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 9200.0
   },
   {
@@ -1193,6 +1284,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 900.0
   },
   {
@@ -1206,6 +1298,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 1200.0
   },
   {
@@ -1219,6 +1312,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "wood",
+    "region_material": null,
     "price": 3500.0
   },
   {
@@ -1232,6 +1326,7 @@
     "elevation_in": 0,
     "form": "box",
     "material": "metal",
+    "region_material": null,
     "price": 40000.0
   }
 ]
