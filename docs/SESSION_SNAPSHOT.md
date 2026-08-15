@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 857e2d5 -->
+<!-- SNAPSHOT-HEAD: bf22ee2 -->
 
 # Session snapshot — read this first
 
@@ -297,7 +297,7 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | still **`0680c80`**, unmoved — `0018`+`0019-ruling.md` landed there. This branch (`d74-vessel-enclosure-split`) is now at **`857e2d5`**: `0020-ruling.md` landing plus the vessel/enclosure split, and `0022`–`0024`'s remedies (evidence render, `WORKING_AGREEMENT.md`'s fourth positive-control member, D76/D77) are being committed on top of it. |
+| **`main`** | still **`0680c80`**, unmoved — `0018`+`0019-ruling.md` landed there. This branch (`d74-vessel-enclosure-split`) is now at **`bf22ee2`**: `0020-ruling.md` landing plus the vessel/enclosure split (`857e2d5`), then `0022`–`0024`'s remedies (evidence render, `WORKING_AGREEMENT.md`'s fourth positive-control member, D76/D77, `bf22ee2`), then a follow-up committing Cowork's concurrent `channel-commands.svg` update (the `0023` session-continuity content pictured). |
 | **Branches** | **`d74-vessel-enclosure-split`** — at a PR, AMBER, waiting on Patrick's check; every row of the check now has a render (see §0). |
 | **Gate** | on this branch at `857e2d5`: `collected=727 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **720 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **78 records**, **30 open**. **D75, D76, D77 filed** (D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`). `python tools/gate.py --docs` GREEN. |
