@@ -16,7 +16,7 @@ opened: 2026-08-11
 closed: null
 closed_by: null
 rank: 70
-related: [68, 50]
+related: [68, 50, 76]
 state_source: row
 github_issue: null
 ---
@@ -77,6 +77,12 @@ requirement, which is worth knowing when this record's design pass is finally
 taken: **"reveal an opaque interior mesh behind/inside a translucent body" is
 not a hypothetical use case invented for the panel — it is the second real
 check that needed it.**
+
+**The non-compositing itself now has its own record, [D76](0076-an-opaque-mesh-inside-a-translucent-body-does.md)**,
+per [`handoff/0022-ruling.md`](../handoff/0022-ruling.md) §4 — a rendering
+limitation with a general statement, not a line item of this panel's design.
+A components panel that simply *hides* the body is a workaround for D76, not
+a fix of it; read D76 before assuming this panel closes that gap.
 
 ## Ruling
 

@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 0680c80 -->
+<!-- SNAPSHOT-HEAD: 857e2d5 -->
 
 # Session snapshot — read this first
 
@@ -59,11 +59,14 @@ must not be trusted over it.
 ## 0. WHERE THE WORK IS
 
 **THE VESSEL/ENCLOSURE SPLIT IS BUILT AND AT A PR — AMBER, waiting on Patrick's
-check.** [`handoff/0018-ruling.md`](handoff/0018-ruling.md) ruled it (and found
-`0017`'s control was pointed the wrong way — every case, control included,
-expected and got the same answer, a third member of the positive-control
-family); [`handoff/0021-report.md`](handoff/0021-report.md) is the build, opening
-the PR per [`0020-ruling.md`](handoff/0020-ruling.md)'s protocol.
+check, and every row of the check now has a render.** [`handoff/0018-ruling.md`](handoff/0018-ruling.md)
+ruled it (and found `0017`'s control was pointed the wrong way — every case,
+control included, expected and got the same answer, a third member of the
+positive-control family); [`handoff/0021-report.md`](handoff/0021-report.md) is
+the build, opening the PR per [`0020-ruling.md`](handoff/0020-ruling.md)'s
+protocol; [`handoff/0022-ruling.md`](handoff/0022-ruling.md) accepted the
+control and ruled row 1 not discharged by the mesh numbers alone; [`handoff/0024-report.md`](handoff/0024-report.md)
+built the remedy — see below.
 
 **`KNOWN_FORMS` gains `vessel`. `build_prism` now asks ONE categorical
 question** — does this form allow a recess: `vessel` (`bathtub`, `swim_spa`,
@@ -82,15 +85,28 @@ carrying two facts.
 > touched the cap. A control proves the question it was built to answer, no
 > more.
 
-**ONE THING THE RENDER CANNOT SHOW, confirmed by dumping the built mesh
-directly:** `walk_in_shower`'s bench is the right size, material and position,
-and **does not appear in the render at any glass transparency tested.** The
-`fp3d.py` CLI does not composite an opaque interior mesh through a translucent
-body. Noted against [D69](defects/0069-an-auxiliary-control-panel-on-the-3d-view.md)
-rather than fixed — the check's row for `walk_in_shower` is answered from the
-mesh numbers instead of the picture. **[D75](defects/0075-a-recessed-floor-feature-is-not-representable.md)
+**A RENDERER LIMIT, NOW ITS OWN RECORD — [D76](defects/0076-an-opaque-mesh-inside-a-translucent-body-does.md),
+filed 2026‑08‑15 per [`0022-ruling.md`](handoff/0022-ruling.md) §4, cross-referenced
+to D69 rather than buried in it.** `walk_in_shower`'s bench is the right size,
+material and position (confirmed by dumping the built mesh directly), and does
+not composite through the translucent body at any glass alpha tested — general
+statement: **an opaque mesh inside a translucent one does not composite in
+`fp3d.py`'s viewer, at all.** **Row 1 is NOT discharged by the mesh numbers
+alone** ([`0022-ruling.md`](handoff/0022-ruling.md) §3 — a geometric receipt
+proves position, not that the bench *reads as a bench*): the remedy is
+[`evidence/enclosure-bodies-omitted.png`](evidence/enclosure-bodies-omitted.png),
+a render from a new evidence script
+([`evidence/enclosure_bodies_omitted_render.py`](evidence/enclosure_bodies_omitted_render.py))
+that drops exactly one mesh — `walk_in_shower`'s glass body, the only glass
+item in the fixture — from `build_model`'s own unmodified output. Nothing
+invented; every remaining mesh is real and already measured. **[D75](defects/0075-a-recessed-floor-feature-is-not-representable.md)
 filed alongside the split** — an enclosure's region can only stand on the
-floor, never recess into it; no catalog item needs this today.
+floor, never recess into it; no catalog item needs this today. **[D77](defects/0077-fp3d-py-shot-reports-success-on-a-failed.md)
+filed while building the render** — `fp3d.py --shot` prints `wrote` and writes
+nothing when the offscreen platform cannot create a GL context, because
+`.save()`'s return value is never checked; not fixed, out of scope.
+**"A control proves the question it was built to answer, and no more" is now
+the positive-control family's fourth member, landed in [`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md).**
 
 **Prism (PR #28) and region extrusion (PR #29) are still merged, and `seat`,
 `bed`, `basin` are still RETIRED** ([`handoff/0015-ruling.md`](handoff/0015-ruling.md)).
@@ -151,11 +167,13 @@ failing or unsure one goes to the reviewer and becomes the next ruling.
    is a truthy `bytes` regardless of value, so the first cut reported every
    pixel painted. `tests/test_furnishings.py`, three tests, fail-first checked.
 3. ~~**AWAITING PATRICK: does `0017`'s measurement confirm a second form?**~~
-   **RULED AND BUILT, 2026‑08‑15 — AT A PR, AWAITING THE CHECK.** See §0.
-   `enclosure` splits categorically, not on a threshold; materials split with
-   it; a second bug (the bench's extrusion direction) found by dumping the
-   mesh; one thing the render cannot show, noted against D69; D75 filed as the
-   accepted limit.
+   **RULED AND BUILT, 2026‑08‑15 — AT A PR, AWAITING THE CHECK, EVERY ROW NOW
+   HAS A RENDER.** See §0. `enclosure` splits categorically, not on a
+   threshold; materials split with it; a second bug (the bench's extrusion
+   direction) found by dumping the mesh; the non-compositing renderer limit is
+   now its own record (D76, cross-referenced to D69) with row 1 answered by an
+   evidence render rather than carried on the mesh numbers alone; D75 filed as
+   the accepted limit; D77 filed on a tooling gap found building the render.
 4. **THE AUTHORING LIST — four items, one of them provisional.**
    **`glass_shower`** (no fill at all) and **`boat_trailer`** carry forward;
    **`shower`** and **`walk_in_shower`** join (they extrude to a *featureless*
@@ -279,10 +297,10 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`0680c80`** — `0018`+`0019-ruling.md` landed. This branch (`d74-vessel-enclosure-split`) carries `0020-ruling.md` landing plus the vessel/enclosure split, at a PR, AMBER. |
-| **Branches** | **`d74-vessel-enclosure-split`** — at a PR, AMBER, waiting on Patrick's check (row 1 of it answered from mesh numbers, not the render — see §0). |
-| **Gate** | on this branch: `collected=727 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **720 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **76 records**, **28 open**. **D75 filed** (accepted limit, D44's precedent); **D69 noted**. `python tools/gate.py --docs` GREEN. |
+| **`main`** | still **`0680c80`**, unmoved — `0018`+`0019-ruling.md` landed there. This branch (`d74-vessel-enclosure-split`) is now at **`857e2d5`**: `0020-ruling.md` landing plus the vessel/enclosure split, and `0022`–`0024`'s remedies (evidence render, `WORKING_AGREEMENT.md`'s fourth positive-control member, D76/D77) are being committed on top of it. |
+| **Branches** | **`d74-vessel-enclosure-split`** — at a PR, AMBER, waiting on Patrick's check; every row of the check now has a render (see §0). |
+| **Gate** | on this branch at `857e2d5`: `collected=727 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **720 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Records** | **78 records**, **30 open**. **D75, D76, D77 filed** (D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |
