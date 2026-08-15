@@ -549,4 +549,63 @@ THE ONE-CALL RULE, REFINED BY USE  2026-08-08
          AS A RUN. A case that only checked rc would have passed while
          the exemption was broken.
          7 probes, 7 as required.
+
+D72 -- THE IMPORT-TIME ASSET WRITE, FIXED  2026-08-15  (GREEN, auto-merged)
+         files:   _gen_assets.py  tests/test_gen_assets.py (comments only)
+         The module-level write-everything body -- the FURNISHINGS/SOLIDS/
+         MATERIALS consistency check through the final print -- now lives
+         in main(), called under `if __name__ == "__main__":`. Everything
+         above stays importable with NO SIDE EFFECT: `import _gen_assets`
+         writes nothing and creates no directories (the mkdir calls moved
+         into main() too).
+         THE OBVIOUS RECEIPT WAS THE WRONG ONE, AND SAYING SO IS THE
+         FINDING. Hashing the checked-out assets/ tree before and after
+         running the script reported 13 files differing -- every one a
+         CRLF PHANTOM-DIFF (CLAUDE.md: .gitattributes forces LF in the
+         repo, but this working tree still checks out CRLF), reproduced
+         IDENTICALLY against the unmodified generator from HEAD. Chasing
+         it further would have been chasing a fact about the checkout,
+         not about the change.
+         THE CONTROLLED RECEIPT: run the unmodified generator once and the
+         modified one once, same session, both into a clean checkout, and
+         diff the two OUTPUTS against each other rather than against a
+         checked-out blob.
+             diff -rq <old-code output> <new-code output>
+             IDENTICAL: no output-content difference from the refactor
+         That isolates the one variable the receipt is actually about.
+         git diff --stat -- assets/ on the final tree is clean; D70's
+         tests pass unchanged, because the wrap preserves statement order
+         and only shifts indentation.
+         D71 -- QSvgRenderer RENDERABILITY CHECK, filed alongside D72 and
+         fixed in the same pass  2026-08-15  (GREEN, auto-merged)
+         files:   tests/test_furnishings.py
+         THE RECORD'S PROPOSED METHOD WAS WRONG, MEASURED BEFORE TRUSTING
+         IT (the positive-control rule). isValid() was proposed as the
+         check that catches "well-formed XML that draws nothing" -- and
+         isValid() returns True for an <svg> with NO CHILDREN AT ALL, and
+         for one whose only child is a tag Qt's SVG module does not
+         implement. It only re-detects XML that fails to PARSE, which
+         svg_error already refuses before writing -- so using it alone
+         would have made the new test a second copy of D70's check, not
+         new coverage.
+         THE INSTRUMENT THAT ACTUALLY WORKS: render to a buffer, look for
+         a painted pixel. A positive control proves it catches two
+         synthetic blanks isValid() missed, and that a real symbol still
+         passes.
+         THE CONTROL THEN CAUGHT A SECOND BUG, IN ITS OWN FIRST DRAFT:
+         sip.voidptr.__getitem__ returns a length-1 bytes per index, which
+         is TRUTHY REGARDLESS OF VALUE (bool(b'\x00') is True) -- so the
+         first cut of the pixel scan reported EVERY pixel as painted,
+         including a genuinely blank image. bytes(ptr) first, then index,
+         fixes it. The control is why this was caught before it shipped
+         as an always-green check.
+         test_every_catalog_symbol_renders_something then walks all 95
+         catalog entries through furnishing_renderer, the PRODUCTION
+         accessor, per the record's original (correct) half. FAIL-FIRST
+         CHECKED by blanking a real symbol (glass_shower.svg -> an empty
+         <svg/>) and confirming the sweep names it; restored from git.
+         Both closed as filed, with D71's method corrected from what was
+         proposed to what measurement showed was needed -- ordinary
+         defect-closure prose, not a handoff ruling: neither record's
+         technical shape needed a policy decision, only correct execution.
 ```

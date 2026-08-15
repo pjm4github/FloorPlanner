@@ -8,8 +8,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent / "assets"
 ICONS = ROOT / "icons"
 FURN = ROOT / "furnishings"
-ICONS.mkdir(parents=True, exist_ok=True)
-FURN.mkdir(parents=True, exist_ok=True)
 
 INK = "#374151"
 FILL = "#f8fafc"
@@ -890,245 +888,265 @@ MATERIALS = {
 # the failure this file exists to make impossible: it is the one field with no
 # safe default, so a new symbol added without one stops here rather than
 # reaching a viewer as a guess.
-_ids = {fid for fid, *_ in FURNISHINGS}
-_unauthored = sorted(_ids - set(SOLIDS))
-_orphans = sorted(set(SOLIDS) - _ids)
-_bad_material = sorted({m for _h, _e, _f, m in SOLIDS.values()
-                        if m not in MATERIALS})
-if _unauthored or _orphans or _bad_material:
-    raise SystemExit(
-        "assets not written -- the 3D data model is incomplete:\n"
-        + (f"  {len(_unauthored)} furnishing(s) with no SOLIDS row: "
-           f"{', '.join(_unauthored)}\n" if _unauthored else "")
-        + (f"  {len(_orphans)} SOLIDS row(s) naming no furnishing: "
-           f"{', '.join(_orphans)}\n" if _orphans else "")
-        + (f"  {len(_bad_material)} material(s) not in MATERIALS: "
-           f"{', '.join(_bad_material)}\n" if _bad_material else ""))
 
-# Purchase prices are filled in at runtime by the app's AI ▸ Update
-# furnishing prices… tool, so carry any existing prices across regeneration
-# rather than resetting them to 0.
-try:
-    _prev_price = {e["id"]: float(e.get("price", 0.0))
-                   for e in json.loads((FURN / "manifest.json")
-                                       .read_text(encoding="utf-8"))}
-except (OSError, ValueError, KeyError, TypeError):
-    _prev_price = {}
+def main():
+    """Write the whole asset tree: furnishing SVGs + manifest/materials/groups,
+    tool icons.  BEHIND THE MAIN GUARD (D72) -- everything above this line is
+    now safely IMPORTABLE: constants, `svg`/`svg_error`/the drawing primitives,
+    and the data tables (`FURNISHINGS`, `SOLIDS`, `MATERIALS`).  `import
+    _gen_assets` no longer regenerates the tree as a side effect; only calling
+    `main()` (or running the file as a script) does.
 
-manifest = []
-_pending, _malformed = [], []
-for fid, name, cat, w, d, body in FURNISHINGS:
-    _text = svg(w, d, body)
-    _err = svg_error(_text)
-    if _err:
-        _malformed.append((f"{fid}.svg", _err,
-                           "body is a str, not a list of elements"
-                           if isinstance(body, str) else "malformed element"))
-    _pending.append((FURN / f"{fid}.svg", _text))
-    height, elevation, form, material = SOLIDS[fid]
-    manifest.append({"id": fid, "name": name, "category": cat,
-                     "file": f"{fid}.svg", "width_in": w, "depth_in": d,
-                     "height_in": height, "elevation_in": elevation,
-                     "form": form, "material": material,
-                     "price": _prev_price.get(fid, 0.0)})
-# D70: REFUSE BEFORE WRITING ANYTHING, the same shape as the data-model gate
-# above -- a half-written asset tree is worse than none, and this generator is
-# the only thing between a bad symbol and a silently blank item.
-if _malformed:
-    raise SystemExit(
-        f"assets not written -- {len(_malformed)} malformed SVG(s):\n"
-        + "".join(f"  {n}: {why} ({err})\n" for n, err, why in _malformed))
-for _path, _text in _pending:
-    _path.write_text(_text, encoding="utf-8")
+    THE RECEIPT IS BYTE-IDENTICAL OUTPUT: this function's body is the same
+    statements that used to run at module level, moved and indented, not
+    rewritten -- so what it writes is unchanged."""
+    ICONS.mkdir(parents=True, exist_ok=True)
+    FURN.mkdir(parents=True, exist_ok=True)
 
-(FURN / "manifest.json").write_text(
-    json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-(FURN / "materials.json").write_text(
-    json.dumps(MATERIALS, indent=2) + "\n", encoding="utf-8")
+    _ids = {fid for fid, *_ in FURNISHINGS}
+    _unauthored = sorted(_ids - set(SOLIDS))
+    _orphans = sorted(set(SOLIDS) - _ids)
+    _bad_material = sorted({m for _h, _e, _f, m in SOLIDS.values()
+                            if m not in MATERIALS})
+    if _unauthored or _orphans or _bad_material:
+        raise SystemExit(
+            "assets not written -- the 3D data model is incomplete:\n"
+            + (f"  {len(_unauthored)} furnishing(s) with no SOLIDS row: "
+               f"{', '.join(_unauthored)}\n" if _unauthored else "")
+            + (f"  {len(_orphans)} SOLIDS row(s) naming no furnishing: "
+               f"{', '.join(_orphans)}\n" if _orphans else "")
+            + (f"  {len(_bad_material)} material(s) not in MATERIALS: "
+               f"{', '.join(_bad_material)}\n" if _bad_material else ""))
 
-# Palette sections: furnishings grouped by room type; items are the SVG
-# file names and may appear in several groups.  "All" lists everything
-# and is the section the app opens by default.
-GROUPS = [
-    ("Living Room", ["sofa", "loveseat", "armchair", "coffee_table",
-                     "side_table", "tv_stand", "large_tv", "gas_fireplace",
-                     "bookshelf"]),
-    ("Dining Room", ["dining_table", "dining_table_round", "dining_chair",
-                     "buffet", "hutch"]),
-    ("Kitchen", ["refrigerator", "range", "dishwasher", "kitchen_sink",
-                 "base_cab_24", "base_cab_36", "drawer_base_18",
-                 "sink_base_36", "corner_base_36", "wall_cab_24",
-                 "wall_cab_30", "wall_cab_36", "kitchen_island", "island_sink",
-                 "pantry_18", "pantry_24", "pantry_36", "dining_chair"]),
-    ("Bedroom", ["bed_king", "bed_queen", "bed_full", "bed_twin",
-                 "nightstand", "dresser", "wardrobe", "armchair",
-                 "tv_stand", "desk", "office_chair", "bookshelf"]),
-    ("Bathroom", ["bathtub", "shower", "walk_in_shower", "glass_shower",
-                  "toilet", "vanity", "vanity_24", "vanity_36", "vanity_48"]),
-    ("Laundry", ["washer", "dryer"]),
-    ("Garage", ["suv", "car", "motorcycle", "bicycle", "boat",
-                "boat_trailer", "garden_tractor", "riding_mower_snow",
-                "workbench", "storage_shelves", "lawnmower", "snowblower",
-                "wheelbarrow", "trashcan"]),
-    ("Shop", ["toolchest", "table_saw", "lathe", "jointer", "drill_press",
-              "cutoff_saw", "bandsaw", "planer", "workbench",
-              "storage_shelves"]),
-    ("Sunroom", ["lounge_chair", "sauna", "umbrella_table", "swim_spa",
-                 "whirlpool", "armchair", "side_table"]),
-    ("Office", ["desk", "office_chair", "office_set", "corner_desk",
-                "bookshelf", "armchair", "side_table"]),
-    ("HVAC", ["gas_furnace", "electric_furnace", "oil_furnace",
-              "gas_water_heater", "electric_water_heater", "water_softener",
-              "gas_tank", "oil_tank", "electric_panel", "car_charger",
-              "battery_wall", "well_pump", "heat_exchanger"]),
-    ("Framing", ["stairs", "elevator"]),
-]
-groups_out = [{"name": "All",
-               "items": [f"{fid}.svg" for fid, *_ in FURNISHINGS]}]
-groups_out += [{"name": name, "items": [f"{i}.svg" for i in ids]}
-               for name, ids in GROUPS]
-(FURN / "groups.json").write_text(
-    json.dumps(groups_out, indent=2) + "\n", encoding="utf-8")
+    # Purchase prices are filled in at runtime by the app's AI ▸ Update
+    # furnishing prices… tool, so carry any existing prices across regeneration
+    # rather than resetting them to 0.
+    try:
+        _prev_price = {e["id"]: float(e.get("price", 0.0))
+                       for e in json.loads((FURN / "manifest.json")
+                                           .read_text(encoding="utf-8"))}
+    except (OSError, ValueError, KeyError, TypeError):
+        _prev_price = {}
 
-(FURN / "LICENSE").write_text(
-    "Floor Planner furnishing symbol library\n"
-    "----------------------------------------\n"
-    "These top-view furniture/fixture symbols were drawn for this project\n"
-    "and are released under CC0 1.0 Universal (public domain dedication).\n"
-    "https://creativecommons.org/publicdomain/zero/1.0/\n",
-    encoding="utf-8")
-(FURN / "README.md").write_text(
-    "# Furnishing symbol library (CC0)\n\n"
-    "Top-view architectural symbols used by the Furnishings palette.\n\n"
-    "* Every SVG `viewBox` is in **inches** (`0 0 WIDTH DEPTH`), so the app\n"
-    "  renders each symbol at true scale (1 scene unit = 1\").\n"
-    "* `manifest.json` lists the catalog: `id`, `name`, `category`, `file`,\n"
-    "  `width_in`, `depth_in`, `price` (USD purchase cost; the app's\n"
-    "  AI ‣ Update furnishing prices… tool fills these in), plus the four\n"
-    "  fields the 3D viewers read:\n"
-    "  * `height_in` — the item's height in inches.  **Required, and it has\n"
-    "    no default**: a wrong height supplied by a default cannot be told\n"
-    "    apart from a right one, so a symbol added without one stops the\n"
-    "    generator instead.  These are authored architect's nominals.\n"
-    "  * `elevation_in` — the height of the item's underside above the\n"
-    "    level's floor.  `0` for anything floor-bearing; non-zero for the\n"
-    "    wall-hung items (upper cabinets, the large TV, the electric panel,\n"
-    "    the car charger, the battery wall) and for the counter-mounted\n"
-    "    `kitchen_sink`, whose rim then lands at the standard 36\".\n"
-    "  * `form` — which solid generator builds it: `box`, `slab` (a top on\n"
-    "    legs), `seat`, `bed`, `basin`, `enclosure`, `vehicle`, and the\n"
-    "    reserved `planting` and `prism`.  A viewer that does not implement\n"
-    "    a form falls back to `box` and **says so in its report**; an\n"
-    "    unrecognised one renders in the loud magenta.\n"
-    "  * `material` — a name only, resolved in `materials.json`.\n"
-    "* `materials.json` holds each material's `colour` (r, g, b, a in 0..1),\n"
-    "  `roughness` and `metalness` — **once**, so the properties are not\n"
-    "  repeated across 95 catalog entries.  `unknown` is the deliberate\n"
-    "  fallback and is loud on purpose: an item the catalog does not define\n"
-    "  must look wrong rather than plausible.\n"
-    "* `groups.json` defines the palette's expandable sections: a list of\n"
-    "  `{name, items}` where each item is an SVG file name from this\n"
-    "  directory.  A furnishing may appear in several groups.  The `All`\n"
-    "  group always shows the whole library and is open by default.\n\n"
-    "To add your own symbol: drop an SVG here whose viewBox matches the\n"
-    "real-world footprint in inches, add a manifest entry, and list it in\n"
-    "the groups it belongs to.\n\n"
-    "**Everything in this directory is generated by `_gen_assets.py`** —\n"
-    "including this README, the manifest and `materials.json`.  Edit that\n"
-    "script and re-run it; a hand edit here is overwritten on the next run.\n",
-    encoding="utf-8")
+    manifest = []
+    _pending, _malformed = [], []
+    for fid, name, cat, w, d, body in FURNISHINGS:
+        _text = svg(w, d, body)
+        _err = svg_error(_text)
+        if _err:
+            _malformed.append((f"{fid}.svg", _err,
+                               "body is a str, not a list of elements"
+                               if isinstance(body, str) else "malformed element"))
+        _pending.append((FURN / f"{fid}.svg", _text))
+        height, elevation, form, material = SOLIDS[fid]
+        manifest.append({"id": fid, "name": name, "category": cat,
+                         "file": f"{fid}.svg", "width_in": w, "depth_in": d,
+                         "height_in": height, "elevation_in": elevation,
+                         "form": form, "material": material,
+                         "price": _prev_price.get(fid, 0.0)})
+    # D70: REFUSE BEFORE WRITING ANYTHING, the same shape as the data-model gate
+    # above -- a half-written asset tree is worse than none, and this generator is
+    # the only thing between a bad symbol and a silently blank item.
+    if _malformed:
+        raise SystemExit(
+            f"assets not written -- {len(_malformed)} malformed SVG(s):\n"
+            + "".join(f"  {n}: {why} ({err})\n" for n, err, why in _malformed))
+    for _path, _text in _pending:
+        _path.write_text(_text, encoding="utf-8")
 
-# ---------------------------------------------------------------- tool icons
-TOOL_ICONS = {
-    "select": [
-        '<path d="M7 3 L7 18 L11 14.5 L13.5 20 L16 18.9 L13.5 13.5 '
-        'L18.5 13.5 Z" fill="#1f2937"/>'],
-    "wall_ext": [
-        '<rect x="2.5" y="9" width="19" height="6" fill="#1f2937"/>',
-        '<line x1="2.5" y1="12" x2="21.5" y2="12" stroke="#f8fafc" '
-        'stroke-width="1" stroke-dasharray="3,2"/>'],
-    "wall_int": [
-        '<rect x="2.5" y="10" width="19" height="4" fill="#9ca3af"/>',
-        '<line x1="2.5" y1="12" x2="21.5" y2="12" stroke="#f8fafc" '
-        'stroke-width="1" stroke-dasharray="3,2"/>'],
-    "door": [
-        '<line x1="2" y1="20" x2="6" y2="20" stroke="#1f2937" '
-        'stroke-width="2.4"/>',
-        '<line x1="18" y1="20" x2="22" y2="20" stroke="#1f2937" '
-        'stroke-width="2.4"/>',
-        '<line x1="6.5" y1="19.5" x2="6.5" y2="7.5" stroke="#1f2937" '
-        'stroke-width="1.6"/>',
-        '<path d="M6.5 7.5 A12 12 0 0 1 18.5 19.5" fill="none" '
-        'stroke="#1f2937" stroke-width="1.2" stroke-dasharray="2.5,2"/>'],
-    "window": [
-        '<rect x="2.5" y="9" width="19" height="6" fill="#f8fafc" '
-        'stroke="#1f2937" stroke-width="1.4"/>',
-        '<line x1="2.5" y1="12" x2="21.5" y2="12" stroke="#1f2937" '
-        'stroke-width="1"/>'],
-    "room": [
-        # speech-bubble callout with a tail at the lower left
-        '<path d="M6 3.5 H18 Q21 3.5 21 6.5 V12 Q21 15 18 15 H12.5 '
-        'L6.5 20.5 L8.5 15 H6 Q3 15 3 12 V6.5 Q3 3.5 6 3.5 Z" '
-        'fill="#f8fafc" stroke="#1f2937" stroke-width="1.5" '
-        'stroke-linejoin="round"/>',
-        '<line x1="7" y1="8" x2="17" y2="8" stroke="#1f2937" '
-        'stroke-width="1.3"/>',
-        '<line x1="7" y1="11" x2="13.5" y2="11" stroke="#1f2937" '
-        'stroke-width="1.3"/>'],
-    "delete": [
-        '<line x1="4.5" y1="6.5" x2="19.5" y2="6.5" stroke="#1f2937" '
-        'stroke-width="1.6"/>',
-        '<line x1="9.5" y1="4" x2="14.5" y2="4" stroke="#1f2937" '
-        'stroke-width="1.6"/>',
-        '<path d="M6.5 6.5 L7.5 20.5 L16.5 20.5 L17.5 6.5" fill="none" '
-        'stroke="#1f2937" stroke-width="1.6"/>',
-        '<line x1="10" y1="9.5" x2="10.3" y2="17.5" stroke="#1f2937" '
-        'stroke-width="1.2"/>',
-        '<line x1="14" y1="9.5" x2="13.7" y2="17.5" stroke="#1f2937" '
-        'stroke-width="1.2"/>'],
-    "zoomfit": [
-        '<circle cx="10.5" cy="10.5" r="6" fill="none" stroke="#1f2937" '
-        'stroke-width="1.7"/>',
-        '<line x1="15" y1="15" x2="20.5" y2="20.5" stroke="#1f2937" '
-        'stroke-width="2.2"/>'],
-    "undo": [
-        '<path d="M6 8 H14.5 A5.5 5.5 0 1 1 9 18.5" fill="none" '
-        'stroke="#1f2937" stroke-width="1.8" stroke-linecap="round"/>',
-        '<polyline points="9.5,4.5 6,8 9.5,11.5" fill="none" '
-        'stroke="#1f2937" stroke-width="1.8" stroke-linecap="round" '
-        'stroke-linejoin="round"/>'],
-    "redo": [
-        '<path d="M18 8 H9.5 A5.5 5.5 0 1 0 15 18.5" fill="none" '
-        'stroke="#1f2937" stroke-width="1.8" stroke-linecap="round"/>',
-        '<polyline points="14.5,4.5 18,8 14.5,11.5" fill="none" '
-        'stroke="#1f2937" stroke-width="1.8" stroke-linecap="round" '
-        'stroke-linejoin="round"/>'],
-    "record": [
-        # the universal red "record" dot
-        '<circle cx="12" cy="12" r="7" fill="#dc2626" stroke="#991b1b" '
-        'stroke-width="1.4"/>'],
-}
-# the icons build their SVG inline rather than through `svg()`, so the D70
-# check is applied here too -- one writer skipped is the whole gap.
-_icons, _bad_icons = [], []
-for name, body in TOOL_ICONS.items():
-    _text = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
-             'width="24" height="24">\n' + "\n".join(body) + "\n</svg>\n")
-    _err = svg_error(_text)
-    if _err:
-        _bad_icons.append((f"{name}.svg", _err,
-                           "body is a str, not a list of elements"
-                           if isinstance(body, str) else "malformed element"))
-    _icons.append((ICONS / f"{name}.svg", _text))
-if _bad_icons:
-    raise SystemExit(
-        f"icons not written -- {len(_bad_icons)} malformed SVG(s):\n"
-        + "".join(f"  {n}: {why} ({err})\n" for n, err, why in _bad_icons))
-for _path, _text in _icons:
-    _path.write_text(_text, encoding="utf-8")
-(ICONS / "README.md").write_text(
-    "# Toolbar icons\n\nSVG icons for the Floor Planner toolbar, drawn for "
-    "this project (CC0).\n", encoding="utf-8")
+    (FURN / "manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    (FURN / "materials.json").write_text(
+        json.dumps(MATERIALS, indent=2) + "\n", encoding="utf-8")
 
-print(f"wrote {len(FURNISHINGS)} furnishing symbols + manifest, "
-      f"{len(TOOL_ICONS)} tool icons")
+    # Palette sections: furnishings grouped by room type; items are the SVG
+    # file names and may appear in several groups.  "All" lists everything
+    # and is the section the app opens by default.
+    GROUPS = [
+        ("Living Room", ["sofa", "loveseat", "armchair", "coffee_table",
+                         "side_table", "tv_stand", "large_tv", "gas_fireplace",
+                         "bookshelf"]),
+        ("Dining Room", ["dining_table", "dining_table_round", "dining_chair",
+                         "buffet", "hutch"]),
+        ("Kitchen", ["refrigerator", "range", "dishwasher", "kitchen_sink",
+                     "base_cab_24", "base_cab_36", "drawer_base_18",
+                     "sink_base_36", "corner_base_36", "wall_cab_24",
+                     "wall_cab_30", "wall_cab_36", "kitchen_island", "island_sink",
+                     "pantry_18", "pantry_24", "pantry_36", "dining_chair"]),
+        ("Bedroom", ["bed_king", "bed_queen", "bed_full", "bed_twin",
+                     "nightstand", "dresser", "wardrobe", "armchair",
+                     "tv_stand", "desk", "office_chair", "bookshelf"]),
+        ("Bathroom", ["bathtub", "shower", "walk_in_shower", "glass_shower",
+                      "toilet", "vanity", "vanity_24", "vanity_36", "vanity_48"]),
+        ("Laundry", ["washer", "dryer"]),
+        ("Garage", ["suv", "car", "motorcycle", "bicycle", "boat",
+                    "boat_trailer", "garden_tractor", "riding_mower_snow",
+                    "workbench", "storage_shelves", "lawnmower", "snowblower",
+                    "wheelbarrow", "trashcan"]),
+        ("Shop", ["toolchest", "table_saw", "lathe", "jointer", "drill_press",
+                  "cutoff_saw", "bandsaw", "planer", "workbench",
+                  "storage_shelves"]),
+        ("Sunroom", ["lounge_chair", "sauna", "umbrella_table", "swim_spa",
+                     "whirlpool", "armchair", "side_table"]),
+        ("Office", ["desk", "office_chair", "office_set", "corner_desk",
+                    "bookshelf", "armchair", "side_table"]),
+        ("HVAC", ["gas_furnace", "electric_furnace", "oil_furnace",
+                  "gas_water_heater", "electric_water_heater", "water_softener",
+                  "gas_tank", "oil_tank", "electric_panel", "car_charger",
+                  "battery_wall", "well_pump", "heat_exchanger"]),
+        ("Framing", ["stairs", "elevator"]),
+    ]
+    groups_out = [{"name": "All",
+                   "items": [f"{fid}.svg" for fid, *_ in FURNISHINGS]}]
+    groups_out += [{"name": name, "items": [f"{i}.svg" for i in ids]}
+                   for name, ids in GROUPS]
+    (FURN / "groups.json").write_text(
+        json.dumps(groups_out, indent=2) + "\n", encoding="utf-8")
+
+    (FURN / "LICENSE").write_text(
+        "Floor Planner furnishing symbol library\n"
+        "----------------------------------------\n"
+        "These top-view furniture/fixture symbols were drawn for this project\n"
+        "and are released under CC0 1.0 Universal (public domain dedication).\n"
+        "https://creativecommons.org/publicdomain/zero/1.0/\n",
+        encoding="utf-8")
+    (FURN / "README.md").write_text(
+        "# Furnishing symbol library (CC0)\n\n"
+        "Top-view architectural symbols used by the Furnishings palette.\n\n"
+        "* Every SVG `viewBox` is in **inches** (`0 0 WIDTH DEPTH`), so the app\n"
+        "  renders each symbol at true scale (1 scene unit = 1\").\n"
+        "* `manifest.json` lists the catalog: `id`, `name`, `category`, `file`,\n"
+        "  `width_in`, `depth_in`, `price` (USD purchase cost; the app's\n"
+        "  AI ‣ Update furnishing prices… tool fills these in), plus the four\n"
+        "  fields the 3D viewers read:\n"
+        "  * `height_in` — the item's height in inches.  **Required, and it has\n"
+        "    no default**: a wrong height supplied by a default cannot be told\n"
+        "    apart from a right one, so a symbol added without one stops the\n"
+        "    generator instead.  These are authored architect's nominals.\n"
+        "  * `elevation_in` — the height of the item's underside above the\n"
+        "    level's floor.  `0` for anything floor-bearing; non-zero for the\n"
+        "    wall-hung items (upper cabinets, the large TV, the electric panel,\n"
+        "    the car charger, the battery wall) and for the counter-mounted\n"
+        "    `kitchen_sink`, whose rim then lands at the standard 36\".\n"
+        "  * `form` — which solid generator builds it: `box`, `slab` (a top on\n"
+        "    legs), `seat`, `bed`, `basin`, `enclosure`, `vehicle`, and the\n"
+        "    reserved `planting` and `prism`.  A viewer that does not implement\n"
+        "    a form falls back to `box` and **says so in its report**; an\n"
+        "    unrecognised one renders in the loud magenta.\n"
+        "  * `material` — a name only, resolved in `materials.json`.\n"
+        "* `materials.json` holds each material's `colour` (r, g, b, a in 0..1),\n"
+        "  `roughness` and `metalness` — **once**, so the properties are not\n"
+        "  repeated across 95 catalog entries.  `unknown` is the deliberate\n"
+        "  fallback and is loud on purpose: an item the catalog does not define\n"
+        "  must look wrong rather than plausible.\n"
+        "* `groups.json` defines the palette's expandable sections: a list of\n"
+        "  `{name, items}` where each item is an SVG file name from this\n"
+        "  directory.  A furnishing may appear in several groups.  The `All`\n"
+        "  group always shows the whole library and is open by default.\n\n"
+        "To add your own symbol: drop an SVG here whose viewBox matches the\n"
+        "real-world footprint in inches, add a manifest entry, and list it in\n"
+        "the groups it belongs to.\n\n"
+        "**Everything in this directory is generated by `_gen_assets.py`** —\n"
+        "including this README, the manifest and `materials.json`.  Edit that\n"
+        "script and re-run it; a hand edit here is overwritten on the next run.\n",
+        encoding="utf-8")
+
+    # ---------------------------------------------------------------- tool icons
+    TOOL_ICONS = {
+        "select": [
+            '<path d="M7 3 L7 18 L11 14.5 L13.5 20 L16 18.9 L13.5 13.5 '
+            'L18.5 13.5 Z" fill="#1f2937"/>'],
+        "wall_ext": [
+            '<rect x="2.5" y="9" width="19" height="6" fill="#1f2937"/>',
+            '<line x1="2.5" y1="12" x2="21.5" y2="12" stroke="#f8fafc" '
+            'stroke-width="1" stroke-dasharray="3,2"/>'],
+        "wall_int": [
+            '<rect x="2.5" y="10" width="19" height="4" fill="#9ca3af"/>',
+            '<line x1="2.5" y1="12" x2="21.5" y2="12" stroke="#f8fafc" '
+            'stroke-width="1" stroke-dasharray="3,2"/>'],
+        "door": [
+            '<line x1="2" y1="20" x2="6" y2="20" stroke="#1f2937" '
+            'stroke-width="2.4"/>',
+            '<line x1="18" y1="20" x2="22" y2="20" stroke="#1f2937" '
+            'stroke-width="2.4"/>',
+            '<line x1="6.5" y1="19.5" x2="6.5" y2="7.5" stroke="#1f2937" '
+            'stroke-width="1.6"/>',
+            '<path d="M6.5 7.5 A12 12 0 0 1 18.5 19.5" fill="none" '
+            'stroke="#1f2937" stroke-width="1.2" stroke-dasharray="2.5,2"/>'],
+        "window": [
+            '<rect x="2.5" y="9" width="19" height="6" fill="#f8fafc" '
+            'stroke="#1f2937" stroke-width="1.4"/>',
+            '<line x1="2.5" y1="12" x2="21.5" y2="12" stroke="#1f2937" '
+            'stroke-width="1"/>'],
+        "room": [
+            # speech-bubble callout with a tail at the lower left
+            '<path d="M6 3.5 H18 Q21 3.5 21 6.5 V12 Q21 15 18 15 H12.5 '
+            'L6.5 20.5 L8.5 15 H6 Q3 15 3 12 V6.5 Q3 3.5 6 3.5 Z" '
+            'fill="#f8fafc" stroke="#1f2937" stroke-width="1.5" '
+            'stroke-linejoin="round"/>',
+            '<line x1="7" y1="8" x2="17" y2="8" stroke="#1f2937" '
+            'stroke-width="1.3"/>',
+            '<line x1="7" y1="11" x2="13.5" y2="11" stroke="#1f2937" '
+            'stroke-width="1.3"/>'],
+        "delete": [
+            '<line x1="4.5" y1="6.5" x2="19.5" y2="6.5" stroke="#1f2937" '
+            'stroke-width="1.6"/>',
+            '<line x1="9.5" y1="4" x2="14.5" y2="4" stroke="#1f2937" '
+            'stroke-width="1.6"/>',
+            '<path d="M6.5 6.5 L7.5 20.5 L16.5 20.5 L17.5 6.5" fill="none" '
+            'stroke="#1f2937" stroke-width="1.6"/>',
+            '<line x1="10" y1="9.5" x2="10.3" y2="17.5" stroke="#1f2937" '
+            'stroke-width="1.2"/>',
+            '<line x1="14" y1="9.5" x2="13.7" y2="17.5" stroke="#1f2937" '
+            'stroke-width="1.2"/>'],
+        "zoomfit": [
+            '<circle cx="10.5" cy="10.5" r="6" fill="none" stroke="#1f2937" '
+            'stroke-width="1.7"/>',
+            '<line x1="15" y1="15" x2="20.5" y2="20.5" stroke="#1f2937" '
+            'stroke-width="2.2"/>'],
+        "undo": [
+            '<path d="M6 8 H14.5 A5.5 5.5 0 1 1 9 18.5" fill="none" '
+            'stroke="#1f2937" stroke-width="1.8" stroke-linecap="round"/>',
+            '<polyline points="9.5,4.5 6,8 9.5,11.5" fill="none" '
+            'stroke="#1f2937" stroke-width="1.8" stroke-linecap="round" '
+            'stroke-linejoin="round"/>'],
+        "redo": [
+            '<path d="M18 8 H9.5 A5.5 5.5 0 1 0 15 18.5" fill="none" '
+            'stroke="#1f2937" stroke-width="1.8" stroke-linecap="round"/>',
+            '<polyline points="14.5,4.5 18,8 14.5,11.5" fill="none" '
+            'stroke="#1f2937" stroke-width="1.8" stroke-linecap="round" '
+            'stroke-linejoin="round"/>'],
+        "record": [
+            # the universal red "record" dot
+            '<circle cx="12" cy="12" r="7" fill="#dc2626" stroke="#991b1b" '
+            'stroke-width="1.4"/>'],
+    }
+    # the icons build their SVG inline rather than through `svg()`, so the D70
+    # check is applied here too -- one writer skipped is the whole gap.
+    _icons, _bad_icons = [], []
+    for name, body in TOOL_ICONS.items():
+        _text = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+                 'width="24" height="24">\n' + "\n".join(body) + "\n</svg>\n")
+        _err = svg_error(_text)
+        if _err:
+            _bad_icons.append((f"{name}.svg", _err,
+                               "body is a str, not a list of elements"
+                               if isinstance(body, str) else "malformed element"))
+        _icons.append((ICONS / f"{name}.svg", _text))
+    if _bad_icons:
+        raise SystemExit(
+            f"icons not written -- {len(_bad_icons)} malformed SVG(s):\n"
+            + "".join(f"  {n}: {why} ({err})\n" for n, err, why in _bad_icons))
+    for _path, _text in _icons:
+        _path.write_text(_text, encoding="utf-8")
+    (ICONS / "README.md").write_text(
+        "# Toolbar icons\n\nSVG icons for the Floor Planner toolbar, drawn for "
+        "this project (CC0).\n", encoding="utf-8")
+
+    print(f"wrote {len(FURNISHINGS)} furnishing symbols + manifest, "
+          f"{len(TOOL_ICONS)} tool icons")
+
+
+
+if __name__ == "__main__":
+    main()
