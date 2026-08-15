@@ -6,9 +6,11 @@ character by character, the generator reports success, and only the plan SYMBOL
 is blank because only it reads the SVG. The catalog, the footprint and the 3D
 mesh all read the manifest and look fine.
 
-These tests exercise `svg_error` directly rather than shelling out to the
-generator: the module writes assets at import, so importing it in-process would
-regenerate the tree as a side effect of running the suite.
+These tests exercise `svg_error` directly rather than importing the module,
+even though import is now inert (D72 moved the write behind a main guard) --
+the exec-from-source-text approach predates that fix and stays, because
+compiling one named function out of the source is a smaller, more explicit
+dependency than importing the whole generator module for a single predicate.
 """
 from pathlib import Path
 
@@ -20,12 +22,14 @@ GEN = Path(__file__).resolve().parent.parent / "_gen_assets.py"
 
 
 def _svg_error():
-    """`svg_error` alone, without executing the module's write-everything body.
+    """`svg_error` alone, without a real dependency on the whole generator.
 
-    The generator has no `if __name__ == "__main__"` guard -- it does its work
-    at import -- so the function is compiled out of the source rather than
-    imported. Restating it here instead would be a second definition of the
-    predicate under test, which the working agreement forbids.
+    D72 moved the write-everything body behind `if __name__ == "__main__":`,
+    so `import _gen_assets` is safe now -- but this still compiles the one
+    function out of the source rather than importing the module, because that
+    stays the smaller dependency for a test that wants exactly one predicate.
+    Restating it here instead would be a second definition of the predicate
+    under test, which the working agreement forbids.
     """
     src = GEN.read_text(encoding="utf-8")
     start = src.index("def svg_error(")

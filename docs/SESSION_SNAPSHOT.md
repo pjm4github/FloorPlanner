@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: d10d02c -->
+<!-- SNAPSHOT-HEAD: d7db1d8 -->
 
 # Session snapshot — read this first
 
@@ -86,20 +86,29 @@ is measured **from the item's base**, the same datum as `height_in`.
 ## THE QUEUE: ONE SMALL BATCH, THEN GRID SNAP — ruled 2026‑08‑14
 
 **The batch is deliberately small, because the artwork wave it was meant to
-protect has mostly already passed.** In order:
+protect has mostly already passed.**
 
-1. **[D72](defects/0072-gen-assets-writes-the-asset-tree-at-import.md) — the
-   import-time asset write.** Small, and **it blocks any future authoring
-   tool**: there is currently no way to ask that module a question without
-   making it do all of its work. **Main guard, byte-comparison receipt.**
-2. **[D71](defects/0071-renderability-is-checkable-in-a-test-where-qt.md) — the
-   `QSvgRenderer` check in a test.** The generator **stays Qt-free**; the suite
-   asserts renderability where Qt is already paid for. **It catches exactly what
-   the generator structurally cannot — a symbol that parses and draws nothing.**
-3. **The two artwork items, with D71 now standing behind them.**
+1. ~~**[D72](defects/0072-gen-assets-writes-the-asset-tree-at-import.md) — the
+   import-time asset write.**~~ **DONE, 2026‑08‑15.** Module-level write moved
+   behind a main guard; `import _gen_assets` is now inert. **The obvious
+   receipt (hash the tree before/after) was the wrong one** — it reported 13
+   files differing, every one a pre-existing CRLF phantom-diff, reproduced
+   identically against the unmodified generator. The controlled receipt —
+   diff the *outputs* of the old and new code, not a checked-out blob against
+   an output — showed **no content difference**.
+2. ~~**[D71](defects/0071-renderability-is-checkable-in-a-test-where-qt.md) — the
+   `QSvgRenderer` check in a test.**~~ **DONE, 2026‑08‑15, WITH A CORRECTION TO
+   THE FILED METHOD.** `isValid()`, the record's proposed instrument, does
+   **not** catch a symbol that parses and draws nothing — measured: it returns
+   `True` for an `<svg>` with no children at all. The actual check is
+   **render to a buffer and look for a painted pixel**. Its own positive
+   control then caught a second bug in its own first draft: `sip.voidptr[i]`
+   is a truthy `bytes` regardless of value, so the first cut reported every
+   pixel painted. `tests/test_furnishings.py`, three tests, fail-first checked.
+3. **The two artwork items remain, with D71 now standing behind them.**
    **`glass_shower`**, drawn entirely in strokes, and **`boat_trailer`**, whose
    five filled fragments extrude as five slabs and no trailer. **Both are
-   redraws, not code.**
+   redraws, not code — the live item.**
 
 **THEN GRID SNAP — the inversion.** The largest daily-use improvement left on
 the board, and **fully specified**: snap-by-default; **shift means
@@ -211,10 +220,10 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`d10d02c`** — the furnishings close-out, on PR #29 (region extrusion), PR #28 (prism), PR #27. PRs #19–#29 all merged. |
-| **Branches** | **none open.** |
-| **Gate** | `collected=711 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **704 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **75 records**, 29 open. **D73 and D74 both closed** with the wall-types feature. `python tools/gate.py --docs` GREEN. |
+| **`main`** | **`d7db1d8`** — the channel-contract change, on `4c69013` (generators retired), on `d10d02c` (furnishings close-out), on PR #29/#28/#27. PRs #19–#29 all merged. This branch (`batch-d72-d71`) is cut against its own uncommitted tip, D72+D71 done. |
+| **Branches** | **`batch-d72-d71`** — D72 and D71 done, not yet committed/merged; the two artwork redraws remain on it. |
+| **Gate** | `collected=727 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **720 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Records** | **75 records**, **27 open**. **D71 and D72 both closed**, 2026‑08‑15. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |
