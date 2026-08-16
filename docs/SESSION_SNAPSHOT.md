@@ -1,12 +1,14 @@
-<!-- SNAPSHOT-HEAD: 168190f -->
+<!-- SNAPSHOT-HEAD: db09acf -->
 
 # Session snapshot — read this first
 
-**Re-cut 2026‑08‑12, and kept current by the gate ever since — see the box
-below.** The cut before it sat **eight commits stale**: it pinned `main` at
-`4e08191`, and its §0 named the furnishings census as the next task when that
-census was done, ruled and committed. **That is the last time this file was
-allowed to drift.**
+**Re-cut 2026‑08‑12 for the gate condition below, and kept current by the gate
+ever since.** **Trimmed to its stated job 2026‑08‑16, Patrick's ruling —
+[`handoff/0028-ruling.md`](handoff/0028-ruling.md).** The file had grown to 621
+lines by accumulating narrative that already lives in `handoff/`, `defects/`
+and `WORKING_AGREEMENT.md` — the ruling's own measure: *"an index that
+summarises the thing it indexes has stopped being an index."* Only §1 (state)
+and §5 (traps) stay dense by design; everything else is now a pointer.
 
 This file exists so a fresh session can start from disk instead of from a chat
 summary. It is an **index and a state marker, not a second copy of the record** —
@@ -48,282 +50,59 @@ must not be trusted over it.
 > which is why the gate asserts the marker and the `main` row in §1 carry the
 > **same** hash, so the marker cannot be bumped while the prose beside it goes
 > on lying.
+>
+> **On a PR's merge-ref checkout** (`refs/pull/N/merge`), `HEAD` has two
+> parents and the check reads `HEAD^2` instead — [D78](defects/0078-the-snapshot-staleness-gate-cannot-pass-on.md),
+> gated on `GITHUB_EVENT_NAME == "pull_request"` so a genuine merge commit on
+> `main` is never misread the same way. `tools/gate.py`'s own docstring on
+> `_snapshot_checkout_base` carries the full reasoning.
 
 > **[`README.md`](README.md) is the map** — what each document is, which decide
 > things, which are history. **[`ROADMAP.md`](ROADMAP.md) is the autonomy
-> charter** — which items may proceed without Patrick and which may not. Read §4
-> below for the short version, and the map for the whole.
+> charter** — which items may proceed without Patrick and which may not, and
+> **§3 is the full tiered work queue** this file no longer restates.
 
 ---
 
 ## 0. WHERE THE WORK IS
 
-**THE VESSEL/ENCLOSURE SPLIT IS MERGED — PR #31 → `main`@`b813343`, 2026‑08‑16.**
-[`handoff/0018-ruling.md`](handoff/0018-ruling.md) ruled it; `0021`, `0022`,
-`0024` built and evidenced it; [`handoff/0025-ruling.md`](handoff/0025-ruling.md)
-is Patrick's check, **passed, verbatim: *"The check looks great. Its all set
-on those items."*** Full trail in `handoff/README.md`'s pair table
-(`0018`–`0027`).
+**THE VESSEL/ENCLOSURE SPLIT IS MERGED — PR #31 → `main`, 2026‑08‑16 — AND
+D78 (a CI-only gate bug the merge itself surfaced) IS CLOSED.** Full trail,
+one line per exchange: [`handoff/README.md`](handoff/README.md)'s pair table,
+`0018` through `0028`. Live records: [D75](defects/0075-a-recessed-floor-feature-is-not-representable.md)
+(accepted limit), [D76](defects/0076-an-opaque-mesh-inside-a-translucent-body-does.md)
+(renderer limit, open), [D77](defects/0077-fp3d-py-shot-reports-success-on-a-failed.md)
+(tooling gap, open), D78 (closed).
 
-**D78 — THE MERGE ITSELF SURFACED A CI-ONLY GATE BUG, FIXED IN THREE ROUNDS,
-ALL THREE MEASURED RATHER THAN ASSUMED:**
-
-1. `actions/checkout`'s default PR-preview ref (`refs/pull/N/merge`) has
-   `main` as its FIRST parent, so `HEAD~1` was always `main`'s tip, never the
-   branch's own commits — a branch that correctly re-cut its marker could
-   never pass this check in CI. Fixed: read `HEAD^2` on a merge commit.
-2. That fix's own shape-detection (`HEAD^@`) was blind under a SHALLOW fetch
-   (`actions/checkout`'s default `fetch-depth: 1`) — git hides EVERY
-   parent-relative revision at the shallow boundary, mislabelling a real merge
-   as `linear`. Fixed: detect shape from `git cat-file -p HEAD` (the raw
-   object, unaffected by shallow depth); give the `deep` CI job
-   `fetch-depth: 0`, matching `docs`'s own existing precedent.
-3. **Merging PR #31 surfaced a THIRD bug the first two rounds could not have
-   caught, because it only exists once a merge has actually happened**: this
-   repository's real merge strategy is a genuine two-parent commit
-   (`gh pr merge --merge`), so `push`-to-`main` — and any local session on
-   `main` right after a merge — checks out a PERMANENT commit that must be
-   read as itself. Reading it as `HEAD^2` instead validates the marker against
-   the *merged branch's* last commit, not `main`'s real tip; it silently
-   passed on this repo's own push-triggered run for PR #31 only because a
-   one-commit feature branch made the two coincide. **Fixed: the substitution
-   now fires only when `GITHUB_EVENT_NAME == "pull_request"`** — the one
-   context that actually checks out the synthetic ref this was built for.
-
-**Four tests in `tests/test_gate.py` receipt all three fixes**, including one
-built specifically to tell "linear read of a real merge" apart from "merge
-read of a synthetic ref" (a two-commit branch, where the two interpretations
-give different answers). **D78 closed.**
-
-**NEXT, PER [`0025`](handoff/0025-ruling.md) §4, IN ORDER:** the three artwork
-redraws (`glass_shower`, `shower`, `walk_in_shower` — AMBER, now unblocked);
-[`0019`](handoff/0019-ruling.md)'s status board (GREEN, read-back first); grid
-snap (read-back first). **[`0028`](handoff/0028-ruling.md)** (GREEN, trim this
-file and `handoff/README.md` to their stated job) is ordered behind `0027` and
-not yet started.
-
-**`KNOWN_FORMS` gains `vessel`. `build_prism` now asks ONE categorical
-question** — does this form allow a recess: `vessel` (`bathtub`, `swim_spa`,
-`whirlpool`) keeps the height-decides-well-or-raised rule; `enclosure` (`shower`,
-`walk_in_shower`, `glass_shower`, `sauna`) makes every region a solid **standing
-on the floor**, never a recess. **Materials split alongside it** — a body
-material and a `region_material`, both in the catalog, so a vessel's water
-reads translucent and an enclosure's bench reads solid instead of one column
-carrying two facts.
-
-> **A SECOND BUG WAS FOUND BY DUMPING THE MESH, NOT BY THE PROBE.** The first
-> cut reused "sits on the body" for an enclosure's region and built
-> `walk_in_shower`'s bench spanning **18″ to 78″** — near the ceiling — instead
-> of **0″ to 18″**, on the floor. **The roof-over control had nothing to say
-> about it**: it only ever asked whether the CAP was open, and this bug never
-> touched the cap. A control proves the question it was built to answer, no
-> more.
-
-**A RENDERER LIMIT, NOW ITS OWN RECORD — [D76](defects/0076-an-opaque-mesh-inside-a-translucent-body-does.md),
-filed 2026‑08‑15 per [`0022-ruling.md`](handoff/0022-ruling.md) §4, cross-referenced
-to D69 rather than buried in it.** `walk_in_shower`'s bench is the right size,
-material and position (confirmed by dumping the built mesh directly), and does
-not composite through the translucent body at any glass alpha tested — general
-statement: **an opaque mesh inside a translucent one does not composite in
-`fp3d.py`'s viewer, at all.** **Row 1 is NOT discharged by the mesh numbers
-alone** ([`0022-ruling.md`](handoff/0022-ruling.md) §3 — a geometric receipt
-proves position, not that the bench *reads as a bench*): the remedy is
-[`evidence/enclosure-bodies-omitted.png`](evidence/enclosure-bodies-omitted.png),
-a render from a new evidence script
-([`evidence/enclosure_bodies_omitted_render.py`](evidence/enclosure_bodies_omitted_render.py))
-that drops exactly one mesh — `walk_in_shower`'s glass body, the only glass
-item in the fixture — from `build_model`'s own unmodified output. Nothing
-invented; every remaining mesh is real and already measured. **[D75](defects/0075-a-recessed-floor-feature-is-not-representable.md)
-filed alongside the split** — an enclosure's region can only stand on the
-floor, never recess into it; no catalog item needs this today. **[D77](defects/0077-fp3d-py-shot-reports-success-on-a-failed.md)
-filed while building the render** — `fp3d.py --shot` prints `wrote` and writes
-nothing when the offscreen platform cannot create a GL context, because
-`.save()`'s return value is never checked; not fixed, out of scope.
-**"A control proves the question it was built to answer, and no more" is now
-the positive-control family's fourth member, landed in [`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md).**
-
-**Prism (PR #28) and region extrusion (PR #29) are still merged, and `seat`,
-`bed`, `basin` are still RETIRED** ([`handoff/0015-ruling.md`](handoff/0015-ruling.md)).
-`enclosure`'s retirement is **answered, not reopened**: region extrusion covers
-it, with the split above.
-
-> **THE REUSABLE PART IS THE SEQUENCE, NOT THE OUTCOME:** build the cheap
-> general mechanism, **re-measure**, then decide whether the specific ones are
-> still wanted. **Four functions unwritten is the receipt.** Full form in
-> [`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md), which also carries: **"extrudes
-> a body" is not "reads as its kind"** (the `enclosure 6 of 7` number that
-> helped retire the generators, corrected); and now **identity needs a
-> categorical channel's THIRD instance** — near-identical enclosures at the same
-> height, indistinguishable until the render was looked at.
-
-**How a furnishing gets its 3D form now**, in one place:
-
-| | |
-|---|---|
-| `box`, `slab` | their own generators, as before |
-| `vessel` region, below body height | **recesses** — a well, the body's cap opened (a tub, a sink bowl) |
-| `enclosure` region, any height | **a solid standing on the floor** — never a recess (a bench, a stove) |
-| any other nested region above body height | sits ON the body (a pillow, a chair back) |
-| a symbol with nothing closed to extrude | still a box, and **named** in the model's report |
-| a symbol that extrudes to a **featureless** box | still not named — **the report's blind spot**, found by `0016` |
-
-**`data-h` CARRIES A HEIGHT AND NOTHING ELSE** — position comes from the
-artwork, and a test walks every SVG and fails on any other `data-` attribute.
-**Materials now carry two facts too**: `material` (body) and `region_material`
-(optional, falls back to the body's) — both live in the catalog beside the
-height, for the same reason: a property of the KIND, not of the drawing.
-
-**A CHECK REQUEST NAMES THE PLAN AND LISTS ITS ITEMS**, standing rule as of
-`0016`. **THE COORDINATION PROTOCOL IS NOW ON DISK TOO** ([`0020-ruling.md`](handoff/0020-ruling.md)):
-`NNNN is up` → Code reads and builds; Code opens the PR and stops at AMBER,
-never asked for one; a passing check goes to Code with what was seen, a
-failing or unsure one goes to the reviewer and becomes the next ruling.
+**Next: the three artwork redraws, below.**
 
 ---
 
-## THE QUEUE: THE VESSEL/ENCLOSURE CHECK, THEN THE REDRAWS, THEN GRID SNAP
+## THE QUEUE
 
-1. ~~**[D72](defects/0072-gen-assets-writes-the-asset-tree-at-import.md) — the
-   import-time asset write.**~~ **DONE, 2026‑08‑15.** Module-level write moved
-   behind a main guard; `import _gen_assets` is now inert. **The obvious
-   receipt (hash the tree before/after) was the wrong one** — it reported 13
-   files differing, every one a pre-existing CRLF phantom-diff, reproduced
-   identically against the unmodified generator. The controlled receipt —
-   diff the *outputs* of the old and new code, not a checked-out blob against
-   an output — showed **no content difference**.
-2. ~~**[D71](defects/0071-renderability-is-checkable-in-a-test-where-qt.md) — the
-   `QSvgRenderer` check in a test.**~~ **DONE, 2026‑08‑15, WITH A CORRECTION TO
-   THE FILED METHOD.** `isValid()`, the record's proposed instrument, does
-   **not** catch a symbol that parses and draws nothing — measured: it returns
-   `True` for an `<svg>` with no children at all. The actual check is
-   **render to a buffer and look for a painted pixel**. Its own positive
-   control then caught a second bug in its own first draft: `sip.voidptr[i]`
-   is a truthy `bytes` regardless of value, so the first cut reported every
-   pixel painted. `tests/test_furnishings.py`, three tests, fail-first checked.
-3. ~~**AWAITING PATRICK: does `0017`'s measurement confirm a second form?**~~
-   **RULED AND BUILT, 2026‑08‑15 — AT A PR, AWAITING THE CHECK, EVERY ROW NOW
-   HAS A RENDER.** See §0. `enclosure` splits categorically, not on a
-   threshold; materials split with it; a second bug (the bench's extrusion
-   direction) found by dumping the mesh; the non-compositing renderer limit is
-   now its own record (D76, cross-referenced to D69) with row 1 answered by an
-   evidence render rather than carried on the mesh numbers alone; D75 filed as
-   the accepted limit; D77 filed on a tooling gap found building the render.
-4. **THE AUTHORING LIST — four items, one of them provisional.**
-   **`glass_shower`** (no fill at all) and **`boat_trailer`** carry forward;
-   **`shower`** and **`walk_in_shower`** join (they extrude to a *featureless*
-   box, invisible to the model's report). **`boat_trailer` is reclassified**:
-   its form is `vehicle`, the one generator [`0015`](handoff/0015-ruling.md)
-   did **not** retire, and its failure — five disconnected filled fragments —
-   is what an open-frame plan symbol gives you. **Its likely fix is the loft
-   design, not a redraw; it is held out of the redraw batch until that is
-   decided.** So the redraw batch is really **three**: `glass_shower`,
-   `shower`, `walk_in_shower` — **unblocked now that item 3 is built**, though
-   it still waits on item 3's PR actually merging, since redrawing against an
-   extruder whose behaviour could still change is work done twice.
+1. **The three artwork redraws — AMBER, one check for all three.**
+   `glass_shower`, `shower`, `walk_in_shower` — indistinguishable because
+   identity is carried by footprint, a scalar; the fix is an internal region
+   that differs in KIND. Unblocked now that the extruder they flow into
+   (PR #31) is merged. Brief: [`handoff/0016-ruling.md`](handoff/0016-ruling.md)
+   §2–3; ordered here by [`handoff/0025-ruling.md`](handoff/0025-ruling.md) §4.
+2. **[`handoff/0019-ruling.md`](handoff/0019-ruling.md)'s status board — GREEN,
+   read-back first.** Freeze the closed migration's Status table as history;
+   move forward status to a generated `docs/STATUS.md`. Read-back owed: what
+   identifies a completed unit when recent work has no phase number at all.
+3. **Grid snap — the largest daily-use improvement left, fully specified, read-back
+   owed before any code.** Snap-by-default; shift means unconstrained; the
+   angled-wall rule quantises length along the ray; intersection joins with
+   their two refusals; the live readout shows snapped values. The read-back:
+   clause-by-clause EXISTS/PARTIAL/ABSENT, thresholds with reasons, the shift
+   modifier audit, the angle convention already in the geometry code, and
+   Ctrl's disposition. Spec: [`ROADMAP.md`](ROADMAP.md) A6.
 
-**THEN GRID SNAP — the inversion.** The largest daily-use improvement left on
-the board, and **fully specified**: snap-by-default; **shift means
-unconstrained** across both gestures; the angled-wall rule **quantising length
-along the ray**; intersection joins with their two refusals; and the live
-length-and-angle readout showing **snapped values rather than cursor position**.
-
-> **ITS READ-BACK IS STILL OWED AND UNCHANGED**, and it comes before any code:
-> the **clause-by-clause reconciliation** marking each **EXISTS / PARTIAL /
-> ABSENT**; the **thresholds with their reasons**; the **modifier audit** for
-> shift; the **angle convention already in the geometry code**; and **Ctrl's
-> disposition** once snapping is the default.
-
-**Not in this queue, and where they were left:** the **vehicle loft**
-(`VIEWER_NOTES` §5 — the design stands, only its urgency changed, and it may now
-also be `boat_trailer`'s fix), then **parameterisation** and **AI symbol
-drafting**, third and fourth, **both behind a read-back**.
-
-**SETTABLE WALL TYPES AND PORCH RAILINGS ARE COMPLETE — 2026‑08‑13, PR #27
-(`3864f38`).** D73 and **D74 both closed**; Patrick's manual check passed and is
-recorded verbatim in [D74](defects/0074-thickness-cannot-carry-wall-identity-and-the.md)
-and [`progress/phase-5.md`](progress/phase-5.md). Types settable, thicknesses
-from **one** normative table, identity carried by **decoration along the run**,
-gates **derived** rather than chosen, and the opening sheet naming what it made.
-**Phase 5 still owes P5.1 and P5.3.**
-
-> **THE AMBER GATE RETURNED A FINDING TWICE ON THIS ONE FEATURE, IN OPPOSITE
-> DIRECTIONS**, and that is the argument for the tier rather than a complaint
-> about it: it **refuted** the thickness ruling at PR #26 while every automated
-> signal was green, and it **confirmed** the decoration channel at PR #27 where
-> no automated signal could have.
-
-*(The two parts of D74's ruling are kept below — the reasoning outlives the
-feature, and §5 carries the general form.)* Settable wall types shipped at PR #26
-and **Patrick's manual check refuted part of it.** Two parts, both his judgement:
-
-1. **THICKNESS CANNOT CARRY IDENTITY.** He cannot tell a fence from a railing at
-   working zoom and never will — both are physically ~2 inches, and thickness is
-   already spent representing real thickness. Hedge and retaining only *appear*
-   to work because those genuinely are fatter. **The general form, which outlives
-   the feature: A CHANNEL COMMITTED TO REPRESENTING A REAL QUANTITY CANNOT ALSO
-   CARRY IDENTITY.** The second channel is **decoration along the run** — not
-   colour, not dash, both spoken for. Fence: perpendicular post ticks. Railing:
-   closer, lighter cross-ticks. Hedge: scalloped edge. Retaining: keeps
-   thickness. **Drafting conventions, so the exact form is adjustable — the
-   channel is not.** **The fence's FILLED POST is ruled IN** (2026‑08‑12): it is
-   not beyond the ruling, it completes it — see §5's categorical-channel rule.
-2. **THE GATE NEEDS A SYMBOL AND THE DIALOG MUST NAME THE KIND.** Break in the
-   run plus a thin quarter-circle swing arc; the properties dialog shows the kind
-   as **read-only text with its reason**. **Deriving a property is not a licence
-   to hide it.**
-
-**AND ONE THING THE BUILD FOUND, which is worth more than the feature:** the
-first cut of the channel **passed every test and would still have failed the
-check.** Fence and railing rendered at working zoom as *the same ladder*,
-differing only in how fine it was — a distinction you make by comparing, not one
-you make at a glance. **No test was going to say so.** It took a render at the
-zoom a person actually works at. See D74's *"the form was already adjusted once,
-by looking"*.
-
-**FURNISHINGS — THE LIVE WORK**, unblocked by the Phase 6 park below, which was
-the answer [`handoff/0010-ruling.md`](handoff/0010-ruling.md) was waiting on.
-The census that opened it found **a third of the catalog rendering as a box — 28
-of 95**; **that is now 1 of 95** (see the top of this section). Ruled order:
-**(1) the `prism` generator, and it OPENS WITH A MEASUREMENT — ✅ DONE** ·
-**(2) the remaining generators by item count — now a DECISION, not a task** ·
-**(3) parameterisation — a READ-BACK first** · **(4) AI symbol drafting, last,
-and AUTHORING TIME ONLY.**
-
-> **ITEM (1)'s MEASUREMENT IS DONE AND RULED — [`handoff/0012-readback-prism-outlines.md`](handoff/0012-readback-prism-outlines.md) · [`0012-ruling.md`](handoff/0012-ruling.md).**
-> Of the 28: **19 BODY** (prism extrudes something recognisable), **6 PARTIAL**
-> (body kept, line-drawn structure lost), **3 NONE** (fragments floating in
-> space — worse than the box). **The split is by form and it is stark:** the four
-> furniture forms are **16 BODY of 18**; `vehicle` is **3 of 10**.
->
-> **THE RULING: BUILD PRISM, THEN RE-MEASURE, THEN DECIDE.** Do **not** build the
-> four furniture generators first — if prism covers 16 of 18 on those forms, most
-> may never need writing, and building them first **guarantees work prism would
-> have made redundant**. `vehicle` does not wait on that decision: 3 of 10 is
-> already its answer, and that is a better reason than item count ever was. **The
-> three NONE items are AUTHORING work and stay separate, so a code task does not
-> acquire an artwork dependency.**
->
-> **PRISM'S RECEIPT IS A RE-MEASUREMENT, NOT A CLAIM** (Patrick, 2026‑08‑13):
-> after it lands, **how many of the 28 box-fallback items still fall back, and
-> which.** That number decides whether any further generator is written, and
-> ***"a third of the catalog renders as a box"*** is the sentence it either
-> falsifies or does not.
-
-**STILL OPEN AND NOT STARTED: WIDEN THE COMMAND ROSTER, DERIVED FROM THE
-PROPERTY.** Pre-committed at `2557e32` and never done. Enumerate every code path
-that **WRITES TO THE DOCUMENT**, by parsing writes to the model — **not**
-`MainWindow`'s methods, not the menu, not any class's public surface. Those are
-containers, and *a container census can only return its own contents*. Seed set
-at [`handoff/0009-readback-p6d-cutover.md`](handoff/0009-readback-p6d-cutover.md)
-§Q2. **Its urgency dropped with the Phase 6 park** — it was the cutover's
-prerequisite and the cutover is not happening — but **the census itself is still
-worth having**, because it is the only enumeration of the document's write
-surface anyone has asked for.
-
-> **THE RE-CUT RULE, added at this cut:** a task that changes `main`'s head, the
-> queue, the record count or the gate line **re-cuts §0 and §1 in its own
-> commit.** Not "before the next session" — in the commit. This file went stale
-> because eight commits each left it for the next one.
+**Full tiered queue (A2–A5, the command-roster census, Phase 5's remainder,
+etc.):** [`ROADMAP.md`](ROADMAP.md) §3. **`boat_trailer` and the vehicle
+loft** are not in this queue — both behind a read-back, design at
+[`floorplanner/viewer/VIEWER_NOTES.md`](../floorplanner/viewer/VIEWER_NOTES.md)
+§5.
 
 ---
 
@@ -331,11 +110,11 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`168190f`** — PR #31 merged at `b813343` (`gh pr merge --merge`; real two-parent commit, this repo's standing strategy), then D78's third round direct on `main` (`168190f`). Carries the vessel/enclosure split, the check's pass (`0025`), and D78's fix in full (`0027` — see §0). |
+| **`main`** | **`db09acf`** — PR #31 merged at `b813343` (`gh pr merge --merge`; real two-parent commit, this repo's standing strategy), then D78's third round direct on `main`. Carries the vessel/enclosure split, the check's pass (`0025`), and D78's fix in full (`0027` — see §0). |
 | **Branches** | **`d74-vessel-enclosure-split`** — merged, kept (not deleted). No other branch live. |
-| **Gate** | local at `168190f`: `collected=731 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **724 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** **CI on `168190f` (push, verified): all 6 jobs green, `Docs-Snapshot-Shape: linear` — the corrected label, on the real merge commit, not a coincidence.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **79 records**, **30 open**. **D75, D76, D77 open, D78 CLOSED** (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. `python tools/gate.py --docs` GREEN locally. |
-| **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
+| **Gate** | local at `db09acf`: `collected=731 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **724 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI on this same commit's predecessor confirmed green with the correct `Docs-Snapshot-Shape: linear` label on `main`'s real merge commit. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Records** | **79 records**, **30 open**. D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
+| **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |
 | **PHASE 5** | **P5.2 (settable wall types + porch railings) COMPLETE**, PR #26 then PR #27, D73 and D74 closed. Progress entry at [`progress/phase-5.md`](progress/phase-5.md). **P5.1 and P5.3 not started**; the Yard catalog stays RED on artwork scope, and D46 closes with it. |
@@ -344,134 +123,21 @@ surface anyone has asked for.
 `.gate-result.json`; a `PreToolUse` hook blocks any `git commit` unless that file
 exists, reads GREEN, and is **newer than every tracked file** — every tracked
 file, `.md` included, so a document edit made after the gate ran makes it stale.
-See §6.
+See §5.
 
 ---
 
 ## 2. PHASE 6 IS PARKED — 2026‑08‑12
 
-**Patrick's ruling. P6.a and P6.b stay MERGED AND DORMANT; P6.c and P6.d are NOT
-WIRED.** The full record with its reasoning is in [`ROADMAP.md`](ROADMAP.md); the
-short form:
-
-**The subsumption case was refuted by measurement.** Phase 6 does **not** retire
-`snapshot()` (4 of 8 callers die; the rest are dirty tracking and diagnostics),
-**D42 does not die with it** (the re-cut has no `MoveVertices`; the drag is one
-memento *wrapping* three appliers, so applier consolidation is independent), and
-**D45 does not die with it** (a load-path/format change; a memento stack stores
-documents and does not make the loader carry a binding). **So what remains buys a
-better undo and closes no records.**
-
-**What would reopen it, stated so the park has an exit that is not a mood:** an
-**undo defect the memento stack cannot fix**, or a **feature needing semantic
-replay rather than whole-document restore** (collaborative edit, scripted redo, a
-diff-based audit trail).
+**P6.a and P6.b stay MERGED AND DORMANT; P6.c and P6.d are NOT WIRED.**
+Refuted by measurement: Phase 6 does not retire `snapshot()`, and neither
+D42's applier consolidation nor D45's `_edge_wall` folds in here. **Full
+record, reasoning and the two named reopening conditions:**
+[`ROADMAP.md`](ROADMAP.md) § "PHASE 6 IS PARKED".
 
 ---
 
-## 3. THE REST OF THE QUEUE, in order
-
-**The tiers are [`ROADMAP.md`](ROADMAP.md)'s and are also recorded in the plan
-(§ "the work, tiered"). Code does not self-classify.** GREEN merges on green CI;
-**AMBER stops at the PR and Patrick's manual check is the merge condition**; RED
-does not start. **The GREEN batch is done and merged. A1 (D47) and A1b (D53) are
-DONE**, merged at PRs #17 and #18.
-
-> ### THE VERTEX-ACCUMULATION FAMILY IS CLOSED OR PARKED (2026‑08‑11)
->
-> **Six measurement passes ended here, on Patrick's ruling. Nothing in this block
-> is live work; all of it is register state.**
->
-> * **[D61](defects/0061-a-room-move-permanently-adds-two-walls.md) — ACCEPTED LIMITATION**, `type:limit` on D44's precedent. `Edit ▸ Coalesce all walls now` is the documented mitigation and the accumulation is **obvious in the scene**. **Reopens if it becomes invisible, or if the mitigation stops sufficing on a larger plan.**
-> * **2b — CLOSED as NOT ISOLATED, not as fixed.** The stashed implementation targeted a shape the three-state baseline disproved, and was deleted.
-> * **[D66](defects/0066-a-departing-room-carries-its-neighbours-walls.md) — the one real finding** six passes produced. Parked.
-> * **PARKED, register entries only:** [D63](defects/0063-a-coalesced-outline-partly-rebounds-on-save.md)'s producer 2, [D64](defects/0064-the-save-writes-an-outline-corner-at-a.md), [D65](defects/0065-weld-scene-is-implicated-in-three-separate.md). **Not to be reopened without a new instruction.**
-> * **D63 producer 1 stays CLOSED** — rebound 0 on five plans, robust across four pairing tolerances.
-
-1. ~~**AWAITING PATRICK: the enclosure form split.**~~ **RULED AND BUILT
-   (`0018`), AT A PR, AWAITING THE CHECK.** See §0 — `enclosure` splits
-   categorically into `vessel` and `enclosure`, materials split with it, and
-   two things were found while building it (an extrusion-direction bug caught
-   by dumping the mesh, and a renderer limit noted against D69).
-2. **THE REST OF THE SMALL BATCH — D72 and D71 done; three artwork redraws
-   (`glass_shower`, `shower`, `walk_in_shower`) unblocked by item 1's ruling**,
-   still waiting on its PR merging before redrawing against an extruder whose
-   behaviour could still change. `boat_trailer` is held out of this batch
-   entirely — see §0, its likely fix is the vehicle loft, not a redraw.
-3. **GRID SNAP — the inversion. THE READ-BACK COMES FIRST.** Fully specified;
-   §0 carries the five things the read-back owes. Was A6; it moves up because
-   the furnishings work is (mostly) done and this is the largest daily-use
-   improvement left.
-4. **Furnishings — 3D FORMS MOSTLY DONE, three of four generators RETIRED for
-   good.** Prism and region extrusion merged (PRs #28, #29). Trail:
-   [`handoff/0012`](handoff/0012-readback-prism-outlines.md) ·
-   [`0012-ruling`](handoff/0012-ruling.md) ·
-   [`0013`](handoff/0013-report-prism-receipt.md) ·
-   [`0013-ruling`](handoff/0013-ruling.md) ·
-   [`0014`](handoff/0014-report-furniture-regions.md) ·
-   [`0014-ruling`](handoff/0014-ruling.md) ·
-   [`0015-ruling`](handoff/0015-ruling.md) ·
-   [`0016-ruling`](handoff/0016-ruling.md) ·
-   [`0017`](handoff/0017-report.md) ·
-   [`0018-ruling`](handoff/0018-ruling.md) ·
-   [`0021`](handoff/0021-report.md); log at
-   [`progress/furnishings.md`](progress/furnishings.md). **What remains: the
-   enclosure PR's check (item 1), the vehicle loft (possibly `boat_trailer`'s fix
-   too now), then parameterisation and AI drafting — both behind a read-back.**
-5. **The command-roster census, derived from the property.** See §0.
-6. **A2 — D11's runtime z collapse. ⏸ PARKED, twice over.** The hang is **not
-   reproducible** (2026‑08‑09): five orders of magnitude on either z step leaves
-   the event breakdown identical at 545, `docs/evidence/d11-a2-z-step-measurement.txt`.
-   And it was **DROPPED BEHIND D68** (2026‑08‑11) — the viewer now renders the
-   active floor, which makes the z collapse stop mattering for the common case.
-   The instrument is kept at `evidence/d11_a2_z_step_counter.py`; **do not
-   re-derive it.**
-7. **A3 — D11's SERIALIZATION half.** Unblocked by **ruling R‑B**: an *additive
-   optional* field or enum value does not bump the document version, so a
-   stacking index can be added at `schema_revision` without a v6. AMBER.
-8. **D59 — the CHEAP TWELVE at document boundaries.** A real plan was saved
-   carrying an `I7`, nothing reported it, and the user met it later as a silent
-   crash (D57). P1.2's O(n²)-per-edit cost objection does not touch this half.
-   **AMBER, and it moves up on evidence rather than preference.**
-9. **A4 — D49, the deep checks at document boundaries. AMENDED 2026‑08‑07 — read
-   the amendment, not the proposal it supersedes.** The ruling: **CHECK YES, FIX
-   NO**; **SAVE ASKS, IT DOES NOT REFUSE**; the report must be **ACTIONABLE**
-   (rooms *and overlap area*, plus select-and-zoom). Acceptance case is `planc1`;
-   `farmplace` is the silence case once D52's half 1 lands.
-10. **A5 — D41, the new simple-ring invariant.** Ruled at **R‑A**. **A read-back
-    is required before starting.**
-11. ~~**A6 — Grid snap.**~~ **MOVED TO #3 and no longer RED** — the sub-rulings are answered and the feature is fully specified (2026‑08‑14). Kept as a row so `A6` still resolves where it is referenced.
-12. **Phase 5 — the rest:** P5.1 site levels/categories/area accounting, P5.3
-    site schedule fields + reports. **P5.2 is what shipped.** The Yard catalog is
-    RED on artwork scope; **D46** closes with it.
-
-**Other open records, not queued as tasks but live: D44** (an accepted limit),
-**D45**, **D50** (a level's elevation is destroyed by a load/save round trip —
-blocks Phase 7's Build Floor), **D52** (room-inside-a-room has no representation
-and I11 misreports the workaround), **D51** (the census depends on the working
-tree), **D67**, **D69**, **D71**, **D72**.
-[`defects/INDEX.md`](defects/INDEX.md) is generated and is authoritative over
-this paragraph.
-
-**Patrick will ask separately for the consolidated feature-and-phase document. Do
-not start it unprompted.**
-
-### `examples/farmplaceBIGmultifloor.json` — read this before touching `examples/`
-
-**It still fails I11, and it is TRACKED.** `check(deep=True)` →
-`["I11 rooms 'Lounge' and 'Toi' overlap"]`; `check(deep=False)` → `[]`. It was
-committed at **`83a3ccc`** together with the `KNOWN_UNCLEAN` exemption, which is
-documented as being for **REAL PLANS carrying a known, recorded fault** — as
-distinct from `planc1.v5.json`, *a fixture built to be dirty*. The entry names
-**D52** as the record that owns the fault.
-`test_known_unclean_still_fails` asserts each listed file is schema-valid and
-**still carries its named fault**, so the list cannot become a place where
-failures go to be forgotten — `roundedMultifloor.json` was on it one morning and
-came off it the same afternoon.
-
----
-
-## 4. How to read this repo's record
+## 3. How to read this repo's record
 
 Which document answers which question:
 
@@ -479,7 +145,7 @@ Which document answers which question:
 |---|---|
 | *What is the architecture? What are the house rules?* | **`CLAUDE.md`** |
 | *What is every document, and which are authoritative?* | **[`README.md`](README.md)** — the map. Start here when unsure. |
-| *What may proceed without Patrick, and what may not?* | **[`ROADMAP.md`](ROADMAP.md)** — the tier charter (GREEN / AMBER / RED), the autonomy policy, rulings **R‑A** and **R‑B**, and the **Phase 6 park**. |
+| *What may proceed without Patrick, and what may not?* | **[`ROADMAP.md`](ROADMAP.md)** — the tier charter (GREEN / AMBER / RED), the autonomy policy, rulings **R‑A** and **R‑B**, the full work queue, and the **Phase 6 park**. |
 | *What rules bind the work?* — census doctrine, gate discipline, what a receipt is, how vacuity is detected | **[`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md)**. Extracted from the plan because the rules outlive the migration. |
 | *What is planned, and what is done?* | **[`V5_MIGRATION_PLAN.md`](V5_MIGRATION_PLAN.md)** — Status table, phase specs, risk register, sequencing rationale. |
 | *What happened, and what proved it?* | **[`progress/`](progress/)** — the log, split by phase, verbatim and contemporaneous. Index at [`progress/README.md`](progress/README.md). |
@@ -489,89 +155,52 @@ Which document answers which question:
 | *What was the plan before this one?* | **[`superseded/`](superseded/)** — kept because it holds material found nowhere else, **not** because it is safe to skip. |
 
 **Reading order for a fresh session:** `CLAUDE.md` → this file →
-[`README.md`](README.md) → [`ROADMAP.md`](ROADMAP.md) → then whichever row above
-the task needs.
+[`handoff/`](handoff/) (highest number first) → [`README.md`](README.md) →
+[`ROADMAP.md`](ROADMAP.md) → then whichever row above the task needs.
 
 **`docs/CODE_REVIEW_v2.md` is still worth reading** for §1 (module verdicts) and
 §2 (the five structural findings). Its §3 is now a pointer into `defects/`.
 
 ---
 
-## 5. The rules that bind the work
+## 4. The rules that bind the work
 
-All in [`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md): **a green signal is only
-evidence about what it measures**; **retire visibility before permission**, and
-enumerate a view's consumers first; **a task that changes what an operation does
-owes a differential receipt**; **vacuity has three shapes** (plus UNSATISFIABLE,
-its mirror); **negative assertions are where vacuity concentrates**, so
-preconditions are mandatory there; **verify a probe — and a record edit —
-actually landed**; **measure survival justifications** like any other claim;
-**grep for identifiers, parse for shapes**; **in a test, call the production
-predicate rather than restating it**; and **a tidy-up pass that outlives its mess
-only touches things nobody asked it to**.
+**Full text and reasoning for every rule below is
+[`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md).** This is names only — enough
+to know a rule exists and where to read it, per
+[`handoff/0028-ruling.md`](handoff/0028-ruling.md)'s own instruction that this
+section stop carrying the reasoning WORKING_AGREEMENT.md already carries.
 
-**Added since the docs refactor:**
-
-- **EVERY CENSUS IS SHAPED BY ITS ENUMERATION SOURCE, AND THE SOURCE IS THE BLIND
-  SPOT — enumerate from the PROPERTY, not from a place things are kept.** Three
-  instances: the split-on-write survey enumerated a **spelling** and missed five
-  `setattr` writers through two censuses; A1b's hit census enumerated a
-  **predicate** and missed a 68-line `contextMenuEvent`; P6.b's roster enumerated
-  a **container** (`MainWindow`'s public surface) and missed the drag, then four
-  more after the trap had just been named. **The tell is the preposition** —
-  *"every mutator IN MainWindow"* and *"every path that WRITES TO the document"*
-  sound like one census and are not.
-- **IDENTITY NEEDS A CATEGORICAL CHANNEL, NOT A SCALAR ONE — added 2026‑08‑12,
-  and it has TWO INSTANCES one level apart.** **Thickness** failed because two
-  types share a real thickness (*a channel committed to representing a real
-  quantity cannot also carry identity* — the narrower form, which came first).
-  **Fineness** then failed the same way inside the fix: tick spacing and weight
-  are scalars too, and the render showed one ladder at two pitches. What worked
-  was **categorical** — the fence's ticks carry a filled post, the railing's do
-  not. **Ask of any identity channel: are its values points on an axis, or
-  different kinds of mark?** A scalar holds in a side-by-side comparison and
-  fails at a glance, and a glance is what the user gives it. Sits with the
-  project's other channel rulings: dashed is spoken for twice, colour in 3D.
-- **A CRITERION THAT SPLITS TWO STRUCTURALLY IDENTICAL CASES IS MEASURING THE
-  WRONG THING, AND THE AGGREGATE NEVER SHOWS IT — added 2026‑08‑12, beside the
-  positive control; same family, different failure.** The positive control
-  catches an instrument reporting **nothing**; this catches one reporting a
-  **plausible something**. One 25% line called `lawnmower` usable and
-  `snowblower` not — identical symbols — while **21-of-28 looked perfectly
-  respectable from above**. **The practice: inspect the items either side of the
-  line, not the count**, and print every raw value so a different cut needs no
-  re-run.
-- **AN ACCEPTANCE STATED AS A COUNT IS SATISFIED BY REPLACEMENT.** *"40 of 40
-  survive a save"* cannot distinguish forty survivors from forty removals and
-  forty fresh insertions. When the question is whether a specific thing
-  **persisted**, the measure must be an **identity**, not a total — the cheap
-  form is a **set equality in both directions**.
-- **A content correction discovered during a structural move is NEVER folded into
-  the move** — it is the next commit, with its own receipt.
-- **A lint that fails on correctly-recorded history is a lint that gets
-  disabled.** Dangling *keys* fail the gate; dangling *links and paths* are
-  reported and never enforced.
-- **A boundary belongs at the instrument. Annotate, do not rewrite** — applied to
-  documents, not just code.
-- **TRUNCATION INVITES FABRICATION** — `| tail` has caused two different
-  failures. Never truncate a gate, a census or any output you are about to quote.
-  **`tools/gate.py --trailer` reprints the stored block** so the numbers never
-  pass through a human. `--quick` and `--deep` deliberately do not write that
-  block.
-- **The GREEN criterion was amended 2026‑08‑07, and the amendment is Patrick's.**
-  It reads *"no new semantics, and nothing the user must learn"* rather than *"no
-  user-visible behaviour change"*. A report that fires **only when something is
-  already wrong**, reusing an existing message, adds nothing to learn. A new
-  mode, a new gesture, a changed default, or a message that can fire on
-  **correct** work all still fail the test.
-- **An append-only shared file serialises parallel branches.** Before two agents
-  run at once, progress entries move to per-task files. **A precondition on
-  concurrency, not a debt.**
+- a green signal is only evidence about what it measures
+- retire visibility before permission; enumerate a view's consumers first
+- a task that changes what an operation does owes a differential receipt
+- vacuity has three shapes, plus UNSATISFIABLE, its mirror
+- negative assertions are where vacuity concentrates — preconditions are mandatory there
+- verify a probe — and a record edit — actually landed
+- measure survival justifications like any other claim
+- grep for identifiers, parse for shapes
+- in a test, call the production predicate rather than restating it
+- a tidy-up pass that outlives its mess only touches things nobody asked it to
+- every census is shaped by its enumeration source — enumerate from the PROPERTY, not a container
+- identity needs a categorical channel, not a scalar one
+- a criterion that splits two structurally identical cases is measuring the wrong thing, and the aggregate never shows it
+- an acceptance stated as a count is satisfied by replacement — measure identity, not a total
+- a content correction discovered during a structural move is never folded into the move
+- a lint that fails on correctly-recorded history is a lint that gets disabled
+- a boundary belongs at the instrument — annotate, do not rewrite
+- truncation invites fabrication
+- the GREEN criterion: "no new semantics, and nothing the user must learn"
+- an append-only shared file serialises parallel branches
+- **every instrument is validated against a case known to be non-zero before its zero is believed** — the positive-control family, four members, all in `WORKING_AGREEMENT.md`: an instrument reporting nothing; one reporting a plausible something; one that can report only one of its two answers; and **a control proves the question it was built to answer, and no more** (added 2026‑08‑16)
 
 ---
 
-## 6. Things that will waste your time if you don't know them
+## 5. Things that will waste your time if you don't know them
 
+- **A task that changes `main`'s head, the queue, the record count or the gate
+  line RE-CUTS §0/§1 IN ITS OWN COMMIT** — not "before the next session." This
+  file went stale for eight commits, once, because each one left it for the
+  next.
 - **A `git commit` is BLOCKED unless a fresh green gate result exists on disk.**
   `tools/gate.py` writes `.gate-result.json` (gitignored) at the end of a
   full-mode run; `.claude/hooks/verify_gate.py` checks it exists, reads GREEN,
@@ -580,7 +209,11 @@ only touches things nobody asked it to**.
   never the commit message.
 - **ONE CALL CANNOT BOTH RUN THE GATE AND COMMIT**, and the hook blocks that
   shape outright. **`--trailer` is exempt** — it runs nothing and writes nothing,
-  and it is exactly the command that belongs beside a commit.
+  and it is exactly the command that belongs beside a commit. **The hook's match
+  is a plain substring on `tools/gate.py`**, so it also fires on a `git add`
+  that merely names that path (or `tests/test_gate.py`) in the same command as
+  a commit, and on a commit MESSAGE that quotes the string — stage in one call,
+  commit (ideally via `-F <file>`, not an inline message) in the next.
 - **A `NameError` inside a Qt virtual override PRESENTS AS A SEGFAULT.** PyQt6
   aborts the process on an unhandled Python exception in an override, so the run
   dies with **no traceback and no pytest summary**. **`config.py` has an
@@ -592,6 +225,20 @@ only touches things nobody asked it to**.
   `viewer/fp3d.py` is deliberately Qt-free and loads that module **by path**. A
   **source-text grep** guards it, so prose that merely names the bindings trips
   it; reword the prose rather than weakening the guard.
+- **`fp3d.py`'s GL rendering (`--shot`, `make_view`) needs a REAL display, not
+  `QT_QPA_PLATFORM=offscreen`.** Measured 2026‑08‑16 (D77, D78's investigation):
+  under `offscreen`, this project's Qt cannot create a GL context at all —
+  `grabFramebuffer()` returns a null image, `.save()` returns `False` (its
+  return value is unchecked), and `--shot` prints `wrote <path>` and writes
+  nothing, reproducibly. The real platform, an actual window, works. Headless
+  2D work (`QGraphicsScene`, `export_canvas`) is unaffected — this is GL-specific.
+- **A SHALLOW git checkout (`fetch-depth: 1`, `actions/checkout`'s default)
+  hides ALL parent-relative revisions at the boundary commit** — not just a
+  merge commit's second parent; `HEAD^1` fails too. Measured on CI building
+  D78. `git cat-file -p HEAD` still shows the true `parent` lines (raw object
+  content, unaffected); `git rev-parse HEAD^N` / `HEAD~N` do not. Jobs that
+  need real ancestry (this file's own staleness check, `closed_by` validation)
+  need `fetch-depth: 0`.
 - **`QRubberBand.show()` on an offscreen viewport kills the process** —
   pre-existing, reproducible on `main`, and why no headless test covers the
   Ctrl+drag band.
