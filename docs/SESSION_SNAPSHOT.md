@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 1960025 -->
+<!-- SNAPSHOT-HEAD: 2630018 -->
 
 # Session snapshot — read this first
 
@@ -58,8 +58,8 @@ must not be trusted over it.
 
 ## 0. WHERE THE WORK IS
 
-**THE VESSEL/ENCLOSURE SPLIT IS BUILT, PATRICK'S CHECK PASSED, AND IT IS
-BLOCKED ON A CI FINDING — PR #31, AMBER, NOT MERGED.** [`handoff/0018-ruling.md`](handoff/0018-ruling.md)
+**THE VESSEL/ENCLOSURE SPLIT IS BUILT, PATRICK'S CHECK PASSED, AND D78 IS
+FIXED — PR #31, AMBER, ONE PUSH FROM MERGE.** [`handoff/0018-ruling.md`](handoff/0018-ruling.md)
 ruled it (and found `0017`'s control was pointed the wrong way — every case,
 control included, expected and got the same answer, a third member of the
 positive-control family); [`handoff/0021-report.md`](handoff/0021-report.md) is
@@ -69,14 +69,17 @@ control and ruled row 1 not discharged by the mesh numbers alone;
 [`handoff/0024-report.md`](handoff/0024-report.md) built the remedy;
 [`handoff/0025-ruling.md`](handoff/0025-ruling.md) is Patrick's check,
 **passed, verbatim: *"The check looks great. Its all set on those items."***
-**CI then came back red on [`PR #31`](https://github.com/pjm4github/FloorPlanner/pull/31)
-— [D78](defects/0078-the-snapshot-staleness-gate-cannot-pass-on.md)
+**CI then came back red** — [D78](defects/0078-the-snapshot-staleness-gate-cannot-pass-on.md)
 ([`handoff/0026-report.md`](handoff/0026-report.md)): the snapshot-staleness
 check cannot pass on a PR's default merge-ref checkout, structurally, for any
 branch that correctly re-cuts its own marker. Not a content problem — `Gate-
-DEEP` and every records check are identical to the clean local run. Not
-merged; not fixed; three candidate remedies named, none chosen, awaiting a
-ruling.**
+DEEP` and every records check were identical to the clean local run.
+**[`handoff/0027-ruling.md`](handoff/0027-ruling.md) ruled the remedy**
+(`_snapshot_head()` reads `HEAD^2`/`HEAD^2~1` on a merge commit, recovering the
+branch's own tip) **and it is built and receipted** — two new tests
+(`tests/test_gate.py`) prove both directions on a real two-parent git commit.
+**D78 closed.** Merge PR #31 once this push's CI confirms green — `0025`'s
+pass stands, no re-check owed.
 
 **`KNOWN_FORMS` gains `vessel`. `build_prism` now asks ONE categorical
 question** — does this form allow a recess: `vessel` (`bathtub`, `swim_spa`,
@@ -307,10 +310,10 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | still **`0680c80`**, unmoved — `0018`+`0019-ruling.md` landed there. This branch (`d74-vessel-enclosure-split`) is now at **`1960025`**: `0020-ruling.md` landing plus the vessel/enclosure split (`857e2d5`), `0022`–`0024`'s remedies (`bf22ee2`), a follow-up landing Cowork's concurrent `channel-commands.svg` update (`1960025`) — pushed and at [`PR #31`](https://github.com/pjm4github/FloorPlanner/pull/31), Patrick's check passed (`0025`), CI red on [D78](defects/0078-the-snapshot-staleness-gate-cannot-pass-on.md) (`0026`), not yet merged. |
-| **Branches** | **`d74-vessel-enclosure-split`** — [PR #31](https://github.com/pjm4github/FloorPlanner/pull/31), AMBER, Patrick's check passed, **blocked on CI** (D78 — a gate/CI structural mismatch, not a content problem). |
-| **Gate** | on this branch, local (`1960025`): `collected=727 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **720 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** **CI on PR #31: 4 of 6 jobs green** (`ruff`, `pytest` ×3); `records (gate --docs)` and `pytest deep invariants (py3.13)` **red on `Docs-Snapshot` only** — D78. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **79 records**, **31 open**. **D75, D76, D77, D78 filed** (D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`; D78 the snapshot-gate/CI-checkout mismatch, blocking PR #31's merge). `python tools/gate.py --docs` GREEN locally. |
+| **`main`** | still **`0680c80`**, unmoved — `0018`+`0019-ruling.md` landed there. This branch (`d74-vessel-enclosure-split`) is now at **`2630018`** locally (`0026`'s finding), about to gain the `0027` fix (`_snapshot_head` reads `HEAD^2` on a merge commit) on top — [`PR #31`](https://github.com/pjm4github/FloorPlanner/pull/31), Patrick's check passed (`0025`), D78 fixed and receipted, awaiting this push's CI before merge. |
+| **Branches** | **`d74-vessel-enclosure-split`** — [PR #31](https://github.com/pjm4github/FloorPlanner/pull/31), AMBER, Patrick's check passed, D78 fixed — **merge once this push's CI is green** (`0025`'s pass stands, no re-check owed). |
+| **Gate** | on this branch, local: `collected=729 ruff=clean vacuous=0 end_assign=0 snapshot=current` (727 + 2 new `tests/test_gate.py` merge-ref tests); OFF / ON / DEEP each **722 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** **CI on the previous push (`2630018`): 4 of 6 jobs green**, the other two red on `Docs-Snapshot` only — D78, now fixed; this push's CI is the receipt. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Records** | **79 records**, **30 open**. **D75, D76, D77 open, D78 CLOSED** (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by two new merge-ref tests). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. `python tools/gate.py --docs` GREEN locally. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |

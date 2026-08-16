@@ -4,8 +4,8 @@ id: 78
 title: "The snapshot-staleness gate cannot pass on a PR's default merge-ref checkout"
 
 # maps directly onto GitHub Issues fields
-state: open
-state_reason: null
+state: closed
+state_reason: completed
 labels:
   - type:defect
   - area:tooling
@@ -13,7 +13,7 @@ milestone: null
 
 # ours; becomes body prose after migration
 opened: 2026-08-15
-closed: null
+closed: 2026-08-16
 closed_by: null
 rank: 78
 related: [27]
@@ -96,17 +96,36 @@ check confirmed.
 
 ## Ruling
 
-*(Open — filed 2026‑08‑15, on Code's own report,
-[`handoff/0026-report.md`](../handoff/0026-report.md).)* Not fixed here — the
-gate's snapshot check and/or the CI workflow's checkout step are shared
-infrastructure, and this record exists so the fix is a decision rather than a
-guess. Candidate remedies, not chosen: **(a)** the `docs` and deep-invariant
-CI jobs check out `${{ github.event.pull_request.head.sha }}` explicitly
-instead of the default merge ref, so `HEAD`/`HEAD~1` mean what `gate.py`
-already assumes they mean; **(b)** `_snapshot_head()` detects a merge commit
-(more than one parent) and walks the **second** parent instead of the first;
-**(c)** the snapshot check is scoped to run only on push-to-`main`, not on
-`pull_request`, since AMBER's merge condition is Patrick's check plus green
-CI on the *other* jobs, and the snapshot's own staleness is meaningless
-mid-review. **(a) is the smallest, most local change** and does not touch
-`gate.py`'s semantics at all.
+Filed 2026‑08‑15, on Code's own report,
+[`handoff/0026-report.md`](../handoff/0026-report.md), with three candidate
+remedies and none chosen. **Ruled 2026‑08‑16, [`handoff/0027-ruling.md`](../handoff/0027-ruling.md)
+§3 — (b) adopted, (a) and (c) refused.** (a) (check out
+`pull_request.head.sha` explicitly) was refused because it changes what CI is
+*evidence of* — a semantic conflict with `main` that breaks nothing on either
+branch alone would then pass and land. (c) (push-to-`main` only) was refused
+because it moves detection to after the merge, reproducing the exact
+red-at-rest failure the staleness ruling itself warns against. **(b)**:
+`_snapshot_head()` (`tools/gate.py`) now detects a merge commit via `git
+rev-parse HEAD^@` (all parents, one call, no history walk) and, when `HEAD`
+has two or more parents, reads `HEAD^2`/`HEAD^2~1` instead of `HEAD`/`HEAD~1`
+— recovering the real, linear checkout the check was written for, since
+`HEAD^2` is the branch's own tip on a `refs/pull/N/merge` ref, not the
+synthetic merge commit. The shape detected is now printed as its own trailer
+line, `Docs-Snapshot-Shape: linear` or `merge (using HEAD^2, the branch's
+own tip)`.
+
+## Receipt
+
+**Both directions demonstrated on a REAL two-parent git commit**, per
+[`0027`](../handoff/0027-ruling.md) §4's own instruction that a repaired
+check is uncontrolled until it has produced its other answer too —
+`tests/test_gate.py::test_a_merge_ref_checkout_with_a_correctly_cut_marker_is_GREEN`
+and `::test_a_merge_ref_checkout_with_a_STALE_marker_is_RED` each build a
+throwaway repo (`git init`, a root commit, a `feature` branch, `git merge
+--no-ff` to reproduce the exact `[base, head]` parent order measured on PR
+#31's own `refs/pull/31/merge`), check out the merge commit detached — the
+same state CI's `actions/checkout@v5` produces — and run the real
+`_snapshot_head()` against it: a marker cut against the branch's own parent
+passes, a deliberately unrelated marker fails, both correctly attributed to
+the `merge` shape in the trailer. All 9 tests in `tests/test_gate.py` pass,
+the 7 pre-existing ones unchanged.
