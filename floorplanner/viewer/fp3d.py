@@ -368,6 +368,73 @@ def svg_outlines(path):
     return parts, (vb[2], vb[3])
 
 
+def _ring_bbox(ring):
+    xs = [p[0] for p in ring]
+    ys = [p[1] for p in ring]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _bboxes_touch(a, b, tol):
+    ax0, ay0, ax1, ay1 = a
+    bx0, by0, bx1, by1 = b
+    return not (ax1 + tol < bx0 or bx1 + tol < ax0
+                or ay1 + tol < by0 or by1 + tol < ay0)
+
+
+def extrudability(parts, viewbox=None):
+    """(filled_count, body_fragments, has_region) for one symbol's
+    `svg_outlines()` return -- the three facts handoff 0029's predicates ask
+    of every catalog symbol.
+
+    `filled_count` is `len(parts)`: zero means nothing here can be extruded
+    at all (`glass_shower`, all strokes).
+
+    `body_fragments` is NOT a count of top-level rings -- a chair's seat plus
+    a separate backrest rect is TWO top-level rings and a perfectly ordinary
+    `beside` body (`build_prism`'s own existing pattern), not a fragmented
+    one. It is the number of CONNECTED COMPONENTS among the top-level
+    (non-nested) rings' bounding boxes, where two rings are one component if
+    their boxes touch or overlap within a small tolerance (3% of the
+    viewBox's smaller dimension -- a drafting-scale allowance for two pieces
+    drawn to meet, not a scalar identity threshold: this is "did the artist
+    mean these to touch," not "how big is this relative to that," which is
+    the shape the lawnmower/snowblower threshold got wrong). One component is
+    a single connected body; more than one is disconnected pieces standing in
+    for it (`boat_trailer`'s slabs, no trailer -- gaps of tens of viewBox
+    units, nothing close to the tolerance). `viewbox=None` (or fewer than two
+    top-level rings) skips the geometry and reports whatever `len(outer)` is.
+
+    `has_region` is whether any NESTED part also carries an annotated height
+    -- an internal feature distinct from the body, as opposed to a body with
+    nothing inside it (a `box`/`slab` form, or a symbol not yet given one).
+
+    A single, cheap function so a census and a gate test read the exact same
+    fact rather than each re-deriving it from `parts` their own way.
+    """
+    outer = [p for p in parts if not p.nested]
+    if viewbox is not None and len(outer) > 1:
+        tol = 0.03 * min(viewbox)
+        boxes = [_ring_bbox(p.ring) for p in outer]
+        parent = list(range(len(boxes)))
+
+        def find(i):
+            while parent[i] != i:
+                i = parent[i]
+            return i
+
+        for i in range(len(boxes)):
+            for j in range(i + 1, len(boxes)):
+                if _bboxes_touch(boxes[i], boxes[j], tol):
+                    ri, rj = find(i), find(j)
+                    if ri != rj:
+                        parent[ri] = rj
+        fragments = len({find(i) for i in range(len(boxes))})
+    else:
+        fragments = len(outer)
+    has_region = any(p.nested and p.h is not None for p in parts)
+    return len(parts), fragments, has_region
+
+
 def _ear_clip(ring):
     """Triangulate a simple polygon by ear clipping -> [(i, j, k), ...].
 

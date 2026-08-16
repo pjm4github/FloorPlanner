@@ -609,3 +609,28 @@ D72 -- THE IMPORT-TIME ASSET WRITE, FIXED  2026-08-15  (GREEN, auto-merged)
          defect-closure prose, not a handoff ruling: neither record's
          technical shape needed a policy decision, only correct execution.
 ```
+
+0028 -- SESSION_SNAPSHOT.md AND handoff/README.md TRIMMED TO THEIR STATED JOB  2026-08-16  (GREEN)
+         handoff: 0028 (ruling)
+         files:   docs/SESSION_SNAPSHOT.md  docs/handoff/README.md
+         Differential receipt, measured before and after, per 0028's own
+         instruction that a cut with no receipt is indistinguishable from
+         a tidy-up nobody measured:
+             SESSION_SNAPSHOT.md   600 lines / 41,093 B  ->  268 lines / 18,006 B
+             handoff/README.md         -- / 26,906 B  ->  156 lines / 10,211 B
+         No fragmentation (one file, one marker, one gate, as ruled). The
+         queue sections collapse to current-item-plus-next-two with one
+         link each into the ruling that owns them; "the rules that bind"
+         becomes names and one link into WORKING_AGREEMENT.md, dropping
+         the reasoning that document already carries in full; Phase 6's
+         park collapses to its verdict plus a link to ROADMAP.md's own
+         copy. Kept as-is: the gate-condition header, the state table,
+         "how to read the record," and the traps list -- which gained
+         three entries from this session's own findings (the commit
+         hook's gate.py substring match, fp3d.py's GL/offscreen limit,
+         and the shallow-fetch parent-hiding behaviour D78 measured).
+         handoff/README.md's pair table goes from dense multi-sentence
+         paragraphs to one line per exchange; the protocol prose at the
+         top is untouched, per the ruling -- it is the channel contract,
+         not a copy of anything.
+```

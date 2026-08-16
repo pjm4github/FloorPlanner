@@ -467,3 +467,154 @@ THE VESSEL/ENCLOSURE SPLIT, BUILT  2026-08-15  (AMBER, at a PR)
          only the one file (manifest.json) with a real difference, rather
          than committing 95 files of noise.
 ```
+
+THE VESSEL/ENCLOSURE SPLIT -- CHECK PASSED, PR #31 MERGED  2026-08-16  (was AMBER, now complete)
+         handoff: 0022 (ruling), 0024 (report, remedy built), 0025
+                  (ruling, Patrick's check passed), 0026-0027 (D78's
+                  three-round fix), 0028 (ruling + report, doc trim)
+         branch:  d74-vessel-enclosure-split -> merged into main at
+                  b813343 (gh pr merge --merge), D78's fix landed direct
+                  on main afterward at 168190f
+         files:   docs/evidence/enclosure_bodies_omitted_render.py (new)
+                  docs/evidence/enclosure-bodies-omitted.png (new)
+                  docs/WORKING_AGREEMENT.md (positive-control 4th member)
+                  docs/defects/0076-*.md 0077-*.md 0078-*.md (new)
+
+         ROW 1 (walk_in_shower's bench) was answered from the mesh
+         numbers alone in the PR as opened -- 0022 ruled that was NOT a
+         discharge of the check (a geometric receipt proves position, not
+         that the bench READS as a bench) and ordered an evidence render
+         instead. Built: a new evidence script drops exactly one mesh
+         (the item's glass body -- the only glass item in the fixture)
+         from build_model's own unmodified output before rendering, so
+         the bench stands alone on the grid with nothing invented.
+
+         D76 FILED: an opaque mesh inside a translucent body does not
+         composite in fp3d.py's viewer, at any alpha tested -- its own
+         record now, cross-referenced to D69 rather than buried in it.
+         D77 FILED while building the render: fp3d.py --shot reports
+         success on a failed framebuffer grab (grabFramebuffer() returns
+         null under QT_QPA_PLATFORM=offscreen on this machine because Qt
+         cannot create a GL context there; .save()'s return value is
+         never checked). Neither fixed here -- filed, not blocking.
+
+         PATRICK'S CHECK PASSED, verbatim: "The check looks great. Its
+         all set on those items." Row 3's live question (is porcelain
+         right for swim_spa/whirlpool) answered yes by the pass.
+
+         D78, FOUND BY THE MERGE ITSELF, FIXED IN THREE ROUNDS, EACH
+         MEASURED RATHER THAN ASSUMED:
+           1. actions/checkout's default PR-preview ref (refs/pull/N/merge)
+              has main as HEAD's first parent, so HEAD~1 was always main's
+              tip, never the branch's own commits -- no branch that
+              correctly re-cut its marker could ever pass this check in
+              CI. Fixed: read HEAD^2 on a merge commit.
+           2. That fix's own shape detection (HEAD^@) was itself blind
+              under actions/checkout's default SHALLOW fetch -- git hides
+              EVERY parent-relative revision at the shallow boundary
+              (HEAD^1 fails too, not just HEAD^2), even though the raw
+              commit object (git cat-file -p HEAD) still lists both
+              parents. Fixed: detect shape from cat-file; the deep CI job
+              gains fetch-depth: 0, matching the docs job's own existing
+              precedent.
+           3. MERGING PR #31 SURFACED A THIRD BUG THE FIRST TWO ROUNDS
+              COULD NOT HAVE CAUGHT: this repo's real merge strategy is a
+              genuine two-parent commit, so push-to-main checks out a
+              PERMANENT commit that must be read as itself -- reading it
+              as HEAD^2 instead validates the marker against the merged
+              branch's last commit, not main's real tip. It silently
+              passed on this repo's own push-triggered run for PR #31
+              only because a one-commit feature branch made the two
+              coincide. Fixed: the substitution now requires
+              GITHUB_EVENT_NAME == "pull_request".
+         Four tests in tests/test_gate.py receipt all three rounds,
+         including one built on a two-commit branch specifically because
+         a one-commit branch cannot tell "linear read of a real merge"
+         apart from "merge read of a synthetic ref." D78 closed.
+
+         MERGED 2026-08-16, gh pr merge --merge (PR #31, b813343); CI
+         confirmed green on the real push-to-main run with the corrected
+         Docs-Snapshot-Shape: linear label -- not a coincidence.
+
+         D75/D76/D77 close with the merge as filed; D76 and D77 stay open
+         and unscheduled (D76 cross-referenced to D69; D77 a tooling gap,
+         not yet fixed).
+```
+
+THE EXTRUDABILITY PREDICATE, BUILT AND THE CENSUS RUN  2026-08-16  (GREEN)
+         handoff: 0029 (ruling), 0030-0031 (glance render + fixture placed),
+                  0032 (report)
+         files:   floorplanner/viewer/fp3d.py (extrudability(), new)
+                  tests/test_extrudability.py (new, 3 tests)
+                  fixtures/shower-glance-check.json (Cowork's, committed)
+                  docs/evidence/shower-glance-before.png (new)
+                  fixtures/README.md (row added)
+
+         THREE PREDICATES from 0016 SS5d, all reading ONE production
+         function (extrudability(), off svg_outlines()'s own return) so
+         a gate test and a census can never derive "fragmented" or "has
+         a region" two different ways: (1) every symbol has >=1 closed
+         filled shape -- FAILS, catches glass_shower alone; (2) the body
+         is one CONNECTED region -- FAILS, boat_trailer exempted (ruled,
+         vehicle loft); (3) a REPORTED census of body-with-no-region
+         items -- does not fail, 73 of 95.
+
+         PREDICATE 2 NEEDED A CORRECTION BEFORE IT SHIPPED. A naive
+         top-level-ring COUNT flags 17 items -- dining_chair's seat plus
+         backrest is two top-level rings and an ordinary build_prism
+         "beside" body, not a fragmented one (read the function: shapes
+         not nested inside the largest ring become "beside" and stay
+         grouped with the body -- a documented, working pattern). The
+         real signal is CONNECTED COMPONENTS among the top-level rings'
+         bounding boxes at 3% of the viewBox's smaller dimension -- a
+         drafting-scale "meant to touch" tolerance, not a scalar size
+         cutoff (the lawnmower/snowblower mistake, not repeated).
+         boat_trailer's six slabs: tens of viewBox units apart, six
+         components. dining_chair's seat/back: 0.25 units apart on an
+         18-unit viewBox, one component.
+
+         FAIL-FIRST CHECKED, both hard predicates: predicate 1 with its
+         assertion flipped to expect nothing still names glass_shower;
+         predicate 2 with boat_trailer's exemption removed fails naming
+         exactly boat_trailer: 6. Both restored before commit.
+
+         THE CENSUS CATCHES SIX MORE FRAGMENTED ITEMS BESIDES
+         boat_trailer, not anticipated by 0029: motorcycle, bicycle,
+         garden_tractor, riding_mower_snow (all vehicles, matching
+         0012's own finding that vehicle was the form most prone to
+         this), drill_press, water_softener. Sanity-checked by hand:
+         drill_press's column and base sit 9.6% of its viewBox apart, a
+         real gap; water_softener's two tanks 5.4% apart. NOT FILED, NOT
+         RULED -- exempted in the test by name, each with "found
+         building this predicate, not yet ruled" as its stated reason,
+         left for a ruling on whether to file as one defect or several.
+
+         walk_in_shower now HAS a region (its bench) -- and per SS3
+         below, that does NOT take it off the redraw list.
+
+         D76 RECONCILIATION (0030 SS4), ordered before any redraw:
+         compared the bench's mesh bounding box against the body's on
+         ALL THREE axes, not just z. bench x[-27.5,-16.5] y[-18.5,18.5]
+         z[0,18] is fully contained in body x[-29.25,29.25]
+         y[-20.25,20.25] z[0,78]. D76 STANDS, UNAMENDED -- the bench
+         does not protrude; it is invisible strictly because the opaque
+         mesh is fully enclosed by the translucent one.
+
+         THE FINDING THAT CHANGES THE REDRAW BRIEF: a region-shaped mark
+         (nested, in wells/on_body/grounded) inherits D76's limit
+         whenever the body is translucent -- walk_in_shower's bench
+         already proves this. A "beside" mark (a second top-level ring,
+         not nested inside the body) shares the BODY's material and is
+         not enclosed by anything, so it composites normally. The
+         redraw's door/curb/threshold marks should be beside shapes, not
+         regions -- and walk_in_shower likely needs one added alongside
+         its already-correct, already-invisible bench.
+
+         fixtures/shower-glance-check.json PLACED (Cowork's, byte-
+         identical to Patrick's own save, per 0031): shower /
+         walk_in_shower / glass_shower left to right in a plain walled
+         room. Re-rendered fresh for the before receipt (same file, same
+         camera) rather than trusting the original render sight-unseen.
+         fixtures/README.md gains its row, with the "do not edit before
+         the after-shot" prohibition 0031 ordered.
+```

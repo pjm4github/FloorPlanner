@@ -154,3 +154,7 @@ this table is not a second copy of it.
 | [`0026-report.md`](0026-report.md) | Report — PR #31 pushed, CI red on a structural finding; D78 filed |
 | [`0027-ruling.md`](0027-ruling.md) | Ruling — a self-correction, then D78's remedy (b), adopted and receipted |
 | [`0028-ruling.md`](0028-ruling.md) | Ruling, GREEN — trim this file and `SESSION_SNAPSHOT.md` to their stated job |
+| [`0029-ruling.md`](0029-ruling.md) | Ruling — the extrudability predicate goes first, GREEN; then the redraws, AMBER |
+| [`0030-ruling.md`](0030-ruling.md) | Ruling — the glance test fails today (baseline render); a mark in the render contradicts D76, reconciliation ordered |
+| [`0031-ruling.md`](0031-ruling.md) | Ruling, GREEN — the glance fixture placed (`shower-glance-check.json`), a Cowork status view recorded, four untested check fixtures named as a deferred gap |
+| [`0032-report.md`](0032-report.md) | Report — predicate built (with a correction to predicate 2), census run (6 more fragmented items found), D76 reconciled (stands, unamended); the redraw brief changes to `beside`-shaped marks, not regions |

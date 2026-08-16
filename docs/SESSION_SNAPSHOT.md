@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: db09acf -->
+<!-- SNAPSHOT-HEAD: 156135f -->
 
 # Session snapshot — read this first
 
@@ -74,23 +74,46 @@ one line per exchange: [`handoff/README.md`](handoff/README.md)'s pair table,
 (renderer limit, open), [D77](defects/0077-fp3d-py-shot-reports-success-on-a-failed.md)
 (tooling gap, open), D78 (closed).
 
-**Next: the three artwork redraws, below.**
+**Next: the artwork redraws — the predicate is built, the census is run, D76
+is reconciled (stands, unamended). See THE QUEUE below and
+[`handoff/0032-report.md`](handoff/0032-report.md) for the full receipt.**
 
 ---
 
 ## THE QUEUE
 
-1. **The three artwork redraws — AMBER, one check for all three.**
-   `glass_shower`, `shower`, `walk_in_shower` — indistinguishable because
-   identity is carried by footprint, a scalar; the fix is an internal region
-   that differs in KIND. Unblocked now that the extruder they flow into
-   (PR #31) is merged. Brief: [`handoff/0016-ruling.md`](handoff/0016-ruling.md)
-   §2–3; ordered here by [`handoff/0025-ruling.md`](handoff/0025-ruling.md) §4.
-2. **[`handoff/0019-ruling.md`](handoff/0019-ruling.md)'s status board — GREEN,
-   read-back first.** Freeze the closed migration's Status table as history;
-   move forward status to a generated `docs/STATUS.md`. Read-back owed: what
-   identifies a completed unit when recent work has no phase number at all.
-3. **Grid snap — the largest daily-use improvement left, fully specified, read-back
+1. **THE EXTRUDABILITY PREDICATE — BUILT, GREEN.** `floorplanner/viewer/fp3d.py:extrudability()`
+   plus `tests/test_extrudability.py`, three predicates from
+   [`handoff/0029-ruling.md`](handoff/0029-ruling.md) §2. **Census result:**
+   only `glass_shower` has zero closed filled shapes; `boat_trailer` plus six
+   MORE items (`motorcycle`, `bicycle`, `garden_tractor`, `riding_mower_snow`,
+   `drill_press`, `water_softener`) have a fragmented body, exempted by name
+   in the test pending a ruling on filing; 73 of 95 have a body with no
+   internal region. **D76 reconciliation** ([`0030`](handoff/0030-ruling.md)
+   §4): `walk_in_shower`'s bench is fully contained in the body on all three
+   axes — D76 stands, unamended. **Consequence: a region-shaped mark
+   (nested) inherits D76's invisibility whenever the body is translucent; a
+   `beside` mark (a second top-level ring, sharing the body's material,
+   never enclosed) does not** — the redraw brief is `beside` shapes, not
+   regions. Full detail: [`0032-report.md`](handoff/0032-report.md).
+2. **The artwork redraws — AMBER, one check for all three.** `shower`,
+   `walk_in_shower`, `glass_shower` — the render, not the census alone,
+   decides the list ([`0030`](handoff/0030-ruling.md) §1: *"None of the three
+   reads as a shower at all"*), so `walk_in_shower` stays despite already
+   having a (invisible) region. Fail-first baseline in place:
+   [`fixtures/shower-glance-check.json`](../fixtures/shower-glance-check.json)
+   (do not edit before the after-shot), before-render at
+   [`docs/evidence/shower-glance-before.png`](evidence/shower-glance-before.png).
+   Brief: [`handoff/0016-ruling.md`](handoff/0016-ruling.md) §2–3.
+3. **[`handoff/0019-ruling.md`](handoff/0019-ruling.md)'s status board — GREEN,
+   read-back first, priority lowered by [`0029`](handoff/0029-ruling.md) §6**
+   (Patrick has a Cowork skill rendering the same state on demand — a VIEW,
+   not the artifact; `STATUS.md` is still owed, the skill removes the urgency
+   not the requirement). Freeze the closed migration's Status table as
+   history; move forward status to a generated `docs/STATUS.md`. Read-back
+   owed: what identifies a completed unit when recent work has no phase
+   number at all.
+4. **Grid snap — the largest daily-use improvement left, fully specified, read-back
    owed before any code.** Snap-by-default; shift means unconstrained; the
    angled-wall rule quantises length along the ray; intersection joins with
    their two refusals; the live readout shows snapped values. The read-back:
@@ -110,9 +133,9 @@ loft** are not in this queue — both behind a read-back, design at
 
 | | |
 |---|---|
-| **`main`** | **`db09acf`** — PR #31 merged at `b813343` (`gh pr merge --merge`; real two-parent commit, this repo's standing strategy), then D78's third round direct on `main`. Carries the vessel/enclosure split, the check's pass (`0025`), and D78's fix in full (`0027` — see §0). |
+| **`main`** | **`156135f`** — PR #31 merged at `b813343`, D78 fixed (`168190f`, `db09acf`), `0028`'s trim (`156135f`). Full trail: `handoff/README.md`'s pair table. |
 | **Branches** | **`d74-vessel-enclosure-split`** — merged, kept (not deleted). No other branch live. |
-| **Gate** | local at `db09acf`: `collected=731 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **724 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI on this same commit's predecessor confirmed green with the correct `Docs-Snapshot-Shape: linear` label on `main`'s real merge commit. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Gate** | local: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current` (731 + 3 new `tests/test_extrudability.py`); OFF / ON / DEEP each **727 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI confirmed green on `db09acf` and `156135f`, both push-to-`main`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **79 records**, **30 open**. D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
