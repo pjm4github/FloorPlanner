@@ -20,6 +20,11 @@ Read **`docs/SESSION_SNAPSHOT.md`** first: where the work stands, what to read i
 what order, the rules that bind it, and the traps that waste time. It is an index
 and a state marker — where it points at another document, that document wins.
 
+Then **`docs/handoff/`** — the channel between Code and the reviewer, and the
+primary work surface per its own `README.md`'s channel contract. Highest number
+is current; read every ruling since the snapshot's own head before doing
+anything the snapshot names as owed.
+
 ## v5 migration (in progress)
 The file format and domain model are moving to `floorplanner/design/design-schema.v5.json` (vendored at P0.7; pointer at `docs/design-schema.v5.md`).
 Read `docs/V5_MIGRATION_PLAN.md` before changing walls/rooms/items/mainwindow —

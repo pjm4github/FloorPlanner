@@ -1,0 +1,27 @@
+{
+ "format": "floorplanner-design",
+ "version": 5,
+ "levels": [
+  {
+   "id": "L0",
+   "name": "default",
+   "elevation_in": 0.0,
+   "height_in": 96.0
+  }
+ ],
+ "vertices": [],
+ "walls": [],
+ "rooms": [],
+ "furnishings": [
+  {
+   "id": "f0",
+   "level": "L0",
+   "kind": "walk_in_shower",
+   "pos": [
+    0.0,
+    0.0
+   ],
+   "rotation": 0.0
+  }
+ ]
+}

@@ -717,16 +717,26 @@ FURNISHINGS = [
 #                 items and for the one counter-mounted one, kitchen_sink,
 #                 whose rim then lands at the standard 36".
 #   form          which generator builds the solid.  box and slab are
-#                 implemented; seat / bed / basin / enclosure / vehicle build
-#                 as boxes for now, and the viewer reports any form it does
-#                 not know rather than guessing.  planting and prism are
-#                 RESERVED and unused: nothing in the catalog is a plant (see
-#                 the landscape-kinds note below), and prism -- extruding the
-#                 symbol's true SVG outline -- is a second pass.
-#   material      a NAME only.  Colour, roughness and metalness live once, in
-#                 MATERIALS below, and are written to materials.json.  Putting
-#                 three numbers on 95 entries would rebuild the duplication
-#                 this table exists to remove.
+#                 implemented directly; every other form falls back to prism
+#                 -- the plan symbol, extruded (handoff 0012/0013) -- except
+#                 vehicle and planting, still RESERVED.  vessel and enclosure
+#                 (0018) are the two shapes prism's above/below rule can
+#                 build: a vessel's internal region may RECESS (a tub's
+#                 well); an enclosure's may only stand SOLID on the floor (a
+#                 bench, a stove) -- the viewer reports any form it does not
+#                 know rather than guessing.
+#   material      the BODY's material, a NAME only.  Colour, roughness and
+#                 metalness live once, in MATERIALS below, and are written to
+#                 materials.json.  Putting three numbers on 95 entries would
+#                 rebuild the duplication this table exists to remove.
+#   region_material  OPTIONAL 5th element, the material of the item's
+#                 internal REGION when it has one and it differs from the
+#                 body's (0018 SS6: "materials attach to PARTS, not to
+#                 ITEMS").  A vessel's region is its declared contents
+#                 (`water`, translucent); an enclosure's is whatever solid
+#                 sits inside it (a bench, a stove).  Absent for the 88 rows
+#                 with no region, or where the region reasonably shares the
+#                 body's material.
 #
 # LANDSCAPE KINDS ARE ABSENT ON PURPOSE.  tools/make_site_demo.py mints
 # `bench`, `planter`, `shrub` and `tree`, which exist in no catalog -- the
@@ -734,8 +744,19 @@ FURNISHINGS = [
 # definition anywhere.  They are not added here: drawing four new symbols
 # would pre-empt P5.2's landscape catalog.  They now render as unknown, which
 # is what the editor already thinks of them.
+def unpack_solid(row):
+    """(height, elevation, form, material, region_material) for one SOLIDS
+    row -- `region_material` is `None` when the row is the plain 4-tuple every
+    other entry still is.  ONE DEFINITION, so the two consumers (the
+    MATERIALS validation above `main()`'s guard, and the manifest writer)
+    cannot drift on how they read the same table."""
+    if len(row) == 4:
+        return (*row, None)
+    return row
+
+
 SOLIDS = {
-    # id                      height  elev  form         material
+    # id                      height  elev  form         material  [region_material]
     # -- Living
     "sofa":                   (32,      0, "seat",      "soft"),
     "loveseat":               (32,      0, "seat",      "soft"),
@@ -780,10 +801,16 @@ SOLIDS = {
     "bed_twin":               (26,      0, "bed",       "soft"),
     "nightstand":             (26,      0, "box",       "wood"),
     "dresser":                (34,      0, "box",       "wood"),
-    # -- Bathroom
-    "bathtub":                (20,      0, "enclosure", "porcelain"),
+    # -- Bathroom.  bathtub is a VESSEL (0018): its region is the water
+    # surface, a RECESS below the rim -- exactly the shape the above/below
+    # rule already gets right, which is why the form split leaves it alone
+    # beyond the label.  walk_in_shower is an ENCLOSURE: its bench is a solid
+    # standing on the floor, so it gains a region_material of its own (a
+    # bench has no material in the OLD one-material-per-item schema, because
+    # there was no second slot to put one in).
+    "bathtub":                (20,      0, "vessel",    "porcelain", "water"),
     "shower":                 (78,      0, "enclosure", "glass"),
-    "walk_in_shower":         (78,      0, "enclosure", "glass"),
+    "walk_in_shower":         (78,      0, "enclosure", "glass",     "stone"),
     "glass_shower":           (78,      0, "enclosure", "glass"),
     "toilet":                 (30,      0, "box",       "porcelain"),
     "vanity":                 (34,      0, "box",       "wood"),
@@ -820,10 +847,19 @@ SOLIDS = {
     # -- Sunroom.  umbrella_table is the TABLE's height; the umbrella above it
     # is not modelled, and a 96" box would be a lie about a shade.
     "lounge_chair":           (30,      0, "seat",      "soft"),
-    "sauna":                  (84,      0, "enclosure", "wood"),
+    # sauna is an ENCLOSURE (0018): the stove is a solid standing on the
+    # floor, and it gains its own region_material (metal) -- the body stays
+    # wood, which was already right.
+    "sauna":                  (84,      0, "enclosure", "wood", "metal"),
     "umbrella_table":         (30,      0, "slab",      "wood"),
-    "swim_spa":               (40,      0, "enclosure", "water"),
-    "whirlpool":              (36,      0, "enclosure", "water"),
+    # swim_spa and whirlpool are VESSELS (0018): each BODY MATERIAL changes
+    # from "water" -- which made the whole tub translucent, surround
+    # included, because one column was carrying both "what surrounds the
+    # water" and "the water" -- to "porcelain", the surround; the water
+    # itself moves to region_material, which is the only slot the geometry
+    # actually gives it a shape to sit in.
+    "swim_spa":               (40,      0, "vessel",    "porcelain", "water"),
+    "whirlpool":              (36,      0, "vessel",    "porcelain", "water"),
     # -- Office / Storage
     "desk":                   (30,      0, "slab",      "wood"),
     "office_chair":           (40,      0, "seat",      "soft"),
@@ -906,8 +942,9 @@ def main():
     _ids = {fid for fid, *_ in FURNISHINGS}
     _unauthored = sorted(_ids - set(SOLIDS))
     _orphans = sorted(set(SOLIDS) - _ids)
-    _bad_material = sorted({m for _h, _e, _f, m in SOLIDS.values()
-                            if m not in MATERIALS})
+    _all_materials = {m for row in SOLIDS.values()
+                      for m in unpack_solid(row)[3:] if m is not None}
+    _bad_material = sorted(_all_materials - set(MATERIALS))
     if _unauthored or _orphans or _bad_material:
         raise SystemExit(
             "assets not written -- the 3D data model is incomplete:\n"
@@ -938,11 +975,12 @@ def main():
                                "body is a str, not a list of elements"
                                if isinstance(body, str) else "malformed element"))
         _pending.append((FURN / f"{fid}.svg", _text))
-        height, elevation, form, material = SOLIDS[fid]
+        height, elevation, form, material, region_material = unpack_solid(SOLIDS[fid])
         manifest.append({"id": fid, "name": name, "category": cat,
                          "file": f"{fid}.svg", "width_in": w, "depth_in": d,
                          "height_in": height, "elevation_in": elevation,
                          "form": form, "material": material,
+                         "region_material": region_material,
                          "price": _prev_price.get(fid, 0.0)})
     # D70: REFUSE BEFORE WRITING ANYTHING, the same shape as the data-model gate
     # above -- a half-written asset tree is worse than none, and this generator is

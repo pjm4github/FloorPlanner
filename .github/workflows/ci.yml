@@ -180,6 +180,13 @@ jobs:
       QT_QPA_PLATFORM: offscreen
     steps:
       - uses: actions/checkout@v5
+        with:
+          # This job runs gate.py --deep, which includes the Docs-Snapshot
+          # check (D78, handoff 0027/0028): on a PR, that check needs to walk
+          # to the branch's own tip and its parent, and the default depth of 1
+          # hides both behind the shallow boundary -- confirmed on CI itself,
+          # not reasoned about. Same fix, same reason as the `docs` job above.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v6
         with:

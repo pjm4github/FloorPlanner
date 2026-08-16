@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: ad73b21 -->
+<!-- SNAPSHOT-HEAD: d0c29b1 -->
 
 # Session snapshot — read this first
 
@@ -58,56 +58,123 @@ must not be trusted over it.
 
 ## 0. WHERE THE WORK IS
 
-**THE ENCLOSURE QUESTION IS THE LIVE ITEM, and it is Patrick's to rule on —
-Code's part (the measurement) is done.** [`handoff/0016-ruling.md`](handoff/0016-ruling.md)
-found, from an actual render, that three enclosure symbols at near-identical
-footprint and the **same height** are indistinguishable in 3D, and that
-`form="enclosure"` may be conflating a **vessel** (recess-into-top, correct) and
-a **room** (a tall hollow volume, where a low internal feature should stand on
-the floor, not recess into the ceiling). **[`handoff/0017-report.md`](handoff/0017-report.md)
-is the owed measurement, confirming the mechanism** — `walk_in_shower`, `sauna`
-and `whirlpool` **all** produce a WELL (an opened cap); correct for `whirlpool`,
-wrong for the other two, by the same reasoning the ruling inferred from a
-picture. **No fix and no ruling yet — Patrick's, explicitly, per his own
-instruction not to rule from an inference.**
+**THE VESSEL/ENCLOSURE SPLIT IS BUILT, PATRICK'S CHECK PASSED, AND D78 IS
+FIXED — PR #31, AMBER, ONE PUSH FROM MERGE.** [`handoff/0018-ruling.md`](handoff/0018-ruling.md)
+ruled it (and found `0017`'s control was pointed the wrong way — every case,
+control included, expected and got the same answer, a third member of the
+positive-control family); [`handoff/0021-report.md`](handoff/0021-report.md) is
+the build, opening the PR per [`0020-ruling.md`](handoff/0020-ruling.md)'s
+protocol; [`handoff/0022-ruling.md`](handoff/0022-ruling.md) accepted the
+control and ruled row 1 not discharged by the mesh numbers alone;
+[`handoff/0024-report.md`](handoff/0024-report.md) built the remedy;
+[`handoff/0025-ruling.md`](handoff/0025-ruling.md) is Patrick's check,
+**passed, verbatim: *"The check looks great. Its all set on those items."***
+**CI then came back red** — [D78](defects/0078-the-snapshot-staleness-gate-cannot-pass-on.md)
+([`handoff/0026-report.md`](handoff/0026-report.md)): the snapshot-staleness
+check cannot pass on a PR's default merge-ref checkout, structurally, for any
+branch that correctly re-cuts its own marker. Not a content problem — `Gate-
+DEEP` and every records check were identical to the clean local run.
+**[`handoff/0027-ruling.md`](handoff/0027-ruling.md) ruled the remedy**
+(`_snapshot_head()` reads `HEAD^2`/`HEAD^2~1` on a merge commit, recovering the
+branch's own tip) — built, tested locally, pushed. **CI's `records` job then
+went GREEN, but `pytest deep invariants` stayed RED on a SECOND bug the local
+tests hadn't exercised**: under `actions/checkout`'s default shallow fetch
+(`fetch-depth: 1`, which the `deep` job used and `docs` never did), git hides
+*every* parent-relative revision (even `HEAD^1`) at the shallow boundary, so
+the original `HEAD^@`-based shape detection silently mislabelled a real merge
+commit as `linear`. Fixed by reading `git cat-file -p HEAD` (the raw object,
+unaffected by shallow depth) for shape detection, and giving the `deep` job
+`fetch-depth: 0` to match the `docs` job's own precedent so `HEAD^2`/`HEAD^2~1`
+actually resolve. A third test reproduces the shallow case offline (a local
+`git clone --depth=1`, no network). **D78 closed.** Merge PR #31 once this
+push's CI confirms green — `0025`'s pass stands, no re-check owed.
 
-**Prism (PR #28) and region extrusion (PR #29) are still merged, and the four
-furniture generators — `seat`, `bed`, `basin`, `enclosure` — are still RETIRED**
-([`handoff/0015-ruling.md`](handoff/0015-ruling.md)) — **but `0016` reopened
-*whether region extrusion covers the enclosures*, one of the four**, without
-reopening the retirement itself. `seat`, `bed` and `basin` are untouched.
+**[`handoff/0028-ruling.md`](handoff/0028-ruling.md) — a second, unrelated
+GREEN ruling, ordered behind this one**: this file and `handoff/README.md`
+are growing per-exchange rather than per-week and need trimming to their
+stated job (index + state marker; one line per handoff pair). Not started —
+queued for after PR #31 merges.
+
+**`KNOWN_FORMS` gains `vessel`. `build_prism` now asks ONE categorical
+question** — does this form allow a recess: `vessel` (`bathtub`, `swim_spa`,
+`whirlpool`) keeps the height-decides-well-or-raised rule; `enclosure` (`shower`,
+`walk_in_shower`, `glass_shower`, `sauna`) makes every region a solid **standing
+on the floor**, never a recess. **Materials split alongside it** — a body
+material and a `region_material`, both in the catalog, so a vessel's water
+reads translucent and an enclosure's bench reads solid instead of one column
+carrying two facts.
+
+> **A SECOND BUG WAS FOUND BY DUMPING THE MESH, NOT BY THE PROBE.** The first
+> cut reused "sits on the body" for an enclosure's region and built
+> `walk_in_shower`'s bench spanning **18″ to 78″** — near the ceiling — instead
+> of **0″ to 18″**, on the floor. **The roof-over control had nothing to say
+> about it**: it only ever asked whether the CAP was open, and this bug never
+> touched the cap. A control proves the question it was built to answer, no
+> more.
+
+**A RENDERER LIMIT, NOW ITS OWN RECORD — [D76](defects/0076-an-opaque-mesh-inside-a-translucent-body-does.md),
+filed 2026‑08‑15 per [`0022-ruling.md`](handoff/0022-ruling.md) §4, cross-referenced
+to D69 rather than buried in it.** `walk_in_shower`'s bench is the right size,
+material and position (confirmed by dumping the built mesh directly), and does
+not composite through the translucent body at any glass alpha tested — general
+statement: **an opaque mesh inside a translucent one does not composite in
+`fp3d.py`'s viewer, at all.** **Row 1 is NOT discharged by the mesh numbers
+alone** ([`0022-ruling.md`](handoff/0022-ruling.md) §3 — a geometric receipt
+proves position, not that the bench *reads as a bench*): the remedy is
+[`evidence/enclosure-bodies-omitted.png`](evidence/enclosure-bodies-omitted.png),
+a render from a new evidence script
+([`evidence/enclosure_bodies_omitted_render.py`](evidence/enclosure_bodies_omitted_render.py))
+that drops exactly one mesh — `walk_in_shower`'s glass body, the only glass
+item in the fixture — from `build_model`'s own unmodified output. Nothing
+invented; every remaining mesh is real and already measured. **[D75](defects/0075-a-recessed-floor-feature-is-not-representable.md)
+filed alongside the split** — an enclosure's region can only stand on the
+floor, never recess into it; no catalog item needs this today. **[D77](defects/0077-fp3d-py-shot-reports-success-on-a-failed.md)
+filed while building the render** — `fp3d.py --shot` prints `wrote` and writes
+nothing when the offscreen platform cannot create a GL context, because
+`.save()`'s return value is never checked; not fixed, out of scope.
+**"A control proves the question it was built to answer, and no more" is now
+the positive-control family's fourth member, landed in [`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md).**
+
+**Prism (PR #28) and region extrusion (PR #29) are still merged, and `seat`,
+`bed`, `basin` are still RETIRED** ([`handoff/0015-ruling.md`](handoff/0015-ruling.md)).
+`enclosure`'s retirement is **answered, not reopened**: region extrusion covers
+it, with the split above.
 
 > **THE REUSABLE PART IS THE SEQUENCE, NOT THE OUTCOME:** build the cheap
 > general mechanism, **re-measure**, then decide whether the specific ones are
-> still wanted. **Four functions unwritten is the receipt.** Full form, with its
-> two conditions and the correction it needed, in
-> [`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md) — which now also carries a
-> sibling finding: **"extrudes a body" is not "reads as its kind"**, the same
-> substitution `0016` found in the `enclosure 6 of 7` number that helped retire
-> the four generators in the first place.
+> still wanted. **Four functions unwritten is the receipt.** Full form in
+> [`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md), which also carries: **"extrudes
+> a body" is not "reads as its kind"** (the `enclosure 6 of 7` number that
+> helped retire the generators, corrected); and now **identity needs a
+> categorical channel's THIRD instance** — near-identical enclosures at the same
+> height, indistinguishable until the render was looked at.
 
 **How a furnishing gets its 3D form now**, in one place:
 
 | | |
 |---|---|
 | `box`, `slab` | their own generators, as before |
-| everything else | **the plan symbol, extruded** — and where a closed shape carries `data-h`, its own height: **above** the body a raised region (pillow, bench, chair back), **below** it a well with the body's cap opened (tub, sink bowl), **not nested** a column of its own |
+| `vessel` region, below body height | **recesses** — a well, the body's cap opened (a tub, a sink bowl) |
+| `enclosure` region, any height | **a solid standing on the floor** — never a recess (a bench, a stove) |
+| any other nested region above body height | sits ON the body (a pillow, a chair back) |
 | a symbol with nothing closed to extrude | still a box, and **named** in the model's report |
-| a symbol that extrudes to a **featureless** box | still not named — **the report's blind spot**, found by `0016` (`shower`, `walk_in_shower`) |
+| a symbol that extrudes to a **featureless** box | still not named — **the report's blind spot**, found by `0016` |
 
 **`data-h` CARRIES A HEIGHT AND NOTHING ELSE** — position comes from the
-artwork, and a test walks every SVG and fails on any other `data-` attribute. It
-is measured **from the item's base**, the same datum as `height_in`.
+artwork, and a test walks every SVG and fails on any other `data-` attribute.
+**Materials now carry two facts too**: `material` (body) and `region_material`
+(optional, falls back to the body's) — both live in the catalog beside the
+height, for the same reason: a property of the KIND, not of the drawing.
 
-**A CHECK REQUEST NOW NAMES THE PLAN AND LISTS ITS ITEMS**, standing rule as of
-`0016`: a first verdict was withdrawn (not overruled) after the checked render
-turned out not to contain the item being judged — *vacuous by precondition*,
-arriving at a person instead of at code. Full form in
-[`WORKING_AGREEMENT.md`](WORKING_AGREEMENT.md).
+**A CHECK REQUEST NAMES THE PLAN AND LISTS ITS ITEMS**, standing rule as of
+`0016`. **THE COORDINATION PROTOCOL IS NOW ON DISK TOO** ([`0020-ruling.md`](handoff/0020-ruling.md)):
+`NNNN is up` → Code reads and builds; Code opens the PR and stops at AMBER,
+never asked for one; a passing check goes to Code with what was seen, a
+failing or unsure one goes to the reviewer and becomes the next ruling.
 
 ---
 
-## THE QUEUE: THE ENCLOSURE RULING, THEN THE REST OF THE BATCH, THEN GRID SNAP
+## THE QUEUE: THE VESSEL/ENCLOSURE CHECK, THEN THE REDRAWS, THEN GRID SNAP
 
 1. ~~**[D72](defects/0072-gen-assets-writes-the-asset-tree-at-import.md) — the
    import-time asset write.**~~ **DONE, 2026‑08‑15.** Module-level write moved
@@ -126,13 +193,14 @@ arriving at a person instead of at code. Full form in
    control then caught a second bug in its own first draft: `sip.voidptr[i]`
    is a truthy `bytes` regardless of value, so the first cut reported every
    pixel painted. `tests/test_furnishings.py`, three tests, fail-first checked.
-3. **AWAITING PATRICK: does `0017`'s measurement confirm a second form
-   (vessel vs. room)?** If it does, **the fix is a second form, not a
-   threshold** — the split is a height gap (20/36/40 vs. 78/78/78/84), and a
-   threshold there would repeat the exact mistake already recorded at
-   [`0012-ruling.md`](handoff/0012-ruling.md) (one 25% line split two
-   structurally identical vehicle symbols). **Nothing is built until this is
-   ruled.**
+3. ~~**AWAITING PATRICK: does `0017`'s measurement confirm a second form?**~~
+   **RULED AND BUILT, 2026‑08‑15 — AT A PR, AWAITING THE CHECK, EVERY ROW NOW
+   HAS A RENDER.** See §0. `enclosure` splits categorically, not on a
+   threshold; materials split with it; a second bug (the bench's extrusion
+   direction) found by dumping the mesh; the non-compositing renderer limit is
+   now its own record (D76, cross-referenced to D69) with row 1 answered by an
+   evidence render rather than carried on the mesh numbers alone; D75 filed as
+   the accepted limit; D77 filed on a tooling gap found building the render.
 4. **THE AUTHORING LIST — four items, one of them provisional.**
    **`glass_shower`** (no fill at all) and **`boat_trailer`** carry forward;
    **`shower`** and **`walk_in_shower`** join (they extrude to a *featureless*
@@ -142,8 +210,9 @@ arriving at a person instead of at code. Full form in
    is what an open-frame plan symbol gives you. **Its likely fix is the loft
    design, not a redraw; it is held out of the redraw batch until that is
    decided.** So the redraw batch is really **three**: `glass_shower`,
-   `shower`, `walk_in_shower` — and it **waits on item 3**, since redrawing a
-   bench the extruder would still punch into a floor is work done twice.
+   `shower`, `walk_in_shower` — **unblocked now that item 3 is built**, though
+   it still waits on item 3's PR actually merging, since redrawing against an
+   extruder whose behaviour could still change is work done twice.
 
 **THEN GRID SNAP — the inversion.** The largest daily-use improvement left on
 the board, and **fully specified**: snap-by-default; **shift means
@@ -255,10 +324,10 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`ad73b21`** — `0016-ruling.md` landed, on `e1eeb3a` (snapshot re-cut), on `c214619` (PR #30, D72+D71). PRs #19–#30 all merged. |
-| **Branches** | **none open.** |
-| **Gate** | `collected=727 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **720 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **75 records**, **27 open**. **D71 and D72 both closed**, 2026‑08‑15. `python tools/gate.py --docs` GREEN. |
+| **`main`** | still **`0680c80`**, unmoved. This branch (`d74-vessel-enclosure-split`) is now at **`d0c29b1`** locally, about to gain a second `0027` follow-up on top — [`PR #31`](https://github.com/pjm4github/FloorPlanner/pull/31), Patrick's check passed (`0025`), D78 fixed and receipted, **merge once this push's CI is green**. |
+| **Branches** | **`d74-vessel-enclosure-split`** — [PR #31](https://github.com/pjm4github/FloorPlanner/pull/31), AMBER, Patrick's check passed, D78 fixed — **merge once this push's CI is green** (`0025`'s pass stands, no re-check owed). |
+| **Gate** | on this branch, local: `collected=730 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each pass, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** **CI on `d0c29b1`: `records (gate --docs)` went GREEN; `pytest deep invariants (py3.13)` still RED** — not the same bug: shape detection (`HEAD^@`) is itself blind under a SHALLOW fetch (`actions/checkout`'s default depth 1 hides even `HEAD^1` on a real two-parent commit, measured on CI), which the `docs` job never hit because it already used `fetch-depth: 0`. Fixed this push: shape detection reads `git cat-file -p HEAD` (unaffected by shallow depth) and the `deep` job's checkout gains `fetch-depth: 0`, matching the `docs` job's own precedent. Third test added, reproducing the shallow case offline. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Records** | **79 records**, **30 open**. **D75, D76, D77 open, D78 CLOSED** (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by three `tests/test_gate.py` merge-ref tests). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. `python tools/gate.py --docs` GREEN locally. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |
@@ -312,15 +381,16 @@ DONE**, merged at PRs #17 and #18.
 > * **PARKED, register entries only:** [D63](defects/0063-a-coalesced-outline-partly-rebounds-on-save.md)'s producer 2, [D64](defects/0064-the-save-writes-an-outline-corner-at-a.md), [D65](defects/0065-weld-scene-is-implicated-in-three-separate.md). **Not to be reopened without a new instruction.**
 > * **D63 producer 1 stays CLOSED** — rebound 0 on five plans, robust across four pairing tolerances.
 
-1. **AWAITING PATRICK: the enclosure form split.** `0016`/`0017` — see §0. The
-   measurement is done and confirms the mechanism; whether `enclosure` splits
-   into a vessel form and a room form is his to rule on, and **nothing builds
-   until it is**.
+1. ~~**AWAITING PATRICK: the enclosure form split.**~~ **RULED AND BUILT
+   (`0018`), AT A PR, AWAITING THE CHECK.** See §0 — `enclosure` splits
+   categorically into `vessel` and `enclosure`, materials split with it, and
+   two things were found while building it (an extrusion-direction bug caught
+   by dumping the mesh, and a renderer limit noted against D69).
 2. **THE REST OF THE SMALL BATCH — D72 and D71 done; three artwork redraws
-   (`glass_shower`, `shower`, `walk_in_shower`) wait on item 1**, since
-   redrawing a bench the extruder would still punch into a floor is work done
-   twice. `boat_trailer` is held out of this batch entirely — see §0, its
-   likely fix is the vehicle loft, not a redraw.
+   (`glass_shower`, `shower`, `walk_in_shower`) unblocked by item 1's ruling**,
+   still waiting on its PR merging before redrawing against an extruder whose
+   behaviour could still change. `boat_trailer` is held out of this batch
+   entirely — see §0, its likely fix is the vehicle loft, not a redraw.
 3. **GRID SNAP — the inversion. THE READ-BACK COMES FIRST.** Fully specified;
    §0 carries the five things the read-back owes. Was A6; it moves up because
    the furnishings work is (mostly) done and this is the largest daily-use
@@ -335,9 +405,11 @@ DONE**, merged at PRs #17 and #18.
    [`0014-ruling`](handoff/0014-ruling.md) ·
    [`0015-ruling`](handoff/0015-ruling.md) ·
    [`0016-ruling`](handoff/0016-ruling.md) ·
-   [`0017`](handoff/0017-report.md); log at
+   [`0017`](handoff/0017-report.md) ·
+   [`0018-ruling`](handoff/0018-ruling.md) ·
+   [`0021`](handoff/0021-report.md); log at
    [`progress/furnishings.md`](progress/furnishings.md). **What remains: the
-   enclosure ruling (item 1), the vehicle loft (possibly `boat_trailer`'s fix
+   enclosure PR's check (item 1), the vehicle loft (possibly `boat_trailer`'s fix
    too now), then parameterisation and AI drafting — both behind a read-back.**
 5. **The command-roster census, derived from the property.** See §0.
 6. **A2 — D11's runtime z collapse. ⏸ PARKED, twice over.** The hang is **not

@@ -14,6 +14,7 @@ prove it. Every one of the five outcomes is driven here, and the three RED ones
 are the point of the file.
 """
 import importlib.util
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -106,6 +107,112 @@ def test_no_HEAD_is_RED_rather_than_waved_through():
     rc, msg = _gate().snapshot_verdict(_snapshot(), [])
     assert rc == 1
     assert "cannot read HEAD" in msg
+
+
+def _run(cmd, cwd):
+    r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+    assert r.returncode == 0, f"{cmd} failed: {r.stderr}"
+    return r.stdout.strip()
+
+
+def _merge_ref_repo(tmp_path, make_snapshot_text):
+    """A real two-parent merge commit, checked out detached -- exactly the
+    shape `refs/pull/N/merge` has (handoff 0027, D78): `root` on `main`,
+    `feature` branched from it and carrying `docs/SESSION_SNAPSHOT.md` as
+    `make_snapshot_text(root_sha)` produces, then `main` merged with
+    `--no-ff feature` (parents [root, feature] in that order, matching
+    GitHub's base-then-branch) and checked out by sha, detached.
+
+    Real git, not a fixture of hashes -- `_snapshot_head()` shells out to
+    `git rev-parse`, so the thing under test IS the subprocess boundary; a
+    fabricated `tips` list would test `snapshot_verdict` again, which the
+    tests above already cover exhaustively."""
+    _run(["git", "init", "-b", "main"], tmp_path)
+    _run(["git", "config", "user.email", "t@example.com"], tmp_path)
+    _run(["git", "config", "user.name", "T"], tmp_path)
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "SESSION_SNAPSHOT.md").write_text("root\n", encoding="utf-8")
+    _run(["git", "add", "-A"], tmp_path)
+    _run(["git", "commit", "-m", "root"], tmp_path)
+    root_sha = _run(["git", "rev-parse", "HEAD"], tmp_path)
+
+    _run(["git", "checkout", "-b", "feature"], tmp_path)
+    (tmp_path / "docs" / "SESSION_SNAPSHOT.md").write_text(
+        make_snapshot_text(root_sha), encoding="utf-8")
+    _run(["git", "add", "-A"], tmp_path)
+    _run(["git", "commit", "-m", "feature"], tmp_path)
+    feature_sha = _run(["git", "rev-parse", "HEAD"], tmp_path)
+
+    _run(["git", "checkout", "main"], tmp_path)
+    _run(["git", "merge", "--no-ff", "feature", "-m", "Merge feature into main"],
+        tmp_path)
+    merge_sha = _run(["git", "rev-parse", "HEAD"], tmp_path)
+    _run(["git", "checkout", merge_sha], tmp_path)          # detached, like CI
+    return root_sha, feature_sha
+
+
+def test_a_merge_ref_checkout_with_a_correctly_cut_marker_is_GREEN(
+        tmp_path, monkeypatch, capsys):
+    """THE POSITIVE-CONTROL DIRECTION, per handoff 0027 SS4 -- a repaired check
+    proves nothing until it has produced BOTH of its answers under the shape
+    it was repaired for. The marker is cut against `root_sha` (the branch's
+    own parent, one commit of slack -- the ordinary resting state), which
+    `HEAD^2~1` recovers on the merge ref."""
+    root_sha, _feature_sha = _merge_ref_repo(
+        tmp_path, lambda root: _snapshot(marker=root[:7], row=root[:7]))
+    monkeypatch.chdir(tmp_path)
+    rc = _gate()._snapshot_head()
+    out = capsys.readouterr().out
+    assert rc == 0, out
+    assert "Docs-Snapshot-Shape: merge" in out
+    assert "HEAD~1" in out
+
+
+def test_a_merge_ref_checkout_with_a_STALE_marker_is_RED(
+        tmp_path, monkeypatch, capsys):
+    """THE NEGATIVE-CONTROL DIRECTION, same section. Without this, `rc == 0`
+    above could mean the shape-detection is a no-op that waves everything
+    through under a merge ref, which is the exact failure D78 itself is."""
+    _merge_ref_repo(
+        tmp_path, lambda root: _snapshot(marker="0000000", row="0000000"))
+    monkeypatch.chdir(tmp_path)
+    rc = _gate()._snapshot_head()
+    out = capsys.readouterr().out
+    assert rc == 1, out
+    assert "Docs-Snapshot-Shape: merge" in out
+    assert "RED" in out
+
+
+def test_a_shallow_merge_ref_checkout_is_labelled_merge_not_linear(
+        tmp_path, monkeypatch, capsys):
+    """THE REAL CI FAILURE (handoff 0027/0028), reproduced offline, no network
+    needed -- `git clone --depth=1` off a local path reproduces the same
+    shallow boundary a remote fetch does. Measured directly on CI: under
+    `actions/checkout`'s default `fetch-depth: 1`, `HEAD^1` fails with
+    "unknown revision" on a genuine two-parent commit -- not just `HEAD^2` --
+    because git hides EVERY parent-relative syntax at a shallow boundary, even
+    though `git cat-file -p HEAD` still shows both `parent` lines (real
+    content of the object already on disk, unaffected by the boundary).
+
+    So this cannot be GREEN -- `HEAD^2~1` genuinely cannot be resolved without
+    more history, and the CI-side fix for that is fetch depth, not this
+    function. What THIS function owes is an HONEST label: `merge`, not a
+    `linear` mislabel that would send a reader chasing the wrong marker."""
+    src = tmp_path / "src"
+    src.mkdir()
+    _merge_ref_repo(src, lambda root: _snapshot(marker=root[:7], row=root[:7]))
+
+    dst = tmp_path / "dst"
+    _run(["git", "clone", "--no-local", "--depth=1", "--branch", "main",
+         str(src), str(dst)], tmp_path)
+
+    monkeypatch.chdir(dst)
+    rc = _gate()._snapshot_head()
+    out = capsys.readouterr().out
+    assert rc == 1, out
+    assert "Docs-Snapshot-Shape: merge" in out, (
+        "a shallow fetch of a merge commit must not be mistaken for a linear "
+        "checkout, even though it cannot fully resolve either")
 
 
 def test_the_real_snapshot_carries_a_marker():

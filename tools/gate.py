@@ -241,6 +241,25 @@ def _snapshot_head() -> int:
 
     IT DOES NOT CHECK THAT THE CONTENT WAS RE-READ. Nothing can. It makes the
     file impossible to ignore, not impossible to update carelessly.
+
+    A MERGE-REF CHECKOUT IS A SECOND SHAPE, NOT AN EXCEPTION -- added
+    2026-08-16 (handoff 0027, D78). `actions/checkout@v5` on a `pull_request`
+    trigger checks out `refs/pull/N/merge`, a SYNTHETIC commit GitHub builds by
+    merging the PR branch into its base; that commit never existed as a real
+    working tree, and its first parent is the BASE branch, not the branch doing
+    the work. `HEAD~1` there is always `main`'s tip, never anything the PR
+    branch committed -- so a branch that correctly re-cuts its own marker
+    (the rule two paragraphs up) is GUARANTEED to fail this check under that
+    checkout, and a branch that never re-cuts it would coincidentally pass, for
+    the wrong reason. Rejected fixes: narrowing CI to check out the branch in
+    isolation (that changes what CI is EVIDENCE OF -- a semantic conflict with
+    `main` would then pass and land); moving the check to push-to-`main` only
+    (detection after the merge, and a red-at-rest `main` is the exact failure
+    the staleness ruling itself warns against). The premise this check was
+    written for is a REAL, LINEAR checkout -- so on a two-parent HEAD, `HEAD^2`
+    (the branch's own tip, not the synthetic merge) recovers that premise; this
+    is reading the ref for the shape it actually has, not bending the workflow
+    to fit the check's original assumption.
     """
     try:
         with open(SNAPSHOT, encoding="utf-8") as fh:
@@ -248,8 +267,9 @@ def _snapshot_head() -> int:
     except OSError as e:
         print(f"Docs-Snapshot: RED -- cannot read {SNAPSHOT} ({e})")
         return 1
+    base, shape = _snapshot_checkout_base()
     tips = []
-    for rev in ("HEAD", "HEAD~1"):
+    for rev in (base, f"{base}~1"):
         try:
             p = subprocess.run(["git", "rev-parse", rev], capture_output=True,
                                text=True)
@@ -258,8 +278,45 @@ def _snapshot_head() -> int:
         if p.returncode == 0 and p.stdout.strip():
             tips.append(p.stdout.strip())
     rc, msg = snapshot_verdict(text, tips)
+    print(f"Docs-Snapshot-Shape: {shape}")
     print(msg)
     return rc
+
+
+def _snapshot_checkout_base():
+    """(`base` revision, shape label) -- `HEAD` unless `HEAD` is a merge commit.
+
+    READS `git cat-file -p HEAD`, THE RAW COMMIT OBJECT, NOT `HEAD^@` OR ANY
+    `^`/`~` SYNTAX -- measured 2026-08-16, on CI itself, that the difference
+    matters. Under a SHALLOW fetch (`actions/checkout`'s default
+    `fetch-depth: 1`), git marks the fetched commit as a shallow boundary and
+    every parent-TRAVERSAL syntax (`HEAD^@`, `HEAD^1`, `HEAD^2`, `HEAD~1`)
+    reports zero parents there -- `HEAD^1` on a genuine two-parent commit
+    fails with "unknown revision", not merely `HEAD^2`. The commit OBJECT
+    itself is unaffected: `cat-file -p` prints its real `parent` lines
+    regardless of shallow depth, because that is literal content of the
+    object already on disk, not a graph walk. So shape detection uses
+    `cat-file`, which is always right; RESOLVING `HEAD^2`/`HEAD^2~1` still
+    needs those commits actually fetched, and fails honestly (see
+    `_snapshot_head`) rather than mislabelling a merge as `linear` when it
+    is not.
+
+    On GitHub's `refs/pull/N/merge`, two `parent` lines is the standing case
+    (base-then-merge-branch), so the SECOND (`HEAD^2`) is the branch's own
+    tip. Fewer than two (an ordinary commit, or a root commit with none) is
+    the linear case this check was written for.
+    """
+    try:
+        p = subprocess.run(["git", "cat-file", "-p", "HEAD"], capture_output=True,
+                           text=True)
+    except OSError:
+        return "HEAD", "linear"
+    if p.returncode != 0:
+        return "HEAD", "linear"
+    parents = [ln for ln in p.stdout.splitlines() if ln.startswith("parent ")]
+    if len(parents) >= 2:
+        return "HEAD^2", "merge (using HEAD^2, the branch's own tip)"
+    return "HEAD", "linear"
 
 
 def snapshot_verdict(text: str, tips):

@@ -377,4 +377,93 @@ THE ENCLOSURE CHECK -- ONE BOX WEARING THREE NAMES  2026-08-15
          since redrawing an artwork item the extruder would still punch
          a hole in is work done twice. The redraws wait on Patrick's
          ruling on the form split.
+
+THE VESSEL/ENCLOSURE SPLIT, BUILT  2026-08-15  (AMBER, at a PR)
+         handoff: 0018 (ruling), 0021 (report, opens the PR)
+         branch:  d74-vessel-enclosure-split
+         files:   floorplanner/viewer/fp3d.py  _gen_assets.py
+                  assets/furnishings/manifest.json
+                  docs/evidence/enclosure_form_measurement.py (+3 renders)
+                  docs/defects/0075-*.md (new)  0069 (noted)
+         Patrick's check: sauna's roof unbroken, whirlpool solid-body +
+         translucent water, on the after render. walk_in_shower's row is
+         answered from mesh numbers instead -- see below.
+
+         THE §2 CONTROL RAN FIRST, AS ORDERED, BOTH SIDES: bathtub -> WELL,
+         sofa's back (already proven RAISED by PR #29) -> RAISED. Neither
+         side assumed from the prior probe.
+
+         THE SPLIT: KNOWN_FORMS gains vessel. build_prism now takes the
+         real catalog form (threaded through build_model's loop via a
+         catalog_form variable captured BEFORE form gets overwritten to
+         the generic "prism" dispatch tag) and asks ONE categorical
+         question -- does this form allow a recess. vessel (bathtub,
+         swim_spa, whirlpool): unchanged, height decides well vs raised.
+         enclosure (shower, walk_in_shower, glass_shower, sauna): a
+         region is ALWAYS a solid, never a recess, regardless of height.
+         NOT A THRESHOLD -- categorical, on form, exactly as ruled.
+
+         A SECOND BUG, FOUND BY DUMPING THE MESH, NOT BY THE PROBE. The
+         first cut reused the "sits ON the body" extrusion formula
+         (body_h -> region_h) for enclosures too -- correct for a pillow
+         rising above a mattress, wrong for a room, where body_h is the
+         WALL height and a low internal feature must stand on the FLOOR.
+         Built walk_in_shower's bench spanning 18in to 78in -- a column
+         near the ceiling -- instead of 0 to 18in. THE ROOF-OVER PROBE
+         COULD NOT HAVE CAUGHT THIS: it only asks whether the CAP is
+         open, and this bug never touched the cap. Fixed with a third
+         bucket (grounded, alongside wells and on_body) using the SAME
+         floor-to-height formula beside already had. The instrument
+         family this project keeps caught the classification bug and had
+         nothing to say about the extrusion bug one layer down -- a
+         control proves the question it was built to answer, no more.
+
+         THE MATERIALS SPLIT, BUILT ALONGSIDE IT. build_prism now returns
+         (body_parts, region_parts), not one flat list -- build_solid's
+         own internal dispatch flattens them back together, since it has
+         no region_material to route a second list to; only build_model's
+         direct call uses the split. _gen_assets.py's SOLIDS table gains
+         an OPTIONAL 5th element (region_material), read via one
+         unpack_solid() helper so the two consumers (the MATERIALS
+         validation, the manifest writer) cannot drift on how they read
+         the same row -- 88 rows stay the 4-tuple they always were.
+             bathtub         body porcelain (unchanged)  region water
+             swim_spa        body porcelain (WAS water)  region water
+             whirlpool       body porcelain (WAS water)  region water
+             walk_in_shower  body glass (unchanged)       region stone
+             sauna           body wood (unchanged)        region metal
+         swim_spa and whirlpool's OLD body material ("water") made the
+         WHOLE TUB translucent, surround included -- one column carrying
+         two facts, the D73/D74 disease again, same remedy: one
+         normative source per fact.
+
+         ONE THING THE RENDER CANNOT SHOW, and it is not a geometry
+         problem -- confirmed by dumping the built mesh directly:
+             furnishings:glass   z[ 0.0, 78.0]   body, translucent
+             furnishings:stone   z[ 0.0, 18.0]   bench, right position
+         The bench is the right size, right material, right place. IT
+         DOES NOT APPEAR IN THE RENDER AT ANY GLASS ALPHA TESTED (0.35
+         shipped, 0.12 synthetic, both restored after). The fp3d.py CLI
+         does not composite an opaque interior mesh through a translucent
+         body, independent of transparency. NOTED AGAINST D69 rather than
+         fixed here -- exactly the class the ruling's own SS7 anticipated
+         for sauna, and this turns out to be the sharper instance, since
+         walk_in_shower's body is translucent SPECIFICALLY so the
+         interior would be visible, and it still is not.
+
+         D75 FILED ALONGSIDE THE SPLIT, D44's precedent, per the ruling's
+         own instruction to state a limit when it lands rather than
+         discover it later: an enclosure's region can only stand ON the
+         floor, never recess INTO it (a shower pan, a floor drain). No
+         catalog item needs this today.
+
+         Whole catalog re-built as a sanity check: 95 of 95 furnishings,
+         0 notes, only glass_shower still falls back to a box (unchanged
+         -- no closed shape at all).
+
+         THE CRLF PHANTOM-DIFF, MET AGAIN: regenerating assets touched
+         all 95 SVGs' line endings with no content change. Isolated by
+         diffing CRLF-stripped content against HEAD per file and staging
+         only the one file (manifest.json) with a real difference, rather
+         than committing 95 files of noise.
 ```

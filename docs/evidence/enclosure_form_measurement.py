@@ -21,6 +21,12 @@ This is the same technique `test_a_tub_is_HOLLOW` in `tests/test_viewer_model.py
 already uses and already proved discriminates a hollow structure from a solid
 one wearing the same z-values (that test's own first cut was vacuous for
 exactly the reason a naive z-value check would be here too).
+
+CONTROLLED ON BOTH SIDES (added at handoff 0018, correcting the first cut):
+`bathtub` must read WELL and `sofa`'s back must read RAISED, or the result
+below is not trusted. The first cut ran only the WELL side, which every case
+under test also happened to expect -- see `two_sided_control`'s own docstring
+for why that made the first run's "3 of 3" not yet a measurement.
 """
 import importlib.util
 import json
@@ -79,13 +85,29 @@ def region_world_centroid(fp3d, ring, vw, vh, w, d):
     return (cx - vw / 2.0) * sx, (vh / 2.0 - cy) * sy
 
 
-def measure(fp3d, manifest, kind):
+def measure(fp3d, manifest, kind, region_filter=None):
+    """(results, outer, model) for one catalog kind.
+
+    `body_h` is derived exactly as `build_prism` derives it -- **the body's own
+    annotation if it carries one, else the catalog's `height_in`** -- not
+    hardcoded to `height_in`. A first draft of this function hardcoded it, which
+    would have silently mis-measured any item whose BODY states its own height
+    (`sofa`'s body is 17″, not its catalog 32″); it happened to be harmless for
+    the three enclosure items only because none of them annotates its body.
+    Caught before it shipped by needing `sofa` for the negative control below,
+    which would have failed with the wrong `body_h`.
+
+    `region_filter` narrows which nested regions are measured (used by the
+    negative control to isolate a RAISED region on an item that also has
+    regions this probe is not asking about)."""
     spec = next(i for i in manifest if i["id"] == kind)
-    body_h = float(spec["height_in"])
     parts, (vw, vh) = fp3d.svg_outlines(str(FURN / spec["file"]))
     parts = sorted(parts, key=lambda p: fp3d._ring_area(p.ring), reverse=True)
     outer = parts[0]
+    body_h = outer.h if outer.h is not None else float(spec["height_in"])
     regions = [p for p in parts[1:] if p.nested and p.h is not None]
+    if region_filter is not None:
+        regions = [p for p in regions if region_filter(p)]
 
     model = fp3d.build_model(one_item_doc(kind))
     results = []
@@ -128,23 +150,51 @@ def look(manifest, out_dir):
          f"--shot {out.relative_to(ROOT)}")
 
 
-def positive_control(fp3d, manifest):
-    """Before trusting the roof-over signal on the three tall enclosures,
-    point it at a case with a KNOWN answer either way (WORKING_AGREEMENT's
-    positive-control rule): `bathtub` is a genuine vessel and must still read
-    as a WELL, or the instrument is broken in a way that would make every
-    result below meaningless rather than merely wrong."""
-    results, _outer, _model = measure(fp3d, manifest, "bathtub")
-    assert results and results[0]["cap_open_at_body_h"], (
-        "POSITIVE CONTROL FAILED: bathtub -- a known, ruled-correct well -- "
-        "did not read as one. The measurement below cannot be trusted.")
-    print("positive control: bathtub reads as a WELL, as it must -- proceeding\n")
+def two_sided_control(fp3d, manifest):
+    """BOTH of the instrument's two possible answers, each demonstrated on a
+    KNOWN case, before either is trusted on the three items under test.
+
+    THE FIRST CUT OF THIS PROBE RAN ONLY ONE SIDE (handoff 0018 §2): `bathtub`
+    reading WELL, and every one of the three items under test ALSO reading
+    WELL. **A control that shares its expected answer with every case under
+    test tests the one direction that cannot fail** -- a `roof_over()` that
+    always returned `False` (a mis-mapped centroid, a viewBox transform off by
+    a factor, a bug in the face lookup) would have produced that exact output,
+    control included. `bathtub` showed the instrument CAN say WELL; nothing
+    showed it can say anything else, so *"3 of 3 produced a WELL"* was a
+    sentence about a function that had only ever emitted one string.
+
+    This is a THIRD member of a family this project already keeps: the plain
+    positive control catches an instrument reporting NOTHING; the
+    identical-cases rule catches one reporting a PLAUSIBLE SOMETHING; this one
+    catches an instrument that can only report ONE OF ITS TWO ANSWERS. **A
+    control must be chosen for the answer you are NOT expecting.**
+
+    So: `bathtub`'s well (unchanged) PLUS `sofa`'s back, a region already
+    proven RAISED by PR #29's own tests -- if this probe cannot reproduce that,
+    it cannot be trusted to prove the fix either, since the fix's own receipt
+    is *"the sauna's heater now reads RAISED"*, measured by this same probe."""
+    well, _outer, _model = measure(fp3d, manifest, "bathtub")
+    assert well and well[0]["cap_open_at_body_h"], (
+        "CONTROL FAILED (well side): bathtub -- a known, ruled-correct well "
+        "-- did not read as one. The measurement below cannot be trusted.")
+
+    raised, _outer, _model = measure(
+        fp3d, manifest, "sofa", region_filter=lambda p: p.h == 32.0)
+    assert raised and not raised[0]["cap_open_at_body_h"], (
+        "CONTROL FAILED (raised side): sofa's back -- a known-raised region "
+        "-- did not read as one. The instrument may be unable to report "
+        "RAISED at all, which would make every WELL result below meaningless "
+        "rather than merely wrong.")
+
+    print("control: bathtub -> WELL, sofa's back -> RAISED -- both sides of "
+         "the instrument shown working; proceeding\n")
 
 
 def main():
     fp3d = load_fp3d()
     manifest = json.loads((FURN / "manifest.json").read_text("utf-8"))
-    positive_control(fp3d, manifest)
+    two_sided_control(fp3d, manifest)
 
     print(f"{'item':16s} {'region h':>9s} {'body h':>7s}  outcome")
     print("-" * 60)
