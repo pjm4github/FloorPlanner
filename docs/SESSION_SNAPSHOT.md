@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: b813343 -->
+<!-- SNAPSHOT-HEAD: 168190f -->
 
 # Session snapshot — read this first
 
@@ -331,9 +331,9 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | **`b813343`** — PR #31 merged, 2026‑08‑16 (`gh pr merge --merge`; real two-parent commit, this repo's standing strategy). Carries the vessel/enclosure split, the vessel/enclosure check's pass (`0025`), and D78's fix in full (`0027`, all three rounds — see §0). |
+| **`main`** | **`168190f`** — PR #31 merged at `b813343` (`gh pr merge --merge`; real two-parent commit, this repo's standing strategy), then D78's third round direct on `main` (`168190f`). Carries the vessel/enclosure split, the check's pass (`0025`), and D78's fix in full (`0027` — see §0). |
 | **Branches** | **`d74-vessel-enclosure-split`** — merged, kept (not deleted). No other branch live. |
-| **Gate** | local at `b813343`: `collected=731 ruff=clean vacuous=0 end_assign=0`; OFF / ON / DEEP each **724 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** **CI on `main` (push, post-merge): all 6 jobs green.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Gate** | local at `168190f`: `collected=731 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **724 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** **CI on `168190f` (push, verified): all 6 jobs green, `Docs-Snapshot-Shape: linear` — the corrected label, on the real merge commit, not a coincidence.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **79 records**, **30 open**. **D75, D76, D77 open, D78 CLOSED** (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. `python tools/gate.py --docs` GREEN locally. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
