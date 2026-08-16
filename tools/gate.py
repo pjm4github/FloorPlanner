@@ -286,20 +286,35 @@ def _snapshot_head() -> int:
 def _snapshot_checkout_base():
     """(`base` revision, shape label) -- `HEAD` unless `HEAD` is a merge commit.
 
-    `HEAD^@` is git's own syntax for "every parent of HEAD", one per line, and
-    costs one process call -- no history walk. Two or more lines means `HEAD`
-    is a merge commit; on GitHub's `refs/pull/N/merge` it always is, built as
-    base-then-merge-branch, so the SECOND parent (`HEAD^2`) is the branch's own
-    tip. Fewer than two parents (a real commit, or a root commit with none) is
-    the ordinary linear case this check was written for.
+    READS `git cat-file -p HEAD`, THE RAW COMMIT OBJECT, NOT `HEAD^@` OR ANY
+    `^`/`~` SYNTAX -- measured 2026-08-16, on CI itself, that the difference
+    matters. Under a SHALLOW fetch (`actions/checkout`'s default
+    `fetch-depth: 1`), git marks the fetched commit as a shallow boundary and
+    every parent-TRAVERSAL syntax (`HEAD^@`, `HEAD^1`, `HEAD^2`, `HEAD~1`)
+    reports zero parents there -- `HEAD^1` on a genuine two-parent commit
+    fails with "unknown revision", not merely `HEAD^2`. The commit OBJECT
+    itself is unaffected: `cat-file -p` prints its real `parent` lines
+    regardless of shallow depth, because that is literal content of the
+    object already on disk, not a graph walk. So shape detection uses
+    `cat-file`, which is always right; RESOLVING `HEAD^2`/`HEAD^2~1` still
+    needs those commits actually fetched, and fails honestly (see
+    `_snapshot_head`) rather than mislabelling a merge as `linear` when it
+    is not.
+
+    On GitHub's `refs/pull/N/merge`, two `parent` lines is the standing case
+    (base-then-merge-branch), so the SECOND (`HEAD^2`) is the branch's own
+    tip. Fewer than two (an ordinary commit, or a root commit with none) is
+    the linear case this check was written for.
     """
     try:
-        p = subprocess.run(["git", "rev-parse", "HEAD^@"], capture_output=True,
+        p = subprocess.run(["git", "cat-file", "-p", "HEAD"], capture_output=True,
                            text=True)
     except OSError:
         return "HEAD", "linear"
-    parents = [ln for ln in p.stdout.splitlines() if ln.strip()]
-    if p.returncode == 0 and len(parents) >= 2:
+    if p.returncode != 0:
+        return "HEAD", "linear"
+    parents = [ln for ln in p.stdout.splitlines() if ln.startswith("parent ")]
+    if len(parents) >= 2:
         return "HEAD^2", "merge (using HEAD^2, the branch's own tip)"
     return "HEAD", "linear"
 

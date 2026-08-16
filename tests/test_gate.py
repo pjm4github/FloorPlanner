@@ -183,6 +183,38 @@ def test_a_merge_ref_checkout_with_a_STALE_marker_is_RED(
     assert "RED" in out
 
 
+def test_a_shallow_merge_ref_checkout_is_labelled_merge_not_linear(
+        tmp_path, monkeypatch, capsys):
+    """THE REAL CI FAILURE (handoff 0027/0028), reproduced offline, no network
+    needed -- `git clone --depth=1` off a local path reproduces the same
+    shallow boundary a remote fetch does. Measured directly on CI: under
+    `actions/checkout`'s default `fetch-depth: 1`, `HEAD^1` fails with
+    "unknown revision" on a genuine two-parent commit -- not just `HEAD^2` --
+    because git hides EVERY parent-relative syntax at a shallow boundary, even
+    though `git cat-file -p HEAD` still shows both `parent` lines (real
+    content of the object already on disk, unaffected by the boundary).
+
+    So this cannot be GREEN -- `HEAD^2~1` genuinely cannot be resolved without
+    more history, and the CI-side fix for that is fetch depth, not this
+    function. What THIS function owes is an HONEST label: `merge`, not a
+    `linear` mislabel that would send a reader chasing the wrong marker."""
+    src = tmp_path / "src"
+    src.mkdir()
+    _merge_ref_repo(src, lambda root: _snapshot(marker=root[:7], row=root[:7]))
+
+    dst = tmp_path / "dst"
+    _run(["git", "clone", "--no-local", "--depth=1", "--branch", "main",
+         str(src), str(dst)], tmp_path)
+
+    monkeypatch.chdir(dst)
+    rc = _gate()._snapshot_head()
+    out = capsys.readouterr().out
+    assert rc == 1, out
+    assert "Docs-Snapshot-Shape: merge" in out, (
+        "a shallow fetch of a merge commit must not be mistaken for a linear "
+        "checkout, even though it cannot fully resolve either")
+
+
 def test_the_real_snapshot_carries_a_marker():
     """The file itself, not a fixture. The tests above would all pass against a
     repository whose snapshot had no marker at all."""

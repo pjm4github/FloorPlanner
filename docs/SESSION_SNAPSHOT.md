@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 2630018 -->
+<!-- SNAPSHOT-HEAD: d0c29b1 -->
 
 # Session snapshot — read this first
 
@@ -76,10 +76,24 @@ branch that correctly re-cuts its own marker. Not a content problem — `Gate-
 DEEP` and every records check were identical to the clean local run.
 **[`handoff/0027-ruling.md`](handoff/0027-ruling.md) ruled the remedy**
 (`_snapshot_head()` reads `HEAD^2`/`HEAD^2~1` on a merge commit, recovering the
-branch's own tip) **and it is built and receipted** — two new tests
-(`tests/test_gate.py`) prove both directions on a real two-parent git commit.
-**D78 closed.** Merge PR #31 once this push's CI confirms green — `0025`'s
-pass stands, no re-check owed.
+branch's own tip) — built, tested locally, pushed. **CI's `records` job then
+went GREEN, but `pytest deep invariants` stayed RED on a SECOND bug the local
+tests hadn't exercised**: under `actions/checkout`'s default shallow fetch
+(`fetch-depth: 1`, which the `deep` job used and `docs` never did), git hides
+*every* parent-relative revision (even `HEAD^1`) at the shallow boundary, so
+the original `HEAD^@`-based shape detection silently mislabelled a real merge
+commit as `linear`. Fixed by reading `git cat-file -p HEAD` (the raw object,
+unaffected by shallow depth) for shape detection, and giving the `deep` job
+`fetch-depth: 0` to match the `docs` job's own precedent so `HEAD^2`/`HEAD^2~1`
+actually resolve. A third test reproduces the shallow case offline (a local
+`git clone --depth=1`, no network). **D78 closed.** Merge PR #31 once this
+push's CI confirms green — `0025`'s pass stands, no re-check owed.
+
+**[`handoff/0028-ruling.md`](handoff/0028-ruling.md) — a second, unrelated
+GREEN ruling, ordered behind this one**: this file and `handoff/README.md`
+are growing per-exchange rather than per-week and need trimming to their
+stated job (index + state marker; one line per handoff pair). Not started —
+queued for after PR #31 merges.
 
 **`KNOWN_FORMS` gains `vessel`. `build_prism` now asks ONE categorical
 question** — does this form allow a recess: `vessel` (`bathtub`, `swim_spa`,
@@ -310,10 +324,10 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | still **`0680c80`**, unmoved — `0018`+`0019-ruling.md` landed there. This branch (`d74-vessel-enclosure-split`) is now at **`2630018`** locally (`0026`'s finding), about to gain the `0027` fix (`_snapshot_head` reads `HEAD^2` on a merge commit) on top — [`PR #31`](https://github.com/pjm4github/FloorPlanner/pull/31), Patrick's check passed (`0025`), D78 fixed and receipted, awaiting this push's CI before merge. |
+| **`main`** | still **`0680c80`**, unmoved. This branch (`d74-vessel-enclosure-split`) is now at **`d0c29b1`** locally, about to gain a second `0027` follow-up on top — [`PR #31`](https://github.com/pjm4github/FloorPlanner/pull/31), Patrick's check passed (`0025`), D78 fixed and receipted, **merge once this push's CI is green**. |
 | **Branches** | **`d74-vessel-enclosure-split`** — [PR #31](https://github.com/pjm4github/FloorPlanner/pull/31), AMBER, Patrick's check passed, D78 fixed — **merge once this push's CI is green** (`0025`'s pass stands, no re-check owed). |
-| **Gate** | on this branch, local: `collected=729 ruff=clean vacuous=0 end_assign=0 snapshot=current` (727 + 2 new `tests/test_gate.py` merge-ref tests); OFF / ON / DEEP each **722 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** **CI on the previous push (`2630018`): 4 of 6 jobs green**, the other two red on `Docs-Snapshot` only — D78, now fixed; this push's CI is the receipt. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **79 records**, **30 open**. **D75, D76, D77 open, D78 CLOSED** (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by two new merge-ref tests). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. `python tools/gate.py --docs` GREEN locally. |
+| **Gate** | on this branch, local: `collected=730 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each pass, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** **CI on `d0c29b1`: `records (gate --docs)` went GREEN; `pytest deep invariants (py3.13)` still RED** — not the same bug: shape detection (`HEAD^@`) is itself blind under a SHALLOW fetch (`actions/checkout`'s default depth 1 hides even `HEAD^1` on a real two-parent commit, measured on CI), which the `docs` job never hit because it already used `fetch-depth: 0`. Fixed this push: shape detection reads `git cat-file -p HEAD` (unaffected by shallow depth) and the `deep` job's checkout gains `fetch-depth: 0`, matching the `docs` job's own precedent. Third test added, reproducing the shallow case offline. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Records** | **79 records**, **30 open**. **D75, D76, D77 open, D78 CLOSED** (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by three `tests/test_gate.py` merge-ref tests). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. `python tools/gate.py --docs` GREEN locally. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |
