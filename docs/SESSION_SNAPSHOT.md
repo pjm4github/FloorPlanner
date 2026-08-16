@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: d0c29b1 -->
+<!-- SNAPSHOT-HEAD: b813343 -->
 
 # Session snapshot — read this first
 
@@ -58,42 +58,49 @@ must not be trusted over it.
 
 ## 0. WHERE THE WORK IS
 
-**THE VESSEL/ENCLOSURE SPLIT IS BUILT, PATRICK'S CHECK PASSED, AND D78 IS
-FIXED — PR #31, AMBER, ONE PUSH FROM MERGE.** [`handoff/0018-ruling.md`](handoff/0018-ruling.md)
-ruled it (and found `0017`'s control was pointed the wrong way — every case,
-control included, expected and got the same answer, a third member of the
-positive-control family); [`handoff/0021-report.md`](handoff/0021-report.md) is
-the build, opening the PR per [`0020-ruling.md`](handoff/0020-ruling.md)'s
-protocol; [`handoff/0022-ruling.md`](handoff/0022-ruling.md) accepted the
-control and ruled row 1 not discharged by the mesh numbers alone;
-[`handoff/0024-report.md`](handoff/0024-report.md) built the remedy;
-[`handoff/0025-ruling.md`](handoff/0025-ruling.md) is Patrick's check,
-**passed, verbatim: *"The check looks great. Its all set on those items."***
-**CI then came back red** — [D78](defects/0078-the-snapshot-staleness-gate-cannot-pass-on.md)
-([`handoff/0026-report.md`](handoff/0026-report.md)): the snapshot-staleness
-check cannot pass on a PR's default merge-ref checkout, structurally, for any
-branch that correctly re-cuts its own marker. Not a content problem — `Gate-
-DEEP` and every records check were identical to the clean local run.
-**[`handoff/0027-ruling.md`](handoff/0027-ruling.md) ruled the remedy**
-(`_snapshot_head()` reads `HEAD^2`/`HEAD^2~1` on a merge commit, recovering the
-branch's own tip) — built, tested locally, pushed. **CI's `records` job then
-went GREEN, but `pytest deep invariants` stayed RED on a SECOND bug the local
-tests hadn't exercised**: under `actions/checkout`'s default shallow fetch
-(`fetch-depth: 1`, which the `deep` job used and `docs` never did), git hides
-*every* parent-relative revision (even `HEAD^1`) at the shallow boundary, so
-the original `HEAD^@`-based shape detection silently mislabelled a real merge
-commit as `linear`. Fixed by reading `git cat-file -p HEAD` (the raw object,
-unaffected by shallow depth) for shape detection, and giving the `deep` job
-`fetch-depth: 0` to match the `docs` job's own precedent so `HEAD^2`/`HEAD^2~1`
-actually resolve. A third test reproduces the shallow case offline (a local
-`git clone --depth=1`, no network). **D78 closed.** Merge PR #31 once this
-push's CI confirms green — `0025`'s pass stands, no re-check owed.
+**THE VESSEL/ENCLOSURE SPLIT IS MERGED — PR #31 → `main`@`b813343`, 2026‑08‑16.**
+[`handoff/0018-ruling.md`](handoff/0018-ruling.md) ruled it; `0021`, `0022`,
+`0024` built and evidenced it; [`handoff/0025-ruling.md`](handoff/0025-ruling.md)
+is Patrick's check, **passed, verbatim: *"The check looks great. Its all set
+on those items."*** Full trail in `handoff/README.md`'s pair table
+(`0018`–`0027`).
 
-**[`handoff/0028-ruling.md`](handoff/0028-ruling.md) — a second, unrelated
-GREEN ruling, ordered behind this one**: this file and `handoff/README.md`
-are growing per-exchange rather than per-week and need trimming to their
-stated job (index + state marker; one line per handoff pair). Not started —
-queued for after PR #31 merges.
+**D78 — THE MERGE ITSELF SURFACED A CI-ONLY GATE BUG, FIXED IN THREE ROUNDS,
+ALL THREE MEASURED RATHER THAN ASSUMED:**
+
+1. `actions/checkout`'s default PR-preview ref (`refs/pull/N/merge`) has
+   `main` as its FIRST parent, so `HEAD~1` was always `main`'s tip, never the
+   branch's own commits — a branch that correctly re-cut its marker could
+   never pass this check in CI. Fixed: read `HEAD^2` on a merge commit.
+2. That fix's own shape-detection (`HEAD^@`) was blind under a SHALLOW fetch
+   (`actions/checkout`'s default `fetch-depth: 1`) — git hides EVERY
+   parent-relative revision at the shallow boundary, mislabelling a real merge
+   as `linear`. Fixed: detect shape from `git cat-file -p HEAD` (the raw
+   object, unaffected by shallow depth); give the `deep` CI job
+   `fetch-depth: 0`, matching `docs`'s own existing precedent.
+3. **Merging PR #31 surfaced a THIRD bug the first two rounds could not have
+   caught, because it only exists once a merge has actually happened**: this
+   repository's real merge strategy is a genuine two-parent commit
+   (`gh pr merge --merge`), so `push`-to-`main` — and any local session on
+   `main` right after a merge — checks out a PERMANENT commit that must be
+   read as itself. Reading it as `HEAD^2` instead validates the marker against
+   the *merged branch's* last commit, not `main`'s real tip; it silently
+   passed on this repo's own push-triggered run for PR #31 only because a
+   one-commit feature branch made the two coincide. **Fixed: the substitution
+   now fires only when `GITHUB_EVENT_NAME == "pull_request"`** — the one
+   context that actually checks out the synthetic ref this was built for.
+
+**Four tests in `tests/test_gate.py` receipt all three fixes**, including one
+built specifically to tell "linear read of a real merge" apart from "merge
+read of a synthetic ref" (a two-commit branch, where the two interpretations
+give different answers). **D78 closed.**
+
+**NEXT, PER [`0025`](handoff/0025-ruling.md) §4, IN ORDER:** the three artwork
+redraws (`glass_shower`, `shower`, `walk_in_shower` — AMBER, now unblocked);
+[`0019`](handoff/0019-ruling.md)'s status board (GREEN, read-back first); grid
+snap (read-back first). **[`0028`](handoff/0028-ruling.md)** (GREEN, trim this
+file and `handoff/README.md` to their stated job) is ordered behind `0027` and
+not yet started.
 
 **`KNOWN_FORMS` gains `vessel`. `build_prism` now asks ONE categorical
 question** — does this form allow a recess: `vessel` (`bathtub`, `swim_spa`,
@@ -324,10 +331,10 @@ surface anyone has asked for.
 
 | | |
 |---|---|
-| **`main`** | still **`0680c80`**, unmoved. This branch (`d74-vessel-enclosure-split`) is now at **`d0c29b1`** locally, about to gain a second `0027` follow-up on top — [`PR #31`](https://github.com/pjm4github/FloorPlanner/pull/31), Patrick's check passed (`0025`), D78 fixed and receipted, **merge once this push's CI is green**. |
-| **Branches** | **`d74-vessel-enclosure-split`** — [PR #31](https://github.com/pjm4github/FloorPlanner/pull/31), AMBER, Patrick's check passed, D78 fixed — **merge once this push's CI is green** (`0025`'s pass stands, no re-check owed). |
-| **Gate** | on this branch, local: `collected=730 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each pass, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** **CI on `d0c29b1`: `records (gate --docs)` went GREEN; `pytest deep invariants (py3.13)` still RED** — not the same bug: shape detection (`HEAD^@`) is itself blind under a SHALLOW fetch (`actions/checkout`'s default depth 1 hides even `HEAD^1` on a real two-parent commit, measured on CI), which the `docs` job never hit because it already used `fetch-depth: 0`. Fixed this push: shape detection reads `git cat-file -p HEAD` (unaffected by shallow depth) and the `deep` job's checkout gains `fetch-depth: 0`, matching the `docs` job's own precedent. Third test added, reproducing the shallow case offline. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **79 records**, **30 open**. **D75, D76, D77 open, D78 CLOSED** (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by three `tests/test_gate.py` merge-ref tests). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. `python tools/gate.py --docs` GREEN locally. |
+| **`main`** | **`b813343`** — PR #31 merged, 2026‑08‑16 (`gh pr merge --merge`; real two-parent commit, this repo's standing strategy). Carries the vessel/enclosure split, the vessel/enclosure check's pass (`0025`), and D78's fix in full (`0027`, all three rounds — see §0). |
+| **Branches** | **`d74-vessel-enclosure-split`** — merged, kept (not deleted). No other branch live. |
+| **Gate** | local at `b813343`: `collected=731 ruff=clean vacuous=0 end_assign=0`; OFF / ON / DEEP each **724 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** **CI on `main` (push, post-merge): all 6 jobs green.** The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Records** | **79 records**, **30 open**. **D75, D76, D77 open, D78 CLOSED** (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. `python tools/gate.py --docs` GREEN locally. |
 | **Working tree** | see §6 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |

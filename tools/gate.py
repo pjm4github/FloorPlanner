@@ -55,6 +55,7 @@ reconciliation are defined ONCE. Two implementations of a gate are two things
 that can drift, and this project has already paid for that once (F2's disease,
 P3.4 point 1).
 """
+import os
 import re
 import subprocess
 import sys
@@ -303,9 +304,26 @@ def _snapshot_checkout_base():
 
     On GitHub's `refs/pull/N/merge`, two `parent` lines is the standing case
     (base-then-merge-branch), so the SECOND (`HEAD^2`) is the branch's own
-    tip. Fewer than two (an ordinary commit, or a root commit with none) is
-    the linear case this check was written for.
+    tip.
+
+    GATED ON `GITHUB_EVENT_NAME == "pull_request"`, NOT ON PARENT COUNT ALONE
+    -- added 2026-08-16, same day, after the first cut misfired on `main`
+    itself. This repository's normal merge strategy is a real two-parent
+    merge commit (`gh pr merge --merge`, not squash), so `push`-to-`main`
+    CI -- and any local session on `main` right after a merge -- checks out a
+    GENUINE, PERMANENT merge commit that ought to be read as itself, exactly
+    like any other `HEAD`. Substituting `HEAD^2` there is not a workaround, it
+    is a wrong answer: it validates the marker against the merged branch's own
+    last commit instead of `main`'s real, current tip, and the two coincide
+    only by luck (measured: it silently passed on this repository's own
+    push-triggered run for PR #31's merge, for exactly that reason, right up
+    until this fix). Only a `pull_request` event checks out the SYNTHETIC,
+    throwaway `refs/pull/N/merge` ref this substitution exists for; `push`,
+    `workflow_dispatch`, and no CI at all (a local checkout) all see a
+    committed-or-committable HEAD that means what it says.
     """
+    if os.environ.get("GITHUB_EVENT_NAME") != "pull_request":
+        return "HEAD", "linear"
     try:
         p = subprocess.run(["git", "cat-file", "-p", "HEAD"], capture_output=True,
                            text=True)
