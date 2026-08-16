@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 156135f -->
+<!-- SNAPSHOT-HEAD: 17f6c01 -->
 
 # Session snapshot — read this first
 
@@ -74,9 +74,14 @@ one line per exchange: [`handoff/README.md`](handoff/README.md)'s pair table,
 (renderer limit, open), [D77](defects/0077-fp3d-py-shot-reports-success-on-a-failed.md)
 (tooling gap, open), D78 (closed).
 
-**Next: the artwork redraws — the predicate is built, the census is run, D76
-is reconciled (stands, unamended). See THE QUEUE below and
-[`handoff/0032-report.md`](handoff/0032-report.md) for the full receipt.**
+**THE THREE REDRAWS ARE BUILT — branch `shower-identity-redraws`, AMBER, AT A
+PR.** [`handoff/0033-report.md`](handoff/0033-report.md) opens it. All three
+marks are `build_prism` `beside` shapes (per `0032`'s D76 finding, not nested
+regions); before/after renders in place at
+[`shower-glance-check.json`](../fixtures/shower-glance-check.json)'s own
+camera. **One honest limit named in the report, not hidden**: the marks read
+clearly up close, more subtly at the check's own room-scale camera —
+Patrick's to judge. See THE QUEUE below.
 
 ---
 
@@ -96,15 +101,17 @@ is reconciled (stands, unamended). See THE QUEUE below and
    `beside` mark (a second top-level ring, sharing the body's material,
    never enclosed) does not** — the redraw brief is `beside` shapes, not
    regions. Full detail: [`0032-report.md`](handoff/0032-report.md).
-2. **The artwork redraws — AMBER, one check for all three.** `shower`,
-   `walk_in_shower`, `glass_shower` — the render, not the census alone,
-   decides the list ([`0030`](handoff/0030-ruling.md) §1: *"None of the three
-   reads as a shower at all"*), so `walk_in_shower` stays despite already
-   having a (invisible) region. Fail-first baseline in place:
-   [`fixtures/shower-glance-check.json`](../fixtures/shower-glance-check.json)
-   (do not edit before the after-shot), before-render at
-   [`docs/evidence/shower-glance-before.png`](evidence/shower-glance-before.png).
-   Brief: [`handoff/0016-ruling.md`](handoff/0016-ruling.md) §2–3.
+2. **THE ARTWORK REDRAWS — BUILT, AT A PR, AWAITING THE CHECK.** `shower`
+   and `glass_shower` gain a filled door leaf (`glass_shower` also gains its
+   first-ever filled body); `walk_in_shower` gains a fixed glass panel at
+   the opening, alongside its already-correct, already-invisible bench. All
+   three: `build_prism` `beside` shapes, not regions. Before/after:
+   [`before`](evidence/shower-glance-before.png) ·
+   [`after`](evidence/shower-glance-after.png), same fixture
+   ([`shower-glance-check.json`](../fixtures/shower-glance-check.json)),
+   same camera. Full build notes, including the honest zoom-level limit:
+   [`handoff/0033-report.md`](handoff/0033-report.md). Brief:
+   [`handoff/0016-ruling.md`](handoff/0016-ruling.md) §2–3.
 3. **[`handoff/0019-ruling.md`](handoff/0019-ruling.md)'s status board — GREEN,
    read-back first, priority lowered by [`0029`](handoff/0029-ruling.md) §6**
    (Patrick has a Cowork skill rendering the same state on demand — a VIEW,
@@ -133,9 +140,9 @@ loft** are not in this queue — both behind a read-back, design at
 
 | | |
 |---|---|
-| **`main`** | **`156135f`** — PR #31 merged at `b813343`, D78 fixed (`168190f`, `db09acf`), `0028`'s trim (`156135f`). Full trail: `handoff/README.md`'s pair table. |
-| **Branches** | **`d74-vessel-enclosure-split`** — merged, kept (not deleted). No other branch live. |
-| **Gate** | local: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current` (731 + 3 new `tests/test_extrudability.py`); OFF / ON / DEEP each **727 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI confirmed green on `db09acf` and `156135f`, both push-to-`main`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **`main`** | **`17f6c01`** — PR #31 merged at `b813343`, D78 fixed (`168190f`, `db09acf`), `0028`'s trim (`156135f`), the extrudability predicate + census + D76 reconciliation (`17f6c01`). Full trail: `handoff/README.md`'s pair table. |
+| **Branches** | **`shower-identity-redraws`** — the three redraws, AMBER, AT A PR, awaiting Patrick's check. `d74-vessel-enclosure-split` merged and kept, not live. |
+| **Gate** | local on this branch: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **727 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI confirmed green on `main`@`17f6c01`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **79 records**, **30 open**. D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |

@@ -66,15 +66,18 @@ def census(fp3d, manifest):
 # predicate 1 -- at least one closed filled shape
 # --------------------------------------------------------------------------
 def test_every_symbol_has_a_closed_filled_shape(census):
-    """`glass_shower` is drawn entirely in strokes (`fill="none"`), so
-    `svg_outlines` finds nothing to extrude -- confirmed directly, not
-    inferred: it is the one item still on the box-fallback list. This is the
-    predicate that would have caught it before the render did."""
+    """`glass_shower` WAS drawn entirely in strokes (`fill="none"`), so
+    `svg_outlines` found nothing to extrude -- confirmed directly, not
+    inferred, and it was the one item still on the box-fallback list. Fixed
+    2026-08-16 (handoff 0029/0032's redraw): its boundary is now one filled
+    rect, the conventional plan-symbol shape (solid outline, a swing arc for
+    the door) rather than four boundary lines with a gap. This predicate
+    would have caught the original state before the render did; it now
+    guards against a regression back to it."""
     empty = sorted(k for k, (filled, _frags, _region) in census.items()
                    if filled == 0)
-    assert empty == ["glass_shower"], (
-        f"symbol(s) with no closed filled shape at all: {empty} -- if this "
-        f"list changed, a redraw fixed one or a new symbol needs one")
+    assert empty == [], (
+        f"symbol(s) with no closed filled shape at all: {empty}")
 
 
 # --------------------------------------------------------------------------

@@ -618,3 +618,79 @@ THE EXTRUDABILITY PREDICATE, BUILT AND THE CENSUS RUN  2026-08-16  (GREEN)
          fixtures/README.md gains its row, with the "do not edit before
          the after-shot" prohibition 0031 ordered.
 ```
+
+THE THREE REDRAWS, BUILT  2026-08-16  (AMBER, at a PR)
+         handoff: 0029 (ruling), 0032 (report, the beside-not-region
+                  finding), 0033 (report, opens the PR)
+         branch:  shower-identity-redraws
+         files:   _gen_assets.py  assets/furnishings/shower.svg
+                  assets/furnishings/walk_in_shower.svg
+                  assets/furnishings/glass_shower.svg
+                  tests/test_viewer_model.py (3 pinned tests updated)
+                  tests/test_extrudability.py (predicate 1's assertion)
+                  docs/evidence/shower-glance-after.png (new)
+         Patrick's check: do the three read as different things, without
+         being put side by side, at a glance -- fixture and camera fixed
+         by 0031, before/after renders in place.
+
+         ALL THREE MARKS ARE build_prism "BESIDE" SHAPES, NOT REGIONS --
+         the finding 0032's D76 reconciliation forced. A nested,
+         annotated region inherits D76's invisibility whenever the body
+         is translucent glass (walk_in_shower's own bench already proved
+         it, unredrawn). A beside shape -- a second top-level ring in
+         the plan symbol, centroid outside the body's own footprint --
+         shares the body's material and is never enclosed by anything,
+         so it composites the ordinary way two adjacent meshes do.
+
+         glass_shower: the four boundary LINES with a door gap (no
+         closed fill anywhere -- predicate 1's one violator) become ONE
+         FILLED RECT, the conventional plan-symbol shape, plus a filled
+         door leaf standing proud of the opening. extrudability()
+         (0,0,False) -> (2,1,False).
+
+         shower: already had a filled body; gains the same door-leaf
+         treatment. (1,1,False) -> (2,1,False).
+
+         walk_in_shower: the existing bench (grounded, nested, correct,
+         invisible per D76) is left exactly as it is -- its fix is a
+         SECOND mark, not a redraw of the first. First cut used a low
+         curb (top=4, a realistic threshold height) and it was TOO
+         SUBTLE TO READ, measured by looking rather than assumed: a
+         close solo render showed only a sliver at the very bottom edge
+         of frame. Revised to a near-full-height FIXED GLASS PANEL
+         (top=74) at the opening -- categorically distinct from
+         glass_shower's swinging door and shower's stall door, a real
+         difference (walk-in showers use a fixed panel, not a hinged
+         door), not an arbitrary third variant. Clearly visible as a
+         protruding leaf in a close solo render after the revision.
+         (2,1,True) -> (3,1,True); has_region was already True (the
+         invisible bench) and stays True.
+
+         THREE PINNED TESTS UPDATED FOR THE ARTWORK'S OWN LEGITIMATE
+         CHANGE, not loosened. test_a_line_art_symbol_FALLS_BACK_and_is_
+         NAMED and test_the_fallback_still_draws_the_item no longer pin
+         glass_shower (it now has a real prism) -- rewritten against a
+         SYNTHETIC line-art-only kind (a catalog entry naming a file
+         that does not exist; svg_outlines already returns empty for a
+         missing file via its own OSError catch), so the fallback
+         mechanism stays tested once no real catalog item exercises it.
+         test_an_unannotated_nested_shape_is_still_DROPPED updates its
+         expected triangle count (12 -> 24) for shower's new door leaf
+         while still asserting the unfilled decoration (diagonal lines,
+         drain circle) stays dropped.
+
+         AN HONEST LIMIT, STATED RATHER THAN HIDDEN (0033 SS5): at close
+         range every mark reads clearly as a distinct protruding panel.
+         AT THE CHECK'S OWN CAMERA -- shower-glance-check.json's
+         room-scale, walled view, which 0031 fixed as the after-shot's
+         camera -- the marks are smaller and harder to make out. The
+         after render is offered as-is, at that camera, because the
+         fixture's own camera IS the check; whether it is enough is
+         Patrick's to judge, not assumed either way here.
+
+         D76 RECONFIRMED UNCHANGED: bench still fully contained on all
+         three axes after the panel redesign (only a new, separate mesh
+         added). enclosure_form_measurement.py re-run unchanged
+         (walk_in_shower still RAISED, whirlpool still WELL) -- the
+         vessel/enclosure classification this task did not touch.
+```

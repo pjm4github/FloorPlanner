@@ -158,3 +158,4 @@ this table is not a second copy of it.
 | [`0030-ruling.md`](0030-ruling.md) | Ruling — the glance test fails today (baseline render); a mark in the render contradicts D76, reconciliation ordered |
 | [`0031-ruling.md`](0031-ruling.md) | Ruling, GREEN — the glance fixture placed (`shower-glance-check.json`), a Cowork status view recorded, four untested check fixtures named as a deferred gap |
 | [`0032-report.md`](0032-report.md) | Report — predicate built (with a correction to predicate 2), census run (6 more fragmented items found), D76 reconciled (stands, unamended); the redraw brief changes to `beside`-shaped marks, not regions |
+| [`0033-report.md`](0033-report.md) | Report — the three redraws built as `beside` shapes, AMBER, PR opens; an honest limit named — the marks are clear up close, subtler at the check's own room-scale camera |
