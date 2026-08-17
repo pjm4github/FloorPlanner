@@ -158,3 +158,12 @@ this table is not a second copy of it.
 | [`0030-ruling.md`](0030-ruling.md) | Ruling — the glance test fails today (baseline render); a mark in the render contradicts D76, reconciliation ordered |
 | [`0031-ruling.md`](0031-ruling.md) | Ruling, GREEN — the glance fixture placed (`shower-glance-check.json`), a Cowork status view recorded, four untested check fixtures named as a deferred gap |
 | [`0032-report.md`](0032-report.md) | Report — predicate built (with a correction to predicate 2), census run (6 more fragmented items found), D76 reconciled (stands, unamended); the redraw brief changes to `beside`-shaped marks, not regions |
+**`0033`, `0034`, `0036-report.md` are on branch `shower-identity-redraws`
+(PR #32) only — not yet on `main`; their rows are in that branch's copy of
+this file and land here when the PR merges, per the branch-owns-its-work
+discipline. Not duplicated here to avoid a dead link on `main`.**
+
+| [`0035-ruling.md`](0035-ruling.md) | Ruling — Patrick's own report: cross-floor snapping (a census must test BOTH a missing filter and mis-tagged floor data, since the obvious query paths already filter correctly) and a per-floor totals feature, blocked on open D55 (totals double-count overlaps) — GREEN measurement can start now, neither displaces `0033`'s check or grid snap |
+| [`0036-ruling.md`](0036-ruling.md) | **Number collision** — this file and `shower-identity-redraws`'s `0036-report.md` share a number; both legitimately committed on their own branches, neither renamed; see `0038`. Ruling — snap vs. bleed-through are different faults with no shared code; the discriminator is whether the saved document changes across the gesture, and it must run before `0035`'s census |
+| [`0037-ruling.md`](0037-ruling.md) | Ruling — light gray IS the ghost paint, so `show_others` was true; names a suspect (the load path setting only `active`) and revises the census to Qt-reachability paths, not `.floor`-filtered ones |
+| [`0038-report.md`](0038-report.md) | Report — `0037` §2's suspect does not hold: `apply_design_to_scene` already calls `_sync_floor_state()` on load (`bridge.py:1265`, since 2026‑07‑26), measured correct on Patrick's own submitted plan both with and without `show_others` pre-set. Reopens `0036`'s document-diff discriminator, still unanswered |

@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 156135f -->
+<!-- SNAPSHOT-HEAD: 17f6c01 -->
 
 # Session snapshot — read this first
 
@@ -96,15 +96,17 @@ is reconciled (stands, unamended). See THE QUEUE below and
    `beside` mark (a second top-level ring, sharing the body's material,
    never enclosed) does not** — the redraw brief is `beside` shapes, not
    regions. Full detail: [`0032-report.md`](handoff/0032-report.md).
-2. **The artwork redraws — AMBER, one check for all three.** `shower`,
+2. **The artwork redraws — AMBER, at [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32)
+   (branch `shower-identity-redraws`), awaiting Patrick's check.** `shower`,
    `walk_in_shower`, `glass_shower` — the render, not the census alone,
    decides the list ([`0030`](handoff/0030-ruling.md) §1: *"None of the three
    reads as a shower at all"*), so `walk_in_shower` stays despite already
    having a (invisible) region. Fail-first baseline in place:
    [`fixtures/shower-glance-check.json`](../fixtures/shower-glance-check.json)
-   (do not edit before the after-shot), before-render at
-   [`docs/evidence/shower-glance-before.png`](evidence/shower-glance-before.png).
-   Brief: [`handoff/0016-ruling.md`](handoff/0016-ruling.md) §2–3.
+   (do not edit before the after-shot). **Full detail — including a
+   working-distance camera and a filed defect, `0033` through `0036-report.md`
+   — is on that branch only, not yet on `main`**; it lands here when the PR
+   merges. Brief: [`handoff/0016-ruling.md`](handoff/0016-ruling.md) §2–3.
 3. **[`handoff/0019-ruling.md`](handoff/0019-ruling.md)'s status board — GREEN,
    read-back first, priority lowered by [`0029`](handoff/0029-ruling.md) §6**
    (Patrick has a Cowork skill rendering the same state on demand — a VIEW,
@@ -127,16 +129,39 @@ loft** are not in this queue — both behind a read-back, design at
 [`floorplanner/viewer/VIEWER_NOTES.md`](../floorplanner/viewer/VIEWER_NOTES.md)
 §5.
 
+**Cross-floor snapping/bleed-through — Patrick's own report
+([`0035`](handoff/0035-ruling.md), [`0036-ruling.md`](handoff/0036-ruling.md),
+[`0037`](handoff/0037-ruling.md)) — GREEN measurement only so far, still not
+started as a fix, does not displace items 1–2 above.** [D67](defects/0067-selection-is-not-scoped-to-the-active-floor.md)
+-adjacent. `0037`'s named suspect (the v5 load path never re-syncing floor
+display state) **does not hold** — measured directly on Patrick's own
+submitted plan, both by code reading and by a live headless probe:
+`apply_design_to_scene` already calls `win._sync_floor_state()`
+(`floorplanner/design/bridge.py:1265`, present since 2026‑07‑26). See
+[`0038-report.md`](handoff/0038-report.md). **Reopens [`0036-ruling.md`](handoff/0036-ruling.md)
+§3's own discriminator** (does the saved document change across the
+gesture?), still unrun — blocked on two facts neither ruling nor the intake
+file states (was `show_others` on; did the wall stay moved after release).
+`fixtures/incoming/crossfloor-snap-2026-08-17.json` has no `.txt` companion
+note; one handoff old, not yet two.
+
+> **Numbering collision, on the record rather than hidden:
+> [`handoff/0036-ruling.md`](handoff/0036-ruling.md) and this session's own
+> `handoff/0036-report.md` (on branch `shower-identity-redraws`) are two
+> unrelated files sharing one number.** Both legitimately committed on their
+> own branches; neither renamed — doing so would break more citations than it
+> fixes. Numbering continues forward from `0038`.
+
 ---
 
 ## 1. Where the work stands
 
 | | |
 |---|---|
-| **`main`** | **`156135f`** — PR #31 merged at `b813343`, D78 fixed (`168190f`, `db09acf`), `0028`'s trim (`156135f`). Full trail: `handoff/README.md`'s pair table. |
-| **Branches** | **`d74-vessel-enclosure-split`** — merged, kept (not deleted). No other branch live. |
-| **Gate** | local: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current` (731 + 3 new `tests/test_extrudability.py`); OFF / ON / DEEP each **727 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI confirmed green on `db09acf` and `156135f`, both push-to-`main`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **79 records**, **30 open**. D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
+| **`main`** | **`17f6c01`** — PR #31 merged at `b813343`, D78 fixed (`168190f`, `db09acf`), `0028`'s trim (`156135f`), the extrudability predicate + census + D76 reconciliation (`17f6c01`), now gaining the cross-floor investigation (this commit). Full trail: `handoff/README.md`'s pair table. |
+| **Branches** | **`shower-identity-redraws`** — [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32), AMBER, awaiting Patrick's check; ahead of this snapshot (carries `0033`–`0036-report.md`, D79, the working-distance camera — not yet on `main`). `d74-vessel-enclosure-split` merged, kept, not live. |
+| **Gate** | local on `main`: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **727 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI confirmed green on every `main` push through `17f6c01`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Records** | **79 records on `main`**, **30 open** (D79 exists on the redraw branch only, not yet merged). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |
