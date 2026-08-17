@@ -110,6 +110,11 @@ console script), plus bundled fonts and artwork.
   a location auto-place on the first clear spot. Rooms that fall outside
   the canvas **grow it to fit** (up to 500'; larger values are rejected as
   typos). See [`examples/`](examples/) for sample files and previews.
+- **Export to Chief Architect (DXF)** — File ▸ Export ▸ Chief Architect
+  (DXF)… writes a purpose-built DXF R12 file (plus a sidecar) per storey
+  level for Chief Architect X17's **CAD to Walls** importer, so a plan
+  becomes native Chief walls, doors, windows and railings. See
+  [below](#export-to-chief-architect-dxf) for the verified import workflow.
 - **Room boolean operations** — select two rooms (Ctrl+click their names)
   and the **Rooms** menu treats their perimeters as polygons: *Combine*
   unions them (dropping the shared interior walls), *Intersect* keeps just
@@ -276,6 +281,189 @@ screenshots): dark walls on a light background. After importing, name rooms
 (the app detects enclosed areas) and add doors/windows/furniture. Scale comes
 from the real width (or `--px-per-ft`); double-line walls collapse with
 `--merge <px>`. Diagonal walls and photos/scans are out of scope.
+
+## Export to Chief Architect (DXF)
+
+**File ▸ Export ▸ Chief Architect (DXF)…** writes one DXF R12 file (plus an
+`.openings.json` sidecar) per storey level, purpose-built for Chief
+Architect X17's **CAD to Walls** importer — the fastest way to get a
+FloorPlanner design into Chief as *native* walls, doors, windows and
+railings, rather than tracing over a picture. It is a zero-dependency
+converter (`floorplanner/export/fp2dxf.py`, pure stdlib) validated
+end-to-end against Chief Architect Premier X17 on a real two-storey plan;
+doors, windows, rails, hinge handedness, per-level export and multi-floor
+stacking all confirmed working.
+
+```
+FloorPlanner v5 design ──export──▶ <level>.dxf + <level>.openings.json
+                                          │
+                                          ▼   (per floor, in Chief)
+                       Import Drawing wizard ▶ CAD ▸ CAD to Walls
+                                          │
+                                          ▼
+                      native Chief walls / doors / windows / rails
+```
+
+Pick an output folder; the app writes every storey level (site/lot levels
+are skipped) and shows a completion summary listing the files written and
+any warnings (an opening that overran its wall, two openings overlapping on
+one wall, a zero-length wall). Furnishings, reference images and dimension
+annotations are **not** exported — FloorPlanner owns plan topology, Chief
+owns construction build-up (platforms, roof, framing).
+
+### Why the export looks the way it does
+
+- **Coordinates.** FloorPlanner is plan-inches, x-right, **y-down** (Qt
+  scene); DXF is y-up, so every y is negated. The plan lands in negative-y
+  in Chief — harmless, but **do not drag the imported CAD before
+  converting** (it breaks multi-floor stacking, which relies on every level
+  sharing the FloorPlanner origin).
+- **Walls** are emitted as their two *face lines* (centreline ± half the
+  wall's real thickness — read live from FloorPlanner's own per-type
+  standards, never a copy), square-capped at the vertex projections. The
+  schema's shared-vertex topology guarantees wall ends coincide, and Chief
+  auto-joins converted walls at coincident ends, so miters are unnecessary.
+- **Layers all carry an `FP-` prefix** (`FP-WALLS`, `FP-RAILS`, `FP-DOORS`,
+  `FP-WINDOWS`, plus reference-only `FP-X-*` layers) so an imported layer
+  can never case-insensitively merge with Chief's own native `Doors` /
+  `Windows` layers — a real ambiguity, measured in testing, not a
+  precaution taken on spec.
+- **Doors need symbols, not just a gap.** Chief classifies an opening by
+  its conventional drawing symbol; bare parallel gap lines read as a
+  *window*. Hinged doors and gates emit a leaf line plus a 90° swing arc
+  (from the schema's `hinge` / `swings_toward`, defaulting to `v1`/`left`
+  when absent so classification never fails); sliders emit two overlapping
+  half-width panels. Plain gap lines are kept for windows, which classify
+  correctly as-is.
+- **Concept rooms are quarantined.** Walls that serve only
+  `category:"concept"` rooms go to the reference-only `FP-X-CONCEPT` layer
+  and are never converted — matching FloorPlanner's own rule that concept
+  rooms aren't part of the buildable plan.
+- **Open room edges** (a side with no wall) draw dashed on
+  `FP-X-OPEN-EDGE`; trace an Invisible wall over them in Chief so the room
+  encloses (Chief needs a wall, even an invisible one, to bound a room).
+- **The sidecar** `<level>.openings.json` carries what a DXF line can't:
+  per opening id, its wall, kind, code, station span, sill/head height,
+  door type, hinge and swing — the source of truth for the QC pass below.
+  The same data rides on-plan as small magenta `FP-NOTES` text tags next to
+  each opening.
+
+### The verified Chief Architect X17 import workflow
+
+**Follow this exactly — the settings below are traps whose wrongness stays
+invisible until CAD to Walls silently does nothing.** Run it once per
+level, on the matching Chief floor; use a fresh Chief plan for the first
+import.
+
+1. **File ▸ Import ▸ Import Drawing.**
+   ![Import Drawing dialog](docs/evidence/chief-export/01-import-drawing-dialog.png)
+   **Show Import Assistant: ON** · Show For Each File: off ·
+   **Create CAD Blocks: OFF** — critical: blocks hide the individual lines
+   from CAD to Walls.
+2. **Import Assistant — entity handling.**
+   ![Entity handling](docs/evidence/chief-export/02-import-assistant-entities.png)
+   Convert lines with shared end points into **Polylines: OFF, Boxes:
+   OFF** — critical: wall faces share endpoints at every corner by
+   construction and must stay discrete LINEs. CAD blocks option is
+   irrelevant (the file contains none); Hatch: off.
+3. **Select Layers.**
+   ![Select layers](docs/evidence/chief-export/03-select-layers.png)
+   Leave **all layers checked**; leave the *Convert To* column **empty**
+   (it's for terrain elevation data only).
+4. **Layer Mapping.**
+   ![Layer mapping](docs/evidence/chief-export/04-layer-mapping.png)
+   Select **"Chief Architect layers by name"** with **"Import all layer
+   attributes"** — this preserves the FP-* layers, colours and linetypes.
+   (The default "single layer" flattens everything: wrong.)
+5. **Drawing Unit.**
+   ![Drawing unit](docs/evidence/chief-export/05-drawing-unit.png)
+   Unit: **in**, drawing is 1:1. Dimension-line options are moot (the file
+   contains none).
+
+   After Finish, the drawing appears as coloured line work (black walls,
+   red doors, blue windows, cyan rails):
+   ![Imported CAD](docs/evidence/chief-export/06-imported-cad-plan-view.png)
+6. **CAD ▸ CAD to Walls… (Ctrl+F3).**
+   ![CAD menu](docs/evidence/chief-export/07-cad-menu-cad-to-walls.png)
+   The layer dropdowns list native and imported layers together — pick the
+   **FP-** entries only:
+   ![Layer dropdown](docs/evidence/chief-export/08-convert-dialog-layer-dropdown.png)
+
+   | Slot | Layer |
+   |---|---|
+   | Wall Layer | FP-WALLS |
+   | Window Layer | FP-WINDOWS |
+   | Door Layer | FP-DOORS |
+   | Rail Layer | FP-RAILS |
+
+   Set Wall Types: **Wall Type 1 = Siding-6**, **Wall Type 2 =
+   Interior-4** (Chief matches a line-pair spacing to a wall type within
+   **±1 inch**, so exactness beyond that isn't required — agreement is).
+   Never assign any `FP-X-*` layer. For the record, the first-session
+   dialog below used the merged native `Windows`/`Doors` layers — with the
+   FP- prefix this ambiguity no longer exists:
+   ![First-run dialog](docs/evidence/chief-export/09-convert-dialog-first-run.png)
+7. **Result.** The first-attempt failure mode that motivated the door
+   symbols — both doors arrived as `2640DH` windows (correct width and
+   station, wrong class):
+   ![Doors as windows](docs/evidence/chief-export/10-first-run-doors-as-windows.png)
+
+   Converted plan (walls, rooms, auto-dimensions, auto roof) and 3D:
+   ![Converted plan](docs/evidence/chief-export/11-converted-plan-floor1.png)
+   ![3D](docs/evidence/chief-export/12-3d-view.png)
+
+   Chief's auto dimensions measure to its own framing conventions and will
+   not literally reproduce sidecar stations; the DXF geometry itself is
+   exact. The dashed green perimeter and diagonals are Chief's auto hip
+   roof (disable via Auto Rebuild Roofs if unwanted during QC).
+8. **Additional floors.**
+   ![Build Floor menu](docs/evidence/chief-export/13-build-floor-menu.png)
+   **Build ▸ Floor ▸ Build New Floor…** → choose **"Derive new 2nd floor
+   plan from the 1st floor plan"**, accept the floor defaults dialog
+   (Chief's platform build-up; *Finished Ceiling* is the field to true up
+   against the level's height if an exact match is wanted):
+   ![2nd floor defaults](docs/evidence/chief-export/14-2nd-floor-defaults.png)
+
+   Delete the derived placeholder walls, then on Floor 2 import that
+   level's DXF with **identical settings** and re-run CAD to Walls.
+   Because every level shares the FloorPlanner origin, floors stack
+   exactly — verify with the Reference Floor toggle:
+   ![Floor 2 converted](docs/evidence/chief-export/15-floor2-converted.png)
+9. **QC and cleanup.**
+   1. Apply what Chief can't take from geometry alone: window sill/head,
+      slider door type, verify hinge/swing (the magenta `FP-NOTES` tags
+      carry the same data on-plan).
+   2. Trace **Invisible walls** over `FP-X-OPEN-EDGE` lines to enclose
+      open-edged rooms.
+   3. **Edit ▸ Delete Objects** → scope All Floors → check the **CAD**
+      group but **uncheck Dimensions, Automatic and Dimensions, Manual**
+      (those are live Chief objects, not import residue) → Delete.
+      ![Delete Objects](docs/evidence/chief-export/16-delete-objects-cleanup.png)
+
+      CAD to Walls *copies* rather than consumes, so this final sweep
+      removes the entire imported underlay, leaving a pure native Chief
+      model.
+
+### Known limitations
+
+- `cased` / `pass_through` openings ride `FP-DOORS` with a default door
+  symbol; convert to Chief's Doorway type during QC (the real kind is in
+  the tag/sidecar).
+- Wall type carries over only via thickness matching; multi-layer
+  assembly definitions are set in Chief per type, once.
+- A gate/door with no recorded hinge/swing gets a defaulted handedness
+  (`v1`/`left`) purely so it classifies as a door — fix the handedness in
+  QC.
+- Furnishings, reference images and dimension annotations are not
+  exported (deliberate — see above).
+- The reverse direction (a Chief-exported DXF → a FloorPlanner design) is
+  not implemented; it needs a real Chief-exported DXF sample to tune the
+  wall-pairing pass.
+
+The sample design behind the screenshots above, and the DXF/sidecar pair it
+produces, are checked in at [`fixtures/chief-export/`](fixtures/chief-export/)
+and pinned by `tests/test_fp2dxf.py` — regenerating them without stating why
+is a regression, not routine maintenance.
 
 ## Asset pipeline
 
