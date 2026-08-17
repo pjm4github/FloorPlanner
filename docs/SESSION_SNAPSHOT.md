@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 3053e1f -->
+<!-- SNAPSHOT-HEAD: b6ac4d1 -->
 
 # Session snapshot — read this first
 
@@ -74,8 +74,8 @@ one line per exchange: [`handoff/README.md`](handoff/README.md)'s pair table,
 (renderer limit, open), [D77](defects/0077-fp3d-py-shot-reports-success-on-a-failed.md)
 (tooling gap, open), D78 (closed).
 
-**THE THREE REDRAWS ARE BUILT, CHECKED AND MERGING — branch
-`shower-identity-redraws`, [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32).**
+**THE THREE REDRAWS ARE BUILT, CHECKED AND MERGED — [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32)
+→ `main` at `b6ac4d1`, closing the artwork item open since 2026‑08‑15.**
 [`handoff/0033-report.md`](handoff/0033-report.md) opened it;
 [`0034-ruling.md`](handoff/0034-ruling.md) withdrew `0030`'s D76-contradiction
 claim (the mesh measurement stands) and named the check as **two questions**:
@@ -290,10 +290,10 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **MERGING** — `origin/main` is `fb054e3` (`54b4a88` plus the `fp2dxf` integration report, `0050-report.md`, [PR #33](https://github.com/pjm4github/FloorPlanner/pull/33) open); `shower-identity-redraws` has just merged that in (`3053e1f`) on top of its own prior merge of `main`@`6a22aee` (`dc65a9c`). **About to merge into `main` via PR #32**, per [`0050`](handoff/0050-ruling.md)/[`0053`](handoff/0053-ruling.md). Final hash lands in the next re-cut. Full trail: `handoff/README.md`'s pair table. |
-| **Branches** | **`shower-identity-redraws`** — [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32), merging now; Patrick's check passed in the running app, extrudability census re-run and clean (below). **`fp2dxf-integration`** — [PR #33](https://github.com/pjm4github/FloorPlanner/pull/33), AMBER, awaiting Patrick's Chief Architect check **on the regenerated DXF, not the originally-shipped sample** ([`0053`](handoff/0053-ruling.md) §2). `d74-vessel-enclosure-split` merged, kept — **owed deletion**, [`0053`](handoff/0053-ruling.md) §2 item 4. |
-| **Gate** | re-run on the fully combined tree (`main` + both PRs' branch content), full mode, GREEN: `collected=754 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF/ON/DEEP each **747 passed, 7 deselected**, every sum reconciling. **Extrudability census re-run** (`0050` §3 step 3, the one thing owed before merging PR #32): `glass_shower` 0→2 filled shapes (was predicate 1's only failure), `shower` 2 filled/1 frag/no region, `walk_in_shower` 3 filled/1 frag/has region (pre-existing D76-invisible bench) — all three predicates pass, no new exemptions. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **80 records, 31 open** (D79 — six fragmented catalog symbols, one record, `bicycle` cited to `0013-ruling.md`, three pointed at the vehicle loft, two open). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
+| **`main`** | **`b6ac4d1`** — merge of [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32) (`shower-identity-redraws`: the three redraws, D79, the working-distance camera) into `54b4a88`+`fp2dxf`'s `0050-report.md` (`fb054e3`). Fast-forwarded locally, pushed. Full trail: `handoff/README.md`'s pair table. |
+| **Branches** | **`fp2dxf-integration`** — [PR #33](https://github.com/pjm4github/FloorPlanner/pull/33), AMBER, awaiting Patrick's Chief Architect check **on the regenerated DXF, not the originally-shipped sample** ([`0053`](handoff/0053-ruling.md) §2). Five spent branches deleted, local and remote, per [`0053`](handoff/0053-ruling.md) §2 item 4: `d74-vessel-enclosure-split`, `mailbox-0050`, `shower-identity-redraws` (all merged), `d74-decoration-channel`, `i15-outline-completeness` (merged earlier, left lying around). |
+| **Gate** | GREEN on `main`@`b6ac4d1`'s own tree (re-run pending this re-cut's own commit). Last full-tree confirmation, on the pre-merge combined tree: `collected=754 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF/ON/DEEP each **747 passed, 7 deselected**. CI on PR #32 green on all six jobs before merge. **Extrudability census, re-run before the merge** (`0050` §3 step 3): `glass_shower` 0→2 filled shapes (was predicate 1's only failure), `shower` 2 filled/1 frag/no region, `walk_in_shower` 3 filled/1 frag/has region (pre-existing D76-invisible bench) — all three predicates pass, no new exemptions. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Records** | **80 records, 31 open** (D79 — six fragmented catalog symbols, one record, `bicycle` cited to `0013-ruling.md`, three pointed at the vehicle loft, two open — now on `main`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |
