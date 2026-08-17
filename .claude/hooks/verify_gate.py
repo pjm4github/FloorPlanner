@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""PreToolUse hook: refuse `git commit` unless a FRESH GREEN gate is on disk.
+"""PreToolUse hook: refuse `git commit`/`git push` unless a FRESH GREEN gate
+result of the right STRENGTH is on disk.
 
 THE ENFORCEMENT HALF OF "a green signal is only evidence about what it
 measures". The gate has always measured the right thing. Nothing has ever made
@@ -17,16 +18,31 @@ reads THE RESULT FILE and never the commit message. A message can say anything;
 `.gate-result.json` is written by `tools/gate.py` itself, at the end of a
 full-mode run, from the numbers it just computed.
 
-Three conditions, and the third is the one that matters:
+Four conditions, and the fourth is new (0043/0047-ruling.md SS4):
 
   1. `.gate-result.json` EXISTS          -- you ran the gate at all
   2. its verdict is GREEN                -- and it passed
   3. it is NEWER THAN EVERY TRACKED FILE -- and it passed on THIS tree
+  4. its MODE IS STRONG ENOUGH FOR THE EVENT -- see the split below
 
 Without (3) the hook is theatre: a green result from an hour and six edits ago
 would wave through exactly the fourth incident. It is also the condition most
 likely to be silently broken, which is why the fail-first receipt for this hook
 tests it explicitly by touching a source file and retrying.
+
+THE COMMIT/PUSH SPLIT. `python tools/gate.py --quick` (ruff + OFF only, ~25s)
+now writes `.gate-result.json` too, tagged `"mode": "quick"` -- see that
+script's own docstring. A `git commit` accepts either mode, GREEN and fresh; a
+`git push` accepts `mode == "full"` only. **Nothing that reaches `origin`, CI
+or a PR is gated on anything less than the full 3x-suite run** -- the bar
+moved from every commit to every push, not down. What changes is which of the
+twenty private, never-pushed intermediate commits a session splits a change
+into has to pay the full 3x tax individually; none of them do anymore, and the
+one commit that actually leaves the machine still does. `WORKING_AGREEMENT.md`
+(amended 2026-08-10) already said gating every commit was wrong for exactly
+this shape -- a series split for legibility, where the intermediate trees
+never existed as anything a reviewer or CI would see -- and the hook had not
+caught up to the amendment until now.
 
 Exit codes: 0 lets the command through, 2 blocks it and shows stderr to the
 model. Any other failure mode here (unreadable JSON, no git) also blocks, on the
@@ -36,21 +52,22 @@ WHAT THIS CANNOT SEE, stated here because an unstated boundary reads as
 coverage -- and this one was found by testing the hook rather than by reasoning
 about it:
 
-  * A COMMAND THAT EDITS TRACKED FILES AND THEN COMMITS, IN ONE INVOCATION, is
-    not covered by the freshness check. `PreToolUse` fires BEFORE the command
-    runs, so the tree the hook inspects is the tree as it was at approval time.
-    A single Bash call that touches a source file and then commits will be
-    approved against the pre-edit state -- measured, by exactly that command
-    landing an empty commit while the guard watched. Splitting edit and commit
-    into separate calls (the normal working shape) is fully covered.
+  * A COMMAND THAT EDITS TRACKED FILES AND THEN COMMITS OR PUSHES, IN ONE
+    INVOCATION, is not covered by the freshness check. `PreToolUse` fires
+    BEFORE the command runs, so the tree the hook inspects is the tree as it
+    was at approval time. A single Bash call that touches a source file and
+    then commits will be approved against the pre-edit state -- measured, by
+    exactly that command landing an empty commit while the guard watched.
+    Splitting edit and commit into separate calls (the normal working shape)
+    is fully covered.
 
     THE MOST COMMON SHAPE OF THIS IS NOW BLOCKED OUTRIGHT: a command containing
-    BOTH a gate invocation and a commit. See `GATE_RUN_RE` below. It does not
-    close the general case -- nothing at PreToolUse can -- but it closes the one
-    that actually happens, which was writing this very boundary note and then
-    walking into it within the hour.
-  * `xargs`-fed commits, shell aliases, and any commit made outside these
-    tools.
+    BOTH a gate invocation and a commit or push. See `GATE_RUN_RE` below. It
+    does not close the general case -- nothing at PreToolUse can -- but it
+    closes the one that actually happens, which was writing this very
+    boundary note and then walking into it within the hour.
+  * `xargs`-fed commits, shell aliases, and any commit or push made outside
+    these tools.
   * WHETHER THE COMMIT MESSAGE DESCRIBES THE RUN. This hook closes exactly one
     question -- *did the gate run, green, on this tree* -- and it never reads
     the message. A message can quote a trailer that is wrong, or invented, or
@@ -74,25 +91,28 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 RESULT = os.path.join(ROOT, ".gate-result.json")
 GATE_CMD = "python tools/gate.py"
 
-# `git commit` in a COMMAND POSITION: at the start of a line, or after a shell
-# separator, optionally behind one prefix token (`sudo git commit`). MULTILINE
-# so a heredoc-bearing command still anchors per line. See the note at the call
-# site for what this deliberately misses.
+# `git commit` / `git push` in a COMMAND POSITION: at the start of a line, or
+# after a shell separator, optionally behind one prefix token (`sudo git
+# commit`). MULTILINE so a heredoc-bearing command still anchors per line. See
+# the note at the call site for what this deliberately misses.
 COMMIT_RE = re.compile(r"(?:^|[;&|])\s*(?:\S+\s+)?git\s+commit\b", re.M)
+PUSH_RE = re.compile(r"(?:^|[;&|])\s*(?:\S+\s+)?git\s+push\b", re.M)
 
-# A RUN OF THE GATE, in the same command line as a commit.
+# A RUN OF THE GATE, in the same command line as a commit or push.
 #
 # Why this is enforced rather than left to discipline: `PreToolUse` fires BEFORE
-# the command runs, so when one call does `gate.py` and then commits, the hook
-# judges the tree AS IT WAS BEFORE THE GATE EVEN RAN. The verdict it reads is
-# the PREVIOUS run's. On 2026-08-07 that let a commit through on a RED gate --
-# in the same session, and within the hour, as the note above documenting the
-# hole was written. Three times that session a rule was written and then broken
-# by its author; the answer to that is a check, not more resolve.
+# the command runs, so when one call does `gate.py` and then commits or pushes,
+# the hook judges the tree AS IT WAS BEFORE THE GATE EVEN RAN. The verdict it
+# reads is the PREVIOUS run's. On 2026-08-07 that let a commit through on a RED
+# gate -- in the same session, and within the hour, as the note above
+# documenting the hole was written. Three times that session a rule was
+# written and then broken by its author; the answer to that is a check, not
+# more resolve.
 #
 # Deliberately matches the TOOL, not the word "gate": `tools/gate.py` in any
 # spelling (`python tools/gate.py`, `py -m ...`, a bare path), which is the only
-# thing that writes the result file the commit is about to be judged against.
+# thing that writes the result file the commit/push is about to be judged
+# against.
 #
 # `--trailer` IS EXEMPT, and the exemption is the rule working rather than a
 # hole in it. That mode runs nothing and writes nothing -- it reprints the
@@ -121,7 +141,7 @@ def main():
     if isinstance(ti, dict):
         cmd = str(ti.get("command") or "")
 
-    # Only commits are gated, and only ACTUAL INVOCATIONS of one.
+    # Only commits and pushes are gated, and only ACTUAL INVOCATIONS of one.
     #
     # The first draft matched the substring anywhere in the command line and
     # blocked the very command that was validating it -- an `echo` whose
@@ -129,35 +149,47 @@ def main():
     # been blocked too, and this repo's documents are full of the phrase. So the
     # match is anchored to a command position. That still catches every form
     # used here -- `git add -A && git commit ...`, `git commit <paths> -F -` fed
-    # by a heredoc, `cd x; git commit` -- while a mention inside a quoted
-    # argument is not an invocation and is not treated as one.
+    # by a heredoc, `cd x; git commit`, `git push origin main` -- while a
+    # mention inside a quoted argument is not an invocation and is not treated
+    # as one.
     #
     # `--amend` is a commit and is not exempt. Deliberately NOT handled:
-    # `xargs git commit`, shell aliases, and a commit made outside these tools.
-    # This hook raises the floor; it is not a sandbox, and saying so is the
-    # point -- an unstated boundary reads as coverage.
-    if not COMMIT_RE.search(cmd):
+    # `xargs git commit`, shell aliases, and a commit or push made outside
+    # these tools. This hook raises the floor; it is not a sandbox, and saying
+    # so is the point -- an unstated boundary reads as coverage.
+    is_commit = bool(COMMIT_RE.search(cmd))
+    is_push = bool(PUSH_RE.search(cmd))
+    if not is_commit and not is_push:
         sys.exit(0)
 
-    # ONE CALL CANNOT BOTH RUN THE GATE AND COMMIT. Checked before the result
-    # file is even read, because in this shape the result file is guaranteed to
-    # be the WRONG one: this hook runs before the command, so it would be
-    # judging the previous run's verdict against the pre-command tree, and
-    # whatever the gate is about to say would never be consulted at all.
+    # A COMMAND NAMING BOTH ("git commit ... && git push") IS GATED AS A PUSH.
+    # Push is the stricter requirement (full mode only), so judging the whole
+    # line by it is correct either way: if only the commit half were meant to
+    # run today, split the call.
+    event = "push" if is_push else "commit"
+    event_verb = "pushes" if is_push else "commits"       # "commit" -> "commits"
+
+    # ONE CALL CANNOT BOTH RUN THE GATE AND COMMIT/PUSH. Checked before the
+    # result file is even read, because in this shape the result file is
+    # guaranteed to be the WRONG one: this hook runs before the command, so it
+    # would be judging the previous run's verdict against the pre-command
+    # tree, and whatever the gate is about to say would never be consulted at
+    # all.
     if GATE_RUN_RE.search(cmd):
-        block("this command runs the gate AND commits.\n"
+        block(f"this command runs the gate AND {event_verb}.\n"
               "         PreToolUse fires BEFORE the command, so the verdict "
               "checked here is the\n"
               "         PREVIOUS run's -- the gate you are about to run cannot "
               "affect it. On\n"
               "         2026-08-07 exactly this let a commit through on a RED "
               "gate.\n"
-              "         Run the gate and commit in SEPARATE calls: read the "
-              "verdict, then commit.")
+              f"         Run the gate and {event} in SEPARATE calls: read the "
+              f"verdict, then {event}.")
 
     if not os.path.exists(RESULT):
+        need = GATE_CMD if event == "push" else f"{GATE_CMD} (or --quick)"
         block(f"no {os.path.basename(RESULT)} -- the gate has not been run.\n"
-              f"         Run `{GATE_CMD}` and commit after it reports GREEN.")
+              f"         Run `{need}` and {event} after it reports GREEN.")
 
     try:
         with open(RESULT, encoding="utf-8") as fh:
@@ -171,8 +203,20 @@ def main():
         trailer = [ln for ln in (data.get("trailer") or [])
                    if "RED" in ln or "UNRECONCILED" in ln]
         detail = ("\n         " + "\n         ".join(trailer)) if trailer else ""
-        block(f"the last full-mode gate was {verdict or 'not GREEN'}."
-              f"{detail}\n         Fix it, re-run `{GATE_CMD}`, then commit.")
+        block(f"the last gate result was {verdict or 'not GREEN'}."
+              f"{detail}\n         Fix it, re-run `{GATE_CMD}`, then {event}.")
+
+    # (4) STRENGTH. A `git commit` accepts either mode; a `git push` needs the
+    # full 3x-suite run specifically -- 0043/0047-ruling.md SS4. This is a
+    # THIRD, DISTINCT message from both "no result" and "RED": a quick result
+    # is a real, GREEN result, just not a strong enough one for this event.
+    mode = str(data.get("mode", "full")).lower()
+    if event == "push" and mode != "full":
+        block("the last gate result is `--quick` (ruff + OFF only), GREEN, "
+              "but a push needs FULL MODE.\n"
+              "         `--quick` unlocks a commit; only `python tools/gate.py` "
+              "(no flag) unlocks a push.\n"
+              "         Run the full gate, then push.")
 
     # (3) FRESHNESS. The result must post-date every tracked file, or it is a
     # verdict about a tree that no longer exists.
@@ -201,7 +245,7 @@ def main():
               f"changed since it was written {age:.1f} min ago:\n"
               f"         {shown}{more}\n"
               f"         A green gate for an earlier tree is not a green gate "
-              f"for this one.\n         Re-run `{GATE_CMD}`, then commit.")
+              f"for this one.\n         Re-run `{GATE_CMD}`, then {event}.")
 
     sys.exit(0)
 

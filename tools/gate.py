@@ -31,9 +31,10 @@ reconcile. An unreconciled sum is a defect (a test counted twice, as
 `test_a_clipped_band_leaves_every_room_coherent` was under `deep`), not a
 rounding difference, so it is treated as red.
 
-    python tools/gate.py            # ruff + OFF + ON + DEEP
-    python tools/gate.py --quick    # ruff + OFF only
-    python tools/gate.py --deep     # ruff + DEEP only -- what CI's deep job runs
+    python tools/gate.py            # ruff + OFF + ON + DEEP -- unlocks a PUSH
+    python tools/gate.py --quick    # ruff + OFF only -- unlocks a COMMIT, not a push
+    python tools/gate.py --deep     # ruff + DEEP only -- what CI's deep job runs;
+                                    # writes no result, unlocks neither event
     python tools/gate.py --perf     # the timing lane, explicitly (P3.8)
     python tools/gate.py --docs     # the record lane: defect front matter,
                                     # the generated index, every defect
@@ -41,6 +42,14 @@ rounding difference, so it is treated as red.
     python tools/gate.py --trailer  # re-print the last full-mode trailer,
                                     # verbatim, for redirection into a commit
                                     # message file -- NEVER retype it
+
+THE COMMIT/PUSH SPLIT (0043/0047-ruling.md SS4): `.gate-result.json` now
+carries a `"mode"` field, `"quick"` or `"full"`. `.claude/hooks/verify_gate.py`
+accepts either mode, GREEN and fresh, to unlock a `git commit`; a `git push`
+requires `mode == "full"` specifically. The strength moved, not shrank: what
+still needs a full 3x-suite run before it can reach `origin`, CI or a PR is
+unchanged -- only the twenty private, never-pushed intermediate commits a
+series gets split into stop paying that tax individually.
 
 THE DOCS LANE IS ITS OWN LANE, like `--perf`, and deliberately NOT part of the
 default block. The trailer above is pasted verbatim into commit messages, so its
@@ -462,8 +471,8 @@ def _docs() -> int:
 RESULT = ".gate-result.json"             # gitignored; see _write_result
 
 
-def _write_result(bad, collected, ruff, n_vac, n_end, lines) -> None:
-    """Leave the verdict ON DISK, for the commit hook to read.
+def _write_result(bad, collected, ruff, n_vac, n_end, lines, mode) -> None:
+    """Leave the verdict ON DISK, for the commit/push hook to read.
 
     THE HOOK CHECKS THIS FILE, NEVER THE COMMIT MESSAGE, and that is the whole
     design. Three of the four incidents behind the hook were a CLAIM about a
@@ -476,14 +485,20 @@ def _write_result(bad, collected, ruff, n_vac, n_end, lines) -> None:
     different things -- "you did not run it" and "you ran it and it failed" --
     and a guard that cannot tell them apart teaches people to delete the file.
 
-    Only a FULL-MODE run writes it. `--quick` skips two of the three gates and
-    `--deep` skips two others; letting either satisfy the hook would make the
-    guard weaker than the thing it guards.
+    `mode` IS `"quick"` OR `"full"` -- 0043-ruling.md SS4 / 0047-ruling.md SS4,
+    the hook split. `--quick` (ruff + OFF only) now writes too, so it can
+    unlock a COMMIT -- a private, un-pushed tree costs nothing if it turns out
+    wrong. `--deep` still writes nothing: it is CI's own job (defect 27), not
+    a local development mode, and was never the thing either event's guard was
+    supposed to accept. The HOOK is what still requires `mode == "full"` for a
+    PUSH specifically -- this function just records which one ran; it does not
+    itself decide what any event may accept.
     """
     import json
     import time
     payload = {
         "verdict": "RED" if bad else "GREEN",
+        "mode": mode,
         "collected": collected,
         "ruff": ruff,
         "vacuous": n_vac,
@@ -556,10 +571,11 @@ def main() -> int:
 
     n_vac, vac = _vacuity()
     n_end, ends = _end_assignments()
-    # THE SNAPSHOT CHECK RUNS IN FULL MODE, NOT ONLY IN `--docs`, AND THE
-    # DIFFERENCE IS THE WHOLE POINT. The commit hook reads `.gate-result.json`,
-    # which only a full-mode run writes; `--docs` prints its own verdict and
-    # writes nothing. A staleness check living only in the docs lane would be
+    # THE SNAPSHOT CHECK RUNS HERE (both `--quick` and full mode), NOT ONLY IN
+    # `--docs`, AND THE DIFFERENCE IS THE WHOLE POINT. The commit/push hook
+    # reads `.gate-result.json`, which `--quick` and full mode both write now
+    # (0043/0047-ruling.md SS4); `--docs` prints its own verdict and writes
+    # nothing. A staleness check living only in the docs lane would be
     # one more thing nobody runs -- which is the exact failure it exists to
     # close. It costs one file read and one `git rev-parse`.
     # `_snapshot_check` (not `_snapshot_head` directly) is what skips it in
@@ -594,8 +610,12 @@ def main() -> int:
                  f"{'' if bad else ' (every sum reconciles against --collect-only)'}")
 
     print("\n".join(lines))
-    if not quick and not deep_only:      # full mode only -- see the docstring
-        _write_result(bad, collected, ruff, n_vac, n_end, lines)
+    # `--deep` writes nothing (CI's own job, defect 27 -- never a local
+    # development mode). `--quick` and full mode both write now, tagged by
+    # which one ran; see `_write_result`'s docstring (0043/0047-ruling.md SS4).
+    if not deep_only:
+        _write_result(bad, collected, ruff, n_vac, n_end, lines,
+                      "quick" if quick else "full")
     return 1 if bad else 0
 
 

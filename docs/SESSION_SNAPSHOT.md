@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: a1d35f7 -->
+<!-- SNAPSHOT-HEAD: 6a22aee -->
 
 # Session snapshot — read this first
 
@@ -99,13 +99,21 @@ at [`handoff/0047-ruling.md`](handoff/0047-ruling.md) §1). [`0047`](handoff/004
 authorised all three held items — push needed no asking (the autonomy policy
 already covers GREEN pushes), the CI-lane move as ruled at `0042`, the hook
 split with four controls instead of one. **Also done:** `main` pushed to
-`origin` (was 3 ahead), and the `Docs-Snapshot` check moved out of the
-`pull_request` CI lane — [`handoff/0048-report.md`](handoff/0048-report.md).
-**Owed next:** the hook split (`0043` §4 / `0047` §4, its own commit, four
-controls), then the DXF integration on a fresh context.
-[`handoff/0045-ruling.md`](handoff/0045-ruling.md) landed alongside — a
-correction to how Patrick's own shower check is run (against the wrong
-branch), tier NONE, no action item for Code.
+`origin` (was 3 ahead), the `Docs-Snapshot` check moved out of the
+`pull_request` CI lane ([`handoff/0048-report.md`](handoff/0048-report.md)),
+and the commit hook split — `git commit` accepts a `--quick` or full GREEN
+result, `git push` requires full specifically, 18 new tests against an
+isolated fixture repo covering all 8 cells of `0047`'s table plus
+distinct-message and freshness controls (caught a real pluralisation bug
+before it shipped) — [`handoff/0049-report.md`](handoff/0049-report.md).
+**Everything [`0044`](handoff/0044-ruling.md) §3 / [`0047`](handoff/0047-ruling.md)
+ordered is done except item 6.** [`handoff/0045-ruling.md`](handoff/0045-ruling.md)
+landed alongside — a correction to how Patrick's own shower check is run
+(against the wrong branch), tier NONE, no action item for Code.
+
+**Next: [`0038-ruling.md`](handoff/0038-ruling.md)'s `fp2dxf` DXF integration
+— the big chunk, on a fresh context, per [`0044`](handoff/0044-ruling.md) §3
+item 6 and [`0047`](handoff/0047-ruling.md) §5.** Not started this session.
 
 ---
 
@@ -161,15 +169,17 @@ branch), tier NONE, no action item for Code.
    `HEAD^2` merge-ref logic are untouched, so every existing D78 regression
    test still exercises the real thing. Two new controls (skip-when-stale,
    skip-scoped-to-PR). Full receipt: [`handoff/0048-report.md`](handoff/0048-report.md).
-6. **The commit hook splits quick-for-commit / full-for-push — owed next,
-   AUTHORISED with FOUR controls required, not one.** [`handoff/0043-ruling.md`](handoff/0043-ruling.md)
-   §4 / [`handoff/0047-ruling.md`](handoff/0047-ruling.md) §4: `--quick`
-   (`ruff` + OFF only, ~25s) unlocks a commit; only a full-mode GREEN result,
-   newer than every tracked file, unlocks a push. The four controls, all in
-   the same commit: no result refused at both events; a `--quick` GREEN
-   allowed at commit, refused at push; a full GREEN allowed at both; any RED
-   result refused at both — and "no result" vs "a red result" must produce
-   **different messages** at each event, not merely both refuse.
+6. **The commit hook splits quick-for-commit / full-for-push — DONE.**
+   [`handoff/0043-ruling.md`](handoff/0043-ruling.md) §4 /
+   [`handoff/0047-ruling.md`](handoff/0047-ruling.md) §4: `.gate-result.json`
+   carries a `mode` field now (`--quick` writes too); `git commit` accepts
+   either mode, `git push` requires `mode == "full"`. All four controls, in
+   the same commit, at both events: no result refused; `--quick` GREEN
+   allowed at commit / refused at push; full GREEN allowed at both; any RED
+   refused; "no result" / "RED" / "quick-at-push" each produce a
+   **different** message. `tests/test_verify_gate_hook.py`, 18 tests against
+   an isolated fixture repo, caught a real `"pushs"` pluralisation bug before
+   it shipped. Full receipt: [`handoff/0049-report.md`](handoff/0049-report.md).
 
 **Full tiered queue (A2–A5, the command-roster census, Phase 5's remainder,
 etc.):** [`ROADMAP.md`](ROADMAP.md) §3. **`boat_trailer` and the vehicle
@@ -228,7 +238,7 @@ and the golden-file test the sample makes nearly free. Ordered behind item
 
 | | |
 |---|---|
-| **`main`** | **`a1d35f7`** — PR #31 merged at `b813343`, D78 fixed, `0028`'s trim, the extrudability predicate + census + D76 reconciliation (`17f6c01`), the cross-floor investigation (`2c9c075`) and its marker fixes (`fcb92ba`, `0510bae`, `a416222`), the `fp2dxf` recovery (`5d61f1f`), the `0043` renumbering + snapshot re-cut (`7332716`), and the mailbox cherry-pick + flap receipt (`a1d35f7`). **Pushed to `origin/main`.** Full trail: `handoff/README.md`'s pair table. |
+| **`main`** | **`6a22aee`** — PR #31 merged at `b813343`, D78 fixed, `0028`'s trim, the extrudability predicate + census + D76 reconciliation (`17f6c01`), the cross-floor investigation (`2c9c075`) and its marker fixes (`fcb92ba`, `0510bae`, `a416222`), the `fp2dxf` recovery (`5d61f1f`), the `0043` renumbering + snapshot re-cut (`7332716`), the mailbox cherry-pick + flap receipt (`a1d35f7`), and the `Docs-Snapshot` CI-lane move (`6a22aee`). **Pushed to `origin/main` through `a1d35f7`; the hook-split commit about to land is not pushed yet.** Full trail: `handoff/README.md`'s pair table. |
 | **Branches** | **`shower-identity-redraws`** — [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32), AMBER, awaiting Patrick's check; ahead of this snapshot (carries `0033`–`0036-report.md`, a new fragmented-symbols defect record, the working-distance camera — none yet on `main`). `d74-vessel-enclosure-split` merged, kept, not live. |
 | **Gate** | local on `main`: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **727 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI confirmed green on every `main` push through `17f6c01`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **79 records on `main`**, **30 open** (the redraw branch's own new fragmented-symbols record exists there only, not yet merged). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
