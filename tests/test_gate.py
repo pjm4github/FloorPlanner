@@ -272,6 +272,64 @@ def test_a_shallow_merge_ref_checkout_is_labelled_merge_not_linear(
         "checkout, even though it cannot fully resolve either")
 
 
+def _stale_marker_repo(tmp_path):
+    """A linear repo whose HEAD carries a deliberately stale marker -- the
+    same fixture shape `test_TWO_commits_behind_is_RED` uses, but as real git
+    history so `_snapshot_check()` (which shells out) can be driven end to
+    end, not just `snapshot_verdict`."""
+    _run(["git", "init", "-b", "main"], tmp_path)
+    _run(["git", "config", "user.email", "t@example.com"], tmp_path)
+    _run(["git", "config", "user.name", "T"], tmp_path)
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "SESSION_SNAPSHOT.md").write_text("root\n", encoding="utf-8")
+    _run(["git", "add", "-A"], tmp_path)
+    _run(["git", "commit", "-m", "root"], tmp_path)
+    (tmp_path / "docs" / "SESSION_SNAPSHOT.md").write_text(
+        _snapshot(marker="0000000", row="0000000"), encoding="utf-8")
+    _run(["git", "add", "-A"], tmp_path)
+    _run(["git", "commit", "-m", "stale marker"], tmp_path)
+
+
+def test_the_pull_request_lane_skips_the_check_EVEN_WHEN_STALE(
+        tmp_path, monkeypatch, capsys):
+    """THE POSITIVE CONTROL FOR THE SKIP ITSELF (0042-ruling.md). A change
+    that stops calling a check is indistinguishable from a working check that
+    only ever saw green trees, unless it is shown suppressing a tree that
+    WOULD have failed. This repo's marker is the same deliberately-stale
+    fixture `test_TWO_commits_behind_is_RED` uses against `snapshot_verdict`
+    directly -- here it goes through `_snapshot_check()`, the call-site
+    wrapper `main()`/`_docs()` actually use, with `GITHUB_EVENT_NAME` set the
+    way a PR-triggered CI run sets it. If this returns non-zero, the skip is
+    not reaching the place it is supposed to."""
+    _stale_marker_repo(tmp_path)
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    monkeypatch.chdir(tmp_path)
+    n_snap, field = _gate()._snapshot_check()
+    out = capsys.readouterr().out
+    assert n_snap == 0, out
+    assert field == "skipped"
+    assert "skipped" in out
+    assert "0042-ruling.md" in out
+
+
+def test_OUTSIDE_the_pull_request_lane_a_stale_marker_still_goes_RED(
+        tmp_path, monkeypatch, capsys):
+    """THE NEGATIVE CONTROL, same section: the skip must be scoped to
+    `pull_request`, not a blanket disable of the check. Identical fixture to
+    the test above, `GITHUB_EVENT_NAME` unset -- push-to-`main`, `workflow_
+    dispatch` and a local session all look like this, and 0042-ruling.md SS4
+    is explicit that a deliberately stale marker must still go RED in every
+    one of them."""
+    _stale_marker_repo(tmp_path)
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+    monkeypatch.chdir(tmp_path)
+    n_snap, field = _gate()._snapshot_check()
+    out = capsys.readouterr().out
+    assert n_snap == 1, out
+    assert field == "stale"
+    assert "RED" in out
+
+
 def test_the_real_snapshot_carries_a_marker():
     """The file itself, not a fixture. The tests above would all pass against a
     repository whose snapshot had no marker at all."""

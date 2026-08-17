@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 7332716 -->
+<!-- SNAPSHOT-HEAD: a1d35f7 -->
 
 # Session snapshot — read this first
 
@@ -90,16 +90,22 @@ CI-lane ruling, landed on disk mid-recovery and took the number first).
 **[`handoff/0044-ruling.md`](handoff/0044-ruling.md) set the order for
 everything owed after the recovery** — push, the mailbox cherry-pick, a gate
 flap receipt, `0042`'s CI-lane move, `0043`'s hook split, then the DXF
-integration last, on a fresh context. **Done in this commit:** the
-`0033`–`0036-report.md` cherry-pick from `shower-identity-redraws` (the
-mailbox hole `0040` §4 first named is closed) and the flap receipt (gate run
-twice on one unchanged tree, identical both times — no flap measured). Full
-trail: [`handoff/0046-report.md`](handoff/0046-report.md). **`push`, the
-CI-lane move and the hook split are held for Patrick's explicit go-ahead**
-(push and infrastructure edits, per CLAUDE.md's own etiquette) rather than
-acted on under `0044`'s GREEN tier alone. [`handoff/0045-ruling.md`](handoff/0045-ruling.md)
-landed alongside — a correction to how Patrick's own shower check is run
-(against the wrong branch), tier NONE, no action item for Code.
+integration last, on a fresh context. **Done:** the `0033`–`0036-report.md`
+cherry-pick (the mailbox hole `0040` §4 first named is closed) and the flap
+receipt (gate run twice on one unchanged tree, identical both times — no
+flap; Patrick's "seems to be flapping" was the 92.6s of 3x test time, per
+[`0043-ruling.md`](handoff/0043-ruling.md) §1, not nondeterminism, confirmed
+at [`handoff/0047-ruling.md`](handoff/0047-ruling.md) §1). [`0047`](handoff/0047-ruling.md)
+authorised all three held items — push needed no asking (the autonomy policy
+already covers GREEN pushes), the CI-lane move as ruled at `0042`, the hook
+split with four controls instead of one. **Also done:** `main` pushed to
+`origin` (was 3 ahead), and the `Docs-Snapshot` check moved out of the
+`pull_request` CI lane — [`handoff/0048-report.md`](handoff/0048-report.md).
+**Owed next:** the hook split (`0043` §4 / `0047` §4, its own commit, four
+controls), then the DXF integration on a fresh context.
+[`handoff/0045-ruling.md`](handoff/0045-ruling.md) landed alongside — a
+correction to how Patrick's own shower check is run (against the wrong
+branch), tier NONE, no action item for Code.
 
 ---
 
@@ -145,14 +151,25 @@ landed alongside — a correction to how Patrick's own shower check is run
    clause-by-clause EXISTS/PARTIAL/ABSENT, thresholds with reasons, the shift
    modifier audit, the angle convention already in the geometry code, and
    Ctrl's disposition. Spec: [`ROADMAP.md`](ROADMAP.md) A6.
-5. **`Docs-Snapshot` moves out of the `pull_request` CI lane — GREEN, not yet
-   done.** [`handoff/0042-ruling.md`](handoff/0042-ruling.md): the only check
-   this project's CI has ever failed on when the code itself was fine; it
-   reads git topology (`HEAD~1`), which a merge-ref reshapes, while the local
-   commit hook already prevents a stale marker from landing at all. Stays on
-   push-to-`main` and the local full gate; comes out of `pull_request`. Not
-   yet actioned — a workflow-file change, flagged rather than done inline
-   with the recovery it arrived beside.
+5. **`Docs-Snapshot` moves out of the `pull_request` CI lane — DONE.**
+   [`handoff/0042-ruling.md`](handoff/0042-ruling.md): the only check this
+   project's CI has ever failed on when the code itself was fine; it read git
+   topology (`HEAD~1`), which a merge-ref reshapes, while the local commit
+   hook already prevents a stale marker from landing at all. `tools/gate.py`'s
+   `_snapshot_check()` now skips it on `GITHUB_EVENT_NAME == "pull_request"`,
+   at the `main()`/`_docs()` call sites only — `_snapshot_head()` and the
+   `HEAD^2` merge-ref logic are untouched, so every existing D78 regression
+   test still exercises the real thing. Two new controls (skip-when-stale,
+   skip-scoped-to-PR). Full receipt: [`handoff/0048-report.md`](handoff/0048-report.md).
+6. **The commit hook splits quick-for-commit / full-for-push — owed next,
+   AUTHORISED with FOUR controls required, not one.** [`handoff/0043-ruling.md`](handoff/0043-ruling.md)
+   §4 / [`handoff/0047-ruling.md`](handoff/0047-ruling.md) §4: `--quick`
+   (`ruff` + OFF only, ~25s) unlocks a commit; only a full-mode GREEN result,
+   newer than every tracked file, unlocks a push. The four controls, all in
+   the same commit: no result refused at both events; a `--quick` GREEN
+   allowed at commit, refused at push; a full GREEN allowed at both; any RED
+   result refused at both — and "no result" vs "a red result" must produce
+   **different messages** at each event, not merely both refuse.
 
 **Full tiered queue (A2–A5, the command-roster census, Phase 5's remainder,
 etc.):** [`ROADMAP.md`](ROADMAP.md) §3. **`boat_trailer` and the vehicle
@@ -211,7 +228,7 @@ and the golden-file test the sample makes nearly free. Ordered behind item
 
 | | |
 |---|---|
-| **`main`** | **`7332716`** — PR #31 merged at `b813343`, D78 fixed, `0028`'s trim, the extrudability predicate + census + D76 reconciliation (`17f6c01`), the cross-floor investigation (`2c9c075`) and its marker fixes (`fcb92ba`, `0510bae`, `a416222`), the `fp2dxf` recovery (`5d61f1f`), and the `0043` renumbering + snapshot re-cut (`7332716`). **Unpushed — 2 ahead of `origin/main`, held for Patrick's go-ahead.** Full trail: `handoff/README.md`'s pair table. |
+| **`main`** | **`a1d35f7`** — PR #31 merged at `b813343`, D78 fixed, `0028`'s trim, the extrudability predicate + census + D76 reconciliation (`17f6c01`), the cross-floor investigation (`2c9c075`) and its marker fixes (`fcb92ba`, `0510bae`, `a416222`), the `fp2dxf` recovery (`5d61f1f`), the `0043` renumbering + snapshot re-cut (`7332716`), and the mailbox cherry-pick + flap receipt (`a1d35f7`). **Pushed to `origin/main`.** Full trail: `handoff/README.md`'s pair table. |
 | **Branches** | **`shower-identity-redraws`** — [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32), AMBER, awaiting Patrick's check; ahead of this snapshot (carries `0033`–`0036-report.md`, a new fragmented-symbols defect record, the working-distance camera — none yet on `main`). `d74-vessel-enclosure-split` merged, kept, not live. |
 | **Gate** | local on `main`: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **727 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI confirmed green on every `main` push through `17f6c01`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **79 records on `main`**, **30 open** (the redraw branch's own new fragmented-symbols record exists there only, not yet merged). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
