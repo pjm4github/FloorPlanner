@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 6a22aee -->
+<!-- SNAPSHOT-HEAD: eca09ee -->
 
 # Session snapshot — read this first
 
@@ -111,9 +111,15 @@ ordered is done except item 6.** [`handoff/0045-ruling.md`](handoff/0045-ruling.
 landed alongside — a correction to how Patrick's own shower check is run
 (against the wrong branch), tier NONE, no action item for Code.
 
-**Next: [`0038-ruling.md`](handoff/0038-ruling.md)'s `fp2dxf` DXF integration
-— the big chunk, on a fresh context, per [`0044`](handoff/0044-ruling.md) §3
-item 6 and [`0047`](handoff/0047-ruling.md) §5.** Not started this session.
+**[`0038-ruling.md`](handoff/0038-ruling.md)'s `fp2dxf` DXF integration —
+BUILT, on branch `fp2dxf-integration`, per [`0044`](handoff/0044-ruling.md) §3
+item 6 and [`0047`](handoff/0047-ruling.md) §5.** The zip is unpacked and
+deleted, the golden DXF pair regenerated against `STD_T` (differential
+receipt in that branch's own commits), the README split, the menu action +
+completion dialog wired, the golden-file test written, gate GREEN. AMBER —
+pushed and PR'd next; Patrick's Chief Architect manual check
+(0038-ruling.md §8) is out of Code's reach and stays the merge condition.
+Full receipt: the handoff report this session writes once the PR is open.
 
 ---
 
@@ -218,13 +224,24 @@ windows). **Measured done, per [`0043-report.md`](handoff/0043-report.md):**
 thickness reads `STD_T` by path (the D73/D74 disease closed, not repeated),
 and all three library-hygiene fixes (`SystemExit` → a catchable `ValueError`,
 `print()` confined to the CLI entry point with `convert()` returning
-warnings/summary on `ConvertResult`, explicit `utf-8` on both writes). **Still
-owed:** the zip (`handoff/0038-fp2dxf-handoff.zip`) is unpacked and deleted in
-the same commit — its `sample/`, `screenshots/` and `README.md` are not yet
-anywhere in the repo tree — then a README split (handoff spec vs. user docs)
-and the golden-file test the sample makes nearly free. Ordered behind item
-2's check, the cross-floor work above, and now [`0040-ruling.md`](handoff/0040-ruling.md)
-§4's cherry-pick, per that ruling's own tier.
+warnings/summary on `ConvertResult`, explicit `utf-8` on both writes). **Now
+also done, on branch `fp2dxf-integration`:** the zip unpacked and deleted in
+one commit (`sample_design.json`/`L1.dxf`/`L2.dxf`/sidecars →
+`fixtures/chief-export/`, the 16 screenshots → `docs/evidence/chief-export/`,
+the schema copy dropped as a byte-identical duplicate of the vendored one);
+the golden DXF pair **regenerated** against the now-live `STD_T` (only
+`exterior` 6.5"→6.0" and `railing` 3.0"→2.0" moved — the differential
+receipt, stated in full in that commit's own message and `tests/test_fp2dxf.py`'s
+docstring); the README split (§1 of the handoff README discarded as a spent
+spec, §§2–5 into a new root `README.md` section, workflow steps transcribed
+verbatim per the ruling's own warning about silent-failure settings); the
+File ▸ Export ▸ Chief Architect (DXF)… menu action + completion dialog
+(`planio.py`'s `export_dxf`/`export_dxf_path`, the `export_legacy_v4_path`
+convention); and the golden-file test (7 tests, byte-for-byte + a positive
+control + two tests driving the menu wiring itself). Gate GREEN, ruff clean.
+**AMBER — Patrick's Chief Architect manual check (0038-ruling.md §8) is the
+merge condition and is out of Code's reach**; pushed and PR'd this session,
+not merged.
 
 > **A second numbering collision, same session:
 > [`handoff/0038-ruling.md`](handoff/0038-ruling.md) and this session's own
@@ -238,7 +255,7 @@ and the golden-file test the sample makes nearly free. Ordered behind item
 
 | | |
 |---|---|
-| **`main`** | **`6a22aee`** — PR #31 merged at `b813343`, D78 fixed, `0028`'s trim, the extrudability predicate + census + D76 reconciliation (`17f6c01`), the cross-floor investigation (`2c9c075`) and its marker fixes (`fcb92ba`, `0510bae`, `a416222`), the `fp2dxf` recovery (`5d61f1f`), the `0043` renumbering + snapshot re-cut (`7332716`), the mailbox cherry-pick + flap receipt (`a1d35f7`), and the `Docs-Snapshot` CI-lane move (`6a22aee`). **Pushed to `origin/main` through `a1d35f7`; the hook-split commit about to land is not pushed yet.** Full trail: `handoff/README.md`'s pair table. |
+| **`main`** | **`6a22aee`** — PR #31 merged at `b813343`, D78 fixed, `0028`'s trim, the extrudability predicate + census + D76 reconciliation (`17f6c01`), the cross-floor investigation (`2c9c075`) and its marker fixes (`fcb92ba`, `0510bae`, `a416222`), the `fp2dxf` recovery (`5d61f1f`), the `0043` renumbering + snapshot re-cut (`7332716`), the mailbox cherry-pick + flap receipt (`a1d35f7`), and the `Docs-Snapshot` CI-lane move (`6a22aee`). **Pushed to `origin/main` through `a1d35f7`; the hook-split commit about to land is not pushed yet.** Full trail: `handoff/README.md`'s pair table. **This marker is cut against branch `fp2dxf-integration` @ `eca09ee`, not `origin/main` directly** — three commits on top of `main`'s own `54b4a88` (zip unpacked into `fixtures/chief-export/`+`docs/evidence/chief-export/` with the golden DXF pair regenerated against `STD_T`, the README split, the File ▸ Export ▸ Chief Architect (DXF)… menu action + completion dialog + golden-file test), gate GREEN, not yet pushed or PR'd. `origin/main` itself is unchanged at `54b4a88` this session; the real main-side re-cut (with the PR link) lands in the doc-only mailbox commit once the branch is pushed. |
 | **Branches** | **`shower-identity-redraws`** — [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32), AMBER, awaiting Patrick's check; ahead of this snapshot (carries `0033`–`0036-report.md`, a new fragmented-symbols defect record, the working-distance camera — none yet on `main`). `d74-vessel-enclosure-split` merged, kept, not live. |
 | **Gate** | local on `main`: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **727 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI confirmed green on every `main` push through `17f6c01`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **79 records on `main`**, **30 open** (the redraw branch's own new fragmented-symbols record exists there only, not yet merged). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
