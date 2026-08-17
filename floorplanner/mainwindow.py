@@ -278,6 +278,9 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         a_v4 = QAction("Export legacy v4…", self)     # one release, so nobody
         a_v4.triggered.connect(self.export_legacy_v4)  # is stranded on v5
         m_file.addAction(a_v4)
+        a_dxf = QAction("Export ▸ Chief Architect (DXF)…", self)  # handoff 0038
+        a_dxf.triggered.connect(self.export_dxf)
+        m_file.addAction(a_dxf)
         m_file.addSeparator()
         a_tload = QAction("&Load template room…", self)   # P4.4
         a_tload.triggered.connect(self.load_template_room)
