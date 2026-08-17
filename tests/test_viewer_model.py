@@ -362,27 +362,46 @@ def test_a_prism_is_not_MIRRORED_along_the_depth_axis(fp3d):
         "the mower's deck must land on the +y side; it is mirrored")
 
 
+# A SYNTHETIC LINE-ART KIND, not a real catalog item -- `glass_shower` was
+# this case (drawn entirely in strokes, nothing to extrude) until the
+# 2026-08-16 redraw (handoff 0029/0032) gave it a filled body, which is
+# progress the fallback test should not regress on. `load_outline` resolves
+# `file` against the real assets directory regardless of what `catalog=`
+# supplies (`outline_dir = _assets_dir()`, not parameterised), so a
+# filename that does not exist there hits the same `OSError` branch
+# `svg_outlines` already returns `([], (0.0, 0.0))` for -- no real symbol
+# needs to stay broken for this test to mean something.
+_LINE_ART_KIND = "test_line_art_only_synthetic"
+_LINE_ART_CATALOG = (
+    {_LINE_ART_KIND: {
+        "id": _LINE_ART_KIND, "form": "prism", "width_in": 60.0,
+        "depth_in": 48.0, "height_in": 78.0, "material": "glass",
+        "file": "does_not_exist_line_art_only.svg"}},
+    {"glass": {"colour": [0.6, 0.7, 0.8, 0.35]}},
+    [])
+
+
 def test_a_line_art_symbol_FALLS_BACK_and_is_NAMED(fp3d):
-    """`glass_shower` is drawn entirely in strokes -- there is nothing to
-    extrude, and a prism would have to invent a boundary. It must fall back to
-    the box AND be named in the report, because "a third of the catalog renders
-    as a box" is a claim that only stays checkable if the survivors are listed
-    rather than totalled."""
-    model = fp3d.build_model(_doc("glass_shower"))
-    assert model.stats["box_fallback_kinds"] == ["glass_shower"]
-    assert "glass_shower" not in model.stats["prism_kinds"]
-    assert any("STILL DRAWN AS A BOX" in line and "glass_shower" in line
+    """A symbol drawn entirely in strokes has nothing to extrude, and a prism
+    would have to invent a boundary. It must fall back to the box AND be
+    named in the report, because "a third of the catalog renders as a box"
+    is a claim that only stays checkable if the survivors are listed rather
+    than totalled."""
+    model = fp3d.build_model(_doc(_LINE_ART_KIND), catalog=_LINE_ART_CATALOG)
+    assert model.stats["box_fallback_kinds"] == [_LINE_ART_KIND]
+    assert _LINE_ART_KIND not in model.stats["prism_kinds"]
+    assert any("STILL DRAWN AS A BOX" in line and _LINE_ART_KIND in line
                for line in model.info), model.info
 
 
-def test_the_fallback_still_draws_the_item(fp3d, manifest):
+def test_the_fallback_still_draws_the_item(fp3d):
     """A fallback that drew NOTHING would satisfy the test above and lose the
     furnishing. The box must still be there, at the catalog's size."""
-    spec = next(i for i in manifest if i["id"] == "glass_shower")
-    vs = _furn_verts(fp3d, fp3d.build_model(_doc("glass_shower")))
+    vs = _furn_verts(fp3d, fp3d.build_model(_doc(_LINE_ART_KIND),
+                                            catalog=_LINE_ART_CATALOG))
     assert vs, "the fallback drew nothing at all"
     w = max(v[0] for v in vs) - min(v[0] for v in vs)
-    assert abs(w - spec["width_in"]) < 1e-6, "the box is not the catalog's size"
+    assert abs(w - 60.0) < 1e-6, "the box is not the catalog's size"
 
 
 def test_rotation_carries_through_the_prism(fp3d, manifest):
@@ -522,12 +541,15 @@ def test_a_sofa_is_a_SEAT_WITH_A_BACK_not_a_slab(fp3d, manifest):
 
 def test_an_unannotated_nested_shape_is_still_DROPPED(fp3d):
     """Decoration that states no height would extrude to the body's own height
-    and z-fight the face it sits on. `shower`'s inner shapes are unfilled and
-    unannotated, so the solid stays a plain enclosure."""
+    and z-fight the face it sits on. `shower`'s inner unfilled shapes (the
+    diagonal lines, the drain circle) carry no fill and no `data-h`, so they
+    stay dropped -- the body plus its (filled, annotated, 2026-08-16 redraw)
+    door leaf is two plain boxes, not more: 12 triangles each, not one more
+    per piece of decoration that would z-fight if it were not dropped."""
     model = fp3d.build_model(_doc("shower"))
     tris = sum(len(m.faces) for m in model.meshes
                if m.name.startswith("furnishings:"))
-    assert tris == 12, f"expected a plain prism, got {tris} triangles"
+    assert tris == 24, f"expected the body plus its door leaf, got {tris} triangles"
 
 
 def test_the_annotation_carries_A_HEIGHT_AND_NOTHING_ELSE(manifest):
