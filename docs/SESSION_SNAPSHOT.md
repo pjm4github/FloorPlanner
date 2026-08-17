@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 0510bae -->
+<!-- SNAPSHOT-HEAD: a416222 -->
 
 # Session snapshot — read this first
 
@@ -152,13 +152,35 @@ note; one handoff old, not yet two.
 > own branches; neither renamed — doing so would break more citations than it
 > fixes. Numbering continues forward from `0038`.
 
+**`fp2dxf` (a v5 → Chief Architect DXF exporter, built outside this repo) —
+[`0038-ruling.md`](handoff/0038-ruling.md), AMBER, BLOCKED BEFORE IT CAN
+START.** Accepted in principle: pure stdlib, a clean `convert()` API, a real
+differential-receipt finding (both doors import as windows). Owes, once
+unblocked: thickness rewired to read `STD_T` rather than carrying its own
+(disagreeing) copy — the D73/D74 disease again, one column carrying a real
+quantity AND a Chief-type mapping — three library-hygiene fixes (`SystemExit`
+inside `convert()`, `print()` as the only progress channel, no explicit file
+encoding), a README split (handoff spec vs. user docs), and a golden-file
+test the shipped sample already makes nearly free. **`fp2dxf.py` itself,
+its README, sample input/output and screenshots are not anywhere in this
+repository** — checked exhaustively
+([`0039-report.md`](handoff/0039-report.md)) — so none of it can start until
+dropped somewhere readable. Ordered behind item 2's check and the
+cross-floor work above, per `0038`'s own tier.
+
+> **A second numbering collision, same session:
+> [`handoff/0038-ruling.md`](handoff/0038-ruling.md) and this session's own
+> `handoff/0038-report.md`** (written earlier, about the cross-floor
+> investigation) **share a number.** Neither renamed. Numbering continues
+> forward from `0039`.
+
 ---
 
 ## 1. Where the work stands
 
 | | |
 |---|---|
-| **`main`** | **`0510bae`** — PR #31 merged at `b813343`, D78 fixed (`168190f`, `db09acf`), `0028`'s trim (`156135f`), the extrudability predicate + census + D76 reconciliation (`17f6c01`), the cross-floor investigation (`2c9c075`), a reference fix (`fcb92ba`), that fix's own marker re-cut (`0510bae`). Full trail: `handoff/README.md`'s pair table. |
+| **`main`** | **`a416222`** — PR #31 merged at `b813343`, D78 fixed, `0028`'s trim, the extrudability predicate + census + D76 reconciliation (`17f6c01`), the cross-floor investigation (`2c9c075`) and its marker fixes (`fcb92ba`, `0510bae`, `a416222`). Full trail: `handoff/README.md`'s pair table. |
 | **Branches** | **`shower-identity-redraws`** — [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32), AMBER, awaiting Patrick's check; ahead of this snapshot (carries `0033`–`0036-report.md`, a new fragmented-symbols defect record, the working-distance camera — none yet on `main`). `d74-vessel-enclosure-split` merged, kept, not live. |
 | **Gate** | local on `main`: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **727 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI confirmed green on every `main` push through `17f6c01`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **79 records on `main`**, **30 open** (the redraw branch's own new fragmented-symbols record exists there only, not yet merged). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
