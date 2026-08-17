@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 5d61f1f -->
+<!-- SNAPSHOT-HEAD: 7332716 -->
 
 # Session snapshot — read this first
 
@@ -86,10 +86,20 @@ committed GREEN at `5d61f1f`. Full trail:
 [`handoff/0043-report.md`](handoff/0043-report.md) (numbered `0043`, not
 `0042` — [`handoff/0042-ruling.md`](handoff/0042-ruling.md), Patrick's own
 CI-lane ruling, landed on disk mid-recovery and took the number first).
-**Owed next, ahead of
-any new topic:** [`handoff/0040-ruling.md`](handoff/0040-ruling.md) §4's
-cherry-pick of `0033`–`0036-report.md` from `shower-identity-redraws` onto
-`main` — it gates the next handoff number.
+
+**[`handoff/0044-ruling.md`](handoff/0044-ruling.md) set the order for
+everything owed after the recovery** — push, the mailbox cherry-pick, a gate
+flap receipt, `0042`'s CI-lane move, `0043`'s hook split, then the DXF
+integration last, on a fresh context. **Done in this commit:** the
+`0033`–`0036-report.md` cherry-pick from `shower-identity-redraws` (the
+mailbox hole `0040` §4 first named is closed) and the flap receipt (gate run
+twice on one unchanged tree, identical both times — no flap measured). Full
+trail: [`handoff/0046-report.md`](handoff/0046-report.md). **`push`, the
+CI-lane move and the hook split are held for Patrick's explicit go-ahead**
+(push and infrastructure edits, per CLAUDE.md's own etiquette) rather than
+acted on under `0044`'s GREEN tier alone. [`handoff/0045-ruling.md`](handoff/0045-ruling.md)
+landed alongside — a correction to how Patrick's own shower check is run
+(against the wrong branch), tier NONE, no action item for Code.
 
 ---
 
@@ -201,7 +211,7 @@ and the golden-file test the sample makes nearly free. Ordered behind item
 
 | | |
 |---|---|
-| **`main`** | **`5d61f1f`** — PR #31 merged at `b813343`, D78 fixed, `0028`'s trim, the extrudability predicate + census + D76 reconciliation (`17f6c01`), the cross-floor investigation (`2c9c075`) and its marker fixes (`fcb92ba`, `0510bae`, `a416222`), and the `fp2dxf` recovery (`5d61f1f`). Full trail: `handoff/README.md`'s pair table. |
+| **`main`** | **`7332716`** — PR #31 merged at `b813343`, D78 fixed, `0028`'s trim, the extrudability predicate + census + D76 reconciliation (`17f6c01`), the cross-floor investigation (`2c9c075`) and its marker fixes (`fcb92ba`, `0510bae`, `a416222`), the `fp2dxf` recovery (`5d61f1f`), and the `0043` renumbering + snapshot re-cut (`7332716`). **Unpushed — 2 ahead of `origin/main`, held for Patrick's go-ahead.** Full trail: `handoff/README.md`'s pair table. |
 | **Branches** | **`shower-identity-redraws`** — [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32), AMBER, awaiting Patrick's check; ahead of this snapshot (carries `0033`–`0036-report.md`, a new fragmented-symbols defect record, the working-distance camera — none yet on `main`). `d74-vessel-enclosure-split` merged, kept, not live. |
 | **Gate** | local on `main`: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **727 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI confirmed green on every `main` push through `17f6c01`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **79 records on `main`**, **30 open** (the redraw branch's own new fragmented-symbols record exists there only, not yet merged). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
