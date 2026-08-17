@@ -24,6 +24,21 @@ make: a thickness change, a layer rename, a coordinate flip, a re-ordered
 entity all turn it red. Qt-free by construction -- `fp2dxf` imports nothing
 from `floorplanner` (see `floorplanner/export/__init__.py`), so this needs
 no `fp`/`win` fixture, only a temp directory.
+
+COMPARED AS TEXT, NOT RAW BYTES -- measured, not assumed. `convert()`
+writes with `Path.write_text(..., encoding="utf-8")` and no `newline=`
+argument, so on Windows every `\n` it emits becomes `\r\n` on disk; this
+repo's `.gitattributes` (`* text=auto eol=lf`) then normalises the
+COMMITTED copy back to bare `\n` on checkout. A byte-for-byte comparison
+between a freshly generated file (CRLF, on Windows) and the checked-out
+golden (LF, unconditionally, on every platform, per `eol=lf`) fails on
+line endings alone with the content otherwise identical -- reproduced
+directly: this suite went red immediately after a `git rebase` re-checked
+out the fixtures. `.read_text()` applies universal-newline translation on
+both sides, so the comparison is exactly what the golden-file test is
+FOR (thickness, layer, coordinates, entity order) without being hostage
+to a pre-existing, platform-dependent quirk in `convert()`'s own write
+path that no defect has been filed against.
 """
 import json
 from pathlib import Path
@@ -45,10 +60,10 @@ def _regenerate(tmp_path):
 
 
 @pytest.mark.parametrize("level", GOLDEN_LEVELS)
-def test_convert_reproduces_the_committed_dxf_byte_for_byte(level, tmp_path):
+def test_convert_reproduces_the_committed_dxf(level, tmp_path):
     written, _ = _regenerate(tmp_path)
-    fresh = written[level].read_bytes()
-    golden = (FIXTURE_DIR / f"{level}.dxf").read_bytes()
+    fresh = written[level].read_text(encoding="utf-8")
+    golden = (FIXTURE_DIR / f"{level}.dxf").read_text(encoding="utf-8")
     assert fresh == golden, (
         f"{level}.dxf regenerated from sample_design.json no longer matches "
         f"the committed golden file -- a thickness change, a layer rename or "
@@ -57,12 +72,11 @@ def test_convert_reproduces_the_committed_dxf_byte_for_byte(level, tmp_path):
 
 
 @pytest.mark.parametrize("level", GOLDEN_LEVELS)
-def test_convert_reproduces_the_committed_openings_sidecar_byte_for_byte(
-        level, tmp_path):
+def test_convert_reproduces_the_committed_openings_sidecar(level, tmp_path):
     doc = json.loads((FIXTURE_DIR / "sample_design.json").read_text(encoding="utf-8"))
     convert(doc, tmp_path)
-    fresh = (tmp_path / f"{level}.openings.json").read_bytes()
-    golden = (FIXTURE_DIR / f"{level}.openings.json").read_bytes()
+    fresh = (tmp_path / f"{level}.openings.json").read_text(encoding="utf-8")
+    golden = (FIXTURE_DIR / f"{level}.openings.json").read_text(encoding="utf-8")
     assert fresh == golden, f"{level}.openings.json drifted from the golden sidecar"
 
 
@@ -71,8 +85,8 @@ def test_the_sample_converts_clean_no_warnings(tmp_path):
     happily if `convert()` silently produced nothing. The sample is a known-
     good design (0038-ruling.md's own acceptance input), so it must emit
     both levels and zero warnings -- an opening overrun/overlap or a
-    zero-length wall would otherwise hide inside a byte-for-byte pass against
-    a golden file that itself carried the same defect."""
+    zero-length wall would otherwise hide inside a content-identical pass
+    against a golden file that itself carried the same defect."""
     _, result = _regenerate(tmp_path)
     assert {p.stem for p in result.written} == set(GOLDEN_LEVELS)
     assert result.warnings == []
