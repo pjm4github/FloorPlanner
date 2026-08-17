@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 17f6c01 -->
+<!-- SNAPSHOT-HEAD: 8904d9e -->
 
 # Session snapshot — read this first
 
@@ -75,43 +75,50 @@ one line per exchange: [`handoff/README.md`](handoff/README.md)'s pair table,
 (tooling gap, open), D78 (closed).
 
 **THE THREE REDRAWS ARE BUILT — branch `shower-identity-redraws`, AMBER, AT A
-PR.** [`handoff/0033-report.md`](handoff/0033-report.md) opens it. All three
-marks are `build_prism` `beside` shapes (per `0032`'s D76 finding, not nested
-regions); before/after renders in place at
-[`shower-glance-check.json`](../fixtures/shower-glance-check.json)'s own
-camera. **One honest limit named in the report, not hidden**: the marks read
-clearly up close, more subtly at the check's own room-scale camera —
-Patrick's to judge. See THE QUEUE below.
+PR (#32).** [`handoff/0033-report.md`](handoff/0033-report.md) opened it;
+[`0034-ruling.md`](handoff/0034-ruling.md) withdrew `0030`'s D76-contradiction
+claim (the mesh measurement stands) and named the check as **two questions**:
+does it read at a glance, and is the camera working distance. Both now
+answered with evidence: room-scale renders (`0031`'s original camera, for
+comparability) AND working-distance renders (furnishings' own bbox, for the
+actual glance test) are both on record —
+[`handoff/0036-report.md`](handoff/0036-report.md). **At working distance the
+marks are unambiguous.** [D79](defects/0079-six-catalog-symbols-extrude-as-disconnected.md)
+filed for the six fragmented items the predicate found beyond `boat_trailer`.
+See THE QUEUE below.
 
 ---
 
 ## THE QUEUE
 
-1. **THE EXTRUDABILITY PREDICATE — BUILT, GREEN.** `floorplanner/viewer/fp3d.py:extrudability()`
-   plus `tests/test_extrudability.py`, three predicates from
-   [`handoff/0029-ruling.md`](handoff/0029-ruling.md) §2. **Census result:**
-   only `glass_shower` has zero closed filled shapes; `boat_trailer` plus six
-   MORE items (`motorcycle`, `bicycle`, `garden_tractor`, `riding_mower_snow`,
-   `drill_press`, `water_softener`) have a fragmented body, exempted by name
-   in the test pending a ruling on filing; 73 of 95 have a body with no
-   internal region. **D76 reconciliation** ([`0030`](handoff/0030-ruling.md)
-   §4): `walk_in_shower`'s bench is fully contained in the body on all three
-   axes — D76 stands, unamended. **Consequence: a region-shaped mark
-   (nested) inherits D76's invisibility whenever the body is translucent; a
-   `beside` mark (a second top-level ring, sharing the body's material,
-   never enclosed) does not** — the redraw brief is `beside` shapes, not
-   regions. Full detail: [`0032-report.md`](handoff/0032-report.md).
-2. **THE ARTWORK REDRAWS — BUILT, AT A PR, AWAITING THE CHECK.** `shower`
-   and `glass_shower` gain a filled door leaf (`glass_shower` also gains its
-   first-ever filled body); `walk_in_shower` gains a fixed glass panel at
-   the opening, alongside its already-correct, already-invisible bench. All
-   three: `build_prism` `beside` shapes, not regions. Before/after:
+1. **THE EXTRUDABILITY PREDICATE — BUILT, GREEN, MERGED TO `main`.**
+   `floorplanner/viewer/fp3d.py:extrudability()` plus `tests/test_extrudability.py`,
+   three predicates from [`handoff/0029-ruling.md`](handoff/0029-ruling.md) §2.
+   **D76 reconciliation** ([`0030`](handoff/0030-ruling.md) §4, confirmed not
+   withdrawn by [`0034`](handoff/0034-ruling.md) §1): `walk_in_shower`'s bench
+   is fully contained in the body on all three axes — D76 stands, unamended.
+   **Consequence: a region-shaped mark (nested) inherits D76's invisibility
+   whenever the body is translucent; a `beside` mark does not** — the redraw
+   brief is `beside` shapes, not regions. [D79](defects/0079-six-catalog-symbols-extrude-as-disconnected.md)
+   filed for the six fragmented items beyond `boat_trailer` (`0034` §5); the
+   3% connectivity tolerance's raw values printed and land in the test's own
+   docstring (`0034` §4 — nothing sits between ~1% and 3%). Full detail:
+   [`0032`](handoff/0032-report.md) · [`0036-report.md`](handoff/0036-report.md).
+2. **THE ARTWORK REDRAWS — BUILT, AT A PR (#32), AWAITING THE CHECK.**
+   `shower` and `glass_shower` gain a filled door leaf (`glass_shower` also
+   gains its first-ever filled body); `walk_in_shower` gains a fixed glass
+   panel at the opening, alongside its already-correct, already-invisible
+   bench. All three: `build_prism` `beside` shapes, not regions. **Two
+   cameras, both on record** (`0034` §2): room-scale (comparability) —
    [`before`](evidence/shower-glance-before.png) ·
-   [`after`](evidence/shower-glance-after.png), same fixture
-   ([`shower-glance-check.json`](../fixtures/shower-glance-check.json)),
-   same camera. Full build notes, including the honest zoom-level limit:
-   [`handoff/0033-report.md`](handoff/0033-report.md). Brief:
-   [`handoff/0016-ruling.md`](handoff/0016-ruling.md) §2–3.
+   [`after`](evidence/shower-glance-after.png) — and working-distance (the
+   actual glance test) —
+   [`before`](evidence/shower-glance-working-distance-before.png) ·
+   [`after`](evidence/shower-glance-working-distance-after.png), reproducible
+   via `docs/evidence/shower_glance_working_distance.py`. **At working
+   distance the marks are unambiguous.** Full build notes:
+   [`0033`](handoff/0033-report.md) · [`0036-report.md`](handoff/0036-report.md).
+   Brief: [`handoff/0016-ruling.md`](handoff/0016-ruling.md) §2–3.
 3. **[`handoff/0019-ruling.md`](handoff/0019-ruling.md)'s status board — GREEN,
    read-back first, priority lowered by [`0029`](handoff/0029-ruling.md) §6**
    (Patrick has a Cowork skill rendering the same state on demand — a VIEW,
@@ -134,16 +141,31 @@ loft** are not in this queue — both behind a read-back, design at
 [`floorplanner/viewer/VIEWER_NOTES.md`](../floorplanner/viewer/VIEWER_NOTES.md)
 §5.
 
+**[`handoff/0035-ruling.md`](handoff/0035-ruling.md) — Patrick's own report,
+not started, does not displace items 1–4 above.** Two items: **cross-floor
+snapping** (a wall on the working floor sometimes snaps to a hidden floor's
+geometry) — the obvious query paths already filter by floor, so the census
+must test BOTH a missing filter (hypothesis A) and mis-tagged floor data
+that every filter would pass correctly (hypothesis B, the one a query census
+cannot see); a reproduction plan is owed first, dropped in
+`fixtures/incoming/`; check whether [D67](defects/0067-selection-is-not-scoped-to-the-active-floor.md)
+is the same root before filing new. **Per-floor totals** (feature, AMBER,
+accepted in shape) — blocked on open [D55](defects/0055-area-totals-double-count-overlapping.md)
+(totals double-count overlapping rooms), which must be fixed first or as
+part of this, per D15's debounce constraint (one bucketed pass, not one scan
+per floor). The GREEN measurement (census + floor-tag dump) may start
+without touching the redraw branch.
+
 ---
 
 ## 1. Where the work stands
 
 | | |
 |---|---|
-| **`main`** | **`17f6c01`** — PR #31 merged at `b813343`, D78 fixed (`168190f`, `db09acf`), `0028`'s trim (`156135f`), the extrudability predicate + census + D76 reconciliation (`17f6c01`). Full trail: `handoff/README.md`'s pair table. |
-| **Branches** | **`shower-identity-redraws`** — the three redraws, AMBER, AT A PR, awaiting Patrick's check. `d74-vessel-enclosure-split` merged and kept, not live. |
-| **Gate** | local on this branch: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **727 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI confirmed green on `main`@`17f6c01`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **79 records**, **30 open**. D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
+| **`main`** | still **`17f6c01`**, unmoved — PR #31 merged at `b813343`, D78 fixed (`168190f`, `db09acf`), `0028`'s trim (`156135f`), the extrudability predicate + census + D76 reconciliation (`17f6c01`). This branch (`shower-identity-redraws`) is now at **`8904d9e`**: the three redraws, plus `0034`'s working-distance camera, raw values and D79 (this commit, landing on top of `8904d9e`). Full trail: `handoff/README.md`'s pair table. |
+| **Branches** | **`shower-identity-redraws`** — [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32), AMBER, awaiting Patrick's check. `d74-vessel-enclosure-split` merged and kept, not live. |
+| **Gate** | local on this branch: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **727 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI confirmed green on `main`@`17f6c01` and on PR #32's prior commit. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Records** | **80 records**, **31 open**. D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`; [D79](defects/0079-six-catalog-symbols-extrude-as-disconnected.md) six fragmented catalog symbols, one record, `bicycle` cited to `0013-ruling.md`, three pointed at the vehicle loft, two open. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |

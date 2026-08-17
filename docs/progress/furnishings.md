@@ -694,3 +694,54 @@ THE THREE REDRAWS, BUILT  2026-08-16  (AMBER, at a PR)
          (walk_in_shower still RAISED, whirlpool still WELL) -- the
          vessel/enclosure classification this task did not touch.
 ```
+
+0034'S FOUR ACTION ITEMS -- CAMERA, RAW VALUES, D79 FILED  2026-08-16  (GREEN, on the redraw branch)
+         handoff: 0034 (ruling), 0036 (report)
+         branch:  shower-identity-redraws (same PR as the redraws)
+         files:   docs/evidence/shower_glance_working_distance.py (new)
+                  docs/evidence/shower-glance-working-distance-before.png
+                  docs/evidence/shower-glance-working-distance-after.png
+                  fixtures/README.md (row expanded, both cameras documented)
+                  docs/defects/0079-*.md (new)
+                  tests/test_extrudability.py (exemption reasons, docstring)
+
+         0030'S D76-CONTRADICTION CLAIM WITHDRAWN BY THE REVIEWER (0034
+         SS1) on the strength of 0032's own mesh measurement -- no code
+         or doc change needed here, D76 already stood unamended.
+
+         THE WORKING-DISTANCE CAMERA. fp3d.py's CLI has no camera-
+         distance flag -- make_view() always auto-fits the WHOLE model,
+         walls included, which for this fixture is a 348in x 138in room.
+         The new evidence script builds the view normally then re-points
+         the pivot and distance at the FURNISHINGS' own bounding box.
+         Before-shot obtained by temporarily copying the three pre-
+         redraw SVGs from main over the working tree, rendering, then
+         `git checkout --` to restore -- a one-time historical shot, not
+         a reproducible script (the after-shot script is; re-run it
+         after any future redraw of these three symbols). AT THIS
+         DISTANCE THE MARKS ARE UNAMBIGUOUS -- a protruding leaf on each
+         of the three, clearly a different tone from the body. Both
+         cameras stay on the record (0031's room-scale one still answers
+         the comparability question); fixtures/README.md's row documents
+         both and how each is reproduced.
+
+         THE 3% TOLERANCE'S RAW VALUES, PRINTED (0034 SS4): closest-pair
+         bounding-box gap for every catalog item with 2+ top-level
+         shapes, as a percentage of the viewBox's smaller dimension.
+         Nothing sits between roughly 1% and 3% -- jointer at 2.75% is
+         the closest item still called connected, water_softener at
+         8.33% is the closest still called disconnected, a 5.6-point
+         margin either side. Landed in the test's own docstring so the
+         receipt travels with the assertion.
+
+         D79 FILED, one record for six items (0034 SS5), not six
+         records: motorcycle/garden_tractor/riding_mower_snow cite
+         0012-ruling.md's own vehicle finding (3 of 10 built cleanly)
+         and point at the vehicle loft, same as boat_trailer's existing
+         disposition. bicycle closes by citation to 0013-ruling.md SS3
+         ("stays as it is ... a bicycle IS thin") rather than reopening
+         it. drill_press and water_softener left open -- not vehicle
+         form, no existing disposition, real gaps (9.6% and 5.4%) not
+         rounding noise. Test's exemption reasons updated from "not yet
+         ruled" to cite D79 or 0013-ruling.md by name.
+```
