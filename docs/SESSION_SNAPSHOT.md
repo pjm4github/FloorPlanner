@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: a416222 -->
+<!-- SNAPSHOT-HEAD: 5d61f1f -->
 
 # Session snapshot — read this first
 
@@ -78,6 +78,19 @@ one line per exchange: [`handoff/README.md`](handoff/README.md)'s pair table,
 is reconciled (stands, unamended). See THE QUEUE below and
 [`handoff/0032-report.md`](handoff/0032-report.md) for the full receipt.**
 
+**A recovery landed 2026‑08‑17** — Code hit its context limit before a
+checkpoint; the gate was GREEN at the limit, so it cost one commit, not a
+lost session. Gate re-run found and fixed one new finding (`B905`), then
+committed GREEN at `5d61f1f`. Full trail:
+[`handoff/0041-ruling.md`](handoff/0041-ruling.md),
+[`handoff/0043-report.md`](handoff/0043-report.md) (numbered `0043`, not
+`0042` — [`handoff/0042-ruling.md`](handoff/0042-ruling.md), Patrick's own
+CI-lane ruling, landed on disk mid-recovery and took the number first).
+**Owed next, ahead of
+any new topic:** [`handoff/0040-ruling.md`](handoff/0040-ruling.md) §4's
+cherry-pick of `0033`–`0036-report.md` from `shower-identity-redraws` onto
+`main` — it gates the next handoff number.
+
 ---
 
 ## THE QUEUE
@@ -122,6 +135,14 @@ is reconciled (stands, unamended). See THE QUEUE below and
    clause-by-clause EXISTS/PARTIAL/ABSENT, thresholds with reasons, the shift
    modifier audit, the angle convention already in the geometry code, and
    Ctrl's disposition. Spec: [`ROADMAP.md`](ROADMAP.md) A6.
+5. **`Docs-Snapshot` moves out of the `pull_request` CI lane — GREEN, not yet
+   done.** [`handoff/0042-ruling.md`](handoff/0042-ruling.md): the only check
+   this project's CI has ever failed on when the code itself was fine; it
+   reads git topology (`HEAD~1`), which a merge-ref reshapes, while the local
+   commit hook already prevents a stale marker from landing at all. Stays on
+   push-to-`main` and the local full gate; comes out of `pull_request`. Not
+   yet actioned — a workflow-file change, flagged rather than done inline
+   with the recovery it arrived beside.
 
 **Full tiered queue (A2–A5, the command-roster census, Phase 5's remainder,
 etc.):** [`ROADMAP.md`](ROADMAP.md) §3. **`boat_trailer` and the vehicle
@@ -153,20 +174,20 @@ note; one handoff old, not yet two.
 > fixes. Numbering continues forward from `0038`.
 
 **`fp2dxf` (a v5 → Chief Architect DXF exporter, built outside this repo) —
-[`0038-ruling.md`](handoff/0038-ruling.md), AMBER, BLOCKED BEFORE IT CAN
-START.** Accepted in principle: pure stdlib, a clean `convert()` API, a real
-differential-receipt finding (both doors import as windows). Owes, once
-unblocked: thickness rewired to read `STD_T` rather than carrying its own
-(disagreeing) copy — the D73/D74 disease again, one column carrying a real
-quantity AND a Chief-type mapping — three library-hygiene fixes (`SystemExit`
-inside `convert()`, `print()` as the only progress channel, no explicit file
-encoding), a README split (handoff spec vs. user docs), and a golden-file
-test the shipped sample already makes nearly free. **`fp2dxf.py` itself,
-its README, sample input/output and screenshots are not anywhere in this
-repository** — checked exhaustively
-([`0039-report.md`](handoff/0039-report.md)) — so none of it can start until
-dropped somewhere readable. Ordered behind item 2's check and the
-cross-floor work above, per `0038`'s own tier.
+[`0038-ruling.md`](handoff/0038-ruling.md), AMBER, package now landed at
+`floorplanner/export/`.** Accepted in principle: pure stdlib, a clean
+`convert()` API, a real differential-receipt finding (both doors import as
+windows). **Measured done, per [`0043-report.md`](handoff/0043-report.md):**
+thickness reads `STD_T` by path (the D73/D74 disease closed, not repeated),
+and all three library-hygiene fixes (`SystemExit` → a catchable `ValueError`,
+`print()` confined to the CLI entry point with `convert()` returning
+warnings/summary on `ConvertResult`, explicit `utf-8` on both writes). **Still
+owed:** the zip (`handoff/0038-fp2dxf-handoff.zip`) is unpacked and deleted in
+the same commit — its `sample/`, `screenshots/` and `README.md` are not yet
+anywhere in the repo tree — then a README split (handoff spec vs. user docs)
+and the golden-file test the sample makes nearly free. Ordered behind item
+2's check, the cross-floor work above, and now [`0040-ruling.md`](handoff/0040-ruling.md)
+§4's cherry-pick, per that ruling's own tier.
 
 > **A second numbering collision, same session:
 > [`handoff/0038-ruling.md`](handoff/0038-ruling.md) and this session's own
@@ -180,7 +201,7 @@ cross-floor work above, per `0038`'s own tier.
 
 | | |
 |---|---|
-| **`main`** | **`a416222`** — PR #31 merged at `b813343`, D78 fixed, `0028`'s trim, the extrudability predicate + census + D76 reconciliation (`17f6c01`), the cross-floor investigation (`2c9c075`) and its marker fixes (`fcb92ba`, `0510bae`, `a416222`). Full trail: `handoff/README.md`'s pair table. |
+| **`main`** | **`5d61f1f`** — PR #31 merged at `b813343`, D78 fixed, `0028`'s trim, the extrudability predicate + census + D76 reconciliation (`17f6c01`), the cross-floor investigation (`2c9c075`) and its marker fixes (`fcb92ba`, `0510bae`, `a416222`), and the `fp2dxf` recovery (`5d61f1f`). Full trail: `handoff/README.md`'s pair table. |
 | **Branches** | **`shower-identity-redraws`** — [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32), AMBER, awaiting Patrick's check; ahead of this snapshot (carries `0033`–`0036-report.md`, a new fragmented-symbols defect record, the working-distance camera — none yet on `main`). `d74-vessel-enclosure-split` merged, kept, not live. |
 | **Gate** | local on `main`: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **727 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI confirmed green on every `main` push through `17f6c01`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **79 records on `main`**, **30 open** (the redraw branch's own new fragmented-symbols record exists there only, not yet merged). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
