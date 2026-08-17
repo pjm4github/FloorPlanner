@@ -634,3 +634,51 @@ D72 -- THE IMPORT-TIME ASSET WRITE, FIXED  2026-08-15  (GREEN, auto-merged)
          top is untouched, per the ruling -- it is the channel contract,
          not a copy of anything.
 ```
+
+D67-ADJACENT CROSS-FLOOR INVESTIGATION -- 0037's SUSPECT REFUTED  2026-08-17  (GREEN, measurement only, no code changed)
+         handoff: 0035 (ruling, Patrick's report), 0036-ruling.md (ruling,
+                  the snap-vs-paint discriminator -- COLLIDES with this
+                  session's own 0036-report.md, both committed, not
+                  renamed), 0037 (ruling, names a suspect), 0038 (report)
+         files:   none -- inspection plus a headless probe against an
+                  existing fixture, no assertion added
+
+         0037 SS2 CLAIMED the v5 load path calls set_floor_state(active=...)
+         and nothing else, so apply_floor_visibility (reachable only
+         through _sync_floor_state()) never runs after a load -- and named
+         that as the single cause of both the "wrong after release" and
+         "light gray bleed through" symptoms.
+
+         MEASURED, AND IT DOES NOT HOLD. apply_design_to_scene
+         (floorplanner/design/bridge.py:1265-1266) already calls
+         win._sync_floor_state() -- present since 2026-07-26 (git blame,
+         commit 2678ff5), three weeks before the report. Loaded Patrick's
+         own submitted plan (fixtures/incoming/crossfloor-snap-2026-08-17.json)
+         headless through the real MainWindow.open_document(): with
+         default settings, the upper floor comes out fully hidden and
+         disabled (0/45 visible, 0/45 enabled), the default floor fully
+         visible and enabled (106/106 each); with show_other_floors
+         pre-set True (simulating carried-over session state), the upper
+         floor ghosts correctly -- visible, gray, disabled. Neither run
+         reproduces anything reported.
+
+         REOPENS 0036's own document-diff discriminator (save before the
+         gesture, make it, save after, diff the files), never run --
+         still needed, and still blocked on facts neither ruling nor the
+         intake file states: was show_others actually on when it
+         happened, and did the wall stay moved after release. The intake
+         file has no .txt companion note. Does not touch 0035's
+         hypothesis A (a query path with no floor filter) at all --
+         genuinely still open if geometry turns out to have moved.
+
+         ALSO CHECKED SS5's more general claim (a derived property with
+         one manual call site): all three bare set_floor_state() calls
+         found (levels.py:50 -- inside _sync_floor_state itself;
+         planio.py:236 in apply_project_to_scene, which also calls
+         _sync_floor_state() at line 313; bridge.py:1134 in
+         apply_design_to_scene, which also calls it at line 1265) are
+         each followed, in the same function, by the complete sync. The
+         enumeration is still worth finishing properly, but none of the
+         three found here is the missing-invalidation case the rule
+         warns about.
+```

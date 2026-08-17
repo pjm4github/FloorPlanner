@@ -31,9 +31,10 @@ reconcile. An unreconciled sum is a defect (a test counted twice, as
 `test_a_clipped_band_leaves_every_room_coherent` was under `deep`), not a
 rounding difference, so it is treated as red.
 
-    python tools/gate.py            # ruff + OFF + ON + DEEP
-    python tools/gate.py --quick    # ruff + OFF only
-    python tools/gate.py --deep     # ruff + DEEP only -- what CI's deep job runs
+    python tools/gate.py            # ruff + OFF + ON + DEEP -- unlocks a PUSH
+    python tools/gate.py --quick    # ruff + OFF only -- unlocks a COMMIT, not a push
+    python tools/gate.py --deep     # ruff + DEEP only -- what CI's deep job runs;
+                                    # writes no result, unlocks neither event
     python tools/gate.py --perf     # the timing lane, explicitly (P3.8)
     python tools/gate.py --docs     # the record lane: defect front matter,
                                     # the generated index, every defect
@@ -41,6 +42,14 @@ rounding difference, so it is treated as red.
     python tools/gate.py --trailer  # re-print the last full-mode trailer,
                                     # verbatim, for redirection into a commit
                                     # message file -- NEVER retype it
+
+THE COMMIT/PUSH SPLIT (0043/0047-ruling.md SS4): `.gate-result.json` now
+carries a `"mode"` field, `"quick"` or `"full"`. `.claude/hooks/verify_gate.py`
+accepts either mode, GREEN and fresh, to unlock a `git commit`; a `git push`
+requires `mode == "full"` specifically. The strength moved, not shrank: what
+still needs a full 3x-suite run before it can reach `origin`, CI or a PR is
+unchanged -- only the twenty private, never-pushed intermediate commits a
+series gets split into stop paying that tax individually.
 
 THE DOCS LANE IS ITS OWN LANE, like `--perf`, and deliberately NOT part of the
 default block. The trailer above is pasted verbatim into commit messages, so its
@@ -209,6 +218,38 @@ def _end_assignments() -> tuple:
 SNAPSHOT = "docs/SESSION_SNAPSHOT.md"
 SNAPSHOT_MARK = re.compile(r"<!--\s*SNAPSHOT-HEAD:\s*([0-9a-f]{7,40})\s*-->")
 SNAPSHOT_ROW = re.compile(r"^\|\s*\*\*`main`\*\*\s*\|(.*)$", re.M)
+
+
+def _snapshot_check():
+    """(n_snap, field) -- `_snapshot_head()`, skipped in the `pull_request` lane.
+
+    0042-ruling.md: `Docs-Snapshot` is the only check in this project's CI that
+    has ever failed when the code itself was fine, and it is the only one that
+    reads git TOPOLOGY (`HEAD`, `HEAD~1`) rather than the tree -- and CI
+    reshapes topology by design. On a `pull_request` trigger `HEAD` is a
+    SYNTHETIC merge-ref (`refs/pull/N/merge`) that never existed as a real
+    working tree, so the check is answering a question about a commit nobody
+    made. The commit hook already refuses a stale marker before it can be
+    committed at all, so nothing reaches `main`, `origin` or a push-triggered
+    CI run without having passed this check first -- the PR lane's copy adds
+    no coverage the hook did not already provide, only a false alarm shape.
+
+    THE SKIP LIVES HERE, NOT INSIDE `_snapshot_head()`. That keeps
+    `_snapshot_head()` and `_snapshot_checkout_base()` -- and every existing
+    `tests/test_gate.py` case that calls them directly -- exercising the real
+    merge-ref logic unchanged (0027-ruling.md SS4's positive/negative control
+    pair, kept per 0042-ruling.md SS4: "do not lose it in the move"). Only the
+    two CALL SITES (`main()`, `_docs()`) skip, so a deliberately stale marker
+    still goes RED wherever the check actually runs -- push-to-`main`, the
+    local full gate, or a direct call to `_snapshot_head()` in a test.
+    """
+    if os.environ.get("GITHUB_EVENT_NAME") == "pull_request":
+        print("Docs-Snapshot: skipped -- pull_request lane (0042-ruling.md: "
+              "the check reads git topology a merge-ref reshapes; the commit "
+              "hook already refuses a stale marker before it can be committed)")
+        return 0, "skipped"
+    n = _snapshot_head()
+    return n, ("stale" if n else "current")
 
 
 def _snapshot_head() -> int:
@@ -406,7 +447,8 @@ def _docs() -> int:
         ("Docs-Refs", ["tools/ref_audit.py", "--strict-ids"]),
         ("Docs-GitHub", ["tools/defects_to_github.py", "--dry-run"]),
     ]
-    bad = bool(_snapshot_head())
+    n_snap, snap_field = _snapshot_check()
+    bad = bool(n_snap)
     for label, cmd in checks:
         rc, out = _run_script(cmd)
         bad = bad or rc != 0
@@ -419,9 +461,9 @@ def _docs() -> int:
                     if "DRY RUN" in ln]
         for ln in keep[:12 if rc else 4]:
             print(ln)
-    note = "" if bad else (" (snapshot current, records valid, index current, "
-                           "every defect reference resolves, migration dry run "
-                           "clean)")
+    note = "" if bad else (f" (snapshot {snap_field}, records valid, index "
+                           "current, every defect reference resolves, "
+                           "migration dry run clean)")
     print(f"Docs-Verdict: {'RED' if bad else 'GREEN'}{note}")
     return 1 if bad else 0
 
@@ -429,8 +471,8 @@ def _docs() -> int:
 RESULT = ".gate-result.json"             # gitignored; see _write_result
 
 
-def _write_result(bad, collected, ruff, n_vac, n_end, lines) -> None:
-    """Leave the verdict ON DISK, for the commit hook to read.
+def _write_result(bad, collected, ruff, n_vac, n_end, lines, mode) -> None:
+    """Leave the verdict ON DISK, for the commit/push hook to read.
 
     THE HOOK CHECKS THIS FILE, NEVER THE COMMIT MESSAGE, and that is the whole
     design. Three of the four incidents behind the hook were a CLAIM about a
@@ -443,14 +485,20 @@ def _write_result(bad, collected, ruff, n_vac, n_end, lines) -> None:
     different things -- "you did not run it" and "you ran it and it failed" --
     and a guard that cannot tell them apart teaches people to delete the file.
 
-    Only a FULL-MODE run writes it. `--quick` skips two of the three gates and
-    `--deep` skips two others; letting either satisfy the hook would make the
-    guard weaker than the thing it guards.
+    `mode` IS `"quick"` OR `"full"` -- 0043-ruling.md SS4 / 0047-ruling.md SS4,
+    the hook split. `--quick` (ruff + OFF only) now writes too, so it can
+    unlock a COMMIT -- a private, un-pushed tree costs nothing if it turns out
+    wrong. `--deep` still writes nothing: it is CI's own job (defect 27), not
+    a local development mode, and was never the thing either event's guard was
+    supposed to accept. The HOOK is what still requires `mode == "full"` for a
+    PUSH specifically -- this function just records which one ran; it does not
+    itself decide what any event may accept.
     """
     import json
     import time
     payload = {
         "verdict": "RED" if bad else "GREEN",
+        "mode": mode,
         "collected": collected,
         "ruff": ruff,
         "vacuous": n_vac,
@@ -523,16 +571,18 @@ def main() -> int:
 
     n_vac, vac = _vacuity()
     n_end, ends = _end_assignments()
-    # THE SNAPSHOT CHECK RUNS IN FULL MODE, NOT ONLY IN `--docs`, AND THE
-    # DIFFERENCE IS THE WHOLE POINT. The commit hook reads `.gate-result.json`,
-    # which only a full-mode run writes; `--docs` prints its own verdict and
-    # writes nothing. A staleness check living only in the docs lane would be
+    # THE SNAPSHOT CHECK RUNS HERE (both `--quick` and full mode), NOT ONLY IN
+    # `--docs`, AND THE DIFFERENCE IS THE WHOLE POINT. The commit/push hook
+    # reads `.gate-result.json`, which `--quick` and full mode both write now
+    # (0043/0047-ruling.md SS4); `--docs` prints its own verdict and writes
+    # nothing. A staleness check living only in the docs lane would be
     # one more thing nobody runs -- which is the exact failure it exists to
     # close. It costs one file read and one `git rev-parse`.
-    n_snap = _snapshot_head()
+    # `_snapshot_check` (not `_snapshot_head` directly) is what skips it in
+    # the `pull_request` lane -- see that function's docstring, 0042-ruling.md.
+    n_snap, snap_field = _snapshot_check()
     lines = [f"Gate-Census: collected={collected} ruff={ruff} "
-             f"vacuous={n_vac} end_assign={n_end} snapshot="
-             f"{'stale' if n_snap else 'current'}"]
+             f"vacuous={n_vac} end_assign={n_end} snapshot={snap_field}"]
     bad = rc != 0 or n_vac > 0 or n_end > 0 or n_snap > 0
     if vac:
         print("Unfailable assertions (vacuous by tautology):")
@@ -560,8 +610,12 @@ def main() -> int:
                  f"{'' if bad else ' (every sum reconciles against --collect-only)'}")
 
     print("\n".join(lines))
-    if not quick and not deep_only:      # full mode only -- see the docstring
-        _write_result(bad, collected, ruff, n_vac, n_end, lines)
+    # `--deep` writes nothing (CI's own job, defect 27 -- never a local
+    # development mode). `--quick` and full mode both write now, tagged by
+    # which one ran; see `_write_result`'s docstring (0043/0047-ruling.md SS4).
+    if not deep_only:
+        _write_result(bad, collected, ruff, n_vac, n_end, lines,
+                      "quick" if quick else "full")
     return 1 if bad else 0
 
 

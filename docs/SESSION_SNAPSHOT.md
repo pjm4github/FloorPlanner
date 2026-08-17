@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 8904d9e -->
+<!-- SNAPSHOT-HEAD: 6a22aee -->
 
 # Session snapshot — read this first
 
@@ -87,6 +87,43 @@ marks are unambiguous.** [D79](defects/0079-six-catalog-symbols-extrude-as-disco
 filed for the six fragmented items the predicate found beyond `boat_trailer`.
 See THE QUEUE below.
 
+**A recovery landed 2026‑08‑17** — Code hit its context limit before a
+checkpoint; the gate was GREEN at the limit, so it cost one commit, not a
+lost session. Gate re-run found and fixed one new finding (`B905`), then
+committed GREEN at `5d61f1f`. Full trail:
+[`handoff/0041-ruling.md`](handoff/0041-ruling.md),
+[`handoff/0043-report.md`](handoff/0043-report.md) (numbered `0043`, not
+`0042` — [`handoff/0042-ruling.md`](handoff/0042-ruling.md), Patrick's own
+CI-lane ruling, landed on disk mid-recovery and took the number first).
+
+**[`handoff/0044-ruling.md`](handoff/0044-ruling.md) set the order for
+everything owed after the recovery** — push, the mailbox cherry-pick, a gate
+flap receipt, `0042`'s CI-lane move, `0043`'s hook split, then the DXF
+integration last, on a fresh context. **Done:** the `0033`–`0036-report.md`
+cherry-pick (the mailbox hole `0040` §4 first named is closed) and the flap
+receipt (gate run twice on one unchanged tree, identical both times — no
+flap; Patrick's "seems to be flapping" was the 92.6s of 3x test time, per
+[`0043-ruling.md`](handoff/0043-ruling.md) §1, not nondeterminism, confirmed
+at [`handoff/0047-ruling.md`](handoff/0047-ruling.md) §1). [`0047`](handoff/0047-ruling.md)
+authorised all three held items — push needed no asking (the autonomy policy
+already covers GREEN pushes), the CI-lane move as ruled at `0042`, the hook
+split with four controls instead of one. **Also done:** `main` pushed to
+`origin` (was 3 ahead), the `Docs-Snapshot` check moved out of the
+`pull_request` CI lane ([`handoff/0048-report.md`](handoff/0048-report.md)),
+and the commit hook split — `git commit` accepts a `--quick` or full GREEN
+result, `git push` requires full specifically, 18 new tests against an
+isolated fixture repo covering all 8 cells of `0047`'s table plus
+distinct-message and freshness controls (caught a real pluralisation bug
+before it shipped) — [`handoff/0049-report.md`](handoff/0049-report.md).
+**Everything [`0044`](handoff/0044-ruling.md) §3 / [`0047`](handoff/0047-ruling.md)
+ordered is done except item 6.** [`handoff/0045-ruling.md`](handoff/0045-ruling.md)
+landed alongside — a correction to how Patrick's own shower check is run
+(against the wrong branch), tier NONE, no action item for Code.
+
+**Next: [`0038-ruling.md`](handoff/0038-ruling.md)'s `fp2dxf` DXF integration
+— the big chunk, on a fresh context, per [`0044`](handoff/0044-ruling.md) §3
+item 6 and [`0047`](handoff/0047-ruling.md) §5.** Not started this session.
+
 ---
 
 ## THE QUEUE
@@ -94,31 +131,39 @@ See THE QUEUE below.
 1. **THE EXTRUDABILITY PREDICATE — BUILT, GREEN, MERGED TO `main`.**
    `floorplanner/viewer/fp3d.py:extrudability()` plus `tests/test_extrudability.py`,
    three predicates from [`handoff/0029-ruling.md`](handoff/0029-ruling.md) §2.
+   **Census result:** only `glass_shower` had zero closed filled shapes before
+   the redraw; `boat_trailer` plus six more items (`motorcycle`, `bicycle`,
+   `garden_tractor`, `riding_mower_snow`, `drill_press`, `water_softener`) have
+   a fragmented body, exempted by name pending a ruling on filing — [D79](defects/0079-six-catalog-symbols-extrude-as-disconnected.md)
+   filed for those six (`0034` §5); 73 of 95 have a body with no internal
+   region; the 3% connectivity tolerance's raw values are printed and land in
+   the test's own docstring (`0034` §4 — nothing sits between ~1% and 3%).
    **D76 reconciliation** ([`0030`](handoff/0030-ruling.md) §4, confirmed not
    withdrawn by [`0034`](handoff/0034-ruling.md) §1): `walk_in_shower`'s bench
    is fully contained in the body on all three axes — D76 stands, unamended.
    **Consequence: a region-shaped mark (nested) inherits D76's invisibility
-   whenever the body is translucent; a `beside` mark does not** — the redraw
-   brief is `beside` shapes, not regions. [D79](defects/0079-six-catalog-symbols-extrude-as-disconnected.md)
-   filed for the six fragmented items beyond `boat_trailer` (`0034` §5); the
-   3% connectivity tolerance's raw values printed and land in the test's own
-   docstring (`0034` §4 — nothing sits between ~1% and 3%). Full detail:
-   [`0032`](handoff/0032-report.md) · [`0036-report.md`](handoff/0036-report.md).
-2. **THE ARTWORK REDRAWS — BUILT, AT A PR (#32), AWAITING THE CHECK.**
-   `shower` and `glass_shower` gain a filled door leaf (`glass_shower` also
-   gains its first-ever filled body); `walk_in_shower` gains a fixed glass
-   panel at the opening, alongside its already-correct, already-invisible
-   bench. All three: `build_prism` `beside` shapes, not regions. **Two
-   cameras, both on record** (`0034` §2): room-scale (comparability) —
-   [`before`](evidence/shower-glance-before.png) ·
+   whenever the body is translucent; a `beside` mark (a second top-level ring,
+   sharing the body's material, never enclosed) does not** — the redraw brief
+   is `beside` shapes, not regions. Full detail: [`0032`](handoff/0032-report.md) ·
+   [`0036-report.md`](handoff/0036-report.md).
+2. **THE ARTWORK REDRAWS — BUILT, PATRICK'S CHECK PASSED ([`0050`](handoff/0050-ruling.md)),
+   MERGING NOW.** `shower` and `glass_shower` gain a filled door leaf
+   (`glass_shower` also gains its first-ever filled body); `walk_in_shower`
+   gains a fixed glass panel at the opening, alongside its already-correct,
+   already-invisible bench. All three: `build_prism` `beside` shapes, not
+   regions. **Two cameras, both on record** (`0034` §2): room-scale
+   (comparability) — [`before`](evidence/shower-glance-before.png) ·
    [`after`](evidence/shower-glance-after.png) — and working-distance (the
    actual glance test) —
    [`before`](evidence/shower-glance-working-distance-before.png) ·
    [`after`](evidence/shower-glance-working-distance-after.png), reproducible
    via `docs/evidence/shower_glance_working_distance.py`. **At working
-   distance the marks are unambiguous.** Full build notes:
-   [`0033`](handoff/0033-report.md) · [`0036-report.md`](handoff/0036-report.md).
-   Brief: [`handoff/0016-ruling.md`](handoff/0016-ruling.md) §2–3.
+   distance the marks are unambiguous.** The branch was 9 behind `main` at
+   check time; this merge brings it current, re-gates the combined tree and
+   re-runs the census before landing — see [`0050`](handoff/0050-ruling.md)
+   §3. Full build notes: [`0033`](handoff/0033-report.md) ·
+   [`0036-report.md`](handoff/0036-report.md). Brief:
+   [`handoff/0016-ruling.md`](handoff/0016-ruling.md) §2–3.
 3. **[`handoff/0019-ruling.md`](handoff/0019-ruling.md)'s status board — GREEN,
    read-back first, priority lowered by [`0029`](handoff/0029-ruling.md) §6**
    (Patrick has a Cowork skill rendering the same state on demand — a VIEW,
@@ -134,6 +179,27 @@ See THE QUEUE below.
    clause-by-clause EXISTS/PARTIAL/ABSENT, thresholds with reasons, the shift
    modifier audit, the angle convention already in the geometry code, and
    Ctrl's disposition. Spec: [`ROADMAP.md`](ROADMAP.md) A6.
+5. **`Docs-Snapshot` moves out of the `pull_request` CI lane — DONE.**
+   [`handoff/0042-ruling.md`](handoff/0042-ruling.md): the only check this
+   project's CI has ever failed on when the code itself was fine; it read git
+   topology (`HEAD~1`), which a merge-ref reshapes, while the local commit
+   hook already prevents a stale marker from landing at all. `tools/gate.py`'s
+   `_snapshot_check()` now skips it on `GITHUB_EVENT_NAME == "pull_request"`,
+   at the `main()`/`_docs()` call sites only — `_snapshot_head()` and the
+   `HEAD^2` merge-ref logic are untouched, so every existing D78 regression
+   test still exercises the real thing. Two new controls (skip-when-stale,
+   skip-scoped-to-PR). Full receipt: [`handoff/0048-report.md`](handoff/0048-report.md).
+6. **The commit hook splits quick-for-commit / full-for-push — DONE.**
+   [`handoff/0043-ruling.md`](handoff/0043-ruling.md) §4 /
+   [`handoff/0047-ruling.md`](handoff/0047-ruling.md) §4: `.gate-result.json`
+   carries a `mode` field now (`--quick` writes too); `git commit` accepts
+   either mode, `git push` requires `mode == "full"`. All four controls, in
+   the same commit, at both events: no result refused; `--quick` GREEN
+   allowed at commit / refused at push; full GREEN allowed at both; any RED
+   refused; "no result" / "RED" / "quick-at-push" each produce a
+   **different** message. `tests/test_verify_gate_hook.py`, 18 tests against
+   an isolated fixture repo, caught a real `"pushs"` pluralisation bug before
+   it shipped. Full receipt: [`handoff/0049-report.md`](handoff/0049-report.md).
 
 **Full tiered queue (A2–A5, the command-roster census, Phase 5's remainder,
 etc.):** [`ROADMAP.md`](ROADMAP.md) §3. **`boat_trailer` and the vehicle
@@ -141,20 +207,50 @@ loft** are not in this queue — both behind a read-back, design at
 [`floorplanner/viewer/VIEWER_NOTES.md`](../floorplanner/viewer/VIEWER_NOTES.md)
 §5.
 
-**[`handoff/0035-ruling.md`](handoff/0035-ruling.md) — Patrick's own report,
-not started, does not displace items 1–4 above.** Two items: **cross-floor
-snapping** (a wall on the working floor sometimes snaps to a hidden floor's
-geometry) — the obvious query paths already filter by floor, so the census
-must test BOTH a missing filter (hypothesis A) and mis-tagged floor data
-that every filter would pass correctly (hypothesis B, the one a query census
-cannot see); a reproduction plan is owed first, dropped in
-`fixtures/incoming/`; check whether [D67](defects/0067-selection-is-not-scoped-to-the-active-floor.md)
-is the same root before filing new. **Per-floor totals** (feature, AMBER,
-accepted in shape) — blocked on open [D55](defects/0055-area-totals-double-count-overlapping.md)
-(totals double-count overlapping rooms), which must be fixed first or as
-part of this, per D15's debounce constraint (one bucketed pass, not one scan
-per floor). The GREEN measurement (census + floor-tag dump) may start
-without touching the redraw branch.
+**Cross-floor snapping/bleed-through — Patrick's own report
+([`0035`](handoff/0035-ruling.md), [`0036-ruling.md`](handoff/0036-ruling.md),
+[`0037`](handoff/0037-ruling.md)) — GREEN measurement only so far, still not
+started as a fix, does not displace items 1–2 above.** [D67](defects/0067-selection-is-not-scoped-to-the-active-floor.md)
+-adjacent. `0037`'s named suspect (the v5 load path never re-syncing floor
+display state) **does not hold** — measured directly on Patrick's own
+submitted plan, both by code reading and by a live headless probe:
+`apply_design_to_scene` already calls `win._sync_floor_state()`
+(`floorplanner/design/bridge.py:1265`, present since 2026‑07‑26). See
+[`0038-report.md`](handoff/0038-report.md). **Reopens [`0036-ruling.md`](handoff/0036-ruling.md)
+§3's own discriminator** (does the saved document change across the
+gesture?), still unrun — blocked on two facts neither ruling nor the intake
+file states (was `show_others` on; did the wall stay moved after release).
+`fixtures/incoming/crossfloor-snap-2026-08-17.json` has no `.txt` companion
+note; one handoff old, not yet two.
+
+> **Numbering collision, on the record rather than hidden:
+> [`handoff/0036-ruling.md`](handoff/0036-ruling.md) and this session's own
+> `handoff/0036-report.md` (on branch `shower-identity-redraws`) are two
+> unrelated files sharing one number.** Both legitimately committed on their
+> own branches; neither renamed — doing so would break more citations than it
+> fixes. Numbering continues forward from `0038`.
+
+**`fp2dxf` (a v5 → Chief Architect DXF exporter, built outside this repo) —
+[`0038-ruling.md`](handoff/0038-ruling.md), AMBER, package now landed at
+`floorplanner/export/`.** Accepted in principle: pure stdlib, a clean
+`convert()` API, a real differential-receipt finding (both doors import as
+windows). **Measured done, per [`0043-report.md`](handoff/0043-report.md):**
+thickness reads `STD_T` by path (the D73/D74 disease closed, not repeated),
+and all three library-hygiene fixes (`SystemExit` → a catchable `ValueError`,
+`print()` confined to the CLI entry point with `convert()` returning
+warnings/summary on `ConvertResult`, explicit `utf-8` on both writes). **Still
+owed:** the zip (`handoff/0038-fp2dxf-handoff.zip`) is unpacked and deleted in
+the same commit — its `sample/`, `screenshots/` and `README.md` are not yet
+anywhere in the repo tree — then a README split (handoff spec vs. user docs)
+and the golden-file test the sample makes nearly free. Ordered behind item
+2's check, the cross-floor work above, and now [`0040-ruling.md`](handoff/0040-ruling.md)
+§4's cherry-pick, per that ruling's own tier.
+
+> **A second numbering collision, same session:
+> [`handoff/0038-ruling.md`](handoff/0038-ruling.md) and this session's own
+> `handoff/0038-report.md`** (written earlier, about the cross-floor
+> investigation) **share a number.** Neither renamed. Numbering continues
+> forward from `0039`.
 
 ---
 
@@ -162,10 +258,10 @@ without touching the redraw branch.
 
 | | |
 |---|---|
-| **`main`** | still **`17f6c01`**, unmoved — PR #31 merged at `b813343`, D78 fixed (`168190f`, `db09acf`), `0028`'s trim (`156135f`), the extrudability predicate + census + D76 reconciliation (`17f6c01`). This branch (`shower-identity-redraws`) is now at **`8904d9e`**: the three redraws, plus `0034`'s working-distance camera, raw values and D79 (this commit, landing on top of `8904d9e`). Full trail: `handoff/README.md`'s pair table. |
-| **Branches** | **`shower-identity-redraws`** — [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32), AMBER, awaiting Patrick's check. `d74-vessel-enclosure-split` merged and kept, not live. |
-| **Gate** | local on this branch: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF / ON / DEEP each **727 passed, 7 deselected**, every sum reconciling; **`Gate-Verdict: GREEN`**. **Zero xfails.** CI confirmed green on `main`@`17f6c01` and on PR #32's prior commit. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **80 records**, **31 open**. D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`; [D79](defects/0079-six-catalog-symbols-extrude-as-disconnected.md) six fragmented catalog symbols, one record, `bicycle` cited to `0013-ruling.md`, three pointed at the vehicle loft, two open. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
+| **`main`** | **MERGING** — `6a22aee` (PR #31, D78, `0028`'s trim, the extrudability predicate + census + D76 reconciliation at `17f6c01`, the cross-floor investigation, the `fp2dxf` recovery, the `0043` renumbering, the mailbox cherry-pick, the `Docs-Snapshot` CI-lane move) combined with `shower-identity-redraws`'s `8904d9e` (the three redraws, `0034`'s working-distance camera, raw values, D79) in this merge commit — see [`0050-ruling.md`](handoff/0050-ruling.md). Final hash and gate numbers land in the next re-cut. Full trail: `handoff/README.md`'s pair table. |
+| **Branches** | **`shower-identity-redraws`** — [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32), merging to `main` now per [`0050-ruling.md`](handoff/0050-ruling.md); Patrick's check passed. `d74-vessel-enclosure-split` merged and kept, not live. |
+| **Gate** | **being re-run on the combined tree** — the branch's own last local run: `collected=734 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF/ON/DEEP each 727 passed, 7 deselected, GREEN. New numbers land in the next re-cut. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Records** | **80 records, 31 open** (the branch's [D79](defects/0079-six-catalog-symbols-extrude-as-disconnected.md) — six fragmented catalog symbols, one record, `bicycle` cited to `0013-ruling.md`, three pointed at the vehicle loft, two open — folds in with this merge). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |

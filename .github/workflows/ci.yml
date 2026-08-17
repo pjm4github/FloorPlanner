@@ -37,6 +37,13 @@ jobs:
     # printing them is the check. That is the point of the dry run -- the claim
     # "this format is GitHub-ready" is verified on every push instead of on the
     # day someone finally migrates.
+    #
+    # `Docs-Snapshot`, one of the checks `--docs` runs, self-skips here on a
+    # `pull_request` trigger (0042-ruling.md): no workflow change needed for
+    # that, since GitHub Actions already exports `GITHUB_EVENT_NAME` to every
+    # step, and `tools/gate.py`'s `_snapshot_check()` reads it directly. The
+    # rest of this job's checks (defect records, the index, cross-references,
+    # the migration dry run) are unaffected and still run on every trigger.
     steps:
       - uses: actions/checkout@v5
         with:
@@ -182,10 +189,12 @@ jobs:
       - uses: actions/checkout@v5
         with:
           # This job runs gate.py --deep, which includes the Docs-Snapshot
-          # check (D78, handoff 0027/0028): on a PR, that check needs to walk
-          # to the branch's own tip and its parent, and the default depth of 1
-          # hides both behind the shallow boundary -- confirmed on CI itself,
-          # not reasoned about. Same fix, same reason as the `docs` job above.
+          # check (D78, handoff 0027/0028) on every trigger EXCEPT
+          # `pull_request` (0042-ruling.md skips it there -- see the `docs`
+          # job's comment above). On `push`, that check still needs to
+          # resolve HEAD~1, and the default depth of 1 gives a single commit
+          # with no parent at all -- confirmed on CI itself, not reasoned
+          # about. Same fix, same reason as the `docs` job above.
           fetch-depth: 0
 
       - uses: actions/setup-python@v6
