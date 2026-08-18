@@ -354,7 +354,14 @@ FURNISHINGS = [
     ("shower", "Shower 36\"", "Bathroom", 36, 36,
      [R(0.75, 0.75, 34.5, 34.5, 1, sw=1.2), R(3, 3, 30, 30, 1, "none", 0.6),
       L(3, 3, 33, 33, 0.4), L(33, 3, 3, 33, 0.4),
-      Ci(18, 18, 1.8, "none", 0.7)]),
+      Ci(18, 18, 1.8, "none", 0.7),
+      # hinged door leaf, swung proud of the front opening -- a BESIDE part
+      # (its centroid sits outside the body ring), not a nested region, so
+      # it shares the body's own glass material and is never occluded by it
+      # (0032-report.md SS4: a region enclosed by translucent glass does not
+      # composite -- D76 -- but a beside part standing next to the body,
+      # never inside it, is not that case)
+      R(4, 34.6, 27, 2.6, 0.4, top=76)]),
     ("walk_in_shower", "Luxury Walk-in Shower", "Bathroom", 60, 42,
      [R(0.75, 0.75, 58.5, 40.5, 1.5, sw=1.2),               # tiled enclosure
       # faint tile grout grid
@@ -370,16 +377,31 @@ FURNISHINGS = [
       # linear drain along the right end
       R(53, 4, 3.5, 34, 0.4, "none", 0.6), L(54.75, 4, 54.75, 38, 0.4),
       # frameless glass screen on the front with a walk-in opening
-      L(31, 39.8, 58.5, 39.8, 1.6), L(31, 39.8, 31, 33, 1.2)]),
+      L(31, 39.8, 58.5, 39.8, 1.6), L(31, 39.8, 31, 33, 1.2),
+      # the fixed glass panel itself, standing at the opening -- a BESIDE
+      # part, same reason as shower's door leaf: a walk-in's opening is a
+      # single FIXED panel, not a hinged door (glass_shower's) or a full
+      # stall door (shower's), which is its own categorical mark rather
+      # than a copy of either. Near full height, not a low curb -- a curb
+      # this shallow (originally 4in) read as barely a seam at the render's
+      # own camera angle; the bench (a NESTED region) is correct and still
+      # invisible through the glass body (D76), so identity cannot rest on
+      # it alone
+      R(31, 41.0, 27.5, 1.8, 0.3, top=74)]),
     ("glass_shower", "Luxury Glass Shower 5' x 4'", "Bathroom", 60, 48,
-     [# floor-to-ceiling glass enclosure: outer panels with a door gap, plus
+     [# floor-to-ceiling glass enclosure -- ONE FILLED BODY (was four
+      # boundary lines with a gap for the door: no closed fill anywhere,
+      # so nothing here could be extruded at all -- predicate 1,
+      # 0032-report.md SS1). A conventional plan symbol (solid outline plus
+      # a swing arc) reads at least as correctly as the line-art gap did.
+      R(1, 1, 58, 46, 0, sw=1.1),
       # a faint inner line for the glass thickness
-      L(1, 1, 59, 1, 1.1), L(1, 1, 1, 47, 1.1), L(59, 1, 59, 47, 1.1),
-      L(1, 47, 11, 47, 1.1), L(34, 47, 59, 47, 1.1),
       R(2.6, 2.6, 54.8, 43.0, 0, "none", 0.35),
       # frameless glass door swinging in from the front opening
       L(34, 47, 34, 24, 1.3),
       Pth("M 11 47 A 23 23 0 0 1 34 24", "none", 0.6),
+      # the door leaf itself -- a BESIDE part, same reason as shower's
+      R(11, 46.4, 23, 2.6, 0.3, top=76),
       # ceiling rainfall head over the centre, with a tile grid in the head
       R(28, 13, 18, 18, 1, "none", 0.7),
       L(33, 13, 33, 31, 0.3), L(37, 13, 37, 31, 0.3), L(41, 13, 41, 31, 0.3),
