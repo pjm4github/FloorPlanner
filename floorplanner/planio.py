@@ -12,6 +12,7 @@ The three payloads, kept distinct on purpose:
 """
 import copy
 import json
+from pathlib import Path
 
 from PyQt6 import sip  # noqa: F401
 from PyQt6.QtCore import *  # noqa: F401
@@ -48,6 +49,7 @@ from floorplanner.design.template import (        # P4.4 one-room templates
 from floorplanner.design.validate import check
 from floorplanner.design.bridge import rebase_weld_baseline
 from floorplanner.design.verify import rebase  # P1.6 shadow mode
+from floorplanner.export.fp2dxf import convert as convert_to_dxf  # handoff 0038
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
 from floorplanner.macro import *  # noqa: F401
@@ -647,6 +649,63 @@ class PlanIOMixin:
             json.dump({**state, "active_floor": self.active_floor}, f, indent=2)
         self.status(f"Exported legacy v4 plan to {path}")
         return path
+
+    def export_dxf(self):
+        """File ▸ Export ▸ Chief Architect (DXF)… -- `fp2dxf`, a v5 design ->
+        Chief Architect X17 DXF converter built outside this repo and landed
+        at `floorplanner/export/fp2dxf.py` (handoff 0038-ruling.md). Prompts
+        for an OUTPUT FOLDER (fp2dxf writes one `<level>.dxf` +
+        `<level>.openings.json` pair per storey level, so a single-file
+        dialog doesn't fit), then reports what got written -- the README's
+        own ask, per 0038-ruling.md SS4's "TWO" finding: `convert()` already
+        collects the summary and warnings on its `ConvertResult`, this only
+        has to surface them instead of printing them."""
+        start = str(Path(self.current_path).parent) if self.current_path \
+            else str(designs_dir())
+        outdir = QFileDialog.getExistingDirectory(
+            self, "Export to Chief Architect (DXF) — choose a folder", start)
+        if outdir:
+            self.export_dxf_path(outdir)
+
+    def export_dxf_path(self, outdir: str, interactive: bool = True):
+        """Non-interactive DXF export (the `export_legacy_v4_path` /
+        `_import_rooms` convention: scripted/test callers pass
+        interactive=False and read the return value or the status line).
+
+        Serializes the CURRENT document the same way Save does
+        (`design_document()`, not `snapshot()` -- provenance and
+        `active_floor` are irrelevant to the export, but the wall/room/
+        opening data must be exactly what a Save would write) and hands it
+        to `convert()` untouched. `convert()` raises a plain `ValueError` on
+        a bad document rather than exiting the process (0038-ruling.md SS4
+        "ONE" -- an uncaught exception inside a Qt menu handler presents as
+        a segfault with no traceback, SESSION_SNAPSHOT SS5), so that is
+        caught here exactly like every other IO failure in this mixin.
+
+        Returns the `ConvertResult` so a macro/test can inspect it without
+        parsing the dialog text."""
+        doc = self.design_document()
+        try:
+            result = convert_to_dxf(doc, Path(outdir))
+        except (ValueError, OSError) as ex:
+            if interactive:
+                QMessageBox.critical(self, "Export to Chief Architect (DXF)",
+                                     str(ex))
+            self.status(f"DXF export failed: {ex}")
+            return None
+        lines = [f"Wrote {len(result.written)} file(s) to {outdir}:"]
+        lines += [f"  • {p.name}" for p in result.written]
+        if result.skipped_levels:
+            lines.append("")
+            lines.append("Skipped site level(s) (re-export with a specific "
+                         "level to include): " + ", ".join(result.skipped_levels))
+        if result.warnings:
+            lines.append("")
+            lines.append(f"{len(result.warnings)} warning(s):")
+            lines += [f"  ! {w}" for w in result.warnings]
+        text = "\n".join(lines)
+        self._report(text, interactive, "Export to Chief Architect (DXF)")
+        return result
 
     def load_path(self, path: str):
         """Non-interactive open (no dialogs).  Raises on failure.

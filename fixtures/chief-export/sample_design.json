@@ -1,0 +1,604 @@
+{
+  "format": "floorplanner-design",
+  "version": 5,
+  "units": "inches",
+  "settings": {
+    "vertex_weld_in": 0.6,
+    "join_tol_in": 9.0,
+    "area_basis": "inside_face"
+  },
+  "levels": [
+    {
+      "id": "L1",
+      "name": "Main Level",
+      "elevation_in": 0,
+      "height_in": 108
+    },
+    {
+      "id": "L2",
+      "name": "Upper Level",
+      "elevation_in": 108,
+      "height_in": 96
+    }
+  ],
+  "vertices": [
+    {
+      "id": "vA",
+      "level": "L1",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "vE",
+      "level": "L1",
+      "x": 120,
+      "y": 0
+    },
+    {
+      "id": "vB",
+      "level": "L1",
+      "x": 240,
+      "y": 0
+    },
+    {
+      "id": "vC",
+      "level": "L1",
+      "x": 240,
+      "y": 180
+    },
+    {
+      "id": "vF",
+      "level": "L1",
+      "x": 120,
+      "y": 180
+    },
+    {
+      "id": "vD",
+      "level": "L1",
+      "x": 0,
+      "y": 180
+    },
+    {
+      "id": "vG",
+      "level": "L1",
+      "x": 240,
+      "y": 252
+    },
+    {
+      "id": "vH",
+      "level": "L1",
+      "x": 120,
+      "y": 252
+    },
+    {
+      "id": "vP1",
+      "level": "L1",
+      "x": 300,
+      "y": 20
+    },
+    {
+      "id": "vP2",
+      "level": "L1",
+      "x": 360,
+      "y": 20
+    },
+    {
+      "id": "vP3",
+      "level": "L1",
+      "x": 360,
+      "y": 80
+    },
+    {
+      "id": "vP4",
+      "level": "L1",
+      "x": 300,
+      "y": 80
+    },
+    {
+      "id": "uA",
+      "level": "L2",
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "uB",
+      "level": "L2",
+      "x": 240,
+      "y": 0
+    },
+    {
+      "id": "uC",
+      "level": "L2",
+      "x": 240,
+      "y": 180
+    },
+    {
+      "id": "uD",
+      "level": "L2",
+      "x": 0,
+      "y": 180
+    },
+    {
+      "id": "uM1",
+      "level": "L2",
+      "x": 0,
+      "y": 90
+    },
+    {
+      "id": "uM2",
+      "level": "L2",
+      "x": 240,
+      "y": 90
+    }
+  ],
+  "walls": [
+    {
+      "id": "wAE",
+      "level": "L1",
+      "v1": "vA",
+      "v2": "vE",
+      "type": "exterior",
+      "left": "r1",
+      "right": null
+    },
+    {
+      "id": "wEB",
+      "level": "L1",
+      "v1": "vE",
+      "v2": "vB",
+      "type": "exterior",
+      "left": "r2",
+      "right": null
+    },
+    {
+      "id": "wBC",
+      "level": "L1",
+      "v1": "vB",
+      "v2": "vC",
+      "type": "exterior",
+      "left": "r2",
+      "right": null,
+      "openings": [
+        {
+          "id": "oW1",
+          "kind": "window",
+          "code": "3650",
+          "anchor": {
+            "from": "center",
+            "offset_in": 0
+          },
+          "sill_in": 30,
+          "head_in": 80
+        }
+      ]
+    },
+    {
+      "id": "wCF",
+      "level": "L1",
+      "v1": "vC",
+      "v2": "vF",
+      "type": "exterior",
+      "left": "r2",
+      "right": "porch",
+      "openings": [
+        {
+          "id": "oD2",
+          "kind": "door",
+          "code": "3080",
+          "door_type": "sliding",
+          "anchor": {
+            "from": "v2",
+            "offset_in": 30
+          },
+          "hinge": "none",
+          "swings_toward": "none"
+        }
+      ]
+    },
+    {
+      "id": "wFD",
+      "level": "L1",
+      "v1": "vF",
+      "v2": "vD",
+      "type": "exterior",
+      "left": "r1",
+      "right": null
+    },
+    {
+      "id": "wDA",
+      "level": "L1",
+      "v1": "vD",
+      "v2": "vA",
+      "type": "exterior",
+      "left": "r1",
+      "right": null
+    },
+    {
+      "id": "wEF",
+      "level": "L1",
+      "v1": "vE",
+      "v2": "vF",
+      "type": "interior",
+      "left": "r2",
+      "right": "r1",
+      "openings": [
+        {
+          "id": "oD1",
+          "kind": "door",
+          "code": "3080",
+          "door_type": "hinged",
+          "anchor": {
+            "from": "v1",
+            "offset_in": 24
+          },
+          "hinge": "v1",
+          "swings_toward": "right"
+        }
+      ]
+    },
+    {
+      "id": "wCG",
+      "level": "L1",
+      "v1": "vC",
+      "v2": "vG",
+      "type": "exterior",
+      "left": "porch",
+      "right": null
+    },
+    {
+      "id": "wGH",
+      "level": "L1",
+      "v1": "vG",
+      "v2": "vH",
+      "type": "railing",
+      "left": "porch",
+      "right": null,
+      "openings": [
+        {
+          "id": "oG1",
+          "kind": "gate",
+          "code": "3642",
+          "anchor": {
+            "from": "center",
+            "offset_in": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "wP12",
+      "level": "L1",
+      "v1": "vP1",
+      "v2": "vP2",
+      "type": "partition",
+      "left": "cnpt",
+      "right": null
+    },
+    {
+      "id": "wP23",
+      "level": "L1",
+      "v1": "vP2",
+      "v2": "vP3",
+      "type": "partition",
+      "left": "cnpt",
+      "right": null
+    },
+    {
+      "id": "wP34",
+      "level": "L1",
+      "v1": "vP3",
+      "v2": "vP4",
+      "type": "partition",
+      "left": "cnpt",
+      "right": null
+    },
+    {
+      "id": "wP41",
+      "level": "L1",
+      "v1": "vP4",
+      "v2": "vP1",
+      "type": "partition",
+      "left": "cnpt",
+      "right": null
+    },
+    {
+      "id": "uAB",
+      "level": "L2",
+      "v1": "uA",
+      "v2": "uB",
+      "type": "exterior",
+      "left": "br1",
+      "right": null,
+      "openings": [
+        {
+          "id": "uW1",
+          "kind": "window",
+          "code": "3050",
+          "anchor": {
+            "from": "center",
+            "offset_in": 0
+          },
+          "sill_in": 30,
+          "head_in": 80
+        }
+      ]
+    },
+    {
+      "id": "uBM2",
+      "level": "L2",
+      "v1": "uB",
+      "v2": "uM2",
+      "type": "exterior",
+      "left": "br1",
+      "right": null
+    },
+    {
+      "id": "uM2C",
+      "level": "L2",
+      "v1": "uM2",
+      "v2": "uC",
+      "type": "exterior",
+      "left": "br2",
+      "right": null
+    },
+    {
+      "id": "uCD",
+      "level": "L2",
+      "v1": "uC",
+      "v2": "uD",
+      "type": "exterior",
+      "left": "br2",
+      "right": null,
+      "openings": [
+        {
+          "id": "uW2",
+          "kind": "window",
+          "code": "3050",
+          "anchor": {
+            "from": "v1",
+            "offset_in": 40
+          },
+          "sill_in": 30,
+          "head_in": 80
+        }
+      ]
+    },
+    {
+      "id": "uDM1",
+      "level": "L2",
+      "v1": "uD",
+      "v2": "uM1",
+      "type": "exterior",
+      "left": "br2",
+      "right": null
+    },
+    {
+      "id": "uM1A",
+      "level": "L2",
+      "v1": "uM1",
+      "v2": "uA",
+      "type": "exterior",
+      "left": "br1",
+      "right": null
+    },
+    {
+      "id": "uMID",
+      "level": "L2",
+      "v1": "uM1",
+      "v2": "uM2",
+      "type": "interior",
+      "left": "br2",
+      "right": "br1",
+      "openings": [
+        {
+          "id": "uD1",
+          "kind": "door",
+          "code": "3080",
+          "door_type": "hinged",
+          "anchor": {
+            "from": "center",
+            "offset_in": 0
+          },
+          "hinge": "v1",
+          "swings_toward": "left"
+        }
+      ]
+    }
+  ],
+  "rooms": [
+    {
+      "id": "r1",
+      "level": "L1",
+      "name": "Study",
+      "category": "interior",
+      "outline": [
+        {
+          "v": "vA",
+          "wall": "wAE"
+        },
+        {
+          "v": "vE",
+          "wall": "wEF"
+        },
+        {
+          "v": "vF",
+          "wall": "wFD"
+        },
+        {
+          "v": "vD",
+          "wall": "wDA"
+        }
+      ],
+      "placement": {
+        "state": "placed"
+      },
+      "label": {
+        "offset": [
+          0,
+          -10
+        ]
+      },
+      "properties": {
+        "room_type": "office",
+        "ceiling_height_in": 108,
+        "floor_finish": "white oak"
+      }
+    },
+    {
+      "id": "r2",
+      "level": "L1",
+      "name": "Great Room",
+      "category": "interior",
+      "outline": [
+        {
+          "v": "vE",
+          "wall": "wEB"
+        },
+        {
+          "v": "vB",
+          "wall": "wBC"
+        },
+        {
+          "v": "vC",
+          "wall": "wCF"
+        },
+        {
+          "v": "vF",
+          "wall": "wEF"
+        }
+      ],
+      "placement": {
+        "state": "placed"
+      }
+    },
+    {
+      "id": "porch",
+      "level": "L1",
+      "name": "Screen Porch",
+      "category": "exterior",
+      "outline": [
+        {
+          "v": "vF",
+          "wall": "wCF"
+        },
+        {
+          "v": "vC",
+          "wall": "wCG"
+        },
+        {
+          "v": "vG",
+          "wall": "wGH"
+        },
+        {
+          "v": "vH",
+          "wall": null
+        }
+      ],
+      "placement": {
+        "state": "placed"
+      },
+      "area_accounting": "unconditioned"
+    },
+    {
+      "id": "cnpt",
+      "level": "L1",
+      "name": "Future Studio?",
+      "category": "concept",
+      "outline": [
+        {
+          "v": "vP1",
+          "wall": "wP12"
+        },
+        {
+          "v": "vP2",
+          "wall": "wP23"
+        },
+        {
+          "v": "vP3",
+          "wall": "wP34"
+        },
+        {
+          "v": "vP4",
+          "wall": "wP41"
+        }
+      ],
+      "placement": {
+        "state": "floating"
+      }
+    },
+    {
+      "id": "br1",
+      "level": "L2",
+      "name": "Bedroom 1",
+      "category": "interior",
+      "outline": [
+        {
+          "v": "uA",
+          "wall": "uAB"
+        },
+        {
+          "v": "uB",
+          "wall": "uBM2"
+        },
+        {
+          "v": "uM2",
+          "wall": "uMID"
+        },
+        {
+          "v": "uM1",
+          "wall": "uM1A"
+        }
+      ],
+      "placement": {
+        "state": "placed"
+      },
+      "properties": {
+        "room_type": "bedroom",
+        "ceiling_height_in": 96
+      }
+    },
+    {
+      "id": "br2",
+      "level": "L2",
+      "name": "Bedroom 2",
+      "category": "interior",
+      "outline": [
+        {
+          "v": "uM1",
+          "wall": "uMID"
+        },
+        {
+          "v": "uM2",
+          "wall": "uM2C"
+        },
+        {
+          "v": "uC",
+          "wall": "uCD"
+        },
+        {
+          "v": "uD",
+          "wall": "uDM1"
+        }
+      ],
+      "placement": {
+        "state": "placed"
+      },
+      "properties": {
+        "room_type": "bedroom",
+        "ceiling_height_in": 96
+      }
+    }
+  ],
+  "annotations": [
+    {
+      "id": "a1",
+      "level": "L1",
+      "kind": "text",
+      "pos": [
+        8,
+        230
+      ],
+      "text": "Grade slopes away S -- verify porch footing depth"
+    }
+  ]
+}

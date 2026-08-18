@@ -1,0 +1,58 @@
+{
+  "oW1": {
+    "wall": "wBC",
+    "kind": "window",
+    "code": "3650",
+    "station_in": [
+      72.0,
+      108.0
+    ],
+    "sill_in": 30,
+    "head_in": 80,
+    "door_type": null,
+    "hinge": null,
+    "swings_toward": null
+  },
+  "oD2": {
+    "wall": "wCF",
+    "kind": "door",
+    "code": "3080",
+    "station_in": [
+      60.0,
+      90.0
+    ],
+    "sill_in": null,
+    "head_in": null,
+    "door_type": "sliding",
+    "hinge": "none",
+    "swings_toward": "none"
+  },
+  "oD1": {
+    "wall": "wEF",
+    "kind": "door",
+    "code": "3080",
+    "station_in": [
+      24.0,
+      54.0
+    ],
+    "sill_in": null,
+    "head_in": null,
+    "door_type": "hinged",
+    "hinge": "v1",
+    "swings_toward": "right"
+  },
+  "oG1": {
+    "wall": "wGH",
+    "kind": "gate",
+    "code": "3642",
+    "station_in": [
+      42.0,
+      78.0
+    ],
+    "sill_in": null,
+    "head_in": null,
+    "door_type": null,
+    "hinge": null,
+    "swings_toward": null
+  }
+}

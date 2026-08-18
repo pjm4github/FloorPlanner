@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: b6ac4d1 -->
+<!-- SNAPSHOT-HEAD: 2a11f98 -->
 
 # Session snapshot — read this first
 
@@ -129,17 +129,20 @@ landed alongside — a correction to how Patrick's own shower check is run
 (against the wrong branch), tier NONE, no action item for Code.
 
 **[`0044`](handoff/0044-ruling.md) §3 item 6 / [`0047`](handoff/0047-ruling.md)
-§5's `fp2dxf` DXF integration is BUILT — [PR #33](https://github.com/pjm4github/FloorPlanner/pull/33)
-(branch `fp2dxf-integration`), AMBER, awaiting Patrick's check.** The zip
-unpacked and deleted, the golden DXF pair regenerated against `STD_T` (diff
-stated in full: only `exterior`/`railing` moved), the README split (the
-verified Chief Architect workflow transcribed, not summarised), the File ▸
-Export ▸ Chief Architect (DXF)… menu action + completion dialog, a 7-test
-golden-file receipt, gate GREEN. **Patrick's own manual check — export a
-two-storey plan, import one level into Chief Architect X17, confirm walls/
-doors/windows arrive as their own kinds — needs real Chief Architect
-software and is out of Code's reach**, so it is the merge condition, not
-something claimed done. Full receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
+§5's `fp2dxf` DXF integration is BUILT, CHECKED, MERGING — [PR #33](https://github.com/pjm4github/FloorPlanner/pull/33)
+(branch `fp2dxf-integration`).** The zip unpacked and deleted, the golden DXF
+pair regenerated against `STD_T` (diff stated in full: only
+`exterior`/`railing` moved), the README split (the verified Chief Architect
+workflow transcribed, not summarised, into the root `README.md` — not
+`docs/guides/` as [`0052-ruling.md`](handoff/0052-ruling.md) later specified;
+that ruling landed after this branch had already forked and could not be
+seen from it, flagged rather than silently left), the File ▸ "Export ▸ Chief
+Architect (DXF)…" menu action (one flat File-menu entry, not a nested
+submenu — the `▸` is only in the label text) + completion dialog, a 7-test
+golden-file receipt, gate GREEN. **Patrick's own manual check PASSED
+2026‑08‑17** — exported the regenerated `L1.dxf`/`L2.dxf` and imported into
+Chief Architect X17, closing [`0038-ruling.md`](handoff/0038-ruling.md) §8's
+merge condition. Full receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 ---
 
@@ -256,9 +259,9 @@ note; one handoff old, not yet two.
 > fixes. Numbering continues forward from `0038`.
 
 **`fp2dxf` (a v5 → Chief Architect DXF exporter, built outside this repo) —
-[`0038-ruling.md`](handoff/0038-ruling.md), AMBER, DONE end to end, at
+[`0038-ruling.md`](handoff/0038-ruling.md), DONE end to end, at
 [PR #33](https://github.com/pjm4github/FloorPlanner/pull/33) (branch
-`fp2dxf-integration`), awaiting Patrick's check.** Accepted in principle:
+`fp2dxf-integration`), Patrick's check PASSED, merging.** Accepted in principle:
 pure stdlib, a clean `convert()` API, a real differential-receipt finding
 (both doors import as windows). Thickness reads `STD_T` by path (the
 D73/D74 disease closed, not repeated), all three library-hygiene fixes
@@ -290,9 +293,9 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`b6ac4d1`** — merge of [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32) (`shower-identity-redraws`: the three redraws, D79, the working-distance camera) into `54b4a88`+`fp2dxf`'s `0050-report.md` (`fb054e3`). Fast-forwarded locally, pushed. Full trail: `handoff/README.md`'s pair table. |
-| **Branches** | **`fp2dxf-integration`** — [PR #33](https://github.com/pjm4github/FloorPlanner/pull/33), AMBER, awaiting Patrick's Chief Architect check **on the regenerated DXF, not the originally-shipped sample** ([`0053`](handoff/0053-ruling.md) §2). Five spent branches deleted, local and remote, per [`0053`](handoff/0053-ruling.md) §2 item 4: `d74-vessel-enclosure-split`, `mailbox-0050`, `shower-identity-redraws` (all merged), `d74-decoration-channel`, `i15-outline-completeness` (merged earlier, left lying around). |
-| **Gate** | GREEN on `main`@`b6ac4d1`'s own tree (re-run pending this re-cut's own commit). Last full-tree confirmation, on the pre-merge combined tree: `collected=754 ruff=clean vacuous=0 end_assign=0 snapshot=current`; OFF/ON/DEEP each **747 passed, 7 deselected**. CI on PR #32 green on all six jobs before merge. **Extrudability census, re-run before the merge** (`0050` §3 step 3): `glass_shower` 0→2 filled shapes (was predicate 1's only failure), `shower` 2 filled/1 frag/no region, `walk_in_shower` 3 filled/1 frag/has region (pre-existing D76-invisible bench) — all three predicates pass, no new exemptions. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **`main`** | **`b6ac4d1`** on `origin` — merge of [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32) (`shower-identity-redraws`: the three redraws, D79, the working-distance camera) into `54b4a88`+`fp2dxf`'s `0050-report.md` (`fb054e3`). This snapshot is cut on `fp2dxf-integration` at its own tip `2a11f98` (one parent of the merge-with-`main` commit about to land on this branch), not on `main` itself — see `handoff/README.md`'s pair table for the full trail. |
+| **Branches** | **`fp2dxf-integration`** — [PR #33](https://github.com/pjm4github/FloorPlanner/pull/33). **Patrick's Chief Architect check PASSED 2026‑08‑17** — exported `L1.dxf`/`L2.dxf` (the regenerated pair, not the originally-shipped sample, per [`0053`](handoff/0053-ruling.md) §2) and imported into Chief Architect X17. [`0038-ruling.md`](handoff/0038-ruling.md) §8's merge condition is met; brought current with `main` (8 behind) and merging next. Five spent branches already deleted, local and remote, per [`0053`](handoff/0053-ruling.md) §2 item 4: `d74-vessel-enclosure-split`, `mailbox-0050`, `shower-identity-redraws` (all merged), `d74-decoration-channel`, `i15-outline-completeness`. |
+| **Gate** | re-run on the fully combined tree (`main` + `fp2dxf-integration`): pending this re-cut's own commit. Last confirmations: `main`@`b6ac4d1` GREEN, `collected=754`; `fp2dxf-integration`'s own branch GREEN before this merge, `collected=761` (the branch's 7 additional `fp2dxf`/hook tests). CI on PR #32 green on all six jobs before merge. Extrudability census (`0050` §3 step 3, already landed with PR #32): `glass_shower` 0→2 filled shapes, `shower` 2 filled/1 frag/no region, `walk_in_shower` 3 filled/1 frag/has region — all three predicates pass. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **80 records, 31 open** (D79 — six fragmented catalog symbols, one record, `bicycle` cited to `0013-ruling.md`, three pointed at the vehicle loft, two open — now on `main`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |

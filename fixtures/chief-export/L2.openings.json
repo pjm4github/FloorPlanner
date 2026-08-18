@@ -1,0 +1,44 @@
+{
+  "uW1": {
+    "wall": "uAB",
+    "kind": "window",
+    "code": "3050",
+    "station_in": [
+      105.0,
+      135.0
+    ],
+    "sill_in": 30,
+    "head_in": 80,
+    "door_type": null,
+    "hinge": null,
+    "swings_toward": null
+  },
+  "uW2": {
+    "wall": "uCD",
+    "kind": "window",
+    "code": "3050",
+    "station_in": [
+      40.0,
+      70.0
+    ],
+    "sill_in": 30,
+    "head_in": 80,
+    "door_type": null,
+    "hinge": null,
+    "swings_toward": null
+  },
+  "uD1": {
+    "wall": "uMID",
+    "kind": "door",
+    "code": "3080",
+    "station_in": [
+      105.0,
+      135.0
+    ],
+    "sill_in": null,
+    "head_in": null,
+    "door_type": "hinged",
+    "hinge": "v1",
+    "swings_toward": "left"
+  }
+}
