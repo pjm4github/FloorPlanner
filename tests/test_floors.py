@@ -168,6 +168,37 @@ def test_v3_file_loads_as_single_default_floor(fp, win):
     assert walls and all(w.floor == fp.DEFAULT_FLOOR for w in walls)
 
 
+def test_align_to_wall_does_not_snap_to_a_hidden_floor(fp, win):
+    """0061-ruling.md: `PlanView._align_to_wall` (view.py:244) scans
+    `scene.items()` -- the WHOLE scene, every floor -- with no `.floor`
+    filter, unlike `nearest_wall_endpoint`/`nearest_wall_body` above, which
+    both check `it.floor == active`. Patrick's report, clause for clause:
+    a wall drawn on the working floor can snap its free end onto an open
+    end left dangling on a HIDDEN floor ("wrong after release"), and only
+    when that end falls within the zoom-dependent tolerance ("sometimes").
+    Fail-first per the ruling's own order: this must be RED before the
+    filter is added and GREEN after -- see the fix beside it in view.py.
+
+    This synthetic scene stands in for `fixtures/crossfloor-snap-2026-08-17.json`
+    (`fixtures/README.md`), Patrick's own two-storey plan and the report
+    behind this whole thread -- minimal and deterministic where the real
+    151-wall plan is neither, and it reproduces the mechanism directly."""
+    sc = win.scene
+    hidden = fp.WallItem(QPointF(500, 500), QPointF(620, 500), "interior")
+    hidden.floor = "Upper"
+    sc.addItem(hidden)
+    assert win.active_floor == fp.DEFAULT_FLOOR
+    assert fp.floor_display_mode("Upper") == "hidden"       # unmistakably not shown
+
+    # a wall drawn on the active floor, its free end within snap tolerance
+    # of the hidden wall's open end (500, 500) -- calls the production
+    # predicate directly rather than restating its math
+    pt = QPointF(505, 300)
+    aligned = win.view._align_to_wall(None, pt, horizontal=True)
+    assert aligned.x() == pytest.approx(pt.x()), (
+        "a new wall's endpoint snapped to an open end on a hidden floor")
+
+
 def test_refresh_rooms_cmd_spares_inactive_floor_rooms(fp, win, make_room):
     # defect 2 (P0.5): refresh_rooms_cmd tests room_walled against the ACTIVE
     # floor's walls, so a room parked on another floor looked unwalled and was
