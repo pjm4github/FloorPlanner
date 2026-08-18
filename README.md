@@ -311,6 +311,11 @@ one wall, a zero-length wall). Furnishings, reference images and dimension
 annotations are **not** exported — FloorPlanner owns plan topology, Chief
 owns construction build-up (platforms, roof, framing).
 
+**Before exporting, check Edit ▸ "Wall orthogonality report…".** A wall
+that is a fraction of a degree off axis draws as straight in FloorPlanner
+but reads as a real angle to Chief's CAD to Walls importer — this is the
+tool that tells you before Chief does.
+
 ### Why the export looks the way it does
 
 - **Coordinates.** FloorPlanner is plan-inches, x-right, **y-down** (Qt

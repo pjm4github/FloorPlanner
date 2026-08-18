@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 575508f -->
+<!-- SNAPSHOT-HEAD: 0763f12 -->
 
 # Session snapshot — read this first
 
@@ -244,6 +244,18 @@ merge condition. Full receipt: [`handoff/0050-report.md`](handoff/0050-report.md
    itself (item 4 above) is unchanged but its read-back still owes one more
    clause: does snapping cover the *output* of an operation, or only cursor
    input? **Item C (a repair) is RED — no ruling exists, none owed here.**
+   **The corpus census B's whole justification depended on — run
+   ([`0057`](handoff/0057-ruling.md) §2 / [`0058-report.md`](handoff/0058-report.md)):**
+   948 walls across 16 v5 plans (`docs/evidence/orthogonality_census.py`,
+   8 files skipped and each named why), **63 within 1° of orthogonal
+   without being on it** — `0055`'s own input to item C's tolerance
+   argument. Two more of `0055`'s own claimed numbers independently
+   reproduced (both `wiscaway` files, exact match). One outlier named, not
+   triaged: `fixtures/incoming/crossfloor-snap-2026-08-17.json`, 36 walls
+   over 5°, belongs to the cross-floor-snapping thread (below, not
+   numbered in this queue), not this one. A guide line added to
+   `README.md`'s export section pointing at
+   the report before exporting.
 
 **Full tiered queue (A2–A5, the command-roster census, Phase 5's remainder,
 etc.):** [`ROADMAP.md`](ROADMAP.md) §3. **`boat_trailer` and the vehicle
@@ -309,7 +321,7 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`575508f`** — the two-PR snapshot re-cut (`15bd553`, PR #33) plus item B, the orthogonality report (`0055`/`0056`). Full trail: `handoff/README.md`'s pair table. |
+| **`main`** | **`0763f12`** — the two-PR snapshot re-cut (`15bd553`, PR #33) plus item B, the orthogonality report (`0055`/`0056`). Full trail: `handoff/README.md`'s pair table. |
 | **Branches** | **None open from this session.** `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
 | **Gate** | re-run on `main`@`15bd553`'s own tree pending this re-cut's own commit. Last confirmations: PR #33 CI green on all six jobs (including the previously-red `records (gate --docs)` job — resolved once the branch picked up `main`'s current tip) before merge; `fp2dxf-integration`'s own combined-tree gate GREEN, `collected=761`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **80 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
