@@ -83,6 +83,65 @@ class GapReviewDialog(QDialog):
         self.refresh()
 
 
+class OrthogonalityReportDialog(QDialog):
+    """0055-ruling.md item B: a REPORT, not a repair. Names every wall
+    within a few degrees of axis-aligned but not on it, so "Chief complains
+    about my walls" becomes a number Patrick can act on -- WITHOUT deciding
+    for him which walls are deliberate diagonals and which are join-artifact
+    drift (SS5: that question is explicitly not settled here). There is no
+    button that changes a wall's angle; item C (a repair) is unruled and out
+    of this dialog's scope on purpose."""
+
+    def __init__(self, win):
+        super().__init__(win)
+        self.win = win
+        self.setWindowTitle("Wall orthogonality report")
+        self.resize(560, 380)
+        lay = QVBoxLayout(self)
+        self.info = QLabel()
+        self.info.setWordWrap(True)
+        lay.addWidget(self.info)
+        self.listw = QListWidget()
+        lay.addWidget(self.listw)
+        b_done = QPushButton("Close")
+        b_done.clicked.connect(self.accept)
+        lay.addWidget(b_done)
+        self.refresh()
+
+    def refresh(self):
+        import warnings
+        from floorplanner.design.bridge import design_from_scene
+        from floorplanner.design.validate import (
+            ORTHOGONALITY_BANDS, orthogonality_bands, wall_orthogonality,
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            doc = design_from_scene(self.win).to_dict()
+        levels = {lv["id"]: lv["name"] for lv in doc.get("levels", [])}
+        rows = wall_orthogonality(doc)
+        bands = orthogonality_bands(rows)
+        summary = ", ".join(f"{bands[label]} {label}"
+                            for _lo, _hi, label in ORTHOGONALITY_BANDS
+                            if bands[label])
+        offaxis = [r for r in rows if r[3] > 0.01]
+        self.listw.clear()
+        for wid, lvl, typ, deg in offaxis:
+            self.listw.addItem(
+                f"{levels.get(lvl, lvl)}: wall {wid} ({typ}) is {deg:.2f} "
+                f"degrees off axis")
+        if offaxis:
+            self.info.setText(
+                f"{len(offaxis)} of {len(rows)} wall(s) are off axis: "
+                f"{summary}. A small deviation (well under 1 degree) is "
+                "often not a deliberate diagonal -- it can be left over "
+                "from a move, join, weld or coalesce. This report only "
+                "lists them; nothing here changes a wall's angle.")
+        else:
+            self.info.setText(
+                f"All {len(rows)} wall(s) are axis-aligned (or a deliberate "
+                "diagonal within 0.01 degrees of one).")
+
+
 # Inventory table headers (itemised plan tables, exportable to CSV).
 FURN_INV_HEADERS = ["Item", "Quantity", "Unit price", "Line total"]
 HOUSE_INV_HEADERS = ["Item", "Detail", "Quantity", "Size"]

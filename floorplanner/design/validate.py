@@ -597,3 +597,69 @@ def report(d):
         rows.append((r["name"], abs(_area2(pts)) / 2 / 144, per / 12,
                      len(r["outline"]), openn, r["placement"]["state"], acc))
     return rows
+
+
+def wall_angle_deviation_deg(a, b):
+    """Degrees off the nearest axis-aligned angle, in `[0, 45]` -- 0 is
+    perfectly orthogonal, 45 is a perfect diagonal. Read the same whether the
+    wall is a deliberate 45-degree bay or a join artifact that happens to
+    land there: this measures WHAT the geometry is, not WHY it got that way
+    (0055-ruling.md SS5 declines that question on purpose)."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    if dx == 0.0 and dy == 0.0:
+        return 0.0
+    deg = math.degrees(math.atan2(dy, dx)) % 90.0
+    return min(deg, 90.0 - deg)
+
+
+def wall_orthogonality(d):
+    """Per-wall deviation from the nearest axis-aligned angle --
+    0055-ruling.md's item B, THE REPORT, not the repair (item C, unruled).
+    Grid snap constrains new cursor input; it cannot see a wall an existing
+    operation (move/join/weld/coalesce) already rotated off axis after the
+    fact, and this measures exactly that population, worst first.
+
+    Returns `[(wall_id, level, type, deg)]`. A wall with a missing or
+    coincident vertex pair is already an I2/I3 violation and is skipped here
+    -- this is a report about walls that are VALID but not quite straight,
+    not a second copy of `check()`."""
+    V = {v["id"]: (v["x"], v["y"]) for v in d["vertices"]}
+    out = []
+    for w in d["walls"]:
+        a, b = V.get(w["v1"]), V.get(w["v2"])
+        if a is None or b is None:
+            continue
+        out.append((w["id"], w["level"], w["type"],
+                     wall_angle_deviation_deg(a, b)))
+    return sorted(out, key=lambda t: -t[3])
+
+
+ORTHOGONALITY_BANDS = (
+    (5.0, math.inf, "> 5 deg"),
+    (1.0, 5.0, "1-5 deg"),
+    (0.1, 1.0, "0.1-1 deg"),
+    (0.01, 0.1, "0.01-0.1 deg"),
+    (0.0, 0.01, "< 0.01 deg"),
+)
+"""0055-ruling.md SS2's five deviation bands, in degrees, worst first.
+Each band is `(lo, hi, label)` with `lo < deg <= hi`, except the last, which
+also takes `deg == 0.0` (an exactly axis-aligned wall). ASCII labels
+deliberately -- no degree sign -- SESSION_SNAPSHOT.md SS5: the test
+console is cp1252, and a label that appears in an assertion diff must not
+be able to crash the very failure message reporting it."""
+
+
+def orthogonality_bands(rows):
+    """Bucket `wall_orthogonality()`'s rows into `ORTHOGONALITY_BANDS`.
+
+    Returns `{label: count}`, ZERO-FILLED for every band even when empty --
+    an instrument that only prints the bands it found something in cannot be
+    told apart from one that never ran (the positive-control family,
+    `WORKING_AGREEMENT.md`)."""
+    counts = {label: 0 for _lo, _hi, label in ORTHOGONALITY_BANDS}
+    for _wid, _lvl, _typ, deg in rows:
+        for lo, hi, label in ORTHOGONALITY_BANDS:
+            if lo < deg <= hi or (lo == 0.0 and deg == 0.0):
+                counts[label] += 1
+                break
+    return counts

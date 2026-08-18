@@ -17,7 +17,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from floorplanner.design.validate import (  # noqa: E402  (after sys.path setup)
-    check, load_schema, report, schema_errors,
+    ORTHOGONALITY_BANDS, check, load_schema, orthogonality_bands, report,
+    schema_errors, wall_orthogonality,
 )
 
 
@@ -52,6 +53,20 @@ def main(argv):
     one = sum(1 for w in doc["walls"] if bool(w.get("left")) != bool(w.get("right")))
     print(f"\nwalls shared by two rooms {sh} | bounding one room {one} | "
           f"free {len(doc['walls']) - sh - one}")
+
+    # 0055-ruling.md item B: a REPORT, not a repair -- names how many walls
+    # sit off axis and by how much; fixes nothing, snaps nothing.
+    orows = wall_orthogonality(doc)
+    obands = orthogonality_bands(orows)
+    print("\northogonality (deviation from the nearest axis-aligned angle):")
+    for _lo, _hi, label in ORTHOGONALITY_BANDS:
+        print(f"  {label:<14}{obands[label]}")
+    worst = [r for r in orows if r[3] > 0.01][:8]
+    if worst:
+        print("  worst offenders (wall, level, type, deg):")
+        for wid, lvl, typ, deg in worst:
+            print(f"    {wid:<6}{lvl:<6}{typ:<12}{deg:.4f}")
+
     return 1 if (serr or ierr) else 0
 
 

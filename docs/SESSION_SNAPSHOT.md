@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 15bd553 -->
+<!-- SNAPSHOT-HEAD: 575508f -->
 
 # Session snapshot — read this first
 
@@ -228,18 +228,22 @@ merge condition. Full receipt: [`handoff/0050-report.md`](handoff/0050-report.md
    **different** message. `tests/test_verify_gate_hook.py`, 18 tests against
    an isolated fixture repo, caught a real `"pushs"` pluralisation bug before
    it shipped. Full receipt: [`handoff/0049-report.md`](handoff/0049-report.md).
-7. **An orthogonality REPORT — new, not started, GREEN.**
-   [`handoff/0055-ruling.md`](handoff/0055-ruling.md): grid snap will NOT fix
-   the off-axis walls Patrick's own export showed Chief flagging — measured
-   as two populations (`L1`'s large angles are likely real architecture,
-   `L2`'s 75 sub-2° deviations are drift, not drawing) produced by
-   operations (move/join/weld/coalesce) relocating a vertex, which snap
-   (constrains cursor input only) cannot touch. Build a `check()` report or
-   menu item naming every wall within N° of axis first — cheap, and it is
-   the receipt for whether a later repair (RED, unauthorised, its own
-   ruling owed) ever worked. Grid snap itself (item 4 above) is unchanged
-   but its read-back now owes one more clause: does snapping cover the
-   *output* of an operation, or only cursor input?
+7. **An orthogonality REPORT — DONE (item B only; item C is a separate,
+   unauthorised repair).** [`handoff/0055-ruling.md`](handoff/0055-ruling.md):
+   grid snap will NOT fix the off-axis walls Patrick's own export showed
+   Chief flagging — measured as two populations (`L1`'s large angles are
+   likely real architecture, `L2`'s 75 sub-2° deviations are drift, not
+   drawing) produced by operations (move/join/weld/coalesce) relocating a
+   vertex, which snap (constrains cursor input only) cannot touch.
+   `floorplanner/design/validate.py` gains `wall_orthogonality()` /
+   `orthogonality_bands()`, wired into both `tools/validate_design.py` (the
+   corpus census) and a new Edit ▸ "Wall orthogonality report…" dialog.
+   Cross-checked against `0055`'s own corpus numbers (6/2 off-axis walls),
+   not just written to pass — matched. 17 new tests, gate GREEN. Full
+   receipt: [`handoff/0056-report.md`](handoff/0056-report.md). Grid snap
+   itself (item 4 above) is unchanged but its read-back still owes one more
+   clause: does snapping cover the *output* of an operation, or only cursor
+   input? **Item C (a repair) is RED — no ruling exists, none owed here.**
 
 **Full tiered queue (A2–A5, the command-roster census, Phase 5's remainder,
 etc.):** [`ROADMAP.md`](ROADMAP.md) §3. **`boat_trailer` and the vehicle
@@ -305,7 +309,7 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`15bd553`** — merge of [PR #33](https://github.com/pjm4github/FloorPlanner/pull/33) (`fp2dxf-integration`, Patrick's Chief Architect check passed) into `b6ac4d1` (PR #32, the shower redraws). Fast-forwarded locally, pushed. **Both PRs from this session's queue are now closed.** Full trail: `handoff/README.md`'s pair table. |
+| **`main`** | **`575508f`** — the two-PR snapshot re-cut (`15bd553`, PR #33) plus item B, the orthogonality report (`0055`/`0056`). Full trail: `handoff/README.md`'s pair table. |
 | **Branches** | **None open from this session.** `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
 | **Gate** | re-run on `main`@`15bd553`'s own tree pending this re-cut's own commit. Last confirmations: PR #33 CI green on all six jobs (including the previously-red `records (gate --docs)` job — resolved once the branch picked up `main`'s current tip) before merge; `fp2dxf-integration`'s own combined-tree gate GREEN, `collected=761`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **80 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |

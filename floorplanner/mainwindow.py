@@ -334,6 +334,9 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         a_gaps = QAction("Review wall gaps…", self)
         a_gaps.triggered.connect(self.review_wall_gaps)
         m_edit.addAction(a_gaps)
+        a_ortho = QAction("Wall orthogonality report…", self)  # 0055-ruling.md item B
+        a_ortho.triggered.connect(self.review_wall_orthogonality)
+        m_edit.addAction(a_ortho)
 
         # A VIEW MENU, and 3D view is its first item (D53). It had NO menu-bar
         # entry, no shortcut and no toolbar button: `show_3d_view`'s only two
@@ -1299,6 +1302,13 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         band; the user closes chosen pairs one at a time. A deliberate 6"
         reveal left alone stays exactly as drawn."""
         GapReviewDialog(self).exec()
+
+    def review_wall_orthogonality(self):
+        """Edit ▸ Wall orthogonality report… -- 0055-ruling.md item B, a
+        REPORT, not a repair. Names every wall off axis and by how much;
+        does not decide which are deliberate diagonals and which are drift,
+        and nothing in it changes a wall's angle (item C, unruled)."""
+        OrthogonalityReportDialog(self).exec()
 
     def _selection_spec(self):
         """Selected walls/furnishings (groups expand to their members)
