@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 2a11f98 -->
+<!-- SNAPSHOT-HEAD: 15bd553 -->
 
 # Session snapshot — read this first
 
@@ -129,8 +129,8 @@ landed alongside — a correction to how Patrick's own shower check is run
 (against the wrong branch), tier NONE, no action item for Code.
 
 **[`0044`](handoff/0044-ruling.md) §3 item 6 / [`0047`](handoff/0047-ruling.md)
-§5's `fp2dxf` DXF integration is BUILT, CHECKED, MERGING — [PR #33](https://github.com/pjm4github/FloorPlanner/pull/33)
-(branch `fp2dxf-integration`).** The zip unpacked and deleted, the golden DXF
+§5's `fp2dxf` DXF integration is BUILT, CHECKED, MERGED — [PR #33](https://github.com/pjm4github/FloorPlanner/pull/33)
+→ `main` at `15bd553`, closing this list's last item.** The zip unpacked and deleted, the golden DXF
 pair regenerated against `STD_T` (diff stated in full: only
 `exterior`/`railing` moved), the README split (the verified Chief Architect
 workflow transcribed, not summarised, into the root `README.md` — not
@@ -228,6 +228,18 @@ merge condition. Full receipt: [`handoff/0050-report.md`](handoff/0050-report.md
    **different** message. `tests/test_verify_gate_hook.py`, 18 tests against
    an isolated fixture repo, caught a real `"pushs"` pluralisation bug before
    it shipped. Full receipt: [`handoff/0049-report.md`](handoff/0049-report.md).
+7. **An orthogonality REPORT — new, not started, GREEN.**
+   [`handoff/0055-ruling.md`](handoff/0055-ruling.md): grid snap will NOT fix
+   the off-axis walls Patrick's own export showed Chief flagging — measured
+   as two populations (`L1`'s large angles are likely real architecture,
+   `L2`'s 75 sub-2° deviations are drift, not drawing) produced by
+   operations (move/join/weld/coalesce) relocating a vertex, which snap
+   (constrains cursor input only) cannot touch. Build a `check()` report or
+   menu item naming every wall within N° of axis first — cheap, and it is
+   the receipt for whether a later repair (RED, unauthorised, its own
+   ruling owed) ever worked. Grid snap itself (item 4 above) is unchanged
+   but its read-back now owes one more clause: does snapping cover the
+   *output* of an operation, or only cursor input?
 
 **Full tiered queue (A2–A5, the command-roster census, Phase 5's remainder,
 etc.):** [`ROADMAP.md`](ROADMAP.md) §3. **`boat_trailer` and the vehicle
@@ -259,9 +271,9 @@ note; one handoff old, not yet two.
 > fixes. Numbering continues forward from `0038`.
 
 **`fp2dxf` (a v5 → Chief Architect DXF exporter, built outside this repo) —
-[`0038-ruling.md`](handoff/0038-ruling.md), DONE end to end, at
-[PR #33](https://github.com/pjm4github/FloorPlanner/pull/33) (branch
-`fp2dxf-integration`), Patrick's check PASSED, merging.** Accepted in principle:
+[`0038-ruling.md`](handoff/0038-ruling.md), DONE end to end and MERGED —
+[PR #33](https://github.com/pjm4github/FloorPlanner/pull/33) → `main` at
+`15bd553`. Patrick's check passed.** Accepted in principle:
 pure stdlib, a clean `convert()` API, a real differential-receipt finding
 (both doors import as windows). Thickness reads `STD_T` by path (the
 D73/D74 disease closed, not repeated), all three library-hygiene fixes
@@ -293,10 +305,10 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`b6ac4d1`** on `origin` — merge of [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32) (`shower-identity-redraws`: the three redraws, D79, the working-distance camera) into `54b4a88`+`fp2dxf`'s `0050-report.md` (`fb054e3`). This snapshot is cut on `fp2dxf-integration` at its own tip `2a11f98` (one parent of the merge-with-`main` commit about to land on this branch), not on `main` itself — see `handoff/README.md`'s pair table for the full trail. |
-| **Branches** | **`fp2dxf-integration`** — [PR #33](https://github.com/pjm4github/FloorPlanner/pull/33). **Patrick's Chief Architect check PASSED 2026‑08‑17** — exported `L1.dxf`/`L2.dxf` (the regenerated pair, not the originally-shipped sample, per [`0053`](handoff/0053-ruling.md) §2) and imported into Chief Architect X17. [`0038-ruling.md`](handoff/0038-ruling.md) §8's merge condition is met; brought current with `main` (8 behind) and merging next. Five spent branches already deleted, local and remote, per [`0053`](handoff/0053-ruling.md) §2 item 4: `d74-vessel-enclosure-split`, `mailbox-0050`, `shower-identity-redraws` (all merged), `d74-decoration-channel`, `i15-outline-completeness`. |
-| **Gate** | re-run on the fully combined tree (`main` + `fp2dxf-integration`): pending this re-cut's own commit. Last confirmations: `main`@`b6ac4d1` GREEN, `collected=754`; `fp2dxf-integration`'s own branch GREEN before this merge, `collected=761` (the branch's 7 additional `fp2dxf`/hook tests). CI on PR #32 green on all six jobs before merge. Extrudability census (`0050` §3 step 3, already landed with PR #32): `glass_shower` 0→2 filled shapes, `shower` 2 filled/1 frag/no region, `walk_in_shower` 3 filled/1 frag/has region — all three predicates pass. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **80 records, 31 open** (D79 — six fragmented catalog symbols, one record, `bicycle` cited to `0013-ruling.md`, three pointed at the vehicle loft, two open — now on `main`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
+| **`main`** | **`15bd553`** — merge of [PR #33](https://github.com/pjm4github/FloorPlanner/pull/33) (`fp2dxf-integration`, Patrick's Chief Architect check passed) into `b6ac4d1` (PR #32, the shower redraws). Fast-forwarded locally, pushed. **Both PRs from this session's queue are now closed.** Full trail: `handoff/README.md`'s pair table. |
+| **Branches** | **None open from this session.** `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
+| **Gate** | re-run on `main`@`15bd553`'s own tree pending this re-cut's own commit. Last confirmations: PR #33 CI green on all six jobs (including the previously-red `records (gate --docs)` job — resolved once the branch picked up `main`'s current tip) before merge; `fp2dxf-integration`'s own combined-tree gate GREEN, `collected=761`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Records** | **80 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |
