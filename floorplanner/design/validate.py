@@ -639,14 +639,25 @@ ORTHOGONALITY_BANDS = (
     (1.0, 5.0, "1-5 deg"),
     (0.1, 1.0, "0.1-1 deg"),
     (0.01, 0.1, "0.01-0.1 deg"),
-    (0.0, 0.01, "< 0.01 deg"),
+    (0.0, 0.01, "0 < dev < 0.01 deg"),
+    (None, None, "on axis"),
 )
-"""0055-ruling.md SS2's five deviation bands, in degrees, worst first.
-Each band is `(lo, hi, label)` with `lo < deg <= hi`, except the last, which
-also takes `deg == 0.0` (an exactly axis-aligned wall). ASCII labels
-deliberately -- no degree sign -- SESSION_SNAPSHOT.md SS5: the test
-console is cp1252, and a label that appears in an assertion diff must not
-be able to crash the very failure message reporting it."""
+"""0059-ruling.md SS2's six deviation bands, in degrees, worst first. Each
+band is `(lo, hi, label)` with `lo < deg <= hi`, except the last, `(None,
+None, "on axis")`, which takes `deg == 0.0` exactly and is matched
+separately rather than by range.
+
+0055-ruling.md's original five bands merged "exactly on axis" into "< 0.01
+deg", which let 791 of 948 corpus walls sit in one bucket mixing the two --
+undercounting 0059's own headline (63 walls within 1 deg of orthogonal
+without being on it) by the 12 that were exactly 0.0 and so never reached
+the range check at all. Splitting the bucket is what lets a reader
+reproduce that headline from the printed table (0059-ruling.md SS2: "print
+every raw value so a different cut needs no re-run").
+
+ASCII labels deliberately -- no degree sign -- SESSION_SNAPSHOT.md SS5: the
+test console is cp1252, and a label that appears in an assertion diff must
+not be able to crash the very failure message reporting it."""
 
 
 def orthogonality_bands(rows):
@@ -658,8 +669,11 @@ def orthogonality_bands(rows):
     `WORKING_AGREEMENT.md`)."""
     counts = {label: 0 for _lo, _hi, label in ORTHOGONALITY_BANDS}
     for _wid, _lvl, _typ, deg in rows:
+        if deg == 0.0:
+            counts["on axis"] += 1
+            continue
         for lo, hi, label in ORTHOGONALITY_BANDS:
-            if lo < deg <= hi or (lo == 0.0 and deg == 0.0):
+            if lo is not None and lo < deg <= hi:
                 counts[label] += 1
                 break
     return counts

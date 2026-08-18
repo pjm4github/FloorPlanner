@@ -34,8 +34,9 @@ def _v5_files():
 def main():
     grand_rows = []
     skipped = []                              # no silent drops: log what and why
-    print(f"{'file':<48}{'walls':>7}", "".join(f"{lbl:>12}" for _lo, _hi, lbl
-                                                in ORTHOGONALITY_BANDS))
+    labels = [lbl for _lo, _hi, lbl in ORTHOGONALITY_BANDS]
+    col_w = max(len(lbl) for lbl in labels) + 2
+    print(f"{'file':<48}{'walls':>7}", "".join(f"{lbl:>{col_w}}" for lbl in labels))
     for p in _v5_files():
         rel = str(p.relative_to(ROOT)).replace("\\", "/")
         try:
@@ -52,12 +53,12 @@ def main():
             continue
         bands = orthogonality_bands(rows)
         print(f"{rel:<48}{len(rows):>7}",
-              "".join(f"{bands[lbl]:>12}" for _lo, _hi, lbl in ORTHOGONALITY_BANDS))
+              "".join(f"{bands[lbl]:>{col_w}}" for lbl in labels))
         grand_rows.extend(rows)
 
     total_bands = orthogonality_bands(grand_rows)
     print(f"\n{'TOTAL':<48}{len(grand_rows):>7}",
-          "".join(f"{total_bands[lbl]:>12}" for _lo, _hi, lbl in ORTHOGONALITY_BANDS))
+          "".join(f"{total_bands[lbl]:>{col_w}}" for lbl in labels))
 
     within_1_not_on = sum(1 for *_rest, deg in grand_rows if 0.0 < deg <= 1.0)
     print(f"\nWalls within 1 degree of orthogonal WITHOUT being on it: "

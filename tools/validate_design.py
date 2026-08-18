@@ -59,8 +59,9 @@ def main(argv):
     orows = wall_orthogonality(doc)
     obands = orthogonality_bands(orows)
     print("\northogonality (deviation from the nearest axis-aligned angle):")
+    label_w = max(len(lbl) for _lo, _hi, lbl in ORTHOGONALITY_BANDS) + 2
     for _lo, _hi, label in ORTHOGONALITY_BANDS:
-        print(f"  {label:<14}{obands[label]}")
+        print(f"  {label:<{label_w}}{obands[label]}")
     worst = [r for r in orows if r[3] > 0.01][:8]
     if worst:
         print("  worst offenders (wall, level, type, deg):")

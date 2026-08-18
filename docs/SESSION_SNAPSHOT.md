@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 0763f12 -->
+<!-- SNAPSHOT-HEAD: 6c741c4 -->
 
 # Session snapshot — read this first
 
@@ -229,7 +229,7 @@ merge condition. Full receipt: [`handoff/0050-report.md`](handoff/0050-report.md
    an isolated fixture repo, caught a real `"pushs"` pluralisation bug before
    it shipped. Full receipt: [`handoff/0049-report.md`](handoff/0049-report.md).
 7. **An orthogonality REPORT — DONE (item B only; item C is a separate,
-   unauthorised repair).** [`handoff/0055-ruling.md`](handoff/0055-ruling.md):
+   unauthorised repair, still RED).** [`handoff/0055-ruling.md`](handoff/0055-ruling.md):
    grid snap will NOT fix the off-axis walls Patrick's own export showed
    Chief flagging — measured as two populations (`L1`'s large angles are
    likely real architecture, `L2`'s 75 sub-2° deviations are drift, not
@@ -245,17 +245,34 @@ merge condition. Full receipt: [`handoff/0050-report.md`](handoff/0050-report.md
    clause: does snapping cover the *output* of an operation, or only cursor
    input? **Item C (a repair) is RED — no ruling exists, none owed here.**
    **The corpus census B's whole justification depended on — run
-   ([`0057`](handoff/0057-ruling.md) §2 / [`0058-report.md`](handoff/0058-report.md)):**
-   948 walls across 16 v5 plans (`docs/evidence/orthogonality_census.py`,
-   8 files skipped and each named why), **63 within 1° of orthogonal
-   without being on it** — `0055`'s own input to item C's tolerance
-   argument. Two more of `0055`'s own claimed numbers independently
-   reproduced (both `wiscaway` files, exact match). One outlier named, not
-   triaged: `fixtures/incoming/crossfloor-snap-2026-08-17.json`, 36 walls
-   over 5°, belongs to the cross-floor-snapping thread (below, not
-   numbered in this queue), not this one. A guide line added to
-   `README.md`'s export section pointing at
-   the report before exporting.
+   ([`0057`](handoff/0057-ruling.md) §2 / [`0058-report.md`](handoff/0058-report.md)),
+   then corrected ([`0059-ruling.md`](handoff/0059-ruling.md) /
+   [`0060-report.md`](handoff/0060-report.md)):** 948 walls across 16 v5
+   plans (`docs/evidence/orthogonality_census.py`, 8 files skipped and each
+   named why). **`0058`'s printed table could not reproduce its own 63
+   headline** — the bottom band merged "exactly on axis" with "off by up to
+   0.01°", hiding 12 of the 63. `ORTHOGONALITY_BANDS` now splits that bucket
+   into `0.01-0.1 deg` / `0 < dev < 0.01 deg` / `on axis` (its own row,
+   matched on `deg == 0.0` rather than by range); both printers'
+   column-width bugs (exposed by the longer label) fixed alongside. Re-run:
+   **32 + 19 + 12 = 63, exactly** — the table now produces its own headline.
+   Two more of `0055`'s own claimed numbers independently reproduced (both
+   `wiscaway` files, exact match). **`0059`'s suggested separating
+   measurement (crossfloor plan vs `wiscaway2026-08-09R`'s off-axis rate)
+   run, and it does not separate the two** — `wiscaway2026-08-09R` (no
+   reported cross-floor symptom) has MORE walls over 5° (53) than the
+   crossfloor plan (36), correcting `0058`'s "highest in the corpus" framing;
+   orthogonality severity should not be read as evidence for the cross-floor
+   thread below. **`0037` §3's reachability census also run, folded in for
+   free per `0059` §5 item 3**: every mouse/macro hit-test and selection path
+   (`items.py`'s `hit_candidates()` and everything built on it — `view.py`'s
+   `hit`/`blank`/`_band_may_start`/rubber-band select/`_align_to_wall`,
+   `macro.py`'s `_opening`/`_cmd_select`) shares one root and none filter by
+   `.floor`, versus 100% of `walls.py`'s geometry hot paths, which do.
+   Currently masked by `apply_floor_visibility` running at load — not a
+   reproduced bug, no fix built (a fix is AMBER, per `0037` §6). A guide line
+   added to `README.md`'s export section pointing at the report before
+   exporting.
 
 **Full tiered queue (A2–A5, the command-roster census, Phase 5's remainder,
 etc.):** [`ROADMAP.md`](ROADMAP.md) §3. **`boat_trailer` and the vehicle
@@ -272,7 +289,16 @@ display state) **does not hold** — measured directly on Patrick's own
 submitted plan, both by code reading and by a live headless probe:
 `apply_design_to_scene` already calls `win._sync_floor_state()`
 (`floorplanner/design/bridge.py:1265`, present since 2026‑07‑26). See
-[`0038-report.md`](handoff/0038-report.md). **Reopens [`0036-ruling.md`](handoff/0036-ruling.md)
+[`0038-report.md`](handoff/0038-report.md). **`0037` §3's narrowed census —
+run** ([`0060-report.md`](handoff/0060-report.md), folded into the
+orthogonality item above per [`0059`](handoff/0059-ruling.md) §5 item 3):
+every mouse/macro reachability path (`items.py`'s `hit_candidates()` and
+everything built on it) trusts Qt's visible/enabled state alone, versus
+`walls.py`'s geometry hot paths, which all check `.floor` directly — a
+structural gap ("a derived property that must be manually re-applied is not
+derived — it is cached," `0037` §5), currently masked because
+`apply_floor_visibility` does run at load. Not a reproduced bug; no fix
+built (AMBER). **Reopens [`0036-ruling.md`](handoff/0036-ruling.md)
 §3's own discriminator** (does the saved document change across the
 gesture?), still unrun — blocked on two facts neither ruling nor the intake
 file states (was `show_others` on; did the wall stay moved after release).
@@ -321,9 +347,9 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`0763f12`** — the two-PR snapshot re-cut (`15bd553`, PR #33) plus item B, the orthogonality report (`0055`/`0056`). Full trail: `handoff/README.md`'s pair table. |
+| **`main`** | **`6c741c4`** at this file's cut — the census run (`0055`/`0056`/`0057`/`0058`) plus, in this pending commit, `0059`'s band-split correction, the crossfloor-vs-`wiscaway09R` rate comparison, and `0037` §3's reachability census (`0059`/`0060`). Full trail: `handoff/README.md`'s pair table. |
 | **Branches** | **None open from this session.** `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
-| **Gate** | re-run on `main`@`15bd553`'s own tree pending this re-cut's own commit. Last confirmations: PR #33 CI green on all six jobs (including the previously-red `records (gate --docs)` job — resolved once the branch picked up `main`'s current tip) before merge; `fp2dxf-integration`'s own combined-tree gate GREEN, `collected=761`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **Gate** | full mode, re-run for this commit. Last confirmations: PR #33 CI green on all six jobs (including the previously-red `records (gate --docs)` job — resolved once the branch picked up `main`'s current tip) before merge; `fp2dxf-integration`'s own combined-tree gate GREEN, `collected=761`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **80 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |

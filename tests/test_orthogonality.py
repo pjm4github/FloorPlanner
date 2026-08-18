@@ -148,7 +148,8 @@ def test_bands_sort_each_row_into_exactly_one_band():
     assert bands["1-5 deg"] == 1
     assert bands["0.1-1 deg"] == 1
     assert bands["0.01-0.1 deg"] == 1
-    assert bands["< 0.01 deg"] == 2
+    assert bands["on axis"] == 1
+    assert bands["0 < dev < 0.01 deg"] == 1
     assert sum(bands.values()) == len(rows)
 
 
