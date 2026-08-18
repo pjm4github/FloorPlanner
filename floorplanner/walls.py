@@ -801,10 +801,13 @@ def delete_wall(scene, wall, settle=True):
         rebuild_all_walls(scene)
 
 
-def wall_endpoint_open(scene, p: QPointF, ignore=()) -> bool:
+def wall_endpoint_open(scene, p: QPointF, ignore=(), floor=None) -> bool:
     """True when `p` is a free, dangling wall end: no other (non-open) wall has
     an endpoint within JOIN_TOL of it.  Walls in `ignore` are skipped (the
-    endpoint's own wall, and the wall being drawn).
+    endpoint's own wall, and the wall being drawn). `floor`, when given,
+    restricts the scan to that floor's own network -- otherwise a wall on a
+    different floor that happens to land nearby could mark an active-floor
+    end as joined when its own floor's network leaves it dangling (0061-ruling.md).
 
     THIS IS RIGHTLY SPATIAL, AND IT STAYS THAT WAY -- it is not a survivor of
     the pre-vertex world awaiting migration to vertex degree, so please do not
@@ -826,6 +829,8 @@ def wall_endpoint_open(scene, p: QPointF, ignore=()) -> bool:
         return False
     for w in scene.items():
         if not isinstance(w, WallItem) or w in ignore:
+            continue
+        if floor is not None and w.floor != floor:
             continue
         if (QLineF(w.p1, p).length() < JOIN_TOL
                 or QLineF(w.p2, p).length() < JOIN_TOL):
