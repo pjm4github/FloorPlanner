@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 6c741c4 -->
+<!-- SNAPSHOT-HEAD: 404ed89 -->
 
 # Session snapshot — read this first
 
@@ -265,14 +265,38 @@ merge condition. Full receipt: [`handoff/0050-report.md`](handoff/0050-report.md
    orthogonality severity should not be read as evidence for the cross-floor
    thread below. **`0037` §3's reachability census also run, folded in for
    free per `0059` §5 item 3**: every mouse/macro hit-test and selection path
-   (`items.py`'s `hit_candidates()` and everything built on it — `view.py`'s
-   `hit`/`blank`/`_band_may_start`/rubber-band select/`_align_to_wall`,
-   `macro.py`'s `_opening`/`_cmd_select`) shares one root and none filter by
-   `.floor`, versus 100% of `walls.py`'s geometry hot paths, which do.
-   Currently masked by `apply_floor_visibility` running at load — not a
-   reproduced bug, no fix built (a fix is AMBER, per `0037` §6). A guide line
-   added to `README.md`'s export section pointing at the report before
-   exporting.
+   shares one root (`items.py`'s `hit_candidates()`) and none filter by
+   `.floor`, versus 100% of `walls.py`'s geometry hot paths, which do. **The
+   census found a live one** ([`0061-ruling.md`](handoff/0061-ruling.md)):
+   `view.py:244` `PlanView._align_to_wall` scans bare `sc.items()`, not
+   `items(pos)`, so — unlike the other reachability sites, which Qt's own
+   visibility filtering already masks — it is NOT masked, and a wall drawn on
+   the active floor could snap its free end onto an open end on a hidden
+   floor, matching Patrick's cross-floor report clause for clause. **Fixed on
+   branch `cross-floor-align-fix`** ([`0062-report.md`](handoff/0062-report.md)):
+   a fail-first test confirmed RED (`500.0` where `505.0` was drawn) then
+   GREEN after `_align_to_wall`/`wall_endpoint_open` both gained the
+   `.floor == active` filter every other hot path already had; the
+   long-untriaged `fixtures/incoming/crossfloor-snap-2026-08-17.json`
+   promoted to `fixtures/` (real corpus evidence, kept; the defect itself
+   covered by the synthetic test). **[PR #34](https://github.com/pjm4github/FloorPlanner/pull/34)
+   open, AMBER, stopped for Patrick's manual check** — *"with the second
+   floor hidden, does a wall you draw still jump to something you cannot
+   see?"* [`0063-ruling.md`](handoff/0063-ruling.md) accepts the fix and adds
+   `wall_endpoint_open`'s `floor=` param as more than asked (a second,
+   previously-unreported half of the same fault, reasoned from the
+   mechanism), but flags the fail-first test as a negative assertion with no
+   positive-control pairing (D43/positive-control family) — **owed on the
+   branch: a control assertion, same scene, active floor, alignment must
+   still fire.** Also flags a fourth `fixtures/incoming/` exit as needed
+   (promoted as measurement subject, no test) — **added to
+   `fixtures/incoming/README.md`.** Three more items named, not built: the
+   four masked reachability sites (no receipt yet), `wall_endpoint_open`'s
+   `floor=None` default (should invert, but changes two existing callers
+   with no receipt), and — unaffected by any of this — **item C's ruling,
+   still Patrick's, still RED, now the oldest item on his side.** A guide
+   line added to `README.md`'s export section pointing at the orthogonality
+   report before exporting.
 
 **Full tiered queue (A2–A5, the command-roster census, Phase 5's remainder,
 etc.):** [`ROADMAP.md`](ROADMAP.md) §3. **`boat_trailer` and the vehicle
@@ -347,8 +371,8 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`6c741c4`** at this file's cut — the census run (`0055`/`0056`/`0057`/`0058`) plus, in this pending commit, `0059`'s band-split correction, the crossfloor-vs-`wiscaway09R` rate comparison, and `0037` §3's reachability census (`0059`/`0060`). Full trail: `handoff/README.md`'s pair table. |
-| **Branches** | **None open from this session.** `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
+| **`main`** | **`404ed89`** at this file's cut — `444996a` (the band-split correction, the rate comparison, `0037` §3's census) then `404ed89` (the `0061`/`0062`/`0063` mailbox pair, doc-only — the code they describe stays on the AMBER branch below, per `0051`/`0053`'s "mailbox lands on `main` first" rule). Full trail: `handoff/README.md`'s pair table. |
+| **Branches** | **`cross-floor-align-fix`, open — [PR #34](https://github.com/pjm4github/FloorPlanner/pull/34), AMBER, stopped for Patrick's manual check.** The `_align_to_wall` cross-floor snap fix; `0063-ruling.md`'s control-assertion addition is owed there next. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
 | **Gate** | full mode, re-run for this commit. Last confirmations: PR #33 CI green on all six jobs (including the previously-red `records (gate --docs)` job — resolved once the branch picked up `main`'s current tip) before merge; `fp2dxf-integration`'s own combined-tree gate GREEN, `collected=761`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **80 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
