@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 404ed89 -->
+<!-- SNAPSHOT-HEAD: 5d85b09 -->
 
 # Session snapshot — read this first
 
@@ -371,7 +371,7 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`404ed89`** at this file's cut — `444996a` (the band-split correction, the rate comparison, `0037` §3's census) then `404ed89` (the `0061`/`0062`/`0063` mailbox pair, doc-only — the code they describe stays on the AMBER branch below, per `0051`/`0053`'s "mailbox lands on `main` first" rule). Full trail: `handoff/README.md`'s pair table. |
+| **`main`** | **`5d85b09`** at this file's cut — `444996a` (the band-split correction, the rate comparison, `0037` §3's census), `404ed89` (the `0061`/`0062`/`0063` mailbox pair, doc-only — the code they describe stays on the AMBER branch below), `f93e9dd` (the snapshot re-cut plus `incoming/`'s fourth exit), then `5d85b09` — outside the handoff queue, Patrick asked directly in-session: the status bar now shows the selected wall's id and its two vertex ids (`WallItem.uid`, mirroring `Vertex.uid`; cleared unless exactly one wall is selected). Full trail: `handoff/README.md`'s pair table. |
 | **Branches** | **`cross-floor-align-fix`, open — [PR #34](https://github.com/pjm4github/FloorPlanner/pull/34), AMBER, stopped for Patrick's manual check.** The `_align_to_wall` cross-floor snap fix; `0063-ruling.md`'s control-assertion addition is owed there next. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
 | **Gate** | full mode, re-run for this commit. Last confirmations: PR #33 CI green on all six jobs (including the previously-red `records (gate --docs)` job — resolved once the branch picked up `main`'s current tip) before merge; `fp2dxf-integration`'s own combined-tree gate GREEN, `collected=761`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **80 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
