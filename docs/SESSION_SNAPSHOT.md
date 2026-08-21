@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 6c741c4 -->
+<!-- SNAPSHOT-HEAD: d9c44de -->
 
 # Session snapshot — read this first
 
@@ -347,8 +347,8 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`6c741c4`** at this file's cut — the census run (`0055`/`0056`/`0057`/`0058`) plus, in this pending commit, `0059`'s band-split correction, the crossfloor-vs-`wiscaway09R` rate comparison, and `0037` §3's reachability census (`0059`/`0060`). Full trail: `handoff/README.md`'s pair table. |
-| **Branches** | **None open from this session.** `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
+| **`main`** | **This copy of the file is stale by construction** — it is `cross-floor-align-fix`'s own branch copy, unmerged, and the marker above (`d9c44de`) names THIS BRANCH'S tip, not `main`'s. `main`'s real, current state (band-split fix, `0037` §3's census, the `0061`/`0062`/`0063` mailbox pair) is on `main` itself, not reproduced here — per [`0063-ruling.md`](handoff/0063-ruling.md) §6, the branch carries only code, and the mailbox/snapshot record lives on `main`. Reconcile at merge. |
+| **Branches** | **`cross-floor-align-fix`, open — [PR #34](https://github.com/pjm4github/FloorPlanner/pull/34), AMBER, stopped for Patrick's manual check.** The `_align_to_wall` cross-floor snap fix plus its positive-control assertion ([`0063-ruling.md`](handoff/0063-ruling.md) §3). `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
 | **Gate** | full mode, re-run for this commit. Last confirmations: PR #33 CI green on all six jobs (including the previously-red `records (gate --docs)` job — resolved once the branch picked up `main`'s current tip) before merge; `fp2dxf-integration`'s own combined-tree gate GREEN, `collected=761`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **80 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |

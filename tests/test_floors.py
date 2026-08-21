@@ -178,6 +178,9 @@ def test_align_to_wall_does_not_snap_to_a_hidden_floor(fp, win):
     when that end falls within the zoom-dependent tolerance ("sometimes").
     Fail-first per the ruling's own order: this must be RED before the
     filter is added and GREEN after -- see the fix beside it in view.py.
+    Carries a positive control (0063-ruling.md sec3): the same geometry on
+    the ACTIVE floor must still align, so a filter that over-rejects and
+    kills alignment outright cannot pass this test by accident.
 
     This synthetic scene stands in for `fixtures/crossfloor-snap-2026-08-17.json`
     (`fixtures/README.md`), Patrick's own two-storey plan and the report
@@ -197,6 +200,17 @@ def test_align_to_wall_does_not_snap_to_a_hidden_floor(fp, win):
     aligned = win.view._align_to_wall(None, pt, horizontal=True)
     assert aligned.x() == pytest.approx(pt.x()), (
         "a new wall's endpoint snapped to an open end on a hidden floor")
+
+    # 0063-ruling.md sec3: the positive control -- the same geometry, an
+    # open end at the same offset, but on the ACTIVE floor. Without this,
+    # the assertion above is a pure negative ("nothing happened") and
+    # cannot tell a working filter apart from alignment having quietly
+    # stopped firing at all (D43's own shape). This must still snap.
+    near = fp.WallItem(QPointF(500, 700), QPointF(620, 700), "interior")
+    sc.addItem(near)
+    aligned2 = win.view._align_to_wall(None, QPointF(505, 300), horizontal=True)
+    assert aligned2.x() == pytest.approx(500.0), (
+        "alignment stopped snapping to an open end on the ACTIVE floor")
 
 
 def test_refresh_rooms_cmd_spares_inactive_floor_rooms(fp, win, make_room):
