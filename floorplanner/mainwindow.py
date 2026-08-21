@@ -90,6 +90,13 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
 
         self.coord_label = QLabel("")
         self.statusBar().addPermanentWidget(self.coord_label)
+        # the selected wall's identity: id + its two vertices, cleared unless
+        # exactly one wall is selected -- kept updated in _apply_edit_actions,
+        # the existing debounced selectionChanged handler, rather than a
+        # second listener
+        self.wall_label = QLabel("")
+        self.wall_label.setStyleSheet("QLabel { padding: 0 6px; }")
+        self.statusBar().addPermanentWidget(self.wall_label)
         # active-floor indicator: click to pop a quick floor-switch menu
         self.floor_label = QLabel("Floor: default")
         self.floor_label.setToolTip("Active floor — click to switch")
@@ -777,6 +784,19 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             self.a_align.setEnabled(n_shapes >= 1)
         for a in getattr(self, "_distribute_actions", []):
             a.setEnabled(n_shapes >= 3)
+        walls = [it for it in sel if isinstance(it, WallItem)]
+        if hasattr(self, "wall_label"):
+            self.wall_label.setText(self._wall_label_text(walls))
+
+    @staticmethod
+    def _wall_label_text(walls) -> str:
+        """The selected wall's id + its two vertex ids, for the status bar --
+        empty unless exactly one wall is selected (a count for N>1 would need
+        no lookup per wall and is not what was asked for)."""
+        if len(walls) != 1:
+            return ""
+        w = walls[0]
+        return f"Wall {w.uid}: {w.v1} -> {w.v2}"
 
     def nudge_selected(self, dx: int, dy: int, fine: bool = False) -> bool:
         """Arrow-key nudge of selected groups / ungrouped furnishings by one

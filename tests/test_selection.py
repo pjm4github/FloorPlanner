@@ -9,6 +9,34 @@ from PyQt6.QtCore import QPointF, QRectF
 pytestmark = pytest.mark.selection
 
 
+def test_selecting_one_wall_shows_its_id_and_vertices_on_the_status_bar(fp, win):
+    w = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    win.scene.addItem(w)
+    w.setSelected(True)
+    win._apply_edit_actions()
+    assert win.wall_label.text() == f"Wall {w.uid}: {w.v1} -> {w.v2}"
+
+
+def test_wall_label_clears_unless_exactly_one_wall_is_selected(fp, win):
+    w1 = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    w2 = fp.WallItem(QPointF(0, 50), QPointF(120, 50), "interior")
+    win.scene.addItem(w1)
+    win.scene.addItem(w2)
+
+    w1.setSelected(True)
+    win._apply_edit_actions()
+    assert win.wall_label.text() != ""            # exactly one: shown
+
+    w2.setSelected(True)
+    win._apply_edit_actions()
+    assert win.wall_label.text() == ""             # two selected: cleared
+
+    w1.setSelected(False)
+    w2.setSelected(False)
+    win._apply_edit_actions()
+    assert win.wall_label.text() == ""             # none selected: cleared
+
+
 def test_selects_only_fully_enclosed_walls(fp, win):
     sc = win.scene
     inside = fp.WallItem(QPointF(20, 20), QPointF(80, 20), "interior")

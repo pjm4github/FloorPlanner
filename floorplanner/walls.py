@@ -5,6 +5,7 @@ clipping, and the full-scene rebuild.
 rebuild_all_walls() refreshes rooms and a couple of WallItem actions touch
 room binding; those are LATE imports from floorplanner.rooms so this module
 stays importable before rooms (which imports this one)."""
+import itertools
 import math
 from collections import namedtuple
 
@@ -1254,6 +1255,9 @@ def _compute_wall_junctions(scene, walls=None):
         w.update()
 
 
+_WALL_UIDS = itertools.count(1)
+
+
 class WallItem(QGraphicsItem):
     """A straight wall segment.  Local coords == scene coords (pos stays 0,0).
 
@@ -1265,6 +1269,7 @@ class WallItem(QGraphicsItem):
     def __init__(self, p1: QPointF, p2: QPointF, wall_type: str = "exterior"):
         super().__init__()
         self.wall_type = wall_type
+        self._uid = None              # minted lazily on first read, see `uid`
         # P3.1: the geometry lives in VERTICES now. p1/p2 are read-through
         # properties over them, so every existing caller keeps working; two
         # wall ends referencing the SAME Vertex object are the same corner.
@@ -1287,6 +1292,20 @@ class WallItem(QGraphicsItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setZValue(WALL_Z)           # above the translucent room fill (3)
         self.rebuild()
+
+    @property
+    def uid(self) -> str:
+        """A stable, session-local identity for this wall item -- `"W1"`,
+        `"W2"`, ... Minted lazily on first read, then fixed for this item's
+        lifetime, same shape as `Vertex.uid`. NOT the id a saved document
+        assigns (`design_from_scene` renumbers geometrically at export --
+        `vertex.py`'s own module note); this is for a live editing session
+        only (the status bar, debugging), where lifting the whole scene to a
+        `Design` just to name one wall would be the per-event rebuild P3.4
+        forbids on the edit path."""
+        if self._uid is None:
+            self._uid = f"W{next(_WALL_UIDS)}"
+        return self._uid
 
     # -- vertices (P3.1) -----------------------------------------------------
     # p1/p2 read through to the vertex table; ASSIGNMENT IS SPLIT-ON-WRITE --

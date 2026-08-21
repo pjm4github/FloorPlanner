@@ -82,6 +82,20 @@ def test_draw_ignores_fully_joined_wall(fp, win):
     assert end.x() != pytest.approx(200)         # no snap to the joined wall
 
 
+def test_wall_uid_is_lazy_stable_and_distinct(fp, scene):
+    """`WallItem.uid` mirrors `Vertex.uid` exactly (vertex.py's own module
+    note): minted on first read, then fixed for the item's lifetime -- a
+    session-local identity for the status bar, not the id a saved document
+    assigns (that renumbers geometrically at export)."""
+    a = fp.WallItem(QPointF(0, 0), QPointF(100, 0), "interior")
+    b = fp.WallItem(QPointF(0, 50), QPointF(100, 50), "interior")
+    scene.addItem(a)
+    scene.addItem(b)
+    assert a.uid.startswith("W") and b.uid.startswith("W")
+    assert a.uid != b.uid
+    assert a.uid == a.uid                  # stable across repeated reads
+
+
 def test_wall_length_and_point_at(fp, scene):
     w = fp.WallItem(QPointF(0, 0), QPointF(100, 0), "interior")
     scene.addItem(w)
