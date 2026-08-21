@@ -39,6 +39,32 @@ def test_fmt_ftin(fp):
     assert fp.fmt_ftin(0) == "0'-0\""
 
 
+@pytest.mark.parametrize("inches,expect", [
+    (0, "0"), (120, "10"), (148.14, "12.3"), (6, "0.5"), (1500, "125"),
+])
+def test_fmt_ft3(fp, inches, expect):
+    """Decimal feet, 3 significant digits -- no unit suffix (callers append
+    one, since a coordinate pair wants it once, not per axis)."""
+    assert fp.fmt_ft3(inches) == expect
+
+
+@pytest.mark.parametrize("p1,p2,expect", [
+    ((0, 0), (100, 0), 0.0),          # due east
+    ((0, 0), (0, 100), 90.0),         # due north
+    ((0, 0), (-100, 0), 180.0),       # due west
+    ((0, 0), (0, -100), 270.0),       # due south -- NOT folded onto 90
+    ((0, 0), (100, 100), 45.0),
+])
+def test_heading_deg_exact_cardinals_and_a_diagonal(fp, p1, p2, expect):
+    h = fp.heading_deg(QPointF(*p1), QPointF(*p2))
+    assert h == pytest.approx(expect, abs=1e-9)
+
+
+def test_heading_deg_is_none_for_a_degenerate_pair(fp):
+    p = QPointF(5, 5)
+    assert fp.heading_deg(p, p) is None
+
+
 def test_grid_snap(fp):
     p = fp.grid_snap(QPointF(23, 7), step=12)
     assert (p.x(), p.y()) == (24, 12)

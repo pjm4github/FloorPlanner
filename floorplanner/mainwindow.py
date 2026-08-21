@@ -790,13 +790,25 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
 
     @staticmethod
     def _wall_label_text(walls) -> str:
-        """The selected wall's id + its two vertex ids, for the status bar --
-        empty unless exactly one wall is selected (a count for N>1 would need
-        no lookup per wall and is not what was asked for)."""
+        """The selected wall's id, its two vertices' id + (x, y) in decimal
+        feet (3 significant digits), its length, and its heading -- for the
+        status bar. Empty unless exactly one wall is selected. The heading
+        is omitted for an exactly axis-aligned wall (0/90/180/270) and shown
+        otherwise, drift included on purpose: a wall a fraction of a degree
+        off axis is exactly the class this project's own orthogonality
+        report exists to surface, and rounding it away here would hide the
+        same fact this label is for."""
         if len(walls) != 1:
             return ""
         w = walls[0]
-        return f"Wall {w.uid}: {w.v1} -> {w.v2}"
+        p1, p2 = w.p1, w.p2
+        text = (f"Wall {w.uid}: {w.v1}({fmt_ft3(p1.x())}, {fmt_ft3(p1.y())})ft"
+                f" -> {w.v2}({fmt_ft3(p2.x())}, {fmt_ft3(p2.y())})ft"
+                f"  len {fmt_ft3(w.length())}ft")
+        heading = heading_deg(p1, p2)
+        if heading is not None and heading % 90.0 != 0.0:
+            text += f"  angle {heading:.1f}deg"
+        return text
 
     def nudge_selected(self, dx: int, dy: int, fine: bool = False) -> bool:
         """Arrow-key nudge of selected groups / ungrouped furnishings by one

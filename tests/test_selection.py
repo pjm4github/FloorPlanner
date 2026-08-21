@@ -9,12 +9,28 @@ from PyQt6.QtCore import QPointF, QRectF
 pytestmark = pytest.mark.selection
 
 
-def test_selecting_one_wall_shows_its_id_and_vertices_on_the_status_bar(fp, win):
+def test_selecting_one_wall_shows_id_vertices_length_on_the_status_bar(fp, win):
+    """Axis-aligned (due east, 10ft) -- no angle clause: 0/90/180/270 is
+    the "nothing to report" case, per the format the angle test below
+    exercises the other half of."""
     w = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
     win.scene.addItem(w)
     w.setSelected(True)
     win._apply_edit_actions()
-    assert win.wall_label.text() == f"Wall {w.uid}: {w.v1} -> {w.v2}"
+    assert win.wall_label.text() == (
+        f"Wall {w.uid}: {w.v1}(0, 0)ft -> {w.v2}(10, 0)ft  len 10ft")
+
+
+def test_wall_label_shows_heading_for_a_non_axis_wall(fp, win):
+    """A 45-degree diagonal: the angle clause appears, and coordinates are
+    decimal feet to 3 significant digits, as asked."""
+    w = fp.WallItem(QPointF(0, 0), QPointF(100, 100), "interior")
+    win.scene.addItem(w)
+    w.setSelected(True)
+    win._apply_edit_actions()
+    assert win.wall_label.text() == (
+        f"Wall {w.uid}: {w.v1}(0, 0)ft -> {w.v2}(8.33, 8.33)ft"
+        f"  len 11.8ft  angle 45.0deg")
 
 
 def test_wall_label_clears_unless_exactly_one_wall_is_selected(fp, win):
