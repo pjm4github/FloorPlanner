@@ -12,7 +12,7 @@ from PyQt6.QtCore import QLineF, QPointF
 from floorplanner.config import SETTINGS, SNAP_STEP
 
 __all__ = [
-    "fmt_ftin", "fmt_in", "fmt_ft3", "parse_feet",
+    "fmt_ftin", "fmt_in", "fmt_ft2", "parse_feet",
     "grid_snap", "wall_snap", "wall_snap_len", "parse_wwhh",
     "line_intersection", "dist_point_segment", "heading_deg",
     "bring_to_front", "send_to_back", "add_front_back_actions",
@@ -46,12 +46,19 @@ def fmt_in(inches: float) -> str:
     return f'{sign}{s}"'
 
 
-def fmt_ft3(inches: float) -> str:
-    """Format a length/coordinate given in inches as DECIMAL feet, 3
-    significant digits, e.g. 148.14 -> "12.3" (feet). No unit suffix --
+def fmt_ft2(inches: float) -> str:
+    """Format a length/coordinate given in inches as DECIMAL feet, FIXED at
+    2 decimal places, e.g. 148.14 -> "12.34" (feet). No unit suffix --
     callers that need one append it, since a coordinate pair usually wants
-    it once, not per axis."""
-    return f"{inches / 12.0:.3g}"
+    it once, not per axis.
+
+    Fixed, not significant-figure, on purpose (0065-ruling.md sec4): a
+    coordinate's useful precision does not scale with its magnitude -- an
+    inch is an inch at 8ft and at 140ft -- so resolution must not depend on
+    where a wall happens to sit. The prior `.3g` gave only 1ft resolution
+    (up to 6" of display error) on the 11.5% of this project's own corpus
+    vertices at or above 100ft."""
+    return f"{inches / 12.0:.2f}"
 
 
 def heading_deg(p1: QPointF, p2: QPointF):

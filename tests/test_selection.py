@@ -3,6 +3,8 @@ enclosed by the band gets its own edge walls selected. Selection is READ-ONLY
 (P0.5 fix 4 / defect 10): an edge backed only by a longer party wall is left
 unselected -- it is NOT duplicated into a new wall. The two tests below that
 once asserted that duplication now assert that selection creates nothing."""
+import math
+
 import pytest
 from PyQt6.QtCore import QPointF, QRectF
 
@@ -18,19 +20,57 @@ def test_selecting_one_wall_shows_id_vertices_length_on_the_status_bar(fp, win):
     w.setSelected(True)
     win._apply_edit_actions()
     assert win.wall_label.text() == (
-        f"Wall {w.uid}: {w.v1}(0, 0)ft -> {w.v2}(10, 0)ft  len 10ft")
+        f"Wall {w.uid}: {w.v1}(0.00, 0.00)ft -> {w.v2}(10.00, 0.00)ft"
+        f"  len 10.00ft")
 
 
 def test_wall_label_shows_heading_for_a_non_axis_wall(fp, win):
     """A 45-degree diagonal: the angle clause appears, and coordinates are
-    decimal feet to 3 significant digits, as asked."""
+    decimal feet, fixed to 2 places (0065-ruling.md sec4)."""
     w = fp.WallItem(QPointF(0, 0), QPointF(100, 100), "interior")
     win.scene.addItem(w)
     w.setSelected(True)
     win._apply_edit_actions()
     assert win.wall_label.text() == (
-        f"Wall {w.uid}: {w.v1}(0, 0)ft -> {w.v2}(8.33, 8.33)ft"
-        f"  len 11.8ft  angle 45.0deg")
+        f"Wall {w.uid}: {w.v1}(0.00, 0.00)ft -> {w.v2}(8.33, 8.33)ft"
+        f"  len 11.79ft  angle 45.0000deg")
+
+
+def test_the_angle_clause_never_prints_a_cardinal(fp, win):
+    """0065-ruling.md sec3's own receipt. A wall a ten-thousandth of a
+    degree off vertical (heading 90.0001, not 90) -- the exact shape that
+    broke at 1-decimal precision: 90.0001 rounds to "90.0", a false
+    statement fired by the branch that decided the wall is NOT at 90. At
+    4 decimals it must print its real, non-cardinal value instead."""
+    theta = math.radians(90.0 + 0.0001)
+    length = 100_000.0
+    p2 = QPointF(length * math.cos(theta), length * math.sin(theta))
+    w = fp.WallItem(QPointF(0, 0), p2, "interior")
+    win.scene.addItem(w)
+    w.setSelected(True)
+    win._apply_edit_actions()
+    text = win.wall_label.text()
+    assert "angle" in text
+    for cardinal in ("0.0000deg", "90.0000deg", "180.0000deg", "270.0000deg"):
+        assert cardinal not in text, f"{text!r} reads as an exact cardinal"
+
+
+@pytest.mark.parametrize("p2", [
+    QPointF(120, 0),      # due east   (heading 0)
+    QPointF(0, 120),      # due north  (heading 90)
+    QPointF(-120, 0),     # due west   (heading 180)
+    QPointF(0, -120),     # due south  (heading 270)
+])
+def test_wall_label_omits_angle_for_all_four_cardinals(fp, win, p2):
+    """0065-ruling.md sec5: the exact-string test above only exercises due
+    east (heading 0); this closes the gap at the label level -- the other
+    three cardinals must suppress the angle clause too, not just the
+    approx-tolerant heading_deg() test in test_geometry.py."""
+    w = fp.WallItem(QPointF(0, 0), p2, "interior")
+    win.scene.addItem(w)
+    w.setSelected(True)
+    win._apply_edit_actions()
+    assert "angle" not in win.wall_label.text()
 
 
 def test_wall_label_clears_unless_exactly_one_wall_is_selected(fp, win):
