@@ -812,8 +812,14 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             # drift onto a false-looking "90.0" for any deviation under
             # 0.05deg -- a statement contradicting the branch that produced
             # it. 4 decimals (matching validate.py's own worst-offenders
-            # table) keeps that from happening down to 0.0001deg, the
-            # smallest drift this project's own corpus census has measured.
+            # table) resolves down to ~0.00005deg, comfortably below every
+            # deviation this project's corpus census has found (smallest on
+            # record: 0.0002037deg -- 0068-ruling.md sec2, measured, not the
+            # rounder 0.0001 an earlier ruling supplied as a test magnitude
+            # and this comment once mistakenly repeated as a census result).
+            # A fixed precision still has a floor of its own; see
+            # 0068-ruling.md sec4 for the remaining edge case no fixed
+            # precision closes, raised to Patrick rather than assumed here.
             text += f"  angle {heading:.4f}deg"
         return text
 

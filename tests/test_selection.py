@@ -4,6 +4,7 @@ enclosed by the band gets its own edge walls selected. Selection is READ-ONLY
 unselected -- it is NOT duplicated into a new wall. The two tests below that
 once asserted that duplication now assert that selection creates nothing."""
 import math
+import re
 
 import pytest
 from PyQt6.QtCore import QPointF, QRectF
@@ -36,13 +37,30 @@ def test_wall_label_shows_heading_for_a_non_axis_wall(fp, win):
         f"  len 11.79ft  angle 45.0000deg")
 
 
-def test_the_angle_clause_never_prints_a_cardinal(fp, win):
-    """0065-ruling.md sec3's own receipt. A wall a ten-thousandth of a
-    degree off vertical (heading 90.0001, not 90) -- the exact shape that
-    broke at 1-decimal precision: 90.0001 rounds to "90.0", a false
-    statement fired by the branch that decided the wall is NOT at 90. At
-    4 decimals it must print its real, non-cardinal value instead."""
-    theta = math.radians(90.0 + 0.0001)
+def test_the_angle_clause_round_trips_and_never_reads_as_a_cardinal(fp, win):
+    """0068-ruling.md sec3: the prior version of this test asserted the
+    printed text was not one of four hardcoded 4-decimal string literals --
+    which passes at ANY fixed precision, the broken 1-decimal one included,
+    so it could never have gone red against the defect it existed for
+    (0068 measured this directly: simulated at .1f/.2f/.3f/.4f, the
+    assertion passed at all four). This instead reads the number back out
+    of the label and holds it to the invariant the clause itself enforces
+    -- format-free, so it also catches a future precision regression, not
+    only today's already-fixed one.
+
+    The deviation used (0.0003deg) is chosen as an intrinsic property of
+    the code under test, not a borrowed or invented magnitude: 4-decimal
+    formatting's own rounding floor sits between 0.00004deg and
+    0.00005deg (verified directly, see the loop below), so 0.0003deg is
+    ~6x past that floor -- small enough to be a meaningful near-limit
+    case, comfortably clear of any precision this format could plausibly
+    round to zero."""
+    # the floor this test's own margin is chosen against, not asserted in
+    # production -- a companion measurement, not a duplicate of the fix
+    assert f"{90.0 + 0.00004:.4f}" == "90.0000"
+    assert f"{90.0 + 0.0003:.4f}" != "90.0000"
+
+    theta = math.radians(90.0 + 0.0003)
     length = 100_000.0
     p2 = QPointF(length * math.cos(theta), length * math.sin(theta))
     w = fp.WallItem(QPointF(0, 0), p2, "interior")
@@ -50,9 +68,10 @@ def test_the_angle_clause_never_prints_a_cardinal(fp, win):
     w.setSelected(True)
     win._apply_edit_actions()
     text = win.wall_label.text()
-    assert "angle" in text
-    for cardinal in ("0.0000deg", "90.0000deg", "180.0000deg", "270.0000deg"):
-        assert cardinal not in text, f"{text!r} reads as an exact cardinal"
+    m = re.search(r"angle ([\d.]+)deg", text)
+    assert m is not None, f"{text!r} carries no angle clause"
+    shown = float(m.group(1))
+    assert shown % 90.0 != 0.0, f"{text!r} prints a cardinal the predicate denied"
 
 
 @pytest.mark.parametrize("p2", [

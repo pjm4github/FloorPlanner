@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: ca3c6b7 -->
+<!-- SNAPSHOT-HEAD: c51662b -->
 
 # Session snapshot — read this first
 
@@ -371,8 +371,8 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **This copy of the file is stale by construction** — it is `wall-label-fixes`'s own branch copy, unmerged, and the marker above (`ca3c6b7`) names THIS BRANCH'S fork point, not `main`'s current state. `main`'s real state lives on `main` itself. Reconcile at merge — the pattern `0065-ruling.md` §1 adopted from `cross-floor-align-fix`'s `ea215ff`. |
-| **Branches** | **`cross-floor-align-fix`, open — [PR #34](https://github.com/pjm4github/FloorPlanner/pull/34), AMBER, stopped for Patrick's manual check** (unchanged by this branch). **`wall-label-fixes`, open — fixes `0065-ruling.md` §§3-4** (the angle clause's false-cardinal rounding; `fmt_ft2`'s fixed-decimal replacement for `fmt_ft3`'s significant figures), **AMBER, stopped for Patrick's manual check**, batched with PR #34's per `0065` §7. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
+| **`main`** | **This copy of the file is stale by construction** — it is `wall-label-fixes`'s own branch copy (`main` now merged in, per `0068-ruling.md` §5's "before the check, not after"), and the marker above (`c51662b`) names this branch's own pre-merge tip, not `main`'s current state. `main`'s real state lives on `main` itself. |
+| **Branches** | **`cross-floor-align-fix`, open — [PR #34](https://github.com/pjm4github/FloorPlanner/pull/34), AMBER, stopped for Patrick's manual check.** **`wall-label-fixes`, open — [PR #35](https://github.com/pjm4github/FloorPlanner/pull/35), AMBER, stopped for Patrick's manual check**, batched with #34; `0068-ruling.md`'s §3 (a vacuous receipt, replaced with a format-free round-trip assertion) and §2 (a laundered number in a comment, corrected) landed on this branch, `main` merged in and re-gated before the check per §5. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
 | **Gate** | full mode, re-run for this commit. Last confirmations: PR #33 CI green on all six jobs (including the previously-red `records (gate --docs)` job — resolved once the branch picked up `main`'s current tip) before merge; `fp2dxf-integration`'s own combined-tree gate GREEN, `collected=761`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **80 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
