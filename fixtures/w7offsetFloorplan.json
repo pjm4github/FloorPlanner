@@ -1,0 +1,219 @@
+{
+ "format": "floorplanner-design",
+ "version": 5,
+ "units": "inches",
+ "settings": {
+  "wall_snap_in": 6.0,
+  "rotate_snap_deg": 15.0,
+  "canvas_w_in": 1200.0,
+  "canvas_h_in": 840.0,
+  "cost_per_sqft": 150.0,
+  "vertex_weld_in": 0.6,
+  "join_tol_in": 9.0,
+  "area_basis": "centerline",
+  "editing": {
+   "shuffle": false,
+   "auto_coalesce": true,
+   "auto_weld": true,
+   "auto_bind": true
+  },
+  "active_floor": "default"
+ },
+ "levels": [
+  {
+   "id": "L1",
+   "name": "default",
+   "elevation_in": 0.0,
+   "height_in": 96.0,
+   "kind": "storey",
+   "reference": false
+  }
+ ],
+ "vertices": [
+  {
+   "id": "v1",
+   "level": "L1",
+   "x": 60.0,
+   "y": 300.0
+  },
+  {
+   "id": "v2",
+   "level": "L1",
+   "x": 60.0,
+   "y": 389.0628
+  },
+  {
+   "id": "v3",
+   "level": "L1",
+   "x": 60.0,
+   "y": 420.0
+  },
+  {
+   "id": "v4",
+   "level": "L1",
+   "x": 108.0,
+   "y": 347.5515
+  },
+  {
+   "id": "v5",
+   "level": "L1",
+   "x": 108.0,
+   "y": 389.0628
+  },
+  {
+   "id": "v6",
+   "level": "L1",
+   "x": 204.0,
+   "y": 300.0
+  },
+  {
+   "id": "v7",
+   "level": "L1",
+   "x": 204.0,
+   "y": 347.5515
+  },
+  {
+   "id": "v8",
+   "level": "L1",
+   "x": 204.0,
+   "y": 389.0628
+  },
+  {
+   "id": "v9",
+   "level": "L1",
+   "x": 300.0,
+   "y": 300.0
+  },
+  {
+   "id": "v10",
+   "level": "L1",
+   "x": 300.0,
+   "y": 420.0
+  }
+ ],
+ "walls": [
+  {
+   "id": "w1",
+   "level": "L1",
+   "v1": "v1",
+   "v2": "v2",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w2",
+   "level": "L1",
+   "v1": "v1",
+   "v2": "v6",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w3",
+   "level": "L1",
+   "v1": "v2",
+   "v2": "v3",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w4",
+   "level": "L1",
+   "v1": "v2",
+   "v2": "v5",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w5",
+   "level": "L1",
+   "v1": "v3",
+   "v2": "v10",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w6",
+   "level": "L1",
+   "v1": "v4",
+   "v2": "v5",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w7",
+   "level": "L1",
+   "v1": "v5",
+   "v2": "v8",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w8",
+   "level": "L1",
+   "v1": "v6",
+   "v2": "v9",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w9",
+   "level": "L1",
+   "v1": "v7",
+   "v2": "v4",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w10",
+   "level": "L1",
+   "v1": "v7",
+   "v2": "v6",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w11",
+   "level": "L1",
+   "v1": "v8",
+   "v2": "v7",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w12",
+   "level": "L1",
+   "v1": "v10",
+   "v2": "v9",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  }
+ ],
+ "rooms": [],
+ "furnishings": [],
+ "groups": []
+}
