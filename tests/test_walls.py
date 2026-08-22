@@ -82,6 +82,61 @@ def test_draw_ignores_fully_joined_wall(fp, win):
     assert end.x() != pytest.approx(200)         # no snap to the joined wall
 
 
+# -- 0070-ruling.md: a T-junction start point must land on the grid too -------
+#
+# nearest_wall_body_point() returns the raw geometric projection of the
+# click onto the host wall's centreline, never rounded to the grid --
+# _snap_start took that point VERBATIM. A fresh wall started against an
+# existing wall's body silently inherited whatever fraction the click
+# happened to land on, and no later operation could ever remove it (the
+# bisect in 0070's own report reproduced this identically with weld/
+# coalesce on and off -- the seed is the draw, not the normalisation).
+
+def test_t_junction_start_snaps_along_the_host_wall_to_grid(fp, win):
+    sc = win.scene
+    host = fp.WallItem(QPointF(60, 300), QPointF(60, 420), "interior")
+    sc.addItem(host)
+    fp.rebuild_all_walls(sc)
+    # a click near the host's body, well off any 6" line along it
+    q = win.view._snap_start(QPointF(63, 359))
+    assert q.x() == pytest.approx(60)              # stays exactly on the host
+    assert q.y() % fp.SETTINGS["wall_snap_in"] == pytest.approx(0)
+
+
+def test_t_junction_start_on_a_diagonal_host_is_unchanged(fp, win):
+    """A diagonal host has no single well-defined grid position along it,
+    so the point is returned as the raw projection -- same as before this
+    fix, not a regression for the deliberate-diagonal case."""
+    sc = win.scene
+    host = fp.WallItem(QPointF(0, 0), QPointF(200, 200), "interior")
+    sc.addItem(host)
+    fp.rebuild_all_walls(sc)
+    q = win.view._snap_start(QPointF(101, 99))
+    assert q.x() == pytest.approx(q.y())            # still exactly on y=x
+
+
+def test_w7offgrid_macro_lands_every_vertex_on_the_snap_grid(fp, win):
+    """0070-ruling.md: Patrick's own reproduced report, replayed verbatim.
+    This is about what the app PRODUCES, not the corpus of legitimately
+    off-grid loaded history (0070 sec5 item 3) -- a fresh scene, the macro
+    the only input, every vertex it creates must land on the snap grid."""
+    import pathlib
+    macro = pathlib.Path(__file__).resolve().parent.parent / "fixtures" / "w7offgrid.fpm"
+    for line in macro.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            res = win.run_macro(line)
+            assert res["ok"], res
+    step = fp.SETTINGS["wall_snap_in"]
+    walls = [w for w in win.scene.items() if isinstance(w, fp.WallItem)]
+    assert len(walls) == 9, f"wall count {len(walls)} after the replay"
+    for w in walls:
+        for label, v in (("p1.x", w.p1.x()), ("p1.y", w.p1.y()),
+                          ("p2.x", w.p2.x()), ("p2.y", w.p2.y())):
+            r = v % step
+            assert r < 1e-6 or step - r < 1e-6, (
+                f"wall {w.uid} {label}={v} is not on the {step}\" grid")
+
+
 def test_wall_uid_is_lazy_stable_and_distinct(fp, scene):
     """`WallItem.uid` mirrors `Vertex.uid` exactly (vertex.py's own module
     note): minted on first read, then fixed for the item's lifetime -- a
