@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 4f61c33 -->
+<!-- SNAPSHOT-HEAD: ca3c6b7 -->
 
 # Session snapshot — read this first
 
@@ -371,8 +371,8 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`4f61c33`** at this file's cut — `444996a`/`404ed89`/`f93e9dd` (the orthogonality band-split correction, the `0061`-`0063` mailbox, `incoming/`'s fourth exit — see `handoff/README.md`'s pair table for the full trail), then two outside the handoff queue, Patrick asking directly in-session: `5d85b09` put the selected wall's id + its two vertex ids on the status bar, `cc12bbf` extended that label with each vertex's (x, y), the wall's length, and its heading when not exactly axis-aligned. **[`0065-ruling.md`](handoff/0065-ruling.md) found two defects in that label** (the angle clause can print a false exact cardinal; `fmt_ft3`'s significant-figure format loses resolution at high coordinates) — both AMBER, owed next. |
-| **Branches** | **`cross-floor-align-fix`, open — [PR #34](https://github.com/pjm4github/FloorPlanner/pull/34), AMBER, stopped for Patrick's manual check.** The `_align_to_wall` cross-floor snap fix; `0063-ruling.md`'s control-assertion addition is owed there next. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
+| **`main`** | **`ca3c6b7`** at this file's cut — `9b545ed` landed `0064`/`0065`, `ca3c6b7` amended `ROADMAP.md`'s tier table per `0065` §2 (Patrick's own instruction is authority ranking above a ruling). Full trail: `handoff/README.md`'s pair table. **[`0067-report.md`](handoff/0067-report.md) is the current state of the wall-label thread** — `0065`'s two label defects (false-cardinal rounding; `fmt_ft3`'s significant figures) fixed on PR #35, batched with PR #34's manual check; item C reserved as `0066`, Patrick's own. |
+| **Branches** | **`cross-floor-align-fix`, open — [PR #34](https://github.com/pjm4github/FloorPlanner/pull/34), AMBER, stopped for Patrick's manual check** (the `_align_to_wall` cross-floor snap fix, its positive control added). **`wall-label-fixes`, open — [PR #35](https://github.com/pjm4github/FloorPlanner/pull/35), AMBER, stopped for Patrick's manual check**, batched with #34. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
 | **Gate** | full mode, re-run for this commit. Last confirmations: PR #33 CI green on all six jobs (including the previously-red `records (gate --docs)` job — resolved once the branch picked up `main`'s current tip) before merge; `fp2dxf-integration`'s own combined-tree gate GREEN, `collected=761`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **80 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
