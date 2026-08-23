@@ -12,6 +12,7 @@ over this module.
 """
 import json
 import math
+import re
 from pathlib import Path
 
 STD_T = {"exterior": 6.0, "interior": 4.5, "partition": 3.5,
@@ -697,3 +698,180 @@ def orthogonality_bands(rows):
                 counts[label] += 1
                 break
     return counts
+
+
+# ---------------------------------------------------------------------------
+# The orthogonality REPAIR -- 0066-ruling.md item C, unblocked by
+# 0082-ruling.md's three amendments (its own sec6 tier table). Item B above
+# is a report and stays one; nothing below is reachable except from the one
+# menu item 0066 sec5 names ("Never automatic. Never on open, never on save,
+# never on export.").
+# ---------------------------------------------------------------------------
+
+REPAIR_NEAR_AXIS_DEG = 1.0
+"""The repair's candidate population is exactly item 1's own census -- "63
+within 1 degree of an axis without being on it" (0066-ruling.md sec1) -- NOT
+a displacement cut. This is what 0066 sec1's "safe by construction" argument
+for the 45-degree bay actually rests on: a deliberate diagonal's displacement
+(0.707 * length, tens of inches) is enormous, but the argument only holds if
+the bay never enters the candidate set in the first place. `T = 1/16"`
+(0066 sec3) is reserved for item 3's user-settable tolerance (RED, unbuilt);
+this first delivery's own accepted read-back (0079-report.md sec2(b), matched
+independently at 0082-ruling.md sec1, including the corpus's 3.000" headline
+wall as a genuine -- conflict-refused, not size-excluded -- candidate) never
+gates on a displacement threshold, only on the conflict predicate below."""
+
+
+def wall_repair_conflict(d, wall_id, endpoint_attr):
+    """True if straightening `wall_id` by moving its `endpoint_attr`
+    ('v1' or 'v2') would tilt another wall sharing that vertex.
+
+    Straightening a near-horizontal wall changes only the moved endpoint's
+    y (set equal to the other endpoint's y); a near-vertical wall, only x.
+    So the conflict is exact: does any OTHER wall at that same vertex
+    already run EXACTLY along the axis about to move? Moving y tilts an
+    exactly-horizontal neighbour; moving x tilts an exactly-vertical one --
+    0066-ruling.md sec4's own words, as a predicate.
+
+    Reads `d` FRESH on every call -- no snapshot is taken -- which is what
+    makes 0082-ruling.md sec3's per-wall re-evaluation correct: called again
+    after `repair_wall_orthogonality` has mutated earlier walls in the same
+    batch, it sees THOSE walls' new, now-exact axis alignment."""
+    V = {v["id"]: (v["x"], v["y"]) for v in d["vertices"]}
+    w = next(x for x in d["walls"] if x["id"] == wall_id)
+    a, b = V[w["v1"]], V[w["v2"]]
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    moving_y = abs(dy) <= abs(dx)          # near-horizontal: y is the free coord
+    vid = w[endpoint_attr]
+    for other in d["walls"]:
+        if other["id"] == wall_id or vid not in (other["v1"], other["v2"]):
+            continue
+        oa, ob = V[other["v1"]], V[other["v2"]]
+        if moving_y and oa[1] == ob[1] and oa[0] != ob[0]:
+            return True                     # an exactly-horizontal neighbour
+        if not moving_y and oa[0] == ob[0] and oa[1] != ob[1]:
+            return True                     # an exactly-vertical neighbour
+    return False
+
+
+def choose_repair_endpoint(d, wall_id):
+    """'v1', 'v2', or None (both ends conflict -- the whole wall is
+    refused). The endpoint with NO conflict; if both are free, either --
+    for an isolated wall the displacement is identical either way (moving
+    v1's y to match v2's, or v2's to match v1's, moves the SAME distance).
+    The tie-break only has teeth once a vertex is shared by more than one
+    near-axis wall in the same batch, which is item 3's graph-solve, not
+    this first delivery -- stated now so it needs no re-deriving there."""
+    free = [a for a in ("v1", "v2") if not wall_repair_conflict(d, wall_id, a)]
+    if not free:
+        return None
+    return free[0]
+
+
+def _invariant_key(message):
+    """A `check()` message reduced to a STABLE key -- the invariant code
+    plus every subject id, never the rendered geometry (0082-ruling.md
+    sec4). `check()`'s messages embed measurements ("48.3..108.3 of 95.5",
+    a wall length) that the repair itself changes for a WALL THAT WAS
+    ALREADY FAILING, by moving a vertex that wall's own neighbours share --
+    comparing on the full string would read that as a brand-new violation
+    and roll back a repair for a fault that predates it.
+
+    Invariant codes are `I` + digits (+ an optional letter, e.g. `I5b`);
+    document ids are a lowercase letter (or letters) + digits (`w17`,
+    `v92`, `o26`). The two alphabets never collide, so one regex separates
+    them. I11's own message names rooms by NAME, not id ("rooms 'Kitchen'
+    and 'Hall' overlap") -- quoted substrings are pulled in too, so that
+    check keys on the same room pair rather than collapsing every overlap
+    into one key."""
+    code = message.split(None, 1)[0]
+    ids = sorted(set(re.findall(r"\b[a-z]+\d+\b", message))
+                 | set(re.findall(r"'([^']+)'", message)))
+    return (code, tuple(ids))
+
+
+def repair_wall_orthogonality(d, deep=True):
+    """0066-ruling.md item C, as amended by 0082-ruling.md secs 2-4.
+    Straightens every near-axis wall (`REPAIR_NEAR_AXIS_DEG`) by moving
+    exactly one endpoint onto the OTHER endpoint's axis-aligned coordinate,
+    worst deviation first; a wall whose every candidate endpoint conflicts
+    (`choose_repair_endpoint` returns `None`) is REFUSED and left exactly as
+    it was.
+
+    THE INTERLOCK (0082 sec2, withdrawing 0066 sec5's refuse-to-start
+    clause): runs on any document, even one that already fails `check()` --
+    refusing protects nothing, since the plans this repair exists for are
+    exactly the ones with the most pre-existing drift. `check()` runs
+    before and after, compared on `_invariant_key` (0082 sec4), and the
+    WHOLE repair is discarded -- returning `d` byte-for-byte, via a deep
+    copy that is never mutated in place -- if and only if it introduces a
+    key that was not already failing.
+
+    THE CONFLICT PREDICATE IS RE-EVALUATED PER WALL (0082 sec3): each call
+    to `choose_repair_endpoint` reads the document as mutated by every wall
+    already processed in this same batch, not a snapshot taken up front --
+    a wall straightened earlier can make a later wall's shared vertex newly
+    conflicted, and only a live re-check catches it (measured on a real
+    six-wall chain, `wiscaway2026-08-09R`'s `w53`..`w59`).
+
+    Returns a dict:
+      doc          -- the repaired document (a deep copy; `d` itself is
+                       never mutated), or `d` unchanged if `rolled_back`
+      moved        -- [(wall_id, level, type, displacement_in)], worst first
+      refused      -- [(wall_id, level, type, displacement_in)], untouched
+      relocations  -- [(level, (old_x, old_y), (new_x, new_y))], one entry
+                       per VERTEX actually relocated (a shared vertex moved
+                       by more than one wall in this batch appears once, at
+                       its final position) -- the scene applier's input,
+                       matching `walls.close_gap`'s own (level, a, b) shape
+                       so the same coordinate-relocate-and-reweld path
+                       serves both
+      rolled_back  -- True if the repair introduced a new violation
+      newly_failing -- the `_invariant_key`s that would have been new,
+                       populated only when `rolled_back`
+
+    NEVER CLAIMS ZERO OFF-AXIS WALLS REMAIN (0066 sec4): a rectilinear loop
+    whose runs do not sum to zero has a residual, and a refused wall is
+    where it lands. For every wall NOT refused, the displacement this
+    function leaves behind is exactly 0 -- the moved coordinate is SET
+    EQUAL to the other endpoint's, not merely brought within a tolerance."""
+    import copy
+    before_keys = {_invariant_key(m) for m in check(d, deep=deep)}
+    orig_xy = {v["id"]: (v["x"], v["y"]) for v in d["vertices"]}
+
+    work = copy.deepcopy(d)
+    V = {v["id"]: v for v in work["vertices"]}
+    W = {w["id"]: w for w in work["walls"]}
+    candidates = [row for row in wall_orthogonality(work)
+                  if 0 < row[3] <= REPAIR_NEAR_AXIS_DEG]
+
+    moved, refused = [], []
+    relocated_ids = set()
+    for wall_id, level, wtype, _deg, disp in candidates:
+        ep = choose_repair_endpoint(work, wall_id)
+        if ep is None:
+            refused.append((wall_id, level, wtype, disp))
+            continue
+        w = W[wall_id]
+        other_id = w["v2"] if ep == "v1" else w["v1"]
+        a, b = V[w["v1"]], V[w["v2"]]
+        moving_y = abs(b["y"] - a["y"]) <= abs(b["x"] - a["x"])
+        moved_v, other_v = V[w[ep]], V[other_id]
+        if moving_y:
+            moved_v["y"] = other_v["y"]
+        else:
+            moved_v["x"] = other_v["x"]
+        moved.append((wall_id, level, wtype, disp))
+        relocated_ids.add(w[ep])
+
+    after_keys = {_invariant_key(m) for m in check(work, deep=deep)}
+    newly_failing = after_keys - before_keys
+    if newly_failing:
+        return {"doc": d, "moved": [], "refused": [], "relocations": [],
+                "rolled_back": True, "newly_failing": newly_failing}
+    relocations = [(V[vid]["level"], orig_xy[vid], (V[vid]["x"], V[vid]["y"]))
+                   for vid in sorted(relocated_ids)
+                   if orig_xy[vid] != (V[vid]["x"], V[vid]["y"])]
+    return {"doc": work, "moved": moved, "refused": refused,
+            "relocations": relocations, "rolled_back": False,
+            "newly_failing": set()}

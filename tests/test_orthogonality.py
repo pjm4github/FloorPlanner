@@ -1,5 +1,5 @@
 """Wall orthogonality report -- 0055-ruling.md item B (a REPORT, not a
-repair; item C, a repair, is unruled and not built here).
+repair). Item C, the repair, is `test_orthogonality_repair.py`.
 
 Grid snap constrains new cursor input; it cannot see a wall an existing
 operation (move/join/weld/coalesce) already rotated off axis, and this

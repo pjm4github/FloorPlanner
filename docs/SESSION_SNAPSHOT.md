@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 223f95e -->
+<!-- SNAPSHOT-HEAD: 07cf672 -->
 
 # Session snapshot — read this first
 
@@ -143,6 +143,16 @@ golden-file receipt, gate GREEN. **Patrick's own manual check PASSED
 2026‑08‑17** — exported the regenerated `L1.dxf`/`L2.dxf` and imported into
 Chief Architect X17, closing [`0038-ruling.md`](handoff/0038-ruling.md) §8's
 merge condition. Full receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
+
+**THE WALL ORTHOGONALITY REPAIR (item C) IS BUILT, GATED GREEN, AND OPEN AS A
+FOURTH AMBER PR — `wall-orthogonality-repair`, stopped for Patrick's own
+check.** [`0066-ruling.md`](handoff/0066-ruling.md) →
+[`0079-report.md`](handoff/0079-report.md) →
+[`0082-ruling.md`](handoff/0082-ruling.md) (three amendments, unblocking) →
+[`0083-report.md`](handoff/0083-report.md) (built, plus two measured
+findings neither ruling anticipated — see THE QUEUE item 8). Full detail
+there; not restated here beyond the pointer, per this file's own rule that
+an index does not summarise the thing it indexes.
 
 ---
 
@@ -293,10 +303,47 @@ merge condition. Full receipt: [`handoff/0050-report.md`](handoff/0050-report.md
    `fixtures/incoming/README.md`.** Three more items named, not built: the
    four masked reachability sites (no receipt yet), `wall_endpoint_open`'s
    `floor=None` default (should invert, but changes two existing callers
-   with no receipt), and — unaffected by any of this — **item C's ruling,
-   still Patrick's, still RED, now the oldest item on his side.** A guide
-   line added to `README.md`'s export section pointing at the orthogonality
-   report before exporting.
+   with no receipt). A guide line added to `README.md`'s export section
+   pointing at the orthogonality report before exporting. **Item C (the
+   repair) is no longer RED** — ruled at [`0066`](handoff/0066-ruling.md),
+   read back at [`0079`](handoff/0079-report.md), amended and unblocked at
+   [`0082`](handoff/0082-ruling.md), and BUILT at
+   [`0083`](handoff/0083-report.md) — see THE QUEUE item 8 below.
+
+8. **THE WALL ORTHOGONALITY REPAIR — BUILT, GATED GREEN, AMBER, STOPPED FOR
+   PATRICK'S CHECK.** [`0066-ruling.md`](handoff/0066-ruling.md) item C, read
+   back at [`0079-report.md`](handoff/0079-report.md), amended and unblocked
+   at [`0082-ruling.md`](handoff/0082-ruling.md) (withdrew the
+   refuse-to-start clause, moved the before/after differential onto a stable
+   key, made the conflict predicate re-evaluate per wall against the
+   document as mutated so far). Built exactly to that spec:
+   `validate.py`'s `repair_wall_orthogonality` + `OrthogonalityRepairDialog`
+   + Edit ▸ "Repair wall orthogonality…". The candidate population is the
+   near-axis census itself (`0 < deg <= 1.0`), not a displacement-bounded
+   set — settled by `0079`/`0082` both treating `farmplaceBIGmultifloor`
+   `w24` (0066's own 3.000″ headline outlier) as a genuine candidate,
+   refused only for conflict. **Two findings measured, neither anticipated
+   by either ruling** ([`0083-report.md`](handoff/0083-report.md) §§4-5):
+   "61 of 63" does not hold corpus-wide — `fixtures/incoming/crossfloor-snap-2026-08-17.json`
+   alone carries 37 near-axis walls, and straightening it introduces two
+   genuine new `I14` violations, so `0082`'s own whole-document rollback
+   (correct as specified) withholds all 37 — the honest corpus total is
+   **22 moved, 4 refused, 37 withheld by one file's rollback** (receipt:
+   `docs/evidence/orthogonality_repair_census.py`, new); and a wall the
+   repair REFUSES can still have its own displacement change, because it
+   shares a vertex with a wall the repair DOES move (measured on
+   `wiscaway2026-08-09R`'s `w54`) — a real gap in `0079`/`0082`'s own
+   acceptance clause (f), named for a future ruling, not silently tested
+   around. Chain receipt run per `0082` §3's own instruction: RED under a
+   naive as-loaded predicate (a real six-wall chain, `w53..w59`, ends up
+   WORSE — one wall at 3.25° off axis), GREEN under the built one (every
+   non-refused wall in the chain lands at exactly 0°). 19 new tests
+   (`tests/test_orthogonality_repair.py`), full suite 852 passed, `ruff`
+   clean, gate GREEN. Item 3 (user-settable `T`, the graph solve) is
+   unaffected and stays RED. **PR open on `wall-orthogonality-repair`,
+   AMBER, stopped for Patrick's own check** (`0066` §7: run the repair on
+   the plan behind `L2.dxf`, re-export, recount against Chief's 75 — and
+   does the drawing still look like the drawing).
 
 **Full tiered queue (A2–A5, the command-roster census, Phase 5's remainder,
 etc.):** [`ROADMAP.md`](ROADMAP.md) §3. **`boat_trailer` and the vehicle
@@ -371,9 +418,9 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`223f95e`** at this file's cut. **[`0081-report.md`](handoff/0081-report.md) is the current consolidated status** — read that first, not this row: three AMBER PRs open and unchanged (#34/#35/#36, five Patrick checks restated verbatim in one place), item C's read-back answered but the repair itself still blocked, every GREEN settings/`fp2pdf` item across `0072`-`0078` built and merged. **Nothing is currently GREEN and unbuilt.** `0066` was the only reserved handoff number and it is spent. Full trail: `handoff/README.md`'s pair table. |
-| **Branches** | **`cross-floor-align-fix`** ([PR #34](https://github.com/pjm4github/FloorPlanner/pull/34)) **· `wall-label-fixes`** ([PR #35](https://github.com/pjm4github/FloorPlanner/pull/35)) **· `t-junction-grid-snap`** ([PR #36](https://github.com/pjm4github/FloorPlanner/pull/36), D80's fix) — **all three AMBER, all three stopped for Patrick's manual check, batched as one app session** (`0071-report.md` §6 restates all five questions; `0072` §7 flags the queue is now four deep on one check session and asks that no more AMBER work race onto it). `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
-| **Gate** | full mode, re-run for this commit. Last confirmations: PR #33 CI green on all six jobs (including the previously-red `records (gate --docs)` job — resolved once the branch picked up `main`'s current tip) before merge; `fp2dxf-integration`'s own combined-tree gate GREEN, `collected=761`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **`main`** | **`07cf672`** at this file's cut. **[`0083-report.md`](handoff/0083-report.md) is the current status** — read that first, not this row: `0082-ruling.md` unblocked item C (the orthogonality repair), and it is now BUILT, gated GREEN, and open as a fourth AMBER PR (`wall-orthogonality-repair`), stopped for Patrick's own check (run the repair on the `L2.dxf` source plan, re-export, recount against Chief's 75). Two findings surfaced by actually running it that neither `0079` nor `0082` anticipated: "61 of 63" does not hold corpus-wide (`crossfloor-snap-2026-08-17.json` alone carries 37 near-axis walls and its whole-file rollback withholds all of them — the honest total is 22 moved / 4 refused / 37 withheld) and a refused wall's OWN displacement can still change as a side effect of a neighbour's repair through a shared vertex (`0083` §5) — both named, not built into a new design. Item 3 (user-settable `T`, the graph solve) stays RED. Full trail: `handoff/README.md`'s pair table. |
+| **Branches** | **`cross-floor-align-fix`** ([PR #34](https://github.com/pjm4github/FloorPlanner/pull/34)) **· `wall-label-fixes`** ([PR #35](https://github.com/pjm4github/FloorPlanner/pull/35)) **· `t-junction-grid-snap`** ([PR #36](https://github.com/pjm4github/FloorPlanner/pull/36), D80's fix) **· `wall-orthogonality-repair`** (item C, `0083-report.md`) — **all four AMBER, all four stopped for Patrick's manual check.** `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
+| **Gate** | full mode, re-run for this commit. `Gate-Census: collected=852 ruff=clean vacuous=0 end_assign=0 snapshot=current`, GREEN. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **80 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |

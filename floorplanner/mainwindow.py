@@ -344,6 +344,9 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         a_ortho = QAction("Wall orthogonality report…", self)  # 0055-ruling.md item B
         a_ortho.triggered.connect(self.review_wall_orthogonality)
         m_edit.addAction(a_ortho)
+        a_ortho_repair = QAction("Repair wall orthogonality…", self)  # 0066/0082 item C
+        a_ortho_repair.triggered.connect(self.repair_wall_orthogonality)
+        m_edit.addAction(a_ortho_repair)
 
         # A VIEW MENU, and 3D view is its first item (D53). It had NO menu-bar
         # entry, no shortcut and no toolbar button: `show_3d_view`'s only two
@@ -1341,6 +1344,12 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         does not decide which are deliberate diagonals and which are drift,
         and nothing in it changes a wall's angle (item C, unruled)."""
         OrthogonalityReportDialog(self).exec()
+
+    def repair_wall_orthogonality(self):
+        """Edit ▸ Repair wall orthogonality… -- 0066-ruling.md item C,
+        unblocked by 0082-ruling.md. Previews, applies as one undoable
+        operation on Apply, never runs automatically (0066 sec5)."""
+        OrthogonalityRepairDialog(self).exec()
 
     def _selection_spec(self):
         """Selected walls/furnishings (groups expand to their members)

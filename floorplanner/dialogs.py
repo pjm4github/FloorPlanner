@@ -144,6 +144,93 @@ class OrthogonalityReportDialog(QDialog):
                 "diagonal within 0.01 degrees of one).")
 
 
+class OrthogonalityRepairDialog(QDialog):
+    """Edit ▸ "Repair wall orthogonality…" -- 0066-ruling.md item C, as
+    amended by 0082-ruling.md secs 2-4 (the wording below follows
+    0079-report.md sec2(d)'s own read-back). Computes the WHOLE repair on a
+    document walked from the scene -- nothing here touches the scene until
+    Apply. Never automatic (0066 sec5): this dialog is the one and only
+    place this app straightens a wall's angle."""
+
+    def __init__(self, win):
+        super().__init__(win)
+        self.win = win
+        self.setWindowTitle("Repair wall orthogonality")
+        self.resize(560, 400)
+        lay = QVBoxLayout(self)
+        self.info = QLabel()
+        self.info.setWordWrap(True)
+        lay.addWidget(self.info)
+        self.listw = QListWidget()
+        lay.addWidget(self.listw)
+        row = QHBoxLayout()
+        self.b_apply = QPushButton("Apply")
+        self.b_apply.clicked.connect(self._apply)
+        row.addWidget(self.b_apply)
+        b_cancel = QPushButton("Cancel")
+        b_cancel.clicked.connect(self.reject)
+        row.addWidget(b_cancel)
+        lay.addLayout(row)
+        self.refresh()
+
+    def refresh(self):
+        import warnings
+        from floorplanner.design.bridge import design_from_scene
+        from floorplanner.design.validate import repair_wall_orthogonality
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            self._doc = design_from_scene(self.win).to_dict()
+        self._levels = {lv["id"]: lv["name"] for lv in self._doc.get("levels", [])}
+        self._result = repair_wall_orthogonality(self._doc)
+        self.listw.clear()
+
+        if self._result["rolled_back"]:
+            n = len(self._result["newly_failing"])
+            self.info.setText(
+                f"The repair would have introduced {n} new invariant "
+                "violation(s) -- nothing was changed.")
+            self.b_apply.setEnabled(False)
+            return
+
+        moved, refused = self._result["moved"], self._result["refused"]
+        if not moved and not refused:
+            self.info.setText("No near-axis walls found -- nothing to repair.")
+            self.b_apply.setEnabled(False)
+            return
+
+        largest = max((m[3] for m in moved), default=0.0)
+        parts = []
+        if moved:
+            parts.append(f"{len(moved)} wall(s) will be straightened "
+                        f"(largest correction: {largest:.3f}\").")
+        if refused:
+            parts.append(f"{len(refused)} wall(s) are refused — both ends "
+                        "are shared with an already-exactly-axis wall — "
+                        "and are listed below, unchanged.")
+        parts.append("Nothing is applied until you choose Apply.")
+        self.info.setText(" ".join(parts))
+
+        for wid, lvl, typ, disp in moved:
+            self.listw.addItem(f"{self._levels.get(lvl, lvl)}: wall {wid} "
+                              f"({typ}) — will move {disp:.3f}\"")
+        for wid, lvl, typ, _disp in refused:
+            self.listw.addItem(f"{self._levels.get(lvl, lvl)}: wall {wid} "
+                              f"({typ}) — refused (both ends conflict with "
+                              "an exactly-axis wall)")
+        self.b_apply.setEnabled(bool(moved))
+
+    def _apply(self):
+        from floorplanner.walls import close_gap
+        n_moved = len(self._result["moved"])
+        n_refused = len(self._result["refused"])
+        for lvl, old, new in self._result["relocations"]:
+            close_gap(self.win.scene, QPointF(*new), QPointF(*old),
+                      floor=self._levels.get(lvl, lvl), tol=1e-4)
+        self.win.status(f"Wall orthogonality repaired — {n_moved} wall(s) "
+                        f"straightened, {n_refused} refused.")
+        self.accept()
+
+
 # Inventory table headers (itemised plan tables, exportable to CSV).
 FURN_INV_HEADERS = ["Item", "Quantity", "Unit price", "Line total"]
 HOUSE_INV_HEADERS = ["Item", "Detail", "Quantity", "Size"]
