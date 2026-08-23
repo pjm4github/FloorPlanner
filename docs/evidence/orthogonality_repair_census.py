@@ -34,10 +34,11 @@ def _v5_files():
 
 
 def main():
-    total_moved = total_refused = total_candidates = 0
+    total_moved = total_refused = total_over_t = total_candidates = 0
     rolled_back = []
     skipped = []
-    print(f"{'file':<52}{'near-axis':>10}{'moved':>8}{'refused':>9}{'status':>12}")
+    print(f"{'file':<48}{'near-axis':>10}{'moved':>8}{'refused':>9}"
+          f"{'over_t':>8}{'status':>12}")
     for p in _v5_files():
         rel = str(p.relative_to(ROOT)).replace("\\", "/")
         try:
@@ -60,16 +61,19 @@ def main():
         total_candidates += len(near_axis)
         if res["rolled_back"]:
             rolled_back.append((rel, len(near_axis), sorted(res["newly_failing"])))
-            print(f"{rel:<52}{len(near_axis):>10}{'--':>8}{'--':>9}{'ROLLED BACK':>12}")
+            print(f"{rel:<48}{len(near_axis):>10}{'--':>8}{'--':>9}"
+                  f"{'--':>8}{'ROLLED BACK':>12}")
             continue
         total_moved += len(res["moved"])
         total_refused += len(res["refused"])
-        print(f"{rel:<52}{len(near_axis):>10}{len(res['moved']):>8}"
-              f"{len(res['refused']):>9}{'applied':>12}")
+        total_over_t += len(res["over_t"])
+        print(f"{rel:<48}{len(near_axis):>10}{len(res['moved']):>8}"
+              f"{len(res['refused']):>9}{len(res['over_t']):>8}{'applied':>12}")
 
     print(f"\nTOTAL near-axis candidates: {total_candidates}")
     print(f"TOTAL moved (straightened): {total_moved}")
-    print(f"TOTAL refused (conflict):   {total_refused}")
+    print(f"TOTAL refused (conflict or would-worsen): {total_refused}")
+    print(f"TOTAL over_t (at/above T, size-excluded): {total_over_t}")
     print(f"TOTAL stranded by a whole-file rollback: "
           f"{sum(n for _r, n, _k in rolled_back)}, across {len(rolled_back)} file(s)")
     if rolled_back:
@@ -82,7 +86,7 @@ def main():
     if skipped:
         print(f"\nSkipped ({len(skipped)}), and why -- not silently dropped:")
         for rel, why in skipped:
-            print(f"  {rel:<52}{why}")
+            print(f"  {rel:<48}{why}")
 
 
 if __name__ == "__main__":

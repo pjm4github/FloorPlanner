@@ -709,17 +709,28 @@ def orthogonality_bands(rows):
 # ---------------------------------------------------------------------------
 
 REPAIR_NEAR_AXIS_DEG = 1.0
-"""The repair's candidate population is exactly item 1's own census -- "63
-within 1 degree of an axis without being on it" (0066-ruling.md sec1) -- NOT
-a displacement cut. This is what 0066 sec1's "safe by construction" argument
-for the 45-degree bay actually rests on: a deliberate diagonal's displacement
-(0.707 * length, tens of inches) is enormous, but the argument only holds if
-the bay never enters the candidate set in the first place. `T = 1/16"`
-(0066 sec3) is reserved for item 3's user-settable tolerance (RED, unbuilt);
-this first delivery's own accepted read-back (0079-report.md sec2(b), matched
-independently at 0082-ruling.md sec1, including the corpus's 3.000" headline
-wall as a genuine -- conflict-refused, not size-excluded -- candidate) never
-gates on a displacement threshold, only on the conflict predicate below."""
+"""The upper bound on the population `wall_orthogonality()` is even
+considered from -- item 1's own census, "63 within 1 degree of an axis
+without being on it" (0066-ruling.md sec1). This is what 0066 sec1's "safe
+by construction" argument for the 45-degree bay rests on: a deliberate
+diagonal's displacement (0.707 * length, tens of inches) is enormous, but
+the argument only holds if the bay never enters this population at all.
+`REPAIR_T_IN` (below) narrows it further, to the walls the repair actually
+touches."""
+
+REPAIR_T_IN = 1 / 16
+"""0066-ruling.md sec3's own boxed ruling: **"below T, moving a vertex
+cannot change any dimension a residential plan expresses; above it, the
+correction is a real edit and the user must see it before it happens."**
+`0084-ruling.md` sec1 corrected `0083-report.md`'s reading of this: the
+0079-report.md read-back that measured conflicts "over all 63" was a
+SUPERSET MEASUREMENT, never a candidacy decision -- 0066 sec3's own table
+(32 auto-repairable under T, 31 reported-not-touched at or above it) is the
+one that was actually ruled, and it is restored here. Below `T`: a
+candidate for straightening, subject only to the conflict predicate. At or
+above it: reported in `over_t`, never moved -- which is what makes `w24`
+(0066 sec1's own 3.000" headline outlier) untouchable for the RIGHT reason,
+size, not conflict."""
 
 
 def wall_repair_conflict(d, wall_id, endpoint_attr):
@@ -790,13 +801,49 @@ def _invariant_key(message):
     return (code, tuple(ids))
 
 
-def repair_wall_orthogonality(d, deep=True):
-    """0066-ruling.md item C, as amended by 0082-ruling.md secs 2-4.
-    Straightens every near-axis wall (`REPAIR_NEAR_AXIS_DEG`) by moving
-    exactly one endpoint onto the OTHER endpoint's axis-aligned coordinate,
-    worst deviation first; a wall whose every candidate endpoint conflicts
-    (`choose_repair_endpoint` returns `None`) is REFUSED and left exactly as
-    it was.
+def _worsened_wall(work, orig_deg, tol=1e-6):
+    """0084-ruling.md sec2: has ANY wall gotten WORSE than its degree before
+    the repair ran? Returns that wall's id, or `None`. `tol` absorbs float
+    noise from a relocation that does not touch this wall's own coordinates
+    at all.
+
+    NO WALL IS EXEMPTED, INCLUDING A CANDIDATE STILL WAITING ITS OWN TURN --
+    measured, not assumed: an earlier draft exempted still-pending
+    candidates on the theory that they get a chance to fix themselves. A
+    real corpus wall (`wiscaway2026-08-09R`'s `w57`) disproved it: tilted
+    off axis by an EARLIER neighbour's move while still pending, it then
+    reached its OWN turn already worse than it started, was refused there
+    for an unrelated conflict, and was never re-checked against its
+    original degree again -- the guarantee silently broke. Checking every
+    wall, unconditionally, costs some coverage (a move gets undone even
+    when the wall it disturbs would have straightened itself moments
+    later) but is the only form of this check that is actually correct."""
+    for wid, _lvl, _typ, deg, _disp in wall_orthogonality(work):
+        if deg > orig_deg.get(wid, 0.0) + tol:
+            return wid
+    return None
+
+
+def repair_wall_orthogonality(d, deep=True, t_in=REPAIR_T_IN):
+    """0066-ruling.md item C, as amended by 0082-ruling.md secs 2-4 and
+    0084-ruling.md secs 1-2. Straightens every near-axis wall whose
+    displacement is UNDER `t_in` (`REPAIR_T_IN` by default -- 0084 sec1
+    restores 0066 sec3's own candidacy filter, which `0083-report.md` had
+    dropped) by moving exactly one endpoint onto the OTHER endpoint's
+    axis-aligned coordinate, worst deviation first. A candidate is REFUSED,
+    left exactly where it was, for either of two reasons:
+
+      "conflict"      -- every candidate endpoint is shared with a wall
+                          already exactly on axis (`choose_repair_endpoint`
+                          returns `None`)
+      "would worsen X" -- moving it leaves some OTHER wall, X, MORE off
+                          axis than X was before the repair ran (0084
+                          sec2's own post-condition, below)
+
+    Near-axis walls AT OR ABOVE `t_in` are never candidates at all --
+    returned in `over_t`, reported, untouched. This is what makes `w24`
+    (0066 sec1's own 3.000" headline outlier) untouchable for the RIGHT
+    reason: size, not conflict (0084 sec1).
 
     THE INTERLOCK (0082 sec2, withdrawing 0066 sec5's refuse-to-start
     clause): runs on any document, even one that already fails `check()` --
@@ -814,11 +861,35 @@ def repair_wall_orthogonality(d, deep=True):
     conflicted, and only a live re-check catches it (measured on a real
     six-wall chain, `wiscaway2026-08-09R`'s `w53`..`w59`).
 
+    THE ORTHOGONALITY POST-CONDITION (0084 sec2): `0082`'s interlock guarded
+    `check()`'s invariants and never the quantity this repair exists to
+    improve. Measured: a wall this repair REFUSES can still be tilted worse
+    by a NEIGHBOUR's successful move, through a vertex they share -- `check()`
+    saw nothing wrong (no invariant reads "is this wall still as straight as
+    it was"). So after each successful move, EVERY wall is re-measured; if
+    any of them is now worse than before the whole repair started, THIS move
+    alone is undone (the vertex reverts to its saved position) and the
+    candidate is refused instead. NOT EVEN A STILL-PENDING CANDIDATE IS
+    EXEMPTED -- an earlier draft exempted them on the theory that they get a
+    chance to straighten themselves later in the same batch, and a real
+    corpus wall (`wiscaway2026-08-09R`'s `w57`) disproved it: tilted by an
+    earlier move while pending, it then reached its own turn already worse,
+    was refused there for an unrelated conflict, and the guarantee silently
+    broke (`_worsened_wall`'s own docstring carries the full account). This
+    costs some coverage -- a move can be undone even when the wall it
+    disturbs would have fixed itself moments later -- but is the only form
+    of this check that is actually correct. `0084` sec2's own accounting:
+    restoring `t_in` already caps the damage (a `T`-sized move on a typical
+    wall tilts a neighbour by at most `asin(T/L)`, a fraction of a degree);
+    this closes the remainder.
+
     Returns a dict:
       doc          -- the repaired document (a deep copy; `d` itself is
                        never mutated), or `d` unchanged if `rolled_back`
       moved        -- [(wall_id, level, type, displacement_in)], worst first
-      refused      -- [(wall_id, level, type, displacement_in)], untouched
+      refused      -- [(wall_id, level, type, displacement_in, reason)]
+      over_t       -- [(wall_id, level, type, displacement_in)], near-axis
+                       but never a candidate -- size, not conflict
       relocations  -- [(level, (old_x, old_y), (new_x, new_y))], one entry
                        per VERTEX actually relocated (a shared vertex moved
                        by more than one wall in this batch appears once, at
@@ -831,10 +902,11 @@ def repair_wall_orthogonality(d, deep=True):
                        populated only when `rolled_back`
 
     NEVER CLAIMS ZERO OFF-AXIS WALLS REMAIN (0066 sec4): a rectilinear loop
-    whose runs do not sum to zero has a residual, and a refused wall is
-    where it lands. For every wall NOT refused, the displacement this
-    function leaves behind is exactly 0 -- the moved coordinate is SET
-    EQUAL to the other endpoint's, not merely brought within a tolerance."""
+    whose runs do not sum to zero has a residual, and a refused (or
+    over-`t_in`) wall is where it lands. For every wall in `moved`, the
+    displacement this function leaves behind is exactly 0 -- the moved
+    coordinate is SET EQUAL to the other endpoint's, not merely brought
+    within a tolerance."""
     import copy
     before_keys = {_invariant_key(m) for m in check(d, deep=deep)}
     orig_xy = {v["id"]: (v["x"], v["y"]) for v in d["vertices"]}
@@ -842,36 +914,50 @@ def repair_wall_orthogonality(d, deep=True):
     work = copy.deepcopy(d)
     V = {v["id"]: v for v in work["vertices"]}
     W = {w["id"]: w for w in work["walls"]}
-    candidates = [row for row in wall_orthogonality(work)
-                  if 0 < row[3] <= REPAIR_NEAR_AXIS_DEG]
+    all_rows = wall_orthogonality(work)
+    orig_deg = {wid: deg for wid, _lvl, _typ, deg, _disp in all_rows}
+    near_axis = [row for row in all_rows if 0 < row[3] <= REPAIR_NEAR_AXIS_DEG]
+    candidates = [row for row in near_axis if row[4] < t_in]
+    over_t = [(wid, lvl, typ, disp) for wid, lvl, typ, _deg, disp in near_axis
+              if disp >= t_in]
 
     moved, refused = [], []
     relocated_ids = set()
     for wall_id, level, wtype, _deg, disp in candidates:
         ep = choose_repair_endpoint(work, wall_id)
         if ep is None:
-            refused.append((wall_id, level, wtype, disp))
+            refused.append((wall_id, level, wtype, disp, "conflict"))
             continue
         w = W[wall_id]
         other_id = w["v2"] if ep == "v1" else w["v1"]
         a, b = V[w["v1"]], V[w["v2"]]
         moving_y = abs(b["y"] - a["y"]) <= abs(b["x"] - a["x"])
         moved_v, other_v = V[w[ep]], V[other_id]
+        saved = (moved_v["x"], moved_v["y"])
         if moving_y:
             moved_v["y"] = other_v["y"]
         else:
             moved_v["x"] = other_v["x"]
+
+        worsened = _worsened_wall(work, orig_deg)
+        if worsened is not None:
+            moved_v["x"], moved_v["y"] = saved
+            refused.append((wall_id, level, wtype, disp,
+                            f"would worsen {worsened}"))
+            continue
+
         moved.append((wall_id, level, wtype, disp))
         relocated_ids.add(w[ep])
 
     after_keys = {_invariant_key(m) for m in check(work, deep=deep)}
     newly_failing = after_keys - before_keys
     if newly_failing:
-        return {"doc": d, "moved": [], "refused": [], "relocations": [],
-                "rolled_back": True, "newly_failing": newly_failing}
+        return {"doc": d, "moved": [], "refused": [], "over_t": [],
+                "relocations": [], "rolled_back": True,
+                "newly_failing": newly_failing}
     relocations = [(V[vid]["level"], orig_xy[vid], (V[vid]["x"], V[vid]["y"]))
                    for vid in sorted(relocated_ids)
                    if orig_xy[vid] != (V[vid]["x"], V[vid]["y"])]
     return {"doc": work, "moved": moved, "refused": refused,
-            "relocations": relocations, "rolled_back": False,
-            "newly_failing": set()}
+            "over_t": over_t, "relocations": relocations,
+            "rolled_back": False, "newly_failing": set()}

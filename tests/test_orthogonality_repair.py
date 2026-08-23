@@ -13,6 +13,16 @@
        repair changes a neighbouring wall's length and a pre-existing
        violation re-rendering with different numbers must not look new.
 
+0084-ruling.md corrects two things `0083-report.md` got wrong by actually
+running the built repair rather than re-deriving the spec:
+
+  sec1 RESTORES `T = 1/16"` as the candidacy filter `0066-ruling.md` sec3
+       ruled and `0083` dropped -- a near-axis wall AT OR ABOVE `T` is
+       reported in `over_t`, never a candidate, regardless of conflict;
+  sec2 ADDS an orthogonality post-condition: no wall's OWN deviation may
+       end up worse than before the repair ran, even a wall the repair
+       never chose to touch -- `check()`'s invariants never guarded this.
+
 Item B (the report, `wall_orthogonality`/`orthogonality_bands`) is covered
 in `test_orthogonality.py` and is not repeated here.
 """
@@ -24,6 +34,7 @@ from PyQt6.QtCore import QPointF
 
 import FloorPlanner as fp
 from floorplanner.design.validate import (
+    REPAIR_T_IN,
     check,
     choose_repair_endpoint,
     repair_wall_orthogonality,
@@ -136,9 +147,10 @@ def test_invariant_key_captures_i11s_quoted_room_names():
 
 def test_a_moved_wall_lands_exactly_on_axis_not_merely_within_tolerance():
     """0079-report.md sec2(f): the moved coordinate is SET EQUAL to the
-    other endpoint's, not bounded by a tolerance."""
+    other endpoint's, not bounded by a tolerance. Displacement kept under
+    0084-ruling.md sec1's restored `T` so this wall stays a candidate."""
     doc = _doc(
-        vertices=[_v("v1", 0, 0), _v("v2", 100, 0.5)],
+        vertices=[_v("v1", 0, 0), _v("v2", 100, 0.02)],
         walls=[_w("w1", "v1", "v2")],
     )
     res = repair_wall_orthogonality(doc)
@@ -152,23 +164,23 @@ def test_relocations_names_the_one_vertex_that_actually_moved():
     point -- `walls.close_gap`'s own (level, a, b) shape, so the same
     relocate-and-reweld path can serve both callers."""
     doc = _doc(
-        vertices=[_v("v1", 0, 0), _v("v2", 100, 0.5)],
+        vertices=[_v("v1", 0, 0), _v("v2", 100, 0.02)],
         walls=[_w("w1", "v1", "v2")],
     )
     res = repair_wall_orthogonality(doc)
-    assert res["relocations"] == [("L1", (0, 0), (0, 0.5))]
+    assert res["relocations"] == [("L1", (0, 0), (0, 0.02))]
 
 
 def test_a_refused_wall_is_named_with_its_unchanged_displacement():
     doc = _doc(
         vertices=[_v("v0", -100, 0), _v("v1", 0, 0),
-                  _v("v2", 100, 0.5), _v("v3", 200, 0.5)],
+                  _v("v2", 100, 0.02), _v("v3", 200, 0.02)],
         walls=[_w("w0", "v0", "v1"), _w("w1", "v1", "v2"),
                _w("w2", "v2", "v3")],
     )
     res = repair_wall_orthogonality(doc)
     assert res["moved"] == []
-    assert [r[0] for r in res["refused"]] == ["w1"]
+    assert [(r[0], r[4]) for r in res["refused"]] == [("w1", "conflict")]
     # NEVER CLAIMS ZERO REMAIN (0066-ruling.md sec4): the refused wall is
     # still off axis in the returned document.
     assert _deg_of(res["doc"], "w1") > 0.0
@@ -182,8 +194,60 @@ def test_a_deliberate_diagonal_is_never_a_candidate():
         walls=[_w("w1", "v1", "v2")],
     )
     res = repair_wall_orthogonality(doc)
-    assert res["moved"] == [] and res["refused"] == []
+    assert res["moved"] == [] and res["refused"] == [] and res["over_t"] == []
     assert _deg_of(res["doc"], "w1") == 45.0
+
+
+# ---------------------------------------------------------------------------
+# 0084-ruling.md sec1: T restored as the candidacy filter
+# ---------------------------------------------------------------------------
+
+def test_a_near_axis_wall_at_or_above_T_is_reported_not_touched():
+    """0084-ruling.md sec1: `0066-ruling.md` sec3's own table (auto-repairable
+    under `T`, reported-not-touched at or above it) is restored. This wall's
+    displacement (~0.1") is comfortably at or above `REPAIR_T_IN` (1/16") and
+    comfortably within the near-axis population (well under 1 degree) -- so
+    it must be reported in `over_t`, never moved, never refused."""
+    doc = _doc(
+        vertices=[_v("v1", 0, 0), _v("v2", 100, 0.1)],
+        walls=[_w("w1", "v1", "v2")],
+    )
+    res = repair_wall_orthogonality(doc)
+    assert res["moved"] == [] and res["refused"] == []
+    assert [w[0] for w in res["over_t"]] == ["w1"]
+    assert res["over_t"][0][3] > REPAIR_T_IN
+    assert _deg_of(res["doc"], "w1") > 0.0          # left exactly as it was
+
+
+# ---------------------------------------------------------------------------
+# 0084-ruling.md sec2: the orthogonality post-condition
+# ---------------------------------------------------------------------------
+
+def test_a_move_that_would_worsen_another_wall_is_undone_and_refused():
+    """`wA`'s only candidate endpoint (`v1`, chosen first -- both free, no
+    conflict) is shared with `wB`, an ALREADY off-axis wall (~3 degrees,
+    nowhere near `wA`'s own near-axis population, so it never gets a turn
+    of its own). Moving `v1` to straighten `wA` measurably tilts `wB`
+    further off axis -- `check()` sees no invariant violation, but the
+    post-condition catches it: `wA` is refused, `v1` reverts, and `wB`'s
+    degree in the returned document is EXACTLY what it was before the
+    repair ran, not merely close to it."""
+    doc = _doc(
+        vertices=[_v("v1", 0, 0), _v("v2", 100, 0.02), _v("v3", 1000, -52.4)],
+        walls=[_w("wA", "v1", "v2"), _w("wB", "v1", "v3")],
+    )
+    orig_b_deg = _deg_of(doc, "wB")
+    assert orig_b_deg > 1.0                          # not near-axis; no turn of its own
+    res = repair_wall_orthogonality(doc)
+    assert res["rolled_back"] is False
+    assert res["moved"] == []
+    assert len(res["refused"]) == 1
+    wid, _lvl, _typ, _disp, reason = res["refused"][0]
+    assert wid == "wA" and reason == "would worsen wB"
+    assert _deg_of(res["doc"], "wB") == orig_b_deg
+    # wA itself is exactly where it started -- the whole move was undone
+    V = {v["id"]: (v["x"], v["y"]) for v in res["doc"]["vertices"]}
+    assert V["v1"] == (0, 0)
 
 
 def test_the_repair_runs_despite_a_pre_existing_violation_0066_refuse_to_start_withdrawn():
@@ -192,7 +256,7 @@ def test_the_repair_runs_despite_a_pre_existing_violation_0066_refuse_to_start_w
     hanging off the end of an unrelated wall) still gets its near-axis
     walls straightened -- refusing protects nothing."""
     doc = _doc(
-        vertices=[_v("v1", 0, 0), _v("v2", 100, 0.5),
+        vertices=[_v("v1", 0, 0), _v("v2", 100, 0.02),
                   _v("v3", 200, 0), _v("v4", 300, 0)],
         walls=[_w("w1", "v1", "v2"),
                _w("w2", "v3", "v4", openings=[{
@@ -211,11 +275,14 @@ def test_a_re_rendered_pre_existing_violation_does_not_trigger_rollback():
     """0082-ruling.md sec4's own hazard, reproduced: `w2` already carries
     an I7 violation. Straightening `w1` moves the vertex `w1` and `w2`
     share, which changes `w2`'s LENGTH (and so the numbers I7's message
-    renders) without changing whether the opening is off the wall. The
-    stable key is unchanged, so this must NOT read as a new violation."""
+    renders) without changing whether the opening is off the wall. `v3`'s
+    own y is placed so a `w1` displacement just under 0084-ruling.md sec1's
+    restored `T` still crosses a 1-decimal rounding boundary in `w2`'s
+    printed length (50.0 -> 50.1) -- the stable key is unchanged, so this
+    must NOT read as a new violation."""
     doc = _doc(
         vertices=[_v("vZ", -100, 0), _v("v1", 0, 0),
-                  _v("v2", 100, 0.5), _v("v3", 100, 50.5)],
+                  _v("v2", 100, 0.06), _v("v3", 100, 50.08)],
         walls=[
             _w("wZ", "vZ", "v1"),          # exactly horizontal: conflicts v1
             _w("w1", "v1", "v2"),          # near-horizontal: must move v2
@@ -240,12 +307,15 @@ def test_a_re_rendered_pre_existing_violation_does_not_trigger_rollback():
 
 def test_a_genuinely_new_violation_rolls_back_the_whole_repair():
     """`w2`'s free endpoint is forced onto `w3`'s body -- an I14 unwelded T
-    that does not exist before the repair runs. The whole operation must be
-    discarded: `doc` comes back unchanged (not a like-valued copy -- the
-    very same document), and both `moved`/`refused` are empty."""
+    that does not exist before the repair runs. `v2` starts 0.65" from
+    `w3`'s line (outside the 0.6" weld tolerance: no pre-existing fault) and
+    is moved 0.06" (under 0084-ruling.md sec1's restored `T`) to land at
+    0.59" -- inside it. The whole operation must be discarded: `doc` comes
+    back unchanged (not a like-valued copy -- the very same document), and
+    both `moved`/`refused` are empty."""
     doc = _doc(
-        vertices=[_v("v1", 100, -1000), _v("v2", 105, 0),
-                  _v("v3", 100, -2000), _v("v4", 100, -50), _v("v5", 100, 50)],
+        vertices=[_v("v1", 100.59, -1000), _v("v2", 100.65, 0),
+                  _v("v3", 100.59, -2000), _v("v4", 100, -50), _v("v5", 100, 50)],
         walls=[
             _w("w1", "v1", "v3"),          # exactly vertical: conflicts v1
             _w("w2", "v1", "v2"),          # near-vertical: must move v2
@@ -313,20 +383,23 @@ def test_the_re_evaluated_predicate_leaves_every_non_refused_chain_wall_on_axis_
     """The production repair, re-evaluating `choose_repair_endpoint` fresh
     before each wall against the document as mutated so far. `0066`
     sec4/`0079-report.md`'s own acceptance (f): every wall the repair did
-    NOT refuse lands at EXACTLY 0."""
+    NOT refuse -- and was actually a candidate (0084-ruling.md sec1: some
+    chain walls are at or above the restored `T` and are never touched at
+    all) -- lands at EXACTLY 0."""
     res = repair_wall_orthogonality(wiscaway_doc)
     assert res["rolled_back"] is False
     moved_ids = {m[0] for m in res["moved"]}
     refused_ids = {r[0] for r in res["refused"]}
-    assert moved_ids | refused_ids >= set(CHAIN_WALLS) & (moved_ids | refused_ids)
+    over_t_ids = {o[0] for o in res["over_t"]}
     seen = 0
     for wid in CHAIN_WALLS:
         if wid in moved_ids:
             seen += 1
             assert _deg_of(res["doc"], wid) == 0.0, wid
-        elif wid in refused_ids:
+        elif wid in refused_ids or wid in over_t_ids:
             seen += 1
     assert seen == len(CHAIN_WALLS)           # every chain wall accounted for
+    assert moved_ids & set(CHAIN_WALLS)       # and at least one really moved
 
 
 # ---------------------------------------------------------------------------
@@ -334,21 +407,45 @@ def test_the_re_evaluated_predicate_leaves_every_non_refused_chain_wall_on_axis_
 # to the digit against the ruling's own named walls
 # ---------------------------------------------------------------------------
 
-def test_farmplaces_two_named_refusals_match_the_ruling_exactly():
-    """0079-report.md sec2(b), independently re-measured at 0082-ruling.md
-    sec1: the two fully-refused walls on this file, named. `w24` is 0066
-    sec1's own 3.000-inch headline example -- refused for CONFLICT, not
-    excluded for size, which is what settles that this repair's candidate
-    population is the near-axis census, not a displacement-bounded one."""
+def test_farmplaces_near_axis_walls_are_all_over_t_per_0084():
+    """0084-ruling.md sec1's own measured table: this file has 0 near-axis
+    walls under the restored `T`, 4 at or above it -- including `w24`,
+    0066 sec1's own 3.000-inch headline example, and `w44`
+    (0079-report.md sec2(b)'s two conflict-refused walls under the OLD,
+    dropped spec). Under the restored `T` neither is even a candidate:
+    `w24` is untouchable for the RIGHT reason, size, not conflict."""
     doc = json.loads((ROOT / "examples" / "farmplaceBIGmultifloor.json")
                       .read_text(encoding="utf-8"))
     assert len(check(doc, deep=True)) == 1        # 0082 sec2's own table
     res = repair_wall_orthogonality(doc)
     assert res["rolled_back"] is False
-    refused = {r[0]: round(r[3], 4) for r in res["refused"]}
-    assert refused == {"w24": 3.0, "w44": 0.1145}
-    for wid, *_rest in res["moved"]:
-        assert _deg_of(res["doc"], wid) == 0.0
+    assert res["moved"] == [] and res["refused"] == []
+    over_t = {w[0]: round(w[3], 4) for w in res["over_t"]}
+    assert over_t["w24"] == 3.0
+    assert over_t["w44"] == 0.1145
+    assert len(over_t) == 4                       # 0084 sec1's own count
+
+
+@pytest.mark.parametrize("name", [
+    "examples/farmplaceBIGmultifloor.json",
+    "examples/planc1.v5.json",
+    "examples/symmetricP1.json",
+    "fixtures/wiscaway2026-08-09R.json",
+])
+def test_the_post_condition_holds_corpus_wide_no_wall_ends_up_worse(name):
+    """0084-ruling.md sec2's own guarantee, checked against real plans, not
+    just the synthetic case that found the exemption bug
+    (`_worsened_wall`'s own docstring). For every wall in the document,
+    its FINAL deviation must be no greater than its ORIGINAL one -- not
+    only the walls this repair chose to move or refuse."""
+    doc = json.loads((ROOT / name).read_text(encoding="utf-8"))
+    orig = {wid: deg for wid, _lvl, _typ, deg, _disp in wall_orthogonality(doc)}
+    res = repair_wall_orthogonality(doc)
+    assert res["rolled_back"] is False
+    after = {wid: deg for wid, _lvl, _typ, deg, _disp in wall_orthogonality(res["doc"])}
+    worsened = {wid: (orig[wid], after[wid]) for wid in orig
+                if after[wid] > orig[wid] + 1e-6}
+    assert worsened == {}
 
 
 # crossfloor-snap-2026-08-17.json is NOT referenced here on purpose: per
@@ -366,7 +463,7 @@ def test_farmplaces_two_named_refusals_match_the_ruling_exactly():
 
 @pytest.mark.gui
 def test_apply_straightens_the_walls_scene_geometry_not_just_the_preview(win):
-    win.scene.addItem(fp.WallItem(QPointF(0, 0), QPointF(200, 1.0), "interior"))
+    win.scene.addItem(fp.WallItem(QPointF(0, 0), QPointF(200, 0.02), "interior"))
     dlg = fp.OrthogonalityRepairDialog(win)
     try:
         assert dlg.listw.count() == 1

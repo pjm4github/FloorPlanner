@@ -192,8 +192,10 @@ class OrthogonalityRepairDialog(QDialog):
             self.b_apply.setEnabled(False)
             return
 
-        moved, refused = self._result["moved"], self._result["refused"]
-        if not moved and not refused:
+        moved = self._result["moved"]
+        refused = self._result["refused"]
+        over_t = self._result["over_t"]
+        if not moved and not refused and not over_t:
             self.info.setText("No near-axis walls found -- nothing to repair.")
             self.b_apply.setEnabled(False)
             return
@@ -204,19 +206,23 @@ class OrthogonalityRepairDialog(QDialog):
             parts.append(f"{len(moved)} wall(s) will be straightened "
                         f"(largest correction: {largest:.3f}\").")
         if refused:
-            parts.append(f"{len(refused)} wall(s) are refused — both ends "
-                        "are shared with an already-exactly-axis wall — "
-                        "and are listed below, unchanged.")
+            parts.append(f"{len(refused)} wall(s) are refused and are "
+                        "listed below, unchanged.")
+        if over_t:
+            from floorplanner.design.validate import REPAIR_T_IN
+            parts.append(f"{len(over_t)} wall(s) are off axis by "
+                        f"{REPAIR_T_IN:.4f}\" or more -- too large to "
+                        "straighten automatically; see Edit ▸ Wall "
+                        "orthogonality report… for the full list.")
         parts.append("Nothing is applied until you choose Apply.")
         self.info.setText(" ".join(parts))
 
         for wid, lvl, typ, disp in moved:
             self.listw.addItem(f"{self._levels.get(lvl, lvl)}: wall {wid} "
                               f"({typ}) — will move {disp:.3f}\"")
-        for wid, lvl, typ, _disp in refused:
+        for wid, lvl, typ, _disp, reason in refused:
             self.listw.addItem(f"{self._levels.get(lvl, lvl)}: wall {wid} "
-                              f"({typ}) — refused (both ends conflict with "
-                              "an exactly-axis wall)")
+                              f"({typ}) — refused ({reason})")
         self.b_apply.setEnabled(bool(moved))
 
     def _apply(self):
