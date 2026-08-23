@@ -196,6 +196,7 @@ not built.
 > before? And: does the drawing still look like your drawing? Nothing moved
 > that you meant to be where it was.
 
-Branch: `wall-orthogonality-repair`. PR opened against `main`, AMBER, stopped
-for the check above — matching `0081-report.md` §1's own pattern for
-PRs #34/#35/#36.
+Branch: `wall-orthogonality-repair`.
+[PR #37](https://github.com/pjm4github/FloorPlanner/pull/37) opened against
+`main`, AMBER, stopped for the check above — matching `0081-report.md` §1's
+own pattern for PRs #34/#35/#36.
