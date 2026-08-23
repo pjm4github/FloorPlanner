@@ -4,6 +4,7 @@ This is the home of the shared mutable ``SETTINGS`` dict (read across the whole
 app) and the immutable constants.  Everything imports these from here so the
 settings object is a single shared instance, never duplicated.
 """
+import hashlib
 import json
 import os
 import sys
@@ -20,6 +21,7 @@ __all__ = [
     "SNAP_STEP", "WALL_SNAP_DEFAULT", "WALL_SNAP_CHOICES", "ROTATE_SNAP_DEFAULT",
     "CANVAS_W_DEFAULT", "CANVAS_H_DEFAULT", "MAX_CANVAS_IN",
     "DEFAULT_SETTINGS", "SETTINGS", "editing_enabled", "coerce_setting",
+    "SETTINGS_VERSION",
     "JOIN_TOL",
     "MIN_WALL_LEN",
     "WALL_PROJECT_STICK", "WALL_PROJECT_NEAR", "ROOM_SIG_MARGIN",
@@ -94,9 +96,27 @@ def coerce_setting(key: str, val, default):
     One function, used by every loader (planio.py, design/bridge.py) rather
     than duplicated -- "two implementations of a precedence chain is how the
     thickness tables happened" (0073 sec6). A value that cannot be coerced is
-    REPORTED via a warning, not swallowed."""
+    REPORTED via a warning, not swallowed.
+
+    THE BOOL BRANCH PARSES TEXT EXPLICITLY (0077-ruling.md sec2): a bare
+    `bool(val)` on a string is `bool("false") is True` -- the exact
+    string-typed hazard this whole thread exists to eliminate, alive again
+    in the one function whose job is "do not blindly coerce"."""
     if isinstance(default, bool):
-        return bool(val)
+        if isinstance(val, bool):
+            return val
+        if isinstance(val, str):
+            low = val.strip().lower()
+            if low in ("true", "1"):
+                return True
+            if low in ("false", "0"):
+                return False
+            warnings.warn(
+                f"setting {key!r}: {val!r} is not a recognised boolean "
+                f"('true'/'false'/'1'/'0'), using the default {default!r}",
+                stacklevel=2)
+            return default
+        return bool(val)          # a real int/float: unambiguous
     if isinstance(default, str):
         return str(val)
     if isinstance(default, int):
@@ -284,26 +304,106 @@ def _read_legacy_ini_value(path: Path, key: str):
     return None
 
 
-def _ensure_settings_file() -> Path:
-    """Create `settings_file()` if it does not exist yet: MIGRATE the
-    legacy INI's `anthropic_api_key` if one is present there, otherwise
-    start empty. Runs at most once per file -- once the JSON exists this
-    returns immediately without reading the INI again, so clearing the key
-    later never brings it back (0075-ruling.md sec3's idempotence clause).
+#: Bumped whenever `DEFAULT_SETTINGS` changes shape (a key added, removed,
+#: renamed, or re-defaulted) -- `0078-ruling.md` sec2. Full materialisation
+#: (below) means an existing user's file has NO absent keys for a new
+#: default to fall through to, so this version marker plus
+#: `_SETTINGS_MIGRATIONS` is the only thing that can still reach them.
+SETTINGS_VERSION = 1
 
-    Deliberately does NOT materialise every `DEFAULT_SETTINGS` key: that
-    would pin today's defaults into the file forever, so a later default
-    change would reach nobody who already has a file (0074-ruling.md
-    sec5). Just a `version` marker plus whatever migration actually found."""
+#: Ordered migration steps: `(from_version, fn)`, `fn(data: dict) -> dict`,
+#: each upgrading a file from `from_version` to `from_version + 1`.
+#: `_migrate_settings_data` applies every step in order and bumps the
+#: marker. Empty at `SETTINGS_VERSION == 1` because there is no version 0
+#: to migrate FROM -- the mechanism exists and is tested
+#: (`test_changing_DEFAULT_SETTINGS_requires_a_version_bump`) before it is
+#: ever needed, per this project's own "generation, or a gate that fails"
+#: rule: a table that only gets written the day it is first needed is a
+#: table nobody remembered to write.
+_SETTINGS_MIGRATIONS = []
+
+
+def _default_settings_fingerprint() -> str:
+    """A hash of `DEFAULT_SETTINGS`' keys, TYPES and VALUES -- what
+    `test_changing_DEFAULT_SETTINGS_requires_a_version_bump` pins against
+    `SETTINGS_VERSION`. Editing a default without bumping the version
+    reddens the gate; the fix is to bump `SETTINGS_VERSION`, add the
+    migration row, and update the pin -- mechanical, not remembered
+    (`0078-ruling.md` sec2)."""
+    items = sorted((k, type(v).__name__, repr(v))
+                   for k, v in DEFAULT_SETTINGS.items())
+    return hashlib.sha256(repr(items).encode("utf-8")).hexdigest()[:16]
+
+
+def _migrate_settings_data(data: dict) -> dict:
+    """Apply every step in `_SETTINGS_MIGRATIONS` between `data`'s own
+    `version` and `SETTINGS_VERSION`, in order; a file already current
+    (the common case) is returned with only its `version` normalised, so
+    this is cheap to call on every load, not just the first one. A key
+    the file does not carry (an old file, or a migration step that does
+    not touch it) still falls through to `DEFAULT_SETTINGS` at read
+    time -- this function upgrades what is THERE, it does not fill gaps."""
+    version = data.get("version", 0)
+    for from_version, fn in _SETTINGS_MIGRATIONS:
+        if version == from_version:
+            data = fn(data)
+            version = from_version + 1
+    data["version"] = SETTINGS_VERSION
+    return data
+
+
+def _materialize_settings(migrated_key=None) -> dict:
+    """Every `DEFAULT_SETTINGS` key at its default value, plus `version` --
+    Patrick's own words: *"if it doesn't exist then it creates a default
+    version"* (`0078-ruling.md` sec1). `anthropic_api_key` is added ONLY
+    when migration found a real one -- materialisation never mints a slot
+    for a secret (`0075-ruling.md` sec3 clause 2)."""
+    data = {"version": SETTINGS_VERSION}
+    data.update(DEFAULT_SETTINGS)
+    if migrated_key:
+        data["anthropic_api_key"] = migrated_key
+    return data
+
+
+def _ensure_settings_file() -> Path:
+    """Create `settings_file()` if it does not exist yet, or QUARANTINE it
+    and start fresh if it exists but cannot be parsed (`0077-ruling.md`
+    sec6: a truncated write -- power loss, full disk -- must not be
+    silently emptied the moment the next save runs; `catalog.py`'s own
+    `except Exception: return ""` guarantees nobody would otherwise hear
+    about it).
+
+    MIGRATES the legacy INI's `anthropic_api_key` ONLY when the JSON is
+    genuinely absent -- never on a quarantine-and-recreate. A JSON file
+    existed here once, so the INI stays dead exactly as ordinary
+    idempotence already requires (`0075-ruling.md` sec3): re-consulting
+    the INI on every recovery would let a corrupted file resurrect an
+    intentionally-cleared key, which is the loophole that rule exists to
+    close, reached by a different road."""
     path = settings_file()
-    if path.exists():
-        return path
-    data = {"version": 1}
-    legacy = _legacy_ini_file()
-    if legacy.exists():
-        key = _read_legacy_ini_value(legacy, "anthropic_api_key")
-        if key:
-            data["anthropic_api_key"] = key
+    genuinely_fresh = not path.exists()
+    if not genuinely_fresh:
+        try:
+            json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            bad = path.with_name(path.name + ".bad")
+            try:
+                path.replace(bad)
+            except OSError:
+                pass
+            else:
+                warnings.warn(
+                    f"{path} could not be read as JSON; preserved as "
+                    f"{bad} and starting fresh with default settings",
+                    stacklevel=2)
+        else:
+            return path                          # valid existing file
+    migrated_key = None
+    if genuinely_fresh:
+        legacy = _legacy_ini_file()
+        if legacy.exists():
+            migrated_key = _read_legacy_ini_value(legacy, "anthropic_api_key")
+    data = _materialize_settings(migrated_key)
     try:
         path.write_text(json.dumps(data, indent=2, sort_keys=True),
                         encoding="utf-8")
@@ -328,6 +428,19 @@ class _JsonSettings:
             self._data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             self._data = {}
+            return
+        # version-upgrade on load, not only at creation (0078-ruling.md
+        # sec2): a file materialised under an OLDER SETTINGS_VERSION still
+        # needs to walk forward, and a key it does not carry still falls
+        # through to DEFAULT_SETTINGS at read time regardless.
+        if self._data.get("version") != SETTINGS_VERSION:
+            self._data = _migrate_settings_data(self._data)
+            try:
+                self._path.write_text(
+                    json.dumps(self._data, indent=2, sort_keys=True),
+                    encoding="utf-8")
+            except OSError:
+                pass
 
     def value(self, key, default=None):
         return self._data.get(key, default)

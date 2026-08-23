@@ -69,7 +69,7 @@ def test_thickness_table_matches_std_t_not_a_transcribed_copy():
     change to either table is caught by disagreement, not by both moving
     together."""
     from floorplanner.design.validate import STD_T
-    assert fp2pdf.DEFAULT_THICKNESS == STD_T
+    assert fp2pdf._default_thickness() == STD_T
 
 
 # ---------------------------------------------------------------------------
@@ -111,14 +111,49 @@ def test_module_imports_without_reportlab():
     at module top would make the whole module (and anything that imports
     it, including the app's own menu wiring once built) fail to import at
     all without reportlab installed. Importing fp2pdf here, in a suite that
-    does not require reportlab, already partly proves this; PAGE and
-    DEFAULT_THICKNESS are computed with no reportlab symbol at module
-    scope, checked directly."""
+    does not require reportlab, already partly proves this; PAGE is
+    computed with no reportlab symbol at module scope, checked directly."""
     src = Path(fp2pdf.__file__).read_text(encoding="utf-8")
     top = src.split("\ndef ", 1)[0]           # everything before the first def
     assert "import reportlab" not in top and "from reportlab" not in top, (
         "reportlab is imported at module top -- the module (and its "
         "importer) can no longer load without it installed")
+
+
+def test_module_imports_with_fp2dxf_absent():
+    """0077-ruling.md sec5's own receipt: fp2pdf used to exec the whole of
+    fp2dxf.py by path just to borrow its thickness loader, so the PDF
+    exporter depended on the DXF one -- backwards for a package whose own
+    docstring is about running "without dragging in" anything. Renames
+    fp2dxf.py aside (restored in `finally`, whatever happens) and loads a
+    SEPARATE copy of fp2pdf.py, under a throwaway module name so the real
+    `floorplanner.export.fp2pdf` already in `sys.modules` is untouched --
+    fp2dxf.py genuinely absent from disk, not merely unimported, and
+    _stdt.py's own relative path to `design/validate.py` still resolves
+    because fp2pdf.py stays in its real location throughout."""
+    import importlib.util
+    import sys
+    real_dir = Path(fp2pdf.__file__).resolve().parent
+    fp2dxf_path = real_dir / "fp2dxf.py"
+    hidden = real_dir / "fp2dxf.py.hidden-for-test"
+    fp2dxf_path.rename(hidden)
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "_iso_fp2pdf_no_fp2dxf", real_dir / "fp2pdf.py")
+        mod = importlib.util.module_from_spec(spec)
+        # fp2pdf.py's own ConvertResult is a @dataclass, which resolves
+        # type hints via sys.modules[cls.__module__] -- register under
+        # this throwaway name before exec_module, same as fp2pdf.py's own
+        # loader does for fp2dxf.py's ConvertResult.
+        sys.modules[spec.name] = mod
+        try:
+            spec.loader.exec_module(mod)  # must not raise looking for fp2dxf.py
+        finally:
+            del sys.modules[spec.name]
+    finally:
+        hidden.rename(fp2dxf_path)
+    from floorplanner.design.validate import STD_T
+    assert mod._default_thickness() == STD_T
 
 
 def test_convert_degrades_to_a_valueerror_when_reportlab_is_missing(

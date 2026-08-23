@@ -34,6 +34,24 @@ def test_coerce_setting_preserves_the_declared_type(fp, default, val, expect):
     assert type(got) is type(expect)
 
 
+@pytest.mark.parametrize("val,expect", [
+    ("false", False), ("False", False), ("0", False),
+    ("true", True), ("True", True), ("1", True),
+])
+def test_coerce_setting_parses_boolean_text_explicitly(fp, val, expect):
+    """0077-ruling.md sec2's own receipt: `bool("false")` is `True` -- the
+    exact hazard 0075 eliminated from the app-settings store, alive again
+    in the coercer whose job is not to do that. Explicit token parsing,
+    not a bare `bool()`."""
+    assert fp.coerce_setting("shuffle", val, True) is expect
+
+
+def test_coerce_setting_warns_and_falls_back_on_unrecognised_boolean_text(fp):
+    with pytest.warns(UserWarning, match="shuffle"):
+        got = fp.coerce_setting("shuffle", "maybe", True)
+    assert got is True
+
+
 def test_coerce_setting_falls_back_and_warns_on_an_uncoercible_number(fp):
     with pytest.warns(UserWarning, match="k"):
         got = fp.coerce_setting("k", "not-a-number", 6.0)
@@ -130,7 +148,83 @@ def test_settings_file_is_created_as_json_on_first_use(fp, sandboxed_config):
     fp.app_settings().value("anything")
     assert fp.settings_file().exists()
     data = json.loads(fp.settings_file().read_text(encoding="utf-8"))
-    assert data.get("version") == 1
+    assert data.get("version") == fp.SETTINGS_VERSION
+
+
+# ---------------------------------------------------------------------------
+# materialisation -- 0078-ruling.md sec1: "I want to see the settings in
+# the file" -- every DEFAULT_SETTINGS key, mirrored exactly, no exceptions
+# ---------------------------------------------------------------------------
+
+def test_materialisation_writes_every_default_settings_key(fp, sandboxed_config):
+    fp.app_settings().value("anything")
+    data = json.loads(fp.settings_file().read_text(encoding="utf-8"))
+    for key, default in fp.DEFAULT_SETTINGS.items():
+        assert key in data, f"{key} missing from the materialised file"
+        assert data[key] == default
+
+
+def test_materialisation_includes_auto_bind_even_though_the_dialog_hides_it(
+        fp, sandboxed_config):
+    """0078 sec1: the file mirrors the MODEL, and the model has the flag --
+    a hand-maintained skip-list would drift; auto_bind is in DEFAULT_SETTINGS
+    so it is in the file, exactly like everything else."""
+    fp.app_settings().value("anything")
+    data = json.loads(fp.settings_file().read_text(encoding="utf-8"))
+    assert "auto_bind" in data
+
+
+# ---------------------------------------------------------------------------
+# the version pin -- 0078 sec2: mechanical, not remembered
+# ---------------------------------------------------------------------------
+
+def test_changing_DEFAULT_SETTINGS_requires_a_version_bump(fp):
+    """A hash of DEFAULT_SETTINGS' keys, types AND values, pinned against
+    the current SETTINGS_VERSION. Editing a default without bumping the
+    version reddens THIS test -- the fix is to bump SETTINGS_VERSION, add
+    a migration row to _SETTINGS_MIGRATIONS, and update the pin below.
+    Not a courtesy: with full materialisation there are no absent keys
+    left for a future default change to reach an existing user through
+    (0078 sec2) -- this is the only thing standing between that and a
+    default nobody can ever change again."""
+    from floorplanner.config import _default_settings_fingerprint
+    assert fp.SETTINGS_VERSION == 1
+    assert _default_settings_fingerprint() == "1ed175834bdbb015"
+
+
+# ---------------------------------------------------------------------------
+# the corrupt-file path -- 0077 sec6: preserved, reported once, not
+# silently emptied
+# ---------------------------------------------------------------------------
+
+def test_a_corrupt_settings_file_is_quarantined_not_silently_emptied(
+        fp, sandboxed_config):
+    path = fp.settings_file()
+    path.write_text("{not valid json", encoding="utf-8")
+    with pytest.warns(UserWarning, match="could not be read"):
+        s = fp.app_settings()
+    bad = path.with_name(path.name + ".bad")
+    assert bad.exists() and bad.read_text(encoding="utf-8") == "{not valid json", (
+        "the corrupt file was not preserved")
+    assert path.exists()                       # a fresh one takes its place
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["wall_snap_in"] == fp.DEFAULT_SETTINGS["wall_snap_in"]
+    assert s.value("wall_snap_in") == fp.DEFAULT_SETTINGS["wall_snap_in"]
+
+
+def test_corruption_recovery_does_not_re_migrate_from_a_stale_ini(
+        fp, sandboxed_config):
+    """A JSON existed once (now corrupt) -- the legacy INI stays dead on
+    recovery too, same as ordinary idempotence (0075 sec3), or a corrupted
+    file becomes a backdoor for resurrecting a cleared key."""
+    legacy = fp.config_dir() / "floorplanner.ini"
+    legacy.write_text("[General]\nanthropic_api_key=sk-ant-stale\n",
+                      encoding="utf-8")
+    fp.settings_file().write_text("{not valid json", encoding="utf-8")
+    with pytest.warns(UserWarning):
+        fp.app_settings()
+    assert fp.load_saved_api_key() == "", (
+        "corruption recovery resurrected a key from the still-present INI")
 
 
 # ---------------------------------------------------------------------------

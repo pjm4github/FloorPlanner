@@ -33,41 +33,48 @@ import argparse
 import importlib.util
 import json
 import math
-import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 
-def _load_std_thickness() -> dict[str, float]:
-    """`floorplanner.design.validate.STD_T`, via `fp2dxf.py`'s own by-path
-    loader -- REUSED, not transcribed (0072-ruling.md sec2(1): this file
-    shipped a THIRD wall-thickness table, disagreeing with the normative one
-    in 4 of 7 rows).
+def _load_stdt_module():
+    """`_stdt.py`, loaded BY PATH -- the leaf `0077-ruling.md` sec5 built so
+    this file and `fp2dxf.py` share one loader instead of one execing the
+    other (execing the whole 23KB `fp2dxf.py` just to reach its seven-line
+    loader needed a `sys.modules` registration to satisfy ITS OWN
+    `ConvertResult` `@dataclass` -- a coupling this leaf removes; `_stdt.py`
+    has no dataclasses to trip over).
 
-    Not a plain `from floorplanner.export.fp2dxf import _load_std_thickness`:
-    importing ANY `floorplanner` submodule first runs `floorplanner/__init__.py`,
-    which star-imports the whole Qt editor -- the identical problem
-    `fp2dxf.py`'s own loader avoids for `validate.py`, one level up from
-    here (`export/__init__.py`'s own docstring). So `fp2dxf.py` is loaded
-    by path too, exactly the same way, and only its already-computed
-    `STD_T` is taken from it."""
-    path = Path(__file__).resolve().parent / "fp2dxf.py"
-    spec = importlib.util.spec_from_file_location("_fp2pdf_fp2dxf", path)
+    Not `from floorplanner.export._stdt import ...`: importing ANY
+    `floorplanner` submodule first runs `floorplanner/__init__.py`, which
+    star-imports the whole Qt editor (`export/__init__.py`'s own
+    docstring)."""
+    path = Path(__file__).resolve().parent / "_stdt.py"
+    spec = importlib.util.spec_from_file_location("_fp2pdf_stdt", path)
     mod = importlib.util.module_from_spec(spec)
-    # fp2dxf.py's own ConvertResult is a @dataclass, and Python's dataclass
-    # decorator resolves type hints via sys.modules[cls.__module__] -- so
-    # the module must be registered there BEFORE exec_module runs, or the
-    # decorator itself raises. validate.py's loader (fp2dxf.py's own) never
-    # hit this because it has no dataclasses in it.
-    sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)
-    return dict(mod.STD_T)
+    return mod
 
 
-#: THE NORMATIVE thickness table, read live from `floorplanner.design.validate`
-#: via `fp2dxf.py` -- never a copy. See `_load_std_thickness`.
-DEFAULT_THICKNESS = _load_std_thickness()
+_default_thickness_cache = None
+
+
+def _default_thickness() -> dict[str, float]:
+    """THE NORMATIVE thickness table, read live from
+    `floorplanner.design.validate` via `_stdt.py` -- REUSED, not
+    transcribed (0072-ruling.md sec2(1): this file once shipped a THIRD
+    wall-thickness table, disagreeing with the normative one in 4 of 7
+    rows).
+
+    LAZY, NOT MODULE SCOPE (0077-ruling.md sec5, the same shape the
+    deferred `reportlab` import already has): nothing runs merely by
+    importing this file. Cached after the first call within one process."""
+    global _default_thickness_cache
+    if _default_thickness_cache is None:
+        _default_thickness_cache = _load_stdt_module().load_std_thickness()
+    return _default_thickness_cache
+
 
 PAGE = (17 * 72, 11 * 72)                     # 17x11 landscape, in points
 MARGIN = 0.5 * 72
@@ -595,7 +602,7 @@ def convert(doc, out: Path, meta, only_levels=None,
         raise ValueError(
             "reportlab is not installed; PDF export is unavailable "
             "(pip install reportlab)") from exc
-    th = dict(DEFAULT_THICKNESS)
+    th = dict(_default_thickness())
     th.update(thickness_overrides or {})
     levels = [lv for lv in doc["levels"]
               if lv.get("kind", "storey") != "site"
