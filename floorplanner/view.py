@@ -262,14 +262,15 @@ class PlanView(QGraphicsView):
         sc = self.scene()
         if sc is None:
             return pt
+        active = active_floor()
         tol = max(JOIN_TOL, 16.0 / max(self.transform().m11(), 1e-6))
         base = pt.x() if horizontal else pt.y()
         best, bestd = None, tol
         for w in sc.items():
-            if not isinstance(w, WallItem) or w is exclude:
-                continue
+            if not isinstance(w, WallItem) or w is exclude or w.floor != active:
+                continue                          # align only to the active floor
             for end in (w.p1, w.p2):
-                if not wall_endpoint_open(sc, end, ignore=(w, exclude)):
+                if not wall_endpoint_open(sc, end, ignore=(w, exclude), floor=active):
                     continue
                 c = end.x() if horizontal else end.y()
                 d = abs(base - c)
