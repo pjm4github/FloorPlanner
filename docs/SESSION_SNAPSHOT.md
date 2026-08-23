@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: abc2124 -->
+<!-- SNAPSHOT-HEAD: 9dc174f -->
 
 # Session snapshot — read this first
 
@@ -419,8 +419,8 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`abc2124`** at this file's cut. **[`0087-report.md`](handoff/0087-report.md) is the current status** — read that first: `0086-ruling.md`'s ready report is done, all three AMBER PRs (#34/#35/#36) are 0 commits behind `main`, individually re-gated GREEN, and waiting on Patrick's check session. `wall-orthogonality-repair` (PR #37) is excluded from that session (`0084-ruling.md` §1/§2 — restore `T`, add the orthogonality post-condition — are owed on the branch first). Full trail: `handoff/README.md`'s pair table. |
-| **Branches** | **`cross-floor-align-fix`** ([PR #34](https://github.com/pjm4github/FloorPlanner/pull/34), `904bd93`) **· `wall-label-fixes`** ([PR #35](https://github.com/pjm4github/FloorPlanner/pull/35), `c908cad`) **· `t-junction-grid-snap`** ([PR #36](https://github.com/pjm4github/FloorPlanner/pull/36), `881c908`, D80's fix) — **all three AMBER, 0 behind `main`, gate GREEN, ready for Patrick's check** (`t-junction-grid-snap` first, per `0086`). **`wall-orthogonality-repair`** ([PR #37](https://github.com/pjm4github/FloorPlanner/pull/37), item C) is AMBER but NOT ready for that check — `0084`'s `T`-restore/post-condition owed first, and excluded from this check session by `0086` §3. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
+| **`main`** | **`9dc174f`** at this file's cut. **[`0090-ruling.md`](handoff/0090-ruling.md) is the current status** — read that first: all three checks PASSED (`0088`/`0089`/`0090`), the AMBER queue that was the bottleneck is EMPTY. `0088`-`0091` land here doc-only; the three PRs merge next, sequentially (#36, #34, #35), each re-gated on the combined tree before merging. `wall-orthogonality-repair` (PR #37) becomes the only AMBER item once the merges land — `0084-ruling.md` §6 items 1-3 (restore `T`, the post-condition, re-measure) are owed first. Full trail: `handoff/README.md`'s pair table. |
+| **Branches** | **`cross-floor-align-fix`** (#34) **· `wall-label-fixes`** (#35) **· `t-junction-grid-snap`** (#36, D80's fix) — **all three PASSED Patrick's check, merging now in that order** (`0090`). **`wall-orthogonality-repair`** ([PR #37](https://github.com/pjm4github/FloorPlanner/pull/37), item C) is AMBER, not yet ready for a check — `0084-ruling.md` §6 items 1-3 owed first. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
 | **Gate** | full mode, re-run for this commit. `Gate-Census: collected=840 ruff=clean vacuous=0 end_assign=0 snapshot=current`, GREEN — matches, since this commit is docs-only. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **80 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
