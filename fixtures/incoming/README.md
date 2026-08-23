@@ -41,7 +41,7 @@ wrong person at the wrong moment.
 | `fixtures/` | **characterised** failures, each named in `../README.md` |
 | `fixtures/incoming/` | **uncharacterised** intake. No test may reach it. |
 
-## Triage moves a file OUT of here — three exits, and only three
+## Triage moves a file OUT of here — four exits, and only four
 
 Every file leaves by exactly one of these, and the exit is **named** when it is
 taken:
@@ -50,9 +50,19 @@ taken:
    [`../README.md`](../README.md) naming exactly what it violates and why it is
    retained, **and a fail-first test that references it**. A promotion with no
    test is a file that has been moved, not triaged.
-2. **DELETED as a duplicate**, *naming the fixture that already covers it*. "We
+2. **PROMOTED to `fixtures/` as a measurement subject**, with an entry in
+   [`../README.md`](../README.md) naming exactly what it is evidence FOR and
+   which census, script, or record consumes it — **no test names it, and none
+   is owed**. This is not exit 1 with the test skipped: the file's value is a
+   number a census reads, not a fault a test reproduces, so nothing in the
+   suite references it by design. [`0063-ruling.md`](../../docs/handoff/0063-ruling.md)
+   §4 — the clause exit 1 assumed ("the only reason to keep an intake file is
+   as a test input") does not hold for `crossfloor-snap-2026-08-17.json`,
+   which `docs/evidence/orthogonality_census.py` had already been counting
+   while it sat here.
+3. **DELETED as a duplicate**, *naming the fixture that already covers it*. "We
    have one of these" is only a reason if you can say which one.
-3. **DELETED as no-defect-found**, *naming what was checked*. The value is the
+4. **DELETED as no-defect-found**, *naming what was checked*. The value is the
    negative result: without the list, the next identical report starts from
    nothing.
 

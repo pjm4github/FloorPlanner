@@ -12,9 +12,9 @@ from PyQt6.QtCore import QLineF, QPointF
 from floorplanner.config import SETTINGS, SNAP_STEP
 
 __all__ = [
-    "fmt_ftin", "fmt_in", "parse_feet",
+    "fmt_ftin", "fmt_in", "fmt_ft3", "parse_feet",
     "grid_snap", "wall_snap", "wall_snap_len", "parse_wwhh",
-    "line_intersection", "dist_point_segment",
+    "line_intersection", "dist_point_segment", "heading_deg",
     "bring_to_front", "send_to_back", "add_front_back_actions",
     "handle_front_back", "axis_wall_intersection",
 ]
@@ -44,6 +44,30 @@ def fmt_in(inches: float) -> str:
     frac = v - whole
     s = str(whole) if frac == 0 else f"{whole} 1/2"
     return f'{sign}{s}"'
+
+
+def fmt_ft3(inches: float) -> str:
+    """Format a length/coordinate given in inches as DECIMAL feet, 3
+    significant digits, e.g. 148.14 -> "12.3" (feet). No unit suffix --
+    callers that need one append it, since a coordinate pair usually wants
+    it once, not per axis."""
+    return f"{inches / 12.0:.3g}"
+
+
+def heading_deg(p1: QPointF, p2: QPointF):
+    """The wall's own compass heading in degrees, `[0, 360)`, `p1` -> `p2`.
+    None for a degenerate (coincident) pair -- no direction is defined.
+
+    Unlike `wall_angle_deviation_deg` (validate.py), this is the actual
+    heading, not deviation from the nearest axis: 90 and 270 are both
+    reported exactly, not folded together. That is deliberate -- it is for
+    a human reading one wall's own direction, not a corpus-wide drift
+    census, and folding a wall pointing east onto one pointing west would
+    misinform exactly the reader it is for."""
+    dx, dy = p2.x() - p1.x(), p2.y() - p1.y()
+    if math.hypot(dx, dy) < 1e-9:
+        return None
+    return math.degrees(math.atan2(dy, dx)) % 360.0
 
 
 def parse_feet(text) -> float:

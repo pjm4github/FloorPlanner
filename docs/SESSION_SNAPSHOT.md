@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: d9c44de -->
+<!-- SNAPSHOT-HEAD: ea215ff -->
 
 # Session snapshot — read this first
 
@@ -144,6 +144,16 @@ golden-file receipt, gate GREEN. **Patrick's own manual check PASSED
 Chief Architect X17, closing [`0038-ruling.md`](handoff/0038-ruling.md) §8's
 merge condition. Full receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
+**THE WALL ORTHOGONALITY REPAIR (item C) IS BUILT, GATED GREEN, AND OPEN AS A
+FOURTH AMBER PR — `wall-orthogonality-repair`, stopped for Patrick's own
+check.** [`0066-ruling.md`](handoff/0066-ruling.md) →
+[`0079-report.md`](handoff/0079-report.md) →
+[`0082-ruling.md`](handoff/0082-ruling.md) (three amendments, unblocking) →
+[`0083-report.md`](handoff/0083-report.md) (built, plus two measured
+findings neither ruling anticipated — see THE QUEUE item 8). Full detail
+there; not restated here beyond the pointer, per this file's own rule that
+an index does not summarise the thing it indexes.
+
 ---
 
 ## THE QUEUE
@@ -265,14 +275,76 @@ merge condition. Full receipt: [`handoff/0050-report.md`](handoff/0050-report.md
    orthogonality severity should not be read as evidence for the cross-floor
    thread below. **`0037` §3's reachability census also run, folded in for
    free per `0059` §5 item 3**: every mouse/macro hit-test and selection path
-   (`items.py`'s `hit_candidates()` and everything built on it — `view.py`'s
-   `hit`/`blank`/`_band_may_start`/rubber-band select/`_align_to_wall`,
-   `macro.py`'s `_opening`/`_cmd_select`) shares one root and none filter by
-   `.floor`, versus 100% of `walls.py`'s geometry hot paths, which do.
-   Currently masked by `apply_floor_visibility` running at load — not a
-   reproduced bug, no fix built (a fix is AMBER, per `0037` §6). A guide line
-   added to `README.md`'s export section pointing at the report before
-   exporting.
+   shares one root (`items.py`'s `hit_candidates()`) and none filter by
+   `.floor`, versus 100% of `walls.py`'s geometry hot paths, which do. **The
+   census found a live one** ([`0061-ruling.md`](handoff/0061-ruling.md)):
+   `view.py:244` `PlanView._align_to_wall` scans bare `sc.items()`, not
+   `items(pos)`, so — unlike the other reachability sites, which Qt's own
+   visibility filtering already masks — it is NOT masked, and a wall drawn on
+   the active floor could snap its free end onto an open end on a hidden
+   floor, matching Patrick's cross-floor report clause for clause. **Fixed on
+   branch `cross-floor-align-fix`** ([`0062-report.md`](handoff/0062-report.md)):
+   a fail-first test confirmed RED (`500.0` where `505.0` was drawn) then
+   GREEN after `_align_to_wall`/`wall_endpoint_open` both gained the
+   `.floor == active` filter every other hot path already had; the
+   long-untriaged `fixtures/incoming/crossfloor-snap-2026-08-17.json`
+   promoted to `fixtures/` (real corpus evidence, kept; the defect itself
+   covered by the synthetic test). **[PR #34](https://github.com/pjm4github/FloorPlanner/pull/34)
+   open, AMBER, stopped for Patrick's manual check** — *"with the second
+   floor hidden, does a wall you draw still jump to something you cannot
+   see?"* [`0063-ruling.md`](handoff/0063-ruling.md) accepts the fix and adds
+   `wall_endpoint_open`'s `floor=` param as more than asked (a second,
+   previously-unreported half of the same fault, reasoned from the
+   mechanism), but flags the fail-first test as a negative assertion with no
+   positive-control pairing (D43/positive-control family) — **owed on the
+   branch: a control assertion, same scene, active floor, alignment must
+   still fire.** Also flags a fourth `fixtures/incoming/` exit as needed
+   (promoted as measurement subject, no test) — **added to
+   `fixtures/incoming/README.md`.** Three more items named, not built: the
+   four masked reachability sites (no receipt yet), `wall_endpoint_open`'s
+   `floor=None` default (should invert, but changes two existing callers
+   with no receipt). A guide line added to `README.md`'s export section
+   pointing at the orthogonality report before exporting. **Item C (the
+   repair) is no longer RED** — ruled at [`0066`](handoff/0066-ruling.md),
+   read back at [`0079`](handoff/0079-report.md), amended and unblocked at
+   [`0082`](handoff/0082-ruling.md), and BUILT at
+   [`0083`](handoff/0083-report.md) — see THE QUEUE item 8 below.
+
+8. **THE WALL ORTHOGONALITY REPAIR — BUILT, GATED GREEN, AMBER, STOPPED FOR
+   PATRICK'S CHECK.** [`0066-ruling.md`](handoff/0066-ruling.md) item C, read
+   back at [`0079-report.md`](handoff/0079-report.md), amended and unblocked
+   at [`0082-ruling.md`](handoff/0082-ruling.md) (withdrew the
+   refuse-to-start clause, moved the before/after differential onto a stable
+   key, made the conflict predicate re-evaluate per wall against the
+   document as mutated so far). Built exactly to that spec:
+   `validate.py`'s `repair_wall_orthogonality` + `OrthogonalityRepairDialog`
+   + Edit ▸ "Repair wall orthogonality…". The candidate population is the
+   near-axis census itself (`0 < deg <= 1.0`), not a displacement-bounded
+   set — settled by `0079`/`0082` both treating `farmplaceBIGmultifloor`
+   `w24` (0066's own 3.000″ headline outlier) as a genuine candidate,
+   refused only for conflict. **Two findings measured, neither anticipated
+   by either ruling** ([`0083-report.md`](handoff/0083-report.md) §§4-5):
+   "61 of 63" does not hold corpus-wide — `fixtures/incoming/crossfloor-snap-2026-08-17.json`
+   alone carries 37 near-axis walls, and straightening it introduces two
+   genuine new `I14` violations, so `0082`'s own whole-document rollback
+   (correct as specified) withholds all 37 — the honest corpus total is
+   **22 moved, 4 refused, 37 withheld by one file's rollback** (receipt:
+   `docs/evidence/orthogonality_repair_census.py`, new); and a wall the
+   repair REFUSES can still have its own displacement change, because it
+   shares a vertex with a wall the repair DOES move (measured on
+   `wiscaway2026-08-09R`'s `w54`) — a real gap in `0079`/`0082`'s own
+   acceptance clause (f), named for a future ruling, not silently tested
+   around. Chain receipt run per `0082` §3's own instruction: RED under a
+   naive as-loaded predicate (a real six-wall chain, `w53..w59`, ends up
+   WORSE — one wall at 3.25° off axis), GREEN under the built one (every
+   non-refused wall in the chain lands at exactly 0°). 19 new tests
+   (`tests/test_orthogonality_repair.py`), full suite 852 passed, `ruff`
+   clean, gate GREEN. Item 3 (user-settable `T`, the graph solve) is
+   unaffected and stays RED. **[PR #37](https://github.com/pjm4github/FloorPlanner/pull/37)
+   open on `wall-orthogonality-repair`, AMBER, stopped for Patrick's own
+   check** (`0066` §7: run the repair on the plan behind `L2.dxf`,
+   re-export, recount against Chief's 75 — and does the drawing still look
+   like the drawing).
 
 **Full tiered queue (A2–A5, the command-roster census, Phase 5's remainder,
 etc.):** [`ROADMAP.md`](ROADMAP.md) §3. **`boat_trailer` and the vehicle
@@ -347,9 +419,9 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **This copy of the file is stale by construction** — it is `cross-floor-align-fix`'s own branch copy, unmerged, and the marker above (`d9c44de`) names THIS BRANCH'S tip, not `main`'s. `main`'s real, current state (band-split fix, `0037` §3's census, the `0061`/`0062`/`0063` mailbox pair) is on `main` itself, not reproduced here — per [`0063-ruling.md`](handoff/0063-ruling.md) §6, the branch carries only code, and the mailbox/snapshot record lives on `main`. Reconcile at merge. |
-| **Branches** | **`cross-floor-align-fix`, open — [PR #34](https://github.com/pjm4github/FloorPlanner/pull/34), AMBER, stopped for Patrick's manual check.** The `_align_to_wall` cross-floor snap fix plus its positive-control assertion ([`0063-ruling.md`](handoff/0063-ruling.md) §3). `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
-| **Gate** | full mode, re-run for this commit. Last confirmations: PR #33 CI green on all six jobs (including the previously-red `records (gate --docs)` job — resolved once the branch picked up `main`'s current tip) before merge; `fp2dxf-integration`'s own combined-tree gate GREEN, `collected=761`. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
+| **`main`** | **`ea215ff`** at this file's cut — this snapshot's marker (line 1), required to match this row exactly, per this section's own gate rule; `main` itself is ahead of this (see `handoff/README.md`'s pair table for its actual tip). This copy is carried onto `cross-floor-align-fix` while bringing that branch current, per `0086-ruling.md`. **[`0084-ruling.md`](handoff/0084-ruling.md) is the current status** — read that first, not this row: item C (`wall-orthogonality-repair`, PR #37) is accepted in most of its shape but `T = 1/16″` was wrongly dropped as the candidacy filter (restore it — without it the largest correction is 3.000″, not the ~0.04″ that makes Patrick's "still looks like your drawing?" check answerable) and the interlock never guarded the quantity the repair exists to improve (a refused-but-near-axis wall can still be tilted by a neighbour's move — add a post-condition: no wall's deviation may increase). Both AMBER, both owed on the branch before Patrick's check runs. `0083` §4's "61 of 63" correction stands but its stated CAUSE was wrong: `crossfloor-snap` WAS in `0066`'s original census; the miss was that neither ruling modelled the whole-file rollback, not missing coverage — re-measure once `T` is restored, since most of `crossfloor`'s 37 candidates may drop out on size alone and the rollback question may moot itself. Also new: the mailbox now only lands on `main` by GATE, not rule — see the hook note in §5. Full trail: `handoff/README.md`'s pair table. |
+| **Branches** | **`cross-floor-align-fix`** ([PR #34](https://github.com/pjm4github/FloorPlanner/pull/34)) **· `wall-label-fixes`** ([PR #35](https://github.com/pjm4github/FloorPlanner/pull/35)) **· `t-junction-grid-snap`** ([PR #36](https://github.com/pjm4github/FloorPlanner/pull/36), D80's fix) **· `wall-orthogonality-repair`** ([PR #37](https://github.com/pjm4github/FloorPlanner/pull/37), item C) — **all four AMBER. #34/#35/#36 stopped for Patrick's manual check now; #37 is NOT ready for that check yet** — `0084-ruling.md` §1/§2 (restore `T`, add the orthogonality post-condition) are owed on the branch first. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
+| **Gate** | full mode, re-run for this commit. `Gate-Census: collected=840 ruff=clean vacuous=0 end_assign=0 snapshot=current`, GREEN. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **80 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`, receipted by four `tests/test_gate.py` merge-ref tests). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
@@ -444,6 +516,10 @@ section stop carrying the reasoning WORKING_AGREEMENT.md already carries.
   and is **newer than every tracked file** — **including `.md` files**, so *edit
   the documents first, then gate, then commit*. The hook reads the RESULT FILE,
   never the commit message.
+- **A NEW `docs/handoff/NNNN-*.md` ONLY COMMITS ON `main`** (0084-ruling.md
+  §4) — `.claude/hooks/verify_gate.py` refuses a `git commit` that ADDS one on
+  any other branch, merge commits exempt. Write the report or ruling, commit
+  it on `main`, then branch for the code that answers it.
 - **ONE CALL CANNOT BOTH RUN THE GATE AND COMMIT**, and the hook blocks that
   shape outright. **`--trailer` is exempt** — it runs nothing and writes nothing,
   and it is exactly the command that belongs beside a commit. **The hook's match

@@ -124,6 +124,48 @@ PUSH_RE = re.compile(r"(?:^|[;&|])\s*(?:\S+\s+)?git\s+push\b", re.M)
 # fix already corrected once.
 GATE_RUN_RE = re.compile(r"tools[/\\]gate\.py(?!\s+--trailer)")
 
+# A new mailbox file, `docs/handoff/NNNN-*.md` -- never `archive/`, never
+# `README.md` (no `[^/]` boundary trips on either). 0084-ruling.md SS4: the
+# pair for THIS repair sat on `wall-orthogonality-repair`, unreadable from
+# `main`, for the sixth time -- a rule restated five times and not followed
+# is a rule that is wrong about how Code works, so it becomes a gate.
+HANDOFF_RE = re.compile(r"^docs/handoff/\d{4}-[^/]+\.md$")
+
+
+def _current_branch(cwd):
+    r = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=cwd,
+                       capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def _staged_new_handoff_files(cwd, cmd):
+    """Handoff files about to be ADDED by this commit -- staged via `git add`
+    (`git diff --cached --diff-filter=A`) UNION any explicit path argument on
+    the command line itself (`git commit docs/handoff/0086-ruling.md -F -`,
+    this project's own documented pattern for committing alongside other
+    staged files -- CLAUDE.md's "use git commit <paths> when anything else is
+    staged"), checked with `git status --porcelain` for that one path so a
+    MODIFY of an existing file is never mistaken for an add."""
+    found = set()
+    r = subprocess.run(["git", "diff", "--cached", "--name-status",
+                        "--diff-filter=A", "--", "docs/handoff"],
+                       cwd=cwd, capture_output=True, text=True)
+    if r.returncode == 0:
+        for line in r.stdout.splitlines():
+            parts = line.split("\t", 1)
+            if len(parts) == 2 and HANDOFF_RE.match(parts[1]):
+                found.add(parts[1])
+
+    for tok in cmd.split():
+        path = tok.strip("'\"")
+        if not HANDOFF_RE.match(path.replace(os.sep, "/")):
+            continue
+        st = subprocess.run(["git", "status", "--porcelain", "--", path],
+                            cwd=cwd, capture_output=True, text=True)
+        if st.returncode == 0 and st.stdout[:2] in ("??", "A ", "AM"):
+            found.add(path)
+    return found
+
 
 def block(msg):
     sys.stderr.write(f"BLOCKED: {msg}\n")
@@ -168,6 +210,29 @@ def main():
     # run today, split the call.
     event = "push" if is_push else "commit"
     event_verb = "pushes" if is_push else "commits"       # "commit" -> "commits"
+
+    # THE MAILBOX ONLY LANDS ON `main` (0084-ruling.md SS4). A COMMIT (not a
+    # push -- this is about where the file is created, not where it ships)
+    # that ADDS a `docs/handoff/NNNN-*.md` on any other branch is refused,
+    # UNLESS it is a merge commit (`main` coming IN, which legitimately
+    # carries mailbox files that already exist there).
+    if event == "commit":
+        branch = _current_branch(ROOT)
+        merging = subprocess.run(
+            ["git", "rev-parse", "--git-path", "MERGE_HEAD"], cwd=ROOT,
+            capture_output=True, text=True)
+        is_merge = (merging.returncode == 0
+                   and os.path.exists(os.path.join(ROOT, merging.stdout.strip())))
+        if branch and branch != "main" and not is_merge:
+            new_handoff = _staged_new_handoff_files(ROOT, cmd)
+            if new_handoff:
+                shown = ", ".join(sorted(new_handoff))
+                block(f"this commit adds {shown} on branch '{branch}', not "
+                      "`main`.\n"
+                      "         The mailbox only lands on `main` -- write "
+                      "the report or ruling, commit it there,\n"
+                      "         then branch for the code that answers it "
+                      "(0084-ruling.md SS4).")
 
     # ONE CALL CANNOT BOTH RUN THE GATE AND COMMIT/PUSH. Checked before the
     # result file is even read, because in this shape the result file is

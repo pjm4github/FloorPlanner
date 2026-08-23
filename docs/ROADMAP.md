@@ -24,6 +24,19 @@ item, by tier, and the tier is assigned **here** — Code does not self-classify
 | **AMBER** | a ruling exists, but the task changes what the user sees or what an operation produces | run it, gate it, PR it, **stop** — Patrick's manual check is the merge condition |
 | **RED** | a ruling is missing | **do not start.** Read-back first |
 
+**Amended 2026‑08‑21, [`handoff/0065-ruling.md`](handoff/0065-ruling.md) §2:**
+the table above keys every row on *a ruling exists / is missing*, but a ruling
+is not the only form of authority for a change — **Patrick's own direct
+instruction is another, and it outranks a ruling.** With authority present
+(either kind), the tier still follows from the change's nature exactly as the
+table says; this is not a fourth tier, only a name for what "a ruling exists"
+was always standing in for.
+
+**One clause closes the hole [`handoff/0068-ruling.md`](handoff/0068-ruling.md) §5
+found in the paragraph above: an instruction-as-authority claim must be
+QUOTED IN THE REPORT that relies on it, not merely asserted.** *"Patrick asked
+for it"* names nobody can audit; the report owes the words, the same way a
+ruling owes its own file rather than a summary of one.
 
 **The GREEN criterion was amended on 2026-08-07, and the amendment is Patrick's,
 not a reading Code arrived at.** It first read *"no user-visible behaviour
