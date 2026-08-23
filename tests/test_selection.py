@@ -25,16 +25,30 @@ def test_selecting_one_wall_shows_id_vertices_length_on_the_status_bar(fp, win):
         f"  len 10.00ft")
 
 
-def test_wall_label_shows_heading_for_a_non_axis_wall(fp, win):
-    """A 45-degree diagonal: the angle clause appears, and coordinates are
-    decimal feet, fixed to 2 places (0065-ruling.md sec4)."""
-    w = fp.WallItem(QPointF(0, 0), QPointF(100, 100), "interior")
+def test_wall_label_shows_heading_and_deviation_for_an_off_grid_wall(fp, win):
+    """0092/0093-ruling.md: off the 15-degree intended-angle grid, the
+    clause shows BOTH numbers -- heading at fixed decimals, deviation at
+    significant figures -- and coordinates are decimal feet, fixed to 2
+    places (0065-ruling.md sec4)."""
+    w = fp.WallItem(QPointF(0, 0), QPointF(100, 20), "interior")
     win.scene.addItem(w)
     w.setSelected(True)
     win._apply_edit_actions()
     assert win.wall_label.text() == (
-        f"Wall {w.uid}: {w.v1}(0.00, 0.00)ft -> {w.v2}(8.33, 8.33)ft"
-        f"  len 11.79ft  angle 45.0000deg")
+        f"Wall {w.uid}: {w.v1}(0.00, 0.00)ft -> {w.v2}(8.33, 1.67)ft"
+        f"  len 8.50ft  angle 11.3099deg (3.69deg off axis)")
+
+
+def test_wall_label_omits_the_clause_entirely_for_a_deliberate_45_degree_wall(fp, win):
+    """0093-ruling.md sec1's own point: 45deg is a multiple of the default
+    15deg step, so it is an INTENDED angle, not a drift -- the clause
+    (heading included, sec5) says nothing at all, unlike the old
+    cardinal-only rule this replaces."""
+    w = fp.WallItem(QPointF(0, 0), QPointF(100, 100), "interior")
+    win.scene.addItem(w)
+    w.setSelected(True)
+    win._apply_edit_actions()
+    assert "angle" not in win.wall_label.text()
 
 
 def test_the_angle_clause_round_trips_and_never_reads_as_a_cardinal(fp, win):
@@ -43,9 +57,10 @@ def test_the_angle_clause_round_trips_and_never_reads_as_a_cardinal(fp, win):
     which passes at ANY fixed precision, the broken 1-decimal one included,
     so it could never have gone red against the defect it existed for
     (0068 measured this directly: simulated at .1f/.2f/.3f/.4f, the
-    assertion passed at all four). This instead reads the number back out
-    of the label and holds it to the invariant the clause itself enforces
-    -- format-free, so it also catches a future precision regression, not
+    assertion passed at all four). This instead reads the DEVIATION back
+    out of the label and holds it to 0092-ruling.md's own invariant: when
+    the clause fires, the printed deviation must never parse as zero --
+    format-free, so it also catches a future precision regression, not
     only today's already-fixed one.
 
     The deviation used (0.0003deg) is chosen as an intrinsic property of
@@ -68,10 +83,9 @@ def test_the_angle_clause_round_trips_and_never_reads_as_a_cardinal(fp, win):
     w.setSelected(True)
     win._apply_edit_actions()
     text = win.wall_label.text()
-    m = re.search(r"angle ([\d.]+)deg", text)
+    m = re.search(r"angle [\d.]+deg \(([^)]+)deg off axis\)", text)
     assert m is not None, f"{text!r} carries no angle clause"
-    shown = float(m.group(1))
-    assert shown % 90.0 != 0.0, f"{text!r} prints a cardinal the predicate denied"
+    assert float(m.group(1)) != 0.0, f"{text!r} prints a deviation that reads as zero"
 
 
 @pytest.mark.parametrize("p2", [
@@ -86,6 +100,36 @@ def test_wall_label_omits_angle_for_all_four_cardinals(fp, win, p2):
     three cardinals must suppress the angle clause too, not just the
     approx-tolerant heading_deg() test in test_geometry.py."""
     w = fp.WallItem(QPointF(0, 0), p2, "interior")
+    win.scene.addItem(w)
+    w.setSelected(True)
+    win._apply_edit_actions()
+    assert "angle" not in win.wall_label.text()
+
+
+@pytest.mark.parametrize("angle_deg", [0, 15, 30, 45, 60, 75, 90])
+def test_a_ctrl_drag_angle_snapped_wall_shows_no_angle_clause(fp, win, angle_deg):
+    """0094-ruling.md's own receipt: `_angle_snapped_target` (walls.py) is
+    the SAME grid the label measures deviation from, so a wall built
+    through it -- at any of its own increments, not only the four old
+    cardinals -- must show nothing. RED under exact equality for 15/30/60/75
+    before the tolerance fix (0094 sec2's own measured ~4e-15deg noise)."""
+    theta = math.radians(angle_deg)
+    length = 1000.0
+    p2 = QPointF(length * math.cos(theta), length * math.sin(theta))
+    w = fp.WallItem(QPointF(0, 0), p2, "interior")
+    win.scene.addItem(w)
+    w.setSelected(True)
+    win._apply_edit_actions()
+    assert "angle" not in win.wall_label.text()
+
+
+def test_an_arbitrary_rotate_snap_step_falls_back_to_cardinals_only(fp, win):
+    """0093-ruling.md sec2: `rotate_snap_deg` is a furnishing setting that
+    can be set to anything in 1-90; at a step that does not divide 90 (7,
+    here), a vertical wall (heading 90) would otherwise report a false
+    "6deg off axis". Falls back to 90 silently -- no warning, no failure."""
+    fp.SETTINGS["rotate_snap_deg"] = 7.0
+    w = fp.WallItem(QPointF(0, 0), QPointF(0, 120), "interior")   # due north
     win.scene.addItem(w)
     w.setSelected(True)
     win._apply_edit_actions()
