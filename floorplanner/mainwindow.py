@@ -791,23 +791,36 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
     @staticmethod
     def _wall_label_text(walls) -> str:
         """The selected wall's id, its two vertices' id + (x, y) in decimal
-        feet (3 significant digits), its length, and its heading -- for the
-        status bar. Empty unless exactly one wall is selected. The heading
-        is omitted for an exactly axis-aligned wall (0/90/180/270) and shown
-        otherwise, drift included on purpose: a wall a fraction of a degree
-        off axis is exactly the class this project's own orthogonality
-        report exists to surface, and rounding it away here would hide the
-        same fact this label is for."""
+        feet (fixed 2 decimals -- 0065-ruling.md sec4), its length, and its
+        heading -- for the status bar. Empty unless exactly one wall is
+        selected. The heading is omitted for an exactly axis-aligned wall
+        (0/90/180/270) and shown otherwise, drift included on purpose: a
+        wall a fraction of a degree off axis is exactly the class this
+        project's own orthogonality report exists to surface, and rounding
+        it away here would hide the same fact this label is for."""
         if len(walls) != 1:
             return ""
         w = walls[0]
         p1, p2 = w.p1, w.p2
-        text = (f"Wall {w.uid}: {w.v1}({fmt_ft3(p1.x())}, {fmt_ft3(p1.y())})ft"
-                f" -> {w.v2}({fmt_ft3(p2.x())}, {fmt_ft3(p2.y())})ft"
-                f"  len {fmt_ft3(w.length())}ft")
+        text = (f"Wall {w.uid}: {w.v1}({fmt_ft2(p1.x())}, {fmt_ft2(p1.y())})ft"
+                f" -> {w.v2}({fmt_ft2(p2.x())}, {fmt_ft2(p2.y())})ft"
+                f"  len {fmt_ft2(w.length())}ft")
         heading = heading_deg(p1, p2)
         if heading is not None and heading % 90.0 != 0.0:
-            text += f"  angle {heading:.1f}deg"
+            # 0065-ruling.md sec3: the clause fires exactly when heading is
+            # NOT a cardinal, so printing it at 1 decimal rounded a real
+            # drift onto a false-looking "90.0" for any deviation under
+            # 0.05deg -- a statement contradicting the branch that produced
+            # it. 4 decimals (matching validate.py's own worst-offenders
+            # table) resolves down to ~0.00005deg, comfortably below every
+            # deviation this project's corpus census has found (smallest on
+            # record: 0.0002037deg -- 0068-ruling.md sec2, measured, not the
+            # rounder 0.0001 an earlier ruling supplied as a test magnitude
+            # and this comment once mistakenly repeated as a census result).
+            # A fixed precision still has a floor of its own; see
+            # 0068-ruling.md sec4 for the remaining edge case no fixed
+            # precision closes, raised to Patrick rather than assumed here.
+            text += f"  angle {heading:.4f}deg"
         return text
 
     def nudge_selected(self, dx: int, dy: int, fine: bool = False) -> bool:

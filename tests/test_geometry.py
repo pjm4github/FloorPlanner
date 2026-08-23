@@ -40,12 +40,17 @@ def test_fmt_ftin(fp):
 
 
 @pytest.mark.parametrize("inches,expect", [
-    (0, "0"), (120, "10"), (148.14, "12.3"), (6, "0.5"), (1500, "125"),
+    (0, "0.00"), (120, "10.00"), (148.14, "12.34"), (6, "0.50"),
+    (1500, "125.00"), (1700.04, "141.67"),
 ])
-def test_fmt_ft3(fp, inches, expect):
-    """Decimal feet, 3 significant digits -- no unit suffix (callers append
-    one, since a coordinate pair wants it once, not per axis)."""
-    assert fp.fmt_ft3(inches) == expect
+def test_fmt_ft2(fp, inches, expect):
+    """Decimal feet, FIXED at 2 decimals -- 0065-ruling.md sec4: resolution
+    must not depend on magnitude, unlike the significant-figure format this
+    replaced (which gave only 1ft resolution above 100ft; the last case
+    here, 141.67ft, is past that threshold and still resolves to 2 places).
+    No unit suffix -- callers append one, since a coordinate pair wants it
+    once, not per axis."""
+    assert fp.fmt_ft2(inches) == expect
 
 
 @pytest.mark.parametrize("p1,p2,expect", [
