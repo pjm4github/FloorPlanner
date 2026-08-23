@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 52aa311 -->
+<!-- SNAPSHOT-HEAD: 0873077 -->
 
 # Session snapshot — read this first
 
@@ -419,7 +419,7 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`52aa311`** at this file's cut. **[`0096-report.md`](handoff/0096-report.md) is the current status** — read that first: **two AMBER PRs open, both worth checking, batched together per the rulings' own order.** [PR #37](https://github.com/pjm4github/FloorPlanner/pull/37) — item C, `T` restored + the orthogonality post-condition (`0095-report.md`). [PR #38](https://github.com/pjm4github/FloorPlanner/pull/38) — the status-bar angle clause, both heading and deviation, suppressed on-intended-angle at the 15° `rotate_snap_deg` grid (`0092`-`0094`, closing `0068` §4; `0096-report.md`). `0085`'s `CLAUDE.md` trim is GREEN, unblocked, still owed. Full trail: `handoff/README.md`'s pair table. |
+| **`main`** | **`0873077`** at this file's cut. **[`0097-report.md`](handoff/0097-report.md) is the current status** — read that first: `CLAUDE.md` trimmed to traps only (`0085-ruling.md` §2), 13,824 → 4,730 bytes; the module roster/phase history/perf figures/extract-join-floors narrative moved to the new **`docs/ARCHITECTURE.md`**, nothing lost. **Two AMBER PRs open, both worth checking, batched together.** [PR #37](https://github.com/pjm4github/FloorPlanner/pull/37) — item C, `T` restored + the orthogonality post-condition (`0095-report.md`). [PR #38](https://github.com/pjm4github/FloorPlanner/pull/38) — the status-bar angle clause (`0092`-`0094`, closing `0068` §4; `0096-report.md`). Full trail: `handoff/README.md`'s pair table. |
 | **Branches** | **`wall-orthogonality-repair`** ([PR #37](https://github.com/pjm4github/FloorPlanner/pull/37), item C) **· `wall-label-angle-clause`** ([PR #38](https://github.com/pjm4github/FloorPlanner/pull/38), the angle clause) — both AMBER, both open, both worth checking now. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **81 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). `python tools/gate.py --docs` GREEN. |
