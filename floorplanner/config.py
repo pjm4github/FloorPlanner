@@ -4,11 +4,13 @@ This is the home of the shared mutable ``SETTINGS`` dict (read across the whole
 app) and the immutable constants.  Everything imports these from here so the
 settings object is a single shared instance, never duplicated.
 """
+import json
 import os
 import sys
+import warnings
 from pathlib import Path
 
-from PyQt6.QtCore import QRectF, QSettings, QStandardPaths
+from PyQt6.QtCore import QRectF, QStandardPaths
 from PyQt6.QtGui import QColor, QFontDatabase, QIcon
 
 from floorplanner.model import DEFAULT_FLOOR  # schema constant (single source)
@@ -17,7 +19,8 @@ __all__ = [
     "FOOT", "EXTERIOR_T", "INTERIOR_T", "GRID_MINOR", "GRID_MAJOR",
     "SNAP_STEP", "WALL_SNAP_DEFAULT", "WALL_SNAP_CHOICES", "ROTATE_SNAP_DEFAULT",
     "CANVAS_W_DEFAULT", "CANVAS_H_DEFAULT", "MAX_CANVAS_IN",
-    "DEFAULT_SETTINGS", "SETTINGS", "editing_enabled", "JOIN_TOL",
+    "DEFAULT_SETTINGS", "SETTINGS", "editing_enabled", "coerce_setting",
+    "JOIN_TOL",
     "MIN_WALL_LEN",
     "WALL_PROJECT_STICK", "WALL_PROJECT_NEAR", "ROOM_SIG_MARGIN",
     "WALL_Z", "CLICK_SLOP", "OPENING_Z", "canvas_rect",
@@ -79,6 +82,38 @@ def editing_enabled(flag: str) -> bool:
     if SETTINGS.get("shuffle", False):
         return False
     return bool(SETTINGS.get(flag, True))
+
+
+def coerce_setting(key: str, val, default):
+    """Coerce a raw settings value (from a loaded document, or any other
+    untyped source) to the TYPE `DEFAULT_SETTINGS[key]` declares, rather than
+    blindly forcing `float` -- 0073-ruling.md sec2: both settings loaders did
+    exactly that, so a string setting (a title, an author) was silently
+    replaced by its own default on every load, before anyone could see it.
+
+    One function, used by every loader (planio.py, design/bridge.py) rather
+    than duplicated -- "two implementations of a precedence chain is how the
+    thickness tables happened" (0073 sec6). A value that cannot be coerced is
+    REPORTED via a warning, not swallowed."""
+    if isinstance(default, bool):
+        return bool(val)
+    if isinstance(default, str):
+        return str(val)
+    if isinstance(default, int):
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            warnings.warn(
+                f"setting {key!r}: {val!r} is not an int, using the "
+                f"default {default!r}", stacklevel=2)
+            return default
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        warnings.warn(
+            f"setting {key!r}: {val!r} is not a number, using the "
+            f"default {default!r}", stacklevel=2)
+        return default
 JOIN_TOL = 9.0            # endpoints within 9" join together
 MIN_WALL_LEN = 6.0
 WALL_PROJECT_STICK = 9.0  # stretch sticks within 9" of an orthogonal wall line
@@ -206,9 +241,10 @@ def config_dir() -> Path:
 
 
 def settings_file() -> Path:
-    """The app-wide settings file (INI) holding cross-session preferences
-    such as a remembered AI API key."""
-    return config_dir() / "floorplanner.ini"
+    """The app-wide settings file (JSON) holding cross-session preferences
+    such as a remembered AI API key. Migrated at most once from a QSettings
+    INI of the same name -- see `_ensure_settings_file` (0075-ruling.md)."""
+    return config_dir() / "floorplanner.json"
 
 
 def designs_dir() -> Path:
@@ -224,10 +260,95 @@ def designs_dir() -> Path:
     return p
 
 
-def app_settings() -> QSettings:
-    """QSettings backed by settings_file() so preferences live in a real,
-    standard-location INI file (not the Windows registry)."""
-    return QSettings(str(settings_file()), QSettings.Format.IniFormat)
+def _legacy_ini_file() -> Path:
+    """Where the app settings lived before 0075-ruling.md (a QSettings INI)
+    -- read only by the one-shot migration below, never written again."""
+    return config_dir() / "floorplanner.ini"
+
+
+def _read_legacy_ini_value(path: Path, key: str):
+    """One key out of the pre-migration QSettings INI, without QSettings --
+    0075-ruling.md sec2 drops the Qt dependency from the app-settings store
+    entirely. QSettings' IniFormat writes an ungrouped key under `[General]`,
+    which is the one shape this reads; anything else is treated as absent
+    (a partial/foreign INI is not this migration's problem to solve)."""
+    import configparser
+    cp = configparser.ConfigParser()
+    try:
+        if not cp.read(path, encoding="utf-8"):
+            return None
+    except configparser.Error:
+        return None
+    if cp.has_option("General", key):
+        return cp.get("General", key)
+    return None
+
+
+def _ensure_settings_file() -> Path:
+    """Create `settings_file()` if it does not exist yet: MIGRATE the
+    legacy INI's `anthropic_api_key` if one is present there, otherwise
+    start empty. Runs at most once per file -- once the JSON exists this
+    returns immediately without reading the INI again, so clearing the key
+    later never brings it back (0075-ruling.md sec3's idempotence clause).
+
+    Deliberately does NOT materialise every `DEFAULT_SETTINGS` key: that
+    would pin today's defaults into the file forever, so a later default
+    change would reach nobody who already has a file (0074-ruling.md
+    sec5). Just a `version` marker plus whatever migration actually found."""
+    path = settings_file()
+    if path.exists():
+        return path
+    data = {"version": 1}
+    legacy = _legacy_ini_file()
+    if legacy.exists():
+        key = _read_legacy_ini_value(legacy, "anthropic_api_key")
+        if key:
+            data["anthropic_api_key"] = key
+    try:
+        path.write_text(json.dumps(data, indent=2, sort_keys=True),
+                        encoding="utf-8")
+    except OSError:
+        pass
+    return path
+
+
+class _JsonSettings:
+    """A minimal shim over a plain JSON file, shaped to the two methods
+    `app_settings()`'s one caller (`catalog.py`) uses -- same names as the
+    `QSettings` object this replaces, but a DIFFERENT GUARANTEE: `value()`
+    returns the type that was stored, not an untyped INI string. That is
+    the whole reason for the change (0075-ruling.md sec1): `QSettings`' INI
+    backend, and `configparser` equally, would hand back the string
+    `"false"` for a stored `False` -- truthy, silently inverting every
+    boolean flag on read."""
+
+    def __init__(self, path: Path):
+        self._path = path
+        try:
+            self._data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            self._data = {}
+
+    def value(self, key, default=None):
+        return self._data.get(key, default)
+
+    def setValue(self, key, value):
+        self._data[key] = value
+        try:
+            self._path.write_text(
+                json.dumps(self._data, indent=2, sort_keys=True),
+                encoding="utf-8")
+        except OSError:
+            pass
+
+
+def app_settings() -> "_JsonSettings":
+    """The app-wide settings store: a plain JSON file, not `QSettings`
+    (0075-ruling.md) -- an untyped INI string was the exact hazard being
+    eliminated, and `configparser` carries the identical one under a
+    different name. Same two-method shape every existing caller already
+    uses; `catalog.py` needs no change."""
+    return _JsonSettings(_ensure_settings_file())
 
 
 # Bundled fonts: Qt no longer ships fonts, so the DejaVu family in

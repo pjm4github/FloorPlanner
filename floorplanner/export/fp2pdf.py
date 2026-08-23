@@ -30,19 +30,46 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import math
+import sys
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 
-from reportlab.lib.pagesizes import landscape
-from reportlab.pdfgen import canvas as rl_canvas
 
-DEFAULT_THICKNESS = {
-    "exterior": 6.5, "interior": 4.5, "partition": 3.5,
-    "railing": 3.0, "fence": 1.5, "hedge": 24.0, "retaining": 8.0,
-}
-PAGE = landscape((11 * 72, 17 * 72))          # 17x11 in points
+def _load_std_thickness() -> dict[str, float]:
+    """`floorplanner.design.validate.STD_T`, via `fp2dxf.py`'s own by-path
+    loader -- REUSED, not transcribed (0072-ruling.md sec2(1): this file
+    shipped a THIRD wall-thickness table, disagreeing with the normative one
+    in 4 of 7 rows).
+
+    Not a plain `from floorplanner.export.fp2dxf import _load_std_thickness`:
+    importing ANY `floorplanner` submodule first runs `floorplanner/__init__.py`,
+    which star-imports the whole Qt editor -- the identical problem
+    `fp2dxf.py`'s own loader avoids for `validate.py`, one level up from
+    here (`export/__init__.py`'s own docstring). So `fp2dxf.py` is loaded
+    by path too, exactly the same way, and only its already-computed
+    `STD_T` is taken from it."""
+    path = Path(__file__).resolve().parent / "fp2dxf.py"
+    spec = importlib.util.spec_from_file_location("_fp2pdf_fp2dxf", path)
+    mod = importlib.util.module_from_spec(spec)
+    # fp2dxf.py's own ConvertResult is a @dataclass, and Python's dataclass
+    # decorator resolves type hints via sys.modules[cls.__module__] -- so
+    # the module must be registered there BEFORE exec_module runs, or the
+    # decorator itself raises. validate.py's loader (fp2dxf.py's own) never
+    # hit this because it has no dataclasses in it.
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return dict(mod.STD_T)
+
+
+#: THE NORMATIVE thickness table, read live from `floorplanner.design.validate`
+#: via `fp2dxf.py` -- never a copy. See `_load_std_thickness`.
+DEFAULT_THICKNESS = _load_std_thickness()
+
+PAGE = (17 * 72, 11 * 72)                     # 17x11 landscape, in points
 MARGIN = 0.5 * 72
 DIM_LANE = 0.30 * 72                          # per dimension row
 TITLE_H = 0.85 * 72
@@ -535,24 +562,53 @@ class Sheet:
         self.c.showPage()
 
 
+@dataclass
+class ConvertResult:
+    """Everything a caller needs to show a completion summary -- a GUI menu
+    handler as much as the CLI below, per 0072-ruling.md sec2(3), the same
+    shape `fp2dxf.ConvertResult` already settled: the module has no
+    business deciding where its progress and warnings are READ, only
+    collecting them."""
+    out: Path = None
+    sheets: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
 def convert(doc, out: Path, meta, only_levels=None,
-            thickness_overrides=None, include_concept=False) -> Path:
+            thickness_overrides=None, include_concept=False) -> ConvertResult:
     if doc.get("format") != "floorplanner-design" or doc.get("version") != 5:
-        raise SystemExit("not a floorplanner-design v5 document")
+        # A NORMAL EXCEPTION, NOT `raise SystemExit` (0038-ruling.md sec4 /
+        # 0072-ruling.md sec2(2)): this is a library call from a Qt menu
+        # handler as well as the CLI, and `SystemExit` inside a Qt call
+        # stack is not something a `try/except Exception` around the menu
+        # action would even see coming.
+        raise ValueError("not a floorplanner-design v5 document")
+    try:
+        # DEFERRED, NOT A MODULE-TOP IMPORT (0072-ruling.md sec2(4) / D40):
+        # reportlab is optional (requirements-viewer.txt's own precedent --
+        # "optional; the editor runs without it"), so importing it only
+        # inside convert() means the module itself, and the app that wires
+        # it in, still load without it -- only an actual export attempt
+        # fails, with a reason.
+        from reportlab.pdfgen import canvas as rl_canvas
+    except ImportError as exc:
+        raise ValueError(
+            "reportlab is not installed; PDF export is unavailable "
+            "(pip install reportlab)") from exc
     th = dict(DEFAULT_THICKNESS)
     th.update(thickness_overrides or {})
     levels = [lv for lv in doc["levels"]
               if lv.get("kind", "storey") != "site"
               and (not only_levels or lv["id"] in only_levels)]
+    result = ConvertResult(out=out)
     c = rl_canvas.Canvas(str(out), pagesize=PAGE)
     c.setTitle(f"{meta['title']} - floor plans")
     c.setAuthor(meta["author"])
     for i, lv in enumerate(levels):
         Sheet(c, doc, lv, th, include_concept, meta).render(i + 1, len(levels))
-        print(f"  sheet P{i+1}: {lv.get('name', lv['id'])}")
+        result.sheets.append(f"sheet P{i + 1}: {lv.get('name', lv['id'])}")
     c.save()
-    print(f"  wrote {out}")
-    return out
+    return result
 
 
 def main(argv=None):
@@ -576,9 +632,14 @@ def main(argv=None):
         overrides[k] = float(v)
     meta = {"title": a.title, "subtitle": a.subtitle, "author": a.author,
             "assembly_note": a.assembly_note, "dim_note": a.dim_note}
-    doc = json.loads(a.design.read_text())
+    doc = json.loads(a.design.read_text(encoding="utf-8"))
     print(f"fp2pdf: {a.design}")
-    convert(doc, a.out, meta, a.levels, overrides, a.include_concept)
+    result = convert(doc, a.out, meta, a.levels, overrides, a.include_concept)
+    for line in result.sheets:
+        print(f"  {line}")
+    for msg in result.warnings:
+        print(f"  WARNING: {msg}")
+    print(f"  wrote {result.out}")
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ pytestmark = pytest.mark.io
 
 def test_standard_paths_are_named_and_nested(fp):
     assert fp.designs_dir().name == "FloorPlanner"
-    assert fp.settings_file().name == "floorplanner.ini"
+    assert fp.settings_file().name == "floorplanner.json"  # 0075-ruling.md
     assert fp.settings_file().parent == fp.config_dir()
 
 
