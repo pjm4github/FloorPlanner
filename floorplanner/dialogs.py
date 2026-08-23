@@ -125,17 +125,19 @@ class OrthogonalityReportDialog(QDialog):
                             if bands[label])
         offaxis = [r for r in rows if r[3] > 0.01]
         self.listw.clear()
-        for wid, lvl, typ, deg in offaxis:
+        for wid, lvl, typ, deg, disp in offaxis:
             self.listw.addItem(
                 f"{levels.get(lvl, lvl)}: wall {wid} ({typ}) is {deg:.2f} "
-                f"degrees off axis")
+                f"degrees off axis (would move {disp:.3f}\" if straightened)")
         if offaxis:
             self.info.setText(
                 f"{len(offaxis)} of {len(rows)} wall(s) are off axis: "
                 f"{summary}. A small deviation (well under 1 degree) is "
                 "often not a deliberate diagonal -- it can be left over "
-                "from a move, join, weld or coalesce. This report only "
-                "lists them; nothing here changes a wall's angle.")
+                "from a move, join, weld or coalesce. The inches figure is "
+                "how far a straightening repair would move that wall's free "
+                "end (0066-ruling.md) -- this report only lists them; "
+                "nothing here changes a wall's angle.")
         else:
             self.info.setText(
                 f"All {len(rows)} wall(s) are axis-aligned (or a deliberate "

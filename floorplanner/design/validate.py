@@ -612,25 +612,45 @@ def wall_angle_deviation_deg(a, b):
     return min(deg, 90.0 - deg)
 
 
-def wall_orthogonality(d):
-    """Per-wall deviation from the nearest axis-aligned angle --
-    0055-ruling.md's item B, THE REPORT, not the repair (item C, unruled).
-    Grid snap constrains new cursor input; it cannot see a wall an existing
-    operation (move/join/weld/coalesce) already rotated off axis after the
-    fact, and this measures exactly that population, worst first.
+def wall_orthogonality_displacement_in(deg: float, length_in: float) -> float:
+    """0066-ruling.md sec1: the tolerance a REPAIR is bounded by is not the
+    degree the report reads in -- a repair moves a vertex, and length is the
+    other half of that product. `length_in * sin(radians(deg))` is exactly
+    how far the free endpoint moves if the wall is straightened onto its
+    nearest axis, keeping the other endpoint fixed (the perpendicular
+    coordinate set equal, nothing else touched) -- verified against 0066's
+    own four-row table (e.g. 0.9290deg over 185.02in -> 3.000in) to the
+    thousandth of an inch. Degrees stay in the report, where they belong --
+    "how the fault is found, not how the fix is bounded" (0066 sec1)."""
+    return length_in * math.sin(math.radians(deg))
 
-    Returns `[(wall_id, level, type, deg)]`. A wall with a missing or
-    coincident vertex pair is already an I2/I3 violation and is skipped here
-    -- this is a report about walls that are VALID but not quite straight,
-    not a second copy of `check()`."""
+
+def wall_orthogonality(d):
+    """Per-wall deviation from the nearest axis-aligned angle, AND the
+    displacement (inches) that deviation implies if the wall were
+    straightened -- 0055-ruling.md's item B, THE REPORT (the degrees),
+    extended by 0066-ruling.md item C sec1's own finding that a REPAIR
+    cannot be bounded in degrees (nearly the same angle can move a vertex
+    by an inch or by three, across a single "under 1 degree" band -- 0066
+    sec1's own measurement). Grid snap constrains new cursor input; it
+    cannot see a wall an existing operation (move/join/weld/coalesce)
+    already rotated off axis after the fact, and this measures exactly
+    that population, worst first.
+
+    Returns `[(wall_id, level, type, deg, displacement_in)]`. A wall with a
+    missing or coincident vertex pair is already an I2/I3 violation and is
+    skipped here -- this is a report about walls that are VALID but not
+    quite straight, not a second copy of `check()`."""
     V = {v["id"]: (v["x"], v["y"]) for v in d["vertices"]}
     out = []
     for w in d["walls"]:
         a, b = V.get(w["v1"]), V.get(w["v2"])
         if a is None or b is None:
             continue
-        out.append((w["id"], w["level"], w["type"],
-                     wall_angle_deviation_deg(a, b)))
+        deg = wall_angle_deviation_deg(a, b)
+        length_in = math.hypot(b[0] - a[0], b[1] - a[1])
+        out.append((w["id"], w["level"], w["type"], deg,
+                     wall_orthogonality_displacement_in(deg, length_in)))
     return sorted(out, key=lambda t: -t[3])
 
 
@@ -668,7 +688,7 @@ def orthogonality_bands(rows):
     told apart from one that never ran (the positive-control family,
     `WORKING_AGREEMENT.md`)."""
     counts = {label: 0 for _lo, _hi, label in ORTHOGONALITY_BANDS}
-    for _wid, _lvl, _typ, deg in rows:
+    for _wid, _lvl, _typ, deg, _disp in rows:
         if deg == 0.0:
             counts["on axis"] += 1
             continue
