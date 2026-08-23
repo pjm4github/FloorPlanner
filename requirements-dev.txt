@@ -4,3 +4,7 @@ pytest
 ruff
 jsonschema        # validates the v5 design corpus (floorplanner.design.validate)
 pyyaml            # workflow YAML validation before push (.github/workflows)
+reportlab         # dev/test only (0077-ruling.md sec6) -- fp2pdf.py's own
+                  # PDF generation is optional at runtime (D40); required
+                  # here so its end-to-end receipts actually render a PDF
+                  # instead of being pytest.importorskip'd on every run

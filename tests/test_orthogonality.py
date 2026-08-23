@@ -20,7 +20,7 @@ from PyQt6.QtCore import QPointF
 import FloorPlanner as fp
 from floorplanner.design.validate import (
     ORTHOGONALITY_BANDS, orthogonality_bands, wall_angle_deviation_deg,
-    wall_orthogonality,
+    wall_orthogonality, wall_orthogonality_displacement_in,
 )
 
 pytestmark = pytest.mark.walls
@@ -86,6 +86,32 @@ def test_deviation_is_symmetric_regardless_of_wall_direction():
 
 
 # ---------------------------------------------------------------------------
+# wall_orthogonality_displacement_in -- 0066-ruling.md sec1: the repair's
+# tolerance is a DISPLACEMENT, not a degree
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("deg,length_in,expect", [
+    (0.0002, 450.00, 0.002),
+    (0.6488, 90.01, 1.019),
+    (0.9094, 63.01, 1.000),
+    (0.9290, 185.02, 3.000),
+])
+def test_displacement_matches_0066s_own_four_row_table(deg, length_in, expect):
+    """Cross-checked against 0066-ruling.md sec1's own printed table rather
+    than trusted -- the two nearly-identical-angle rows (0.9094deg/1.000in,
+    0.9290deg/3.000in) are the ruling's own argument that a degree cut
+    cannot bound a repair; reproducing them independently is the receipt
+    that this implementation makes the same argument, not a different
+    one."""
+    got = wall_orthogonality_displacement_in(deg, length_in)
+    assert got == pytest.approx(expect, abs=5e-4)
+
+
+def test_displacement_is_zero_exactly_on_axis():
+    assert wall_orthogonality_displacement_in(0.0, 450.0) == 0.0
+
+
+# ---------------------------------------------------------------------------
 # wall_orthogonality -- per-document, sorted worst-first, skips bad refs
 # ---------------------------------------------------------------------------
 
@@ -119,7 +145,8 @@ def test_wall_orthogonality_on_an_ALL_AXIS_document_is_the_negative_control():
         vertices=[_v("v1", 0, 0), _v("v2", 100, 0), _v("v3", 100, 100)],
     )
     rows = wall_orthogonality(doc)
-    assert all(deg == 0.0 for *_rest, deg in rows)
+    assert all(deg == 0.0 for _wid, _lvl, _typ, deg, _disp in rows)
+    assert all(disp == 0.0 for *_rest, disp in rows)
 
 
 # ---------------------------------------------------------------------------
@@ -136,12 +163,12 @@ def test_bands_are_zero_filled_even_when_empty():
 
 def test_bands_sort_each_row_into_exactly_one_band():
     rows = [
-        ("w1", "L1", "interior", 10.0),    # > 5
-        ("w2", "L1", "interior", 3.0),     # 1-5
-        ("w3", "L1", "interior", 0.5),     # 0.1-1
-        ("w4", "L1", "interior", 0.05),    # 0.01-0.1
-        ("w5", "L1", "interior", 0.0),     # < 0.01 (exactly zero)
-        ("w6", "L1", "interior", 0.005),   # < 0.01
+        ("w1", "L1", "interior", 10.0, 1.0),    # > 5
+        ("w2", "L1", "interior", 3.0, 1.0),     # 1-5
+        ("w3", "L1", "interior", 0.5, 1.0),     # 0.1-1
+        ("w4", "L1", "interior", 0.05, 1.0),    # 0.01-0.1
+        ("w5", "L1", "interior", 0.0, 0.0),     # < 0.01 (exactly zero)
+        ("w6", "L1", "interior", 0.005, 1.0),   # < 0.01
     ]
     bands = orthogonality_bands(rows)
     assert bands["> 5 deg"] == 1

@@ -257,3 +257,93 @@ def test_a_command_UNRELATED_to_commit_or_push_is_untouched(tmp_path):
     hook = _hook_repo(tmp_path)
     r = _invoke(hook, tmp_path, "git status")
     assert r.returncode == 0, r.stderr
+
+
+# ---------------------------------------------------------------------------
+# 0084-ruling.md SS4: a NEW docs/handoff/NNNN-*.md commit only lands on
+# `main` -- refused on any other branch, unless it is a merge bringing
+# `main` in
+# ---------------------------------------------------------------------------
+
+def _stage_new_handoff(tmp_path, name="0086-ruling.md", add=True):
+    d = tmp_path / "docs" / "handoff"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / name).write_text("x\n", encoding="utf-8")
+    if add:
+        _run_git(["add", f"docs/handoff/{name}"], tmp_path)
+
+
+def test_a_new_handoff_file_on_a_feature_branch_is_REFUSED(tmp_path):
+    hook = _hook_repo(tmp_path)
+    _write_result(tmp_path, "GREEN", "full")
+    _run_git(["checkout", "-b", "some-feature"], tmp_path)
+    _stage_new_handoff(tmp_path)
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 2, r.stderr
+    assert "some-feature" in r.stderr
+    assert "0086-ruling.md" in r.stderr
+
+
+def test_a_new_handoff_file_on_main_is_ALLOWED(tmp_path):
+    hook = _hook_repo(tmp_path)
+    _stage_new_handoff(tmp_path)
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 0, r.stderr
+
+
+def test_a_modified_EXISTING_handoff_file_on_a_feature_branch_is_ALLOWED(tmp_path):
+    """Only an ADD is refused -- a correction to a file that already landed
+    on `main` is an ordinary edit, not a mailbox violation."""
+    hook = _hook_repo(tmp_path)
+    _stage_new_handoff(tmp_path)
+    _run_git(["commit", "-m", "land it"], tmp_path)
+    _run_git(["checkout", "-b", "some-feature"], tmp_path)
+    (tmp_path / "docs" / "handoff" / "0086-ruling.md").write_text(
+        "x\ny\n", encoding="utf-8")
+    _run_git(["add", "docs/handoff/0086-ruling.md"], tmp_path)
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 0, r.stderr
+
+
+def test_the_commit_pathspec_form_is_also_caught(tmp_path):
+    """`git commit <paths>` (this project's own documented pattern when
+    something else is already staged) stages the named path itself -- never
+    pre-staged via `git add`, so only the command-line scan finds it."""
+    hook = _hook_repo(tmp_path)
+    _write_result(tmp_path, "GREEN", "full")
+    _run_git(["checkout", "-b", "some-feature"], tmp_path)
+    _stage_new_handoff(tmp_path, add=False)          # untracked, not staged
+    r = _invoke(hook, tmp_path, "git commit docs/handoff/0086-ruling.md -m x")
+    assert r.returncode == 2, r.stderr
+    assert "some-feature" in r.stderr
+
+
+def test_a_merge_commit_bringing_a_handoff_file_in_is_ALLOWED(tmp_path):
+    """`main` merging into a feature branch legitimately carries mailbox
+    files that already exist there -- MERGE_HEAD is the exemption."""
+    hook = _hook_repo(tmp_path)
+    _run_git(["checkout", "-b", "some-feature"], tmp_path)
+    (tmp_path / "b.txt").write_text("feature\n", encoding="utf-8")
+    _run_git(["add", "-A"], tmp_path)
+    _run_git(["commit", "-m", "feature work"], tmp_path)
+    _run_git(["checkout", "main"], tmp_path)
+    _stage_new_handoff(tmp_path)
+    _run_git(["commit", "-m", "land it"], tmp_path)
+    _run_git(["checkout", "some-feature"], tmp_path)
+    subprocess.run(["git", "merge", "--no-ff", "--no-commit", "main"],
+                   cwd=tmp_path, capture_output=True, text=True, check=True)
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m merge")
+    assert r.returncode == 0, r.stderr
+
+
+def test_a_feature_branch_commit_touching_OTHER_files_is_unaffected(tmp_path):
+    hook = _hook_repo(tmp_path)
+    _run_git(["checkout", "-b", "some-feature"], tmp_path)
+    (tmp_path / "c.txt").write_text("y\n", encoding="utf-8")
+    _run_git(["add", "-A"], tmp_path)
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 0, r.stderr

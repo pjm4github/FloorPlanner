@@ -60,9 +60,22 @@ def main():
     print(f"\n{'TOTAL':<48}{len(grand_rows):>7}",
           "".join(f"{total_bands[lbl]:>{col_w}}" for lbl in labels))
 
-    within_1_not_on = sum(1 for *_rest, deg in grand_rows if 0.0 < deg <= 1.0)
+    near_axis = [(deg, disp) for _wid, _lvl, _typ, deg, disp in grand_rows
+                 if 0.0 < deg <= 1.0]
     print(f"\nWalls within 1 degree of orthogonal WITHOUT being on it: "
-          f"{within_1_not_on} of {len(grand_rows)}")
+          f"{len(near_axis)} of {len(grand_rows)}")
+
+    # 0066-ruling.md sec1/sec2: the repair's tolerance is a DISPLACEMENT, in
+    # inches, not the degree this table is banded on -- printed here, sorted,
+    # so the same census that found item C's population also reproduces the
+    # number that bounds its repair, per WORKING_AGREEMENT.md's own rule that
+    # a threshold owes every raw value printed, not just the count either
+    # side of it.
+    displacements = sorted(disp for _deg, disp in near_axis)
+    print("\nTheir implied displacement (inches, sorted) -- 0066-ruling.md's "
+          "own repair bound is stated against this list:")
+    for i in range(0, len(displacements), 10):
+        print("  " + " ".join(f"{v:.4f}" for v in displacements[i:i + 10]))
 
     if skipped:
         print(f"\nSkipped ({len(skipped)}), and why -- not silently dropped:")

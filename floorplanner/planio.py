@@ -210,13 +210,7 @@ class PlanIOMixin:
                                keep_backdrop: bool = False):
         for key, default in DEFAULT_SETTINGS.items():
             val = project.settings.get(key, default)
-            if isinstance(default, bool):    # keep flags as bool (not 1.0/0.0)
-                SETTINGS[key] = bool(val)
-                continue
-            try:
-                SETTINGS[key] = float(val)
-            except (TypeError, ValueError):
-                SETTINGS[key] = default
+            SETTINGS[key] = coerce_setting(key, val, default)
         self._apply_canvas()
         # the reference image is a tracing backdrop, not plan data -- on undo
         # (keep_backdrop) detach it so scene.clear() doesn't delete it, then

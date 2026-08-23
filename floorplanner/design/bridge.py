@@ -57,7 +57,7 @@ from PyQt6.QtWidgets import QGraphicsScene
 
 from floorplanner.config import (
     DEFAULT_FLOOR, DEFAULT_SETTINGS, JOIN_TOL, SETTINGS, active_floor,
-    set_floor_state,
+    coerce_setting, set_floor_state,
 )
 from floorplanner.design.canonical import canonicalize
 from floorplanner.design.legacy import (
@@ -1087,13 +1087,7 @@ def apply_design_to_scene(target, design, report=None, strict=False,
     editing = settings.get("editing") or {}
     for key, default in DEFAULT_SETTINGS.items():
         val = editing.get(key, settings.get(key, default))
-        if isinstance(default, bool):
-            SETTINGS[key] = bool(val)
-            continue
-        try:
-            SETTINGS[key] = float(val)
-        except (TypeError, ValueError):
-            SETTINGS[key] = default
+        SETTINGS[key] = coerce_setting(key, val, default)
     if win is not None:
         # settings the walk does not re-emit (a document `name`, anything a
         # later phase adds) would otherwise evaporate on the first save
