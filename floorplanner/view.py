@@ -225,9 +225,33 @@ class PlanView(QGraphicsView):
     def _snap_start(self, sp: QPointF) -> QPointF:
         tol = max(6.0, 10.0 / max(self.transform().m11(), 1e-6))
         q = nearest_wall_endpoint(self.scene(), sp, tol)
-        if q is None:
-            q = nearest_wall_body_point(self.scene(), sp, tol)
-        return q if q is not None else wall_snap(sp)
+        if q is not None:
+            return q
+        hit = nearest_wall_body(self.scene(), sp, tol)
+        if hit is not None:
+            return self._grid_snap_t_junction(*hit)
+        return wall_snap(sp)
+
+    @staticmethod
+    def _grid_snap_t_junction(wall, q: QPointF) -> QPointF:
+        """0070-ruling.md sec3/sec5: `q` is the raw geometric projection of
+        the click onto `wall`'s centreline -- exactly on the host's line,
+        but never rounded to the grid, so a fresh wall started against an
+        existing wall's body (a T-junction) silently inherited whatever
+        fraction the click happened to land on and no later operation could
+        remove it (this was the FIRST bad step the bisect named, identical
+        with weld/coalesce on or off -- the seed is here, not in
+        normalisation). Snap the position ALONG the host to the grid,
+        leaving the coordinate ACROSS it untouched so the point stays
+        exactly on the host's line. Only for an axis-aligned host: a
+        diagonal wall has no single grid position to round the point onto,
+        so it is returned unchanged, same as before this fix."""
+        dx, dy = wall.p2.x() - wall.p1.x(), wall.p2.y() - wall.p1.y()
+        if abs(dy) < 1e-6:                          # horizontal host
+            return QPointF(wall_snap_len(q.x()), q.y())
+        if abs(dx) < 1e-6:                          # vertical host
+            return QPointF(q.x(), wall_snap_len(q.y()))
+        return q
 
     def _align_to_wall(self, exclude, pt, horizontal) -> QPointF:
         """Snap the drawn endpoint's free coordinate (x when horizontal, y
@@ -238,14 +262,15 @@ class PlanView(QGraphicsView):
         sc = self.scene()
         if sc is None:
             return pt
+        active = active_floor()
         tol = max(JOIN_TOL, 16.0 / max(self.transform().m11(), 1e-6))
         base = pt.x() if horizontal else pt.y()
         best, bestd = None, tol
         for w in sc.items():
-            if not isinstance(w, WallItem) or w is exclude:
-                continue
+            if not isinstance(w, WallItem) or w is exclude or w.floor != active:
+                continue                          # align only to the active floor
             for end in (w.p1, w.p2):
-                if not wall_endpoint_open(sc, end, ignore=(w, exclude)):
+                if not wall_endpoint_open(sc, end, ignore=(w, exclude), floor=active):
                     continue
                 c = end.x() if horizontal else end.y()
                 d = abs(base - c)

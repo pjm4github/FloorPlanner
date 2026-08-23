@@ -4,8 +4,8 @@ id: 80
 title: "A fresh wall started at a T-junction inherits an un-snapped position along the host wall"
 
 # maps directly onto GitHub Issues fields
-state: open
-state_reason: null
+state: closed
+state_reason: completed
 labels:
   - type:defect
   - area:geometry
@@ -13,7 +13,7 @@ milestone: null
 
 # ours; becomes body prose after migration
 opened: 2026-08-22
-closed: null
+closed: 2026-08-23
 closed_by: null
 rank: 80
 related: []
@@ -86,6 +86,14 @@ gui and not slow"` and `-m gui` both green, `ruff` clean.
 
 ## Ruling
 
-*(Open — filed 2026‑08‑22. Fix built and gated GREEN, AMBER tier per
-`0070-ruling.md` §7 item 3 — batched with PR #34/#35's manual check, not
-merged. Closed once Patrick's check passes and a ruling says so.)*
+**Closed 2026‑08‑23, [`handoff/0088-ruling.md`](../handoff/0088-ruling.md).**
+Patrick's own check, on `t-junction-grid-snap` at `881c908`, in the running
+app, against the exact procedure `0070-ruling.md` §7 named — a new plan, 6″
+wall snap, a rectangular room, an interior wall started on an existing
+wall's body, slid with the Select tool: *"The result of
+t-junction-grid-snap is perfect. The walls snap exactly correct."* Merged
+to `main` at `ac6d763` (PR #36). `0070-ruling.md` §3's other four snap sites
+(`_wall_end_point`'s length-snap, `_align_to_wall`'s inherited coordinate,
+the body-slide's displacement-snap) remain untouched and unfiled — one
+passed check on this one site is not a claim about the class
+(`0062-report.md` §3 / `0063-ruling.md` §2).
