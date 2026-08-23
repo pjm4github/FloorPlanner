@@ -64,9 +64,9 @@ def main(argv):
         print(f"  {label:<{label_w}}{obands[label]}")
     worst = [r for r in orows if r[3] > 0.01][:8]
     if worst:
-        print("  worst offenders (wall, level, type, deg):")
-        for wid, lvl, typ, deg in worst:
-            print(f"    {wid:<6}{lvl:<6}{typ:<12}{deg:.4f}")
+        print("  worst offenders (wall, level, type, deg, would-move-in):")
+        for wid, lvl, typ, deg, disp in worst:
+            print(f"    {wid:<6}{lvl:<6}{typ:<12}{deg:<10.4f}{disp:.4f}")
 
     return 1 if (serr or ierr) else 0
 

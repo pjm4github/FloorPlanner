@@ -70,27 +70,37 @@ from pathlib import Path
 # --------------------------------------------------------------------------
 
 
-def _load_std_thickness() -> dict[str, float]:
-    """`floorplanner.design.validate.STD_T`, loaded BY PATH.
-
-    Not `from floorplanner.design.validate import STD_T`: the top-level
-    package's `__init__.py` star-imports the whole Qt editor (measured at
-    P5.2, recorded in D73's own text), so an ordinary import would drag Qt
-    into a module whose whole point is to run with zero dependencies.
-    `floorplanner/viewer/fp3d.py` solves the identical problem the same way.
-    """
-    path = (Path(__file__).resolve().parent.parent
-            / "design" / "validate.py")
-    spec = importlib.util.spec_from_file_location("_fp2dxf_validate", path)
+def _load_stdt_module():
+    """`_stdt.py`, loaded BY PATH -- the leaf `0077-ruling.md` sec5 built so
+    this file and `fp2pdf.py` share one loader instead of one execing the
+    other. Not `from floorplanner.export._stdt import ...`: importing ANY
+    `floorplanner` submodule first runs `floorplanner/__init__.py`, which
+    star-imports the whole Qt editor (measured at P5.2, D73's own text)."""
+    path = Path(__file__).resolve().parent / "_stdt.py"
+    spec = importlib.util.spec_from_file_location("_fp2dxf_stdt", path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    return dict(mod.STD_T)
+    return mod
 
 
-#: THE NORMATIVE thickness table, read live from `floorplanner.design.validate`
-#: -- never a copy. `wall_thickness()` still honours a wall's own
-#: `thickness_in` override first, exactly as the schema documents it.
-STD_T = _load_std_thickness()
+_std_t_cache = None
+
+
+def _std_t() -> dict[str, float]:
+    """THE NORMATIVE thickness table, read live from
+    `floorplanner.design.validate` via `_stdt.py` -- never a copy.
+    `wall_thickness()` still honours a wall's own `thickness_in` override
+    first, exactly as the schema documents it.
+
+    LAZY, NOT MODULE SCOPE (`0077-ruling.md` sec5): nothing runs merely by
+    importing this file -- the same shape `fp2pdf.py`'s deferred `reportlab`
+    import already has. Cached after the first call within one process;
+    each call is otherwise a fresh read of whatever `validate.py` says
+    right now."""
+    global _std_t_cache
+    if _std_t_cache is None:
+        _std_t_cache = _load_stdt_module().load_std_thickness()
+    return _std_t_cache
 
 #: wall type -> the Chief Architect wall type NAME to pick in the CAD to
 #: Walls dialog's Wall Type 1/2 dropdowns. A NAME, not a thickness --
@@ -249,7 +259,7 @@ class OpeningSpan:
 @dataclass
 class Ctx:
     doc: dict
-    thickness: dict = field(default_factory=lambda: dict(STD_T))
+    thickness: dict = field(default_factory=lambda: dict(_std_t()))
     warnings: list = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -535,7 +545,7 @@ def main(argv=None) -> None:
     overrides = {}
     for s in a.set:
         k, _, v = s.partition("=")
-        if k not in STD_T:
+        if k not in _std_t():
             ap.error(f"unknown wall type {k!r}")
         overrides[k] = float(v)
     a.outdir.mkdir(parents=True, exist_ok=True)

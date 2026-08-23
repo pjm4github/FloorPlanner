@@ -32,6 +32,12 @@ instruction is another, and it outranks a ruling.** With authority present
 table says; this is not a fourth tier, only a name for what "a ruling exists"
 was always standing in for.
 
+**One clause closes the hole [`handoff/0068-ruling.md`](handoff/0068-ruling.md) §5
+found in the paragraph above: an instruction-as-authority claim must be
+QUOTED IN THE REPORT that relies on it, not merely asserted.** *"Patrick asked
+for it"* names nobody can audit; the report owes the words, the same way a
+ruling owes its own file rather than a summary of one.
+
 **The GREEN criterion was amended on 2026-08-07, and the amendment is Patrick's,
 not a reading Code arrived at.** It first read *"no user-visible behaviour
 change"*. That was inconsistent with this document's own G4 acceptance, which
