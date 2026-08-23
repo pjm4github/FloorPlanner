@@ -3,6 +3,9 @@ enclosed by the band gets its own edge walls selected. Selection is READ-ONLY
 (P0.5 fix 4 / defect 10): an edge backed only by a longer party wall is left
 unselected -- it is NOT duplicated into a new wall. The two tests below that
 once asserted that duplication now assert that selection creates nothing."""
+import math
+import re
+
 import pytest
 from PyQt6.QtCore import QPointF, QRectF
 
@@ -18,19 +21,75 @@ def test_selecting_one_wall_shows_id_vertices_length_on_the_status_bar(fp, win):
     w.setSelected(True)
     win._apply_edit_actions()
     assert win.wall_label.text() == (
-        f"Wall {w.uid}: {w.v1}(0, 0)ft -> {w.v2}(10, 0)ft  len 10ft")
+        f"Wall {w.uid}: {w.v1}(0.00, 0.00)ft -> {w.v2}(10.00, 0.00)ft"
+        f"  len 10.00ft")
 
 
 def test_wall_label_shows_heading_for_a_non_axis_wall(fp, win):
     """A 45-degree diagonal: the angle clause appears, and coordinates are
-    decimal feet to 3 significant digits, as asked."""
+    decimal feet, fixed to 2 places (0065-ruling.md sec4)."""
     w = fp.WallItem(QPointF(0, 0), QPointF(100, 100), "interior")
     win.scene.addItem(w)
     w.setSelected(True)
     win._apply_edit_actions()
     assert win.wall_label.text() == (
-        f"Wall {w.uid}: {w.v1}(0, 0)ft -> {w.v2}(8.33, 8.33)ft"
-        f"  len 11.8ft  angle 45.0deg")
+        f"Wall {w.uid}: {w.v1}(0.00, 0.00)ft -> {w.v2}(8.33, 8.33)ft"
+        f"  len 11.79ft  angle 45.0000deg")
+
+
+def test_the_angle_clause_round_trips_and_never_reads_as_a_cardinal(fp, win):
+    """0068-ruling.md sec3: the prior version of this test asserted the
+    printed text was not one of four hardcoded 4-decimal string literals --
+    which passes at ANY fixed precision, the broken 1-decimal one included,
+    so it could never have gone red against the defect it existed for
+    (0068 measured this directly: simulated at .1f/.2f/.3f/.4f, the
+    assertion passed at all four). This instead reads the number back out
+    of the label and holds it to the invariant the clause itself enforces
+    -- format-free, so it also catches a future precision regression, not
+    only today's already-fixed one.
+
+    The deviation used (0.0003deg) is chosen as an intrinsic property of
+    the code under test, not a borrowed or invented magnitude: 4-decimal
+    formatting's own rounding floor sits between 0.00004deg and
+    0.00005deg (verified directly, see the loop below), so 0.0003deg is
+    ~6x past that floor -- small enough to be a meaningful near-limit
+    case, comfortably clear of any precision this format could plausibly
+    round to zero."""
+    # the floor this test's own margin is chosen against, not asserted in
+    # production -- a companion measurement, not a duplicate of the fix
+    assert f"{90.0 + 0.00004:.4f}" == "90.0000"
+    assert f"{90.0 + 0.0003:.4f}" != "90.0000"
+
+    theta = math.radians(90.0 + 0.0003)
+    length = 100_000.0
+    p2 = QPointF(length * math.cos(theta), length * math.sin(theta))
+    w = fp.WallItem(QPointF(0, 0), p2, "interior")
+    win.scene.addItem(w)
+    w.setSelected(True)
+    win._apply_edit_actions()
+    text = win.wall_label.text()
+    m = re.search(r"angle ([\d.]+)deg", text)
+    assert m is not None, f"{text!r} carries no angle clause"
+    shown = float(m.group(1))
+    assert shown % 90.0 != 0.0, f"{text!r} prints a cardinal the predicate denied"
+
+
+@pytest.mark.parametrize("p2", [
+    QPointF(120, 0),      # due east   (heading 0)
+    QPointF(0, 120),      # due north  (heading 90)
+    QPointF(-120, 0),     # due west   (heading 180)
+    QPointF(0, -120),     # due south  (heading 270)
+])
+def test_wall_label_omits_angle_for_all_four_cardinals(fp, win, p2):
+    """0065-ruling.md sec5: the exact-string test above only exercises due
+    east (heading 0); this closes the gap at the label level -- the other
+    three cardinals must suppress the angle clause too, not just the
+    approx-tolerant heading_deg() test in test_geometry.py."""
+    w = fp.WallItem(QPointF(0, 0), p2, "interior")
+    win.scene.addItem(w)
+    w.setSelected(True)
+    win._apply_edit_actions()
+    assert "angle" not in win.wall_label.text()
 
 
 def test_wall_label_clears_unless_exactly_one_wall_is_selected(fp, win):

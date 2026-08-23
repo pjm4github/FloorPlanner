@@ -352,11 +352,12 @@ def test_farmplaces_two_named_refusals_match_the_ruling_exactly():
 
 
 # crossfloor-snap-2026-08-17.json is NOT referenced here on purpose: per
-# fixtures/README.md and 0063-ruling.md sec4 it is an UNCHARACTERISED-intake
-# measurement subject only ("no test names it, and none is owed") -- its
-# repair-coverage finding is measured and reported by
-# docs/evidence/orthogonality_repair_census.py instead, the same tier a
-# census script already reads it at (`orthogonality_census.py`).
+# fixtures/README.md (promoted out of the intake directory under
+# 0061-ruling.md sec6's own "either-way naming") it is a MEASUREMENT SUBJECT
+# only -- "no test names it, and none is owed" -- its repair-coverage finding
+# is measured and reported by docs/evidence/orthogonality_repair_census.py
+# instead, the same tier a census script already reads it at
+# (`orthogonality_census.py`).
 
 
 # ---------------------------------------------------------------------------

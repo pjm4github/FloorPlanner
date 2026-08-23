@@ -7,12 +7,11 @@ per-file read-back examples (`farmplaceBIGmultifloor.json`,
 `wiscaway2026-08-09R.json`) either ruling actually walked.
 
 Walks the same file set `orthogonality_census.py` does (`examples/` +
-`fixtures/`, recursively -- INCLUDING `fixtures/incoming/`, which is where
-`crossfloor-snap-2026-08-17.json` sits: promoted per
-[0063-ruling.md](../handoff/0063-ruling.md) sec4 as a measurement subject,
-"no test names it, and none is owed" -- this script is that measurement, not
-a test, and `orthogonality_census.py` already reads this same file at this
-same tier).
+`fixtures/`, recursively -- INCLUDING `fixtures/crossfloor-snap-2026-08-17.json`,
+promoted out of `fixtures/incoming/` per [0061-ruling.md](../handoff/0061-ruling.md)
+sec6 as a measurement subject, "no test names it, and none is owed" -- this
+script is that measurement, not a test, and `orthogonality_census.py` already
+reads this same file at this same tier).
 
     python docs/evidence/orthogonality_repair_census.py
 """
