@@ -433,10 +433,13 @@ def snapshot_verdict(text: str, tips):
 def _docs() -> int:
     """The record lane: are the defect records well-formed and reachable?
 
-    Three tools, each already the single definition of its own question, run in
-    the order that makes a failure readable: the records themselves first (a
-    malformed record makes everything downstream meaningless), then whether the
-    repo's references still find them, then whether they would still migrate.
+    Each check is already the single definition of its own question, run in
+    the order that makes a failure readable: the defect records themselves
+    first (a malformed record makes everything downstream meaningless), then
+    the per-task progress index (0104-ruling.md SS5 tier 1 -- generated, same
+    as the defect index, so it cannot drift from the files it lists), then
+    whether the repo's references still find them, then whether they would
+    still migrate.
 
     Every check here is on DATA, not behaviour, so it costs no test run and can
     be invoked on its own while editing records.
@@ -444,6 +447,7 @@ def _docs() -> int:
     checks = [
         ("Docs-Defects", ["tools/defects_index.py", "--validate"]),
         ("Docs-Index", ["tools/defects_index.py", "--check"]),
+        ("Docs-Progress", ["tools/progress_index.py", "--check"]),
         ("Docs-Refs", ["tools/ref_audit.py", "--strict-ids"]),
         ("Docs-GitHub", ["tools/defects_to_github.py", "--dry-run"]),
     ]
@@ -462,8 +466,8 @@ def _docs() -> int:
         for ln in keep[:12 if rc else 4]:
             print(ln)
     note = "" if bad else (f" (snapshot {snap_field}, records valid, index "
-                           "current, every defect reference resolves, "
-                           "migration dry run clean)")
+                           "current, progress index current, every defect "
+                           "reference resolves, migration dry run clean)")
     print(f"Docs-Verdict: {'RED' if bad else 'GREEN'}{note}")
     return 1 if bad else 0
 
