@@ -794,8 +794,19 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
 
     `source` is a `MainWindow` (preferred -- it owns the authoritative floor
     roster) or a bare `QGraphicsScene`.  Pass a dict as `report` to receive the
-    walk's counts; `strict=True` raises instead of warning when the weld check
-    finds the scene disagreeing with itself (P1.6's `--verify-design` hook)."""
+    walk's counts AND `report["wall_items"]` (0101-ruling.md): `{final
+    (canonical) wall id: WallItem}` -- the composition of the `src` out-param
+    `_walls_of` already builds (live item -> pre-canonical id) with
+    `canonicalize()`'s own renumbering (pre-canonical id -> final id), which
+    were computed separately and both discarded on every prior call. Correlated
+    by Python object identity on the wall dict itself (`canonicalize` mutates
+    the SAME dicts in place, never copies), not by re-deriving a geometric
+    match -- so it survives a merge or a split exactly as `of_item` (the
+    group-membership map two lines below) already does for the reverse
+    direction. A snapshot of this one walk: stale the instant the scene
+    changes again, same as everything else this function returns.
+    `strict=True` raises instead of warning when the weld check finds the
+    scene disagreeing with itself (P1.6's `--verify-design` hook)."""
     scene, roster = _resolve(source, floors)
     seq = defaultdict(int)
 
@@ -810,6 +821,13 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
     buckets = _by_floor(scene)
     levels, vertices, walls, rooms, furnishings = [], [], [], [], []
     groups = []                            # P4.5, defect 3
+    # id(wall dict object) -> live WallItem (0101-ruling.md), ACROSS ALL
+    # LEVELS -- unlike `of_item` a few lines below (per-level on purpose,
+    # consumed within the same iteration for that level's own groups),
+    # this one is read only once, after the whole roster loop, against the
+    # FULLY ACCUMULATED `walls` list -- so it must accumulate too, not
+    # reset per floor.
+    wall_of_item = {}
     for f in roster:                       # LEVELS OUTER -- see the module note
         lid = nid("L")
         levels.append({"id": lid, "name": f.name, "elevation_in": 0.0,
@@ -846,6 +864,11 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
                 live = wsrc.get((*sorted((rec["v1"], rec["v2"])),))
                 if live is not None:
                     _note(rec["id"], live)
+                    # keyed by the DICT OBJECT, not its (about to be
+                    # renumbered) "id" string -- canonicalize() mutates this
+                    # same object in place, so the correlation survives its
+                    # own renumbering without re-deriving anything.
+                    wall_of_item[id(rec)] = live
             for rid_, live in rsrc.items():
                 _note(rid_, live)
             poly_all.update(_bind_sides(lr, lw, vt))
@@ -899,7 +922,7 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
     settings["area_basis"] = "centerline"
     settings["editing"] = editing
 
-    return Design.from_dict(canonicalize({
+    design_doc = canonicalize({
         "format": "floorplanner-design", "version": 5, "units": "inches",
         "settings": settings, "levels": levels, "vertices": vertices,
         "walls": walls, "rooms": rooms, "furnishings": furnishings,
@@ -910,7 +933,13 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         # `src` out-param that `face_at` already uses is what maps live item
         # to emitted id, so no second (geometric) matcher was invented.
         "groups": groups,
-    }))
+    })
+    # 0101-ruling.md: canonicalize() mutated `walls`' dicts IN PLACE (sorted
+    # the list, renumbered each "id"), so the same objects `wall_of_item`
+    # keyed by identity are still these ones -- read the id it wrote.
+    rep["wall_items"] = {w["id"]: wall_of_item[id(w)] for w in walls
+                         if id(w) in wall_of_item}
+    return Design.from_dict(design_doc)
 
 
 # -------------------------------------------------- "detect room here" (P3.5)

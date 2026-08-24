@@ -486,3 +486,19 @@ def test_the_dialog_disables_apply_when_there_is_nothing_to_repair(win):
         assert "nothing to repair" in dlg.info.text()
     finally:
         dlg.close()
+
+
+@pytest.mark.gui
+def test_the_preview_row_names_both_ids_and_the_coordinates_0098_0100(win):
+    """0098/0100-ruling.md: PR #37's own preview is the other surface that
+    blocked Patrick's check -- a wall it names must be one he can find."""
+    w = fp.WallItem(QPointF(0, 0), QPointF(1200, 0.02), "interior")
+    win.scene.addItem(w)
+    dlg = fp.OrthogonalityRepairDialog(win)
+    try:
+        text = dlg.listw.item(0).text()
+        assert text.startswith(f"default: {w.uid} · w1 (interior) "
+                               "at (0.00, 0.00) -> (100.00, 0.00)ft — "
+                               "will move ")
+    finally:
+        dlg.close()

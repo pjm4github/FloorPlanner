@@ -150,7 +150,14 @@ class OrthogonalityRepairDialog(QDialog):
     0079-report.md sec2(d)'s own read-back). Computes the WHOLE repair on a
     document walked from the scene -- nothing here touches the scene until
     Apply. Never automatic (0066 sec5): this dialog is the one and only
-    place this app straightens a wall's angle."""
+    place this app straightens a wall's angle.
+
+    Each row names both wall ids and the CURRENT (pre-repair) endpoints in
+    feet (0098/0100-ruling.md): Patrick selected a wall the report didn't
+    mean, because the status-bar id and the document id are two different
+    namespaces both printed as "W<n>". `0101-ruling.md`'s map --
+    `design_from_scene`'s `report["wall_items"]` -- is what makes the
+    status-bar id available here at all."""
 
     def __init__(self, win):
         super().__init__(win)
@@ -179,8 +186,13 @@ class OrthogonalityRepairDialog(QDialog):
         from floorplanner.design.validate import repair_wall_orthogonality
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            self._doc = design_from_scene(self.win).to_dict()
+            rep = {}
+            self._doc = design_from_scene(self.win, report=rep).to_dict()
+        self._wall_items = rep.get("wall_items", {})    # 0101-ruling.md
         self._levels = {lv["id"]: lv["name"] for lv in self._doc.get("levels", [])}
+        self._V = {v["id"]: (v["x"], v["y"])
+                  for v in self._doc.get("vertices", [])}
+        self._W = {w["id"]: w for w in self._doc.get("walls", [])}
         self._result = repair_wall_orthogonality(self._doc)
         self.listw.clear()
 
@@ -218,12 +230,31 @@ class OrthogonalityRepairDialog(QDialog):
         self.info.setText(" ".join(parts))
 
         for wid, lvl, typ, disp in moved:
-            self.listw.addItem(f"{self._levels.get(lvl, lvl)}: wall {wid} "
-                              f"({typ}) — will move {disp:.3f}\"")
+            self.listw.addItem(f"{self._levels.get(lvl, lvl)}: {self._tag(wid)}"
+                              f"{wid} ({typ}){self._coords(wid)} — will move "
+                              f"{disp:.3f}\"")
         for wid, lvl, typ, _disp, reason in refused:
-            self.listw.addItem(f"{self._levels.get(lvl, lvl)}: wall {wid} "
-                              f"({typ}) — refused ({reason})")
+            self.listw.addItem(f"{self._levels.get(lvl, lvl)}: {self._tag(wid)}"
+                              f"{wid} ({typ}){self._coords(wid)} — refused "
+                              f"({reason})")
         self.b_apply.setEnabled(bool(moved))
+
+    def _tag(self, wid):
+        """0098/0100-ruling.md: the status-bar id beside the document id,
+        so a wall this dialog names can be found in the running app."""
+        item = self._wall_items.get(wid)
+        return f"{item.uid} · " if item is not None else ""
+
+    def _coords(self, wid):
+        """The wall's CURRENT endpoints (before this repair applies) in
+        feet, matching 0100 sec1's own ruled row shape."""
+        w = self._W.get(wid)
+        if w is None or w["v1"] not in self._V or w["v2"] not in self._V:
+            return ""
+        x1, y1 = self._V[w["v1"]]
+        x2, y2 = self._V[w["v2"]]
+        return (f" at ({fmt_ft2(x1)}, {fmt_ft2(y1)}) -> "
+               f"({fmt_ft2(x2)}, {fmt_ft2(y2)})ft")
 
     def _apply(self):
         from floorplanner.walls import close_gap
