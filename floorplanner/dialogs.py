@@ -116,8 +116,12 @@ class OrthogonalityReportDialog(QDialog):
         )
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            doc = design_from_scene(self.win).to_dict()
+            rep = {}
+            doc = design_from_scene(self.win, report=rep).to_dict()
+        wall_items = rep.get("wall_items", {})       # 0101-ruling.md
         levels = {lv["id"]: lv["name"] for lv in doc.get("levels", [])}
+        W = {w["id"]: w for w in doc.get("walls", [])}
+        V = {v["id"]: (v["x"], v["y"]) for v in doc.get("vertices", [])}
         rows = wall_orthogonality(doc)
         bands = orthogonality_bands(rows)
         summary = ", ".join(f"{bands[label]} {label}"
@@ -126,9 +130,18 @@ class OrthogonalityReportDialog(QDialog):
         offaxis = [r for r in rows if r[3] > 0.01]
         self.listw.clear()
         for wid, lvl, typ, deg, disp in offaxis:
+            item = wall_items.get(wid)
+            tag = f"{item.uid} · " if item is not None else ""
+            w = W.get(wid)
+            coords = ""
+            if w is not None and w["v1"] in V and w["v2"] in V:
+                x1, y1 = V[w["v1"]]
+                x2, y2 = V[w["v2"]]
+                coords = (f" at ({fmt_ft2(x1)}, {fmt_ft2(y1)}) -> "
+                         f"({fmt_ft2(x2)}, {fmt_ft2(y2)})ft")
             self.listw.addItem(
-                f"{levels.get(lvl, lvl)}: wall {wid} ({typ}) is {deg:.2f} "
-                f"degrees off axis (would move {disp:.3f}\" if straightened)")
+                f"{levels.get(lvl, lvl)}: {tag}{wid} ({typ}){coords} — "
+                f"{deg:.2f}deg off axis (would move {disp:.3f}\" if straightened)")
         if offaxis:
             self.info.setText(
                 f"{len(offaxis)} of {len(rows)} wall(s) are off axis: "

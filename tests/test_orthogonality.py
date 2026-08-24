@@ -221,6 +221,24 @@ def test_the_dialog_lists_an_off_axis_wall_it_is_given(win):
 
 
 @pytest.mark.gui
+def test_the_dialog_row_names_both_ids_and_the_coordinates_0100(win):
+    """0098/0100-ruling.md: the status-bar id (`WallItem.uid`) and the
+    document id are two different namespaces, both printed as "W<n>" --
+    Patrick selected a wall the report didn't mean. The row must carry
+    both, plus the endpoints in feet, so a wall it names can be found."""
+    w = fp.WallItem(QPointF(0, 0), QPointF(1200, 1200), "interior")
+    win.scene.addItem(w)
+    dlg = fp.OrthogonalityReportDialog(win)
+    try:
+        text = dlg.listw.item(0).text()
+        assert text.startswith(f"default: {w.uid} · w1 (interior) "
+                               "at (0.00, 0.00) -> (100.00, 100.00)ft — "
+                               "45.00deg off axis")
+    finally:
+        dlg.close()
+
+
+@pytest.mark.gui
 def test_the_dialog_reports_clean_when_every_wall_is_on_axis(win):
     win.scene.addItem(fp.WallItem(QPointF(0, 0), QPointF(200, 0), "interior"))
     dlg = fp.OrthogonalityReportDialog(win)

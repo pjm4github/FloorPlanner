@@ -276,6 +276,29 @@ def test_walk_is_level_scoped(fp, win, make_room):
     assert check(doc, deep=True) == []
 
 
+def test_wall_items_covers_every_floor_not_just_the_last_0101(fp, win, make_room):
+    """0101-ruling.md: `report["wall_items"]` (final wall id -> live
+    `WallItem`) must cover every level the walk emits. The accumulator
+    that builds it was first written per-level (like `of_item`, which is
+    fine there because it is consumed within that same level's iteration)
+    -- but `wall_items` is only read once, after the whole roster loop, so
+    a per-level accumulator would silently keep only the LAST floor's
+    walls. Caught here before it shipped, on the same two-floor fixture
+    `test_walk_is_level_scoped` already uses."""
+    _two_floor_scene(fp, win, make_room)
+    doc, rep = _walk(win)
+    wall_items = rep["wall_items"]
+    assert len(wall_items) == len(doc["walls"]) > 0
+    assert len({w["level"] for w in doc["walls"]}) == 2, (
+        "fixture must actually span two levels")
+    for w in doc["walls"]:
+        item = wall_items[w["id"]]
+        assert item is not None
+        # the mapped item's own geometry matches the doc wall it names
+        V = {v["id"]: (v["x"], v["y"]) for v in doc["vertices"]}
+        assert (item.p1.x(), item.p1.y()) in (V[w["v1"]], V[w["v2"]])
+
+
 def test_empty_level_survives_the_walk(fp, win, make_room):
     """A floor with no items still emits its level -- which is why the roster
     comes from `MainWindow.floors` and is never derived from the scene."""
