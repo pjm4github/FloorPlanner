@@ -47,16 +47,24 @@ rather than the one incident `0042` named.
 
 ## 2. `0105`'s CUTS, BUILT
 
-`.github/workflows/ci.yml`: four jobs disabled via job-level `if: false`
-(the matrix leg via `if: matrix.python-version == '3.13'`), matching §5's
-"disable, do not delete" — each carries a comment at the top of its job
-block citing `0105-ruling.md` and why, so a reader does not have to
-re-litigate it:
+`.github/workflows/ci.yml`: three whole jobs disabled via job-level
+`if: false`, matching §5's "disable, do not delete" — each carries a comment
+at the top of its job block citing `0105-ruling.md` and why, so a reader
+does not have to re-litigate it:
 
-- `pytest (py3.10)` — the matrix leg, not the job (Linux py3.13 survives)
 - `pytest (windows)`
 - `pytest deep invariants (py3.13)`
 - `records (gate --docs)`
+
+**`pytest (py3.10)` is a matrix LEG, not a job**, and disabling it cost a
+real mistake, caught by CI itself: the first push (`63b6836`) tried a
+job-level `if: matrix.python-version == '3.13'` and it broke the workflow
+file outright — zero jobs ran, no logs, `gh run view` only says "likely
+failed because of a workflow file issue." **A job-level `if:` cannot read
+`matrix` context** here, contrary to what the syntax looks like it should
+do. Refixed in this same commit with a per-step `if:` on every step of the
+surviving job instead — well-documented, and this commit's own push is the
+confirmation it works.
 
 **The surviving job** (`test`, py3.13) now runs `python tools/gate.py`
 (bare, full mode — OFF + ON + DEEP + the snapshot-staleness check) in place

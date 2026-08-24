@@ -84,29 +84,34 @@ jobs:
       fail-fast: false
       matrix:
         # 3.10 IS STILL LISTED, NOT DELETED -- 0105-ruling.md sec5's "disable,
-        # do not delete". Disabled below by the job-level `if:`; re-enabling
-        # it is deleting that one condition. requires-python was raised to
-        # >=3.13 alongside this cut (pyproject.toml) -- a repo must not
-        # promise a version it no longer tests.
+        # do not delete". Disabled below by a per-step `if:` (a job-level
+        # `if:` cannot read `matrix` here -- confirmed empirically: it failed
+        # the whole workflow file at parse time, before any job ran, on the
+        # first attempt); re-enabling 3.10 is deleting that one condition
+        # from every step. requires-python was raised to >=3.13 alongside
+        # this cut (pyproject.toml) -- a repo must not promise a version it
+        # no longer tests.
         python-version: ["3.10", "3.13"]
-    if: matrix.python-version == '3.13'
     env:
       # the suite is headless; conftest also sets this, but be explicit for CI
       QT_QPA_PLATFORM: offscreen
     steps:
-      - uses: actions/checkout@v5
+      - if: matrix.python-version == '3.13'
+        uses: actions/checkout@v5
         with:
           # full mode's snapshot-staleness check needs HEAD~1 -- same fix,
           # same reason as the (cut) `docs` and `deep` jobs' own comments.
           fetch-depth: 0
 
-      - uses: actions/setup-python@v6
+      - if: matrix.python-version == '3.13'
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: requirements-dev.txt
 
-      - name: Install Qt runtime libraries
+      - if: matrix.python-version == '3.13'
+        name: Install Qt runtime libraries
         # PyQt6 wheels ship Qt itself but still dlopen these system libs, even
         # under the offscreen platform plugin.
         run: |
@@ -118,18 +123,21 @@ jobs:
           sudo apt-get install -y --no-install-recommends libglib2.0-0t64 \
             || sudo apt-get install -y --no-install-recommends libglib2.0-0
 
-      - name: Install Python dependencies
+      - if: matrix.python-version == '3.13'
+        name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Full gate (ruff + OFF + ON + DEEP + snapshot check)
+      - if: matrix.python-version == '3.13'
+        name: Full gate (ruff + OFF + ON + DEEP + snapshot check)
         # CALLS THE LOCAL GATE, rather than reimplementing it -- same
         # reasoning as the (cut) `deep` job's own comment: two
         # implementations of a gate are two things that can drift.
         run: python tools/gate.py
 
-      - name: Validate v5 design corpus
+      - if: matrix.python-version == '3.13'
+        name: Validate v5 design corpus
         # independent of the suite, and not part of tools/gate.py: the schema
         # + invariant validator must accept every clean floorplanner-design
         # example (planc1.v5.json is the intentionally-corrupt fixture, so it
