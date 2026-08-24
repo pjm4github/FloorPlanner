@@ -131,6 +131,16 @@ GATE_RUN_RE = re.compile(r"tools[/\\]gate\.py(?!\s+--trailer)")
 # is a rule that is wrong about how Code works, so it becomes a gate.
 HANDOFF_RE = re.compile(r"^docs/handoff/\d{4}-[^/]+\.md$")
 
+# The two-writer-one-suffix shape (README.md "THE CHANNEL CONTRACT"): Code
+# writes `NNNN-report.md`, the reviewer writes `NNNN-ruling.md`, and each side
+# only ever creates -- never edits the other's. That split is what makes a
+# same-number collision impossible IF both sides check the directory first.
+# Four have landed anyway (0036, 0043, 0050, 0101 -- 0103-ruling.md SS4)
+# because nothing enforced it. `_staged_new_handoff_files` above already finds
+# every add; this pattern picks the number and suffix off a standard name so
+# the add can be checked against its counterpart already on disk.
+PAIR_RE = re.compile(r"^docs/handoff/(\d{4})-(report|ruling)\.md$")
+
 
 def _current_branch(cwd):
     r = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=cwd,
@@ -165,6 +175,26 @@ def _staged_new_handoff_files(cwd, cmd):
         if st.returncode == 0 and st.stdout[:2] in ("??", "A ", "AM"):
             found.add(path)
     return found
+
+
+def _collision(cwd, new_path):
+    """If `new_path` is a standard `NNNN-report.md`/`NNNN-ruling.md` add and its
+    counterpart (same number, other suffix) already exists on disk -- checked
+    in `docs/handoff/` AND `docs/handoff/archive/`, since the numbering is
+    shared across both (README.md SS"protocol" item 3) -- return that
+    counterpart's path. `None` if the name doesn't fit the pattern (an older,
+    pre-channel-contract file) or nothing collides."""
+    m = PAIR_RE.match(new_path)
+    if not m:
+        return None
+    number, suffix = m.groups()
+    other = "ruling" if suffix == "report" else "report"
+    name = f"{number}-{other}.md"
+    for d in ("docs/handoff", "docs/handoff/archive"):
+        candidate = os.path.join(cwd, d, name)
+        if os.path.exists(candidate):
+            return f"{d}/{name}"
+    return None
 
 
 def block(msg):
@@ -223,8 +253,8 @@ def main():
             capture_output=True, text=True)
         is_merge = (merging.returncode == 0
                    and os.path.exists(os.path.join(ROOT, merging.stdout.strip())))
+        new_handoff = _staged_new_handoff_files(ROOT, cmd) if not is_merge else set()
         if branch and branch != "main" and not is_merge:
-            new_handoff = _staged_new_handoff_files(ROOT, cmd)
             if new_handoff:
                 shown = ", ".join(sorted(new_handoff))
                 block(f"this commit adds {shown} on branch '{branch}', not "
@@ -233,6 +263,22 @@ def main():
                       "the report or ruling, commit it there,\n"
                       "         then branch for the code that answers it "
                       "(0084-ruling.md SS4).")
+
+        # THE FOURTH COLLISION (0036, 0043, 0050, 0101) IS A RACE: two writers,
+        # one sequence, no lock. This closes Code's half of it -- a number
+        # whose other suffix is already on disk is refused here instead of
+        # landing as a collision that then has to be flagged and carried
+        # forward per 0044-ruling.md (0103-ruling.md SS4).
+        for path in sorted(new_handoff):
+            counterpart = _collision(ROOT, path)
+            if counterpart:
+                number = PAIR_RE.match(path).group(1)
+                block(f"{path} collides with {counterpart} -- number "
+                      f"{number} is already taken.\n"
+                      "         Next free number = highest in "
+                      "`docs/handoff/` (archive included) plus one\n"
+                      "         (README.md \"protocol\" item 3). Pick that "
+                      "number and retry.")
 
     # ONE CALL CANNOT BOTH RUN THE GATE AND COMMIT/PUSH. Checked before the
     # result file is even read, because in this shape the result file is
