@@ -7,7 +7,7 @@ name = "floorplanner"
 version = "1.0"                       # source of truth: APP_VERSION in floorplanner/config.py
 description = "A 2D architectural floor-plan editor written in Python with PyQt6."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"            # was >=3.10; CI's 3.10 leg cut, 0105-ruling.md sec5
 license = { file = "LICENSE" }
 authors = [{ name = "Patrick Moran" }]
 dependencies = [
