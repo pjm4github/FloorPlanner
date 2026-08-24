@@ -347,3 +347,76 @@ def test_a_feature_branch_commit_touching_OTHER_files_is_unaffected(tmp_path):
     _write_result(tmp_path, "GREEN", "full")
     r = _invoke(hook, tmp_path, "git commit -m x")
     assert r.returncode == 0, r.stderr
+
+
+# ---------------------------------------------------------------------------
+# 0103-ruling.md SS4: a new `NNNN-report.md`/`NNNN-ruling.md` whose
+# counterpart (same number, other suffix) is already on disk is a collision
+# -- refused, forcing the second writer to pick the next free number instead
+# of landing the fourth (0036, 0043, 0050, 0101) repeat of this shape.
+# ---------------------------------------------------------------------------
+
+def test_a_report_colliding_with_an_existing_ruling_of_the_same_number_is_REFUSED(tmp_path):
+    hook = _hook_repo(tmp_path)
+    (tmp_path / "docs" / "handoff").mkdir(parents=True)
+    (tmp_path / "docs" / "handoff" / "0101-ruling.md").write_text(
+        "x\n", encoding="utf-8")
+    _run_git(["add", "-A"], tmp_path)
+    _run_git(["commit", "-m", "land the ruling"], tmp_path)
+    _stage_new_handoff(tmp_path, name="0101-report.md")
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 2, r.stderr
+    assert "0101-report.md" in r.stderr
+    assert "0101-ruling.md" in r.stderr
+    assert "already taken" in r.stderr
+
+
+def test_a_ruling_colliding_with_an_existing_report_of_the_same_number_is_REFUSED(tmp_path):
+    hook = _hook_repo(tmp_path)
+    (tmp_path / "docs" / "handoff").mkdir(parents=True)
+    (tmp_path / "docs" / "handoff" / "0101-report.md").write_text(
+        "x\n", encoding="utf-8")
+    _run_git(["add", "-A"], tmp_path)
+    _run_git(["commit", "-m", "land the report"], tmp_path)
+    _stage_new_handoff(tmp_path, name="0101-ruling.md")
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 2, r.stderr
+    assert "0101-ruling.md" in r.stderr
+    assert "0101-report.md" in r.stderr
+
+
+def test_a_collision_against_an_ARCHIVED_counterpart_is_also_REFUSED(tmp_path):
+    """The numbering is shared across `docs/handoff/` and its `archive/`
+    (README.md protocol item 3: 'next free number ... archive included')."""
+    hook = _hook_repo(tmp_path)
+    (tmp_path / "docs" / "handoff" / "archive").mkdir(parents=True)
+    (tmp_path / "docs" / "handoff" / "archive" / "0050-ruling.md").write_text(
+        "x\n", encoding="utf-8")
+    _run_git(["add", "-A"], tmp_path)
+    _run_git(["commit", "-m", "archive it"], tmp_path)
+    _stage_new_handoff(tmp_path, name="0050-report.md")
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 2, r.stderr
+    assert "0050-report.md" in r.stderr
+
+
+def test_a_fresh_number_with_no_counterpart_is_ALLOWED(tmp_path):
+    hook = _hook_repo(tmp_path)
+    _stage_new_handoff(tmp_path, name="0104-report.md")
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 0, r.stderr
+
+
+def test_a_non_standard_handoff_NAME_is_not_checked_for_collision(tmp_path):
+    """Older, pre-channel-contract names (e.g. `0010-census-furnishings.md`)
+    don't fit the report/ruling split -- the collision check only applies to
+    the standard pair pattern, not every `docs/handoff/*.md` add."""
+    hook = _hook_repo(tmp_path)
+    _stage_new_handoff(tmp_path, name="0010-census-furnishings.md")
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 0, r.stderr
