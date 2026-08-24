@@ -30,6 +30,7 @@
 | [`ROADMAP.md`](ROADMAP.md) | **What may proceed without Patrick, and what may not.** Tiers every remaining item GREEN / AMBER / RED, and carries the rulings issued with them. Code does not self-classify; the tiers are also recorded in the plan. |
 | [`V5_MIGRATION_PLAN.md`](V5_MIGRATION_PLAN.md) | The Status table (every task and its tick), the phase specifications, the risk register and the sequencing rationale. **What is planned and what is done.** |
 | [`DESIGN_MODEL_v5.md`](DESIGN_MODEL_v5.md) | Why the room is the durable unit and walls are an optional binding onto its outline. The rationale behind the schema. |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | The module layout roster, phase-history pointers, extract/join and floors mechanics, and the performance measurements moved out of `CLAUDE.md` at [`handoff/0085-ruling.md`](handoff/0085-ruling.md) — `CLAUDE.md` itself is traps only now. |
 | [`design-schema.v5.md`](design-schema.v5.md) | A **pointer**, not a stub. The schema itself was vendored into the package at P0.7 and lives at `floorplanner/design/design-schema.v5.json`; this file remains so references to the old location still resolve. |
 | [`defects/`](defects/) | The defect register — **one file per record**. See below. |
 | [`SANITY_CHECK.md`](SANITY_CHECK.md) | The three manual gates and their outcomes. The only checks a human has to perform by hand. |
