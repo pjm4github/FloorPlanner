@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 33b04c1 -->
+<!-- SNAPSHOT-HEAD: a571d25 -->
 
 # Session snapshot — read this first
 
@@ -153,6 +153,20 @@ check.** [`0066-ruling.md`](handoff/0066-ruling.md) →
 findings neither ruling anticipated — see THE QUEUE item 8). Full detail
 there; not restated here beyond the pointer, per this file's own rule that
 an index does not summarise the thing it indexes.
+
+**THE WALL ID/COORDINATE FIX (`0098`–`0102`) IS BUILT, AMBER, BATCHED WITH
+PR #37's CHECK.** [`0103-ruling.md`](handoff/0103-ruling.md) accepted it,
+found and owned a real contradiction in `0100` (§5 vs §6 — now a standing
+rule: naming something as unblocking a person exempts it from its own
+read-back gate, stated in the same sentence), and answered the four
+remaining questions: centre-and-select (not select alone), a dead row is one
+whose id fails a fresh round-trip walk (not just `sip.isdeleted`), Coalesce's
+preview is its own item (RED, pending its own ruling), and the gaps dialog
+is dropped (`0100` §2 was wrong to call it the same treatment — a gap is a
+vertex pair, no wall id). **Owed now: the shared `WallRowList` widget
+(AMBER, tier 2) on both `wall-report-id-fix` (PR #39) and
+`wall-orthogonality-repair` (PR #37); the mailbox hook's duplicate-number
+check (GREEN, tier 3) is being built in this session.**
 
 ---
 
@@ -419,7 +433,7 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`33b04c1`** at this file's cut. **Both surfaces `0098-ruling.md` §2 named are now fixed** — the standalone orthogonality report (PR #39) and PR #37's own repair preview each show both wall ids and the current endpoints in feet (`W7 · w19 (interior) at (...)ft`), composing the two maps `0101-ruling.md` named through `design_from_scene`'s existing `report` out-param. **PR #37's check is UNBLOCKED** — run it against `fixtures/wiscaway2026-08-09R.json` (5 repairable walls), not `wiscaway2026-08-08.json` (`0099-ruling.md`'s own table: zero repairable there, both off-axis walls are deliberate diagonals). `0100` §§2-4 (click-to-select, the shared row widget, modeless dialogs, Coalesce's own preview) remain RED, read-back only partly answered — not needed to unblock the check. PR #38 (the angle clause) is unaffected, still worth checking. **Numbering collision, on the record:** this session's own read-back landed as `handoff/0101-report.md`, sharing its number with Patrick's own `handoff/0101-ruling.md`; neither renamed, numbering continues from `0102`. Full trail: `handoff/README.md`'s pair table. |
+| **`main`** | **`a571d25`** at this file's cut. **Both surfaces `0098-ruling.md` §2 named are now fixed** — the standalone orthogonality report (PR #39) and PR #37's own repair preview each show both wall ids and the current endpoints in feet (`W7 · w19 (interior) at (...)ft`), composing the two maps `0101-ruling.md` named through `design_from_scene`'s existing `report` out-param. **PR #37's check is UNBLOCKED** — run it against `fixtures/wiscaway2026-08-09R.json` (5 repairable walls), not `wiscaway2026-08-08.json` (`0099-ruling.md`'s own table: zero repairable there, both off-axis walls are deliberate diagonals). **`0103-ruling.md` landed**: accepted `0102`, owned the `0100` §5/§6 contradiction (new standing rule — an item named as unblocking a person is exempt from its own read-back gate, stated in the same sentence), answered the four remaining questions (centre+select; a dead row is one that fails a fresh round-trip walk; Coalesce's preview is its own RED item; the gaps dialog is dropped, `0100` §2 was wrong to call it the same treatment). **Owed: the shared `WallRowList` widget (AMBER, tier 2) on PR #37 and PR #39; the mailbox hook's duplicate-number check (GREEN, tier 3), being built now.** PR #38 (the angle clause) is unaffected, still worth checking. **Numbering collisions, on the record:** `0036`, `0043`, `0050`, and `0101` (Code's `handoff/0101-report.md` vs. Patrick's own `handoff/0101-ruling.md`); neither renamed, numbering continues forward each time. Full trail: `handoff/README.md`'s pair table. |
 | **Branches** | **`wall-orthogonality-repair`** ([PR #37](https://github.com/pjm4github/FloorPlanner/pull/37), item C) — AMBER, open, **check UNBLOCKED, ready to run** (against `wiscaway2026-08-09R.json`). **`wall-report-id-fix`** ([PR #39](https://github.com/pjm4github/FloorPlanner/pull/39), the standalone report's own fix) — AMBER, open, ready. **`wall-label-angle-clause`** ([PR #38](https://github.com/pjm4github/FloorPlanner/pull/38), the angle clause) — AMBER, open, worth checking, unaffected. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **81 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). `python tools/gate.py --docs` GREEN. |
