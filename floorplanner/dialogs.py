@@ -83,6 +83,59 @@ class GapReviewDialog(QDialog):
         self.refresh()
 
 
+class WallRowList(QListWidget):
+    """Shared row widget for wall lists across the orthogonality report and
+    repair preview (0100-ruling.md SS3(a)(b), answered by 0103-ruling.md SS3):
+    clicking a row centres the view on that wall and selects it -- "so I can
+    find them" needs more than selection alone, since a wall off-screen is
+    invisible either way, and this app had exactly one prior `centerOn`
+    (startup) to set precedent from neither direction.
+
+    A dead row -- including a MERGED wall, where the Qt object survives but
+    its id no longer names anything -- goes grey in place, reads "no longer
+    present", and stops accepting clicks. THE TEST IS THE ROUND TRIP: a wall
+    id that does not come back from a FRESH `design_from_scene()` walk is
+    dead, whatever `sip.isdeleted` thinks of the pointer -- that guard alone
+    misses exactly the merged case."""
+
+    def __init__(self, win, parent=None):
+        super().__init__(parent)
+        self.win = win
+        self.itemClicked.connect(self._on_click)
+
+    def add_row(self, wall_id, text):
+        """Append a row naming `wall_id` (the document/canonical id) with
+        `text` as its label; returns the QListWidgetItem."""
+        item = QListWidgetItem(text)
+        item.setData(Qt.ItemDataRole.UserRole, wall_id)
+        self.addItem(item)
+        return item
+
+    def _on_click(self, item):
+        wall_id = item.data(Qt.ItemDataRole.UserRole)
+        if wall_id is None:                # already marked dead
+            return
+        import warnings
+        from floorplanner.design.bridge import design_from_scene
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            rep = {}
+            design_from_scene(self.win, report=rep)
+        wall_item = rep.get("wall_items", {}).get(wall_id)
+        if wall_item is None or sip.isdeleted(wall_item):
+            self._mark_dead(item)
+            return
+        self.win.scene.clearSelection()
+        wall_item.setSelected(True)
+        self.win.view.centerOn(wall_item)
+
+    def _mark_dead(self, item):
+        item.setData(Qt.ItemDataRole.UserRole, None)
+        item.setText(f"{item.text()}  — no longer present")
+        item.setForeground(QColor("#999"))
+        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
+
+
 class OrthogonalityReportDialog(QDialog):
     """0055-ruling.md item B: a REPORT, not a repair. Names every wall
     within a few degrees of axis-aligned but not on it, so "Chief complains
@@ -168,7 +221,7 @@ class OrthogonalityRepairDialog(QDialog):
         self.info = QLabel()
         self.info.setWordWrap(True)
         lay.addWidget(self.info)
-        self.listw = QListWidget()
+        self.listw = WallRowList(win)
         lay.addWidget(self.listw)
         row = QHBoxLayout()
         self.b_apply = QPushButton("Apply")
@@ -230,11 +283,11 @@ class OrthogonalityRepairDialog(QDialog):
         self.info.setText(" ".join(parts))
 
         for wid, lvl, typ, disp in moved:
-            self.listw.addItem(f"{self._levels.get(lvl, lvl)}: {self._tag(wid)}"
+            self.listw.add_row(wid, f"{self._levels.get(lvl, lvl)}: {self._tag(wid)}"
                               f"{wid} ({typ}){self._coords(wid)} — will move "
                               f"{disp:.3f}\"")
         for wid, lvl, typ, _disp, reason in refused:
-            self.listw.addItem(f"{self._levels.get(lvl, lvl)}: {self._tag(wid)}"
+            self.listw.add_row(wid, f"{self._levels.get(lvl, lvl)}: {self._tag(wid)}"
                               f"{wid} ({typ}){self._coords(wid)} — refused "
                               f"({reason})")
         self.b_apply.setEnabled(bool(moved))

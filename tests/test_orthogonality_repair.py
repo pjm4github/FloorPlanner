@@ -30,7 +30,7 @@ import json
 from pathlib import Path
 
 import pytest
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import QPointF, Qt
 
 import FloorPlanner as fp
 from floorplanner.design.validate import (
@@ -500,5 +500,54 @@ def test_the_preview_row_names_both_ids_and_the_coordinates_0098_0100(win):
         assert text.startswith(f"default: {w.uid} · w1 (interior) "
                                "at (0.00, 0.00) -> (100.00, 0.00)ft — "
                                "will move ")
+    finally:
+        dlg.close()
+
+
+# ---------------------------------------------------------------------------
+# WallRowList on the repair preview -- click-to-centre-select and dead rows
+# (0100-ruling.md SS3(a)(b), answered and ordered by 0103-ruling.md SS3/SS5)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.gui
+def test_clicking_a_MOVED_row_selects_its_wall_and_centres_the_view(win):
+    """Patrick's own words, quoted in 0103-ruling.md SS3(a): "so I can find
+    them." Selection alone does nothing for a wall off-screen."""
+    w = fp.WallItem(QPointF(900, 700), QPointF(1100, 700.02), "interior")
+    win.scene.addItem(w)
+    dlg = fp.OrthogonalityRepairDialog(win)
+    try:
+        row = dlg.listw.item(0)
+        assert row is not None
+        dlg.listw.itemClicked.emit(row)
+        assert w.isSelected()
+        centre = win.view.mapToScene(win.view.viewport().rect().center())
+        target = w.sceneBoundingRect().center()
+        assert abs(centre.x() - target.x()) < 50
+        assert abs(centre.y() - target.y()) < 50
+    finally:
+        dlg.close()
+
+
+@pytest.mark.gui
+def test_a_row_whose_wall_no_longer_exists_goes_dead_on_click(win):
+    """THE TEST IS THE ROUND TRIP (0103-ruling.md SS3(b)): the row is not
+    told the wall is gone in advance -- it discovers this by re-walking the
+    scene fresh on click and finding the id does not come back. A removed
+    wall and a MERGED one (object alive, id no longer resolves) hit the
+    exact same code path here -- `wall_items.get(wall_id)` returns nothing
+    either way -- so a plain removal exercises the mechanism the ruling
+    asked for without needing a real merge to reproduce it."""
+    w = fp.WallItem(QPointF(0, 0), QPointF(200, 0.02), "interior")
+    win.scene.addItem(w)
+    dlg = fp.OrthogonalityRepairDialog(win)
+    try:
+        row = dlg.listw.item(0)
+        win.scene.removeItem(w)
+        dlg.listw.itemClicked.emit(row)
+        assert "no longer present" in row.text()
+        assert not bool(row.flags() & Qt.ItemFlag.ItemIsEnabled)
+        assert row.data(Qt.ItemDataRole.UserRole) is None
+        dlg.listw.itemClicked.emit(row)          # a second click must not raise
     finally:
         dlg.close()
