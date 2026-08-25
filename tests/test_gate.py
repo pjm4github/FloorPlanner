@@ -338,3 +338,48 @@ def test_the_real_snapshot_carries_a_marker():
         "docs/SESSION_SNAPSHOT.md must carry a SNAPSHOT-HEAD marker"
     assert _gate().SNAPSHOT_ROW.search(text), \
         "docs/SESSION_SNAPSHOT.md must carry a `main` row for the marker to agree with"
+
+
+# ---------------------------------------------------------------------------
+# _select_modes -- 0107-ruling.md SS4: DEEP runs under CI only, not on a
+# developer's own push. A plain function of three booleans, pulled out of
+# main() specifically so this does not require spawning pytest to test.
+# ---------------------------------------------------------------------------
+
+def _labels(modes):
+    return [label.strip() for label, _env, _extra in modes]
+
+
+def test_quick_is_OFF_ONLY_regardless_of_CI():
+    g = _gate()
+    assert _labels(g._select_modes(quick=True, deep_only=False, in_ci=False)) == ["OFF"]
+    assert _labels(g._select_modes(quick=True, deep_only=False, in_ci=True)) == ["OFF"]
+
+
+def test_deep_only_is_DEEP_ONLY_regardless_of_CI():
+    g = _gate()
+    assert _labels(g._select_modes(quick=False, deep_only=True, in_ci=False)) == ["DEEP"]
+    assert _labels(g._select_modes(quick=False, deep_only=True, in_ci=True)) == ["DEEP"]
+
+
+def test_full_mode_LOCALLY_is_OFF_AND_ON_ONLY():
+    """THE POINT OF 0107 SS4: a developer's own push does not pay for DEEP."""
+    g = _gate()
+    assert _labels(g._select_modes(quick=False, deep_only=False, in_ci=False)) \
+        == ["OFF", "ON"]
+
+
+def test_full_mode_UNDER_CI_is_OFF_ON_AND_DEEP():
+    """The one run DEEP still covers -- the clean-checkout run that cannot be
+    bypassed by --no-verify on the machine it is checking."""
+    g = _gate()
+    assert _labels(g._select_modes(quick=False, deep_only=False, in_ci=True)) \
+        == ["OFF", "ON", "DEEP"]
+
+
+def test_quick_takes_priority_over_deep_only():
+    """Both flags together is nonsensical input, but the precedence must be
+    stable and documented by a test rather than left to argument order in
+    an if-chain nobody re-reads."""
+    g = _gate()
+    assert _labels(g._select_modes(quick=True, deep_only=True, in_ci=True)) == ["OFF"]

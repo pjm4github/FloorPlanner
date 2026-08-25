@@ -61,6 +61,27 @@ def _hook_repo(tmp_path):
     return copy
 
 
+def _write_stub_gate(tmp_path, docs_ok=True):
+    """A minimal stand-in for `tools/gate.py --docs` (0107-ruling.md SS3: the
+    hook now runs it LIVE at push, not from a result file) -- exercises the
+    HOOK's own integration (does it call this, does it block on non-zero, is
+    it skipped at commit) without dragging in the real docs machinery
+    (`docs/defects/`, `docs/SESSION_SNAPSHOT.md`, ...), which is already
+    covered by `defects_index`'s own tests and by running the real tool."""
+    tools = tmp_path / "tools"
+    tools.mkdir(exist_ok=True)
+    body = (
+        "import sys\n"
+        "if '--docs' in sys.argv:\n"
+        + ("    print('Docs-Verdict: GREEN')\n    sys.exit(0)\n"
+           if docs_ok else
+           "    print('Docs-Refs: unresolved=1')\n"
+           "    print('Docs-Verdict: RED')\n    sys.exit(1)\n")
+        + "sys.exit(0)\n"
+    )
+    (tools / "gate.py").write_text(body, encoding="utf-8")
+
+
 def _write_result(tmp_path, verdict, mode, older_than=None):
     """Write `.gate-result.json` at repo root, matching what `gate.py`'s
     `_write_result` produces. `older_than`, if given, back-dates the file's
@@ -146,6 +167,7 @@ def test_full_GREEN_is_ALLOWED_at_commit(tmp_path):
 
 def test_full_GREEN_is_ALLOWED_at_push(tmp_path):
     hook = _hook_repo(tmp_path)
+    _write_stub_gate(tmp_path, docs_ok=True)
     _write_result(tmp_path, "GREEN", "full")
     r = _invoke(hook, tmp_path, "git push")
     assert r.returncode == 0, r.stderr
@@ -347,3 +369,125 @@ def test_a_feature_branch_commit_touching_OTHER_files_is_unaffected(tmp_path):
     _write_result(tmp_path, "GREEN", "full")
     r = _invoke(hook, tmp_path, "git commit -m x")
     assert r.returncode == 0, r.stderr
+
+
+# ---------------------------------------------------------------------------
+# 0103-ruling.md SS4: a new `NNNN-report.md`/`NNNN-ruling.md` whose
+# counterpart (same number, other suffix) is already on disk is a collision
+# -- refused, forcing the second writer to pick the next free number instead
+# of landing the fourth (0036, 0043, 0050, 0101) repeat of this shape.
+# ---------------------------------------------------------------------------
+
+def test_a_report_colliding_with_an_existing_ruling_of_the_same_number_is_REFUSED(tmp_path):
+    hook = _hook_repo(tmp_path)
+    (tmp_path / "docs" / "handoff").mkdir(parents=True)
+    (tmp_path / "docs" / "handoff" / "0101-ruling.md").write_text(
+        "x\n", encoding="utf-8")
+    _run_git(["add", "-A"], tmp_path)
+    _run_git(["commit", "-m", "land the ruling"], tmp_path)
+    _stage_new_handoff(tmp_path, name="0101-report.md")
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 2, r.stderr
+    assert "0101-report.md" in r.stderr
+    assert "0101-ruling.md" in r.stderr
+    assert "already taken" in r.stderr
+
+
+def test_a_ruling_colliding_with_an_existing_report_of_the_same_number_is_REFUSED(tmp_path):
+    hook = _hook_repo(tmp_path)
+    (tmp_path / "docs" / "handoff").mkdir(parents=True)
+    (tmp_path / "docs" / "handoff" / "0101-report.md").write_text(
+        "x\n", encoding="utf-8")
+    _run_git(["add", "-A"], tmp_path)
+    _run_git(["commit", "-m", "land the report"], tmp_path)
+    _stage_new_handoff(tmp_path, name="0101-ruling.md")
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 2, r.stderr
+    assert "0101-ruling.md" in r.stderr
+    assert "0101-report.md" in r.stderr
+
+
+def test_a_collision_against_an_ARCHIVED_counterpart_is_also_REFUSED(tmp_path):
+    """The numbering is shared across `docs/handoff/` and its `archive/`
+    (README.md protocol item 3: 'next free number ... archive included')."""
+    hook = _hook_repo(tmp_path)
+    (tmp_path / "docs" / "handoff" / "archive").mkdir(parents=True)
+    (tmp_path / "docs" / "handoff" / "archive" / "0050-ruling.md").write_text(
+        "x\n", encoding="utf-8")
+    _run_git(["add", "-A"], tmp_path)
+    _run_git(["commit", "-m", "archive it"], tmp_path)
+    _stage_new_handoff(tmp_path, name="0050-report.md")
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 2, r.stderr
+    assert "0050-report.md" in r.stderr
+
+
+def test_a_fresh_number_with_no_counterpart_is_ALLOWED(tmp_path):
+    hook = _hook_repo(tmp_path)
+    _stage_new_handoff(tmp_path, name="0104-report.md")
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 0, r.stderr
+
+
+def test_a_non_standard_handoff_NAME_is_not_checked_for_collision(tmp_path):
+    """Older, pre-channel-contract names (e.g. `0010-census-furnishings.md`)
+    don't fit the report/ruling split -- the collision check only applies to
+    the standard pair pattern, not every `docs/handoff/*.md` add."""
+    hook = _hook_repo(tmp_path)
+    _stage_new_handoff(tmp_path, name="0010-census-furnishings.md")
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 0, r.stderr
+
+
+# ---------------------------------------------------------------------------
+# 0107-ruling.md SS3: `tools/gate.py --docs` runs LIVE at push (it writes no
+# result file, so there is nothing to read) -- 0105 cut CI's docs job on the
+# claim the commit hook already covers it; it did not, and this closes that.
+# ---------------------------------------------------------------------------
+
+def test_a_GREEN_docs_lane_is_ALLOWED_at_push(tmp_path):
+    hook = _hook_repo(tmp_path)
+    _write_stub_gate(tmp_path, docs_ok=True)
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git push")
+    assert r.returncode == 0, r.stderr
+
+
+def test_a_RED_docs_lane_is_REFUSED_at_push(tmp_path):
+    hook = _hook_repo(tmp_path)
+    _write_stub_gate(tmp_path, docs_ok=False)
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git push")
+    assert r.returncode == 2, r.stderr
+    assert "--docs" in r.stderr
+    assert "Docs-Refs" in r.stderr           # the stub's own detail line
+
+
+def test_the_docs_lane_is_NOT_CHECKED_at_commit(tmp_path):
+    """Only push -- 0107-ruling.md SS3: 'At push, not commit -- the record is
+    what lands.' A RED docs lane must not block an ordinary commit."""
+    hook = _hook_repo(tmp_path)
+    _write_stub_gate(tmp_path, docs_ok=False)
+    _write_result(tmp_path, "GREEN", "full")
+    r = _invoke(hook, tmp_path, "git commit -m x")
+    assert r.returncode == 0, r.stderr
+
+
+def test_a_RED_docs_lane_and_a_RED_pytest_gate_produce_DIFFERENT_messages(tmp_path):
+    """0047-ruling.md SS4's own distinction, extended to the new check: a
+    RED docs lane is not the same failure as a RED pytest gate, and the two
+    must not read alike."""
+    hook = _hook_repo(tmp_path)
+    _write_stub_gate(tmp_path, docs_ok=False)
+    _write_result(tmp_path, "GREEN", "full")
+    docs_red = _invoke(hook, tmp_path, "git push")
+    _write_result(tmp_path, "RED", "full")
+    pytest_red = _invoke(hook, tmp_path, "git push")
+    assert docs_red.stderr != pytest_red.stderr
+    assert "--docs" in docs_red.stderr
+    assert "--docs" not in pytest_red.stderr

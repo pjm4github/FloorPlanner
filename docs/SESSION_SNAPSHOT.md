@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 52aa311 -->
+<!-- SNAPSHOT-HEAD: ecf91bd -->
 
 # Session snapshot — read this first
 
@@ -153,6 +153,20 @@ check.** [`0066-ruling.md`](handoff/0066-ruling.md) →
 findings neither ruling anticipated — see THE QUEUE item 8). Full detail
 there; not restated here beyond the pointer, per this file's own rule that
 an index does not summarise the thing it indexes.
+
+**THE WALL ID/COORDINATE FIX (`0098`–`0102`) IS BUILT, AMBER, BATCHED WITH
+PR #37's CHECK.** [`0103-ruling.md`](handoff/0103-ruling.md) accepted it,
+found and owned a real contradiction in `0100` (§5 vs §6 — now a standing
+rule: naming something as unblocking a person exempts it from its own
+read-back gate, stated in the same sentence), and answered the four
+remaining questions: centre-and-select (not select alone), a dead row is one
+whose id fails a fresh round-trip walk (not just `sip.isdeleted`), Coalesce's
+preview is its own item (RED, pending its own ruling), and the gaps dialog
+is dropped (`0100` §2 was wrong to call it the same treatment — a gap is a
+vertex pair, no wall id). **Owed now: the shared `WallRowList` widget
+(AMBER, tier 2) on both `wall-report-id-fix` (PR #39) and
+`wall-orthogonality-repair` (PR #37); the mailbox hook's duplicate-number
+check (GREEN, tier 3) is being built in this session.**
 
 ---
 
@@ -419,8 +433,8 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`52aa311`** at this file's cut. **[`0096-report.md`](handoff/0096-report.md) is the current status** — read that first: PR #37 (item C, `T` restored + the orthogonality post-condition, `0095-report.md`) is open and worth checking. The status-bar angle clause (`0092`-`0094`: both heading and deviation, suppressed on-intended-angle at the 15° `rotate_snap_deg` grid, a self-found and fixed tolerance bug) is BUILT, about to be committed on its own branch — a second AMBER PR, batched with #37's check per the rulings' own order. `0085`'s `CLAUDE.md` trim is GREEN, unblocked, still owed. Full trail: `handoff/README.md`'s pair table. |
-| **Branches** | **`wall-orthogonality-repair`** ([PR #37](https://github.com/pjm4github/FloorPlanner/pull/37), item C) — AMBER, open, worth checking. A second branch for `0092`-`0094` (the status-bar angle clause) about to be pushed, batched with #37's check. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
+| **`main`** | **`ecf91bd`** at this file's cut. **`0098`-`0107` (wall id/coordinate work, per-task progress files, the ON/DEEP CI measurement, the CI hazard fixes) are DONE** — full trail: `handoff/README.md`'s pair table. **`0108`-`0110` spec three new AMBER features** (all queued behind PR #37/#38, per `0111`): "Snap to Grid" (per-wall, manual, AMBER), "Snap to Grid Orthogonal" (the safer variant, build **first**), a disabled placeholder menu item for the 15°-angle case (GREEN, no arithmetic exists for it — `tan 15°` is irrational, proven in `0110` §3). **`0111`/`0112` order the close-out, IN PROGRESS**: mailbox landed, `0112`'s `plans.pdf` gitignore + delete just done — **next: bring `main` into `wall-report-id-fix`, `wall-orthogonality-repair` (PR #37) and `wall-label-angle-clause` (PR #38), re-gate each, push, then one check session in that order** (three branches need a check, not two — `wall-report-id-fix` needs one too, `0102`'s AMBER tier). Nothing else opens a branch until those three merge — `0072` §7's three-concurrent-AMBER-PRs bottleneck has rebuilt itself. **Numbering collisions, on the record:** `0036`, `0043`, `0050`, `0101`; neither renamed, numbering continues forward each time. |
+| **Branches** | **`wall-orthogonality-repair`** ([PR #37](https://github.com/pjm4github/FloorPlanner/pull/37), item C) — AMBER, open, **check UNBLOCKED, ready to run** (against `wiscaway2026-08-09R.json`). **`wall-report-id-fix`** ([PR #39](https://github.com/pjm4github/FloorPlanner/pull/39), the standalone report's own fix) — AMBER, open, ready. **`wall-label-angle-clause`** ([PR #38](https://github.com/pjm4github/FloorPlanner/pull/38), the angle clause) — AMBER, open, worth checking, unaffected. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **81 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |

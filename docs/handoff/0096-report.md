@@ -39,3 +39,5 @@ silently. Full suite 859 passed, `ruff` clean, gate GREEN.
 > bar must say nothing about its angle.
 
 Branch: `wall-label-angle-clause`.
+[PR #38](https://github.com/pjm4github/FloorPlanner/pull/38) opened against
+`main`, AMBER, batched with PR #37's check.
