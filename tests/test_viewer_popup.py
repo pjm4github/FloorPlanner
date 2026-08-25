@@ -204,9 +204,12 @@ def test_the_qml_document_ships_beside_the_module():
     p = Path(fp3dq.QML_PATH)
     assert p.is_file() and p.name == "scene.qml"
     assert "View3D" in p.read_text(encoding="utf-8")
-    # read as TEXT, not via tomllib: this project supports py3.10, where
-    # tomllib does not exist (caught by CI's 3.10 leg, not by the 3.13 box
-    # it was written on -- which is exactly what that leg is for)
+    # read as TEXT, not via tomllib: written when this project supported
+    # py3.10, where tomllib does not exist. CI's 3.10 leg is cut and
+    # requires-python is now >=3.13 (0105-ruling.md sec5), so tomllib would
+    # work today -- left as text rather than switched, since nothing here
+    # needs the parse and a plain substring check is one less thing to get
+    # wrong.
     root = Path(__file__).resolve().parent.parent
     toml = (root / "pyproject.toml").read_text(encoding="utf-8")
     line = next((ln for ln in toml.splitlines()

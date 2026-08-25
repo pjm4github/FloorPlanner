@@ -28,6 +28,19 @@ jobs:
   docs:
     name: records (gate --docs)
     runs-on: ubuntu-latest
+    # CUT (disabled, not deleted) -- 0105-ruling.md sec5: one agent on one
+    # machine, and the commit hook already refuses a commit or push whose
+    # gate result is not fresh and GREEN, so this job's usual purpose --
+    # catching what a contributor forgot to run -- has no contributor left
+    # to catch. Its own failure record was git-topology noise wearing a CI
+    # job's clothes (0042-ruling.md), never a defect the local gate missed.
+    # NOTE, not covered by the fix: `--docs`-specific checks (defect front
+    # matter, the generated index, cross-references, the migration dry run)
+    # are NOT part of `tools/gate.py`'s bare/full-mode run, so cutting this
+    # job means nothing currently runs them anywhere, local or CI -- flagged
+    # in 0106-report.md, not re-decided here (0105 sec6: "a change to the
+    # judge ... ruled here and not decided by Code").
+    if: false
     # No app dependencies: every check in this lane reads FILES -- defect front
     # matter, the generated index, cross-references, and the gh commands the
     # migration would emit. It needs no Qt, no display and no pytest, so it is
@@ -57,22 +70,50 @@ jobs:
       - run: python tools/gate.py --docs
 
   test:
-    name: pytest (py${{ matrix.python-version }})
+    # THE ONE SURVIVING pytest JOB -- 0105-ruling.md sec5: with one agent on
+    # one machine, CI's remaining value is not catching what a contributor
+    # forgot to run (there is no contributor); it is being the one run that
+    # starts from a clean checkout and cannot be bypassed by
+    # `--no-verify` on the machine it is checking (sec4). So it now runs the
+    # SAME full gate the commit/push hook requires locally -- OFF, ON and
+    # DEEP in one call -- rather than reimplementing a subset of it, which
+    # also makes the old `deep` job (below, cut) redundant.
+    #
+    # ONE VERSION, NO MATRIX -- 0107-ruling.md sec5: the first shape of this
+    # cut kept `python-version: ["3.10", "3.13"]` with every step guarded by
+    # `if: matrix.python-version == '3.13'`, "disabled, not deleted" applied
+    # to a matrix leg. That produced a job that spins up a runner, skips
+    # every step, and reports SUCCESS having tested nothing -- the exact
+    # silent-pass shape this project keeps catching, and `pyproject.toml`
+    # already says `>=3.13`, so 3.10 was not even a claim left to protect.
+    # Simplified to one hard-coded version instead.
+    #
+    # THE GOTCHA STAYS DOCUMENTED even though the scaffolding it explains is
+    # gone: a JOB-level `if:` cannot read `matrix` context here -- tried
+    # first, and it failed the whole workflow file at PARSE TIME (zero jobs
+    # ran, no logs) on the commit that first cut CI. A STEP-level `if:` can.
+    # If a matrix ever comes back to this job, that is the fact to remember.
+    #
+    # DEEP RUNS HERE ONLY, NOT ON A DEVELOPER'S PUSH -- 0107-ruling.md sec4:
+    # `tools/gate.py`'s bare/full mode now runs OFF+ON locally and adds DEEP
+    # only when `CI=true` (GitHub Actions sets it on every job), because this
+    # is the one run measured (0106-report.md) to be un-bypassable. **IF THIS
+    # JOB IS EVER CUT, DEEP RUNS NOWHERE -- reverse 0107 sec4 first.**
+    name: pytest (py3.13, full gate)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # 3.10 is the floor declared in pyproject.toml; 3.13 is what we develop on
-        python-version: ["3.10", "3.13"]
     env:
       # the suite is headless; conftest also sets this, but be explicit for CI
       QT_QPA_PLATFORM: offscreen
     steps:
       - uses: actions/checkout@v5
+        with:
+          # full mode's snapshot-staleness check needs HEAD~1 -- same fix,
+          # same reason as the (cut) `docs` and `deep` jobs' own comments.
+          fetch-depth: 0
 
       - uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.13"
           cache: pip
           cache-dependency-path: requirements-dev.txt
 
@@ -93,23 +134,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Run tests
-        # exclude perf: timing-ratio scaling tests flap on shared runners; they
-        # are a local gate (P0.6, P3.8). Deterministic slow tests still run.
-        run: python -m pytest -ra -m "not perf"
-
-      - name: Run tests with --verify-design (P1.6 shadow mode)
-        # THE Phase 1 gate: the same suite, with the v5 Design rebuilt and
-        # checked against the invariants at every quiescent point. Anything that
-        # fires here is a real bug in the current code, not a bridge artefact.
-        env:
-          FP_VERIFY_DESIGN: "1"
-        run: python -m pytest -ra -m "not perf"
+      - name: Full gate (ruff + OFF + ON + DEEP + snapshot check)
+        # CALLS THE LOCAL GATE, rather than reimplementing it -- same
+        # reasoning as the (cut) `deep` job's own comment: two
+        # implementations of a gate are two things that can drift. DEEP runs
+        # here because `CI=true` -- see the job comment above.
+        run: python tools/gate.py
 
       - name: Validate v5 design corpus
-        # independent of the suite: the schema + invariant validator must accept
-        # every clean floorplanner-design example (planc1.v5.json is the
-        # intentionally-corrupt fixture, so it is not validated here)
+        # independent of the suite, and not part of tools/gate.py: the schema
+        # + invariant validator must accept every clean floorplanner-design
+        # example (planc1.v5.json is the intentionally-corrupt fixture, so it
+        # is not validated here)
         run: |
           python tools/validate_design.py examples/symmetricP1.json
           python tools/validate_design.py examples/site_demo.json
@@ -117,6 +153,15 @@ jobs:
   windows:
     name: pytest (windows)
     runs-on: windows-latest
+    # CUT (disabled, not deleted) -- 0105-ruling.md sec1/sec5: this job's
+    # premise ("CI doesn't test the platform we run on") does not hold --
+    # this IS Patrick's own machine's configuration (py3.13, Windows), which
+    # is exactly what duplicates the local gate rather than covering
+    # something it misses. Its one real value, a genuine Windows-only fault
+    # (0064-report.md sec4's cp1252 console crash), is a real asymmetry, but
+    # sec3/sec4's argument -- one agent, one machine, nothing to catch that
+    # a clean-checkout run does not already catch locally -- still applies.
+    if: false
     # DEFECT 27'S SECOND HALF. The deep half closed at 65c4c02; this is the
     # other one -- every job above is `ubuntu-latest`, and **Windows is this
     # project's primary development and use platform**. The register's own
@@ -161,6 +206,16 @@ jobs:
         run: python -m pytest -ra -m "not perf"
 
   deep:
+    # CUT (disabled, not deleted) -- 0105-ruling.md sec5: redundant now, not
+    # wrong -- the surviving `test` job (py3.13) calls the bare full gate,
+    # which runs OFF, ON and DEEP together (the same three passes this job
+    # ran alone), so a separate deep-only job re-tests what that job already
+    # covers. 267 CI runs measured (2026-07-20, when this workflow began,
+    # through today): this job went RED 37 times and every one was
+    # `Docs-Snapshot: RED` with `Gate-DEEP` itself reporting OK -- zero
+    # instances of DEEP catching an invariant fault OFF/ON did not already
+    # report. Full receipt: 0106-report.md.
+    if: false
     # DEFECT 27, FIRST HALF (P3.8). Until now CI ran only the CHEAP TWELVE
     # invariants (FP_VERIFY_DESIGN=1), so I5b, I11 and I14 -- the O(n^2) three,
     # and the two that caught the real corruption in planc1.json -- were guarded
