@@ -18,12 +18,16 @@ reads THE RESULT FILE and never the commit message. A message can say anything;
 `.gate-result.json` is written by `tools/gate.py` itself, at the end of a
 full-mode run, from the numbers it just computed.
 
-Four conditions, and the fourth is new (0043/0047-ruling.md SS4):
+Five conditions, the fourth from 0043/0047-ruling.md SS4 and the fifth from
+0107-ruling.md SS3:
 
   1. `.gate-result.json` EXISTS          -- you ran the gate at all
   2. its verdict is GREEN                -- and it passed
   3. it is NEWER THAN EVERY TRACKED FILE -- and it passed on THIS tree
   4. its MODE IS STRONG ENOUGH FOR THE EVENT -- see the split below
+  5. AT PUSH, `tools/gate.py --docs` IS RUN LIVE AND MUST BE GREEN -- see
+     the docs-lane note below; unlike (1)-(4) this one is not read from a
+     result file, because `--docs` writes none
 
 Without (3) the hook is theatre: a green result from an hour and six edits ago
 would wave through exactly the fourth incident. It is also the condition most
@@ -33,16 +37,21 @@ tests it explicitly by touching a source file and retrying.
 THE COMMIT/PUSH SPLIT. `python tools/gate.py --quick` (ruff + OFF only, ~25s)
 now writes `.gate-result.json` too, tagged `"mode": "quick"` -- see that
 script's own docstring. A `git commit` accepts either mode, GREEN and fresh; a
-`git push` accepts `mode == "full"` only. **Nothing that reaches `origin`, CI
-or a PR is gated on anything less than the full 3x-suite run** -- the bar
-moved from every commit to every push, not down. What changes is which of the
-twenty private, never-pushed intermediate commits a session splits a change
-into has to pay the full 3x tax individually; none of them do anymore, and the
-one commit that actually leaves the machine still does. `WORKING_AGREEMENT.md`
-(amended 2026-08-10) already said gating every commit was wrong for exactly
-this shape -- a series split for legibility, where the intermediate trees
-never existed as anything a reviewer or CI would see -- and the hook had not
-caught up to the amendment until now.
+`git push` accepts `mode == "full"` only, PLUS the live `--docs` run at (5)
+below. **Full mode itself is OFF+ON locally, OFF+ON+DEEP under CI**
+(0107-ruling.md SS4 -- `gate.py`'s own docstring carries the full reasoning;
+measured first, 0106-report.md, that DEEP has never once diverged from ON in
+this project's recorded CI history). The bar moved from every commit to every
+push, not down, and DEEP did not vanish -- it moved from the developer's own
+push to the one run (CI, from a clean checkout) that cannot be bypassed by
+`--no-verify` on the machine being checked. What changes for a session
+splitting a change into private, never-pushed intermediate commits is that
+none of them pay any of this tax; the one commit that actually leaves the
+machine still pays it in full. `WORKING_AGREEMENT.md` (amended 2026-08-10)
+already said gating every commit was wrong for exactly this shape -- a series
+split for legibility, where the intermediate trees never existed as anything
+a reviewer or CI would see -- and the hook had not caught up to the amendment
+until now.
 
 Exit codes: 0 lets the command through, 2 blocks it and shows stderr to the
 model. Any other failure mode here (unreadable JSON, no git) also blocks, on the
@@ -357,6 +366,38 @@ def main():
               f"         {shown}{more}\n"
               f"         A green gate for an earlier tree is not a green gate "
               f"for this one.\n         Re-run `{GATE_CMD}`, then {event}.")
+
+    # (5) THE DOCS LANE, AT PUSH ONLY -- 0107-ruling.md SS3. `0105-ruling.md`
+    # cut CI's `records (gate --docs)` job on the claim "the commit hook
+    # enforces it" -- IT DOES NOT: `--docs` is an early, mutually exclusive
+    # return in `gate.py`'s `main()` (`if "--docs" in sys.argv: return
+    # _docs()`), never reached by a bare, `--quick` or full-mode run, and it
+    # writes no result file for this hook to have read. That gap cost seven
+    # real catches (0106-report.md SS1: `Docs-Refs` unresolved cross-references
+    # fired in 7 of the 47 CI failures measured, the one class the rest of the
+    # gate never runs).
+    #
+    # THE FIX IS TO RUN IT, not to teach it to write `.gate-result.json` -- a
+    # second result file the hook could read is a second source of truth, the
+    # exact shape this hook's own docstring exists to prevent. So this is the
+    # one place in this file that executes a check live rather than reading
+    # one that already ran, and only at PUSH: the record is what lands there
+    # (0047-ruling.md's strict bar already sits at push, not commit), and the
+    # docs lane is cheap enough (`ci.yml`'s own former comment: "finishes in
+    # seconds") that paying it once per push is not the tax full-mode pytest
+    # would be.
+    if event == "push":
+        result = subprocess.run(
+            [sys.executable, "tools/gate.py", "--docs"], cwd=ROOT,
+            capture_output=True, text=True)
+        if result.returncode != 0:
+            lines = [ln for ln in result.stdout.splitlines()
+                     if ln.startswith(("Docs-", "Ref-")) or ln.strip()]
+            detail = ("\n         " + "\n         ".join(lines[-12:])) \
+                if lines else ""
+            block(f"`python tools/gate.py --docs` is RED.{detail}\n"
+                  "         Fix it, then push -- this runs fresh on every "
+                  "push attempt, no result file to re-check.")
 
     sys.exit(0)
 
