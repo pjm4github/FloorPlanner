@@ -38,3 +38,7 @@ _to_delete/
 # about ONE working tree at ONE moment -- committing it would make a stale
 # verdict travel to other machines as though it were current.
 .gate-result.json
+
+# fp2pdf's CLI defaults --out to "plans.pdf" relative to the cwd, so a hand-run
+# from inside the checkout drops one here. Never a source file.
+plans.pdf

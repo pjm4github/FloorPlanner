@@ -31,10 +31,11 @@ reconcile. An unreconciled sum is a defect (a test counted twice, as
 `test_a_clipped_band_leaves_every_room_coherent` was under `deep`), not a
 rounding difference, so it is treated as red.
 
-    python tools/gate.py            # ruff + OFF + ON + DEEP -- unlocks a PUSH
+    python tools/gate.py            # ruff + OFF + ON (+ DEEP when CI=true) --
+                                    # unlocks a PUSH; see 0107-ruling.md SS4
     python tools/gate.py --quick    # ruff + OFF only -- unlocks a COMMIT, not a push
-    python tools/gate.py --deep     # ruff + DEEP only -- what CI's deep job runs;
-                                    # writes no result, unlocks neither event
+    python tools/gate.py --deep     # ruff + DEEP only, standalone -- writes no
+                                    # result, unlocks neither event
     python tools/gate.py --perf     # the timing lane, explicitly (P3.8)
     python tools/gate.py --docs     # the record lane: defect front matter,
                                     # the generated index, every defect
@@ -46,10 +47,22 @@ rounding difference, so it is treated as red.
 THE COMMIT/PUSH SPLIT (0043/0047-ruling.md SS4): `.gate-result.json` now
 carries a `"mode"` field, `"quick"` or `"full"`. `.claude/hooks/verify_gate.py`
 accepts either mode, GREEN and fresh, to unlock a `git commit`; a `git push`
-requires `mode == "full"` specifically. The strength moved, not shrank: what
-still needs a full 3x-suite run before it can reach `origin`, CI or a PR is
-unchanged -- only the twenty private, never-pushed intermediate commits a
-series gets split into stop paying that tax individually.
+requires `mode == "full"` specifically -- and, separately, runs `--docs` LIVE
+at push time (0107-ruling.md SS3; `--docs` writes no result file, so there is
+nothing for the hook to read here). The private, never-pushed intermediate
+commits a series gets split into stop paying the full-suite tax individually;
+the one commit that actually leaves the machine still does.
+
+FULL MODE IS OFF+ON LOCALLY, OFF+ON+DEEP UNDER CI (0107-ruling.md SS4,
+reversing 0105-ruling.md's original "DEEP job cut, no replacement" -- measured
+first: 0106-report.md found zero CI runs, out of the project's complete
+history, where DEEP caught a fault OFF/ON did not). `os.environ["CI"]`
+(GitHub Actions' own convention) is what decides, not a flag -- so the exact
+same command, `python tools/gate.py`, means two different things depending on
+where it runs, and that asymmetry is deliberate: DEEP stays real coverage, on
+the one run (CI, from a clean checkout) that cannot be bypassed by
+`--no-verify` on the machine being checked, without taxing every local push
+for a divergence that has not yet happened once.
 
 THE DOCS LANE IS ITS OWN LANE, like `--perf`, and deliberately NOT part of the
 default block. The trailer above is pasted verbatim into commit messages, so its
@@ -58,11 +71,15 @@ that branch's own trailers incomparable, which is the census-discrepancy class
 this tool exists to prevent. `--docs` prints its own verdict, quoted beside the
 full-mode trailer rather than inside it.
 
-CI CALLS THIS TOOL RATHER THAN REIMPLEMENTING IT (defect 27, P3.8). The DEEP
-job runs `--deep`, so the invariant set, the perf exclusion and the census
-reconciliation are defined ONCE. Two implementations of a gate are two things
-that can drift, and this project has already paid for that once (F2's disease,
-P3.4 point 1).
+CI CALLS THIS TOOL RATHER THAN REIMPLEMENTING IT (defect 27, P3.8). The
+surviving job runs the SAME bare invocation the commit/push hook requires
+locally (`python tools/gate.py`, no flag), so the invariant set, the perf
+exclusion and the census reconciliation stay defined ONCE -- CI's `CI=true`
+is what additionally unlocks its DEEP pass, not a separate `--deep` job
+calling a separate mode (that job is cut, 0105-ruling.md SS5; `--deep`
+standalone still exists as a manual diagnostic, but nothing automated calls
+it). Two implementations of a gate are two things that can drift, and this
+project has already paid for that once (F2's disease, P3.4 point 1).
 """
 import os
 import re
@@ -91,6 +108,27 @@ GATES = [
     ("ON  ", {"FP_VERIFY_DESIGN": "1"}, ["-m", "not perf"]),
     ("DEEP", {"FP_VERIFY_DESIGN": "deep"}, ["-m", "not perf"]),
 ]
+
+
+def _select_modes(quick, deep_only, in_ci):
+    """Which of `GATES` a run performs -- pulled out of `main()` so it is a
+    plain function of three booleans, testable without spawning pytest.
+
+    DEEP RUNS UNDER CI ONLY -- 0107-ruling.md SS4. Measured (0106-report.md)
+    across all recorded CI history: zero instances of DEEP going RED on a
+    real fault while OFF/ON were GREEN. The surviving CI job (0105-ruling.md
+    SS5) runs the exact same bare invocation from a clean checkout it cannot
+    bypass, so DEEP still runs on every push -- just not on the developer's
+    own machine, where it cost ~50s for a check that has never yet diverged
+    from ON. `in_ci` is meant to be `os.environ.get("CI") == "true"`, GitHub
+    Actions' own convention (set on every job, not invented here).
+    **IF THAT CI JOB IS EVER CUT, DEEP RUNS NOWHERE AND THIS REVERSES** --
+    see its own comment in `ci.yml` beside the job."""
+    if quick:
+        return GATES[:1]
+    if deep_only:
+        return GATES[2:3]
+    return GATES if in_ci else GATES[:2]
 
 
 def _run(args, env_extra=None):
@@ -433,10 +471,13 @@ def snapshot_verdict(text: str, tips):
 def _docs() -> int:
     """The record lane: are the defect records well-formed and reachable?
 
-    Three tools, each already the single definition of its own question, run in
-    the order that makes a failure readable: the records themselves first (a
-    malformed record makes everything downstream meaningless), then whether the
-    repo's references still find them, then whether they would still migrate.
+    Each check is already the single definition of its own question, run in
+    the order that makes a failure readable: the defect records themselves
+    first (a malformed record makes everything downstream meaningless), then
+    the per-task progress index (0104-ruling.md SS5 tier 1 -- generated, same
+    as the defect index, so it cannot drift from the files it lists), then
+    whether the repo's references still find them, then whether they would
+    still migrate.
 
     Every check here is on DATA, not behaviour, so it costs no test run and can
     be invoked on its own while editing records.
@@ -444,6 +485,7 @@ def _docs() -> int:
     checks = [
         ("Docs-Defects", ["tools/defects_index.py", "--validate"]),
         ("Docs-Index", ["tools/defects_index.py", "--check"]),
+        ("Docs-Progress", ["tools/progress_index.py", "--check"]),
         ("Docs-Refs", ["tools/ref_audit.py", "--strict-ids"]),
         ("Docs-GitHub", ["tools/defects_to_github.py", "--dry-run"]),
     ]
@@ -462,8 +504,8 @@ def _docs() -> int:
         for ln in keep[:12 if rc else 4]:
             print(ln)
     note = "" if bad else (f" (snapshot {snap_field}, records valid, index "
-                           "current, every defect reference resolves, "
-                           "migration dry run clean)")
+                           "current, progress index current, every defect "
+                           "reference resolves, migration dry run clean)")
     print(f"Docs-Verdict: {'RED' if bad else 'GREEN'}{note}")
     return 1 if bad else 0
 
@@ -593,7 +635,7 @@ def main() -> int:
               "-- use set_end_vertex / relocated_to):")
         for h in ends:
             print(f"    {h}")
-    modes = GATES[:1] if quick else (GATES[2:3] if deep_only else GATES)
+    modes = _select_modes(quick, deep_only, os.environ.get("CI") == "true")
     for label, env, extra in modes:
         grc, gout = _run(["pytest", "-q", "-p", "no:randomly", *extra], env)
         summary = _summary(gout)

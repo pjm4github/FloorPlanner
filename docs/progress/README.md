@@ -28,6 +28,7 @@ and compared byte-for-byte against the plan's blob before the move — identical
 | [`side-tasks.md`](side-tasks.md) | — | — | 2026-08-06 → | work belonging to no phase |
 | [`phase-5.md`](phase-5.md) | — | — | 2026-08-11 → | P5.2 · P5.2-followup · P5.2-complete |
 | [`furnishings.md`](furnishings.md) | — | — | 2026-08-13 → | prism |
+| [`tasks/`](tasks/) | — | — | 2026-08-24 → | new entries, one file per task — see below |
 
 **`phase-5.md` was opened on 2026‑08‑12, a day after its first entry's work
 merged**, and its header says so. P5.2 shipped at PR #26 with a defect record and
@@ -115,14 +116,22 @@ migrate to a tracker without transcription" — the first two clauses are exactl
 this finding, one directory over, and they were written before anything had
 measured it. Now something has.
 
-The shape would be `progress/tasks/<task>.md` with `README.md` generated from
-them, mirroring `defects/INDEX.md`: one writer per file, no shared tail, and the
-index derived rather than maintained.
+**DONE — [`0104-ruling.md`](../handoff/0104-ruling.md) SS5 tier 1, named as the
+blocker on running agents in parallel.** [`tasks/`](tasks/) is the new
+destination: one file per task, `YYYY-MM-DD-<slug>.md`, and
+[`tasks/INDEX.md`](tasks/INDEX.md) is *generated* from them by
+`tools/progress_index.py` (mirroring `defects/INDEX.md`; wired into
+`tools/gate.py --docs` as `Docs-Progress`) — one writer per file, no shared
+tail, the index derived rather than maintained. **Write new entries there,
+not here.**
 
-**Not done now, deliberately.** With one agent working one branch at a time the
-conflict is two minutes of hand-merging per batch, and the log's readability as
-a single narrative is worth more than that. This is a **precondition on
-concurrency, not a debt**: the day two agents run at once, this changes first.
+**The files above are NOT migrated, and that is deliberate, not partial
+work.** They are frozen narrative — nothing has appended to any of them since
+2026-08-17 — so re-splitting settled history into per-task files would carry
+all the risk of a large mechanical move (matching the split's own
+byte-for-byte discipline) for a conflict that history, being finished, can no
+longer have. The day-two-agents problem this section measured is about WHERE
+THE NEXT ENTRY LANDS, and that is solved by `tasks/` existing at all.
 
 ## Conventions
 
@@ -137,4 +146,8 @@ genres and different readers, so they are linked rather than merged.
 **The log lives inside a code fence**, as it always has, so its column-aligned
 `ruff:` / `pytest:` / `files:` / `notes:` fields render as written. Each file
 reopens the fence and closes it at the end; a fence cannot be split across
-files, and that is the only formatting a split file adds.
+files, and that is the only formatting a split file adds. **This still applies
+inside the body of a [`tasks/`](tasks/) entry** — only the file's first two
+lines (title, then the `**date**, branch \`…\`.` meta line
+`tools/progress_index.py` parses) are new; the prose and fenced fields below
+them follow the same conventions as always.
