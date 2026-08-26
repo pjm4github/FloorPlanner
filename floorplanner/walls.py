@@ -1731,6 +1731,22 @@ class WallItem(QGraphicsItem):
         along the wall axis (pulling a corner away opens that side)."""
         return True
 
+    def _hit_endpoint(self, scene_pos):
+        """"p1" / "p2" / `None` -- which end (if either) `scene_pos` is
+        close enough to for an endpoint-targeted action, using the SAME
+        catch radius `mousePressEvent` picks its drag mode with. Factored
+        out so `contextMenuEvent`'s "Snap to Grid Orthogonal" (0110-ruling.md
+        SS2) can reuse the identical hit test rather than inventing a
+        second one -- the ruling's own words."""
+        tol = max(12.0, 20.0 / self._view_scale())
+        ep_tol = min(tol, self.length() / 3.0)
+        ends = self._ends_editable()       # endpoints locked while in a room
+        if ends and QLineF(scene_pos, self.p1).length() <= ep_tol:
+            return "p1"
+        if ends and QLineF(scene_pos, self.p2).length() <= ep_tol:
+            return "p2"
+        return None
+
     def mousePressEvent(self, e):
         if self.group() is not None:
             # grouped: let the group own the drag.  Running the wall-slide
@@ -1748,11 +1764,9 @@ class WallItem(QGraphicsItem):
         # in) so the little end-knob is easy to grab without missing -- but
         # never more than a third of the wall, so a SHORT wall keeps a grabbable
         # middle to body-slide perpendicular (else the end zones cover it all)
-        tol = max(12.0, 20.0 / self._view_scale())
-        ep_tol = min(tol, self.length() / 3.0)
-        ends = self._ends_editable()       # endpoints locked while in a room
-        near_p1 = ends and QLineF(sp, self.p1).length() <= ep_tol
-        near_p2 = ends and QLineF(sp, self.p2).length() <= ep_tol
+        hit = self._hit_endpoint(sp)
+        near_p1 = hit == "p1"
+        near_p2 = hit == "p2"
         ctrl = bool(e.modifiers() & Qt.KeyboardModifier.ControlModifier)
         if ctrl and not (near_p1 or near_p2):
             # Ctrl+click on the body toggles selection-set membership; Ctrl on
@@ -2452,6 +2466,29 @@ class WallItem(QGraphicsItem):
     def contextMenuEvent(self, e):
         from floorplanner.rooms import detach_wall_from_room  # late (cycle)
         menu = QMenu()
+        # SNAP TO GRID ORTHOGONAL (0110-ruling.md, built first of the two
+        # snap actions SS5 orders -- the safer variant). The anchor is
+        # WHICHEVER END THE CLICK LANDED NEAR, `_hit_endpoint` reusing
+        # `mousePressEvent`'s own hit test rather than a second one. Always
+        # shown, only enabled with an anchor -- a stable menu shape reads
+        # better than one that reflows by click position.
+        hit_end = self._hit_endpoint(e.scenePos())
+        a_snap_ortho = menu.addAction("Snap to Grid Orthogonal")
+        a_snap_ortho.setEnabled(hit_end is not None)
+        if hit_end is None:
+            a_snap_ortho.setToolTip("Right-click near one end to choose it "
+                                    "as the anchor.")
+        # THE 15-DEGREE PLACEHOLDER (0110-ruling.md SS4/SS5 tier 3): DISABLED,
+        # not silent -- a menu item that does nothing when clicked is a
+        # defect, so it exists and says why it cannot be clicked. No
+        # arithmetic exists for it (SS3: `tan 15deg` is irrational, so no
+        # wall at 15 degrees can have both ends on any grid, at any length).
+        a_snap_15 = menu.addAction("Snap to 15deg grid…")
+        a_snap_15.setEnabled(False)
+        a_snap_15.setToolTip("Not yet specified -- a wall at 15 degrees "
+                             "cannot have both ends on the grid; see "
+                             "0110-ruling.md SS3.")
+        menu.addSeparator()
         # SETTABLE WALL TYPES (Phase 5). The seven the document already knows,
         # not the two this menu used to offer -- `wall.type` has carried the
         # landscape types since P0.7 and nothing could set them. Labels carry
@@ -2475,7 +2512,9 @@ class WallItem(QGraphicsItem):
             e.accept()
             return
         sc = self.scene()
-        if chosen in a_types:
+        if chosen is a_snap_ortho and hit_end is not None:
+            self._snap_to_grid_orthogonal(hit_end)
+        elif chosen in a_types:
             self.wall_type = a_types[chosen]
             self.rebuild()
         elif a_detach is not None and chosen is a_detach and sc is not None:
@@ -2484,6 +2523,73 @@ class WallItem(QGraphicsItem):
         elif chosen is a_del and sc is not None:
             delete_wall(sc, self)   # room survives via its outline; edge opens
         e.accept()
+
+    def _snap_to_grid_orthogonal(self, which):
+        """0110-ruling.md SS2: make THIS wall exactly axis-aligned AND both
+        ends land on the alignment grid, anchored at `which` ("p1" / "p2",
+        whichever end the context menu was opened near).
+
+        Walks the scene into a document (the same `report=` seam
+        0101-ruling.md named), resolves this `WallItem` to its document id
+        via the out-param map, and the CLICKED end to 'v1'/'v2' by nearest
+        SCENE POSITION rather than trusting any p1/p2-to-v1/v2 label
+        convention -- the bridge's own v1/v2 assignment is not guaranteed to
+        preserve scene orientation across a merge or split.
+
+        Refuses (nothing applied, status line says why) or applies via
+        `close_gap` -- the SAME identity-carrying relocation primitive the
+        batch repair uses, so a shared corner's other walls and any room
+        outline holding it follow by construction (P3.1) -- one call per
+        vertex, both folded into the one undo step the app's own debounced
+        commit already gives a single scene mutation."""
+        from floorplanner.design.bridge import design_from_scene  # late (cycle)
+        from floorplanner.design.validate import snap_wall_to_grid_orthogonal
+        sc = self.scene()
+        win = sc.parent() if sc is not None else None
+        if win is None or not hasattr(win, "status"):
+            return
+        import warnings
+        rep = {}
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            doc = design_from_scene(win, report=rep).to_dict()
+        wall_items = rep.get("wall_items", {})
+        wall_id = next((k for k, v in wall_items.items() if v is self), None)
+        w = next((x for x in doc["walls"] if x["id"] == wall_id), None)
+        if wall_id is None or w is None:
+            win.status("Could not identify this wall in the document -- "
+                      "nothing changed.")
+            return
+        V = {v["id"]: (v["x"], v["y"]) for v in doc["vertices"]}
+        clicked_pt = self.p1 if which == "p1" else self.p2
+        d1 = QLineF(clicked_pt, QPointF(*V[w["v1"]])).length()
+        d2 = QLineF(clicked_pt, QPointF(*V[w["v2"]])).length()
+        endpoint_attr = "v1" if d1 <= d2 else "v2"
+
+        res = snap_wall_to_grid_orthogonal(
+            doc, wall_id, endpoint_attr, SETTINGS["wall_snap_in"])
+        if res["refused"] is not None:
+            win.status(f"Snap to Grid Orthogonal refused ({res['refused']}) "
+                      f"-- nothing changed.")
+            return
+        if not res["relocations"]:
+            win.status("Already exactly orthogonal and on grid -- nothing "
+                      "to snap.")
+            return
+        levels = {lv["id"]: lv["name"] for lv in doc.get("levels", [])}
+        moved_desc = []
+        for lvl, old, new in res["relocations"]:
+            close_gap(sc, QPointF(*new), QPointF(*old),
+                     floor=levels.get(lvl, lvl), tol=1e-4)
+            moved_desc.append(
+                f"({fmt_ft2(old[0])}, {fmt_ft2(old[1])}) -> "
+                f"({fmt_ft2(new[0])}, {fmt_ft2(new[1])})ft")
+        msg = f"Snapped wall {wall_id} to grid, exactly orthogonal: " \
+              f"{', '.join(moved_desc)}."
+        if res["worsened"]:
+            msg += (f" Less aligned now: {', '.join(res['worsened'])} "
+                   f"-- unchanged, just worse; select and snap it next.")
+        win.status(msg)
 
 
 class OpeningItem(QGraphicsItem):

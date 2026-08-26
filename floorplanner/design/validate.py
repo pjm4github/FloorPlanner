@@ -961,3 +961,152 @@ def repair_wall_orthogonality(d, deep=True, t_in=REPAIR_T_IN):
     return {"doc": work, "moved": moved, "refused": refused,
             "over_t": over_t, "relocations": relocations,
             "rolled_back": False, "newly_failing": set()}
+
+
+# ---------------------------------------------------------------------------
+# "Snap to Grid Orthogonal" -- 0110-ruling.md SS2, amended by 0109-ruling.md
+# SS3. A per-wall, manual action (0108-ruling.md), NOT a use of
+# `repair_wall_orthogonality`: it makes the CLICKED endpoint's wall exactly
+# axis-aligned AND both ends land on the alignment grid, in one move,
+# anchored at the vertex the user clicked -- so "which endpoint moves"
+# (0079-report.md SS2(c)'s open question for item C) is answered by where
+# they click, not guessed.
+# ---------------------------------------------------------------------------
+
+SNAP_ORTHO_NEAR_45_DEG = 5.0
+"""0110-ruling.md SS2's "REFUSE when the wall is too near 45 -- there is no
+orthogonal value to share, and guessing one would rotate the wall 45
+degrees" names the HAZARD but not a number. This is a judgement call, not a
+ruled value: refuse when the wall's deviation from axis
+(`wall_angle_deviation_deg`, 0 = on axis, 45 = exact diagonal) is within
+this many degrees of 45, i.e. `deg > 45.0 - SNAP_ORTHO_NEAR_45_DEG`. Chosen
+by the same reasoning `REPAIR_NEAR_AXIS_DEG` used at the other end of the
+scale (a round, named band, not a tuned constant) -- flagged here for a
+future ruling to tighten or loosen if 5 degrees turns out wrong in
+practice."""
+
+
+def vertex_grid_error_in(x: float, y: float, step: float) -> float:
+    """Distance from `(x, y)` to the nearest grid intersection at `step` --
+    how far a corner sits off the alignment grid, in inches. `0` exactly on
+    grid on both axes."""
+    gx, gy = round(x / step) * step, round(y / step) * step
+    return math.hypot(x - gx, y - gy)
+
+
+def wall_grid_error_in(d, step: float) -> dict:
+    """`{wall_id: error_in}` -- each wall's WORSE of its two endpoints'
+    `vertex_grid_error_in`, for every wall with two resolvable vertices.
+    Companion measurement to `wall_orthogonality`'s per-wall degree, for the
+    same "did this wall get worse" comparison, applied to grid alignment
+    rather than axis alignment."""
+    V = {v["id"]: (v["x"], v["y"]) for v in d["vertices"]}
+    out = {}
+    for w in d["walls"]:
+        a, b = V.get(w["v1"]), V.get(w["v2"])
+        if a is None or b is None:
+            continue
+        out[w["id"]] = max(vertex_grid_error_in(*a, step),
+                           vertex_grid_error_in(*b, step))
+    return out
+
+
+def snap_wall_to_grid_orthogonal(d, wall_id, endpoint_attr, step):
+    """0110-ruling.md SS2, amended by 0109-ruling.md SS3.
+
+    The CLICKED vertex (`wall_id`'s `endpoint_attr`, `'v1'` or `'v2'`) snaps
+    to the nearest grid point on BOTH coordinates. The OTHER vertex takes
+    the clicked vertex's SHARED-AXIS coordinate -- the one that must match
+    for the wall to land exactly on axis, chosen by the wall's LARGER
+    original delta, the same test `wall_repair_conflict` uses -- and its own
+    free coordinate independently snaps to grid. Result: exactly
+    axis-aligned AND both ends on grid, in one move.
+
+    Moving a shared `Vertex` moves every other wall (and room outline) that
+    holds it, by construction (P3.1) -- correct, and not something this
+    function works around.
+
+    REFUSES, `d` returned byte-identical (nothing applied):
+      "near-45"           -- see `SNAP_ORTHO_NEAR_45_DEG`
+      "degenerate"        -- both ends would round to the same grid point
+      "would introduce X" -- `check()`'s invariant differential
+                              (0082-ruling.md SS4's stable key), the SAME
+                              interlock `repair_wall_orthogonality` uses --
+                              an opening running off its wall (I7) is caught
+                              HERE, not by a special case, and so is a
+                              degenerate NEIGHBOUR this function did not
+                              directly touch
+
+    REPORTS, does not refuse (0109-ruling.md SS3's amendment to
+    0108-ruling.md SS3's fourth refusal): every OTHER wall whose angle
+    deviation OR grid error gets worse. Named, not prevented -- "he is
+    cleaning a whole plan one wall at a time... a neighbour left temporarily
+    crooked is the next wall he selects, not a defect."
+
+    Returns a dict:
+      doc         -- the result (a deep copy of `d`, mutated), or `d` itself
+                     if refused
+      refused     -- `None`, or one of the reason strings above
+      relocations -- `[(level, (old_x, old_y), (new_x, new_y))]`, one entry
+                     per vertex that actually moved (0, 1 or 2) -- the same
+                     shape `repair_wall_orthogonality` returns, so the same
+                     scene applier (`close_gap`) serves both
+      worsened    -- sorted `[wall_id, ...]`, the OTHER walls the report
+                     names, empty when nothing got worse
+    """
+    import copy
+    work = copy.deepcopy(d)
+    before_keys = {_invariant_key(m) for m in check(d, deep=True)}
+    V = {v["id"]: v for v in work["vertices"]}
+    w = next(x for x in work["walls"] if x["id"] == wall_id)
+    other_attr = "v2" if endpoint_attr == "v1" else "v1"
+    clicked, other = V[w[endpoint_attr]], V[w[other_attr]]
+    ax, ay = clicked["x"], clicked["y"]
+    bx, by = other["x"], other["y"]
+
+    deg = wall_angle_deviation_deg((ax, ay), (bx, by))
+    if deg > 45.0 - SNAP_ORTHO_NEAR_45_DEG:
+        return {"doc": d, "refused": "near-45", "relocations": [], "worsened": []}
+
+    dx, dy = bx - ax, by - ay
+    moving_y = abs(dy) <= abs(dx)          # near-horizontal: shared coord is y
+    new_ax, new_ay = round(ax / step) * step, round(ay / step) * step
+    if moving_y:
+        new_bx, new_by = round(bx / step) * step, new_ay
+    else:
+        new_bx, new_by = new_ax, round(by / step) * step
+
+    if (new_ax, new_ay) == (new_bx, new_by):
+        return {"doc": d, "refused": "degenerate", "relocations": [],
+                "worsened": []}
+
+    orig_deg = {wid: dg for wid, _lvl, _typ, dg, _disp in wall_orthogonality(work)}
+    orig_grid = wall_grid_error_in(work, step)
+    orig_clicked_xy, orig_other_xy = (ax, ay), (bx, by)
+
+    clicked["x"], clicked["y"] = new_ax, new_ay
+    other["x"], other["y"] = new_bx, new_by
+
+    after_keys = {_invariant_key(m) for m in check(work, deep=True)}
+    newly = after_keys - before_keys
+    if newly:
+        return {"doc": d, "refused": f"would introduce {sorted(newly)[0][0]}",
+                "relocations": [], "worsened": []}
+
+    new_deg = {wid: dg for wid, _lvl, _typ, dg, _disp in wall_orthogonality(work)}
+    new_grid = wall_grid_error_in(work, step)
+    worsened = sorted({
+        wid for wid in new_deg
+        if new_deg[wid] > orig_deg.get(wid, 0.0) + 1e-6
+        or new_grid.get(wid, 0.0) > orig_grid.get(wid, 0.0) + 1e-6})
+
+    relocations = []
+    if (clicked["x"], clicked["y"]) != orig_clicked_xy:
+        relocations.append((clicked["level"], orig_clicked_xy,
+                            (clicked["x"], clicked["y"])))
+    if (other["x"], other["y"]) != orig_other_xy:
+        relocations.append((other["level"], orig_other_xy,
+                            (other["x"], other["y"])))
+
+    return {"doc": work, "refused": None, "relocations": relocations,
+            "worsened": worsened}
