@@ -83,6 +83,59 @@ class GapReviewDialog(QDialog):
         self.refresh()
 
 
+class WallRowList(QListWidget):
+    """Shared row widget for wall lists across the orthogonality report and
+    repair preview (0100-ruling.md SS3(a)(b), answered by 0103-ruling.md SS3):
+    clicking a row centres the view on that wall and selects it -- "so I can
+    find them" needs more than selection alone, since a wall off-screen is
+    invisible either way, and this app had exactly one prior `centerOn`
+    (startup) to set precedent from neither direction.
+
+    A dead row -- including a MERGED wall, where the Qt object survives but
+    its id no longer names anything -- goes grey in place, reads "no longer
+    present", and stops accepting clicks. THE TEST IS THE ROUND TRIP: a wall
+    id that does not come back from a FRESH `design_from_scene()` walk is
+    dead, whatever `sip.isdeleted` thinks of the pointer -- that guard alone
+    misses exactly the merged case."""
+
+    def __init__(self, win, parent=None):
+        super().__init__(parent)
+        self.win = win
+        self.itemClicked.connect(self._on_click)
+
+    def add_row(self, wall_id, text):
+        """Append a row naming `wall_id` (the document/canonical id) with
+        `text` as its label; returns the QListWidgetItem."""
+        item = QListWidgetItem(text)
+        item.setData(Qt.ItemDataRole.UserRole, wall_id)
+        self.addItem(item)
+        return item
+
+    def _on_click(self, item):
+        wall_id = item.data(Qt.ItemDataRole.UserRole)
+        if wall_id is None:                # already marked dead
+            return
+        import warnings
+        from floorplanner.design.bridge import design_from_scene
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            rep = {}
+            design_from_scene(self.win, report=rep)
+        wall_item = rep.get("wall_items", {}).get(wall_id)
+        if wall_item is None or sip.isdeleted(wall_item):
+            self._mark_dead(item)
+            return
+        self.win.scene.clearSelection()
+        wall_item.setSelected(True)
+        self.win.view.centerOn(wall_item)
+
+    def _mark_dead(self, item):
+        item.setData(Qt.ItemDataRole.UserRole, None)
+        item.setText(f"{item.text()}  — no longer present")
+        item.setForeground(QColor("#999"))
+        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
+
+
 class OrthogonalityReportDialog(QDialog):
     """0055-ruling.md item B: a REPORT, not a repair. Names every wall
     within a few degrees of axis-aligned but not on it, so "Chief complains
@@ -101,7 +154,7 @@ class OrthogonalityReportDialog(QDialog):
         self.info = QLabel()
         self.info.setWordWrap(True)
         lay.addWidget(self.info)
-        self.listw = QListWidget()
+        self.listw = WallRowList(win)
         lay.addWidget(self.listw)
         b_done = QPushButton("Close")
         b_done.clicked.connect(self.accept)
@@ -116,8 +169,12 @@ class OrthogonalityReportDialog(QDialog):
         )
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            doc = design_from_scene(self.win).to_dict()
+            rep = {}
+            doc = design_from_scene(self.win, report=rep).to_dict()
+        wall_items = rep.get("wall_items", {})       # 0101-ruling.md
         levels = {lv["id"]: lv["name"] for lv in doc.get("levels", [])}
+        W = {w["id"]: w for w in doc.get("walls", [])}
+        V = {v["id"]: (v["x"], v["y"]) for v in doc.get("vertices", [])}
         rows = wall_orthogonality(doc)
         bands = orthogonality_bands(rows)
         summary = ", ".join(f"{bands[label]} {label}"
@@ -126,9 +183,19 @@ class OrthogonalityReportDialog(QDialog):
         offaxis = [r for r in rows if r[3] > 0.01]
         self.listw.clear()
         for wid, lvl, typ, deg, disp in offaxis:
-            self.listw.addItem(
-                f"{levels.get(lvl, lvl)}: wall {wid} ({typ}) is {deg:.2f} "
-                f"degrees off axis (would move {disp:.3f}\" if straightened)")
+            item = wall_items.get(wid)
+            tag = f"{item.uid} · " if item is not None else ""
+            w = W.get(wid)
+            coords = ""
+            if w is not None and w["v1"] in V and w["v2"] in V:
+                x1, y1 = V[w["v1"]]
+                x2, y2 = V[w["v2"]]
+                coords = (f" at ({fmt_ft2(x1)}, {fmt_ft2(y1)}) -> "
+                         f"({fmt_ft2(x2)}, {fmt_ft2(y2)})ft")
+            self.listw.add_row(
+                wid,
+                f"{levels.get(lvl, lvl)}: {tag}{wid} ({typ}){coords} — "
+                f"{deg:.2f}deg off axis (would move {disp:.3f}\" if straightened)")
         if offaxis:
             self.info.setText(
                 f"{len(offaxis)} of {len(rows)} wall(s) are off axis: "

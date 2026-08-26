@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 
 import pytest
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import QPointF, Qt
 
 import FloorPlanner as fp
 from floorplanner.design.validate import (
@@ -221,11 +221,82 @@ def test_the_dialog_lists_an_off_axis_wall_it_is_given(win):
 
 
 @pytest.mark.gui
+def test_the_dialog_row_names_both_ids_and_the_coordinates_0100(win):
+    """0098/0100-ruling.md: the status-bar id (`WallItem.uid`) and the
+    document id are two different namespaces, both printed as "W<n>" --
+    Patrick selected a wall the report didn't mean. The row must carry
+    both, plus the endpoints in feet, so a wall it names can be found."""
+    w = fp.WallItem(QPointF(0, 0), QPointF(1200, 1200), "interior")
+    win.scene.addItem(w)
+    dlg = fp.OrthogonalityReportDialog(win)
+    try:
+        text = dlg.listw.item(0).text()
+        assert text.startswith(f"default: {w.uid} · w1 (interior) "
+                               "at (0.00, 0.00) -> (100.00, 100.00)ft — "
+                               "45.00deg off axis")
+    finally:
+        dlg.close()
+
+
+@pytest.mark.gui
 def test_the_dialog_reports_clean_when_every_wall_is_on_axis(win):
     win.scene.addItem(fp.WallItem(QPointF(0, 0), QPointF(200, 0), "interior"))
     dlg = fp.OrthogonalityReportDialog(win)
     try:
         assert dlg.listw.count() == 0
         assert "axis-aligned" in dlg.info.text()
+    finally:
+        dlg.close()
+
+
+# ---------------------------------------------------------------------------
+# WallRowList -- click-to-centre-select and dead-row behaviour
+# (0100-ruling.md SS3(a)(b), answered and ordered by 0103-ruling.md SS3/SS5)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.gui
+def test_clicking_a_row_selects_its_wall_and_centres_the_view(win):
+    """0101-report.md SS2 measured the app had exactly one prior `centerOn`
+    (startup) -- no precedent either way. Patrick's own words, quoted in
+    0103-ruling.md SS3(a): "so I can find them." Selection alone does
+    nothing for a wall off-screen, so both must happen."""
+    far = fp.WallItem(QPointF(900, 700), QPointF(1100, 703), "interior")
+    win.scene.addItem(far)
+    dlg = fp.OrthogonalityReportDialog(win)
+    try:
+        row = dlg.listw.item(0)
+        assert row is not None
+        dlg.listw.itemClicked.emit(row)
+        assert far.isSelected()
+        centre = win.view.mapToScene(win.view.viewport().rect().center())
+        target = far.sceneBoundingRect().center()
+        assert abs(centre.x() - target.x()) < 50
+        assert abs(centre.y() - target.y()) < 50
+    finally:
+        dlg.close()
+
+
+@pytest.mark.gui
+def test_a_row_whose_wall_no_longer_exists_goes_dead_on_click(win):
+    """THE TEST IS THE ROUND TRIP (0103-ruling.md SS3(b)): the row is not
+    told the wall is gone in advance -- it discovers this by re-walking the
+    scene fresh on click and finding the id does not come back. A removed
+    wall and a MERGED one (object alive, id no longer resolves) hit the
+    exact same code path here -- `wall_items.get(wall_id)` returns nothing
+    either way -- so a plain removal exercises the mechanism the ruling
+    asked for without needing a real merge to reproduce it."""
+    w = fp.WallItem(QPointF(0, 0), QPointF(200, 3), "interior")
+    win.scene.addItem(w)
+    dlg = fp.OrthogonalityReportDialog(win)
+    try:
+        row = dlg.listw.item(0)
+        win.scene.removeItem(w)
+        dlg.listw.itemClicked.emit(row)
+        assert "no longer present" in row.text()
+        assert not bool(row.flags() & Qt.ItemFlag.ItemIsEnabled)
+        assert row.data(Qt.ItemDataRole.UserRole) is None
+        # a second click on an already-dead row must not raise (no id to
+        # look up, no fresh walk attempted)
+        dlg.listw.itemClicked.emit(row)
     finally:
         dlg.close()
