@@ -791,16 +791,48 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         if hasattr(self, "wall_label"):
             self.wall_label.setText(self._wall_label_text(walls))
 
+    #: 0094-ruling.md sec3: below this, a deviation is float noise from the
+    #: angle snap's own round trip (~4e-15deg, measured), not a real drift
+    #: -- five orders of magnitude above the noise, five below the smallest
+    #: real corpus drift on record (2.04e-4deg, 0066-ruling.md sec2). There
+    #: is no value in that gap and nothing physical lands there.
+    ANGLE_CLAUSE_TOL_DEG = 1e-9
+
+    @staticmethod
+    def _angle_snap_step_deg() -> float:
+        """0093-ruling.md sec2: the wall label's intended-angle grid is
+        `SETTINGS["rotate_snap_deg"]` -- the SAME increment `_angle_snapped_
+        target` (walls.py) already snaps Ctrl-drags to, deliberately reused
+        rather than a second setting meaning the same thing. Falls back to
+        90 (cardinals only, today's behaviour) unless the configured step
+        divides 90 exactly -- an arbitrary step (the spin box allows 1-90)
+        would otherwise make every vertical wall in the plan report a false
+        "6deg off axis" at, say, a 7deg step. Never fails, never warns: a
+        furnishing-rotation setting must not make the wall label wrong."""
+        step = SETTINGS.get("rotate_snap_deg", ROTATE_SNAP_DEFAULT)
+        if step <= 0 or abs(round(90.0 / step) * step - 90.0) > 1e-9:
+            return 90.0
+        return step
+
     @staticmethod
     def _wall_label_text(walls) -> str:
         """The selected wall's id, its two vertices' id + (x, y) in decimal
         feet (fixed 2 decimals -- 0065-ruling.md sec4), its length, and its
-        heading -- for the status bar. Empty unless exactly one wall is
-        selected. The heading is omitted for an exactly axis-aligned wall
-        (0/90/180/270) and shown otherwise, drift included on purpose: a
-        wall a fraction of a degree off axis is exactly the class this
-        project's own orthogonality report exists to surface, and rounding
-        it away here would hide the same fact this label is for."""
+        angle -- for the status bar. Empty unless exactly one wall is
+        selected.
+
+        THE ANGLE CLAUSE FIRES IFF THE WALL IS NOT ON AN INTENDED ANGLE
+        (0093-ruling.md sec1) -- deviation from the nearest multiple of
+        `_angle_snap_step_deg()`, not from the nearest cardinal, so a
+        deliberate 45deg wall (itself a multiple of the default 15deg step)
+        says nothing at all, heading included (0093 sec5). When it fires,
+        BOTH numbers show (0092-ruling.md, closing 0068 sec4): the heading
+        at fixed decimals (an absolute bearing, useful precision does not
+        scale with size) and the deviation at significant figures (a small
+        relative quantity) -- the pair is what makes it honest, since a
+        fixed-decimal heading alone can still round to a false cardinal
+        below `ANGLE_CLAUSE_TOL_DEG`, and the deviation beside it never
+        reads as exactly zero for a real one."""
         if len(walls) != 1:
             return ""
         w = walls[0]
@@ -809,21 +841,12 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                 f" -> {w.v2}({fmt_ft2(p2.x())}, {fmt_ft2(p2.y())})ft"
                 f"  len {fmt_ft2(w.length())}ft")
         heading = heading_deg(p1, p2)
-        if heading is not None and heading % 90.0 != 0.0:
-            # 0065-ruling.md sec3: the clause fires exactly when heading is
-            # NOT a cardinal, so printing it at 1 decimal rounded a real
-            # drift onto a false-looking "90.0" for any deviation under
-            # 0.05deg -- a statement contradicting the branch that produced
-            # it. 4 decimals (matching validate.py's own worst-offenders
-            # table) resolves down to ~0.00005deg, comfortably below every
-            # deviation this project's corpus census has found (smallest on
-            # record: 0.0002037deg -- 0068-ruling.md sec2, measured, not the
-            # rounder 0.0001 an earlier ruling supplied as a test magnitude
-            # and this comment once mistakenly repeated as a census result).
-            # A fixed precision still has a floor of its own; see
-            # 0068-ruling.md sec4 for the remaining edge case no fixed
-            # precision closes, raised to Patrick rather than assumed here.
-            text += f"  angle {heading:.4f}deg"
+        if heading is not None:
+            step = MainWindow._angle_snap_step_deg()
+            remainder = heading % step
+            deviation = min(remainder, step - remainder)
+            if deviation > MainWindow.ANGLE_CLAUSE_TOL_DEG:
+                text += f"  angle {heading:.4f}deg ({deviation:.3g}deg off axis)"
         return text
 
     def nudge_selected(self, dx: int, dy: int, fine: bool = False) -> bool:
