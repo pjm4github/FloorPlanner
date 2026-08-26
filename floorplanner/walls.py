@@ -2478,6 +2478,14 @@ class WallItem(QGraphicsItem):
         if hit_end is None:
             a_snap_ortho.setToolTip("Right-click near one end to choose it "
                                     "as the anchor.")
+        # SNAP TO GRID (plain, 0108-ruling.md, built second per
+        # 0110-ruling.md SS5 -- its tilt hazard is now a named limitation,
+        # not a surprise: both ends round INDEPENDENTLY, no anchor, so a
+        # wall whose ends straddle a grid line can come out tilted. Always
+        # enabled -- no endpoint proximity needed, unlike the orthogonal
+        # variant. MULTI-SELECT APPLIES TO EACH SELECTED WALL IN TURN
+        # (0108-ruling.md SS4), handled in `_snap_to_grid` itself.
+        a_snap_plain = menu.addAction("Snap to Grid")
         # THE 15-DEGREE PLACEHOLDER (0110-ruling.md SS4/SS5 tier 3): DISABLED,
         # not silent -- a menu item that does nothing when clicked is a
         # defect, so it exists and says why it cannot be clicked. No
@@ -2514,6 +2522,8 @@ class WallItem(QGraphicsItem):
         sc = self.scene()
         if chosen is a_snap_ortho and hit_end is not None:
             self._snap_to_grid_orthogonal(hit_end)
+        elif chosen is a_snap_plain:
+            self._snap_to_grid()
         elif chosen in a_types:
             self.wall_type = a_types[chosen]
             self.rebuild()
@@ -2589,6 +2599,69 @@ class WallItem(QGraphicsItem):
         if res["worsened"]:
             msg += (f" Less aligned now: {', '.join(res['worsened'])} "
                    f"-- unchanged, just worse; select and snap it next.")
+        win.status(msg)
+
+    def _snap_to_grid(self):
+        """0108-ruling.md, amended by 0109-ruling.md SS3: both of THIS
+        wall's endpoints snap independently to the nearest grid point --
+        NO anchor, unlike `_snap_to_grid_orthogonal`, so no endpoint hit
+        test is needed to fire it.
+
+        MULTI-SELECT APPLIES TO EACH SELECTED WALL IN TURN (0108-ruling.md
+        SS4): if more than one `WallItem` is selected when the menu opens,
+        every one of them snaps, not just the wall that was right-clicked.
+        THE GUARDS ARE RE-EVALUATED BETWEEN WALLS, NOT PRECOMPUTED
+        (0082-ruling.md SS3's stale-predicate lesson, which the batch
+        repair paid for once already): the document is walked FRESH before
+        each wall's turn, so a snap that moved a shared corner is already
+        visible to the next wall sharing it, rather than judged against a
+        snapshot taken before the batch started."""
+        sc = self.scene()
+        win = sc.parent() if sc is not None else None
+        if win is None or not hasattr(win, "status"):
+            return
+        selected = [it for it in sc.selectedItems() if isinstance(it, WallItem)]
+        targets = selected if self in selected else [self]
+
+        from floorplanner.design.bridge import design_from_scene  # late (cycle)
+        from floorplanner.design.validate import snap_wall_to_grid
+        step = SETTINGS["wall_snap_in"]
+        n_snapped, refusals, worsened_all = 0, [], []
+        for wall_item in targets:
+            import warnings
+            rep = {}
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                doc = design_from_scene(win, report=rep).to_dict()
+            wall_items = rep.get("wall_items", {})
+            wall_id = next((k for k, v in wall_items.items()
+                           if v is wall_item), None)
+            if wall_id is None:
+                continue
+            res = snap_wall_to_grid(doc, wall_id, step)
+            if res["refused"] is not None:
+                refusals.append(f"{wall_id} ({res['refused']})")
+                continue
+            if not res["relocations"]:
+                continue                       # already exactly on grid
+            levels = {lv["id"]: lv["name"] for lv in doc.get("levels", [])}
+            for lvl, old, new in res["relocations"]:
+                close_gap(sc, QPointF(*new), QPointF(*old),
+                         floor=levels.get(lvl, lvl), tol=1e-4)
+            n_snapped += 1
+            worsened_all.extend(res["worsened"])
+
+        parts = []
+        if n_snapped:
+            parts.append(f"{n_snapped} wall(s) snapped to grid")
+        if refusals:
+            parts.append(f"{len(refusals)} refused: {', '.join(refusals)}")
+        if not parts:
+            parts.append("Already exactly on grid -- nothing to snap.")
+        msg = "; ".join(parts) + "."
+        if worsened_all:
+            msg += (f" Less aligned now: "
+                   f"{', '.join(sorted(set(worsened_all)))}.")
         win.status(msg)
 
 

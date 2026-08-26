@@ -1110,3 +1110,77 @@ def snap_wall_to_grid_orthogonal(d, wall_id, endpoint_attr, step):
 
     return {"doc": work, "refused": None, "relocations": relocations,
             "worsened": worsened}
+
+
+# ---------------------------------------------------------------------------
+# "Snap to Grid" (plain) -- 0108-ruling.md, amended by 0109-ruling.md SS3.
+# Simpler than the orthogonal variant: no anchor, no shared axis, no
+# near-45 hazard -- both endpoints round to the grid INDEPENDENTLY, so the
+# wall's angle is whatever it is afterward, not forced onto axis. 0108 SS1:
+# "two ends that round to the same row make the wall axis-aligned as a side
+# effect, not as the goal."
+# ---------------------------------------------------------------------------
+
+def snap_wall_to_grid(d, wall_id, step):
+    """0108-ruling.md, amended by 0109-ruling.md SS3. Each of `wall_id`'s two
+    endpoints independently snaps to the nearest grid point at `step` --
+    NOT `repair_wall_orthogonality` (a wall can be axis-aligned and off-grid,
+    or the reverse, 0108 SS1) and not `snap_wall_to_grid_orthogonal` (no
+    anchor: both ends move, neither is privileged, so "which endpoint moves"
+    does not arise here either, just for a different reason -- both do).
+
+    REFUSES, `d` returned byte-identical (nothing applied):
+      "degenerate"        -- both ends would round to the same grid point
+      "would introduce X" -- `check()`'s invariant differential
+                              (0082-ruling.md SS4's stable key) -- an
+                              opening running off its wall (I7) is caught
+                              here, not by a special case, exactly as
+                              `snap_wall_to_grid_orthogonal` does it
+
+    REPORTS, does not refuse (0109-ruling.md SS3's amendment): every OTHER
+    wall whose angle deviation or grid error gets worse.
+
+    Returns the same shape `snap_wall_to_grid_orthogonal` does:
+      doc, refused, relocations (0, 1 or 2 entries), worsened
+    """
+    import copy
+    work = copy.deepcopy(d)
+    before_keys = {_invariant_key(m) for m in check(d, deep=True)}
+    V = {v["id"]: v for v in work["vertices"]}
+    w = next(x for x in work["walls"] if x["id"] == wall_id)
+    v1, v2 = V[w["v1"]], V[w["v2"]]
+    orig1_xy, orig2_xy = (v1["x"], v1["y"]), (v2["x"], v2["y"])
+    new1 = (round(v1["x"] / step) * step, round(v1["y"] / step) * step)
+    new2 = (round(v2["x"] / step) * step, round(v2["y"] / step) * step)
+
+    if new1 == new2:
+        return {"doc": d, "refused": "degenerate", "relocations": [],
+                "worsened": []}
+
+    orig_deg = {wid: dg for wid, _lvl, _typ, dg, _disp in wall_orthogonality(work)}
+    orig_grid = wall_grid_error_in(work, step)
+
+    v1["x"], v1["y"] = new1
+    v2["x"], v2["y"] = new2
+
+    after_keys = {_invariant_key(m) for m in check(work, deep=True)}
+    newly = after_keys - before_keys
+    if newly:
+        return {"doc": d, "refused": f"would introduce {sorted(newly)[0][0]}",
+                "relocations": [], "worsened": []}
+
+    new_deg = {wid: dg for wid, _lvl, _typ, dg, _disp in wall_orthogonality(work)}
+    new_grid = wall_grid_error_in(work, step)
+    worsened = sorted({
+        wid for wid in new_deg
+        if new_deg[wid] > orig_deg.get(wid, 0.0) + 1e-6
+        or new_grid.get(wid, 0.0) > orig_grid.get(wid, 0.0) + 1e-6})
+
+    relocations = []
+    if (v1["x"], v1["y"]) != orig1_xy:
+        relocations.append((v1["level"], orig1_xy, (v1["x"], v1["y"])))
+    if (v2["x"], v2["y"]) != orig2_xy:
+        relocations.append((v2["level"], orig2_xy, (v2["x"], v2["y"])))
+
+    return {"doc": work, "refused": None, "relocations": relocations,
+            "worsened": worsened}
