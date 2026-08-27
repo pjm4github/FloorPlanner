@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 84c1dbe -->
+<!-- SNAPSHOT-HEAD: 07d1d19 -->
 
 # Session snapshot — read this first
 
@@ -433,7 +433,7 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`84c1dbe`** at this file's cut. **PR #39, PR #37 (item C), PR #38, PR #40, PR #41 all merged and CONFIRMED** — `0115-ruling.md`: Patrick confirmed the two `0113`-quoted checks are his own; nothing conditional any more. **`0108`-`0110`'s three snap-to-grid features are COMPLETE.** **Still open, Patrick's alone, no code blocks it: the `L2.dxf` Chief recount** (`0066` §6's closing receipt for item C) — runs whenever Chief is next open; item C closes when he reports the number. Full trail: `handoff/README.md`'s pair table, `handoff/0113-report.md` for the build arc. **Numbering collisions, on the record:** `0036`, `0043`, `0050`, `0101`; neither renamed, numbering continues forward each time. |
+| **`main`** | **`07d1d19`** at this file's cut. PR #39/#37/#38/#40/#41 all merged and CONFIRMED (`0115`). **`0108`-`0110`'s three snap-to-grid features COMPLETE.** **Still open, Patrick's alone, no code blocks it: the `L2.dxf` Chief recount** (`0066` §6's closing receipt for item C). **`0116-ruling.md` landed — the Export menu, unblocked, BUILDING NOW**: real `Export` submenu (Rooms as CSV / Chief Architect DXF / PDF plan set / Legacy v4), the literal `▸` removed from the DXF label, PDF wired to `fp2pdf.py` with an options dialog + Save-As, `reportlab`-missing disabled-not-crashed. AMBER, one branch, one check. Full trail: `handoff/README.md`'s pair table, `handoff/0113-report.md` for the prior build arc. **Numbering collisions, on the record:** `0036`, `0043`, `0050`, `0101`; neither renamed, numbering continues forward each time. |
 | **Branches** | **`wall-orthogonality-repair`** ([PR #37](https://github.com/pjm4github/FloorPlanner/pull/37), item C) — AMBER, open, **check UNBLOCKED, ready to run** (against `wiscaway2026-08-09R.json`). **`wall-report-id-fix`** ([PR #39](https://github.com/pjm4github/FloorPlanner/pull/39), the standalone report's own fix) — AMBER, open, ready. **`wall-label-angle-clause`** ([PR #38](https://github.com/pjm4github/FloorPlanner/pull/38), the angle clause) — AMBER, open, worth checking, unaffected. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **81 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). `python tools/gate.py --docs` GREEN. |
