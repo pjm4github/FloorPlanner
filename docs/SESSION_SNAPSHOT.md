@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: d897df3 -->
+<!-- SNAPSHOT-HEAD: 69f03ca -->
 
 # Session snapshot — read this first
 
@@ -433,7 +433,7 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`d897df3`** at this file's cut. **PR #39, PR #37 (item C), PR #38 (angle clause), PR #40 (Snap to Grid Orthogonal), PR #41 (plain Snap to Grid) all merged and checked** — Patrick's PR #41 check passed ("works perfectly"). All five branches deleted, local and remote. **`0108`-`0110`'s three snap-to-grid features are now COMPLETE**: Orthogonal (safer, built first), plain (both ends independent, its tilt hazard a named limitation), and a disabled 15deg placeholder (no arithmetic exists for it — `tan 15deg` is irrational). Full trail: `handoff/README.md`'s pair table. **Numbering collisions, on the record:** `0036`, `0043`, `0050`, `0101`; neither renamed, numbering continues forward each time. |
+| **`main`** | **`69f03ca`** at this file's cut. **PR #39, PR #37 (item C), PR #38 (angle clause), PR #40 (Snap to Grid Orthogonal), PR #41 (plain Snap to Grid) all merged and checked** — Patrick's PR #41 check passed ("works perfectly"). All five branches deleted, local and remote. **`0108`-`0110`'s three snap-to-grid features are now COMPLETE**: Orthogonal (safer, built first), plain (both ends independent, its tilt hazard a named limitation), and a disabled 15deg placeholder (no arithmetic exists for it — `tan 15deg` is irrational). Full trail: `handoff/README.md`'s pair table, and `handoff/0113-report.md` for the whole arc in one place. **Numbering collisions, on the record:** `0036`, `0043`, `0050`, `0101`; neither renamed, numbering continues forward each time. |
 | **Branches** | **`wall-orthogonality-repair`** ([PR #37](https://github.com/pjm4github/FloorPlanner/pull/37), item C) — AMBER, open, **check UNBLOCKED, ready to run** (against `wiscaway2026-08-09R.json`). **`wall-report-id-fix`** ([PR #39](https://github.com/pjm4github/FloorPlanner/pull/39), the standalone report's own fix) — AMBER, open, ready. **`wall-label-angle-clause`** ([PR #38](https://github.com/pjm4github/FloorPlanner/pull/38), the angle clause) — AMBER, open, worth checking, unaffected. `fp2dxf-integration` deleted, local and remote, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **81 records, 31 open.** D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). `python tools/gate.py --docs` GREEN. |
