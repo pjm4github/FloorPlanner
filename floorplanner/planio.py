@@ -50,6 +50,7 @@ from floorplanner.design.validate import check
 from floorplanner.design.bridge import rebase_weld_baseline
 from floorplanner.design.verify import rebase  # P1.6 shadow mode
 from floorplanner.export.fp2dxf import convert as convert_to_dxf  # handoff 0038
+from floorplanner.export.fp2pdf import convert as convert_to_pdf  # 0072/0116
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
 from floorplanner.macro import *  # noqa: F401
@@ -699,6 +700,63 @@ class PlanIOMixin:
             lines += [f"  ! {w}" for w in result.warnings]
         text = "\n".join(lines)
         self._report(text, interactive, "Export to Chief Architect (DXF)")
+        return result
+
+    def export_pdf(self):
+        """File ▸ Export ▸ PDF plan set… -- `fp2pdf`, a v5 design -> a
+        dimensioned floor-plan PDF (0072-ruling.md §5, unblocked by
+        0116-ruling.md once §2's four hygiene fixes landed). Two dialogs,
+        not one: `PDFExportOptionsDialog` first (title/notes/levels), THEN
+        a Save-As -- unlike `export_dxf`'s folder picker, `fp2pdf` writes
+        ONE PDF with one sheet per level, so this is a single-FILE dialog
+        (`QFileDialog.getSaveFileName`), the one place 0072 §5 named as the
+        deliberate difference from the DXF precedent."""
+        doc = self.design_document()
+        default_title = Path(self.current_path).stem if self.current_path \
+            else "Untitled"
+        dlg = PDFExportOptionsDialog(doc, default_title, self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        meta, only_levels, include_concept = dlg.values()
+        if only_levels == []:
+            self.status("No levels selected -- nothing to export.")
+            return
+        start = str(Path(self.current_path).with_suffix(".pdf")) \
+            if self.current_path else str(designs_dir() / f"{meta['title']}.pdf")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export PDF plan set", start, "PDF (*.pdf);;All files (*)")
+        if path:
+            self.export_pdf_path(path, meta, only_levels, include_concept)
+
+    def export_pdf_path(self, path: str, meta: dict, only_levels=None,
+                        include_concept: bool = False,
+                        interactive: bool = True):
+        """Non-interactive PDF export (the `export_dxf_path` convention:
+        scripted/test callers pass `interactive=False` and read the return
+        value). Same document, same failure handling as `export_dxf_path` --
+        `convert()` raises a plain `ValueError` (0072-ruling.md §2(2)/D40
+        for a missing `reportlab`, §2(2) for a bad document) rather than
+        exiting the process, caught here like every other IO failure in
+        this mixin.
+
+        Returns the `ConvertResult` so a macro/test can inspect it without
+        parsing the dialog text."""
+        doc = self.design_document()
+        try:
+            result = convert_to_pdf(doc, Path(path), meta, only_levels,
+                                    include_concept=include_concept)
+        except (ValueError, OSError) as ex:
+            if interactive:
+                QMessageBox.critical(self, "Export PDF plan set", str(ex))
+            self.status(f"PDF export failed: {ex}")
+            return None
+        lines = [f"Wrote {path}:"] + [f"  • {s}" for s in result.sheets]
+        if result.warnings:
+            lines.append("")
+            lines.append(f"{len(result.warnings)} warning(s):")
+            lines += [f"  ! {w}" for w in result.warnings]
+        text = "\n".join(lines)
+        self._report(text, interactive, "Export PDF plan set")
         return result
 
     def load_path(self, path: str):

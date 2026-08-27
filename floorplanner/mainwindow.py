@@ -1,5 +1,6 @@
 """The application main window: menus, toolbars, the scene<->model
 serialization bridge, IO, and all edit orchestration."""
+import importlib.util
 
 from PyQt6 import sip  # noqa: F401
 from PyQt6.QtCore import *  # noqa: F401
@@ -270,9 +271,6 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         a_img = QAction("Import from i&mage (PNG)…", self)
         a_img.triggered.connect(lambda: self.start_image_import())
         m_file.addAction(a_img)
-        a_exp = QAction("&Export rooms to CSV…", self)
-        a_exp.triggered.connect(self.export_rooms_csv)
-        m_file.addAction(a_exp)
         m_file.addSeparator()
         a_save = QAction("&Save", self)
         a_save.setShortcut(QKeySequence.StandardKey.Save)
@@ -282,12 +280,35 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         a_saveas.setShortcut(QKeySequence.StandardKey.SaveAs)
         a_saveas.triggered.connect(self.save_plan_as)
         m_file.addAction(a_saveas)
-        a_v4 = QAction("Export legacy v4…", self)     # one release, so nobody
-        a_v4.triggered.connect(self.export_legacy_v4)  # is stranded on v5
-        m_file.addAction(a_v4)
-        a_dxf = QAction("Export ▸ Chief Architect (DXF)…", self)  # handoff 0038
+        m_file.addSeparator()
+        # THE EXPORT SUBMENU (0072-ruling.md §4, unblocked by 0116-ruling.md):
+        # a REAL `addMenu`, not a label containing "▸" -- the DXF action's own
+        # label carried a literal "▸" as plain text (0050-report.md flagged it
+        # against itself, never ruled, until Patrick asked for exactly this).
+        # Four entries, every existing slot keeping its name (re-parent, not a
+        # rewrite) -- the two Import actions above are untouched, he asked
+        # about exports.
+        m_export = m_file.addMenu("&Export")
+        a_exp = QAction("&Rooms as CSV…", self)
+        a_exp.triggered.connect(self.export_rooms_csv)
+        m_export.addAction(a_exp)
+        a_dxf = QAction("&Chief Architect (DXF)…", self)  # handoff 0038
         a_dxf.triggered.connect(self.export_dxf)
-        m_file.addAction(a_dxf)
+        m_export.addAction(a_dxf)
+        # PDF PLAN SET (0072-ruling.md §5 / 0116-ruling.md §2). `reportlab`
+        # missing -> DISABLED WITH A REASON, not a crash (D40) -- checked with
+        # `find_spec`, which does not execute reportlab's own code, only the
+        # cheap "is it on disk" question the menu needs.
+        a_pdf = QAction("&PDF plan set…", self)
+        a_pdf.triggered.connect(self.export_pdf)
+        if importlib.util.find_spec("reportlab") is None:
+            a_pdf.setEnabled(False)
+            a_pdf.setToolTip("reportlab is not installed; PDF export is "
+                             "unavailable (pip install reportlab)")
+        m_export.addAction(a_pdf)
+        a_v4 = QAction("&Legacy v4…", self)            # one release, so nobody
+        a_v4.triggered.connect(self.export_legacy_v4)   # is stranded on v5
+        m_export.addAction(a_v4)
         m_file.addSeparator()
         a_tload = QAction("&Load template room…", self)   # P4.4
         a_tload.triggered.connect(self.load_template_room)
