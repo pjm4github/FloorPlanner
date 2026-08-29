@@ -115,6 +115,74 @@ def parse_code(code: str) -> tuple[float, float]:
     return float(code[:cut]), float(code[cut:])
 
 
+STATION_TOL_IN = 1.0   # 0118-ruling.md sec2 step 1: the sheet's own resolution
+
+
+def cluster_stations(values, tol: float = STATION_TOL_IN) -> list[float]:
+    """Merge dimension stations closer than `tol` into their mean.
+
+    0118-ruling.md sec2: a drifted wall's near-duplicate vertex used to mint
+    its own station a fraction of an inch from a clean one, cramming a full
+    dimension segment -- extension lines, ticks, a 45-rotated label -- into
+    a sliver of the page (the "mess of dimensions on top of each other").
+    After whole-inch labels, a segment under `tol` cannot be expressed on
+    the sheet at all, so keeping it separate loses nothing the paper could
+    say. Chains transitively: a run of stations each within `tol` of its
+    predecessor collapses to one, even if the run's own span exceeds `tol`.
+    """
+    if not values:
+        return []
+    groups = [[values[0]]]
+    for v in values[1:]:
+        if v - groups[-1][-1] < tol:
+            groups[-1].append(v)
+        else:
+            groups.append([v])
+    return [sum(g) / len(g) for g in groups]
+
+
+def _rounded_stations(coords):
+    """Nearest whole inch, per 0118-ruling.md sec2 step 2 -- computed once
+    and shared by row 1's adjacent-pair differences and row 2's overall
+    difference, so they telescope BY CONSTRUCTION (integer arithmetic, no
+    compounding). Rounding each label independently -- `ftin(b - a)` on the
+    raw stations -- does not: it is the classic drafting bug where the
+    parts stop summing to the whole."""
+    return [round(c) for c in coords]
+
+
+def _door_symbol(kind: str, door_type) -> str | None:
+    """Which PDF symbol a door/gate opening gets -- the vocabulary is
+    `floorplanner/config.py:DOOR_TYPES`, drawn in the editor by
+    `walls.py:_paint_door`, transcribed here rather than invented.
+    Returns None for a non-door/gate kind (window/cased/pass-through,
+    handled by `draw_opening`'s own fallback) and `"unknown"` for a
+    `door_type` string outside the catalog -- D81's own finding is that
+    `door_type == "sliding"` can never match any of these, so that string
+    (and any other stray value) now falls through here, drawn as a generic
+    swing but named in a warning, not silently absorbed."""
+    if kind == "gate":
+        return "swing"
+    if kind != "door":
+        return None
+    dt = (door_type or "").upper()
+    if dt in ("LH", "RH", ""):
+        return "swing"
+    if dt == "FRENCH":
+        return "french"
+    if dt == "BIFOLD":
+        return "bifold"
+    if dt == "POCKET":
+        return "pocket"
+    if dt == "SLIDER":
+        return "slider"
+    if dt == "DOORWAY":
+        return "doorway"
+    if dt.startswith("GARAGE"):
+        return "garage"
+    return "unknown"
+
+
 class Sheet:
     """One storey plan sheet. Plan coords in inches (y already flipped up);
     self.k = points per plan-inch."""
@@ -126,7 +194,14 @@ class Sheet:
         self.rooms = {r["id"]: r for r in doc["rooms"]}
         self.walls = [w for w in doc["walls"] if w["level"] == level["id"]
                       and w["type"] not in ("fence", "hedge")]
+        self.warnings = []
         self._frame()
+
+    def warn(self, msg: str) -> None:
+        # COLLECTED, NOT PRINTED -- `convert()` is a library call from a Qt
+        # menu handler as well as the CLI, same shape as fp2dxf.py's
+        # `Ctx.warn` (this file's own sibling).
+        self.warnings.append(msg)
 
     # ---------- setup ----------
     def pt(self, vid):
@@ -270,25 +345,20 @@ class Sheet:
         def A(s, d):   # point at station s, offset d from centerline
             return (p1[0] + ux * s + nx * d, p1[1] + uy * s + ny * d)
 
-        # jamb lines closing the wall poche
-        for s in (s0, s1):
-            a, b = A(s, t2), A(s, -t2)
-            self.line(*a, *b, w=0.9)
+        def rect(sa, da, sb, db, w=0.7, dash=None):
+            pts = [A(sa, da), A(sb, da), A(sb, db), A(sa, db)]
+            for a, b in zip(pts, pts[1:] + pts[:1], strict=True):
+                self.line(*a, *b, w=w, dash=dash)
 
-        sliding = kind == "door" and op.get("door_type") == "sliding"
-        if kind in ("door", "gate") and not sliding:
-            hinge = op.get("hinge") if op.get("hinge") in ("v1", "v2") else "v1"
-            swing = op.get("swings_toward")
-            if swing not in ("left", "right"):
-                # default: swing toward whichever side of the wall has a
-                # room (Qt-left maps to geometric left under the y-flip)
-                swing = "left" if self._host_wall_left else "right"
-            s_h = s0 if hinge == "v1" else s1
-            s_j = s1 if hinge == "v1" else s0
-            sgn = 1.0 if swing == "left" else -1.0
-            hx, hy = A(s_h, 0)
-            jx, jy = A(s_j, 0)
-            lx, ly = hx + nx * wd * sgn, hy + ny * wd * sgn
+        def leaf(hinge_s, radius, direction, sgn):
+            """One swing leaf + quarter-circle arc, hinged at `hinge_s`.
+            `direction` = +1 if the jamb it swings toward sits at a HIGHER
+            station, -1 if lower. Reference: `walls.py:_paint_door`'s
+            `_swing_arc` -- same shape (hinge -> perpendicular open-leaf
+            tip, arc back to the jamb), this file's own coordinate frame."""
+            hx, hy = A(hinge_s, 0)
+            jx, jy = A(hinge_s + direction * radius, 0)
+            lx, ly = hx + nx * radius * sgn, hy + ny * radius * sgn
             self.line(hx, hy, lx, ly, w=0.8)
             a_leaf = math.degrees(math.atan2(ly - hy, lx - hx))
             a_jamb = math.degrees(math.atan2(jy - hy, jx - hx))
@@ -299,19 +369,69 @@ class Sheet:
             c = self.c
             c.saveState()
             c.setLineWidth(0.5)
-            c.arc(self.X(hx - wd), self.Y(hy - wd),
-                  self.X(hx + wd), self.Y(hy + wd), start, ext)
+            c.arc(self.X(hx - radius), self.Y(hy - radius),
+                  self.X(hx + radius), self.Y(hy + radius), start, ext)
             c.restoreState()
-        elif sliding:
-            for kof, side in ((0.0, 1), (0.45, -1)):
-                a = A(s0 + kof * wd, side * t2 * 0.35)
-                b = A(s0 + (kof + 0.55) * wd, side * t2 * 0.35)
-                self.line(*a, *b, w=1.2)
-        else:                                       # window / cased / pass
+
+        # jamb lines closing the wall poche
+        for s in (s0, s1):
+            a, b = A(s, t2), A(s, -t2)
+            self.line(*a, *b, w=0.9)
+
+        symbol = _door_symbol(kind, op.get("door_type"))
+        if symbol is None:                           # window / cased / pass
             for d in (t2 * 0.25, -t2 * 0.25):
                 self.line(*A(s0, d), *A(s1, d), w=0.6)
             if kind == "window":
                 self.line(*A(mid, t2 * 0.25), *A(mid, -t2 * 0.25), w=0.6)
+        else:
+            if symbol == "unknown":
+                self.warn(f"opening {op.get('code')}: unrecognized "
+                          f"door_type {op.get('door_type')!r}, drawn as a "
+                          f"generic swing")
+            hinge = op.get("hinge") if op.get("hinge") in ("v1", "v2") else "v1"
+            swing = op.get("swings_toward")
+            if swing not in ("left", "right"):
+                # default: swing toward whichever side of the wall has a
+                # room (Qt-left maps to geometric left under the y-flip)
+                swing = "left" if self._host_wall_left else "right"
+            sgn = 1.0 if swing == "left" else -1.0
+            if symbol in ("swing", "unknown"):
+                if hinge == "v1":
+                    leaf(s0, wd, 1.0, sgn)
+                else:
+                    leaf(s1, wd, -1.0, sgn)
+            elif symbol == "french":
+                leaf(s0, wd / 2, 1.0, sgn)
+                leaf(s1, wd / 2, -1.0, sgn)
+            elif symbol == "bifold":
+                face_d = sgn * t2
+                rise = sgn * 0.35 * wd
+                for a, m, b in ((s0, s0 + 0.25 * wd, mid),
+                                (mid, s0 + 0.75 * wd, s1)):
+                    self.line(*A(a, face_d), *A(m, face_d + rise), w=0.8)
+                    self.line(*A(m, face_d + rise), *A(b, face_d), w=0.8)
+            elif symbol == "pocket":
+                # dashed panel slid INTO the wall run before s0, plus the
+                # short solid stub still visible at the opening's near half
+                rect(s0 - wd, -t2 + 0.75, s0, t2 - 0.75, w=0.7, dash=[3, 2])
+                rect(s0, -t2 / 3, mid, t2 / 3, w=0.8)
+            elif symbol == "slider":
+                pw = 0.55 * wd
+                rect(s0, -0.70 * t2, s0 + pw, -0.10 * t2, w=0.8)
+                rect(s1 - pw, 0.10 * t2, s1, 0.70 * t2, w=0.8)
+            elif symbol == "doorway":
+                for d in (t2, -t2):
+                    self.line(*A(s0, d), *A(s1, d), w=0.6, dash=[3, 2])
+            elif symbol == "garage":
+                _wd_code, h = parse_code(op["code"])
+                rect(s0, -t2 * 0.25, s1, t2 * 0.25, w=0.8)
+                depth = sgn * min(h, 96.0)
+                y0 = sgn * t2
+                rect(s0, y0, s1, y0 + depth, w=0.6, dash=[3, 2])
+                if (op.get("door_type") or "").upper() == "GARAGE-2":
+                    self.line(*A(mid, y0), *A(mid, y0 + depth), w=0.6,
+                              dash=[3, 2])
 
         rot = math.degrees(math.atan2(uy, ux))
         if rot > 90 or rot <= -90:
@@ -408,7 +528,7 @@ class Sheet:
                     fx.add(round(mx, 3))
                 elif abs(ux) < 1e-6:
                     fy.add(round(my, 3))
-        return sorted(fx), sorted(fy)
+        return cluster_stations(sorted(fx)), cluster_stations(sorted(fy))
 
     def dim_row_x(self, coords, y_pt):
         """horizontal dimension string at page-y y_pt (points)"""
@@ -431,8 +551,10 @@ class Sheet:
             c.setLineWidth(0.9)
             c.line(px - 3, y_pt - 3, px + 3, y_pt + 3)
         c.restoreState()
-        for a, b in zip(coords, coords[1:], strict=False):
-            label = ftin(b - a)
+        rounded = _rounded_stations(coords)
+        for a, b, ra, rb in zip(coords, coords[1:], rounded, rounded[1:],
+                                 strict=False):
+            label = ftin(rb - ra)
             mx = (self.X(a) + self.X(b)) / 2
             wpt = c.stringWidth(label, "Helvetica", 6.5)
             c.setFont("Helvetica", 6.5)
@@ -464,8 +586,10 @@ class Sheet:
             c.setLineWidth(0.9)
             c.line(x_pt - 3, py - 3, x_pt + 3, py + 3)
         c.restoreState()
-        for a, b in zip(coords, coords[1:], strict=False):
-            label = ftin(b - a)
+        rounded = _rounded_stations(coords)
+        for a, b, ra, rb in zip(coords, coords[1:], rounded, rounded[1:],
+                                 strict=False):
+            label = ftin(rb - ra)
             my = (self.Y(a) + self.Y(b)) / 2
             c.saveState()
             c.translate(x_pt - 2.5, my)
@@ -612,8 +736,10 @@ def convert(doc, out: Path, meta, only_levels=None,
     c.setTitle(f"{meta['title']} - floor plans")
     c.setAuthor(meta["author"])
     for i, lv in enumerate(levels):
-        Sheet(c, doc, lv, th, include_concept, meta).render(i + 1, len(levels))
+        sheet = Sheet(c, doc, lv, th, include_concept, meta)
+        sheet.render(i + 1, len(levels))
         result.sheets.append(f"sheet P{i + 1}: {lv.get('name', lv['id'])}")
+        result.warnings.extend(sheet.warnings)
     c.save()
     return result
 
