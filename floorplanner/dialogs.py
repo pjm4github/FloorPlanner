@@ -899,6 +899,77 @@ class SettingsDialog(QDialog):
         SETTINGS["auto_weld"] = bool(self.ck_weld.isChecked())
 
 
+class PDFExportOptionsDialog(QDialog):
+    """File ▸ Export ▸ PDF plan set… — 0072-ruling.md §5 / 0116-ruling.md §2:
+    title, subtitle, author, wall-assembly note, dimension note, level
+    selection, include-concept. Title defaults from the document's own name
+    (`current_path`'s stem), not `"RESIDENCE"`.
+
+    NO THICKNESS OVERRIDE CONTROL. `fp2pdf.py`'s own table is now the
+    normative `STD_T` (0072-ruling.md §2(1), the third-table defect fixed) —
+    a GUI control that let a user contradict it would reopen D73 through the
+    front door, this time with a widget inviting it (0072-ruling.md §5)."""
+
+    def __init__(self, doc, default_title, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("PDF plan set options")
+        form = QFormLayout(self)
+
+        self.ed_title = QLineEdit(default_title)
+        form.addRow("Title", self.ed_title)
+        self.ed_subtitle = QLineEdit("")
+        form.addRow("Subtitle", self.ed_subtitle)
+        self.ed_author = QLineEdit("Owner")
+        form.addRow("Author", self.ed_author)
+        self.ed_assembly = QLineEdit(
+            "2x6 exterior / 2x4 interior, conventional framing")
+        form.addRow("Wall assembly note", self.ed_assembly)
+        self.ed_dim = QLineEdit("All dimensions to overall wall faces")
+        form.addRow("Dimension note", self.ed_dim)
+
+        # ONE SHEET PER STOREY LEVEL, checkable -- a site-kind level is
+        # never a sheet (fp2pdf.convert()'s own filter) so it is not
+        # offered here either; nothing to uncheck that would never render.
+        self.level_checks = []
+        levels_box = QVBoxLayout()
+        for lv in doc.get("levels", []):
+            if lv.get("kind", "storey") == "site":
+                continue
+            cb = QCheckBox(lv.get("name", lv["id"]))
+            cb.setChecked(True)
+            cb.setProperty("level_id", lv["id"])
+            levels_box.addWidget(cb)
+            self.level_checks.append(cb)
+        form.addRow("Levels", levels_box)
+
+        self.ck_concept = QCheckBox("Include concept rooms")
+        self.ck_concept.setChecked(False)
+        form.addRow("", self.ck_concept)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        form.addRow(buttons)
+
+    def values(self):
+        """(meta, only_levels, include_concept). `only_levels` is `None`
+        for "every level" (every checkbox checked, or none exist to
+        choose), else the checked level ids -- possibly `[]` if the user
+        unchecked every one, which the caller refuses rather than exports
+        an empty PDF."""
+        meta = {"title": self.ed_title.text().strip() or "Untitled",
+                "subtitle": self.ed_subtitle.text().strip(),
+                "author": self.ed_author.text().strip() or "Owner",
+                "assembly_note": self.ed_assembly.text().strip(),
+                "dim_note": self.ed_dim.text().strip()}
+        checked = [cb.property("level_id") for cb in self.level_checks
+                  if cb.isChecked()]
+        only_levels = None if len(checked) == len(self.level_checks) \
+            else checked
+        return meta, only_levels, self.ck_concept.isChecked()
+
+
 class ImageImportDialog(QDialog):
     """File > Import from image…: scale + detection settings for turning a
     raster floor-plan PNG into walls."""
