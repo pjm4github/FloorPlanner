@@ -530,78 +530,82 @@ class Sheet:
                     fy.add(round(my, 3))
         return cluster_stations(sorted(fx)), cluster_stations(sorted(fy))
 
-    def dim_row_x(self, coords, y_pt):
-        """horizontal dimension string at page-y y_pt (points)"""
-        c = self.c
-        if len(coords) < 2:
+    def dim_row_along(self, ext_pairs, station_pts, labels, rot_deg):
+        """One dimension string -- extension lines, the row line + arch
+        ticks, and labels -- shared by the two orthogonal rows and (a
+        later, angled-lane tranche). 0119-ruling.md sec3: "the same
+        routine with the axis baked in... one generalisation, not a
+        third copy." Entirely in PAGE POINTS; a caller does its own
+        plan-to-page projection (the near-drawing gaps and overshoot are
+        the one part that genuinely differs per row, not the part named
+        as triplicated).
+
+        `ext_pairs`: [(start_pt, end_pt), ...], one per station, drawn
+        as-is. `station_pts`: the row-line points themselves, ticked and
+        connected. `labels`: len(station_pts) - 1 strings, one per
+        adjacent pair. `rot_deg`: text rotation, already flipped upright
+        by the caller -- the same one-line idiom `draw_opening` and
+        `draw_extras` use for their own labels."""
+        if len(station_pts) < 2:
             return
-        # extension lines
-        for x in coords:
+        c = self.c
+        for start, end in ext_pairs:
             c.saveState()
             c.setLineWidth(0.4)
             c.setStrokeGray(0.25)
-            c.line(self.X(x), self.oy + self.by0 * self.k - 4,
-                   self.X(x), y_pt - 5)
+            c.line(start[0], start[1], end[0], end[1])
             c.restoreState()
         c.saveState()
         c.setLineWidth(0.5)
-        c.line(self.X(coords[0]) - 4, y_pt, self.X(coords[-1]) + 4, y_pt)
-        for x in coords:                          # arch ticks
-            px = self.X(x)
+        (x0, y0), (x1, y1) = station_pts[0], station_pts[-1]
+        dx, dy = x1 - x0, y1 - y0
+        length = math.hypot(dx, dy) or 1.0
+        ux, uy = dx / length, dy / length
+        c.line(x0 - 4 * ux, y0 - 4 * uy, x1 + 4 * ux, y1 + 4 * uy)
+        for px, py in station_pts:                # arch ticks
             c.setLineWidth(0.9)
-            c.line(px - 3, y_pt - 3, px + 3, y_pt + 3)
+            c.line(px - 3, py - 3, px + 3, py + 3)
         c.restoreState()
-        rounded = _rounded_stations(coords)
-        for a, b, ra, rb in zip(coords, coords[1:], rounded, rounded[1:],
-                                 strict=False):
-            label = ftin(rb - ra)
-            mx = (self.X(a) + self.X(b)) / 2
-            wpt = c.stringWidth(label, "Helvetica", 6.5)
+        for (ax, ay), (bx, by), label in zip(
+                station_pts, station_pts[1:], labels, strict=False):
+            seg_len = math.hypot(bx - ax, by - ay)
+            mx, my = (ax + bx) / 2, (ay + by) / 2
             c.setFont("Helvetica", 6.5)
-            if wpt + 4 < self.X(b) - self.X(a):
-                c.drawCentredString(mx, y_pt + 2.5, label)
+            wpt = c.stringWidth(label, "Helvetica", 6.5)
+            c.saveState()
+            c.translate(mx, my)
+            c.rotate(rot_deg)
+            if wpt + 4 < seg_len:
+                c.drawCentredString(0, 2.5, label)
             else:
-                c.saveState()
-                c.translate(mx, y_pt + 6)
                 c.rotate(45)
                 c.drawString(3, 1, label)
-                c.restoreState()
+            c.restoreState()
 
-    def dim_row_y(self, coords, x_pt):
-        c = self.c
+    def dim_row_x(self, coords, y_pt):
+        """horizontal dimension string at page-y y_pt (points)"""
         if len(coords) < 2:
             return
-        for y in coords:
-            c.saveState()
-            c.setLineWidth(0.4)
-            c.setStrokeGray(0.25)
-            c.line(self.ox + self.bx0 * self.k - 4, self.Y(y),
-                   x_pt + 5, self.Y(y))
-            c.restoreState()
-        c.saveState()
-        c.setLineWidth(0.5)
-        c.line(x_pt, self.Y(coords[0]) - 4, x_pt, self.Y(coords[-1]) + 4)
-        for y in coords:
-            py = self.Y(y)
-            c.setLineWidth(0.9)
-            c.line(x_pt - 3, py - 3, x_pt + 3, py + 3)
-        c.restoreState()
         rounded = _rounded_stations(coords)
-        for a, b, ra, rb in zip(coords, coords[1:], rounded, rounded[1:],
-                                 strict=False):
-            label = ftin(rb - ra)
-            my = (self.Y(a) + self.Y(b)) / 2
-            c.saveState()
-            c.translate(x_pt - 2.5, my)
-            c.rotate(90)
-            c.setFont("Helvetica", 6.5)
-            wpt = c.stringWidth(label, "Helvetica", 6.5)
-            if wpt + 4 < self.Y(b) - self.Y(a):
-                c.drawCentredString(0, 0, label)
-            else:
-                c.rotate(-45)
-                c.drawString(3, 0, label)
-            c.restoreState()
+        labels = [ftin(rb - ra) for ra, rb in
+                  zip(rounded, rounded[1:], strict=False)]
+        station_pts = [(self.X(x), y_pt) for x in coords]
+        ext_base = self.oy + self.by0 * self.k - 4
+        ext_pairs = [((self.X(x), ext_base), (self.X(x), y_pt - 5))
+                     for x in coords]
+        self.dim_row_along(ext_pairs, station_pts, labels, 0.0)
+
+    def dim_row_y(self, coords, x_pt):
+        if len(coords) < 2:
+            return
+        rounded = _rounded_stations(coords)
+        labels = [ftin(rb - ra) for ra, rb in
+                  zip(rounded, rounded[1:], strict=False)]
+        station_pts = [(x_pt, self.Y(y)) for y in coords]
+        ext_base = self.ox + self.bx0 * self.k - 4
+        ext_pairs = [((ext_base, self.Y(y)), (x_pt + 5, self.Y(y)))
+                     for y in coords]
+        self.dim_row_along(ext_pairs, station_pts, labels, 90.0)
 
     def draw_dims(self):
         fx, fy = self._features()

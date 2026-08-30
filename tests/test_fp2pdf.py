@@ -383,3 +383,22 @@ def test_convert_warns_on_an_unrecognized_door_type_but_still_renders(
     assert out.exists()
     assert len(result.warnings) == 1
     assert door_type in result.warnings[0]
+
+
+# ---------------------------------------------------------------------------
+# 0119-ruling.md sec3 / 0123-ruling.md sec3 item 1 -- dim_row_along shared by
+# the two orthogonal rows (GREEN: no visible change, existing tests unchanged)
+# ---------------------------------------------------------------------------
+
+def test_convert_renders_the_rect_doc_unchanged_after_the_refactor(tmp_path):
+    """The GREEN receipt: existing dimension tests unchanged, and the
+    corpus telescoping census (docs/evidence/pdf_dimension_telescoping_census.py)
+    re-run identical (964 raw -> 856 clustered, per 0121-report.md) --
+    checked by hand alongside this receipt, not re-asserted here since it
+    needs the real corpus, not a synthetic doc."""
+    pytest.importorskip("reportlab")
+    out = tmp_path / "out.pdf"
+    result = convert(_rect_doc(), out, _MINIMAL_META)
+    assert isinstance(result, ConvertResult)
+    assert result.warnings == []
+    assert out.exists()
