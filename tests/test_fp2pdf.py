@@ -202,3 +202,184 @@ def test_main_round_trips_a_design_via_the_cli(tmp_path):
     fp2pdf.main([str(design_path), "-o", str(out_path),
                 "--title", "Test House", "--author", "Tester"])
     assert out_path.exists()
+
+
+# ---------------------------------------------------------------------------
+# 0118-ruling.md sec2 -- D82: drifted stations pile up, so cluster first,
+# then round the SURVIVING stations before differencing (telescoping labels)
+# ---------------------------------------------------------------------------
+
+def test_cluster_stations_merges_a_drifted_pair_within_one_inch():
+    """The sheet's own resolution is 1" after D82's whole-inch labels -- a
+    drifted wall's near-duplicate station 0.07" from a clean one used to
+    mint its own extension line, tick and rotated label crammed onto a
+    fraction of a point (the pile-up Patrick reported)."""
+    merged = fp2pdf.cluster_stations([100.0, 100.07, 250.0])
+    assert len(merged) == 2
+    assert merged[0] == pytest.approx((100.0 + 100.07) / 2)
+    assert merged[1] == 250.0
+
+
+def test_cluster_stations_keeps_a_two_inch_outlier_separate():
+    """0118-ruling.md sec2's own boundary: 1.6"-3" drift outliers SURVIVE
+    clustering and show as honest slivers -- exactly the walls worth
+    snapping, not hidden by this presentation-side fix."""
+    merged = fp2pdf.cluster_stations([100.0, 102.0])
+    assert merged == [100.0, 102.0]
+
+
+def test_cluster_stations_chains_a_transitive_run():
+    """A run of stations each within tol of its predecessor collapses to
+    one cluster even though the run's own span (0.9) exceeds a single
+    pairwise gap -- documented behaviour, not an accident."""
+    merged = fp2pdf.cluster_stations([0.0, 0.5, 0.9])
+    assert len(merged) == 1
+
+
+def test_rounded_station_labels_telescope_where_naive_rounding_would_not():
+    """The classic drafting bug: rounding each segment's own length
+    independently does not sum to the rounded overall. Stations 0.0, 10.4,
+    20.6, 31.0 -- naive per-segment rounding gives 10 + 10 + 10 = 30, one
+    inch short of round(31.0) = 31. Rounding the STATIONS first and
+    differencing (0118-ruling.md sec2 step 2, `_rounded_stations`) is what
+    `dim_row_x`/`dim_row_y` now do, and it telescopes by construction."""
+    coords = [0.0, 10.4, 20.6, 31.0]
+    naive = [round(b - a) for a, b in zip(coords, coords[1:], strict=False)]
+    assert sum(naive) != round(coords[-1] - coords[0]), (
+        "the naive approach was supposed to disagree -- fixture no longer "
+        "demonstrates the bug this receipt exists for")
+    rounded = fp2pdf._rounded_stations(coords)
+    segments = [b - a for a, b in zip(rounded, rounded[1:], strict=False)]
+    assert sum(segments) == rounded[-1] - rounded[0]
+    assert rounded[-1] - rounded[0] == round(coords[-1] - coords[0])
+
+
+def _drift_pair_doc():
+    """Two independent walls whose facing ends sit 0.07" apart on the same
+    line -- exactly the drift D61/D63/D64/D65 leave behind, and the shape
+    of Patrick's own complaint: "when walls are slightly off then there is
+    a mess of dimensions on top of each other"."""
+    return {
+        "format": "floorplanner-design", "version": 5,
+        "levels": [_MINIMAL_LEVEL],
+        "vertices": [
+            {"id": "v1", "x": 0, "y": 0}, {"id": "v2", "x": 100.0, "y": 0},
+            {"id": "v3", "x": 100.07, "y": 0}, {"id": "v4", "x": 200.0, "y": 0},
+        ],
+        "walls": [
+            {"id": "w1", "level": "L1", "v1": "v1", "v2": "v2",
+             "type": "exterior", "openings": []},
+            {"id": "w2", "level": "L1", "v1": "v3", "v2": "v4",
+             "type": "exterior", "openings": []},
+        ],
+        "rooms": [], "furnishings": [],
+    }
+
+
+def test_features_collapses_a_0_07_inch_drift_pair_into_one_station():
+    """Fail-first per 0118-ruling.md sec4's own receipt list: before
+    clustering, `_features()` minted one station per distinct (rounded to
+    0.001") x value -- four raw endpoints here (0, 100.0, 100.07, 200.0)
+    become FOUR stations, not three, and the 0.07" pair renders as its own
+    crammed dimension segment."""
+    sheet = fp2pdf.Sheet(None, _drift_pair_doc(), _MINIMAL_LEVEL,
+                          fp2pdf._default_thickness(), False, _MINIMAL_META)
+    fx, _fy = sheet._features()
+    assert len(fx) == 3, f"expected the drifted pair to merge, got {fx}"
+    assert fx[0] == 0.0
+    assert fx[-1] == 200.0
+
+
+# ---------------------------------------------------------------------------
+# 0118-ruling.md sec3 -- D81: one symbol per catalog door_type, keyed off
+# the real vocabulary (`walls.py:_paint_door`'s), not the never-true
+# `door_type == "sliding"` check
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("door_type,expected", [
+    ("LH", "swing"), ("RH", "swing"), ("", "swing"),
+    ("FRENCH", "french"), ("BIFOLD", "bifold"), ("POCKET", "pocket"),
+    ("SLIDER", "slider"), ("DOORWAY", "doorway"),
+    ("GARAGE-1", "garage"), ("GARAGE-2", "garage"),
+    ("garage-1", "garage"),          # case-insensitive, like the rest
+])
+def test_door_symbol_dispatches_every_catalog_value(door_type, expected):
+    """`floorplanner/config.py:DOOR_TYPES`'s full vocabulary, one assertion
+    per value -- 0118-ruling.md sec4's own receipt list."""
+    assert fp2pdf._door_symbol("door", door_type) == expected
+
+
+def test_door_symbol_flags_sliding_as_unknown_not_a_silent_swing():
+    """D81's actual finding: `door_type == "sliding"` can never be true
+    against this catalog, so it silently fell through to a generic swing.
+    It must now be named, not absorbed."""
+    assert fp2pdf._door_symbol("door", "sliding") == "unknown"
+    assert fp2pdf._door_symbol("door", "made-up-type") == "unknown"
+
+
+def test_door_symbol_gate_is_always_a_swing_regardless_of_door_type():
+    """`door_type` is schema-documented as meaningful only when kind ==
+    "door" -- a gate's own field (if present at all) must not steer it."""
+    assert fp2pdf._door_symbol("gate", "anything") == "swing"
+
+
+def test_door_symbol_non_door_kind_is_not_a_door_at_all():
+    assert fp2pdf._door_symbol("window", "LH") is None
+
+
+def _door_doc(door_type):
+    """One 200" wall carrying a single door/gate opening of `door_type`,
+    centred, wide enough for FRENCH's half-width leaves to stay positive."""
+    kind = "gate" if door_type == "GATE" else "door"
+    return {
+        "format": "floorplanner-design", "version": 5,
+        "levels": [_MINIMAL_LEVEL],
+        "vertices": [
+            {"id": "v1", "x": 0, "y": 0}, {"id": "v2", "x": 200.0, "y": 0},
+            {"id": "v3", "x": 200.0, "y": 150.0},
+            {"id": "v4", "x": 0, "y": 150.0},
+        ],
+        "walls": [
+            {"id": "w1", "level": "L1", "v1": "v1", "v2": "v2",
+             "type": "exterior", "openings": [
+                 {"id": "o1", "kind": kind, "code": "3068",
+                  "anchor": {"from": "center", "offset_in": 0.0},
+                  "door_type": door_type, "hinge": "v1",
+                  "swings_toward": "left"}]},
+            {"id": "w2", "level": "L1", "v1": "v2", "v2": "v3",
+             "type": "exterior", "openings": []},
+            {"id": "w3", "level": "L1", "v1": "v3", "v2": "v4",
+             "type": "exterior", "openings": []},
+            {"id": "w4", "level": "L1", "v1": "v4", "v2": "v1",
+             "type": "exterior", "openings": []},
+        ],
+        "rooms": [], "furnishings": [],
+    }
+
+
+@pytest.mark.parametrize("door_type", [
+    "LH", "RH", "FRENCH", "BIFOLD", "POCKET", "SLIDER", "DOORWAY",
+    "GARAGE-1", "GARAGE-2", "GATE",
+])
+def test_convert_renders_every_catalog_door_type_without_raising(
+        tmp_path, door_type):
+    pytest.importorskip("reportlab")
+    out = tmp_path / "out.pdf"
+    result = convert(_door_doc(door_type), out, _MINIMAL_META)
+    assert out.exists()
+    assert result.warnings == []
+
+
+@pytest.mark.parametrize("door_type", ["sliding", "made-up-type"])
+def test_convert_warns_on_an_unrecognized_door_type_but_still_renders(
+        tmp_path, door_type):
+    """D81 sec3's own instruction: an unknown value draws the generic
+    swing AND is listed in `ConvertResult.warnings` -- not silently
+    absorbed, which is exactly how `"sliding"` went unnoticed the first
+    time."""
+    pytest.importorskip("reportlab")
+    out = tmp_path / "out.pdf"
+    result = convert(_door_doc(door_type), out, _MINIMAL_META)
+    assert out.exists()
+    assert len(result.warnings) == 1
+    assert door_type in result.warnings[0]
