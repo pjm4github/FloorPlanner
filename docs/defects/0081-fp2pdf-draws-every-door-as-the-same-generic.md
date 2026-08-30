@@ -4,8 +4,8 @@ id: 81
 title: "fp2pdf draws every door as the same generic swing leaf, never reading the catalog door_type"
 
 # maps directly onto GitHub Issues fields
-state: open
-state_reason: null
+state: closed
+state_reason: completed
 labels:
   - type:defect
   - area:io
@@ -13,7 +13,7 @@ milestone: null
 
 # ours; becomes body prose after migration
 opened: 2026-08-28
-closed: null
+closed: 2026-08-30
 closed_by: null
 rank: 81
 related: []
@@ -66,3 +66,16 @@ than adding more special-case string literals one at a time — `fp2dxf.py:324`
 already appends the raw `door_type` string into its exported entity, which is
 a second, differently-shaped precedent worth reading before choosing this
 fix's shape.
+
+## Ruling
+
+**Closed 2026‑08‑30, [`handoff/0118-ruling.md`](../handoff/0118-ruling.md) →
+[`0122-report.md`](../handoff/0122-report.md).** `_door_symbol()` now
+dispatches on the real catalog (`LH`/`RH`/`FRENCH`/`BIFOLD`/`POCKET`/
+`SLIDER`/`DOORWAY`/`GARAGE-*`), each drawn distinctly in
+`floorplanner/export/fp2pdf.py:draw_opening`, keyed off
+`walls.py:_paint_door` as the reference rendering; an unrecognized
+`door_type` still draws the generic swing but is named in
+`ConvertResult.warnings`, not silently absorbed. Patrick's own check on
+[PR #43](https://github.com/pjm4github/FloorPlanner/pull/43) passed
+("looks pretty good"); merged to `main` at `36fb6b5`.

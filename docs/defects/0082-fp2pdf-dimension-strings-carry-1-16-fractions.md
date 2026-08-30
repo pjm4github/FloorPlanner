@@ -4,8 +4,8 @@ id: 82
 title: "fp2pdf dimension strings carry 1/16\" fractions Patrick wants whole feet-inches only"
 
 # maps directly onto GitHub Issues fields
-state: open
-state_reason: null
+state: closed
+state_reason: completed
 labels:
   - type:task
   - area:io
@@ -13,7 +13,7 @@ milestone: null
 
 # ours; becomes body prose after migration
 opened: 2026-08-28
-closed: null
+closed: 2026-08-30
 closed_by: null
 rank: 82
 related: []
@@ -55,3 +55,23 @@ reads without changing any stored geometry — worth a differential receipt
 ambiguous or that disagrees with its neighbour's rounded total) before
 shipping, per this project's own rule that a task changing what an operation
 reports owes a receipt.
+
+## Ruling
+
+**Closed 2026‑08‑30, [`handoff/0118-ruling.md`](../handoff/0118-ruling.md) →
+[`0122-report.md`](../handoff/0122-report.md).** Built as **station
+clustering + whole-inch telescoping**, not naive independent rounding
+(`0118` §2): drifted stations under the sheet's own 1″ resolution merge to
+their mean first, then `dim_row_x`/`dim_row_y` label adjacent pairs from
+ROUNDED stations so row 1 sums to row 2 exactly — the differential receipt
+this record itself called for, run corpus-wide at
+`docs/evidence/pdf_dimension_telescoping_census.py` (964→856 stations
+across 21 real sheets, telescoping holds on every one).
+**Scope, precisely: the wall-run dimension ROWS only** — `ftin()` itself is
+unchanged and every other caller (room clear-size / ceiling-height labels
+in `draw_rooms`) still prints its 1/16″ form, per `0118` §2's own text
+("`ftin` keeps its 1/16″ form for anything else that calls it"); this
+record's own "Site" section named the dimension rows specifically, not
+those labels. Patrick's own check on
+[PR #43](https://github.com/pjm4github/FloorPlanner/pull/43) passed;
+merged to `main` at `36fb6b5`.
