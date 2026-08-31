@@ -1,0 +1,5726 @@
+{
+ "format": "floorplanner-design",
+ "version": 5,
+ "units": "inches",
+ "settings": {
+  "wall_snap_in": 6.0,
+  "rotate_snap_deg": 15.0,
+  "canvas_w_in": 2400.0,
+  "canvas_h_in": 1200.0,
+  "cost_per_sqft": 300.0,
+  "vertex_weld_in": 0.6,
+  "join_tol_in": 9.0,
+  "area_basis": "centerline",
+  "editing": {
+   "shuffle": false,
+   "auto_coalesce": true,
+   "auto_weld": true,
+   "auto_bind": true
+  },
+  "active_floor": "default"
+ },
+ "levels": [
+  {
+   "id": "L1",
+   "name": "default",
+   "elevation_in": 0.0,
+   "height_in": 96.0,
+   "kind": "storey",
+   "reference": false
+  },
+  {
+   "id": "L2",
+   "name": "upper",
+   "elevation_in": 0.0,
+   "height_in": 96.0,
+   "kind": "storey",
+   "reference": false
+  }
+ ],
+ "vertices": [
+  {
+   "id": "v1",
+   "level": "L1",
+   "x": 161.0001,
+   "y": 839.9583
+  },
+  {
+   "id": "v2",
+   "level": "L1",
+   "x": 162.0,
+   "y": 192.0
+  },
+  {
+   "id": "v3",
+   "level": "L1",
+   "x": 162.0,
+   "y": 336.0
+  },
+  {
+   "id": "v4",
+   "level": "L1",
+   "x": 162.0001,
+   "y": 695.9583
+  },
+  {
+   "id": "v5",
+   "level": "L1",
+   "x": 162.2818,
+   "y": 594.0
+  },
+  {
+   "id": "v6",
+   "level": "L1",
+   "x": 192.0,
+   "y": 695.9693
+  },
+  {
+   "id": "v7",
+   "level": "L1",
+   "x": 228.0,
+   "y": 695.9824
+  },
+  {
+   "id": "v8",
+   "level": "L1",
+   "x": 246.0,
+   "y": 695.989
+  },
+  {
+   "id": "v9",
+   "level": "L1",
+   "x": 276.0,
+   "y": 594.0
+  },
+  {
+   "id": "v10",
+   "level": "L1",
+   "x": 276.0,
+   "y": 696.0
+  },
+  {
+   "id": "v11",
+   "level": "L1",
+   "x": 276.0,
+   "y": 744.0
+  },
+  {
+   "id": "v12",
+   "level": "L1",
+   "x": 336.0,
+   "y": 336.0
+  },
+  {
+   "id": "v13",
+   "level": "L1",
+   "x": 336.0,
+   "y": 408.0001
+  },
+  {
+   "id": "v14",
+   "level": "L1",
+   "x": 336.0,
+   "y": 456.0
+  },
+  {
+   "id": "v15",
+   "level": "L1",
+   "x": 336.0,
+   "y": 546.0
+  },
+  {
+   "id": "v16",
+   "level": "L1",
+   "x": 336.0,
+   "y": 594.0
+  },
+  {
+   "id": "v17",
+   "level": "L1",
+   "x": 347.0,
+   "y": 336.0
+  },
+  {
+   "id": "v18",
+   "level": "L1",
+   "x": 365.9706,
+   "y": 317.0294
+  },
+  {
+   "id": "v19",
+   "level": "L1",
+   "x": 414.0,
+   "y": 456.0
+  },
+  {
+   "id": "v20",
+   "level": "L1",
+   "x": 414.0,
+   "y": 546.1461
+  },
+  {
+   "id": "v21",
+   "level": "L1",
+   "x": 422.0294,
+   "y": 317.0294
+  },
+  {
+   "id": "v22",
+   "level": "L1",
+   "x": 441.0,
+   "y": 336.0
+  },
+  {
+   "id": "v23",
+   "level": "L1",
+   "x": 456.0,
+   "y": 594.0
+  },
+  {
+   "id": "v24",
+   "level": "L1",
+   "x": 456.0,
+   "y": 696.0
+  },
+  {
+   "id": "v25",
+   "level": "L1",
+   "x": 456.0,
+   "y": 744.0
+  },
+  {
+   "id": "v26",
+   "level": "L1",
+   "x": 491.9992,
+   "y": 546.3453
+  },
+  {
+   "id": "v27",
+   "level": "L1",
+   "x": 491.9994,
+   "y": 516.0
+  },
+  {
+   "id": "v28",
+   "level": "L1",
+   "x": 491.9997,
+   "y": 456.0
+  },
+  {
+   "id": "v29",
+   "level": "L1",
+   "x": 491.9998,
+   "y": 408.0
+  },
+  {
+   "id": "v30",
+   "level": "L1",
+   "x": 492.0,
+   "y": 336.0
+  },
+  {
+   "id": "v31",
+   "level": "L1",
+   "x": 540.0,
+   "y": 336.0
+  },
+  {
+   "id": "v32",
+   "level": "L1",
+   "x": 540.0,
+   "y": 408.0
+  },
+  {
+   "id": "v33",
+   "level": "L1",
+   "x": 540.0,
+   "y": 516.0
+  },
+  {
+   "id": "v34",
+   "level": "L1",
+   "x": 540.0,
+   "y": 546.0
+  },
+  {
+   "id": "v35",
+   "level": "L1",
+   "x": 648.0,
+   "y": 594.0
+  },
+  {
+   "id": "v36",
+   "level": "L1",
+   "x": 648.0,
+   "y": 696.0
+  },
+  {
+   "id": "v37",
+   "level": "L1",
+   "x": 648.0,
+   "y": 744.0
+  },
+  {
+   "id": "v38",
+   "level": "L1",
+   "x": 726.0,
+   "y": 594.0
+  },
+  {
+   "id": "v39",
+   "level": "L1",
+   "x": 726.3683,
+   "y": 408.0007
+  },
+  {
+   "id": "v40",
+   "level": "L1",
+   "x": 726.4871,
+   "y": 348.001
+  },
+  {
+   "id": "v41",
+   "level": "L1",
+   "x": 726.5086,
+   "y": 337.1765
+  },
+  {
+   "id": "v42",
+   "level": "L1",
+   "x": 726.5119,
+   "y": 335.5001
+  },
+  {
+   "id": "v43",
+   "level": "L1",
+   "x": 742.4193,
+   "y": 193.5807
+  },
+  {
+   "id": "v44",
+   "level": "L1",
+   "x": 815.6074,
+   "y": 246.4047
+  },
+  {
+   "id": "v45",
+   "level": "L1",
+   "x": 828.0,
+   "y": 594.0
+  },
+  {
+   "id": "v46",
+   "level": "L1",
+   "x": 828.0,
+   "y": 600.0
+  },
+  {
+   "id": "v47",
+   "level": "L1",
+   "x": 828.0,
+   "y": 606.0
+  },
+  {
+   "id": "v48",
+   "level": "L1",
+   "x": 828.0,
+   "y": 616.9905
+  },
+  {
+   "id": "v49",
+   "level": "L1",
+   "x": 828.0,
+   "y": 693.987
+  },
+  {
+   "id": "v50",
+   "level": "L1",
+   "x": 828.0,
+   "y": 696.0
+  },
+  {
+   "id": "v51",
+   "level": "L1",
+   "x": 828.0,
+   "y": 744.0
+  },
+  {
+   "id": "v52",
+   "level": "L1",
+   "x": 840.0,
+   "y": 96.0
+  },
+  {
+   "id": "v53",
+   "level": "L1",
+   "x": 859.2302,
+   "y": 246.0
+  },
+  {
+   "id": "v54",
+   "level": "L1",
+   "x": 891.8639,
+   "y": 381.4306
+  },
+  {
+   "id": "v55",
+   "level": "L1",
+   "x": 893.7089,
+   "y": 496.1283
+  },
+  {
+   "id": "v56",
+   "level": "L1",
+   "x": 894.0,
+   "y": 96.0
+  },
+  {
+   "id": "v57",
+   "level": "L1",
+   "x": 894.1155,
+   "y": 447.0612
+  },
+  {
+   "id": "v58",
+   "level": "L1",
+   "x": 902.6204,
+   "y": 607.7748
+  },
+  {
+   "id": "v59",
+   "level": "L1",
+   "x": 904.3952,
+   "y": 606.0
+  },
+  {
+   "id": "v60",
+   "level": "L1",
+   "x": 906.0,
+   "y": 606.0
+  },
+  {
+   "id": "v61",
+   "level": "L1",
+   "x": 906.0,
+   "y": 696.0
+  },
+  {
+   "id": "v62",
+   "level": "L1",
+   "x": 925.805,
+   "y": 415.3717
+  },
+  {
+   "id": "v63",
+   "level": "L1",
+   "x": 935.0,
+   "y": 840.0
+  },
+  {
+   "id": "v64",
+   "level": "L1",
+   "x": 936.0,
+   "y": 696.0
+  },
+  {
+   "id": "v65",
+   "level": "L1",
+   "x": 941.3385,
+   "y": 544.3305
+  },
+  {
+   "id": "v66",
+   "level": "L1",
+   "x": 943.9297,
+   "y": 330.6942
+  },
+  {
+   "id": "v67",
+   "level": "L1",
+   "x": 951.9777,
+   "y": 153.9777
+  },
+  {
+   "id": "v68",
+   "level": "L1",
+   "x": 953.532,
+   "y": 556.8631
+  },
+  {
+   "id": "v69",
+   "level": "L1",
+   "x": 960.0,
+   "y": 696.0
+  },
+  {
+   "id": "v70",
+   "level": "L1",
+   "x": 961.9774,
+   "y": 565.3878
+  },
+  {
+   "id": "v71",
+   "level": "L1",
+   "x": 969.8335,
+   "y": 170.0698
+  },
+  {
+   "id": "v72",
+   "level": "L1",
+   "x": 977.2488,
+   "y": 364.1755
+  },
+  {
+   "id": "v73",
+   "level": "L1",
+   "x": 998.0,
+   "y": 487.669
+  },
+  {
+   "id": "v74",
+   "level": "L1",
+   "x": 1013.7027,
+   "y": 262.7027
+  },
+  {
+   "id": "v75",
+   "level": "L1",
+   "x": 1026.6148,
+   "y": 630.6319
+  },
+  {
+   "id": "v76",
+   "level": "L1",
+   "x": 1037.7976,
+   "y": 238.6078
+  },
+  {
+   "id": "v77",
+   "level": "L1",
+   "x": 1046.3785,
+   "y": 295.3785
+  },
+  {
+   "id": "v78",
+   "level": "L1",
+   "x": 1048.9117,
+   "y": 436.7573
+  },
+  {
+   "id": "v79",
+   "level": "L1",
+   "x": 1092.9519,
+   "y": 183.4535
+  },
+  {
+   "id": "v80",
+   "level": "L1",
+   "x": 1118.4736,
+   "y": 367.4736
+  },
+  {
+   "id": "v81",
+   "level": "L1",
+   "x": 1157.6259,
+   "y": 761.643
+  },
+  {
+   "id": "v82",
+   "level": "L1",
+   "x": 1198.009,
+   "y": 288.5106
+  },
+  {
+   "id": "v83",
+   "level": "L1",
+   "x": 1299.8323,
+   "y": 186.6873
+  },
+  {
+   "id": "v84",
+   "level": "L1",
+   "x": 1516.2069,
+   "y": 403.0619
+  },
+  {
+   "id": "v85",
+   "level": "L2",
+   "x": 162.0786,
+   "y": 408.0022
+  },
+  {
+   "id": "v86",
+   "level": "L2",
+   "x": 162.2818,
+   "y": 594.0
+  },
+  {
+   "id": "v87",
+   "level": "L2",
+   "x": 276.0,
+   "y": 594.0
+  },
+  {
+   "id": "v88",
+   "level": "L2",
+   "x": 276.0,
+   "y": 696.0
+  },
+  {
+   "id": "v89",
+   "level": "L2",
+   "x": 276.0,
+   "y": 744.0
+  },
+  {
+   "id": "v90",
+   "level": "L2",
+   "x": 336.0,
+   "y": 408.0001
+  },
+  {
+   "id": "v91",
+   "level": "L2",
+   "x": 336.0,
+   "y": 456.0
+  },
+  {
+   "id": "v92",
+   "level": "L2",
+   "x": 336.0,
+   "y": 546.0
+  },
+  {
+   "id": "v93",
+   "level": "L2",
+   "x": 336.0,
+   "y": 594.0
+  },
+  {
+   "id": "v94",
+   "level": "L2",
+   "x": 413.9999,
+   "y": 546.1727
+  },
+  {
+   "id": "v95",
+   "level": "L2",
+   "x": 456.0,
+   "y": 594.0
+  },
+  {
+   "id": "v96",
+   "level": "L2",
+   "x": 456.0,
+   "y": 696.0
+  },
+  {
+   "id": "v97",
+   "level": "L2",
+   "x": 456.0,
+   "y": 744.0
+  },
+  {
+   "id": "v98",
+   "level": "L2",
+   "x": 491.9992,
+   "y": 546.3453
+  },
+  {
+   "id": "v99",
+   "level": "L2",
+   "x": 491.9993,
+   "y": 516.0
+  },
+  {
+   "id": "v100",
+   "level": "L2",
+   "x": 491.9996,
+   "y": 456.0
+  },
+  {
+   "id": "v101",
+   "level": "L2",
+   "x": 491.9998,
+   "y": 408.0
+  },
+  {
+   "id": "v102",
+   "level": "L2",
+   "x": 540.0,
+   "y": 408.0
+  },
+  {
+   "id": "v103",
+   "level": "L2",
+   "x": 540.0,
+   "y": 516.0
+  },
+  {
+   "id": "v104",
+   "level": "L2",
+   "x": 540.0,
+   "y": 546.0
+  },
+  {
+   "id": "v105",
+   "level": "L2",
+   "x": 648.0,
+   "y": 594.0
+  },
+  {
+   "id": "v106",
+   "level": "L2",
+   "x": 648.0,
+   "y": 696.0
+  },
+  {
+   "id": "v107",
+   "level": "L2",
+   "x": 648.0,
+   "y": 744.0
+  },
+  {
+   "id": "v108",
+   "level": "L2",
+   "x": 726.0,
+   "y": 594.0
+  },
+  {
+   "id": "v109",
+   "level": "L2",
+   "x": 726.0951,
+   "y": 545.9968
+  },
+  {
+   "id": "v110",
+   "level": "L2",
+   "x": 726.3683,
+   "y": 408.0
+  },
+  {
+   "id": "v111",
+   "level": "L2",
+   "x": 828.0,
+   "y": 408.0
+  },
+  {
+   "id": "v112",
+   "level": "L2",
+   "x": 828.0,
+   "y": 594.0
+  },
+  {
+   "id": "v113",
+   "level": "L2",
+   "x": 828.0,
+   "y": 616.9905
+  },
+  {
+   "id": "v114",
+   "level": "L2",
+   "x": 828.0,
+   "y": 693.987
+  },
+  {
+   "id": "v115",
+   "level": "L2",
+   "x": 828.0,
+   "y": 696.0
+  },
+  {
+   "id": "v116",
+   "level": "L2",
+   "x": 828.0,
+   "y": 744.0
+  }
+ ],
+ "walls": [
+  {
+   "id": "w1",
+   "level": "L1",
+   "v1": "v1",
+   "v2": "v4",
+   "type": "railing",
+   "left": null,
+   "right": "r17",
+   "openings": []
+  },
+  {
+   "id": "w2",
+   "level": "L1",
+   "v1": "v1",
+   "v2": "v63",
+   "type": "railing",
+   "left": "r17",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w3",
+   "level": "L1",
+   "v1": "v2",
+   "v2": "v43",
+   "type": "railing",
+   "left": null,
+   "right": "r2",
+   "openings": []
+  },
+  {
+   "id": "w4",
+   "level": "L1",
+   "v1": "v3",
+   "v2": "v2",
+   "type": "railing",
+   "left": null,
+   "right": "r2",
+   "openings": []
+  },
+  {
+   "id": "w5",
+   "level": "L1",
+   "v1": "v3",
+   "v2": "v5",
+   "type": "exterior",
+   "left": "r12",
+   "right": null,
+   "openings": [
+    {
+     "id": "o1",
+     "kind": "window",
+     "code": "3648",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 40.0
+     }
+    },
+    {
+     "id": "o2",
+     "kind": "window",
+     "code": "3648",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 91.999
+     }
+    }
+   ]
+  },
+  {
+   "id": "w6",
+   "level": "L1",
+   "v1": "v4",
+   "v2": "v6",
+   "type": "exterior",
+   "left": "r19",
+   "right": "r17",
+   "openings": []
+  },
+  {
+   "id": "w7",
+   "level": "L1",
+   "v1": "v5",
+   "v2": "v4",
+   "type": "exterior",
+   "left": "r19",
+   "right": null,
+   "openings": [
+    {
+     "id": "o3",
+     "kind": "window",
+     "code": "3648",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 23.296
+     }
+    }
+   ]
+  },
+  {
+   "id": "w8",
+   "level": "L1",
+   "v1": "v5",
+   "v2": "v9",
+   "type": "interior",
+   "left": "r12",
+   "right": "r19",
+   "openings": []
+  },
+  {
+   "id": "w9",
+   "level": "L1",
+   "v1": "v6",
+   "v2": "v7",
+   "type": "exterior",
+   "left": "r19",
+   "right": "r17",
+   "openings": []
+  },
+  {
+   "id": "w10",
+   "level": "L1",
+   "v1": "v7",
+   "v2": "v8",
+   "type": "exterior",
+   "left": "r19",
+   "right": "r17",
+   "openings": []
+  },
+  {
+   "id": "w11",
+   "level": "L1",
+   "v1": "v8",
+   "v2": "v10",
+   "type": "exterior",
+   "left": "r19",
+   "right": "r17",
+   "openings": []
+  },
+  {
+   "id": "w12",
+   "level": "L1",
+   "v1": "v9",
+   "v2": "v16",
+   "type": "interior",
+   "left": "r12",
+   "right": "r10",
+   "openings": []
+  },
+  {
+   "id": "w13",
+   "level": "L1",
+   "v1": "v10",
+   "v2": "v9",
+   "type": "interior",
+   "left": "r19",
+   "right": "r10",
+   "openings": []
+  },
+  {
+   "id": "w14",
+   "level": "L1",
+   "v1": "v10",
+   "v2": "v11",
+   "type": "exterior",
+   "left": "r10",
+   "right": "r17",
+   "openings": []
+  },
+  {
+   "id": "w15",
+   "level": "L1",
+   "v1": "v11",
+   "v2": "v25",
+   "type": "exterior",
+   "left": "r10",
+   "right": "r17",
+   "openings": [
+    {
+     "id": "o4",
+     "kind": "window",
+     "code": "9648",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 40.0
+     }
+    }
+   ]
+  },
+  {
+   "id": "w16",
+   "level": "L1",
+   "v1": "v12",
+   "v2": "v3",
+   "type": "exterior",
+   "left": "r12",
+   "right": "r2",
+   "openings": [
+    {
+     "id": "o5",
+     "kind": "window",
+     "code": "2448",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 15.0
+     }
+    },
+    {
+     "id": "o6",
+     "kind": "door",
+     "code": "6080",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 51.0
+     },
+     "door_type": "FRENCH",
+     "hinge": "none",
+     "swings_toward": "left"
+    },
+    {
+     "id": "o7",
+     "kind": "window",
+     "code": "2448",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 23.003
+     }
+    }
+   ]
+  },
+  {
+   "id": "w17",
+   "level": "L1",
+   "v1": "v13",
+   "v2": "v12",
+   "type": "interior",
+   "left": "r12",
+   "right": "r11",
+   "openings": [
+    {
+     "id": "o8",
+     "kind": "door",
+     "code": "3680",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 13.0
+     },
+     "door_type": "RH",
+     "hinge": "v1",
+     "swings_toward": "right"
+    }
+   ]
+  },
+  {
+   "id": "w18",
+   "level": "L1",
+   "v1": "v14",
+   "v2": "v13",
+   "type": "interior",
+   "left": "r12",
+   "right": "r11",
+   "openings": []
+  },
+  {
+   "id": "w19",
+   "level": "L1",
+   "v1": "v14",
+   "v2": "v19",
+   "type": "interior",
+   "left": "r11",
+   "right": "r24",
+   "openings": []
+  },
+  {
+   "id": "w20",
+   "level": "L1",
+   "v1": "v15",
+   "v2": "v14",
+   "type": "interior",
+   "left": "r12",
+   "right": "r24",
+   "openings": [
+    {
+     "id": "o9",
+     "kind": "door",
+     "code": "3280",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 29.0
+     },
+     "door_type": "LH",
+     "hinge": "v1",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w21",
+   "level": "L1",
+   "v1": "v15",
+   "v2": "v20",
+   "type": "interior",
+   "left": "r24",
+   "right": "r7",
+   "openings": []
+  },
+  {
+   "id": "w22",
+   "level": "L1",
+   "v1": "v16",
+   "v2": "v15",
+   "type": "interior",
+   "left": "r12",
+   "right": "r7",
+   "openings": [
+    {
+     "id": "o10",
+     "kind": "door",
+     "code": "3680",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 5.0
+     },
+     "door_type": "LH",
+     "hinge": "v2",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w23",
+   "level": "L1",
+   "v1": "v16",
+   "v2": "v23",
+   "type": "interior",
+   "left": "r7",
+   "right": "r10",
+   "openings": [
+    {
+     "id": "o11",
+     "kind": "door",
+     "code": "6080",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 20.0
+     },
+     "door_type": "DOORWAY",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w24",
+   "level": "L1",
+   "v1": "v17",
+   "v2": "v12",
+   "type": "exterior",
+   "left": "r11",
+   "right": "r2",
+   "openings": []
+  },
+  {
+   "id": "w25",
+   "level": "L1",
+   "v1": "v17",
+   "v2": "v18",
+   "type": "exterior",
+   "left": "r2",
+   "right": "r11",
+   "openings": []
+  },
+  {
+   "id": "w26",
+   "level": "L1",
+   "v1": "v19",
+   "v2": "v20",
+   "type": "interior",
+   "left": "r20",
+   "right": "r24",
+   "openings": []
+  },
+  {
+   "id": "w27",
+   "level": "L1",
+   "v1": "v19",
+   "v2": "v28",
+   "type": "interior",
+   "left": "r11",
+   "right": "r20",
+   "openings": []
+  },
+  {
+   "id": "w28",
+   "level": "L1",
+   "v1": "v20",
+   "v2": "v26",
+   "type": "interior",
+   "left": "r20",
+   "right": "r7",
+   "openings": [
+    {
+     "id": "o12",
+     "kind": "door",
+     "code": "4880",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 10.999
+     },
+     "door_type": "BIFOLD",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w29",
+   "level": "L1",
+   "v1": "v21",
+   "v2": "v18",
+   "type": "exterior",
+   "left": "r11",
+   "right": "r2",
+   "openings": [
+    {
+     "id": "o13",
+     "kind": "window",
+     "code": "3648",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 9.059
+     }
+    }
+   ]
+  },
+  {
+   "id": "w30",
+   "level": "L1",
+   "v1": "v22",
+   "v2": "v21",
+   "type": "exterior",
+   "left": "r11",
+   "right": "r2",
+   "openings": []
+  },
+  {
+   "id": "w31",
+   "level": "L1",
+   "v1": "v23",
+   "v2": "v35",
+   "type": "interior",
+   "left": "r7",
+   "right": "r4",
+   "openings": [
+    {
+     "id": "o14",
+     "kind": "door",
+     "code": "18080",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 5.0
+     },
+     "door_type": "DOORWAY",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w32",
+   "level": "L1",
+   "v1": "v24",
+   "v2": "v23",
+   "type": "interior",
+   "left": "r10",
+   "right": "r4",
+   "openings": [
+    {
+     "id": "o15",
+     "kind": "door",
+     "code": "4880",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 25.0
+     },
+     "door_type": "FRENCH",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w33",
+   "level": "L1",
+   "v1": "v24",
+   "v2": "v36",
+   "type": "exterior",
+   "left": "r4",
+   "right": "r17",
+   "openings": [
+    {
+     "id": "o16",
+     "kind": "window",
+     "code": "2448",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 19.0
+     }
+    },
+    {
+     "id": "o17",
+     "kind": "door",
+     "code": "6080",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 62.0
+     },
+     "door_type": "FRENCH",
+     "hinge": "none",
+     "swings_toward": "left"
+    },
+    {
+     "id": "o18",
+     "kind": "window",
+     "code": "2448",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 22.0
+     }
+    }
+   ]
+  },
+  {
+   "id": "w34",
+   "level": "L1",
+   "v1": "v25",
+   "v2": "v24",
+   "type": "exterior",
+   "left": "r10",
+   "right": "r17",
+   "openings": []
+  },
+  {
+   "id": "w35",
+   "level": "L1",
+   "v1": "v26",
+   "v2": "v27",
+   "type": "interior",
+   "left": "r20",
+   "right": "r1",
+   "openings": []
+  },
+  {
+   "id": "w36",
+   "level": "L1",
+   "v1": "v26",
+   "v2": "v34",
+   "type": "interior",
+   "left": "r1",
+   "right": "r7",
+   "openings": [
+    {
+     "id": "o19",
+     "kind": "door",
+     "code": "3280",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 6.538
+     },
+     "door_type": "LH",
+     "hinge": "v2",
+     "swings_toward": "right"
+    }
+   ]
+  },
+  {
+   "id": "w37",
+   "level": "L1",
+   "v1": "v27",
+   "v2": "v28",
+   "type": "interior",
+   "left": "r20",
+   "right": "r21",
+   "openings": []
+  },
+  {
+   "id": "w38",
+   "level": "L1",
+   "v1": "v27",
+   "v2": "v33",
+   "type": "interior",
+   "left": "r21",
+   "right": "r1",
+   "openings": []
+  },
+  {
+   "id": "w39",
+   "level": "L1",
+   "v1": "v28",
+   "v2": "v29",
+   "type": "interior",
+   "left": "r11",
+   "right": "r21",
+   "openings": []
+  },
+  {
+   "id": "w40",
+   "level": "L1",
+   "v1": "v29",
+   "v2": "v30",
+   "type": "interior",
+   "left": "r11",
+   "right": "r21",
+   "openings": []
+  },
+  {
+   "id": "w41",
+   "level": "L1",
+   "v1": "v30",
+   "v2": "v22",
+   "type": "exterior",
+   "left": "r11",
+   "right": "r2",
+   "openings": []
+  },
+  {
+   "id": "w42",
+   "level": "L1",
+   "v1": "v31",
+   "v2": "v30",
+   "type": "exterior",
+   "left": "r21",
+   "right": "r2",
+   "openings": []
+  },
+  {
+   "id": "w43",
+   "level": "L1",
+   "v1": "v31",
+   "v2": "v32",
+   "type": "interior",
+   "left": "r5",
+   "right": "r21",
+   "openings": []
+  },
+  {
+   "id": "w44",
+   "level": "L1",
+   "v1": "v32",
+   "v2": "v33",
+   "type": "interior",
+   "left": "r5",
+   "right": "r21",
+   "openings": []
+  },
+  {
+   "id": "w45",
+   "level": "L1",
+   "v1": "v33",
+   "v2": "v34",
+   "type": "interior",
+   "left": "r5",
+   "right": "r1",
+   "openings": []
+  },
+  {
+   "id": "w46",
+   "level": "L1",
+   "v1": "v35",
+   "v2": "v34",
+   "type": "interior",
+   "left": "r7",
+   "right": "r5",
+   "openings": [
+    {
+     "id": "o20",
+     "kind": "door",
+     "code": "10480",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 3.186
+     },
+     "door_type": "DOORWAY",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w47",
+   "level": "L1",
+   "v1": "v35",
+   "v2": "v38",
+   "type": "interior",
+   "left": "r5",
+   "right": "r3",
+   "openings": [
+    {
+     "id": "o21",
+     "kind": "door",
+     "code": "6080",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 5.0
+     },
+     "door_type": "DOORWAY",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w48",
+   "level": "L1",
+   "v1": "v36",
+   "v2": "v35",
+   "type": "interior",
+   "left": "r4",
+   "right": "r3",
+   "openings": [
+    {
+     "id": "o22",
+     "kind": "door",
+     "code": "4880",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 22.0
+     },
+     "door_type": "FRENCH",
+     "hinge": "none",
+     "swings_toward": "right"
+    }
+   ]
+  },
+  {
+   "id": "w49",
+   "level": "L1",
+   "v1": "v36",
+   "v2": "v37",
+   "type": "exterior",
+   "left": "r3",
+   "right": "r17",
+   "openings": []
+  },
+  {
+   "id": "w50",
+   "level": "L1",
+   "v1": "v37",
+   "v2": "v51",
+   "type": "exterior",
+   "left": "r3",
+   "right": "r17",
+   "openings": [
+    {
+     "id": "o23",
+     "kind": "window",
+     "code": "9648",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 40.0
+     }
+    }
+   ]
+  },
+  {
+   "id": "w51",
+   "level": "L1",
+   "v1": "v38",
+   "v2": "v39",
+   "type": "interior",
+   "left": "r5",
+   "right": "r9",
+   "openings": [
+    {
+     "id": "o24",
+     "kind": "door",
+     "code": "14080",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 0.002
+     },
+     "door_type": "DOORWAY",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w52",
+   "level": "L1",
+   "v1": "v39",
+   "v2": "v40",
+   "type": "interior",
+   "left": "r5",
+   "right": "r9",
+   "openings": []
+  },
+  {
+   "id": "w53",
+   "level": "L1",
+   "v1": "v40",
+   "v2": "v41",
+   "type": "interior",
+   "left": "r5",
+   "right": "r9",
+   "openings": []
+  },
+  {
+   "id": "w54",
+   "level": "L1",
+   "v1": "v41",
+   "v2": "v42",
+   "type": "interior",
+   "left": "r5",
+   "right": "r9",
+   "openings": []
+  },
+  {
+   "id": "w55",
+   "level": "L1",
+   "v1": "v42",
+   "v2": "v31",
+   "type": "exterior",
+   "left": "r5",
+   "right": "r2",
+   "openings": [
+    {
+     "id": "o25",
+     "kind": "door",
+     "code": "10080",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 35.513
+     },
+     "door_type": "SLIDER",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w56",
+   "level": "L1",
+   "v1": "v42",
+   "v2": "v44",
+   "type": "exterior",
+   "left": "r2",
+   "right": "r9",
+   "openings": [
+    {
+     "id": "o26",
+     "kind": "window",
+     "code": "3648",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 39.129
+     }
+    }
+   ]
+  },
+  {
+   "id": "w57",
+   "level": "L1",
+   "v1": "v45",
+   "v2": "v38",
+   "type": "interior",
+   "left": "r3",
+   "right": "r9",
+   "openings": []
+  },
+  {
+   "id": "w58",
+   "level": "L1",
+   "v1": "v46",
+   "v2": "v45",
+   "type": "interior",
+   "left": "r3",
+   "right": "r9",
+   "openings": []
+  },
+  {
+   "id": "w59",
+   "level": "L1",
+   "v1": "v47",
+   "v2": "v46",
+   "type": "interior",
+   "left": "r3",
+   "right": "r9",
+   "openings": []
+  },
+  {
+   "id": "w60",
+   "level": "L1",
+   "v1": "v48",
+   "v2": "v47",
+   "type": "interior",
+   "left": "r3",
+   "right": "r14",
+   "openings": []
+  },
+  {
+   "id": "w61",
+   "level": "L1",
+   "v1": "v49",
+   "v2": "v48",
+   "type": "interior",
+   "left": "r3",
+   "right": "r14",
+   "openings": [
+    {
+     "id": "o27",
+     "kind": "door",
+     "code": "5680",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 10.01
+     },
+     "door_type": "DOORWAY",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w62",
+   "level": "L1",
+   "v1": "v50",
+   "v2": "v49",
+   "type": "exterior",
+   "left": "r3",
+   "right": "r14",
+   "openings": []
+  },
+  {
+   "id": "w63",
+   "level": "L1",
+   "v1": "v50",
+   "v2": "v61",
+   "type": "exterior",
+   "left": "r14",
+   "right": "r17",
+   "openings": [
+    {
+     "id": "o28",
+     "kind": "window",
+     "code": "3648",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 20.0
+     }
+    }
+   ]
+  },
+  {
+   "id": "w64",
+   "level": "L1",
+   "v1": "v51",
+   "v2": "v50",
+   "type": "exterior",
+   "left": "r3",
+   "right": "r17",
+   "openings": []
+  },
+  {
+   "id": "w65",
+   "level": "L1",
+   "v1": "v52",
+   "v2": "v43",
+   "type": "railing",
+   "left": "r2",
+   "right": null,
+   "openings": [
+    {
+     "id": "o29",
+     "kind": "gate",
+     "code": "3280",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 47.0
+     }
+    }
+   ]
+  },
+  {
+   "id": "w66",
+   "level": "L1",
+   "v1": "v52",
+   "v2": "v56",
+   "type": "railing",
+   "left": null,
+   "right": "r2",
+   "openings": []
+  },
+  {
+   "id": "w67",
+   "level": "L1",
+   "v1": "v53",
+   "v2": "v44",
+   "type": "exterior",
+   "left": "r9",
+   "right": "r2",
+   "openings": [
+    {
+     "id": "o30",
+     "kind": "window",
+     "code": "2048",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 9.377
+     }
+    }
+   ]
+  },
+  {
+   "id": "w68",
+   "level": "L1",
+   "v1": "v54",
+   "v2": "v66",
+   "type": "interior",
+   "left": "r9",
+   "right": "r8",
+   "openings": []
+  },
+  {
+   "id": "w69",
+   "level": "L1",
+   "v1": "v56",
+   "v2": "v67",
+   "type": "railing",
+   "left": null,
+   "right": "r2",
+   "openings": []
+  },
+  {
+   "id": "w70",
+   "level": "L1",
+   "v1": "v57",
+   "v2": "v55",
+   "type": "interior",
+   "left": "r16",
+   "right": "r9",
+   "openings": []
+  },
+  {
+   "id": "w71",
+   "level": "L1",
+   "v1": "v57",
+   "v2": "v62",
+   "type": "interior",
+   "left": "r9",
+   "right": "r16",
+   "openings": [
+    {
+     "id": "o31",
+     "kind": "door",
+     "code": "3280",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 4.816
+     },
+     "door_type": "RH",
+     "hinge": "v1",
+     "swings_toward": "right"
+    }
+   ]
+  },
+  {
+   "id": "w72",
+   "level": "L1",
+   "v1": "v58",
+   "v2": "v59",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w73",
+   "level": "L1",
+   "v1": "v59",
+   "v2": "v47",
+   "type": "interior",
+   "left": "r14",
+   "right": "r9",
+   "openings": [
+    {
+     "id": "o32",
+     "kind": "door",
+     "code": "4880",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 12.395
+     },
+     "door_type": "DOORWAY",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w74",
+   "level": "L1",
+   "v1": "v59",
+   "v2": "v68",
+   "type": "interior",
+   "left": "r9",
+   "right": "r18",
+   "openings": [
+    {
+     "id": "o33",
+     "kind": "door",
+     "code": "3680",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 5.956
+     },
+     "door_type": "LH",
+     "hinge": "v1",
+     "swings_toward": "right"
+    }
+   ]
+  },
+  {
+   "id": "w75",
+   "level": "L1",
+   "v1": "v60",
+   "v2": "v59",
+   "type": "interior",
+   "left": "r14",
+   "right": "r18",
+   "openings": []
+  },
+  {
+   "id": "w76",
+   "level": "L1",
+   "v1": "v61",
+   "v2": "v60",
+   "type": "interior",
+   "left": "r14",
+   "right": "r18",
+   "openings": []
+  },
+  {
+   "id": "w77",
+   "level": "L1",
+   "v1": "v61",
+   "v2": "v64",
+   "type": "exterior",
+   "left": "r18",
+   "right": "r17",
+   "openings": []
+  },
+  {
+   "id": "w78",
+   "level": "L1",
+   "v1": "v62",
+   "v2": "v54",
+   "type": "interior",
+   "left": "r9",
+   "right": "r8",
+   "openings": [
+    {
+     "id": "o34",
+     "kind": "door",
+     "code": "3880",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 4.0
+     },
+     "door_type": "DOORWAY",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w79",
+   "level": "L1",
+   "v1": "v62",
+   "v2": "v72",
+   "type": "interior",
+   "left": "r8",
+   "right": "r13",
+   "openings": [
+    {
+     "id": "o35",
+     "kind": "door",
+     "code": "3680",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 8.0
+     },
+     "door_type": "LH",
+     "hinge": "v1",
+     "swings_toward": "right"
+    }
+   ]
+  },
+  {
+   "id": "w80",
+   "level": "L1",
+   "v1": "v64",
+   "v2": "v63",
+   "type": "railing",
+   "left": null,
+   "right": "r17",
+   "openings": []
+  },
+  {
+   "id": "w81",
+   "level": "L1",
+   "v1": "v64",
+   "v2": "v69",
+   "type": "exterior",
+   "left": "r18",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w82",
+   "level": "L1",
+   "v1": "v65",
+   "v2": "v55",
+   "type": "interior",
+   "left": "r9",
+   "right": "r16",
+   "openings": []
+  },
+  {
+   "id": "w83",
+   "level": "L1",
+   "v1": "v65",
+   "v2": "v73",
+   "type": "interior",
+   "left": "r16",
+   "right": "r6",
+   "openings": []
+  },
+  {
+   "id": "w84",
+   "level": "L1",
+   "v1": "v66",
+   "v2": "v53",
+   "type": "interior",
+   "left": "r9",
+   "right": "r22",
+   "openings": []
+  },
+  {
+   "id": "w85",
+   "level": "L1",
+   "v1": "v66",
+   "v2": "v74",
+   "type": "interior",
+   "left": "r22",
+   "right": "r8",
+   "openings": [
+    {
+     "id": "o36",
+     "kind": "door",
+     "code": "8080",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 6.422
+     },
+     "door_type": "DOORWAY",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w86",
+   "level": "L1",
+   "v1": "v67",
+   "v2": "v53",
+   "type": "exterior",
+   "left": "r22",
+   "right": "r2",
+   "openings": [
+    {
+     "id": "o37",
+     "kind": "door",
+     "code": "6080",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 27.653
+     },
+     "door_type": "SLIDER",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w87",
+   "level": "L1",
+   "v1": "v68",
+   "v2": "v65",
+   "type": "interior",
+   "left": "r9",
+   "right": "r6",
+   "openings": []
+  },
+  {
+   "id": "w88",
+   "level": "L1",
+   "v1": "v70",
+   "v2": "v68",
+   "type": "interior",
+   "left": "r18",
+   "right": "r6",
+   "openings": []
+  },
+  {
+   "id": "w89",
+   "level": "L1",
+   "v1": "v72",
+   "v2": "v77",
+   "type": "interior",
+   "left": "r8",
+   "right": "r23",
+   "openings": [
+    {
+     "id": "o38",
+     "kind": "door",
+     "code": "3680",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 26.0
+     },
+     "door_type": "LH",
+     "hinge": "v1",
+     "swings_toward": "right"
+    }
+   ]
+  },
+  {
+   "id": "w90",
+   "level": "L1",
+   "v1": "v72",
+   "v2": "v78",
+   "type": "interior",
+   "left": "r23",
+   "right": "r13",
+   "openings": []
+  },
+  {
+   "id": "w91",
+   "level": "L1",
+   "v1": "v73",
+   "v2": "v62",
+   "type": "interior",
+   "left": "r16",
+   "right": "r13",
+   "openings": []
+  },
+  {
+   "id": "w92",
+   "level": "L1",
+   "v1": "v73",
+   "v2": "v78",
+   "type": "interior",
+   "left": "r13",
+   "right": "r6",
+   "openings": [
+    {
+     "id": "o39",
+     "kind": "door",
+     "code": "3280",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 8.0
+     },
+     "door_type": "LH",
+     "hinge": "v1",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w93",
+   "level": "L1",
+   "v1": "v74",
+   "v2": "v76",
+   "type": "interior",
+   "left": "r22",
+   "right": "r15",
+   "openings": []
+  },
+  {
+   "id": "w94",
+   "level": "L1",
+   "v1": "v75",
+   "v2": "v69",
+   "type": "exterior",
+   "left": null,
+   "right": "r18",
+   "openings": [
+    {
+     "id": "o40",
+     "kind": "window",
+     "code": "3648",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 51.0
+     }
+    }
+   ]
+  },
+  {
+   "id": "w95",
+   "level": "L1",
+   "v1": "v75",
+   "v2": "v70",
+   "type": "interior",
+   "left": "r18",
+   "right": "r6",
+   "openings": []
+  },
+  {
+   "id": "w96",
+   "level": "L1",
+   "v1": "v75",
+   "v2": "v81",
+   "type": "exterior",
+   "left": "r6",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w97",
+   "level": "L1",
+   "v1": "v76",
+   "v2": "v67",
+   "type": "exterior",
+   "left": null,
+   "right": null,
+   "openings": [
+    {
+     "id": "o41",
+     "kind": "window",
+     "code": "3648",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 42.529
+     }
+    }
+   ]
+  },
+  {
+   "id": "w98",
+   "level": "L1",
+   "v1": "v77",
+   "v2": "v74",
+   "type": "interior",
+   "left": "r8",
+   "right": "r15",
+   "openings": [
+    {
+     "id": "o42",
+     "kind": "door",
+     "code": "3280",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 6.0
+     },
+     "door_type": "RH",
+     "hinge": "v2",
+     "swings_toward": "right"
+    }
+   ]
+  },
+  {
+   "id": "w99",
+   "level": "L1",
+   "v1": "v78",
+   "v2": "v80",
+   "type": "interior",
+   "left": "r23",
+   "right": "r6",
+   "openings": []
+  },
+  {
+   "id": "w100",
+   "level": "L1",
+   "v1": "v79",
+   "v2": "v76",
+   "type": "exterior",
+   "left": "r15",
+   "right": null,
+   "openings": [
+    {
+     "id": "o43",
+     "kind": "window",
+     "code": "3648",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 21.0
+     }
+    }
+   ]
+  },
+  {
+   "id": "w101",
+   "level": "L1",
+   "v1": "v80",
+   "v2": "v77",
+   "type": "interior",
+   "left": "r23",
+   "right": "r15",
+   "openings": []
+  },
+  {
+   "id": "w102",
+   "level": "L1",
+   "v1": "v80",
+   "v2": "v82",
+   "type": "interior",
+   "left": "r15",
+   "right": "r6",
+   "openings": []
+  },
+  {
+   "id": "w103",
+   "level": "L1",
+   "v1": "v81",
+   "v2": "v84",
+   "type": "exterior",
+   "left": "r6",
+   "right": null,
+   "openings": [
+    {
+     "id": "o44",
+     "kind": "door",
+     "code": "4080",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 28.0
+     },
+     "door_type": "LH",
+     "hinge": "v1",
+     "swings_toward": "left"
+    },
+    {
+     "id": "o45",
+     "kind": "window",
+     "code": "2448",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 82.0
+     }
+    },
+    {
+     "id": "o46",
+     "kind": "door",
+     "code": "19080",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 118.0
+     },
+     "door_type": "GARAGE-2",
+     "hinge": "none",
+     "swings_toward": "left"
+    },
+    {
+     "id": "o47",
+     "kind": "window",
+     "code": "2448",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 159.11
+     }
+    },
+    {
+     "id": "o48",
+     "kind": "door",
+     "code": "11080",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 13.262
+     },
+     "door_type": "GARAGE-1",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w104",
+   "level": "L1",
+   "v1": "v82",
+   "v2": "v79",
+   "type": "exterior",
+   "left": "r15",
+   "right": null,
+   "openings": [
+    {
+     "id": "o49",
+     "kind": "window",
+     "code": "3648",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 21.573
+     }
+    }
+   ]
+  },
+  {
+   "id": "w105",
+   "level": "L1",
+   "v1": "v83",
+   "v2": "v82",
+   "type": "exterior",
+   "left": "r6",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w106",
+   "level": "L1",
+   "v1": "v84",
+   "v2": "v83",
+   "type": "exterior",
+   "left": "r6",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w107",
+   "level": "L2",
+   "v1": "v85",
+   "v2": "v90",
+   "type": "exterior",
+   "left": null,
+   "right": "r30",
+   "openings": []
+  },
+  {
+   "id": "w108",
+   "level": "L2",
+   "v1": "v86",
+   "v2": "v85",
+   "type": "exterior",
+   "left": null,
+   "right": "r30",
+   "openings": [
+    {
+     "id": "o50",
+     "kind": "window",
+     "code": "6048",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 70.999
+     }
+    }
+   ]
+  },
+  {
+   "id": "w109",
+   "level": "L2",
+   "v1": "v86",
+   "v2": "v87",
+   "type": "exterior",
+   "left": "r30",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w110",
+   "level": "L2",
+   "v1": "v87",
+   "v2": "v88",
+   "type": "exterior",
+   "left": "r28",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w111",
+   "level": "L2",
+   "v1": "v88",
+   "v2": "v89",
+   "type": "exterior",
+   "left": "r28",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w112",
+   "level": "L2",
+   "v1": "v89",
+   "v2": "v97",
+   "type": "exterior",
+   "left": "r28",
+   "right": null,
+   "openings": [
+    {
+     "id": "o51",
+     "kind": "window",
+     "code": "8048",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 49.0
+     }
+    }
+   ]
+  },
+  {
+   "id": "w113",
+   "level": "L2",
+   "v1": "v90",
+   "v2": "v91",
+   "type": "interior",
+   "left": "r25",
+   "right": "r30",
+   "openings": []
+  },
+  {
+   "id": "w114",
+   "level": "L2",
+   "v1": "v90",
+   "v2": "v101",
+   "type": "exterior",
+   "left": null,
+   "right": "r25",
+   "openings": [
+    {
+     "id": "o52",
+     "kind": "window",
+     "code": "3648",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 37.0
+     }
+    }
+   ]
+  },
+  {
+   "id": "w115",
+   "level": "L2",
+   "v1": "v91",
+   "v2": "v92",
+   "type": "interior",
+   "left": "r25",
+   "right": "r30",
+   "openings": []
+  },
+  {
+   "id": "w116",
+   "level": "L2",
+   "v1": "v92",
+   "v2": "v93",
+   "type": "interior",
+   "left": "r27",
+   "right": "r30",
+   "openings": [
+    {
+     "id": "o53",
+     "kind": "door",
+     "code": "3680",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 4.82
+     },
+     "door_type": "RH",
+     "hinge": "v1",
+     "swings_toward": "right"
+    }
+   ]
+  },
+  {
+   "id": "w117",
+   "level": "L2",
+   "v1": "v92",
+   "v2": "v94",
+   "type": "interior",
+   "left": "r25",
+   "right": "r27",
+   "openings": []
+  },
+  {
+   "id": "w118",
+   "level": "L2",
+   "v1": "v93",
+   "v2": "v87",
+   "type": "interior",
+   "left": "r28",
+   "right": "r30",
+   "openings": []
+  },
+  {
+   "id": "w119",
+   "level": "L2",
+   "v1": "v94",
+   "v2": "v98",
+   "type": "interior",
+   "left": "r25",
+   "right": "r27",
+   "openings": [
+    {
+     "id": "o54",
+     "kind": "door",
+     "code": "3680",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 8.999
+     },
+     "door_type": "RH",
+     "hinge": "v1",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w120",
+   "level": "L2",
+   "v1": "v95",
+   "v2": "v93",
+   "type": "interior",
+   "left": "r28",
+   "right": "r27",
+   "openings": [
+    {
+     "id": "o55",
+     "kind": "door",
+     "code": "3680",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 9.0
+     },
+     "door_type": "LH",
+     "hinge": "v1",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w121",
+   "level": "L2",
+   "v1": "v96",
+   "v2": "v95",
+   "type": "interior",
+   "left": "r28",
+   "right": "r26",
+   "openings": []
+  },
+  {
+   "id": "w122",
+   "level": "L2",
+   "v1": "v96",
+   "v2": "v97",
+   "type": "exterior",
+   "left": null,
+   "right": "r28",
+   "openings": []
+  },
+  {
+   "id": "w123",
+   "level": "L2",
+   "v1": "v96",
+   "v2": "v106",
+   "type": "exterior",
+   "left": "r26",
+   "right": null,
+   "openings": [
+    {
+     "id": "o56",
+     "kind": "window",
+     "code": "2448",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 50.0
+     }
+    },
+    {
+     "id": "o57",
+     "kind": "window",
+     "code": "2448",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 134.0
+     }
+    }
+   ]
+  },
+  {
+   "id": "w124",
+   "level": "L2",
+   "v1": "v98",
+   "v2": "v99",
+   "type": "interior",
+   "left": "r25",
+   "right": "r32",
+   "openings": []
+  },
+  {
+   "id": "w125",
+   "level": "L2",
+   "v1": "v98",
+   "v2": "v104",
+   "type": "interior",
+   "left": "r32",
+   "right": "r27",
+   "openings": [
+    {
+     "id": "o58",
+     "kind": "door",
+     "code": "4680",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 0.262
+     },
+     "door_type": "DOORWAY",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w126",
+   "level": "L2",
+   "v1": "v99",
+   "v2": "v100",
+   "type": "interior",
+   "left": "r25",
+   "right": "r32",
+   "openings": []
+  },
+  {
+   "id": "w127",
+   "level": "L2",
+   "v1": "v100",
+   "v2": "v101",
+   "type": "interior",
+   "left": "r25",
+   "right": "r32",
+   "openings": []
+  },
+  {
+   "id": "w128",
+   "level": "L2",
+   "v1": "v101",
+   "v2": "v102",
+   "type": "exterior",
+   "left": null,
+   "right": "r32",
+   "openings": []
+  },
+  {
+   "id": "w129",
+   "level": "L2",
+   "v1": "v102",
+   "v2": "v103",
+   "type": "interior",
+   "left": "r31",
+   "right": "r32",
+   "openings": []
+  },
+  {
+   "id": "w130",
+   "level": "L2",
+   "v1": "v102",
+   "v2": "v110",
+   "type": "exterior",
+   "left": null,
+   "right": "r31",
+   "openings": []
+  },
+  {
+   "id": "w131",
+   "level": "L2",
+   "v1": "v103",
+   "v2": "v104",
+   "type": "interior",
+   "left": "r31",
+   "right": "r32",
+   "openings": []
+  },
+  {
+   "id": "w132",
+   "level": "L2",
+   "v1": "v105",
+   "v2": "v95",
+   "type": "interior",
+   "left": "r26",
+   "right": "r27",
+   "openings": [
+    {
+     "id": "o59",
+     "kind": "door",
+     "code": "18080",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 4.211
+     },
+     "door_type": "DOORWAY",
+     "hinge": "none",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w133",
+   "level": "L2",
+   "v1": "v105",
+   "v2": "v106",
+   "type": "interior",
+   "left": "r29",
+   "right": "r26",
+   "openings": []
+  },
+  {
+   "id": "w134",
+   "level": "L2",
+   "v1": "v107",
+   "v2": "v106",
+   "type": "exterior",
+   "left": null,
+   "right": "r29",
+   "openings": []
+  },
+  {
+   "id": "w135",
+   "level": "L2",
+   "v1": "v108",
+   "v2": "v105",
+   "type": "interior",
+   "left": "r29",
+   "right": "r27",
+   "openings": [
+    {
+     "id": "o60",
+     "kind": "door",
+     "code": "3680",
+     "anchor": {
+      "from": "v2",
+      "offset_in": 8.0
+     },
+     "door_type": "RH",
+     "hinge": "v1",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w136",
+   "level": "L2",
+   "v1": "v109",
+   "v2": "v104",
+   "type": "interior",
+   "left": "r27",
+   "right": "r31",
+   "openings": []
+  },
+  {
+   "id": "w137",
+   "level": "L2",
+   "v1": "v109",
+   "v2": "v108",
+   "type": "interior",
+   "left": "r33",
+   "right": "r27",
+   "openings": [
+    {
+     "id": "o61",
+     "kind": "door",
+     "code": "3680",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 5.0
+     },
+     "door_type": "RH",
+     "hinge": "v2",
+     "swings_toward": "left"
+    }
+   ]
+  },
+  {
+   "id": "w138",
+   "level": "L2",
+   "v1": "v109",
+   "v2": "v110",
+   "type": "interior",
+   "left": "r31",
+   "right": "r33",
+   "openings": []
+  },
+  {
+   "id": "w139",
+   "level": "L2",
+   "v1": "v110",
+   "v2": "v111",
+   "type": "exterior",
+   "left": null,
+   "right": "r33",
+   "openings": []
+  },
+  {
+   "id": "w140",
+   "level": "L2",
+   "v1": "v112",
+   "v2": "v108",
+   "type": "interior",
+   "left": "r29",
+   "right": "r33",
+   "openings": []
+  },
+  {
+   "id": "w141",
+   "level": "L2",
+   "v1": "v112",
+   "v2": "v111",
+   "type": "exterior",
+   "left": "r33",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w142",
+   "level": "L2",
+   "v1": "v113",
+   "v2": "v112",
+   "type": "exterior",
+   "left": "r29",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w143",
+   "level": "L2",
+   "v1": "v114",
+   "v2": "v113",
+   "type": "exterior",
+   "left": "r29",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w144",
+   "level": "L2",
+   "v1": "v115",
+   "v2": "v114",
+   "type": "exterior",
+   "left": "r29",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w145",
+   "level": "L2",
+   "v1": "v116",
+   "v2": "v107",
+   "type": "exterior",
+   "left": null,
+   "right": "r29",
+   "openings": [
+    {
+     "id": "o62",
+     "kind": "window",
+     "code": "8048",
+     "anchor": {
+      "from": "v1",
+      "offset_in": 44.0
+     }
+    }
+   ]
+  },
+  {
+   "id": "w146",
+   "level": "L2",
+   "v1": "v116",
+   "v2": "v115",
+   "type": "exterior",
+   "left": "r29",
+   "right": null,
+   "openings": []
+  }
+ ],
+ "rooms": [
+  {
+   "id": "r1",
+   "level": "L1",
+   "name": "CLST",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v26",
+     "wall": "w35"
+    },
+    {
+     "v": "v27",
+     "wall": "w38"
+    },
+    {
+     "v": "v33",
+     "wall": "w45"
+    },
+    {
+     "v": "v34",
+     "wall": "w36"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -0.183,
+     -0.185
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r2",
+   "level": "L1",
+   "name": "DECK",
+   "category": "exterior",
+   "outline": [
+    {
+     "v": "v2",
+     "wall": "w3"
+    },
+    {
+     "v": "v43",
+     "wall": "w65"
+    },
+    {
+     "v": "v52",
+     "wall": "w66"
+    },
+    {
+     "v": "v56",
+     "wall": "w69"
+    },
+    {
+     "v": "v67",
+     "wall": "w86"
+    },
+    {
+     "v": "v53",
+     "wall": "w67"
+    },
+    {
+     "v": "v44",
+     "wall": "w56"
+    },
+    {
+     "v": "v42",
+     "wall": "w55"
+    },
+    {
+     "v": "v31",
+     "wall": "w42"
+    },
+    {
+     "v": "v30",
+     "wall": "w41"
+    },
+    {
+     "v": "v22",
+     "wall": "w30"
+    },
+    {
+     "v": "v21",
+     "wall": "w29"
+    },
+    {
+     "v": "v18",
+     "wall": "w25"
+    },
+    {
+     "v": "v17",
+     "wall": "w24"
+    },
+    {
+     "v": "v12",
+     "wall": "w16"
+    },
+    {
+     "v": "v3",
+     "wall": "w4"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     58.391,
+     -6.095
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": false,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Shed",
+    "floor_finish": "Engineered Wood",
+    "wall_finish": "Plaster",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r3",
+   "level": "L1",
+   "name": "DINING",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v35",
+     "wall": "w47"
+    },
+    {
+     "v": "v38",
+     "wall": "w57"
+    },
+    {
+     "v": "v45",
+     "wall": "w58"
+    },
+    {
+     "v": "v46",
+     "wall": "w59"
+    },
+    {
+     "v": "v47",
+     "wall": "w60"
+    },
+    {
+     "v": "v48",
+     "wall": "w61"
+    },
+    {
+     "v": "v49",
+     "wall": "w62"
+    },
+    {
+     "v": "v50",
+     "wall": "w64"
+    },
+    {
+     "v": "v51",
+     "wall": "w50"
+    },
+    {
+     "v": "v37",
+     "wall": "w49"
+    },
+    {
+     "v": "v36",
+     "wall": "w48"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -46.636,
+     -24.635
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r4",
+   "level": "L1",
+   "name": "FOYER",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v23",
+     "wall": "w31"
+    },
+    {
+     "v": "v35",
+     "wall": "w48"
+    },
+    {
+     "v": "v36",
+     "wall": "w33"
+    },
+    {
+     "v": "v24",
+     "wall": "w32"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     1.0,
+     -17.0
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r5",
+   "level": "L1",
+   "name": "GREAT",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v31",
+     "wall": "w55"
+    },
+    {
+     "v": "v42",
+     "wall": "w54"
+    },
+    {
+     "v": "v41",
+     "wall": "w53"
+    },
+    {
+     "v": "v40",
+     "wall": "w52"
+    },
+    {
+     "v": "v39",
+     "wall": "w51"
+    },
+    {
+     "v": "v38",
+     "wall": "w47"
+    },
+    {
+     "v": "v35",
+     "wall": "w46"
+    },
+    {
+     "v": "v34",
+     "wall": "w45"
+    },
+    {
+     "v": "v33",
+     "wall": "w44"
+    },
+    {
+     "v": "v32",
+     "wall": "w43"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -38.987,
+     -12.268
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Vaulted",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r6",
+   "level": "L1",
+   "name": "Garage",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v65",
+     "wall": "w83"
+    },
+    {
+     "v": "v73",
+     "wall": "w92"
+    },
+    {
+     "v": "v78",
+     "wall": "w99"
+    },
+    {
+     "v": "v80",
+     "wall": "w102"
+    },
+    {
+     "v": "v82",
+     "wall": "w105"
+    },
+    {
+     "v": "v83",
+     "wall": "w106"
+    },
+    {
+     "v": "v84",
+     "wall": "w103"
+    },
+    {
+     "v": "v81",
+     "wall": "w96"
+    },
+    {
+     "v": "v75",
+     "wall": "w95"
+    },
+    {
+     "v": "v70",
+     "wall": "w88"
+    },
+    {
+     "v": "v68",
+     "wall": "w87"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     140.875,
+     -132.57
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": false,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Concrete",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r7",
+   "level": "L1",
+   "name": "HALL",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v15",
+     "wall": "w21"
+    },
+    {
+     "v": "v20",
+     "wall": "w28"
+    },
+    {
+     "v": "v26",
+     "wall": "w36"
+    },
+    {
+     "v": "v34",
+     "wall": "w46"
+    },
+    {
+     "v": "v35",
+     "wall": "w31"
+    },
+    {
+     "v": "v23",
+     "wall": "w23"
+    },
+    {
+     "v": "v16",
+     "wall": "w22"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     7.715,
+     3.358
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r8",
+   "level": "L1",
+   "name": "HALL2",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v54",
+     "wall": "w68"
+    },
+    {
+     "v": "v66",
+     "wall": "w85"
+    },
+    {
+     "v": "v74",
+     "wall": "w98"
+    },
+    {
+     "v": "v77",
+     "wall": "w89"
+    },
+    {
+     "v": "v72",
+     "wall": "w79"
+    },
+    {
+     "v": "v62",
+     "wall": "w78"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -7.392,
+     10.635
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r9",
+   "level": "L1",
+   "name": "KIT",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v38",
+     "wall": "w51"
+    },
+    {
+     "v": "v39",
+     "wall": "w52"
+    },
+    {
+     "v": "v40",
+     "wall": "w53"
+    },
+    {
+     "v": "v41",
+     "wall": "w54"
+    },
+    {
+     "v": "v42",
+     "wall": "w56"
+    },
+    {
+     "v": "v44",
+     "wall": "w67"
+    },
+    {
+     "v": "v53",
+     "wall": "w84"
+    },
+    {
+     "v": "v66",
+     "wall": "w68"
+    },
+    {
+     "v": "v54",
+     "wall": "w78"
+    },
+    {
+     "v": "v62",
+     "wall": "w71"
+    },
+    {
+     "v": "v57",
+     "wall": "w70"
+    },
+    {
+     "v": "v55",
+     "wall": "w82"
+    },
+    {
+     "v": "v65",
+     "wall": "w87"
+    },
+    {
+     "v": "v68",
+     "wall": "w74"
+    },
+    {
+     "v": "v59",
+     "wall": "w73"
+    },
+    {
+     "v": "v47",
+     "wall": "w59"
+    },
+    {
+     "v": "v46",
+     "wall": "w58"
+    },
+    {
+     "v": "v45",
+     "wall": "w57"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -12.078,
+     32.391
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r10",
+   "level": "L1",
+   "name": "LOUNGE",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v9",
+     "wall": "w12"
+    },
+    {
+     "v": "v16",
+     "wall": "w23"
+    },
+    {
+     "v": "v23",
+     "wall": "w32"
+    },
+    {
+     "v": "v24",
+     "wall": "w34"
+    },
+    {
+     "v": "v25",
+     "wall": "w15"
+    },
+    {
+     "v": "v11",
+     "wall": "w14"
+    },
+    {
+     "v": "v10",
+     "wall": "w13"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -13.714,
+     15.0
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r11",
+   "level": "L1",
+   "name": "MBATH",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v12",
+     "wall": "w24"
+    },
+    {
+     "v": "v17",
+     "wall": "w25"
+    },
+    {
+     "v": "v18",
+     "wall": "w29"
+    },
+    {
+     "v": "v21",
+     "wall": "w30"
+    },
+    {
+     "v": "v22",
+     "wall": "w41"
+    },
+    {
+     "v": "v30",
+     "wall": "w40"
+    },
+    {
+     "v": "v29",
+     "wall": "w39"
+    },
+    {
+     "v": "v28",
+     "wall": "w27"
+    },
+    {
+     "v": "v19",
+     "wall": "w19"
+    },
+    {
+     "v": "v14",
+     "wall": "w18"
+    },
+    {
+     "v": "v13",
+     "wall": "w17"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -3.727,
+     4.631
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Engineered Wood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r12",
+   "level": "L1",
+   "name": "MBR",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v3",
+     "wall": "w16"
+    },
+    {
+     "v": "v12",
+     "wall": "w17"
+    },
+    {
+     "v": "v13",
+     "wall": "w18"
+    },
+    {
+     "v": "v14",
+     "wall": "w20"
+    },
+    {
+     "v": "v15",
+     "wall": "w22"
+    },
+    {
+     "v": "v16",
+     "wall": "w12"
+    },
+    {
+     "v": "v9",
+     "wall": "w8"
+    },
+    {
+     "v": "v5",
+     "wall": "w5"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -10.035,
+     -19.0
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r13",
+   "level": "L1",
+   "name": "MUD",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v62",
+     "wall": "w79"
+    },
+    {
+     "v": "v72",
+     "wall": "w90"
+    },
+    {
+     "v": "v78",
+     "wall": "w92"
+    },
+    {
+     "v": "v73",
+     "wall": "w91"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     12.509,
+     5.007
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Laminate",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r14",
+   "level": "L1",
+   "name": "NOOK",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v47",
+     "wall": "w73"
+    },
+    {
+     "v": "v59",
+     "wall": "w75"
+    },
+    {
+     "v": "v60",
+     "wall": "w76"
+    },
+    {
+     "v": "v61",
+     "wall": "w63"
+    },
+    {
+     "v": "v50",
+     "wall": "w62"
+    },
+    {
+     "v": "v49",
+     "wall": "w61"
+    },
+    {
+     "v": "v48",
+     "wall": "w60"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     4.801,
+     -17.854
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r15",
+   "level": "L1",
+   "name": "OFFICE",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v74",
+     "wall": "w93"
+    },
+    {
+     "v": "v76",
+     "wall": "w100"
+    },
+    {
+     "v": "v79",
+     "wall": "w104"
+    },
+    {
+     "v": "v82",
+     "wall": "w102"
+    },
+    {
+     "v": "v80",
+     "wall": "w101"
+    },
+    {
+     "v": "v77",
+     "wall": "w98"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     5.678,
+     0.187
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r16",
+   "level": "L1",
+   "name": "PANTRY",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v55",
+     "wall": "w70"
+    },
+    {
+     "v": "v57",
+     "wall": "w71"
+    },
+    {
+     "v": "v62",
+     "wall": "w91"
+    },
+    {
+     "v": "v73",
+     "wall": "w83"
+    },
+    {
+     "v": "v65",
+     "wall": "w82"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     21.406,
+     6.888
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Laminate",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r17",
+   "level": "L1",
+   "name": "PORCH",
+   "category": "exterior",
+   "outline": [
+    {
+     "v": "v1",
+     "wall": "w1"
+    },
+    {
+     "v": "v4",
+     "wall": "w6"
+    },
+    {
+     "v": "v6",
+     "wall": "w9"
+    },
+    {
+     "v": "v7",
+     "wall": "w10"
+    },
+    {
+     "v": "v8",
+     "wall": "w11"
+    },
+    {
+     "v": "v10",
+     "wall": "w14"
+    },
+    {
+     "v": "v11",
+     "wall": "w15"
+    },
+    {
+     "v": "v25",
+     "wall": "w34"
+    },
+    {
+     "v": "v24",
+     "wall": "w33"
+    },
+    {
+     "v": "v36",
+     "wall": "w49"
+    },
+    {
+     "v": "v37",
+     "wall": "w50"
+    },
+    {
+     "v": "v51",
+     "wall": "w64"
+    },
+    {
+     "v": "v50",
+     "wall": "w63"
+    },
+    {
+     "v": "v61",
+     "wall": "w77"
+    },
+    {
+     "v": "v64",
+     "wall": "w80"
+    },
+    {
+     "v": "v63",
+     "wall": "w2"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     9.625,
+     73.008
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": false,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Shed",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r18",
+   "level": "L1",
+   "name": "PWDR",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v59",
+     "wall": "w74"
+    },
+    {
+     "v": "v68",
+     "wall": "w88"
+    },
+    {
+     "v": "v70",
+     "wall": "w95"
+    },
+    {
+     "v": "v75",
+     "wall": "w94"
+    },
+    {
+     "v": "v69",
+     "wall": "w81"
+    },
+    {
+     "v": "v64",
+     "wall": "w77"
+    },
+    {
+     "v": "v61",
+     "wall": "w76"
+    },
+    {
+     "v": "v60",
+     "wall": "w75"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     5.685,
+     2.39
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r19",
+   "level": "L1",
+   "name": "PZZL",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v4",
+     "wall": "w7"
+    },
+    {
+     "v": "v5",
+     "wall": "w8"
+    },
+    {
+     "v": "v9",
+     "wall": "w13"
+    },
+    {
+     "v": "v10",
+     "wall": "w11"
+    },
+    {
+     "v": "v8",
+     "wall": "w10"
+    },
+    {
+     "v": "v7",
+     "wall": "w9"
+    },
+    {
+     "v": "v6",
+     "wall": "w6"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -13.326,
+     -40.843
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r20",
+   "level": "L1",
+   "name": "SAFE",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v19",
+     "wall": "w27"
+    },
+    {
+     "v": "v28",
+     "wall": "w37"
+    },
+    {
+     "v": "v27",
+     "wall": "w35"
+    },
+    {
+     "v": "v26",
+     "wall": "w28"
+    },
+    {
+     "v": "v20",
+     "wall": "w26"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -17.861,
+     -12.541
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r21",
+   "level": "L1",
+   "name": "STAIRd",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v27",
+     "wall": "w37"
+    },
+    {
+     "v": "v28",
+     "wall": "w39"
+    },
+    {
+     "v": "v29",
+     "wall": "w40"
+    },
+    {
+     "v": "v30",
+     "wall": "w42"
+    },
+    {
+     "v": "v31",
+     "wall": "w43"
+    },
+    {
+     "v": "v32",
+     "wall": "w44"
+    },
+    {
+     "v": "v33",
+     "wall": "w38"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     8.429,
+     -71.143
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r22",
+   "level": "L1",
+   "name": "SUN",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v53",
+     "wall": "w86"
+    },
+    {
+     "v": "v67",
+     "wall": null
+    },
+    {
+     "v": "v71",
+     "wall": null
+    },
+    {
+     "v": "v76",
+     "wall": "w93"
+    },
+    {
+     "v": "v74",
+     "wall": "w85"
+    },
+    {
+     "v": "v66",
+     "wall": "w84"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     2.255,
+     5.325
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r23",
+   "level": "L1",
+   "name": "UTILITY",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v72",
+     "wall": "w89"
+    },
+    {
+     "v": "v77",
+     "wall": "w101"
+    },
+    {
+     "v": "v80",
+     "wall": "w99"
+    },
+    {
+     "v": "v78",
+     "wall": "w90"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -9.753,
+     -2.946
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Laminate",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r24",
+   "level": "L1",
+   "name": "WIC",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v14",
+     "wall": "w19"
+    },
+    {
+     "v": "v19",
+     "wall": "w26"
+    },
+    {
+     "v": "v20",
+     "wall": "w21"
+    },
+    {
+     "v": "v15",
+     "wall": "w20"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -6.817,
+     -20.189
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 120.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r25",
+   "level": "L2",
+   "name": "BATHu",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v90",
+     "wall": "w114"
+    },
+    {
+     "v": "v101",
+     "wall": "w127"
+    },
+    {
+     "v": "v100",
+     "wall": "w126"
+    },
+    {
+     "v": "v99",
+     "wall": "w124"
+    },
+    {
+     "v": "v98",
+     "wall": "w119"
+    },
+    {
+     "v": "v94",
+     "wall": "w117"
+    },
+    {
+     "v": "v92",
+     "wall": "w115"
+    },
+    {
+     "v": "v91",
+     "wall": "w113"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -19.75,
+     10.686
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Vaulted",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r26",
+   "level": "L2",
+   "name": "FOYER-HALL",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v95",
+     "wall": "w132"
+    },
+    {
+     "v": "v105",
+     "wall": "w133"
+    },
+    {
+     "v": "v106",
+     "wall": "w123"
+    },
+    {
+     "v": "v96",
+     "wall": "w121"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     2.75,
+     8.149
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": false,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r27",
+   "level": "L2",
+   "name": "HALLu",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v92",
+     "wall": "w117"
+    },
+    {
+     "v": "v94",
+     "wall": "w119"
+    },
+    {
+     "v": "v98",
+     "wall": "w125"
+    },
+    {
+     "v": "v104",
+     "wall": "w136"
+    },
+    {
+     "v": "v109",
+     "wall": "w137"
+    },
+    {
+     "v": "v108",
+     "wall": "w135"
+    },
+    {
+     "v": "v105",
+     "wall": "w132"
+    },
+    {
+     "v": "v95",
+     "wall": "w120"
+    },
+    {
+     "v": "v93",
+     "wall": "w116"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -10.344,
+     2.609
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": false,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r28",
+   "level": "L2",
+   "name": "L1",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v87",
+     "wall": "w118"
+    },
+    {
+     "v": "v93",
+     "wall": "w120"
+    },
+    {
+     "v": "v95",
+     "wall": "w121"
+    },
+    {
+     "v": "v96",
+     "wall": "w122"
+    },
+    {
+     "v": "v97",
+     "wall": "w112"
+    },
+    {
+     "v": "v89",
+     "wall": "w111"
+    },
+    {
+     "v": "v88",
+     "wall": "w110"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -13.714,
+     -1.0
+    ],
+    "show_dimensions": true,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": false,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Cathedral",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r29",
+   "level": "L2",
+   "name": "L2",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v105",
+     "wall": "w135"
+    },
+    {
+     "v": "v108",
+     "wall": "w140"
+    },
+    {
+     "v": "v112",
+     "wall": "w142"
+    },
+    {
+     "v": "v113",
+     "wall": "w143"
+    },
+    {
+     "v": "v114",
+     "wall": "w144"
+    },
+    {
+     "v": "v115",
+     "wall": "w146"
+    },
+    {
+     "v": "v116",
+     "wall": "w145"
+    },
+    {
+     "v": "v107",
+     "wall": "w134"
+    },
+    {
+     "v": "v106",
+     "wall": "w133"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -29.667,
+     3.336
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": false,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Cathedral",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r30",
+   "level": "L2",
+   "name": "LOFT",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v85",
+     "wall": "w107"
+    },
+    {
+     "v": "v90",
+     "wall": "w113"
+    },
+    {
+     "v": "v91",
+     "wall": "w115"
+    },
+    {
+     "v": "v92",
+     "wall": "w116"
+    },
+    {
+     "v": "v93",
+     "wall": "w118"
+    },
+    {
+     "v": "v87",
+     "wall": "w109"
+    },
+    {
+     "v": "v86",
+     "wall": "w108"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -34.842,
+     -11.935
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": false,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Vaulted",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r31",
+   "level": "L2",
+   "name": "OPEN",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v102",
+     "wall": "w130"
+    },
+    {
+     "v": "v110",
+     "wall": "w138"
+    },
+    {
+     "v": "v109",
+     "wall": "w136"
+    },
+    {
+     "v": "v104",
+     "wall": "w131"
+    },
+    {
+     "v": "v103",
+     "wall": "w129"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     19.507,
+     -5.799
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": false,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r32",
+   "level": "L2",
+   "name": "STAIRu",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v98",
+     "wall": "w124"
+    },
+    {
+     "v": "v99",
+     "wall": "w126"
+    },
+    {
+     "v": "v100",
+     "wall": "w127"
+    },
+    {
+     "v": "v101",
+     "wall": "w128"
+    },
+    {
+     "v": "v102",
+     "wall": "w129"
+    },
+    {
+     "v": "v103",
+     "wall": "w131"
+    },
+    {
+     "v": "v104",
+     "wall": "w125"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -0.571,
+     4.808
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": false,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r33",
+   "level": "L2",
+   "name": "STORE",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v108",
+     "wall": "w137"
+    },
+    {
+     "v": "v109",
+     "wall": "w138"
+    },
+    {
+     "v": "v110",
+     "wall": "w139"
+    },
+    {
+     "v": "v111",
+     "wall": "w141"
+    },
+    {
+     "v": "v112",
+     "wall": "w140"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     12.107,
+     -5.999
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": false,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  }
+ ],
+ "furnishings": [
+  {
+   "id": "f1",
+   "level": "L1",
+   "kind": "nightstand",
+   "room": "r12",
+   "pos": [
+    184.0,
+    525.0
+   ],
+   "rotation": 270.0
+  },
+  {
+   "id": "f2",
+   "level": "L1",
+   "kind": "nightstand",
+   "room": "r12",
+   "pos": [
+    185.0,
+    423.0
+   ],
+   "rotation": 270.0
+  },
+  {
+   "id": "f3",
+   "level": "L1",
+   "kind": "armchair",
+   "room": "r12",
+   "pos": [
+    193.0,
+    367.0
+   ],
+   "rotation": 315.0
+  },
+  {
+   "id": "f4",
+   "level": "L1",
+   "kind": "armchair",
+   "room": "r19",
+   "pos": [
+    207.0,
+    667.0
+   ],
+   "rotation": 229.0
+  },
+  {
+   "id": "f5",
+   "level": "L1",
+   "kind": "bed_king",
+   "room": "r12",
+   "pos": [
+    210.0,
+    475.0
+   ],
+   "rotation": 270.0
+  },
+  {
+   "id": "f6",
+   "level": "L1",
+   "kind": "armchair",
+   "room": "r19",
+   "pos": [
+    240.0,
+    626.0
+   ],
+   "rotation": 47.0
+  },
+  {
+   "id": "f7",
+   "level": "L1",
+   "kind": "wardrobe",
+   "room": "r12",
+   "pos": [
+    245.0,
+    576.0
+   ],
+   "rotation": 180.0
+  },
+  {
+   "id": "f8",
+   "level": "L1",
+   "kind": "dresser",
+   "room": "r12",
+   "pos": [
+    324.0,
+    452.0
+   ],
+   "rotation": 90.0
+  },
+  {
+   "id": "f9",
+   "level": "L1",
+   "kind": "base_cab_36",
+   "room": "r11",
+   "pos": [
+    353.0,
+    406.0
+   ],
+   "rotation": 270.0
+  },
+  {
+   "id": "f10",
+   "level": "L1",
+   "kind": "vanity_48",
+   "room": "r11",
+   "pos": [
+    385.0,
+    438.0
+   ],
+   "rotation": 180.0
+  },
+  {
+   "id": "f11",
+   "level": "L1",
+   "kind": "bathtub",
+   "room": "r11",
+   "pos": [
+    395.0,
+    337.0
+   ],
+   "rotation": 90.0
+  },
+  {
+   "id": "f12",
+   "level": "L1",
+   "kind": "toilet",
+   "room": "r11",
+   "pos": [
+    424.0,
+    436.0
+   ],
+   "rotation": 180.0
+  },
+  {
+   "id": "f13",
+   "level": "L1",
+   "kind": "office_chair",
+   "room": "r11",
+   "pos": [
+    458.0,
+    358.0
+   ],
+   "rotation": 63.0
+  },
+  {
+   "id": "f14",
+   "level": "L1",
+   "kind": "glass_shower",
+   "room": "r11",
+   "pos": [
+    465.0,
+    424.0
+   ],
+   "rotation": 90.0
+  },
+  {
+   "id": "f15",
+   "level": "L1",
+   "kind": "stairs",
+   "room": "r21",
+   "pos": [
+    516.0,
+    440.0
+   ],
+   "rotation": 0.0,
+   "state": {
+    "flight": "full",
+    "turn": "left",
+    "direction": "up"
+   }
+  },
+  {
+   "id": "f16",
+   "level": "L1",
+   "kind": "gas_fireplace",
+   "room": "r5",
+   "pos": [
+    554.0,
+    463.0
+   ],
+   "rotation": 270.0
+  },
+  {
+   "id": "f17",
+   "level": "L1",
+   "kind": "armchair",
+   "room": "r5",
+   "pos": [
+    605.0,
+    409.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f18",
+   "level": "L1",
+   "kind": "armchair",
+   "room": "r5",
+   "pos": [
+    607.0,
+    531.0
+   ],
+   "rotation": 180.0
+  },
+  {
+   "id": "f19",
+   "level": "L1",
+   "kind": "coffee_table",
+   "room": "r5",
+   "pos": [
+    633.0,
+    466.0
+   ],
+   "rotation": 90.0
+  },
+  {
+   "id": "f20",
+   "level": "L1",
+   "kind": "armchair",
+   "room": "r5",
+   "pos": [
+    659.0,
+    407.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f21",
+   "level": "L1",
+   "kind": "armchair",
+   "room": "r5",
+   "pos": [
+    661.0,
+    533.0
+   ],
+   "rotation": 180.0
+  },
+  {
+   "id": "f22",
+   "level": "L1",
+   "kind": "side_table",
+   "room": "r5",
+   "pos": [
+    692.0,
+    412.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f23",
+   "level": "L1",
+   "kind": "side_table",
+   "room": "r5",
+   "pos": [
+    693.0,
+    524.0
+   ],
+   "rotation": 180.0
+  },
+  {
+   "id": "f24",
+   "level": "L1",
+   "kind": "sofa",
+   "room": "r5",
+   "pos": [
+    697.0,
+    467.0
+   ],
+   "rotation": 90.0
+  },
+  {
+   "id": "f25",
+   "level": "L1",
+   "kind": "base_cab_36",
+   "room": "r9",
+   "pos": [
+    740.0,
+    387.0
+   ],
+   "rotation": 270.0
+  },
+  {
+   "id": "f26",
+   "level": "L1",
+   "kind": "base_cab_36",
+   "room": "r9",
+   "pos": [
+    741.0,
+    361.0
+   ],
+   "rotation": 270.0
+  },
+  {
+   "id": "f27",
+   "level": "L1",
+   "kind": "dining_table",
+   "room": "r3",
+   "pos": [
+    744.0,
+    675.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f28",
+   "level": "L1",
+   "kind": "base_cab_36",
+   "room": "r9",
+   "pos": [
+    749.0,
+    336.0
+   ],
+   "rotation": 315.0
+  },
+  {
+   "id": "f29",
+   "level": "L1",
+   "kind": "corner_base_36",
+   "room": "r9",
+   "pos": [
+    754.0,
+    405.0
+   ],
+   "rotation": 225.0
+  },
+  {
+   "id": "f30",
+   "level": "L1",
+   "kind": "dishwasher",
+   "room": "r9",
+   "pos": [
+    766.0,
+    316.0
+   ],
+   "rotation": 315.0
+  },
+  {
+   "id": "f31",
+   "level": "L1",
+   "kind": "corner_desk",
+   "room": "r9",
+   "pos": [
+    785.0,
+    558.0
+   ],
+   "rotation": 270.0
+  },
+  {
+   "id": "f32",
+   "level": "L1",
+   "kind": "sink_base_36",
+   "room": "r9",
+   "pos": [
+    786.0,
+    295.0
+   ],
+   "rotation": 135.0
+  },
+  {
+   "id": "f33",
+   "level": "L1",
+   "kind": "kitchen_island",
+   "room": "r9",
+   "pos": [
+    791.0,
+    442.0
+   ],
+   "rotation": 45.0
+  },
+  {
+   "id": "f34",
+   "level": "L1",
+   "kind": "base_cab_36",
+   "room": "r9",
+   "pos": [
+    812.0,
+    270.0
+   ],
+   "rotation": 315.0
+  },
+  {
+   "id": "f35",
+   "level": "L1",
+   "kind": "base_cab_36",
+   "room": "r9",
+   "pos": [
+    839.0,
+    262.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f36",
+   "level": "L1",
+   "kind": "range",
+   "room": "r9",
+   "pos": [
+    868.0,
+    275.0
+   ],
+   "rotation": 225.0
+  },
+  {
+   "id": "f37",
+   "level": "L1",
+   "kind": "side_table",
+   "room": "r9",
+   "pos": [
+    875.0,
+    382.0
+   ],
+   "rotation": 45.0
+  },
+  {
+   "id": "f38",
+   "level": "L1",
+   "kind": "base_cab_36",
+   "room": "r9",
+   "pos": [
+    889.0,
+    297.0
+   ],
+   "rotation": 45.0
+  },
+  {
+   "id": "f39",
+   "level": "L1",
+   "kind": "side_table",
+   "room": "r9",
+   "pos": [
+    890.0,
+    520.0
+   ],
+   "rotation": 90.0
+  },
+  {
+   "id": "f40",
+   "level": "L1",
+   "kind": "base_cab_36",
+   "room": "r9",
+   "pos": [
+    895.0,
+    361.0
+   ],
+   "rotation": 135.0
+  },
+  {
+   "id": "f41",
+   "level": "L1",
+   "kind": "refrigerator",
+   "room": "r9",
+   "pos": [
+    901.0,
+    313.0
+   ],
+   "rotation": 225.0
+  },
+  {
+   "id": "f42",
+   "level": "L1",
+   "kind": "side_table",
+   "room": "r9",
+   "pos": [
+    914.0,
+    539.0
+   ],
+   "rotation": 270.0
+  },
+  {
+   "id": "f43",
+   "level": "L1",
+   "kind": "base_cab_36",
+   "room": "r9",
+   "pos": [
+    919.0,
+    337.0
+   ],
+   "rotation": 135.0
+  },
+  {
+   "id": "f44",
+   "level": "L1",
+   "kind": "toilet",
+   "room": "r18",
+   "pos": [
+    932.0,
+    677.0
+   ],
+   "rotation": 180.0
+  },
+  {
+   "id": "f45",
+   "level": "L1",
+   "kind": "dining_chair",
+   "room": "r22",
+   "pos": [
+    963.0,
+    196.0
+   ],
+   "rotation": 14.0
+  },
+  {
+   "id": "f46",
+   "level": "L1",
+   "kind": "base_cab_36",
+   "room": "r18",
+   "pos": [
+    968.0,
+    669.0
+   ],
+   "rotation": 135.0
+  },
+  {
+   "id": "f47",
+   "level": "L1",
+   "kind": "dining_chair",
+   "room": "r22",
+   "pos": [
+    990.0,
+    227.0
+   ],
+   "rotation": 89.0
+  },
+  {
+   "id": "f48",
+   "level": "L1",
+   "kind": "vanity_36",
+   "room": "r18",
+   "pos": [
+    994.0,
+    643.0
+   ],
+   "rotation": 135.0
+  },
+  {
+   "id": "f49",
+   "level": "L1",
+   "kind": "washer",
+   "room": "r23",
+   "pos": [
+    1064.0,
+    336.0
+   ],
+   "rotation": 45.0
+  },
+  {
+   "id": "f50",
+   "level": "L1",
+   "kind": "dryer",
+   "room": "r23",
+   "pos": [
+    1089.0,
+    364.0
+   ],
+   "rotation": 45.0
+  },
+  {
+   "id": "f51",
+   "level": "L1",
+   "kind": "workbench",
+   "room": "r6",
+   "pos": [
+    1166.0,
+    356.0
+   ],
+   "rotation": 315.0
+  },
+  {
+   "id": "f52",
+   "level": "L1",
+   "kind": "car",
+   "room": "r6",
+   "pos": [
+    1202.0,
+    579.0
+   ],
+   "rotation": 315.0
+  },
+  {
+   "id": "f53",
+   "level": "L1",
+   "kind": "suv",
+   "room": "r6",
+   "pos": [
+    1269.0,
+    506.0
+   ],
+   "rotation": 315.0
+  },
+  {
+   "id": "f54",
+   "level": "L1",
+   "kind": "riding_mower_snow",
+   "room": "r6",
+   "pos": [
+    1322.0,
+    297.0
+   ],
+   "rotation": 315.0
+  },
+  {
+   "id": "f55",
+   "level": "L1",
+   "kind": "snowblower",
+   "room": "r6",
+   "pos": [
+    1340.0,
+    395.0
+   ],
+   "rotation": 315.0
+  },
+  {
+   "id": "f56",
+   "level": "L1",
+   "kind": "garden_tractor",
+   "room": "r6",
+   "pos": [
+    1412.0,
+    403.0
+   ],
+   "rotation": 315.0
+  },
+  {
+   "id": "f57",
+   "level": "L2",
+   "kind": "toilet",
+   "room": "r25",
+   "pos": [
+    362.0,
+    485.0
+   ],
+   "rotation": 270.0
+  },
+  {
+   "id": "f58",
+   "level": "L2",
+   "kind": "vanity",
+   "room": "r25",
+   "pos": [
+    380.0,
+    427.0
+   ],
+   "rotation": 0.0
+  },
+  {
+   "id": "f59",
+   "level": "L2",
+   "kind": "bathtub",
+   "room": "r25",
+   "pos": [
+    438.0,
+    429.0
+   ],
+   "rotation": 270.0
+  }
+ ],
+ "groups": [],
+ "provenance": {
+  "migrated_from": {
+   "format": "floorplanner-json",
+   "version": 3
+  },
+  "tool": "floorplanner.design.importer",
+  "mode": "clean",
+  "endpoints_welded": 4,
+  "openings_deduped": 2,
+  "notes": [
+   "Hall: stored 243.5 sf -> traced 61.5 sf",
+   "M Bath: stored 591.6 sf -> traced 182.0 sf",
+   "2 stacked duplicate opening(s) removed"
+  ]
+ }
+}

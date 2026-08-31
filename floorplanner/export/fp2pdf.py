@@ -9,16 +9,23 @@ formatted to a residential designer's transmittal spec:
   * door symbols (leaf + swing arc / slider panels), window glazing lines,
     every opening tagged with its WWHH size code
   * room labels: NAME / clear WxL size / ceiling height
-  * dimension strings (arch ticks, feet-inches text):
-      row 1: features -- every wall line + every opening centerline
-      row 2: overall
-    on the bottom (x) and left (y) of the plan
+  * dimension strings (arch ticks, whole-inch feet-inches text, grid-aware
+    decluttering against the document's own wall_snap_in):
+      row 1: features -- every wall endpoint (no openings -- 0128-ruling.md)
+      row 2: overall, within the same row's own family (0130-ruling.md)
+    on the bottom (x) and left (y) of the plan, for orthogonal walls; each
+    off-axis angle family (45 degrees, 135 degrees, ...) gets its own lane
+    outside the drawing, for rooms with `label.show_dimensions` on
+    (0120-ruling.md)
   * title block: project, level, scale, date, wall-assembly note,
-    dimension-reference note, NOT FOR CONSTRUCTION
+    dimension-reference note, an openings-not-dimensioned note,
+    NOT FOR CONSTRUCTION
 
-Dimension reference: OVERALL WALL FACES (stated in the title block).
-The receiving designer converts to their own convention (e.g. stud-stud);
-wall assemblies are called out so that conversion is deterministic.
+Dimension reference: WALL CENTERLINES (stated in the title block --
+0129-ruling.md sec3(c), matching the document's own `area_basis:
+centerline` convention). The receiving designer converts to their own
+convention (e.g. stud-stud); wall assemblies are called out so that
+conversion is deterministic.
 
 Requires: reportlab  (pip install reportlab)
 
@@ -141,6 +148,45 @@ def cluster_stations(values, tol: float = STATION_TOL_IN) -> list[float]:
     return [sum(g) / len(g) for g in groups]
 
 
+WALL_SNAP_DEFAULT_IN = 6.0   # floorplanner/config.py:WALL_SNAP_DEFAULT --
+                               # not imported (config.py pulls in PyQt6),
+                               # the same constraint _door_symbol's own
+                               # vocabulary transcription already documents
+GRID_TOL_IN = 0.1   # 0129-ruling.md sec3(a): how close counts as "on-grid"
+
+
+def _on_grid(station: float, snap_in: float) -> bool:
+    if snap_in <= 0:
+        return False
+    return abs(station - round(station / snap_in) * snap_in) <= GRID_TOL_IN
+
+
+def grid_filter_stations(stations, snap_in: float) -> list[float]:
+    """0129-ruling.md sec3(a): a second decluttering pass, after
+    `cluster_stations`'s own 1" merge. When stations that survived
+    clustering still sit closer together than the document's own grid
+    step (`snap_in`, `wall_snap_in` read from the document -- "drop the
+    ones that are fractions of an inch or not close to the grid"), the
+    OFF-GRID one is dropped; a grid station is never dropped. An
+    all-off-grid crowd keeps clustering's own mean, unchanged -- there is
+    no grid station to prefer. Chains transitively, the same convention
+    `cluster_stations` already uses."""
+    if len(stations) < 2 or snap_in <= 0:
+        return list(stations)
+    groups = [[stations[0]]]
+    for s in stations[1:]:
+        if s - groups[-1][-1] < snap_in:
+            groups[-1].append(s)
+        else:
+            groups.append([s])
+    out = []
+    for g in groups:
+        on_grid = [s for s in g if _on_grid(s, snap_in)]
+        out.append(sum(on_grid) / len(on_grid) if on_grid
+                    else sum(g) / len(g))
+    return out
+
+
 def _rounded_stations(coords):
     """Nearest whole inch, per 0118-ruling.md sec2 step 2 -- computed once
     and shared by row 1's adjacent-pair differences and row 2's overall
@@ -214,6 +260,12 @@ class Sheet:
         self.walls = [w for w in doc["walls"] if w["level"] == level["id"]
                       and w["type"] not in ("fence", "hedge")]
         self.warnings = []
+        # 0129-ruling.md sec3(a): read the DOCUMENT's own grid, not a
+        # hardcoded 6 -- the default is only what config.py:WALL_SNAP_DEFAULT
+        # already uses when a plan's settings block omits it.
+        self.wall_snap_in = float(
+            (doc.get("settings") or {}).get("wall_snap_in")
+            or WALL_SNAP_DEFAULT_IN)
         self._frame()
 
     def warn(self, msg: str) -> None:
@@ -532,16 +584,33 @@ class Sheet:
         will be sent to the architect who will redraw those windows and
         doors." Openings still DRAW (symbols + W/H tags); only the
         dimension STATIONS drop them, here and in the angled lanes
-        (`_lane_geometry`)."""
+        (`_lane_geometry`).
+
+        NEAR-CARDINAL WALLS ONLY -- 0130-ruling.md sec1: "a wall
+        contributes stations only to the row family matching its own
+        angle." A 45/135 wall's endpoints go to its own lane
+        (`_angled_families`/`_lane_geometry`) and nowhere else; a shared
+        corner between an orthogonal and an angled wall still appears in
+        both, but once from EACH wall, not by this loop double-counting
+        one. Withdraws 0119-ruling.md sec2's "corner stations" bullet.
+
+        Then `cluster_stations` (0118) and `grid_filter_stations`
+        (0129 sec3(a)) -- the document's own grid step declutters what
+        1" clustering alone still leaves crowded."""
         fx, fy = set(), set()
         for w in self.walls:
             if self.is_concept(w):
                 continue
             p1, p2 = self.pt(w["v1"]), self.pt(w["v2"])
+            angle = _wall_angle_deg(p2[0] - p1[0], p2[1] - p1[1])
+            if not _near_cardinal(angle):
+                continue
             for p in (p1, p2):
                 fx.add(round(p[0], 3))
                 fy.add(round(p[1], 3))
-        return cluster_stations(sorted(fx)), cluster_stations(sorted(fy))
+        fx = grid_filter_stations(cluster_stations(sorted(fx)), self.wall_snap_in)
+        fy = grid_filter_stations(cluster_stations(sorted(fy)), self.wall_snap_in)
+        return fx, fy
 
     def dim_row_along(self, ext_pairs, station_pts, labels, rot_deg):
         """One dimension string -- extension lines, the row line + arch
@@ -703,7 +772,15 @@ class Sheet:
         that envelope rather than at the family's centroid, never
         crossing its geometry to reach the lane). Split out from
         `_draw_angled_lane` so both are directly testable without a
-        canvas."""
+        canvas.
+
+        Grid-filtered same as the orthogonal rows (0129-ruling.md
+        sec3(a)) -- but "on-grid" here means a multiple of `wall_snap_in`
+        ALONG THE FAMILY'S OWN AXIS from its centroid, not an absolute
+        canvas coordinate: an angled wall's absolute (x, y) is not a
+        round number even when correctly snapped (6" along a 45 ray is
+        dx = dy = 6/sqrt(2)), so relative distance along the ray is the
+        only grid concept that applies here at all."""
         theta = math.radians(fam["angle"])
         u = (math.cos(theta), math.sin(theta))
         n = (-math.sin(theta), math.cos(theta))
@@ -726,6 +803,7 @@ class Sheet:
         sign = 1.0 if (ccx - bcx) * n[0] + (ccy - bcy) * n[1] >= 0 else -1.0
 
         stations = cluster_stations(sorted(proj_u(p) for p in pts))
+        stations = grid_filter_stations(stations, self.wall_snap_in)
         reach = max((proj_n(p) * sign for p in pts), default=0.0)
 
         return {"theta": theta, "u": u, "n": (n[0] * sign, n[1] * sign),
@@ -915,7 +993,7 @@ def main(argv=None):
     ap.add_argument("--assembly-note",
                     default="2x6 exterior / 2x4 interior, conventional framing")
     ap.add_argument("--dim-note",
-                    default="All dimensions to overall wall faces")
+                    default="All dimensions to wall centerlines")
     ap.add_argument("--level", action="append", dest="levels")
     ap.add_argument("--set", action="append", default=[], metavar="TYPE=IN")
     ap.add_argument("--include-concept", action="store_true")

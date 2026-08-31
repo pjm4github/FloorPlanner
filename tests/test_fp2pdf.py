@@ -709,3 +709,190 @@ def test_angled_lane_on_the_real_wiscaway_wing_stays_snug_and_off_the_geometry()
             "fixture no longer carries an opening on the wing -- "
             "the door-omission receipt needs one to mean anything")
         assert len(geo["stations"]) <= 2 * len(fam["walls"])
+
+
+# ---------------------------------------------------------------------------
+# 0129-ruling.md sec3(a)/(c) -- grid-aware station filtering, the
+# document's own wall_snap_in, and the centerline title-block note
+# ---------------------------------------------------------------------------
+
+def test_grid_filter_stations_drops_the_off_grid_member_of_a_close_pair():
+    """24.0 is a 6" grid multiple; 24.3 is not, and sits 0.3" away --
+    well under the 6" grid step. The off-grid one goes."""
+    assert fp2pdf.grid_filter_stations([24.0, 24.3], 6.0) == [24.0]
+
+
+def test_grid_filter_stations_keeps_an_all_off_grid_crowds_mean():
+    """Neither 24.3 nor 24.6 is on-grid -- nothing to prefer, so
+    clustering's own mean stands, unchanged."""
+    out = fp2pdf.grid_filter_stations([24.3, 24.6], 6.0)
+    assert out == [pytest.approx((24.3 + 24.6) / 2)]
+
+
+def test_grid_filter_stations_never_drops_a_lone_grid_station():
+    out = fp2pdf.grid_filter_stations([6.0], 6.0)
+    assert out == [6.0]
+
+
+def test_grid_filter_stations_leaves_far_apart_stations_alone():
+    """8" apart is >= the 6" grid step -- not a crowd, not filtered."""
+    assert fp2pdf.grid_filter_stations([24.0, 32.0], 6.0) == [24.0, 32.0]
+
+
+def test_grid_filter_uses_the_snap_value_given_not_a_hardcoded_six():
+    """The same 8"-apart pair as above, but a 12" grid step now makes
+    them a crowd -- and only 24.0 (a multiple of 12) is on-grid. A
+    receipt that passes with either value proves nothing (0132-ruling.md
+    sec2); this one only passes because the function actually reads
+    `snap_in`."""
+    assert fp2pdf.grid_filter_stations([24.0, 32.0], 12.0) == [24.0]
+
+
+def test_sheet_wall_snap_in_defaults_to_six_when_settings_missing():
+    sheet = _sheet(_rect_doc())
+    assert sheet.wall_snap_in == 6.0
+
+
+def test_sheet_wall_snap_in_is_read_from_the_documents_settings():
+    doc = _rect_doc()
+    doc["settings"] = {"wall_snap_in": 12.0}
+    sheet = _sheet(doc)
+    assert sheet.wall_snap_in == 12.0
+
+
+def test_dim_note_defaults_say_centerlines_not_faces():
+    """0129-ruling.md sec3(c): the old faces doctrine is superseded by
+    its author. Checked in both places the note text lives -- the CLI
+    default and the PDF export dialog's default -- so neither reverts
+    silently."""
+    fp2pdf_src = Path(fp2pdf.__file__).read_text(encoding="utf-8")
+    assert "All dimensions to wall centerlines" in fp2pdf_src
+    assert "overall wall faces" not in fp2pdf_src
+    dialogs_path = Path(fp2pdf.__file__).resolve().parent.parent / "dialogs.py"
+    dialogs_src = dialogs_path.read_text(encoding="utf-8")
+    assert "All dimensions to wall centerlines" in dialogs_src
+    assert "overall wall faces" not in dialogs_src
+
+
+def test_features_and_lane_geometry_never_apply_a_face_offset():
+    """0129-ruling.md sec3(c): stations already come from vertex
+    (centerline) coordinates -- a source guard against a face offset
+    creeping into either function later."""
+    import inspect
+    for fn in (fp2pdf.Sheet._features, fp2pdf.Sheet._lane_geometry):
+        src = inspect.getsource(fn)
+        assert "wall_t" not in src
+        assert "self.th" not in src
+
+
+def test_lane_labels_have_no_fractional_remainder():
+    """0129-ruling.md sec3(b): the 45/135 lanes label in the same
+    whole-inch feet-and-inches form the orthogonal rows use -- confirmed,
+    not assumed. `ftin` only appends a "n/d" suffix when there IS a
+    fraction, so its absence proves the whole-inch rounding reached the
+    lane's own labels too."""
+    doc = _triangle_doc([("rA", True, 0, False), ("rB", True, 300, False)])
+    sheet = _sheet(doc)
+    fam = sheet._angled_families()[0]
+    geo = sheet._lane_geometry(fam)
+    rounded = fp2pdf._rounded_stations(geo["stations"])
+    assert len(rounded) >= 2
+    for ra, rb in zip(rounded, rounded[1:], strict=False):
+        assert "/" not in fp2pdf.ftin(rb - ra)
+
+
+# ---------------------------------------------------------------------------
+# 0130-ruling.md -- family exclusivity: a wall's endpoints go only to the
+# row family matching its own angle
+# ---------------------------------------------------------------------------
+
+def test_features_excludes_a_lone_diagonal_walls_endpoints():
+    """A doc with exactly one wall, at 45 degrees, and no cardinal walls
+    at all: `_features()` must come back empty. Before 0130, every
+    wall's endpoints went into both fx and fy regardless of angle -- this
+    is RED against that code, by construction (0080-report.md's own
+    telescoping-contrast precedent: proven by arithmetic, not a revert)."""
+    doc = {
+        "format": "floorplanner-design", "version": 5,
+        "levels": [_MINIMAL_LEVEL],
+        "vertices": [{"id": "v1", "x": 0, "y": 0}, {"id": "v2", "x": 100, "y": 100}],
+        "walls": [{"id": "w1", "level": "L1", "v1": "v1", "v2": "v2",
+                   "type": "exterior", "openings": []}],
+        "rooms": [], "furnishings": [],
+    }
+    fx, fy = _sheet(doc)._features()
+    assert fx == []
+    assert fy == []
+
+
+def _shared_corner_doc():
+    """v1(0,0)-v2(100,0): a cardinal wall. v2(100,0)-v3(150,50): a 45
+    degree wall sharing v2 with the cardinal one. v3 belongs to no
+    cardinal wall at all."""
+    return {
+        "format": "floorplanner-design", "version": 5,
+        "levels": [_MINIMAL_LEVEL],
+        "vertices": [{"id": "v1", "x": 0, "y": 0}, {"id": "v2", "x": 100, "y": 0},
+                     {"id": "v3", "x": 150, "y": 50}],
+        "walls": [
+            {"id": "w1", "level": "L1", "v1": "v1", "v2": "v2",
+             "type": "exterior", "openings": []},
+            {"id": "w2", "level": "L1", "v1": "v2", "v2": "v3",
+             "type": "exterior", "openings": []},
+        ],
+        "rooms": [{"id": "r1", "level": "L1", "name": "R", "category": "living",
+                   "area_accounting": "conditioned",
+                   "outline": [{"v": "v1", "wall": "w1"},
+                               {"v": "v2", "wall": "w2"},
+                               {"v": "v3", "wall": None}],
+                   "label": {"show_dimensions": True}}],
+        "furnishings": [],
+    }
+
+
+def test_shared_corner_appears_in_both_families_once_each():
+    """0130-ruling.md sec1: "a shared corner between an orthogonal and a
+    45 wall appears in both families -- once from each wall, at the same
+    point -- which is correct, not a duplicate." v2 is that corner; v3
+    belongs only to the diagonal wall and must be absent from the X/Y
+    rows entirely."""
+    doc = _shared_corner_doc()
+    sheet = _sheet(doc)
+    fx, fy = sheet._features()
+    v1, v2, v3 = sheet.pt("v1"), sheet.pt("v2"), sheet.pt("v3")
+    assert any(abs(x - v2[0]) < 1e-6 for x in fx), "the shared corner is missing from the X row"
+    assert any(abs(x - v1[0]) < 1e-6 for x in fx), "the cardinal wall's own far end is missing"
+    assert not any(abs(x - v3[0]) < 1e-6 for x in fx), (
+        "the diagonal-only vertex leaked into the X row")
+    fams = sheet._angled_families()
+    assert len(fams) == 1
+    geo = sheet._lane_geometry(fams[0])
+
+    def proj(p):
+        return ((p[0] - geo["ccx"]) * geo["u"][0]
+                 + (p[1] - geo["ccy"]) * geo["u"][1])
+
+    assert any(abs(s - proj(v2)) < 1e-6 for s in geo["stations"]), (
+        "the shared corner is missing from its own lane")
+    assert any(abs(s - proj(v3)) < 1e-6 for s in geo["stations"])
+
+
+def test_real_wiscaway_r2_wing_vertex_is_absent_from_the_orthogonal_rows():
+    """The real corpus corroboration, per 0130-ruling.md sec3's own
+    receipt list -- run against the file 0132-ruling.md names as the
+    tranche's baseline, whose show_dimensions flags are already set as
+    Patrick left them (no forcing needed)."""
+    doc = json.loads((Path(__file__).parent.parent / "fixtures" /
+                      "wiscaway2026-08-30R2.json").read_text(encoding="utf-8"))
+    level = next(lv for lv in doc["levels"] if lv["id"] == "L1")
+    sheet = _sheet(doc, level)
+    fams = sheet._angled_families()
+    assert fams, "expected at least one angled family on the real wing"
+    fx, fy = sheet._features()
+    assert fx and fy
+    w = fams[0]["walls"][0]
+    p1 = sheet.pt(w["v1"])
+    assert not any(abs(x - p1[0]) < 1e-6 for x in fx), (
+        "an angled-wing vertex leaked into the X row on the real file")
+    assert not any(abs(y - p1[1]) < 1e-6 for y in fy), (
+        "an angled-wing vertex leaked into the Y row on the real file")
