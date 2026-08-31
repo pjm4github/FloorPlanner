@@ -183,6 +183,25 @@ def _door_symbol(kind: str, door_type) -> str | None:
     return "unknown"
 
 
+FAMILY_ANGLE_TOL = 1.0   # deg -- 0120-ruling.md sec2 step 1's own
+                          # near-cardinal bound, reused as the family
+                          # clustering tolerance (0118's machinery, rotated)
+
+
+def _wall_angle_deg(dx: float, dy: float) -> float:
+    """A wall's orientation, undirected -- v1->v2 and v2->v1 read the same
+    family, so the raw angle is folded into [0, 180)."""
+    return math.degrees(math.atan2(dy, dx)) % 180.0
+
+
+def _near_cardinal(angle_deg: float, tol: float = FAMILY_ANGLE_TOL) -> bool:
+    """Within `tol` of horizontal OR vertical -- already covered by the X/Y
+    rows (`_features()`'s own `abs(uy) < 1e-6` / `abs(ux) < 1e-6` tests), so
+    0120-ruling.md sec2 step 1 excludes it from every angle family."""
+    return (angle_deg <= tol or angle_deg >= 180.0 - tol
+            or abs(angle_deg - 90.0) <= tol)
+
+
 class Sheet:
     """One storey plan sheet. Plan coords in inches (y already flipped up);
     self.k = points per plan-inch."""
@@ -507,6 +526,13 @@ class Sheet:
 
     # ---------- dimensions ----------
     def _features(self):
+        """Wall endpoints ONLY -- no opening centrelines. 0128-ruling.md
+        sec1, global and explicit: "drop the doors, opening and windows
+        from the callouts for the PDF. This will be the reference that
+        will be sent to the architect who will redraw those windows and
+        doors." Openings still DRAW (symbols + W/H tags); only the
+        dimension STATIONS drop them, here and in the angled lanes
+        (`_lane_geometry`)."""
         fx, fy = set(), set()
         for w in self.walls:
             if self.is_concept(w):
@@ -515,19 +541,6 @@ class Sheet:
             for p in (p1, p2):
                 fx.add(round(p[0], 3))
                 fy.add(round(p[1], 3))
-            dx, dy = p2[0] - p1[0], p2[1] - p1[1]
-            L = math.hypot(dx, dy)
-            if L < 1e-9:
-                continue
-            ux, uy = dx / L, dy / L
-            for op in (w.get("openings") or []):
-                s0, s1 = self.opening_span(w, op, L)
-                mid = (s0 + s1) / 2
-                mx, my = p1[0] + ux * mid, p1[1] + uy * mid
-                if abs(uy) < 1e-6:
-                    fx.add(round(mx, 3))
-                elif abs(ux) < 1e-6:
-                    fy.add(round(my, 3))
         return cluster_stations(sorted(fx)), cluster_stations(sorted(fy))
 
     def dim_row_along(self, ext_pairs, station_pts, labels, rot_deg):
@@ -618,6 +631,146 @@ class Sheet:
         self.dim_row_y(fy, x1)
         self.dim_row_y([fy[0], fy[-1]], x2)
 
+    # ---------- angled dimension lanes (0120-ruling.md) ----------
+    def _angled_families(self):
+        """Rooms with `label.show_dimensions` on, cycled for their
+        non-cardinal outline edges, grouped into angle families (angle
+        mod 180, clustered at `FAMILY_ANGLE_TOL` -- 0118's station
+        clustering, rotated onto degrees instead of inches).
+        0120-ruling.md sec2 step 1 / sec3: a 45 wall in no show-dims room,
+        or in a dims-off room, is never visited here at all -- "that is
+        the feature, not a gap."""
+        wall_by_id = {w["id"]: w for w in self.walls}
+        seen = set()
+        members = []
+        for room in self.doc["rooms"]:
+            if room["level"] != self.level["id"]:
+                continue
+            if not (room.get("label") or {}).get("show_dimensions"):
+                continue
+            for e in room["outline"]:
+                wid = e.get("wall")
+                if wid is None or wid in seen:
+                    continue
+                w = wall_by_id.get(wid)
+                if w is None:
+                    continue
+                seen.add(wid)
+                p1, p2 = self.pt(w["v1"]), self.pt(w["v2"])
+                angle = _wall_angle_deg(p2[0] - p1[0], p2[1] - p1[1])
+                if _near_cardinal(angle):
+                    continue
+                members.append((angle, w))
+        if not members:
+            return []
+        members.sort(key=lambda m: m[0])
+        families = [[members[0]]]
+        for angle, w in members[1:]:
+            if angle - families[-1][-1][0] < FAMILY_ANGLE_TOL:
+                families[-1].append((angle, w))
+            else:
+                families.append([(angle, w)])
+        return [{"angle": sum(a for a, _ in fam) / len(fam),
+                 "walls": [w for _, w in fam]} for fam in families]
+
+    def draw_angled_dims(self):
+        for fam in self._angled_families():
+            self._draw_angled_lane(fam)
+
+    def _lane_geometry(self, fam):
+        """`fam`'s own axis (`u`), perpendicular (`n`), projection origin
+        (`cc`) and CLUSTERED stations -- every member wall's TWO ENDPOINTS
+        ONLY, projected onto `u` and clustered exactly as the orthogonal
+        rows are (0118-ruling.md sec2 step 1).
+
+        NO OPENING CENTRELINES -- 0127-ruling.md sec1 / 0128-ruling.md
+        sec1 (global, all rows): "drop the doors, opening and windows
+        from the callouts for the PDF. This will be the reference that
+        will be sent to the architect who will redraw those windows and
+        doors." Supersedes 0119-ruling.md sec1 / 0120-ruling.md sec2 step
+        3's own instruction to include them -- a live correction against
+        the real, rendered page beats a spec nobody had looked at
+        rendered yet.
+
+        Also returns `reach`, the family's OWN outward perpendicular
+        extent (the projection of its own farthest point onto the
+        OUTWARD `n`, decided by which side of the plan bbox centre the
+        family's centroid sits on) -- `_draw_angled_lane` anchors BOTH
+        the lane's clearance and its extension lines' near edge to this,
+        not to the whole plan bbox (0127-ruling.md sec2: the rotated
+        equivalent of the orthogonal rows' own `ext_base` -- the family's
+        own outer envelope plus `DIM_LANE`, extension lines starting at
+        that envelope rather than at the family's centroid, never
+        crossing its geometry to reach the lane). Split out from
+        `_draw_angled_lane` so both are directly testable without a
+        canvas."""
+        theta = math.radians(fam["angle"])
+        u = (math.cos(theta), math.sin(theta))
+        n = (-math.sin(theta), math.cos(theta))
+        walls = fam["walls"]
+
+        pts = []
+        for w in walls:
+            pts += [self.pt(w["v1"]), self.pt(w["v2"])]
+        ccx = sum(p[0] for p in pts) / len(pts)
+        ccy = sum(p[1] for p in pts) / len(pts)
+
+        def proj_u(p):
+            return (p[0] - ccx) * u[0] + (p[1] - ccy) * u[1]
+
+        def proj_n(p):
+            return (p[0] - ccx) * n[0] + (p[1] - ccy) * n[1]
+
+        bcx = (self.bx0 + self.bx1) / 2
+        bcy = (self.by0 + self.by1) / 2
+        sign = 1.0 if (ccx - bcx) * n[0] + (ccy - bcy) * n[1] >= 0 else -1.0
+
+        stations = cluster_stations(sorted(proj_u(p) for p in pts))
+        reach = max((proj_n(p) * sign for p in pts), default=0.0)
+
+        return {"theta": theta, "u": u, "n": (n[0] * sign, n[1] * sign),
+                "ccx": ccx, "ccy": ccy, "stations": stations, "reach": reach}
+
+    def _draw_angled_lane(self, fam):
+        """One dimension lane for `fam`, drawn snug against its own
+        outermost wall (0120-ruling.md sec2 step 2 read against Patrick's
+        own check: outside the family's own footprint, not the whole plan
+        bbox), stations clustered and whole-inch telescoped exactly as
+        the orthogonal rows are."""
+        geo = self._lane_geometry(fam)
+        theta, u, nx_ny = geo["theta"], geo["u"], geo["n"]
+        ccx, ccy, stations, reach = (
+            geo["ccx"], geo["ccy"], geo["stations"], geo["reach"])
+        if len(stations) < 2:
+            return
+
+        nx, ny = nx_ny
+        gap_in = 4.0 / self.k
+        ext_offset = reach + gap_in            # the family's own outer edge
+        lane_offset = ext_offset + DIM_LANE / self.k
+
+        def to_page(px, py):
+            return (self.X(px), self.Y(py))
+
+        def lane_plan(s, extra=0.0):
+            off = lane_offset + extra
+            return ccx + u[0] * s + nx * off, ccy + u[1] * s + ny * off
+
+        def ext_plan(s):
+            return ccx + u[0] * s + nx * ext_offset, ccy + u[1] * s + ny * ext_offset
+
+        station_pts = [to_page(*lane_plan(s)) for s in stations]
+        ext_pairs = [(to_page(*ext_plan(s)),
+                      to_page(*lane_plan(s, 5.0 / self.k)))
+                     for s in stations]
+        rounded = _rounded_stations(stations)
+        labels = [ftin(rb - ra) for ra, rb in
+                  zip(rounded, rounded[1:], strict=False)]
+        rot = math.degrees(theta)
+        if rot > 90 or rot <= -90:
+            rot += 180
+        self.dim_row_along(ext_pairs, station_pts, labels, rot)
+
     # ---------- annotations, open edges ----------
     def draw_extras(self):
         for room in self.doc["rooms"]:
@@ -671,7 +824,10 @@ class Sheet:
         c.setFont("Helvetica", 7.5)
         c.drawString(cols[1] + 8, y0 + TITLE_H - 32,
                      f"SCALE: {self.scale_name}   (11x17 SHEET)")
-        c.drawString(cols[1] + 8, y0 + 8, m["dim_note"])
+        c.drawString(cols[1] + 8, y0 + 15, m["dim_note"])
+        c.setFont("Helvetica", 6)
+        c.drawString(cols[1] + 8, y0 + 6,
+                     "Openings shown for reference; not dimensioned")
         c.setFont("Helvetica", 7.5)
         c.drawString(cols[2] + 8, y0 + TITLE_H - 16, "WALL ASSEMBLIES:")
         c.drawString(cols[2] + 8, y0 + TITLE_H - 28, m["assembly_note"])
@@ -693,6 +849,7 @@ class Sheet:
         self.draw_rooms()
         self.draw_extras()
         self.draw_dims()
+        self.draw_angled_dims()
         self.title_block(sheet_no, total)
         self.c.showPage()
 
