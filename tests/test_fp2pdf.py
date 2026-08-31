@@ -402,3 +402,310 @@ def test_convert_renders_the_rect_doc_unchanged_after_the_refactor(tmp_path):
     assert isinstance(result, ConvertResult)
     assert result.warnings == []
     assert out.exists()
+
+
+# ---------------------------------------------------------------------------
+# 0127-ruling.md / 0128-ruling.md -- opening stations leave EVERY row
+# (bottom X, left Y, and the angled lanes); openings still DRAW
+# ---------------------------------------------------------------------------
+
+def _door_wall_doc():
+    """One wall with a centred door vs. the same wall without one --
+    isolates whether `_features()` reads the opening at all."""
+    def doc(has_door):
+        openings = [{"id": "o1", "kind": "door", "code": "3068",
+                     "anchor": {"from": "center", "offset_in": 0.0},
+                     "door_type": "LH", "hinge": "v1",
+                     "swings_toward": "left"}] if has_door else []
+        return {
+            "format": "floorplanner-design", "version": 5,
+            "levels": [_MINIMAL_LEVEL],
+            "vertices": [{"id": "v1", "x": 0, "y": 0},
+                         {"id": "v2", "x": 200, "y": 0}],
+            "walls": [{"id": "w1", "level": "L1", "v1": "v1", "v2": "v2",
+                       "type": "exterior", "openings": openings}],
+            "rooms": [], "furnishings": [],
+        }
+    return doc
+
+
+def test_features_excludes_opening_stations_from_both_orthogonal_rows():
+    """0128-ruling.md sec1: "Doors, windows, and every other opening kind
+    leave the dimension stations of every row" -- the bottom X row and
+    the left Y row, not just the angled lanes. A door on a wall adds no
+    station beyond that wall's own two endpoints."""
+    make = _door_wall_doc()
+    fx_without, fy_without = _sheet(make(False))._features()
+    fx_with, fy_with = _sheet(make(True))._features()
+    assert fx_with == fx_without
+    assert fy_with == fy_without
+    assert len(fx_without) == 2, "expected just the wall's two endpoints"
+
+
+def test_title_block_notes_openings_are_shown_but_not_dimensioned():
+    """0128-ruling.md sec1's own footer instruction: 'openings shown for
+    reference; not dimensioned', beside the existing dimension-reference
+    note -- so the receiving architect reads the omission as a decision,
+    not a gap."""
+    src = Path(fp2pdf.__file__).read_text(encoding="utf-8")
+    assert "not dimensioned" in src
+
+
+# ---------------------------------------------------------------------------
+# 0120-ruling.md -- tranche 2 item 2: the room-show_dimensions-driven
+# angled dimension lane (AMBER)
+# ---------------------------------------------------------------------------
+
+def _sheet(doc, level=None):
+    return fp2pdf.Sheet(None, doc, level or _MINIMAL_LEVEL,
+                         fp2pdf._default_thickness(), False, _MINIMAL_META)
+
+
+def _triangle_doc(rooms):
+    """rooms: [(id, show_dims, x_offset, has_door), ...]. Each room is a
+    right triangle (xoff,0)-(xoff+100,0)-(xoff,100): the two legs are
+    cardinal (excluded by `_near_cardinal`), the hypotenuse
+    (xoff+100,0)-(xoff,100) is the one family edge (45 degrees in
+    `Sheet.pt()`'s own y-flipped page space), every room's at the SAME
+    angle so same-angle rooms merge into one family (0120-ruling.md
+    sec2's own stated consequence)."""
+    vertices, walls, room_defs = [], [], []
+    for i, (rid, show_dims, xoff, has_door) in enumerate(rooms):
+        v0, v1, v2 = f"v{i}0", f"v{i}1", f"v{i}2"
+        vertices += [
+            {"id": v0, "x": xoff, "y": 0},
+            {"id": v1, "x": xoff + 100, "y": 0},
+            {"id": v2, "x": xoff, "y": 100},
+        ]
+        w0, w1, w2 = f"{rid}w0", f"{rid}w1", f"{rid}w2"
+        hyp_openings = []
+        if has_door:
+            hyp_openings = [{"id": f"{rid}o", "kind": "door", "code": "3068",
+                             "anchor": {"from": "center", "offset_in": 0.0},
+                             "door_type": "LH", "hinge": "v1",
+                             "swings_toward": "left"}]
+        walls += [
+            {"id": w0, "level": "L1", "v1": v0, "v2": v1,
+             "type": "exterior", "openings": []},
+            {"id": w1, "level": "L1", "v1": v1, "v2": v2,
+             "type": "exterior", "openings": hyp_openings},
+            {"id": w2, "level": "L1", "v1": v2, "v2": v0,
+             "type": "exterior", "openings": []},
+        ]
+        room_defs.append({
+            "id": rid, "level": "L1", "name": rid, "category": "living",
+            "area_accounting": "conditioned",
+            "outline": [{"v": v0, "wall": w0}, {"v": v1, "wall": w1},
+                        {"v": v2, "wall": w2}],
+            "label": {"show_dimensions": show_dims},
+        })
+    return {
+        "format": "floorplanner-design", "version": 5,
+        "levels": [_MINIMAL_LEVEL],
+        "vertices": vertices, "walls": walls, "rooms": room_defs,
+        "furnishings": [],
+    }
+
+
+@pytest.mark.parametrize("dx,dy,expected", [
+    (1.0, 0.0, 0.0), (0.0, 1.0, 90.0), (-1.0, 0.0, 0.0), (1.0, 1.0, 45.0),
+])
+def test_wall_angle_deg_is_undirected(dx, dy, expected):
+    """v1->v2 and v2->v1 must read the same family."""
+    assert fp2pdf._wall_angle_deg(dx, dy) == pytest.approx(expected)
+    assert fp2pdf._wall_angle_deg(-dx, -dy) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("angle,near", [
+    (0.0, True), (0.5, True), (179.6, True), (90.0, True), (89.3, True),
+    (45.0, False), (135.0, False), (2.0, False), (88.0, False),
+])
+def test_near_cardinal_excludes_both_axes(angle, near):
+    """0120-ruling.md sec2 step 1: near-cardinal is horizontal OR
+    vertical -- a wall near 90 degrees is already the Y row's job, same
+    as one near 0/180 is the X row's."""
+    assert fp2pdf._near_cardinal(angle) is near
+
+
+def test_angled_families_merges_two_rooms_at_the_same_angle():
+    """0120-ruling.md sec2's own stated consequence: all of a family's
+    rooms project onto one shared lane."""
+    doc = _triangle_doc([("rA", True, 0, False), ("rB", True, 300, False)])
+    fams = _sheet(doc)._angled_families()
+    assert len(fams) == 1
+    # `Sheet.pt()` flips y (Sheet's own "plan coords, y already flipped up"
+    # convention), so the hypotenuse's page-space angle is 45, not the
+    # 135 its raw (x,y) vertices would suggest -- both rooms land there.
+    assert fams[0]["angle"] == pytest.approx(45.0)
+    assert {w["id"] for w in fams[0]["walls"]} == {"rAw1", "rBw1"}
+
+
+def test_angled_families_excludes_a_dims_off_room():
+    """0120-ruling.md sec3: a 45 wall in a room with dimensions off gets
+    no angled callout -- the feature, not a gap."""
+    doc = _triangle_doc([("rA", True, 0, False), ("rB", False, 300, False)])
+    fams = _sheet(doc)._angled_families()
+    assert len(fams) == 1
+    assert {w["id"] for w in fams[0]["walls"]} == {"rAw1"}
+
+
+def test_angled_families_empty_when_no_room_opts_in():
+    doc = _triangle_doc([("rA", False, 0, False)])
+    assert _sheet(doc)._angled_families() == []
+
+
+def test_angled_families_ignores_the_two_cardinal_legs():
+    """Only the hypotenuse (45 degrees) is a family member -- the two
+    legs are horizontal/vertical, the X/Y rows' own job."""
+    doc = _triangle_doc([("rA", True, 0, False)])
+    fams = _sheet(doc)._angled_families()
+    assert len(fams) == 1
+    assert [w["id"] for w in fams[0]["walls"]] == ["rAw1"]
+
+
+def test_lane_geometry_telescopes_to_the_family_extent():
+    """0120-ruling.md sec4's own receipt: a two-room 45 family -> one
+    lane, stations telescoping to the family extent -- proven the same
+    way 0118-ruling.md's orthogonal rows are, not asserted."""
+    doc = _triangle_doc([("rA", True, 0, False), ("rB", True, 300, False)])
+    sheet = _sheet(doc)
+    fam = sheet._angled_families()[0]
+    geo = sheet._lane_geometry(fam)
+    stations = geo["stations"]
+    assert len(stations) >= 2
+    rounded = fp2pdf._rounded_stations(stations)
+    segments = sum(b - a for a, b in zip(rounded, rounded[1:], strict=False))
+    assert segments == rounded[-1] - rounded[0]
+
+
+def test_lane_geometry_excludes_door_stations():
+    """Patrick's own check on the first cut, against a real plan: "I dont
+    want the positions of the doors listed in the dimensions." Overrides
+    0119-ruling.md sec1 / 0120-ruling.md sec2 step 3's own instruction to
+    include opening centrelines -- a door on the family edge must add NO
+    station beyond the wall's own two endpoints. Full trail: 0126-report.md."""
+    without_door = _sheet(_triangle_doc([("rA", True, 0, False)]))
+    with_door = _sheet(_triangle_doc([("rA", True, 0, True)]))
+    fam_no_door = without_door._angled_families()[0]
+    fam_door = with_door._angled_families()[0]
+    stations_no_door = without_door._lane_geometry(fam_no_door)["stations"]
+    stations_with_door = with_door._lane_geometry(fam_door)["stations"]
+    assert len(stations_with_door) == len(stations_no_door) == 2, (
+        "a door centred on the 135-degree wall added a station of its own")
+
+
+def test_convert_renders_a_show_dims_angled_room_without_raising(tmp_path):
+    pytest.importorskip("reportlab")
+    doc = _triangle_doc([("rA", True, 0, True), ("rB", True, 300, False)])
+    out = tmp_path / "out.pdf"
+    result = convert(doc, out, _MINIMAL_META)
+    assert out.exists()
+    assert result.warnings == []
+
+
+def _triangle_plus_distant_wing_doc():
+    """A small 45-degree triangle room (the show-dims family, ~140" across
+    diagonally) sitting beside a large, FAR AWAY cardinal room -- so the
+    overall plan bbox is much bigger than the family's own footprint, the
+    shape of Patrick's actual report (docs/evidence/DIM45.png, 0126-report.md):
+    a small angled wing on one side of a much larger house. Reproduces the
+    bug directly: the first cut sized the lane's clearance off the WHOLE
+    bbox and started extension lines from the family's own centroid, so
+    they ran hundreds of inches across the big room before reaching the
+    lane. A minimal synthetic case; the real corpus regression is
+    `test_angled_lane_on_the_real_wiscaway_wing_stays_snug_and_off_the_geometry`."""
+    triangle = _triangle_doc([("rA", True, 0, False)])
+    far_v0, far_v1, far_v2, far_v3 = "fv0", "fv1", "fv2", "fv3"
+    triangle["vertices"] += [
+        {"id": far_v0, "x": 2000, "y": 0}, {"id": far_v1, "x": 3000, "y": 0},
+        {"id": far_v2, "x": 3000, "y": 1000}, {"id": far_v3, "x": 2000, "y": 1000},
+    ]
+    triangle["walls"] += [
+        {"id": "fw0", "level": "L1", "v1": far_v0, "v2": far_v1,
+         "type": "exterior", "openings": []},
+        {"id": "fw1", "level": "L1", "v1": far_v1, "v2": far_v2,
+         "type": "exterior", "openings": []},
+        {"id": "fw2", "level": "L1", "v1": far_v2, "v2": far_v3,
+         "type": "exterior", "openings": []},
+        {"id": "fw3", "level": "L1", "v1": far_v3, "v2": far_v0,
+         "type": "exterior", "openings": []},
+    ]
+    return triangle
+
+
+def test_lane_reach_is_local_to_the_family_not_the_whole_plan_bbox():
+    """Patrick's second finding: the lane must sit SNUG against the
+    family's own outermost wall, not clear across a much larger plan."""
+    doc = _triangle_plus_distant_wing_doc()
+    sheet = _sheet(doc)
+    assert sheet.bx1 - sheet.bx0 > 2500, "fixture must dwarf the triangle"
+    fam = sheet._angled_families()[0]
+    geo = sheet._lane_geometry(fam)
+    # the triangle's own legs run 0..100" -- its outward reach from the
+    # hypotenuse should be on that scale, nowhere near the ~3000" bbox
+    assert geo["reach"] < 150, (
+        f"reach={geo['reach']!r} was pulled out by the far wing's bbox, "
+        f"not sized off the family's own footprint")
+
+
+def test_angled_lane_extension_lines_do_not_cross_the_family_footprint():
+    """Patrick's third finding: callouts must not cross over the drawing.
+    An extension line runs from the family's own outer edge straight out
+    to the lane -- every point on it must be AT OR BEYOND that edge, in
+    the outward direction, never back across the family's own walls."""
+    doc = _triangle_plus_distant_wing_doc()
+    sheet = _sheet(doc)
+    fam = sheet._angled_families()[0]
+    geo = sheet._lane_geometry(fam)
+    n = geo["n"]
+    ccx, ccy = geo["ccx"], geo["ccy"]
+
+    def proj_n(x, y):
+        return (x - ccx) * n[0] + (y - ccy) * n[1]
+
+    # every member wall's own vertices, in the outward-perpendicular sense,
+    # must sit AT OR BEHIND the family's own reach -- nothing pokes past it
+    member_n = [proj_n(*sheet.pt(w["v1"])) for w in fam["walls"]]
+    member_n += [proj_n(*sheet.pt(w["v2"])) for w in fam["walls"]]
+    assert max(member_n) <= geo["reach"] + 1e-6
+
+
+def test_angled_lane_on_the_real_wiscaway_wing_stays_snug_and_off_the_geometry():
+    """The real corpus regression, per fixtures/README.md's own entry --
+    Patrick's diagonal wing (SUN/OFFICE/HALL2/UTILITY/MUD/GARAGE), Show
+    dimensions forced on, reproduces the first cut's three faults and
+    confirms the fix on the actual reported file, not just a synthetic
+    triangle."""
+    doc = json.loads((Path(__file__).parent.parent / "fixtures" /
+                      "wiscaway2026-08-30R1.json").read_text(encoding="utf-8"))
+    wing_room_ids = {"r6", "r8", "r13", "r15", "r16", "r22", "r23"}
+    for r in doc["rooms"]:
+        if r["id"] in wing_room_ids:
+            r.setdefault("label", {})["show_dimensions"] = True
+    level = next(lv for lv in doc["levels"] if lv["id"] == "L1")
+    sheet = _sheet(doc, level)
+    families = sheet._angled_families()
+    assert len(families) == 2, "expected the two wing runs (~45 / ~135)"
+    for fam in families:
+        geo = sheet._lane_geometry(fam)
+        n = geo["n"]
+        ccx, ccy = geo["ccx"], geo["ccy"]
+        # snug: the reach stays on the wing's own scale, nowhere near the
+        # ~1360" whole-plan bbox this fixture's house spans
+        assert geo["reach"] < 500
+        # no crossing: no member wall pokes past the lane's own reach
+        member_n = [(sheet.pt(w["v1"])[0] - ccx) * n[0]
+                    + (sheet.pt(w["v1"])[1] - ccy) * n[1]
+                    for w in fam["walls"]]
+        member_n += [(sheet.pt(w["v2"])[0] - ccx) * n[0]
+                     + (sheet.pt(w["v2"])[1] - ccy) * n[1]
+                     for w in fam["walls"]]
+        assert max(member_n) <= geo["reach"] + 1e-6
+        # no door stations: this fixture is only a meaningful regression
+        # for the omission if at least one wing wall actually carries an
+        # opening, and RAW (pre-cluster) stations must be exactly the two
+        # endpoints per wall -- never more, however many openings exist
+        assert any(w.get("openings") for w in fam["walls"]), (
+            "fixture no longer carries an opening on the wing -- "
+            "the door-omission receipt needs one to mean anything")
+        assert len(geo["stations"]) <= 2 * len(fam["walls"])
