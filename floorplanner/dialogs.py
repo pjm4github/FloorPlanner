@@ -924,7 +924,7 @@ class PDFExportOptionsDialog(QDialog):
         self.ed_assembly = QLineEdit(
             "2x6 exterior / 2x4 interior, conventional framing")
         form.addRow("Wall assembly note", self.ed_assembly)
-        self.ed_dim = QLineEdit("All dimensions to overall wall faces")
+        self.ed_dim = QLineEdit("All dimensions to wall centerlines")
         form.addRow("Dimension note", self.ed_dim)
 
         # ONE SHEET PER STOREY LEVEL, checkable -- a site-kind level is
