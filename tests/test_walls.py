@@ -10,10 +10,10 @@ pytestmark = pytest.mark.walls
 NOMOD = Qt.KeyboardModifier.NoModifier
 
 
-def _draw_end(fp, win, p1, drag_to):
-    """End point of a wall drawn from p1 toward drag_to (no modifiers)."""
+def _draw_end(fp, win, p1, drag_to, mods=NOMOD):
+    """End point of a wall drawn from p1 toward drag_to."""
     temp = fp.WallItem(QPointF(*p1), QPointF(*p1), "interior")
-    return win.view._wall_end_point(temp, QPointF(*drag_to), NOMOD)
+    return win.view._wall_end_point(temp, QPointF(*drag_to), mods)
 
 
 def test_wall_draw_aligns_end_to_orthogonal_wall(fp, win):
@@ -47,6 +47,29 @@ def test_wall_draw_leaves_gap_when_not_meeting(fp, win):
 def test_wall_draw_orthogonal_far_from_walls(fp, win):
     end = _draw_end(fp, win, (0, 500), (250, 540))
     assert end.y() == pytest.approx(500)   # horizontal, no off-axis pull
+
+
+def test_wall_draw_ctrl_snaps_to_15_degrees(fp, win):
+    """Ctrl on the DRAW gesture, not just the reshape-an-existing-end drag
+    (`test_ctrl_drag_snaps_to_nearest_15`) -- the same fixed-increment
+    formula (`SETTINGS['rotate_snap_deg']`), anchored at the drawn wall's
+    own p1 instead of `WallItem._anchor`."""
+    ctrl = Qt.KeyboardModifier.ControlModifier
+    # drag toward 40deg -- nearest 15deg multiple is 45deg
+    end = _draw_end(fp, win, (0, 0), (100, 84), mods=ctrl)
+    length = (end.x() ** 2 + end.y() ** 2) ** 0.5
+    assert end.x() == pytest.approx(length * 0.7071067811865476, abs=0.05)
+    assert end.y() == pytest.approx(length * 0.7071067811865476, abs=0.05)
+
+
+def test_wall_draw_ctrl_does_not_pull_orthogonal(fp, win):
+    """A near-horizontal Ctrl drag lands on 0deg (a 15deg multiple), same as
+    the unmodified default -- but arrived at via the angle-snap formula, not
+    the orthogonal-rounding one, so a genuinely off-axis Ctrl drag (the test
+    above) is free to land away from square."""
+    ctrl = Qt.KeyboardModifier.ControlModifier
+    end = _draw_end(fp, win, (0, 0), (200, 4), mods=ctrl)
+    assert end.y() == pytest.approx(0.0, abs=1e-6)
 
 
 def test_no_autogrow_when_released_short(fp, scene):

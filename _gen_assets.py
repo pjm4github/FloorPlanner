@@ -1176,6 +1176,15 @@ def main():
             '<polyline points="14.5,4.5 18,8 14.5,11.5" fill="none" '
             'stroke="#1f2937" stroke-width="1.8" stroke-linecap="round" '
             'stroke-linejoin="round"/>'],
+        "roof": [
+            # gable outline, ridge dashed down the middle -- 0139-ruling.md's
+            # own 2D convention (ridge heavy, eaves/gable dashed), inverted
+            # here since the icon reads better with the OUTLINE bold and the
+            # ridge as the accent line
+            '<path d="M2.5 15.5 L12 4 L21.5 15.5 Z" fill="none" '
+            'stroke="#1f2937" stroke-width="1.8" stroke-linejoin="round"/>',
+            '<line x1="12" y1="4" x2="12" y2="15.5" stroke="#1f2937" '
+            'stroke-width="1.3" stroke-dasharray="2.3,2"/>'],
         "record": [
             # the universal red "record" dot
             '<circle cx="12" cy="12" r="7" fill="#dc2626" stroke="#991b1b" '

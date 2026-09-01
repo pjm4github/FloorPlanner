@@ -12,6 +12,7 @@ from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
 from floorplanner.rooms import _wall_endpoints_match  # star skips underscores
+from floorplanner.roofs import RoofItem
 from floorplanner.items import *  # noqa: F401
 
 
@@ -121,6 +122,8 @@ class PlanView(QGraphicsView):
         self._panning = False
         self._pan_last = None
         self._temp_wall = None
+        self._temp_roof = None            # ridge being dragged, or None
+        self._roof_awaiting_eaves = None  # ridge fixed, awaiting the eaves pick
         self._last_scene = None           # last mouse position (paste target)
         self._rubber = None               # Ctrl+drag selection rubber band
         self._rubber_origin = None
@@ -286,6 +289,16 @@ class PlanView(QGraphicsView):
             return QPointF(wall.p1)
         if mods & Qt.KeyboardModifier.ShiftModifier:
             return wall_snap(QPointF(sp))     # free angle
+        if mods & Qt.KeyboardModifier.ControlModifier:
+            # fixed angular increments off the anchor (SETTINGS['rotate_snap_deg'],
+            # default 15deg) -- same formula WallItem._angle_snapped_target uses
+            # for a re-angle DRAG on an existing wall's end; this is the DRAW
+            # gesture's own copy, anchored at wall.p1 instead of self._anchor.
+            step = math.radians(max(1.0, SETTINGS.get("rotate_snap_deg", 15.0)))
+            ang = round(math.atan2(dy, dx) / step) * step
+            length = max(MIN_WALL_LEN, wall_snap_len(math.hypot(dx, dy)))
+            return QPointF(wall.p1.x() + math.cos(ang) * length,
+                           wall.p1.y() + math.sin(ang) * length)
         ang = math.atan2(dy, dx)              # orthogonal from the anchor
         a = round(ang / (math.pi / 2)) * (math.pi / 2)
         horizontal = abs(math.cos(a)) > 0.5
@@ -452,6 +465,34 @@ class PlanView(QGraphicsView):
                         self._make_named_room(sp, name.strip(), res)
                 e.accept()
                 return
+            if tool == TOOL_ROOF_RIDGE:
+                if self._roof_awaiting_eaves is not None:
+                    # STAGE 2: this press is the eaves pick, not a new ridge
+                    # (0139-ruling.md sec1/sec3: "pick a ridge line, pick an
+                    # eaves line"). Same wall lookup as _place_opening.
+                    wall = None
+                    for it in self.scene().items(sp):
+                        if isinstance(it, WallItem):
+                            wall = it
+                            break
+                    if wall is None:
+                        self.win.status(
+                            "Roof ridge: click the eaves wall this roof "
+                            "spans over (Esc cancels).")
+                        e.accept()
+                        return
+                    item = self._roof_awaiting_eaves
+                    self._roof_awaiting_eaves = None
+                    self.win.finish_roof_ridge(item, wall)
+                    e.accept()
+                    return
+                # STAGE 1: start the ridge, same anchor snap a wall gets
+                p = self._snap_start(sp)
+                item = RoofItem(p, p)
+                self.scene().addItem(item)
+                self._temp_roof = item
+                e.accept()
+                return
             # SELECT tool: pan when pressing empty space.
             #
             # D53: `on_blank_canvas`, not `itemAt(...) is None`. Now that a
@@ -527,6 +568,15 @@ class PlanView(QGraphicsView):
             w.set_end_vertex("p2", w.end_vertex("p2").relocated_to(
                 self._wall_end_point(w, sp, e.modifiers())))
             w.rebuild()
+            e.accept()
+            return
+
+        if self._temp_roof is not None:
+            # SAME snap math as a wall drag (0139-ruling.md sec1: "the ridge
+            # tool calls that machinery") -- `_wall_end_point` only reads
+            # `wall.p1`, so a RoofItem duck-types as the `wall` it expects.
+            item = self._temp_roof
+            item.set_ridge(item.p1, self._wall_end_point(item, sp, e.modifiers()))
             e.accept()
             return
 
@@ -656,6 +706,19 @@ class PlanView(QGraphicsView):
             e.accept()
             return
 
+        if self._temp_roof is not None and e.button() == Qt.MouseButton.LeftButton:
+            item, self._temp_roof = self._temp_roof, None
+            if item.length() < MIN_WALL_LEN:
+                self.scene().removeItem(item)
+                self.win.status("Roof ridge too short; try again.")
+            else:
+                self._roof_awaiting_eaves = item
+                self.win.status(
+                    "Roof ridge set. Click the eaves wall this roof spans "
+                    "over (Esc cancels).")
+            e.accept()
+            return
+
         super().mouseReleaseEvent(e)
 
     def contextMenuEvent(self, e):
@@ -761,6 +824,12 @@ class PlanView(QGraphicsView):
         if self._temp_wall is not None:
             self.scene().removeItem(self._temp_wall)
             self._temp_wall = None
+        if self._temp_roof is not None:
+            self.scene().removeItem(self._temp_roof)
+            self._temp_roof = None
+        if self._roof_awaiting_eaves is not None:
+            self.scene().removeItem(self._roof_awaiting_eaves)
+            self._roof_awaiting_eaves = None
 
     # -- door / window placement ---------------------------------------------------
     def _place_opening(self, sp: QPointF, kind: str):

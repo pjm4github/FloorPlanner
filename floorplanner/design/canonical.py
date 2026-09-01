@@ -106,4 +106,13 @@ def canonicalize(doc):
     groups.sort(key=lambda g: (lorder.get(g.get("level"), 0), g["members"]))
     for i, g in enumerate(groups, 1):
         g["id"] = f"g{i}"
+
+    # ROOFS (0139-ruling.md R1): a ridge's two literal points ARE its
+    # identity, same as a furnishing's `pos` -- no vertex table to remap,
+    # since a roof does not need welding (`_roofs_of`'s own docstring).
+    roofs = doc.get("roofs") or []
+    roofs.sort(key=lambda rf: (lorder[rf["level"]], rf["ridge"][0][0],
+                               rf["ridge"][0][1]))
+    for i, rf in enumerate(roofs, 1):
+        rf["id"] = f"rf{i}"
     return doc
