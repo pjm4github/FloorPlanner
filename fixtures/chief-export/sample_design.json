@@ -185,7 +185,7 @@
           "id": "oD2",
           "kind": "door",
           "code": "3080",
-          "door_type": "sliding",
+          "door_type": "SLIDER",
           "anchor": {
             "from": "v2",
             "offset_in": 30
@@ -226,7 +226,7 @@
           "id": "oD1",
           "kind": "door",
           "code": "3080",
-          "door_type": "hinged",
+          "door_type": "LH",
           "anchor": {
             "from": "v1",
             "offset_in": 24
@@ -394,7 +394,7 @@
           "id": "uD1",
           "kind": "door",
           "code": "3080",
-          "door_type": "hinged",
+          "door_type": "LH",
           "anchor": {
             "from": "center",
             "offset_in": 0

@@ -25,6 +25,22 @@ entity all turn it red. Qt-free by construction -- `fp2dxf` imports nothing
 from `floorplanner` (see `floorplanner/export/__init__.py`), so this needs
 no `fp`/`win` fixture, only a temp directory.
 
+REGENERATED AGAIN, 0135-ruling.md's own door-symbol-by-type fix -- and the
+diff caught something in the FIXTURE, not just the code: `sample_design.json`
+itself carried two bogus `door_type` values, `"sliding"` and `"hinged"`,
+neither a real `config.py:DOOR_TYPES` member. `oD2`'s `"sliding"` happened
+to satisfy the OLD (dead) `door_type == "sliding"` check by coincidence, so
+its slider geometry was already right; `oD1`/`uD1`'s `"hinged"` never
+mattered to geometry (hinge/swings_toward carry that). Both corrected to
+real catalog values (`SLIDER`, `LH`) in the same commit as the code fix --
+this is the defect's own root cause, present in the golden fixture, not a
+tangential cleanup. **THE DIFF:** `oD2`, `oD1`, `uD1`'s NOTES tag text
+changed to the corrected type name; two new glass LINE entities appear on
+`FP-WINDOWS` in both `L1.dxf` and `L2.dxf` (windows previously emitted gap
+lines only); `oD2`'s own slider-panel geometry is UNCHANGED (the
+coincidence above). Both `.openings.json` sidecars: only the `door_type`
+field's text changed, stations untouched.
+
 COMPARED AS TEXT, NOT RAW BYTES -- measured, not assumed. `convert()`
 writes with `Path.write_text(..., encoding="utf-8")` and no `newline=`
 argument, so on Windows every `\n` it emits becomes `\r\n` on disk; this
@@ -45,6 +61,7 @@ from pathlib import Path
 
 import pytest
 
+from floorplanner.export import fp2dxf
 from floorplanner.export.fp2dxf import convert
 
 pytestmark = pytest.mark.io
@@ -91,6 +108,125 @@ def test_the_sample_converts_clean_no_warnings(tmp_path):
     assert {p.stem for p in result.written} == set(GOLDEN_LEVELS)
     assert result.warnings == []
     assert result.skipped_levels == []
+
+
+# --------------------------------------------------------------------------
+# 0135-ruling.md -- one DXF symbol per catalog door_type, windows made real
+# --------------------------------------------------------------------------
+
+_LEVEL = {"id": "L1", "name": "Main", "elevation_in": 0.0, "height_in": 96.0,
+          "kind": "storey", "reference": False}
+
+
+def _one_opening_doc(kind, door_type=None, hinge="v1", swings_toward="left"):
+    """One 200" wall carrying a single opening -- enough for `emit_wall`,
+    nothing else."""
+    op = {"id": "o1", "kind": kind, "code": "3068",
+          "anchor": {"from": "center", "offset_in": 0.0}}
+    if kind in ("door", "gate"):
+        op["door_type"] = door_type
+        op["hinge"] = hinge
+        op["swings_toward"] = swings_toward
+    return {
+        "format": "floorplanner-design", "version": 5,
+        "levels": [_LEVEL],
+        "vertices": [{"id": "v1", "x": 0, "y": 0}, {"id": "v2", "x": 200, "y": 0}],
+        "walls": [{"id": "w1", "level": "L1", "v1": "v1", "v2": "v2",
+                   "type": "exterior", "openings": [op]}],
+        "rooms": [], "furnishings": [],
+    }
+
+
+def test_door_symbol_dispatch_is_exhaustive_over_the_real_catalog():
+    """0135-ruling.md sec2's own receipt: dispatch is exhaustive over
+    `config.py:DOOR_TYPES` itself -- fails the moment a new catalog type
+    exists without a symbol here, rather than silently falling through to
+    a generic swing the way `door_type == "sliding"` did."""
+    from floorplanner.config import DOOR_TYPES
+    for dt in DOOR_TYPES:
+        symbol = fp2dxf._door_symbol("door", dt)
+        assert symbol not in (None, "unknown"), (
+            f"catalog door_type {dt!r} has no DXF symbol")
+
+
+def test_door_symbol_flags_the_fixtures_own_former_bugs_as_unknown():
+    """0135-ruling.md sec1's own finding, reproduced directly:
+    `"sliding"` and `"hinged"` -- the two bogus values
+    `sample_design.json` itself carried -- match nothing in the real
+    catalog and must not be silently absorbed as a generic swing."""
+    assert fp2dxf._door_symbol("door", "sliding") == "unknown"
+    assert fp2dxf._door_symbol("door", "hinged") == "unknown"
+
+
+def test_doorway_type_emits_no_arc_no_leaf():
+    """0135-ruling.md sec2's own named receipt: DOORWAY emits zero arcs --
+    the phantom swinging leaf D81's sibling defect gave every DOORWAY
+    opening before this fix."""
+    dxf = fp2dxf.DxfR12()
+    ctx = fp2dxf.Ctx(doc=_one_opening_doc("door", "DOORWAY"))
+    sidecar = {}
+    fp2dxf.emit_wall(ctx, dxf, ctx.doc["walls"][0], sidecar)
+    text = dxf.dumps()
+    assert "\n0\nARC\n" not in text
+    assert "DOORWAY" in text
+
+
+def test_french_type_emits_exactly_two_arcs():
+    """0135-ruling.md sec2's own named receipt: FRENCH emits two."""
+    dxf = fp2dxf.DxfR12()
+    ctx = fp2dxf.Ctx(doc=_one_opening_doc("door", "FRENCH"))
+    sidecar = {}
+    fp2dxf.emit_wall(ctx, dxf, ctx.doc["walls"][0], sidecar)
+    text = dxf.dumps()
+    assert text.count("\n0\nARC\n") == 2
+
+
+def test_window_emits_a_glass_line_not_just_gap_lines():
+    """0135-ruling.md sec2's own named receipt: window emits its glass
+    line -- before this fix a window was bare gap-spanning lines and
+    nothing else, indistinguishable from an unclassified opening."""
+    dxf = fp2dxf.DxfR12()
+    ctx = fp2dxf.Ctx(doc=_one_opening_doc("window"))
+    sidecar = {}
+    fp2dxf.emit_wall(ctx, dxf, ctx.doc["walls"][0], sidecar)
+    text = dxf.dumps()
+    # two gap lines (one per face) + one glass line at the centreline
+    assert text.count("0\nLINE\n8\nFP-WINDOWS\n") == 3
+
+
+def test_gate_still_gets_a_swing_leaf_and_arc():
+    """Unchanged behaviour, confirmed: a gate is not a `door_type`-bearing
+    kind, so it always gets the plain swing (matches the pre-0135 branch
+    exactly, per 0135 sec2's "LH/RH, gate -- leaf+arc as today")."""
+    dxf = fp2dxf.DxfR12()
+    ctx = fp2dxf.Ctx(doc=_one_opening_doc("gate"))
+    sidecar = {}
+    fp2dxf.emit_wall(ctx, dxf, ctx.doc["walls"][0], sidecar)
+    text = dxf.dumps()
+    assert text.count("\n0\nARC\n") == 1
+
+
+def test_convert_warns_on_an_unrecognized_door_type_but_still_renders(tmp_path):
+    doc = _one_opening_doc("door", "sliding")   # the fixture's own former bug
+    result = fp2dxf.convert(doc, tmp_path)
+    assert len(result.written) == 1
+    assert len(result.warnings) == 1
+    assert "sliding" in result.warnings[0]
+    assert "o1" in result.warnings[0]
+
+
+def test_convert_r2_arc_count_matches_the_hand_verified_census(tmp_path):
+    """0135-ruling.md sec1's own census on `wiscaway2026-08-30R2.json`: 9
+    LH + 7 RH + 1 gate (one arc each) + 4 FRENCH (two arcs each) = 25
+    arcs total, zero warnings -- every real door_type in the corpus
+    dispatches to a real symbol."""
+    doc = json.loads((Path(__file__).parent.parent / "fixtures" /
+                      "wiscaway2026-08-30R2.json").read_text(encoding="utf-8"))
+    result = fp2dxf.convert(doc, tmp_path)
+    assert result.warnings == []
+    total_arcs = sum(p.read_text(encoding="utf-8").count("\n0\nARC\n")
+                     for p in result.written)
+    assert total_arcs == 25
 
 
 # --------------------------------------------------------------------------

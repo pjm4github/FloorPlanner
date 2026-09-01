@@ -338,6 +338,63 @@ def opening_tag(op: dict) -> str:
 # emission
 # --------------------------------------------------------------------------
 
+def _door_symbol(kind: str, door_type) -> str | None:
+    """Which DXF symbol an opening gets -- the vocabulary is
+    `config.py:DOOR_TYPES`, drawn in the editor by `walls.py:_paint_door`
+    and in the PDF exporter by `fp2pdf.py:_door_symbol` -- a third,
+    independent transcription, because DXF geometry (LINE/ARC entities)
+    shares nothing with either renderer's own primitives. 0135-ruling.md
+    sec1's own finding, here too: `door_type == "sliding"` can never
+    match this catalog, so every door exported as one hinged leaf+arc --
+    including DOORWAY openings, which got a phantom swinging leaf they
+    do not have. Returns `"unknown"` for a `door_type` string outside the
+    catalog, drawn as a generic swing but named in `ctx.warn()`, not
+    silently absorbed -- the same discipline D81 already established for
+    `fp2pdf.py`."""
+    if kind == "window":
+        return "window"
+    if kind == "gate":
+        return "swing"
+    if kind != "door":
+        return None                       # cased / pass_through: gap only
+    dt = (door_type or "").upper()
+    if dt in ("LH", "RH", ""):
+        return "swing"
+    if dt == "FRENCH":
+        return "french"
+    if dt == "BIFOLD":
+        return "bifold"
+    if dt == "POCKET":
+        return "pocket"
+    if dt == "SLIDER":
+        return "slider"
+    if dt == "DOORWAY":
+        return "doorway"
+    if dt.startswith("GARAGE"):
+        return "garage"
+    return "unknown"
+
+
+def _swing_leaf(dxf, op_layer, p1, ux, uy, nx, ny, hinge_s, radius,
+                direction, sgn) -> None:
+    """One swing leaf + quarter-circle arc, hinged at station `hinge_s`.
+    `direction` = +1 if the jamb it swings toward sits at a HIGHER
+    station, -1 if lower -- the DXF analogue of `fp2pdf.py`'s own `leaf`
+    closure inside `draw_opening`, same geometry, LINE/ARC entities
+    instead of a reportlab canvas."""
+    hx, hy = p1[0] + ux * hinge_s, p1[1] + uy * hinge_s
+    js = hinge_s + direction * radius
+    jx, jy = p1[0] + ux * js, p1[1] + uy * js
+    lx, ly = hx + nx * radius * sgn, hy + ny * radius * sgn
+    dxf.line(op_layer, hx, hy, lx, ly)
+    a_leaf = math.degrees(math.atan2(ly - hy, lx - hx))
+    a_jamb = math.degrees(math.atan2(jy - hy, jx - hx))
+    if (a_leaf - a_jamb) % 360.0 <= 180.0:
+        dxf.arc(op_layer, hx, hy, radius, a_jamb, a_leaf)
+    else:
+        dxf.arc(op_layer, hx, hy, radius, a_leaf, a_jamb)
+
+
 def emit_wall(ctx: Ctx, dxf: DxfR12, wall: dict, sidecar: dict) -> None:
     p1, p2 = ctx.pt(wall["v1"]), ctx.pt(wall["v2"])
     dx, dy = p2[0] - p1[0], p2[1] - p1[1]
@@ -379,48 +436,69 @@ def emit_wall(ctx: Ctx, dxf: DxfR12, wall: dict, sidecar: dict) -> None:
         for side in (+1.0, -1.0):
             (x1, y1), (x2, y2) = sta(sp.s0, side), sta(sp.s1, side)
             dxf.line(op_layer, x1, y1, x2, y2)
-        # conventional door symbol (leaf + swing arc): Chief's CAD to
-        # Walls classifies openings by symbol shape -- bare gap lines
-        # read as a WINDOW, so doors need the leaf/arc to be doors.
+        # Conventional symbol per catalog type: Chief's CAD to Walls
+        # classifies openings by symbol shape (KB-00170) -- bare gap
+        # lines read as a WINDOW, so doors need a leaf/arc, and windows
+        # need their own glass line, to read as what they are.
         op = sp.opening
-        hinge = op.get("hinge")
-        swing = op.get("swings_toward")
-        sliding = op["kind"] == "door" and op.get("door_type") == "sliding"
-        if op["kind"] in ("door", "gate") and not sliding:
+        w = sp.s1 - sp.s0
+        mid_s = (sp.s0 + sp.s1) / 2.0
+        symbol = _door_symbol(op["kind"], op.get("door_type"))
+
+        def _pt(s, off=0.0):
+            return (p1[0] + ux * s + nx * off, p1[1] + uy * s + ny * off)
+
+        if symbol == "window":
+            # the conventional triple-line symbol -- gap lines (already
+            # emitted above) plus the glass line at the centerline
+            dxf.line(op_layer, *_pt(sp.s0), *_pt(sp.s1))
+        elif symbol is not None:
+            if symbol == "unknown":
+                ctx.warn(f"opening {op['id']}: unrecognized door_type "
+                         f"{op.get('door_type')!r}, drawn as a generic "
+                         f"swing")
             # No hinge/swing recorded -> still draw a symbol with a
             # DEFAULT handedness (hinge:v1, swing:left) so Chief
             # classifies it as a DOOR; handedness is a QC fix, the
-            # object class is not.
-            if hinge not in ("v1", "v2"):
-                hinge = "v1"
-            if swing not in ("left", "right"):
-                swing = "left"
-            w = sp.s1 - sp.s0
-            s_h = sp.s0 if hinge == "v1" else sp.s1
-            s_j = sp.s1 if hinge == "v1" else sp.s0
-            hx, hy = p1[0] + ux * s_h, p1[1] + uy * s_h   # hinge, centerline
-            jx, jy = p1[0] + ux * s_j, p1[1] + uy * s_j   # jamb
-            # Qt 'left' of v1->v2 maps to geometric CCW-left in DXF
-            # under the y-flip, so the sign convention carries over.
+            # object class is not. Qt 'left' of v1->v2 maps to geometric
+            # CCW-left in DXF under the y-flip, so the sign convention
+            # carries over.
+            hinge = op.get("hinge") if op.get("hinge") in ("v1", "v2") else "v1"
+            swing = (op.get("swings_toward")
+                     if op.get("swings_toward") in ("left", "right")
+                     else "left")
             sgn = 1.0 if swing == "left" else -1.0
-            lx, ly = hx + nx * w * sgn, hy + ny * w * sgn  # leaf tip
-            dxf.line(op_layer, hx, hy, lx, ly)             # leaf
-            a_leaf = math.degrees(math.atan2(ly - hy, lx - hx))
-            a_jamb = math.degrees(math.atan2(jy - hy, jx - hx))
-            if (a_leaf - a_jamb) % 360.0 <= 180.0:         # CCW 90-deg sweep
-                dxf.arc(op_layer, hx, hy, w, a_jamb, a_leaf)
-            else:
-                dxf.arc(op_layer, hx, hy, w, a_leaf, a_jamb)
-        elif sliding:
-            # slider: two overlapping half-width panels on the centerline
-            w = sp.s1 - sp.s0
-            for k, side in ((0, +1.0), (1, -1.0)):
-                a = sp.s0 + k * w * 0.45
-                b = a + w * 0.55
-                ox, oy = nx * 0.75 * side, ny * 0.75 * side
-                dxf.line(op_layer,
-                         p1[0] + ux * a + ox, p1[1] + uy * a + oy,
-                         p1[0] + ux * b + ox, p1[1] + uy * b + oy)
+            if symbol in ("swing", "unknown"):
+                hinge_s = sp.s0 if hinge == "v1" else sp.s1
+                direction = 1.0 if hinge == "v1" else -1.0
+                _swing_leaf(dxf, op_layer, p1, ux, uy, nx, ny,
+                            hinge_s, w, direction, sgn)
+            elif symbol == "french":
+                _swing_leaf(dxf, op_layer, p1, ux, uy, nx, ny,
+                            sp.s0, w / 2.0, 1.0, sgn)
+                _swing_leaf(dxf, op_layer, p1, ux, uy, nx, ny,
+                            sp.s1, w / 2.0, -1.0, sgn)
+            elif symbol == "bifold":
+                face_d = sgn * t2
+                rise = sgn * 0.35 * w
+                for a, m, b in ((sp.s0, sp.s0 + 0.25 * w, mid_s),
+                                (mid_s, sp.s0 + 0.75 * w, sp.s1)):
+                    dxf.line(op_layer, *_pt(a, face_d), *_pt(m, face_d + rise))
+                    dxf.line(op_layer, *_pt(m, face_d + rise), *_pt(b, face_d))
+            elif symbol == "pocket":
+                # a single line recessed into the wall cavity before s0 --
+                # the panel slid out of the way, not the opening itself
+                dxf.line(op_layer, *_pt(sp.s0 - w), *_pt(sp.s0))
+            elif symbol == "slider":
+                # two overlapping half-width panels on the centerline
+                for k, side in ((0, +1.0), (1, -1.0)):
+                    a = sp.s0 + k * w * 0.45
+                    b = a + w * 0.55
+                    dxf.line(op_layer, *_pt(a, 0.75 * side), *_pt(b, 0.75 * side))
+            elif symbol == "garage":
+                # a full-width panel line -- the closed overhead door
+                dxf.line(op_layer, *_pt(sp.s0), *_pt(sp.s1))
+            # symbol == "doorway": gap lines only, no leaf, no arc
 
         mid = (sp.s0 + sp.s1) / 2.0
         tx = p1[0] + ux * mid + nx * (t2 + NOTE_H * 1.5)
