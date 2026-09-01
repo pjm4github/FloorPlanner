@@ -37,7 +37,7 @@
     ],
     "sill_in": null,
     "head_in": null,
-    "door_type": "hinged",
+    "door_type": "LH",
     "hinge": "v1",
     "swings_toward": "left"
   }
