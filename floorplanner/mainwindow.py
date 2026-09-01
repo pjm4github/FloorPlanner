@@ -46,11 +46,11 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                       "more in, Ctrl+G groups, Ctrl+X/C/V cut-copy-paste "
                       "\u2022 drag empty space to pan \u2022 wheel zoom"),
         TOOL_WALL_EXT: "Exterior wall (6\"): click-drag to draw. Orthogonal "
-                       "from the anchor (hold Shift for free angle). Esc "
-                       "cancels.",
+                       "from the anchor (Shift = free angle, Ctrl = 15° "
+                       "steps). Esc cancels.",
         TOOL_WALL_INT: "Interior wall (4 1/2\"): click-drag to draw. "
-                       "Orthogonal from the anchor (hold Shift for free "
-                       "angle). Esc cancels.",
+                       "Orthogonal from the anchor (Shift = free angle, "
+                       "Ctrl = 15° steps). Esc cancels.",
         TOOL_DOOR: "Door: click on a wall, then enter the WWHH size "
                    "(e.g. 3280 = 32\" x 80\").",
         TOOL_WINDOW: "Window: click on a wall, then enter the WWHH size "
@@ -59,9 +59,9 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                    "then the tool reverts to Select. Ctrl+click the tool to "
                    "keep it active for several rooms.",
         TOOL_ROOF_RIDGE: "Roof ridge: click-drag to sketch the ridge line "
-                         "(hold Shift for free angle, same as a wall). "
-                         "Release, then click the eaves wall this roof "
-                         "spans over. Esc cancels.",
+                         "(Shift = free angle, Ctrl = 15° steps, same as a "
+                         "wall). Release, then click the eaves wall this "
+                         "roof spans over. Esc cancels.",
     }
 
     def __init__(self):

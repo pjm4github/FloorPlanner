@@ -88,6 +88,29 @@ def test_shift_gives_a_free_angle_ridge_same_as_a_wall(fp, win, monkeypatch):
     assert (r.p2.x(), r.p2.y()) == (120.0, 120.0)     # true 45deg, not snapped square
 
 
+def test_ctrl_gives_a_15_degree_stepped_ridge_same_as_a_wall(fp, win, monkeypatch):
+    """Patrick's own check: Ctrl on the ridge drag should behave exactly
+    like Ctrl on a wall drag -- 15deg increments, not just Shift's free
+    angle. Same shared `_wall_end_point` fix, so this is the ridge-side
+    receipt for `test_wall_draw_ctrl_snaps_to_15_degrees`."""
+    win.prepare_headless()
+    _eaves_wall(fp, win)
+    win.set_tool(fp.TOOL_ROOF_RIDGE)
+    monkeypatch.setattr(QDialog, "exec",
+                        lambda self: QDialog.DialogCode.Accepted)
+
+    ctrl = Qt.KeyboardModifier.ControlModifier
+    _drag_ridge(win, (0, 0), (100, 84), mods=ctrl)   # ~40deg -> snaps to 45
+    _click(win, (100, 100))
+
+    roofs = _roofs(win)
+    assert len(roofs) == 1
+    r = roofs[0]
+    length = (r.p2.x() ** 2 + r.p2.y() ** 2) ** 0.5
+    assert r.p2.x() == pytest.approx(length * 0.7071067811865476, abs=0.05)
+    assert r.p2.y() == pytest.approx(length * 0.7071067811865476, abs=0.05)
+
+
 def test_a_ridge_too_short_is_discarded(fp, win):
     win.prepare_headless()
     win.set_tool(fp.TOOL_ROOF_RIDGE)

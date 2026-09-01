@@ -289,6 +289,16 @@ class PlanView(QGraphicsView):
             return QPointF(wall.p1)
         if mods & Qt.KeyboardModifier.ShiftModifier:
             return wall_snap(QPointF(sp))     # free angle
+        if mods & Qt.KeyboardModifier.ControlModifier:
+            # fixed angular increments off the anchor (SETTINGS['rotate_snap_deg'],
+            # default 15deg) -- same formula WallItem._angle_snapped_target uses
+            # for a re-angle DRAG on an existing wall's end; this is the DRAW
+            # gesture's own copy, anchored at wall.p1 instead of self._anchor.
+            step = math.radians(max(1.0, SETTINGS.get("rotate_snap_deg", 15.0)))
+            ang = round(math.atan2(dy, dx) / step) * step
+            length = max(MIN_WALL_LEN, wall_snap_len(math.hypot(dx, dy)))
+            return QPointF(wall.p1.x() + math.cos(ang) * length,
+                           wall.p1.y() + math.sin(ang) * length)
         ang = math.atan2(dy, dx)              # orthogonal from the anchor
         a = round(ang / (math.pi / 2)) * (math.pi / 2)
         horizontal = abs(math.cos(a)) > 0.5
