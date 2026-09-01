@@ -712,20 +712,21 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
 
     def finish_roof_ridge(self, item, eaves_wall):
         """Roof ▸ Sketch ridge…'s second half: the ridge is drawn, an eaves
-        wall is picked (0139-ruling.md R2 / 0140-ruling.md sec3). The picked
-        wall sets `item.span_in` (the 2D overlay's plan reach -- not a
-        document field, see `RoofItem`'s docstring); the minimal heights
-        dialog sets the two persisted heights. Cancelling drops the ridge
-        entirely, same as an under-length wall drag."""
+        wall is picked (0139-ruling.md R2 / 0140-ruling.md). The picked wall
+        sets `item.span_in` (the 2D overlay's plan reach -- not a document
+        field, see `RoofItem`'s docstring); the End-On dialog
+        (0140-ruling.md's own "one dialog, two doors" -- this is the third:
+        the ridge-sketch tool's own initial prompt) sets the two persisted
+        heights. Cancelling drops the ridge entirely, same as an
+        under-length wall drag."""
         item.span_in = eaves_span_from_wall(item.p1, item.p2, eaves_wall)
         item.rebuild()
-        dlg = RoofHeightsDialog(self)
+        dlg = RoofEndOnDialog(item, self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             self.scene.removeItem(item)
             self.status("Roof ridge cancelled.")
             return None
-        item.ridge_h_in, item.eaves_h_in = dlg.values()
-        item.rebuild()
+        dlg.apply()
         self.status(f"Roof ridge added ({fmt_ftin(item.length())} long, "
                     f"ridge {fmt_in(item.ridge_h_in)}, "
                     f"eaves {fmt_in(item.eaves_h_in)}).")

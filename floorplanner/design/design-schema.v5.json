@@ -142,13 +142,17 @@
           "type": "array", "prefixItems": [{ "$ref": "#/$defs/point" }, { "$ref": "#/$defs/point" }],
           "minItems": 2, "maxItems": 2
         },
-        "eaves_h_in": { "description": "Eaves height above the level (defaults to the level's own wall top when the roof is created; stored explicitly from then on, an override is a normal edit).", "type": "number" },
-        "ridge_h_in": { "description": "Ridge height above the level. PITCH IS DERIVED from these two heights and the ridge-to-eaves horizontal run -- never stored, so a dialog showing a live pitch and one accepting a typed pitch are the same control recomputing whichever height is unlocked, not two facts that can disagree.", "type": "number" },
+        "eaves_h_in": { "description": "Eaves height, measured from the roof's own level BASE (`elevation_in`) -- amended at R2b (0140-ruling.md sec3) from an earlier wall-top-relative reading; the wall top still appears as a reference on the End-On dialog's own drawing.", "type": "number" },
+        "ridge_h_in": { "description": "Ridge height, same base datum as `eaves_h_in`. PITCH IS DERIVED from these two heights and the ridge-to-eaves horizontal run -- never stored, so a dialog showing a live pitch and one accepting a typed pitch are the same control recomputing whichever height is unlocked, not two facts that can disagree.", "type": "number" },
         "overhang_in": { "description": "Eave overhang, plan-perpendicular from the ridge's own footprint.", "type": "number", "minimum": 0, "default": 0 },
         "gable": {
           "description": "One flag per ridge endpoint (index-aligned with `ridge`): true = a vertical gable-end triangle at that end; false = that end is a hip (not represented in 3D until a later tranche, but distinguished here so R4 has something to toggle).",
           "type": "array", "prefixItems": [{ "type": "boolean" }, { "type": "boolean" }],
           "minItems": 2, "maxItems": 2, "default": [true, true]
+        },
+        "marker_end": {
+          "description": "R2b (0140-ruling.md, the End-On marker): which `ridge` endpoint (0 or 1, index-aligned) the End-On marker sits at -- document state so it survives reload, same idea as a room label's offset. Optional: roofs written before R2b default to 1.",
+          "type": "integer", "enum": [0, 1], "default": 1
         }
       }
     },

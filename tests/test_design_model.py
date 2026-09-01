@@ -53,6 +53,46 @@ def test_roofs_round_trip_byte_identical():
     assert json.dumps(rt, ensure_ascii=False) == json.dumps(doc, ensure_ascii=False)
 
 
+def test_roof_marker_end_round_trips_byte_identical():
+    """R2b (0140-ruling.md): `marker_end` is additive over R1's own roof
+    record -- present-and-set round-trips exactly, same discipline as
+    every other optional-with-a-schema-default field."""
+    doc = {
+        "format": "floorplanner-design", "version": 6, "units": "inches",
+        "levels": [{"id": "L1", "name": "Main"}],
+        "vertices": [], "walls": [], "rooms": [],
+        "roofs": [{
+            "id": "rf1", "level": "L1",
+            "ridge": [[0.0, 0.0], [240.0, 0.0]],
+            "eaves_h_in": 96.0, "ridge_h_in": 132.0,
+            "overhang_in": 12.0, "gable": [True, True], "marker_end": 0,
+        }],
+    }
+    rt = Design.from_dict(doc).to_dict()
+    assert rt == doc
+
+
+def test_roof_marker_end_absent_stays_absent():
+    """A roof record written before R2b (R1/R2's own tests, real fixtures)
+    has no `marker_end` key at all -- it must stay absent through the
+    model layer, not silently materialise a default. The schema default
+    (1) is an application/schema-level fallback (bridge.py, design-schema
+    .v5.json), not something `Design` invents on the field's behalf."""
+    doc = {
+        "format": "floorplanner-design", "version": 6, "units": "inches",
+        "levels": [{"id": "L1", "name": "Main"}],
+        "vertices": [], "walls": [], "rooms": [],
+        "roofs": [{
+            "id": "rf1", "level": "L1",
+            "ridge": [[0.0, 0.0], [240.0, 0.0]],
+            "eaves_h_in": 96.0, "ridge_h_in": 132.0,
+        }],
+    }
+    rt = Design.from_dict(doc).to_dict()
+    assert "marker_end" not in rt["roofs"][0]
+    assert rt == doc
+
+
 def test_roofs_absent_stays_absent_not_an_empty_list():
     """The same present-vs-absent distinction every other block already
     gets: a version-5 document with no `roofs` key at all must round-trip

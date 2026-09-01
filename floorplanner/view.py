@@ -12,7 +12,7 @@ from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
 from floorplanner.rooms import _wall_endpoints_match  # star skips underscores
-from floorplanner.roofs import RoofItem
+from floorplanner.roofs import RoofEndMarkerItem, RoofItem
 from floorplanner.items import *  # noqa: F401
 
 
@@ -486,13 +486,24 @@ class PlanView(QGraphicsView):
                     self.win.finish_roof_ridge(item, wall)
                     e.accept()
                     return
-                # STAGE 1: start the ridge, same anchor snap a wall gets
-                p = self._snap_start(sp)
-                item = RoofItem(p, p)
-                self.scene().addItem(item)
-                self._temp_roof = item
-                e.accept()
-                return
+                # A press on an EXISTING roof's own marker or ridge is not
+                # "start a new ridge here" -- it is the marker drag / the
+                # ridge's own selection (R2b: the marker stays draggable
+                # while the ridge tool is the sticky active tool, same as
+                # a fresh sketch). Falls through to Qt's normal item
+                # dispatch, which is what lets RoofEndMarkerItem's own
+                # mousePressEvent -- and RoofItem's own selection -- run.
+                for it in self.scene().items(sp):
+                    if isinstance(it, (RoofEndMarkerItem, RoofItem)):
+                        break
+                else:
+                    # STAGE 1: start the ridge, same anchor snap a wall gets
+                    p = self._snap_start(sp)
+                    item = RoofItem(p, p)
+                    self.scene().addItem(item)
+                    self._temp_roof = item
+                    e.accept()
+                    return
             # SELECT tool: pan when pressing empty space.
             #
             # D53: `on_blank_canvas`, not `itemAt(...) is None`. Now that a

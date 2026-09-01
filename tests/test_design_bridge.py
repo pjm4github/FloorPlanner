@@ -919,3 +919,58 @@ def test_canonicalize_sorts_and_renumbers_roofs_by_level_then_position(fp, win):
     # sorted by ridge[0], so the one starting at x=0 is rf1
     assert doc["roofs"][0]["ridge"][0] == [0.0, 0.0]
     assert doc["roofs"][1]["ridge"][0] == [200.0, 0.0]
+
+
+# --------------------------------------------------------------------------
+# R2b (0140-ruling.md, the End-On marker): `marker_end` walks/reads too
+# --------------------------------------------------------------------------
+
+def test_design_from_scene_includes_marker_end(fp, win):
+    roof = fp.RoofItem(QPointF(0, 0), QPointF(200, 0), span_in=100.0)
+    roof.marker_end = 0
+    win.scene.addItem(roof)
+    doc, _ = _walk(win)
+    assert doc["roofs"][0]["marker_end"] == 0
+
+
+def test_marker_end_round_trips_through_apply(fp, win):
+    win.scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100),
+                                  "exterior"))
+    roof = fp.RoofItem(QPointF(0, 0), QPointF(200, 0), span_in=100.0)
+    roof.marker_end = 0
+    win.scene.addItem(roof)
+    d1, _ = _walk(win)
+    _apply(win, d1)
+    roofs = [it for it in win.scene.items() if isinstance(it, fp.RoofItem)]
+    assert len(roofs) == 1
+    assert roofs[0].marker_end == 0
+    d2, _ = _walk(win)
+    assert d1 == d2
+
+
+def test_a_roof_written_before_r2b_still_applies_with_the_default_marker_end(
+        fp, win):
+    """A saved roof with no `marker_end` key (every R1/R2-era record) must
+    still load -- the schema default (1) applies at the bridge layer."""
+    doc, _ = _walk(win)
+    doc["roofs"] = [{
+        "id": "rf1", "level": doc["levels"][0]["id"],
+        "ridge": [[0.0, 0.0], [200.0, 0.0]],
+        "eaves_h_in": 96.0, "ridge_h_in": 132.0,
+    }]
+    doc["version"] = 6
+    _apply(win, doc)
+    roofs = [it for it in win.scene.items() if isinstance(it, fp.RoofItem)]
+    assert len(roofs) == 1
+    assert roofs[0].marker_end == 1
+
+
+def test_roof_item_carries_an_end_marker_child(fp, win):
+    """RoofItem always owns a marker (0140-ruling.md sec1: one marker per
+    roof) -- created for a fresh sketch, and again on every load, not
+    something a document field has to ask for separately."""
+    roof = fp.RoofItem(QPointF(0, 0), QPointF(200, 0), span_in=100.0)
+    win.scene.addItem(roof)
+    from floorplanner.roofs import RoofEndMarkerItem
+    assert isinstance(roof.marker, RoofEndMarkerItem)
+    assert roof.marker.scene() is win.scene   # a Qt child follows its parent in

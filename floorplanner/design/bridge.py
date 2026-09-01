@@ -805,7 +805,8 @@ def _roofs_of(items, lid, nid, src=None):
                "eaves_h_in": float(it.eaves_h_in),
                "ridge_h_in": float(it.ridge_h_in),
                "overhang_in": float(it.overhang_in),
-               "gable": [bool(it.gable[0]), bool(it.gable[1])]}
+               "gable": [bool(it.gable[0]), bool(it.gable[1])],
+               "marker_end": 1 if it.marker_end else 0}
         if src is not None:
             src[rec["id"]] = it
         out.append(rec)
@@ -1315,7 +1316,8 @@ def apply_design_to_scene(target, design, report=None, strict=False,
                         ridge_h_in=float(rfd["ridge_h_in"]),
                         overhang_in=float(rfd.get("overhang_in", 0.0)),
                         gable=list(rfd.get("gable", [True, True])),
-                        span_in=span_in)
+                        span_in=span_in,
+                        marker_end=int(rfd.get("marker_end", 1)))
         item.floor = floor   # never the global
         scene.addItem(item)
         rep["roofs"] += 1
