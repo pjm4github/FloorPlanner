@@ -334,3 +334,91 @@ def test_negative_I16_fires_on_a_pinched_ring():
     errs = check(d, deep=False, boundary=True)
     assert any(e.startswith("I16") and room["id"] in e for e in errs), (
         f"I16 must fire on a ring that visits a vertex twice -- got {errs[:4]}")
+
+
+# --------------------------------------------------------------------------
+# 0139-ruling.md R1: the additive `roofs` block, version 5/6
+# --------------------------------------------------------------------------
+
+def _roof_doc(version=6, roofs=None):
+    d = _load("sample_plan.v5.json")
+    d["version"] = version
+    if roofs is None:
+        d.pop("roofs", None)
+    else:
+        d["roofs"] = roofs
+    return d
+
+
+_ONE_ROOF = [{
+    "id": "rf1", "level": "L1",
+    "ridge": [[0.0, 0.0], [240.0, 0.0]],
+    "eaves_h_in": 96.0, "ridge_h_in": 132.0,
+    "overhang_in": 12.0, "gable": [True, True],
+}]
+
+
+def test_a_version_5_document_with_no_roofs_key_is_still_valid():
+    """The migration this schema change owes: nothing about an EXISTING
+    document needs to change to keep validating. Every real corpus file
+    already proves this via `test_clean_design_validates`; this pins the
+    specific claim so it survives a future schema edit that narrows the
+    version enum back down without anyone noticing."""
+    doc = _roof_doc(version=5, roofs=None)
+    assert schema_errors(doc) == []
+
+
+def test_a_version_6_document_with_a_well_formed_roof_validates():
+    doc = _roof_doc(version=6, roofs=_ONE_ROOF)
+    assert schema_errors(doc) == []
+
+
+def test_version_5_document_may_also_carry_roofs():
+    """`roofs` is gated by nothing but its own presence -- the schema does
+    not couple it to the version number. 0139-ruling.md's own intent
+    ("`design_document()` writes 6 ... a loaded 5 is left as 5 unless
+    re-saved") describes a WRITER convention, not a schema constraint;
+    the READER (this validator) must accept either combination so an
+    old-numbered file someone hand-edited, or a future migrator that adds
+    roofs without touching the version key, is not rejected."""
+    doc = _roof_doc(version=5, roofs=_ONE_ROOF)
+    assert schema_errors(doc) == []
+
+
+def test_version_7_is_rejected():
+    doc = _roof_doc(version=7, roofs=None)
+    assert schema_errors(doc) != []
+
+
+@pytest.mark.parametrize("bad_roof", [
+    {"id": "rf1", "level": "L1", "ridge": [[0, 0], [1, 1]],
+     "eaves_h_in": 96, "ridge_h_in": 132},   # missing nothing -- baseline shape
+])
+def test_a_minimal_roof_with_only_the_required_fields_validates(bad_roof):
+    doc = _roof_doc(version=6, roofs=[bad_roof])
+    assert schema_errors(doc) == [], (
+        "overhang_in/gable have schema defaults and must be OPTIONAL")
+
+
+def test_a_roof_missing_a_required_field_is_rejected():
+    incomplete = {"id": "rf1", "level": "L1",
+                  "ridge": [[0, 0], [240, 0]], "eaves_h_in": 96}
+    # ridge_h_in omitted
+    doc = _roof_doc(version=6, roofs=[incomplete])
+    assert schema_errors(doc) != []
+
+
+def test_a_roof_with_an_unknown_property_is_rejected():
+    """additionalProperties: false, matching every other object in this
+    schema -- a typo'd key must not silently vanish."""
+    roof = dict(_ONE_ROOF[0])
+    roof["pitch_deg"] = 30.0   # pitch is DERIVED, never stored (0139 sec2)
+    doc = _roof_doc(version=6, roofs=[roof])
+    assert schema_errors(doc) != []
+
+
+def test_a_roof_with_a_three_point_ridge_is_rejected():
+    roof = dict(_ONE_ROOF[0])
+    roof["ridge"] = [[0, 0], [120, 0], [240, 0]]
+    doc = _roof_doc(version=6, roofs=[roof])
+    assert schema_errors(doc) != []

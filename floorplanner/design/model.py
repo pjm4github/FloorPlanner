@@ -181,6 +181,31 @@ class Group(_Node):
 
 
 @dataclass
+class Roof(_Node):
+    """P1.1's own additive shape, added at 0139-ruling.md ("the roofline
+    plan") R1: a ridge line, two heights, an overhang, and a per-end
+    gable/hip flag. `ridge`/`gable` are raw 2-element arrays -- points
+    and booleans respectively -- not their own dataclasses, the same
+    RAW-passthrough convention `Furnishing.pos`/`Room.placement` already
+    use for a schema shape with no sub-object identity of its own.
+    Pitch is DERIVED (rise over the ridge-to-eaves horizontal run), never
+    stored -- the two heights are the source of truth, so a UI showing a
+    live pitch and one accepting a typed pitch are the same dialog
+    recomputing whichever height is unlocked, not two representations
+    that can disagree."""
+    FIELDS: ClassVar = [("id", RAW), ("level", RAW), ("ridge", RAW),
+                        ("eaves_h_in", RAW), ("ridge_h_in", RAW),
+                        ("overhang_in", RAW), ("gable", RAW)]
+    id: Any = _MISSING
+    level: Any = _MISSING
+    ridge: Any = _MISSING
+    eaves_h_in: Any = _MISSING
+    ridge_h_in: Any = _MISSING
+    overhang_in: Any = _MISSING
+    gable: Any = _MISSING
+
+
+@dataclass
 class Provenance(_Node):
     FIELDS: ClassVar = [("migrated_from", RAW), ("tool", RAW), ("mode", RAW),
                         ("endpoints_welded", RAW), ("openings_deduped", RAW),
@@ -201,7 +226,8 @@ class Design(_Node):
                         ("rooms", _list(Room)),
                         ("furnishings", _list(Furnishing)),
                         ("groups", _list(Group)), ("reference_images", RAW),
-                        ("annotations", RAW), ("provenance", Provenance)]
+                        ("annotations", RAW), ("roofs", _list(Roof)),
+                        ("provenance", Provenance)]
     format: Any = _MISSING
     version: Any = _MISSING
     units: Any = _MISSING
@@ -214,4 +240,5 @@ class Design(_Node):
     groups: Any = _MISSING
     reference_images: Any = _MISSING
     annotations: Any = _MISSING
+    roofs: Any = _MISSING
     provenance: Any = _MISSING
