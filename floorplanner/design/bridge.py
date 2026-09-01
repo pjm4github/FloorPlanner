@@ -71,6 +71,7 @@ from floorplanner.items import (
 )
 from floorplanner.model import Floor
 from floorplanner.vertex import Vertex
+from floorplanner.roofs import RoofItem, nearest_eaves_wall
 from floorplanner.rooms import (
     OutlineEdge, RoomItem, poly_area_sqft, room_path_from_corners,
 )
@@ -319,6 +320,10 @@ def _room_key(r):
 
 def _furn_key(f):
     return (f.pos().x(), f.pos().y(), f.kind, f.rotation())
+
+
+def _roof_key(rf):
+    return (rf.p1.x(), rf.p1.y(), rf.p2.x(), rf.p2.y())
 
 
 # ------------------------------------------------------------------ weld check
@@ -788,6 +793,25 @@ def _furnishings_of(items, lid, nid, rooms, poly, src=None):
     return out
 
 
+def _roofs_of(items, lid, nid, src=None):
+    """This level's roofs (0139-ruling.md P1.1, R2's first writer). Only
+    the modelled fields are emitted -- `span_in` is a live-scene render
+    affordance, not a document field (`RoofItem`'s own docstring), so a
+    round trip re-derives it on load rather than persisting it here."""
+    out = []
+    for it in _ordered(items, RoofItem, _roof_key):
+        rec = {"id": nid("rf"), "level": lid,
+               "ridge": [[it.p1.x(), it.p1.y()], [it.p2.x(), it.p2.y()]],
+               "eaves_h_in": float(it.eaves_h_in),
+               "ridge_h_in": float(it.ridge_h_in),
+               "overhang_in": float(it.overhang_in),
+               "gable": [bool(it.gable[0]), bool(it.gable[1])]}
+        if src is not None:
+            src[rec["id"]] = it
+        out.append(rec)
+    return out
+
+
 # ------------------------------------------------------------------ public API
 def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
     """Walk the live scene into a v5 `Design`.
@@ -819,7 +843,7 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
     rep["levels"] = len(roster)
 
     buckets = _by_floor(scene)
-    levels, vertices, walls, rooms, furnishings = [], [], [], [], []
+    levels, vertices, walls, rooms, furnishings, roofs = [], [], [], [], [], []
     groups = []                            # P4.5, defect 3
     # id(wall dict object) -> live WallItem (0101-ruling.md), ACROSS ALL
     # LEVELS -- unlike `of_item` a few lines below (per-level on purpose,
@@ -882,6 +906,10 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         lf = _furnishings_of(items, lid, nid, lr_all, poly_all, src=fsrc)
         for fid_, live in fsrc.items():
             _note(fid_, live)
+        rfsrc = {}
+        lroofs = _roofs_of(items, lid, nid, src=rfsrc)
+        for rfid_, live in rfsrc.items():
+            _note(rfid_, live)
         # ...and the groups themselves: a membership list over what the walk
         # emitted, per the schema's "a group NEVER copies anything".
         for g in _ordered(items, GroupItem, lambda g: (id(g),)):
@@ -897,6 +925,7 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         walls += lw_all
         rooms += lr_all
         furnishings += lf
+        roofs += lroofs
 
     n = rep["unwelded_ends"]
     if n and strict:
@@ -923,9 +952,16 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
     settings["editing"] = editing
 
     design_doc = canonicalize({
-        "format": "floorplanner-design", "version": 5, "units": "inches",
+        "format": "floorplanner-design",
+        # R1's own migration discipline (0139-ruling.md sec1): a document
+        # with no roofs at all stays version 5, no key emitted; roofs bump
+        # it to 6, the only condition that does (design-schema.v5.json's
+        # own `version` description).
+        "version": 6 if roofs else 5,
+        "units": "inches",
         "settings": settings, "levels": levels, "vertices": vertices,
         "walls": walls, "rooms": rooms, "furnishings": furnishings,
+        **({"roofs": roofs} if roofs else {}),
         # DEFECT 3 CLOSES AT P4.5. The old note here said a grouped wall
         # "has no single id -- it splits into segments", and that is still
         # true: the answer is that membership is a SET of document objects,
@@ -1109,7 +1145,7 @@ def apply_design_to_scene(target, design, report=None, strict=False,
                   else (target.scene, target))
     doc = design.to_dict() if isinstance(design, Design) else design
     rep = report if report is not None else {}
-    rep.update({"walls": 0, "rooms": 0, "furnishings": 0,
+    rep.update({"walls": 0, "rooms": 0, "furnishings": 0, "roofs": 0,
                 "openings_failed": [], "unknown_furnishings": []})
 
     settings = doc.get("settings") or {}
@@ -1264,6 +1300,25 @@ def apply_design_to_scene(target, design, report=None, strict=False,
         scene.addItem(item)
         fmap[fd["id"]] = item
         rep["furnishings"] += 1
+
+    # ROOFS (0139-ruling.md R1's block, R2's first reader). `span_in` is not
+    # a document field -- `nearest_eaves_wall` re-derives the 2D overlay's
+    # plan reach from whatever wall is nearest and roughly parallel to the
+    # ridge NOW, on THIS level, rather than trusting a value that could have
+    # gone stale against the plan (see `RoofItem`'s own docstring).
+    for rfd in doc.get("roofs", []) or []:
+        p1 = QPointF(*rfd["ridge"][0])
+        p2 = QPointF(*rfd["ridge"][1])
+        floor = lname.get(rfd["level"], DEFAULT_FLOOR)
+        _, span_in = nearest_eaves_wall(scene, p1, p2, floor)
+        item = RoofItem(p1, p2, eaves_h_in=float(rfd["eaves_h_in"]),
+                        ridge_h_in=float(rfd["ridge_h_in"]),
+                        overhang_in=float(rfd.get("overhang_in", 0.0)),
+                        gable=list(rfd.get("gable", [True, True])),
+                        span_in=span_in)
+        item.floor = floor   # never the global
+        scene.addItem(item)
+        rep["roofs"] += 1
 
     # GROUPS (P4.5, defect 3). Rebuilt last, once every member exists, and
     # only from ids the document actually resolved -- a group whose members

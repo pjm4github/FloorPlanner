@@ -814,6 +814,49 @@ class ConceptRoomDialog(QDialog):
                 float(self.sp_d.value()) * FOOT)
 
 
+class RoofHeightsDialog(QDialog):
+    """Roof ▸ Sketch Ridge…'s own dialog, shown once the ridge is drawn and
+    the eaves wall is picked (0139-ruling.md R2, MINIMAL per 0140-ruling.md
+    sec3): two initial heights, nothing else. Pitch is derived, not typed
+    -- R2b's three-way ridge/eaves/pitch dialog (0140-ruling.md sec2)
+    replaces this one when it lands; this dialog does not anticipate it."""
+
+    def __init__(self, parent=None, eaves_default_in=None):
+        super().__init__(parent)
+        self.setWindowTitle("Roof heights")
+        form = QFormLayout(self)
+
+        eaves_default = float(eaves_default_in if eaves_default_in is not None
+                              else DEFAULT_ROOM_PROPS["ceiling_height_in"])
+
+        self.sp_eaves = QDoubleSpinBox()
+        self.sp_eaves.setRange(60.0, 300.0)
+        self.sp_eaves.setSuffix(" in")
+        self.sp_eaves.setValue(eaves_default)
+        form.addRow("Eaves height", self.sp_eaves)
+
+        self.sp_ridge = QDoubleSpinBox()
+        self.sp_ridge.setRange(60.0, 600.0)
+        self.sp_ridge.setSuffix(" in")
+        self.sp_ridge.setValue(eaves_default + 48.0)
+        form.addRow("Ridge height", self.sp_ridge)
+
+        note = QLabel("Both measured from the level's own base. Pitch is "
+                      "derived from these two, not typed here.")
+        note.setStyleSheet("color: #666;")
+        form.addRow(note)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        form.addRow(buttons)
+
+    def values(self):
+        """(ridge_h_in, eaves_h_in)."""
+        return float(self.sp_ridge.value()), float(self.sp_eaves.value())
+
+
 class SettingsDialog(QDialog):
     """File > Settings…: plan-wide preferences, saved in the plan file."""
 

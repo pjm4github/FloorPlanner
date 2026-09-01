@@ -17,6 +17,7 @@ from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
+from floorplanner.roofs import RoofItem, eaves_span_from_wall
 from floorplanner.items import *  # noqa: F401
 from floorplanner.model import (  # serialization bridge (aliased)
     DEFAULT_FLOOR, Floor,
@@ -57,6 +58,10 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         TOOL_ROOM: "Room name: click inside an enclosed area to name a room, "
                    "then the tool reverts to Select. Ctrl+click the tool to "
                    "keep it active for several rooms.",
+        TOOL_ROOF_RIDGE: "Roof ridge: click-drag to sketch the ridge line "
+                         "(hold Shift for free angle, same as a wall). "
+                         "Release, then click the eaves wall this roof "
+                         "spans over. Esc cancels.",
     }
 
     def __init__(self):
@@ -164,6 +169,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             (TOOL_DOOR, "Door", "D", "door"),
             (TOOL_WINDOW, "Window", "W", "window"),
             (TOOL_ROOM, "Room Name", "R", "room"),
+            (TOOL_ROOF_RIDGE, "Roof Ridge", "G", "roof"),
         ]
         for tool, label, key, icon in defs:
             a = QAction(tool_icon(icon), label, self)
@@ -411,6 +417,13 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         a_refresh = QAction("&Refresh rooms (drop unwalled)", self)
         a_refresh.triggered.connect(self.refresh_rooms_cmd)
         m_rooms.addAction(a_refresh)
+
+        # 0139-ruling.md's roofline plan, R2 (menu + ridge sketch + eaves
+        # pick + a minimal heights dialog -- 0140-ruling.md sec3)
+        m_roof = self.menuBar().addMenu("R&oof")
+        a_ridge = QAction("&Sketch ridge  [G]", self)   # "G": the toolbar's own shortcut
+        a_ridge.triggered.connect(lambda: self.set_tool(TOOL_ROOF_RIDGE))
+        m_roof.addAction(a_ridge)
 
         m_inv = self.menuBar().addMenu("In&ventory")
         for label, slot in [("&House (structure)…", self.inventory_house),
@@ -697,6 +710,27 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                     "wall-less; drag it by its name.")
         return room
 
+    def finish_roof_ridge(self, item, eaves_wall):
+        """Roof ▸ Sketch ridge…'s second half: the ridge is drawn, an eaves
+        wall is picked (0139-ruling.md R2 / 0140-ruling.md sec3). The picked
+        wall sets `item.span_in` (the 2D overlay's plan reach -- not a
+        document field, see `RoofItem`'s docstring); the minimal heights
+        dialog sets the two persisted heights. Cancelling drops the ridge
+        entirely, same as an under-length wall drag."""
+        item.span_in = eaves_span_from_wall(item.p1, item.p2, eaves_wall)
+        item.rebuild()
+        dlg = RoofHeightsDialog(self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            self.scene.removeItem(item)
+            self.status("Roof ridge cancelled.")
+            return None
+        item.ridge_h_in, item.eaves_h_in = dlg.values()
+        item.rebuild()
+        self.status(f"Roof ridge added ({fmt_ftin(item.length())} long, "
+                    f"ridge {fmt_in(item.ridge_h_in)}, "
+                    f"eaves {fmt_in(item.eaves_h_in)}).")
+        return item
+
     def _sync_template_action(self):
         """File ▸ Save template room… is live only while exactly one FLOATING
         room is selected (P4.4's ruled rule -- and a structural one: only a
@@ -759,7 +793,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                 # a bordering room survives via its stored outline; the
                 # vacated edge becomes an open edge (P4.1)
                 delete_wall(self.scene, it, settle=False)
-            elif isinstance(it, (RoomItem, FurnishingItem, GroupItem)):
+            elif isinstance(it, (RoomItem, FurnishingItem, GroupItem, RoofItem)):
                 self.scene.removeItem(it)
         rebuild_all_walls(self.scene)
 

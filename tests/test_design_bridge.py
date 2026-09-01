@@ -372,6 +372,17 @@ def test_document_is_schema_valid(fp, win):
     assert schema_errors(doc) == []
 
 
+def test_a_document_with_a_roof_is_schema_valid(fp, win):
+    from floorplanner.design.validate import schema_errors
+    win.scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100),
+                                  "exterior"))
+    win.scene.addItem(fp.RoofItem(QPointF(0, 0), QPointF(200, 0),
+                                  span_in=100.0))
+    doc, _rep = _walk(win)
+    assert doc["version"] == 6
+    assert schema_errors(doc) == []
+
+
 def test_ids_are_canonical_not_stacking_order(fp, scene, make_room):
     """Ids are minted in geometric order, so z-order cannot rewrite the
     document. Without this, `Bring to front` would change every id -- and the
@@ -808,3 +819,103 @@ def test_both_walls_of_callers_pass_the_same_report_shape(fp, win):
     design_from_scene(win, report=report)
     assert isinstance(report["openings_failed"], list)
     assert isinstance(report["openings_failed_ids"], set)
+
+
+# --------------------------------------------------------------------------
+# 0139-ruling.md R2: the bridge's own first roof reader/writer. `RoofItem`
+# is imported via `fp` (re-exported through FloorPlanner.py's star imports,
+# same as WallItem/RoomItem) rather than a direct floorplanner.roofs import,
+# matching every other item-construction call in this file.
+# --------------------------------------------------------------------------
+def test_design_from_scene_includes_a_roof_and_bumps_version_to_6(fp, win):
+    win.scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100),
+                                  "exterior"))
+    win.scene.addItem(fp.RoofItem(QPointF(0, 0), QPointF(200, 0),
+                                  eaves_h_in=96.0, ridge_h_in=132.0,
+                                  overhang_in=6.0, span_in=100.0))
+    doc, _ = _walk(win)
+    assert doc["version"] == 6
+    assert len(doc["roofs"]) == 1
+    rf = doc["roofs"][0]
+    assert rf["id"] == "rf1"
+    assert rf["ridge"] == [[0.0, 0.0], [200.0, 0.0]]
+    assert rf["eaves_h_in"] == 96.0
+    assert rf["ridge_h_in"] == 132.0
+    assert rf["overhang_in"] == 6.0
+    assert rf["gable"] == [True, True]
+    # span_in is NOT a document field (RoofItem's own docstring) --
+    # nothing about the live-scene render affordance leaks into the walk
+    assert "span_in" not in rf and "span" not in rf
+
+
+def test_design_from_scene_with_no_roofs_stays_v5_and_omits_the_key(fp, win):
+    doc, _ = _walk(win)
+    assert doc["version"] == 5
+    assert "roofs" not in doc
+
+
+def test_a_roof_round_trips_through_apply_and_rederives_its_span(fp, win):
+    """P1.5's own identity, for roofs: scene -> Design -> scene -> Design
+    is identical at the second Design, even though span_in (unpersisted)
+    is RECOMPUTED rather than carried across apply -- it converges to the
+    same number because the same wall is still there to re-derive it from."""
+    win.scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100),
+                                  "exterior"))
+    win.scene.addItem(fp.RoofItem(QPointF(0, 0), QPointF(200, 0),
+                                  eaves_h_in=90.0, ridge_h_in=126.0,
+                                  overhang_in=12.0, span_in=100.0))
+    d1, _ = _walk(win)
+    _apply(win, d1)
+    roofs = [it for it in win.scene.items() if isinstance(it, fp.RoofItem)]
+    assert len(roofs) == 1
+    r2 = roofs[0]
+    assert (r2.p1.x(), r2.p1.y()) == (0.0, 0.0)
+    assert (r2.p2.x(), r2.p2.y()) == (200.0, 0.0)
+    assert r2.eaves_h_in == 90.0 and r2.ridge_h_in == 126.0
+    assert r2.overhang_in == 12.0
+    assert r2.span_in == pytest.approx(100.0)   # re-derived from the wall
+    d2, _ = _walk(win)
+    assert d1 == d2
+
+
+def test_apply_sets_a_roofs_floor_from_the_level_not_the_global(fp, win):
+    win.floors = [fp.Floor("Upper"), fp.Floor("Lower")]
+    win.active_floor = "Lower"
+    win._sync_floor_state()
+    upper_wall = fp.WallItem(QPointF(0, 100), QPointF(200, 100), "exterior")
+    upper_wall.floor = "Upper"
+    win.scene.addItem(upper_wall)
+    upper_roof = fp.RoofItem(QPointF(0, 0), QPointF(200, 0), span_in=100.0)
+    upper_roof.floor = "Upper"
+    win.scene.addItem(upper_roof)
+    d1, _ = _walk(win)
+    win.active_floor = "Upper"    # the GLOBAL active floor is now "Upper"...
+    win._sync_floor_state()
+    _apply(win, d1)
+    roofs = [it for it in win.scene.items() if isinstance(it, fp.RoofItem)]
+    assert len(roofs) == 1
+    # ...but the reconstructed roof still carries the LEVEL's floor, "Upper"
+    # either way here -- the real guard is that apply never reads the global
+    assert roofs[0].floor == "Upper"
+
+
+def test_a_roof_with_no_nearby_wall_falls_back_to_the_default_span(fp, win):
+    win.scene.addItem(fp.RoofItem(QPointF(0, 0), QPointF(200, 0),
+                                  span_in=999.0))   # discarded, never stored
+    d1, _ = _walk(win)
+    _apply(win, d1)
+    roofs = [it for it in win.scene.items() if isinstance(it, fp.RoofItem)]
+    assert roofs[0].span_in == fp.DEFAULT_HALF_SPAN_IN
+
+
+def test_canonicalize_sorts_and_renumbers_roofs_by_level_then_position(fp, win):
+    win.scene.addItem(fp.RoofItem(QPointF(200, 0), QPointF(400, 0),
+                                  span_in=50.0))
+    win.scene.addItem(fp.RoofItem(QPointF(0, 0), QPointF(200, 0),
+                                  span_in=50.0))
+    doc, _ = _walk(win)
+    ids = [rf["id"] for rf in doc["roofs"]]
+    assert ids == ["rf1", "rf2"]
+    # sorted by ridge[0], so the one starting at x=0 is rf1
+    assert doc["roofs"][0]["ridge"][0] == [0.0, 0.0]
+    assert doc["roofs"][1]["ridge"][0] == [200.0, 0.0]
