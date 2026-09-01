@@ -12,8 +12,8 @@ scene layer. Import it explicitly:
 `from floorplanner.design.bridge import design_from_scene`.
 """
 from floorplanner.design.model import (  # noqa: F401
-    Design, Furnishing, Group, Level, Opening, OutlineEdge, Provenance, Room,
-    Vertex, Wall,
+    Design, Furnishing, Group, Level, Opening, OutlineEdge, Provenance, Roof,
+    Room, Vertex, Wall,
 )
 from floorplanner.design.topology import (  # noqa: F401
     Face, enclosing_face, merge_collinear, planarize, split_edge, trace_faces,

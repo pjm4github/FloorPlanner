@@ -30,6 +30,43 @@ def test_round_trip_is_byte_identical(name):
     assert json.dumps(rt, ensure_ascii=False) == json.dumps(doc, ensure_ascii=False)
 
 
+def test_roofs_round_trip_byte_identical():
+    """0139-ruling.md R1: `roofs` is additive and version-6-only in intent,
+    but no DESIGN_FIXTURES corpus file carries one yet (they all predate
+    it), so this is the direct receipt rather than a corpus pass-through.
+    A version-5 document with `roofs` present is still a document
+    `Design` must round-trip faithfully -- the model layer does not
+    enforce the version gate, the schema does (see test_schema.py)."""
+    doc = {
+        "format": "floorplanner-design", "version": 6, "units": "inches",
+        "levels": [{"id": "L1", "name": "Main"}],
+        "vertices": [], "walls": [], "rooms": [],
+        "roofs": [{
+            "id": "r1", "level": "L1",
+            "ridge": [[0.0, 0.0], [240.0, 0.0]],
+            "eaves_h_in": 96.0, "ridge_h_in": 132.0,
+            "overhang_in": 12.0, "gable": [True, True],
+        }],
+    }
+    rt = Design.from_dict(doc).to_dict()
+    assert rt == doc
+    assert json.dumps(rt, ensure_ascii=False) == json.dumps(doc, ensure_ascii=False)
+
+
+def test_roofs_absent_stays_absent_not_an_empty_list():
+    """The same present-vs-absent distinction every other block already
+    gets: a version-5 document with no `roofs` key at all must round-trip
+    with `roofs` still absent, not silently materialise `"roofs": []`."""
+    doc = {
+        "format": "floorplanner-design", "version": 5, "units": "inches",
+        "levels": [{"id": "L1", "name": "Main"}],
+        "vertices": [], "walls": [], "rooms": [],
+    }
+    rt = Design.from_dict(doc).to_dict()
+    assert "roofs" not in rt
+    assert rt == doc
+
+
 def test_present_null_vs_absent_are_distinguished():
     # the crux of byte-identity: a free wall keeps `left: null` (present), while a
     # room with no area_accounting keeps that key ABSENT -- not emitted as null
