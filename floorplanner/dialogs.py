@@ -1,5 +1,6 @@
 """Modal dialogs (inventory, room properties, settings, image import, AI
 pricing, about) and the inventory row/TSV helpers that feed them."""
+import math
 import os
 
 from PyQt6 import sip  # noqa: F401
@@ -12,6 +13,7 @@ from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
+from floorplanner.roofs import RoofItem
 from floorplanner.items import *  # noqa: F401
 
 class GapReviewDialog(QDialog):
@@ -814,47 +816,198 @@ class ConceptRoomDialog(QDialog):
                 float(self.sp_d.value()) * FOOT)
 
 
-class RoofHeightsDialog(QDialog):
-    """Roof ▸ Sketch Ridge…'s own dialog, shown once the ridge is drawn and
-    the eaves wall is picked (0139-ruling.md R2, MINIMAL per 0140-ruling.md
-    sec3): two initial heights, nothing else. Pitch is derived, not typed
-    -- R2b's three-way ridge/eaves/pitch dialog (0140-ruling.md sec2)
-    replaces this one when it lands; this dialog does not anticipate it."""
+class _EndOnCanvas(QWidget):
+    """The end-on drawing itself (0140-ruling.md, the End-On dialog ruling,
+    sec1): the roof triangle over the level's wall stack, projected along
+    the ridge axis -- ridge apex, both eave lines, the wall top as a
+    reference, R/H/P labelled on the drawing. Redrawn on every edit via
+    `set_values`; the geometry math lives in the dialog, this widget only
+    paints whatever it is handed."""
 
-    def __init__(self, parent=None, eaves_default_in=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Roof heights")
-        form = QFormLayout(self)
+        self.setMinimumSize(360, 240)
+        self.span_in = 144.0
+        self.ridge_h = 132.0
+        self.eaves_h = 96.0
+        self.pitch_deg = 0.0
+        self.wall_top_in = float(DEFAULT_ROOM_PROPS["ceiling_height_in"])
 
-        eaves_default = float(eaves_default_in if eaves_default_in is not None
-                              else DEFAULT_ROOM_PROPS["ceiling_height_in"])
+    def set_values(self, span_in, ridge_h, eaves_h, pitch_deg):
+        self.span_in = max(1.0, span_in)
+        self.ridge_h, self.eaves_h, self.pitch_deg = ridge_h, eaves_h, pitch_deg
+        self.update()
+
+    def paintEvent(self, _e):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        w, h = self.width(), self.height()
+        margin = 32.0
+        half_w = self.span_in
+        top_in = max(self.ridge_h, self.wall_top_in) + 24.0
+        sx = (w - 2 * margin) / (2.0 * half_w)
+        sy = (h - 2 * margin) / max(top_in, 1.0)
+        scale = min(sx, sy)
+        cx = w / 2.0
+        base_y = h - margin
+
+        def pt(x_in, y_in):
+            return QPointF(cx + x_in * scale, base_y - y_in * scale)
+
+        ridge_pt = pt(0.0, self.ridge_h)
+        eave_l = pt(-half_w, self.eaves_h)
+        eave_r = pt(half_w, self.eaves_h)
+
+        # ground line
+        p.setPen(QPen(QColor(90, 90, 90), 1.5))
+        p.drawLine(QPointF(margin * 0.4, base_y), QPointF(w - margin * 0.4, base_y))
+        # wall-top reference, dashed (0140-ruling.md sec3: shown as reference,
+        # not the datum -- R/H are measured from the ground line above)
+        p.setPen(QPen(QColor(150, 150, 150), 1.0, Qt.PenStyle.DashLine))
+        wt_y = base_y - self.wall_top_in * scale
+        p.drawLine(QPointF(margin * 0.4, wt_y), QPointF(w - margin * 0.4, wt_y))
+        # the roof itself: ridge heavy-adjacent slopes, eaves at wall stack
+        p.setPen(QPen(QColor(133, 77, 14), 2.4))
+        p.drawLine(eave_l, ridge_pt)
+        p.drawLine(ridge_pt, eave_r)
+        p.setPen(QPen(QColor(60, 60, 60), 1.2))
+        p.drawLine(QPointF(eave_l.x(), base_y), eave_l)
+        p.drawLine(QPointF(eave_r.x(), base_y), eave_r)
+
+        p.setPen(QPen(QColor(20, 20, 20)))
+        p.drawText(ridge_pt + QPointF(6, -6), f"R {fmt_in(self.ridge_h)}")
+        p.drawText(eave_r + QPointF(6, 4), f"H {fmt_in(self.eaves_h)}")
+        p.drawText(eave_r + QPointF(6, 20), f"P {self.pitch_deg:.1f}°")
+
+
+class RoofEndOnDialog(QDialog):
+    """The End-On marker's dialog (0140-ruling.md, R2b): a live end-on
+    drawing with three editable values -- ridge height, eaves height,
+    pitch -- one relation, two degrees of freedom. RULED (0139-ruling.md
+    sec2, sharpened by Patrick's own worked example in 0140-ruling.md
+    sec2): the two most recently EDITED fields are the inputs; the third
+    is derived and recomputed live. At first open the heights are the
+    primaries and pitch is derived, matching how the roof was created.
+
+    REPLACES 0139-ruling.md R2's plainer `RoofHeightsDialog` entirely
+    (0140-ruling.md sec1: "one dialog, two doors") -- reached from the
+    marker's right-click, from selecting any ridge, AND from the
+    ridge-sketch tool's own initial heights prompt."""
+
+    _FIELDS = ("pitch", "ridge_h", "eaves_h")   # order = initial recency
+
+    def __init__(self, roof: RoofItem, parent=None):
+        super().__init__(parent)
+        self.roof = roof
+        self.setWindowTitle("Roof heights (end-on)")
+        self._recent = list(self._FIELDS)   # last element = most recent edit
+        self._programmatic = False
+
+        lay = QVBoxLayout(self)
+        self.canvas = _EndOnCanvas(self)
+        lay.addWidget(self.canvas)
+
+        form = QFormLayout()
+        self.sp_ridge = QDoubleSpinBox()
+        self.sp_ridge.setRange(0.0, 600.0)
+        self.sp_ridge.setSuffix(" in")
+        self.lab_ridge = QLabel("Ridge height (R)")
+        form.addRow(self.lab_ridge, self.sp_ridge)
 
         self.sp_eaves = QDoubleSpinBox()
-        self.sp_eaves.setRange(60.0, 300.0)
+        self.sp_eaves.setRange(0.0, 600.0)
         self.sp_eaves.setSuffix(" in")
-        self.sp_eaves.setValue(eaves_default)
-        form.addRow("Eaves height", self.sp_eaves)
+        self.lab_eaves = QLabel("Eaves height (H)")
+        form.addRow(self.lab_eaves, self.sp_eaves)
 
-        self.sp_ridge = QDoubleSpinBox()
-        self.sp_ridge.setRange(60.0, 600.0)
-        self.sp_ridge.setSuffix(" in")
-        self.sp_ridge.setValue(eaves_default + 48.0)
-        form.addRow("Ridge height", self.sp_ridge)
+        self.sp_pitch = QDoubleSpinBox()
+        self.sp_pitch.setRange(0.0, 80.0)
+        self.sp_pitch.setDecimals(1)
+        self.sp_pitch.setSuffix(" deg")
+        self.lab_pitch = QLabel("Pitch (P)")
+        form.addRow(self.lab_pitch, self.sp_pitch)
+        lay.addLayout(form)
 
-        note = QLabel("Both measured from the level's own base. Pitch is "
-                      "derived from these two, not typed here.")
+        note = QLabel("Both heights measured from the level's own base "
+                      "(the ground line); the wall top is shown for "
+                      "reference. Editing any two derives the third -- "
+                      "the derived field is marked — derived.")
+        note.setWordWrap(True)
         note.setStyleSheet("color: #666;")
-        form.addRow(note)
+        lay.addWidget(note)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
                                    | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        form.addRow(buttons)
+        lay.addWidget(buttons)
 
-    def values(self):
-        """(ridge_h_in, eaves_h_in)."""
-        return float(self.sp_ridge.value()), float(self.sp_eaves.value())
+        span = float(getattr(roof, "span_in", 144.0))
+        self.canvas.span_in = span
+        self._set_field("ridge_h", float(roof.ridge_h_in), redraw=False)
+        self._set_field("eaves_h", float(roof.eaves_h_in), redraw=False)
+        self._recompute()   # seed pitch from the stored heights
+        self._refresh_labels()
+
+        self.sp_ridge.valueChanged.connect(lambda v: self._on_edit("ridge_h", v))
+        self.sp_eaves.valueChanged.connect(lambda v: self._on_edit("eaves_h", v))
+        self.sp_pitch.valueChanged.connect(lambda v: self._on_edit("pitch", v))
+
+    # -- the three-way recompute (0139-ruling.md sec2 / 0140-ruling.md sec2) --
+    def _spin(self, field):
+        return {"ridge_h": self.sp_ridge, "eaves_h": self.sp_eaves,
+                "pitch": self.sp_pitch}[field]
+
+    def _set_field(self, field, value, redraw=True):
+        self._programmatic = True
+        self._spin(field).setValue(value)
+        self._programmatic = False
+        if redraw:
+            self._redraw()
+
+    def _on_edit(self, field, _value):
+        if self._programmatic:
+            return
+        self._recent.remove(field)
+        self._recent.append(field)          # most recent = last
+        self._recompute()
+        self._refresh_labels()
+
+    def _recompute(self):
+        derived = self._recent[0]           # least recently edited
+        span = self.canvas.span_in
+        ridge_h = self.sp_ridge.value()
+        eaves_h = self.sp_eaves.value()
+        pitch_rad = math.radians(self.sp_pitch.value())
+        if derived == "pitch":
+            pitch_rad = math.atan2(max(0.0, ridge_h - eaves_h), span)
+            self._set_field("pitch", math.degrees(pitch_rad), redraw=False)
+        elif derived == "ridge_h":
+            ridge_h = eaves_h + span * math.tan(pitch_rad)
+            self._set_field("ridge_h", ridge_h, redraw=False)
+        else:                                # derived == "eaves_h"
+            eaves_h = ridge_h - span * math.tan(pitch_rad)
+            self._set_field("eaves_h", eaves_h, redraw=False)
+        self._redraw()
+
+    def _redraw(self):
+        self.canvas.set_values(self.canvas.span_in, self.sp_ridge.value(),
+                               self.sp_eaves.value(), self.sp_pitch.value())
+
+    def _refresh_labels(self):
+        derived = self._recent[0]
+        labels = {"ridge_h": ("Ridge height (R)", self.lab_ridge),
+                  "eaves_h": ("Eaves height (H)", self.lab_eaves),
+                  "pitch": ("Pitch (P)", self.lab_pitch)}
+        for field, (base, lab) in labels.items():
+            lab.setText(base + ("  — derived" if field == derived else ""))
+
+    def apply(self):
+        """Write the (always-consistent) current heights back to the roof.
+        Pitch itself is never stored (0139-ruling.md sec2: derived, always)."""
+        self.roof.ridge_h_in = float(self.sp_ridge.value())
+        self.roof.eaves_h_in = float(self.sp_eaves.value())
+        self.roof.rebuild()
 
 
 class SettingsDialog(QDialog):

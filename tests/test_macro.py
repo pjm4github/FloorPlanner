@@ -116,6 +116,8 @@ def test_tool_code_switches_tool(fp, win):
     assert win.tool == fp.TOOL_SELECT
     win.run_macro("R")                        # Room
     assert win.tool == fp.TOOL_ROOM
+    win.run_macro("G")                        # Roof ridge
+    assert win.tool == fp.TOOL_ROOF_RIDGE
 
 
 def test_legacy_digit_tool_still_works(fp, win):
@@ -417,6 +419,14 @@ def test_recorder_tool_and_place_hooks(fp, win):
     assert "E" in text.split()
     assert "PLACE sofa 120 96" in text
     assert win._recorder is None                   # stop unhooks the recorder
+
+
+def test_recorder_records_g_for_the_roof_ridge_tool(fp, win):
+    dlg = fp.MacroRecorderDialog(win)
+    dlg.start()
+    win.set_tool(fp.TOOL_ROOF_RIDGE)               # -> "G"
+    dlg.stop()
+    assert dlg.edit.toPlainText().split() == ["G"]
 
 
 def test_recorder_ignores_when_not_started_or_paused(fp, win):

@@ -192,10 +192,17 @@ class Roof(_Node):
     stored -- the two heights are the source of truth, so a UI showing a
     live pitch and one accepting a typed pitch are the same dialog
     recomputing whichever height is unlocked, not two representations
-    that can disagree."""
+    that can disagree.
+
+    `marker_end` -- 0 (`ridge[0]`) or 1 (`ridge[1]`) -- added at R2b
+    (0140-ruling.md's End-On marker): which ridge end the marker sits at,
+    document state so it survives reload, same as a room label's offset.
+    OPTIONAL (schema default 1) so R1/R2's own roof records, written before
+    this field existed, stay valid without a migration."""
     FIELDS: ClassVar = [("id", RAW), ("level", RAW), ("ridge", RAW),
                         ("eaves_h_in", RAW), ("ridge_h_in", RAW),
-                        ("overhang_in", RAW), ("gable", RAW)]
+                        ("overhang_in", RAW), ("gable", RAW),
+                        ("marker_end", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     ridge: Any = _MISSING
@@ -203,6 +210,7 @@ class Roof(_Node):
     ridge_h_in: Any = _MISSING
     overhang_in: Any = _MISSING
     gable: Any = _MISSING
+    marker_end: Any = _MISSING
 
 
 @dataclass

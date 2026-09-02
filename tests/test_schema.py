@@ -422,3 +422,31 @@ def test_a_roof_with_a_three_point_ridge_is_rejected():
     roof["ridge"] = [[0, 0], [120, 0], [240, 0]]
     doc = _roof_doc(version=6, roofs=[roof])
     assert schema_errors(doc) != []
+
+
+# --------------------------------------------------------------------------
+# R2b (0140-ruling.md, the End-On marker): `marker_end`, additive over R1
+# --------------------------------------------------------------------------
+
+def test_a_roof_with_marker_end_0_or_1_validates():
+    for end in (0, 1):
+        roof = dict(_ONE_ROOF[0])
+        roof["marker_end"] = end
+        doc = _roof_doc(version=6, roofs=[roof])
+        assert schema_errors(doc) == [], f"marker_end={end} should validate"
+
+
+def test_a_roof_with_no_marker_end_still_validates():
+    """R1/R2's own roof records, written before R2b, carry no `marker_end`
+    key at all -- optional, with a schema default, exactly like
+    overhang_in/gable already are."""
+    doc = _roof_doc(version=6, roofs=_ONE_ROOF)   # _ONE_ROOF has no marker_end
+    assert "marker_end" not in _ONE_ROOF[0]
+    assert schema_errors(doc) == []
+
+
+def test_a_roof_with_an_out_of_range_marker_end_is_rejected():
+    roof = dict(_ONE_ROOF[0])
+    roof["marker_end"] = 2
+    doc = _roof_doc(version=6, roofs=[roof])
+    assert schema_errors(doc) != []

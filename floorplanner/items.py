@@ -18,6 +18,7 @@ from floorplanner.rooms import (
     RoomItem, report_self_intersections, room_owns_walls, walls_cover_room,
     rooms_holding,
 )
+from floorplanner.roofs import RoofEndMarkerItem, RoofItem
 
 # Stairs — a dynamic "Framing" furnishing: step count from the room's ceiling
 # height (standard ~7" risers); full or half flight to a landing.
@@ -1253,8 +1254,19 @@ class ReferenceImageItem(QGraphicsItem):
 #:
 #: A room still comes last among the things a user ordinarily selects, which is
 #: the property D53 needed; it just is not the axiom.
-HIT_PRIORITY = (OpeningItem, FurnishingItem, WallItem, GroupItem, RoomItem,
-                ReferenceImageItem)
+#:
+#: `RoofEndMarkerItem` outranks EVERYTHING for the same contained-thing reason
+#: `OpeningItem` outranks `WallItem` above -- it is a Qt CHILD of its `RoofItem`
+#: (roofs.py), so the two are routinely returned for the same point and the
+#: marker is the more specific answer. `RoofItem` itself ranks with `WallItem`
+#: (both are the plan's own structural lines, above the room fill they sit
+#: over) -- added here, not left to fall through to the "unknown" tail rank,
+#: because that tail rank is BELOW `RoomItem`: a named room's own fill was
+#: silently winning every right-click meant for a ridge drawn over it, since
+#: an unlisted type's rank (`len(HIT_PRIORITY)`) is worse than `RoomItem`'s.
+#: Caught from Patrick's own report, not a test.
+HIT_PRIORITY = (RoofEndMarkerItem, OpeningItem, FurnishingItem, WallItem,
+                RoofItem, GroupItem, RoomItem, ReferenceImageItem)
 
 
 def _hit_rank(item) -> int:
