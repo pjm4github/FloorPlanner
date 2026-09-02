@@ -188,8 +188,29 @@ def test_changing_DEFAULT_SETTINGS_requires_a_version_bump(fp):
     (0078 sec2) -- this is the only thing standing between that and a
     default nobody can ever change again."""
     from floorplanner.config import _default_settings_fingerprint
-    assert fp.SETTINGS_VERSION == 1
-    assert _default_settings_fingerprint() == "1ed175834bdbb015"
+    assert fp.SETTINGS_VERSION == 2
+    assert _default_settings_fingerprint() == "070767e835d45bdc"
+
+
+def test_a_v1_settings_file_migrates_show_and_edit_roofs_on_load(
+        fp, sandboxed_config):
+    """The positive control _SETTINGS_MIGRATIONS' first real row needs:
+    a v1 file that genuinely lacks show_roofs/edit_roofs (full
+    materialisation means it has no absent-key fallback to either
+    default) must gain both, at their defaults, on the very next read --
+    and the file on disk must be rewritten at version 2, not just the
+    in-memory value."""
+    fp.settings_file().parent.mkdir(parents=True, exist_ok=True)
+    v1 = {"version": 1, "wall_snap_in": 6.0}   # a real pre-R2c file: no
+    fp.settings_file().write_text(json.dumps(v1), encoding="utf-8")   # roof keys
+
+    assert fp.app_settings().value("show_roofs") is True
+    assert fp.app_settings().value("edit_roofs") is True
+
+    on_disk = json.loads(fp.settings_file().read_text(encoding="utf-8"))
+    assert on_disk["version"] == 2
+    assert on_disk["show_roofs"] is True
+    assert on_disk["edit_roofs"] is True
 
 
 # ---------------------------------------------------------------------------

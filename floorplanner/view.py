@@ -466,6 +466,16 @@ class PlanView(QGraphicsView):
                 e.accept()
                 return
             if tool == TOOL_ROOF_RIDGE:
+                # R2c (0145-ruling.md sec2): "sketching the first ridge via
+                # the menu turns both switches on" -- the menu/toolbar
+                # action is disabled while Edit is off, but this tool can
+                # still be reached via a macro's bare "G" token (it bypasses
+                # QAction.isEnabled entirely), so the force-on lives at the
+                # gesture itself, not only at the action that usually starts
+                # it. A same-value guard inside each setter keeps this a
+                # no-op on every ordinary press.
+                self.win._set_show_roofs(True)
+                self.win._set_edit_roofs(True)
                 if self._roof_awaiting_eaves is not None:
                     # STAGE 2: this press is the eaves pick, not a new ridge
                     # (0139-ruling.md sec1/sec3: "pick a ridge line, pick an

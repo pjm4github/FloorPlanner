@@ -96,7 +96,15 @@
           "description": "`centerline` reproduces v4. `inside_face` offsets each bound outline edge inward by half its wall's thickness — the number that belongs in a room schedule.",
           "enum": ["centerline", "inside_face"], "default": "inside_face"
         },
-        "editing": { "$ref": "#/$defs/editing_modes" }
+        "editing": { "$ref": "#/$defs/editing_modes" },
+        "show_roofs": {
+          "description": "R2c (0139-ruling.md's roofline plan): the Roof menu's own Show-roof switch. False hides every roof from both rendering and hit-testing (RoofItem behaves as absent). Implies `edit_roofs: false` when off (a hidden roof cannot be the one being edited).",
+          "type": "boolean", "default": true
+        },
+        "edit_roofs": {
+          "description": "R2c: the Roof menu's own Edit-roof switch. True implies `show_roofs: true`. False leaves roofs rendered but fully inert -- every mouse/keyboard event passes through to the floor tools underneath, as if no roof existed.",
+          "type": "boolean", "default": true
+        }
       }
     },
 
