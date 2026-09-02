@@ -1,13 +1,13 @@
 ---
 # permanent key, independent of GitHub
 id: 84
-title: "The Room tool's verbose ROOM token: Patrick reads it as a holdover bug; needs his own clarification"
+title: "The Room-naming macro token uses ROOM, not R -- a holdover, Patrick confirms"
 
 # maps directly onto GitHub Issues fields
 state: open
 state_reason: null
 labels:
-  - type:task
+  - type:defect
   - area:tooling
 milestone: null
 
@@ -21,7 +21,7 @@ state_source: row
 github_issue: null
 ---
 
-# D84 — the Room tool records a verbose `ROOM name x y` token; preliminary read says by design, needs Patrick's own clarification
+# D84 — the room-naming macro token uses `ROOM`, not `R` — a holdover, Patrick confirms
 
 **Filed per Patrick's own report, 2026‑09‑02, in chat (not a numbered
 ruling — noted for later per his own words: "Make a note of that and we
@@ -60,8 +60,22 @@ maybe the concern is that the ROOF tool has no equivalent rich token yet
 request for a `ROOF ...`-style summarising token, D83's sibling, not a
 report that `ROOM` is spelled wrong. Left open rather than guessed at.
 
-## Not investigated further
+## Clarified, reclassified task -> defect — [`0145-ruling.md`](../handoff/0145-ruling.md) §1
 
-No code change attempted — Patrick's own instruction was to hold this for
-later. This record exists so the discrepancy between his description and
-what the code actually does is on record before memory of either fades.
+Patrick's own word, restating the finding rather than accepting the
+preliminary "by design" read above: *"it uses 'ROOM' instead of 'R'. that
+is a holdover from an earlier version of the code."* His intent is the
+literal one: the room-naming token should use the key `"R"`, not the
+word `"ROOM"`. **Target key: `"R"`.** Reclassified `type:task` ->
+`type:defect` accordingly.
+
+The preliminary-read section above stays on record rather than deleted —
+it is what made his restatement worth asking for, and the record should
+show a question was asked and answered, not just the answer.
+
+## Not built yet
+
+**Still held for later, alongside D83** — [`0146-ruling.md`](../handoff/0146-ruling.md):
+*"D83/D84 held"*, record-only, no build authorized. This record exists so
+the discrepancy between his first description and the code's actual
+behavior is on record, and now so is his own clarification of intent.

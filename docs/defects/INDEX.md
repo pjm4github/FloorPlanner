@@ -7,9 +7,9 @@
 
 | type | count | | area | count |
 |---|---:|---|---|---:|
-| `type:defect` | 60 | | `area:geometry` | 29 |
+| `type:defect` | 61 | | `area:geometry` | 29 |
 | `type:gap` | 13 | | `area:ui` | 11 |
-| `type:task` | 9 | | `area:io` | 10 |
+| `type:task` | 8 | | `area:io` | 10 |
 | `type:limit` | 3 | | `area:schema` | 8 |
 |  |  | | `area:tooling` | 8 |
 |  |  | | `area:viewer` | 7 |
@@ -113,7 +113,7 @@ nowhere else. It is **not** a ranking throughout — see `README.md`.
 | **D81** | [fp2pdf draws every door as the same generic swing leaf, never reading the catalog door_type](0081-fp2pdf-draws-every-door-as-the-same-generic.md) | closed (completed) | — | io | type:defect |
 | **D82** | [fp2pdf dimension strings carry 1/16" fractions Patrick wants whole feet-inches only](0082-fp2pdf-dimension-strings-carry-1-16-fractions.md) | closed (completed) | — | io | type:task |
 | **D83** | [Macro recording does not capture the tool already selected before recording started](0083-macro-recording-does-not-capture-the-tool.md) | open | — | tooling | type:defect |
-| **D84** | [The Room tool's verbose ROOM token: Patrick reads it as a holdover bug; needs his own clarification](0084-the-room-tool-records-a-verbose-room-name-x-y.md) | open | — | tooling | type:task |
+| **D84** | [The Room-naming macro token uses ROOM, not R -- a holdover, Patrick confirms](0084-the-room-tool-records-a-verbose-room-name-x-y.md) | open | — | tooling | type:defect |
 
 ---
 
@@ -205,4 +205,4 @@ nowhere else. It is **not** a ranking throughout — see `README.md`.
 | **D81** | [fp2pdf draws every door as the same generic swing leaf, never reading the catalog door_type](0081-fp2pdf-draws-every-door-as-the-same-generic.md) | closed (completed) | — | io | type:defect |
 | **D82** | [fp2pdf dimension strings carry 1/16" fractions Patrick wants whole feet-inches only](0082-fp2pdf-dimension-strings-carry-1-16-fractions.md) | closed (completed) | — | io | type:task |
 | **D83** | [Macro recording does not capture the tool already selected before recording started](0083-macro-recording-does-not-capture-the-tool.md) | open | — | tooling | type:defect |
-| **D84** | [The Room tool's verbose ROOM token: Patrick reads it as a holdover bug; needs his own clarification](0084-the-room-tool-records-a-verbose-room-name-x-y.md) | open | — | tooling | type:task |
+| **D84** | [The Room-naming macro token uses ROOM, not R -- a holdover, Patrick confirms](0084-the-room-tool-records-a-verbose-room-name-x-y.md) | open | — | tooling | type:defect |
