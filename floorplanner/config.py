@@ -74,6 +74,11 @@ DEFAULT_SETTINGS = {
     "auto_bind": True,                # bind room edges to coincident walls
     #                                   (policy flag; no automatic site today --
     #                                   the P4.3 census, stated not invented)
+    # R2c (0145-ruling.md sec2): Show roof / Edit roof, the Roof menu's own
+    # pair, invariant Edit implies Show. True/True so every roof R1/R2/R2b
+    # already wrote stays visible and editable without a migration.
+    "show_roofs": True,
+    "edit_roofs": True,
 }
 SETTINGS = dict(DEFAULT_SETTINGS)
 
@@ -311,18 +316,31 @@ def _read_legacy_ini_value(path: Path, key: str):
 #: (below) means an existing user's file has NO absent keys for a new
 #: default to fall through to, so this version marker plus
 #: `_SETTINGS_MIGRATIONS` is the only thing that can still reach them.
-SETTINGS_VERSION = 1
+SETTINGS_VERSION = 2
+
+
+def _migrate_v1_to_v2(data: dict) -> dict:
+    """R2c (0145-ruling.md sec2): `show_roofs`/`edit_roofs` added to
+    `DEFAULT_SETTINGS`. A v1 app-settings file predates them and, being
+    fully materialised, has no absent-key fallback to reach their
+    defaults through (the exact gap `SETTINGS_VERSION` exists to close) --
+    `setdefault`, not assignment, in case a v1 file somehow already
+    carries either key (hand-edited, or a future migration re-run)."""
+    data.setdefault("show_roofs", True)
+    data.setdefault("edit_roofs", True)
+    return data
+
 
 #: Ordered migration steps: `(from_version, fn)`, `fn(data: dict) -> dict`,
 #: each upgrading a file from `from_version` to `from_version + 1`.
 #: `_migrate_settings_data` applies every step in order and bumps the
-#: marker. Empty at `SETTINGS_VERSION == 1` because there is no version 0
-#: to migrate FROM -- the mechanism exists and is tested
-#: (`test_changing_DEFAULT_SETTINGS_requires_a_version_bump`) before it is
+#: marker. The mechanism was tested
+#: (`test_changing_DEFAULT_SETTINGS_requires_a_version_bump`) before it was
 #: ever needed, per this project's own "generation, or a gate that fails"
 #: rule: a table that only gets written the day it is first needed is a
-#: table nobody remembered to write.
-_SETTINGS_MIGRATIONS = []
+#: table nobody remembered to write. `(1, _migrate_v1_to_v2)` is that
+#: table's first real row.
+_SETTINGS_MIGRATIONS = [(1, _migrate_v1_to_v2)]
 
 
 def _default_settings_fingerprint() -> str:

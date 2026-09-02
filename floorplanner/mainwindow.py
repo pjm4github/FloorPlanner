@@ -421,9 +421,21 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         # 0139-ruling.md's roofline plan, R2 (menu + ridge sketch + eaves
         # pick + a minimal heights dialog -- 0140-ruling.md sec3)
         m_roof = self.menuBar().addMenu("R&oof")
-        a_ridge = QAction("&Sketch ridge  [G]", self)   # "G": the toolbar's own shortcut
-        a_ridge.triggered.connect(lambda: self.set_tool(TOOL_ROOF_RIDGE))
-        m_roof.addAction(a_ridge)
+        self.a_ridge = QAction("&Sketch ridge  [G]", self)   # "G": the toolbar's own shortcut
+        self.a_ridge.triggered.connect(lambda: self.set_tool(TOOL_ROOF_RIDGE))
+        m_roof.addAction(self.a_ridge)
+        m_roof.addSeparator()
+        # R2c (0145-ruling.md sec2): the pair, invariant Edit implies Show
+        self.a_show_roofs = QAction("&Show roof", self)
+        self.a_show_roofs.setCheckable(True)
+        self.a_show_roofs.setChecked(bool(SETTINGS.get("show_roofs", True)))
+        self.a_show_roofs.toggled.connect(self._set_show_roofs)
+        m_roof.addAction(self.a_show_roofs)
+        self.a_edit_roofs = QAction("&Edit roof", self)
+        self.a_edit_roofs.setCheckable(True)
+        self.a_edit_roofs.setChecked(bool(SETTINGS.get("edit_roofs", True)))
+        self.a_edit_roofs.toggled.connect(self._set_edit_roofs)
+        m_roof.addAction(self.a_edit_roofs)
 
         m_inv = self.menuBar().addMenu("In&ventory")
         for label, slot in [("&House (structure)…", self.inventory_house),
@@ -566,6 +578,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self.scene.update()
         self._update_title()
         self._sync_editing_ui()
+        self._sync_roof_ui()
 
     def _sync_editing_ui(self):
         """Point the toolbar's shuffle toggle at the document's flag. Called
@@ -606,6 +619,63 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                     "join rooms explicitly (right-click > Join room into "
                     "plan)." if on else
                     "Shuffle mode off: automatic joining passes re-enabled.")
+
+    def _sync_roof_ui(self):
+        """R2c (0145-ruling.md sec2): point the Roof menu's two checkboxes
+        at the document's flags, and disable the ridge-sketch tool (menu
+        action + toolbar button) whenever `edit_roofs` is off -- "the roof
+        sketch tools and marker only operate with Edit ON." Called from
+        `_apply_canvas` (legacy open/import/New) and the v5 bridge apply,
+        same two call sites `_sync_editing_ui` already covers."""
+        show = bool(SETTINGS.get("show_roofs", True))
+        edit = bool(SETTINGS.get("edit_roofs", True))
+        a = getattr(self, "a_show_roofs", None)
+        if a is not None:
+            a.setChecked(show)
+        a = getattr(self, "a_edit_roofs", None)
+        if a is not None:
+            a.setChecked(edit)
+        a = getattr(self, "a_ridge", None)
+        if a is not None:
+            a.setEnabled(edit)
+        a = self._tool_actions.get(TOOL_ROOF_RIDGE) if hasattr(
+            self, "_tool_actions") else None
+        if a is not None:
+            a.setEnabled(edit)
+
+    def _set_show_roofs(self, on):
+        """Same-value guard, invariant Edit=>Show: unchecking Show forces
+        Edit off too (a hidden roof cannot be the one being edited)."""
+        on = bool(on)
+        if bool(SETTINGS.get("show_roofs", True)) == on:
+            return
+        SETTINGS["show_roofs"] = on
+        if not on:
+            SETTINGS["edit_roofs"] = False
+            if self.tool == TOOL_ROOF_RIDGE:
+                self.set_tool(TOOL_SELECT)
+        self._sync_roof_ui()
+        self._sync_floor_state()          # re-applies apply_roof_visibility
+        self._mark_dirty()
+        self.status("Roofs hidden." if not on else "Roofs shown.")
+
+    def _set_edit_roofs(self, on):
+        """Same-value guard, invariant Edit=>Show: checking Edit forces
+        Show on too."""
+        on = bool(on)
+        if bool(SETTINGS.get("edit_roofs", True)) == on:
+            return
+        SETTINGS["edit_roofs"] = on
+        if on:
+            SETTINGS["show_roofs"] = True
+        elif self.tool == TOOL_ROOF_RIDGE:
+            self.set_tool(TOOL_SELECT)
+        self._sync_roof_ui()
+        self._sync_floor_state()
+        self._mark_dirty()
+        self.status("Roofs are now read-only -- clicks and keys reach the "
+                    "floor underneath." if not on else
+                    "Roofs are editable again.")
 
     VIEWER_HINT = ("3D view needs pip install -r requirements-viewer.txt")
 

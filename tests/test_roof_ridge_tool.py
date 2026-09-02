@@ -120,14 +120,98 @@ def test_a_ridge_too_short_is_discarded(fp, win):
     assert win.view._roof_awaiting_eaves is None
 
 
-def test_escape_mid_draw_removes_the_ridge(fp, win):
+def test_escape_before_the_ridge_is_released_discards_it(fp, win):
+    """STILL BEING DRAGGED (not yet released) is the wall tool's own
+    precedent exactly: an in-progress drag is free to cancel."""
     win.prepare_headless()
+    win.set_tool(fp.TOOL_ROOF_RIDGE)
+    left = Qt.MouseButton.LeftButton
+    _send_mouse(win, QEvent.Type.MouseButtonPress, 0, 0, left, left)
+    _send_mouse(win, QEvent.Type.MouseMove, 200, 0,
+               Qt.MouseButton.NoButton, left)
+    assert win.view._temp_roof is not None
+    win.view.cancel_temp()
+    assert _roofs(win) == []
+    assert win.view._temp_roof is None
+
+
+def test_escape_while_awaiting_the_eaves_pick_keeps_the_ridge(fp, win):
+    """Patrick's own report (`fixtures/disappearingroof.fpm`, replayed
+    verbatim below): a
+    ridge already released reads as a finished roof on screen (the full
+    eave/gable preview is drawn from the moment it exists) -- abandoning
+    the eaves pick (Esc, or -- the real report -- switching tools) must
+    not silently discard something that already looked done. It is kept,
+    with span_in auto-derived from the nearest qualifying wall, same
+    search a LOADED roof already uses; the default constructor heights
+    stay adjustable afterward from the marker's own dialog."""
+    win.prepare_headless()
+    win.scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100),
+                                  "exterior"))
+    win.set_tool(fp.TOOL_ROOF_RIDGE)
+    _drag_ridge(win, (0, 0), (200, 0))
+    pending = win.view._roof_awaiting_eaves
+    assert pending is not None
+
+    win.view.cancel_temp()
+
+    assert win.view._roof_awaiting_eaves is None
+    assert _roofs(win) == [pending]             # kept, not discarded
+    assert pending.span_in == pytest.approx(100.0)   # derived from the wall
+    assert pending.ridge_h_in == 132.0 and pending.eaves_h_in == 96.0
+
+
+def test_switching_tools_while_awaiting_the_eaves_pick_keeps_the_ridge(fp, win):
+    """The exact reported scenario: G, drag a ridge, then switch tools
+    with NO eaves click at all -- set_tool()'s own cancel_temp() call must
+    not throw the ridge away."""
+    win.prepare_headless()
+    win.scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100),
+                                  "exterior"))
     win.set_tool(fp.TOOL_ROOF_RIDGE)
     _drag_ridge(win, (0, 0), (200, 0))
     assert win.view._roof_awaiting_eaves is not None
-    win.view.cancel_temp()
-    assert _roofs(win) == []
+
+    win.set_tool(fp.TOOL_SELECT)
+
+    assert len(_roofs(win)) == 1
     assert win.view._roof_awaiting_eaves is None
+
+
+def test_replaying_the_reported_macro_keeps_the_roof_after_switching_tools(
+        fp, win, monkeypatch):
+    """`fixtures/disappearingroof.fpm`, replayed verbatim -- Patrick's own
+    reproduced report (see `fixtures/README.md`'s own entry): four walls,
+    a ridge sketched across them with NO eaves-pick click, then `S ^Z`
+    (Select, Undo). Confirmed RED against the unfixed `cancel_temp()`
+    (the roof was gone after `S`), GREEN after."""
+    import pathlib
+    macro = pathlib.Path(__file__).resolve().parent.parent / "fixtures" / "disappearingroof.fpm"
+    win.prepare_headless()
+    monkeypatch.setattr(QDialog, "exec",
+                        lambda self: QDialog.DialogCode.Accepted)
+    lines = macro.read_text(encoding="utf-8").splitlines()
+    for line in lines[:-1]:                     # every line except "S ^Z"
+        if line.strip():
+            res = win.run_macro(line)
+            assert res["ok"], res
+
+    # "S": the ridge must survive the tool switch, auto-completed --
+    # this is the fix; the fixture's own bug report was that it did not
+    res = win.run_macro("S")
+    assert res["ok"], res
+    roofs = _roofs(win)
+    assert len(roofs) == 1
+    assert roofs[0].span_in > 0
+
+    # "^Z" (undo, the fixture's own diagnostic step): a NORMAL undo of the
+    # roof's own creation now, not a rescue of a wrongly-discarded item --
+    # and redo round-trips it back cleanly, not a corrupted shape
+    res = win.run_macro("^Z")
+    assert res["ok"], res
+    assert _roofs(win) == []
+    win.redo()
+    assert len(_roofs(win)) == 1
 
 
 def test_eaves_pick_on_blank_canvas_keeps_waiting(fp, win):

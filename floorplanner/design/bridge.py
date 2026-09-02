@@ -1164,6 +1164,11 @@ def apply_design_to_scene(target, design, report=None, strict=False,
         sync = getattr(win, "_sync_editing_ui", None)
         if sync is not None:
             sync()
+        # same reasoning, R2c (0145-ruling.md sec2): the Roof menu's own
+        # Show/Edit checkboxes and the ridge-sketch tool's enabled state
+        sync = getattr(win, "_sync_roof_ui", None)
+        if sync is not None:
+            sync()
 
     backdrops = []
     if keep_backdrop:

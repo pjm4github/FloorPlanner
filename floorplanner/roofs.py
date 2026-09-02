@@ -29,6 +29,45 @@ def eaves_span_from_wall(p1: QPointF, p2: QPointF, wall: WallItem) -> float:
     return dist_point_segment(mid, p1, p2)
 
 
+def _roofs_editable() -> bool:
+    return bool(SETTINGS.get("edit_roofs", True))
+
+
+def apply_roof_visibility(scene):
+    """Show roof / Edit roof (0145-ruling.md sec2), layered on each roof's
+    OWN floor display mode -- recomputed fresh here rather than read off
+    the item's current visible/enabled state, so re-enabling the document
+    switches always recovers correctly regardless of call order against
+    `apply_floor_visibility` (config.py), which this always follows
+    (`levels.py`'s `_sync_floor_state`).
+
+    Three states. HIDDEN (`show_roofs` off): `setVisible(False)` is enough
+    on its own -- Qt excludes an invisible item from `scene.items()`
+    entirely, so it is absent from every hit census, automatic or manual.
+    SHOWN, NOT EDITABLE (`edit_roofs` off): stays painted, but
+    `setEnabled(False)` stops Qt's own automatic event dispatch, AND
+    `RoofItem`/`RoofEndMarkerItem`'s own `shape()` empties out in that
+    same state (see their docstrings) so manual scans
+    (`RoomItem._outranked_at`, the ridge-sketch tool's own marker
+    pre-check) never see it either -- "every mouse/key event reaches the
+    floor tools exactly as if no roof existed" needs both, since only
+    `shape()` governs a geometric query, not `setEnabled` alone. A roof
+    that stops being editable is deselected, so no stray selection outline
+    survives a switch it can no longer be clicked to clear."""
+    if scene is None:
+        return
+    show = bool(SETTINGS.get("show_roofs", True))
+    edit = _roofs_editable()
+    for it in scene.items():
+        if not isinstance(it, RoofItem):
+            continue
+        mode = floor_display_mode(it.floor)
+        it.setVisible(mode != "hidden" and show)
+        it.setEnabled(mode == "active" and show and edit)
+        if not edit:
+            it.setSelected(False)
+
+
 def nearest_eaves_wall(scene, p1: QPointF, p2: QPointF, floor, exclude=None):
     """The wall on `floor` whose centerline runs closest to parallel with
     ridge `p1`-`p2` and sits nearest to it -- the automatic half of the
@@ -151,6 +190,13 @@ class RoofItem(QGraphicsItem):
         return self._bounds
 
     def shape(self) -> QPainterPath:
+        if not _roofs_editable():
+            # "shown, not editable": empty, not just disabled -- a manual
+            # scan (RoomItem._outranked_at, the ridge tool's own marker
+            # pre-check) must miss this ridge exactly as setEnabled(False)
+            # already makes Qt's own automatic dispatch miss it. boundingRect
+            # is untouched, so paint() keeps drawing at full extent.
+            return QPainterPath()
         stroker = QPainterPathStroker()
         stroker.setWidth(8.0)
         return stroker.createStroke(self._path)
@@ -260,6 +306,8 @@ class RoofEndMarkerItem(QGraphicsItem):
         return QRectF(-r, -r, 2.0 * r, 2.0 * r)
 
     def shape(self) -> QPainterPath:
+        if not _roofs_editable():
+            return QPainterPath()   # same "shown, not editable" reasoning
         path = QPainterPath()
         path.addEllipse(QPointF(0.0, 0.0), self._hit_radius(), self._hit_radius())
         return path
