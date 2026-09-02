@@ -211,10 +211,26 @@ class RoofEndMarkerItem(QGraphicsItem):
     Plain click/drag moves it between the two ridge ends -- release snaps
     to whichever end is nearer, never a free position (§1: "which end
     persists in the roof object", a binary choice, not a coordinate).
-    Right-click opens the End-On dialog -- the first of its "two doors";
-    `RoofItem.contextMenuEvent` is the second."""
+    Right-click OR double-click opens the End-On dialog -- the first of
+    its "two doors"; `RoofItem.contextMenuEvent` is the second. (A plain
+    double-click with no override still reaches `mousePressEvent` twice,
+    per Qt's own default -- giving it real behaviour instead of leaving
+    that second press ambiguous is what closes off a wall underneath ever
+    mistaking it for the start of a new ridge; see `_hit_radius`.)
 
-    RADIUS = 6.0
+    THE HIT REGION IS VIEW-SCALED, not a fixed scene-space radius -- same
+    convention `FurnishingItem`'s rotator handle already uses
+    (`_view_scale`/`HANDLE_PX`, items.py), for the same reason: a small
+    handle sized in plan inches shrinks to a few PIXELS at any zoom out
+    past a room or two, and a click or the second half of a double-click
+    that misses by a couple of pixels used to fall through to the
+    ridge-sketch tool's own press handler -- which, if it then landed on
+    a wall, could misread as an eaves pick for an accidentally-started
+    zero-length ridge, corrupting `span_in` toward zero and reading back
+    as a near-90deg pitch. Caught from Patrick's own report, not a test."""
+
+    RADIUS = 6.0             # the drawn glyph, in scene inches
+    HIT_PX = 14.0             # the CLICKABLE radius, in view pixels
 
     def __init__(self, roof: RoofItem):
         super().__init__(roof)
@@ -222,7 +238,7 @@ class RoofEndMarkerItem(QGraphicsItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setZValue(WALL_Z + 2)        # above the ridge it marks
         self.setToolTip("Roof end marker -- drag to the other ridge end, "
-                        "right-click for heights")
+                        "right-click (or double-click) for heights")
         self._dragging = False
         self.sync_position()
 
@@ -230,9 +246,23 @@ class RoofEndMarkerItem(QGraphicsItem):
         self.prepareGeometryChange()
         self.setPos(self.roof.p2 if self.roof.marker_end else self.roof.p1)
 
+    def _view_scale(self) -> float:
+        sc = self.scene()
+        if sc and sc.views():
+            return max(sc.views()[0].transform().m11(), 1e-6)
+        return 1.0
+
+    def _hit_radius(self) -> float:
+        return max(self.RADIUS, self.HIT_PX / self._view_scale())
+
     def boundingRect(self) -> QRectF:
-        r = self.RADIUS + 2.0
+        r = self._hit_radius() + 2.0
         return QRectF(-r, -r, 2.0 * r, 2.0 * r)
+
+    def shape(self) -> QPainterPath:
+        path = QPainterPath()
+        path.addEllipse(QPointF(0.0, 0.0), self._hit_radius(), self._hit_radius())
+        return path
 
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -269,4 +299,13 @@ class RoofEndMarkerItem(QGraphicsItem):
 
     def contextMenuEvent(self, e):
         self.roof.open_end_on_dialog()
+        e.accept()
+
+    def mouseDoubleClickEvent(self, e):
+        # Qt's own default (unless overridden) re-delivers a double-click
+        # as a second mousePressEvent -- defined here as "open the
+        # dialog" instead, so it is never ambiguous with a drag.
+        self._dragging = False
+        if e.button() == Qt.MouseButton.LeftButton:
+            self.roof.open_end_on_dialog()
         e.accept()

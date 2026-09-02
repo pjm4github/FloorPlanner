@@ -105,6 +105,80 @@ def test_dragging_the_marker_on_a_45_degree_ridge_still_snaps(fp, win):
     assert (roof.marker.pos().x(), roof.marker.pos().y()) == (0.0, 0.0)
 
 
+def test_the_markers_hit_region_stays_grabbable_when_zoomed_out(fp, win):
+    """Patrick's own report: a click near the marker that misses its tiny
+    visual glyph used to fall through to the ridge-sketch tool's own press
+    handler -- and if that landed on a wall, it could misread as an eaves
+    pick for an accidentally-started zero-length ridge, corrupting
+    `span_in` toward zero (reading back as a near-90deg pitch). Fixed by
+    sizing the hit region in VIEW PIXELS, same convention
+    `FurnishingItem`'s rotator handle already uses -- pinned here by
+    zooming out until the drawn glyph (RADIUS, in scene inches) would be
+    sub-pixel, and confirming the hit region has not shrunk with it."""
+    roof = RoofItem(QPointF(0, 0), QPointF(200, 0), span_in=100.0)
+    win.scene.addItem(roof)
+    win.view.resetTransform()
+    win.view.scale(0.05, 0.05)      # zoomed WAY out: RADIUS (6") -> 0.3px
+    marker = roof.marker
+
+    far_but_close_px = QPointF(marker.HIT_PX * 0.8, 0.0)   # inside the hit
+    # inside the hit region in ITEM coordinates once converted to view px
+    scale = marker._view_scale()
+    item_pt = QPointF(far_but_close_px.x() / scale, far_but_close_px.y() / scale)
+    assert marker.shape().contains(item_pt)
+
+    too_far_px = QPointF(marker.HIT_PX * 2.0, 0.0)
+    item_pt_far = QPointF(too_far_px.x() / scale, too_far_px.y() / scale)
+    assert not marker.shape().contains(item_pt_far)
+
+
+def test_a_press_near_but_off_the_marker_does_not_start_a_second_ridge(fp, win):
+    """The generous hit region (above) is what the ridge-sketch tool's own
+    pre-check (view.py) relies on to avoid mis-starting a new ridge when a
+    click is aimed at the marker but lands a few pixels short."""
+    win.prepare_headless()
+    win.scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100),
+                                  "exterior"))
+    roof = RoofItem(QPointF(0, 0), QPointF(200, 0), span_in=100.0)
+    win.scene.addItem(roof)
+    win.set_tool(fp.TOOL_ROOF_RIDGE)
+
+    left = Qt.MouseButton.LeftButton
+    # a few scene-inches off the marker's exact centre (200, 0) -- well
+    # within its view-pixel hit region at the default (1:1) test zoom
+    _send_mouse(win, QEvent.Type.MouseButtonPress, 205, 3, left, left)
+    _send_mouse(win, QEvent.Type.MouseMove, 150, 100, Qt.MouseButton.NoButton, left)
+    _send_mouse(win, QEvent.Type.MouseButtonRelease, 150, 100, left,
+               Qt.MouseButton.NoButton)
+
+    roofs = [it for it in win.scene.items() if isinstance(it, RoofItem)]
+    assert len(roofs) == 1                       # no second roof appeared
+    assert roofs[0].span_in == pytest.approx(100.0)   # original span intact
+
+
+def test_double_click_opens_the_dialog_instead_of_arming_a_drag(fp, win, monkeypatch):
+    win.prepare_headless()
+    roof = RoofItem(QPointF(0, 0), QPointF(200, 0), ridge_h_in=132.0,
+                    eaves_h_in=96.0, span_in=100.0)
+    win.scene.addItem(roof)
+
+    def _accept_and_edit(dlg_self):
+        dlg_self.sp_ridge.setValue(180.0)
+        return QDialog.DialogCode.Accepted
+    monkeypatch.setattr(QDialog, "exec", _accept_and_edit)
+
+    left = Qt.MouseButton.LeftButton
+    _send_mouse(win, QEvent.Type.MouseButtonPress, 200, 0, left, left)
+    _send_mouse(win, QEvent.Type.MouseButtonRelease, 200, 0, left,
+               Qt.MouseButton.NoButton)
+    _send_mouse(win, QEvent.Type.MouseButtonDblClick, 200, 0, left, left)
+    _send_mouse(win, QEvent.Type.MouseButtonRelease, 200, 0, left,
+               Qt.MouseButton.NoButton)
+
+    assert roof.ridge_h_in == pytest.approx(180.0)
+    assert roof.marker._dragging is False
+
+
 # --------------------------------------------------------------------------
 # "one dialog, two doors": marker right-click, and the ridge's own menu
 # --------------------------------------------------------------------------
@@ -158,6 +232,28 @@ def test_ridge_menu_delete_removes_the_roof_and_its_marker(fp, win, monkeypatch)
 
     _right_click(win, 100, 0)
 
+    assert roof.scene() is None
+    assert roof.marker.scene() is None
+
+
+def test_delete_key_removes_a_selected_roof(fp, win):
+    roof = RoofItem(QPointF(0, 0), QPointF(200, 0), span_in=100.0)
+    win.scene.addItem(roof)
+    roof.setSelected(True)
+    win.delete_selected()
+    assert roof.scene() is None
+
+
+def test_delete_key_removes_the_roof_when_only_its_marker_is_selected(fp, win):
+    """Clicking near a ridge end is at least as likely to select the
+    MARKER as the ridge line itself (they sit on top of one another) --
+    Delete must not silently do nothing just because the selected item is
+    the marker rather than the roof it belongs to."""
+    roof = RoofItem(QPointF(0, 0), QPointF(200, 0), span_in=100.0)
+    win.scene.addItem(roof)
+    roof.marker.setSelected(True)
+    assert not roof.isSelected()          # precondition: only the marker is
+    win.delete_selected()
     assert roof.scene() is None
     assert roof.marker.scene() is None
 

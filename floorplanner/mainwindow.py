@@ -17,7 +17,7 @@ from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
-from floorplanner.roofs import RoofItem, eaves_span_from_wall
+from floorplanner.roofs import RoofEndMarkerItem, RoofItem, eaves_span_from_wall
 from floorplanner.items import *  # noqa: F401
 from floorplanner.model import (  # serialization bridge (aliased)
     DEFAULT_FLOOR, Floor,
@@ -796,6 +796,12 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                 delete_wall(self.scene, it, settle=False)
             elif isinstance(it, (RoomItem, FurnishingItem, GroupItem, RoofItem)):
                 self.scene.removeItem(it)
+            elif isinstance(it, RoofEndMarkerItem):
+                # deleting the MARKER means deleting the roof it marks --
+                # a roof always has exactly one, so there is no "just the
+                # marker" to remove on its own
+                if it.roof.scene() is not None:
+                    self.scene.removeItem(it.roof)
         rebuild_all_walls(self.scene)
 
     # -- group / ungroup / cut / copy / paste -------------------------------------

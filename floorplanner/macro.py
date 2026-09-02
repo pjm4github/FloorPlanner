@@ -104,14 +104,20 @@ class MacroRunner:
     """
 
     # single-char tool codes (mnemonic): Select Exterior Interior Door
-    # Window Room.  The legacy 1-6 digits are still accepted for old macros.
+    # Window Room.  Roof ridge is "G" -- "R" is Room's already, so it
+    # reuses the tool's own toolbar shortcut (mainwindow.py's `defs`
+    # table) instead of a new mnemonic.  The legacy 1-6 digits are still
+    # accepted for old macros; roof ridge has no digit form (it postdates
+    # that convention).
     _TOOL_CODES = {"S": TOOL_SELECT, "E": TOOL_WALL_EXT, "I": TOOL_WALL_INT,
-                   "D": TOOL_DOOR, "W": TOOL_WINDOW, "R": TOOL_ROOM}
+                   "D": TOOL_DOOR, "W": TOOL_WINDOW, "R": TOOL_ROOM,
+                   "G": TOOL_ROOF_RIDGE}
     _DIGIT_TOOLS = [TOOL_SELECT, TOOL_WALL_EXT, TOOL_WALL_INT,
                     TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM]
     _TOOL_NAMES = {"select": TOOL_SELECT, "extwall": TOOL_WALL_EXT,
                    "intwall": TOOL_WALL_INT, "door": TOOL_DOOR,
-                   "window": TOOL_WINDOW, "room": TOOL_ROOM}
+                   "window": TOOL_WINDOW, "room": TOOL_ROOM,
+                   "roofridge": TOOL_ROOF_RIDGE}
     # derived from THE TABLE — add rows there, never here
     _CARET_METHODS = {t: s["method"] for t, s in CARET_SHORTCUTS.items()
                       if s["method"]}
@@ -638,7 +644,8 @@ class MacroRecorderDialog(QDialog):
     _ARROW_KEYS = {Qt.Key.Key_Left: "LEFT", Qt.Key.Key_Right: "RIGHT",
                    Qt.Key.Key_Up: "UP", Qt.Key.Key_Down: "DOWN"}
     _TOOL_CODES = {TOOL_SELECT: "S", TOOL_WALL_EXT: "E", TOOL_WALL_INT: "I",
-                   TOOL_DOOR: "D", TOOL_WINDOW: "W", TOOL_ROOM: "R"}
+                   TOOL_DOOR: "D", TOOL_WINDOW: "W", TOOL_ROOM: "R",
+                   TOOL_ROOF_RIDGE: "G"}
 
     def __init__(self, win):
         super().__init__(win)
