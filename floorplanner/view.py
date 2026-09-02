@@ -12,7 +12,7 @@ from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
 from floorplanner.rooms import _wall_endpoints_match  # star skips underscores
-from floorplanner.roofs import RoofEndMarkerItem, RoofItem
+from floorplanner.roofs import RoofEndMarkerItem, RoofItem, nearest_eaves_wall
 from floorplanner.items import *  # noqa: F401
 
 
@@ -846,11 +846,30 @@ class PlanView(QGraphicsView):
             self.scene().removeItem(self._temp_wall)
             self._temp_wall = None
         if self._temp_roof is not None:
+            # STILL BEING DRAGGED (the ridge itself not yet released) --
+            # matches the wall tool's own precedent exactly: an
+            # in-progress drag is free to cancel.
             self.scene().removeItem(self._temp_roof)
             self._temp_roof = None
         if self._roof_awaiting_eaves is not None:
-            self.scene().removeItem(self._roof_awaiting_eaves)
-            self._roof_awaiting_eaves = None
+            # NOT the same case. The ridge is already released and drawn
+            # -- with a full eave/gable preview, per Patrick's own report
+            # ("disappearingroof.fpm": G CLICK...DRAG... then S with no
+            # eaves click at all) -- so it already READS as a finished
+            # roof on screen. Discarding it here silently threw away
+            # something the user reasonably believed was done. Auto-
+            # complete instead, with the SAME nearest-wall search a
+            # loaded roof already uses to re-derive span_in -- heights
+            # stay at RoofItem's own constructor defaults, adjustable
+            # afterward from the marker's own dialog.
+            item, self._roof_awaiting_eaves = self._roof_awaiting_eaves, None
+            _, span_in = nearest_eaves_wall(self.scene(), item.p1, item.p2,
+                                            item.floor)
+            item.span_in = span_in
+            item.rebuild()
+            self.win.status(
+                "Roof ridge kept -- eaves set from the nearest wall. "
+                "Right-click the marker to adjust heights.")
 
     # -- door / window placement ---------------------------------------------------
     def _place_opening(self, sp: QPointF, kind: str):
