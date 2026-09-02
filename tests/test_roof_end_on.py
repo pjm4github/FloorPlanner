@@ -327,3 +327,59 @@ def test_apply_writes_only_the_two_heights_pitch_never_stored(fp, win):
     assert roof.eaves_h_in == pytest.approx(
         150.0 - 100.0 * math.tan(math.radians(30.0)), abs=0.05)
     assert not hasattr(roof, "pitch_deg")
+
+
+# --------------------------------------------------------------------------
+# a named room must not swallow a right-click meant for a ridge over it
+# (items.py's HIT_PRIORITY) -- Patrick's own report
+# --------------------------------------------------------------------------
+def _room_and_ridge(fp, win, ridge_y=40.0):
+    macro = ("WALL 0 0 240 0 ext WALL 240 0 240 180 ext "
+             "WALL 240 180 0 180 ext WALL 0 180 0 0 ext "
+             "ROOM Den 120 90")
+    res = win.run_macro(macro)
+    assert res["ok"], res["errors"]
+    room = next(it for it in win.scene.items() if isinstance(it, fp.RoomItem))
+    # a room this session has actually interacted with gets raised well above
+    # a roof's fixed z (RoomItem.raise_to_front's own "* 10" running counter)
+    # -- the scenario Patrick's own report was in ("a room is defined and
+    # named"), not the untouched-room case, which never exercised the bug
+    room.raise_to_front()
+    roof = RoofItem(QPointF(20, ridge_y), QPointF(220, ridge_y), span_in=30.0)
+    win.scene.addItem(roof)
+    return room, roof
+
+
+def test_a_raised_room_no_longer_outranks_a_roof_over_it(fp, win):
+    room, roof = _room_and_ridge(fp, win)
+    assert room.zValue() > roof.zValue()      # precondition: room IS on top by z
+    scene_pt = QPointF(120, 40)                # on the ridge, off the room's label
+    outranked_by = room._outranked_at(scene_pt, room.mapFromScene(scene_pt))
+    assert outranked_by is roof
+
+
+def test_right_click_on_a_ridge_inside_a_named_room_reaches_the_roof(
+        fp, win, monkeypatch):
+    win.prepare_headless()
+    room, roof = _room_and_ridge(fp, win)
+
+    entered = []
+    orig_room_menu = fp.RoomItem.contextMenuEvent
+
+    def spy_room(self, e):
+        entered.append("RoomItem")
+        return orig_room_menu(self, e)
+    monkeypatch.setattr(fp.RoomItem, "contextMenuEvent", spy_room)
+
+    def spy_roof(self, e):
+        entered.append("RoofItem")
+        e.accept()
+    monkeypatch.setattr(RoofItem, "contextMenuEvent", spy_roof)
+    monkeypatch.setattr(QMenu, "exec", lambda self, *a, **k: None)
+
+    _right_click(win, 120, 40)             # on the ridge, off the room's label
+
+    assert entered == ["RoomItem", "RoofItem"], (
+        "the room declined (Qt's raw z-order tried it first, correctly), "
+        "and the roof answered -- if only 'RoomItem' appears, the room's "
+        "own fill swallowed a click meant for the ridge over it")
