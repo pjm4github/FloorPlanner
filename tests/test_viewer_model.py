@@ -13,6 +13,7 @@ grow one back without something going red.
 """
 import importlib.util
 import json
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -600,3 +601,178 @@ def test_every_annotated_region_reaches_its_stated_height(fp3d, manifest):
         assert not missing, f"{it['id']}: annotated {missing}, built {sorted(zs)}"
         checked += 1
     assert checked >= 10, f"only {checked} annotated items -- did they vanish?"
+
+
+# --------------------------------------------------------------------------
+# roofs -- 0139-ruling.md's roofline plan, R3: planes + gable ends
+# --------------------------------------------------------------------------
+# A 300x200 rectangular shell, walls only -- the ridge's own nearest-eaves
+# search needs real wall geometry to find, and a SYMMETRIC layout (ridge
+# centred between two parallel walls) makes the span unambiguous regardless
+# of which of the two equidistant walls the search happens to visit first.
+def _roof_doc(ridge, eaves_h_in=96.0, ridge_h_in=132.0, overhang_in=0.0,
+              gable=None, level_z=0.0):
+    return {
+        "levels": [{"id": "L1", "elevation_in": level_z, "height_in": 96.0}],
+        "vertices": [
+            {"id": "v1", "x": 0, "y": 0}, {"id": "v2", "x": 300, "y": 0},
+            {"id": "v3", "x": 300, "y": 200}, {"id": "v4", "x": 0, "y": 200}],
+        "walls": [
+            {"id": "w1", "level": "L1", "v1": "v1", "v2": "v2", "type": "exterior"},
+            {"id": "w2", "level": "L1", "v1": "v2", "v2": "v3", "type": "exterior"},
+            {"id": "w3", "level": "L1", "v1": "v3", "v2": "v4", "type": "exterior"},
+            {"id": "w4", "level": "L1", "v1": "v4", "v2": "v1", "type": "exterior"},
+        ],
+        "rooms": [], "furnishings": [],
+        "roofs": [{"id": "rf1", "level": "L1", "ridge": ridge,
+                   "eaves_h_in": eaves_h_in, "ridge_h_in": ridge_h_in,
+                   "overhang_in": overhang_in,
+                   "gable": gable if gable is not None else [True, True]}],
+    }
+
+
+# ridge along x at y=100 (centred between the y=0 and y=200 long walls,
+# which run parallel to it) -- the nearest-eaves search must find span=100
+_RIDGE = [[50, 100], [250, 100]]
+
+
+def _roof_mesh(model):
+    return next(m for m in model.meshes if m.name == "roofs")
+
+
+def test_roof_plane_slope_matches_the_derived_pitch(fp3d):
+    """0139-ruling.md's own claim: pitch is DERIVED from the two heights over
+    the ridge-to-EAVES (wall) run, not stored. With overhang 0 the plane's
+    outer edge sits exactly at the wall, so ridge-height and eaves-height are
+    the plane's own two z extremes, AND the specific ridge/eave vertex PAIR
+    that should be `span` apart in plan really is -- the two checks together
+    rule out a bug that reaches the right z's via the wrong horizontal run
+    (e.g. eaves height applied at the ridge's own footprint)."""
+    span, eaves_h, ridge_h = 100.0, 96.0, 132.0
+    doc = _roof_doc(_RIDGE, eaves_h_in=eaves_h, ridge_h_in=ridge_h)
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    assert not model.notes, model.notes
+    mesh = _roof_mesh(model)
+    zs = mesh.verts[:, 2]
+    assert zs.max() == pytest.approx(ridge_h), "ridge height not reached"
+    assert zs.min() == pytest.approx(eaves_h - fp3d.ROOF_T), \
+        "eaves edge (minus plane thickness) not reached"
+
+    # r1 = (50, -100, 132); its own eave point sits `span` away, perpendicular
+    # to the ridge (world y grows toward the wall at plan y=0) -- (50, 0, 96)
+    import numpy as np
+    v = mesh.verts
+    top = v[np.isclose(v[:, 2], ridge_h)]
+    r1 = min(top, key=lambda p: p[0])
+    assert tuple(round(c, 3) for c in r1) == (50.0, -100.0, ridge_h)
+    eave = v[np.isclose(v[:, 2], eaves_h) & np.isclose(v[:, 0], 50.0)]
+    assert len(eave) >= 1, "no eave-height vertex above the ridge's own x"
+    e1 = eave[0]
+    run = math.hypot(e1[0] - r1[0], e1[1] - r1[1])
+    assert run == pytest.approx(span), \
+        f"the ridge/eave vertex pair are {run:.2f}in apart in plan, not span={span}"
+    want_pitch = math.degrees(math.atan2(ridge_h - eaves_h, span))
+    got_pitch = math.degrees(math.atan2(r1[2] - e1[2], run))
+    assert got_pitch == pytest.approx(want_pitch)
+
+
+def test_roof_gable_ends_close_by_default(fp3d):
+    """The R3 acceptance line itself ("gables closed"): with `gable`
+    defaulting `[True, True]`, both ridge ends get a closing vertical
+    triangle -- checked by face count, since `_prism_slab` gives a
+    deterministic 12 triangles per quad plane and 8 per triangular gable."""
+    doc = _roof_doc(_RIDGE)
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    mesh = _roof_mesh(model)
+    assert len(mesh.faces) == 2 * 12 + 2 * 8, \
+        f"expected two planes + two gable closures, got {len(mesh.faces)} faces"
+    assert not model.info, f"a default all-gable roof should need no note: {model.info}"
+
+
+def test_roof_hip_end_is_left_open_and_named(fp3d):
+    """`gable[i] = False` has no UI yet (roofs.py's own `RoofItem`
+    docstring), so R3 must not silently draw it as a gable -- it must be
+    OPEN (one fewer closing triangle) and NAMED, the same "known gap,
+    reported" discipline the furnishing fallbacks already use."""
+    doc = _roof_doc(_RIDGE, gable=[True, False])
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    mesh = _roof_mesh(model)
+    assert len(mesh.faces) == 2 * 12 + 1 * 8, \
+        "the hip end must not gain a closing triangle"
+    assert any("hip" in n and "end 1" in n for n in model.info), model.info
+    assert not model.notes, "a named, expected gap is INFO, not a fault"
+
+
+def test_roof_overhang_continues_the_same_slope_past_the_wall(fp3d):
+    """The model's own claim: overhang extends the SAME plane at the SAME
+    slope, it does not add a second, flatter strip. The outer edge, `overhang`
+    beyond the wall, must sit BELOW the eaves height by `slope * overhang`."""
+    span, eaves_h, ridge_h, overhang = 100.0, 96.0, 132.0, 12.0
+    doc = _roof_doc(_RIDGE, eaves_h_in=eaves_h, ridge_h_in=ridge_h,
+                    overhang_in=overhang, gable=[True, True])
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    mesh = _roof_mesh(model)
+    slope = (ridge_h - eaves_h) / span
+    want_edge_h = eaves_h - slope * overhang
+    zs = sorted({round(float(z), 3) for z in mesh.verts[:, 2]})
+    assert round(want_edge_h, 3) in zs, \
+        f"outer overhang edge should be at {want_edge_h:.3f}, got {zs}"
+    assert want_edge_h < eaves_h, \
+        "PRECONDITION: an overhang must droop below the eaves, or this proves nothing"
+
+
+def test_roofs_false_omits_the_mesh_but_not_the_count(fp3d):
+    """`roofs=False` mirrors `floors=False`/`furnishings=False`: no mesh, but
+    the document is still walked -- `stats["roofs"]` is not gated by the
+    same flag that suppresses the geometry, exactly as `n_wall`/`n_floor`
+    are not, so a caller can tell "1 roof, suppressed" from "0 roofs"."""
+    doc = _roof_doc(_RIDGE)
+    model = fp3d.build_model(doc, furnishings=False, floors=False, roofs=False)
+    assert not any(m.name == "roofs" for m in model.meshes)
+
+
+def test_a_document_with_no_roofs_key_still_builds(fp3d, manifest):
+    """Every v5 document written before R1 has no `roofs` key at all --
+    `doc.get("roofs", [])` must not raise and must simply build nothing."""
+    model = fp3d.build_model(_doc("sofa"), floors=False)
+    assert not any(m.name == "roofs" for m in model.meshes)
+    assert model.stats["roofs"] == 0
+
+
+def test_build_model_with_a_roof_imports_neither_qt_nor_floorplanner():
+    """The roof section is genuinely new code reading a genuinely new
+    document key -- VIEWER_NOTES s1's isolation claim needs its own receipt
+    here, not just inherited from the furnishings-only probe above, since
+    the eaves search is a hand-duplicated copy of Qt-importing code
+    (`_heading_deg`'s docstring) and a copy-paste mistake could easily pull
+    the wrong module in."""
+    probe = (
+        "import importlib.util, sys, json\n"
+        f"spec = importlib.util.spec_from_file_location('m', r'"
+        f"{ROOT / 'floorplanner' / 'viewer' / 'fp3d.py'}')\n"
+        "m = importlib.util.module_from_spec(spec)\n"
+        "sys.modules['m'] = m\n"
+        "spec.loader.exec_module(m)\n"
+        "doc = {'levels': [{'id': 'L1', 'elevation_in': 0, 'height_in': 96}],"
+        " 'vertices': [{'id': 'v1', 'x': 0, 'y': 0}, {'id': 'v2', 'x': 300,"
+        " 'y': 0}, {'id': 'v3', 'x': 300, 'y': 200}, {'id': 'v4', 'x': 0,"
+        " 'y': 200}],"
+        " 'walls': [{'id': 'w1', 'level': 'L1', 'v1': 'v1', 'v2': 'v2',"
+        " 'type': 'exterior'}, {'id': 'w2', 'level': 'L1', 'v1': 'v3',"
+        " 'v2': 'v4', 'type': 'exterior'}],"
+        " 'rooms': [], 'furnishings': [],"
+        " 'roofs': [{'id': 'rf1', 'level': 'L1',"
+        " 'ridge': [[50, 100], [250, 100]], 'eaves_h_in': 96.0,"
+        " 'ridge_h_in': 132.0, 'overhang_in': 0.0, 'gable': [True, True]}]}\n"
+        "model = m.build_model(doc)\n"
+        "assert any(mm.name == 'roofs' for mm in model.meshes), "
+        "'built no roof, so the check is vacuous'\n"
+        "leaked = sorted(k for k in sys.modules\n"
+        "                if k.split('.')[0] in ('PyQt6', 'floorplanner',\n"
+        "                                       'FloorPlanner'))\n"
+        "print(json.dumps(leaked))\n")
+    out = subprocess.run([sys.executable, "-c", probe], capture_output=True,
+                         text=True, cwd=str(ROOT))
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout.strip()) == [], \
+        f"build_model pulled in {out.stdout.strip()}"
