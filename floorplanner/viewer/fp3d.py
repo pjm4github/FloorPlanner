@@ -31,6 +31,14 @@ Conventions
 * Furnishings are not: their size, height, elevation, form and material come
   from assets/furnishings/manifest.json + materials.json, read as data.  This
   file states no furnishing dimension of its own.
+* A roof (0139-ruling.md's roofline plan) is two sloped planes off its ridge
+  plus gable-end triangles; ridge/eaves heights are measured from the
+  level's own base, pitch is DERIVED (rise over the ridge-to-eaves run, not
+  the overhang tip), and the eaves span is re-derived from the nearest
+  parallel wall on the fly -- it is a live-scene affordance, not a document
+  field (`Roof`'s own docstring), so this file re-derives it exactly as the
+  editor's own `nearest_eaves_wall` does, duplicated rather than imported
+  because that function lives in a PyQt6-importing module.
 """
 
 from __future__ import annotations
@@ -96,9 +104,13 @@ FLOOR_C = {                      # by room category
     "site": (0.52, 0.70, 0.42, 1.0), "concept": (0.55, 0.60, 0.85, 0.45),
 }
 FLOATING_C = (0.95, 0.72, 0.28, 1.0)     # a room that is not placed
+ROOF_C = (0.52, 0.30, 0.06, 1.0)         # roof-brown -- matches roofs.py's
+                                          # 2D ink (QColor(133, 77, 14)), so
+                                          # plan and 3D read as the same roof
 
 DEFAULT_SILL = 36.0              # window sill when the document doesn't say
 SLAB_T = 1.0                     # floor slab thickness, drawn below z0
+ROOF_T = 4.0                      # roof-plane thickness, drawn below its top
 
 # --------------------------------------------------------------------------
 # the furnishing catalog -- READ, never restated
@@ -655,6 +667,80 @@ def _box(corners_xy, z0, z1):
     return v, np.array(f, dtype=int)
 
 
+def _prism_slab(corners_xyz, drop):
+    """`_box` generalised to a TOP RING WHOSE Z VARIES PER VERTEX -- a roof
+    plane is not horizontal, so its top ring cannot be described by one z0.
+    The bottom ring is the same (x, y), offset straight down in world z by
+    `drop` -- the same "offset in z, not the plane's own normal"
+    simplification `_box` already uses for vertical wall/floor prisms, not a
+    new one. `corners_xy` may be any length >= 3 (a quad for a roof plane, a
+    triangle for a gable end) -- both wind and cap by the same fan.
+
+    Winding is normalised the SAME WAY `_box` does: the 2D (x, y) signed
+    area alone decides CCW, ignoring z. That still gives the outward
+    direction here because the sweep is purely vertical (bottom = top minus
+    a constant z), so a side face's outward-ness depends only on the
+    tangential (x, y) winding, not on how the top ring's z happens to vary --
+    and for any roof pitch under 90 degrees the top cap's normal keeps a
+    positive z component under the same rule, so "CCW in plan" still reads
+    as "outward, roughly up" for the sloped cap too.
+    """
+    p = list(corners_xyz)
+    n = len(p)
+    a2 = sum(p[i][0] * p[(i + 1) % n][1] - p[(i + 1) % n][0] * p[i][1]
+             for i in range(n))
+    if a2 < 0:
+        p = p[::-1]
+    top = np.array(p, dtype=float)
+    bot = top.copy()
+    bot[:, 2] -= drop
+    v = np.vstack([bot, top])
+    f = []
+    for i in range(1, n - 1):                     # bottom cap, fan, normal -z-ish
+        f.append([0, i + 1, i])
+    for i in range(1, n - 1):                     # top cap, fan, normal +z-ish
+        f.append([n, n + i, n + i + 1])
+    for i in range(n):                            # sides, outward
+        j = (i + 1) % n
+        f += [[i, j, j + n], [i, j + n, i + n]]
+    return v, np.array(f, dtype=int)
+
+
+def _heading_deg(p1, p2):
+    """Plain-(x, y)-tuple heading, in degrees -- a Qt-free duplicate of
+    `geometry.py`'s `heading_deg`, needed because that module's caller,
+    `roofs.py`'s `nearest_eaves_wall`, imports PyQt6 directly (`from
+    PyQt6.QtCore import *`), and this file must not (VIEWER_NOTES s1,
+    `test_build_model_imports_neither_qt_nor_floorplanner`). Unlike
+    `WALL_T` (data, loadable by path from a Qt-free module), this is
+    behaviour reached only through a Qt-importing module, so there is no
+    load-by-path escape -- the handful of lines are duplicated instead,
+    same algorithm, asserted so a future drift shows up as a numeric
+    mismatch rather than a silent one."""
+    dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+    if abs(dx) < 1e-9 and abs(dy) < 1e-9:
+        return None
+    return math.degrees(math.atan2(dy, dx))
+
+
+def _dist_point_segment(p, a, b):
+    """Qt-free duplicate of `geometry.py`'s `dist_point_segment` -- see
+    `_heading_deg`'s docstring for why this is a duplicate, not an import."""
+    ax, ay = a
+    bx, by = b
+    px, py = p
+    dx, dy = bx - ax, by - ay
+    ln2 = dx * dx + dy * dy
+    if ln2 < 1e-12:
+        return math.hypot(px - ax, py - ay)
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / ln2))
+    return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+
+
+ROOF_EAVES_ANGLE_TOL_DEG = 20.0   # matches roofs.py's EAVES_SEARCH_ANGLE_TOL_DEG
+ROOF_DEFAULT_HALF_SPAN_IN = 144.0  # matches roofs.py's DEFAULT_HALF_SPAN_IN
+
+
 # --------------------------------------------------------------------------
 # furnishing solids -- one generator per `form` in the catalog
 # --------------------------------------------------------------------------
@@ -1016,7 +1102,7 @@ def opening_span(anchor, width, length):
 
 
 def build_model(doc, levels=None, furnishings=True, wall_height=None,
-                floors=True, openings=True, catalog=None):
+                floors=True, openings=True, catalog=None, roofs=True):
     """v5 design dict -> Model.  Pure numpy; no Qt, no floorplanner import.
 
     `catalog` is a (specs, materials, problems) triple as `load_catalog()`
@@ -1204,6 +1290,115 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         model.meshes.append(
             Mesh(f"walls:{wtype}", v, f, WALL_C.get(wtype, WALL_C["interior"])))
 
+    # ---- roofs -------------------------------------------------------------
+    # 0139-ruling.md's roofline plan, R3: a gable roof is two sloped planes
+    # off the ridge plus vertical gable-end triangles (0139 sec2). Heights
+    # are measured from the level's own base (0140-ruling.md sec3); pitch is
+    # DERIVED, never stored -- rise over the ridge-to-EAVES (wall) run, not
+    # to the overhang tip, exactly as `RoofEndOnDialog._recompute` derives it
+    # in the editor. The overhang continues the SAME plane at the SAME slope
+    # past the eaves line, which is why one quad (ridge to outer edge) is the
+    # whole plane rather than a separate flat overhang strip.
+    n_roof = 0
+    if roofs:
+        # The wall endpoints this roof's nearest-eaves search needs, in world
+        # (x, y) -- a Qt-free duplicate of `roofs.py`'s `nearest_eaves_wall`
+        # search (see `_heading_deg`'s docstring for why it is a duplicate,
+        # not an import). Built once, independent of `by_type` above, which
+        # only kept solid PARTS, not endpoints or level ids.
+        wall_segs = []
+        for w in walls:
+            if w.get("level") not in lv:
+                continue
+            try:
+                wall_segs.append((w.get("level"), pt(w["v1"]), pt(w["v2"])))
+            except KeyError:
+                continue
+
+        def nearest_span(level_id, p1, p2):
+            ang = _heading_deg(p1, p2)
+            if ang is None:
+                return ROOF_DEFAULT_HALF_SPAN_IN
+            ang %= 180.0
+            best = None
+            for lvl, wp1, wp2 in wall_segs:
+                if lvl != level_id:
+                    continue
+                wang = _heading_deg(wp1, wp2)
+                if wang is None:
+                    continue
+                wang %= 180.0
+                d_ang = abs(wang - ang)
+                d_ang = min(d_ang, 180.0 - d_ang)
+                if d_ang > ROOF_EAVES_ANGLE_TOL_DEG:
+                    continue
+                mid = ((wp1[0] + wp2[0]) / 2.0, (wp1[1] + wp2[1]) / 2.0)
+                d = _dist_point_segment(mid, p1, p2)
+                if best is None or d < best:
+                    best = d
+            return best if best is not None else ROOF_DEFAULT_HALF_SPAN_IN
+
+        roof_parts = []
+        for rf in doc.get("roofs", []):
+            rid = rf.get("id", "?")
+            lid = rf.get("level")
+            if lid not in lv:
+                continue
+            ridge = rf.get("ridge") or []
+            if len(ridge) != 2:
+                model.notes.append(
+                    f"roof {rid}: ridge needs 2 points -- skipped")
+                continue
+            p1 = (float(ridge[0][0]), -float(ridge[0][1]))
+            p2 = (float(ridge[1][0]), -float(ridge[1][1]))
+            ridge_len = math.hypot(p2[0] - p1[0], p2[1] - p1[1])
+            if ridge_len < 1e-6:
+                model.notes.append(f"roof {rid}: zero-length ridge -- skipped")
+                continue
+            ux, uy = (p2[0] - p1[0]) / ridge_len, (p2[1] - p1[1]) / ridge_len
+            nx, ny = -uy, ux
+
+            span = nearest_span(lid, p1, p2)
+            overhang = float(rf.get("overhang_in", 0.0) or 0.0)
+            reach = span + overhang
+            eaves_h = float(rf.get("eaves_h_in", 96.0))
+            ridge_h = float(rf.get("ridge_h_in", 132.0))
+            slope = (ridge_h - eaves_h) / span if span > 1e-6 else 0.0
+            edge_h = ridge_h - slope * reach
+
+            z0 = base(lid)
+            ridge_z = z0 + ridge_h
+            edge_z = z0 + edge_h
+            r1 = (p1[0], p1[1], ridge_z)
+            r2 = (p2[0], p2[1], ridge_z)
+            e_pos1 = (p1[0] + nx * reach, p1[1] + ny * reach, edge_z)
+            e_pos2 = (p2[0] + nx * reach, p2[1] + ny * reach, edge_z)
+            e_neg1 = (p1[0] - nx * reach, p1[1] - ny * reach, edge_z)
+            e_neg2 = (p2[0] - nx * reach, p2[1] - ny * reach, edge_z)
+
+            # the two roof planes -- one on each side of the ridge
+            roof_parts.append(_prism_slab([r1, r2, e_pos2, e_pos1], ROOF_T))
+            roof_parts.append(_prism_slab([r1, e_neg1, e_neg2, r2], ROOF_T))
+
+            # gable ends -- a hip end has no UI to set it yet (roofs.py's own
+            # RoofItem docstring: "there is no UI yet to set it to a hip
+            # end -- that is R4"), so one is left OPEN and NAMED rather than
+            # silently drawn as a gable it is not.
+            gable = rf.get("gable") or [True, True]
+            ends = ((r1, e_pos1, e_neg1), (r2, e_pos2, e_neg2))
+            for end_idx, (apex, ep, en) in enumerate(ends):
+                if end_idx < len(gable) and not gable[end_idx]:
+                    model.info.append(
+                        f"roof {rid}: end {end_idx} is a hip -- not modelled "
+                        f"until R4, left open")
+                    continue
+                roof_parts.append(_prism_slab([apex, ep, en], ROOF_T))
+            n_roof += 1
+
+        if roof_parts:
+            v, f = _merge(roof_parts)
+            model.meshes.append(Mesh("roofs", v, f, ROOF_C))
+
     # ---- furnishings -----------------------------------------------------
     if furnishings:
         specs, materials, problems = (catalog if catalog is not None
@@ -1352,7 +1547,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         a = np.vstack(allv)
         model.bbox = (a.min(axis=0), a.max(axis=0))
     model.stats = {"levels": list(lv), "walls": n_wall, "openings": n_open,
-                   "rooms": n_floor, "furnishings": n_furn,
+                   "rooms": n_floor, "furnishings": n_furn, "roofs": n_roof,
                    "triangles": int(sum(len(m.faces) for m in model.meshes)),
                    # WHICH kinds, not how many: the sentence this work is
                    # measured against ("a third of the catalog renders as a
@@ -1533,6 +1728,7 @@ def main(argv=None):
     ap.add_argument("--no-floors", action="store_true")
     ap.add_argument("--no-openings", action="store_true",
                     help="draw walls solid, ignoring doors and windows")
+    ap.add_argument("--no-roofs", action="store_true")
     ap.add_argument("--wall-height", type=float, default=None,
                     help='override level height, inches (default: the level\'s)')
     ap.add_argument("--edges", action="store_true",
@@ -1568,12 +1764,14 @@ def main(argv=None):
                         furnishings=not a.no_furnishings,
                         floors=not a.no_floors,
                         openings=not a.no_openings,
+                        roofs=not a.no_roofs,
                         wall_height=a.wall_height)
 
     s = model.stats
     print(f"{a.design}: levels {','.join(s['levels'])} · {s['rooms']} rooms · "
           f"{s['walls']} walls · {s['openings']} openings · "
-          f"{s['furnishings']} furnishings · {s['triangles']:,} triangles")
+          f"{s['furnishings']} furnishings · {s['roofs']} roofs · "
+          f"{s['triangles']:,} triangles")
     if model.bbox is not None:
         lo, hi = model.bbox
         print(f"  extent  {hi[0]-lo[0]:.1f} x {hi[1]-lo[1]:.1f} x "
