@@ -7,6 +7,7 @@ Sits above walls (it finds an eaves wall to size its plan footprint), same
 layer as rooms.py -- both load after walls, before items."""
 import math
 
+from PyQt6 import sip
 from PyQt6.QtCore import *  # noqa: F401
 from PyQt6.QtGui import *  # noqa: F401
 from PyQt6.QtWidgets import QDialog, QGraphicsItem, QMenu
@@ -119,10 +120,18 @@ def _room_ceiling_at(scene, pt: QPointF, floor):
     re-derived (late import: rooms.py is roofs.py's own same-layer peer,
     per this module's docstring, so importing it here rather than at
     module level keeps that peer relationship a fact about load order,
-    not just about who happens to import whom first)."""
+    not just about who happens to import whom first).
+
+    `sip.isdeleted` guards every item `scene.items()` returns: `paint()`
+    (this function's only caller, via `roof_clip_spans`) can run while a
+    scene is mid-teardown (`clear_plan`'s `scene.clear()`), and a stale
+    Python wrapper around an already-destroyed C++ `RoomItem` raises the
+    moment anything touches it -- the same guard `walls.py`'s own
+    `itemChange` already needs for the same reason."""
     from floorplanner.rooms import RoomItem  # late (peer layer)
     for it in scene.items():
-        if (isinstance(it, RoomItem) and getattr(it, "floor", None) == floor
+        if (isinstance(it, RoomItem) and not sip.isdeleted(it)
+                and getattr(it, "floor", None) == floor
                 and it.path.contains(pt)):
             return float(it.properties.get(
                 "ceiling_height_in", DEFAULT_ROOM_PROPS["ceiling_height_in"]))
@@ -240,11 +249,22 @@ def roof_clip_spans(scene, wall):
     """The dotted-line sub-span(s) along `wall` (0145-ruling.md sec3):
     where any roof on the same floor covers it below the room's own
     ceiling height. `[]` when nothing clips -- the common case, and the
-    caller's own cue to draw nothing extra."""
-    if scene is None:
+    caller's own cue to draw nothing extra.
+
+    Every item this touches -- `wall` itself, and every `RoofItem`
+    `scene.items()` returns -- is checked with `sip.isdeleted` first:
+    `WallItem.paint()` (the only caller) can fire while the scene is being
+    torn down (`clear_plan`'s `scene.clear()`, `File > New`), and Qt does
+    not guarantee every already-scheduled repaint is skipped before an
+    item's C++ side is gone -- touching one raises, which a paint()
+    override cannot recover from (it presents as a crash, not a
+    traceback: PyQt6 aborts the process on an unhandled exception in a
+    Qt virtual override)."""
+    if scene is None or sip.isdeleted(wall):
         return []
     roofs = [it for it in scene.items()
-             if isinstance(it, RoofItem) and it.floor == wall.floor]
+             if isinstance(it, RoofItem) and not sip.isdeleted(it)
+             and it.floor == wall.floor]
     if not roofs:
         return []                          # cheap exit before the room scan
     ceiling_in = _wall_ceiling_in(scene, wall)

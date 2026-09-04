@@ -13,6 +13,7 @@ boundaries against the closed form, the same discipline the R3 (3D) tests
 already applied to the same slope formula.
 """
 import pytest
+from PyQt6 import sip
 from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QImage, QPainter, QPainterPath
 
@@ -293,3 +294,40 @@ def test_no_clip_ink_when_nothing_clips(scene):
     any_ink = any(_is_clip_ink(img.pixelColor(x, y))
                  for x in range(px - 2, px + 3) for y in range(0, 300, 5))
     assert not any_ink, "clip ink painted with nothing analytically clipped"
+
+
+# --------------------------------------------------------------------------
+# a stale reference handed in directly
+# --------------------------------------------------------------------------
+# Investigating a crash Patrick's own check hit (roughly: several roofs
+# incl. one at 45deg, then File > New): `scene.items()` was checked
+# directly and, at least under this Qt build, a `sip.delete()`d item is
+# gone from it in the SAME call that deletes it -- `QGraphicsScene`
+# appears to detach an item from its own list synchronously as part of
+# deleting it, so a roof or room reached THROUGH `scene.items()` was never
+# actually reproducible as stale here. What IS real: `roof_clip_spans` is a
+# public function, not just `WallItem.paint()`'s private detail, and a
+# CALLER holding a wall reference from before it was deleted gets silently
+# WRONG spans (computed off whatever plain-Python attributes happen to
+# survive C++ deletion) rather than an empty, honest answer. `sip.delete()`
+# forces that state directly rather than needing to win a real Qt
+# scheduling race. The roof/room guards inside the function are kept as
+# the same cheap, established precaution `walls.py`'s own `sip.isdeleted`
+# checks already are elsewhere in this codebase, but this file does not
+# claim a test proves them load-bearing -- `scene.items()` did not hand
+# back a stale one in anything tried here, so nothing here reproduces
+# Patrick's own crash; it narrows what this session could rule out, not
+# what caused it.
+def test_a_stale_wall_reference_gets_an_empty_answer_not_wrong_data(scene):
+    wall = _gable_wall(scene)
+    _roof(scene)
+    _room(scene)
+    live = roof_clip_spans(scene, wall)
+    assert live, "precondition: this roof does clip while the wall is live"
+
+    scene.removeItem(wall)
+    sip.delete(wall)
+    assert sip.isdeleted(wall)
+    assert roof_clip_spans(scene, wall) == [], (
+        "a wall reference that outlived its own deletion returned data "
+        "instead of the honest empty answer")
