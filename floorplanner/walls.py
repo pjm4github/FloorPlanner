@@ -1686,6 +1686,22 @@ class WallItem(QGraphicsItem):
             painter.setPen(QPen(ink, 0))
             painter.drawPath(self._decor)
 
+        # ROOF-CLIP DOTTED LINE (R3b, 0145-ruling.md sec3): the sub-span(s)
+        # of this wall a roof on its own floor covers below the room's own
+        # ceiling height. A permanent design fact about the wall, same as
+        # the decoration above -- ghosted with the rest of a non-active
+        # floor rather than skipped. Late import: roofs.py imports THIS
+        # module, so importing it back at module level would be a real
+        # cycle -- same treatment this file already gives the walls<->rooms
+        # cycle elsewhere.
+        from floorplanner.roofs import roof_clip_spans  # late (cycle)
+        clip_spans = roof_clip_spans(self.scene(), self)
+        if clip_spans:
+            ink = FLOOR_GHOST if ghost else QColor(230, 90, 20)
+            painter.setPen(QPen(ink, 2.0, Qt.PenStyle.DashLine))
+            for s0, s1 in clip_spans:
+                painter.drawLine(self.point_at(s0), self.point_at(s1))
+
         if ghost:                            # skip selection knobs + length label
             return
 
