@@ -47,11 +47,29 @@ follow ridge length + span + overhang, so a short, unpicked-eaves ridge is
 also thin). Not the marker — `RoofEndMarkerItem` already has a
 view-scaled minimum hit radius; the ridge's own line does not.
 
-## Not investigated yet
+## Reproduced and fixed, 2026‑09‑05
 
-Not reproduced from a fresh sketch (a ridge under `MIN_WALL_LEN` is
-discarded on release — `view.py`'s `_temp_roof` handling — so this is
-about a ridge that is short but not THAT short, or one that reached this
-state some other way, e.g. loaded from a document). No fix attempted;
-unrelated to R3b's own clip-line work, which does not touch hit-testing.
-Held, not scheduled against any tranche.
+Confirmed live with a screenshot and his own diagnosis: *"I cant deleted
+it or select it. I think the dotted roof edges need to be selectable so
+that I can select the roof."* Root cause matched his own read exactly:
+`RoofItem.rebuild()` built `self._path` (what `shape()` strokes) from the
+ridge segment alone — `paint()` also draws two dashed EAVE lines and, per
+gable end, a dashed GABLE line, none of which were ever part of the
+clickable shape. For a roof picked with a small span (a thin sliver
+alongside a normal-length ridge) or a short ridge (a thin sliver alongside
+normal-length eave lines), most of what actually reads on screen sat
+outside the hit region entirely — his own "little tiny roof" and this
+thin-span report are the same bug from two different axes.
+
+**Fix** (`floorplanner/roofs.py`, `RoofItem.rebuild()`): `self._path` now
+includes every segment `paint()` draws — the ridge, both eave lines, and
+each end's gable line when that end is a gable — so `shape()`'s 8in
+stroke covers the whole visible outline, not just the ridge. 4 new tests,
+`tests/test_roof_hit_testing.py`: a thin-span roof selectable on its eave
+line, a short-ridge roof selectable on its eave line (confirmed RED
+against the unfixed `rebuild()`, GREEN after), a gable-end line
+selectable, and the full select-then-delete round trip.
+
+Built on branch `roofs-r3b-clip-line` (already open for R3b's own clip-line
+work), gate GREEN. **Still OPEN** pending his own re-check that a
+previously-stuck roof is now selectable and deletable in the running app.

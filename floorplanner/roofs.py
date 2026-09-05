@@ -353,9 +353,27 @@ class RoofItem(QGraphicsItem):
         self._bounds = QRectF(min(xs) - pad, min(ys) - pad,
                               max(xs) - min(xs) + 2 * pad,
                               max(ys) - min(ys) + 2 * pad)
+        # D85: the ridge alone used to be the only clickable part -- for a
+        # ridge picked short (or barely picked at all, span/overhang doing
+        # the rest of the visual reach), the DASHED eave/gable lines paint()
+        # draws are most of what actually appears on screen, and none of it
+        # was selectable. The shape now covers everything paint() draws
+        # (ridge heavy, both eave lines, and each end's gable line when that
+        # end is a gable) so the reported bug -- a roof visible but not
+        # selectable -- cannot recur regardless of how thin the ridge is.
         path = QPainterPath()
         path.moveTo(self.p1)
         path.lineTo(self.p2)
+        path.moveTo(e1a)
+        path.lineTo(e1b)
+        path.moveTo(e2a)
+        path.lineTo(e2b)
+        if self.gable[0]:
+            path.moveTo(e1a)
+            path.lineTo(e2a)
+        if self.gable[1]:
+            path.moveTo(e1b)
+            path.lineTo(e2b)
         self._path = path
         marker = getattr(self, "marker", None)   # absent mid-__init__
         if marker is not None:
