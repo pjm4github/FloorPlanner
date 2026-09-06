@@ -72,12 +72,15 @@ def apply_roof_visibility(scene):
 def nearest_eaves_wall(scene, p1: QPointF, p2: QPointF, floor, exclude=None):
     """The wall on `floor` whose centerline runs closest to parallel with
     ridge `p1`-`p2` and sits nearest to it -- the automatic half of the
-    eaves pick. `RoofItem.span_in` is NOT part of the persisted `Roof`
-    record (0139-ruling.md sec2 names no width field), so a roof loaded
-    from a document re-derives its eaves reference this way instead of
-    trusting a stored value that could go stale against the plan's own
-    walls. Returns `(wall_or_None, span_in)`; `span_in` falls back to
-    `DEFAULT_HALF_SPAN_IN` when nothing on the floor qualifies."""
+    eaves pick, used to seed a FRESH ridge's `span_in` (both sides, always
+    symmetric at sketch time). Before R4a (0154-ruling.md) this was also
+    how a LOADED roof found its span every time, since the field did not
+    exist in the document at all; as of R4a a loaded roof's `span_in`
+    comes from the document once it has one, and this search only runs
+    again for a roof saved before R4a existed (`design/bridge.py`'s own
+    migration) or a genuinely new sketch. Returns `(wall_or_None,
+    span_in)`; `span_in` falls back to `DEFAULT_HALF_SPAN_IN` when nothing
+    on the floor qualifies."""
     ang = heading_deg(p1, p2)
     if ang is None:
         return None, DEFAULT_HALF_SPAN_IN
@@ -186,9 +189,14 @@ def _clip_spans_against_one_roof(wall, rf, ceiling_in: float):
         return []
     ux, uy = dx / ridge_len, dy / ridge_len
     nx, ny = -uy, ux
-    reach = rf.span_in + rf.overhang_in
+    # R4a: per side, not a single shared reach/slope -- side L is perp >= 0
+    # (the +normal direction, index 0), side R is perp < 0 (index 1).
+    span_l, span_r = rf.span_in
+    oh_l, oh_r = rf.overhang_in
+    reach_l, reach_r = span_l + oh_l, span_r + oh_r
     ridge_h, eaves_h = rf.ridge_h_in, rf.eaves_h_in
-    slope = ((ridge_h - eaves_h) / rf.span_in) if rf.span_in > _CLIP_EPS_IN else 0.0
+    slope_l = ((ridge_h - eaves_h) / span_l) if span_l > _CLIP_EPS_IN else 0.0
+    slope_r = ((ridge_h - eaves_h) / span_r) if span_r > _CLIP_EPS_IN else 0.0
     margin = ridge_h - ceiling_in         # > 0: ridge itself clears the ceiling
 
     wu = wall.unit()
@@ -206,12 +214,13 @@ def _clip_spans_against_one_roof(wall, rf, ceiling_in: float):
 
     add_root(0.0 - a0, a1)                 # along(s) == 0
     add_root(ridge_len - a0, a1)           # along(s) == ridge_len
-    add_root(reach - b0, b1)               # perp(s) == +reach
-    add_root(-reach - b0, b1)              # perp(s) == -reach
-    if slope > _CLIP_SLOPE_EPS:
-        perp_thresh = margin / slope
-        add_root(perp_thresh - b0, b1)     # perp(s) == +perp_thresh
-        add_root(-perp_thresh - b0, b1)    # perp(s) == -perp_thresh
+    add_root(0.0 - b0, b1)                 # perp(s) == 0 -- the side switches here
+    add_root(reach_l - b0, b1)             # perp(s) == +reach_l
+    add_root(-reach_r - b0, b1)            # perp(s) == -reach_r
+    if slope_l > _CLIP_SLOPE_EPS:
+        add_root(margin / slope_l - b0, b1)        # perp(s) == +perp_thresh_l
+    if slope_r > _CLIP_SLOPE_EPS:
+        add_root(-margin / slope_r - b0, b1)       # perp(s) == -perp_thresh_r
 
     roots = sorted(set(roots))
     spans = []
@@ -220,6 +229,10 @@ def _clip_spans_against_one_roof(wall, rf, ceiling_in: float):
             continue
         s_mid = (s_lo + s_hi) / 2.0
         along_m, perp_m = a0 + a1 * s_mid, b0 + b1 * s_mid
+        if perp_m >= 0:
+            reach, slope = reach_l, slope_l
+        else:
+            reach, slope = reach_r, slope_r
         if not (-_CLIP_EPS_IN <= along_m <= ridge_len + _CLIP_EPS_IN
                 and abs(perp_m) <= reach + _CLIP_EPS_IN):
             continue                       # not under this roof at all here
@@ -282,18 +295,32 @@ class RoofItem(QGraphicsItem):
     `WallItem`; `p1`/`p2` are the ridge endpoints, plain `QPointF`s rather
     than shared `Vertex`s (0139-ruling.md sec2's model stores the ridge as
     two literal points, not a wall-network corner -- a roof does not need
-    welding). `span_in` is a live-scene render affordance, not a document
-    field: see `nearest_eaves_wall`'s docstring.
+    welding).
 
-    v1 simplification, named rather than silently assumed: the eaves reach
-    is symmetric about the ridge (mirrors 0140-ruling.md sec2's own
-    symmetric-eaves-height assumption), and a `gable` end draws as a
-    straight gable line unconditionally in R2 -- there is no UI yet to set
-    it to a hip end (that is R4)."""
+    `span_in`/`overhang_in` are `[left, right]`, PER SIDE as of R4a
+    (0154-ruling.md) -- LEFT is the ridge direction's own +90deg-rotated
+    normal, RIGHT the opposite side; a ridge-relative side, unrelated to
+    the `ridge`-endpoint index `gable`/`marker_end` use. Both are
+    PROPERTIES: assigning a bare number normalises to `[v, v]` (the
+    ridge-sketch tool's own eaves pick, and every existing caller, still
+    hands over one number), assigning a 2-item sequence is stored
+    per-side as given -- so a caller cannot silently corrupt the pair back
+    into a scalar the way a plain attribute would let it. `span_in` used
+    to be a live-scene render affordance with no document field at all
+    (`nearest_eaves_wall`'s own docstring); R4a gives it one, and
+    `design/bridge.py`'s loader is what materialises a pre-R4a roof's
+    single derived number into `[v, v]` on first load -- this class itself
+    has no document-vs-live distinction to make.
+
+    Unequal sides with one `ridge_h_in`/`eaves_h_in` pair now give unequal
+    pitch on each slope (a saltbox) -- 0139-ruling.md's v1 symmetric-eaves
+    assumption retires here, on schedule. A `gable` end still draws as a
+    straight gable line unconditionally -- there is no UI yet to set it to
+    a hip end (that is R4b)."""
 
     def __init__(self, p1, p2, eaves_h_in=96.0, ridge_h_in=132.0,
                 overhang_in=0.0, gable=None, span_in=DEFAULT_HALF_SPAN_IN,
-                marker_end=1):
+                marker_end=1, eaves_bind="manual"):
         super().__init__()
         # READ-ONLY properties below, mutated only through `set_ridge` --
         # gate.py's own end-assignment census forbids `.p1 =`/`.p2 =`
@@ -306,16 +333,46 @@ class RoofItem(QGraphicsItem):
         self.floor = active_floor()      # active floor (load overrides)
         self.eaves_h_in = float(eaves_h_in)
         self.ridge_h_in = float(ridge_h_in)
-        self.overhang_in = float(overhang_in)
+        self._overhang_in = self._normalized_pair(overhang_in)
         self.gable = list(gable) if gable is not None else [True, True]
-        self.span_in = float(span_in)
+        self._span_in = self._normalized_pair(span_in)
         self.marker_end = 1 if marker_end else 0   # R2b: which ridge end
+        self.eaves_bind = eaves_bind if eaves_bind in ("manual", "room_top") \
+            else "manual"                            # R4a: schema slot only
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setZValue(WALL_Z + 1)        # reads above walls, like a callout
         self._bounds = QRectF()
         self._path = QPainterPath()
         self.marker = RoofEndMarkerItem(self)
         self.rebuild()
+
+    @staticmethod
+    def _normalized_pair(value):
+        """A bare number -> `[v, v]`; a 2-item sequence -> `[a, b]`, stored
+        as floats either way. The one normalisation point for `span_in`/
+        `overhang_in`'s setters, so "someone assigned a scalar" can never
+        silently collapse an already-asymmetric pair one field at a time."""
+        if isinstance(value, (list, tuple)):
+            a, b = value
+            return [float(a), float(b)]
+        v = float(value)
+        return [v, v]
+
+    @property
+    def span_in(self):
+        return list(self._span_in)
+
+    @span_in.setter
+    def span_in(self, value):
+        self._span_in = self._normalized_pair(value)
+
+    @property
+    def overhang_in(self):
+        return list(self._overhang_in)
+
+    @overhang_in.setter
+    def overhang_in(self, value):
+        self._overhang_in = self._normalized_pair(value)
 
     @property
     def p1(self) -> QPointF:
@@ -334,15 +391,17 @@ class RoofItem(QGraphicsItem):
 
     def _eave_ends(self):
         """(eave1_a, eave1_b, eave2_a, eave2_b): the two eave-line endpoints
-        on each side, offset perpendicular to the ridge by span + overhang."""
+        on each side, offset perpendicular to the ridge by that SIDE's own
+        span + overhang (R4a: per-side, no longer a single shared reach)."""
         dx, dy = self.p2.x() - self.p1.x(), self.p2.y() - self.p1.y()
         ln = math.hypot(dx, dy) or 1.0
         nx, ny = -dy / ln, dx / ln
-        reach = self.span_in + self.overhang_in
-        return (QPointF(self.p1.x() + nx * reach, self.p1.y() + ny * reach),
-               QPointF(self.p2.x() + nx * reach, self.p2.y() + ny * reach),
-               QPointF(self.p1.x() - nx * reach, self.p1.y() - ny * reach),
-               QPointF(self.p2.x() - nx * reach, self.p2.y() - ny * reach))
+        reach_l = self._span_in[0] + self._overhang_in[0]
+        reach_r = self._span_in[1] + self._overhang_in[1]
+        return (QPointF(self.p1.x() + nx * reach_l, self.p1.y() + ny * reach_l),
+               QPointF(self.p2.x() + nx * reach_l, self.p2.y() + ny * reach_l),
+               QPointF(self.p1.x() - nx * reach_r, self.p1.y() - ny * reach_r),
+               QPointF(self.p2.x() - nx * reach_r, self.p2.y() - ny * reach_r))
 
     def rebuild(self):
         self.prepareGeometryChange()

@@ -1358,23 +1358,45 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             ux, uy = (p2[0] - p1[0]) / ridge_len, (p2[1] - p1[1]) / ridge_len
             nx, ny = -uy, ux
 
-            span = nearest_span(lid, p1, p2)
-            overhang = float(rf.get("overhang_in", 0.0) or 0.0)
-            reach = span + overhang
+            # R4a: span_in/overhang_in are [left, right] in PLAN space
+            # (roofs.py's own convention: left = the ridge direction's own
+            # +90deg-rotated normal, BEFORE this file's y-flip). That flip
+            # reverses handedness -- this world frame's own +n (nx, ny)
+            # is roofs.py's RIGHT (index 1), not its left, so e_pos below
+            # reads index 1 and e_neg reads index 0. Get this backwards and
+            # an asymmetric roof still builds two planes, just mirrored
+            # left-right against what the 2D plan shows for the same
+            # document -- test_viewer_model.py's own cross-check test
+            # exists so a future edit here cannot get away with that.
+            span_raw = rf.get("span_in")
+            if isinstance(span_raw, (list, tuple)) and len(span_raw) == 2:
+                span_left, span_right = float(span_raw[0]), float(span_raw[1])
+            else:
+                span_left = span_right = nearest_span(lid, p1, p2)
+            overhang_raw = rf.get("overhang_in", 0.0) or 0.0
+            if isinstance(overhang_raw, (list, tuple)):
+                oh_left, oh_right = float(overhang_raw[0]), float(overhang_raw[1])
+            else:
+                oh_left = oh_right = float(overhang_raw)
+            reach_pos, reach_neg = span_right + oh_right, span_left + oh_left
+
             eaves_h = float(rf.get("eaves_h_in", 96.0))
             ridge_h = float(rf.get("ridge_h_in", 132.0))
-            slope = (ridge_h - eaves_h) / span if span > 1e-6 else 0.0
-            edge_h = ridge_h - slope * reach
+            slope_pos = (ridge_h - eaves_h) / span_right if span_right > 1e-6 else 0.0
+            slope_neg = (ridge_h - eaves_h) / span_left if span_left > 1e-6 else 0.0
+            edge_h_pos = ridge_h - slope_pos * reach_pos
+            edge_h_neg = ridge_h - slope_neg * reach_neg
 
             z0 = base(lid)
             ridge_z = z0 + ridge_h
-            edge_z = z0 + edge_h
+            edge_z_pos = z0 + edge_h_pos
+            edge_z_neg = z0 + edge_h_neg
             r1 = (p1[0], p1[1], ridge_z)
             r2 = (p2[0], p2[1], ridge_z)
-            e_pos1 = (p1[0] + nx * reach, p1[1] + ny * reach, edge_z)
-            e_pos2 = (p2[0] + nx * reach, p2[1] + ny * reach, edge_z)
-            e_neg1 = (p1[0] - nx * reach, p1[1] - ny * reach, edge_z)
-            e_neg2 = (p2[0] - nx * reach, p2[1] - ny * reach, edge_z)
+            e_pos1 = (p1[0] + nx * reach_pos, p1[1] + ny * reach_pos, edge_z_pos)
+            e_pos2 = (p2[0] + nx * reach_pos, p2[1] + ny * reach_pos, edge_z_pos)
+            e_neg1 = (p1[0] - nx * reach_neg, p1[1] - ny * reach_neg, edge_z_neg)
+            e_neg2 = (p2[0] - nx * reach_neg, p2[1] - ny * reach_neg, edge_z_neg)
 
             # the two roof planes -- one on each side of the ridge
             roof_parts.append(_prism_slab([r1, r2, e_pos2, e_pos1], ROOF_T))

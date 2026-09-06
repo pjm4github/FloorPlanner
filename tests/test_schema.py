@@ -450,3 +450,79 @@ def test_a_roof_with_an_out_of_range_marker_end_is_rejected():
     roof["marker_end"] = 2
     doc = _roof_doc(version=6, roofs=[roof])
     assert schema_errors(doc) != []
+
+
+# --------------------------------------------------------------------------
+# R4a (0154-ruling.md): span_in/overhang_in's array form, eaves_bind
+# --------------------------------------------------------------------------
+
+def test_a_roof_with_array_span_and_overhang_validates():
+    roof = dict(_ONE_ROOF[0])
+    roof["span_in"] = [80.0, 120.0]
+    roof["overhang_in"] = [6.0, 12.0]        # the NEW array form
+    doc = _roof_doc(version=6, roofs=[roof])
+    assert schema_errors(doc) == []
+
+
+def test_a_roof_with_a_bare_number_overhang_still_validates():
+    """R4a's own backward-compatibility clause: a document written before
+    it (a bare `overhang_in` number, `_ONE_ROOF`'s own shape, no `span_in`
+    at all) must keep validating under this SAME schema -- no version
+    bump, migration happens at the bridge layer on load, not by rejecting
+    the file at the door."""
+    doc = _roof_doc(version=6, roofs=_ONE_ROOF)
+    assert "span_in" not in _ONE_ROOF[0]
+    assert isinstance(_ONE_ROOF[0]["overhang_in"], float)
+    assert schema_errors(doc) == []
+
+
+def test_a_roof_with_no_span_in_still_validates():
+    """span_in is OPTIONAL at the schema level (materialised at the bridge
+    layer, per the sibling test above) -- not required, unlike `ridge`."""
+    roof = dict(_ONE_ROOF[0])
+    assert "span_in" not in roof
+    doc = _roof_doc(version=6, roofs=[roof])
+    assert schema_errors(doc) == []
+
+
+def test_a_roof_with_a_one_sided_span_is_rejected():
+    """`span_in` is exactly 2 items, [left, right] -- a single-element or
+    3-element array is not a side pair."""
+    for bad in ([100.0], [100.0, 100.0, 100.0]):
+        roof = dict(_ONE_ROOF[0])
+        roof["span_in"] = bad
+        doc = _roof_doc(version=6, roofs=[roof])
+        assert schema_errors(doc) != [], f"span_in={bad} should be rejected"
+
+
+def test_a_roof_with_a_zero_or_negative_span_is_rejected():
+    """`span_in` is `exclusiveMinimum: 0` per side -- a zero or negative
+    span has no wall to mean anything, unlike overhang, which may be 0."""
+    for bad in ([0.0, 100.0], [-5.0, 100.0]):
+        roof = dict(_ONE_ROOF[0])
+        roof["span_in"] = bad
+        doc = _roof_doc(version=6, roofs=[roof])
+        assert schema_errors(doc) != [], f"span_in={bad} should be rejected"
+
+
+def test_a_roof_with_eaves_bind_manual_or_room_top_validates():
+    for bind in ("manual", "room_top"):
+        roof = dict(_ONE_ROOF[0])
+        roof["eaves_bind"] = bind
+        doc = _roof_doc(version=6, roofs=[roof])
+        assert schema_errors(doc) == [], f"eaves_bind={bind!r} should validate"
+
+
+def test_a_roof_with_an_unknown_eaves_bind_is_rejected():
+    roof = dict(_ONE_ROOF[0])
+    roof["eaves_bind"] = "wall_top"          # the OLD R1-era datum, retired
+    doc = _roof_doc(version=6, roofs=[roof])
+    assert schema_errors(doc) != []
+
+
+def test_a_roof_with_no_eaves_bind_still_validates():
+    """R1-R3b's own roof records, written before R4a, carry no `eaves_bind`
+    key -- optional, with a schema default, exactly like `marker_end`."""
+    doc = _roof_doc(version=6, roofs=_ONE_ROOF)
+    assert "eaves_bind" not in _ONE_ROOF[0]
+    assert schema_errors(doc) == []

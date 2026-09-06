@@ -219,6 +219,82 @@ def test_two_roofs_union_their_clip_spans(scene):
 
 
 # --------------------------------------------------------------------------
+# R4a (0154-ruling.md): span_in/overhang_in are [left, right], not shared
+# --------------------------------------------------------------------------
+def test_asymmetric_span_clips_each_side_by_its_own_geometry(scene):
+    """The gable-end wall again, but with UNEQUAL sides -- left (index 0,
+    perp >= 0) span 60, right (index 1, perp < 0) span 140. Each side's
+    own reach and slope govern its own half of the wall independently;
+    getting the index<->sign mapping backwards would swap which half
+    clips and by how much, which this test's asymmetry is specifically
+    built to catch (a symmetric span could not)."""
+    wall = _gable_wall(scene)
+    rf = RoofItem(QPointF(50, 100), QPointF(250, 100), eaves_h_in=EAVES_H,
+                 ridge_h_in=RIDGE_H, overhang_in=0.0, span_in=[60.0, 140.0])
+    rf.floor = DEFAULT_FLOOR
+    scene.addItem(rf)
+    _room(scene)
+
+    slope_l = (RIDGE_H - EAVES_H) / 60.0
+    slope_r = (RIDGE_H - EAVES_H) / 140.0
+    thresh_l = (RIDGE_H - CEILING_IN) / slope_l
+    thresh_r = (RIDGE_H - CEILING_IN) / slope_r
+    # side L (s >= 100): covered s in [100, 160], clipped past thresh_l
+    # side R (s < 100): covered s in [0, 100), clipped past thresh_r from s=0
+    want_r_hi = 100.0 - thresh_r
+    want_l_lo = 100.0 + thresh_l
+
+    spans = roof_clip_spans(scene, wall)
+    assert spans == [pytest.approx((0.0, want_r_hi)),
+                     pytest.approx((want_l_lo, 160.0))]
+
+
+def test_eave_ends_reach_differs_per_side(scene):
+    """The plain geometry, one level below the clip math: `_eave_ends()`
+    must offset each side by ITS OWN span + overhang, not a shared value
+    -- checked directly on the roof item, no wall involved."""
+    rf = RoofItem(QPointF(0, 0), QPointF(200, 0), span_in=[30.0, 90.0],
+                 overhang_in=[5.0, 10.0])
+    e1a, e1b, e2a, e2b = rf._eave_ends()
+    # side 1 (index 0, "left"): reach = 30 + 5 = 35
+    assert e1a.y() == pytest.approx(35.0)
+    assert e1b.y() == pytest.approx(35.0)
+    # side 2 (index 1, "right"): reach = 90 + 10 = 100
+    assert e2a.y() == pytest.approx(-100.0)
+    assert e2b.y() == pytest.approx(-100.0)
+
+
+def test_span_in_and_overhang_in_normalize_a_bare_number(scene):
+    """`RoofItem.span_in`/`.overhang_in` are properties precisely so an
+    assignment can never silently collapse an already-asymmetric pair back
+    to one shared number one side at a time -- every existing caller
+    (the ridge-sketch tool's own eaves pick, every test built before R4a)
+    hands over a bare number and must keep working unchanged."""
+    rf = RoofItem(QPointF(0, 0), QPointF(200, 0), span_in=100.0,
+                 overhang_in=6.0)
+    assert rf.span_in == [100.0, 100.0]
+    assert rf.overhang_in == [6.0, 6.0]
+
+    rf.span_in = [40.0, 160.0]              # a real per-side assignment
+    assert rf.span_in == [40.0, 160.0]
+    rf.span_in = 50.0                       # a later bare-number assignment
+    assert rf.span_in == [50.0, 50.0], \
+        "a scalar assignment must reset BOTH sides, not just overwrite one"
+
+    rf.overhang_in = [1.0, 2.0]
+    assert rf.overhang_in == [1.0, 2.0]
+
+
+def test_span_in_getter_returns_a_copy_not_the_live_list(scene):
+    """Mutating what the getter returns must not corrupt the roof's own
+    state -- the same defensive copy `p1`/`p2` already return."""
+    rf = RoofItem(QPointF(0, 0), QPointF(200, 0), span_in=100.0)
+    leaked = rf.span_in
+    leaked[0] = 999.0
+    assert rf.span_in == [100.0, 100.0]
+
+
+# --------------------------------------------------------------------------
 # the paint()-level integration -- the pixels, not just the numbers
 # --------------------------------------------------------------------------
 def _render(scene, size=300):

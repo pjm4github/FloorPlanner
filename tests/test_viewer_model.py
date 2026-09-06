@@ -611,7 +611,13 @@ def test_every_annotated_region_reaches_its_stated_height(fp3d, manifest):
 # centred between two parallel walls) makes the span unambiguous regardless
 # of which of the two equidistant walls the search happens to visit first.
 def _roof_doc(ridge, eaves_h_in=96.0, ridge_h_in=132.0, overhang_in=0.0,
-              gable=None, level_z=0.0):
+              gable=None, level_z=0.0, span_in=None):
+    rf = {"id": "rf1", "level": "L1", "ridge": ridge,
+          "eaves_h_in": eaves_h_in, "ridge_h_in": ridge_h_in,
+          "overhang_in": overhang_in,
+          "gable": gable if gable is not None else [True, True]}
+    if span_in is not None:                 # R4a: [left, right], bypasses
+        rf["span_in"] = span_in             # the nearest-wall derivation
     return {
         "levels": [{"id": "L1", "elevation_in": level_z, "height_in": 96.0}],
         "vertices": [
@@ -624,10 +630,7 @@ def _roof_doc(ridge, eaves_h_in=96.0, ridge_h_in=132.0, overhang_in=0.0,
             {"id": "w4", "level": "L1", "v1": "v4", "v2": "v1", "type": "exterior"},
         ],
         "rooms": [], "furnishings": [],
-        "roofs": [{"id": "rf1", "level": "L1", "ridge": ridge,
-                   "eaves_h_in": eaves_h_in, "ridge_h_in": ridge_h_in,
-                   "overhang_in": overhang_in,
-                   "gable": gable if gable is not None else [True, True]}],
+        "roofs": [rf],
     }
 
 
@@ -776,3 +779,57 @@ def test_build_model_with_a_roof_imports_neither_qt_nor_floorplanner():
     assert out.returncode == 0, out.stderr
     assert json.loads(out.stdout.strip()) == [], \
         f"build_model pulled in {out.stdout.strip()}"
+
+
+# --------------------------------------------------------------------------
+# R4a (0154-ruling.md): span_in/overhang_in are [left, right] in the schema
+# --------------------------------------------------------------------------
+def test_asymmetric_span_renders_with_the_right_handedness_in_3d(fp3d):
+    """This file's own y-flip (world = (x, -y, z)) reverses handedness, so
+    its world-space +normal is roofs.py's plan-space RIGHT (index 1), not
+    left -- get that backwards and an asymmetric roof still builds two
+    planes, just mirrored left-right against what the SAME document's 2D
+    plan shows. A ridge running along plan +y (an x-aligned ridge like
+    `_RIDGE` would not expose the flip: its normal has no y-component to
+    reverse) with `span_in=[30, 90]` and a shared overhang makes the two
+    edge heights measurably different, so mixing up the sides is really
+    detectable here, not just plausible in principle."""
+    import numpy as np
+    ridge = [[150, 50], [150, 150]]              # plan +y ridge -- see above
+    doc = _roof_doc(ridge, eaves_h_in=80.0, ridge_h_in=132.0,
+                    overhang_in=12.0, span_in=[30.0, 90.0])
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    mesh = _roof_mesh(model)
+
+    slope_l = (132.0 - 80.0) / 30.0
+    slope_r = (132.0 - 80.0) / 90.0
+    reach_l, reach_r = 30.0 + 12.0, 90.0 + 12.0     # span + overhang -- the
+    edge_h_l = 132.0 - slope_l * reach_l            # actual plane-edge reach
+    edge_h_r = 132.0 - slope_r * reach_r
+    assert edge_h_l != pytest.approx(edge_h_r), \
+        "precondition: the two sides must actually differ, or this proves nothing"
+
+    # index 0 ("left"): world x = 150 - reach_l = 108; index 1 ("right"):
+    # world x = 150 + reach_r = 252
+    v = mesh.verts
+    at_left_x = v[np.isclose(v[:, 0], 150.0 - reach_l)]
+    at_right_x = v[np.isclose(v[:, 0], 150.0 + reach_r)]
+    assert at_left_x.size and at_right_x.size, "the expected edge x's are missing entirely"
+    assert any(np.isclose(z, edge_h_l) for z in at_left_x[:, 2]), \
+        f"no vertex at the left side's own edge height {edge_h_l}"
+    assert any(np.isclose(z, edge_h_r) for z in at_right_x[:, 2]), \
+        f"no vertex at the right side's own edge height {edge_h_r}"
+    assert not any(np.isclose(z, edge_h_l) for z in at_right_x[:, 2]), \
+        "the LEFT side's height leaked onto the right side -- handedness swapped"
+    assert not any(np.isclose(z, edge_h_r) for z in at_left_x[:, 2]), \
+        "the RIGHT side's height leaked onto the left side -- handedness swapped"
+
+
+def test_a_legacy_roof_with_no_span_in_still_derives_a_symmetric_span(fp3d):
+    """Backward compatibility: a document with no `span_in` at all (every
+    pre-R4a record) still builds, falling back to the nearest-wall search
+    exactly as it did before R4a, giving the SAME span both sides."""
+    model = fp3d.build_model(_roof_doc(_RIDGE), furnishings=False, floors=False)
+    assert not model.notes, model.notes
+    mesh = _roof_mesh(model)
+    assert len(mesh.faces) == 2 * 12 + 2 * 8    # same shape as the R3 receipt
