@@ -6,6 +6,7 @@ eaves-reference geometry.
 Sits above walls (it finds an eaves wall to size its plan footprint), same
 layer as rooms.py -- both load after walls, before items."""
 import math
+from typing import NamedTuple
 
 from PyQt6 import sip
 from PyQt6.QtCore import *  # noqa: F401
@@ -198,6 +199,17 @@ def _clip_spans_against_one_roof(wall, rf, ceiling_in: float):
     slope_l = ((ridge_h - eaves_h) / span_l) if span_l > _CLIP_EPS_IN else 0.0
     slope_r = ((ridge_h - eaves_h) / span_r) if span_r > _CLIP_EPS_IN else 0.0
     margin = ridge_h - ceiling_in         # > 0: ridge itself clears the ceiling
+    # R4b: a HIP end extends the footprint past the ridge end by its run +
+    # overhang, and adds a third plane there -- the roof surface in that
+    # region is the LOWER of the side plane and the hip plane (they meet
+    # along the hip line), so "clipped" is side-clipped OR hip-clipped.
+    # The hip plane's own drop is affine in `along` exactly as a side's is
+    # in `perp`, so it adds roots, never sampling.
+    run_1, ohe_1 = rf.hip_extension(0)
+    run_2, ohe_2 = rf.hip_extension(1)
+    ext_1, ext_2 = run_1 + ohe_1, run_2 + ohe_2
+    slope_h1 = ((ridge_h - eaves_h) / run_1) if run_1 > _CLIP_EPS_IN else 0.0
+    slope_h2 = ((ridge_h - eaves_h) / run_2) if run_2 > _CLIP_EPS_IN else 0.0
 
     wu = wall.unit()
     ox, oy = wall.p1.x() - r1.x(), wall.p1.y() - r1.y()
@@ -212,8 +224,10 @@ def _clip_spans_against_one_roof(wall, rf, ceiling_in: float):
             if -_CLIP_EPS_IN <= s <= L + _CLIP_EPS_IN:
                 roots.append(min(max(s, 0.0), L))
 
-    add_root(0.0 - a0, a1)                 # along(s) == 0
-    add_root(ridge_len - a0, a1)           # along(s) == ridge_len
+    add_root(0.0 - a0, a1)                 # along(s) == 0 -- hip 1 region starts
+    add_root(ridge_len - a0, a1)           # along(s) == ridge_len -- hip 2 starts
+    add_root(-ext_1 - a0, a1)              # along(s) == -ext_1 (footprint end)
+    add_root(ridge_len + ext_2 - a0, a1)   # along(s) == ridge_len + ext_2
     add_root(0.0 - b0, b1)                 # perp(s) == 0 -- the side switches here
     add_root(reach_l - b0, b1)             # perp(s) == +reach_l
     add_root(-reach_r - b0, b1)            # perp(s) == -reach_r
@@ -221,6 +235,10 @@ def _clip_spans_against_one_roof(wall, rf, ceiling_in: float):
         add_root(margin / slope_l - b0, b1)        # perp(s) == +perp_thresh_l
     if slope_r > _CLIP_SLOPE_EPS:
         add_root(-margin / slope_r - b0, b1)       # perp(s) == -perp_thresh_r
+    if slope_h1 > _CLIP_SLOPE_EPS:
+        add_root(-margin / slope_h1 - a0, a1)      # along(s) == -along_thresh_1
+    if slope_h2 > _CLIP_SLOPE_EPS:
+        add_root(ridge_len + margin / slope_h2 - a0, a1)   # == ridge_len + thresh_2
 
     roots = sorted(set(roots))
     spans = []
@@ -233,13 +251,25 @@ def _clip_spans_against_one_roof(wall, rf, ceiling_in: float):
             reach, slope = reach_l, slope_l
         else:
             reach, slope = reach_r, slope_r
-        if not (-_CLIP_EPS_IN <= along_m <= ridge_len + _CLIP_EPS_IN
+        if not (-ext_1 - _CLIP_EPS_IN <= along_m <= ridge_len + ext_2 + _CLIP_EPS_IN
                 and abs(perp_m) <= reach + _CLIP_EPS_IN):
             continue                       # not under this roof at all here
         if slope > _CLIP_SLOPE_EPS:
             clipped = (ridge_h - slope * abs(perp_m)) < ceiling_in - _CLIP_EPS_IN
         else:                              # degenerate/flat roof: uniform verdict
             clipped = margin < -_CLIP_EPS_IN
+        if along_m < 0.0 and ext_1 > _CLIP_EPS_IN:            # under hip end 1
+            beyond = -along_m
+            if slope_h1 > _CLIP_SLOPE_EPS:
+                clipped = clipped or (ridge_h - slope_h1 * beyond) < ceiling_in - _CLIP_EPS_IN
+            else:
+                clipped = clipped or margin < -_CLIP_EPS_IN
+        elif along_m > ridge_len and ext_2 > _CLIP_EPS_IN:    # under hip end 2
+            beyond = along_m - ridge_len
+            if slope_h2 > _CLIP_SLOPE_EPS:
+                clipped = clipped or (ridge_h - slope_h2 * beyond) < ceiling_in - _CLIP_EPS_IN
+            else:
+                clipped = clipped or margin < -_CLIP_EPS_IN
         if clipped:
             spans.append((s_lo, s_hi))
     return spans
@@ -287,6 +317,104 @@ def roof_clip_spans(scene, wall):
     return _merge_spans(spans, wall.length())
 
 
+# ---------------------------------------------------------------------------
+# R4b (0154-ruling.md sec2, requirement 5): eaves bound to the room top
+# ---------------------------------------------------------------------------
+# "assign the roof's bottom -- where the eaves start -- to the top of the
+# rooms it covers." Same datum as every roof height (0140-ruling.md sec3:
+# the level's own base), so a room's top IS its `ceiling_height_in`.
+
+# a room whose overlap with the footprint is thinner than this, on either
+# axis, is a sliver from a shared wall face, not a room the roof covers
+_COVER_MIN_IN = 1.0
+
+
+class RoomTopBinding(NamedTuple):
+    """What `bound_eaves_height` measured: the eaves height the binding
+    produces, and the rooms it read, highest first, as `(name, ceiling)`.
+    `fallback` is True when NO room sits under the footprint and the
+    default ceiling stood in -- reported, never silent."""
+    eaves_h_in: float
+    rooms: list
+    fallback: bool
+
+    def differs(self) -> bool:
+        return len({round(c, 6) for _, c in self.rooms}) > 1
+
+    def note(self) -> str:
+        """One line for the dialog and the status bar to share, so both say
+        the same thing about the same measurement."""
+        if self.fallback:
+            return (f"No room under this roof -- eaves at the default "
+                    f"ceiling, {fmt_in(self.eaves_h_in)}.")
+        listed = ", ".join(f"{n} {fmt_in(c)}" for n, c in self.rooms)
+        if self.differs():
+            return (f"Room tops differ ({listed}) -- the highest governs, "
+                    f"{fmt_in(self.eaves_h_in)}.")
+        return f"Room top {fmt_in(self.eaves_h_in)} ({listed})."
+
+    def status_line(self) -> str:
+        return "Eaves bound to room top: " + self.note()
+
+
+def bound_eaves_height(scene, roof, gable=None) -> RoomTopBinding:
+    """The eaves height `eaves_bind == "room_top"` produces for `roof`: the
+    HIGHEST `ceiling_height_in` among the rooms on the roof's own floor
+    whose outline overlaps its eaves-start footprint (`eaves_start_polygon`
+    -- the span, not the overhang: a room only under the overhang is not a
+    room the roof sits on). Rooms of differing heights under one roof:
+    the highest governs and the mismatch is reported in the returned
+    record, not hidden (0154-ruling.md sec2, Patrick's default). No room
+    at all: `DEFAULT_ROOM_PROPS`' own ceiling, flagged as a fallback.
+    `scene` may be None (a roof not yet in a scene) -- that is the same
+    "no room" case. `gable` previews an unapplied gable/hip toggle."""
+    from floorplanner.rooms import RoomItem  # late (peer layer)
+    fp = QPainterPath()
+    fp.addPolygon(roof.eaves_start_polygon(gable))
+    fp.closeSubpath()
+    found = []
+    if scene is not None:
+        for it in scene.items():
+            if (not isinstance(it, RoomItem) or sip.isdeleted(it)
+                    or getattr(it, "floor", None) != roof.floor):
+                continue
+            inter = it.path.intersected(fp)
+            br = inter.boundingRect()
+            if inter.isEmpty() or br.width() < _COVER_MIN_IN \
+                    or br.height() < _COVER_MIN_IN:
+                continue
+            ceiling = float(it.properties.get(
+                "ceiling_height_in", DEFAULT_ROOM_PROPS["ceiling_height_in"]))
+            found.append((it.name, ceiling))
+    if not found:
+        return RoomTopBinding(float(DEFAULT_ROOM_PROPS["ceiling_height_in"]),
+                              [], True)
+    found.sort(key=lambda nc: (-nc[1], nc[0]))
+    return RoomTopBinding(found[0][1], found, False)
+
+
+def sync_bound_roofs(scene, floor=None):
+    """Re-derive `eaves_h_in` for every roof whose `eaves_bind` is
+    `"room_top"` (on `floor` only, when given) and rebuild it -- the hook
+    a room-height edit calls so "change the room height, watch the roof
+    follow" (0154-ruling.md sec3, R4b's own check) is one call, not a
+    convention. Returns `[(roof, binding)]` for every bound roof it
+    touched, changed or not, so the caller can report what happened."""
+    out = []
+    if scene is None:
+        return out
+    for it in scene.items():
+        if (not isinstance(it, RoofItem) or sip.isdeleted(it)
+                or it.eaves_bind != "room_top"
+                or (floor is not None and it.floor != floor)):
+            continue
+        binding = bound_eaves_height(scene, it)
+        it.eaves_h_in = binding.eaves_h_in
+        it.rebuild()
+        out.append((it, binding))
+    return out
+
+
 class RoofItem(QGraphicsItem):
     """A gable roof's ridge, drawn in plan: ridge heavy, eaves and gable
     ends dashed -- 0139-ruling.md R2's own 2D overlay convention.
@@ -314,9 +442,27 @@ class RoofItem(QGraphicsItem):
 
     Unequal sides with one `ridge_h_in`/`eaves_h_in` pair now give unequal
     pitch on each slope (a saltbox) -- 0139-ruling.md's v1 symmetric-eaves
-    assumption retires here, on schedule. A `gable` end still draws as a
-    straight gable line unconditionally -- there is no UI yet to set it to
-    a hip end (that is R4b)."""
+    assumption retires here, on schedule.
+
+    A HIP end (`gable[i] == False`, settable from R4b's parameters dialog)
+    extends the footprint PAST that ridge end by `hip_extension(i)`: the
+    ridge stays where it was sketched, and a sloped end face runs from the
+    ridge end down to an end eave line `hip run` beyond it (plus the end's
+    own overhang). The hip run is the MEAN of the two side spans -- for
+    the symmetric roof every sketch produces it equals the side span, so
+    all four faces share one pitch (the regular hip); for a saltbox it is
+    the one value that keeps the end face a single plane meeting both
+    sides at their corners. Nothing new is stored for it: `gable` is the
+    whole document fact, the run is derived, same discipline as pitch.
+
+    `eaves_bind == "room_top"` (0154-ruling.md sec2, item 5): `eaves_h_in`
+    is derived from the ceiling of the rooms this roof's eaves-start
+    footprint covers (`bound_eaves_height`) and re-derived by
+    `sync_bound_roofs` whenever a room's height is edited -- and the
+    derived number is STILL written to `eaves_h_in` on save, so a
+    document never has to re-derive it to be complete. Load never
+    re-derives (the saved value is what the binding produced last time
+    it ran); only an edit does."""
 
     def __init__(self, p1, p2, eaves_h_in=96.0, ridge_h_in=132.0,
                 overhang_in=0.0, gable=None, span_in=DEFAULT_HALF_SPAN_IN,
@@ -389,19 +535,69 @@ class RoofItem(QGraphicsItem):
     def length(self) -> float:
         return math.hypot(self.p2.x() - self.p1.x(), self.p2.y() - self.p1.y())
 
+    def hip_extension(self, end: int, gable=None):
+        """`(run, overhang)` along the ridge axis, beyond ridge end `end`
+        (0 = `p1`, 1 = `p2`), that a HIP end adds to the footprint:
+        `(0, 0)` for a gable end. The run is the mean of the two side spans,
+        the overhang the mean of the two side overhangs (class docstring).
+        `gable` overrides the stored flags -- the parameters dialog previews
+        a toggle before it is applied."""
+        flags = self.gable if gable is None else gable
+        if flags[end]:
+            return 0.0, 0.0
+        return ((self._span_in[0] + self._span_in[1]) / 2.0,
+                (self._overhang_in[0] + self._overhang_in[1]) / 2.0)
+
+    def _axis(self):
+        """(ux, uy, nx, ny): the ridge's unit direction p1->p2 and its
+        +90deg-rotated normal (the LEFT side, `span_in[0]`)."""
+        dx, dy = self.p2.x() - self.p1.x(), self.p2.y() - self.p1.y()
+        ln = math.hypot(dx, dy) or 1.0
+        return dx / ln, dy / ln, -dy / ln, dx / ln
+
+    def _extended_ridge(self, gable=None):
+        """`(a1, a2)`: the ridge endpoints pushed outward along the axis by
+        each end's hip extension (run + overhang), i.e. the ALONG-axis
+        extent of the outer eave lines. Equal to `(p1, p2)` for two gable
+        ends."""
+        ux, uy, _, _ = self._axis()
+        r1, o1 = self.hip_extension(0, gable)
+        r2, o2 = self.hip_extension(1, gable)
+        e1, e2 = r1 + o1, r2 + o2
+        return (QPointF(self.p1.x() - ux * e1, self.p1.y() - uy * e1),
+                QPointF(self.p2.x() + ux * e2, self.p2.y() + uy * e2))
+
     def _eave_ends(self):
         """(eave1_a, eave1_b, eave2_a, eave2_b): the two eave-line endpoints
         on each side, offset perpendicular to the ridge by that SIDE's own
-        span + overhang (R4a: per-side, no longer a single shared reach)."""
-        dx, dy = self.p2.x() - self.p1.x(), self.p2.y() - self.p1.y()
-        ln = math.hypot(dx, dy) or 1.0
-        nx, ny = -dy / ln, dx / ln
+        span + overhang (R4a: per-side, no longer a single shared reach),
+        and pushed past a hip end along the axis (R4b: `hip_extension`)."""
+        _, _, nx, ny = self._axis()
+        a1, a2 = self._extended_ridge()
         reach_l = self._span_in[0] + self._overhang_in[0]
         reach_r = self._span_in[1] + self._overhang_in[1]
-        return (QPointF(self.p1.x() + nx * reach_l, self.p1.y() + ny * reach_l),
-               QPointF(self.p2.x() + nx * reach_l, self.p2.y() + ny * reach_l),
-               QPointF(self.p1.x() - nx * reach_r, self.p1.y() - ny * reach_r),
-               QPointF(self.p2.x() - nx * reach_r, self.p2.y() - ny * reach_r))
+        return (QPointF(a1.x() + nx * reach_l, a1.y() + ny * reach_l),
+               QPointF(a2.x() + nx * reach_l, a2.y() + ny * reach_l),
+               QPointF(a1.x() - nx * reach_r, a1.y() - ny * reach_r),
+               QPointF(a2.x() - nx * reach_r, a2.y() - ny * reach_r))
+
+    def eaves_start_polygon(self, gable=None) -> QPolygonF:
+        """The footprint at the EAVES-START line (`span_in`, no overhang) --
+        the plane `eaves_h_in` applies at, and the rectangle whose covered
+        rooms the `room_top` binding reads. A hip end extends it by that
+        end's hip RUN (not its overhang). `gable` overrides the stored
+        flags, for a preview."""
+        ux, uy, nx, ny = self._axis()
+        r1, _ = self.hip_extension(0, gable)
+        r2, _ = self.hip_extension(1, gable)
+        a1 = QPointF(self.p1.x() - ux * r1, self.p1.y() - uy * r1)
+        a2 = QPointF(self.p2.x() + ux * r2, self.p2.y() + uy * r2)
+        sl, sr = self._span_in
+        return QPolygonF([
+            QPointF(a1.x() + nx * sl, a1.y() + ny * sl),
+            QPointF(a2.x() + nx * sl, a2.y() + ny * sl),
+            QPointF(a2.x() - nx * sr, a2.y() - ny * sr),
+            QPointF(a1.x() - nx * sr, a1.y() - ny * sr)])
 
     def rebuild(self):
         self.prepareGeometryChange()
@@ -417,9 +613,10 @@ class RoofItem(QGraphicsItem):
         # the rest of the visual reach), the DASHED eave/gable lines paint()
         # draws are most of what actually appears on screen, and none of it
         # was selectable. The shape now covers everything paint() draws
-        # (ridge heavy, both eave lines, and each end's gable line when that
-        # end is a gable) so the reported bug -- a roof visible but not
-        # selectable -- cannot recur regardless of how thin the ridge is.
+        # (ridge heavy, both eave lines, each end's own end line -- a gable
+        # line or a hip end's end eave -- and a hip end's two hip lines) so
+        # the reported bug -- a roof visible but not selectable -- cannot
+        # recur regardless of how thin the ridge is.
         path = QPainterPath()
         path.moveTo(self.p1)
         path.lineTo(self.p2)
@@ -427,11 +624,17 @@ class RoofItem(QGraphicsItem):
         path.lineTo(e1b)
         path.moveTo(e2a)
         path.lineTo(e2b)
-        if self.gable[0]:
+        path.moveTo(e1a)
+        path.lineTo(e2a)
+        path.moveTo(e1b)
+        path.lineTo(e2b)
+        if not self.gable[0]:
             path.moveTo(e1a)
+            path.lineTo(self.p1)
             path.lineTo(e2a)
-        if self.gable[1]:
+        if not self.gable[1]:
             path.moveTo(e1b)
+            path.lineTo(self.p2)
             path.lineTo(e2b)
         self._path = path
         marker = getattr(self, "marker", None)   # absent mid-__init__
@@ -461,10 +664,17 @@ class RoofItem(QGraphicsItem):
         painter.setPen(QPen(ink, 1.4, Qt.PenStyle.DashLine))
         painter.drawLine(e1a, e1b)
         painter.drawLine(e2a, e2b)
-        if self.gable[0]:
-            painter.drawLine(e1a, e2a)
-        if self.gable[1]:
-            painter.drawLine(e1b, e2b)
+        # each end's own line: a gable line across the ridge end, or -- for
+        # a hip end (R4b) -- the END EAVE beyond it plus the two hip lines
+        # running from the ridge end down to that eave's corners
+        painter.drawLine(e1a, e2a)
+        painter.drawLine(e1b, e2b)
+        if not self.gable[0]:
+            painter.drawLine(self.p1, e1a)
+            painter.drawLine(self.p1, e2a)
+        if not self.gable[1]:
+            painter.drawLine(self.p2, e1b)
+            painter.drawLine(self.p2, e2b)
         heavy = QPen(ink, 3.0, Qt.PenStyle.SolidLine)
         heavy.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(heavy)
@@ -481,15 +691,19 @@ class RoofItem(QGraphicsItem):
     def open_end_on_dialog(self):
         """The dialog's SECOND door (0140-ruling.md sec1: "selecting any
         ridge still reaches the same dialog ... one dialog, two doors") --
-        the marker's own right-click is the first."""
+        the marker's own right-click is the first. R4b: the same dialog is
+        now the parameters dialog (0154-ruling.md sec3), still one dialog."""
         from floorplanner.dialogs import RoofEndOnDialog  # late: cycle guard
         dlg = RoofEndOnDialog(self, self._view())
         if dlg.exec() == QDialog.DialogCode.Accepted:
             dlg.apply()
+            v = self._view()
+            if v is not None and dlg.binding is not None:
+                v.win.status(dlg.binding.status_line())
 
     def contextMenuEvent(self, e):
         menu = QMenu()
-        a_heights = menu.addAction("Roof heights…")
+        a_heights = menu.addAction("Roof parameters…")
         a_del = menu.addAction("Delete roof")
         chosen = menu.exec(e.screenPos())
         if chosen is a_heights:

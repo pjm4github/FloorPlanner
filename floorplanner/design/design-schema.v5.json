@@ -166,11 +166,11 @@
           "default": [0, 0]
         },
         "eaves_bind": {
-          "description": "R4a (0154-ruling.md): `\"manual\"` (default) -- `eaves_h_in` is a value someone set directly. `\"room_top\"` -- `eaves_h_in` is instead derived from the wall-top of the rooms this roof's footprint covers (the higher of a room's own ceiling and its level's `elevation_in + height_in`; disagreement among covered rooms is reported, not hidden), and the derived number is still written to `eaves_h_in` so the document never has to re-derive it to be complete. The actual `room_top` recomputation is R4b's own dialog toggle -- this tranche only gives the field somewhere to round-trip.",
+          "description": "R4a (0154-ruling.md): `\"manual\"` (default) -- `eaves_h_in` is a value someone set directly. `\"room_top\"` (R4b) -- `eaves_h_in` is instead derived from the ceiling (`ceiling_height_in`, same level-base datum as every roof height) of the rooms this roof's eaves-START footprint covers (`span_in`, not the overhang); disagreement among covered rooms is reported, not hidden, and the HIGHEST governs; no room at all falls back to the default ceiling, reported as such. The derived number is still written to `eaves_h_in` so the document never has to re-derive it to be complete: the app re-derives it at the parameters dialog and whenever a covered room's height is edited, never on load.",
           "type": "string", "enum": ["manual", "room_top"], "default": "manual"
         },
         "gable": {
-          "description": "One flag per ridge endpoint (index-aligned with `ridge`): true = a vertical gable-end triangle at that end; false = that end is a hip (not represented in 3D until a later tranche, but distinguished here so R4 has something to toggle).",
+          "description": "One flag per ridge endpoint (index-aligned with `ridge`): true = a vertical gable-end triangle at that end; false = that end is a HIP. R4b (0154-ruling.md sec3) gives the flag its UI (the parameters dialog, per end) and its geometry: a hip end runs the roof PAST that ridge end -- the ridge stays where it was sketched -- by a hip run equal to the mean of the two `span_in` sides (the side span itself on every symmetric roof, so all faces share one pitch), plus the mean of the two `overhang_in` sides; the end face is the sloped triangle from the ridge end down to that end eave. Nothing more is stored for it: the run is derived from the spans, the same discipline as pitch.",
           "type": "array", "prefixItems": [{ "type": "boolean" }, { "type": "boolean" }],
           "minItems": 2, "maxItems": 2, "default": [true, true]
         },
