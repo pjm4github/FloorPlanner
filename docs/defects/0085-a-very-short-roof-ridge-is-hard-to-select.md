@@ -4,8 +4,8 @@ id: 85
 title: "A very short roof ridge is hard to select for deletion"
 
 # maps directly onto GitHub Issues fields
-state: open
-state_reason: null
+state: closed
+state_reason: completed
 labels:
   - type:gap
   - area:ui
@@ -13,7 +13,7 @@ milestone: null
 
 # ours; becomes body prose after migration
 opened: 2026-09-04
-closed: null
+closed: 2026-09-05
 closed_by: null
 rank: 85
 related: []
@@ -71,5 +71,8 @@ against the unfixed `rebuild()`, GREEN after), a gable-end line
 selectable, and the full select-then-delete round trip.
 
 Built on branch `roofs-r3b-clip-line` (already open for R3b's own clip-line
-work), gate GREEN. **Still OPEN** pending his own re-check that a
-previously-stuck roof is now selectable and deletable in the running app.
+work), gate GREEN, merged to `main` at [PR #53](https://github.com/pjm4github/FloorPlanner/pull/53).
+
+## Closed, 2026‑09‑05
+
+Patrick's own check, in chat: *"OK that works fine."* **CLOSED.**
