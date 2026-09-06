@@ -93,6 +93,50 @@ def test_roof_marker_end_absent_stays_absent():
     assert rt == doc
 
 
+def test_roof_span_in_and_eaves_bind_round_trip_byte_identical():
+    """R4a (0154-ruling.md): `span_in` ([left, right]) and `eaves_bind` are
+    additive over R1-R3b's own roof record, same discipline as
+    `marker_end` -- present-and-set round-trips exactly, including
+    `overhang_in` now carrying the array form rather than a bare number."""
+    doc = {
+        "format": "floorplanner-design", "version": 6, "units": "inches",
+        "levels": [{"id": "L1", "name": "Main"}],
+        "vertices": [], "walls": [], "rooms": [],
+        "roofs": [{
+            "id": "rf1", "level": "L1",
+            "ridge": [[0.0, 0.0], [240.0, 0.0]],
+            "eaves_h_in": 96.0, "ridge_h_in": 132.0,
+            "overhang_in": [6.0, 12.0], "span_in": [80.0, 120.0],
+            "eaves_bind": "room_top", "gable": [True, True], "marker_end": 0,
+        }],
+    }
+    rt = Design.from_dict(doc).to_dict()
+    assert rt == doc
+    assert json.dumps(rt, ensure_ascii=False) == json.dumps(doc, ensure_ascii=False)
+
+
+def test_roof_span_in_and_eaves_bind_absent_stay_absent():
+    """A roof record written before R4a has neither key at all -- both must
+    stay absent through the model layer; `bridge.py`'s own migration (not
+    this layer) is what materialises `span_in` on load."""
+    doc = {
+        "format": "floorplanner-design", "version": 6, "units": "inches",
+        "levels": [{"id": "L1", "name": "Main"}],
+        "vertices": [], "walls": [], "rooms": [],
+        "roofs": [{
+            "id": "rf1", "level": "L1",
+            "ridge": [[0.0, 0.0], [240.0, 0.0]],
+            "eaves_h_in": 96.0, "ridge_h_in": 132.0,
+            "overhang_in": 12.0, "gable": [True, True],
+        }],
+    }
+    rt = Design.from_dict(doc).to_dict()
+    assert "span_in" not in rt["roofs"][0]
+    assert "eaves_bind" not in rt["roofs"][0]
+    assert rt["roofs"][0]["overhang_in"] == 12.0    # still a bare number
+    assert rt == doc
+
+
 def test_roofs_absent_stays_absent_not_an_empty_list():
     """The same present-vs-absent distinction every other block already
     gets: a version-5 document with no `roofs` key at all must round-trip

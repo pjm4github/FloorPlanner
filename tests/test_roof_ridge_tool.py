@@ -157,7 +157,7 @@ def test_escape_while_awaiting_the_eaves_pick_keeps_the_ridge(fp, win):
 
     assert win.view._roof_awaiting_eaves is None
     assert _roofs(win) == [pending]             # kept, not discarded
-    assert pending.span_in == pytest.approx(100.0)   # derived from the wall
+    assert pending.span_in == pytest.approx([100.0, 100.0])   # derived from the wall
     assert pending.ridge_h_in == 132.0 and pending.eaves_h_in == 96.0
 
 
@@ -202,7 +202,7 @@ def test_replaying_the_reported_macro_keeps_the_roof_after_switching_tools(
     assert res["ok"], res
     roofs = _roofs(win)
     assert len(roofs) == 1
-    assert roofs[0].span_in > 0
+    assert roofs[0].span_in[0] > 0 and roofs[0].span_in[1] > 0
 
     # "^Z" (undo, the fixture's own diagnostic step): a NORMAL undo of the
     # roof's own creation now, not a rescue of a wrongly-discarded item --
@@ -239,7 +239,7 @@ def test_eaves_pick_sets_span_from_the_picked_wall(fp, win, monkeypatch):
 
     roofs = _roofs(win)
     assert len(roofs) == 1
-    assert roofs[0].span_in == pytest.approx(150.0)
+    assert roofs[0].span_in == pytest.approx([150.0, 150.0])
 
 
 def test_cancelling_the_heights_dialog_drops_the_roof(fp, win, monkeypatch):

@@ -198,10 +198,27 @@ class Roof(_Node):
     (0140-ruling.md's End-On marker): which ridge end the marker sits at,
     document state so it survives reload, same as a room label's offset.
     OPTIONAL (schema default 1) so R1/R2's own roof records, written before
-    this field existed, stay valid without a migration."""
+    this field existed, stay valid without a migration.
+
+    `span_in` -- added at R4a (0154-ruling.md): `[left, right]`, the
+    perpendicular ridge-to-eaves-start distance per side (a ridge-relative
+    side, not the `ridge`-endpoint index `gable`/`marker_end` use).
+    OPTIONAL: a roof written before R4a has none, and `apply_design_to_scene`
+    materialises it (both sides identical) from the same nearest-wall
+    search that used to compute it live on every load -- once materialised
+    and saved, a reload never re-derives it again. `overhang_in` stays the
+    same field name but changes shape at R4a, `[left, right]` instead of
+    one number -- also migrated on load, also RAW (a plain number or a
+    2-list are both valid raw values, so no dataclass change was needed
+    for it, only for the reader/writer either side of this class).
+
+    `eaves_bind` -- added at R4a: `"manual"` (default) or `"room_top"`
+    (R4b's own dialog toggle; this tranche only gives it a field to
+    round-trip). OPTIONAL, same reasoning as `marker_end`."""
     FIELDS: ClassVar = [("id", RAW), ("level", RAW), ("ridge", RAW),
                         ("eaves_h_in", RAW), ("ridge_h_in", RAW),
-                        ("overhang_in", RAW), ("gable", RAW),
+                        ("overhang_in", RAW), ("span_in", RAW),
+                        ("eaves_bind", RAW), ("gable", RAW),
                         ("marker_end", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
@@ -209,6 +226,8 @@ class Roof(_Node):
     eaves_h_in: Any = _MISSING
     ridge_h_in: Any = _MISSING
     overhang_in: Any = _MISSING
+    span_in: Any = _MISSING
+    eaves_bind: Any = _MISSING
     gable: Any = _MISSING
     marker_end: Any = _MISSING
 

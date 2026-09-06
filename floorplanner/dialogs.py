@@ -942,7 +942,12 @@ class RoofEndOnDialog(QDialog):
         buttons.rejected.connect(self.reject)
         lay.addWidget(buttons)
 
-        span = float(getattr(roof, "span_in", 144.0))
+        # R4a: span_in is [left, right] (0154-ruling.md); this dialog still
+        # draws ONE slope (R4b owns showing both sides when they differ),
+        # so it reads the left side as its single reference -- same as
+        # picking either would be before R4b's own display exists to tell
+        # them apart.
+        span = float(getattr(roof, "span_in", [144.0, 144.0])[0])
         self.canvas.span_in = span
         self._set_field("ridge_h", float(roof.ridge_h_in), redraw=False)
         self._set_field("eaves_h", float(roof.eaves_h_in), redraw=False)

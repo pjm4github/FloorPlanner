@@ -150,9 +150,25 @@
           "type": "array", "prefixItems": [{ "$ref": "#/$defs/point" }, { "$ref": "#/$defs/point" }],
           "minItems": 2, "maxItems": 2
         },
-        "eaves_h_in": { "description": "Eaves height, measured from the roof's own level BASE (`elevation_in`) -- amended at R2b (0140-ruling.md sec3) from an earlier wall-top-relative reading; the wall top still appears as a reference on the End-On dialog's own drawing.", "type": "number" },
+        "eaves_h_in": { "description": "Eaves height, measured from the roof's own level BASE (`elevation_in`) -- amended at R2b (0140-ruling.md sec3) from an earlier wall-top-relative reading; the wall top still appears as a reference on the End-On dialog's own drawing. Under `eaves_bind: \"room_top\"` this value is RECOMPUTED (R4b), but still written here so the document stays self-contained.", "type": "number" },
         "ridge_h_in": { "description": "Ridge height, same base datum as `eaves_h_in`. PITCH IS DERIVED from these two heights and the ridge-to-eaves horizontal run -- never stored, so a dialog showing a live pitch and one accepting a typed pitch are the same control recomputing whichever height is unlocked, not two facts that can disagree.", "type": "number" },
-        "overhang_in": { "description": "Eave overhang, plan-perpendicular from the ridge's own footprint.", "type": "number", "minimum": 0, "default": 0 },
+        "span_in": {
+          "description": "R4a (0154-ruling.md): perpendicular distance from the ridge to the eaves-START line (the plane `eaves_h_in` applies at), per side -- [left, right], where LEFT is the ridge's own +90deg-rotated-in-plan normal and RIGHT is the opposite side; a ridge-relative side, unrelated to the `ridge`-endpoint index `gable`/`marker_end` use. Independent per side so the ridge need not sit centred over what it covers -- with one `ridge_h_in`/`eaves_h_in` pair, unequal sides give unequal pitch (a saltbox), legal as of this tranche. NOT required: a document written before R4a has no such field, and carries the pre-R4a behaviour of re-deriving one shared span from the nearest parallel wall every load -- `apply_design_to_scene` does that once, materialises the result as `[span, span]` on the live roof, and a subsequent save writes it, so a reload never re-derives again.",
+          "type": "array", "prefixItems": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "number", "exclusiveMinimum": 0 }],
+          "minItems": 2, "maxItems": 2
+        },
+        "overhang_in": {
+          "description": "Eave overhang, plan-perpendicular from the ridge's own footprint, per side -- [left, right], same side convention as `span_in`. R4a migrates a pre-R4a document's single number to `[v, v]` on load (both sides took the one value); the array form is what a document written from here on always carries.",
+          "oneOf": [
+            { "type": "array", "prefixItems": [{ "type": "number", "minimum": 0 }, { "type": "number", "minimum": 0 }], "minItems": 2, "maxItems": 2 },
+            { "type": "number", "minimum": 0 }
+          ],
+          "default": [0, 0]
+        },
+        "eaves_bind": {
+          "description": "R4a (0154-ruling.md): `\"manual\"` (default) -- `eaves_h_in` is a value someone set directly. `\"room_top\"` -- `eaves_h_in` is instead derived from the wall-top of the rooms this roof's footprint covers (the higher of a room's own ceiling and its level's `elevation_in + height_in`; disagreement among covered rooms is reported, not hidden), and the derived number is still written to `eaves_h_in` so the document never has to re-derive it to be complete. The actual `room_top` recomputation is R4b's own dialog toggle -- this tranche only gives the field somewhere to round-trip.",
+          "type": "string", "enum": ["manual", "room_top"], "default": "manual"
+        },
         "gable": {
           "description": "One flag per ridge endpoint (index-aligned with `ridge`): true = a vertical gable-end triangle at that end; false = that end is a hip (not represented in 3D until a later tranche, but distinguished here so R4 has something to toggle).",
           "type": "array", "prefixItems": [{ "type": "boolean" }, { "type": "boolean" }],

@@ -794,17 +794,24 @@ def _furnishings_of(items, lid, nid, rooms, poly, src=None):
 
 
 def _roofs_of(items, lid, nid, src=None):
-    """This level's roofs (0139-ruling.md P1.1, R2's first writer). Only
-    the modelled fields are emitted -- `span_in` is a live-scene render
-    affordance, not a document field (`RoofItem`'s own docstring), so a
-    round trip re-derives it on load rather than persisting it here."""
+    """This level's roofs (0139-ruling.md P1.1, R2's first writer).
+
+    R4a (0154-ruling.md): `span_in` and `overhang_in` are now written as
+    `[left, right]` -- the footprint is the document's own since this
+    tranche, not re-derived from the nearest wall on every load. Every
+    live `RoofItem`, loaded or freshly sketched, already carries both as a
+    real pair (`RoofItem.span_in`/`.overhang_in` are properties that
+    normalise a bare number to `[v, v]`), so this writer never needs to
+    know which case it is."""
     out = []
     for it in _ordered(items, RoofItem, _roof_key):
         rec = {"id": nid("rf"), "level": lid,
                "ridge": [[it.p1.x(), it.p1.y()], [it.p2.x(), it.p2.y()]],
                "eaves_h_in": float(it.eaves_h_in),
                "ridge_h_in": float(it.ridge_h_in),
-               "overhang_in": float(it.overhang_in),
+               "overhang_in": [float(it.overhang_in[0]), float(it.overhang_in[1])],
+               "span_in": [float(it.span_in[0]), float(it.span_in[1])],
+               "eaves_bind": it.eaves_bind,
                "gable": [bool(it.gable[0]), bool(it.gable[1])],
                "marker_end": 1 if it.marker_end else 0}
         if src is not None:
@@ -1307,22 +1314,33 @@ def apply_design_to_scene(target, design, report=None, strict=False,
         fmap[fd["id"]] = item
         rep["furnishings"] += 1
 
-    # ROOFS (0139-ruling.md R1's block, R2's first reader). `span_in` is not
-    # a document field -- `nearest_eaves_wall` re-derives the 2D overlay's
-    # plan reach from whatever wall is nearest and roughly parallel to the
-    # ridge NOW, on THIS level, rather than trusting a value that could have
-    # gone stale against the plan (see `RoofItem`'s own docstring).
+    # ROOFS (0139-ruling.md R1's block, R2's first reader; R4a re-plans the
+    # footprint into the schema -- 0154-ruling.md). A document written
+    # before R4a has no `span_in` at all: MATERIALIZE it here, once, the
+    # same way every load used to derive it live -- `nearest_eaves_wall`'s
+    # single shared span becomes `[span, span]` on the live roof, and the
+    # NEXT save writes it, so a second load never re-derives it again.
+    # `overhang_in` migrates the same way, scalar -> `[v, v]`, since it
+    # changed shape at the same tranche. A document already carrying the
+    # array form (this app's own output from here on) is used as-is.
     for rfd in doc.get("roofs", []) or []:
         p1 = QPointF(*rfd["ridge"][0])
         p2 = QPointF(*rfd["ridge"][1])
         floor = lname.get(rfd["level"], DEFAULT_FLOOR)
-        _, span_in = nearest_eaves_wall(scene, p1, p2, floor)
+        span_raw = rfd.get("span_in")
+        if isinstance(span_raw, (list, tuple)) and len(span_raw) == 2:
+            span_in = [float(span_raw[0]), float(span_raw[1])]
+        else:
+            _, legacy_span = nearest_eaves_wall(scene, p1, p2, floor)
+            span_in = legacy_span                    # RoofItem normalises
+        overhang_raw = rfd.get("overhang_in", 0.0)
         item = RoofItem(p1, p2, eaves_h_in=float(rfd["eaves_h_in"]),
                         ridge_h_in=float(rfd["ridge_h_in"]),
-                        overhang_in=float(rfd.get("overhang_in", 0.0)),
+                        overhang_in=overhang_raw,      # RoofItem normalises
                         gable=list(rfd.get("gable", [True, True])),
                         span_in=span_in,
-                        marker_end=int(rfd.get("marker_end", 1)))
+                        marker_end=int(rfd.get("marker_end", 1)),
+                        eaves_bind=rfd.get("eaves_bind", "manual"))
         item.floor = floor   # never the global
         scene.addItem(item)
         rep["roofs"] += 1

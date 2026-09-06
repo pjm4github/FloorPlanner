@@ -841,11 +841,12 @@ def test_design_from_scene_includes_a_roof_and_bumps_version_to_6(fp, win):
     assert rf["ridge"] == [[0.0, 0.0], [200.0, 0.0]]
     assert rf["eaves_h_in"] == 96.0
     assert rf["ridge_h_in"] == 132.0
-    assert rf["overhang_in"] == 6.0
+    # R4a (0154-ruling.md): overhang_in/span_in are [left, right] -- a bare
+    # constructor number normalises to the same value both sides
+    assert rf["overhang_in"] == [6.0, 6.0]
+    assert rf["span_in"] == [100.0, 100.0]
+    assert rf["eaves_bind"] == "manual"
     assert rf["gable"] == [True, True]
-    # span_in is NOT a document field (RoofItem's own docstring) --
-    # nothing about the live-scene render affordance leaks into the walk
-    assert "span_in" not in rf and "span" not in rf
 
 
 def test_design_from_scene_with_no_roofs_stays_v5_and_omits_the_key(fp, win):
@@ -854,11 +855,14 @@ def test_design_from_scene_with_no_roofs_stays_v5_and_omits_the_key(fp, win):
     assert "roofs" not in doc
 
 
-def test_a_roof_round_trips_through_apply_and_rederives_its_span(fp, win):
+def test_a_roof_round_trips_through_apply_carrying_its_own_span(fp, win):
     """P1.5's own identity, for roofs: scene -> Design -> scene -> Design
-    is identical at the second Design, even though span_in (unpersisted)
-    is RECOMPUTED rather than carried across apply -- it converges to the
-    same number because the same wall is still there to re-derive it from."""
+    is identical at the second Design. As of R4a (0154-ruling.md), `span_in`
+    is PART of that identity -- it round-trips because it is the document's
+    own value now, not because the same wall is still there to re-derive it
+    from (the wall in this scene is a red herring the OLD version of this
+    test needed and this one does not -- see the sibling test with no wall
+    at all)."""
     win.scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100),
                                   "exterior"))
     win.scene.addItem(fp.RoofItem(QPointF(0, 0), QPointF(200, 0),
@@ -872,8 +876,8 @@ def test_a_roof_round_trips_through_apply_and_rederives_its_span(fp, win):
     assert (r2.p1.x(), r2.p1.y()) == (0.0, 0.0)
     assert (r2.p2.x(), r2.p2.y()) == (200.0, 0.0)
     assert r2.eaves_h_in == 90.0 and r2.ridge_h_in == 126.0
-    assert r2.overhang_in == 12.0
-    assert r2.span_in == pytest.approx(100.0)   # re-derived from the wall
+    assert r2.overhang_in == [12.0, 12.0]
+    assert r2.span_in == pytest.approx([100.0, 100.0])
     d2, _ = _walk(win)
     assert d1 == d2
 
@@ -899,13 +903,19 @@ def test_apply_sets_a_roofs_floor_from_the_level_not_the_global(fp, win):
     assert roofs[0].floor == "Upper"
 
 
-def test_a_roof_with_no_nearby_wall_falls_back_to_the_default_span(fp, win):
+def test_a_roofs_span_survives_round_trip_with_no_nearby_wall_at_all(fp, win):
+    """R4a's own point, sharpened: before it, a span with nothing to
+    re-derive it from fell back to the default on every load, wall or no
+    wall. Now it is the document's own value -- this scene has NO wall
+    anywhere, so the old nearest-wall search would have nothing to find,
+    and the span must survive anyway."""
     win.scene.addItem(fp.RoofItem(QPointF(0, 0), QPointF(200, 0),
-                                  span_in=999.0))   # discarded, never stored
+                                  span_in=999.0))
     d1, _ = _walk(win)
+    assert d1["roofs"][0]["span_in"] == [999.0, 999.0]
     _apply(win, d1)
     roofs = [it for it in win.scene.items() if isinstance(it, fp.RoofItem)]
-    assert roofs[0].span_in == fp.DEFAULT_HALF_SPAN_IN
+    assert roofs[0].span_in == pytest.approx([999.0, 999.0])
 
 
 def test_canonicalize_sorts_and_renumbers_roofs_by_level_then_position(fp, win):
@@ -963,6 +973,128 @@ def test_a_roof_written_before_r2b_still_applies_with_the_default_marker_end(
     roofs = [it for it in win.scene.items() if isinstance(it, fp.RoofItem)]
     assert len(roofs) == 1
     assert roofs[0].marker_end == 1
+
+
+# --------------------------------------------------------------------------
+# R4a (0154-ruling.md): the footprint enters the schema
+# --------------------------------------------------------------------------
+
+def test_a_roof_written_before_r4a_materializes_span_and_overhang(fp, win):
+    """A saved roof with no `span_in` at all and a bare-number `overhang_in`
+    (every R1-R3b-era record) must still load -- `apply_design_to_scene`
+    derives `span_in` from the nearest wall exactly as every load used to,
+    and normalises `overhang_in` to `[v, v]` -- and the NEXT walk must
+    write both back as real document fields, not re-omit them."""
+    win.scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100),
+                                  "exterior"))
+    doc, _ = _walk(win)
+    doc["roofs"] = [{
+        "id": "rf1", "level": doc["levels"][0]["id"],
+        "ridge": [[0.0, 0.0], [200.0, 0.0]],
+        "eaves_h_in": 96.0, "ridge_h_in": 132.0, "overhang_in": 6.0,
+    }]
+    doc["version"] = 6
+    _apply(win, doc)
+    roofs = [it for it in win.scene.items() if isinstance(it, fp.RoofItem)]
+    assert len(roofs) == 1
+    assert roofs[0].span_in == pytest.approx([100.0, 100.0])  # derived from the wall
+    assert roofs[0].overhang_in == [6.0, 6.0]
+    assert roofs[0].eaves_bind == "manual"
+
+    doc2, _ = _walk(win)
+    rf2 = doc2["roofs"][0]
+    assert rf2["span_in"] == pytest.approx([100.0, 100.0])
+    assert rf2["overhang_in"] == [6.0, 6.0]
+    assert rf2["eaves_bind"] == "manual"
+
+
+def test_a_materialized_roof_does_not_rederive_on_a_second_load(fp, win):
+    """The actual point of R4a, made falsifiable: once `span_in` has been
+    materialised and saved, a SECOND load must use the stored value even
+    when there is no wall anywhere to re-derive it from -- if the loader
+    were still re-deriving, a span with nothing nearby would fall back to
+    `DEFAULT_HALF_SPAN_IN` (144), not keep 100."""
+    win.scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100),
+                                  "exterior"))
+    doc, _ = _walk(win)
+    doc["roofs"] = [{
+        "id": "rf1", "level": doc["levels"][0]["id"],
+        "ridge": [[0.0, 0.0], [200.0, 0.0]],
+        "eaves_h_in": 96.0, "ridge_h_in": 132.0, "overhang_in": 6.0,
+    }]
+    doc["version"] = 6
+    _apply(win, doc)                      # first load: derives, materialises
+    materialized, _ = _walk(win)
+    assert materialized["roofs"][0]["span_in"] == pytest.approx([100.0, 100.0])
+
+    win2 = fp.MainWindow()
+    win2.prepare_headless()
+    # deliberately NO wall in this scene at all
+    _apply(win2, materialized)
+    roofs2 = [it for it in win2.scene.items() if isinstance(it, fp.RoofItem)]
+    assert len(roofs2) == 1
+    assert roofs2[0].span_in == pytest.approx([100.0, 100.0]), (
+        "a materialised span was re-derived instead of read from the document")
+
+
+def test_a_resaved_roof_renders_pixel_identical_before_and_after(fp, win):
+    """R4a's own named receipt: a re-saved roof (materialisation changes
+    OWNERSHIP, not geometry) renders identical before vs after, in both
+    the 2D plan overlay and the 3D model -- using the real
+    `fixtures/roofs-r3-orbit-check.json` (two pre-R4a roofs, an orthogonal
+    ridge and one at 45 degrees) as the concrete stand-in for "a re-saved
+    wiscaway roof"."""
+    import importlib.util
+    import sys as _sys
+
+    fixture = (Path(__file__).resolve().parent.parent / "fixtures"
+              / "roofs-r3-orbit-check.json")
+    before_doc = json.loads(fixture.read_text(encoding="utf-8"))
+    assert "span_in" not in before_doc["roofs"][0], (
+        "precondition: this fixture predates R4a")
+
+    _apply(win, before_doc)
+    before_roofs = sorted(
+        (it for it in win.scene.items() if isinstance(it, fp.RoofItem)),
+        key=lambda r: (r.p1.x(), r.p1.y()))
+    before_eaves = [it._eave_ends() for it in before_roofs]
+
+    after_doc, _ = _walk(win)              # materialises span_in/overhang_in
+
+    win2 = fp.MainWindow()
+    win2.prepare_headless()
+    _apply(win2, after_doc)
+    after_roofs = sorted(
+        (it for it in win2.scene.items() if isinstance(it, fp.RoofItem)),
+        key=lambda r: (r.p1.x(), r.p1.y()))
+    after_eaves = [it._eave_ends() for it in after_roofs]
+
+    assert len(before_roofs) == len(after_roofs) == 2
+    for b, a in zip(before_roofs, after_roofs, strict=True):
+        assert (b.p1.x(), b.p1.y()) == (a.p1.x(), a.p1.y())
+        assert (b.p2.x(), b.p2.y()) == (a.p2.x(), a.p2.y())
+        assert b.span_in == pytest.approx(a.span_in)
+        assert b.overhang_in == pytest.approx(a.overhang_in)
+    for b_ends, a_ends in zip(before_eaves, after_eaves, strict=True):
+        for bp, ap in zip(b_ends, a_ends, strict=True):
+            assert (bp.x(), bp.y()) == pytest.approx((ap.x(), ap.y()))
+
+    # and fp3d's own 3D mesh agrees too -- same document, same geometry
+    spec = importlib.util.spec_from_file_location(
+        "fp3d_r4a_receipt",
+        Path(__file__).resolve().parent.parent / "floorplanner" / "viewer"
+        / "fp3d.py")
+    fp3d = importlib.util.module_from_spec(spec)
+    _sys.modules[spec.name] = fp3d
+    spec.loader.exec_module(fp3d)
+
+    before_model = fp3d.build_model(before_doc, furnishings=False)
+    after_model = fp3d.build_model(after_doc, furnishings=False)
+    before_mesh = next(m for m in before_model.meshes if m.name == "roofs")
+    after_mesh = next(m for m in after_model.meshes if m.name == "roofs")
+    assert before_mesh.verts.shape == after_mesh.verts.shape
+    assert before_mesh.verts == pytest.approx(after_mesh.verts)
+    assert (before_mesh.faces == after_mesh.faces).all()
 
 
 def test_roof_item_carries_an_end_marker_child(fp, win):

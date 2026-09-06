@@ -153,7 +153,7 @@ def test_a_press_near_but_off_the_marker_does_not_start_a_second_ridge(fp, win):
 
     roofs = [it for it in win.scene.items() if isinstance(it, RoofItem)]
     assert len(roofs) == 1                       # no second roof appeared
-    assert roofs[0].span_in == pytest.approx(100.0)   # original span intact
+    assert roofs[0].span_in == pytest.approx([100.0, 100.0])   # original span intact
 
 
 def test_double_click_opens_the_dialog_instead_of_arming_a_drag(fp, win, monkeypatch):

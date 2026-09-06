@@ -859,9 +859,13 @@ class PlanView(QGraphicsView):
             # roof on screen. Discarding it here silently threw away
             # something the user reasonably believed was done. Auto-
             # complete instead, with the SAME nearest-wall search a
-            # loaded roof already uses to re-derive span_in -- heights
+            # finished eaves pick uses (`finish_roof_ridge`) -- heights
             # stay at RoofItem's own constructor defaults, adjustable
-            # afterward from the marker's own dialog.
+            # afterward from the marker's own dialog. The result is a
+            # symmetric span (`item.span_in = span_in` normalises the
+            # bare number to `[span_in, span_in]`), same as any other
+            # freshly-picked roof -- R4a only changed what a LOADED
+            # roof does, not a freshly sketched one.
             item, self._roof_awaiting_eaves = self._roof_awaiting_eaves, None
             _, span_in = nearest_eaves_wall(self.scene(), item.p1, item.p2,
                                             item.floor)
