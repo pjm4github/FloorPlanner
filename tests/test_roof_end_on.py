@@ -208,7 +208,7 @@ def test_selecting_the_ridge_reaches_the_same_dialog(fp, win, monkeypatch):
     win.scene.addItem(roof)
 
     def _pick_heights(self, *a, **k):
-        return next(a for a in self.actions() if "heights" in a.text().lower())
+        return next(a for a in self.actions() if "parameters" in a.text().lower())
     monkeypatch.setattr(QMenu, "exec", _pick_heights)
 
     def _accept_and_edit(dlg_self):

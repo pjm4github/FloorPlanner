@@ -17,7 +17,7 @@ from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
-from floorplanner.roofs import RoofEndMarkerItem, RoofItem, eaves_span_from_wall
+from floorplanner.roofs import RoofEndMarkerItem, RoofItem, eaves_spans_per_side
 from floorplanner.items import *  # noqa: F401
 from floorplanner.model import (  # serialization bridge (aliased)
     DEFAULT_FLOOR, Floor,
@@ -783,14 +783,17 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
     def finish_roof_ridge(self, item, eaves_wall):
         """Roof ▸ Sketch ridge…'s second half: the ridge is drawn, an eaves
         wall is picked (0139-ruling.md R2 / 0140-ruling.md). The picked wall
-        sets `item.span_in` (a bare number, normalised to `[span, span]` --
-        R4a's own document field as of 0154-ruling.md, but a fresh sketch
-        still starts symmetric; R4c's own drag grips are what make the two
-        sides diverge); the End-On dialog (0140-ruling.md's own "one
-        dialog, two doors" -- this is the third: the ridge-sketch tool's
-        own initial prompt) sets the two persisted heights. Cancelling
-        drops the ridge entirely, same as an under-length wall drag."""
-        item.span_in = eaves_span_from_wall(item.p1, item.p2, eaves_wall)
+        sets ITS side of `item.span_in`; the other side is measured to the
+        nearest parallel wall across the ridge, mirroring the picked side
+        only when there is none (`eaves_spans_per_side` -- R4b, from
+        Patrick's own check: a ridge sketched a few inches off-centre used
+        to get one mirrored span and a lopsided footprint). The End-On
+        dialog (0140-ruling.md's own "one dialog, two doors" -- this is the
+        third: the ridge-sketch tool's own initial prompt) sets the two
+        persisted heights. Cancelling drops the ridge entirely, same as an
+        under-length wall drag."""
+        item.span_in = eaves_spans_per_side(self.scene, item.p1, item.p2,
+                                            item.floor, picked=eaves_wall)
         item.rebuild()
         dlg = RoofEndOnDialog(item, self)
         if dlg.exec() != QDialog.DialogCode.Accepted:

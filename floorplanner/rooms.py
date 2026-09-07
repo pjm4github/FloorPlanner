@@ -1291,9 +1291,17 @@ class RoomItem(QGraphicsItem):
                 dlg.apply()
                 self.prepareGeometryChange()
                 self.update()
+                # R4b (0154-ruling.md sec2, item 5): a roof whose eaves are
+                # bound to the room top follows a ceiling-height edit here,
+                # at the edit, not at the next save -- late import, roofs.py
+                # is this module's same-layer peer (its own docstring).
+                from floorplanner.roofs import sync_bound_roofs
+                followed = sync_bound_roofs(self.scene(), floor=self.floor)
                 v = self._view()
                 if v is not None:
                     v.win._update_totals()    # include / name may have changed
+                    if followed:
+                        v.win.status(followed[0][1].status_line())
         elif chosen is a_inv:
             RoomInventoryDialog(self, self._view()).exec()
         elif chosen is a_ren:

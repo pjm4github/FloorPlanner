@@ -822,41 +822,65 @@ class _EndOnCanvas(QWidget):
     the ridge axis -- ridge apex, both eave lines, the wall top as a
     reference, R/H/P labelled on the drawing. Redrawn on every edit via
     `set_values`; the geometry math lives in the dialog, this widget only
-    paints whatever it is handed."""
+    paints whatever it is handed.
+
+    R4b: draws BOTH sides from their own span and overhang (0154-ruling.md
+    sec2: "the End-On drawing shows both slopes when they differ") -- the
+    overhang continues each slope past its wall line to the eave tip, and
+    the right side gets its own pitch label whenever it differs from the
+    left. Left is drawn on the left: `span_in[0]`'s side."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumSize(360, 240)
-        self.span_in = 144.0
+        self.span_l = self.span_r = 144.0
+        self.oh_l = self.oh_r = 0.0
         self.ridge_h = 132.0
         self.eaves_h = 96.0
-        self.pitch_deg = 0.0
         self.wall_top_in = float(DEFAULT_ROOM_PROPS["ceiling_height_in"])
 
-    def set_values(self, span_in, ridge_h, eaves_h, pitch_deg):
-        self.span_in = max(1.0, span_in)
-        self.ridge_h, self.eaves_h, self.pitch_deg = ridge_h, eaves_h, pitch_deg
+    @property
+    def span_in(self) -> float:
+        """The LEFT span -- the recompute's reference side (dialog docstring)."""
+        return self.span_l
+
+    def set_values(self, span_l, span_r, oh_l, oh_r, ridge_h, eaves_h,
+                   wall_top_in=None):
+        self.span_l, self.span_r = max(1.0, span_l), max(1.0, span_r)
+        self.oh_l, self.oh_r = max(0.0, oh_l), max(0.0, oh_r)
+        self.ridge_h, self.eaves_h = ridge_h, eaves_h
+        if wall_top_in is not None:
+            self.wall_top_in = float(wall_top_in)
         self.update()
+
+    def pitch_deg(self, side: int) -> float:
+        span = self.span_l if side == 0 else self.span_r
+        return math.degrees(math.atan2(max(0.0, self.ridge_h - self.eaves_h),
+                                       span))
 
     def paintEvent(self, _e):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         w, h = self.width(), self.height()
         margin = 32.0
-        half_w = self.span_in
+        reach_l, reach_r = self.span_l + self.oh_l, self.span_r + self.oh_r
         top_in = max(self.ridge_h, self.wall_top_in) + 24.0
-        sx = (w - 2 * margin) / (2.0 * half_w)
+        sx = (w - 2 * margin) / (reach_l + reach_r)
         sy = (h - 2 * margin) / max(top_in, 1.0)
         scale = min(sx, sy)
-        cx = w / 2.0
+        cx = margin + reach_l * scale       # the ridge's own x
         base_y = h - margin
 
         def pt(x_in, y_in):
             return QPointF(cx + x_in * scale, base_y - y_in * scale)
 
+        rise = self.ridge_h - self.eaves_h
+        slope_l, slope_r = rise / self.span_l, rise / self.span_r
         ridge_pt = pt(0.0, self.ridge_h)
-        eave_l = pt(-half_w, self.eaves_h)
-        eave_r = pt(half_w, self.eaves_h)
+        eave_l = pt(-self.span_l, self.eaves_h)
+        eave_r = pt(self.span_r, self.eaves_h)
+        tip_l = pt(-reach_l, self.eaves_h - slope_l * self.oh_l)
+        tip_r = pt(reach_r, self.eaves_h - slope_r * self.oh_r)
 
         # ground line
         p.setPen(QPen(QColor(90, 90, 90), 1.5))
@@ -866,10 +890,11 @@ class _EndOnCanvas(QWidget):
         p.setPen(QPen(QColor(150, 150, 150), 1.0, Qt.PenStyle.DashLine))
         wt_y = base_y - self.wall_top_in * scale
         p.drawLine(QPointF(margin * 0.4, wt_y), QPointF(w - margin * 0.4, wt_y))
-        # the roof itself: ridge heavy-adjacent slopes, eaves at wall stack
+        # the roof itself: ridge heavy-adjacent slopes, eaves at wall stack,
+        # continued past each wall line to the overhang tip
         p.setPen(QPen(QColor(133, 77, 14), 2.4))
-        p.drawLine(eave_l, ridge_pt)
-        p.drawLine(ridge_pt, eave_r)
+        p.drawLine(tip_l, ridge_pt)
+        p.drawLine(ridge_pt, tip_r)
         p.setPen(QPen(QColor(60, 60, 60), 1.2))
         p.drawLine(QPointF(eave_l.x(), base_y), eave_l)
         p.drawLine(QPointF(eave_r.x(), base_y), eave_r)
@@ -877,7 +902,9 @@ class _EndOnCanvas(QWidget):
         p.setPen(QPen(QColor(20, 20, 20)))
         p.drawText(ridge_pt + QPointF(6, -6), f"R {fmt_in(self.ridge_h)}")
         p.drawText(eave_r + QPointF(6, 4), f"H {fmt_in(self.eaves_h)}")
-        p.drawText(eave_r + QPointF(6, 20), f"P {self.pitch_deg:.1f}°")
+        p.drawText(eave_l + QPointF(-70, 20), f"P {self.pitch_deg(0):.1f}°")
+        if abs(self.span_l - self.span_r) > 1e-6:
+            p.drawText(eave_r + QPointF(6, 20), f"P' {self.pitch_deg(1):.1f}°")
 
 
 class RoofEndOnDialog(QDialog):
@@ -892,16 +919,40 @@ class RoofEndOnDialog(QDialog):
     REPLACES 0139-ruling.md R2's plainer `RoofHeightsDialog` entirely
     (0140-ruling.md sec1: "one dialog, two doors") -- reached from the
     marker's right-click, from selecting any ridge, AND from the
-    ridge-sketch tool's own initial heights prompt."""
+    ridge-sketch tool's own initial heights prompt.
+
+    R4b (0154-ruling.md sec3) makes this same dialog the PARAMETERS
+    dialog -- still one dialog, the same doors -- adding:
+
+    * per-side overhang, with a "same both sides" link that is on
+      whenever the two currently agree (every sketched roof) and mirrors
+      an edit to the other side while it stays on;
+    * gable/hip per end, the ends named by the marker ("end with the
+      marker" / "other end") since that is the one physical way a user
+      tells the two ridge ends apart on screen -- the mapping to
+      `gable[0]`/`gable[1]` goes through `marker_end` at open time;
+    * the `room_top` binding (requirement 5): while bound the eaves
+      field is derived from the covered rooms' ceilings (`roofs.
+      bound_eaves_height`) and locked, so the three-way rule runs
+      between ridge and pitch alone -- the binding is an INPUT that
+      cannot be the derived field. The measurement's own note (which
+      rooms, whether they differ, whether nothing was found) is shown
+      live under the toggle and repeated in the status bar on apply.
+
+    The pitch field is the LEFT side's (`span_in[0]`) -- one editable
+    pitch, because with one ridge/eaves pair the two sides' pitches are
+    not independent; the right side's is shown on the drawing as `P'`
+    whenever the spans differ (nothing before R4c can make them)."""
 
     _FIELDS = ("pitch", "ridge_h", "eaves_h")   # order = initial recency
 
     def __init__(self, roof: RoofItem, parent=None):
         super().__init__(parent)
         self.roof = roof
-        self.setWindowTitle("Roof heights (end-on)")
+        self.setWindowTitle("Roof parameters (end-on)")
         self._recent = list(self._FIELDS)   # last element = most recent edit
         self._programmatic = False
+        self.binding = None                 # RoomTopBinding while bound
 
         lay = QVBoxLayout(self)
         self.canvas = _EndOnCanvas(self)
@@ -926,12 +977,75 @@ class RoofEndOnDialog(QDialog):
         self.sp_pitch.setSuffix(" deg")
         self.lab_pitch = QLabel("Pitch (P)")
         form.addRow(self.lab_pitch, self.sp_pitch)
+
+        # -- R4b: the room-top binding (0154-ruling.md sec2, item 5) --
+        self.ck_bind = QCheckBox("Bind eaves height to the room top")
+        self.ck_bind.setChecked(getattr(roof, "eaves_bind", "manual") == "room_top")
+        form.addRow("", self.ck_bind)
+        self.lab_bind = QLabel("")
+        self.lab_bind.setWordWrap(True)
+        self.lab_bind.setStyleSheet("color: #666;")
+        form.addRow("", self.lab_bind)
+
+        # -- R4b: per-side eaves span (ridge to each eaves wall's centreline)
+        # -- Patrick's own check: the sketch's one-number pick mirrored to
+        # the far side left an off-centre ridge with a lopsided footprint,
+        # and nothing before R4c could correct it. Editable here so an
+        # existing roof can be fixed without redrawing; R4c's eave-edge
+        # grips will drag the same two values.
+        span_l, span_r = (float(v) for v in getattr(roof, "span_in", [144.0, 144.0]))
+        self.sp_span_l = QDoubleSpinBox()
+        self.sp_span_l.setRange(1.0, 1200.0)
+        self.sp_span_l.setDecimals(1)
+        self.sp_span_l.setSuffix(" in")
+        self.sp_span_l.setValue(span_l)
+        form.addRow("Eaves span, left side", self.sp_span_l)
+        self.sp_span_r = QDoubleSpinBox()
+        self.sp_span_r.setRange(1.0, 1200.0)
+        self.sp_span_r.setDecimals(1)
+        self.sp_span_r.setSuffix(" in")
+        self.sp_span_r.setValue(span_r)
+        form.addRow("Eaves span, right side", self.sp_span_r)
+
+        # -- R4b: per-side overhang (requirement 1) --
+        oh_l, oh_r = (float(v) for v in getattr(roof, "overhang_in", [0.0, 0.0]))
+        self.sp_oh_l = QDoubleSpinBox()
+        self.sp_oh_l.setRange(0.0, 120.0)
+        self.sp_oh_l.setDecimals(1)
+        self.sp_oh_l.setSuffix(" in")
+        self.sp_oh_l.setValue(oh_l)
+        form.addRow("Overhang, left side", self.sp_oh_l)
+        self.sp_oh_r = QDoubleSpinBox()
+        self.sp_oh_r.setRange(0.0, 120.0)
+        self.sp_oh_r.setDecimals(1)
+        self.sp_oh_r.setSuffix(" in")
+        self.sp_oh_r.setValue(oh_r)
+        form.addRow("Overhang, right side", self.sp_oh_r)
+        self.ck_oh_same = QCheckBox("Same overhang both sides")
+        self.ck_oh_same.setChecked(abs(oh_l - oh_r) < 1e-6)
+        form.addRow("", self.ck_oh_same)
+
+        # -- R4b: gable <-> hip per end, named by the marker --
+        self._marker_end = 1 if getattr(roof, "marker_end", 1) else 0
+        gable = list(getattr(roof, "gable", [True, True]))
+        self.cb_end_marker = QComboBox()
+        self.cb_end_marker.addItems(["Gable", "Hip"])
+        self.cb_end_marker.setCurrentIndex(0 if gable[self._marker_end] else 1)
+        form.addRow("End with the marker", self.cb_end_marker)
+        self.cb_end_other = QComboBox()
+        self.cb_end_other.addItems(["Gable", "Hip"])
+        self.cb_end_other.setCurrentIndex(0 if gable[1 - self._marker_end] else 1)
+        form.addRow("Other end", self.cb_end_other)
         lay.addLayout(form)
 
         note = QLabel("Both heights measured from the level's own base "
                       "(the ground line); the wall top is shown for "
                       "reference. Editing any two derives the third -- "
-                      "the derived field is marked — derived.")
+                      "the derived field is marked — derived. A span is "
+                      "the ridge-to-wall-centreline distance; the overhang "
+                      "extends that far past the wall (24 in = two 12 in "
+                      "grid lines). A hip end runs the roof past that "
+                      "ridge end by the side span.")
         note.setWordWrap(True)
         note.setStyleSheet("color: #666;")
         lay.addWidget(note)
@@ -942,21 +1056,26 @@ class RoofEndOnDialog(QDialog):
         buttons.rejected.connect(self.reject)
         lay.addWidget(buttons)
 
-        # R4a: span_in is [left, right] (0154-ruling.md); this dialog still
-        # draws ONE slope (R4b owns showing both sides when they differ),
-        # so it reads the left side as its single reference -- same as
-        # picking either would be before R4b's own display exists to tell
-        # them apart.
-        span = float(getattr(roof, "span_in", [144.0, 144.0])[0])
-        self.canvas.span_in = span
+        spans = [float(v) for v in getattr(roof, "span_in", [144.0, 144.0])]
+        self.canvas.span_l, self.canvas.span_r = spans
+        self.canvas.oh_l, self.canvas.oh_r = oh_l, oh_r
         self._set_field("ridge_h", float(roof.ridge_h_in), redraw=False)
         self._set_field("eaves_h", float(roof.eaves_h_in), redraw=False)
+        self._refresh_binding(seed=True)
         self._recompute()   # seed pitch from the stored heights
         self._refresh_labels()
 
         self.sp_ridge.valueChanged.connect(lambda v: self._on_edit("ridge_h", v))
         self.sp_eaves.valueChanged.connect(lambda v: self._on_edit("eaves_h", v))
         self.sp_pitch.valueChanged.connect(lambda v: self._on_edit("pitch", v))
+        self.ck_bind.toggled.connect(self._on_bind_toggled)
+        self.sp_span_l.valueChanged.connect(lambda _v: self._on_span())
+        self.sp_span_r.valueChanged.connect(lambda _v: self._on_span())
+        self.sp_oh_l.valueChanged.connect(lambda v: self._on_overhang(0, v))
+        self.sp_oh_r.valueChanged.connect(lambda v: self._on_overhang(1, v))
+        self.ck_oh_same.toggled.connect(self._on_oh_same_toggled)
+        self.cb_end_marker.currentIndexChanged.connect(lambda _i: self._on_ends())
+        self.cb_end_other.currentIndexChanged.connect(lambda _i: self._on_ends())
 
     # -- the three-way recompute (0139-ruling.md sec2 / 0140-ruling.md sec2) --
     def _spin(self, field):
@@ -978,8 +1097,18 @@ class RoofEndOnDialog(QDialog):
         self._recompute()
         self._refresh_labels()
 
+    def _derived(self) -> str:
+        """The least recently edited field -- except that, while the eaves
+        are bound to the room top, the eaves field is an input by
+        definition and can never be the derived one."""
+        for field in self._recent:
+            if field == "eaves_h" and self.binding is not None:
+                continue
+            return field
+        return self._recent[0]
+
     def _recompute(self):
-        derived = self._recent[0]           # least recently edited
+        derived = self._derived()
         span = self.canvas.span_in
         ridge_h = self.sp_ridge.value()
         eaves_h = self.sp_eaves.value()
@@ -996,22 +1125,109 @@ class RoofEndOnDialog(QDialog):
         self._redraw()
 
     def _redraw(self):
-        self.canvas.set_values(self.canvas.span_in, self.sp_ridge.value(),
-                               self.sp_eaves.value(), self.sp_pitch.value())
+        self.canvas.set_values(self.canvas.span_l, self.canvas.span_r,
+                               self.sp_oh_l.value(), self.sp_oh_r.value(),
+                               self.sp_ridge.value(), self.sp_eaves.value())
 
     def _refresh_labels(self):
-        derived = self._recent[0]
+        derived = self._derived()
         labels = {"ridge_h": ("Ridge height (R)", self.lab_ridge),
                   "eaves_h": ("Eaves height (H)", self.lab_eaves),
                   "pitch": ("Pitch (P)", self.lab_pitch)}
         for field, (base, lab) in labels.items():
+            if field == "eaves_h" and self.binding is not None:
+                lab.setText(base + "  — bound to room top")
+                continue
             lab.setText(base + ("  — derived" if field == derived else ""))
 
+    # -- R4b: the room-top binding --------------------------------------------
+    def gable_flags(self):
+        """`[end 0, end 1]` as the two combos currently say, mapped back
+        through the marker end the labels were named by."""
+        flags = [True, True]
+        flags[self._marker_end] = self.cb_end_marker.currentIndex() == 0
+        flags[1 - self._marker_end] = self.cb_end_other.currentIndex() == 0
+        return flags
+
+    def _refresh_binding(self, seed=False):
+        """Re-measure the covered rooms (the footprint may just have
+        changed -- a hip toggle extends it) and, while bound, push the
+        measured height into the locked eaves field. `seed` is the
+        constructor's own call: no recompute yet, the fields are still
+        being filled in."""
+        from floorplanner.roofs import bound_eaves_height  # late: cycle guard
+        if self.ck_bind.isChecked():
+            self.binding = bound_eaves_height(self.roof.scene(), self.roof,
+                                              self.gable_flags(),
+                                              self.span_values())
+            self.lab_bind.setText(self.binding.note())
+            self.sp_eaves.setEnabled(False)
+            self._set_field("eaves_h", self.binding.eaves_h_in, redraw=False)
+            self.canvas.wall_top_in = self.binding.eaves_h_in
+        else:
+            self.binding = None
+            self.lab_bind.setText("")
+            self.sp_eaves.setEnabled(True)
+        if not seed:
+            self._recompute()
+            self._refresh_labels()
+
+    def _on_bind_toggled(self, _on):
+        self._refresh_binding()
+
+    def _on_ends(self):
+        if self.binding is not None:
+            self._refresh_binding()
+
+    # -- R4b: per-side eaves span -------------------------------------------
+    def span_values(self):
+        return [float(self.sp_span_l.value()), float(self.sp_span_r.value())]
+
+    def _on_span(self):
+        """A span edit moves the wall line on the drawing, changes the
+        derived value (pitch is rise over the LEFT span), and -- while
+        bound -- changes which rooms the footprint covers."""
+        if self._programmatic:
+            return
+        self.canvas.span_l, self.canvas.span_r = self.span_values()
+        if self.binding is not None:
+            self._refresh_binding()          # recomputes and relabels itself
+        else:
+            self._recompute()
+            self._refresh_labels()
+
+    # -- R4b: per-side overhang -----------------------------------------------
+    def _on_overhang(self, side, value):
+        if self._programmatic:
+            return
+        if self.ck_oh_same.isChecked():
+            other = self.sp_oh_r if side == 0 else self.sp_oh_l
+            self._programmatic = True
+            other.setValue(value)
+            self._programmatic = False
+        self._redraw()
+
+    def _on_oh_same_toggled(self, on):
+        if on:
+            self._programmatic = True
+            self.sp_oh_r.setValue(self.sp_oh_l.value())
+            self._programmatic = False
+            self._redraw()
+
     def apply(self):
-        """Write the (always-consistent) current heights back to the roof.
-        Pitch itself is never stored (0139-ruling.md sec2: derived, always)."""
+        """Write the (always-consistent) current heights back to the roof,
+        plus R4b's own fields -- per-side overhang, gable/hip per end, the
+        binding. Pitch itself is never stored (0139-ruling.md sec2:
+        derived, always). Under `room_top` the derived eaves height IS
+        written to `eaves_h_in` (0154-ruling.md sec2: the document stays
+        self-contained; nothing downstream re-derives it)."""
         self.roof.ridge_h_in = float(self.sp_ridge.value())
         self.roof.eaves_h_in = float(self.sp_eaves.value())
+        self.roof.span_in = self.span_values()
+        self.roof.overhang_in = [float(self.sp_oh_l.value()),
+                                 float(self.sp_oh_r.value())]
+        self.roof.gable = self.gable_flags()
+        self.roof.eaves_bind = "room_top" if self.ck_bind.isChecked() else "manual"
         self.roof.rebuild()
 
 

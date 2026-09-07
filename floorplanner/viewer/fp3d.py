@@ -1387,33 +1387,43 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             edge_h_pos = ridge_h - slope_pos * reach_pos
             edge_h_neg = ridge_h - slope_neg * reach_neg
 
+            # R4b: a HIP end (`gable[i] == False`) pushes that end's eave
+            # corners PAST the ridge end along the axis by the hip run
+            # (the mean of the two side spans -- equal to the side span on
+            # every symmetric roof, so all faces share one pitch) plus the
+            # mean overhang, exactly as `roofs.py`'s `RoofItem.hip_extension`
+            # defines it (duplicated, not imported: this file stays Qt-free).
+            # The end face is then the same apex-to-two-corners triangle a
+            # gable end already is, just tilted instead of vertical -- and
+            # each side plane becomes a trapezoid, still planar because the
+            # extended corner keeps its side's own perp offset and height.
+            gable = rf.get("gable") or [True, True]
+            hip_run = (span_left + span_right) / 2.0
+            hip_oh = (oh_left + oh_right) / 2.0
+            ext = [0.0 if (i < len(gable) and gable[i]) else hip_run + hip_oh
+                   for i in (0, 1)]
+            a1 = (p1[0] - ux * ext[0], p1[1] - uy * ext[0])
+            a2 = (p2[0] + ux * ext[1], p2[1] + uy * ext[1])
+
             z0 = base(lid)
             ridge_z = z0 + ridge_h
             edge_z_pos = z0 + edge_h_pos
             edge_z_neg = z0 + edge_h_neg
             r1 = (p1[0], p1[1], ridge_z)
             r2 = (p2[0], p2[1], ridge_z)
-            e_pos1 = (p1[0] + nx * reach_pos, p1[1] + ny * reach_pos, edge_z_pos)
-            e_pos2 = (p2[0] + nx * reach_pos, p2[1] + ny * reach_pos, edge_z_pos)
-            e_neg1 = (p1[0] - nx * reach_neg, p1[1] - ny * reach_neg, edge_z_neg)
-            e_neg2 = (p2[0] - nx * reach_neg, p2[1] - ny * reach_neg, edge_z_neg)
+            e_pos1 = (a1[0] + nx * reach_pos, a1[1] + ny * reach_pos, edge_z_pos)
+            e_pos2 = (a2[0] + nx * reach_pos, a2[1] + ny * reach_pos, edge_z_pos)
+            e_neg1 = (a1[0] - nx * reach_neg, a1[1] - ny * reach_neg, edge_z_neg)
+            e_neg2 = (a2[0] - nx * reach_neg, a2[1] - ny * reach_neg, edge_z_neg)
 
             # the two roof planes -- one on each side of the ridge
             roof_parts.append(_prism_slab([r1, r2, e_pos2, e_pos1], ROOF_T))
             roof_parts.append(_prism_slab([r1, e_neg1, e_neg2, r2], ROOF_T))
 
-            # gable ends -- a hip end has no UI to set it yet (roofs.py's own
-            # RoofItem docstring: "there is no UI yet to set it to a hip
-            # end -- that is R4"), so one is left OPEN and NAMED rather than
-            # silently drawn as a gable it is not.
-            gable = rf.get("gable") or [True, True]
+            # the end faces: a vertical gable triangle, or (R4b) the sloped
+            # hip face -- one triangle either way, apex at the ridge end
             ends = ((r1, e_pos1, e_neg1), (r2, e_pos2, e_neg2))
-            for end_idx, (apex, ep, en) in enumerate(ends):
-                if end_idx < len(gable) and not gable[end_idx]:
-                    model.info.append(
-                        f"roof {rid}: end {end_idx} is a hip -- not modelled "
-                        f"until R4, left open")
-                    continue
+            for apex, ep, en in ends:
                 roof_parts.append(_prism_slab([apex, ep, en], ROOF_T))
             n_roof += 1
 

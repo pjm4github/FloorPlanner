@@ -692,18 +692,43 @@ def test_roof_gable_ends_close_by_default(fp3d):
     assert not model.info, f"a default all-gable roof should need no note: {model.info}"
 
 
-def test_roof_hip_end_is_left_open_and_named(fp3d):
-    """`gable[i] = False` has no UI yet (roofs.py's own `RoofItem`
-    docstring), so R3 must not silently draw it as a gable -- it must be
-    OPEN (one fewer closing triangle) and NAMED, the same "known gap,
-    reported" discipline the furnishing fallbacks already use."""
-    doc = _roof_doc(_RIDGE, gable=[True, False])
+def test_roof_hip_end_builds_a_sloped_end_face_past_the_ridge_end(fp3d):
+    """R4b (0154-ruling.md sec3): `gable[i] = False` now has a UI, and a
+    geometry -- the end face is a sloped triangle whose eave corners sit
+    the hip RUN (mean of the two spans; here the span itself) past the
+    ridge end, at the SAME eave height as the side planes, so all three
+    faces meet at those corners. R3's "left open and named" placeholder
+    (the previous version of this test) retires with it: no info note."""
+    span, eaves_h, ridge_h = 100.0, 96.0, 132.0
+    doc = _roof_doc(_RIDGE, eaves_h_in=eaves_h, ridge_h_in=ridge_h,
+                    gable=[True, False])
     model = fp3d.build_model(doc, furnishings=False, floors=False)
     mesh = _roof_mesh(model)
-    assert len(mesh.faces) == 2 * 12 + 1 * 8, \
-        "the hip end must not gain a closing triangle"
-    assert any("hip" in n and "end 1" in n for n in model.info), model.info
-    assert not model.notes, "a named, expected gap is INFO, not a fault"
+    assert len(mesh.faces) == 2 * 12 + 2 * 8, \
+        "a hip end closes with one triangle, exactly as a gable end does"
+    assert not model.info and not model.notes
+    # _RIDGE runs along +x from x=50 to x=250 (world y flipped): the hip at
+    # end 1 (p2) pushes that end's eave corners to x = 250 + span, still at
+    # the eave height; the gable end at p1 stays at x = 50
+    xs = sorted({round(float(x), 3) for x in mesh.verts[:, 0]})
+    assert max(xs) == pytest.approx(250.0 + span)
+    assert min(xs) == pytest.approx(50.0)
+    far = mesh.verts[[abs(float(x) - (250.0 + span)) < 1e-6
+                      for x in mesh.verts[:, 0]]]
+    zs = {round(float(z), 3) for z in far[:, 2]}
+    # the extended corners carry the eave height (and the slab's own
+    # thickness below it), never the ridge height
+    assert eaves_h in zs and ridge_h not in zs
+
+
+def test_roof_gable_end_is_unchanged_by_the_hip_code_path(fp3d):
+    """Positive control for the test above: with both ends gable, nothing
+    extends -- the footprint's x-extent is exactly the ridge's."""
+    doc = _roof_doc(_RIDGE, gable=[True, True])
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    mesh = _roof_mesh(model)
+    xs = sorted({round(float(x), 3) for x in mesh.verts[:, 0]})
+    assert (min(xs), max(xs)) == (pytest.approx(50.0), pytest.approx(250.0))
 
 
 def test_roof_overhang_continues_the_same_slope_past_the_wall(fp3d):
