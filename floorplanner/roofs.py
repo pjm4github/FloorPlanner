@@ -755,7 +755,7 @@ class RoofItem(QGraphicsItem):
     # in the roof's own frame (a rotated grid of the same pitch, anchored at
     # the origin), the only sense in which a diagonal line can be "on" a
     # square grid. A displacement snap would carry any existing offset
-    # forever -- exactly the wall-drag defect 0070 measured -- so nothing
+    # forever -- exactly the wall-drag fault 0070-ruling.md measured -- so nothing
     # here snaps a delta.
 
     def drag_eave(self, side: int, scene_pt: QPointF):
