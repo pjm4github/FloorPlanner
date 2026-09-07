@@ -31,6 +31,30 @@ def eaves_span_from_wall(p1: QPointF, p2: QPointF, wall: WallItem) -> float:
     return dist_point_segment(mid, p1, p2)
 
 
+def eaves_span_to_ridge_line(p1: QPointF, p2: QPointF, wall: WallItem) -> float:
+    """The PERPENDICULAR distance from `wall`'s centreline midpoint to the
+    ridge's infinite LINE -- the span as the roof planes actually use it
+    (`RoofItem._eave_ends` offsets the eave line perpendicular to the
+    ridge). `eaves_span_from_wall` measures to the ridge SEGMENT instead:
+    the same number while the wall's midpoint projects inside the ridge,
+    but the hypotenuse to the nearer ridge END once it projects past one
+    -- a ridge sketched shorter than its wall, or a 45deg wing's ridge
+    running off the wing, both inflate the span and land the eave line
+    further from the wall than the overhang says. Patrick's own check of
+    R4b ("the overhang must be orthogonal to the walls ... 24 inches from
+    that wall") is exactly this: measured here along the wall's normal,
+    which for an eaves wall parallel to the ridge IS the ridge's normal.
+    The segment form stays for `nearest_eaves_wall` (the pre-R4a
+    migration's receipt is that it reproduces old loads exactly)."""
+    mid = QPointF((wall.p1.x() + wall.p2.x()) / 2.0,
+                  (wall.p1.y() + wall.p2.y()) / 2.0)
+    dx, dy = p2.x() - p1.x(), p2.y() - p1.y()
+    ln = math.hypot(dx, dy)
+    if ln < 1e-9:
+        return QLineF(mid, p1).length()
+    return abs((mid.x() - p1.x()) * dy - (mid.y() - p1.y()) * dx) / ln
+
+
 def _roofs_editable() -> bool:
     return bool(SETTINGS.get("edit_roofs", True))
 
@@ -72,9 +96,11 @@ def apply_roof_visibility(scene):
 
 def nearest_eaves_wall(scene, p1: QPointF, p2: QPointF, floor, exclude=None):
     """The wall on `floor` whose centerline runs closest to parallel with
-    ridge `p1`-`p2` and sits nearest to it -- the automatic half of the
-    eaves pick, used to seed a FRESH ridge's `span_in` (both sides, always
-    symmetric at sketch time). Before R4a (0154-ruling.md) this was also
+    ridge `p1`-`p2` and sits nearest to it -- the ONE-NUMBER search
+    `design/bridge.py`'s pre-R4a migration still reproduces exactly (a
+    loaded old roof must come back with the geometry it always had). A
+    fresh sketch no longer uses it: `eaves_spans_per_side` (R4b) measures
+    each side to its own wall. Before R4a (0154-ruling.md) this was also
     how a LOADED roof found its span every time, since the field did not
     exist in the document at all; as of R4a a loaded roof's `span_in`
     comes from the document once it has one, and this search only runs
@@ -102,6 +128,72 @@ def nearest_eaves_wall(scene, p1: QPointF, p2: QPointF, floor, exclude=None):
         if bestd is None or d < bestd:
             best, bestd = w, d
     return best, (bestd if bestd is not None else DEFAULT_HALF_SPAN_IN)
+
+
+def ridge_side(p1: QPointF, p2: QPointF, pt: QPointF) -> int:
+    """Which side of ridge `p1`-`p2` the point `pt` lies on, as a
+    `span_in`/`overhang_in` index: 0 = LEFT (the ridge direction's own
+    +90deg-rotated normal, `RoofItem`'s convention), 1 = RIGHT."""
+    dx, dy = p2.x() - p1.x(), p2.y() - p1.y()
+    nx, ny = -dy, dx
+    perp = (pt.x() - p1.x()) * nx + (pt.y() - p1.y()) * ny
+    return 0 if perp >= 0.0 else 1
+
+
+def eaves_spans_per_side(scene, p1: QPointF, p2: QPointF, floor, picked=None):
+    """`[left, right]`: the span to the eaves wall on EACH side of ridge
+    `p1`-`p2` -- Patrick's own check of R4b found the one-number pick
+    (mirrored to the far side) makes a ridge sketched a few inches
+    off-centre come out with a lopsided footprint, the far side's eaves
+    line landing inside its wall. So: the `picked` wall (the eaves click)
+    sets its own side; the other side takes the nearest parallel wall
+    that lies ACROSS the ridge from it (`nearest_eaves_wall`'s own
+    parallel/nearest rule, restricted to that side); a side with no such
+    wall mirrors the other side, which is exactly the pre-R4b result --
+    every roof over a single wall, or over none, is unchanged by this.
+
+    With this, "overhang 24in" reads as 24in past EACH wall's centreline
+    in the plan (two 12in grid lines), on both sides -- `span_in` is the
+    ridge-to-wall-centreline distance, so the drawn eave sits at
+    `span + overhang` from the ridge, i.e. `overhang` past the wall."""
+    spans = [None, None]
+    picked_side = None
+    if picked is not None:
+        mid = QPointF((picked.p1.x() + picked.p2.x()) / 2.0,
+                      (picked.p1.y() + picked.p2.y()) / 2.0)
+        picked_side = ridge_side(p1, p2, mid)
+        spans[picked_side] = eaves_span_to_ridge_line(p1, p2, picked)
+    ang = heading_deg(p1, p2)
+    if ang is not None and scene is not None:
+        ang %= 180.0
+        for w in scene.items():
+            if not isinstance(w, WallItem) or w is picked or w.floor != floor:
+                continue
+            wang = heading_deg(w.p1, w.p2)
+            if wang is None:
+                continue
+            wang %= 180.0
+            d_ang = abs(wang - ang)
+            d_ang = min(d_ang, 180.0 - d_ang)
+            if d_ang > EAVES_SEARCH_ANGLE_TOL_DEG:
+                continue
+            mid = QPointF((w.p1.x() + w.p2.x()) / 2.0,
+                          (w.p1.y() + w.p2.y()) / 2.0)
+            side = ridge_side(p1, p2, mid)
+            if side == picked_side:
+                continue                  # the picked wall owns its side
+            d = eaves_span_to_ridge_line(p1, p2, w)
+            if d < 1e-6:
+                continue                  # a wall under the ridge is no eaves
+            if spans[side] is None or d < spans[side]:
+                spans[side] = d
+    if spans[0] is None and spans[1] is None:
+        return [DEFAULT_HALF_SPAN_IN, DEFAULT_HALF_SPAN_IN]
+    if spans[0] is None:
+        spans[0] = spans[1]
+    if spans[1] is None:
+        spans[1] = spans[0]
+    return [float(spans[0]), float(spans[1])]
 
 
 # ---------------------------------------------------------------------------
@@ -357,7 +449,7 @@ class RoomTopBinding(NamedTuple):
         return "Eaves bound to room top: " + self.note()
 
 
-def bound_eaves_height(scene, roof, gable=None) -> RoomTopBinding:
+def bound_eaves_height(scene, roof, gable=None, span=None) -> RoomTopBinding:
     """The eaves height `eaves_bind == "room_top"` produces for `roof`: the
     HIGHEST `ceiling_height_in` among the rooms on the roof's own floor
     whose outline overlaps its eaves-start footprint (`eaves_start_polygon`
@@ -367,10 +459,10 @@ def bound_eaves_height(scene, roof, gable=None) -> RoomTopBinding:
     record, not hidden (0154-ruling.md sec2, Patrick's default). No room
     at all: `DEFAULT_ROOM_PROPS`' own ceiling, flagged as a fallback.
     `scene` may be None (a roof not yet in a scene) -- that is the same
-    "no room" case. `gable` previews an unapplied gable/hip toggle."""
+    "no room" case. `gable`/`span` preview an unapplied dialog edit."""
     from floorplanner.rooms import RoomItem  # late (peer layer)
     fp = QPainterPath()
-    fp.addPolygon(roof.eaves_start_polygon(gable))
+    fp.addPolygon(roof.eaves_start_polygon(gable, span))
     fp.closeSubpath()
     found = []
     if scene is not None:
@@ -535,17 +627,18 @@ class RoofItem(QGraphicsItem):
     def length(self) -> float:
         return math.hypot(self.p2.x() - self.p1.x(), self.p2.y() - self.p1.y())
 
-    def hip_extension(self, end: int, gable=None):
+    def hip_extension(self, end: int, gable=None, span=None):
         """`(run, overhang)` along the ridge axis, beyond ridge end `end`
         (0 = `p1`, 1 = `p2`), that a HIP end adds to the footprint:
         `(0, 0)` for a gable end. The run is the mean of the two side spans,
         the overhang the mean of the two side overhangs (class docstring).
-        `gable` overrides the stored flags -- the parameters dialog previews
-        a toggle before it is applied."""
+        `gable`/`span` override the stored values -- the parameters dialog
+        previews an edit before it is applied."""
         flags = self.gable if gable is None else gable
+        spans = self._span_in if span is None else span
         if flags[end]:
             return 0.0, 0.0
-        return ((self._span_in[0] + self._span_in[1]) / 2.0,
+        return ((spans[0] + spans[1]) / 2.0,
                 (self._overhang_in[0] + self._overhang_in[1]) / 2.0)
 
     def _axis(self):
@@ -581,18 +674,18 @@ class RoofItem(QGraphicsItem):
                QPointF(a1.x() - nx * reach_r, a1.y() - ny * reach_r),
                QPointF(a2.x() - nx * reach_r, a2.y() - ny * reach_r))
 
-    def eaves_start_polygon(self, gable=None) -> QPolygonF:
+    def eaves_start_polygon(self, gable=None, span=None) -> QPolygonF:
         """The footprint at the EAVES-START line (`span_in`, no overhang) --
         the plane `eaves_h_in` applies at, and the rectangle whose covered
         rooms the `room_top` binding reads. A hip end extends it by that
-        end's hip RUN (not its overhang). `gable` overrides the stored
-        flags, for a preview."""
+        end's hip RUN (not its overhang). `gable`/`span` override the
+        stored values, for a preview."""
         ux, uy, nx, ny = self._axis()
-        r1, _ = self.hip_extension(0, gable)
-        r2, _ = self.hip_extension(1, gable)
+        r1, _ = self.hip_extension(0, gable, span)
+        r2, _ = self.hip_extension(1, gable, span)
         a1 = QPointF(self.p1.x() - ux * r1, self.p1.y() - uy * r1)
         a2 = QPointF(self.p2.x() + ux * r2, self.p2.y() + uy * r2)
-        sl, sr = self._span_in
+        sl, sr = self._span_in if span is None else span
         return QPolygonF([
             QPointF(a1.x() + nx * sl, a1.y() + ny * sl),
             QPointF(a2.x() + nx * sl, a2.y() + ny * sl),

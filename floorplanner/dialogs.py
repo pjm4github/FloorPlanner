@@ -987,6 +987,26 @@ class RoofEndOnDialog(QDialog):
         self.lab_bind.setStyleSheet("color: #666;")
         form.addRow("", self.lab_bind)
 
+        # -- R4b: per-side eaves span (ridge to each eaves wall's centreline)
+        # -- Patrick's own check: the sketch's one-number pick mirrored to
+        # the far side left an off-centre ridge with a lopsided footprint,
+        # and nothing before R4c could correct it. Editable here so an
+        # existing roof can be fixed without redrawing; R4c's eave-edge
+        # grips will drag the same two values.
+        span_l, span_r = (float(v) for v in getattr(roof, "span_in", [144.0, 144.0]))
+        self.sp_span_l = QDoubleSpinBox()
+        self.sp_span_l.setRange(1.0, 1200.0)
+        self.sp_span_l.setDecimals(1)
+        self.sp_span_l.setSuffix(" in")
+        self.sp_span_l.setValue(span_l)
+        form.addRow("Eaves span, left side", self.sp_span_l)
+        self.sp_span_r = QDoubleSpinBox()
+        self.sp_span_r.setRange(1.0, 1200.0)
+        self.sp_span_r.setDecimals(1)
+        self.sp_span_r.setSuffix(" in")
+        self.sp_span_r.setValue(span_r)
+        form.addRow("Eaves span, right side", self.sp_span_r)
+
         # -- R4b: per-side overhang (requirement 1) --
         oh_l, oh_r = (float(v) for v in getattr(roof, "overhang_in", [0.0, 0.0]))
         self.sp_oh_l = QDoubleSpinBox()
@@ -1021,8 +1041,11 @@ class RoofEndOnDialog(QDialog):
         note = QLabel("Both heights measured from the level's own base "
                       "(the ground line); the wall top is shown for "
                       "reference. Editing any two derives the third -- "
-                      "the derived field is marked — derived. A hip end "
-                      "runs the roof past that ridge end by the side span.")
+                      "the derived field is marked — derived. A span is "
+                      "the ridge-to-wall-centreline distance; the overhang "
+                      "extends that far past the wall (24 in = two 12 in "
+                      "grid lines). A hip end runs the roof past that "
+                      "ridge end by the side span.")
         note.setWordWrap(True)
         note.setStyleSheet("color: #666;")
         lay.addWidget(note)
@@ -1046,6 +1069,8 @@ class RoofEndOnDialog(QDialog):
         self.sp_eaves.valueChanged.connect(lambda v: self._on_edit("eaves_h", v))
         self.sp_pitch.valueChanged.connect(lambda v: self._on_edit("pitch", v))
         self.ck_bind.toggled.connect(self._on_bind_toggled)
+        self.sp_span_l.valueChanged.connect(lambda _v: self._on_span())
+        self.sp_span_r.valueChanged.connect(lambda _v: self._on_span())
         self.sp_oh_l.valueChanged.connect(lambda v: self._on_overhang(0, v))
         self.sp_oh_r.valueChanged.connect(lambda v: self._on_overhang(1, v))
         self.ck_oh_same.toggled.connect(self._on_oh_same_toggled)
@@ -1133,7 +1158,8 @@ class RoofEndOnDialog(QDialog):
         from floorplanner.roofs import bound_eaves_height  # late: cycle guard
         if self.ck_bind.isChecked():
             self.binding = bound_eaves_height(self.roof.scene(), self.roof,
-                                              self.gable_flags())
+                                              self.gable_flags(),
+                                              self.span_values())
             self.lab_bind.setText(self.binding.note())
             self.sp_eaves.setEnabled(False)
             self._set_field("eaves_h", self.binding.eaves_h_in, redraw=False)
@@ -1152,6 +1178,23 @@ class RoofEndOnDialog(QDialog):
     def _on_ends(self):
         if self.binding is not None:
             self._refresh_binding()
+
+    # -- R4b: per-side eaves span -------------------------------------------
+    def span_values(self):
+        return [float(self.sp_span_l.value()), float(self.sp_span_r.value())]
+
+    def _on_span(self):
+        """A span edit moves the wall line on the drawing, changes the
+        derived value (pitch is rise over the LEFT span), and -- while
+        bound -- changes which rooms the footprint covers."""
+        if self._programmatic:
+            return
+        self.canvas.span_l, self.canvas.span_r = self.span_values()
+        if self.binding is not None:
+            self._refresh_binding()          # recomputes and relabels itself
+        else:
+            self._recompute()
+            self._refresh_labels()
 
     # -- R4b: per-side overhang -----------------------------------------------
     def _on_overhang(self, side, value):
@@ -1180,6 +1223,7 @@ class RoofEndOnDialog(QDialog):
         self-contained; nothing downstream re-derives it)."""
         self.roof.ridge_h_in = float(self.sp_ridge.value())
         self.roof.eaves_h_in = float(self.sp_eaves.value())
+        self.roof.span_in = self.span_values()
         self.roof.overhang_in = [float(self.sp_oh_l.value()),
                                  float(self.sp_oh_r.value())]
         self.roof.gable = self.gable_flags()

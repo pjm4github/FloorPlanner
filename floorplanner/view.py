@@ -12,7 +12,7 @@ from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
 from floorplanner.rooms import _wall_endpoints_match  # star skips underscores
-from floorplanner.roofs import RoofEndMarkerItem, RoofItem, nearest_eaves_wall
+from floorplanner.roofs import RoofEndMarkerItem, RoofItem, eaves_spans_per_side
 from floorplanner.items import *  # noqa: F401
 
 
@@ -861,15 +861,14 @@ class PlanView(QGraphicsView):
             # complete instead, with the SAME nearest-wall search a
             # finished eaves pick uses (`finish_roof_ridge`) -- heights
             # stay at RoofItem's own constructor defaults, adjustable
-            # afterward from the marker's own dialog. The result is a
-            # symmetric span (`item.span_in = span_in` normalises the
-            # bare number to `[span_in, span_in]`), same as any other
-            # freshly-picked roof -- R4a only changed what a LOADED
-            # roof does, not a freshly sketched one.
+            # afterward from the marker's own dialog. Spans are measured
+            # per side (`eaves_spans_per_side`, no picked wall: each side
+            # takes its own nearest parallel wall, mirroring only where
+            # there is none), same as a finished pick -- R4b's own fix
+            # from Patrick's check, applied to both pick paths.
             item, self._roof_awaiting_eaves = self._roof_awaiting_eaves, None
-            _, span_in = nearest_eaves_wall(self.scene(), item.p1, item.p2,
-                                            item.floor)
-            item.span_in = span_in
+            item.span_in = eaves_spans_per_side(self.scene(), item.p1,
+                                                item.p2, item.floor)
             item.rebuild()
             self.win.status(
                 "Roof ridge kept -- eaves set from the nearest wall. "

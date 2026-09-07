@@ -470,3 +470,207 @@ def test_editing_a_rooms_height_moves_the_bound_roof_and_not_the_other(
     assert bound.eaves_h_in == pytest.approx(120.0), "the bound roof followed"
     assert manual.eaves_h_in == EAVES_H, "the unbound roof did not"
     assert "120" in win.statusBar().currentMessage()
+
+
+# --------------------------------------------------------------------------
+# Patrick's check outcome: the eaves pick measures EACH side to its own wall,
+# the dialog exposes the two spans, and "overhang 24in" reads as two 12in
+# grid lines past each wall in the plan
+# --------------------------------------------------------------------------
+def _shell_walls(fp, win, y_top, y_bottom):
+    top = fp.WallItem(QPointF(0, y_top), QPointF(200, y_top), "exterior")
+    bot = fp.WallItem(QPointF(0, y_bottom), QPointF(200, y_bottom), "exterior")
+    win.scene.addItem(top)
+    win.scene.addItem(bot)
+    return top, bot
+
+
+def _accept(monkeypatch):
+    monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
+
+
+def test_the_eaves_pick_measures_each_side_to_its_own_wall(fp, win, monkeypatch):
+    """Ridge at y=100 between walls at y=0 and y=220 -- 20in off-centre,
+    the shape of Patrick's own sketch. The picked (y=0) wall sets its side
+    at 100; the far side is measured to ITS wall, 120, not mirrored.
+    Ridge direction +x: LEFT (index 0) is the +y side."""
+    win.prepare_headless()
+    top, bot = _shell_walls(fp, win, 0.0, 220.0)
+    _accept(monkeypatch)
+    item = RoofItem(QPointF(0, 100), QPointF(200, 100))
+    win.scene.addItem(item)
+    assert win.finish_roof_ridge(item, top) is item
+    assert item.span_in == pytest.approx([120.0, 100.0])
+
+
+def test_picking_the_far_wall_gives_the_same_footprint(fp, win, monkeypatch):
+    """Which of the two walls is clicked must not matter to the result."""
+    win.prepare_headless()
+    top, bot = _shell_walls(fp, win, 0.0, 220.0)
+    _accept(monkeypatch)
+    item = RoofItem(QPointF(0, 100), QPointF(200, 100))
+    win.scene.addItem(item)
+    win.finish_roof_ridge(item, bot)
+    assert item.span_in == pytest.approx([120.0, 100.0])
+
+
+def test_a_single_wall_still_mirrors_to_the_far_side(fp, win, monkeypatch):
+    """The control, and the pre-R4b behaviour preserved: with nothing
+    across the ridge, the far side takes the picked side's span."""
+    win.prepare_headless()
+    wall = fp.WallItem(QPointF(0, 0), QPointF(200, 0), "exterior")
+    win.scene.addItem(wall)
+    _accept(monkeypatch)
+    item = RoofItem(QPointF(0, 100), QPointF(200, 100))
+    win.scene.addItem(item)
+    win.finish_roof_ridge(item, wall)
+    assert item.span_in == pytest.approx([100.0, 100.0])
+
+
+def test_a_perpendicular_wall_is_not_an_eaves_wall_for_either_side(
+        fp, win, monkeypatch):
+    """A gable-end wall (perpendicular to the ridge) fails the parallel
+    rule exactly as it always did -- it must not be mistaken for the far
+    side's eaves."""
+    win.prepare_headless()
+    wall = fp.WallItem(QPointF(0, 0), QPointF(200, 0), "exterior")
+    end = fp.WallItem(QPointF(200, 0), QPointF(200, 300), "exterior")
+    win.scene.addItem(wall)
+    win.scene.addItem(end)
+    _accept(monkeypatch)
+    item = RoofItem(QPointF(0, 100), QPointF(200, 100))
+    win.scene.addItem(item)
+    win.finish_roof_ridge(item, wall)
+    assert item.span_in == pytest.approx([100.0, 100.0])
+
+
+def test_the_cancel_auto_complete_measures_per_side_too(fp, win):
+    """The second pick path (view.py `cancel_temp`, the Esc path: a ridge
+    awaiting its eaves is KEPT and picked for, per Patrick's own
+    "disappearingroof" report) uses the same per-side measurement, with
+    no picked wall at all."""
+    win.prepare_headless()
+    _shell_walls(fp, win, 0.0, 220.0)
+    item = RoofItem(QPointF(0, 100), QPointF(200, 100))
+    win.scene.addItem(item)
+    win.view._roof_awaiting_eaves = item
+    win.view.cancel_temp()
+    assert win.view._roof_awaiting_eaves is None
+    assert item.scene() is win.scene
+    assert item.span_in == pytest.approx([120.0, 100.0])
+
+
+def test_overhang_lands_two_grid_lines_past_each_wall(fp, win, monkeypatch):
+    """Patrick's own acceptance, in his words: "if the overhang says 24
+    inches then [the eave] will be 2 grid lines" past the wall -- on BOTH
+    sides, with the ridge off-centre. GRID_MINOR is the 12in grid."""
+    from floorplanner.config import GRID_MINOR
+    assert GRID_MINOR == 12.0
+    win.prepare_headless()
+    top, bot = _shell_walls(fp, win, 0.0, 240.0)     # both on the grid
+    _accept(monkeypatch)
+    item = RoofItem(QPointF(0, 108), QPointF(200, 108))   # 12in off-centre
+    win.scene.addItem(item)
+    win.finish_roof_ridge(item, top)
+    dlg = _dialog(item)
+    dlg.sp_oh_l.setValue(24.0)                       # linked: both sides
+    assert dlg.sp_oh_r.value() == 24.0
+    dlg.apply()
+    e1a, _, e2a, _ = item._eave_ends()
+    assert e1a.y() == pytest.approx(240.0 + 2 * GRID_MINOR)   # +y wall, 2 lines out
+    assert e2a.y() == pytest.approx(0.0 - 2 * GRID_MINOR)     # -y wall, 2 lines out
+
+
+def test_the_dialog_shows_and_writes_both_spans(fp, win):
+    rf = _roof(win.scene, span_in=[100.0, 100.0])
+    dlg = _dialog(rf)
+    assert (dlg.sp_span_l.value(), dlg.sp_span_r.value()) == (100.0, 100.0)
+    dlg.sp_span_r.setValue(130.0)                    # the lopsided roof, fixed
+    dlg.apply()
+    assert rf.span_in == pytest.approx([100.0, 130.0])
+    _, _, e2a, _ = rf._eave_ends()
+    assert e2a.y() == pytest.approx(100.0 - 130.0)
+
+
+def test_a_left_span_edit_rederives_the_pitch(fp, win):
+    rf = _roof(win.scene)
+    dlg = _dialog(rf)
+    dlg.sp_span_l.setValue(50.0)
+    assert dlg._derived() == "pitch"
+    want = math.degrees(math.atan2(RIDGE_H - EAVES_H, 50.0))
+    assert dlg.sp_pitch.value() == pytest.approx(want, abs=0.05)
+    assert dlg.canvas.span_in == 50.0
+
+
+def test_a_span_edit_re_measures_the_binding(fp, win):
+    """A room sitting past the current eaves line (y 200..300) is not
+    covered until the left span reaches it."""
+    _room(win.scene, 0, 300, 100.0, "Den")
+    path = QPainterPath()
+    path.addRect(0, 200, 300, 100)
+    far = RoomItem("Attic", QPointF(150, 250), path, 100.0)
+    far.floor = DEFAULT_FLOOR
+    far.properties["ceiling_height_in"] = 130.0
+    win.scene.addItem(far)
+    rf = _roof(win.scene)
+    dlg = _dialog(rf)
+    dlg.ck_bind.setChecked(True)
+    assert dlg.sp_eaves.value() == pytest.approx(100.0)
+    dlg.sp_span_l.setValue(150.0)                    # +y side now reaches Attic
+    assert dlg.sp_eaves.value() == pytest.approx(130.0)
+    assert "Attic" in dlg.lab_bind.text()
+
+
+# --------------------------------------------------------------------------
+# Patrick's second note: on an angled roof the overhang must be orthogonal
+# to the wall it overhangs -- 24in from a 45deg wall reads as 24in
+# --------------------------------------------------------------------------
+def _perp_distance(pt, a, b):
+    """Distance from `pt` to the infinite line a-b."""
+    dx, dy = b.x() - a.x(), b.y() - a.y()
+    return abs((pt.x() - a.x()) * dy - (pt.y() - a.y()) * dx) / math.hypot(dx, dy)
+
+
+def test_a_45_degree_wing_overhang_is_24in_from_its_wall(fp, win, monkeypatch):
+    """A 45deg wing: eaves walls parallel to the ridge at 100in either
+    side, and the ridge deliberately SHORT and shifted along the axis, so
+    each wall's midpoint projects PAST a ridge end -- the case the old
+    segment-distance pick inflated (its control test is below). Both eave lines must sit
+    exactly span + 24in from the ridge, i.e. 24in from each wall,
+    measured along the wall's own normal."""
+    win.prepare_headless()
+    s = math.sqrt(0.5)
+    # walls along the (1, 1) direction, offset +-100 along the normal (-1, 1)*s
+    n = QPointF(-s, s)
+    a, b = QPointF(0, 0), QPointF(400, 400)
+    top = fp.WallItem(a + n * 100.0, b + n * 100.0, "exterior")
+    bot = fp.WallItem(a - n * 100.0, b - n * 100.0, "exterior")
+    win.scene.addItem(top)
+    win.scene.addItem(bot)
+    _accept(monkeypatch)
+    ridge = RoofItem(QPointF(250, 250), QPointF(350, 350))    # short, shifted
+    win.scene.addItem(ridge)
+    win.finish_roof_ridge(ridge, top)
+    assert ridge.span_in == pytest.approx([100.0, 100.0], abs=1e-6)
+    ridge.overhang_in = 24.0
+    ridge.rebuild()
+    e1a, e1b, e2a, e2b = ridge._eave_ends()
+    for pt in (e1a, e1b):
+        assert _perp_distance(pt, top.p1, top.p2) == pytest.approx(24.0, abs=1e-6)
+    for pt in (e2a, e2b):
+        assert _perp_distance(pt, bot.p1, bot.p2) == pytest.approx(24.0, abs=1e-6)
+
+
+def test_the_old_segment_pick_would_have_inflated_that_span(fp, win):
+    """The positive control for the test above: the SEGMENT distance the
+    pre-R4b pick used gives more than 100 for the same wall and ridge,
+    which is the inflation Patrick saw; the LINE distance gives 100."""
+    from floorplanner.roofs import eaves_span_from_wall, eaves_span_to_ridge_line
+    s = math.sqrt(0.5)
+    n = QPointF(-s, s)
+    top = fp.WallItem(QPointF(0, 0) + n * 100.0, QPointF(400, 400) + n * 100.0,
+                      "exterior")
+    p1, p2 = QPointF(250, 250), QPointF(350, 350)
+    assert eaves_span_from_wall(p1, p2, top) == pytest.approx(
+        math.hypot(100.0, 70.7106781), abs=1e-4)          # the hypotenuse
+    assert eaves_span_to_ridge_line(p1, p2, top) == pytest.approx(100.0, abs=1e-6)
