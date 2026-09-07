@@ -16,8 +16,8 @@ does not reach at all, a hip roof clips -- in closed form).
 import math
 
 import pytest
-from PyQt6.QtCore import QPoint, QPointF
-from PyQt6.QtGui import QContextMenuEvent, QPainterPath
+from PyQt6.QtCore import QPoint, QPointF, QRectF, Qt
+from PyQt6.QtGui import QContextMenuEvent, QImage, QPainter, QPainterPath
 from PyQt6.QtWidgets import QApplication, QDialog, QMenu
 
 from floorplanner.config import DEFAULT_FLOOR, DEFAULT_ROOM_PROPS
@@ -674,3 +674,77 @@ def test_the_old_segment_pick_would_have_inflated_that_span(fp, win):
     assert eaves_span_from_wall(p1, p2, top) == pytest.approx(
         math.hypot(100.0, 70.7106781), abs=1e-4)          # the hypotenuse
     assert eaves_span_to_ridge_line(p1, p2, top) == pytest.approx(100.0, abs=1e-6)
+
+
+# --------------------------------------------------------------------------
+# Patrick's third note: the selection must hug the roof, oriented with it
+# --------------------------------------------------------------------------
+def _polygon_area(poly):
+    pts = [poly.at(i) for i in range(poly.count())]
+    return abs(sum(a.x() * b.y() - b.x() * a.y()
+                   for a, b in zip(pts, pts[1:] + pts[:1], strict=True))) / 2.0
+
+
+def test_selection_outline_is_the_eave_rectangle_not_the_bounding_box(scene):
+    """A 45deg ridge: the outline is the four eave corners (a rotated
+    rectangle of exactly ridge length x total reach), and its area is far
+    below the axis-aligned bounding box the old paint() drew."""
+    rf = RoofItem(QPointF(100, 100), QPointF(300, 300), span_in=50.0,
+                  overhang_in=10.0)
+    scene.addItem(rf)
+    outline = rf.selection_outline()
+    e1a, e1b, e2a, e2b = rf._eave_ends()
+    assert [outline.at(i) for i in range(4)] == [e1a, e1b, e2b, e2a]
+    ridge_len = math.hypot(200, 200)
+    assert _polygon_area(outline) == pytest.approx(ridge_len * 120.0)
+    b = rf.boundingRect()
+    assert _polygon_area(outline) < 0.6 * b.width() * b.height()
+
+
+def test_selection_outline_of_an_axis_aligned_roof_is_its_footprint(scene):
+    """The control: with the ridge on axis the outline IS the footprint
+    rectangle -- the bounding box minus its own padding."""
+    rf = _roof(scene, overhang_in=12.0)
+    br = rf.selection_outline().boundingRect()
+    assert (br.left(), br.right()) == (pytest.approx(50.0), pytest.approx(250.0))
+    assert (br.top(), br.bottom()) == (pytest.approx(-12.0), pytest.approx(212.0))
+
+
+def _render_bounds(scene, rf):
+    b = rf.boundingRect()
+    w, h = int(b.width()) + 1, int(b.height()) + 1
+    img = QImage(w, h, QImage.Format.Format_RGB32)
+    img.fill(0xFFFFFFFF)
+    pr = QPainter(img)
+    pr.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    scene.render(pr, QRectF(0, 0, w, h), QRectF(b.left(), b.top(), w, h),
+                 Qt.AspectRatioMode.IgnoreAspectRatio)
+    pr.end()
+    return img, b
+
+
+def _has_selection_blue(img, cx, cy, half=5):
+    for x in range(int(cx) - half, int(cx) + half + 1):
+        for y in range(int(cy) - half, int(cy) + half + 1):
+            if 0 <= x < img.width() and 0 <= y < img.height():
+                c = img.pixelColor(x, y)
+                if c.blue() > 150 and c.red() < 120:      # (0,120,215)-ish
+                    return True
+    return False
+
+
+def test_a_selected_45_degree_roof_paints_no_box_corner(scene):
+    """The output, not the internals: the axis-aligned box's own corner
+    region (where the old dashed rectangle ran) carries no selection ink,
+    while the midpoint of a rotated eave edge does -- the polarity pair."""
+    rf = RoofItem(QPointF(100, 100), QPointF(300, 300), span_in=50.0)
+    scene.addItem(rf)
+    rf.setSelected(True)
+    img, b = _render_bounds(scene, rf)
+    # the old rectangle's top edge, midway along: nothing there now
+    assert not _has_selection_blue(img, b.width() / 2.0, 4.0)
+    # the left eave line's midpoint: inside the outline's own edge
+    e1a, e1b, _, _ = rf._eave_ends()
+    mid = QPointF((e1a.x() + e1b.x()) / 2.0 - b.left(),
+                  (e1a.y() + e1b.y()) / 2.0 - b.top())
+    assert _has_selection_blue(img, mid.x(), mid.y())

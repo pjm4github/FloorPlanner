@@ -737,6 +737,13 @@ class RoofItem(QGraphicsItem):
     def boundingRect(self) -> QRectF:
         return self._bounds
 
+    def selection_outline(self) -> QPolygonF:
+        """The tight, ridge-oriented rectangle the selection is drawn as:
+        the four outer eave corners (`_eave_ends`, so a hip end's
+        extension is inside it too). Axis-aligned only when the ridge is."""
+        e1a, e1b, e2a, e2b = self._eave_ends()
+        return QPolygonF([e1a, e1b, e2b, e2a])
+
     def shape(self) -> QPainterPath:
         if not _roofs_editable():
             # "shown, not editable": empty, not just disabled -- a manual
@@ -773,9 +780,13 @@ class RoofItem(QGraphicsItem):
         painter.setPen(heavy)
         painter.drawLine(self.p1, self.p2)
         if self.isSelected():
+            # Patrick's own check of R4b: the selection must hug the roof
+            # -- the eave rectangle, oriented with the ridge -- not the
+            # axis-aligned bounding box, which on a 45deg wing is a big
+            # square with the roof drawn diagonally across it.
             painter.setPen(QPen(QColor(0, 120, 215), 1.0, Qt.PenStyle.DashLine))
             painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawRect(self._bounds)
+            painter.drawPolygon(self.selection_outline())
 
     def _view(self):
         sc = self.scene()
