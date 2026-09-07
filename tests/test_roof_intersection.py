@@ -355,3 +355,84 @@ def test_a_45_degree_wing_clips_and_reclips_on_the_item(scene):
     assert w.shape().contains(start)
     w.setSelected(False)
     assert not w.shape().contains(start)
+
+
+# --------------------------------------------------------------------------
+# Patrick's check of the first cut: two roofs of EQUAL height at an L --
+# the roof whose ridge runs past the apex must stop at the seam even where
+# its own surface is the higher one (his 3D view showed it poking through)
+# --------------------------------------------------------------------------
+def _l_pair(scene=None):
+    """A: ridge (0,200)-(450,200), span 100, 150/96. B: ridge from
+    (400,200) at 45deg down-right, same span and heights. A's last 50in
+    of ridge run past the apex into B; B's start end lies inside A."""
+    s = 0.7071067811865476
+    a = RoofItem(QPointF(0, 200), QPointF(450, 200), span_in=100.0,
+                 overhang_in=0.0, ridge_h_in=150.0, eaves_h_in=96.0)
+    b = RoofItem(QPointF(400, 200), QPointF(400 + 300 * s, 200 + 300 * s),
+                 span_in=100.0, overhang_in=0.0, ridge_h_in=150.0, eaves_h_in=96.0)
+    for rf, name in ((a, "A"), (b, "B")):
+        rf.floor = DEFAULT_FLOOR
+        rf.clip_name = name
+        if scene is not None:
+            scene.addItem(rf)
+    return a, b
+
+
+def test_equal_roofs_at_an_l_both_stop_at_the_two_valleys(scene):
+    a, b = _l_pair()
+    region_a, region_b, seams, warnings = clip_pair(a, b)
+    assert warnings == []
+    # the two valleys: apex (400,200) to the inside corner on A's lower
+    # eave and to the outside corner on A's upper eave -- closed form:
+    # (x-400) = -+ (sqrt2 - 1) * (y-200)
+    k = 2 ** 0.5 - 1
+    assert _pts(seams) == {(400.0, 200.0),
+                           (round(400 - k * 100, 3), 300.0),
+                           (round(400 + k * 100, 3), 100.0)}
+    for h_a, h_b in seam_heights(a, b, seams):
+        assert h_a == pytest.approx(h_b, abs=1e-6)
+
+
+def test_a_s_ridge_past_the_apex_is_gone_even_though_it_is_the_higher_surface(scene):
+    a, b = _l_pair()
+    region_a, region_b, _, _ = clip_pair(a, b)
+    past = QPointF(440, 200)
+    assert surface_height(a, past) > surface_height(b, past), \
+        "precondition: A really is the higher surface there"
+    assert not region_a.contains(past)          # ...and is still cut
+    assert region_b.contains(past)              # B's slope shows through
+    assert region_a.contains(QPointF(300, 200))  # A's body, untouched
+
+
+def test_a_s_corner_past_the_seam_draws_no_line_of_a(scene):
+    """The dashed corner he erased: A's top eave past the outer corner
+    and A's gable line. Neither is A's to draw once A stops at the seam;
+    B's slope, extended behind its own end, is what lies there."""
+    a, b = _l_pair(scene)
+    corner = QPointF(447, 103)
+    assert not a.shape().contains(QPointF(447, 100))     # A's top eave, past the corner
+    assert not a.shape().contains(QPointF(450, 150))     # A's gable line
+    region_a, region_b, _, _ = clip_pair(a, b)
+    # the sliver beyond the outer corner is outside B's band too: nobody's
+    assert not region_a.contains(corner) and not region_b.contains(corner)
+
+
+def test_b_s_start_end_inside_a_is_gone_too(scene):
+    a, b = _l_pair()
+    region_a, region_b, _, _ = clip_pair(a, b)
+    s = 0.7071067811865476
+    start_side = QPointF(400 - 60 * s + 3, 200 + 60 * s - 3)   # B's start corner region
+    assert not region_b.contains(start_side)
+    assert region_a.contains(start_side)
+    assert region_b.contains(QPointF(400 + 200 * s, 200 + 200 * s))   # B's body
+
+
+def test_the_l_on_the_items_hides_a_s_end_lines(scene):
+    a, b = _l_pair(scene)
+    assert a.is_clipped() and b.is_clipped()
+    assert not a.shape().contains(QPointF(440, 200))       # ridge past the apex
+    assert not a.shape().contains(QPointF(450, 150))       # A's gable line
+    assert a.shape().contains(QPointF(300, 200))
+    a.setSelected(True)
+    assert a.shape().contains(QPointF(450, 150))           # whole rectangle

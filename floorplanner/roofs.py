@@ -607,6 +607,7 @@ class RoofItem(QGraphicsItem):
         # stored; None = unclipped. Set only by `sync_roof_clips`.
         self._clip_region = None
         self._seams = []
+        self._clip_ext = (0.0, 0.0)
         self.clip_warnings = []
         self._syncing_clips = False
         self.marker = RoofEndMarkerItem(self)
@@ -774,6 +775,7 @@ class RoofItem(QGraphicsItem):
         while NOT selected. Repaints; never touches the true geometry."""
         self._clip_region = clip.region
         self._seams = list(clip.seams)
+        self._clip_ext = tuple(getattr(clip, "ext", (0.0, 0.0)))
         self.clip_warnings = list(clip.warnings)
         self.update()
 
@@ -908,14 +910,28 @@ class RoofItem(QGraphicsItem):
     def _plan_lines(self):
         """Every plan line paint() draws, as `(kind, p, q)`: the dashed
         eave/end/hip lines and the heavy ridge -- one list, so the clipped
-        and unclipped paths and the hit shape all agree."""
+        and unclipped paths and the hit shape all agree. While clipped, a
+        JOINED end (R4d: `_clip_ext` > 0 there) draws its eaves on into
+        the extension and no end line at all -- the end is inside the
+        other roof, not open (roofclip.py's module docstring)."""
         e1a, e1b, e2a, e2b = self._eave_ends()
-        lines = [("dash", e1a, e1b), ("dash", e2a, e2b),
-                 ("dash", e1a, e2a), ("dash", e1b, e2b)]
-        if not self.gable[0]:
-            lines += [("dash", self.p1, e1a), ("dash", self.p1, e2a)]
-        if not self.gable[1]:
-            lines += [("dash", self.p2, e1b), ("dash", self.p2, e2b)]
+        ext0, ext1 = self._clip_ext if self.is_clipped() else (0.0, 0.0)
+        joined0, joined1 = ext0 > 1e-6, ext1 > 1e-6
+        if joined0 or joined1:
+            ux, uy, _, _ = self._axis()
+            e1a = QPointF(e1a.x() - ux * ext0, e1a.y() - uy * ext0)
+            e2a = QPointF(e2a.x() - ux * ext0, e2a.y() - uy * ext0)
+            e1b = QPointF(e1b.x() + ux * ext1, e1b.y() + uy * ext1)
+            e2b = QPointF(e2b.x() + ux * ext1, e2b.y() + uy * ext1)
+        lines = [("dash", e1a, e1b), ("dash", e2a, e2b)]
+        if not joined0:
+            lines.append(("dash", e1a, e2a))
+            if not self.gable[0]:
+                lines += [("dash", self.p1, e1a), ("dash", self.p1, e2a)]
+        if not joined1:
+            lines.append(("dash", e1b, e2b))
+            if not self.gable[1]:
+                lines += [("dash", self.p2, e1b), ("dash", self.p2, e2b)]
         lines.append(("ridge", self.p1, self.p2))
         return lines
 

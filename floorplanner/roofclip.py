@@ -16,13 +16,38 @@ overlap of the two footprints is cut into convex cells by every line along
 which either surface changes plane (each ridge line, each hip end's two
 equal-height lines), and inside a cell the height DIFFERENCE is linear:
 the seam is where it crosses zero on the cell's edges, found by exact
-linear interpolation, never sampled. A roof keeps the part of a cell where
-it is the higher surface; the part where it is lower lies under the other
-roof and is dropped. Then the connected-component rule: a kept piece that
-no longer touches the roof's own body outside the overlap (the wing poking
-out the FAR side of the main roof, where the main's far slope has dropped
-below the wing again) is dropped too -- "a clipped roof does not extend
-past the joining roof" -- and the other roof shows through it.
+linear interpolation, never sampled.
+
+WHICH SIDE OF THE SEAM A ROOF KEEPS is not "where it is the higher
+surface" -- Patrick's own check of the first cut showed why: two roofs of
+equal height meeting at an L put roof A's ridge, past the apex, ABOVE
+roof B's slope, so the higher-surface rule kept A's whole end and it poked
+out through B (his 3D view). The rule is the ruling's own sentence, "a
+clipped roof does not extend past the joining roof": a roof STOPS AT THE
+SEAM, on the side its own body is on. Concretely each roof's footprint is
+one set of convex pieces (its cells outside the overlap, plus the overlap
+cells split by the seam), a piece is reachable from another across a
+shared boundary UNLESS that boundary is a seam segment, and a roof keeps
+what it can reach from its ANCHOR -- the cell holding the ridge endpoint
+that is NOT inside the other roof (its far end; both ends, for a roof the
+other merely runs into; every outside cell, for a roof neither of whose
+ends is inside the other). What a roof cannot reach it gives up: an overlap
+piece neither body reaches goes to the roof whose surface is LOWER there
+-- the higher surface is precisely the cut-off phantom (the far-side
+island under a main roof shows the main; A's end past the apex shows B's
+slope) -- and pieces OUTSIDE the overlap that are cut off (A's corner
+past the seam) are drawn by nobody -- exactly the lines he erased.
+
+A JOINING END EXTENDS. A roof whose ridge endpoint lies inside the other
+roof does not end at its own end edge there: its planes continue past
+that edge, inside the other roof, up to the seam -- that is how the outer
+corner of an L closes, with a hip from the apex to where the two OUTER
+eaves meet, behind the joining roof's nominal end. So for the pair the
+joining roof's footprint is extended at that end (only inside the other
+roof's own footprint), its eave lines are drawn on into the extension,
+and its end line there -- a gable line, or a hip end's eave and hip lines
+-- is not drawn at all: the end is joined, not open. The extension is
+part of the `RoofClip` (`ext`), derived like everything else.
 
 EVERYTHING IS OUR OWN CONVEX-POLYGON ARITHMETIC, on plain lists of
 `QPointF`. A region is a list of convex cells, a point is inside if any
@@ -61,6 +86,7 @@ class RoofClip(NamedTuple):
     region: object
     seams: list
     warnings: list
+    ext: tuple = (0.0, 0.0)     # per-end extension a joining end was given
 
 
 # ---------------------------------------------------------------------------
@@ -130,6 +156,8 @@ def _edge_vals(poly, a, b, inside_pt):
 
 def _convex_intersection(a, b):
     """a ∩ b for convex polygons: clip `a` against every edge of `b`."""
+    if len(a) < 3 or len(b) < 3:
+        return []
     out = list(a)
     cb = _centroid(b)
     n = len(b)
@@ -225,6 +253,7 @@ class ClipRegion:
 
     def __init__(self, cells):
         self.cells = [list(c) for c in cells if len(c) >= 3]
+        self.ext = (0.0, 0.0)
 
     def contains(self, pt: QPointF) -> bool:
         return any(_contains(c, pt) for c in self.cells)
@@ -283,13 +312,34 @@ def surface_height(rf, pt: QPointF) -> float:
     return h
 
 
-def footprint_polygon(rf):
+def footprint_polygon(rf, ext=(0.0, 0.0)):
     """The outer eave rectangle (overhang and hip extensions included) --
     the region the roof paints, and the domain of its surface -- as a
     list of four fresh `QPointF`s (module docstring: never points that
-    alias a temporary `QPolygonF`)."""
+    alias a temporary `QPolygonF`). `ext` pushes end 0 / end 1 outward
+    along the ridge axis (a joining end, module docstring)."""
     e1a, e1b, e2a, e2b = rf._eave_ends()
-    return [QPointF(e1a), QPointF(e1b), QPointF(e2b), QPointF(e2a)]
+    ux, uy, _, _ = rf._axis()
+    e0, e1 = ext
+    return [QPointF(e1a.x() - ux * e0, e1a.y() - uy * e0),
+            QPointF(e1b.x() + ux * e1, e1b.y() + uy * e1),
+            QPointF(e2b.x() + ux * e1, e2b.y() + uy * e1),
+            QPointF(e2a.x() - ux * e0, e2a.y() - uy * e0)]
+
+
+def _diagonal(poly) -> float:
+    xs = [p.x() for p in poly]
+    ys = [p.y() for p in poly]
+    return math.hypot(max(xs) - min(xs), max(ys) - min(ys))
+
+
+def joining_ext(rf, other_fp):
+    """`(e0, e1)`: how far each of `rf`'s ends is extended for the clip --
+    far enough to cross the other roof entirely when that ridge endpoint
+    lies inside the other's footprint, nothing otherwise."""
+    reach = 2.0 * _diagonal(other_fp)
+    return tuple(reach if _contains(other_fp, pt) else 0.0
+                 for pt in (rf.p1, rf.p2))
 
 
 def _cut_lines(rf):
@@ -336,21 +386,33 @@ def _root_cells(footprint, overlap):
     return [c for c in cells if not _contains(overlap, _centroid(c), tol=-1e-6)]
 
 
-def _connected(pieces, roots):
-    """Indices of `pieces` reachable from any root cell through shared
-    edges (BFS). With no roots at all (a roof wholly inside the other),
-    every piece counts."""
-    if not roots:
-        return set(range(len(pieces)))
-    reached = {i for i, p in enumerate(pieces) if any(_adjacent(p, r) for r in roots)}
-    frontier = list(reached)
+def _reach(start, pieces, allowed, blocked):
+    """Indices reachable from `start` across shared boundaries, staying
+    inside `allowed` and never crossing a pair in `blocked` (the two
+    pieces a seam separates)."""
+    reached = set(start)
+    frontier = list(start)
     while frontier:
         i = frontier.pop()
-        for j, p in enumerate(pieces):
-            if j not in reached and _adjacent(pieces[i], p):
+        for j in allowed:
+            if j in reached or (i, j) in blocked or (j, i) in blocked:
+                continue
+            if _adjacent(pieces[i], pieces[j]):
                 reached.add(j)
                 frontier.append(j)
     return reached
+
+
+def _anchors(rf, other_fp, root_indices, pieces):
+    """The pieces a roof keeps FROM (module docstring): the root cells
+    holding its ridge endpoints that lie outside the other roof's
+    footprint; every root cell when neither end (or both ends) is inside
+    the other, or when no root cell holds a far end (numerical edge)."""
+    far = [pt for pt in (rf.p1, rf.p2) if not _contains(other_fp, pt)]
+    if len(far) != 1:
+        return set(root_indices)
+    hit = {i for i in root_indices if _contains(pieces[i], far[0], tol=1e-3)}
+    return hit or set(root_indices)
 
 
 def clip_pair(a, b):
@@ -359,10 +421,18 @@ def clip_pair(a, b):
     `ClipRegion` (the visible part of that roof's footprint) or None when
     the pair does not interact (no overlap) or is degenerate."""
     fa, fb = footprint_polygon(a), footprint_polygon(b)
-    overlap = _convex_intersection(fa, fb)
-    if not overlap:
+    if not _convex_intersection(fa, fb):
         return None, None, [], []
-    cells = [overlap]
+    ext_a, ext_b = joining_ext(a, fb), joining_ext(b, fa)
+    fa_ext, fb_ext = footprint_polygon(a, ext_a), footprint_polygon(b, ext_b)
+    # the overlap, in three convex parts: both nominal footprints; a's
+    # nominal under b's extension; b's nominal under a's extension
+    ov_a = _convex_intersection(fa, fb_ext)      # everything of a under b(+ext)
+    ov_b = _convex_intersection(fb, fa_ext)      # everything of b under a(+ext)
+    overlap = _convex_intersection(fa, fb)
+    cells = [c for c in (overlap,
+                         _convex_intersection(ov_a, _strip(b, fb, fb_ext)),
+                         _convex_intersection(ov_b, _strip(a, fa, fa_ext))) if c]
     for pt, d in _cut_lines(a) + _cut_lines(b):
         cells = [piece for cell in cells for piece in _split_by_line(cell, pt, d)]
 
@@ -386,30 +456,96 @@ def clip_pair(a, b):
         if len(cross) == 2 and ia is not None and ib is not None:
             seam_of.append((ia, ib, (cross[0], cross[1])))
 
-    root_a, root_b = _root_cells(fa, overlap), _root_cells(fb, overlap)
-    # a's islands go to b, b's islands go to a; repeat until stable
-    own_a = set(range(len(ka_pieces)))
-    own_b = set(range(len(kb_pieces)))
-    extra_a, extra_b = [], []          # pieces inherited from the other's islands
-    for _ in range(3):
-        idx_a = sorted(own_a)
-        keep_a = _connected([ka_pieces[i] for i in idx_a] + extra_a, root_a)
-        dropped_a = [i for k, i in enumerate(idx_a) if k not in keep_a]
-        idx_b = sorted(own_b)
-        keep_b = _connected([kb_pieces[i] for i in idx_b] + extra_b, root_b)
-        dropped_b = [i for k, i in enumerate(idx_b) if k not in keep_b]
-        if not dropped_a and not dropped_b:
-            break
-        own_a -= set(dropped_a)
-        own_b -= set(dropped_b)
-        extra_b += [ka_pieces[i] for i in dropped_a]
-        extra_a += [kb_pieces[i] for i in dropped_b]
+    root_a = _root_cells(fa, ov_a) if ov_a else [list(fa)]
+    root_b = _root_cells(fb, ov_b) if ov_b else [list(fb)]
+    # one piece list: a's outside cells, b's outside cells, then every
+    # overlap piece (ka and kb alike -- both roofs' footprints hold them)
+    pieces = list(root_a) + list(root_b) + list(ka_pieces) + list(kb_pieces)
+    n_ra, n_rb, n_ka = len(root_a), len(root_b), len(ka_pieces)
+    ra_idx = set(range(n_ra))
+    rb_idx = set(range(n_ra, n_ra + n_rb))
+    ka_idx = set(range(n_ra + n_rb, n_ra + n_rb + n_ka))
+    kb_idx = set(range(n_ra + n_rb + n_ka, len(pieces)))
+    ov_idx = ka_idx | kb_idx
+    blocked = {(n_ra + n_rb + ia, n_ra + n_rb + n_ka + ib) for ia, ib, _ in seam_of}
 
-    final_a = [ka_pieces[i] for i in sorted(own_a)] + extra_a
-    final_b = [kb_pieces[i] for i in sorted(own_b)] + extra_b
-    seams = [seg for ia, ib, seg in seam_of if ia in own_a and ib in own_b]
-    return (ClipRegion(root_a + final_a), ClipRegion(root_b + final_b),
-            seams, [])
+    # each roof reaches what it can from its anchors, over its own pieces
+    reach_a = (_reach(_anchors(a, fb, ra_idx, pieces), pieces, ra_idx | ov_idx, blocked)
+               if root_a else set())
+    reach_b = (_reach(_anchors(b, fa, rb_idx, pieces), pieces, rb_idx | ov_idx, blocked)
+               if root_b else set())
+
+    owner = {}
+    for i in ov_idx:
+        in_a, in_b = i in reach_a, i in reach_b
+        if in_a and not in_b:
+            owner[i] = "a"
+        elif in_b and not in_a:
+            owner[i] = "b"
+        elif in_a and in_b:
+            owner[i] = "a" if i in ka_idx else "b"   # tie: the higher surface
+    # unclaimed overlap pieces -- the far-side island, a's phantom end past
+    # the apex, the wedge behind b's end edge -- belong to the roof whose
+    # surface is LOWER there: the higher one is exactly the part that was
+    # cut off at the seam, and the real roof underneath shows through.
+    # (A roof with no body outside the other at all keeps where it is
+    # higher instead: a dormer-like roof poking out of a bigger one.)
+    for i in ov_idx:
+        if i in owner:
+            continue
+        if not root_a and root_b:
+            owner[i] = "a" if i in ka_idx else "b"
+        elif not root_b and root_a:
+            owner[i] = "a" if i in ka_idx else "b"
+        elif not root_a and not root_b:
+            owner[i] = "a" if i in ka_idx else "b"
+        else:
+            owner[i] = "b" if i in ka_idx else "a"
+
+    final_a = ([pieces[i] for i in sorted(reach_a & ra_idx)]
+               + [pieces[i] for i in sorted(ov_idx) if owner[i] == "a"])
+    final_b = ([pieces[i] for i in sorted(reach_b & rb_idx)]
+               + [pieces[i] for i in sorted(ov_idx) if owner[i] == "b"])
+    seams = [seg for ia, ib, seg in seam_of
+             if owner[n_ra + n_rb + ia] != owner[n_ra + n_rb + n_ka + ib]]
+    region_a, region_b = ClipRegion(final_a), ClipRegion(final_b)
+    region_a.ext, region_b.ext = ext_a, ext_b
+    return region_a, region_b, seams, []
+
+
+def _strip(rf, fp_nom, fp_ext):
+    """The extension of `rf`'s footprint: `fp_ext` minus `fp_nom`, which
+    is the union of at most two convex strips (one per extended end).
+    Returned as ONE convex polygon when only one end is extended (the
+    common case); with both ends extended the two strips are merged into
+    their bounding convex hull along the axis, which is the whole
+    extended rectangle -- correct, just not minimal."""
+    ends_extended = [i for i, e in enumerate(rf_ext_of(fp_nom, fp_ext)) if e > EPS]
+    if not ends_extended:
+        return []
+    if len(ends_extended) == 2:
+        return list(fp_ext)
+    end = ends_extended[0]
+    # strip = the extended rectangle cut off at the nominal end edge
+    ux, uy, _, _ = rf._axis()
+    edge_a, edge_b = (fp_nom[0], fp_nom[3]) if end == 0 else (fp_nom[1], fp_nom[2])
+    d = QPointF(edge_b.x() - edge_a.x(), edge_b.y() - edge_a.y())
+    pieces = _split_by_line(list(fp_ext), edge_a, d)
+    outward = QPointF(-ux, -uy) if end == 0 else QPointF(ux, uy)
+    c_nom = _centroid(fp_nom)
+    for piece in pieces:
+        c = _centroid(piece)
+        if (c.x() - c_nom.x()) * outward.x() + (c.y() - c_nom.y()) * outward.y() > 0 \
+                and not _contains(fp_nom, c, tol=-1e-6):
+            return piece
+    return []
+
+
+def rf_ext_of(fp_nom, fp_ext):
+    """Recover the two end extensions from a nominal and an extended
+    footprint (the distance each end edge moved)."""
+    return (math.hypot(fp_ext[0].x() - fp_nom[0].x(), fp_ext[0].y() - fp_nom[0].y()),
+            math.hypot(fp_ext[1].x() - fp_nom[1].x(), fp_ext[1].y() - fp_nom[1].y()))
 
 
 def _name(rf) -> str:
@@ -425,6 +561,7 @@ def compute_roof_clips(roofs) -> dict:
     regions = {id(rf): None for rf in roofs}
     seams = {id(rf): [] for rf in roofs}
     warns = {id(rf): [] for rf in roofs}
+    exts = {id(rf): [0.0, 0.0] for rf in roofs}
     roofs = list(roofs)
     for i, a in enumerate(roofs):
         for b in roofs[i + 1:]:
@@ -433,6 +570,7 @@ def compute_roof_clips(roofs) -> dict:
                 if region is None:
                     continue
                 cur = regions[id(rf)]
+                exts[id(rf)] = [max(x, y) for x, y in zip(exts[id(rf)], region.ext, strict=True)]
                 if cur is None:
                     regions[id(rf)] = region
                 else:
@@ -447,7 +585,8 @@ def compute_roof_clips(roofs) -> dict:
             if ww:
                 warns[id(a)].extend(ww)
                 warns[id(b)].extend(ww)
-    return {id(rf): RoofClip(regions[id(rf)], seams[id(rf)], warns[id(rf)])
+    return {id(rf): RoofClip(regions[id(rf)], seams[id(rf)], warns[id(rf)],
+                             tuple(exts[id(rf)]))
             for rf in roofs}
 
 
