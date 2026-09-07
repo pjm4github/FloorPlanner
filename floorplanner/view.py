@@ -12,7 +12,9 @@ from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
 from floorplanner.rooms import _wall_endpoints_match  # star skips underscores
-from floorplanner.roofs import RoofEndMarkerItem, RoofItem, eaves_spans_per_side
+from floorplanner.roofs import (
+    RoofEndMarkerItem, RoofGripItem, RoofItem, eaves_spans_per_side,
+)
 from floorplanner.items import *  # noqa: F401
 
 
@@ -504,7 +506,7 @@ class PlanView(QGraphicsView):
                 # dispatch, which is what lets RoofEndMarkerItem's own
                 # mousePressEvent -- and RoofItem's own selection -- run.
                 for it in self.scene().items(sp):
-                    if isinstance(it, (RoofEndMarkerItem, RoofItem)):
+                    if isinstance(it, (RoofGripItem, RoofEndMarkerItem, RoofItem)):
                         break
                 else:
                     # STAGE 1: start the ridge, same anchor snap a wall gets

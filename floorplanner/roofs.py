@@ -582,6 +582,8 @@ class RoofItem(QGraphicsItem):
         self._bounds = QRectF()
         self._path = QPainterPath()
         self.marker = RoofEndMarkerItem(self)
+        # R4c (0154-ruling.md sec3): five grips, shown only while selected
+        self.grips = [RoofGripItem(self, kind) for kind in RoofGripItem.KINDS]
         self.rebuild()
 
     @staticmethod
@@ -733,6 +735,82 @@ class RoofItem(QGraphicsItem):
         marker = getattr(self, "marker", None)   # absent mid-__init__
         if marker is not None:
             marker.sync_position()
+        for g in getattr(self, "grips", ()):
+            g.sync_position()
+
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+            # the grips exist only for a selected roof -- a deselected roof
+            # shows its plan lines and its marker, nothing to grab
+            for g in getattr(self, "grips", ()):
+                g.setVisible(bool(value))
+        return super().itemChange(change, value)
+
+    # -- R4c: direct manipulation (0154-ruling.md sec3, the five grips) -----
+    # Every drag lands ON the grid, never moves by it (0070-ruling.md sec3's
+    # class): the quantity snapped is the ABSOLUTE coordinate of the line
+    # being dragged, measured along the ridge's own axis or normal from the
+    # scene origin -- for an axis-aligned ridge that is literally the line's
+    # x or y landing on `wall_snap_in`; for a 45deg wing it is the same rule
+    # in the roof's own frame (a rotated grid of the same pitch, anchored at
+    # the origin), the only sense in which a diagonal line can be "on" a
+    # square grid. A displacement snap would carry any existing offset
+    # forever -- exactly the wall-drag defect 0070 measured -- so nothing
+    # here snaps a delta.
+
+    def drag_eave(self, side: int, scene_pt: QPointF):
+        """Eave-edge grip: move that side's OUTER eave line to (the snapped)
+        `scene_pt`; the overhang rides along, so `span_in[side]` is what
+        changes. The line cannot cross the ridge: the span stays >= 1in."""
+        _, _, nx, ny = self._axis()
+        origin_n = self.p1.x() * nx + self.p1.y() * ny
+        cursor_n = scene_pt.x() * nx + scene_pt.y() * ny
+        perp = wall_snap_len(cursor_n) - origin_n
+        reach = perp if side == 0 else -perp
+        spans = list(self._span_in)
+        spans[side] = max(1.0, reach - self._overhang_in[side])
+        self.span_in = spans
+        self.rebuild()
+
+    def drag_end(self, end: int, scene_pt: QPointF):
+        """Gable-end grip: move that ridge endpoint ALONG the ridge axis so
+        the end line (gable line, or a hip end's outer eave) lands where the
+        cursor projects; direction is preserved -- the roof stays the same
+        rectangle, longer or shorter. A hip end's extension rides along.
+        The ridge keeps at least `MIN_RIDGE_LEN_IN`. The grip itself sits
+        `GRIP_END_OFFSET_IN` outside the line (`RoofGripItem`), so the
+        cursor is read that much inward -- the LINE lands on the grid."""
+        ux, uy, _, _ = self._axis()
+        origin_u = self.p1.x() * ux + self.p1.y() * uy
+        cursor_u = scene_pt.x() * ux + scene_pt.y() * uy
+        cursor_u += GRIP_END_OFFSET_IN if end == 0 else -GRIP_END_OFFSET_IN
+        landed = wall_snap_len(cursor_u) - origin_u        # along, from p1
+        L = self.length()
+        run, oh = self.hip_extension(end)
+        ext = run + oh
+        if end == 0:
+            a_end = min(landed + ext, L - MIN_RIDGE_LEN_IN)
+            self.set_ridge(QPointF(self.p1.x() + ux * a_end,
+                                   self.p1.y() + uy * a_end), self.p2)
+        else:
+            a_end = max(landed - ext, MIN_RIDGE_LEN_IN)
+            self.set_ridge(self.p1, QPointF(self.p1.x() + ux * a_end,
+                                            self.p1.y() + uy * a_end))
+
+    def drag_ridge(self, scene_pt: QPointF):
+        """Ridge grip: slide the ridge LATERALLY between fixed eave edges
+        (0140-ruling.md sec4's deferral, due here) -- both eaves-start lines
+        stay exactly where they are, the two spans rebalance, and the ridge
+        lands on the grid. Clamped so neither span drops under 1in."""
+        _, _, nx, ny = self._axis()
+        origin_n = self.p1.x() * nx + self.p1.y() * ny
+        cursor_n = scene_pt.x() * nx + scene_pt.y() * ny
+        d = wall_snap_len(cursor_n) - origin_n
+        span_l, span_r = self._span_in
+        d = max(1.0 - span_r, min(span_l - 1.0, d))
+        self.span_in = [span_l - d, span_r + d]
+        self.set_ridge(QPointF(self.p1.x() + nx * d, self.p1.y() + ny * d),
+                       QPointF(self.p2.x() + nx * d, self.p2.y() + ny * d))
 
     def boundingRect(self) -> QRectF:
         return self._bounds
@@ -816,6 +894,130 @@ class RoofItem(QGraphicsItem):
             if self.scene() is not None:
                 self.scene().removeItem(self)
         e.accept()
+
+
+MIN_RIDGE_LEN_IN = 12.0     # a gable-end drag cannot shorten the ridge past this
+GRIP_END_OFFSET_IN = 18.0   # an end grip sits this far OUTSIDE its end line (clear of the marker at 1:1)
+
+
+class RoofGripItem(QGraphicsItem):
+    """One of a selected roof's five grips (R4c, 0154-ruling.md sec3): the
+    two eave edges, the two gable ends, the ridge. A Qt CHILD of its
+    `RoofItem`, like the marker, sitting at the midpoint of the line it
+    drags; hidden unless the roof is selected (`RoofItem.itemChange`).
+    Dragging calls the roof's own `drag_eave` / `drag_end` / `drag_ridge`
+    on every move, so the plan follows the cursor live and the undo step
+    is the settled gesture (the app's own debounced snapshot), as for
+    every other drag. Hit region view-scaled, same as the marker."""
+
+    KINDS = ("eave_l", "eave_r", "end_0", "end_1", "ridge")
+    SIZE = 5.0               # drawn half-size, scene inches
+    HIT_PX = 12.0            # clickable half-size, view pixels
+    _TIPS = {
+        "eave_l": "Eave edge -- drag to change this side's span",
+        "eave_r": "Eave edge -- drag to change this side's span",
+        "end_0": "Roof end -- drag along the ridge to lengthen or shorten",
+        "end_1": "Roof end -- drag along the ridge to lengthen or shorten",
+        "ridge": "Ridge -- drag sideways between the eaves",
+    }
+
+    def __init__(self, roof, kind: str):
+        super().__init__(roof)
+        self.roof = roof
+        self.kind = kind
+        # above the roof, BELOW the marker: on a gable end the end line
+        # runs through the ridge endpoint the marker may sit at, and the
+        # marker (the End-On dialog's first door) keeps its click
+        self.setZValue(WALL_Z + 1.5)
+        self.setVisible(False)
+        self._dragging = False
+        self.setToolTip(self._TIPS[kind])
+        self.sync_position()
+
+    def sync_position(self):
+        self.prepareGeometryChange()
+        e1a, e1b, e2a, e2b = self.roof._eave_ends()
+        a, b = {
+            "eave_l": (e1a, e1b), "eave_r": (e2a, e2b),
+            "end_0": (e1a, e2a), "end_1": (e1b, e2b),
+            "ridge": (self.roof.p1, self.roof.p2),
+        }[self.kind]
+        mx, my = (a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0
+        if self.kind in ("end_0", "end_1"):
+            # just outside the end line, along the axis, so a gable end's
+            # grip does not sit on top of the ridge endpoint (and marker)
+            ux, uy, _, _ = self.roof._axis()
+            sign = -1.0 if self.kind == "end_0" else 1.0
+            mx += ux * GRIP_END_OFFSET_IN * sign
+            my += uy * GRIP_END_OFFSET_IN * sign
+        self.setPos(QPointF(mx, my))
+
+    def _view_scale(self) -> float:
+        sc = self.scene()
+        if sc and sc.views():
+            return max(sc.views()[0].transform().m11(), 1e-6)
+        return 1.0
+
+    def _hit_half(self) -> float:
+        return max(self.SIZE, self.HIT_PX / self._view_scale())
+
+    def boundingRect(self) -> QRectF:
+        r = self._hit_half() + 2.0
+        return QRectF(-r, -r, 2.0 * r, 2.0 * r)
+
+    def shape(self) -> QPainterPath:
+        path = QPainterPath()
+        if not _roofs_editable() or not self.isVisible():
+            return path            # same "shown, not editable" reasoning
+        h = self._hit_half()
+        path.addRect(QRectF(-h, -h, 2.0 * h, 2.0 * h))
+        return path
+
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        s = self.SIZE
+        painter.setBrush(QBrush(QColor(255, 255, 255)))
+        painter.setPen(QPen(QColor(0, 120, 215), 1.5))
+        if self.kind == "ridge":
+            d = s * 1.4
+            painter.drawPolygon(QPolygonF([QPointF(0, -d), QPointF(d, 0),
+                                           QPointF(0, d), QPointF(-d, 0)]))
+        else:
+            painter.drawRect(QRectF(-s, -s, 2.0 * s, 2.0 * s))
+
+    def apply_drag(self, scene_pt: QPointF):
+        if self.kind == "eave_l":
+            self.roof.drag_eave(0, scene_pt)
+        elif self.kind == "eave_r":
+            self.roof.drag_eave(1, scene_pt)
+        elif self.kind == "end_0":
+            self.roof.drag_end(0, scene_pt)
+        elif self.kind == "end_1":
+            self.roof.drag_end(1, scene_pt)
+        else:
+            self.roof.drag_ridge(scene_pt)
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.MouseButton.LeftButton:
+            self._dragging = True
+            e.accept()
+        else:
+            super().mousePressEvent(e)
+
+    def mouseMoveEvent(self, e):
+        if self._dragging:
+            self.apply_drag(e.scenePos())
+            e.accept()
+        else:
+            super().mouseMoveEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        if self._dragging and e.button() == Qt.MouseButton.LeftButton:
+            self._dragging = False
+            self.apply_drag(e.scenePos())
+            e.accept()
+        else:
+            super().mouseReleaseEvent(e)
 
 
 class RoofEndMarkerItem(QGraphicsItem):
