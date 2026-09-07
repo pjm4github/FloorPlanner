@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import QDialog, QGraphicsItem, QMenu
 
 from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
+from floorplanner.roofclip import compute_roof_clips
 from floorplanner.walls import WallItem
 
 # how parallel a wall must run to the ridge to count as its eaves reference
@@ -507,6 +508,27 @@ def sync_bound_roofs(scene, floor=None):
     return out
 
 
+def sync_roof_clips(scene, floor=None, exclude=None):
+    """R4d (0164-ruling.md): recompute every roof's intersection clip on
+    `floor` (every floor when None) from the roofs as they are now, and
+    hand each its region/seams/warnings. Called from `RoofItem.rebuild`
+    (so a grip drag or a dialog apply re-clips live), on a roof entering
+    or leaving a scene, and never from paint. `exclude` is a roof on its
+    way out of the scene."""
+    if scene is None:
+        return
+    by_floor = {}
+    for it in scene.items():
+        if (not isinstance(it, RoofItem) or sip.isdeleted(it) or it is exclude
+                or (floor is not None and it.floor != floor)):
+            continue
+        by_floor.setdefault(it.floor, []).append(it)
+    for roofs in by_floor.values():
+        clips = compute_roof_clips(roofs)
+        for rf in roofs:
+            rf.apply_clip(clips[id(rf)])
+
+
 class RoofItem(QGraphicsItem):
     """A gable roof's ridge, drawn in plan: ridge heavy, eaves and gable
     ends dashed -- 0139-ruling.md R2's own 2D overlay convention.
@@ -581,6 +603,13 @@ class RoofItem(QGraphicsItem):
         self.setZValue(WALL_Z + 1)        # reads above walls, like a callout
         self._bounds = QRectF()
         self._path = QPainterPath()
+        # R4d (0164-ruling.md): the intersection clip -- DERIVED, never
+        # stored; None = unclipped. Set only by `sync_roof_clips`.
+        self._clip_region = None
+        self._seams = []
+        self._clip_ext = (0.0, 0.0)
+        self.clip_warnings = []
+        self._syncing_clips = False
         self.marker = RoofEndMarkerItem(self)
         # R4c (0154-ruling.md sec3): five grips, shown only while selected
         self.grips = [RoofGripItem(self, kind) for kind in RoofGripItem.KINDS]
@@ -737,6 +766,29 @@ class RoofItem(QGraphicsItem):
             marker.sync_position()
         for g in getattr(self, "grips", ()):
             g.sync_position()
+        # R4d: any change to this roof's true rectangle re-clips the floor
+        if self.scene() is not None and hasattr(self, "grips"):
+            sync_roof_clips(self.scene(), self.floor)
+
+    def apply_clip(self, clip):
+        """Take a `RoofClip` from `sync_roof_clips`: what to paint and hit
+        while NOT selected. Repaints; never touches the true geometry."""
+        self._clip_region = clip.region
+        self._seams = list(clip.seams)
+        self._clip_ext = tuple(getattr(clip, "ext", (0.0, 0.0)))
+        self.clip_warnings = list(clip.warnings)
+        self.update()
+
+    def is_clipped(self) -> bool:
+        """True while the drawn/hit roof is less than its true rectangle:
+        a clip exists and the roof is not selected (0164-ruling.md sec2:
+        selected = unclipped)."""
+        return self._clip_region is not None and not self.isSelected()
+
+    def seams(self):
+        """The seam segments (solid edges) this roof draws -- `[]` while
+        selected, since the whole rectangle shows then."""
+        return [] if self.isSelected() else list(self._seams)
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
@@ -744,6 +796,18 @@ class RoofItem(QGraphicsItem):
             # shows its plan lines and its marker, nothing to grab
             for g in getattr(self, "grips", ()):
                 g.setVisible(bool(value))
+            # R4d: selected = unclipped; deselect re-clips (the region is
+            # still current -- nothing moved -- so a repaint is the re-clip)
+            self.update()
+        elif change == QGraphicsItem.GraphicsItemChange.ItemSceneHasChanged:
+            # entering a scene: clip against what is there; leaving one:
+            # the others must un-clip against this roof (see removal below)
+            if value is not None and hasattr(self, "grips"):
+                sync_roof_clips(value, self.floor)
+        elif change == QGraphicsItem.GraphicsItemChange.ItemSceneChange:
+            old = self.scene()
+            if value is None and old is not None and hasattr(self, "grips"):
+                sync_roof_clips(old, self.floor, exclude=self)
         return super().itemChange(change, value)
 
     # -- R4c: direct manipulation (0154-ruling.md sec3, the five grips) -----
@@ -832,31 +896,82 @@ class RoofItem(QGraphicsItem):
             return QPainterPath()
         stroker = QPainterPathStroker()
         stroker.setWidth(8.0)
+        if self.is_clipped():
+            # R4d: what paints is what hits (D85's lesson carried) -- the
+            # part beyond the seam is neither drawn nor clickable, and the
+            # seam itself is. Same clipped segments paint() draws.
+            path = QPainterPath()
+            for p, q in self._drawn_lines() + list(self._seams):
+                path.moveTo(p)
+                path.lineTo(q)
+            return stroker.createStroke(path)
         return stroker.createStroke(self._path)
+
+    def _plan_lines(self):
+        """Every plan line paint() draws, as `(kind, p, q)`: the dashed
+        eave/end/hip lines and the heavy ridge -- one list, so the clipped
+        and unclipped paths and the hit shape all agree. While clipped, a
+        JOINED end (R4d: `_clip_ext` > 0 there) draws its eaves on into
+        the extension and no end line at all -- the end is inside the
+        other roof, not open (roofclip.py's module docstring)."""
+        e1a, e1b, e2a, e2b = self._eave_ends()
+        ext0, ext1 = self._clip_ext if self.is_clipped() else (0.0, 0.0)
+        joined0, joined1 = ext0 > 1e-6, ext1 > 1e-6
+        if joined0 or joined1:
+            ux, uy, _, _ = self._axis()
+            e1a = QPointF(e1a.x() - ux * ext0, e1a.y() - uy * ext0)
+            e2a = QPointF(e2a.x() - ux * ext0, e2a.y() - uy * ext0)
+            e1b = QPointF(e1b.x() + ux * ext1, e1b.y() + uy * ext1)
+            e2b = QPointF(e2b.x() + ux * ext1, e2b.y() + uy * ext1)
+        lines = [("dash", e1a, e1b), ("dash", e2a, e2b)]
+        if not joined0:
+            lines.append(("dash", e1a, e2a))
+            if not self.gable[0]:
+                lines += [("dash", self.p1, e1a), ("dash", self.p1, e2a)]
+        if not joined1:
+            lines.append(("dash", e1b, e2b))
+            if not self.gable[1]:
+                lines += [("dash", self.p2, e1b), ("dash", self.p2, e2b)]
+        lines.append(("ridge", self.p1, self.p2))
+        return lines
+
+    def _drawn_lines(self):
+        """The plan lines clipped to the visible region (R4d), as `(p, q)`
+        segments; every line when not clipped."""
+        out = []
+        for _, p, q in self._plan_lines():
+            if self.is_clipped():
+                out.extend(self._clip_region.clip_segment(p, q))
+            else:
+                out.append((p, q))
+        return out
 
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         ghost = floor_display_mode(self.floor) != "active"
         ink = FLOOR_GHOST if ghost else QColor(133, 77, 14)  # roof-brown
-        e1a, e1b, e2a, e2b = self._eave_ends()
-        painter.setPen(QPen(ink, 1.4, Qt.PenStyle.DashLine))
-        painter.drawLine(e1a, e1b)
-        painter.drawLine(e2a, e2b)
-        # each end's own line: a gable line across the ridge end, or -- for
-        # a hip end (R4b) -- the END EAVE beyond it plus the two hip lines
-        # running from the ridge end down to that eave's corners
-        painter.drawLine(e1a, e2a)
-        painter.drawLine(e1b, e2b)
-        if not self.gable[0]:
-            painter.drawLine(self.p1, e1a)
-            painter.drawLine(self.p1, e2a)
-        if not self.gable[1]:
-            painter.drawLine(self.p2, e1b)
-            painter.drawLine(self.p2, e2b)
+        clipped = self.is_clipped()
+        # the dashed lines: both eaves, each end's own line (a gable line
+        # across the ridge end, or -- for a hip end, R4b -- the END EAVE
+        # beyond it plus the two hip lines down to its corners), then the
+        # heavy ridge. R4d: while clipped, every line is drawn only where
+        # it lies inside the visible region (exact segment clipping,
+        # `roofclip.ClipRegion`), and the seam is drawn after, solid -- a
+        # real edge, distinct from the dashed lines.
+        dash = QPen(ink, 1.4, Qt.PenStyle.DashLine)
         heavy = QPen(ink, 3.0, Qt.PenStyle.SolidLine)
         heavy.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(heavy)
-        painter.drawLine(self.p1, self.p2)
+        for kind, p, q in self._plan_lines():
+            painter.setPen(heavy if kind == "ridge" else dash)
+            segs = self._clip_region.clip_segment(p, q) if clipped else [(p, q)]
+            for a, b in segs:
+                painter.drawLine(a, b)
+        if clipped:
+            seam_pen = QPen(ink, 2.0, Qt.PenStyle.SolidLine)   # a real edge
+            seam_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            painter.setPen(seam_pen)
+            for p, q in self._seams:
+                painter.drawLine(p, q)
         if self.isSelected():
             # Patrick's own check of R4b: the selection must hug the roof
             # -- the eave rectangle, oriented with the ridge -- not the
