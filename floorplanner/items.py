@@ -18,7 +18,7 @@ from floorplanner.rooms import (
     RoomItem, report_self_intersections, room_owns_walls, walls_cover_room,
     rooms_holding,
 )
-from floorplanner.roofs import RoofEndMarkerItem, RoofItem
+from floorplanner.roofs import RoofEndMarkerItem, RoofGripItem, RoofItem
 
 # Stairs — a dynamic "Framing" furnishing: step count from the room's ceiling
 # height (standard ~7" risers); full or half flight to a landing.
@@ -1265,7 +1265,8 @@ class ReferenceImageItem(QGraphicsItem):
 #: silently winning every right-click meant for a ridge drawn over it, since
 #: an unlisted type's rank (`len(HIT_PRIORITY)`) is worse than `RoomItem`'s.
 #: Caught from Patrick's own report, not a test.
-HIT_PRIORITY = (RoofEndMarkerItem, OpeningItem, FurnishingItem, WallItem,
+HIT_PRIORITY = (RoofEndMarkerItem, RoofGripItem, OpeningItem, FurnishingItem,
+                WallItem,
                 RoofItem, GroupItem, RoomItem, ReferenceImageItem)
 
 
