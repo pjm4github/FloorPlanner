@@ -858,3 +858,112 @@ def test_a_legacy_roof_with_no_span_in_still_derives_a_symmetric_span(fp3d):
     assert not model.notes, model.notes
     mesh = _roof_mesh(model)
     assert len(mesh.faces) == 2 * 12 + 2 * 8    # same shape as the R3 receipt
+
+
+# --------------------------------------------------------------------------
+# R4e (0167-report.md sec2): the 3D roof meshes are built from the same
+# intersection clip the plan draws
+# --------------------------------------------------------------------------
+def _two_roof_doc(roofs):
+    return {"levels": [{"id": "L1", "elevation_in": 0.0, "height_in": 96.0}],
+            "vertices": [], "walls": [], "rooms": [], "furnishings": [],
+            "roofs": roofs}
+
+
+def _verts_at(mesh, x, y, tol=1e-3):
+    """World-frame vertices at plan (x, y) -- world y is -y -- as z values."""
+    return sorted(round(float(v[2]), 3) for v in mesh.verts
+                  if abs(float(v[0]) - x) < tol and abs(float(v[1]) + y) < tol)
+
+
+_MAIN = {"id": "m", "level": "L1", "ridge": [[0, 200], [400, 200]],
+         "eaves_h_in": 96.0, "ridge_h_in": 150.0, "overhang_in": [0, 0],
+         "span_in": [100, 100], "gable": [True, True]}
+_WING = {"id": "w", "level": "L1", "ridge": [[200, 150], [200, 500]],
+         "eaves_h_in": 96.0, "ridge_h_in": 130.0, "overhang_in": [0, 0],
+         "span_in": [60, 60], "gable": [True, True]}
+
+
+def test_roofclip_loads_by_path(fp3d):
+    assert fp3d.ROOFCLIP is not None, "roofclip.py must load standalone"
+
+
+def test_a_lone_roof_builds_exactly_as_before_r4e(fp3d):
+    """The unclipped path is untouched: same faces as R3's own count."""
+    model = fp3d.build_model(_two_roof_doc([_MAIN]), furnishings=False, floors=False)
+    mesh = _roof_mesh(model)
+    assert len(mesh.faces) == 2 * 12 + 2 * 8
+    assert not model.info
+
+
+def test_a_clipped_wing_stops_at_the_seam_in_3d(fp3d):
+    """The T (test_roof_intersection.py's fixture): the wing's ridge past
+    the valley apex (plan y < 237.037) is under the main and must not be
+    in the mesh; the main shows through at the wing's far ridge end; the
+    apex itself is a shared vertex at the wing's ridge height on BOTH
+    roofs' cells (the seam, z1 == z2)."""
+    model = fp3d.build_model(_two_roof_doc([_MAIN, _WING]), furnishings=False,
+                             floors=False)
+    mesh = _roof_mesh(model)
+    apex_y = 200.0 + (150.0 - 130.0) / 0.54
+    # the wing's far ridge end: no vertex at the WING's height there ...
+    zs = _verts_at(mesh, 200.0, 150.0)
+    assert 130.0 not in zs and (130.0 - fp3d.ROOF_T) not in zs
+    # ... but the main's surface is there (z = 150 - 0.54 * 50 = 123)
+    assert 123.0 in zs
+    # the apex: both roofs meet at 130
+    assert 130.0 in _verts_at(mesh, 200.0, apex_y, tol=1e-2)
+    # nothing of the wing's ridge in the hidden band under the main: strictly
+    # between the island edge (y = 162.963, where the MAIN itself is at 130)
+    # and the apex, the main is above 130, so any z = 130 vertex on the
+    # wing's ridge line there could only be the wing's
+    island_y = 200.0 - (150.0 - 130.0) / 0.54
+    hidden = [v for v in mesh.verts
+              if abs(float(v[0]) - 200.0) < 1e-3
+              and island_y + 1e-3 < -float(v[1]) < apex_y - 1e-3
+              and abs(float(v[2]) - 130.0) < 1e-6]
+    assert hidden == []
+    assert not model.notes
+
+
+def test_an_equal_height_l_has_no_poke_through_in_3d(fp3d):
+    """Patrick's own 3D picture: roof A's ridge past the apex poked out
+    through B. Now A's ridge END (450,200) carries only B's surface height
+    (131.3), never A's 150, and the outer corner (441.4,100) is a shared
+    seam vertex at the eaves height."""
+    s = 0.7071067811865476
+    a = {"id": "A", "level": "L1", "ridge": [[0, 200], [450, 200]],
+         "eaves_h_in": 96.0, "ridge_h_in": 150.0, "overhang_in": [0, 0],
+         "span_in": [100, 100], "gable": [True, True]}
+    b = {"id": "B", "level": "L1",
+         "ridge": [[400, 200], [400 + 300 * s, 200 + 300 * s]],
+         "eaves_h_in": 96.0, "ridge_h_in": 150.0, "overhang_in": [0, 0],
+         "span_in": [100, 100], "gable": [True, True]}
+    model = fp3d.build_model(_two_roof_doc([a, b]), furnishings=False, floors=False)
+    mesh = _roof_mesh(model)
+    zs = _verts_at(mesh, 450.0, 200.0)
+    assert 150.0 not in zs, "A's ridge end must not be at ridge height"
+    assert zs and max(zs) < 132.0                      # B's slope there
+    k = 2 ** 0.5 - 1
+    assert 96.0 in _verts_at(mesh, 400 + k * 100, 100.0, tol=1e-2)   # outer corner
+    assert 150.0 in _verts_at(mesh, 400.0, 200.0)                    # the apex
+
+
+def test_roof_geom_matches_the_editor_item_on_the_same_data(fp3d):
+    """The Qt-free twin (`RoofGeom`) must give the editor's own eave ends
+    for the same record -- including a hip end's extension."""
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PyQt6.QtCore import QPointF
+    from PyQt6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    from floorplanner.roofs import RoofItem
+    rec = {"ridge": [[50, 100], [250, 100]], "eaves_h_in": 96.0,
+           "ridge_h_in": 132.0, "overhang_in": [6, 10], "span_in": [80, 120],
+           "gable": [False, True]}
+    geom = fp3d.ROOFCLIP.RoofGeom.from_record(rec)
+    item = RoofItem(QPointF(50, 100), QPointF(250, 100), span_in=[80, 120],
+                    overhang_in=[6, 10], gable=[False, True])
+    for g, i in zip(geom._eave_ends(), item._eave_ends(), strict=True):
+        assert (g.x(), g.y()) == pytest.approx((i.x(), i.y()))
+    assert geom.hip_extension(0) == item.hip_extension(0)

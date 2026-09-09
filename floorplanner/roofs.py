@@ -774,7 +774,10 @@ class RoofItem(QGraphicsItem):
         """Take a `RoofClip` from `sync_roof_clips`: what to paint and hit
         while NOT selected. Repaints; never touches the true geometry."""
         self._clip_region = clip.region
-        self._seams = list(clip.seams)
+        # roofclip.py is Qt-free (R4e): its points come back as plain
+        # `Pt`s -- QPointF from here on, since these get drawn
+        self._seams = [(QPointF(p.x(), p.y()), QPointF(q.x(), q.y()))
+                       for p, q in clip.seams]
         self._clip_ext = tuple(getattr(clip, "ext", (0.0, 0.0)))
         self.clip_warnings = list(clip.warnings)
         self.update()
@@ -941,10 +944,15 @@ class RoofItem(QGraphicsItem):
         out = []
         for _, p, q in self._plan_lines():
             if self.is_clipped():
-                out.extend(self._clip_region.clip_segment(p, q))
+                out.extend(self._clipped(p, q))
             else:
                 out.append((p, q))
         return out
+
+    def _clipped(self, p, q):
+        """`p`-`q` clipped to the visible region, as QPointF pairs."""
+        return [(QPointF(a.x(), a.y()), QPointF(b.x(), b.y()))
+                for a, b in self._clip_region.clip_segment(p, q)]
 
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -963,7 +971,7 @@ class RoofItem(QGraphicsItem):
         heavy.setCapStyle(Qt.PenCapStyle.RoundCap)
         for kind, p, q in self._plan_lines():
             painter.setPen(heavy if kind == "ridge" else dash)
-            segs = self._clip_region.clip_segment(p, q) if clipped else [(p, q)]
+            segs = self._clipped(p, q) if clipped else [(p, q)]
             for a, b in segs:
                 painter.drawLine(a, b)
         if clipped:

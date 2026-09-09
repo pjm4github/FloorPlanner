@@ -88,6 +88,27 @@ def _load_wall_thickness():
         return {"exterior": 6.0, "interior": 4.5, "partition": 3.5}
 
 
+def _load_roofclip():
+    """R4e (0167-report.md sec2): the roof intersection clip the plan draws,
+    `floorplanner/roofclip.py`, loaded BY PATH for the same reason
+    `validate.py` is -- importing the package would drag in the editor.
+    `roofclip.py` is plain Python (points are its own `Pt`), so loading it
+    standalone is safe. None when it cannot be found: the meshes then
+    build unclipped, as they did before R4e, and a note says so."""
+    import importlib.util
+    here = os.path.dirname(os.path.abspath(__file__))
+    cand = os.path.join(os.path.dirname(here), "roofclip.py")
+    try:
+        spec = importlib.util.spec_from_file_location("_fp_roofclip", cand)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except (OSError, AttributeError, ImportError):
+        return None
+
+
+ROOFCLIP = _load_roofclip()
+
 WALL_T = _load_wall_thickness()  # thickness by type, inches -- the MODEL's
 WALL_H = {                       # height by type; None = full level height
     "exterior": None, "interior": None, "partition": None,
@@ -1338,6 +1359,33 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                     best = d
             return best if best is not None else ROOF_DEFAULT_HALF_SPAN_IN
 
+        # R4e (0167-report.md sec2): the intersection clip, computed on
+        # the document's own roofs per level -- the same pure function the
+        # plan draws from -- BEFORE any mesh is built. A roof with no
+        # partner (clip region None) builds exactly as it did before R4e.
+        clips = {}
+        if ROOFCLIP is not None:
+            geoms_by_level = {}
+            for rf in doc.get("roofs", []):
+                rid, lid = rf.get("id", "?"), rf.get("level")
+                ridge = rf.get("ridge") or []
+                if lid not in lv or len(ridge) != 2:
+                    continue
+                w1 = (float(ridge[0][0]), -float(ridge[0][1]))
+                w2 = (float(ridge[1][0]), -float(ridge[1][1]))
+                if math.hypot(w2[0] - w1[0], w2[1] - w1[1]) < 1e-6:
+                    continue
+                geom = ROOFCLIP.RoofGeom.from_record(
+                    rf, span_fallback=nearest_span(lid, w1, w2))
+                geoms_by_level.setdefault(lid, []).append((rid, geom))
+            for pairs in geoms_by_level.values():
+                per = ROOFCLIP.compute_roof_clips([g for _, g in pairs])
+                for rid, g in pairs:
+                    clips[rid] = (g, per[id(g)])
+        else:
+            model.info.append("roof clip unavailable (roofclip.py not "
+                              "found) -- roofs drawn unclipped")
+
         roof_parts = []
         for rf in doc.get("roofs", []):
             rid = rf.get("id", "?")
@@ -1357,6 +1405,40 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 continue
             ux, uy = (p2[0] - p1[0]) / ridge_len, (p2[1] - p1[1]) / ridge_len
             nx, ny = -uy, ux
+
+            geom, clip = clips.get(rid, (None, None))
+            if clip is not None and clip.region is not None:
+                # CLIPPED: build the mesh from the visible region's cells.
+                # Each cell is split by this roof's own plane boundaries
+                # (its ridge line and any hip end's equal-height lines) so
+                # every piece lies in ONE plane, then lifted onto the
+                # surface -- z from the same `surface_height` the plan's
+                # seam was found with -- and emitted in this file's world
+                # frame (x, -y, z). The seam in 3D falls out where the two
+                # roofs' cells meet at equal height; a JOINED end (clip.ext
+                # > 0 there) gets no end face -- it is inside the other
+                # roof; an unjoined GABLE end keeps its vertical triangle.
+                z0 = base(lid)
+                pieces = list(clip.region.cells)
+                for pt, d in ROOFCLIP._cut_lines(geom):
+                    pieces = [q for cell in pieces
+                              for q in ROOFCLIP._split_by_line(cell, pt, d)]
+                for piece in pieces:
+                    ring = [(c.x(), -c.y(), z0 + ROOFCLIP.surface_height(geom, c))
+                            for c in piece]
+                    roof_parts.append(_prism_slab(ring, ROOF_T))
+                e1a, e1b, e2a, e2b = geom._eave_ends()
+                for end, (apex, ea, eb) in enumerate(
+                        ((geom.p1, e1a, e2a), (geom.p2, e1b, e2b))):
+                    if clip.ext[end] > 1e-6 or not geom.gable[end]:
+                        continue
+                    ring = [(c.x(), -c.y(), z0 + ROOFCLIP.surface_height(geom, c))
+                            for c in (apex, ea, eb)]
+                    roof_parts.append(_prism_slab(ring, ROOF_T))
+                for w in clip.warnings:
+                    model.info.append(f"roof {rid}: {w}")
+                n_roof += 1
+                continue
 
             # R4a: span_in/overhang_in are [left, right] in PLAN space
             # (roofs.py's own convention: left = the ridge direction's own

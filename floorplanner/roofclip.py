@@ -50,13 +50,13 @@ and its end line there -- a gable line, or a hip end's eave and hip lines
 part of the `RoofClip` (`ext`), derived like everything else.
 
 EVERYTHING IS OUR OWN CONVEX-POLYGON ARITHMETIC, on plain lists of
-`QPointF`. A region is a list of convex cells, a point is inside if any
+the editor's point type. A region is a list of convex cells, a point is inside if any
 cell holds it, and a drawn line is clipped to the region segment by
 segment (Cyrus-Beck), so the paint, the hit shape and the tests all read
-the same exact geometry -- no `QPainterPath` booleans, whose results on
+the same exact geometry -- no the toolkit's path type booleans, whose results on
 touching-edge input are not something this module wants to depend on.
 One trap measured while building this, and the reason `footprint_polygon`
-returns COPIES: iterating a temporary `QPolygonF` yields points that alias
+returns COPIES: iterating a temporary toolkit polygon yields points that alias
 its buffer, and once the polygon is collected those points read whatever
 lives there next (another roof's corners, in the run that found it) --
 the same class as `fp_extract.py`'s `QImage` buffer trap in CLAUDE.md.
@@ -67,12 +67,37 @@ Degenerate pairs -- a cell where the difference is zero everywhere
 fallback): never a crash, never a silent guess.
 
 Scope: roofs on the SAME floor clip each other; nothing else.
+
+QT-FREE (R4e, 0167-report.md sec2): `viewer/fp3d.py` builds the 3D roof
+meshes from this same clip, and that file is deliberately free of the Qt
+bindings (loaded by path, source-grep-guarded -- CLAUDE.md), so this module
+speaks plain points. A point is anything with `.x()` and `.y()` -- the
+editor's own point type passes straight in -- and every point this module
+CREATES is a `Pt`. `roofs.py` converts back to its own type where it draws.
+`RoofGeom` is the Qt-free twin of `RoofItem`'s geometry, built from a
+document record, so a document alone (no scene) can be clipped.
 """
 import math
 from typing import NamedTuple
 
-from PyQt6.QtCore import QPointF, Qt
-from PyQt6.QtGui import QPainterPath, QPolygonF
+
+class Pt:
+    """A plain plan point with the editor point type's accessor spelling."""
+    __slots__ = ("_x", "_y")
+
+    def __init__(self, x, y=None):
+        if y is None:                 # copy-construct from anything point-like
+            x, y = x.x(), x.y()
+        self._x, self._y = float(x), float(y)
+
+    def x(self):
+        return self._x
+
+    def y(self):
+        return self._y
+
+    def __repr__(self):
+        return f"Pt({self._x:.3f}, {self._y:.3f})"
 
 EPS = 1e-6            # inches / height units: "equal" for seam and degeneracy
 MIN_CELL_AREA = 1e-3  # a sliver below this is float noise, not a cell
@@ -90,7 +115,7 @@ class RoofClip(NamedTuple):
 
 
 # ---------------------------------------------------------------------------
-# convex polygon tools (a polygon is a list of QPointF, any winding)
+# convex polygon tools (a polygon is a list of editor point, any winding)
 # ---------------------------------------------------------------------------
 def _area(poly) -> float:
     n = len(poly)
@@ -112,7 +137,7 @@ def _clip_by_values(poly, vals):
             kept.append(p)
         if (vp < 0) != (vq < 0) and abs(vp - vq) > EPS:
             t = vp / (vp - vq)
-            x = QPointF(p.x() + (q.x() - p.x()) * t, p.y() + (q.y() - p.y()) * t)
+            x = Pt(p.x() + (q.x() - p.x()) * t, p.y() + (q.y() - p.y()) * t)
             kept.append(x)
             crossings.append(x)
     # a crossing that lands on a kept vertex (a value exactly 0) would
@@ -127,7 +152,7 @@ def _clip_by_values(poly, vals):
     return clean, crossings
 
 
-def _split_by_line(poly, a: QPointF, d: QPointF):
+def _split_by_line(poly, a, d):
     """Cut convex `poly` by the infinite line through `a` with direction
     `d`; returns the non-empty pieces (1 or 2)."""
     vals = [(p.x() - a.x()) * d.y() - (p.y() - a.y()) * d.x() for p in poly]
@@ -138,8 +163,8 @@ def _split_by_line(poly, a: QPointF, d: QPointF):
     return [q for q in (left, right) if len(q) >= 3 and _area(q) > MIN_CELL_AREA]
 
 
-def _centroid(poly) -> QPointF:
-    return QPointF(sum(p.x() for p in poly) / len(poly),
+def _centroid(poly):
+    return Pt(sum(p.x() for p in poly) / len(poly),
                    sum(p.y() for p in poly) / len(poly))
 
 
@@ -168,7 +193,7 @@ def _convex_intersection(a, b):
     return out if len(out) >= 3 and _area(out) > MIN_CELL_AREA else []
 
 
-def _contains(poly, pt: QPointF, tol: float = 1e-6) -> bool:
+def _contains(poly, pt, tol: float = 1e-6) -> bool:
     """Point in convex polygon; `tol` > 0 is boundary-inclusive, < 0
     strictly interior by that margin."""
     n = len(poly)
@@ -188,7 +213,7 @@ def _contains(poly, pt: QPointF, tol: float = 1e-6) -> bool:
     return True
 
 
-def _clip_segment(poly, p: QPointF, q: QPointF):
+def _clip_segment(poly, p, q):
     """The part of segment p-q inside convex `poly` (Cyrus-Beck), or None."""
     t0, t1 = 0.0, 1.0
     c = _centroid(poly)
@@ -213,8 +238,8 @@ def _clip_segment(poly, p: QPointF, q: QPointF):
             return None
     if t1 - t0 < EPS:
         return None
-    return (QPointF(p.x() + dx * t0, p.y() + dy * t0),
-            QPointF(p.x() + dx * t1, p.y() + dy * t1))
+    return (Pt(p.x() + dx * t0, p.y() + dy * t0),
+            Pt(p.x() + dx * t1, p.y() + dy * t1))
 
 
 def _dist_to_segment(p, a, b) -> float:
@@ -238,7 +263,7 @@ def _adjacent(a, b, tol: float = 1e-5) -> bool:
             p, q = x[i], x[(i + 1) % n]
             if math.hypot(q.x() - p.x(), q.y() - p.y()) < tol:
                 continue
-            mid = QPointF((p.x() + q.x()) / 2.0, (p.y() + q.y()) / 2.0)
+            mid = Pt((p.x() + q.x()) / 2.0, (p.y() + q.y()) / 2.0)
             if any(_dist_to_segment(mid, y[j], y[(j + 1) % m]) < tol
                    for j in range(m)):
                 return True
@@ -247,18 +272,17 @@ def _adjacent(a, b, tol: float = 1e-5) -> bool:
 
 class ClipRegion:
     """A visible region as a list of convex cells -- the only geometry
-    the item ever consults: `contains(pt)`, `clip_segment(p, q)` for
-    drawing and hit-testing, `path()` for anything that wants a
-    `QPainterPath` (winding fill, so adjacent cells read as one area)."""
+    the item (and fp3d) ever consults: `contains(pt)`, `clip_segment(p,
+    q)` for drawing and hit-testing, `cells` themselves for the 3D mesh."""
 
     def __init__(self, cells):
         self.cells = [list(c) for c in cells if len(c) >= 3]
         self.ext = (0.0, 0.0)
 
-    def contains(self, pt: QPointF) -> bool:
+    def contains(self, pt) -> bool:
         return any(_contains(c, pt) for c in self.cells)
 
-    def clip_segment(self, p: QPointF, q: QPointF):
+    def clip_segment(self, p, q):
         out = []
         for c in self.cells:
             seg = _clip_segment(c, p, q)
@@ -269,13 +293,89 @@ class ClipRegion:
     def area(self) -> float:
         return sum(_area(c) for c in self.cells)
 
-    def path(self) -> QPainterPath:
-        path = QPainterPath()
-        path.setFillRule(Qt.FillRule.WindingFill)
-        for c in self.cells:
-            path.addPolygon(QPolygonF(c))
-            path.closeSubpath()
-        return path
+
+# ---------------------------------------------------------------------------
+# a roof's geometry without the scene: the document record's twin
+# ---------------------------------------------------------------------------
+class RoofGeom:
+    """`RoofItem`'s geometry API (`p1`/`p2`, `_axis`, `_eave_ends`,
+    `hip_extension`, `length`, the heights and per-side fields) rebuilt
+    from a document `roof` record -- so `fp3d.py` can clip a document
+    with no scene at all. The formulas are `roofs.py`'s, line for line
+    (tests cross-check the two on the same data); `span_in`/`overhang_in`
+    accept the pre-R4a bare-number shape the way the loader does."""
+
+    def __init__(self, p1, p2, span_in, overhang_in, ridge_h_in, eaves_h_in,
+                 gable=None, name=None):
+        # read-only, like RoofItem's: the gate's end-assignment census
+        # polices the literal `.p1 =` spelling project-wide
+        self._p1, self._p2 = Pt(p1), Pt(p2)
+        self.span_in = self._pair(span_in)
+        self.overhang_in = self._pair(overhang_in)
+        self.ridge_h_in = float(ridge_h_in)
+        self.eaves_h_in = float(eaves_h_in)
+        self.gable = list(gable) if gable is not None else [True, True]
+        self.clip_name = name
+
+    @staticmethod
+    def _pair(value):
+        if isinstance(value, (list, tuple)):
+            return [float(value[0]), float(value[1])]
+        return [float(value), float(value)]
+
+    @classmethod
+    def from_record(cls, rec, span_fallback=144.0):
+        """From a `roof` document record; a pre-R4a record (no `span_in`)
+        takes `span_fallback` both sides -- the caller decides what that
+        is (fp3d's own nearest-wall search)."""
+        ridge = rec["ridge"]
+        return cls(Pt(ridge[0][0], ridge[0][1]), Pt(ridge[1][0], ridge[1][1]),
+                   rec.get("span_in", span_fallback),
+                   rec.get("overhang_in", 0.0) or 0.0,
+                   rec.get("ridge_h_in", 132.0), rec.get("eaves_h_in", 96.0),
+                   rec.get("gable") or [True, True], rec.get("id"))
+
+    @property
+    def p1(self):
+        return self._p1
+
+    @property
+    def p2(self):
+        return self._p2
+
+    def length(self) -> float:
+        return math.hypot(self.p2.x() - self.p1.x(), self.p2.y() - self.p1.y())
+
+    def _axis(self):
+        dx, dy = self.p2.x() - self.p1.x(), self.p2.y() - self.p1.y()
+        ln = math.hypot(dx, dy) or 1.0
+        return dx / ln, dy / ln, -dy / ln, dx / ln
+
+    def hip_extension(self, end, gable=None, span=None):
+        flags = self.gable if gable is None else gable
+        spans = self.span_in if span is None else span
+        if flags[end]:
+            return 0.0, 0.0
+        return ((spans[0] + spans[1]) / 2.0,
+                (self.overhang_in[0] + self.overhang_in[1]) / 2.0)
+
+    def _extended_ridge(self, gable=None):
+        ux, uy, _, _ = self._axis()
+        r1, o1 = self.hip_extension(0, gable)
+        r2, o2 = self.hip_extension(1, gable)
+        e1, e2 = r1 + o1, r2 + o2
+        return (Pt(self.p1.x() - ux * e1, self.p1.y() - uy * e1),
+                Pt(self.p2.x() + ux * e2, self.p2.y() + uy * e2))
+
+    def _eave_ends(self):
+        _, _, nx, ny = self._axis()
+        a1, a2 = self._extended_ridge()
+        reach_l = self.span_in[0] + self.overhang_in[0]
+        reach_r = self.span_in[1] + self.overhang_in[1]
+        return (Pt(a1.x() + nx * reach_l, a1.y() + ny * reach_l),
+                Pt(a2.x() + nx * reach_l, a2.y() + ny * reach_l),
+                Pt(a1.x() - nx * reach_r, a1.y() - ny * reach_r),
+                Pt(a2.x() - nx * reach_r, a2.y() - ny * reach_r))
 
 
 # ---------------------------------------------------------------------------
@@ -292,7 +392,7 @@ def _slopes(rf):
     return (rise / sl if sl > EPS else 0.0), (rise / sr if sr > EPS else 0.0)
 
 
-def surface_height(rf, pt: QPointF) -> float:
+def surface_height(rf, pt) -> float:
     """The roof surface's height at plan point `pt` -- the level-base datum
     every roof height uses. Valid over the footprint; outside it the side
     planes simply continue (callers never ask there)."""
@@ -315,16 +415,16 @@ def surface_height(rf, pt: QPointF) -> float:
 def footprint_polygon(rf, ext=(0.0, 0.0)):
     """The outer eave rectangle (overhang and hip extensions included) --
     the region the roof paints, and the domain of its surface -- as a
-    list of four fresh `QPointF`s (module docstring: never points that
-    alias a temporary `QPolygonF`). `ext` pushes end 0 / end 1 outward
+    list of four fresh the editor's point types (module docstring: never points that
+    alias a temporary toolkit polygon). `ext` pushes end 0 / end 1 outward
     along the ridge axis (a joining end, module docstring)."""
     e1a, e1b, e2a, e2b = rf._eave_ends()
     ux, uy, _, _ = rf._axis()
     e0, e1 = ext
-    return [QPointF(e1a.x() - ux * e0, e1a.y() - uy * e0),
-            QPointF(e1b.x() + ux * e1, e1b.y() + uy * e1),
-            QPointF(e2b.x() + ux * e1, e2b.y() + uy * e1),
-            QPointF(e2a.x() - ux * e0, e2a.y() - uy * e0)]
+    return [Pt(e1a.x() - ux * e0, e1a.y() - uy * e0),
+            Pt(e1b.x() + ux * e1, e1b.y() + uy * e1),
+            Pt(e2b.x() + ux * e1, e2b.y() + uy * e1),
+            Pt(e2a.x() - ux * e0, e2a.y() - uy * e0)]
 
 
 def _diagonal(poly) -> float:
@@ -348,7 +448,7 @@ def _cut_lines(rf):
     the hip plane meets each side plane (through the ridge end; for a
     symmetric roof, exactly the drawn hip lines)."""
     p1, ux, uy, nx, ny = _frame(rf)
-    lines = [(QPointF(p1), QPointF(ux, uy))]
+    lines = [(Pt(p1), Pt(ux, uy))]
     slope_l, slope_r = _slopes(rf)
     L = rf.length()
     for end in (0, 1):
@@ -356,7 +456,7 @@ def _cut_lines(rf):
         if run <= EPS:
             continue
         slope_h = (rf.ridge_h_in - rf.eaves_h_in) / run
-        end_pt = QPointF(p1.x() + ux * (0.0 if end == 0 else L),
+        end_pt = Pt(p1.x() + ux * (0.0 if end == 0 else L),
                          p1.y() + uy * (0.0 if end == 0 else L))
         out = -1.0 if end == 0 else 1.0        # "beyond" direction along u
         for sign, slope_s in ((1.0, slope_l), (-1.0, slope_r)):
@@ -366,7 +466,7 @@ def _cut_lines(rf):
             # n: sign*slope_h), any positive scale
             dirx = ux * out * slope_s + nx * sign * slope_h
             diry = uy * out * slope_s + ny * sign * slope_h
-            lines.append((QPointF(end_pt), QPointF(dirx, diry)))
+            lines.append((Pt(end_pt), Pt(dirx, diry)))
     return lines
 
 
@@ -381,7 +481,7 @@ def _root_cells(footprint, overlap):
     n = len(overlap)
     for i in range(n):
         a, b = overlap[i], overlap[(i + 1) % n]
-        d = QPointF(b.x() - a.x(), b.y() - a.y())
+        d = Pt(b.x() - a.x(), b.y() - a.y())
         cells = [piece for cell in cells for piece in _split_by_line(cell, a, d)]
     return [c for c in cells if not _contains(overlap, _centroid(c), tol=-1e-6)]
 
@@ -529,9 +629,9 @@ def _strip(rf, fp_nom, fp_ext):
     # strip = the extended rectangle cut off at the nominal end edge
     ux, uy, _, _ = rf._axis()
     edge_a, edge_b = (fp_nom[0], fp_nom[3]) if end == 0 else (fp_nom[1], fp_nom[2])
-    d = QPointF(edge_b.x() - edge_a.x(), edge_b.y() - edge_a.y())
+    d = Pt(edge_b.x() - edge_a.x(), edge_b.y() - edge_a.y())
     pieces = _split_by_line(list(fp_ext), edge_a, d)
-    outward = QPointF(-ux, -uy) if end == 0 else QPointF(ux, uy)
+    outward = Pt(-ux, -uy) if end == 0 else Pt(ux, uy)
     c_nom = _centroid(fp_nom)
     for piece in pieces:
         c = _centroid(piece)
