@@ -568,14 +568,16 @@ def test_r4f_a_two_roof_pair_inside_a_three_roof_call_is_unaffected(scene):
                                (200.0, round(APEX_Y, 3))}
 
 
-def test_r4f_drawn_by_nobody_stays_a_small_measured_minority():
-    """A pairwise-composed construction (still what this is, even with
-    both seam filters -- see the module-level `compute_roof_clips`
-    docstring) can leave a small residual patch belonging to no roof near
-    a genuine three-way junction, the same CLASS the two-roof algorithm's
-    own docstring already accepts ('a corner past the seam ... drawn by
-    nobody'). Measured here, not hidden, and guarded against a silent
-    regression -- not a claim of zero."""
+def test_r4f_a_genuine_three_way_junction_leaves_nothing_drawn_by_nobody():
+    """His own check found the FIRST cut's residual patch visually --
+    a real hole in the 3D roof at the junction, not a benign sliver.
+    `_fill_unclaimed_ground` closes it: any ground three or more roofs
+    fought over that the pairwise fold could not assign to either
+    partner goes to whichever covering roof is highest there, once every
+    already-decided region and seam is subtracted out first. Scoped to
+    3+ roofs on purpose -- the TWO-roof "corner past the seam ... drawn
+    by nobody" behaviour (D85, tested below) is untouched, matching
+    0170-ruling.md's own regression clause."""
     roofs = _three_ridge_roofs()
     clips = compute_roof_clips(roofs)
     fps = [footprint_polygon(g) for g in roofs]
@@ -594,4 +596,18 @@ def test_r4f_drawn_by_nobody_stays_a_small_measured_minority():
             if not any(clips[id(g)].region is not None
                       and clips[id(g)].region.contains(pt) for g in roofs):
                 gap += 1
-    assert gap / in_any < 0.06, f"drawn-by-nobody grew to {gap}/{in_any}"
+    assert gap == 0, f"drawn-by-nobody: {gap}/{in_any}"
+
+
+def test_r4f_the_fill_pass_never_touches_a_two_roof_corner():
+    """0170-ruling.md's own regression clause, for the fill pass
+    specifically: the L-case's deliberately-unclaimed corner past the
+    seam (D85, `test_a_s_corner_past_the_seam_draws_no_line_of_a`) must
+    stay nobody's even though `compute_roof_clips` now runs a gap-fill
+    pass -- it only ever engages at three or more touched roofs."""
+    a, b = _l_pair()
+    region_a, region_b, _, _ = clip_pair(a, b)
+    corner = QPointF(447, 103)
+    clips = compute_roof_clips([a, b])
+    assert not clips[id(a)].region.contains(corner)
+    assert not clips[id(b)].region.contains(corner)

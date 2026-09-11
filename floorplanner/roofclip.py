@@ -702,20 +702,27 @@ def compute_roof_clips(roofs) -> dict:
     third partner exists to remove any ground) -- the T/L regression this
     ruling names.
 
-    MEASURED, NOT CLAIMED PERFECT: at a genuine three-or-more-way
-    junction this pairwise-composed construction can still leave a small
-    residual patch "drawn by nobody" near the meeting point -- the same
-    CLASS the pairwise algorithm's own module docstring already accepts
-    for two roofs ("a corner past the seam ... drawn by nobody"): a point
-    no single PAIR's own reach/anchor logic assigns to either partner,
-    even though some roof's true body plausibly covers it once all three
-    are weighed together. What this construction GUARANTEES exactly, and
-    what the fixture's own tests measure: no point is EVER drawn by two
-    roofs at once (the fault that reads as a wrong picture), every seam
-    is equal-height on both sides it separates, and no seam survives past
-    where a third roof's own final region has already taken the ground --
-    the spurious crossing-a-third-roof's-body line this ruling was
-    written to remove."""
+    THE GAP-FILL PASS (`_fill_unclaimed_ground`, added after Patrick's own
+    check of the first cut): at a genuine three-or-more-way junction, a
+    point no single PAIR's own reach/anchor logic assigns to either
+    partner can survive as ground nobody draws -- and unlike the
+    two-roof "corner past the seam" case (a genuinely tiny sliver, always
+    OUTSIDE the overlap the two roofs actually fight over), this showed
+    up as a real, visible HOLE in the rendered 3D roof, not a benign
+    sliver -- his own screenshot. So any ground three-or-more roofs are
+    still contesting after the fold above, subtracted against every
+    region and seam already decided, is filled as a last resort: the
+    HIGHEST covering roof there. Scoped to 3+ TOUCHED roofs specifically,
+    so the two-roof regression this ruling names (including the D85
+    corner) is untouched.
+
+    What this construction GUARANTEES exactly, and what the fixture's own
+    tests measure: no point is EVER drawn by two roofs at once (the fault
+    that reads as a wrong picture), every seam is equal-height on both
+    sides it separates, no seam survives past where a third roof's own
+    final region has already taken the ground, and -- for three or more
+    roofs -- no point within the union of footprints is left undrawn
+    either."""
     regions = {id(rf): None for rf in roofs}
     raw_seams = {id(rf): [] for rf in roofs}    # (seg, partner_id)
     warns = {id(rf): [] for rf in roofs}
@@ -777,9 +784,119 @@ def compute_roof_clips(roofs) -> dict:
                     kept.append(cur)
         seams[id(rf)] = kept
 
+    _fill_unclaimed_ground(roofs, regions, warns)
+
     return {id(rf): RoofClip(regions[id(rf)], seams[id(rf)], warns[id(rf)],
                              tuple(exts[id(rf)]))
             for rf in roofs}
+
+
+def _subtract_claimed(cell, regions, roofs):
+    """`cell` minus every cell of every roof's CURRENT region -- exact
+    convex subtraction (`_root_cells`'s own idiom, one already-claimed
+    piece at a time), so a fill candidate can never straddle into ground
+    some region already owns. What survives is genuinely unclaimed."""
+    pieces = [cell]
+    for rf in roofs:
+        region = regions[id(rf)]
+        if region is None:
+            continue
+        for rc in region.cells:
+            nxt = []
+            for p in pieces:
+                ov = _convex_intersection(p, rc)
+                if not ov:
+                    nxt.append(p)
+                else:
+                    nxt.extend(_root_cells(p, ov))
+            pieces = nxt
+    return pieces
+
+
+def _fill_unclaimed_ground(roofs, regions, warns):
+    """Nothing real is drawn by nobody AT A GENUINE MULTI-WAY JUNCTION
+    (0170-ruling.md sec2's own aim, "no point painted by two roofs, none
+    by zero") -- a real building has no hole at a valley three or more
+    roofs meet at, so ground the pairwise-composed fold above could not
+    assign to ANY partner there is filled here, as a last resort:
+    whichever roof physically covering that ground is HIGHEST there. A
+    cheap, safe rule -- every candidate cell is first subtracted against
+    every EXISTING region (`_subtract_claimed`), so this can never
+    contradict an already-decided seam or manufacture a second owner for
+    ground some region already contains.
+
+    SCOPED TO THREE OR MORE ROOFS ON PURPOSE. The pairwise algorithm's own
+    docstring already accepts a small "drawn by nobody" corner for
+    exactly TWO roofs ("a corner past the seam ... drawn by nobody",
+    D85-tested, `test_a_s_corner_past_the_seam_draws_no_line_of_a`) --
+    0170-ruling.md's own regression clause ("the two-roof cases ... must
+    come out identical") means that corner must still be nobody's when
+    only two roofs are in play. So is a coplanar pair, left entirely
+    unclipped by design -- excluded here by its own `warns` entry, the
+    same signal `compute_roof_clips` already used to leave it alone.
+    `regions` is mutated in place."""
+    roofs = list(roofs)
+    footprints = {id(rf): footprint_polygon(rf) for rf in roofs}
+    coplanar = {id(rf) for rf in roofs if warns[id(rf)]}
+    touched = {id(rf) for rf in roofs
+              if regions[id(rf)] is not None and id(rf) not in coplanar}
+    for i, a in enumerate(roofs):
+        if id(a) in coplanar:
+            continue
+        for b in roofs[i + 1:]:
+            if id(b) in coplanar:
+                continue
+            if id(a) in touched and id(b) in touched:
+                continue
+            if _convex_intersection(footprints[id(a)], footprints[id(b)]):
+                touched.add(id(a))
+                touched.add(id(b))
+    if len(touched) < 3:
+        return
+
+    live = [rf for rf in roofs if id(rf) in touched]
+    cut_set = []
+    for rf in live:
+        cut_set.extend(_cut_lines(rf))
+    cells = [list(footprints[id(rf)]) for rf in live]
+    for pt, d in cut_set:
+        cells = [piece for cell in cells for piece in _split_by_line(cell, pt, d)]
+    cells = _dedup_cells(cells)
+
+    filled = {id(rf): [] for rf in live}
+    for cell in cells:
+        for piece in _subtract_claimed(cell, regions, live):
+            if _area(piece) <= MIN_CELL_AREA:
+                continue
+            c = _centroid(piece)
+            coverers = [rf for rf in live
+                       if _contains(footprints[id(rf)], c, tol=-1e-6)]
+            if not coverers:
+                continue
+            best = max(coverers, key=lambda rf: surface_height(rf, c))
+            filled[id(best)].append(piece)
+
+    for rf in live:
+        if not filled[id(rf)]:
+            continue
+        cur = regions[id(rf)]
+        regions[id(rf)] = ClipRegion((cur.cells if cur is not None else [])
+                                     + filled[id(rf)])
+
+
+def _dedup_cells(cells, tol=1e-4):
+    """Convex `cells` starting one candidate per roof's own footprint can
+    repeat the same physical overlap piece once per covering roof -- a
+    convex polygon's vertex SET (order-independent) identifies it."""
+    seen = set()
+    out = []
+    for c in cells:
+        key = tuple(sorted((round(p.x() / tol), round(p.y() / tol)) for p in c))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(c)
+    return out
 
 
 def seam_heights(a, b, seams):
