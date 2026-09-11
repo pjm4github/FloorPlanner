@@ -1,0 +1,604 @@
+{
+ "format": "floorplanner-design",
+ "version": 6,
+ "units": "inches",
+ "settings": {
+  "wall_snap_in": 6.0,
+  "rotate_snap_deg": 15.0,
+  "canvas_w_in": 1200.0,
+  "canvas_h_in": 840.0,
+  "cost_per_sqft": 150.0,
+  "show_roofs": true,
+  "edit_roofs": true,
+  "vertex_weld_in": 0.6,
+  "join_tol_in": 9.0,
+  "area_basis": "centerline",
+  "editing": {
+   "shuffle": false,
+   "auto_coalesce": true,
+   "auto_weld": true,
+   "auto_bind": true
+  },
+  "active_floor": "default"
+ },
+ "levels": [
+  {
+   "id": "L1",
+   "name": "default",
+   "elevation_in": 0.0,
+   "height_in": 96.0,
+   "kind": "storey",
+   "reference": false
+  }
+ ],
+ "vertices": [
+  {
+   "id": "v1",
+   "level": "L1",
+   "x": 79.0,
+   "y": 350.0
+  },
+  {
+   "id": "v2",
+   "level": "L1",
+   "x": 79.0,
+   "y": 620.0
+  },
+  {
+   "id": "v3",
+   "level": "L1",
+   "x": 416.6943,
+   "y": 249.6539
+  },
+  {
+   "id": "v4",
+   "level": "L1",
+   "x": 457.0,
+   "y": 350.0
+  },
+  {
+   "id": "v5",
+   "level": "L1",
+   "x": 457.0,
+   "y": 620.0
+  },
+  {
+   "id": "v6",
+   "level": "L1",
+   "x": 470.2218,
+   "y": 342.3664
+  },
+  {
+   "id": "v7",
+   "level": "L1",
+   "x": 472.5885,
+   "y": 341.0
+  },
+  {
+   "id": "v8",
+   "level": "L1",
+   "x": 571.1267,
+   "y": 517.1388
+  },
+  {
+   "id": "v9",
+   "level": "L1",
+   "x": 587.1353,
+   "y": 544.8664
+  },
+  {
+   "id": "v10",
+   "level": "L1",
+   "x": 671.3057,
+   "y": 102.6539
+  },
+  {
+   "id": "v11",
+   "level": "L1",
+   "x": 698.6943,
+   "y": 738.0922
+  },
+  {
+   "id": "v12",
+   "level": "L1",
+   "x": 825.7382,
+   "y": 370.1388
+  },
+  {
+   "id": "v13",
+   "level": "L1",
+   "x": 986.8189,
+   "y": 277.1388
+  },
+  {
+   "id": "v14",
+   "level": "L1",
+   "x": 1114.3865,
+   "y": 498.0922
+  }
+ ],
+ "walls": [
+  {
+   "id": "w1",
+   "level": "L1",
+   "v1": "v1",
+   "v2": "v4",
+   "type": "interior",
+   "left": null,
+   "right": "r1",
+   "openings": []
+  },
+  {
+   "id": "w2",
+   "level": "L1",
+   "v1": "v2",
+   "v2": "v1",
+   "type": "interior",
+   "left": null,
+   "right": "r1",
+   "openings": []
+  },
+  {
+   "id": "w3",
+   "level": "L1",
+   "v1": "v3",
+   "v2": "v6",
+   "type": "interior",
+   "left": "r3",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w4",
+   "level": "L1",
+   "v1": "v4",
+   "v2": "v6",
+   "type": "interior",
+   "left": null,
+   "right": "r2",
+   "openings": []
+  },
+  {
+   "id": "w5",
+   "level": "L1",
+   "v1": "v5",
+   "v2": "v2",
+   "type": "interior",
+   "left": null,
+   "right": "r1",
+   "openings": []
+  },
+  {
+   "id": "w6",
+   "level": "L1",
+   "v1": "v5",
+   "v2": "v4",
+   "type": "interior",
+   "left": "r1",
+   "right": "r2",
+   "openings": []
+  },
+  {
+   "id": "w7",
+   "level": "L1",
+   "v1": "v5",
+   "v2": "v9",
+   "type": "interior",
+   "left": "r2",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w8",
+   "level": "L1",
+   "v1": "v6",
+   "v2": "v7",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w9",
+   "level": "L1",
+   "v1": "v6",
+   "v2": "v8",
+   "type": "interior",
+   "left": "r3",
+   "right": "r2",
+   "openings": []
+  },
+  {
+   "id": "w10",
+   "level": "L1",
+   "v1": "v8",
+   "v2": "v9",
+   "type": "interior",
+   "left": "r4",
+   "right": "r2",
+   "openings": []
+  },
+  {
+   "id": "w11",
+   "level": "L1",
+   "v1": "v8",
+   "v2": "v12",
+   "type": "interior",
+   "left": "r3",
+   "right": "r4",
+   "openings": []
+  },
+  {
+   "id": "w12",
+   "level": "L1",
+   "v1": "v9",
+   "v2": "v11",
+   "type": "interior",
+   "left": "r4",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w13",
+   "level": "L1",
+   "v1": "v10",
+   "v2": "v3",
+   "type": "interior",
+   "left": "r3",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w14",
+   "level": "L1",
+   "v1": "v10",
+   "v2": "v12",
+   "type": "interior",
+   "left": null,
+   "right": "r3",
+   "openings": []
+  },
+  {
+   "id": "w15",
+   "level": "L1",
+   "v1": "v11",
+   "v2": "v14",
+   "type": "interior",
+   "left": "r4",
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w16",
+   "level": "L1",
+   "v1": "v12",
+   "v2": "v13",
+   "type": "interior",
+   "left": null,
+   "right": "r4",
+   "openings": []
+  },
+  {
+   "id": "w17",
+   "level": "L1",
+   "v1": "v13",
+   "v2": "v14",
+   "type": "interior",
+   "left": null,
+   "right": "r4",
+   "openings": []
+  }
+ ],
+ "rooms": [
+  {
+   "id": "r1",
+   "level": "L1",
+   "name": "A",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v1",
+     "wall": "w1"
+    },
+    {
+     "v": "v4",
+     "wall": "w6"
+    },
+    {
+     "v": "v5",
+     "wall": "w5"
+    },
+    {
+     "v": "v2",
+     "wall": "w2"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -13.0,
+     -50.0
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r2",
+   "level": "L1",
+   "name": "B",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v4",
+     "wall": "w4"
+    },
+    {
+     "v": "v6",
+     "wall": "w9"
+    },
+    {
+     "v": "v8",
+     "wall": "w10"
+    },
+    {
+     "v": "v9",
+     "wall": "w7"
+    },
+    {
+     "v": "v5",
+     "wall": "w6"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     -19.497,
+     8.126
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r3",
+   "level": "L1",
+   "name": "C",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v3",
+     "wall": "w13"
+    },
+    {
+     "v": "v10",
+     "wall": "w14"
+    },
+    {
+     "v": "v12",
+     "wall": "w11"
+    },
+    {
+     "v": "v8",
+     "wall": "w9"
+    },
+    {
+     "v": "v6",
+     "wall": "w3"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     70.983,
+     5.61
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  },
+  {
+   "id": "r4",
+   "level": "L1",
+   "name": "D",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v8",
+     "wall": "w11"
+    },
+    {
+     "v": "v12",
+     "wall": "w16"
+    },
+    {
+     "v": "v13",
+     "wall": "w17"
+    },
+    {
+     "v": "v14",
+     "wall": "w15"
+    },
+    {
+     "v": "v11",
+     "wall": "w12"
+    },
+    {
+     "v": "v9",
+     "wall": "w10"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     137.683,
+     18.089
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  }
+ ],
+ "furnishings": [],
+ "groups": [],
+ "roofs": [
+  {
+   "id": "rf1",
+   "level": "L1",
+   "ridge": [
+    [
+     54.0,
+     468.0
+    ],
+    [
+     756.0,
+     468.0
+    ]
+   ],
+   "eaves_h_in": 96.0,
+   "ridge_h_in": 132.0,
+   "overhang_in": [
+    0.0,
+    0.0
+   ],
+   "span_in": [
+    174.0,
+    144.0
+   ],
+   "eaves_bind": "manual",
+   "gable": [
+    true,
+    true
+   ],
+   "marker_end": 1
+  },
+  {
+   "id": "rf2",
+   "level": "L1",
+   "ridge": [
+    [
+     510.0,
+     126.0
+    ],
+    [
+     750.0,
+     541.6921938165306
+    ]
+   ],
+   "eaves_h_in": 96.0,
+   "ridge_h_in": 132.0,
+   "overhang_in": [
+    0.0,
+    0.0
+   ],
+   "span_in": [
+    142.6320878171965,
+    151.36791218280348
+   ],
+   "eaves_bind": "manual",
+   "gable": [
+    true,
+    true
+   ],
+   "marker_end": 1
+  },
+  {
+   "id": "rf3",
+   "level": "L1",
+   "ridge": [
+    [
+     1122.0,
+     342.0
+    ],
+    [
+     591.9924528839236,
+     648.0000000000002
+    ]
+   ],
+   "eaves_h_in": 96.0,
+   "ridge_h_in": 132.0,
+   "overhang_in": [
+    0.0,
+    0.0
+   ],
+   "span_in": [
+    125.18068809427837,
+    131.37306695894623
+   ],
+   "eaves_bind": "manual",
+   "gable": [
+    true,
+    true
+   ],
+   "marker_end": 1
+  }
+ ]
+}
