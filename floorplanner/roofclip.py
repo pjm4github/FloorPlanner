@@ -242,6 +242,20 @@ def _clip_segment(poly, p, q):
             Pt(p.x() + dx * t1, p.y() + dy * t1))
 
 
+def _clip_segment_by_values(p, q, vp, vq):
+    """The part of segment `p`-`q` where a linear value field (given at
+    its two endpoints) is >= 0 -- the segment analogue of
+    `_clip_by_values`'s polygon clip, exact linear interpolation for the
+    crossing. `None` when nothing survives."""
+    if vp < -EPS and vq < -EPS:
+        return None
+    if vp >= -EPS and vq >= -EPS:
+        return (p, q)
+    t = vp / (vp - vq)
+    x = Pt(p.x() + (q.x() - p.x()) * t, p.y() + (q.y() - p.y()) * t)
+    return (p, x) if vp >= -EPS else (x, q)
+
+
 def _dist_to_segment(p, a, b) -> float:
     abx, aby = b.x() - a.x(), b.y() - a.y()
     L2 = abx * abx + aby * aby
@@ -653,13 +667,57 @@ def _name(rf) -> str:
 
 
 def compute_roof_clips(roofs) -> dict:
-    """Every pairwise clip among `roofs` (all on one floor), folded per
-    roof: with more than one partner a roof's region is what every
-    partner leaves it -- the cells of one partner's region clipped
-    against the other's (convex ∩ convex, exact); seams and warnings
-    accumulate. A roof no pair touched maps to `RoofClip(None, [], [])`."""
+    """Every roof on one floor, clipped against every other --
+    0170-ruling.md sec2: visibility as the upper envelope of every roof
+    surface on the level, with a seam real only where no third roof is
+    higher there.
+
+    THE REGION FOLD is exactly this already, and was already correct
+    before this ruling: a roof's final region is what EVERY partner
+    leaves it -- `clip_pair(a, b)`'s own kept-region-for-a, intersected
+    (convex ∩ convex, exact) across every OTHER partner in turn. Since
+    `clip_pair`'s own two regions for a pair already PARTITION their
+    shared overlap (`test_the_two_regions_partition_the_overlap_and_...`),
+    two different roofs can never both keep the same point -- intersecting
+    across every partner cannot manufacture a double-claim, whatever the
+    partner count.
+
+    THE BUG his three-ridge report actually showed was in the SEAMS: they
+    were unioned from every pair with no filter at all, so a seam found
+    between A and B survived even in ground a third roof C's own clip had
+    already taken away from BOTH A's and B's final region -- exactly the
+    wrong drawing, a valley line crossing straight through C's own roof.
+    The fix: every raw pairwise seam is clipped, once every region is
+    final, through its OWN owning roof's finished `ClipRegion`
+    (`ClipRegion.clip_segment`, the same exact Cyrus-Beck geometry
+    `RoofItem._clipped` draws with). A seam sits exactly on the h_a==h_b
+    locus, so a sub-segment surviving inside A's fully-intersected
+    territory (A at least as high as every partner, including B, there)
+    is automatically inside B's too -- filtering through either owner
+    alone would be sufficient; this filters through both, for symmetry,
+    since two independently-built regions are not bit-identical at a
+    shared boundary.
+
+    Two roofs reduce to exactly `clip_pair`'s own answer, unfiltered (no
+    third partner exists to remove any ground) -- the T/L regression this
+    ruling names.
+
+    MEASURED, NOT CLAIMED PERFECT: at a genuine three-or-more-way
+    junction this pairwise-composed construction can still leave a small
+    residual patch "drawn by nobody" near the meeting point -- the same
+    CLASS the pairwise algorithm's own module docstring already accepts
+    for two roofs ("a corner past the seam ... drawn by nobody"): a point
+    no single PAIR's own reach/anchor logic assigns to either partner,
+    even though some roof's true body plausibly covers it once all three
+    are weighed together. What this construction GUARANTEES exactly, and
+    what the fixture's own tests measure: no point is EVER drawn by two
+    roofs at once (the fault that reads as a wrong picture), every seam
+    is equal-height on both sides it separates, and no seam survives past
+    where a third roof's own final region has already taken the ground --
+    the spurious crossing-a-third-roof's-body line this ruling was
+    written to remove."""
     regions = {id(rf): None for rf in roofs}
-    seams = {id(rf): [] for rf in roofs}
+    raw_seams = {id(rf): [] for rf in roofs}    # (seg, partner_id)
     warns = {id(rf): [] for rf in roofs}
     exts = {id(rf): [0.0, 0.0] for rf in roofs}
     roofs = list(roofs)
@@ -681,10 +739,44 @@ def compute_roof_clips(roofs) -> dict:
                             if piece:
                                 pieces.append(piece)
                     regions[id(rf)] = ClipRegion(pieces)
-                seams[id(rf)].extend(ss)
+            if ss:
+                raw_seams[id(a)].extend((seg, id(b)) for seg in ss)
+                raw_seams[id(b)].extend((seg, id(a)) for seg in ss)
             if ww:
                 warns[id(a)].extend(ww)
                 warns[id(b)].extend(ww)
+
+    # 0170-ruling.md sec2: a seam between two roofs is real only where no
+    # THIRD roof is higher there. Two filters, both needed:
+    #  1. clip through the FINAL (fully partner-intersected) region of the
+    #     seam's own owning roof -- drops whatever ground a further
+    #     partner's pairwise reach/anchor logic already took away;
+    #  2. clip DIRECTLY against every other active roof's own height,
+    #     `h_owner >= h_third` (exact linear interpolation, same idiom as
+    #     `_clip_by_values`) -- (1) alone is not enough: a point can
+    #     survive pairwise reach against EVERY partner taken one at a time
+    #     (reachability is not simply the height comparison) and still be
+    #     ground a third roof's surface is measurably higher over, which
+    #     is exactly the wrong drawing his report named. This second pass
+    #     is the literal, unconditional statement of the rule.
+    seams = {}
+    for rf in roofs:
+        region = regions[id(rf)]
+        kept = []
+        for (p, q), partner_id in raw_seams[id(rf)]:
+            for sub in (region.clip_segment(p, q) if region is not None else [(p, q)]):
+                cur = sub
+                for other in roofs:
+                    if cur is None or id(other) in (id(rf), partner_id):
+                        continue
+                    vp = surface_height(rf, cur[0]) - surface_height(other, cur[0])
+                    vq = surface_height(rf, cur[1]) - surface_height(other, cur[1])
+                    cur = _clip_segment_by_values(cur[0], cur[1], vp, vq)
+                if cur is not None and math.hypot(cur[1].x() - cur[0].x(),
+                                                  cur[1].y() - cur[0].y()) > EPS:
+                    kept.append(cur)
+        seams[id(rf)] = kept
+
     return {id(rf): RoofClip(regions[id(rf)], seams[id(rf)], warns[id(rf)],
                              tuple(exts[id(rf)]))
             for rf in roofs}

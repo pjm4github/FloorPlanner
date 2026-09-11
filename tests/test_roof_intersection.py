@@ -19,13 +19,17 @@ main (hidden); north of the main's ridge, for y < 162.963, the main's far
 slope drops back under the wing's ridge -- the FAR-SIDE ISLAND, the case
 the ruling names ("does not extend past the joining roof").
 """
+import json
+from pathlib import Path
+
 import pytest
 from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QImage, QPainter
 
 from floorplanner.config import DEFAULT_FLOOR
 from floorplanner.roofclip import (
-    clip_pair, compute_roof_clips, seam_heights, seam_length, surface_height,
+    Pt, RoofGeom, _contains, clip_pair, compute_roof_clips, footprint_polygon,
+    seam_heights, seam_length, surface_height,
 )
 from floorplanner.roofs import RoofItem, sync_roof_clips
 
@@ -436,3 +440,158 @@ def test_the_l_on_the_items_hides_a_s_end_lines(scene):
     assert a.shape().contains(QPointF(300, 200))
     a.setSelected(True)
     assert a.shape().contains(QPointF(450, 150))           # whole rectangle
+
+
+# ---------------------------------------------------------------------------
+# R4f (0170-ruling.md): the three-ridge case -- the built pairwise fold
+# (`clip_pair`, unchanged, still the T/L regression above) now filters its
+# SEAMS twice before a `compute_roof_clips` caller ever sees them: once
+# through each roof's own fully partner-intersected region (drops ground a
+# further partner already took), and once again DIRECTLY against every
+# other roof's own height (`h_owner >= h_third`, exact linear clipping) --
+# the literal statement of "a seam is real only where no third roof is
+# higher there". `fixtures/threeRidgeFloorplan.json` is Patrick's own
+# report, promoted here under exit 1: three roofs on one level, every
+# plane its own pitch, ridges converging near the plan's middle-right. His
+# own estimate -- a triple point near (682, 538), all three surfaces at
+# about 117.5in there -- is reproduced below as an EXACT number.
+# ---------------------------------------------------------------------------
+THREE_RIDGE_FIXTURE = (Path(__file__).resolve().parent.parent / "fixtures"
+                       / "threeRidgeFloorplan.json")
+
+
+def _three_ridge_roofs():
+    doc = json.loads(THREE_RIDGE_FIXTURE.read_text(encoding="utf-8"))
+    roofs = []
+    for rec in doc["roofs"]:
+        g = RoofGeom.from_record(rec)
+        g.clip_name = rec["id"]
+        roofs.append(g)
+    return roofs
+
+
+def test_r4f_fixture_promoted_and_loads_three_converging_roofs():
+    roofs = _three_ridge_roofs()
+    assert [g.clip_name for g in roofs] == ["rf1", "rf2", "rf3"]
+
+
+def test_r4f_three_ridges_partition_no_point_drawn_by_two_roofs_at_once():
+    """The invariant that matters for a WRONG PICTURE, 0170-ruling.md
+    sec2's own words: 'no point painted by two roofs'. A dense grid over
+    the union of the three footprints never lands in two roofs' final
+    regions at once -- guaranteed by construction (each roof's region is
+    the intersection, across every partner, of `clip_pair`'s own
+    partition-preserving pairwise result), checked here directly rather
+    than only trusted."""
+    roofs = _three_ridge_roofs()
+    clips = compute_roof_clips(roofs)
+    fps = [footprint_polygon(g) for g in roofs]
+    xs = [p.x() for fp in fps for p in fp]
+    ys = [p.y() for fp in fps for p in fp]
+    n = 45
+    for i in range(n):
+        for j in range(n):
+            x = min(xs) + (max(xs) - min(xs)) * i / (n - 1)
+            y = min(ys) + (max(ys) - min(ys)) * j / (n - 1)
+            pt = Pt(x, y)
+            owners = sum(1 for g in roofs
+                        if clips[id(g)].region is not None
+                        and clips[id(g)].region.contains(pt))
+            assert owners <= 1, (x, y, owners)
+
+
+def test_r4f_no_seam_segment_crosses_a_roof_that_is_actually_higher():
+    """0170-ruling.md sec2, literally: 'a seam draws where the top two
+    surfaces are equal AND no third is higher'. His own report is exactly
+    the failure of the second half -- a seam between two roofs surviving
+    where a third stood above both. Sampled along every seam segment
+    every roof carries, at five points each, against every OTHER roof
+    that actually covers that ground."""
+    roofs = _three_ridge_roofs()
+    clips = compute_roof_clips(roofs)
+    checked = 0
+    for idx, g in enumerate(roofs):
+        for p, q in clips[id(g)].seams:
+            for t in (0.0, 0.25, 0.5, 0.75, 1.0):
+                pt = QPointF(p.x() + (q.x() - p.x()) * t,
+                             p.y() + (q.y() - p.y()) * t)
+                h_here = surface_height(g, pt)
+                for k, other in enumerate(roofs):
+                    if k == idx:
+                        continue
+                    if _contains(footprint_polygon(other), pt, tol=-1e-3):
+                        checked += 1
+                        assert surface_height(other, pt) <= h_here + 1e-3
+    assert checked > 0, "the fixture's own overlap produced nothing to check"
+
+
+def test_r4f_the_three_ridges_meet_at_one_exact_triple_point():
+    """His own estimate ('a triple point exists at ~=(682, 538), all
+    three heights ~=117.5in') reproduced as an exact construction, not
+    eyeballed: among every seam vertex the three roofs carry, EXACTLY ONE
+    lands inside all three footprints with all three surfaces tied."""
+    roofs = _three_ridge_roofs()
+    clips = compute_roof_clips(roofs)
+    verts = set()
+    for g in roofs:
+        for p, q in clips[id(g)].seams:
+            verts.add((round(p.x(), 3), round(p.y(), 3)))
+            verts.add((round(q.x(), 3), round(q.y(), 3)))
+    triples = []
+    for vx, vy in verts:
+        pt = QPointF(vx, vy)
+        if not all(_contains(footprint_polygon(g), pt) for g in roofs):
+            continue
+        heights = [surface_height(g, pt) for g in roofs]
+        if max(heights) - min(heights) < 1e-2:
+            triples.append((pt, heights))
+    assert len(triples) == 1, triples
+    pt, heights = triples[0]
+    assert pt.x() == pytest.approx(682, abs=2)
+    assert pt.y() == pytest.approx(538, abs=2)
+    for h in heights:
+        assert h == pytest.approx(117.5, abs=0.1)
+
+
+def test_r4f_a_two_roof_pair_inside_a_three_roof_call_is_unaffected(scene):
+    """The regression 0170-ruling.md names explicitly: 'the two-roof cases
+    ... must come out identical -- the envelope reduces to the pair rule
+    when n = 2'. A third, non-overlapping roof present in the SAME
+    `compute_roof_clips` call changes nothing about the T fixture's own
+    seam (byte for byte the same two points `clip_pair` gives alone)."""
+    _main(scene)
+    w = _wing(scene)
+    far = _wing(scene, p1=QPointF(900, 150), p2=QPointF(900, 500))
+    sync_roof_clips(scene)
+    assert not far.is_clipped()
+    assert _pts(w.seams()) == {(140.0, 300.0), (260.0, 300.0),
+                               (200.0, round(APEX_Y, 3))}
+
+
+def test_r4f_drawn_by_nobody_stays_a_small_measured_minority():
+    """A pairwise-composed construction (still what this is, even with
+    both seam filters -- see the module-level `compute_roof_clips`
+    docstring) can leave a small residual patch belonging to no roof near
+    a genuine three-way junction, the same CLASS the two-roof algorithm's
+    own docstring already accepts ('a corner past the seam ... drawn by
+    nobody'). Measured here, not hidden, and guarded against a silent
+    regression -- not a claim of zero."""
+    roofs = _three_ridge_roofs()
+    clips = compute_roof_clips(roofs)
+    fps = [footprint_polygon(g) for g in roofs]
+    xs = [p.x() for fp in fps for p in fp]
+    ys = [p.y() for fp in fps for p in fp]
+    n = 70
+    in_any = gap = 0
+    for i in range(n):
+        for j in range(n):
+            x = min(xs) + (max(xs) - min(xs)) * i / (n - 1)
+            y = min(ys) + (max(ys) - min(ys)) * j / (n - 1)
+            pt = Pt(x, y)
+            if not any(_contains(fp, pt) for fp in fps):
+                continue
+            in_any += 1
+            if not any(clips[id(g)].region is not None
+                      and clips[id(g)].region.contains(pt) for g in roofs):
+                gap += 1
+    assert gap / in_any < 0.06, f"drawn-by-nobody grew to {gap}/{in_any}"

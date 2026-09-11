@@ -949,6 +949,32 @@ def test_an_equal_height_l_has_no_poke_through_in_3d(fp3d):
     assert 150.0 in _verts_at(mesh, 400.0, 200.0)                    # the apex
 
 
+# --------------------------------------------------------------------------
+# R4f (0170-ruling.md): the three-ridge fixture -- 3D follows the plan's
+# global clip for free, by `compute_roof_clips`'s own design (fp3d.py just
+# consumes `clip.region.cells`/`.seams`/`.ext`, generically, same as R4e)
+# --------------------------------------------------------------------------
+def test_three_ridge_fixture_mesh_builds_and_finds_the_triple_point(fp3d):
+    """No code here changed for R4f -- this is the receipt that the mesh
+    really does follow the corrected plan clip without a separate fix.
+    `threeRidgeFloorplan.json` (fixtures/, 0170-ruling.md's own report) has
+    a genuine triple point at (682, 538), all three surfaces at ~117.5in
+    (test_roof_intersection.py reproduces it exactly in plan space) -- the
+    3D mesh should carry a vertex at that same height at that same plan
+    location."""
+    doc = json.loads((ROOT / "fixtures" / "threeRidgeFloorplan.json")
+                     .read_text(encoding="utf-8"))
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    assert not model.notes, model.notes
+    mesh = _roof_mesh(model)
+    assert len(mesh.verts) > 0
+    near_triple = [v for v in mesh.verts
+                  if abs(float(v[0]) - 681.586) < 1.0
+                  and abs(float(v[1]) + 538.067) < 1.0]
+    assert any(abs(float(v[2]) - 117.503) < 0.5 for v in near_triple), \
+        f"no mesh vertex found at the triple point's own height: {near_triple}"
+
+
 def test_roof_geom_matches_the_editor_item_on_the_same_data(fp3d):
     """The Qt-free twin (`RoofGeom`) must give the editor's own eave ends
     for the same record -- including a hip end's extension."""
