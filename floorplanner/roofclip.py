@@ -101,6 +101,15 @@ class Pt:
 
 EPS = 1e-6            # inches / height units: "equal" for seam and degeneracy
 MIN_CELL_AREA = 1e-3  # a sliver below this is float noise, not a cell
+# 0170-ruling.md's gap-fill pass (`_fill_unclaimed_ground`) builds its own,
+# independent cell arrangement -- a sub-square-inch scrap there is float
+# residue from reconciling that arrangement against the exact pairwise
+# clip, not real roof, and reads in 3D as a stray fin (his own report)
+MIN_FILL_AREA = 1.0
+FILL_DEDUP_TOL = 1e-2   # coarser than `_dedup_cells`' own default: two
+                        # copies of one overlap piece, built from different
+                        # starting footprints, can differ by float noise
+                        # larger than that default's rounding grid
 
 
 class RoofClip(NamedTuple):
@@ -855,18 +864,52 @@ def _fill_unclaimed_ground(roofs, regions, warns):
         return
 
     live = [rf for rf in roofs if id(rf) in touched]
+
+    # near a genuine three-way junction the pairwise FOLD itself (two
+    # independently-built cell decompositions intersected against each
+    # other) can leave a razor-thin sliver cell -- exact, not a bug in
+    # the math, but a sub-square-inch scrap that `_prism_slab` still
+    # extrudes into its own tiny prism, reading in 3D as a stray fin
+    # (his own second report). Dropped here, for LIVE roofs only, so the
+    # two-roof regression's tight area equality
+    # (`test_the_two_regions_partition_the_overlap_and_the_seam_separates_them`,
+    # `abs=1e-3`) is never touched -- what a sliver leaves behind is
+    # negligible next to the roof it came from and is exactly the ground
+    # the fill pass below folds back into a real neighbour.
+    for rf in live:
+        region = regions[id(rf)]
+        if region is None:
+            continue
+        kept = [c for c in region.cells if _area(c) > MIN_FILL_AREA]
+        if len(kept) != len(region.cells):
+            regions[id(rf)] = ClipRegion(kept) if kept else None
+
     cut_set = []
     for rf in live:
         cut_set.extend(_cut_lines(rf))
     cells = [list(footprints[id(rf)]) for rf in live]
     for pt, d in cut_set:
         cells = [piece for cell in cells for piece in _split_by_line(cell, pt, d)]
-    cells = _dedup_cells(cells)
+    # a coarse dedup key (`_dedup_cells`' own default tol) can miss two
+    # copies of the same physical overlap piece -- one produced starting
+    # from each covering roof's own footprint -- when the split order
+    # leaves their vertices a hair apart in floating point; a second,
+    # LOOSER pass (`FILL_DEDUP_TOL`) catches what the first one didn't,
+    # cheaply, since false-positive merges only ever affect cells this
+    # pass itself just manufactured, never an already-decided region
+    cells = _dedup_cells(_dedup_cells(cells), tol=FILL_DEDUP_TOL)
 
     filled = {id(rf): [] for rf in live}
     for cell in cells:
         for piece in _subtract_claimed(cell, regions, live):
-            if _area(piece) <= MIN_CELL_AREA:
+            # MIN_CELL_AREA (1e-3) is float noise tolerance for the exact
+            # pairwise clip; a FILLED patch is manufactured fresh from a
+            # coarser, independently-built arrangement, so a sub-square-
+            # inch sliver here is numerical residue, not real roof --
+            # `_prism_slab` still extrudes it, and on a real scene (walls
+            # and spans in the hundreds of inches) it reads as a stray
+            # ridge or fin, not a patch of roof (his own second report).
+            if _area(piece) <= MIN_FILL_AREA:
                 continue
             c = _centroid(piece)
             coverers = [rf for rf in live
@@ -877,11 +920,12 @@ def _fill_unclaimed_ground(roofs, regions, warns):
             filled[id(best)].append(piece)
 
     for rf in live:
-        if not filled[id(rf)]:
+        pieces = _dedup_cells(filled[id(rf)], tol=FILL_DEDUP_TOL)
+        if not pieces:
             continue
         cur = regions[id(rf)]
         regions[id(rf)] = ClipRegion((cur.cells if cur is not None else [])
-                                     + filled[id(rf)])
+                                     + pieces)
 
 
 def _dedup_cells(cells, tol=1e-4):

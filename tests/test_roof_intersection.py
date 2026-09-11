@@ -28,8 +28,8 @@ from PyQt6.QtGui import QImage, QPainter
 
 from floorplanner.config import DEFAULT_FLOOR
 from floorplanner.roofclip import (
-    Pt, RoofGeom, _contains, clip_pair, compute_roof_clips, footprint_polygon,
-    seam_heights, seam_length, surface_height,
+    Pt, RoofGeom, _area, _contains, clip_pair, compute_roof_clips,
+    footprint_polygon, seam_heights, seam_length, surface_height,
 )
 from floorplanner.roofs import RoofItem, sync_roof_clips
 
@@ -611,3 +611,69 @@ def test_r4f_the_fill_pass_never_touches_a_two_roof_corner():
     clips = compute_roof_clips([a, b])
     assert not clips[id(a)].region.contains(corner)
     assert not clips[id(b)].region.contains(corner)
+
+
+def test_r4f_no_stray_slivers_or_duplicate_cells_near_the_junction():
+    """His own second report ('a minor ridge that doesn't clean nicely'):
+    the pairwise fold's two independently-built decompositions can
+    intersect into a razor-thin sliver cell near a complex junction --
+    exact, not a math bug, but `_prism_slab` still extrudes it as its own
+    tiny prism, reading as a stray fin. And a fill candidate reduced by
+    `_subtract_claimed` from two different starting cells can converge on
+    the SAME leftover geometry, added twice. Both are now filtered:
+    slivers below `MIN_FILL_AREA` are dropped from a live (3+-touched)
+    roof's region before the fill pass runs, and the fill pass itself
+    dedups what it manufactures before merging it in."""
+    roofs = _three_ridge_roofs()
+    clips = compute_roof_clips(roofs)
+    for g in roofs:
+        region = clips[id(g)].region
+        assert region is not None
+        areas = [_area(cell) for cell in region.cells]
+        assert min(areas) > 1.0, (g.clip_name, min(areas))
+        keys = [tuple(sorted((round(p.x(), 1), round(p.y(), 1)) for p in cell))
+               for cell in region.cells]
+        assert len(keys) == len(set(keys)), (g.clip_name, "duplicate cell")
+
+
+def test_r4f_the_3d_mesh_is_one_connected_surface():
+    """The visual test of the same fix: a stray sliver reads in 3D as a
+    triangle attached to nothing, or barely attached at a single edge --
+    the whole roofs mesh should be ONE connected piece (every triangle
+    reachable from any other by walking shared edges), not several."""
+    doc = json.loads(THREE_RIDGE_FIXTURE.read_text(encoding="utf-8"))
+    from collections import defaultdict
+
+    import importlib.util
+    root = Path(__file__).resolve().parent.parent
+    spec = importlib.util.spec_from_file_location(
+        "fp3d_r4f_check", root / "floorplanner" / "viewer" / "fp3d.py")
+    fp3d = importlib.util.module_from_spec(spec)
+    import sys
+    sys.modules[spec.name] = fp3d
+    spec.loader.exec_module(fp3d)
+
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    mesh = next(m for m in model.meshes if m.name == "roofs")
+    edge_to_faces = defaultdict(list)
+    for fi, face in enumerate(mesh.faces):
+        pts = [tuple(round(float(c), 2) for c in mesh.verts[idx]) for idx in face]
+        n = len(pts)
+        for i in range(n):
+            e = tuple(sorted((pts[i], pts[(i + 1) % n])))
+            edge_to_faces[e].append(fi)
+    parent = list(range(len(mesh.faces)))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for _, faces in edge_to_faces.items():
+        for i in range(1, len(faces)):
+            ra, rb = find(faces[0]), find(faces[i])
+            if ra != rb:
+                parent[ra] = rb
+    n_components = len({find(fi) for fi in range(len(mesh.faces))})
+    assert n_components == 1, f"roof mesh has {n_components} disconnected pieces"
