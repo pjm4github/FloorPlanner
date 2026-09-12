@@ -688,6 +688,103 @@ def _box(corners_xy, z0, z1):
     return v, np.array(f, dtype=int)
 
 
+def _riser_quad(p, q, lo_p, lo_q, hi_p, hi_q):
+    """A flat, DOUBLE-SIDED vertical(-ish) quad closing the step between two
+    adjacent roofs' skirts where their clipped regions meet at a boundary
+    that is NOT a real seam (0174-report.md's own honestly-measured
+    residual: the joining-end candidacy shape's own width limit can seat
+    one roof's eaves height directly next to another's unrelated height
+    there, and each side's own skirt -- `_prism_slab`'s constant `ROOF_T`
+    drop -- is far too short to reach across a real height difference,
+    leaving an open slot only visible from an oblique angle -- his own
+    screenshot, confirmed by a straight-down ray-cast finding no gap at
+    all in TOP-DOWN coverage). `(p, q)` is the shared PLAN segment;
+    `lo_*`/`hi_*` are the world-z RANGE to close at each end (generous on
+    both sides, so it overlaps -- never merely touches -- each roof's own
+    skirt regardless of which one is higher there). Double-sided (both
+    triangle windings) since which side faces the camera is not tracked
+    here -- a thin fill patch is drawn twice rather than risk a backface
+    a viewer never sees flip to the wrong one on a future camera angle."""
+    v = np.array([(p[0], p[1], lo_p), (q[0], q[1], lo_q),
+                 (q[0], q[1], hi_q), (p[0], p[1], hi_p)], dtype=float)
+    f = np.array([[0, 1, 2], [0, 2, 3],
+                 [0, 2, 1], [0, 3, 2]], dtype=int)
+    return v, f
+
+
+def _segment_overlap(a1, b1, a2, b2, tol=1e-4):
+    """The overlapping sub-segment of two COLLINEAR segments a1-b1/a2-b2,
+    as `(p, q)` plan points, or `None` if they are not collinear or do not
+    overlap by more than `tol`. Each point is anything with `.x()`/`.y()`
+    (roofclip's own `Pt` convention)."""
+    dx, dy = b1.x() - a1.x(), b1.y() - a1.y()
+    length = math.hypot(dx, dy)
+    if length < tol:
+        return None
+    ux, uy = dx / length, dy / length
+
+    def param(pt):
+        return (pt.x() - a1.x()) * ux + (pt.y() - a1.y()) * uy
+
+    def perp(pt):
+        return abs((pt.x() - a1.x()) * -uy + (pt.y() - a1.y()) * ux)
+
+    if perp(a2) > tol or perp(b2) > tol:
+        return None
+    lo = max(0.0, min(param(a2), param(b2)))
+    hi = min(length, max(param(a2), param(b2)))
+    if hi - lo < tol:
+        return None
+    return ((a1.x() + ux * lo, a1.y() + uy * lo),
+            (a1.x() + ux * hi, a1.y() + uy * hi))
+
+
+def _cross_roof_risers(geoms_and_clips, roofclip_mod):
+    """For every pair of DIFFERENT live roofs on one level, find every
+    boundary segment where their final clip regions touch, and -- where
+    the two roofs' own heights there do NOT already agree (i.e. it is not
+    a real, drawn seam) -- return the riser needed to visually close the
+    step between their two separately-extruded skirts. `geoms_and_clips`
+    is `[(geom, clip), ...]`; only roofs with a real `clip.region` (i.e.
+    touched by at least one partner) can contribute a boundary at all."""
+    rc = roofclip_mod
+    items = [(geom, cell) for geom, clip in geoms_and_clips
+            if clip is not None and clip.region is not None
+            for cell in clip.region.cells]
+    risers = []
+    seen = set()
+    for i in range(len(items)):
+        g1, c1 = items[i]
+        n1 = len(c1)
+        for j in range(i + 1, len(items)):
+            g2, c2 = items[j]
+            if g1 is g2:
+                continue
+            n2 = len(c2)
+            for ei in range(n1):
+                a1, b1 = c1[ei], c1[(ei + 1) % n1]
+                for ej in range(n2):
+                    a2, b2 = c2[ej], c2[(ej + 1) % n2]
+                    seg = _segment_overlap(a1, b1, a2, b2)
+                    if seg is None:
+                        continue
+                    (px, py), (qx, qy) = seg
+                    key = (round(px, 3), round(py, 3), round(qx, 3), round(qy, 3),
+                          id(g1), id(g2))
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    p, q = rc.Pt(px, py), rc.Pt(qx, qy)
+                    h1p, h1q = rc.surface_height(g1, p), rc.surface_height(g1, q)
+                    h2p, h2q = rc.surface_height(g2, p), rc.surface_height(g2, q)
+                    if abs(h1p - h2p) <= rc.EPS and abs(h1q - h2q) <= rc.EPS:
+                        continue                   # a real seam -- already flush
+                    risers.append(((px, py), (qx, qy),
+                                  min(h1p, h2p), min(h1q, h2q),
+                                  max(h1p, h2p), max(h1q, h2q)))
+    return risers
+
+
 def _prism_slab(corners_xyz, drop):
     """`_box` generalised to a TOP RING WHOSE Z VARIES PER VERTEX -- a roof
     plane is not horizontal, so its top ring cannot be described by one z0.
@@ -1364,6 +1461,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         # plan draws from -- BEFORE any mesh is built. A roof with no
         # partner (clip region None) builds exactly as it did before R4e.
         clips = {}
+        riser_parts = []
         if ROOFCLIP is not None:
             geoms_by_level = {}
             for rf in doc.get("roofs", []):
@@ -1378,15 +1476,37 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 geom = ROOFCLIP.RoofGeom.from_record(
                     rf, span_fallback=nearest_span(lid, w1, w2))
                 geoms_by_level.setdefault(lid, []).append((rid, geom))
-            for pairs in geoms_by_level.values():
+            for lid, pairs in geoms_by_level.items():
                 per = ROOFCLIP.compute_roof_clips([g for _, g in pairs])
                 for rid, g in pairs:
                     clips[rid] = (g, per[id(g)])
+                # 0174-report.md's own honestly-measured residual, closed
+                # here rather than in roofclip.py: the joining-end
+                # candidacy shape's own width limit can seat one roof's
+                # eaves height directly next to another's unrelated height
+                # at a boundary that is NOT a real seam -- each side's own
+                # skirt (a constant ROOF_T drop) is far too short to reach
+                # across a real height difference, leaving a slot only
+                # visible from an oblique angle (his own screenshot; a
+                # straight-down ray-cast finds no gap in top-down coverage
+                # at all -- the 2D partition itself is exact, per
+                # 0174-report.md). A pure ADD: closes the visual step
+                # without touching which roof owns which 2D territory, so
+                # it cannot revisit the D85 regression two wider candidacy
+                # shapes already caused there.
+                z0 = base(lid)
+                for (px, py), (qx, qy), lo_p, lo_q, hi_p, hi_q in \
+                        _cross_roof_risers([(g, per[id(g)]) for _, g in pairs], ROOFCLIP):
+                    # plan (x, y) -> this file's own world frame (x, -y, z)
+                    riser_parts.append(_riser_quad(
+                        (px, -py), (qx, -qy),
+                        z0 + lo_p - ROOF_T, z0 + lo_q - ROOF_T,
+                        z0 + hi_p, z0 + hi_q))
         else:
             model.info.append("roof clip unavailable (roofclip.py not "
                               "found) -- roofs drawn unclipped")
 
-        roof_parts = []
+        roof_parts = list(riser_parts)
         for rf in doc.get("roofs", []):
             rid = rf.get("id", "?")
             lid = rf.get("level")

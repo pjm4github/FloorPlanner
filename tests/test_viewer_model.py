@@ -975,6 +975,137 @@ def test_three_ridge_fixture_mesh_builds_and_finds_the_triple_point(fp3d):
         f"no mesh vertex found at the triple point's own height: {near_triple}"
 
 
+# --------------------------------------------------------------------------
+# 0174-report.md's own honestly-measured residual, closed after his third
+# check found a real, visible hole (his screenshot): the joining-end
+# candidacy shape's own width limit can seat one roof's eaves height
+# directly next to a host's unrelated height at a boundary that is NOT a
+# real seam -- invisible from directly above (the 2D partition itself has
+# no gap at all, `test_roof_intersection.py`'s own exhaustive grid) but a
+# real open slot between the two roofs' separately-extruded skirts,
+# visible only from an oblique angle. `_cross_roof_risers` finds every
+# such mismatched boundary and `_riser_quad` closes it with a connecting
+# wall -- a pure ADD that never touches which roof owns which 2D
+# territory, so it cannot reopen the D85 regression two wider candidacy
+# shapes already caused there.
+# --------------------------------------------------------------------------
+def _point_on_any_triangle(mesh, x, y, z, tol=1e-2):
+    """Does the exact 3D point (world x, -y, z) lie on ANY triangle of
+    `mesh`? A genuine 3D point-in-triangle test (barycentric coordinates
+    in the triangle's OWN basis, not a 2D XY projection) -- a 2D-only
+    lookup cannot see a near-VERTICAL triangle at all (its XY projection
+    is a degenerate, zero-area line), exactly the shape a riser's own
+    closing wall is by design. A real trap hit writing this test: the
+    first version used a 2D barycentric height lookup and could never
+    have found the riser geometry it was meant to verify."""
+    import numpy as np
+    P = np.array([x, -y, z], dtype=float)
+    for face in mesh.faces:
+        if len(face) != 3:
+            continue
+        A, B, C = (np.array(v, dtype=float) for v in mesh.verts[list(face)])
+        v0, v1, v2 = C - A, B - A, P - A
+        d00, d01, d11 = v0 @ v0, v0 @ v1, v1 @ v1
+        d02, d12 = v0 @ v2, v1 @ v2
+        denom = d00 * d11 - d01 * d01
+        if abs(denom) < 1e-9:
+            continue
+        u = (d11 * d02 - d01 * d12) / denom
+        v = (d00 * d12 - d01 * d02) / denom
+        if u < -1e-3 or v < -1e-3 or u + v > 1 + 1e-3:
+            continue
+        if np.linalg.norm(A + u * v0 + v * v1 - P) < tol:
+            return True
+    return False
+
+
+def test_three_ridge_fixture_has_no_open_slot_at_a_measured_crack(fp3d):
+    """His own third check: a visible hole at the junction, confirmed (by
+    disabling floors) to show background straight through -- a real gap,
+    not a lighting artefact. Root cause: adjacent cells of DIFFERENT
+    roofs can meet at a boundary that is not a real seam (heights differ
+    there), and each side's own skirt (a constant, short `ROOF_T` drop)
+    never reaches far enough to touch the other's. Checked EXACTLY where
+    `_cross_roof_risers` itself measured a mismatch: sampled along the
+    INTERIOR of each riser's own edge (25/50/75% -- never at an
+    endpoint, which is a VERTEX often shared with a THIRD roof that a
+    single pairwise riser cannot fully account for on its own, but that
+    is a single, zero-WIDTH point that can never itself be a visible 2D
+    hole), the riser's own [lo, hi] range must be fully covered by SOME
+    triangle -- via a genuine 3D point-in-triangle test, since a 2D
+    XY-only lookup cannot see a near-vertical riser wall at all (its own
+    XY projection is degenerate, exactly like the gable-triangle trap
+    named in 0174-report.md -- a real trap hit writing this test too,
+    caught before it shipped a test that could not have failed)."""
+    doc = json.loads((ROOT / "fixtures" / "threeRidgeFloorplan.json")
+                     .read_text(encoding="utf-8"))
+    geoms = []
+    for rf in doc["roofs"]:
+        g = fp3d.ROOFCLIP.RoofGeom.from_record(rf)
+        g.clip_name = rf["id"]
+        geoms.append(g)
+    per = fp3d.ROOFCLIP.compute_roof_clips(geoms)
+    risers = fp3d._cross_roof_risers([(g, per[id(g)]) for g in geoms], fp3d.ROOFCLIP)
+    assert risers, "no risers found -- nothing for this test to check"
+
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    mesh = _roof_mesh(model)
+    checked = 0
+    for (px, py), (qx, qy), lo_p, lo_q, hi_p, hi_q in risers:
+        # sampled at 25/50/75% ALONG the edge, never at its own endpoints --
+        # an endpoint is a VERTEX, often where a THIRD roof also meets
+        # (a genuine multi-way corner one pairwise riser cannot fully
+        # account for on its own), but that is a single, zero-WIDTH point
+        # -- it can never be a visible 2D hole. The riser's own quad
+        # interpolates lo/hi linearly along the edge, so its INTERIOR
+        # (where a real 2D gap would actually show) is what must be
+        # continuously covered.
+        for t in (0.25, 0.5, 0.75):
+            x = px + (qx - px) * t
+            y = py + (qy - py) * t
+            lo = lo_p + (lo_q - lo_p) * t
+            hi = hi_p + (hi_q - hi_p) * t
+            n = 8
+            for i in range(n):
+                z = lo + (hi - lo) * i / (n - 1)
+                assert _point_on_any_triangle(mesh, x, y, z), \
+                    f"gap at plan ({x}, {y}), z={z} (riser range {lo}-{hi})"
+            checked += 1
+    assert checked > 0
+
+
+def test_a_real_seam_gets_no_riser(fp3d):
+    """The riser fix must never fire where two roofs already meet flush
+    (a real seam, height-equal by construction, `clip_pair`'s own T
+    fixture) -- called directly, `_cross_roof_risers` must find nothing
+    to close there."""
+    main = fp3d.ROOFCLIP.RoofGeom.from_record(_MAIN)
+    main.clip_name = "m"
+    wing = fp3d.ROOFCLIP.RoofGeom.from_record(_WING)
+    wing.clip_name = "w"
+    per = fp3d.ROOFCLIP.compute_roof_clips([main, wing])
+    risers = fp3d._cross_roof_risers(
+        [(main, per[id(main)]), (wing, per[id(wing)])], fp3d.ROOFCLIP)
+    assert risers == []
+
+
+def test_three_ridge_fixture_needs_at_least_one_riser(fp3d):
+    """The positive control for the two tests above: on his own fixture,
+    `_cross_roof_risers` must find SOMETHING to close (else the oblique-
+    ray test above would be passing for a reason unrelated to this fix,
+    e.g. no mismatched boundaries existing at all on this geometry)."""
+    doc = json.loads((ROOT / "fixtures" / "threeRidgeFloorplan.json")
+                     .read_text(encoding="utf-8"))
+    geoms = []
+    for rf in doc["roofs"]:
+        g = fp3d.ROOFCLIP.RoofGeom.from_record(rf)
+        g.clip_name = rf["id"]
+        geoms.append(g)
+    per = fp3d.ROOFCLIP.compute_roof_clips(geoms)
+    risers = fp3d._cross_roof_risers([(g, per[id(g)]) for g in geoms], fp3d.ROOFCLIP)
+    assert len(risers) > 0
+
+
 def test_roof_geom_matches_the_editor_item_on_the_same_data(fp3d):
     """The Qt-free twin (`RoofGeom`) must give the editor's own eave ends
     for the same record -- including a hip end's extension."""
