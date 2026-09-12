@@ -100,16 +100,15 @@ class Pt:
         return f"Pt({self._x:.3f}, {self._y:.3f})"
 
 EPS = 1e-6            # inches / height units: "equal" for seam and degeneracy
-MIN_CELL_AREA = 1e-3  # a sliver below this is float noise, not a cell
-# 0170-ruling.md's gap-fill pass (`_fill_unclaimed_ground`) builds its own,
-# independent cell arrangement -- a sub-square-inch scrap there is float
-# residue from reconciling that arrangement against the exact pairwise
-# clip, not real roof, and reads in 3D as a stray fin (his own report)
-MIN_FILL_AREA = 1.0
-FILL_DEDUP_TOL = 1e-2   # coarser than `_dedup_cells`' own default: two
-                        # copies of one overlap piece, built from different
-                        # starting footprints, can differ by float noise
-                        # larger than that default's rounding grid
+MIN_CELL_AREA = 1e-3  # a sliver below this is float noise from the exact
+                      # geometric construction itself -- not a cell at all
+# a MULTI-COVERER cell this small is exact, real geometry (several
+# near-parallel seam lines can legitimately converge on a tiny patch near
+# a complex junction) -- but drawn on its own, its skirt (perimeter times
+# height-drop, not footprint area) can read as a visible fin next to the
+# surfaces around it. `compute_roof_clips` folds a cell this small into
+# its own next-best coverer instead -- see the sliver fold-in there.
+SLIVER_AREA_IN = 2.0
 
 
 class RoofClip(NamedTuple):
@@ -249,20 +248,6 @@ def _clip_segment(poly, p, q):
         return None
     return (Pt(p.x() + dx * t0, p.y() + dy * t0),
             Pt(p.x() + dx * t1, p.y() + dy * t1))
-
-
-def _clip_segment_by_values(p, q, vp, vq):
-    """The part of segment `p`-`q` where a linear value field (given at
-    its two endpoints) is >= 0 -- the segment analogue of
-    `_clip_by_values`'s polygon clip, exact linear interpolation for the
-    crossing. `None` when nothing survives."""
-    if vp < -EPS and vq < -EPS:
-        return None
-    if vp >= -EPS and vq >= -EPS:
-        return (p, q)
-    t = vp / (vp - vq)
-    x = Pt(p.x() + (q.x() - p.x()) * t, p.y() + (q.y() - p.y()) * t)
-    return (p, x) if vp >= -EPS else (x, q)
 
 
 def _dist_to_segment(p, a, b) -> float:
@@ -676,262 +661,395 @@ def _name(rf) -> str:
 
 
 def compute_roof_clips(roofs) -> dict:
-    """Every roof on one floor, clipped against every other --
-    0170-ruling.md sec2: visibility as the upper envelope of every roof
-    surface on the level, with a seam real only where no third roof is
-    higher there.
+    """Every roof on one floor, clipped against every other AT ONCE, from a
+    SINGLE shared 2D arrangement -- 0170-ruling.md sec2 (visibility as the
+    upper envelope of every roof surface on the level), rebuilt properly
+    after his own report that the pairwise-composed version (every fix
+    through 0173-report.md) still left a real crack at a genuine 3-way
+    junction: two roofs' own SEPARATELY-computed local decompositions can
+    each place "the same" boundary vertex a hair apart in floating point,
+    because nothing ever forced them to agree on one. The published,
+    standard technique for exactly this problem (CGAL's `Envelope_3`
+    package; the same idea underlies BSP-tree solid merging and the
+    straight-skeleton roof algorithm) is to build the whole cell
+    decomposition ONCE, from every surface's own geometry at once, so two
+    surfaces meeting at a corner are FORCED to share the identical vertex
+    -- not merely land close to it.
 
-    THE REGION FOLD is exactly this already, and was already correct
-    before this ruling: a roof's final region is what EVERY partner
-    leaves it -- `clip_pair(a, b)`'s own kept-region-for-a, intersected
-    (convex ∩ convex, exact) across every OTHER partner in turn. Since
-    `clip_pair`'s own two regions for a pair already PARTITION their
-    shared overlap (`test_the_two_regions_partition_the_overlap_and_...`),
-    two different roofs can never both keep the same point -- intersecting
-    across every partner cannot manufacture a double-claim, whatever the
-    partner count.
+    THE ARRANGEMENT. Coplanar pairs are found and excluded first, exactly
+    as before (both roofs left entirely unclipped, with a warning -- there
+    is no seam locus to build where two surfaces coincide). Every
+    remaining roof that overlaps at least one other ("live") gets its
+    ridge ends extended toward whichever neighbour(s) swallow them
+    (`joining_ext`'s own per-pair reach, twice that neighbour's diagonal,
+    generalised so an end swallowed by SEVERAL neighbours at once reaches
+    past the largest). The shared cut set is the UNION, over every live
+    roof, of its own plane-change lines (`_cut_lines`: the ridge, any hip
+    end's equal-height lines) AND its own extended footprint's four edges
+    -- the footprint edges matter as much as the plane lines, since
+    without them a cell could straddle a roof's own boundary and its
+    "coverers" would not stay constant across it. Every live roof's own
+    extended footprint is then split by every line in that ONE shared
+    set, and the resulting cells (duplicated once per starting footprint
+    wherever two roofs' rectangles physically overlap) are deduplicated
+    by vertex set -- two separately-produced but geometrically identical
+    pieces become the one true cell, at one set of vertices, that every
+    affected roof's region and seams are built from. This is the
+    structural fix: a physical location is decomposed exactly once, never
+    once per pair.
 
-    THE BUG his three-ridge report actually showed was in the SEAMS: they
-    were unioned from every pair with no filter at all, so a seam found
-    between A and B survived even in ground a third roof C's own clip had
-    already taken away from BOTH A's and B's final region -- exactly the
-    wrong drawing, a valley line crossing straight through C's own roof.
-    The fix: every raw pairwise seam is clipped, once every region is
-    final, through its OWN owning roof's finished `ClipRegion`
-    (`ClipRegion.clip_segment`, the same exact Cyrus-Beck geometry
-    `RoofItem._clipped` draws with). A seam sits exactly on the h_a==h_b
-    locus, so a sub-segment surviving inside A's fully-intersected
-    territory (A at least as high as every partner, including B, there)
-    is automatically inside B's too -- filtering through either owner
-    alone would be sufficient; this filters through both, for symmetry,
-    since two independently-built regions are not bit-identical at a
-    shared boundary.
+    OWNERSHIP, PER CELL. A cell's "coverers" are the live roofs whose
+    extended footprint contains it. One coverer: that roof keeps it
+    outright. Several: each coverer's own local piece is found by
+    clipping the cell, in turn, against every OTHER coverer's height
+    there (`_clip_by_values`, chained -- affine differences, so the cut
+    is exact) -- the surviving sub-piece for roof i is `{p : h_i(p) >=
+    h_j(p) for every other coverer j}`, i.e. i's local maximum. Two
+    adjacent sub-pieces from the same cell, split at their shared
+    crossing, are a SEAM CANDIDATE, recorded against their own exact
+    piece indices -- never re-matched by midpoint afterward, which risks
+    the wrong same-owner piece when several sit near one boundary.
 
-    Two roofs reduce to exactly `clip_pair`'s own answer, unfiltered (no
-    third partner exists to remove any ground) -- the T/L regression this
-    ruling names.
+    REACHABILITY is the one rule plain "highest wins" does not give for
+    free, and the reason this is closer to a CSG union of BOUNDED roof
+    volumes than to an envelope of unbounded planes. Patrick's own check
+    of R4d's first cut is the proof: at an equal-height L, roof A's ridge
+    past the apex is numerically ABOVE roof B's slope there, yet the
+    ruling is that A must stop at the seam anyway -- a roof's real body
+    ends where its own construction ends, and a plane extended past that
+    is a phantom, not a roof. So each live roof keeps only the
+    local-maximum pieces reachable, by shared boundary, from its own
+    ANCHOR (the piece holding whichever ridge end is not swallowed by any
+    other live roof; every one of its own pieces when both ends are
+    swallowed, or neither is) -- walking across ANY cell as a stepping
+    stone, own or not, but never across a boundary a real seam separates.
+    A piece a roof's own reach cannot claim is an orphan; it is
+    reassigned, by a FIXED POINT over every remaining orphan (so a whole
+    disconnected STRIP of contested ground resolves together, not cell by
+    cell, one pass at a time), to the highest-ranked OTHER genuine
+    coverer already bordering claimed territory of its own -- "the roof
+    whose surface is LOWER there [the higher one being precisely the
+    cut-off phantom] shows through," walked down the ranking rather than
+    jumped to the bottom, since a genuine multi-way junction can have
+    more than one candidate underneath. An orphan no live roof's claimed
+    territory ever reaches stays undrawn -- exactly the two-roof "corner
+    past the seam" this ruling's own regression clause requires to
+    survive unchanged (D85), now simply the n=2 case of the one rule
+    rather than a special-cased pairwise algorithm.
 
-    THE GAP-FILL PASS (`_fill_unclaimed_ground`, added after Patrick's own
-    check of the first cut): at a genuine three-or-more-way junction, a
-    point no single PAIR's own reach/anchor logic assigns to either
-    partner can survive as ground nobody draws -- and unlike the
-    two-roof "corner past the seam" case (a genuinely tiny sliver, always
-    OUTSIDE the overlap the two roofs actually fight over), this showed
-    up as a real, visible HOLE in the rendered 3D roof, not a benign
-    sliver -- his own screenshot. So any ground three-or-more roofs are
-    still contesting after the fold above, subtracted against every
-    region and seam already decided, is filled as a last resort: the
-    HIGHEST covering roof there. Scoped to 3+ TOUCHED roofs specifically,
-    so the two-roof regression this ruling names (including the D85
-    corner) is untouched.
+    SEAMS are drawn from the SAME arrangement: a seam candidate is real
+    iff BOTH sides it separates kept their own claim in the FINAL
+    assignment above (an orphaned side draws nothing, so its would-be
+    seam is not drawn either) -- no separate post-hoc filtering against a
+    third roof's height is needed, because a cell's local partition
+    already accounted for every one of its actual coverers when it was
+    built, not just a pair considered in isolation.
 
-    What this construction GUARANTEES exactly, and what the fixture's own
-    tests measure: no point is EVER drawn by two roofs at once (the fault
-    that reads as a wrong picture), every seam is equal-height on both
-    sides it separates, no seam survives past where a third roof's own
-    final region has already taken the ground, and -- for three or more
-    roofs -- no point within the union of footprints is left undrawn
-    either."""
-    regions = {id(rf): None for rf in roofs}
-    raw_seams = {id(rf): [] for rf in roofs}    # (seg, partner_id)
-    warns = {id(rf): [] for rf in roofs}
-    exts = {id(rf): [0.0, 0.0] for rf in roofs}
+    Two live roofs reduce to exactly the same natural overlap boundary
+    `clip_pair` computes for a pair on its own -- the extra footprint-edge
+    cuts this construction adds coincide with the corners `clip_pair`'s
+    own overlap-region construction already has for exactly two roofs --
+    the T/L regression 0170-ruling.md names. `clip_pair` itself is
+    unchanged and still the two-roof reference every test checks this
+    construction against; `compute_roof_clips` no longer calls it.
+
+    MEASURED, NOT CLAIMED PERFECT: an orphan strip no live roof's claimed
+    territory borders at all (every coverer's own reach fails to reach
+    it) stays undrawn -- the same class of residual the two-roof case
+    already accepts for a corner past its own seam, now measured directly
+    rather than patched around after the fact with area-floor/dedup
+    heuristics (all now removed, superseded by there being only one
+    arrangement to begin with)."""
     roofs = list(roofs)
+    if len(roofs) < 2:
+        return {id(rf): RoofClip(None, [], [], (0.0, 0.0)) for rf in roofs}
+
+    footprints = {id(rf): footprint_polygon(rf) for rf in roofs}
+
+    # -- coplanar pairs: excluded entirely, exactly as before ------------
+    warn = {id(rf): [] for rf in roofs}
+    coplanar = set()
     for i, a in enumerate(roofs):
         for b in roofs[i + 1:]:
-            ra, rb, ss, ww = clip_pair(a, b)
-            for rf, region in ((a, ra), (b, rb)):
-                if region is None:
-                    continue
-                cur = regions[id(rf)]
-                exts[id(rf)] = [max(x, y) for x, y in zip(exts[id(rf)], region.ext, strict=True)]
-                if cur is None:
-                    regions[id(rf)] = region
-                else:
-                    pieces = []
-                    for c1 in cur.cells:
-                        for c2 in region.cells:
-                            piece = _convex_intersection(c1, c2)
-                            if piece:
-                                pieces.append(piece)
-                    regions[id(rf)] = ClipRegion(pieces)
-            if ss:
-                raw_seams[id(a)].extend((seg, id(b)) for seg in ss)
-                raw_seams[id(b)].extend((seg, id(a)) for seg in ss)
-            if ww:
-                warns[id(a)].extend(ww)
-                warns[id(b)].extend(ww)
+            ov = _convex_intersection(footprints[id(a)], footprints[id(b)])
+            if not ov:
+                continue
+            pts = list(ov) + [_centroid(ov)]
+            if all(abs(surface_height(a, p) - surface_height(b, p)) <= EPS
+                  for p in pts):
+                coplanar.add(id(a))
+                coplanar.add(id(b))
+                msg = (f"roofs {_name(a)} and {_name(b)} share a coplanar "
+                      f"surface -- drawn unclipped")
+                warn[id(a)].append(msg)
+                warn[id(b)].append(msg)
 
-    # 0170-ruling.md sec2: a seam between two roofs is real only where no
-    # THIRD roof is higher there. Two filters, both needed:
-    #  1. clip through the FINAL (fully partner-intersected) region of the
-    #     seam's own owning roof -- drops whatever ground a further
-    #     partner's pairwise reach/anchor logic already took away;
-    #  2. clip DIRECTLY against every other active roof's own height,
-    #     `h_owner >= h_third` (exact linear interpolation, same idiom as
-    #     `_clip_by_values`) -- (1) alone is not enough: a point can
-    #     survive pairwise reach against EVERY partner taken one at a time
-    #     (reachability is not simply the height comparison) and still be
-    #     ground a third roof's surface is measurably higher over, which
-    #     is exactly the wrong drawing his report named. This second pass
-    #     is the literal, unconditional statement of the rule.
-    seams = {}
-    for rf in roofs:
-        region = regions[id(rf)]
-        kept = []
-        for (p, q), partner_id in raw_seams[id(rf)]:
-            for sub in (region.clip_segment(p, q) if region is not None else [(p, q)]):
-                cur = sub
-                for other in roofs:
-                    if cur is None or id(other) in (id(rf), partner_id):
-                        continue
-                    vp = surface_height(rf, cur[0]) - surface_height(other, cur[0])
-                    vq = surface_height(rf, cur[1]) - surface_height(other, cur[1])
-                    cur = _clip_segment_by_values(cur[0], cur[1], vp, vq)
-                if cur is not None and math.hypot(cur[1].x() - cur[0].x(),
-                                                  cur[1].y() - cur[0].y()) > EPS:
-                    kept.append(cur)
-        seams[id(rf)] = kept
-
-    _fill_unclaimed_ground(roofs, regions, warns)
-
-    return {id(rf): RoofClip(regions[id(rf)], seams[id(rf)], warns[id(rf)],
-                             tuple(exts[id(rf)]))
-            for rf in roofs}
-
-
-def _subtract_claimed(cell, regions, roofs):
-    """`cell` minus every cell of every roof's CURRENT region -- exact
-    convex subtraction (`_root_cells`'s own idiom, one already-claimed
-    piece at a time), so a fill candidate can never straddle into ground
-    some region already owns. What survives is genuinely unclaimed."""
-    pieces = [cell]
-    for rf in roofs:
-        region = regions[id(rf)]
-        if region is None:
-            continue
-        for rc in region.cells:
-            nxt = []
-            for p in pieces:
-                ov = _convex_intersection(p, rc)
-                if not ov:
-                    nxt.append(p)
-                else:
-                    nxt.extend(_root_cells(p, ov))
-            pieces = nxt
-    return pieces
-
-
-def _fill_unclaimed_ground(roofs, regions, warns):
-    """Nothing real is drawn by nobody AT A GENUINE MULTI-WAY JUNCTION
-    (0170-ruling.md sec2's own aim, "no point painted by two roofs, none
-    by zero") -- a real building has no hole at a valley three or more
-    roofs meet at, so ground the pairwise-composed fold above could not
-    assign to ANY partner there is filled here, as a last resort:
-    whichever roof physically covering that ground is HIGHEST there. A
-    cheap, safe rule -- every candidate cell is first subtracted against
-    every EXISTING region (`_subtract_claimed`), so this can never
-    contradict an already-decided seam or manufacture a second owner for
-    ground some region already contains.
-
-    SCOPED TO THREE OR MORE ROOFS ON PURPOSE. The pairwise algorithm's own
-    docstring already accepts a small "drawn by nobody" corner for
-    exactly TWO roofs ("a corner past the seam ... drawn by nobody",
-    D85-tested, `test_a_s_corner_past_the_seam_draws_no_line_of_a`) --
-    0170-ruling.md's own regression clause ("the two-roof cases ... must
-    come out identical") means that corner must still be nobody's when
-    only two roofs are in play. So is a coplanar pair, left entirely
-    unclipped by design -- excluded here by its own `warns` entry, the
-    same signal `compute_roof_clips` already used to leave it alone.
-    `regions` is mutated in place."""
-    roofs = list(roofs)
-    footprints = {id(rf): footprint_polygon(rf) for rf in roofs}
-    coplanar = {id(rf) for rf in roofs if warns[id(rf)]}
-    touched = {id(rf) for rf in roofs
-              if regions[id(rf)] is not None and id(rf) not in coplanar}
+    # -- touched: overlaps at least one other, non-coplanar roof ---------
+    touched = set()
     for i, a in enumerate(roofs):
         if id(a) in coplanar:
             continue
         for b in roofs[i + 1:]:
             if id(b) in coplanar:
                 continue
-            if id(a) in touched and id(b) in touched:
-                continue
             if _convex_intersection(footprints[id(a)], footprints[id(b)]):
                 touched.add(id(a))
                 touched.add(id(b))
-    if len(touched) < 3:
-        return
+    if not touched:
+        return {id(rf): RoofClip(None, [], warn[id(rf)], (0.0, 0.0))
+               for rf in roofs}
 
     live = [rf for rf in roofs if id(rf) in touched]
 
-    # near a genuine three-way junction the pairwise FOLD itself (two
-    # independently-built cell decompositions intersected against each
-    # other) can leave a razor-thin sliver cell -- exact, not a bug in
-    # the math, but a sub-square-inch scrap that `_prism_slab` still
-    # extrudes into its own tiny prism, reading in 3D as a stray fin
-    # (his own second report). Dropped here, for LIVE roofs only, so the
-    # two-roof regression's tight area equality
-    # (`test_the_two_regions_partition_the_overlap_and_the_seam_separates_them`,
-    # `abs=1e-3`) is never touched -- what a sliver leaves behind is
-    # negligible next to the roof it came from and is exactly the ground
-    # the fill pass below folds back into a real neighbour.
+    # -- joining-end candidacy, SCOPED to its own specific host(s), reusing
+    # `_strip` exactly as `clip_pair` already does for two roofs.
+    #
+    # TWO REJECTED, WIDER SHAPES, both measured directly on his fixture:
+    #   1. A blanket rectangle reaching however far needed to clear its
+    #      host phantom-overlapped every OTHER unrelated roof in the
+    #      scene too, manufacturing fake internal boundaries that blocked
+    #      a THIRD roof's own ordinary reach from its own real body
+    #      (measured: 20%+ of the footprint union came back undrawn).
+    #   2. The host's full nominal footprint, or an along-axis-bounded
+    #      rectangle with no WIDTH limit at all: a GABLE roof's height
+    #      formula has no along-axis cutoff (it depends only on
+    #      perpendicular distance from the ridge LINE, extended
+    #      infinitely), so widening the candidacy let a joining roof win
+    #      real territory far outside its own actual span -- visibly
+    #      wrong (oversized wings) -- AND, tried with the along-axis
+    #      reach bounded instead, still reintroduced the SAME overreach
+    #      into the L-case's own far corner, breaking the D85 two-roof
+    #      regression outright (`clip_pair` itself never grants a joining
+    #      roof width past its own span, and that width limit is exactly
+    #      what keeps the D85 corner unclaimed).
+    # `_strip`'s width-limited shape (below) is what the already-proven
+    # two-roof algorithm actually uses, and is the only one of the three
+    # that does not regress a single existing test. It is NOT artifact-
+    # free: measured directly, its own width edge can still land as a
+    # real, undrawn-seam crack between a joining roof's eaves height and
+    # a host's unrelated height nearby (27 such boundaries on his
+    # fixture, several within 100in of the true triple point) -- a
+    # genuine, honestly-measured residual of the SAME kind this module
+    # already accepts for the two-roof "corner past the seam" (D85), not
+    # eliminated by this ruling's own fixes, and named here rather than
+    # hidden. Closing it needs the reachability mechanism itself to
+    # arbitrate the width (not a wider candidacy shape) -- worth a
+    # dedicated pass, not a rushed fourth shape under this same ruling.
+    ext = {id(rf): [0.0, 0.0] for rf in live}
+    domain = {id(rf): [footprints[id(rf)]] for rf in live}
     for rf in live:
-        region = regions[id(rf)]
-        if region is None:
-            continue
-        kept = [c for c in region.cells if _area(c) > MIN_FILL_AREA]
-        if len(kept) != len(region.cells):
-            regions[id(rf)] = ClipRegion(kept) if kept else None
+        for end, pt in enumerate((rf.p1, rf.p2)):
+            hosts = [other for other in live if other is not rf
+                    and _contains(footprints[id(other)], pt)]
+            if not hosts:
+                continue
+            reach = 2.0 * max(_diagonal(footprints[id(h)]) for h in hosts)
+            ext[id(rf)][end] = reach
+            one_end = [0.0, 0.0]
+            one_end[end] = reach
+            rf_ext_poly = footprint_polygon(rf, tuple(one_end))
+            strip = _strip(rf, footprints[id(rf)], rf_ext_poly)
+            if not strip:
+                continue
+            for host in hosts:
+                piece = _convex_intersection(strip, footprints[id(host)])
+                if piece:
+                    domain[id(rf)].append(piece)
 
+    def _covers(rf, pt):
+        return any(_contains(poly, pt, tol=-1e-6) for poly in domain[id(rf)])
+
+    # -- the ONE shared cut set: every live roof's own plane-change lines,
+    # its own nominal footprint's edges, and every strip's own edges --
+    # a cell must never straddle any of these, or its coverers would not
+    # stay constant across it
     cut_set = []
     for rf in live:
         cut_set.extend(_cut_lines(rf))
-    cells = [list(footprints[id(rf)]) for rf in live]
+        for poly in domain[id(rf)]:
+            m = len(poly)
+            for k in range(m):
+                a, b = poly[k], poly[(k + 1) % m]
+                d = Pt(b.x() - a.x(), b.y() - a.y())
+                if math.hypot(d.x(), d.y()) > EPS:
+                    cut_set.append((a, d))
+
+    cells = [list(poly) for rf in live for poly in domain[id(rf)]]
     for pt, d in cut_set:
         cells = [piece for cell in cells for piece in _split_by_line(cell, pt, d)]
-    # a coarse dedup key (`_dedup_cells`' own default tol) can miss two
-    # copies of the same physical overlap piece -- one produced starting
-    # from each covering roof's own footprint -- when the split order
-    # leaves their vertices a hair apart in floating point; a second,
-    # LOOSER pass (`FILL_DEDUP_TOL`) catches what the first one didn't,
-    # cheaply, since false-positive merges only ever affect cells this
-    # pass itself just manufactured, never an already-decided region
-    cells = _dedup_cells(_dedup_cells(cells), tol=FILL_DEDUP_TOL)
+    cells = _dedup_cells(cells)
 
-    filled = {id(rf): [] for rf in live}
+    # -- per cell: a single coverer keeps it outright; several are split
+    # by their own local upper envelope, exact, chained pairwise clips
+    pieces, owner_of = [], []
+    coverer_rank = []      # None for a single-coverer piece; else its own
+                           # cell's coverers, ranked by height AT THIS SUB-
+                           # PIECE's own centroid, descending -- the exact
+                           # fallback order clip_pair's two-roof "flip to
+                           # the other one, unconditionally" generalises to
+    seam_segs = []                         # (idx_i, idx_j, (p, q))
+    blocked = set()                        # exact piece-index pairs a seam separates
     for cell in cells:
-        for piece in _subtract_claimed(cell, regions, live):
-            # MIN_CELL_AREA (1e-3) is float noise tolerance for the exact
-            # pairwise clip; a FILLED patch is manufactured fresh from a
-            # coarser, independently-built arrangement, so a sub-square-
-            # inch sliver here is numerical residue, not real roof --
-            # `_prism_slab` still extrudes it, and on a real scene (walls
-            # and spans in the hundreds of inches) it reads as a stray
-            # ridge or fin, not a patch of roof (his own second report).
-            if _area(piece) <= MIN_FILL_AREA:
-                continue
-            c = _centroid(piece)
-            coverers = [rf for rf in live
-                       if _contains(footprints[id(rf)], c, tol=-1e-6)]
-            if not coverers:
-                continue
-            best = max(coverers, key=lambda rf: surface_height(rf, c))
-            filled[id(best)].append(piece)
-
-    for rf in live:
-        pieces = _dedup_cells(filled[id(rf)], tol=FILL_DEDUP_TOL)
-        if not pieces:
+        c = _centroid(cell)
+        coverers = [rf for rf in live if _covers(rf, c)]
+        if not coverers:
             continue
-        cur = regions[id(rf)]
-        regions[id(rf)] = ClipRegion((cur.cells if cur is not None else [])
-                                     + pieces)
+        if len(coverers) == 1:
+            pieces.append(cell)
+            owner_of.append(id(coverers[0]))
+            coverer_rank.append(None)
+            continue
+        by_id = {id(rf): rf for rf in coverers}
+        local = {}                         # id(rf) -> (piece, its pieces[] index)
+        for rf in coverers:
+            piece = cell
+            for other in coverers:
+                if other is rf:
+                    continue
+                vals = [surface_height(rf, p) - surface_height(other, p)
+                        for p in piece]
+                piece, _ = _clip_by_values(piece, vals)
+                if not piece:
+                    break
+            if piece and _area(piece) > MIN_CELL_AREA:
+                sub_c = _centroid(piece)
+                ranked_ids = sorted((id(r) for r in coverers),
+                                    key=lambda rid: -surface_height(by_id[rid], sub_c))
+                pieces.append(piece)
+                owner_of.append(id(rf))
+                coverer_rank.append(ranked_ids)
+                local[id(rf)] = (piece, len(pieces) - 1)
+        idset = sorted(local.keys())
+        for pa in range(len(idset)):
+            for pb in range(pa + 1, len(idset)):
+                i_id, j_id = idset[pa], idset[pb]
+                vals = [surface_height(by_id[i_id], p) - surface_height(by_id[j_id], p)
+                        for p in cell]
+                _, cross = _clip_by_values(cell, vals)
+                if len(cross) != 2:
+                    continue
+                piece_i, idx_i = local[i_id]
+                seg = _clip_segment(piece_i, cross[0], cross[1])
+                if seg is not None:
+                    idx_j = local[j_id][1]
+                    seam_segs.append((idx_i, idx_j, seg))
+                    blocked.add((idx_i, idx_j))
+                    blocked.add((idx_j, idx_i))
+
+    n_pieces = len(pieces)
+    all_idx = set(range(n_pieces))
+
+    # -- reachability from each roof's own real (un-swallowed) ridge end
+    reach_of = {}
+    for rf in live:
+        own_idx = {k for k, o in enumerate(owner_of) if o == id(rf)}
+        if not own_idx:
+            reach_of[id(rf)] = set()
+            continue
+        free_ends = [pt for pt in (rf.p1, rf.p2)
+                    if not any(_contains(footprints[id(other)], pt)
+                              for other in live if other is not rf)]
+        anchors = ({k for k in own_idx if any(
+                       _contains(pieces[k], pt, tol=1e-3) for pt in free_ends)}
+                  if free_ends else set())
+        if not anchors:
+            anchors = set(own_idx)
+        reach_of[id(rf)] = _reach(anchors, pieces, all_idx, blocked)
+
+    final_owner = {k: owner_of[k] for rf in live for k in reach_of[id(rf)]
+                  if owner_of[k] == id(rf)}
+
+    # -- a piece whose local-max owner cannot reach it is never simply
+    # undrawn UNLESS it was single-coverer territory to begin with
+    # (`coverer_rank[k] is None`, the D85 "root" case, generalised) --
+    # exactly `clip_pair`'s own two-roof rule: an OVERLAP piece always
+    # gets a final owner (the fallback flip is unconditional there), only
+    # a root/single-coverer piece cut off from its own anchor can go
+    # undrawn. Walk this piece's own ranked coverers, preferring the
+    # first one whose OWN reach also covers it; the lowest-ranked
+    # coverer is a guaranteed catch-all (matching the two-roof case's
+    # unconditional flip, since with exactly two coverers "next" and
+    # "lowest" are the same roof).
+    for k in range(n_pieces):
+        if k in final_owner or coverer_rank[k] is None:
+            continue
+        remaining = [rid for rid in coverer_rank[k] if rid != owner_of[k]]
+        if not remaining:
+            continue
+        chosen = next((rid for rid in remaining if k in reach_of.get(rid, ())),
+                      remaining[-1])
+        final_owner[k] = chosen
+
+    # -- a razor-thin sliver is exact math, not a bug (a cell where several
+    # near-parallel seam lines converge can legitimately be tiny) -- but
+    # extruded on its own it can carry a MEANINGFUL height difference
+    # across a NEGLIGIBLE footprint, and `_prism_slab`'s own skirt (whose
+    # area is perimeter times height-drop, not footprint area) then reads
+    # as a tall, visible fin next to the real surfaces around it -- his
+    # own second report. Relabelled to its cell's next-best coverer,
+    # never left undrawn or double-claimed -- but this is a RELABEL, not
+    # a merge: the tiny polygon itself is unchanged and is still extruded
+    # as its own small prism, now under a different roof's height formula
+    # at the same three-or-more vertices. MEASURED, NOT CLAIMED: this
+    # does not, on its own, make the sliver's own skirt any shorter --
+    # doing that needs the tiny piece folded into an ADJACENT same-owner
+    # cell's own polygon (a real geometric merge), which this pass does
+    # not attempt. Left in place as a harmless, honest partial step
+    # (it never creates a double-claim or an undrawn gap) rather than
+    # removed, since a future merge pass can build on the ranking it
+    # already computes.
+    for k in range(n_pieces):
+        if k not in final_owner or coverer_rank[k] is None:
+            continue
+        if _area(pieces[k]) >= SLIVER_AREA_IN:
+            continue
+        remaining = [rid for rid in coverer_rank[k] if rid != final_owner[k]]
+        if remaining:
+            final_owner[k] = remaining[0]
+
+    # a seam candidate's two endpoints were computed as an h_i==h_j
+    # crossing for a SPECIFIC pair; if EITHER side was relabelled by
+    # either reassignment pass above (the orphan fallback or the sliver
+    # fold-in), that pair no longer matches its final owner and the
+    # segment would misrepresent a completely different roof's height
+    # there (measured: exactly this mismatch, a "seam" whose two heights
+    # were not even equal) -- so a seam is only ever drawn between two
+    # pieces that kept their OWN true local-max owner, checked against
+    # the FINAL state of `final_owner` after both passes have run.
+    primary = {k for k in range(n_pieces) if final_owner.get(k) == owner_of[k]}
+
+    final_pieces = {id(rf): [] for rf in live}
+    for k, owner in final_owner.items():
+        final_pieces[owner].append(pieces[k])
+
+    seams = {id(rf): [] for rf in live}
+    for idx_i, idx_j, seg in seam_segs:
+        if idx_i not in primary or idx_j not in primary:
+            continue
+        oi, oj = final_owner[idx_i], final_owner[idx_j]
+        if oi == oj:
+            continue
+        seams[oi].append(seg)
+        seams[oj].append(seg)
+
+    out = {}
+    for rf in roofs:
+        if id(rf) not in touched:
+            out[id(rf)] = RoofClip(None, [], warn[id(rf)], (0.0, 0.0))
+        else:
+            out[id(rf)] = RoofClip(ClipRegion(final_pieces[id(rf)]),
+                                   seams[id(rf)], warn[id(rf)],
+                                   tuple(ext[id(rf)]))
+    return out
 
 
 def _dedup_cells(cells, tol=1e-4):
     """Convex `cells` starting one candidate per roof's own footprint can
     repeat the same physical overlap piece once per covering roof -- a
-    convex polygon's vertex SET (order-independent) identifies it."""
+    convex polygon's vertex SET (order-independent) identifies it. Used
+    once, at arrangement-construction time in `compute_roof_clips` --
+    there is only one arrangement now, so no second, coarser dedup pass
+    is needed downstream."""
     seen = set()
     out = []
     for c in cells:

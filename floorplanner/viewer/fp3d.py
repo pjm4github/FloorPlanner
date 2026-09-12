@@ -1427,6 +1427,28 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                     ring = [(c.x(), -c.y(), z0 + ROOFCLIP.surface_height(geom, c))
                             for c in piece]
                     roof_parts.append(_prism_slab(ring, ROOF_T))
+                # NOTE (found, not fixed, while chasing 0170-ruling.md's
+                # three-ridge case): `apex`/`ea`/`eb` are, in PLAN (x, y),
+                # exactly COLLINEAR by construction (`_eave_ends()` offsets
+                # `ea`/`eb` from the SAME axis point `apex` sits on, in
+                # opposite perpendicular directions) -- the triangle is
+                # only non-degenerate once height (z) is added. An attempt
+                # to clip it against `clip.region` via `_convex_intersection`
+                # (a 2D, x/y-only operation) therefore always sees zero
+                # area and silently drops every gable triangle -- tried
+                # and reverted in this same session. A genuine 3+-way
+                # junction CAN still let a THIRD roof's territory reach an
+                # unjoined gable end (`clip.ext[end]` only reports whether
+                # THIS end's own ridge point is swallowed, not whether the
+                # roof's nearby TOP SURFACE was ceded elsewhere), so the
+                # whole triangle can still slightly overhang another
+                # roof's final region there (measured on his fixture: one
+                # gable triangle, ~6% outside its own roof's region) --
+                # small, pre-existing, and unrelated to the fixes in this
+                # commit; a correct fix needs `clip.region.clip_segment`
+                # on the PLAN line `ea`-`eb` plus 3D-linear interpolation
+                # along the triangle's own straight edges, not a 2D area
+                # clip. Left as the original, unconditional triangle.
                 e1a, e1b, e2a, e2b = geom._eave_ends()
                 for end, (apex, ea, eb) in enumerate(
                         ((geom.p1, e1a, e2a), (geom.p2, e1b, e2b))):
