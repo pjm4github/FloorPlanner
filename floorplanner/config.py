@@ -35,7 +35,7 @@ __all__ = [
     "config_dir", "settings_file", "designs_dir", "app_settings",
     "FONT_DIR", "FONT_FAMILY", "load_fonts",
     "ICON_DIR", "FURN_DIR", "FURN_MIME", "tool_icon",
-    "DEFAULT_FLOOR", "FLOOR_GHOST", "active_floor", "set_floor_state",
+    "DEFAULT_FLOOR", "FLOOR_GHOST", "ROOF_CLIP_INK", "active_floor", "set_floor_state",
     "floor_display_mode", "apply_floor_visibility",
 ]
 
@@ -525,6 +525,10 @@ def tool_icon(name: str) -> QIcon:
 # SETTINGS — stay live across the whole package.
 # ----------------------------------------------------------------------------
 FLOOR_GHOST = QColor(176, 176, 176)     # flat gray for non-active floors
+# the roof-clip ink: R3b's dash along a wall (walls.py) and R5a's trace on
+# the roof (roofs.py) are one fact drawn from two sides -- one colour, so
+# the trace visibly meets the wall dashes it ends
+ROOF_CLIP_INK = QColor(230, 90, 20)
 
 _FLOOR_STATE = {
     "active": DEFAULT_FLOOR,             # the one editable floor

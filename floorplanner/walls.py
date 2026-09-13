@@ -1697,7 +1697,7 @@ class WallItem(QGraphicsItem):
         from floorplanner.roofs import roof_clip_spans  # late (cycle)
         clip_spans = roof_clip_spans(self.scene(), self)
         if clip_spans:
-            ink = FLOOR_GHOST if ghost else QColor(230, 90, 20)
+            ink = FLOOR_GHOST if ghost else ROOF_CLIP_INK
             painter.setPen(QPen(ink, 2.0, Qt.PenStyle.DashLine))
             for s0, s1 in clip_spans:
                 painter.drawLine(self.point_at(s0), self.point_at(s1))

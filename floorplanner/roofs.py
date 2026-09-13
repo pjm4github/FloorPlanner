@@ -411,6 +411,267 @@ def roof_clip_spans(scene, wall):
 
 
 # ---------------------------------------------------------------------------
+# R5a (0186-ruling.md sec2): the clip trace, ON THE ROOF
+# ---------------------------------------------------------------------------
+# "dashed lines on the roof where the full height of the walls are clipped
+# by the roof" -- the same fact R3b puts on the wall, read from the roof's
+# side: the locus where the roof surface crosses the covered rooms'
+# wall-top plane. Toward the ridge of it the roof clears the ceiling;
+# toward the eaves rooms lose full height, and every R3b wall dash starts
+# or ends exactly where its wall crosses this line. It is also the dormer
+# placement map (the ruling's own reason for building it first).
+#
+# THE GEOMETRY. Within the roof's own footprint the surface is
+# `ridge_h - slope * |perp|` on each side, and past a hip end the LOWER of
+# that and the hip plane `ridge_h - slope_h * beyond` (the same surface
+# `_clip_spans_against_one_roof` reads along a wall). Its level set at a
+# ceiling height `h` is therefore straight lines in the roof's own
+# (along, perp) frame: one per side at `perp = +-(ridge_h - h) / slope`,
+# running the footprint's along-extent but stopping where a hip plane
+# takes over, and per hip end a cross segment at `along = -(ridge_h - h)
+# / slope_h` between the two side lines -- a closed loop for a hip roof,
+# two open lines for a gable one. A side whose line would lie beyond its
+# own eaves never clips, and draws nothing; a ridge below `h` clips
+# everywhere and has no locus at all (R3b dashes the whole wall then; the
+# roof has no line to draw -- `tests/test_roof_clip_trace.py` names that
+# as a limit, not a bug).
+#
+# WHICH CEILING. A roof can cover rooms of different heights, and R3b
+# reads each wall against the LOWER of the rooms it borders
+# (`_wall_ceiling_in`), falling back to the default when no room is
+# there. So the trace does the same at every point: for each distinct
+# ceiling `h` among the floor's rooms (plus the default), the level set
+# at `h` is cut wherever it crosses a room's outline -- dilated by half
+# the floor's thickest wall, so a point ON a wall's centreline still
+# counts as the room's (a room outline stops at the wall's interior
+# face) -- and a piece is kept only where `h` is the governing ceiling
+# at its midpoint: the LOWEST among the rooms holding the point, or the
+# default where none does. Exact, not sampled: every place the verdict
+# can flip is an intersection of the line with a dilated outline (an
+# offset edge line or a vertex's circle), so those are the cuts, and the
+# verdict is constant between them. Same idiom as the wall spans.
+#
+# A ROOF UNDER R4d's CLIP draws the trace only inside its visible region
+# (`RoofItem._drawn_trace`), exactly as its eave lines are, and a JOINED
+# end carries the trace on into its extension: the surface continues
+# there, so the level set does too.
+
+_TRACE_MARGIN_PAD_IN = 0.5   # past the half wall thickness, so a line landing
+                             # exactly on a centreline is not a coin toss
+
+
+def _trace_lines_local(rf, h: float, join_ext=(0.0, 0.0)):
+    """The level set of `rf`'s surface at height `h`, as segments in the
+    roof's own frame: `((a0, p0), (a1, p1))`, `a` along the ridge from
+    `p1`, `p` perpendicular (+ is the LEFT side, `span_in[0]`). Pure
+    geometry of one roof -- no scene, no rooms. `join_ext` is R4d's
+    per-end extension of a joined end (the surface continues there)."""
+    L = rf.length()
+    if L < _CLIP_EPS_IN:
+        return []
+    span_l, span_r = rf.span_in
+    oh_l, oh_r = rf.overhang_in
+    reach_l, reach_r = span_l + oh_l, span_r + oh_r
+    ridge_h, eaves_h = rf.ridge_h_in, rf.eaves_h_in
+    drop = ridge_h - h                      # > 0: the ridge clears the ceiling
+    if drop < -_CLIP_EPS_IN:
+        return []                           # ridge below the ceiling: no locus
+    slope_l = ((ridge_h - eaves_h) / span_l) if span_l > _CLIP_EPS_IN else 0.0
+    slope_r = ((ridge_h - eaves_h) / span_r) if span_r > _CLIP_EPS_IN else 0.0
+    run_1, ohe_1 = rf.hip_extension(0)
+    run_2, ohe_2 = rf.hip_extension(1)
+    ext_1 = run_1 + ohe_1 + max(0.0, join_ext[0])
+    ext_2 = run_2 + ohe_2 + max(0.0, join_ext[1])
+    slope_h1 = ((ridge_h - eaves_h) / run_1) if run_1 > _CLIP_EPS_IN else 0.0
+    slope_h2 = ((ridge_h - eaves_h) / run_2) if run_2 > _CLIP_EPS_IN else 0.0
+    a_lo, a_hi = -ext_1, L + ext_2          # the footprint's along-extent
+
+    # where each hip plane takes over from the side planes, along the axis;
+    # None when that end has no hip plane reaching `h` inside the footprint
+    hip_a1 = hip_a2 = None
+    if slope_h1 > _CLIP_SLOPE_EPS and drop / slope_h1 <= ext_1 + _CLIP_EPS_IN:
+        hip_a1 = -drop / slope_h1
+    if slope_h2 > _CLIP_SLOPE_EPS and drop / slope_h2 <= ext_2 + _CLIP_EPS_IN:
+        hip_a2 = L + drop / slope_h2
+    a_start = a_lo if hip_a1 is None else max(a_lo, hip_a1)
+    a_end = a_hi if hip_a2 is None else min(a_hi, hip_a2)
+
+    # each side's own line, where it lies inside that side's eaves reach
+    def side_thresh(slope, reach):
+        if slope <= _CLIP_SLOPE_EPS:        # flat side: at ridge height throughout
+            return None
+        thresh = drop / slope
+        return thresh if thresh <= reach + _CLIP_EPS_IN else None
+
+    thresh_l = side_thresh(slope_l, reach_l)
+    thresh_r = side_thresh(slope_r, reach_r)
+    lines = []
+    if a_end - a_start > _CLIP_EPS_IN:
+        if thresh_l is not None:
+            lines.append(((a_start, thresh_l), (a_end, thresh_l)))
+        if thresh_r is not None:
+            lines.append(((a_start, -thresh_r), (a_end, -thresh_r)))
+    # a hip end's cross segment: the hip plane at `h`, between the side
+    # lines (or the eaves, where a side never reaches `h`)
+    p_hi = reach_l if thresh_l is None else thresh_l
+    p_lo = -(reach_r if thresh_r is None else thresh_r)
+    for hip_a in (hip_a1, hip_a2):
+        if hip_a is not None and p_hi - p_lo > _CLIP_EPS_IN:
+            lines.append(((hip_a, p_lo), (hip_a, p_hi)))
+    return lines
+
+
+def _trace_to_scene(rf, lines):
+    """Roof-frame `((a, p), (a, p))` pairs -> scene `(QPointF, QPointF)`."""
+    ux, uy, nx, ny = rf._axis()
+    o = rf.p1
+
+    def pt(a, p):
+        return QPointF(o.x() + ux * a + nx * p, o.y() + uy * a + ny * p)
+
+    return [(pt(*s), pt(*e)) for s, e in lines]
+
+
+class _TraceRoom(NamedTuple):
+    """One room as the trace reads it: its ceiling, its outline path (for
+    the inside test) and that outline's edge polygons (for the margin)."""
+    ceiling: float
+    path: object
+    polys: list
+
+    def holds(self, pt: QPointF, margin: float) -> bool:
+        if self.path.contains(pt):
+            return True
+        for poly in self.polys:
+            n = len(poly)
+            for i in range(n):
+                if dist_point_segment(pt, poly[i], poly[(i + 1) % n]) <= margin:
+                    return True
+        return False
+
+
+def _floor_rooms(scene, floor):
+    """Every live room on `floor` as a `_TraceRoom` -- read once per
+    trace, not once per point."""
+    from floorplanner.rooms import RoomItem  # late (peer layer)
+    out = []
+    for it in scene.items():
+        if (not isinstance(it, RoomItem) or sip.isdeleted(it)
+                or getattr(it, "floor", None) != floor):
+            continue
+        ceiling = float(it.properties.get(
+            "ceiling_height_in", DEFAULT_ROOM_PROPS["ceiling_height_in"]))
+        polys = [[QPointF(q) for q in poly]
+                 for poly in it.path.toSubpathPolygons() if len(poly) >= 2]
+        out.append(_TraceRoom(ceiling, it.path, polys))
+    return out
+
+
+def _trace_margin_in(scene, floor) -> float:
+    """Half the thickest wall on `floor`, plus a pad: how far outside a
+    room's outline a point still counts as the room's (its walls' own
+    centrelines, where the R3b dashes live)."""
+    t_max = 0.0
+    for it in scene.items():
+        if isinstance(it, WallItem) and not sip.isdeleted(it) \
+                and it.floor == floor:
+            t_max = max(t_max, float(it.t))
+    return t_max / 2.0 + _TRACE_MARGIN_PAD_IN
+
+
+def _governing_ceiling(rooms, pt: QPointF, margin: float) -> float:
+    """R3b's rule at a point: the LOWEST ceiling among the rooms holding
+    `pt` (outline dilated by `margin`), else the default."""
+    found = [room.ceiling for room in rooms if room.holds(pt, margin)]
+    if not found:
+        return float(DEFAULT_ROOM_PROPS["ceiling_height_in"])
+    return min(found)
+
+
+def _cut_params(p: QPointF, q: QPointF, rooms, margin: float):
+    """Every parameter `t` in (0, 1) at which `p`-`q` can cross a room's
+    dilated outline: its intersections with each edge's line offset by
+    0 / +margin / -margin, and with each vertex's circle of radius
+    `margin`. A superset of the true crossings -- an extra cut only
+    splits a piece whose verdict is the same on both halves."""
+    dx, dy = q.x() - p.x(), q.y() - p.y()
+    qa = dx * dx + dy * dy
+    ts = []
+
+    def add(t):
+        if _CLIP_EPS_IN < t < 1.0 - _CLIP_EPS_IN:
+            ts.append(t)
+
+    for room in rooms:
+        for poly in room.polys:
+            n = len(poly)
+            for i in range(n):
+                a, b = poly[i], poly[(i + 1) % n]
+                ex, ey = b.x() - a.x(), b.y() - a.y()
+                elen = math.hypot(ex, ey)
+                if elen > _CLIP_EPS_IN:
+                    onx, ony = -ey / elen, ex / elen
+                    den = dx * ey - dy * ex
+                    if abs(den) > _CLIP_EPS_IN:
+                        for off in (0.0, margin, -margin):
+                            ax, ay = a.x() + onx * off, a.y() + ony * off
+                            add(((ax - p.x()) * ey - (ay - p.y()) * ex) / den)
+                # the vertex circle: |p + t d - a|^2 == margin^2
+                fx, fy = p.x() - a.x(), p.y() - a.y()
+                qb = 2.0 * (fx * dx + fy * dy)
+                qc = fx * fx + fy * fy - margin * margin
+                disc = qb * qb - 4.0 * qa * qc
+                if qa > _CLIP_EPS_IN and disc >= 0.0:
+                    root = math.sqrt(disc)
+                    add((-qb - root) / (2.0 * qa))
+                    add((-qb + root) / (2.0 * qa))
+    return sorted(set(ts))
+
+
+def roof_clip_trace(scene, roof):
+    """The clip trace of `roof` (0186-ruling.md sec2): `[(p, q)]` scene
+    segments along the locus where its surface meets the ceiling plane of
+    whichever room governs there -- the roof-side reading of the same fact
+    `roof_clip_spans` dashes along a wall. `[]` when nothing clips, or
+    when every governing ceiling is above the ridge. NOT clipped to R4d's
+    visible region (`RoofItem._drawn_trace` does that): this is the
+    roof's own locus. `sip.isdeleted` guards for the same paint-during-
+    teardown reason `roof_clip_spans` carries."""
+    if scene is None or sip.isdeleted(roof):
+        return []
+    rooms = _floor_rooms(scene, roof.floor)
+    margin = _trace_margin_in(scene, roof.floor)
+    heights = {float(DEFAULT_ROOM_PROPS["ceiling_height_in"])}
+    heights.update(room.ceiling for room in rooms)
+    join_ext = roof._clip_ext if roof.is_clipped() else (0.0, 0.0)
+    out = []
+    for h in sorted(heights):
+        for p, q in _trace_to_scene(roof, _trace_lines_local(roof, h, join_ext)):
+            dx, dy = q.x() - p.x(), q.y() - p.y()
+            seg_len = math.hypot(dx, dy)
+            ts = [0.0] + _cut_params(p, q, rooms, margin) + [1.0]
+            # consecutive kept pieces merge back into one segment: the cuts
+            # are a superset of the real crossings, and a dash pattern
+            # restarting at every phantom cut would show them
+            runs = []
+            for t0, t1 in zip(ts, ts[1:], strict=False):
+                if (t1 - t0) * seg_len < _CLIP_EPS_IN:
+                    continue
+                tm = (t0 + t1) / 2.0
+                mid = QPointF(p.x() + dx * tm, p.y() + dy * tm)
+                if abs(_governing_ceiling(rooms, mid, margin) - h) > _CLIP_EPS_IN:
+                    continue
+                if runs and abs(runs[-1][1] - t0) < 1e-12:
+                    runs[-1][1] = t1
+                else:
+                    runs.append([t0, t1])
+            out.extend((QPointF(p.x() + dx * t0, p.y() + dy * t0),
+                        QPointF(p.x() + dx * t1, p.y() + dy * t1))
+                       for t0, t1 in runs)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # R4b (0154-ruling.md sec2, requirement 5): eaves bound to the room top
 # ---------------------------------------------------------------------------
 # "assign the roof's bottom -- where the eaves start -- to the top of the
@@ -954,6 +1215,22 @@ class RoofItem(QGraphicsItem):
         return [(QPointF(a.x(), a.y()), QPointF(b.x(), b.y()))
                 for a, b in self._clip_region.clip_segment(p, q)]
 
+    def _drawn_trace(self):
+        """R5a (0186-ruling.md sec2): the clip trace as drawn -- the
+        roof's own locus (`roof_clip_trace`), cut to the visible region
+        while clipped, exactly as the plan lines are. Computed at paint
+        time, like the wall's own dashes: rooms change without the roof
+        hearing about it, and this is a handful of segments against a
+        handful of outlines, not the junction-clip work CLAUDE.md keeps
+        out of `paint()`."""
+        segs = roof_clip_trace(self.scene(), self)
+        if not self.is_clipped():
+            return segs
+        out = []
+        for p, q in segs:
+            out.extend(self._clipped(p, q))
+        return out
+
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         ghost = floor_display_mode(self.floor) != "active"
@@ -979,6 +1256,17 @@ class RoofItem(QGraphicsItem):
             seam_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
             painter.setPen(seam_pen)
             for p, q in self._seams:
+                painter.drawLine(p, q)
+        # R5a (0186-ruling.md sec2): the clip trace -- where this roof's
+        # surface crosses the covered rooms' ceiling plane. The SAME ink
+        # as R3b's wall dashes (walls.py), because it is the same fact:
+        # each wall dash ends where its wall crosses this line. Ghosted
+        # with the rest of a non-active floor, like the wall dash.
+        trace = self._drawn_trace()
+        if trace:
+            trace_ink = FLOOR_GHOST if ghost else ROOF_CLIP_INK
+            painter.setPen(QPen(trace_ink, 1.6, Qt.PenStyle.DashLine))
+            for p, q in trace:
                 painter.drawLine(p, q)
         if self.isSelected():
             # Patrick's own check of R4b: the selection must hug the roof
