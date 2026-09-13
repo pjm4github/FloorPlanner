@@ -989,6 +989,99 @@ def test_0182_every_equal_height_boundary_between_two_roofs_is_a_drawn_seam():
                    for a, b in segs for e in (a, b)), segs
 
 
+SHORT_RIDGE_FIXTURE = (Path(__file__).resolve().parent.parent / "fixtures"
+                       / "threeRidgeShortRidgeFloorplan.json")
+
+
+def _short_ridge_roofs():
+    doc = json.loads(SHORT_RIDGE_FIXTURE.read_text(encoding="utf-8"))
+    roofs = []
+    for rec in doc["roofs"]:
+        g = RoofGeom.from_record(rec)
+        g.clip_name = rec["id"]
+        roofs.append(g)
+    return roofs
+
+
+def test_0184_a_ridge_end_in_the_air_over_its_host_is_an_open_gable_end():
+    """His own second fixture (`threeRidgeShortRidgeFloorplan.json`,
+    promoted from the intake directory under exit 1): the three-ridge plan with
+    rf2's ridge deliberately cut short, its end 75" before rf1's ridge
+    and 15" above rf1's slope there -- "there should be a gable end that
+    shows up at the end of the roof outline over the top of r#1". The
+    joined-end extension had carried rf2's planes on to rf1's ridge as if
+    the end were buried, and left a real hole east of rf1's own end.
+
+    The rule (0184-report.md): a swallowed end that stops short of every
+    host's ridge, standing above the host, is OPEN -- no extension, so
+    the end line draws and the fascia shows -- while an end at or below
+    its host is joined, and an end that has crossed a host's ridge is a
+    cross-gable's arm and never open (the pinch fixture is unchanged).
+    Receipts: rf2's end and rf1's end both open; rf2 drawn right up to
+    its end edge and not one inch past it; the rf1/rf2 valley ends ON
+    that end edge; nothing blank; and rf1 owns its whole ridge to 756."""
+    roofs = _short_ridge_roofs()
+    rf1, rf2, rf3 = roofs
+    diag = {}
+    clips = compute_roof_clips(roofs, diag=diag)
+    assert clips[id(rf2)].ext == (0.0, 0.0)
+    assert clips[id(rf1)].ext == (0.0, 0.0)
+    assert surface_height(rf2, rf2.p2) > surface_height(rf1, rf2.p2) + 10.0
+    ux, uy, _, _ = rf2._axis()
+    end = rf2.p2
+    just_inside = Pt(end.x() - ux * 2.0, end.y() - uy * 2.0)
+    just_past = Pt(end.x() + ux * 2.0, end.y() + uy * 2.0)
+    assert clips[id(rf2)].region.contains(just_inside)
+    assert not clips[id(rf2)].region.contains(just_past)
+    assert clips[id(rf1)].region.contains(just_past)          # rf1 shows through
+    # the rf1/rf2 valley from A's corner ends on rf2's own end edge
+    valley = next((p, q) for p, q in clips[id(rf2)].seams
+                  if any(abs(e.x() - 459.618) < 0.5 and abs(e.y() - 324.0) < 0.5
+                         for e in (p, q)))
+    far = max(valley, key=lambda e: e.x())
+    along = (far.x() - end.x()) * ux + (far.y() - end.y()) * uy
+    assert abs(along) < 1e-3, (far, along)
+    assert diag["blank"] == []
+    in_any, gap, double = _grid_census(roofs, clips)
+    assert gap == 0 and double == 0
+    for x in (300, 600, 700, 755):
+        assert clips[id(rf1)].region.contains(Pt(x, 468.0))
+
+
+def test_0184_the_open_end_draws_its_end_line_and_the_pinch_is_unchanged(scene):
+    """The item's side of the same rule: with `ext` zero at an open end,
+    `_plan_lines` keeps that end's gable line (a joined end drops it),
+    clipped to where rf2 is really drawn. And the pinch fixture's own
+    rf2 end -- 4" above rf3, but past rf1's ridge it crossed -- stays
+    joined, so 0182/0183's junction is byte-for-byte what he checked."""
+    doc = json.loads(SHORT_RIDGE_FIXTURE.read_text(encoding="utf-8"))
+    items = []
+    for rec in doc["roofs"]:
+        p1, p2 = rec["ridge"]
+        it = RoofItem(QPointF(*p1), QPointF(*p2), span_in=rec["span_in"],
+                      overhang_in=rec["overhang_in"], ridge_h_in=rec["ridge_h_in"],
+                      eaves_h_in=rec["eaves_h_in"], gable=rec["gable"])
+        it.floor = DEFAULT_FLOOR
+        it.clip_name = rec["id"]
+        scene.addItem(it)
+        items.append(it)
+    sync_roof_clips(scene)
+    rf2 = items[1]
+    assert rf2.is_clipped() and rf2._clip_ext == (0.0, 0.0)
+    e1a, e1b, e2a, e2b = rf2._eave_ends()
+    kinds = [(kind, p, q) for kind, p, q in rf2._plan_lines()]
+    end_lines = [(p, q) for kind, p, q in kinds if kind == "dash"
+                 and {(round(p.x(), 3), round(p.y(), 3)), (round(q.x(), 3), round(q.y(), 3))}
+                 == {(round(e1b.x(), 3), round(e1b.y(), 3)), (round(e2b.x(), 3), round(e2b.y(), 3))}]
+    assert len(end_lines) == 1, kinds
+    drawn_end = rf2._clipped(*end_lines[0])
+    assert drawn_end, "the gable end line must survive the clip where rf2 is drawn"
+    pinch = _three_ridge_roofs()
+    clips = compute_roof_clips(pinch)
+    assert clips[id(pinch[1])].ext[1] > 0.0          # rf2 at the pinch: joined
+    assert clips[id(pinch[0])].ext[1] > 0.0          # rf1's crossed end: joined
+
+
 def test_r4g_the_rf3_rake_over_rf1_eave_jump_is_named_correct_and_stays():
     """0177-ruling.md sec3's own receipt: "the one jump boundary that
     remains on this fixture is rf3's rake edge standing over rf1's low

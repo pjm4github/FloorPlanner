@@ -951,7 +951,26 @@ def compute_roof_clips(roofs, diag=None) -> dict:
     # since `_strip` already IS the roof's own span width, and the
     # intersection with each `other` still bounds it to real overlap,
     # never open air).
+    # AN END THAT STOPS SHORT OF ITS HOST'S RIDGE, STANDING ABOVE IT, IS
+    # OPEN, NOT JOINED -- his short-ridge fixture
+    # (`threeRidgeShortRidgeFloorplan.json`): rf2's ridge stops 75" short
+    # of rf1's ridge, its end 15" above rf1's slope, and the extension
+    # carried rf2's planes on to rf1's ridge as if the end were buried. A
+    # ridge end in the air over the roof it sits on is a gable end: the
+    # end line draws, the fascia shows in 3D, nothing extends. An end at
+    # or below its host (the L's B start flush on A's ridge; a lower wing
+    # run into a main) is joined -- its planes continue under the host to
+    # close the hip. And an end whose ridge has CROSSED a host's ridge is
+    # a cross-gable's arm, never open: it is either the phantom the
+    # fixed point prunes at the crossing (A's wedge, rf1 east of the
+    # pinch) or the arm that survives and runs on joined (rf2's south arm
+    # at the pinch, wrapped by the rf2/rf3 seam in his own v2 reference)
+    # -- measured: opening it instead removed the very ground that kept
+    # rf1's east arm severed, and rf1 ran past the pinch. `swallowed`
+    # records every end inside a host, with its overshoot past the ridge
+    # it crossed (None for a join), for the phantom rule below.
     ext = {id(rf): [0.0, 0.0] for rf in live}
+    swallowed = {id(rf): [] for rf in live}
     domain = {id(rf): [footprints[id(rf)]] for rf in live}
     for rf in live:
         for end, pt in enumerate((rf.p1, rf.p2)):
@@ -959,6 +978,17 @@ def compute_roof_clips(roofs, diag=None) -> dict:
                     and _contains(footprints[id(other)], pt)]
             if not hosts:
                 continue
+            overshoots = []
+            for host in hosts:
+                x = _segments_cross(rf.p1, rf.p2, host.p1, host.p2)
+                if x is not None:
+                    d = math.hypot(pt.x() - x.x(), pt.y() - x.y())
+                    if d > 1e-3:
+                        overshoots.append(d)
+            swallowed[id(rf)].append((pt, min(overshoots) if overshoots else None))
+            if (not overshoots and surface_height(rf, pt)
+                    > max(surface_height(h, pt) for h in hosts) + EPS):
+                continue                      # open: a gable end in the air
             reach = 2.0 * max(_diagonal(footprints[id(h)]) for h in hosts)
             ext[id(rf)][end] = reach
             one_end = [0.0, 0.0]
@@ -1146,23 +1176,6 @@ def compute_roof_clips(roofs, diag=None) -> dict:
     # for root ground alone. Measured against the ORIGINAL coverers'
     # planes, pruned or not: the host's plane does not stop existing
     # where its own phantom was pruned.
-    swallowed = {}
-    for rf in live:
-        swallowed[id(rf)] = []
-        for end, pt in enumerate((rf.p1, rf.p2)):
-            if ext[id(rf)][end] <= 0.0:
-                continue
-            overshoots = []
-            for host in live:
-                if host is rf or not _contains(footprints[id(host)], pt):
-                    continue
-                x = _segments_cross(rf.p1, rf.p2, host.p1, host.p2)
-                if x is not None:
-                    d = math.hypot(pt.x() - x.x(), pt.y() - x.y())
-                    if d > 1e-3:
-                        overshoots.append(d)
-            swallowed[id(rf)].append((pt, min(overshoots) if overshoots else None))
-
     def _walk(rf, env):
         """(reached, phantoms, root_orphans) for one roof on one
         envelope: the principal anchor's own walk, and the cut-off
