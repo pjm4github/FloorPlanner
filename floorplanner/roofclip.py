@@ -753,29 +753,47 @@ def compute_roof_clips(roofs) -> dict:
     distinguishes such a roof's two ends the way single-coverage ground
     does for every other one.
 
-    Walking the anchor's own reach crosses ANY cell as a stepping stone,
-    own or not, but never across a boundary a real seam separates. A
-    piece a roof's own reach cannot claim is an orphan; it is
-    reassigned, by a FIXED POINT over every remaining orphan (so a whole
-    disconnected STRIP of contested ground resolves together, not cell by
-    cell, one pass at a time), to the highest-ranked OTHER genuine
-    coverer already bordering claimed territory of its own -- "the roof
-    whose surface is LOWER there [the higher one being precisely the
-    cut-off phantom] shows through," walked down the ranking rather than
-    jumped to the bottom, since a genuine multi-way junction can have
-    more than one candidate underneath. An orphan no live roof's claimed
-    territory ever reaches stays undrawn -- exactly the two-roof "corner
-    past the seam" this ruling's own regression clause requires to
-    survive unchanged (D85), now simply the n=2 case of the one rule
-    rather than a special-cased pairwise algorithm.
+    PRUNE AND RE-ENVELOPE (0179-ruling.md sec2, replacing this module's
+    first cut -- 0178-report.md's own rank-walking fallback, which handed
+    an orphaned piece to "the next-ranked OTHER coverer bordering claimed
+    territory", a fixed order computed ONCE against the ORIGINAL full
+    coverer set). Ruled wrong for the reason a fixed rank order cannot
+    fix: when a piece's true local-max owner is pruned, the ground does
+    not "fall" to whoever was second in a ranking taken before the prune
+    -- it is re-contested from scratch by whoever remains, and the second-
+    ranked candidate at the ORIGINAL three-way comparison is not
+    necessarily the winner of the resulting TWO-way one (the h_i==h_j
+    crossing between the survivors can fall anywhere in the piece, not
+    coincide with where the original loser's height happened to rank).
+    So candidacy per cell is no longer fixed after the first pass: each
+    round rebuilds the local-maximum envelope (the SAME per-cell chained
+    clip described above) using only that cell's currently ACTIVE
+    coverers; anchors and reach are then recomputed on THIS round's
+    result; any piece whose owner cannot reach its own anchor prunes that
+    owner from its cell's active set (never from any OTHER cell); and the
+    next round re-envelopes every affected cell among whoever is left.
+    This repeats to a fixed point -- guaranteed to terminate, since every
+    round that changes anything strictly shrinks some cell's active set,
+    which is bounded below by empty. A cell whose EVERY coverer has been
+    pruned draws for nobody -- the only way ground goes undrawn now,
+    matching the two-roof "corner past the seam" D85 already requires
+    (there, the sole candidate prunes itself and nothing remains) as the
+    n=2 case of the same one rule, rather than a special case of it.
 
-    SEAMS are drawn from the SAME arrangement: a seam candidate is real
-    iff BOTH sides it separates kept their own claim in the FINAL
-    assignment above (an orphaned side draws nothing, so its would-be
-    seam is not drawn either) -- no separate post-hoc filtering against a
-    third roof's height is needed, because a cell's local partition
-    already accounted for every one of its actual coverers when it was
-    built, not just a pair considered in isolation.
+    "ROOT" (single-coverage, anchor-eligible) ground is a property of the
+    ORIGINAL candidacy alone, fixed before any pruning -- a cell that
+    becomes single-active-coverer only THROUGH pruning is an ordinary,
+    unconditional win for whoever is left (nobody else contests it any
+    longer), not a newly-anchoring root; conflating the two would let a
+    roof bootstrap an anchor from ground it never held independently.
+
+    SEAMS are drawn from the SAME arrangement, read off the FINAL
+    (converged) round only: a seam candidate is real iff both sides it
+    separates are still active coverers of that cell when the fixed point
+    is reached -- no separate post-hoc filtering against a third roof's
+    height is needed, because each round's local partition already
+    accounts for every one of that round's actual coverers, not just a
+    pair considered in isolation.
 
     Two live roofs reduce to exactly the same natural overlap boundary
     `clip_pair` computes for a pair on its own -- the extra footprint-edge
@@ -903,101 +921,77 @@ def compute_roof_clips(roofs) -> dict:
         cells = [piece for cell in cells for piece in _split_by_line(cell, pt, d)]
     cells = _dedup_cells(cells)
 
-    # -- per cell: a single coverer keeps it outright; several are split
-    # by their own local upper envelope, exact, chained pairwise clips
-    pieces, owner_of = [], []
-    coverer_rank = []      # None for a single-coverer piece; else its own
-                           # cell's coverers, ranked by height AT THIS SUB-
-                           # PIECE's own centroid, descending -- the exact
-                           # fallback order clip_pair's two-roof "flip to
-                           # the other one, unconditionally" generalises to
-    seam_segs = []                         # (idx_i, idx_j, (p, q))
-    blocked = set()                        # exact piece-index pairs a seam separates
+    # -- ORIGINAL candidacy per cell, fixed for the rest of this function --
+    # `orig_root[i]` (single coverer, from candidacy alone) is the anchor-
+    # eligibility test 0177/0179 endorse; it never changes as pruning
+    # proceeds (see the docstring's "ROOT ... is a property of the
+    # ORIGINAL candidacy alone" paragraph). `active[i]` is the MUTABLE set
+    # the fixed point below prunes from.
+    orig_coverers = []
     for cell in cells:
         c = _centroid(cell)
-        coverers = [rf for rf in live if _covers(rf, c)]
-        if not coverers:
-            continue
-        if len(coverers) == 1:
-            pieces.append(cell)
-            owner_of.append(id(coverers[0]))
-            coverer_rank.append(None)
-            continue
-        by_id = {id(rf): rf for rf in coverers}
-        local = {}                         # id(rf) -> (piece, its pieces[] index)
-        for rf in coverers:
-            piece = cell
-            for other in coverers:
-                if other is rf:
-                    continue
-                vals = [surface_height(rf, p) - surface_height(other, p)
-                        for p in piece]
-                piece, _ = _clip_by_values(piece, vals)
-                if not piece:
-                    break
-            if piece and _area(piece) > MIN_CELL_AREA:
-                sub_c = _centroid(piece)
-                ranked_ids = sorted((id(r) for r in coverers),
-                                    key=lambda rid: -surface_height(by_id[rid], sub_c))
-                pieces.append(piece)
-                owner_of.append(id(rf))
-                coverer_rank.append(ranked_ids)
-                local[id(rf)] = (piece, len(pieces) - 1)
-        idset = sorted(local.keys())
-        for pa in range(len(idset)):
-            for pb in range(pa + 1, len(idset)):
-                i_id, j_id = idset[pa], idset[pb]
-                vals = [surface_height(by_id[i_id], p) - surface_height(by_id[j_id], p)
-                        for p in cell]
-                _, cross = _clip_by_values(cell, vals)
-                if len(cross) != 2:
-                    continue
-                piece_i, idx_i = local[i_id]
-                seg = _clip_segment(piece_i, cross[0], cross[1])
-                if seg is not None:
-                    idx_j = local[j_id][1]
-                    seam_segs.append((idx_i, idx_j, seg))
-                    blocked.add((idx_i, idx_j))
-                    blocked.add((idx_j, idx_i))
+        orig_coverers.append([rf for rf in live if _covers(rf, c)])
+    orig_root = [len(cs) == 1 for cs in orig_coverers]
+    active = [{id(rf) for rf in cs} for cs in orig_coverers]
 
-    n_pieces = len(pieces)
+    def _envelope_round(active):
+        """One pass of the per-cell local-maximum envelope (module
+        docstring's OWNERSHIP, PER CELL paragraph), using only each
+        cell's CURRENTLY active coverers -- rebuilt from scratch every
+        round, never a fixed rank order carried over from a wider set."""
+        pieces, owner_of, coverer_rank, cell_of = [], [], [], []
+        seam_segs, blocked = [], set()
+        for ci, cell in enumerate(cells):
+            coverers = [rf for rf in live if id(rf) in active[ci]]
+            if not coverers:
+                continue
+            if len(coverers) == 1:
+                pieces.append(cell)
+                owner_of.append(id(coverers[0]))
+                coverer_rank.append(None if orig_root[ci] else [id(coverers[0])])
+                cell_of.append(ci)
+                continue
+            by_id = {id(rf): rf for rf in coverers}
+            local = {}                     # id(rf) -> (piece, its pieces[] index)
+            for rf in coverers:
+                piece = cell
+                for other in coverers:
+                    if other is rf:
+                        continue
+                    vals = [surface_height(rf, p) - surface_height(other, p)
+                            for p in piece]
+                    piece, _ = _clip_by_values(piece, vals)
+                    if not piece:
+                        break
+                if piece and _area(piece) > MIN_CELL_AREA:
+                    sub_c = _centroid(piece)
+                    ranked_ids = sorted(
+                        (id(r) for r in coverers),
+                        key=lambda rid: -surface_height(by_id[rid], sub_c))
+                    pieces.append(piece)
+                    owner_of.append(id(rf))
+                    coverer_rank.append(ranked_ids)
+                    cell_of.append(ci)
+                    local[id(rf)] = (piece, len(pieces) - 1)
+            idset = sorted(local.keys())
+            for pa in range(len(idset)):
+                for pb in range(pa + 1, len(idset)):
+                    i_id, j_id = idset[pa], idset[pb]
+                    vals = [surface_height(by_id[i_id], p) - surface_height(by_id[j_id], p)
+                            for p in cell]
+                    _, cross = _clip_by_values(cell, vals)
+                    if len(cross) != 2:
+                        continue
+                    piece_i, idx_i = local[i_id]
+                    seg = _clip_segment(piece_i, cross[0], cross[1])
+                    if seg is not None:
+                        idx_j = local[j_id][1]
+                        seam_segs.append((idx_i, idx_j, seg))
+                        blocked.add((idx_i, idx_j))
+                        blocked.add((idx_j, idx_i))
+        return pieces, owner_of, coverer_rank, cell_of, seam_segs, blocked
 
-    # -- reachability, anchored at the COMPONENT holding each roof's own
-    # SINGLE-COVERAGE ground -- 0177-ruling.md sec1, correcting 0176's
-    # first cut ("whichever ridge end is not swallowed"). Ground no other
-    # live roof's candidacy reaches at all (`coverer_rank is None`,
-    # single-coverer) is unambiguously this roof's own, so it certifies
-    # whichever connected component of the roof's OWN territory
-    # (`own_idx`, plain `_adjacent`) it sits in as real, anchored body --
-    # the component with the MOST such ground, specifically, since a
-    # roof's own territory can genuinely split into several components
-    # (a real, separate wing; or, measured directly, an isolated single-
-    # coverer SCRAP with no connection to the roof's real body at all --
-    # D85's own excluded corner past the seam is single-coverage territory
-    # too, since nothing else's candidacy reaches it, so seeding `_reach`
-    # from EVERY single-coverage cell independently -- this ruling's first
-    # attempt -- reintroduced exactly the fault D85 exists to catch, AND,
-    # measured separately, let the same scrap's own adjacency chain pull
-    # in an entire POKE-THROUGH zone next to it that must fall to the
-    # other roof instead). A roof with no single-coverage ground at all
-    # (wholly inside another's candidacy) anchors at its own `marker_end`'s
-    # component instead.
-    #
-    # The walk FROM this anchor (`_reach`, immediately below) is scoped to
-    # the roof's own territory (`own_idx`), not "any cell, own or not"
-    # (this module's pre-R4g docstring) -- letting a roof's reach hop
-    # through ANOTHER roof's own cells as mere stepping stones was
-    # measured to reopen exactly the point-only saddle 0177-ruling.md
-    # sec1 severs (his fixture's own east-of-the-pinch ground, hopped
-    # back in through a different roof's contested territory). This does
-    # NOT break the ordinary "joining end extends into the other roof, up
-    # to the seam" mechanic (the equal-height L's own poke-through fix):
-    # that piece is not reached via the loser's OWN walk at all -- it is
-    # an ORPHAN once its own roof's walk correctly excludes it, and falls
-    # to the other roof via the UNCONDITIONAL two-coverer fallback below,
-    # exactly `clip_pair`'s own D85 rule, which never needed the winner's
-    # own reach to have found it first.
-    def _components(indices):
+    def _components(pieces, indices, blocked):
         remaining = set(indices)
         comps = []
         while remaining:
@@ -1007,84 +1001,70 @@ def compute_roof_clips(roofs) -> dict:
             remaining -= comp
         return comps
 
-    reach_of = {}
-    for rf in live:
-        own_idx = {k for k, o in enumerate(owner_of) if o == id(rf)}
-        if not own_idx:
-            reach_of[id(rf)] = set()
-            continue
-        comps = _components(own_idx)
-        by_root_area = sorted(
-            comps, key=lambda comp: -sum(
-                _area(pieces[k]) for k in comp if coverer_rank[k] is None))
-        anchors = (by_root_area[0]
-                  if any(coverer_rank[k] is None for k in by_root_area[0])
-                  else None)
-        if anchors is None:
-            marker_pt = rf.p2 if getattr(rf, "marker_end", 1) else rf.p1
-            anchors = next(
-                (comp for comp in comps
-                 if any(_contains(pieces[k], marker_pt, tol=1e-3) for k in comp)),
-                None)
-        if anchors is None:
-            anchors = own_idx
-        reach_of[id(rf)] = _reach(anchors, pieces, own_idx, blocked)
+    # -- THE FIXED POINT (0179-ruling.md sec2): re-envelope, find anchors
+    # and reach on THIS round's result, prune whoever cannot reach their
+    # own piece FROM THAT CELL's active set (never any other cell), and
+    # repeat. Terminates because every round that prunes anything shrinks
+    # some cell's active set, which cannot shrink below empty; bounded
+    # here at one full pass per (roof, cell) pair as a hard backstop
+    # against an implementation bug, not because the math needs slack.
+    for _round in range(len(cells) * len(live) + 1):
+        pieces, owner_of, coverer_rank, cell_of, seam_segs, blocked = \
+            _envelope_round(active)
+        n_pieces = len(pieces)
 
-    final_owner = {k: owner_of[k] for rf in live for k in reach_of[id(rf)]
-                  if owner_of[k] == id(rf)}
+        # `clip_pair`'s own reference (untouched, the two-roof case this
+        # construction must reduce to) never walks a roof's reach through
+        # ANOTHER roof's exclusive root/outside territory (`rb_idx` is not
+        # in A's own `ra_idx | ov_idx` allowed set) -- but it DOES walk
+        # through ANY overlap/contested piece, whoever currently owns it,
+        # since the seam graph among THOSE is what actually decides
+        # connectivity. `own_idx` alone (tried and measured wrong: the
+        # equal-height L's own poke-through returned, because a roof's
+        # reach could no longer even explore the contested pieces where
+        # the real seam boundary does its blocking) drops that overlap-
+        # transit half; `contested` restores exactly it, generalised from
+        # two roofs to N: every piece with 2+ coverers, from ANY owner, is
+        # a legal stepping stone, but another roof's OWN root ground never
+        # is.
+        contested = {k for k in range(n_pieces) if coverer_rank[k] is not None}
+        reach_of = {}
+        for rf in live:
+            own_idx = {k for k, o in enumerate(owner_of) if o == id(rf)}
+            if not own_idx:
+                reach_of[id(rf)] = set()
+                continue
+            comps = _components(pieces, own_idx, blocked)
+            by_root_area = sorted(
+                comps, key=lambda comp: -sum(
+                    _area(pieces[k]) for k in comp if coverer_rank[k] is None))
+            anchors = (by_root_area[0]
+                      if any(coverer_rank[k] is None for k in by_root_area[0])
+                      else None)
+            if anchors is None:
+                marker_pt = rf.p2 if getattr(rf, "marker_end", 1) else rf.p1
+                anchors = next(
+                    (comp for comp in comps
+                     if any(_contains(pieces[k], marker_pt, tol=1e-3) for k in comp)),
+                    None)
+            if anchors is None:
+                anchors = own_idx
+            reach_of[id(rf)] = _reach(anchors, pieces, own_idx | contested, blocked)
 
-    # -- a piece whose local-max owner cannot reach it falls to the next-
-    # ranked OTHER coverer whose OWN claimed territory reaches it -- R4g
-    # (0176-ruling.md sec3) amends `clip_pair`'s own two-roof rule ("an
-    # overlap piece always gets a final owner, the fallback flip is
-    # UNCONDITIONAL") ONLY where there is an actual CHOICE to make. With
-    # exactly two coverers, `remaining` has exactly one entry -- "the
-    # other one" -- and the unconditional flip stays exactly as it always
-    # was: D85's whole architecture (a real, bounded overlap between two
-    # roofs always belongs to one of them) depends on this precise case,
-    # measured directly when a stricter rule broke it (the equal-height
-    # L's own "A's ridge end carries only B's surface" wedge is such a
-    # flip -- A is the pre-clip local max there, numerically, but its
-    # real body cannot reach it, so it falls to B UNCONDITIONALLY; B's
-    # own `reach_of` need not independently reach it, since with only one
-    # alternative there is nothing else IT COULD be).
-    #
-    # At three or more coverers that guarantee breaks: walking straight
-    # to `remaining[-1]` (the WORST-ranked coverer, whatever its rank)
-    # whenever the taller alternatives can't reach it hands unreachable
-    # ground to a roof that is not even locally competitive there --
-    # measured on his fixture (a piece where rf2 is the true local max,
-    # unreachable from rf2's own anchor NOR rf3's, fell to rf1 -- the
-    # WORST of the three -- purely because rf1 happened to be last in
-    # rank, not because rf1 has any claim to it; the 27-boundary residual
-    # 0174-report.md sec6 named was largely this). So with two or more
-    # actual alternatives, walk the ranking and stop at the first one
-    # `reach_of` -- the anchor-connected, seam-respecting graph -- says
-    # can reach it; if NONE of them can, it stays undrawn, generalising
-    # D85's own "unreachable territory belongs to nobody" to the case
-    # where nobody left in contention can reach it either, rather than
-    # manufacturing an owner among candidates who cannot support one.
-    # HONESTLY MEASURED, NOT CLAIMED PERFECT: this is why a genuine
-    # second valley at a 3-way crossing can still be missing rather than
-    # drawn -- named, not hidden, in the report this ruling is answered
-    # by. The one exception, at any coverer count: a piece this small
-    # (`SLIVER_AREA_IN`, the same threshold the fold-in pass below
-    # already uses) keeps the unconditional flip regardless, since
-    # leaving a sub-`SLIVER_AREA_IN` pinhole undrawn reads as a defect in
-    # its own right for no benefit.
-    for k in range(n_pieces):
-        if k in final_owner or coverer_rank[k] is None:
-            continue
-        remaining = [rid for rid in coverer_rank[k] if rid != owner_of[k]]
-        if not remaining:
-            continue
-        if len(remaining) == 1 or _area(pieces[k]) < SLIVER_AREA_IN:
-            final_owner[k] = remaining[-1]
-            continue
-        chosen = next((rid for rid in remaining if k in reach_of.get(rid, ())),
-                      None)
-        if chosen is not None:
-            final_owner[k] = chosen
+        pruned = False
+        for k in range(n_pieces):
+            rid = owner_of[k]
+            if k not in reach_of.get(rid, ()):
+                active[cell_of[k]].discard(rid)
+                pruned = True
+        if not pruned:
+            break
+
+    # every piece surviving the fixed point already passed reachability
+    # (else its round would have pruned it and looped again), so the
+    # final envelope's own ownership needs no further reassignment for
+    # correctness -- what follows is cosmetic only.
+    final_owner = dict(enumerate(owner_of))
 
     # -- a razor-thin sliver is exact math, not a bug (a cell where several
     # near-parallel seam lines converge can legitimately be tiny) -- but
@@ -1092,36 +1072,29 @@ def compute_roof_clips(roofs) -> dict:
     # across a NEGLIGIBLE footprint, and `_prism_slab`'s own skirt (whose
     # area is perimeter times height-drop, not footprint area) then reads
     # as a tall, visible fin next to the real surfaces around it -- his
-    # own second report. Relabelled to its cell's next-best coverer,
-    # never left undrawn or double-claimed -- but this is a RELABEL, not
-    # a merge: the tiny polygon itself is unchanged and is still extruded
-    # as its own small prism, now under a different roof's height formula
-    # at the same three-or-more vertices. MEASURED, NOT CLAIMED: this
-    # does not, on its own, make the sliver's own skirt any shorter --
-    # doing that needs the tiny piece folded into an ADJACENT same-owner
-    # cell's own polygon (a real geometric merge), which this pass does
-    # not attempt. Left in place as a harmless, honest partial step
-    # (it never creates a double-claim or an undrawn gap) rather than
-    # removed, since a future merge pass can build on the ranking it
-    # already computes.
+    # own second report. Relabelled to its cell's next-best coverer among
+    # the FINAL round's own competitors, never left undrawn or double-
+    # claimed -- but this is a RELABEL, not a merge: the tiny polygon
+    # itself is unchanged and is still extruded as its own small prism,
+    # now under a different roof's height formula at the same three-or-
+    # more vertices. MEASURED, NOT CLAIMED: this does not, on its own,
+    # make the sliver's own skirt any shorter -- doing that needs the
+    # tiny piece folded into an ADJACENT same-owner cell's own polygon (a
+    # real geometric merge), which this pass does not attempt. Left in
+    # place as a harmless, honest partial step (it never creates a
+    # double-claim or an undrawn gap) rather than removed, since a future
+    # merge pass can build on the ranking it already computes.
     for k in range(n_pieces):
-        if k not in final_owner or coverer_rank[k] is None:
-            continue
-        if _area(pieces[k]) >= SLIVER_AREA_IN:
+        if coverer_rank[k] is None or _area(pieces[k]) >= SLIVER_AREA_IN:
             continue
         remaining = [rid for rid in coverer_rank[k] if rid != final_owner[k]]
         if remaining:
             final_owner[k] = remaining[0]
 
-    # a seam candidate's two endpoints were computed as an h_i==h_j
-    # crossing for a SPECIFIC pair; if EITHER side was relabelled by
-    # either reassignment pass above (the orphan fallback or the sliver
-    # fold-in), that pair no longer matches its final owner and the
-    # segment would misrepresent a completely different roof's height
-    # there (measured: exactly this mismatch, a "seam" whose two heights
-    # were not even equal) -- so a seam is only ever drawn between two
-    # pieces that kept their OWN true local-max owner, checked against
-    # the FINAL state of `final_owner` after both passes have run.
+    # the sliver fold-in is the only thing that can move a piece away
+    # from its own converged `owner_of` -- so a seam is only drawn
+    # between two pieces that BOTH kept it, checked against the FINAL
+    # state, exactly as before.
     primary = {k for k in range(n_pieces) if final_owner.get(k) == owner_of[k]}
 
     final_pieces = {id(rf): [] for rf in live}
