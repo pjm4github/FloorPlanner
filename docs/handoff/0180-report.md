@@ -31,7 +31,7 @@ interim shape) breaks the ORDINARY two-roof "joining end extends into
 the other roof, up to the seam" mechanic every T/L pair already depends
 on. Measured directly: `test_an_equal_height_l_has_no_poke_through_in_3d`
 regressed — roof A's ridge end poked back out through B, exactly the
-defect 0166-ruling.md closed, because A's own narrow local-max sub-piece
+the fault [`0166-report.md`](0166-report.md) closed, because A's own narrow local-max sub-piece
 near its ridge end could no longer even explore the CONTESTED piece
 where the real seam crossing lives, so nothing ever told it to stop.
 
