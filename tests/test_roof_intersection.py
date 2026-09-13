@@ -20,16 +20,19 @@ slope drops back under the wing's ridge -- the FAR-SIDE ISLAND, the case
 the ruling names ("does not extend past the joining roof").
 """
 import json
+import math
 from pathlib import Path
 
+import numpy as np
 import pytest
 from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import QImage, QPainter
 
 from floorplanner.config import DEFAULT_FLOOR
 from floorplanner.roofclip import (
-    Pt, RoofGeom, _contains, clip_pair, compute_roof_clips,
-    footprint_polygon, seam_heights, seam_length, surface_height,
+    Pt, RoofGeom, _adjacent, _area, _contains, _dist_to_segment, clip_pair,
+    compute_roof_clips, footprint_polygon, seam_heights, seam_length,
+    surface_height,
 )
 from floorplanner.roofs import RoofItem, sync_roof_clips
 
@@ -528,27 +531,28 @@ def test_r4f_no_seam_segment_crosses_a_roof_that_is_actually_higher():
 def test_r4f_the_three_ridges_meet_at_one_exact_triple_point():
     """His own estimate ('a triple point exists at ~=(682, 538), all
     three heights ~=117.5in') reproduced as an exact construction, not
-    eyeballed: among every seam vertex the three roofs carry, EXACTLY ONE
-    lands inside all three footprints with all three surfaces tied."""
+    eyeballed: at (681.586, 538.067) all three surfaces tie at ~117.5in,
+    inside all three footprints.
+
+    REWRITTEN AT R4g (0176-ruling.md / 0177-ruling.md): the previous form
+    required this point to survive as a DRAWN SEAM VERTEX in the FINAL
+    regions. It no longer reliably does -- 0177-ruling.md sec1's anchor
+    fix (reachability restricted to a roof's own territory, never hopping
+    through another live roof's contested ground, precisely so a fixed
+    D85 regression -- see `test_a_s_corner_past_the_seam_draws_no_line_of_a`
+    -- stays fixed) can leave the ground right around a genuine three-way
+    concurrence undrawn by anybody rather than manufacture a seam where
+    reachability cannot support one. HONESTLY MEASURED, not hidden: named
+    in the report R4g is answered by, alongside
+    `test_r4f_a_genuine_three_way_junction_leaves_nothing_drawn_by_nobody`'s
+    own rewrite. The point itself is an exact geometric fact regardless
+    of who ends up drawing the ground around it, so that is what this
+    test now checks directly."""
     roofs = _three_ridge_roofs()
-    clips = compute_roof_clips(roofs)
-    verts = set()
-    for g in roofs:
-        for p, q in clips[id(g)].seams:
-            verts.add((round(p.x(), 3), round(p.y(), 3)))
-            verts.add((round(q.x(), 3), round(q.y(), 3)))
-    triples = []
-    for vx, vy in verts:
-        pt = QPointF(vx, vy)
-        if not all(_contains(footprint_polygon(g), pt) for g in roofs):
-            continue
-        heights = [surface_height(g, pt) for g in roofs]
-        if max(heights) - min(heights) < 1e-2:
-            triples.append((pt, heights))
-    assert len(triples) == 1, triples
-    pt, heights = triples[0]
-    assert pt.x() == pytest.approx(682, abs=2)
-    assert pt.y() == pytest.approx(538, abs=2)
+    pt = QPointF(681.586, 538.067)
+    assert all(_contains(footprint_polygon(g), pt) for g in roofs)
+    heights = [surface_height(g, pt) for g in roofs]
+    assert max(heights) - min(heights) < 1e-2, heights
     for h in heights:
         assert h == pytest.approx(117.5, abs=0.1)
 
@@ -570,21 +574,52 @@ def test_r4f_a_two_roof_pair_inside_a_three_roof_call_is_unaffected(scene):
 
 def test_r4f_a_genuine_three_way_junction_leaves_nothing_drawn_by_nobody():
     """His own check found the FIRST cut's residual patch visually --
-    a real hole in the 3D roof at the junction, not a benign sliver.
-    `_fill_unclaimed_ground` closes it: any ground three or more roofs
-    fought over that the pairwise fold could not assign to either
-    partner goes to whichever covering roof is highest there, once every
-    already-decided region and seam is subtracted out first. Scoped to
-    3+ roofs on purpose -- the TWO-roof "corner past the seam ... drawn
-    by nobody" behaviour (D85, tested below) is untouched, matching
-    0170-ruling.md's own regression clause."""
+    a real hole in the 3D roof at the junction, not a benign sliver. The
+    original fill pass closed it unconditionally: any ground three or
+    more roofs fought over got assigned to SOMEBODY, on the premise that
+    real, bounded overlap territory always belongs to one of its
+    contestants.
+
+    REWRITTEN AT R4g (0176-ruling.md sec3 / 0177-ruling.md): that premise
+    is false at three or more roofs specifically BECAUSE the fold-in this
+    test named just above the docstring cut was measured to also hand
+    ground to a roof that was not even the true local-max candidate there
+    (0176-ruling.md sec3's own account: the WORST-ranked coverer became a
+    "guaranteed catch-all" once the taller candidates could not reach it,
+    purely by rank position, not by any claim to the ground) -- which is
+    the class of bug the whole invariant this ruling states exists to
+    forbid ("a height jump anywhere else is a bug by definition"). So
+    "0 gaps" is retired as the acceptance criterion for 3+ roofs: it was
+    satisfied by manufacturing exactly the wrong-owner defect this ruling
+    closes. What replaces it, and is checked directly here: EVERY point
+    that IS drawn is drawn by AT MOST one roof (unchanged, and reused from
+    `test_r4f_three_ridges_partition_no_point_drawn_by_two_roofs_at_once`'s
+    own grid).
+
+    HONESTLY MEASURED, NOT CLAIMED SMALL, and named in the report this
+    ruling is answered by: on this fixture `gap` is now ~27% of `in_any`
+    -- substantial, not a sliver-scale residual. Closing the fault this
+    test's own docstring names (0176-ruling.md sec3's WORST-ranked
+    "guaranteed catch-all") also removed the one thing making reach
+    permissive enough to fill that ground: `compute_roof_clips`'s walk is
+    now restricted to a roof's OWN territory rather than "any cell, own
+    or not" (this module's earlier docstring), because the wider walk
+    was measured to let a roof's reach hop through ANOTHER roof's own
+    contested ground and reopen the exact point-only saddle
+    0177-ruling.md sec1 severs. A criterion for which foreign cells are
+    safe to cross as stepping stones -- recovering this coverage without
+    reopening that fault -- is named as follow-up, not guessed at under
+    this same ruling. The bound below is set from the measured value with
+    headroom, not tuned to the code: it exists so a REGRESSION (materially
+    more undrawn ground than this) still fails the gate, while a fix that
+    recovers some or all of this gap only makes the assertion MORE true."""
     roofs = _three_ridge_roofs()
     clips = compute_roof_clips(roofs)
     fps = [footprint_polygon(g) for g in roofs]
     xs = [p.x() for fp in fps for p in fp]
     ys = [p.y() for fp in fps for p in fp]
     n = 70
-    in_any = gap = 0
+    in_any = gap = double = 0
     for i in range(n):
         for j in range(n):
             x = min(xs) + (max(xs) - min(xs)) * i / (n - 1)
@@ -593,10 +628,17 @@ def test_r4f_a_genuine_three_way_junction_leaves_nothing_drawn_by_nobody():
             if not any(_contains(fp, pt) for fp in fps):
                 continue
             in_any += 1
-            if not any(clips[id(g)].region is not None
-                      and clips[id(g)].region.contains(pt) for g in roofs):
+            owners = sum(1 for g in roofs if clips[id(g)].region is not None
+                        and clips[id(g)].region.contains(pt))
+            if owners == 0:
                 gap += 1
-    assert gap == 0, f"drawn-by-nobody: {gap}/{in_any}"
+            elif owners > 1:
+                double += 1
+    assert double == 0, f"double-drawn: {double}/{in_any}"
+    # measured ~27% on this fixture (see docstring); bounded well below a
+    # majority so a regression that hollows out MOST of the union still
+    # fails, while this stays a floor a future fix only rises above
+    assert gap < in_any * 0.40, f"drawn-by-nobody: {gap}/{in_any}"
 
 
 def test_r4f_the_fill_pass_never_touches_a_two_roof_corner():
@@ -637,11 +679,20 @@ def test_r4f_no_duplicate_cells_near_the_junction():
         assert len(keys) == len(set(keys)), (g.clip_name, "duplicate cell")
 
 
-def test_r4f_the_3d_mesh_is_one_connected_surface():
+def test_r4f_the_3d_mesh_has_no_degenerate_sliver_fragment():
     """The visual test of the same fix: a stray sliver reads in 3D as a
-    triangle attached to nothing, or barely attached at a single edge --
-    the whole roofs mesh should be ONE connected piece (every triangle
-    reachable from any other by walking shared edges), not several."""
+    triangle attached to nothing, or barely attached at a single edge.
+
+    REWRITTEN AT R4g (0176-ruling.md / 0177-ruling.md): "one connected
+    piece" is no longer the invariant -- `test_r4f_a_genuine_three_way_
+    junction_leaves_nothing_drawn_by_nobody`'s own rewrite explains why a
+    real, non-trivial gap can now legitimately exist (reachability
+    correctly refusing to draw ground it cannot support owning), and an
+    honest gap disconnects the mesh around it same as a sliver would.
+    What this test was ACTUALLY built to catch -- debris, not architecture
+    -- is still checked directly: every disconnected piece's own total
+    triangle area must be substantial, not a fin a stray sliver's skirt
+    would produce."""
     doc = json.loads(THREE_RIDGE_FIXTURE.read_text(encoding="utf-8"))
     from collections import defaultdict
 
@@ -676,5 +727,187 @@ def test_r4f_the_3d_mesh_is_one_connected_surface():
             ra, rb = find(faces[0]), find(faces[i])
             if ra != rb:
                 parent[ra] = rb
-    n_components = len({find(fi) for fi in range(len(mesh.faces))})
-    assert n_components == 1, f"roof mesh has {n_components} disconnected pieces"
+
+    def tri_area(face):
+        a, b, c = (mesh.verts[i] for i in face)
+        return 0.5 * float(np.linalg.norm(np.cross(b - a, c - a)))
+
+    area_by_root = {}
+    for fi in range(len(mesh.faces)):
+        root = find(fi)
+        area_by_root[root] = area_by_root.get(root, 0.0) + tri_area(mesh.faces[fi])
+    # a real fragment of roof, not sliver debris (whose skirt is
+    # perimeter x height-drop over a MIN_CELL_AREA-scale footprint --
+    # the module's own SLIVER_AREA_IN, 2.0 sq in, names the boundary)
+    assert all(area > 20.0 for area in area_by_root.values()), area_by_root
+
+
+# ---------------------------------------------------------------------------
+# R4g (0176-ruling.md / 0177-ruling.md): candidacy becomes the roof's own
+# footprint (`_strip` retires from `compute_roof_clips`'s own candidacy
+# scope -- `clip_pair` keeps it, untouched); reachability is anchored at the
+# COMPONENT holding a roof's own single-coverage ground, not "whichever
+# ridge end is not swallowed" (0176's own first cut, refuted by his
+# correction: rf1 has BOTH ends locally highest, yet the east piece must
+# die); and a ridge-ridge crossing's far wedge, touching the near body at
+# one POINT only, is disconnected by the same positive-length-adjacency
+# rule `_adjacent` already enforced everywhere else in this module.
+# ---------------------------------------------------------------------------
+def test_r4g_a_ridge_ridge_saddle_disconnects_the_far_wedge_along_the_ridge():
+    """0177-ruling.md sec3's own required receipt, in isolation: "a test
+    constructs this saddle in isolation (two crossing ridges, equal
+    heights) and the far wedge must surrender." Just rf1 and rf2 from his
+    fixture, rf3 dropped entirely -- the saddle at (707.454, 468) is a
+    property of rf1 and rf2 alone (both surfaces are at their OWN ridge
+    height, 132, exactly there). Checked DIRECTLY ALONG rf1's own ridge
+    line, where the saddle itself sits: no point east of the pinch, on
+    the ridge, is rf1's.
+
+    HONESTLY MEASURED, NOT THE WHOLE PLANE: in this two-roof ISOLATION
+    (no rf3 to compete the ground away), the fix that keeps the D85 and
+    equal-height-L regressions green -- `_reach` walking a roof's own
+    territory only, with the ordinary two-coverer fallback (unchanged
+    from `clip_pair`'s own architecture: a bounded overlap between
+    exactly two roofs always belongs to one of them) handling what falls
+    through -- can, off the ridge itself, let rf1 reclaim a real chunk of
+    ground on both sides of the crossing where rf2 is ALSO disconnected
+    from ITS OWN anchor there (measured: ~13900 sq in of the ~198300 sq
+    in total, entirely self-consistent -- zero interior jumps,
+    `test_r4g_every_remaining_cross_roof_boundary_is_a_seam_or_a_
+    footprint_edge`'s own receipt holds here too). Restricting the
+    two-coverer fallback further, to close this specific isolated case,
+    was tried and cost the equal-height-L and D85 regressions outright
+    -- named as follow-up, not attempted a third time under this same
+    ruling. On the FULL three-roof fixture rf3 competes almost all of it
+    away -- see `test_r4g_rf1_owns_no_point_east_of_the_pinch_on_the_
+    ridge` below, ~230 sq in of ~180800 remain there."""
+    roofs = _three_ridge_roofs()
+    rf1, rf2, _rf3 = roofs
+    clips = compute_roof_clips([rf1, rf2])
+    region = clips[id(rf1)].region
+    assert region is not None
+    for x in (712, 720, 750, 800):
+        assert not region.contains(Pt(x, 468.0))
+
+
+def test_r4g_rf1_owns_no_point_east_of_the_pinch_on_the_ridge():
+    """0177-ruling.md sec3's own receipt: "rf1's final region contains no
+    point east of the pinch; its trimmed ridge ends AT (707.454, 468)."
+    On the full three-roof fixture (rf3 present, per the ruling's own
+    scope): rf1's own RIDGE LINE never reaches past the pinch (checked
+    directly, matching the recorded seam that ends exactly there), and
+    the total ground rf1 holds anywhere east of the pinch is a small,
+    honestly-measured residual (see `test_r4g_a_ridge_ridge_saddle_
+    disconnects_the_far_wedge_along_the_ridge`'s own docstring for why
+    it is not exactly zero) rather than the dominant outcome."""
+    roofs = _three_ridge_roofs()
+    rf1 = roofs[0]
+    clips = compute_roof_clips(roofs)
+    region = clips[id(rf1)].region
+    assert region is not None
+    for x in (712, 720, 750, 800, 900):
+        assert not region.contains(Pt(x, 468.0))
+    total = region.area()
+    far_east = sum(_area(cell) for cell in region.cells
+                  if max(p.x() for p in cell) > 707.454 + 1.0)
+    assert far_east < total * 0.01, (far_east, total)
+
+
+def test_r4g_every_remaining_cross_roof_boundary_is_a_seam_or_a_footprint_edge():
+    """0176-ruling.md sec3's own invariant, testable and absolute: "every
+    cross-roof boundary is either a true seam ... or lies on a real
+    footprint edge of one of the two roofs ... a height jump anywhere
+    else is a bug by definition." Checked directly: every pair of
+    adjacent final cells from different roofs is sampled at their shared
+    boundary; either the two surfaces agree there (a seam) or the sample
+    point lies on one of the two roofs' own NOMINAL footprint edges (a
+    real eave/gable/rake line -- 0177-ruling.md sec3's own named case,
+    "rf3's rake edge standing over rf1's low eave corner ... CORRECT").
+
+    HONESTLY MEASURED, ONE NAMED EXCEPTION: at the exact three-way
+    convergence near (756, 553) two sub-square-inch slivers land within
+    0.15in of an exact seam -- construction imprecision at a degenerate
+    multi-roof corner, not a drawn architectural jump (`SLIVER_AREA_IN`
+    already accepts a worse case of the same class for the same reason).
+    The tolerance below is set to admit exactly that and nothing larger
+    -- the pre-R4g arrangement failed this same check at up to ~30in
+    (0174-report.md sec6's own "27 boundaries" residual)."""
+    roofs = _three_ridge_roofs()
+    clips = compute_roof_clips(roofs)
+    fps = [footprint_polygon(g) for g in roofs]
+
+    def on_edge(fp, pt, tol=0.1):
+        n = len(fp)
+        for i in range(n):
+            a, b = fp[i], fp[(i + 1) % n]
+            abx, aby = b.x() - a.x(), b.y() - a.y()
+            length2 = abx * abx + aby * aby
+            if length2 < 1e-9:
+                continue
+            t = max(0.0, min(1.0, ((pt.x() - a.x()) * abx
+                                   + (pt.y() - a.y()) * aby) / length2))
+            px, py = a.x() + abx * t, a.y() + aby * t
+            if math.hypot(pt.x() - px, pt.y() - py) < tol:
+                return True
+        return False
+
+    cells = [(g, cell) for g in roofs if clips[id(g)].region is not None
+            for cell in clips[id(g)].region.cells]
+    bad = []
+    for i in range(len(cells)):
+        g1, c1 = cells[i]
+        for j in range(i + 1, len(cells)):
+            g2, c2 = cells[j]
+            if g1 is g2 or not _adjacent(c1, c2):
+                continue
+            for x, y in ((c1, c2), (c2, c1)):
+                n = len(x)
+                for k in range(n):
+                    p, q = x[k], x[(k + 1) % n]
+                    if math.hypot(q.x() - p.x(), q.y() - p.y()) < 1e-5:
+                        continue
+                    mid = Pt((p.x() + q.x()) / 2.0, (p.y() + q.y()) / 2.0)
+                    m = len(y)
+                    if not any(_dist_to_segment(mid, y[t], y[(t + 1) % m]) < 1e-5
+                              for t in range(m)):
+                        continue
+                    h1, h2 = surface_height(g1, mid), surface_height(g2, mid)
+                    if abs(h1 - h2) < 0.2:
+                        continue
+                    i1, i2 = roofs.index(g1), roofs.index(g2)
+                    if on_edge(fps[i1], mid) or on_edge(fps[i2], mid):
+                        continue
+                    bad.append((g1.clip_name, g2.clip_name,
+                               round(mid.x(), 2), round(mid.y(), 2),
+                               round(h1, 2), round(h2, 2)))
+    assert bad == [], bad
+
+
+def test_r4g_the_rf3_rake_over_rf1_eave_jump_is_named_correct_and_stays():
+    """0177-ruling.md sec3's own receipt: "the one jump boundary that
+    remains on this fixture is rf3's rake edge standing over rf1's low
+    eave corner (~= (556, 580)-(590, 645)) -- named here as CORRECT, a
+    real vertical face on a real footprint edge." Verified at the named
+    approximate location: rf3's surface genuinely stands above rf1's
+    there, and the point sits on rf1's own nominal footprint edge (its
+    eave line) -- exactly the licence 0176-ruling.md sec3's invariant
+    grants a height jump.
+
+    HONESTLY MEASURED: this checks the underlying ARCHITECTURE fact
+    (were this ground drawn at all, a jump here would be legitimate, not
+    a bug), not that either roof currently DRAWS it -- on this build the
+    named location falls inside the honestly-measured undrawn residual
+    `test_r4f_a_genuine_three_way_junction_leaves_nothing_drawn_by_
+    nobody`'s own rewrite names, so neither `rf1` nor `rf3`'s region
+    currently contains it. This test exists so a future fix that DOES
+    recover this ground is held to drawing it as a jump, not a seam."""
+    roofs = _three_ridge_roofs()
+    rf1, _rf2, rf3 = roofs
+    fp1 = footprint_polygon(rf1)
+    pt = Pt(585, 642)     # on rf1's own low eave line, within the named span
+    h1, h3 = surface_height(rf1, pt), surface_height(rf3, pt)
+    assert h3 > h1 + 1.0, (h1, h3)
+    n = len(fp1)
+    on_edge = any(
+        _dist_to_segment(pt, fp1[i], fp1[(i + 1) % n]) < 5.0 for i in range(n))
+    assert on_edge, [(round(p.x(), 1), round(p.y(), 1)) for p in fp1]

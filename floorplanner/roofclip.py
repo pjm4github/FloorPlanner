@@ -314,7 +314,7 @@ class RoofGeom:
     accept the pre-R4a bare-number shape the way the loader does."""
 
     def __init__(self, p1, p2, span_in, overhang_in, ridge_h_in, eaves_h_in,
-                 gable=None, name=None):
+                 gable=None, name=None, marker_end=1):
         # read-only, like RoofItem's: the gate's end-assignment census
         # polices the literal `.p1 =` spelling project-wide
         self._p1, self._p2 = Pt(p1), Pt(p2)
@@ -324,6 +324,10 @@ class RoofGeom:
         self.eaves_h_in = float(eaves_h_in)
         self.gable = list(gable) if gable is not None else [True, True]
         self.clip_name = name
+        # R4g (0177-ruling.md sec1): the reachability fallback anchor for a
+        # roof with no single-coverage ground of its own -- `roofs.py`'s
+        # own end-index convention, 0 = p1, 1 = p2
+        self.marker_end = 1 if marker_end else 0
 
     @staticmethod
     def _pair(value):
@@ -341,7 +345,11 @@ class RoofGeom:
                    rec.get("span_in", span_fallback),
                    rec.get("overhang_in", 0.0) or 0.0,
                    rec.get("ridge_h_in", 132.0), rec.get("eaves_h_in", 96.0),
-                   rec.get("gable") or [True, True], rec.get("id"))
+                   rec.get("gable") or [True, True], rec.get("id"),
+                   rec.get("marker_end", 1))
+
+    def marker_pt(self):
+        return self.p2 if self.marker_end else self.p1
 
     @property
     def p1(self):
@@ -719,11 +727,35 @@ def compute_roof_clips(roofs) -> dict:
     ends where its own construction ends, and a plane extended past that
     is a phantom, not a roof. So each live roof keeps only the
     local-maximum pieces reachable, by shared boundary, from its own
-    ANCHOR (the piece holding whichever ridge end is not swallowed by any
-    other live roof; every one of its own pieces when both ends are
-    swallowed, or neither is) -- walking across ANY cell as a stepping
-    stone, own or not, but never across a boundary a real seam separates.
-    A piece a roof's own reach cannot claim is an orphan; it is
+    ANCHOR.
+
+    THE ANCHOR (0177-ruling.md sec1, correcting 0176's own first cut,
+    which this fixture itself refuted): NOT "whichever ridge end is not
+    swallowed by any other live roof" -- his own three-ridge fixture has
+    a roof (rf1) BOTH of whose ends are locally the highest surface, yet
+    the piece past one of them must still die, because that ground is
+    reachable from the other end's real body only through a single POINT
+    (a ridge-ridge crossing, a four-wedge saddle where the two equal-
+    height lines cross and the far wedge touches the near one at that one
+    vertex only) -- connectivity requires a shared boundary of POSITIVE
+    LENGTH, so a vertex-only touch connects nothing, by the same
+    `_adjacent` rule every other reachability step already uses. The
+    anchor is instead THE COMPONENT HOLDING THE ROOF'S OWN SINGLE-
+    COVERAGE GROUND -- territory no other live roof's candidacy reaches
+    at all (`coverer_rank is None`, the one-coverer "root" case): that
+    ground is unambiguously the roof's own, so whatever it connects to,
+    by positive-length boundary, is real body too. A roof with NO single-
+    coverage ground of its own (wholly inside another's candidacy) has no
+    such root to start from, and anchors instead at the piece holding its
+    `marker_end` -- the one ridge endpoint a person or the loader already
+    identified as this roof's own reference end, `roofs.py`'s own R2b
+    convention, reused here as the fallback because nothing GEOMETRIC
+    distinguishes such a roof's two ends the way single-coverage ground
+    does for every other one.
+
+    Walking the anchor's own reach crosses ANY cell as a stepping stone,
+    own or not, but never across a boundary a real seam separates. A
+    piece a roof's own reach cannot claim is an orphan; it is
     reassigned, by a FIXED POINT over every remaining orphan (so a whole
     disconnected STRIP of contested ground resolves together, not cell by
     cell, one pass at a time), to the highest-ranked OTHER genuine
@@ -801,40 +833,30 @@ def compute_roof_clips(roofs) -> dict:
 
     live = [rf for rf in roofs if id(rf) in touched]
 
-    # -- joining-end candidacy, SCOPED to its own specific host(s), reusing
-    # `_strip` exactly as `clip_pair` already does for two roofs.
-    #
-    # TWO REJECTED, WIDER SHAPES, both measured directly on his fixture:
-    #   1. A blanket rectangle reaching however far needed to clear its
-    #      host phantom-overlapped every OTHER unrelated roof in the
-    #      scene too, manufacturing fake internal boundaries that blocked
-    #      a THIRD roof's own ordinary reach from its own real body
-    #      (measured: 20%+ of the footprint union came back undrawn).
-    #   2. The host's full nominal footprint, or an along-axis-bounded
-    #      rectangle with no WIDTH limit at all: a GABLE roof's height
-    #      formula has no along-axis cutoff (it depends only on
-    #      perpendicular distance from the ridge LINE, extended
-    #      infinitely), so widening the candidacy let a joining roof win
-    #      real territory far outside its own actual span -- visibly
-    #      wrong (oversized wings) -- AND, tried with the along-axis
-    #      reach bounded instead, still reintroduced the SAME overreach
-    #      into the L-case's own far corner, breaking the D85 two-roof
-    #      regression outright (`clip_pair` itself never grants a joining
-    #      roof width past its own span, and that width limit is exactly
-    #      what keeps the D85 corner unclaimed).
-    # `_strip`'s width-limited shape (below) is what the already-proven
-    # two-roof algorithm actually uses, and is the only one of the three
-    # that does not regress a single existing test. It is NOT artifact-
-    # free: measured directly, its own width edge can still land as a
-    # real, undrawn-seam crack between a joining roof's eaves height and
-    # a host's unrelated height nearby (27 such boundaries on his
-    # fixture, several within 100in of the true triple point) -- a
-    # genuine, honestly-measured residual of the SAME kind this module
-    # already accepts for the two-roof "corner past the seam" (D85), not
-    # eliminated by this ruling's own fixes, and named here rather than
-    # hidden. Closing it needs the reachability mechanism itself to
-    # arbitrate the width (not a wider candidacy shape) -- worth a
-    # dedicated pass, not a rushed fourth shape under this same ruling.
+    # -- joining-end candidacy -- R4g (0176-ruling.md sec3 / 0177-ruling.md):
+    # "candidacy is the roof's own footprint. Exactly. Nothing narrower
+    # (`_strip` retires -- as a SCOPE, not as code: `clip_pair` still uses
+    # the helper unchanged), nothing wider (no extended planes)." The
+    # extension sliver itself is still cut off at the roof's own nominal
+    # end edge (`_strip`, same shape `clip_pair` already trusts) -- that
+    # part was never the "narrower" defect. What WAS narrower than the
+    # roof's own footprint: the sliver was then intersected against just
+    # the SPECIFIC host(s) whose footprint happened to swallow that ridge
+    # endpoint. A THIRD live roof whose footprint also reaches that same
+    # extension ground was never compared against at all, so its boundary
+    # there was neither a seam nor a candidacy edge -- an unchecked height
+    # jump (27 measured on his fixture, 0174-report.md sec6). The fix
+    # widens the SET the sliver is checked against from "hosts" to "every
+    # other live roof" -- the sliver's own SHAPE and reach are unchanged
+    # (still `_strip`, still `2 * max(diagonal)` over whichever roof(s)
+    # swallow the endpoint, exactly enough to fully cross them), so this
+    # stays bounded to the roof's own real extension amount, never the
+    # unrelated blanket rectangle the two REJECTED wider shapes were
+    # (0174 sec6: phantom-overlapping every unrelated roof, or an
+    # along-axis reach with no WIDTH limit at all -- this touches neither,
+    # since `_strip` already IS the roof's own span width, and the
+    # intersection with each `other` still bounds it to real overlap,
+    # never open air).
     ext = {id(rf): [0.0, 0.0] for rf in live}
     domain = {id(rf): [footprints[id(rf)]] for rf in live}
     for rf in live:
@@ -851,8 +873,10 @@ def compute_roof_clips(roofs) -> dict:
             strip = _strip(rf, footprints[id(rf)], rf_ext_poly)
             if not strip:
                 continue
-            for host in hosts:
-                piece = _convex_intersection(strip, footprints[id(host)])
+            for other in live:
+                if other is rf:
+                    continue
+                piece = _convex_intersection(strip, footprints[id(other)])
                 if piece:
                     domain[id(rf)].append(piece)
 
@@ -937,48 +961,130 @@ def compute_roof_clips(roofs) -> dict:
                     blocked.add((idx_j, idx_i))
 
     n_pieces = len(pieces)
-    all_idx = set(range(n_pieces))
 
-    # -- reachability from each roof's own real (un-swallowed) ridge end
+    # -- reachability, anchored at the COMPONENT holding each roof's own
+    # SINGLE-COVERAGE ground -- 0177-ruling.md sec1, correcting 0176's
+    # first cut ("whichever ridge end is not swallowed"). Ground no other
+    # live roof's candidacy reaches at all (`coverer_rank is None`,
+    # single-coverer) is unambiguously this roof's own, so it certifies
+    # whichever connected component of the roof's OWN territory
+    # (`own_idx`, plain `_adjacent`) it sits in as real, anchored body --
+    # the component with the MOST such ground, specifically, since a
+    # roof's own territory can genuinely split into several components
+    # (a real, separate wing; or, measured directly, an isolated single-
+    # coverer SCRAP with no connection to the roof's real body at all --
+    # D85's own excluded corner past the seam is single-coverage territory
+    # too, since nothing else's candidacy reaches it, so seeding `_reach`
+    # from EVERY single-coverage cell independently -- this ruling's first
+    # attempt -- reintroduced exactly the fault D85 exists to catch, AND,
+    # measured separately, let the same scrap's own adjacency chain pull
+    # in an entire POKE-THROUGH zone next to it that must fall to the
+    # other roof instead). A roof with no single-coverage ground at all
+    # (wholly inside another's candidacy) anchors at its own `marker_end`'s
+    # component instead.
+    #
+    # The walk FROM this anchor (`_reach`, immediately below) is scoped to
+    # the roof's own territory (`own_idx`), not "any cell, own or not"
+    # (this module's pre-R4g docstring) -- letting a roof's reach hop
+    # through ANOTHER roof's own cells as mere stepping stones was
+    # measured to reopen exactly the point-only saddle 0177-ruling.md
+    # sec1 severs (his fixture's own east-of-the-pinch ground, hopped
+    # back in through a different roof's contested territory). This does
+    # NOT break the ordinary "joining end extends into the other roof, up
+    # to the seam" mechanic (the equal-height L's own poke-through fix):
+    # that piece is not reached via the loser's OWN walk at all -- it is
+    # an ORPHAN once its own roof's walk correctly excludes it, and falls
+    # to the other roof via the UNCONDITIONAL two-coverer fallback below,
+    # exactly `clip_pair`'s own D85 rule, which never needed the winner's
+    # own reach to have found it first.
+    def _components(indices):
+        remaining = set(indices)
+        comps = []
+        while remaining:
+            seed = next(iter(remaining))
+            comp = _reach({seed}, pieces, indices, blocked)
+            comps.append(comp)
+            remaining -= comp
+        return comps
+
     reach_of = {}
     for rf in live:
         own_idx = {k for k, o in enumerate(owner_of) if o == id(rf)}
         if not own_idx:
             reach_of[id(rf)] = set()
             continue
-        free_ends = [pt for pt in (rf.p1, rf.p2)
-                    if not any(_contains(footprints[id(other)], pt)
-                              for other in live if other is not rf)]
-        anchors = ({k for k in own_idx if any(
-                       _contains(pieces[k], pt, tol=1e-3) for pt in free_ends)}
-                  if free_ends else set())
-        if not anchors:
-            anchors = set(own_idx)
-        reach_of[id(rf)] = _reach(anchors, pieces, all_idx, blocked)
+        comps = _components(own_idx)
+        by_root_area = sorted(
+            comps, key=lambda comp: -sum(
+                _area(pieces[k]) for k in comp if coverer_rank[k] is None))
+        anchors = (by_root_area[0]
+                  if any(coverer_rank[k] is None for k in by_root_area[0])
+                  else None)
+        if anchors is None:
+            marker_pt = rf.p2 if getattr(rf, "marker_end", 1) else rf.p1
+            anchors = next(
+                (comp for comp in comps
+                 if any(_contains(pieces[k], marker_pt, tol=1e-3) for k in comp)),
+                None)
+        if anchors is None:
+            anchors = own_idx
+        reach_of[id(rf)] = _reach(anchors, pieces, own_idx, blocked)
 
     final_owner = {k: owner_of[k] for rf in live for k in reach_of[id(rf)]
                   if owner_of[k] == id(rf)}
 
-    # -- a piece whose local-max owner cannot reach it is never simply
-    # undrawn UNLESS it was single-coverer territory to begin with
-    # (`coverer_rank[k] is None`, the D85 "root" case, generalised) --
-    # exactly `clip_pair`'s own two-roof rule: an OVERLAP piece always
-    # gets a final owner (the fallback flip is unconditional there), only
-    # a root/single-coverer piece cut off from its own anchor can go
-    # undrawn. Walk this piece's own ranked coverers, preferring the
-    # first one whose OWN reach also covers it; the lowest-ranked
-    # coverer is a guaranteed catch-all (matching the two-roof case's
-    # unconditional flip, since with exactly two coverers "next" and
-    # "lowest" are the same roof).
+    # -- a piece whose local-max owner cannot reach it falls to the next-
+    # ranked OTHER coverer whose OWN claimed territory reaches it -- R4g
+    # (0176-ruling.md sec3) amends `clip_pair`'s own two-roof rule ("an
+    # overlap piece always gets a final owner, the fallback flip is
+    # UNCONDITIONAL") ONLY where there is an actual CHOICE to make. With
+    # exactly two coverers, `remaining` has exactly one entry -- "the
+    # other one" -- and the unconditional flip stays exactly as it always
+    # was: D85's whole architecture (a real, bounded overlap between two
+    # roofs always belongs to one of them) depends on this precise case,
+    # measured directly when a stricter rule broke it (the equal-height
+    # L's own "A's ridge end carries only B's surface" wedge is such a
+    # flip -- A is the pre-clip local max there, numerically, but its
+    # real body cannot reach it, so it falls to B UNCONDITIONALLY; B's
+    # own `reach_of` need not independently reach it, since with only one
+    # alternative there is nothing else IT COULD be).
+    #
+    # At three or more coverers that guarantee breaks: walking straight
+    # to `remaining[-1]` (the WORST-ranked coverer, whatever its rank)
+    # whenever the taller alternatives can't reach it hands unreachable
+    # ground to a roof that is not even locally competitive there --
+    # measured on his fixture (a piece where rf2 is the true local max,
+    # unreachable from rf2's own anchor NOR rf3's, fell to rf1 -- the
+    # WORST of the three -- purely because rf1 happened to be last in
+    # rank, not because rf1 has any claim to it; the 27-boundary residual
+    # 0174-report.md sec6 named was largely this). So with two or more
+    # actual alternatives, walk the ranking and stop at the first one
+    # `reach_of` -- the anchor-connected, seam-respecting graph -- says
+    # can reach it; if NONE of them can, it stays undrawn, generalising
+    # D85's own "unreachable territory belongs to nobody" to the case
+    # where nobody left in contention can reach it either, rather than
+    # manufacturing an owner among candidates who cannot support one.
+    # HONESTLY MEASURED, NOT CLAIMED PERFECT: this is why a genuine
+    # second valley at a 3-way crossing can still be missing rather than
+    # drawn -- named, not hidden, in the report this ruling is answered
+    # by. The one exception, at any coverer count: a piece this small
+    # (`SLIVER_AREA_IN`, the same threshold the fold-in pass below
+    # already uses) keeps the unconditional flip regardless, since
+    # leaving a sub-`SLIVER_AREA_IN` pinhole undrawn reads as a defect in
+    # its own right for no benefit.
     for k in range(n_pieces):
         if k in final_owner or coverer_rank[k] is None:
             continue
         remaining = [rid for rid in coverer_rank[k] if rid != owner_of[k]]
         if not remaining:
             continue
+        if len(remaining) == 1 or _area(pieces[k]) < SLIVER_AREA_IN:
+            final_owner[k] = remaining[-1]
+            continue
         chosen = next((rid for rid in remaining if k in reach_of.get(rid, ())),
-                      remaining[-1])
-        final_owner[k] = chosen
+                      None)
+        if chosen is not None:
+            final_owner[k] = chosen
 
     # -- a razor-thin sliver is exact math, not a bug (a cell where several
     # near-parallel seam lines converge can legitimately be tiny) -- but

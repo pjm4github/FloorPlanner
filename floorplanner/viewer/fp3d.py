@@ -785,6 +785,65 @@ def _cross_roof_risers(geoms_and_clips, roofclip_mod):
     return risers
 
 
+def _gable_fascia_pieces(geom, apex, ea, eb, clip, z0, roofclip_mod):
+    """The owned sub-shapes of an UNJOINED gable end's fascia triangle
+    (apex, ea, eb) -- 0174-report.md sec5's own named method, built at
+    R4g (0176-ruling.md sec4). In PLAN the whole triangle is exactly
+    COLLINEAR (`_eave_ends()` offsets `ea`/`eb` from the same axis point
+    `apex` sits on, in opposite perpendicular directions), so a 2D-area
+    clip against `clip.region` (tried at R4f) always measures zero area
+    and silently drops the whole triangle. The fix clips the DEGENERATE
+    PLAN LINE itself instead (`clip.region.clip_segment`, a 1D operation
+    that is never degenerate on a line), then rebuilds each surviving
+    piece from two INDEPENDENTLY evaluated height profiles along that
+    same line: the roof's own TOP surface (`surface_height`, correctly
+    kinked at the ridge -- this is exactly what the apex-ea/apex-eb
+    edges already are) for the top, and the fascia's own straight BASE
+    edge (linear from eb's height to ea's height, unrelated to the kink
+    -- the original ea-eb edge, unclipped) for the bottom. A surviving
+    range that spans the apex's own position is split there first, so
+    the apex is never approximated away by a single quad's flat top."""
+    rc = roofclip_mod
+    raw = clip.region.clip_segment(eb, ea)
+    if not raw:
+        return []
+    ux, uy = ea.x() - eb.x(), ea.y() - eb.y()
+    length = math.hypot(ux, uy)
+    if length < 1e-9:
+        return []
+    ux, uy = ux / length, uy / length
+
+    def t_of(pt):
+        return ((pt.x() - eb.x()) * ux + (pt.y() - eb.y()) * uy) / length
+
+    def pt_at(t):
+        return rc.Pt(eb.x() + ux * length * t, eb.y() + uy * length * t)
+
+    t_apex = t_of(apex)
+    base_eb, base_ea = rc.surface_height(geom, eb), rc.surface_height(geom, ea)
+
+    def bottom_h(t):
+        return base_eb + t * (base_ea - base_eb)
+
+    def top_h(t):
+        return rc.surface_height(geom, pt_at(t))
+
+    pieces = []
+    for p, q in raw:
+        tp, tq = t_of(p), t_of(q)
+        lo, hi = min(tp, tq), max(tp, tq)
+        splits = sorted({lo, hi} | ({t_apex} if lo < t_apex < hi else set()))
+        for t0, t1 in zip(splits, splits[1:], strict=False):
+            p0, p1 = pt_at(t0), pt_at(t1)
+            pieces.append([
+                (p0.x(), -p0.y(), z0 + bottom_h(t0)),
+                (p1.x(), -p1.y(), z0 + bottom_h(t1)),
+                (p1.x(), -p1.y(), z0 + top_h(t1)),
+                (p0.x(), -p0.y(), z0 + top_h(t0)),
+            ])
+    return pieces
+
+
 def _prism_slab(corners_xyz, drop):
     """`_box` generalised to a TOP RING WHOSE Z VARIES PER VERTEX -- a roof
     plane is not horizontal, so its top ring cannot be described by one z0.
@@ -1547,36 +1606,26 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                     ring = [(c.x(), -c.y(), z0 + ROOFCLIP.surface_height(geom, c))
                             for c in piece]
                     roof_parts.append(_prism_slab(ring, ROOF_T))
-                # NOTE (found, not fixed, while chasing 0170-ruling.md's
-                # three-ridge case): `apex`/`ea`/`eb` are, in PLAN (x, y),
-                # exactly COLLINEAR by construction (`_eave_ends()` offsets
-                # `ea`/`eb` from the SAME axis point `apex` sits on, in
-                # opposite perpendicular directions) -- the triangle is
-                # only non-degenerate once height (z) is added. An attempt
-                # to clip it against `clip.region` via `_convex_intersection`
-                # (a 2D, x/y-only operation) therefore always sees zero
-                # area and silently drops every gable triangle -- tried
-                # and reverted in this same session. A genuine 3+-way
-                # junction CAN still let a THIRD roof's territory reach an
-                # unjoined gable end (`clip.ext[end]` only reports whether
-                # THIS end's own ridge point is swallowed, not whether the
-                # roof's nearby TOP SURFACE was ceded elsewhere), so the
-                # whole triangle can still slightly overhang another
-                # roof's final region there (measured on his fixture: one
-                # gable triangle, ~6% outside its own roof's region) --
-                # small, pre-existing, and unrelated to the fixes in this
-                # commit; a correct fix needs `clip.region.clip_segment`
-                # on the PLAN line `ea`-`eb` plus 3D-linear interpolation
-                # along the triangle's own straight edges, not a 2D area
-                # clip. Left as the original, unconditional triangle.
+                # R4g (0176-ruling.md sec4, closing 0174-report.md sec5's
+                # named residual): a genuine 3+-way junction can let a
+                # THIRD roof's territory reach an unjoined gable end
+                # (`clip.ext[end]` only reports whether THIS end's own
+                # ridge point is swallowed, not whether the roof's nearby
+                # TOP SURFACE was ceded elsewhere -- measured on his
+                # fixture, ~6% of one gable triangle fell outside its own
+                # roof's final region). `_gable_fascia_pieces` clips the
+                # triangle's own DEGENERATE PLAN LINE (never zero-area,
+                # unlike the 2D-area clip tried and reverted at R4f) and
+                # rebuilds each surviving piece from the roof's own top
+                # surface and its straight base edge, independently.
                 e1a, e1b, e2a, e2b = geom._eave_ends()
                 for end, (apex, ea, eb) in enumerate(
                         ((geom.p1, e1a, e2a), (geom.p2, e1b, e2b))):
                     if clip.ext[end] > 1e-6 or not geom.gable[end]:
                         continue
-                    ring = [(c.x(), -c.y(), z0 + ROOFCLIP.surface_height(geom, c))
-                            for c in (apex, ea, eb)]
-                    roof_parts.append(_prism_slab(ring, ROOF_T))
+                    for ring in _gable_fascia_pieces(geom, apex, ea, eb, clip,
+                                                     z0, ROOFCLIP):
+                        roof_parts.append(_prism_slab(ring, ROOF_T))
                 for w in clip.warnings:
                     model.info.append(f"roof {rid}: {w}")
                 n_roof += 1
