@@ -929,22 +929,17 @@ def test_a_clipped_wing_stops_at_the_seam_in_3d(fp3d):
 def test_an_equal_height_l_has_no_poke_through_in_3d(fp3d):
     """Patrick's own 3D picture: roof A's ridge past the apex poked out
     through B. Now A's ridge END (450,200) carries only B's surface height
-    (131.3), never A's 150.
+    (131.3), never A's 150, and the outer corner (441.4,100) is a shared
+    seam vertex at eaves height.
 
-    NARROWED AT R4g (0179-ruling.md sec2): the CORE defect this test
-    exists for -- the poke-through itself -- is checked directly below
-    and is fixed, via the SAME `clip_pair`-style stepping-stone reach
-    (`ra_idx | ov_idx`, generalised) 0179's prune-and-re-envelope rebuild
-    restores. The outer-corner assertion this test also carried (441.4,
-    100 as a drawn shared seam vertex) is DROPPED, not merely relaxed:
-    that specific corner falls inside the same honestly-measured residual
-    `test_r4f_a_genuine_three_way_junction_leaves_nothing_drawn_by_
-    nobody`'s own docstring names for the three-ridge fixture -- a real,
-    small gap between A's and B's territory, measured directly on this
-    exact fixture (a real hole, not a boundary-vertex quirk: neither
-    region contains (400, 130), well inside where both roofs' footprints
-    reach). Named here rather than papered over with a looser vertex
-    check."""
+    The outer-corner assertion was DROPPED at 0179/0180 (the corner fell
+    inside a real blank between A's and B's territory -- neither region
+    held (400, 130)) and is RESTORED at 0181-ruling.md sec2, as the
+    ruling ordered rather than left dropped: A's wedge past the apex is
+    the overshoot of a crossed end and prunes first, B's extension lens
+    behind the apex can never climb back above A's slope, and the ground
+    between re-envelopes to whoever is really there -- B's hip under the
+    wedge, A's north slope under the lens -- meeting at the corner."""
     s = 0.7071067811865476
     a = {"id": "A", "level": "L1", "ridge": [[0, 200], [450, 200]],
          "eaves_h_in": 96.0, "ridge_h_in": 150.0, "overhang_in": [0, 0],
@@ -958,7 +953,14 @@ def test_an_equal_height_l_has_no_poke_through_in_3d(fp3d):
     zs = _verts_at(mesh, 450.0, 200.0)
     assert 150.0 not in zs, "A's ridge end must not be at ridge height"
     assert zs and max(zs) < 132.0                      # B's slope there
+    k = 2 ** 0.5 - 1
+    assert 96.0 in _verts_at(mesh, 400 + k * 100, 100.0, tol=1e-2)   # outer corner
     assert 150.0 in _verts_at(mesh, 400.0, 200.0)                    # the apex
+    geoms = [fp3d.ROOFCLIP.RoofGeom.from_record(r) for r in (a, b)]
+    per = fp3d.ROOFCLIP.compute_roof_clips(geoms)
+    between = fp3d.ROOFCLIP.Pt(400.0, 130.0)
+    assert any(per[id(g)].region.contains(between) for g in geoms), \
+        "the ground between is drawn again"
 
 
 # --------------------------------------------------------------------------
@@ -1144,7 +1146,18 @@ def test_three_ridge_fixture_needs_no_riser_now_the_candidacy_and_reachability_a
     edge` is the 2D form of this same receipt; this is its 3D-mesh
     counterpart. (0175's own positive-control test asserted the opposite
     -- REQUIRING a riser here -- which is exactly why 0177-ruling.md sec3
-    ordered it rewritten rather than left standing to fight this fix.)"""
+    ordered it rewritten rather than left standing to fight this fix.)
+
+    REFINED AT 0181-ruling.md: "no riser at all" held only while rf3's
+    rake-side body was blank. Drawn now, the one jump 0177-ruling.md sec3
+    named CORRECT -- rf3's rake edge standing over rf1's low eave corner,
+    a real vertical face on a real footprint edge -- IS a riser, and the
+    mesh must carry it (a 30"+ step, on rf3's own rake line). What may
+    not appear is a riser anywhere else: every other boundary the
+    detector reports must be construction imprecision at the degenerate
+    corner where rf2's extended ridge, rf3's ridge and rf1's east edge
+    all meet (756, 553) -- sub-inch segments with a step under half an
+    inch, the same class the 2D receipt tolerates at 0.2" mid-edge."""
     doc = json.loads((ROOT / "fixtures" / "threeRidgeFloorplan.json")
                      .read_text(encoding="utf-8"))
     geoms = []
@@ -1154,7 +1167,31 @@ def test_three_ridge_fixture_needs_no_riser_now_the_candidacy_and_reachability_a
         geoms.append(g)
     per = fp3d.ROOFCLIP.compute_roof_clips(geoms)
     risers = fp3d._cross_roof_risers([(g, per[id(g)]) for g in geoms], fp3d.ROOFCLIP)
-    assert risers == [], risers
+    rc = fp3d.ROOFCLIP
+    fps = [rc.footprint_polygon(g) for g in geoms]
+
+    def on_a_footprint_edge(px, py, qx, qy, tol=0.1):
+        for fp in fps:
+            n = len(fp)
+            for i in range(n):
+                a, b = fp[i], fp[(i + 1) % n]
+                if (rc._dist_to_segment(rc.Pt(px, py), a, b) < tol
+                        and rc._dist_to_segment(rc.Pt(qx, qy), a, b) < tol):
+                    return True
+        return False
+
+    real, residue = [], []
+    for (px, py), (qx, qy), lo_p, lo_q, hi_p, hi_q in risers:
+        if on_a_footprint_edge(px, py, qx, qy):
+            real.append(((px, py), (qx, qy), hi_p - lo_p, hi_q - lo_q))
+        else:
+            residue.append(((px, py), (qx, qy), hi_p - lo_p, hi_q - lo_q))
+    # the named-correct face: on rf3's rake, a real step
+    assert any(max(sp, sq) > 30.0 for _p, _q, sp, sq in real), real
+    for (px, py), (qx, qy), sp, sq in residue:
+        assert abs(px - 756.0) < 2.0 and abs(py - 553.0) < 3.0, residue
+        assert max(sp, sq) < 0.5, residue
+        assert ((px - qx) ** 2 + (py - qy) ** 2) ** 0.5 < 2.0, residue
 
 
 def test_roof_geom_matches_the_editor_item_on_the_same_data(fp3d):

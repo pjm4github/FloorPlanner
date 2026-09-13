@@ -259,6 +259,24 @@ def _dist_to_segment(p, a, b) -> float:
     return math.hypot(p.x() - (a.x() + abx * t), p.y() - (a.y() + aby * t))
 
 
+def _segments_cross(a1, a2, b1, b2):
+    """The point where segments a1-a2 and b1-b2 cross, or None (parallel,
+    or meeting outside either segment). Touching at an endpoint counts
+    as a crossing at that point -- the caller measures how far past it
+    an end lies."""
+    dax, day = a2.x() - a1.x(), a2.y() - a1.y()
+    dbx, dby = b2.x() - b1.x(), b2.y() - b1.y()
+    den = dax * dby - day * dbx
+    if abs(den) < EPS:
+        return None
+    rx, ry = b1.x() - a1.x(), b1.y() - a1.y()
+    t = (rx * dby - ry * dbx) / den
+    u = (rx * day - ry * dax) / den
+    if t < -1e-9 or t > 1 + 1e-9 or u < -1e-9 or u > 1 + 1e-9:
+        return None
+    return Pt(a1.x() + dax * t, a1.y() + day * t)
+
+
 def _adjacent(a, b, tol: float = 1e-5) -> bool:
     """Two cells share a boundary segment of positive length: the
     midpoint of some edge of one lies on an edge of the other (either
@@ -502,16 +520,20 @@ def _root_cells(footprint, overlap):
     return [c for c in cells if not _contains(overlap, _centroid(c), tol=-1e-6)]
 
 
-def _reach(start, pieces, allowed, blocked):
+def _reach(start, pieces, allowed, blocked, no_step=None):
     """Indices reachable from `start` across shared boundaries, staying
     inside `allowed` and never crossing a pair in `blocked` (the two
-    pieces a seam separates)."""
+    pieces a seam separates); `no_step(i, j)`, when given, vetoes the
+    directed step i -> j (a joining end's extension climbing back above
+    its host -- `compute_roof_clips`)."""
     reached = set(start)
     frontier = list(start)
     while frontier:
         i = frontier.pop()
         for j in allowed:
             if j in reached or (i, j) in blocked or (j, i) in blocked:
+                continue
+            if no_step is not None and no_step(i, j):
                 continue
             if _adjacent(pieces[i], pieces[j]):
                 reached.add(j)
@@ -668,7 +690,7 @@ def _name(rf) -> str:
     return getattr(rf, "clip_name", None) or f"ridge {rf.p1.x():.0f},{rf.p1.y():.0f}"
 
 
-def compute_roof_clips(roofs) -> dict:
+def compute_roof_clips(roofs, diag=None) -> dict:
     """Every roof on one floor, clipped against every other AT ONCE, from a
     SINGLE shared 2D arrangement -- 0170-ruling.md sec2 (visibility as the
     upper envelope of every roof surface on the level), rebuilt properly
@@ -769,16 +791,17 @@ def compute_roof_clips(roofs) -> dict:
     round rebuilds the local-maximum envelope (the SAME per-cell chained
     clip described above) using only that cell's currently ACTIVE
     coverers; anchors and reach are then recomputed on THIS round's
-    result; any piece whose owner cannot reach its own anchor prunes that
-    owner from its cell's active set (never from any OTHER cell); and the
-    next round re-envelopes every affected cell among whoever is left.
-    This repeats to a fixed point -- guaranteed to terminate, since every
-    round that changes anything strictly shrinks some cell's active set,
-    which is bounded below by empty. A cell whose EVERY coverer has been
-    pruned draws for nobody -- the only way ground goes undrawn now,
-    matching the two-roof "corner past the seam" D85 already requires
-    (there, the sole candidate prunes itself and nothing remains) as the
-    n=2 case of the same one rule, rather than a special case of it.
+    result; a piece whose owner cannot reach it prunes that owner from
+    the piece's OWN ground (the cell splits into the round's pieces
+    first, so a roof never loses a whole cell for one lost sub-piece);
+    and the next round re-envelopes among whoever is left. This repeats
+    to a fixed point -- every round that changes anything strictly
+    shrinks some cell's active set, and the cells come from a finite
+    arrangement. A cell whose EVERY coverer has been pruned draws for
+    nobody -- the only way ground goes undrawn, matching the two-roof
+    "corner past the seam" D85 already requires (there, the sole
+    candidate prunes itself and nothing remains) as the n=2 case of the
+    same one rule, rather than a special case of it.
 
     "ROOT" (single-coverage, anchor-eligible) ground is a property of the
     ORIGINAL candidacy alone, fixed before any pruning -- a cell that
@@ -786,6 +809,31 @@ def compute_roof_clips(roofs) -> dict:
     unconditional win for whoever is left (nobody else contests it any
     longer), not a newly-anchoring root; conflating the two would let a
     roof bootstrap an anchor from ground it never held independently.
+
+    WHAT A ROOF MUST GIVE UP, AND WHAT IT MERELY CANNOT REACH YET
+    (0181-ruling.md sec2, and the fixture measurements in the fixed-point
+    comments below). A cut-off component of a roof's own pieces is one
+    of three things. A PHANTOM holds a swallowed ridge end that has
+    CROSSED a host's ridge -- the joining end's overshoot (A's wedge past
+    the apex with the D85 corner behind it; rf1 east of the pinch): it
+    prunes, and never comes back. A ROOT LIMB holds the roof's own
+    single-coverage ground and no such end (rf3's whole rake-side body,
+    a roof with free ends passing across others): it certifies iff it
+    connects to the principal anchor through the roof's CONTINUITY
+    NETWORK -- its own reached pieces plus every piece where its surface
+    lies BELOW a real roof's drawn one, passing under; ground where it
+    would stand ABOVE the drawn surface is phantom air and conducts
+    nothing, a point contact conducts nothing. A certified limb anchors
+    a walk of its own and draws wherever it wins; hidden ground conducts
+    connectivity but never draws; an uncertified limb prunes with
+    everything only it could reach, and its root ground is the ONE place
+    blank ground is legal. Anything else cut off is an ORPHAN, judged
+    only once no phantom remains anywhere -- whatever still cuts it off
+    then is a real roof, and it prunes. Phantoms prune one at a time,
+    the shorter overshoot first, so a join whose far arm was severed by
+    nothing but another roof's phantom is judged on the re-enveloped
+    ground; and a joining end's extension strip may pass from above its
+    host to below, never back up.
 
     SEAMS are drawn from the SAME arrangement, read off the FINAL
     (converged) round only: a seam candidate is real iff both sides it
@@ -803,13 +851,13 @@ def compute_roof_clips(roofs) -> dict:
     unchanged and still the two-roof reference every test checks this
     construction against; `compute_roof_clips` no longer calls it.
 
-    MEASURED, NOT CLAIMED PERFECT: an orphan strip no live roof's claimed
-    territory borders at all (every coverer's own reach fails to reach
-    it) stays undrawn -- the same class of residual the two-roof case
-    already accepts for a corner past its own seam, now measured directly
-    rather than patched around after the fact with area-floor/dedup
-    heuristics (all now removed, superseded by there being only one
-    arrangement to begin with)."""
+    THE PARTITION INVARIANT, refined once (0181-ruling.md sec3): the
+    visible regions partition the union of footprints except for the
+    root ground of uncertified limbs, asserted globally by a test through
+    `diag` -- pass a dict and it comes back with the final cells, their
+    original coverers, the blank cells and the limb cells, plus a record
+    of every round. On his three-ridge fixture that blank set is empty;
+    on the equal-height L it is D85's corner alone."""
     roofs = list(roofs)
     if len(roofs) < 2:
         return {id(rf): RoofClip(None, [], [], (0.0, 0.0)) for rf in roofs}
@@ -1001,18 +1049,104 @@ def compute_roof_clips(roofs) -> dict:
             remaining -= comp
         return comps
 
-    # -- THE FIXED POINT (0179-ruling.md sec2): re-envelope, find anchors
-    # and reach on THIS round's result, prune whoever cannot reach their
-    # own piece FROM THAT CELL's active set (never any other cell), and
-    # repeat. Terminates because every round that prunes anything shrinks
-    # some cell's active set, which cannot shrink below empty; bounded
-    # here at one full pass per (roof, cell) pair as a hard backstop
-    # against an implementation bug, not because the math needs slack.
-    for _round in range(len(cells) * len(live) + 1):
-        pieces, owner_of, coverer_rank, cell_of, seam_segs, blocked = \
-            _envelope_round(active)
-        n_pieces = len(pieces)
+    # -- THE FIXED POINT (0179-ruling.md sec2, refined at 0181-ruling.md
+    # sec2): re-envelope, find anchors and reach on THIS round's result,
+    # prune whoever cannot reach their own piece, and repeat. Terminates
+    # because every round that does not converge prunes at least one
+    # positive-area piece, and the pieces come from a finite arrangement
+    # (cells only ever split along equal-height lines of finitely many
+    # coverer subsets); the bound is a backstop against an implementation
+    # bug, not slack the math needs.
+    #
+    # A SWALLOWED END NAMES THE PHANTOM. The one thing that distinguishes
+    # ground a roof must give up from ground it merely cannot reach YET is
+    # its own ridge end: a roof whose ridge END lies inside another roof
+    # is a JOINING roof there (module docstring, R4d), and everything of
+    # it cut off from its body on the far side of that seam is its
+    # phantom -- A's wedge past the apex and the D85 corner behind it, B's
+    # extension lens past its own start, rf1 east of the pinch, rf2's far
+    # end inside rf3. That ground never comes back: it prunes, and any
+    # limb of it holding root ground is the uncertified limb 0181 sec2
+    # leaves blank. A cut-off piece that holds no swallowed end is an
+    # ORPHAN: a roof with free ends passing across another (rf3 through
+    # rf1 and rf2's far end), cut off in THIS round only because some
+    # phantom stands in its corridor -- measured on his fixture, rf3's
+    # whole rake-side body was severed from its NE body by nothing but
+    # rf2's own phantom. So phantoms prune FIRST, and the vacated ground
+    # re-envelopes; an orphan is judged only in a round where no phantom
+    # remains anywhere, when whatever still cuts it off is a real roof --
+    # and then either the under-pass network certifies it (a root limb
+    # passing under a real roof to its own free end) or it prunes.
+    #
+    # A PHANTOM IS AN END THAT HAS CROSSED ITS HOST'S RIDGE. Not every
+    # swallowed end is an overshoot: B's start at the L sits exactly ON
+    # A's ridge, and rf2's south end stops 13" short of rf3's ridge --
+    # each a JOIN, a ridge drawn to end at the roof it runs into. A's end
+    # and rf1's east end lie PAST the ridge they crossed (50" and 49") --
+    # "the rf1 ridge completely intersects the rf2 ridge. So the rf1
+    # ridge will end at rf2", his own reading of the junction. So a
+    # cut-off arm holding a swallowed end is a phantom only if that end
+    # lies beyond a crossing of its own ridge with a host's ridge; a
+    # cut-off join end is judged like any orphan, once no phantom
+    # remains. (rf2's end has ALSO crossed rf1's ridge, 86" back -- so
+    # it is a phantom candidate too, and the order below decides.)
+    #
+    # PHANTOMS PRUNE ONE AT A TIME, THE SHORTER OVERSHOOT FIRST. Two
+    # crossed ends can cut each other off -- measured at his pinch: rf1's
+    # ridge crosses rf2's at a single-point saddle, each ridge ends inside
+    # the other roof, and each far arm is severed from its own body by
+    # nothing but the other's far arm. Prune both at once and neither
+    # survives (rf1/rf3 then meet in a false seam under rf2's own ridge,
+    # and rf1 takes ground south of the pinch his reference gives rf2);
+    # prune one and the other is judged on the re-enveloped ground, where
+    # it reconnects around the pinch. Which one: the arm that stops
+    # SOONER after the crossing is the one that was meant to end there
+    # (rf1's 49" before rf2's 86") -- the ordinary T-join in the limit,
+    # where a joining ridge drawn to end AT the main ridge overshoots it
+    # by nothing. The same order holds with rf3 absent (the saddle in
+    # isolation, 0177-ruling.md sec3's own receipt).
+    #
+    # A JOINING END'S EXTENSION NEVER COMES BACK UP. The strip past a
+    # swallowed end exists to close the join UNDER the host (the hip
+    # behind the apex, drawn as the lower surface under the phantom
+    # wedge) or to carry the end's own planes the last few inches to the
+    # seam while still above it -- it may pass from above the host's
+    # planes to below them, never from below back to above. B's lens at
+    # the L is exactly the forbidden move: B's extended ridge dips under
+    # A right behind the apex, then climbs back above A's north slope --
+    # and re-emergence into contested ground is what 0181 sec2 reserves
+    # for root ground alone. Measured against the ORIGINAL coverers'
+    # planes, pruned or not: the host's plane does not stop existing
+    # where its own phantom was pruned.
+    swallowed = {}
+    for rf in live:
+        swallowed[id(rf)] = []
+        for end, pt in enumerate((rf.p1, rf.p2)):
+            if ext[id(rf)][end] <= 0.0:
+                continue
+            overshoots = []
+            for host in live:
+                if host is rf or not _contains(footprints[id(host)], pt):
+                    continue
+                x = _segments_cross(rf.p1, rf.p2, host.p1, host.p2)
+                if x is not None:
+                    d = math.hypot(pt.x() - x.x(), pt.y() - x.y())
+                    if d > 1e-3:
+                        overshoots.append(d)
+            swallowed[id(rf)].append((pt, min(overshoots) if overshoots else None))
 
+    def _walk(rf, env):
+        """(reached, phantoms, root_orphans) for one roof on one
+        envelope: the principal anchor's own walk, and the cut-off
+        remainder split into phantom components (each holding a crossed
+        end, keyed by its overshoot) and orphan components that hold
+        root ground (limb candidates for the network -- 0181-ruling.md
+        sec2)."""
+        pieces, owner_of, coverer_rank, cell_of, _seams, blocked = env
+        n_pieces = len(pieces)
+        own_idx = {k for k, o in enumerate(owner_of) if o == id(rf)}
+        if not own_idx:
+            return set(), [], []
         # `clip_pair`'s own reference (untouched, the two-roof case this
         # construction must reduce to) never walks a roof's reach through
         # ANOTHER roof's exclusive root/outside territory (`rb_idx` is not
@@ -1028,43 +1162,152 @@ def compute_roof_clips(roofs) -> dict:
         # a legal stepping stone, but another roof's OWN root ground never
         # is.
         contested = {k for k in range(n_pieces) if coverer_rank[k] is not None}
-        reach_of = {}
-        for rf in live:
-            own_idx = {k for k, o in enumerate(owner_of) if o == id(rf)}
-            if not own_idx:
-                reach_of[id(rf)] = set()
+        root_idx = {k for k in own_idx if coverer_rank[k] is None}
+        comps = _components(pieces, own_idx, blocked)
+        by_root_area = sorted(
+            comps, key=lambda comp: -sum(_area(pieces[k]) for k in comp & root_idx))
+        principal = by_root_area[0] if by_root_area[0] & root_idx else None
+        if principal is None:
+            marker_pt = rf.p2 if getattr(rf, "marker_end", 1) else rf.p1
+            principal = next(
+                (comp for comp in comps
+                 if any(_contains(pieces[k], marker_pt, tol=1e-3) for k in comp)),
+                None)
+        if principal is None:
+            principal = own_idx
+        allowed = own_idx | contested
+        strip_below, strip_above = set(), set()
+        for k in allowed:
+            c = _centroid(pieces[k])
+            if _contains(footprints[id(rf)], c, tol=-1e-6):
                 continue
-            comps = _components(pieces, own_idx, blocked)
-            by_root_area = sorted(
-                comps, key=lambda comp: -sum(
-                    _area(pieces[k]) for k in comp if coverer_rank[k] is None))
-            anchors = (by_root_area[0]
-                      if any(coverer_rank[k] is None for k in by_root_area[0])
-                      else None)
-            if anchors is None:
-                marker_pt = rf.p2 if getattr(rf, "marker_end", 1) else rf.p1
-                anchors = next(
-                    (comp for comp in comps
-                     if any(_contains(pieces[k], marker_pt, tol=1e-3) for k in comp)),
-                    None)
-            if anchors is None:
-                anchors = own_idx
-            reach_of[id(rf)] = _reach(anchors, pieces, own_idx | contested, blocked)
+            others = [o for o in orig_coverers[cell_of[k]] if o is not rf]
+            if others and surface_height(rf, c) < max(
+                    surface_height(o, c) for o in others) - EPS:
+                strip_below.add(k)
+            else:
+                strip_above.add(k)
+        reached = _reach(principal, pieces, allowed, blocked,
+                         no_step=lambda i, j: i in strip_below and j in strip_above)
+        phantoms, orphans = [], []
+        for comp in _components(pieces, own_idx - reached, blocked):
+            overshoots = [d for pt, d in swallowed[id(rf)] if d is not None
+                          and any(_contains(pieces[k], pt, tol=1e-3) for k in comp)]
+            if overshoots:
+                phantoms.append((min(overshoots), comp))
+            elif comp & root_idx:
+                orphans.append(comp)
+        return reached, phantoms, orphans
 
-        pruned = False
-        for k in range(n_pieces):
-            rid = owner_of[k]
-            if k not in reach_of.get(rid, ()):
-                active[cell_of[k]].discard(rid)
-                pruned = True
-        if not pruned:
+    limb_cells = set()        # root cells pruned as uncertified limbs (sec2)
+    for _round in range(10_000):
+        env = _envelope_round(active)
+        pieces, owner_of, coverer_rank, cell_of, seam_segs, blocked = env
+        n_pieces = len(pieces)
+        contested = {k for k in range(n_pieces) if coverer_rank[k] is not None}
+
+        reach_of, limbs_of, phantoms = {}, {}, []
+        for order, rf in enumerate(live):
+            reach_of[id(rf)], own_phantoms, limbs_of[id(rf)] = _walk(rf, env)
+            phantoms.extend((overshoot, sum(_area(pieces[k]) for k in comp), order, comp)
+                            for overshoot, comp in own_phantoms)
+        all_phantom = set().union(*(comp for *_, comp in phantoms)) if phantoms else set()
+
+        # THE UNDER-PASS NETWORK (0181-ruling.md sec2). A root orphan --
+        # real single-coverage ground of this roof, cut off from its body
+        # by ground some other roof wins -- certifies, and anchors a walk
+        # of its own, iff it connects to the principal through the roof's
+        # CONTINUITY NETWORK: the pieces this roof is drawn on (its own
+        # reached pieces) plus every piece where its surface lies BELOW a
+        # real roof's drawn surface (hidden, passing under --
+        # `_under_pieces`; a phantom above it is not a real roof and is
+        # left out). Ground where it would stand ABOVE the drawn surface
+        # is phantom air and conducts nothing; a point contact conducts
+        # nothing (`_adjacent`). Certified ground draws wherever it wins;
+        # hidden ground conducts connectivity but never draws.
+        certified_of = {}
+        for rf in live:
+            limbs = limbs_of[id(rf)]
+            certified_of[id(rf)] = []
+            if not limbs:
+                continue
+            own_idx = {k for k, o in enumerate(owner_of) if o == id(rf)}
+            reached = reach_of[id(rf)]
+            hidden = _under_pieces(rf, pieces, owner_of, cell_of, orig_coverers,
+                                   exclude=all_phantom)
+            certified = _certify_limbs(limbs, reached & own_idx, pieces, hidden)
+            for comp in certified:
+                reached |= (_reach(comp, pieces, own_idx | contested, blocked)
+                            - all_phantom)
+            certified_of[id(rf)] = certified
+
+        unsupported = {id(rf): {k for k, o in enumerate(owner_of)
+                                if o == id(rf) and k not in reach_of[id(rf)]}
+                       for rf in live}
+        if not any(unsupported.values()):
+            to_prune = set()
+        elif phantoms:
+            phantoms.sort(key=lambda entry: entry[:3])
+            to_prune = set(phantoms[0][3])
+        else:
+            to_prune = {k for ks in unsupported.values() for k in ks}
+        if diag is not None:
+            diag.setdefault("rounds", []).append({
+                "pieces": list(pieces), "owner_of": list(owner_of),
+                "root": [coverer_rank[k] is None for k in range(n_pieces)],
+                "cell_of": list(cell_of), "unsupported": unsupported,
+                "blocked": set(blocked), "rank": list(coverer_rank),
+                "phantoms": [(d, comp) for d, _a, _i, comp in phantoms],
+                "limbs": limbs_of, "certified": certified_of,
+                "pruned": sorted(to_prune)})
+        if not to_prune:
             break
+
+        # A ROOF PRUNES OVER ITS OWN LOST PIECE ONLY, never its whole
+        # cell -- measured on the equal-height L: one cell held both A's
+        # phantom strip east of the valley and B's extension wedge west
+        # of it, and pruning A from the CELL for the strip's sake left
+        # nobody to re-envelope the wedge once B lost it too, blank ground
+        # A's own body should have carried. So every cell holding a piece
+        # about to prune first splits into this round's own pieces --
+        # they partition it exactly, each a convex local-maximum region
+        # -- and each becomes a cell of its own, inheriting the original
+        # candidacy (contested stays contested: ROOT is still a property
+        # of the ORIGINAL cell alone).
+        cell_of = list(cell_of)
+        for ci in {cell_of[k] for k in to_prune}:
+            parts = [k for k in range(n_pieces) if cell_of[k] == ci]
+            if len(parts) == 1:
+                continue
+            base = set(active[ci])
+            cells[ci] = pieces[parts[0]]
+            for k in parts[1:]:
+                cell_of[k] = len(cells)
+                cells.append(pieces[k])
+                orig_coverers.append(orig_coverers[ci])
+                orig_root.append(orig_root[ci])
+                active.append(set(base))
+        for k in to_prune:
+            active[cell_of[k]].discard(owner_of[k])
+            if coverer_rank[k] is None:
+                limb_cells.add(cell_of[k])
 
     # every piece surviving the fixed point already passed reachability
     # (else its round would have pruned it and looped again), so the
     # final envelope's own ownership needs no further reassignment for
     # correctness -- what follows is cosmetic only.
     final_owner = dict(enumerate(owner_of))
+
+    if diag is not None:
+        # the partition invariant, refined once (0181-ruling.md sec3):
+        # blank ground is a subset of the root ground of uncertified
+        # limbs -- a test asserts it globally from these
+        diag["cells"] = cells
+        diag["orig_coverers"] = [[id(rf) for rf in cs] for cs in orig_coverers]
+        diag["blank"] = [ci for ci in range(len(cells)) if not active[ci]]
+        diag["limb_cells"] = sorted(limb_cells)
+        diag["active"] = [set(a) for a in active]
+        diag["final"] = (pieces, owner_of, coverer_rank, cell_of)
 
     # -- a razor-thin sliver is exact math, not a bug (a cell where several
     # near-parallel seam lines converge can legitimately be tiny) -- but
@@ -1120,6 +1363,62 @@ def compute_roof_clips(roofs) -> dict:
                                    seams[id(rf)], warn[id(rf)],
                                    tuple(ext[id(rf)]))
     return out
+
+
+def _under_pieces(rf, pieces, owner_of, cell_of, orig_coverers, exclude=()):
+    """The ground `rf` passes UNDER (0181-ruling.md sec2): for every piece
+    another roof currently draws, inside a cell `rf`'s own candidacy
+    covers (a roof's surface exists only within its own footprint), the
+    part where `rf`'s surface lies below the drawn one. A piece `rf`
+    would stand wholly above is phantom air and contributes nothing; a
+    piece it crosses is cut at the equal-height line and only the
+    under-side kept. `exclude` names pieces that are nobody's real roof
+    (another roof's phantom, about to prune) -- passing under those is
+    not passing under anything."""
+    by_id = {}
+    out = []
+    for k, piece in enumerate(pieces):
+        rid = owner_of[k]
+        if rid == id(rf) or k in exclude:
+            continue
+        coverers = orig_coverers[cell_of[k]]
+        if not any(c is rf for c in coverers):
+            continue
+        owner = by_id.get(rid)
+        if owner is None:
+            owner = by_id[rid] = next(c for c in coverers if id(c) == rid)
+        vals = [surface_height(owner, p) - surface_height(rf, p) for p in piece]
+        if min(vals) >= -EPS:
+            out.append(piece)
+        elif max(vals) > EPS:
+            under, _ = _clip_by_values(piece, vals)
+            if len(under) >= 3 and _area(under) > MIN_CELL_AREA:
+                out.append(under)
+    return out
+
+
+def _certify_limbs(limbs, drawn, pieces, hidden):
+    """Which of `limbs` (root components of one roof, each a set of piece
+    indices) connect to that roof's `drawn` pieces through its continuity
+    network -- the drawn pieces plus the `hidden` polygons it passes
+    under -- by positive-length adjacency only. A certified limb joins
+    the network at once, so a further limb may connect through it."""
+    frontier = [pieces[k] for k in drawn]
+    seen_hidden = set()
+    pending = list(limbs)
+    certified = []
+    while frontier and pending:
+        cur = frontier.pop()
+        for h, poly in enumerate(hidden):
+            if h not in seen_hidden and _adjacent(cur, poly):
+                seen_hidden.add(h)
+                frontier.append(poly)
+        for comp in list(pending):
+            if any(_adjacent(cur, pieces[k]) for k in comp):
+                pending.remove(comp)
+                certified.append(comp)
+                frontier.extend(pieces[k] for k in comp)
+    return certified
 
 
 def _dedup_cells(cells, tol=1e-4):
