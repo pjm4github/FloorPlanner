@@ -937,6 +937,58 @@ def test_r4g_every_remaining_cross_roof_boundary_is_a_seam_or_a_footprint_edge()
     assert bad == [], bad
 
 
+def test_0182_every_equal_height_boundary_between_two_roofs_is_a_drawn_seam():
+    """Patrick's check of 0182: the 3D view was right and the plan was
+    missing joints -- the rf2/rf3 seam between (756, 553) and (773, 509),
+    exactly the boundary the per-piece prune had turned from a crossing
+    inside one cell into an edge between two cells, which the crossing
+    bookkeeping then never recorded. The seam is now read off the final
+    pieces. The receipt is the definition itself, checked globally: every
+    shared edge between two roofs' final cells along which both surfaces
+    agree is covered by a seam segment of BOTH roofs -- and the two named
+    joints are there."""
+    roofs = _three_ridge_roofs()
+    clips = compute_roof_clips(roofs)
+    from floorplanner.roofclip import _shared_segment
+    cells = [(g, cell) for g in roofs if clips[id(g)].region is not None
+            for cell in clips[id(g)].region.cells]
+
+    def covered(g, p, q):
+        for a, b in clips[id(g)].seams:
+            if (_dist_to_segment(p, a, b) < 1e-3 and _dist_to_segment(q, a, b) < 1e-3):
+                return True
+        return False
+
+    missing = []
+    for i in range(len(cells)):
+        g1, c1 = cells[i]
+        for j in range(i + 1, len(cells)):
+            g2, c2 = cells[j]
+            if g1 is g2:
+                continue
+            seg = _shared_segment(c1, c2)
+            if seg is None:
+                continue
+            p, q = seg
+            if any(abs(surface_height(g1, e) - surface_height(g2, e)) > 1e-3 for e in (p, q)):
+                continue
+            if not (covered(g1, p, q) and covered(g2, p, q)):
+                missing.append((g1.clip_name, g2.clip_name, round(p.x(), 2), round(p.y(), 2),
+                                round(q.x(), 2), round(q.y(), 2)))
+    assert missing == [], missing
+    # the joint he marked: from the rf2/rf3 seam's corner at (773, 509)
+    # down to rf2's ridge end at (756, 553), for both roofs (it bends
+    # once on the way, at rf3's ridge line, so it is two segments)
+    rf1, rf2, rf3 = roofs
+    for g in (rf2, rf3):
+        segs = clips[id(g)].seams
+        assert any(math.hypot(a.x() - 772.8, a.y() - 509.3) < 0.5 and b.y() > 525
+                   or math.hypot(b.x() - 772.8, b.y() - 509.3) < 0.5 and a.y() > 525
+                   for a, b in segs), segs
+        assert any(math.hypot(e.x() - 756.5, e.y() - 553.0) < 1.0
+                   for a, b in segs for e in (a, b)), segs
+
+
 def test_r4g_the_rf3_rake_over_rf1_eave_jump_is_named_correct_and_stays():
     """0177-ruling.md sec3's own receipt: "the one jump boundary that
     remains on this fixture is rf3's rake edge standing over rf1's low

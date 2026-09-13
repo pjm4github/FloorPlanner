@@ -277,6 +277,34 @@ def _segments_cross(a1, a2, b1, b2):
     return Pt(a1.x() + dax * t, a1.y() + day * t)
 
 
+def _shared_segment(a, b, tol: float = 1e-4):
+    """The longest edge-on-edge overlap of two convex polygons: the
+    collinear overlap of an edge of `a` with an edge of `b`, as `(p, q)`
+    `Pt`s, or None when no pair of edges overlaps by more than `tol`
+    (a point contact is not a shared segment)."""
+    best = None
+    n, m = len(a), len(b)
+    for i in range(n):
+        a1, b1 = a[i], a[(i + 1) % n]
+        dx, dy = b1.x() - a1.x(), b1.y() - a1.y()
+        length = math.hypot(dx, dy)
+        if length < tol:
+            continue
+        ux, uy = dx / length, dy / length
+        for j in range(m):
+            a2, b2 = b[j], b[(j + 1) % m]
+            if (abs((a2.x() - a1.x()) * -uy + (a2.y() - a1.y()) * ux) > tol
+                    or abs((b2.x() - a1.x()) * -uy + (b2.y() - a1.y()) * ux) > tol):
+                continue
+            t2 = (a2.x() - a1.x()) * ux + (a2.y() - a1.y()) * uy
+            t3 = (b2.x() - a1.x()) * ux + (b2.y() - a1.y()) * uy
+            lo, hi = max(0.0, min(t2, t3)), min(length, max(t2, t3))
+            if hi - lo > tol and (best is None or hi - lo > best[0]):
+                best = (hi - lo, Pt(a1.x() + ux * lo, a1.y() + uy * lo),
+                        Pt(a1.x() + ux * hi, a1.y() + uy * hi))
+    return None if best is None else (best[1], best[2])
+
+
 def _adjacent(a, b, tol: float = 1e-5) -> bool:
     """Two cells share a boundary segment of positive length: the
     midpoint of some edge of one lies on an edge of the other (either
@@ -1334,25 +1362,37 @@ def compute_roof_clips(roofs, diag=None) -> dict:
         if remaining:
             final_owner[k] = remaining[0]
 
-    # the sliver fold-in is the only thing that can move a piece away
-    # from its own converged `owner_of` -- so a seam is only drawn
-    # between two pieces that BOTH kept it, checked against the FINAL
-    # state, exactly as before.
-    primary = {k for k in range(n_pieces) if final_owner.get(k) == owner_of[k]}
-
     final_pieces = {id(rf): [] for rf in live}
     for k, owner in final_owner.items():
         final_pieces[owner].append(pieces[k])
 
+    # SEAMS ARE READ OFF THE FINAL PIECES, not off the round's crossing
+    # bookkeeping -- Patrick's own check of 0182 found one joint missing
+    # in the plan (the rf2/rf3 seam between (756, 553) and (773, 509)):
+    # the per-piece prune splits a cell ALONG an equal-height line, and
+    # from then on that line is a boundary between two single-owner
+    # cells, never again a crossing found inside one cell. So the seam
+    # is now defined by what it is: every shared edge of positive length
+    # between two roofs' final pieces along which the two surfaces agree
+    # at both ends. A shared edge where they do not agree is a real step
+    # (a footprint-edge jump, or the named sub-inch residue), which
+    # `fp3d`'s riser pass already treats by the same test.
+    by_id = {id(rf): rf for rf in live}
     seams = {id(rf): [] for rf in live}
-    for idx_i, idx_j, seg in seam_segs:
-        if idx_i not in primary or idx_j not in primary:
-            continue
-        oi, oj = final_owner[idx_i], final_owner[idx_j]
-        if oi == oj:
-            continue
-        seams[oi].append(seg)
-        seams[oj].append(seg)
+    for i in range(n_pieces):
+        oi = final_owner[i]
+        for j in range(i + 1, n_pieces):
+            oj = final_owner[j]
+            if oi == oj:
+                continue
+            seg = _shared_segment(pieces[i], pieces[j])
+            if seg is None:
+                continue
+            p, q = seg
+            if all(abs(surface_height(by_id[oi], e) - surface_height(by_id[oj], e)) <= 1e-3
+                   for e in (p, q)):
+                seams[oi].append(seg)
+                seams[oj].append(seg)
 
     out = {}
     for rf in roofs:
