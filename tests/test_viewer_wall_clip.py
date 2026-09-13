@@ -49,7 +49,11 @@ def fp3d():
 # closed form tests/test_roof_clip.py and test_roof_clip_trace.py use.
 EAVES_H, RIDGE_H, SPAN, WALL_H = 80.0, 132.0, 100.0, 96.0
 SLOPE = (RIDGE_H - EAVES_H) / SPAN
-PERP_THRESH = (RIDGE_H - WALL_H) / SLOPE        # 69.230769...
+# the cap sits CAP_DROP under the roof's top surface (its underside plus a
+# half-inch of clearance -- Patrick's second look: capped exactly at the
+# surface, "the wall pokes through the roof in 3D view at some angles")
+CAP_DROP = 4.5
+PERP_THRESH = (RIDGE_H - CAP_DROP - WALL_H) / SLOPE     # 60.576923...
 EXT_T = 6.0                                     # fp3d's exterior wall thickness
 
 
@@ -91,15 +95,17 @@ def _build(fp3d, doc, **kw):
 
 
 def _surface_z(x_w, y_w):
-    """The fixture roof's own top surface at a world point (plan y = -y_w),
-    written out independently of roofclip: ridge at plan y=100."""
-    return RIDGE_H - SLOPE * abs(-y_w - 100.0)
+    """The wall cap under the fixture roof at a world point (plan y = -y_w),
+    written out independently of roofclip: ridge at plan y=100, minus the
+    drop to the underside."""
+    return RIDGE_H - SLOPE * abs(-y_w - 100.0) - CAP_DROP
 
 
 # --------------------------------------------------------------------------
 # the instruction itself: nothing sticks up through the roof
 # --------------------------------------------------------------------------
 def test_no_wall_vertex_rises_above_the_roof_surface(fp3d):
+    assert fp3d.WALL_CAP_BELOW_ROOF_IN == CAP_DROP == fp3d.ROOF_T + 0.5
     v = _wall_verts(_build(fp3d, _doc([_roof()])))
     over = [(x, y, z) for x, y, z in v if z > _surface_z(x, y) + 1e-6]
     assert not over, f"{len(over)} wall vertices above the roof, e.g. {over[:3]}"
@@ -122,7 +128,8 @@ def test_the_gable_wall_top_follows_the_slope_and_flattens_under_the_ridge(fp3d)
         return bool(np.any(np.isclose(g[:, 1], y_w, atol=1e-6)
                            & np.isclose(g[:, 2], z, atol=1e-6)))
 
-    assert has(0.0, EAVES_H) and has(-200.0, EAVES_H), "corners not at the eaves"
+    assert has(0.0, EAVES_H - CAP_DROP) and has(-200.0, EAVES_H - CAP_DROP), \
+        "corners not at the eaves underside"
     assert has(-(100.0 - PERP_THRESH), WALL_H), "no crossing vertex, low side"
     assert has(-(100.0 + PERP_THRESH), WALL_H), "no crossing vertex, high side"
     assert has(-100.0, WALL_H), "the wall under the ridge should stay at its top"
@@ -137,8 +144,8 @@ def test_the_eaves_wall_with_no_overhang_is_capped_by_the_continued_plane(fp3d):
     v = _wall_verts(_build(fp3d, _doc([_roof()])))
     e = v[np.abs(v[:, 1]) <= EXT_T / 2 + 1e-6]           # the plan y=0 wall
     assert len(e) >= 8
-    assert e[:, 2].max() <= EAVES_H + SLOPE * EXT_T / 2 + 1e-6
-    assert e[:, 2].max() > EAVES_H - SLOPE * EXT_T / 2 - 1e-6, \
+    assert e[:, 2].max() <= EAVES_H - CAP_DROP + SLOPE * EXT_T / 2 + 1e-6
+    assert e[:, 2].max() > EAVES_H - CAP_DROP - SLOPE * EXT_T / 2 - 1e-6, \
         "capped far below the eave -- the plane was not what did the capping"
 
 
@@ -146,7 +153,7 @@ def test_the_eaves_wall_with_no_overhang_is_capped_by_the_continued_plane(fp3d):
 # what must NOT change
 # --------------------------------------------------------------------------
 def test_a_roof_that_clears_every_wall_top_builds_the_walls_byte_identically(fp3d):
-    hi = _roof(eaves_h=100.0, ridge_h=140.0)
+    hi = _roof(eaves_h=WALL_H + CAP_DROP + 2.0, ridge_h=142.0)   # underside clears 96
     with_roof = _wall_verts(_build(fp3d, _doc([hi])))
     without = _wall_verts(_build(fp3d, _doc([]), roofs=False))
     assert with_roof.shape == without.shape
@@ -172,7 +179,7 @@ def test_a_window_header_wholly_above_the_roof_is_gone_and_the_sill_wall_stays(f
     assert model.stats["openings"] == 1
     v = _wall_verts(model)
     e = v[np.abs(v[:, 1]) <= EXT_T / 2 + 1e-6]
-    assert e[:, 2].max() <= EAVES_H + SLOPE * EXT_T / 2 + 1e-6
+    assert e[:, 2].max() <= EAVES_H - CAP_DROP + SLOPE * EXT_T / 2 + 1e-6
     # the under-sill piece survives: a flat top at z=30, the opening's width
     sill = e[np.isclose(e[:, 2], 30.0)]
     assert len(sill) >= 4 and sill[:, 0].max() - sill[:, 0].min() == pytest.approx(30.0)
@@ -208,12 +215,12 @@ def test_under_a_cross_gable_the_wing_caps_the_wall_not_the_mains_phantom(fp3d):
     wing_slope = (130.0 - 80.0) / 60.0
     for x, y, z in v:
         if 140.0 + 1e-6 < x < 260.0 - 1e-6:
-            assert z <= 130.0 - wing_slope * abs(x - 200.0) + 1e-6, (x, y, z)
+            assert z <= 130.0 - wing_slope * abs(x - 200.0) - CAP_DROP + 1e-6, (x, y, z)
     # at the wing's eave line the capped piece ends at the eaves height and
     # the uncovered piece beyond it stands at the wall top: a real step,
     # because nothing roofs the wall there
     at_eave = v[np.isclose(v[:, 0], 140.0)]
-    assert np.any(np.isclose(at_eave[:, 2], 80.0)), "no capped vertex at the eave"
+    assert np.any(np.isclose(at_eave[:, 2], 80.0 - CAP_DROP)), "no capped vertex at the eave"
     assert np.any(np.isclose(at_eave[:, 2], WALL_H)), "no full-height vertex beyond it"
     outside = v[v[:, 0] < 140.0 - 4.0]
     assert outside[:, 2].max() == pytest.approx(WALL_H)
@@ -257,7 +264,7 @@ def test_on_the_three_ridge_fixture_no_wall_rises_above_the_roof_owning_its_grou
         pt = RC.Pt(x_w, -y_w)
         for g, cells in terr:
             if any(RC._contains(c, pt) for c in cells):
-                return RC.surface_height(g, pt)
+                return RC.surface_height(g, pt) - CAP_DROP
         return None
 
     def above(model):

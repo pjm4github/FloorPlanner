@@ -132,6 +132,13 @@ ROOF_C = (0.52, 0.30, 0.06, 1.0)         # roof-brown -- matches roofs.py's
 DEFAULT_SILL = 36.0              # window sill when the document doesn't say
 SLAB_T = 1.0                     # floor slab thickness, drawn below z0
 ROOF_T = 4.0                      # roof-plane thickness, drawn below its top
+# how far below a roof's TOP surface a wall under it is capped: the slab's
+# own thickness (its underside), plus half an inch so no wall face ever
+# coincides with a roof face -- Patrick's second look at the 3D wall clip
+# (2026-09-13): capped exactly at the top surface, "the wall pokes through
+# the roof in 3D view at some angles" (two coplanar faces fighting);
+# "move the walls down just a little"
+WALL_CAP_BELOW_ROOF_IN = ROOF_T + 0.5
 
 # --------------------------------------------------------------------------
 # the furnishing catalog -- READ, never restated
@@ -920,10 +927,12 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t):
     wall top -> full height, `_clip_by_values` on the vertex differences,
     exact) and at `z_lo` (roof below the piece's base -> the piece is gone:
     a window header wholly above the roof) are the only two more cuts. A
-    capped piece is a `_prism_slab` with its top ring ON the surface and a
-    flat bottom at `z_lo`; the top is the roof's top surface, not its
-    underside, so a wall under a roof that sits exactly at its top is
-    unchanged and a lower roof hides the wall's end inside its own slab.
+    capped piece is a `_prism_slab` with its top ring `WALL_CAP_BELOW_ROOF_IN`
+    under the surface -- the slab's underside and a half-inch of clearance
+    -- and a flat bottom at `z_lo`. His first look had the cap ON the top
+    surface, and the wall showed through the roof at grazing angles: two
+    coplanar faces, one the roof's and one the wall's, and a depth test
+    cannot order them. Nothing of the wall may share a face with the roof.
     Plan-space arithmetic throughout (`roofclip.py`'s own convex tools, on
     plan points with the y-flip undone), converted back at emission."""
     if not terr or roofclip_mod is None:
@@ -979,11 +988,14 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t):
         if geom is None:
             out.append(("flat", pc))
             continue
+        def cap_z(v, geom=geom):
+            return z_base + RC.surface_height(geom, v) - WALL_CAP_BELOW_ROOF_IN
+
         planar = [pc]
         for pt, d in RC._cut_lines(geom):
             planar = [q for cell in planar for q in RC._split_by_line(cell, pt, d)]
         for sub in planar:
-            hs = [z_base + RC.surface_height(geom, v) for v in sub]
+            hs = [cap_z(v) for v in sub]
             if min(hs) >= z_hi - RC.EPS:            # roof clear of the top
                 out.append(("flat", sub))
                 continue
@@ -994,11 +1006,11 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t):
             below, _ = RC._clip_by_values(sub, [z_hi - h for h in hs])
             if len(below) < 3 or RC._area(below) <= RC.MIN_CELL_AREA:
                 continue
-            hs_b = [z_base + RC.surface_height(geom, v) for v in below]
+            hs_b = [cap_z(v) for v in below]
             kept, _ = RC._clip_by_values(below, [h - z_lo for h in hs_b])
             if len(kept) < 3 or RC._area(kept) <= RC.MIN_CELL_AREA:
                 continue                            # wholly above the roof
-            ring = [(v.x(), -v.y(), z_base + RC.surface_height(geom, v))
+            ring = [(v.x(), -v.y(), cap_z(v))
                     for v in kept]
             out.append(("capped", ring))
     if not touched:
