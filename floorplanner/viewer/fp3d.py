@@ -844,7 +844,7 @@ def _gable_fascia_pieces(geom, apex, ea, eb, clip, z0, roofclip_mod):
     return pieces
 
 
-def _prism_slab(corners_xyz, drop):
+def _prism_slab(corners_xyz, drop, bottom_z=None):
     """`_box` generalised to a TOP RING WHOSE Z VARIES PER VERTEX -- a roof
     plane is not horizontal, so its top ring cannot be described by one z0.
     The bottom ring is the same (x, y), offset straight down in world z by
@@ -852,6 +852,8 @@ def _prism_slab(corners_xyz, drop):
     simplification `_box` already uses for vertical wall/floor prisms, not a
     new one. `corners_xy` may be any length >= 3 (a quad for a roof plane, a
     triangle for a gable end) -- both wind and cap by the same fan.
+    `bottom_z` instead puts the bottom ring on one flat height -- a wall
+    piece whose top follows the roof surface but whose base is the floor.
 
     Winding is normalised the SAME WAY `_box` does: the 2D (x, y) signed
     area alone decides CCW, ignoring z. That still gives the outward
@@ -870,7 +872,10 @@ def _prism_slab(corners_xyz, drop):
         p = p[::-1]
     top = np.array(p, dtype=float)
     bot = top.copy()
-    bot[:, 2] -= drop
+    if bottom_z is None:
+        bot[:, 2] -= drop
+    else:                                         # a wall's flat base
+        bot[:, 2] = bottom_z
     v = np.vstack([bot, top])
     f = []
     for i in range(1, n - 1):                     # bottom cap, fan, normal -z-ish
@@ -882,6 +887,132 @@ def _prism_slab(corners_xyz, drop):
         f += [[i, j, j + n], [i, j + n, i + n]]
     return v, np.array(f, dtype=int)
 
+
+def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t):
+    """The solid piece of a wall over plan quad `corners_xy` (this file's
+    world frame) between `z_lo` and `z_hi`, CAPPED AT THE ROOF SURFACE
+    wherever a roof on its level is lower than `z_hi` -- Patrick's own
+    instruction on R5a's check (2026-09-13): *"clip the walls to the roof
+    when viewing in 3D. At the moment the walls stick up through the
+    roof."* Returns `(verts, faces)` parts; exactly `[_box(...)]` when no
+    roof touches the piece, so a plan without roofs (or with every roof
+    above its wall tops) builds byte-identically to before.
+
+    WHOSE SURFACE. `terr` is the level's roofs as `(geom, cells)` -- each
+    roof's TERRITORY, the visible-region cells R4d/R4g assigned it (its
+    whole footprint when it has no partner). The quad is split by every
+    nearby cell's edge lines, so each resulting piece lies wholly inside or
+    outside every cell; a piece inside a roof's territory is capped by THAT
+    roof's surface (the one really over it -- not the lowest of every plane
+    that happens to pass overhead, which under a cross gable would be the
+    main's phantom plane continuing beneath the wing). A piece under no
+    territory at all but within the wall's own thickness `t` of one -- the
+    outer half of an eaves wall with no overhang, where the eave line sits
+    on the wall's centreline -- takes that roof's surface CONTINUED past
+    its edge (`surface_height` extends the planes), because otherwise a
+    thin fin of wall would stand up beside every zero-overhang eave.
+    Anything further from every roof keeps its full height: the roof does
+    not cover it, and the model does not pretend.
+
+    THE CAP. Within one territory piece the owner's surface is split into
+    single planes by its own `_cut_lines` (ridge, hip lines), so on each
+    sub-piece the height is affine; the level set at `z_hi` (roof above the
+    wall top -> full height, `_clip_by_values` on the vertex differences,
+    exact) and at `z_lo` (roof below the piece's base -> the piece is gone:
+    a window header wholly above the roof) are the only two more cuts. A
+    capped piece is a `_prism_slab` with its top ring ON the surface and a
+    flat bottom at `z_lo`; the top is the roof's top surface, not its
+    underside, so a wall under a roof that sits exactly at its top is
+    unchanged and a lower roof hides the wall's end inside its own slab.
+    Plan-space arithmetic throughout (`roofclip.py`'s own convex tools, on
+    plan points with the y-flip undone), converted back at emission."""
+    if not terr or roofclip_mod is None:
+        return [_box(corners_xy, z_lo, z_hi)]
+    RC = roofclip_mod
+    Pt = RC.Pt
+    quad = [Pt(x, -y) for x, y in corners_xy]         # world -> plan
+    xs = [q.x() for q in quad]
+    ys = [q.y() for q in quad]
+    bx0, bx1 = min(xs) - t, max(xs) + t
+    by0, by1 = min(ys) - t, max(ys) + t
+
+    def near(cell):
+        cx = [c.x() for c in cell]
+        cy = [c.y() for c in cell]
+        return not (max(cx) < bx0 or min(cx) > bx1
+                    or max(cy) < by0 or min(cy) > by1)
+
+    nearby = [(geom, [c for c in cells if near(c)]) for geom, cells in terr]
+    nearby = [(g, cs) for g, cs in nearby if cs]
+    if not nearby:
+        return [_box(corners_xy, z_lo, z_hi)]
+
+    # split the quad by every nearby cell edge: each piece then lies wholly
+    # inside or outside every cell
+    pieces = [quad]
+    for _, cells in nearby:
+        for cell in cells:
+            n = len(cell)
+            for i in range(n):
+                a, b = cell[i], cell[(i + 1) % n]
+                d = Pt(b.x() - a.x(), b.y() - a.y())
+                pieces = [q for pc in pieces for q in RC._split_by_line(pc, a, d)]
+
+    def owner_of(pc):
+        c = RC._centroid(pc)
+        for geom, cells in nearby:
+            if any(RC._contains(cell, c) for cell in cells):
+                return geom
+        best, best_d = None, None
+        for geom, cells in nearby:
+            for cell in cells:
+                n = len(cell)
+                d = min(RC._dist_to_segment(c, cell[i], cell[(i + 1) % n])
+                        for i in range(n))
+                if d <= t and (best_d is None or d < best_d):
+                    best, best_d = geom, d
+        return best
+
+    out, touched = [], False
+    for pc in pieces:
+        geom = owner_of(pc)
+        if geom is None:
+            out.append(("flat", pc))
+            continue
+        planar = [pc]
+        for pt, d in RC._cut_lines(geom):
+            planar = [q for cell in planar for q in RC._split_by_line(cell, pt, d)]
+        for sub in planar:
+            hs = [z_base + RC.surface_height(geom, v) for v in sub]
+            if min(hs) >= z_hi - RC.EPS:            # roof clear of the top
+                out.append(("flat", sub))
+                continue
+            touched = True                          # the roof intrudes here
+            above, _ = RC._clip_by_values(sub, [h - z_hi for h in hs])
+            if len(above) >= 3 and RC._area(above) > RC.MIN_CELL_AREA:
+                out.append(("flat", above))
+            below, _ = RC._clip_by_values(sub, [z_hi - h for h in hs])
+            if len(below) < 3 or RC._area(below) <= RC.MIN_CELL_AREA:
+                continue
+            hs_b = [z_base + RC.surface_height(geom, v) for v in below]
+            kept, _ = RC._clip_by_values(below, [h - z_lo for h in hs_b])
+            if len(kept) < 3 or RC._area(kept) <= RC.MIN_CELL_AREA:
+                continue                            # wholly above the roof
+            ring = [(v.x(), -v.y(), z_base + RC.surface_height(geom, v))
+                    for v in kept]
+            out.append(("capped", ring))
+    if not touched:
+        return [_box(corners_xy, z_lo, z_hi)]       # nothing to cap: as before
+    parts = []
+    for kind, ring in out:
+        if kind == "flat":
+            world = [(v.x(), -v.y()) for v in ring]
+            solid = _extrude(world, z_lo, z_hi)
+            if solid is not None:
+                parts.append(solid)
+        else:
+            parts.append(_prism_slab(ring, 0.0, bottom_z=z_lo))
+    return parts
 
 def _heading_deg(p1, p2):
     """Plain-(x, y)-tuple heading, in degrees -- a Qt-free duplicate of
@@ -1383,6 +1514,109 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             v, f = _merge(parts)
             model.meshes.append(Mesh("floors", v, f, col, translucent))
 
+    # ---- roof clips, FIRST -------------------------------------------------
+    # Computed before the walls: the walls are capped at the roof surface
+    # (Patrick, 2026-09-13: "clip the walls to the roof when viewing in 3D"),
+    # so the walls need every roof's territory and surface before any wall
+    # prism is built. The roof section below reuses `clips`/`riser_parts`.
+    clips, riser_parts, terr_by_level = {}, [], {}
+    if roofs:
+        # The wall endpoints this roof's nearest-eaves search needs, in world
+        # (x, y) -- a Qt-free duplicate of `roofs.py`'s `nearest_eaves_wall`
+        # search (see `_heading_deg`'s docstring for why it is a duplicate,
+        # not an import). Built once, independent of `by_type` above, which
+        # only kept solid PARTS, not endpoints or level ids.
+        wall_segs = []
+        for w in walls:
+            if w.get("level") not in lv:
+                continue
+            try:
+                wall_segs.append((w.get("level"), pt(w["v1"]), pt(w["v2"])))
+            except KeyError:
+                continue
+
+        def nearest_span(level_id, p1, p2):
+            ang = _heading_deg(p1, p2)
+            if ang is None:
+                return ROOF_DEFAULT_HALF_SPAN_IN
+            ang %= 180.0
+            best = None
+            for lvl, wp1, wp2 in wall_segs:
+                if lvl != level_id:
+                    continue
+                wang = _heading_deg(wp1, wp2)
+                if wang is None:
+                    continue
+                wang %= 180.0
+                d_ang = abs(wang - ang)
+                d_ang = min(d_ang, 180.0 - d_ang)
+                if d_ang > ROOF_EAVES_ANGLE_TOL_DEG:
+                    continue
+                mid = ((wp1[0] + wp2[0]) / 2.0, (wp1[1] + wp2[1]) / 2.0)
+                d = _dist_point_segment(mid, p1, p2)
+                if best is None or d < best:
+                    best = d
+            return best if best is not None else ROOF_DEFAULT_HALF_SPAN_IN
+
+        # R4e (0167-report.md sec2): the intersection clip, computed on
+        # the document's own roofs per level -- the same pure function the
+        # plan draws from -- BEFORE any mesh is built. A roof with no
+        # partner (clip region None) builds exactly as it did before R4e.
+        clips = {}
+        riser_parts = []
+        if ROOFCLIP is not None:
+            geoms_by_level = {}
+            for rf in doc.get("roofs", []):
+                rid, lid = rf.get("id", "?"), rf.get("level")
+                ridge = rf.get("ridge") or []
+                if lid not in lv or len(ridge) != 2:
+                    continue
+                w1 = (float(ridge[0][0]), -float(ridge[0][1]))
+                w2 = (float(ridge[1][0]), -float(ridge[1][1]))
+                if math.hypot(w2[0] - w1[0], w2[1] - w1[1]) < 1e-6:
+                    continue
+                geom = ROOFCLIP.RoofGeom.from_record(
+                    rf, span_fallback=nearest_span(lid, w1, w2))
+                geoms_by_level.setdefault(lid, []).append((rid, geom))
+            for lid, pairs in geoms_by_level.items():
+                per = ROOFCLIP.compute_roof_clips([g for _, g in pairs])
+                for rid, g in pairs:
+                    clips[rid] = (g, per[id(g)])
+                # the walls' own cap (below): each roof's TERRITORY on the
+                # level -- its visible region's cells when clipped, its
+                # whole footprint otherwise
+                terr_by_level[lid] = [
+                    (g, list(per[id(g)].region.cells)
+                     if per[id(g)].region is not None
+                     else [ROOFCLIP.footprint_polygon(g)])
+                    for _, g in pairs]
+                # 0174-report.md's own honestly-measured residual, closed
+                # here rather than in roofclip.py: the joining-end
+                # candidacy shape's own width limit can seat one roof's
+                # eaves height directly next to another's unrelated height
+                # at a boundary that is NOT a real seam -- each side's own
+                # skirt (a constant ROOF_T drop) is far too short to reach
+                # across a real height difference, leaving a slot only
+                # visible from an oblique angle (his own screenshot; a
+                # straight-down ray-cast finds no gap in top-down coverage
+                # at all -- the 2D partition itself is exact, per
+                # 0174-report.md). A pure ADD: closes the visual step
+                # without touching which roof owns which 2D territory, so
+                # it cannot revisit the D85 regression two wider candidacy
+                # shapes already caused there.
+                z0 = base(lid)
+                for (px, py), (qx, qy), lo_p, lo_q, hi_p, hi_q in \
+                        _cross_roof_risers([(g, per[id(g)]) for _, g in pairs], ROOFCLIP):
+                    # plan (x, y) -> this file's own world frame (x, -y, z)
+                    riser_parts.append(_riser_quad(
+                        (px, -py), (qx, -qy),
+                        z0 + lo_p - ROOF_T, z0 + lo_q - ROOF_T,
+                        z0 + hi_p, z0 + hi_q))
+        else:
+            model.info.append("roof clip unavailable (roofclip.py not "
+                              "found) -- roofs drawn unclipped")
+
+
     # ---- walls -----------------------------------------------------------
     by_type = {}
     for w in walls:
@@ -1447,17 +1681,24 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                     (p1[0] + ux * b - nx * t / 2, p1[1] + uy * b - ny * t / 2),
                     (p1[0] + ux * a - nx * t / 2, p1[1] + uy * a - ny * t / 2)]
 
+        # each solid piece of the wall, capped at the roof surface where a
+        # roof on this level is lower than the piece's top (`_wall_under_roofs`)
+        terr = terr_by_level.get(w["level"]) or []
+
+        def piece(corners, za, zb, terr=terr, z0=z0, t=t):
+            return _wall_under_roofs(corners, za, zb, terr, z0, ROOFCLIP, t)
+
         parts, cursor = [], 0.0
         for (s0, s1, sill, head) in cuts:
             if s0 - cursor > 1e-6:
-                parts.append(_box(quad(cursor, s0), z0, z1))       # solid pier
+                parts += piece(quad(cursor, s0), z0, z1)           # solid pier
             if sill > 1e-6:
-                parts.append(_box(quad(s0, s1), z0, z0 + sill))    # under sill
+                parts += piece(quad(s0, s1), z0, z0 + sill)        # under sill
             if z0 + head < z1 - 1e-6:
-                parts.append(_box(quad(s0, s1), z0 + head, z1))    # header
+                parts += piece(quad(s0, s1), z0 + head, z1)        # header
             cursor = max(cursor, s1)
         if L - cursor > 1e-6:
-            parts.append(_box(quad(cursor, L), z0, z1))
+            parts += piece(quad(cursor, L), z0, z1)
         if parts:
             by_type.setdefault(wtype, []).extend(parts)
             n_wall += 1
@@ -1478,93 +1719,6 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     # whole plane rather than a separate flat overhang strip.
     n_roof = 0
     if roofs:
-        # The wall endpoints this roof's nearest-eaves search needs, in world
-        # (x, y) -- a Qt-free duplicate of `roofs.py`'s `nearest_eaves_wall`
-        # search (see `_heading_deg`'s docstring for why it is a duplicate,
-        # not an import). Built once, independent of `by_type` above, which
-        # only kept solid PARTS, not endpoints or level ids.
-        wall_segs = []
-        for w in walls:
-            if w.get("level") not in lv:
-                continue
-            try:
-                wall_segs.append((w.get("level"), pt(w["v1"]), pt(w["v2"])))
-            except KeyError:
-                continue
-
-        def nearest_span(level_id, p1, p2):
-            ang = _heading_deg(p1, p2)
-            if ang is None:
-                return ROOF_DEFAULT_HALF_SPAN_IN
-            ang %= 180.0
-            best = None
-            for lvl, wp1, wp2 in wall_segs:
-                if lvl != level_id:
-                    continue
-                wang = _heading_deg(wp1, wp2)
-                if wang is None:
-                    continue
-                wang %= 180.0
-                d_ang = abs(wang - ang)
-                d_ang = min(d_ang, 180.0 - d_ang)
-                if d_ang > ROOF_EAVES_ANGLE_TOL_DEG:
-                    continue
-                mid = ((wp1[0] + wp2[0]) / 2.0, (wp1[1] + wp2[1]) / 2.0)
-                d = _dist_point_segment(mid, p1, p2)
-                if best is None or d < best:
-                    best = d
-            return best if best is not None else ROOF_DEFAULT_HALF_SPAN_IN
-
-        # R4e (0167-report.md sec2): the intersection clip, computed on
-        # the document's own roofs per level -- the same pure function the
-        # plan draws from -- BEFORE any mesh is built. A roof with no
-        # partner (clip region None) builds exactly as it did before R4e.
-        clips = {}
-        riser_parts = []
-        if ROOFCLIP is not None:
-            geoms_by_level = {}
-            for rf in doc.get("roofs", []):
-                rid, lid = rf.get("id", "?"), rf.get("level")
-                ridge = rf.get("ridge") or []
-                if lid not in lv or len(ridge) != 2:
-                    continue
-                w1 = (float(ridge[0][0]), -float(ridge[0][1]))
-                w2 = (float(ridge[1][0]), -float(ridge[1][1]))
-                if math.hypot(w2[0] - w1[0], w2[1] - w1[1]) < 1e-6:
-                    continue
-                geom = ROOFCLIP.RoofGeom.from_record(
-                    rf, span_fallback=nearest_span(lid, w1, w2))
-                geoms_by_level.setdefault(lid, []).append((rid, geom))
-            for lid, pairs in geoms_by_level.items():
-                per = ROOFCLIP.compute_roof_clips([g for _, g in pairs])
-                for rid, g in pairs:
-                    clips[rid] = (g, per[id(g)])
-                # 0174-report.md's own honestly-measured residual, closed
-                # here rather than in roofclip.py: the joining-end
-                # candidacy shape's own width limit can seat one roof's
-                # eaves height directly next to another's unrelated height
-                # at a boundary that is NOT a real seam -- each side's own
-                # skirt (a constant ROOF_T drop) is far too short to reach
-                # across a real height difference, leaving a slot only
-                # visible from an oblique angle (his own screenshot; a
-                # straight-down ray-cast finds no gap in top-down coverage
-                # at all -- the 2D partition itself is exact, per
-                # 0174-report.md). A pure ADD: closes the visual step
-                # without touching which roof owns which 2D territory, so
-                # it cannot revisit the D85 regression two wider candidacy
-                # shapes already caused there.
-                z0 = base(lid)
-                for (px, py), (qx, qy), lo_p, lo_q, hi_p, hi_q in \
-                        _cross_roof_risers([(g, per[id(g)]) for _, g in pairs], ROOFCLIP):
-                    # plan (x, y) -> this file's own world frame (x, -y, z)
-                    riser_parts.append(_riser_quad(
-                        (px, -py), (qx, -qy),
-                        z0 + lo_p - ROOF_T, z0 + lo_q - ROOF_T,
-                        z0 + hi_p, z0 + hi_q))
-        else:
-            model.info.append("roof clip unavailable (roofclip.py not "
-                              "found) -- roofs drawn unclipped")
-
         roof_parts = list(riser_parts)
         for rf in doc.get("roofs", []):
             rid = rf.get("id", "?")
