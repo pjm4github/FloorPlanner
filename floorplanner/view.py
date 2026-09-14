@@ -15,6 +15,10 @@ from floorplanner.rooms import _wall_endpoints_match  # star skips underscores
 from floorplanner.roofs import (
     RoofEndMarkerItem, RoofGripItem, RoofItem, eaves_spans_per_side,
 )
+from floorplanner.roofs import (  # R5b: the Dormer tool
+    DORMER_MIN_SPAN_IN, MIN_RIDGE_LEN_IN, dormer_defaults, host_roof_at,
+    snap_to_trace, upslope_direction,
+)
 from floorplanner.items import *  # noqa: F401
 
 
@@ -126,6 +130,8 @@ class PlanView(QGraphicsView):
         self._temp_wall = None
         self._temp_roof = None            # ridge being dragged, or None
         self._roof_awaiting_eaves = None  # ridge fixed, awaiting the eaves pick
+        self._temp_dormer = None          # R5b: dormer being dragged, or None
+        self._dormer_dragged = False
         self._last_scene = None           # last mouse position (paste target)
         self._rubber = None               # Ctrl+drag selection rubber band
         self._rubber_origin = None
@@ -467,6 +473,49 @@ class PlanView(QGraphicsView):
                         self._make_named_room(sp, name.strip(), res)
                 e.accept()
                 return
+            if tool == TOOL_ROOF_DORMER:
+                # R5b (0191-ruling.md sec2): its own tool. Press on a roof
+                # plane -- the roof whose drawn territory holds the point
+                # is the host -- snapped onto the host's clip trace (the
+                # placement map) when within reach; the ridge runs
+                # up-slope by default; the drag sets the width.
+                self.win._set_show_roofs(True)
+                self.win._set_edit_roofs(True)
+                for it in self.scene().items(sp):
+                    if isinstance(it, (RoofGripItem, RoofEndMarkerItem)):
+                        break             # a grip/marker press keeps its meaning
+                else:
+                    host = host_roof_at(self.scene(), sp, active_floor())
+                    if host is None:
+                        self.win.status("Dormer: press on a roof plane -- the "
+                                        "orange clip trace is where the face "
+                                        "goes (Esc cancels).")
+                        e.accept()
+                        return
+                    tol = max(12.0, 20.0 / max(self.transform().m11(), 1e-6))
+                    p = snap_to_trace(self.scene(), host, sp, tol) or wall_snap(sp)
+                    d = upslope_direction(host, p)
+                    if d is None:
+                        self.win.status("Dormer: press on a roof SLOPE, not "
+                                        "on the ridge line.")
+                        e.accept()
+                        return
+                    eaves_h, slope = dormer_defaults(self.scene(), host, p)
+                    item = RoofItem(p, QPointF(p.x() + d[0] * MIN_RIDGE_LEN_IN,
+                                               p.y() + d[1] * MIN_RIDGE_LEN_IN),
+                                    eaves_h_in=eaves_h,
+                                    ridge_h_in=eaves_h + DORMER_MIN_SPAN_IN * slope,
+                                    overhang_in=0.0, gable=[True, True],
+                                    span_in=DORMER_MIN_SPAN_IN, marker_end=0,
+                                    host=host)
+                    item.floor = host.floor
+                    self.scene().addItem(item)
+                    self._temp_dormer = item
+                    self._dormer_dragged = False
+                    self._dormer_face, self._dormer_dir = p, d
+                    self._dormer_slope = slope
+                    e.accept()
+                    return
             if tool == TOOL_ROOF_RIDGE:
                 # R2c (0145-ruling.md sec2): "sketching the first ridge via
                 # the menu turns both switches on" -- the menu/toolbar
@@ -591,6 +640,35 @@ class PlanView(QGraphicsView):
             w.set_end_vertex("p2", w.end_vertex("p2").relocated_to(
                 self._wall_end_point(w, sp, e.modifiers())))
             w.rebuild()
+            e.accept()
+            return
+
+        if self._temp_dormer is not None:
+            # R5b: the drag runs ALONG the face and sets the width, both
+            # sides equal about the face point, landing on the grid
+            # (0070-ruling.md sec3's class); Shift frees the ridge
+            # direction (perpendicular to the drag, still up-slope). The
+            # ridge follows the host's pitch; the back end derives itself
+            # in rebuild.
+            item = self._temp_dormer
+            f = self._dormer_face
+            vx, vy = sp.x() - f.x(), sp.y() - f.y()
+            dx, dy = self._dormer_dir
+            if e.modifiers() & Qt.KeyboardModifier.ShiftModifier \
+                    and math.hypot(vx, vy) > 1e-6:
+                ln = math.hypot(vx, vy)
+                cx, cy = -vy / ln, vx / ln
+                if cx * dx + cy * dy < 0:
+                    cx, cy = -cx, -cy
+                dx, dy = cx, cy
+            half = abs(vx * (-dy) + vy * dx) / 2.0
+            half = max(DORMER_MIN_SPAN_IN, wall_snap_len(half))
+            if half > DORMER_MIN_SPAN_IN + 1e-6:
+                self._dormer_dragged = True
+            item.span_in = half
+            item.ridge_h_in = item.eaves_h_in + half * self._dormer_slope
+            item.set_ridge(f, QPointF(f.x() + dx * MIN_RIDGE_LEN_IN,
+                                      f.y() + dy * MIN_RIDGE_LEN_IN))
             e.accept()
             return
 
@@ -729,6 +807,17 @@ class PlanView(QGraphicsView):
             e.accept()
             return
 
+        if self._temp_dormer is not None and e.button() == Qt.MouseButton.LeftButton:
+            item, self._temp_dormer = self._temp_dormer, None
+            if not self._dormer_dragged:
+                self.scene().removeItem(item)
+                self.win.status("Dormer too narrow; drag along the trace to "
+                                "set its width.")
+            else:
+                self.win.finish_roof_dormer(item)
+            e.accept()
+            return
+
         if self._temp_roof is not None and e.button() == Qt.MouseButton.LeftButton:
             item, self._temp_roof = self._temp_roof, None
             if item.length() < MIN_WALL_LEN:
@@ -847,6 +936,9 @@ class PlanView(QGraphicsView):
         if self._temp_wall is not None:
             self.scene().removeItem(self._temp_wall)
             self._temp_wall = None
+        if self._temp_dormer is not None:          # R5b: a drag in progress
+            self.scene().removeItem(self._temp_dormer)
+            self._temp_dormer = None
         if self._temp_roof is not None:
             # STILL BEING DRAGGED (the ridge itself not yet released) --
             # matches the wall tool's own precedent exactly: an

@@ -474,6 +474,43 @@ def surface_height(rf, pt) -> float:
     return h
 
 
+def meet_along(rf, origin, direction, height, max_t=None):
+    """R5b (0191-ruling.md sec1): the distance `t >= 0` along the ray from
+    `origin` in unit `direction` at which `rf`'s surface first RISES to
+    `height` -- where a dormer's ridge (or its eaves-start line) meets its
+    host's plane. None when the host is already at or above `height` at
+    the origin (a dormer that cannot stand there), or never reaches it
+    within `max_t` (default: twice the host footprint's diagonal). The
+    surface along a straight line is piecewise affine, so the crossing is
+    bracketed by stepping (half-inch steps, far finer than any plane
+    change) and then found by bisection to 1e-9 -- the bracket is the
+    only sampled part, and a piecewise-affine surface cannot cross and
+    re-cross inside one step of a ray that is monotone within each
+    plane."""
+    if max_t is None:
+        max_t = 2.0 * _diagonal(footprint_polygon(rf))
+
+    def h(t):
+        return surface_height(rf, Pt(origin.x() + direction.x() * t,
+                                     origin.y() + direction.y() * t))
+
+    if h(0.0) >= height - EPS:
+        return None
+    step, t_prev, t = 0.5, 0.0, 0.5
+    while t <= max_t + EPS:
+        if h(t) >= height:
+            lo, hi = t_prev, t
+            for _ in range(60):
+                mid = (lo + hi) / 2.0
+                if h(mid) >= height:
+                    hi = mid
+                else:
+                    lo = mid
+            return hi
+        t_prev, t = t, t + step
+    return None
+
+
 def footprint_polygon(rf, ext=(0.0, 0.0)):
     """The outer eave rectangle (overhang and hip extensions included) --
     the region the roof paints, and the domain of its surface -- as a

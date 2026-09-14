@@ -1185,6 +1185,14 @@ def main():
             'stroke="#1f2937" stroke-width="1.8" stroke-linejoin="round"/>',
             '<line x1="12" y1="4" x2="12" y2="15.5" stroke="#1f2937" '
             'stroke-width="1.3" stroke-dasharray="2.3,2"/>'],
+        "dormer": [
+            # R5b: a small gable standing on a slope -- the host's slope as
+            # a grey line, the dormer's gable outline and face above it
+            '<line x1="2.5" y1="18.5" x2="21.5" y2="6.5" stroke="#9ca3af" '
+            'stroke-width="1.8" stroke-linecap="round"/>',
+            '<path d="M8 15.5 L8 10.5 L13 5.5 L18 10.5 L18 9.2" fill="none" '
+            'stroke="#1f2937" stroke-width="1.8" stroke-linejoin="round" '
+            'stroke-linecap="round"/>'],
         "record": [
             # the universal red "record" dot
             '<circle cx="12" cy="12" r="7" fill="#dc2626" stroke="#991b1b" '

@@ -177,6 +177,10 @@
         "marker_end": {
           "description": "R2b (0140-ruling.md, the End-On marker): which `ridge` endpoint (0 or 1, index-aligned) the End-On marker sits at -- document state so it survives reload, same idea as a room label's offset. Optional: roofs written before R2b default to 1.",
           "type": "integer", "enum": [0, 1], "default": 1
+        },
+        "host": {
+          "description": "R5b (0191-ruling.md sec1): the id of the roof this roof STANDS ON -- present only on a DORMER, and its presence is what makes one: a dormer is a roof record like any other (ridge, heights, spans, gable flags), reusing every writer, loader, clip and mesh a roof has, with two derived facts on top. `ridge[0]` is the FACE (the front, where the End-On marker sits, `marker_end` 0); `ridge[1]` is DERIVED -- the point along the ridge line where the host's surface rises to `ridge_h_in` -- and still written here so the document is self-contained (the `eaves_bind` discipline: re-derived by the app on any edit of the dormer or its host, never on load). The two cheeks (along the eaves-start lines, back to where the eaves meet the host plane) and the face are derived geometry, not `walls` records. Must name a roof on the same level; a dangling host is reported and the record skipped on load, never a silent floating roof. Additive optional (ROADMAP R-B): no version bump.",
+          "$ref": "#/$defs/id"
         }
       }
     },

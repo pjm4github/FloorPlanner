@@ -804,6 +804,7 @@ def _roofs_of(items, lid, nid, src=None):
     normalise a bare number to `[v, v]`), so this writer never needs to
     know which case it is."""
     out = []
+    by_item = {}
     for it in _ordered(items, RoofItem, _roof_key):
         rec = {"id": nid("rf"), "level": lid,
                "ridge": [[it.p1.x(), it.p1.y()], [it.p2.x(), it.p2.y()]],
@@ -816,7 +817,14 @@ def _roofs_of(items, lid, nid, src=None):
                "marker_end": 1 if it.marker_end else 0}
         if src is not None:
             src[rec["id"]] = it
+        by_item[id(it)] = rec
         out.append(rec)
+    # R5b: a dormer names its host by the id THIS walk just minted -- a
+    # second pass, since the host may sort after the dormer
+    for it in _ordered(items, RoofItem, _roof_key):
+        host = getattr(it, "host", None)
+        if host is not None and id(host) in by_item:
+            by_item[id(it)]["host"] = by_item[id(host)]["id"]
     return out
 
 
@@ -1323,6 +1331,10 @@ def apply_design_to_scene(target, design, report=None, strict=False,
     # `overhang_in` migrates the same way, scalar -> `[v, v]`, since it
     # changed shape at the same tranche. A document already carrying the
     # array form (this app's own output from here on) is used as-is.
+    # R5b (0191-ruling.md sec1): a dormer's `host` is resolved AFTER every
+    # roof exists (the host may follow it in the document); a dangling host
+    # is reported and the record skipped -- never a silent floating roof.
+    roof_by_id, dormer_hosts = {}, []
     for rfd in doc.get("roofs", []) or []:
         p1 = QPointF(*rfd["ridge"][0])
         p2 = QPointF(*rfd["ridge"][1])
@@ -1344,6 +1356,19 @@ def apply_design_to_scene(target, design, report=None, strict=False,
         item.floor = floor   # never the global
         scene.addItem(item)
         rep["roofs"] += 1
+        roof_by_id[rfd.get("id")] = item
+        if rfd.get("host") is not None:
+            dormer_hosts.append((item, rfd.get("id"), rfd["host"]))
+    for item, rid, hid in dormer_hosts:
+        host = roof_by_id.get(hid)
+        if host is None or host is item or host.floor != item.floor:
+            rep.setdefault("roofs_skipped", []).append(
+                f"{rid}: host {hid!r} is not a roof on its level -- skipped")
+            scene.removeItem(item)
+            rep["roofs"] -= 1
+            continue
+        item.host = host
+        item.rebuild()             # derives the back end against the host
 
     # GROUPS (P4.5, defect 3). Rebuilt last, once every member exists, and
     # only from ids the document actually resolved -- a group whose members

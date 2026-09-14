@@ -62,6 +62,10 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                          "(Shift = free angle, Ctrl = 15° steps, same as a "
                          "wall). Release, then click the eaves wall this "
                          "roof spans over. Esc cancels.",
+        TOOL_ROOF_DORMER: "Dormer: press on a roof plane (snaps to the orange "
+                          "clip trace), drag along it to set the width "
+                          "(Shift = free direction), release to set the "
+                          "heights. Esc cancels.",
     }
 
     def __init__(self):
@@ -170,6 +174,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             (TOOL_WINDOW, "Window", "W", "window"),
             (TOOL_ROOM, "Room Name", "R", "room"),
             (TOOL_ROOF_RIDGE, "Roof Ridge", "G", "roof"),
+            (TOOL_ROOF_DORMER, "Roof Dormer", "M", "dormer"),
         ]
         for tool, label, key, icon in defs:
             a = QAction(tool_icon(icon), label, self)
@@ -424,6 +429,12 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self.a_ridge = QAction("&Sketch ridge  [G]", self)   # "G": the toolbar's own shortcut
         self.a_ridge.triggered.connect(lambda: self.set_tool(TOOL_ROOF_RIDGE))
         m_roof.addAction(self.a_ridge)
+        # R5b (0191-ruling.md sec2): its OWN tool, not an overloaded press
+        # on the ridge tool -- a crossing ridge legitimately starts inside
+        # another roof's region, and that press must stay a ridge
+        self.a_dormer = QAction("Sketch &dormer  [M]", self)
+        self.a_dormer.triggered.connect(lambda: self.set_tool(TOOL_ROOF_DORMER))
+        m_roof.addAction(self.a_dormer)
         m_roof.addSeparator()
         # R2c (0145-ruling.md sec2): the pair, invariant Edit implies Show
         self.a_show_roofs = QAction("&Show roof", self)
@@ -638,10 +649,14 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         a = getattr(self, "a_ridge", None)
         if a is not None:
             a.setEnabled(edit)
-        a = self._tool_actions.get(TOOL_ROOF_RIDGE) if hasattr(
-            self, "_tool_actions") else None
+        a = getattr(self, "a_dormer", None)
         if a is not None:
             a.setEnabled(edit)
+        for tool in (TOOL_ROOF_RIDGE, TOOL_ROOF_DORMER):
+            a = self._tool_actions.get(tool) if hasattr(
+                self, "_tool_actions") else None
+            if a is not None:
+                a.setEnabled(edit)
 
     def _set_show_roofs(self, on):
         """Same-value guard, invariant Edit=>Show: unchecking Show forces
@@ -652,7 +667,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         SETTINGS["show_roofs"] = on
         if not on:
             SETTINGS["edit_roofs"] = False
-            if self.tool == TOOL_ROOF_RIDGE:
+            if self.tool in (TOOL_ROOF_RIDGE, TOOL_ROOF_DORMER):
                 self.set_tool(TOOL_SELECT)
         self._sync_roof_ui()
         self._sync_floor_state()          # re-applies apply_roof_visibility
@@ -668,7 +683,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         SETTINGS["edit_roofs"] = on
         if on:
             SETTINGS["show_roofs"] = True
-        elif self.tool == TOOL_ROOF_RIDGE:
+        elif self.tool in (TOOL_ROOF_RIDGE, TOOL_ROOF_DORMER):
             self.set_tool(TOOL_SELECT)
         self._sync_roof_ui()
         self._sync_floor_state()
@@ -803,6 +818,26 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         dlg.apply()
         self.status(f"Roof ridge added ({fmt_ftin(item.length())} long, "
                     f"ridge {fmt_in(item.ridge_h_in)}, "
+                    f"eaves {fmt_in(item.eaves_h_in)}).")
+        return item
+
+    def finish_roof_dormer(self, item):
+        """Roof ▸ Sketch dormer…'s second half (R5b, 0191-ruling.md sec2):
+        the face and width are set by the drag, the host by the press; the
+        End-On dialog -- its fourth door -- sets the heights, seeded with
+        the dormer defaults the tool already put on the item. The dialog
+        REFUSES a ridge that cannot meet the host (above the host's own
+        ridge): `apply` returns False and the dormer is dropped, exactly
+        as a cancelled ridge is."""
+        dlg = RoofEndOnDialog(item, self)
+        if dlg.exec() != QDialog.DialogCode.Accepted or not dlg.apply():
+            self.scene.removeItem(item)
+            self.status("Dormer cancelled." if dlg.result() != QDialog.DialogCode.Accepted
+                        else "Dormer dropped: its ridge cannot meet the host roof "
+                             "(ridge height too high).")
+            return None
+        self.status(f"Dormer added ({fmt_ftin(item.span_in[0] + item.span_in[1])} "
+                    f"wide, ridge {fmt_in(item.ridge_h_in)}, "
                     f"eaves {fmt_in(item.eaves_h_in)}).")
         return item
 

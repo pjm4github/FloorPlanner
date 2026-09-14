@@ -113,6 +113,12 @@ def canonicalize(doc):
     roofs = doc.get("roofs") or []
     roofs.sort(key=lambda rf: (lorder[rf["level"]], rf["ridge"][0][0],
                                rf["ridge"][0][1]))
+    # R5b: a dormer's `host` names another roof by id, so the renumbering
+    # is applied to the reference too -- the one roof field that is a
+    # reference rather than a literal
+    rf_ren = {rf.get("id"): f"rf{i}" for i, rf in enumerate(roofs, 1)}
     for i, rf in enumerate(roofs, 1):
         rf["id"] = f"rf{i}"
+        if "host" in rf:
+            rf["host"] = rf_ren.get(rf["host"], rf["host"])
     return doc
