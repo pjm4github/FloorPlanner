@@ -15,7 +15,9 @@ from PyQt6.QtWidgets import QDialog, QGraphicsItem, QMenu
 
 from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
-from floorplanner.roofclip import compute_roof_clips
+from floorplanner.roofclip import (
+    Pt, _contains, compute_roof_clips, footprint_polygon, meet_along,
+)
 from floorplanner.walls import WallItem
 
 # how parallel a wall must run to the ridge to count as its eaves reference
@@ -406,8 +408,36 @@ def roof_clip_spans(scene, wall):
     ceiling_in = _wall_ceiling_in(scene, wall)
     spans = []
     for rf in roofs:
-        spans.extend(_clip_spans_against_one_roof(wall, rf, ceiling_in))
+        spans.extend(_within_territory(
+            wall, rf, _clip_spans_against_one_roof(wall, rf, ceiling_in)))
     return _merge_spans(spans, wall.length())
+
+
+def _within_territory(wall, rf, spans):
+    """R5b (0191-ruling.md sec1, the territory fix): a roof dashes a wall
+    only where the wall point lies in that roof's own DRAWN territory --
+    R4d/R4g's visible region -- not everywhere its plane passes overhead.
+    Measured on the read-back's own scene (0190-report.md sec0): the host's
+    plane under a dormer is 90in over a 96in room, and this function used
+    to dash the wall there although the dormer above it is 110in+. A roof
+    with no partner (`_clip_region` None) is unchanged, byte for byte; the
+    region's own exact segment clip (Cyrus-Beck per cell) cuts each span,
+    read back to inches along the wall."""
+    region = rf._clip_region
+    if region is None or not spans:
+        return spans
+    u = wall.unit()
+    o = wall.p1
+    out = []
+    for s0, s1 in spans:
+        a, b = wall.point_at(s0), wall.point_at(s1)
+        for p, q in region.clip_segment(Pt(a.x(), a.y()), Pt(b.x(), b.y())):
+            t0 = (p.x() - o.x()) * u.x() + (p.y() - o.y()) * u.y()
+            t1 = (q.x() - o.x()) * u.x() + (q.y() - o.y()) * u.y()
+            lo, hi = min(t0, t1), max(t0, t1)
+            if hi - lo > _CLIP_EPS_IN:
+                out.append((lo, hi))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -672,6 +702,100 @@ def roof_clip_trace(scene, roof):
 
 
 # ---------------------------------------------------------------------------
+# R5b (0191-ruling.md): dormers -- a roof with a host
+# ---------------------------------------------------------------------------
+# A dormer is a `RoofItem` whose `host` is another roof on its floor
+# (0190-report.md sec1, adopted at 0191 sec1). Everything a roof has, it
+# has; two facts are DERIVED on top: its back ridge end, where its ridge
+# meets the host's plane (`meet_along`), and its cheeks and face, the
+# walls that stand on the host plane under its own eaves. The clip
+# machinery is untouched -- 0190 sec0 measured that a dormer whose back
+# end sits on the host plane already partitions correctly by the same
+# envelope rules (two valleys meeting at the ridge/plane intersection).
+
+DORMER_EAVES_ABOVE_CEILING_IN = 24.0   # default cheek top over the trace's ceiling
+DORMER_MIN_SPAN_IN = 6.0               # half-width below which a drag is a slip
+
+
+def host_roof_at(scene, pt: QPointF, floor):
+    """The roof on `floor` whose drawn territory (R4d's visible region, or
+    a lone roof's whole footprint) holds `pt` -- the roof a dormer pressed
+    there stands on. A dormer cannot host another (v1: named, not
+    built), so dormers are skipped. None when no roof is under `pt`."""
+    if scene is None:
+        return None
+    p = Pt(pt.x(), pt.y())
+    for it in scene.items():
+        if (not isinstance(it, RoofItem) or sip.isdeleted(it)
+                or it.floor != floor or it.is_dormer()):
+            continue
+        region = it._clip_region
+        if region is not None:
+            if region.contains(p):
+                return it
+        elif _contains(footprint_polygon(it), p):
+            return it
+    return None
+
+
+def dormer_defaults(scene, host, pt: QPointF):
+    """`(eaves_h_in, slope)` for a dormer whose face stands at `pt` on
+    `host` (0190-report.md sec3, adopted): the cheek top is the governing
+    ceiling there (R3b's own rule, the trace's height) plus
+    `DORMER_EAVES_ABOVE_CEILING_IN`; the slope is the host's own pitch on
+    the side `pt` lies, so the dormer's ridge follows the host's pitch by
+    default (`ridge_h = eaves_h + span * slope`)."""
+    rooms = _floor_rooms(scene, host.floor) if scene is not None else []
+    margin = _trace_margin_in(scene, host.floor) if scene is not None else 0.0
+    ceiling = _governing_ceiling(rooms, pt, margin)
+    _, _, nx, ny = host._axis()
+    perp = (pt.x() - host.p1.x()) * nx + (pt.y() - host.p1.y()) * ny
+    span = host.span_in[0] if perp >= 0 else host.span_in[1]
+    slope = ((host.ridge_h_in - host.eaves_h_in) / span) if span > _CLIP_EPS_IN else 0.0
+    return ceiling + DORMER_EAVES_ABOVE_CEILING_IN, slope
+
+
+def upslope_direction(host, pt: QPointF):
+    """Unit `(dx, dy)` from `pt` toward `host`'s ridge, perpendicular to
+    its eave -- the default direction of a dormer's ridge. None on the
+    ridge line itself (no side to climb from)."""
+    _, _, nx, ny = host._axis()
+    perp = (pt.x() - host.p1.x()) * nx + (pt.y() - host.p1.y()) * ny
+    if abs(perp) < _CLIP_EPS_IN:
+        return None
+    sign = -1.0 if perp > 0 else 1.0
+    return nx * sign, ny * sign
+
+
+def snap_to_trace(scene, host, pt: QPointF, tol: float):
+    """The nearest point on `host`'s clip trace (`roof_clip_trace`) within
+    `tol` of `pt`, else None -- the dormer's face goes on the placement
+    map (0186-ruling.md sec2). ALONG the trace the point lands on the
+    grid (`wall_snap_len` of its coordinate along the trace's own
+    direction, from the scene origin -- the same "on the grid, never by
+    it" rule every roof drag uses, 0070-ruling.md sec3), clamped to the
+    segment."""
+    best, best_d = None, tol
+    for p, q in roof_clip_trace(scene, host):
+        d = dist_point_segment(pt, p, q)
+        if d < best_d:
+            dx, dy = q.x() - p.x(), q.y() - p.y()
+            ln = math.hypot(dx, dy)
+            if ln < 1e-9:
+                best, best_d = QPointF(p), d
+                continue
+            tx, ty = dx / ln, dy / ln
+            along = wall_snap_len(pt.x() * tx + pt.y() * ty)
+            lo, hi = sorted((p.x() * tx + p.y() * ty, q.x() * tx + q.y() * ty))
+            along = max(lo, min(hi, along))
+            # back to the line: keep the perpendicular offset of the segment
+            perp_off = p.x() * -ty + p.y() * tx
+            best = QPointF(along * tx + perp_off * -ty, along * ty + perp_off * tx)
+            best_d = d
+    return best
+
+
+# ---------------------------------------------------------------------------
 # R4b (0154-ruling.md sec2, requirement 5): eaves bound to the room top
 # ---------------------------------------------------------------------------
 # "assign the roof's bottom -- where the eaves start -- to the top of the
@@ -841,8 +965,11 @@ class RoofItem(QGraphicsItem):
 
     def __init__(self, p1, p2, eaves_h_in=96.0, ridge_h_in=132.0,
                 overhang_in=0.0, gable=None, span_in=DEFAULT_HALF_SPAN_IN,
-                marker_end=1, eaves_bind="manual"):
+                marker_end=1, eaves_bind="manual", host=None):
         super().__init__()
+        # R5b: a DORMER is a roof with a host (the RoofItem it stands on);
+        # its back end (`p2`) is derived against the host at every rebuild
+        self.host = host
         # READ-ONLY properties below, mutated only through `set_ridge` --
         # gate.py's own end-assignment census forbids `.p1 =`/`.p2 =`
         # project-wide (the retired wall split-on-write shim), and its
@@ -919,6 +1046,66 @@ class RoofItem(QGraphicsItem):
     def length(self) -> float:
         return math.hypot(self.p2.x() - self.p1.x(), self.p2.y() - self.p1.y())
 
+    # -- R5b: dormers --------------------------------------------------------
+    def is_dormer(self) -> bool:
+        host = self.host
+        return host is not None and not sip.isdeleted(host)
+
+    def dormers(self):
+        """The dormers standing on THIS roof, live in its scene."""
+        sc = self.scene()
+        if sc is None:
+            return []
+        return [it for it in sc.items()
+                if isinstance(it, RoofItem) and not sip.isdeleted(it)
+                and it.host is self]
+
+    def _derive_back_end(self):
+        """`p2` = where the ridge, run from the face `p1` in its own
+        direction, meets the host's plane at `ridge_h_in` (0191-ruling.md
+        sec1: derived, still written). Left where it is when the ridge
+        cannot meet the host -- the dialog refuses that state before it is
+        applied, so it is only ever transient (a drag in progress)."""
+        dx, dy = self._p2.x() - self._p1.x(), self._p2.y() - self._p1.y()
+        ln = math.hypot(dx, dy)
+        if ln < 1e-9:
+            return
+        ux, uy = dx / ln, dy / ln
+        t = meet_along(self.host, self._p1, Pt(ux, uy), self.ridge_h_in)
+        if t is not None:
+            t = max(t, 1.0)
+            self._p2 = QPointF(self._p1.x() + ux * t, self._p1.y() + uy * t)
+
+    def cheek_lines(self):
+        """The dormer's derived walls in plan, as `(p, q)`: the FACE across
+        the front at the eaves-start width (`span_in`, no overhang), and
+        each CHEEK along its eaves-start line from the face back to where
+        the dormer's eaves meet the host plane (`meet_along` at
+        `eaves_h_in`). `[]` for an ordinary roof."""
+        if not self.is_dormer():
+            return []
+        ux, uy, nx, ny = self._axis()
+        sl, sr = self._span_in
+        face_l = QPointF(self._p1.x() + nx * sl, self._p1.y() + ny * sl)
+        face_r = QPointF(self._p1.x() - nx * sr, self._p1.y() - ny * sr)
+        lines = [(face_l, face_r)]
+        for start in (face_l, face_r):
+            t = meet_along(self.host, start, Pt(ux, uy), self.eaves_h_in)
+            if t is not None and t > _CLIP_EPS_IN:
+                lines.append((start, QPointF(start.x() + ux * t, start.y() + uy * t)))
+        return lines
+
+    def remove_with_dormers(self):
+        """Delete this roof and every dormer standing on it (0191-ruling.md
+        sec1) -- one gesture. Roof deletion has no undo today (none did
+        before R5b either); named in 0192-report.md, not hidden."""
+        sc = self.scene()
+        if sc is None:
+            return
+        for d in self.dormers():
+            sc.removeItem(d)
+        sc.removeItem(self)
+
     def hip_extension(self, end: int, gable=None, span=None):
         """`(run, overhang)` along the ridge axis, beyond ridge end `end`
         (0 = `p1`, 1 = `p2`), that a HIP end adds to the footprint:
@@ -986,6 +1173,8 @@ class RoofItem(QGraphicsItem):
 
     def rebuild(self):
         self.prepareGeometryChange()
+        if self.is_dormer():
+            self._derive_back_end()
         e1a, e1b, e2a, e2b = self._eave_ends()
         pad = 4.0
         xs = [self.p1.x(), self.p2.x(), e1a.x(), e1b.x(), e2a.x(), e2b.x()]
@@ -1021,6 +1210,9 @@ class RoofItem(QGraphicsItem):
             path.moveTo(e1b)
             path.lineTo(self.p2)
             path.lineTo(e2b)
+        for p, q in self.cheek_lines():           # R5b: the cheeks and face
+            path.moveTo(p)
+            path.lineTo(q)
         self._path = path
         marker = getattr(self, "marker", None)   # absent mid-__init__
         if marker is not None:
@@ -1030,6 +1222,11 @@ class RoofItem(QGraphicsItem):
         # R4d: any change to this roof's true rectangle re-clips the floor
         if self.scene() is not None and hasattr(self, "grips"):
             sync_roof_clips(self.scene(), self.floor)
+            # R5b: a host's edit re-derives every dormer standing on it
+            # (their back ends and cheeks read the host's plane)
+            if not self.is_dormer():
+                for d in self.dormers():
+                    d.rebuild()
 
     def apply_clip(self, clip):
         """Take a `RoofClip` from `sync_roof_clips`: what to paint and hit
@@ -1059,7 +1256,9 @@ class RoofItem(QGraphicsItem):
             # the grips exist only for a selected roof -- a deselected roof
             # shows its plan lines and its marker, nothing to grab
             for g in getattr(self, "grips", ()):
-                g.setVisible(bool(value))
+                # R5b: a dormer's back end is derived -- no grip for it
+                g.setVisible(bool(value)
+                             and not (self.is_dormer() and g.kind == "end_1"))
             # R4d: selected = unclipped; deselect re-clips (the region is
             # still current -- nothing moved -- so a repaint is the re-clip)
             self.update()
@@ -1197,6 +1396,7 @@ class RoofItem(QGraphicsItem):
             if not self.gable[1]:
                 lines += [("dash", self.p2, e1b), ("dash", self.p2, e2b)]
         lines.append(("ridge", self.p1, self.p2))
+        lines += [("dash", p, q) for p, q in self.cheek_lines()]   # R5b
         return lines
 
     def _drawn_lines(self):
@@ -1302,8 +1502,7 @@ class RoofItem(QGraphicsItem):
         if chosen is a_heights:
             self.open_end_on_dialog()
         elif chosen is a_del:
-            if self.scene() is not None:
-                self.scene().removeItem(self)
+            self.remove_with_dormers()
         e.accept()
 
 

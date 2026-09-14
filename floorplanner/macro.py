@@ -111,13 +111,13 @@ class MacroRunner:
     # that convention).
     _TOOL_CODES = {"S": TOOL_SELECT, "E": TOOL_WALL_EXT, "I": TOOL_WALL_INT,
                    "D": TOOL_DOOR, "W": TOOL_WINDOW, "R": TOOL_ROOM,
-                   "G": TOOL_ROOF_RIDGE}
+                   "G": TOOL_ROOF_RIDGE, "M": TOOL_ROOF_DORMER}
     _DIGIT_TOOLS = [TOOL_SELECT, TOOL_WALL_EXT, TOOL_WALL_INT,
                     TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM]
     _TOOL_NAMES = {"select": TOOL_SELECT, "extwall": TOOL_WALL_EXT,
                    "intwall": TOOL_WALL_INT, "door": TOOL_DOOR,
                    "window": TOOL_WINDOW, "room": TOOL_ROOM,
-                   "roofridge": TOOL_ROOF_RIDGE}
+                   "roofridge": TOOL_ROOF_RIDGE, "roofdormer": TOOL_ROOF_DORMER}
     # derived from THE TABLE — add rows there, never here
     _CARET_METHODS = {t: s["method"] for t, s in CARET_SHORTCUTS.items()
                       if s["method"]}
@@ -645,7 +645,7 @@ class MacroRecorderDialog(QDialog):
                    Qt.Key.Key_Up: "UP", Qt.Key.Key_Down: "DOWN"}
     _TOOL_CODES = {TOOL_SELECT: "S", TOOL_WALL_EXT: "E", TOOL_WALL_INT: "I",
                    TOOL_DOOR: "D", TOOL_WINDOW: "W", TOOL_ROOM: "R",
-                   TOOL_ROOF_RIDGE: "G"}
+                   TOOL_ROOF_RIDGE: "G", TOOL_ROOF_DORMER: "M"}
 
     def __init__(self, win):
         super().__init__(win)

@@ -1,0 +1,219 @@
+{
+ "format": "floorplanner-design",
+ "version": 6,
+ "units": "inches",
+ "settings": {
+  "wall_snap_in": 6.0,
+  "rotate_snap_deg": 15.0,
+  "canvas_w_in": 1200.0,
+  "canvas_h_in": 840.0,
+  "cost_per_sqft": 150.0,
+  "show_roofs": true,
+  "edit_roofs": true,
+  "vertex_weld_in": 0.6,
+  "join_tol_in": 9.0,
+  "area_basis": "centerline",
+  "editing": {
+   "shuffle": false,
+   "auto_coalesce": true,
+   "auto_weld": true,
+   "auto_bind": true
+  },
+  "active_floor": "default"
+ },
+ "levels": [
+  {
+   "id": "L1",
+   "name": "default",
+   "elevation_in": 0.0,
+   "height_in": 96.0,
+   "kind": "storey",
+   "reference": false
+  }
+ ],
+ "vertices": [
+  {
+   "id": "v1",
+   "level": "L1",
+   "x": 0.0,
+   "y": 0.0
+  },
+  {
+   "id": "v2",
+   "level": "L1",
+   "x": 0.0,
+   "y": 200.0
+  },
+  {
+   "id": "v3",
+   "level": "L1",
+   "x": 400.0,
+   "y": 0.0
+  },
+  {
+   "id": "v4",
+   "level": "L1",
+   "x": 400.0,
+   "y": 200.0
+  }
+ ],
+ "walls": [
+  {
+   "id": "w1",
+   "level": "L1",
+   "v1": "v1",
+   "v2": "v3",
+   "type": "exterior",
+   "left": null,
+   "right": "r1",
+   "openings": []
+  },
+  {
+   "id": "w2",
+   "level": "L1",
+   "v1": "v2",
+   "v2": "v1",
+   "type": "exterior",
+   "left": null,
+   "right": "r1",
+   "openings": []
+  },
+  {
+   "id": "w3",
+   "level": "L1",
+   "v1": "v3",
+   "v2": "v4",
+   "type": "exterior",
+   "left": null,
+   "right": "r1",
+   "openings": []
+  },
+  {
+   "id": "w4",
+   "level": "L1",
+   "v1": "v4",
+   "v2": "v2",
+   "type": "exterior",
+   "left": null,
+   "right": "r1",
+   "openings": []
+  }
+ ],
+ "rooms": [
+  {
+   "id": "r1",
+   "level": "L1",
+   "name": "Loft",
+   "category": "interior",
+   "outline": [
+    {
+     "v": "v1",
+     "wall": "w1"
+    },
+    {
+     "v": "v3",
+     "wall": "w3"
+    },
+    {
+     "v": "v4",
+     "wall": "w4"
+    },
+    {
+     "v": "v2",
+     "wall": "w2"
+    }
+   ],
+   "placement": {
+    "state": "placed",
+    "rotation": 0.0,
+    "extracted_from": null
+   },
+   "label": {
+    "offset": [
+     0.0,
+     0.0
+    ],
+    "show_dimensions": false,
+    "show_area": true
+   },
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": ""
+   }
+  }
+ ],
+ "furnishings": [],
+ "groups": [],
+ "roofs": [
+  {
+   "id": "rf1",
+   "level": "L1",
+   "ridge": [
+    [
+     0.0,
+     100.0
+    ],
+    [
+     400.0,
+     100.0
+    ]
+   ],
+   "eaves_h_in": 96.0,
+   "ridge_h_in": 150.0,
+   "overhang_in": [
+    12.0,
+    12.0
+   ],
+   "span_in": [
+    100.0,
+    100.0
+   ],
+   "eaves_bind": "manual",
+   "gable": [
+    true,
+    true
+   ],
+   "marker_end": 1
+  },
+  {
+   "id": "rf2",
+   "level": "L1",
+   "ridge": [
+    [
+     200.0,
+     190.0
+    ],
+    [
+     200.0,
+     125.92592592592594
+    ]
+   ],
+   "eaves_h_in": 116.0,
+   "ridge_h_in": 136.0,
+   "overhang_in": [
+    0.0,
+    0.0
+   ],
+   "span_in": [
+    30.0,
+    30.0
+   ],
+   "eaves_bind": "manual",
+   "gable": [
+    true,
+    true
+   ],
+   "marker_end": 0,
+   "host": "rf1"
+  }
+ ]
+}

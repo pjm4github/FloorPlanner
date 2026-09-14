@@ -219,7 +219,7 @@ class Roof(_Node):
                         ("eaves_h_in", RAW), ("ridge_h_in", RAW),
                         ("overhang_in", RAW), ("span_in", RAW),
                         ("eaves_bind", RAW), ("gable", RAW),
-                        ("marker_end", RAW)]
+                        ("marker_end", RAW), ("host", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     ridge: Any = _MISSING
@@ -230,6 +230,10 @@ class Roof(_Node):
     eaves_bind: Any = _MISSING
     gable: Any = _MISSING
     marker_end: Any = _MISSING
+    # R5b (0191-ruling.md sec1): a DORMER is a roof with a `host` -- the id
+    # of the roof it stands on. OPTIONAL; presence is what makes it a
+    # dormer. Additive (ROADMAP R-B), no version bump.
+    host: Any = _MISSING
 
 
 @dataclass

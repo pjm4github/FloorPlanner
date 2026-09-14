@@ -949,7 +949,9 @@ class RoofEndOnDialog(QDialog):
     def __init__(self, roof: RoofItem, parent=None):
         super().__init__(parent)
         self.roof = roof
-        self.setWindowTitle("Roof parameters (end-on)")
+        self._dormer = getattr(roof, "host", None) is not None
+        self.setWindowTitle("Dormer parameters (end-on)" if self._dormer
+                            else "Roof parameters (end-on)")
         self._recent = list(self._FIELDS)   # last element = most recent edit
         self._programmatic = False
         self.binding = None                 # RoomTopBinding while bound
@@ -1036,6 +1038,21 @@ class RoofEndOnDialog(QDialog):
         self.cb_end_other.addItems(["Gable", "Hip"])
         self.cb_end_other.setCurrentIndex(0 if gable[1 - self._marker_end] else 1)
         form.addRow("Other end", self.cb_end_other)
+        if self._dormer:
+            # R5b: a dormer's eaves are its cheek top, not a room's ceiling,
+            # and its back end is DERIVED into the host -- neither is a
+            # choice here. The refusal (a ridge that cannot meet the host)
+            # is shown inline, never as a modal (headless-safe).
+            self.ck_bind.setChecked(False)
+            self.ck_bind.setEnabled(False)
+            other = self.cb_end_other if self._marker_end == 0 else self.cb_end_marker
+            other.setCurrentIndex(0)
+            other.setEnabled(False)
+            other.setToolTip("A dormer's back end is derived: it meets the host roof")
+            self.lab_dormer = QLabel("")
+            self.lab_dormer.setWordWrap(True)
+            self.lab_dormer.setStyleSheet("color: #b45309;")
+            form.addRow("", self.lab_dormer)
         lay.addLayout(form)
 
         note = QLabel("Both heights measured from the level's own base "
@@ -1065,6 +1082,8 @@ class RoofEndOnDialog(QDialog):
         self._recompute()   # seed pitch from the stored heights
         self._refresh_labels()
 
+        if self._dormer:
+            self._refresh_dormer_note()
         self.sp_ridge.valueChanged.connect(lambda v: self._on_edit("ridge_h", v))
         self.sp_eaves.valueChanged.connect(lambda v: self._on_edit("eaves_h", v))
         self.sp_pitch.valueChanged.connect(lambda v: self._on_edit("pitch", v))
@@ -1096,6 +1115,38 @@ class RoofEndOnDialog(QDialog):
         self._recent.append(field)          # most recent = last
         self._recompute()
         self._refresh_labels()
+        if self._dormer:
+            self._refresh_dormer_note()
+
+    # -- R5b: the dormer's derived back end and its refusal ---------------
+    def dormer_meet_in(self):
+        """Inches from the face along the ridge to where the host's plane
+        rises to the ridge height as currently typed; None = it never does
+        (the dormer cannot stand: refused, 0191-ruling.md sec1)."""
+        from floorplanner.roofclip import meet_along  # late: cycle guard
+        host = getattr(self.roof, "host", None)
+        if host is None:
+            return None
+        ux, uy, _, _ = self.roof._axis()
+        return meet_along(host, self.roof.p1, QPointF(ux, uy),
+                          float(self.sp_ridge.value()))
+
+    def _refresh_dormer_note(self):
+        t = self.dormer_meet_in()
+        if t is None:
+            self.lab_dormer.setText(
+                "This ridge height never meets the host roof -- the dormer "
+                "cannot stand. Lower the ridge (or the pitch) to continue.")
+        else:
+            self.lab_dormer.setText(
+                f"Back end derived: the ridge meets the host roof "
+                f"{fmt_ftin(t)} behind the face.")
+
+    def accept(self):
+        if self._dormer and self.dormer_meet_in() is None:
+            self._refresh_dormer_note()
+            return                           # stay open; nothing applied
+        super().accept()
 
     def _derived(self) -> str:
         """The least recently edited field -- except that, while the eaves
@@ -1228,7 +1279,12 @@ class RoofEndOnDialog(QDialog):
                                  float(self.sp_oh_r.value())]
         self.roof.gable = self.gable_flags()
         self.roof.eaves_bind = "room_top" if self.ck_bind.isChecked() else "manual"
+        if self._dormer:
+            if self.dormer_meet_in() is None:
+                return False             # refused: the caller drops the dormer
+            self.roof.eaves_bind = "manual"
         self.roof.rebuild()
+        return True
 
 
 class SettingsDialog(QDialog):
