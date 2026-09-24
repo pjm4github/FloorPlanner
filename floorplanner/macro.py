@@ -63,8 +63,9 @@ class MacroRunner:
     written in feet like 10' or 10'6".
 
     Tokens
-      Tool select   S E I D W R        Select / Exterior-wall / Interior-wall /
-                                       Door / Window / Room  (also: TOOL <name>;
+      Tool select   S E I D W R G M    Select / Exterior-wall / Interior-wall /
+                                       Door / Window / Room / Roof ridge /
+                                       Roof dormer  (also: TOOL <name>;
                                        legacy digits 1-6 still work)
       Shortcuts     ^N ^Z ^Y ^X ^C ^V ^G ^A ^S
                                        new / undo / redo / cut / copy / paste /
@@ -91,6 +92,13 @@ class MacroRunner:
                     Ctrl-drag) | DRAG x1 y1 x2 y2 | PRESS x y | RELEASE x y
       Place / edit  PLACE kind x y [rot] | WALL x1 y1 x2 y2 [ext|int] |
                     DOOR x y code | WINDOW x y code | ROOM name x y |
+                    DORMER x y width eaves ridge [dx dy]  (a gable dormer
+                    whose face stands at (x,y) on the roof plane there --
+                    snapped to that roof's clip trace when within reach --
+                    `width` wide, cheek top `eaves` and ridge `ridge` inches
+                    over the level base, ridge up-slope unless dx dy give
+                    its direction; what the recorder emits for the Dormer
+                    tool, dialog values baked in) |
                     SELECT x y | SELECTALL | DESELECT | ROTATE deg |
                     MOVETO x y | DELETE | ZOOMFIT
       Context menu  PUP x y [UP DOWN LEFT RIGHT ENTER ESC HOME END TAB
@@ -422,6 +430,64 @@ class MacroRunner:
         wall.openings.append(op)
         rebuild_all_walls(self.win.scene)
         return i
+
+    def _cmd_dormer(self, toks, i):
+        """DORMER x y width eaves ridge [dx dy] -- R5b's dormer, built the
+        way the Dormer tool builds one (view.py, TOOL_ROOF_DORMER) but with
+        no dialog: the host is the roof whose drawn territory holds (x,y),
+        the face snaps onto that roof's clip trace when within the tool's
+        own reach, the ridge runs up-slope unless `dx dy` say otherwise,
+        and a ridge the host never meets is an error, not a clamp (the
+        dialog's own refusal)."""
+        from floorplanner.roofs import (       # late: roofs imports walls
+            MIN_RIDGE_LEN_IN, RoofItem, host_roof_at, snap_to_trace,
+            upslope_direction,
+        )
+        (x, y, width, eaves, ridge), i = self._take(toks, i, 5)
+        d = None
+        if i + 1 < len(toks):
+            try:
+                d = (self._num(toks[i]), self._num(toks[i + 1]))
+                i += 2
+            except ValueError:
+                d = None
+        self.win._set_show_roofs(True)
+        self.win._set_edit_roofs(True)
+        pt = QPointF(self._num(x), self._num(y))
+        host = host_roof_at(self.win.scene, pt, active_floor())
+        if host is None:
+            raise ValueError(f"no roof plane at ({x}, {y})")
+        p = snap_to_trace(self.win.scene, host, pt, 12.0) or wall_snap(pt)
+        if d is None:
+            d = upslope_direction(host, p)
+            if d is None:
+                raise ValueError("the point lies on the host's ridge line")
+        else:
+            ln = math.hypot(d[0], d[1])
+            if ln < 1e-9:
+                raise ValueError("dx dy give no direction")
+            d = (d[0] / ln, d[1] / ln)
+        half = self._num(width) / 2.0
+        if half <= 0:
+            raise ValueError("width must be positive")
+        item = RoofItem(p, QPointF(p.x() + d[0] * MIN_RIDGE_LEN_IN,
+                                   p.y() + d[1] * MIN_RIDGE_LEN_IN),
+                        eaves_h_in=self._num(eaves), ridge_h_in=self._num(ridge),
+                        overhang_in=0.0, gable=[True, True], span_in=half,
+                        marker_end=0, host=host)
+        item.floor = host.floor
+        self.win.scene.addItem(item)
+        if item.length() <= MIN_RIDGE_LEN_IN + 1e-6 and \
+                not self._dormer_meets(item):
+            self.win.scene.removeItem(item)
+            raise ValueError("the ridge never meets the host roof (too high)")
+        return i
+
+    @staticmethod
+    def _dormer_meets(item) -> bool:
+        from floorplanner.roofclip import Pt, meet_along   # late
+        ux, uy, _, _ = item._axis()
+        return meet_along(item.host, item.p1, Pt(ux, uy), item.ridge_h_in) is not None
 
     def _cmd_room(self, toks, i):
         (name, x, y), i = self._take(toks, i, 3)
@@ -871,6 +937,26 @@ class MacroRecorderDialog(QDialog):
             self._append(f"{tok} {round(scene_pt.x())} {round(scene_pt.y())} "
                          f"{code}", newline=self.nl_check.isChecked())
 
+    def on_dormer(self, item):
+        """A dormer finished through the Dormer tool (mainwindow.py's
+        `finish_roof_dormer`, after its dialog): the face, width and the
+        dialog's two heights ride in one DORMER token -- the on_opening /
+        on_room pattern, so replay needs no dialog. The direction is
+        written only when it is not the default up-slope one (Shift)."""
+        if not self._active():
+            return
+        from floorplanner.roofs import upslope_direction   # late
+        self._end_modal_line()
+        p = item.p1
+        ux, uy, _, _ = item._axis()
+        tok = (f"DORMER {round(p.x())} {round(p.y())} "
+               f"{round(item.span_in[0] + item.span_in[1])} "
+               f"{item.eaves_h_in:g} {item.ridge_h_in:g}")
+        default = upslope_direction(item.host, p) if item.host is not None else None
+        if default is None or abs(ux - default[0]) > 1e-6 or abs(uy - default[1]) > 1e-6:
+            tok += f" {ux:.4f} {uy:.4f}"
+        self._append(tok, newline=self.nl_check.isChecked())
+
     def on_open(self, path):
         # the file came from a modal QFileDialog the event stream cannot
         # see -- capture it into a self-contained "^O path" token, exactly
@@ -971,7 +1057,8 @@ class MacroRecorderDialog(QDialog):
                 end = self.win.view.mapToScene(ev.position().toPoint())
                 # door/window/room clicks are recorded by their dedicated
                 # hooks (with the dialog value), so skip the raw click here
-                if self._press_tool not in (TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM):
+                if self._press_tool not in (TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM,
+                                            TOOL_ROOF_DORMER):
                     self._emit_mouse(self._press_scene, end,
                                      self._press_moved, self._press_ctrl)
                 self._press_scene = None

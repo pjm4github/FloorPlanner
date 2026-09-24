@@ -839,6 +839,9 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self.status(f"Dormer added ({fmt_ftin(item.span_in[0] + item.span_in[1])} "
                     f"wide, ridge {fmt_in(item.ridge_h_in)}, "
                     f"eaves {fmt_in(item.eaves_h_in)}).")
+        if self._recorder is not None:
+            # the dialog's values ride in one self-contained DORMER token
+            self._recorder.on_dormer(item)
         return item
 
     def _sync_template_action(self):

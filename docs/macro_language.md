@@ -34,6 +34,7 @@ include spaces (e.g. a room name `"Living Room"`). A bad token is recorded in
 | Token | Action |
 |-------|--------|
 | `S` `E` `I` `D` `W` `R` | **S**elect / **E**xterior-wall / **I**nterior-wall / **D**oor / **W**indow / **R**oom tool |
+| `G` `M` | Roof rid**g**e / roof dor**m**er tool (`G` because `R` is Room's; `M` for dorMer) |
 | `TOOL <name>` | same, by name: `select extwall intwall door window room` |
 
 (The legacy digit codes `1`–`6` are still accepted for older macros.)
@@ -108,6 +109,7 @@ These build items directly — handy for an AI that knows *what* it wants, not
 | `WALL x1 y1 x2 y2 [ext\|int]` | add a wall (default exterior) |
 | `DOOR x y code` / `WINDOW x y code` | cut an opening into the wall under (x,y); `code` is `WWHH` inches (e.g. `3680`) |
 | `ROOM name x y` | name the enclosed area containing (x,y); the room then owns its walls |
+| `DORMER x y width eaves ridge [dx dy]` | add a gable dormer whose face stands at (x,y) on the roof plane there — snapped to that roof's orange clip trace when within reach — `width` inches wide, cheek top at `eaves` and ridge at `ridge` inches over the level base; the ridge runs up-slope unless `dx dy` give its direction. The back end is derived where the ridge meets the host roof; a ridge the host never meets is an error. This is what the recorder emits for the Dormer tool, dialog values baked in |
 | `SELECT x y` | select the editable item at a point (prefers furnishing/wall over a room label) |
 | `SELECTALL` / `DESELECT` | select all / clear selection |
 | `ROTATE deg` | rotate selected furnishings by `deg` |
@@ -198,8 +200,9 @@ Rather than writing tokens by hand, open the **Macro ▸ Record / Debug…** win
   drops become `PLACE kind x y`, and keys (arrows, `^C`/`^V`/…, `DEL`, `ESC`)
   become their tokens. Actions whose parameters come from a **dialog** rather
   than keystrokes are captured as self-contained tokens with the value baked
-  in — placing a door/window records `DOOR x y WWHH` / `WINDOW x y WWHH`, and
-  naming a room records `ROOM "name" x y` — so replay never needs the dialog.
+  in — placing a door/window records `DOOR x y WWHH` / `WINDOW x y WWHH`,
+  naming a room records `ROOM "name" x y`, and finishing a dormer records
+  `DORMER x y width eaves ridge` — so replay never needs the dialog.
   A right-click context menu records `PUP x y` followed by the keys you press
   to drive it, all on one line — including any text you type into a dialog it
   opens, captured as `TYPE "..."` (e.g.
