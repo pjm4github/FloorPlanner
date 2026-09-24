@@ -139,12 +139,7 @@ ROOF_T = 4.0                      # roof-plane thickness, drawn below its top
 # the roof in 3D view at some angles" (two coplanar faces fighting);
 # "move the walls down just a little"
 WALL_CAP_BELOW_ROOF_IN = ROOF_T + 0.5
-# R5b: a dormer's cheeks and face stand ON the host's plane, under the
-# dormer's own eaves -- sunk this far into the host slab at the bottom and
-# stopped this far under the eaves at the top, and set this far in from
-# the eave/face lines, so no wall face coincides with a roof face (the
-# same fight WALL_CAP_BELOW_ROOF_IN closes for ordinary walls)
-DORMER_WALL_CLEAR_IN = 0.5
+
 
 # --------------------------------------------------------------------------
 # the furnishing catalog -- READ, never restated
@@ -901,77 +896,8 @@ def _prism_slab(corners_xyz, drop, bottom_z=None):
     return v, np.array(f, dtype=int)
 
 
-def _standing_prism(ring_plan, bottoms, top_z):
-    """A solid over plan ring `ring_plan` (plan points) whose bottom ring
-    has one z per vertex (`bottoms`) and whose top is flat at `top_z` --
-    a wall standing on a sloped roof. World frame (x, -y, z); wound
-    outward the way `_prism_slab` winds."""
-    p = [(q.x(), -q.y()) for q in ring_plan]
-    n = len(p)
-    a2 = sum(p[i][0] * p[(i + 1) % n][1] - p[(i + 1) % n][0] * p[i][1]
-             for i in range(n))
-    order = list(range(n)) if a2 >= 0 else list(range(n))[::-1]
-    top = np.array([(p[i][0], p[i][1], top_z) for i in order], dtype=float)
-    bot = np.array([(p[i][0], p[i][1], bottoms[i]) for i in order], dtype=float)
-    v = np.vstack([bot, top])
-    f = []
-    for i in range(1, n - 1):
-        f.append([0, i + 1, i])
-    for i in range(1, n - 1):
-        f.append([n, n + i, n + i + 1])
-    for i in range(n):
-        j = (i + 1) % n
-        f += [[i, j, j + n], [i, j + n, i + n]]
-    return v, np.array(f, dtype=int)
-
-
-def _dormer_walls(geom_d, geom_h, z0, roofclip_mod):
-    """The three walls a gable dormer stands on (0191-ruling.md sec1): the
-    FACE across the front at the eaves-start width and the two CHEEKS
-    along the eaves-start lines, each from the face back to where the
-    dormer's eaves meet the host plane (`meet_along`). Thickness one
-    constant (the interior wall's); every wall set `DORMER_WALL_CLEAR_IN`
-    in from its line, sunk that far into the host at the bottom and
-    stopped that far under the eaves at the top. Plan-space geometry from
-    the same `RoofGeom` the clip used, emitted in this file's world frame.
-    A face the host already tops (eaves at or under the host plane there)
-    draws nothing -- there is no wall to stand."""
-    RC = roofclip_mod
-    Pt = RC.Pt
-    t = float(WALL_T.get("interior", 4.5))
-    c = DORMER_WALL_CLEAR_IN
-    ux, uy, nx, ny = geom_d._axis()
-    sl, sr = geom_d.span_in
-    p1 = geom_d.p1
-    eaves_h = float(geom_d.eaves_h_in)
-    top_z = z0 + eaves_h - c
-
-    def at(a, p):
-        return Pt(p1.x() + ux * a + nx * p, p1.y() + uy * a + ny * p)
-
-    def bottom(pt):
-        return z0 + RC.surface_height(geom_h, pt) - c
-
-    parts = []
-    # the face: just behind the front plane, the eaves-start width
-    face = [at(c, sl - c), at(c + t, sl - c), at(c + t, -sr + c), at(c, -sr + c)]
-    if all(bottom(q) < top_z - RC.EPS for q in face):
-        parts.append(_standing_prism(face, [bottom(q) for q in face], top_z))
-    # each cheek: along its eaves-start line, inset inward, back to the meet
-    for outer, inward in ((sl - c, -1.0), (-sr + c, 1.0)):
-        start = at(c, outer)
-        reach = RC.meet_along(geom_h, start, Pt(ux, uy), eaves_h)
-        if reach is None or reach <= RC.EPS:
-            continue
-        inner = outer + inward * t
-        end = c + reach                       # measured from the inset start
-        cheek = [at(c, outer), at(end, outer), at(end, inner), at(c, inner)]
-        bottoms = [min(bottom(q), top_z) for q in cheek]
-        parts.append(_standing_prism(cheek, bottoms, top_z))
-    return parts
-
-
-def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t):
+def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
+                      to_top=False):
     """The solid piece of a wall over plan quad `corners_xy` (this file's
     world frame) between `z_lo` and `z_hi`, CAPPED AT THE ROOF SURFACE
     wherever a roof on its level is lower than `z_hi` -- Patrick's own
@@ -1010,7 +936,17 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t):
     coplanar faces, one the roof's and one the wall's, and a depth test
     cannot order them. Nothing of the wall may share a face with the roof.
     Plan-space arithmetic throughout (`roofclip.py`'s own convex tools, on
-    plan points with the y-flip undone), converted back at emission."""
+    plan points with the y-flip undone), converted back at emission.
+
+    UNDER A DORMER THE WALL RISES. `terr` entries are `(geom, cells,
+    dormer)`; a piece whose owner is a dormer, when `to_top` says the
+    piece runs to the wall's top (a pier or a header, not the wall under a
+    sill), is capped at the DORMER's plane whether that is below or ABOVE
+    the wall's own top -- Patrick's look at the first dormer (2026-09-24):
+    *"the walls of the dormer are being drawn down from the dormer. It
+    should show only the roof line and intersect with the walls under
+    it."* So there are no dormer walls of its own; the house walls under
+    it climb into its roof, the way a gable wall climbs into a gable."""
     if not terr or roofclip_mod is None:
         return [_box(corners_xy, z_lo, z_hi)]
     RC = roofclip_mod
@@ -1027,15 +963,15 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t):
         return not (max(cx) < bx0 or min(cx) > bx1
                     or max(cy) < by0 or min(cy) > by1)
 
-    nearby = [(geom, [c for c in cells if near(c)]) for geom, cells in terr]
-    nearby = [(g, cs) for g, cs in nearby if cs]
+    nearby = [(geom, [c for c in cells if near(c)], dm) for geom, cells, dm in terr]
+    nearby = [(g, cs, dm) for g, cs, dm in nearby if cs]
     if not nearby:
         return [_box(corners_xy, z_lo, z_hi)]
 
     # split the quad by every nearby cell edge: each piece then lies wholly
     # inside or outside every cell
     pieces = [quad]
-    for _, cells in nearby:
+    for _, cells, _ in nearby:
         for cell in cells:
             n = len(cell)
             for i in range(n):
@@ -1045,22 +981,22 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t):
 
     def owner_of(pc):
         c = RC._centroid(pc)
-        for geom, cells in nearby:
+        for geom, cells, dm in nearby:
             if any(RC._contains(cell, c) for cell in cells):
-                return geom
-        best, best_d = None, None
-        for geom, cells in nearby:
+                return geom, dm
+        best, best_d = (None, False), None
+        for geom, cells, dm in nearby:
             for cell in cells:
                 n = len(cell)
                 d = min(RC._dist_to_segment(c, cell[i], cell[(i + 1) % n])
                         for i in range(n))
                 if d <= t and (best_d is None or d < best_d):
-                    best, best_d = geom, d
+                    best, best_d = (geom, dm), d
         return best
 
     out, touched = [], False
     for pc in pieces:
-        geom = owner_of(pc)
+        geom, dormer = owner_of(pc)
         if geom is None:
             out.append(("flat", pc))
             continue
@@ -1072,6 +1008,14 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t):
             planar = [q for cell in planar for q in RC._split_by_line(cell, pt, d)]
         for sub in planar:
             hs = [cap_z(v) for v in sub]
+            if dormer and to_top:
+                # the wall climbs into the dormer's roof: its top is the
+                # dormer plane wherever that is above the base
+                kept, _ = RC._clip_by_values(sub, [h - z_lo for h in hs])
+                if len(kept) >= 3 and RC._area(kept) > RC.MIN_CELL_AREA:
+                    touched = True
+                    out.append(("capped", [(v.x(), -v.y(), cap_z(v)) for v in kept]))
+                continue
             if min(hs) >= z_hi - RC.EPS:            # roof clear of the top
                 out.append(("flat", sub))
                 continue
@@ -1666,6 +1610,10 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 geom = ROOFCLIP.RoofGeom.from_record(
                     rf, span_fallback=nearest_span(lid, w1, w2))
                 geoms_by_level.setdefault(lid, []).append((rid, geom))
+            # R5b: which records are dormers (a `host`) -- the walls under
+            # a dormer climb into its roof rather than being capped by it
+            dormer_ids = {rf.get("id") for rf in doc.get("roofs", [])
+                          if rf.get("host") is not None}
             for lid, pairs in geoms_by_level.items():
                 per = ROOFCLIP.compute_roof_clips([g for _, g in pairs])
                 for rid, g in pairs:
@@ -1676,8 +1624,9 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 terr_by_level[lid] = [
                     (g, list(per[id(g)].region.cells)
                      if per[id(g)].region is not None
-                     else [ROOFCLIP.footprint_polygon(g)])
-                    for _, g in pairs]
+                     else [ROOFCLIP.footprint_polygon(g)],
+                     rid in dormer_ids)
+                    for rid, g in pairs]
                 # 0174-report.md's own honestly-measured residual, closed
                 # here rather than in roofclip.py: the joining-end
                 # candidacy shape's own width limit can seat one roof's
@@ -1773,42 +1722,24 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         # roof on this level is lower than the piece's top (`_wall_under_roofs`)
         terr = terr_by_level.get(w["level"]) or []
 
-        def piece(corners, za, zb, terr=terr, z0=z0, t=t):
-            return _wall_under_roofs(corners, za, zb, terr, z0, ROOFCLIP, t)
+        def piece(corners, za, zb, to_top, terr=terr, z0=z0, t=t):
+            return _wall_under_roofs(corners, za, zb, terr, z0, ROOFCLIP, t,
+                                     to_top)
 
         parts, cursor = [], 0.0
         for (s0, s1, sill, head) in cuts:
             if s0 - cursor > 1e-6:
-                parts += piece(quad(cursor, s0), z0, z1)           # solid pier
+                parts += piece(quad(cursor, s0), z0, z1, True)     # solid pier
             if sill > 1e-6:
-                parts += piece(quad(s0, s1), z0, z0 + sill)        # under sill
+                parts += piece(quad(s0, s1), z0, z0 + sill, False)  # under sill
             if z0 + head < z1 - 1e-6:
-                parts += piece(quad(s0, s1), z0 + head, z1)        # header
+                parts += piece(quad(s0, s1), z0 + head, z1, True)  # header
             cursor = max(cursor, s1)
         if L - cursor > 1e-6:
-            parts += piece(quad(cursor, L), z0, z1)
+            parts += piece(quad(cursor, L), z0, z1, True)
         if parts:
             by_type.setdefault(wtype, []).extend(parts)
             n_wall += 1
-
-    # ---- R5b: dormer cheeks and face -- walls that stand on a roof --------
-    # (0191-ruling.md sec1: derived geometry, not `walls` records.) Each is
-    # a prism whose BOTTOM ring lies on the host's surface and whose top is
-    # the dormer's eaves height; the gable triangle above the face is the
-    # roof machinery's own (an open gable end).
-    if roofs and ROOFCLIP is not None:
-        for rf in doc.get("roofs", []):
-            hid = rf.get("host")
-            if hid is None or rf.get("level") not in lv:
-                continue
-            geom_d, _ = clips.get(rf.get("id", "?"), (None, None))
-            geom_h, _ = clips.get(hid, (None, None))
-            if geom_d is None or geom_h is None:
-                model.notes.append(f"roof {rf.get('id', '?')}: host {hid!r} "
-                                   f"not built -- no dormer walls")
-                continue
-            by_type.setdefault("exterior", []).extend(
-                _dormer_walls(geom_d, geom_h, base(rf["level"]), ROOFCLIP))
 
     for wtype, parts in by_type.items():
         v, f = _merge(parts)

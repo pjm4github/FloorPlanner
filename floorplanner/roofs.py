@@ -17,6 +17,7 @@ from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.roofclip import (
     Pt, _contains, compute_roof_clips, footprint_polygon, meet_along,
+    surface_height,
 )
 from floorplanner.walls import WallItem
 
@@ -1076,25 +1077,6 @@ class RoofItem(QGraphicsItem):
             t = max(t, 1.0)
             self._p2 = QPointF(self._p1.x() + ux * t, self._p1.y() + uy * t)
 
-    def cheek_lines(self):
-        """The dormer's derived walls in plan, as `(p, q)`: the FACE across
-        the front at the eaves-start width (`span_in`, no overhang), and
-        each CHEEK along its eaves-start line from the face back to where
-        the dormer's eaves meet the host plane (`meet_along` at
-        `eaves_h_in`). `[]` for an ordinary roof."""
-        if not self.is_dormer():
-            return []
-        ux, uy, nx, ny = self._axis()
-        sl, sr = self._span_in
-        face_l = QPointF(self._p1.x() + nx * sl, self._p1.y() + ny * sl)
-        face_r = QPointF(self._p1.x() - nx * sr, self._p1.y() - ny * sr)
-        lines = [(face_l, face_r)]
-        for start in (face_l, face_r):
-            t = meet_along(self.host, start, Pt(ux, uy), self.eaves_h_in)
-            if t is not None and t > _CLIP_EPS_IN:
-                lines.append((start, QPointF(start.x() + ux * t, start.y() + uy * t)))
-        return lines
-
     def remove_with_dormers(self):
         """Delete this roof and every dormer standing on it (0191-ruling.md
         sec1) -- one gesture. Roof deletion has no undo today (none did
@@ -1210,9 +1192,6 @@ class RoofItem(QGraphicsItem):
             path.moveTo(e1b)
             path.lineTo(self.p2)
             path.lineTo(e2b)
-        for p, q in self.cheek_lines():           # R5b: the cheeks and face
-            path.moveTo(p)
-            path.lineTo(q)
         self._path = path
         marker = getattr(self, "marker", None)   # absent mid-__init__
         if marker is not None:
@@ -1256,9 +1235,7 @@ class RoofItem(QGraphicsItem):
             # the grips exist only for a selected roof -- a deselected roof
             # shows its plan lines and its marker, nothing to grab
             for g in getattr(self, "grips", ()):
-                # R5b: a dormer's back end is derived -- no grip for it
-                g.setVisible(bool(value)
-                             and not (self.is_dormer() and g.kind == "end_1"))
+                g.setVisible(bool(value))
             # R4d: selected = unclipped; deselect re-clips (the region is
             # still current -- nothing moved -- so a repaint is the re-clip)
             self.update()
@@ -1312,6 +1289,21 @@ class RoofItem(QGraphicsItem):
         cursor_u = scene_pt.x() * ux + scene_pt.y() * uy
         cursor_u += GRIP_END_OFFSET_IN if end == 0 else -GRIP_END_OFFSET_IN
         landed = wall_snap_len(cursor_u) - origin_u        # along, from p1
+        if end == 1 and self.is_dormer():
+            # R5b, Patrick's look at the first dormer (2026-09-24: "a missing
+            # control knob on the ridge of the dormer where it meets the
+            # roof"): the back end is derived from the ridge height, so its
+            # grip sets the RIDGE HEIGHT -- the dragged point (on the grid
+            # along the ridge) is where the ridge is to meet the host, and
+            # the ridge height becomes the host's surface there; the
+            # rebuild then derives the back end onto that very point.
+            a = max(MIN_RIDGE_LEN_IN, landed)
+            pt = QPointF(self.p1.x() + ux * a, self.p1.y() + uy * a)
+            h = surface_height(self.host, Pt(pt.x(), pt.y()))
+            if h > self.eaves_h_in + 1.0:
+                self.ridge_h_in = float(h)
+                self.rebuild()
+            return
         L = self.length()
         run, oh = self.hip_extension(end)
         ext = run + oh
@@ -1396,7 +1388,6 @@ class RoofItem(QGraphicsItem):
             if not self.gable[1]:
                 lines += [("dash", self.p2, e1b), ("dash", self.p2, e2b)]
         lines.append(("ridge", self.p1, self.p2))
-        lines += [("dash", p, q) for p, q in self.cheek_lines()]   # R5b
         return lines
 
     def _drawn_lines(self):

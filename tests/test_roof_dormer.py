@@ -145,30 +145,45 @@ def test_the_pure_clip_agrees_on_document_records(scene):
 # --------------------------------------------------------------------------
 # cheeks and face, in plan
 # --------------------------------------------------------------------------
-def test_cheeks_run_from_the_face_to_where_the_eaves_meet_the_host(scene):
+def test_a_dormer_draws_only_its_roof_lines(scene):
+    """Patrick's look at the first dormer (2026-09-24): "It should show only
+    the roof line" -- no cheek or face lines of its own. Clipped, its back
+    end is joined, so the plan lines are the two eaves, the front gable
+    line and the ridge; nothing else."""
     _room(scene)
     host = _host(scene)
     d = _dormer(scene, host)
-    lines = d.cheek_lines()
-    assert len(lines) == 3
-    face, cheek_l, cheek_r = lines
-    assert _pts([face]) == [(170.0, 190.0), (230.0, 190.0)]
-    assert {round(q.y(), 3) for _, q in (cheek_l, cheek_r)} == {round(EAVES_MEET_Y, 3)}
-    assert {round(p.x(), 3) for p, _ in (cheek_l, cheek_r)} == {170.0, 230.0}
     kinds = [k for k, _, _ in d._plan_lines()]
-    assert kinds.count("dash") >= 5, "the cheeks and face are drawn dashed"
-    assert host.cheek_lines() == []
+    assert kinds.count("dash") == 3 and kinds.count("ridge") == 1
+    assert not hasattr(d, "cheek_lines")
 
 
-def test_a_selected_dormer_shows_no_grip_at_its_derived_end(scene):
+def test_a_selected_dormer_shows_all_five_grips(scene):
     _room(scene)
     host = _host(scene)
     d = _dormer(scene, host)
     d.setSelected(True)
-    shown = {g.kind for g in d.grips if g.isVisible()}
-    assert "end_1" not in shown and "end_0" in shown and "ridge" in shown
-    host.setSelected(True)
-    assert {g.kind for g in host.grips if g.isVisible()} == set(host.grips[0].KINDS)
+    assert {g.kind for g in d.grips if g.isVisible()} == set(d.grips[0].KINDS)
+
+
+def test_the_back_end_grip_sets_the_ridge_height_from_the_host_plane(scene):
+    """The knob where the ridge meets the roof (his words): dragging it
+    along the ridge picks the meet point; the ridge height becomes the
+    host's surface there and the derived back end lands on it. The grip
+    sits GRIP_END_OFFSET_IN outside the end, so the cursor is read that
+    much inward, and the point lands on the 6in grid."""
+    from floorplanner.roofs import GRIP_END_OFFSET_IN
+    _room(scene)
+    host = _host(scene)
+    d = _dormer(scene, host)
+    assert d.p2.y() == pytest.approx(MEET_Y, abs=1e-6)
+    # ridge runs up-slope (-y); aim the meet at plan y=150 (a = 40 from the face)
+    d.drag_end(1, QPointF(200, 150 - GRIP_END_OFFSET_IN))
+    assert d.ridge_h_in == pytest.approx(150.0 - HOST_SLOPE * 50.0)     # 123
+    assert d.p2.y() == pytest.approx(150.0, abs=1e-6)
+    # too low to stand (host plane under the eaves): refused, unchanged
+    d.drag_end(1, QPointF(200, 189 - GRIP_END_OFFSET_IN))
+    assert d.ridge_h_in == pytest.approx(123.0)
 
 
 def test_deleting_the_host_deletes_its_dormers(scene):
