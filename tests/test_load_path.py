@@ -548,28 +548,35 @@ def test_shadow_mode_still_fires_without_the_snapshot_undo_path(fp, win,
         "the shared walk must be passed through, not dropped"
 
 
-def test_the_3d_view_renders_only_the_active_floor(fp, win, monkeypatch):
-    """D68: the 3D popup renders the ACTIVE FLOOR, not every level.
+def test_the_3d_view_renders_the_whole_building(fp, win, monkeypatch):
+    """R6.a (0197-ruling.md sec4) reverses D68 here: the 3D popup renders
+    EVERY level, by default.
 
-    THE ID IS NOT THE NAME, and that is the trap this pins. `build_model`
-    filters by level **id** (`L1`, `L2`); `active_floor` is the level **name**
-    (`default`, `second`). Passing the name straight through matches nothing and
-    renders an EMPTY model with a note nobody reads -- a silent blank window,
-    worse than the defect. So the assertion is on the RESOLVED ids, and it fails
-    both ways: if the filter is dropped (every level) and if it is wrong (none).
+    D68 scoped it to the active floor because every level rendered at one
+    height -- "an image that lied" -- and R6.0 (D50 closed, 0198-report.md)
+    is what stopped it lying: `elevation_in` survives the round trip now,
+    and `build_model` stacks storeys by it. So this call site stops
+    narrowing: `build_model` is called with `levels` unset. D68's boundary
+    rule still governs -- scope is a `build_model` parameter, never a mesh
+    filter -- and `levels=` stays for D69's panel to ask for one floor.
+
+    THE ID IS NOT THE NAME is still the trap worth pinning: `build_model`
+    filters by level **id** (`L1`, `L2`); `active_floor` is the level
+    **name** (`default`, `second`). A future narrowing that passed the name
+    straight through would render an EMPTY model -- so the fixture keeps
+    ids and names distinct, and the assertion is that NO filter is passed
+    at all, which is the only value that cannot be a mis-mapped one.
     """
     from pathlib import Path
 
-    plan = Path(__file__).resolve().parent.parent / "examples" \
-        / "roundedMultifloor.json"
+    plan = Path(__file__).resolve().parent.parent / "examples"         / "roundedMultifloor.json"
     win.load_path(str(plan))
 
     doc = win.design_document()
     ids = {lv["id"] for lv in doc["levels"]}
     names = {lv["name"] for lv in doc["levels"]}
     assert len(ids) > 1, "precondition: this fixture must be multi-floor"
-    assert not (ids & names), \
-        "precondition: ids and names must differ, or this pins nothing"
+    assert not (ids & names),         "precondition: ids and names must differ, or this pins nothing"
 
     seen = {}
 
@@ -584,9 +591,7 @@ def test_the_3d_view_renders_only_the_active_floor(fp, win, monkeypatch):
     except ImportError:
         pass
 
-    want = [lv["id"] for lv in doc["levels"]
-            if lv["name"] == win.active_floor]
-    assert seen.get("levels") == want, (
-        f"the 3D view must be scoped to the active floor {win.active_floor!r} "
-        f"-> {want}, got {seen.get('levels')!r}")
-    assert seen["levels"], "an empty filter renders a BLANK view, not all floors"
+    assert "levels" in seen, "the popup did not build a model"
+    assert seen["levels"] is None, (
+        f"the 3D view must render the whole building (levels unset), "
+        f"got {seen['levels']!r}")

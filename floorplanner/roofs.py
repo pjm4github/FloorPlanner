@@ -88,14 +88,53 @@ def apply_roof_visibility(scene):
         return
     show = bool(SETTINGS.get("show_roofs", True))
     edit = _roofs_editable()
+    active = active_floor()
     for it in scene.items():
         if not isinstance(it, RoofItem):
             continue
         mode = floor_display_mode(it.floor)
-        it.setVisible(mode != "hidden" and show)
+        # R6.a (0197-ruling.md sec4, Patrick's own display rule): this
+        # level's roofs draw solid; a roof on ANY other level that covers
+        # this level's rooms draws ghosted -- even with "show other floors"
+        # off, since the roof over a room is a fact about that room's
+        # plan. paint() already ghosts every non-active floor's roof; this
+        # only decides whether it is shown at all. Never editable from
+        # another level (R6.c owns the roof tool across levels).
+        covering = (mode == "hidden" and it.floor != active
+                    and roof_covers_floor(scene, it, active))
+        it.setVisible((mode != "hidden" or covering) and show)
         it.setEnabled(mode == "active" and show and edit)
         if not edit:
             it.setSelected(False)
+
+
+def roof_covers_floor(scene, roof, floor) -> bool:
+    """R6.a (0197-ruling.md sec4): does `roof`'s footprint (eaves and
+    overhang, the region it paints) cover a room on `floor`? The SAME
+    overlap rule R4b's `bound_eaves_height` uses to say which rooms a roof
+    sits on -- an intersection thicker than `_COVER_MIN_IN` on both axes,
+    so a shared wall face's sliver is not coverage -- reused rather than
+    a second predicate that could disagree with it (the ruling's own
+    reason). Rooms on `floor` only; nothing about heights: whether the
+    roof is above or below that level is R6.b's composition, not the
+    plan's display rule."""
+    from floorplanner.rooms import RoomItem  # late (peer layer)
+    if scene is None or sip.isdeleted(roof):
+        return False
+    fp = QPainterPath()
+    fp.addPolygon(QPolygonF([QPointF(p.x(), p.y())
+                             for p in footprint_polygon(roof)]))
+    fp.closeSubpath()
+    for it in scene.items():
+        if (not isinstance(it, RoomItem) or sip.isdeleted(it)
+                or getattr(it, "floor", None) != floor):
+            continue
+        inter = it.path.intersected(fp)
+        br = inter.boundingRect()
+        if (not inter.isEmpty() and br.width() >= _COVER_MIN_IN
+                and br.height() >= _COVER_MIN_IN):
+            return True
+    return False
 
 
 def nearest_eaves_wall(scene, p1: QPointF, p2: QPointF, floor, exclude=None):
