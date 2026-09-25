@@ -511,6 +511,48 @@ def meet_along(rf, origin, direction, height, max_t=None):
     return None
 
 
+def rising_reach(rf, origin, direction, max_t=None):
+    """0195-ruling.md sec2: how far along the ray from `origin` in unit
+    `direction` `rf`'s surface keeps STRICTLY RISING while the point stays
+    inside `rf`'s footprint -- the interval on which `meet_along` is the
+    exact inverse of "read the height here": past the crest (the host's
+    ridge line, or a hip end's descending run) a height read is one the
+    surface already reached nearer the origin, so a derivation would land
+    short of the point; past the footprint the planes merely continue
+    and are nobody's roof. 0.0 when the origin is outside the footprint
+    or the surface does not rise from it at all. Half-inch steps bracket
+    the end (a piecewise-affine surface changes slope at a finite set of
+    lines), bisection then finds it to ~1e-9 (the rising test is a
+    nano-inch finite difference, so the end lands that far short of the
+    crest, never past it) -- `meet_along`'s own method."""
+    fp = footprint_polygon(rf)
+    if max_t is None:
+        max_t = 2.0 * _diagonal(fp)
+
+    def at(t):
+        return Pt(origin.x() + direction.x() * t, origin.y() + direction.y() * t)
+
+    def h(t):
+        return surface_height(rf, at(t))
+
+    def rising_at(t):
+        return _contains(fp, at(t)) and h(t + 1e-9) > h(t) + 1e-13
+
+    if not rising_at(0.0):
+        return 0.0
+    step, t = 0.5, 0.0
+    while t + step <= max_t and rising_at(t + step) and h(t + step) > h(t):
+        t += step
+    lo, hi = t, t + step
+    for _ in range(60):
+        mid = (lo + hi) / 2.0
+        if rising_at(mid) and h(mid) > h(lo):
+            lo = mid
+        else:
+            hi = mid
+    return lo
+
+
 def footprint_polygon(rf, ext=(0.0, 0.0)):
     """The outer eave rectangle (overhang and hip extensions included) --
     the region the roof paints, and the domain of its surface -- as a

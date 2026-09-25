@@ -17,7 +17,7 @@ from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.roofclip import (
     Pt, _contains, compute_roof_clips, footprint_polygon, meet_along,
-    surface_height,
+    rising_reach, surface_height,
 )
 from floorplanner.walls import WallItem
 
@@ -1296,8 +1296,18 @@ class RoofItem(QGraphicsItem):
             # grip sets the RIDGE HEIGHT -- the dragged point (on the grid
             # along the ridge) is where the ridge is to meet the host, and
             # the ridge height becomes the host's surface there; the
-            # rebuild then derives the back end onto that very point.
-            a = max(MIN_RIDGE_LEN_IN, landed)
+            # rebuild then derives the back end onto that very point --
+            # ON THE RISING SIDE ONLY (0195-ruling.md sec2): past the host's
+            # crest, or its footprint, a height read there is one the host
+            # already reached nearer the face, and the derivation would fold
+            # the end back short of the cursor. So the drag is clamped to
+            # `rising_reach`: the grip tracks the cursor everywhere it can
+            # go and stops dead where it cannot.
+            reach = rising_reach(self.host, Pt(self.p1.x(), self.p1.y()),
+                                 Pt(ux, uy))
+            if reach < MIN_RIDGE_LEN_IN:
+                return                          # nowhere to rise to: refused
+            a = min(max(MIN_RIDGE_LEN_IN, landed), reach)
             pt = QPointF(self.p1.x() + ux * a, self.p1.y() + uy * a)
             h = surface_height(self.host, Pt(pt.x(), pt.y()))
             if h > self.eaves_h_in + 1.0:

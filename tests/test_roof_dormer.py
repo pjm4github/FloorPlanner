@@ -186,6 +186,62 @@ def test_the_back_end_grip_sets_the_ridge_height_from_the_host_plane(scene):
     assert d.ridge_h_in == pytest.approx(123.0)
 
 
+def test_the_back_end_grip_short_of_the_crest_lands_on_the_cursor(scene):
+    """0195-ruling.md sec2, the pinned side: on the RISING side of the host
+    the drag is the exact inverse of the derivation -- the back end lands
+    on the dragged point to 1e-9."""
+    from floorplanner.roofs import GRIP_END_OFFSET_IN
+    _room(scene)
+    host = _host(scene)
+    d = _dormer(scene, host)
+    for y_t in (156.0, 144.0, 108.0):              # on the 6in grid; crest at y=100
+        d.drag_end(1, QPointF(200, y_t - GRIP_END_OFFSET_IN))
+        assert d.p2.x() == pytest.approx(200.0, abs=1e-9)
+        assert d.p2.y() == pytest.approx(y_t, abs=1e-9)
+        assert d.ridge_h_in == pytest.approx(150.0 - HOST_SLOPE * (y_t - 100.0))
+
+
+def test_the_back_end_grip_past_the_crest_lands_on_the_clamp_not_short_of_it(scene):
+    """0195 sec2's fail-first: past the host's crest the surface falls, and
+    a height read there was already reached nearer the face -- unclamped,
+    the derived end folded back SHORT of the cursor. Clamped to the rising
+    side, a drag past the crest lands ON the crest (a = 90, plan y=100),
+    the ridge at the host's own ridge height, and a further drag stays
+    there."""
+    from floorplanner.roofs import GRIP_END_OFFSET_IN
+    _room(scene)
+    host = _host(scene)
+    d = _dormer(scene, host)
+    d.drag_end(1, QPointF(200, 190 - 120.0 - GRIP_END_OFFSET_IN))   # 30in past the crest
+    assert d.ridge_h_in == pytest.approx(150.0, abs=1e-8)
+    assert d.p2.y() == pytest.approx(100.0, abs=1e-6), "landed short of the clamp"
+    d.drag_end(1, QPointF(200, 190 - 170.0 - GRIP_END_OFFSET_IN))   # further still
+    assert d.p2.y() == pytest.approx(100.0, abs=1e-6)
+
+
+def test_the_back_end_grip_past_the_host_footprint_is_clamped_at_its_edge(scene):
+    """A dormer near the host's gable end whose ridge runs diagonally
+    (Shift) leaves the host's footprint while the surface is still rising:
+    the drag is clamped at the footprint's edge, and the height is the
+    host's surface THERE -- never a height off a plane continued past the
+    footprint (`surface_height`'s "callers never ask there")."""
+    from floorplanner.roofclip import Pt, footprint_polygon, _contains
+    from floorplanner.roofs import GRIP_END_OFFSET_IN
+    _room(scene)
+    host = _host(scene)                            # footprint x in [0, 400] (gable ends)
+    u = (0.5 ** 0.5, -(0.5 ** 0.5))
+    d = _dormer(scene, host, face=QPointF(380, 190),
+                back=QPointF(380 + u[0] * 12, 190 + u[1] * 12),
+                eaves_h=100.0, ridge_h=104.0)
+    far = 60.0                                     # the edge x=400 is 28.3in along
+    d.drag_end(1, QPointF(380 + u[0] * (far + GRIP_END_OFFSET_IN),
+                          190 + u[1] * (far + GRIP_END_OFFSET_IN)))
+    assert _contains(footprint_polygon(host), Pt(d.p2.x(), d.p2.y()), tol=1e-6)
+    assert d.p2.x() == pytest.approx(400.0, abs=1e-6)
+    h_at_edge = 150.0 - HOST_SLOPE * abs(d.p2.y() - 100.0)
+    assert d.ridge_h_in == pytest.approx(h_at_edge, abs=1e-6)
+
+
 def test_deleting_the_host_deletes_its_dormers(scene):
     _room(scene)
     host = _host(scene)

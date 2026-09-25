@@ -103,3 +103,61 @@ def test_the_roof_meshes_are_unchanged_by_the_host_field(fp3d):
     a = next(m for m in with_host.meshes if m.name == "roofs")
     b = next(m for m in without.meshes if m.name == "roofs")
     assert np.array_equal(a.verts, b.verts) and np.array_equal(a.faces, b.faces)
+
+
+# --------------------------------------------------------------------------
+# 0195-ruling.md sec3: what closes the dormer below its eaves -- named and probed
+# --------------------------------------------------------------------------
+def _seg_hits(verts, faces, a, b):
+    """Segment a->b against every triangle (Moller-Trumbore): the hit count."""
+    a = np.array(a, float)
+    b = np.array(b, float)
+    d = b - a
+    v0, v1, v2 = verts[faces[:, 0]], verts[faces[:, 1]], verts[faces[:, 2]]
+    e1, e2 = v1 - v0, v2 - v0
+    p = np.cross(d, e2)
+    det = np.einsum("ij,ij->i", e1, p)
+    ok = np.abs(det) > 1e-12
+    inv = np.where(ok, 1.0 / np.where(ok, det, 1.0), 0.0)
+    t_ = a - v0
+    u = np.einsum("ij,ij->i", t_, p) * inv
+    q = np.cross(t_, e1)
+    v = np.einsum("j,ij->i", d, q) * inv
+    t = np.einsum("ij,ij->i", e2, q) * inv
+    hit = ok & (u >= -1e-9) & (v >= -1e-9) & (u + v <= 1 + 1e-9) & (t >= 0) & (t <= 1)
+    return int(hit.sum())
+
+
+# rays CROSSING each plane inside the gap between the host's surface and the
+# dormer's eaves (world = (x, -y, z)): the left eaves plane x=170 and the
+# right x=230 at plan y=180 (host 106.8, eaves 116 -> z=111); the front y=190
+# at x=200 and x=225 (host 101.4, eaves 116 -> z=108), along y across it
+_GAP_RAYS = {
+    "left eaves plane": ((165, -180, 111), (175, -180, 111)),
+    "right eaves plane": ((225, -180, 111), (235, -180, 111)),
+    "front, at the ridge": ((200, -195, 108), (200, -185, 108)),
+    "front, near a corner": ((225, -195, 108), (225, -185, 108)),
+}
+
+
+def _roof_hits(fp3d):
+    model = fp3d.build_model(_doc(), furnishings=False, floors=False)
+    roof = next(m for m in model.meshes if m.name == "roofs")
+    return {name: _seg_hits(roof.verts, roof.faces, a, b)
+            for name, (a, b) in _GAP_RAYS.items()}
+
+
+def test_the_dormer_is_closed_below_its_eaves_by_the_cross_roof_risers(fp3d, monkeypatch):
+    """The closure, named: R4f's `_cross_roof_risers` -- the double-sided
+    riser quads drawn along every boundary where two roofs' territories
+    meet at UNEQUAL height (a boundary that is not a seam). The dormer's
+    two eaves lines and its face are exactly such boundaries against the
+    host, so the risers span from the host's surface up to the dormer's
+    eaves along all three. Probed: a ray crossing each plane inside the
+    gap hits the mesh; with the risers removed the same rays hit nothing
+    -- so it is the risers, and nothing else, that close the dormer."""
+    with_risers = _roof_hits(fp3d)
+    assert all(n > 0 for n in with_risers.values()), with_risers
+    monkeypatch.setattr(fp3d, "_cross_roof_risers", lambda *a, **k: [])
+    without = _roof_hits(fp3d)
+    assert all(n == 0 for n in without.values()), without
