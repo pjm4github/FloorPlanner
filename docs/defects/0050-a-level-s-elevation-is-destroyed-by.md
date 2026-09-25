@@ -4,8 +4,8 @@ id: 50
 title: "A level's elevation is DESTROYED by a load/save round trip"
 
 # maps directly onto GitHub Issues fields
-state: open
-state_reason: null
+state: closed
+state_reason: completed
 labels:
   - type:defect
   - area:io
@@ -13,8 +13,8 @@ milestone: null
 
 # ours; becomes body prose after migration
 opened: 2026-08-07
-closed: null
-closed_by: null
+closed: 2026-09-25
+closed_by: b8475b7
 rank: 51
 related: []
 state_source: row
@@ -86,7 +86,9 @@ feature that creates storeys cannot be built on a model with no storey height.
 
 ## Receipt
 
-*(Open.)* **Tier AMBER.** Acceptance is a `--list-levels` comparison across a
+**CLOSED 2026-09-25 -- R6.0, [`handoff/0197-ruling.md`](../handoff/0197-ruling.md) sec2, [`handoff/0198-report.md`](../handoff/0198-report.md).** The loader was measured first and was lossy too (`Floor` had nowhere to put the two numbers); `model.Floor` gained `elevation_in`/`height_in`, the loader and the three writers read them, a new level defaults to the level below's elevation plus its height (stored, not derived), and Floors > floor > "Elevation and height..." edits both. The receipt below runs as `tests/test_levels_elevation.py` across all five multifloor plans.
+
+*(As written when open.)* **Tier AMBER.** Acceptance is a `--list-levels` comparison across a
 load/save round trip: set a level's `elevation_in` and `height_in`, open the
 plan, save it, and read the levels back — the values must be the ones that went
 in. The measurement above is the failing half of exactly that test.
