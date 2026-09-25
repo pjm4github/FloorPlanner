@@ -161,16 +161,31 @@ class Furnishing:
 
 @dataclass
 class Floor:
+    """A storey. R6.0 (0197-ruling.md sec2, closing D50): `elevation_in` and
+    `height_in` are the document's own `level.elevation_in` / `height_in`
+    -- STORED on the roster, never derived, because every writer used to
+    emit literals for want of a field to read, and a real elevation in a
+    file was destroyed by being opened (D50). `height_in` is the STOREY
+    height: `viewer/fp3d.py` reads it as the level's wall top (base +
+    height, still capped per wall type by `WALL_H`), and every roof
+    height sits on the level base `elevation_in` (0140-ruling.md sec3);
+    nothing in the 2D editor reads either today."""
     name: str = DEFAULT_FLOOR
     reference: bool = False
+    elevation_in: float = 0.0
+    height_in: float = 96.0
 
     @classmethod
     def from_dict(cls, d: dict) -> "Floor":
         return cls(name=d.get("name", DEFAULT_FLOOR),
-                   reference=bool(d.get("reference", False)))
+                   reference=bool(d.get("reference", False)),
+                   elevation_in=float(d.get("elevation_in", 0.0)),
+                   height_in=float(d.get("height_in", 96.0)))
 
     def to_dict(self) -> dict:
-        return {"name": self.name, "reference": self.reference}
+        return {"name": self.name, "reference": self.reference,
+                "elevation_in": float(self.elevation_in),
+                "height_in": float(self.height_in)}
 
 
 # ---------------------------------------------------------------------------

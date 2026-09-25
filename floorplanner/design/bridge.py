@@ -870,9 +870,11 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
     wall_of_item = {}
     for f in roster:                       # LEVELS OUTER -- see the module note
         lid = nid("L")
-        levels.append({"id": lid, "name": f.name, "elevation_in": 0.0,
-                       "height_in": 96.0, "kind": "storey",
-                       "reference": bool(f.reference)})
+        # R6.0 (D50): the roster's own elevation and height, not literals
+        levels.append({"id": lid, "name": f.name,
+                       "elevation_in": float(getattr(f, "elevation_in", 0.0)),
+                       "height_in": float(getattr(f, "height_in", 96.0)),
+                       "kind": "storey", "reference": bool(f.reference)})
         items = buckets.get(f.name, [])    # ...ITEMS INNER, and only these
         # P4.2: a FLOATING room folds among its own items only. The lift's
         # "coincident coordinates are one corner" rule is exactly the sharing
@@ -1024,6 +1026,20 @@ def _prune_spurs(ids):
     return out
 
 
+def _floor_levels(scene, floor_name):
+    """`(elevation_in, height_in)` of the named floor on the window that owns
+    `scene`, or the defaults when the scene has no window (a bare test
+    scene) -- R6.0 (D50): even the throwaway detect design reads the roster
+    rather than emitting a literal."""
+    for view in (scene.views() if scene is not None else []):
+        win = getattr(view, "win", None)
+        for f in getattr(win, "floors", []) or []:
+            if f.name == floor_name:
+                return (float(getattr(f, "elevation_in", 0.0)),
+                        float(getattr(f, "height_in", 96.0)))
+    return 0.0, 96.0
+
+
 def face_at(scene, point, floor=None):
     """The wall-graph face enclosing `point`, as `[(QPointF corner, WallItem
     covering the edge that STARTS there), ...]`, or None.
@@ -1076,9 +1092,10 @@ def face_at(scene, point, floor=None):
     if not walls:
         return None
     used = {v for w in walls for v in (w["v1"], w["v2"])}
+    elev, height = _floor_levels(scene, floor or active_floor())
     design = Design.from_dict({
-        "levels": [{"id": lid, "name": "detect", "elevation_in": 0.0,
-                    "height_in": 96.0, "kind": "storey"}],
+        "levels": [{"id": lid, "name": "detect", "elevation_in": elev,
+                    "height_in": height, "kind": "storey"}],
         "vertices": [r for r in vt.rows if r["id"] in used],
         "walls": walls, "rooms": [], "furnishings": [],
     })
@@ -1197,8 +1214,13 @@ def apply_design_to_scene(target, design, report=None, strict=False,
     levels = doc.get("levels") or [{"id": "L1", "name": DEFAULT_FLOOR}]
     lname = {lv["id"]: lv.get("name", DEFAULT_FLOOR) for lv in levels}
     if win is not None:
+        # R6.0 (D50, measured first at 0198-report.md sec1): the loader used
+        # to drop both fields on the way in -- `Floor` had nowhere to put
+        # them -- so a writer fixed alone would still round-trip to 0.0
         win.floors = [Floor(lv.get("name", DEFAULT_FLOOR),
-                            bool(lv.get("reference", False))) for lv in levels]
+                            bool(lv.get("reference", False)),
+                            float(lv.get("elevation_in", 0.0)),
+                            float(lv.get("height_in", 96.0))) for lv in levels]
         # active_floor is view state and is not carried by the document; keep
         # the current one when the new roster still has it
         # active_floor is VIEW state. The v5 root is a closed schema, so a saved

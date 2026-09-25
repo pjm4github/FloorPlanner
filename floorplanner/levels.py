@@ -186,6 +186,10 @@ class LevelsMixin:
             a_edit.triggered.connect(lambda _=False, n=f.name: self.switch_floor(n))
             a_ren = sub.addAction("Rename…")
             a_ren.triggered.connect(lambda _=False, n=f.name: self.rename_floor(n))
+            a_lev = sub.addAction(f"Elevation and height…  "
+                                  f"({fmt_in(f.elevation_in)} / {fmt_in(f.height_in)})")
+            a_lev.triggered.connect(
+                lambda _=False, n=f.name: self.edit_floor_levels(n))
             a_ref = sub.addAction("Reference floor")
             a_ref.setCheckable(True)
             a_ref.setChecked(f.reference)
@@ -291,7 +295,13 @@ class LevelsMixin:
         of new_floor (also used by tests)."""
         if self._floor(name) is not None:
             return
-        self.floors.append(Floor(name))
+        # R6.0 (0197-ruling.md sec2 item 3): a new level DEFAULTS to the level
+        # below's elevation plus its height -- stored and written, never
+        # derived on read (D50's own refusal of an invented number)
+        below = self.floors[-1] if self.floors else Floor(DEFAULT_FLOOR)
+        self.floors.append(Floor(name,
+                                 elevation_in=below.elevation_in + below.height_in,
+                                 height_in=below.height_in))
         self.active_floor = name               # switch to it
         self._sync_floor_state()
         self._commit_floor_change()
@@ -320,6 +330,33 @@ class LevelsMixin:
             self.active_floor = new
         self._sync_floor_state()
         self._commit_floor_change()
+
+    def set_floor_levels(self, name, elevation_in, height_in):
+        """R6.0 (D50): set a floor's storey elevation and height -- a roster
+        edit, so an undo step and dirty like rename/reference. The
+        non-interactive core of `edit_floor_levels` (also what a test
+        drives). Returns False when the floor is unknown or the height is
+        not positive."""
+        f = self._floor(name)
+        if f is None or float(height_in) <= 0.0:
+            return False
+        f.elevation_in = float(elevation_in)
+        f.height_in = float(height_in)
+        self._sync_floor_state()
+        self._commit_floor_change()
+        self.status(f"Floor '{name}': elevation {fmt_in(f.elevation_in)}, "
+                    f"height {fmt_in(f.height_in)}.")
+        return True
+
+    def edit_floor_levels(self, name):
+        """Floors ▸ <floor> ▸ Elevation and height… -- the dialog door."""
+        from floorplanner.dialogs import FloorLevelsDialog  # late: cycle guard
+        f = self._floor(name)
+        if f is None:
+            return
+        dlg = FloorLevelsDialog(f, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.set_floor_levels(name, *dlg.values())
 
     def toggle_reference_floor(self, name):
         f = self._floor(name)

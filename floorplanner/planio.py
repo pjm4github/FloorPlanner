@@ -228,7 +228,8 @@ class PlanIOMixin:
         # restore the floor roster + active floor from the model, and prime the
         # runtime cache NOW so items created during this load default to the
         # right active floor (each item's floor is then overridden from the file).
-        self.floors = [Floor(f.name, f.reference) for f in project.floors]
+        self.floors = [Floor(f.name, f.reference, f.elevation_in, f.height_in)
+                       for f in project.floors]
         self.active_floor = project.active_floor
         set_floor_state(active=self.active_floor)
         self._z_top = 0                  # bring-to-front counter resets per doc
@@ -380,7 +381,8 @@ class PlanIOMixin:
         return Project(version=FILE_VERSION, units="inches",
                        settings=dict(SETTINGS), walls=walls, rooms=rooms,
                        furnishings=furnishings,
-                       floors=[Floor(f.name, f.reference) for f in self.floors],
+                       floors=[Floor(f.name, f.reference, f.elevation_in,
+                                     f.height_in) for f in self.floors],
                        active_floor=self.active_floor)
 
     def snapshot(self, report=None) -> dict:

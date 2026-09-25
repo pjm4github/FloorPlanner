@@ -180,8 +180,11 @@ def import_legacy(src, tool="floorplanner.design.importer", design_name=None,
     for f in lv_in:
         lid = nid("L")
         lvl_id[f.get("name", "default")] = lid
+        # R6.0 (D50): a legacy floor record may carry the storey's own
+        # elevation and height (`model.Floor.to_dict` writes them now)
         levels.append({"id": lid, "name": f.get("name", "default"),
-                       "elevation_in": 0.0, "height_in": 96.0,
+                       "elevation_in": float(f.get("elevation_in", 0.0)),
+                       "height_in": float(f.get("height_in", 96.0)),
                        "kind": "storey",
                        "reference": bool(f.get("reference", False))})
     L0 = levels[0]["id"]

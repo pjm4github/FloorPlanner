@@ -907,6 +907,46 @@ class _EndOnCanvas(QWidget):
             p.drawText(eave_r + QPointF(6, 20), f"P' {self.pitch_deg(1):.1f}°")
 
 
+class FloorLevelsDialog(QDialog):
+    """Floors ▸ <floor> ▸ Elevation and height… (R6.0, 0197-ruling.md sec2,
+    closing D50): the storey's own two numbers, both measured in inches
+    from the building's datum -- the elevation of the level's base, and
+    the storey height (its wall top in 3D). A basement's elevation may be
+    negative. Nothing here is derived: what is typed is what is written."""
+
+    def __init__(self, floor, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Floor '{floor.name}': elevation and height")
+        form = QFormLayout(self)
+        self.sp_elev = QDoubleSpinBox()
+        self.sp_elev.setRange(-1200.0, 2400.0)
+        self.sp_elev.setDecimals(1)
+        self.sp_elev.setSuffix(" in")
+        self.sp_elev.setValue(float(floor.elevation_in))
+        form.addRow("Elevation of the level's base", self.sp_elev)
+        self.sp_height = QDoubleSpinBox()
+        self.sp_height.setRange(12.0, 600.0)
+        self.sp_height.setDecimals(1)
+        self.sp_height.setSuffix(" in")
+        self.sp_height.setValue(float(floor.height_in))
+        form.addRow("Storey height", self.sp_height)
+        note = QLabel("Both from the building's datum, in inches. A new floor "
+                      "starts at the floor below's elevation plus its height; "
+                      "edit either here. The 3D view stacks levels by elevation "
+                      "and reads the storey height as the level's wall top.")
+        note.setWordWrap(True)
+        note.setStyleSheet("color: #666;")
+        form.addRow(note)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        form.addRow(buttons)
+
+    def values(self):
+        return float(self.sp_elev.value()), float(self.sp_height.value())
+
+
 class RoofEndOnDialog(QDialog):
     """The End-On marker's dialog (0140-ruling.md, R2b): a live end-on
     drawing with three editable values -- ridge height, eaves height,

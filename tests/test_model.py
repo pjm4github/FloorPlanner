@@ -23,8 +23,8 @@ def _sample_dict() -> dict:
         "version": FILE_VERSION,
         "units": "inches",
         "settings": {"wall_snap_in": 6.0, "auto_coalesce": True},
-        "floors": [{"name": "default", "reference": False},
-                   {"name": "Upper", "reference": True}],
+        "floors": [{"name": "default", "reference": False, "elevation_in": 0.0, "height_in": 96.0},
+                   {"name": "Upper", "reference": True, "elevation_in": 0.0, "height_in": 96.0}],
         "walls": [
             {"type": "interior", "p1": [0.0, 0.0], "p2": [0.0, 96.0],
              "rooms": ["Bath", "Kitchen"], "openings": [], "floor": "default"},
@@ -118,8 +118,8 @@ def test_floors_emitted_but_active_floor_is_not():
     proj.floors = [Floor("default"), Floor("Upper", reference=True)]
     proj.active_floor = "Upper"
     out = proj.to_dict()
-    assert out["floors"] == [{"name": "default", "reference": False},
-                             {"name": "Upper", "reference": True}]
+    assert out["floors"] == [{"name": "default", "reference": False, "elevation_in": 0.0, "height_in": 96.0},
+                             {"name": "Upper", "reference": True, "elevation_in": 0.0, "height_in": 96.0}]
     assert "active_floor" not in out
     assert all("floor" in w for w in out["walls"])
     assert all("floor" in r for r in out["rooms"])
