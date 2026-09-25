@@ -216,3 +216,27 @@ def test_the_qml_document_ships_beside_the_module():
                  if ln.strip().startswith('"floorplanner.viewer"')), None)
     assert line is not None, "floorplanner.viewer has no package-data entry"
     assert "scene.qml" in line, line
+
+
+def test_the_popup_builds_the_whole_building_not_the_active_floor(win, monkeypatch):
+    """R6.a (0197-ruling.md sec4): the 3D view defaults to the whole
+    building. D68 narrowed it to the active floor because every level
+    rendered at one height; R6.0 (D50 closed) stopped that, and this is
+    the one call site ceasing to narrow -- `build_model` is called with
+    no `levels=`. The spy wraps the real builder so the popup still runs."""
+    import floorplanner.viewer.fp3d as fp3d_mod
+    _plan(win)
+    win.new_floor_named("Upper")
+    win.switch_floor("Upper")
+    seen = {}
+    real = fp3d_mod.build_model
+
+    def _spy(doc, *a, **k):
+        seen["levels"] = k.get("levels", a[0] if a else None)
+        return real(doc, *a, **k)
+
+    monkeypatch.setattr(fp3d_mod, "build_model", _spy)
+    _close_modal_soon()
+    win.show_3d_view()
+    assert "levels" in seen, "the popup did not build a model"
+    assert seen["levels"] is None, f"the popup narrowed to {seen['levels']!r}"

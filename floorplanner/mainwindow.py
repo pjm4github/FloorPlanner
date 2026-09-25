@@ -757,9 +757,15 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         # reads -- a silent blank window, which is worse than the defect. The
         # mapping is done here, and a floor with no matching level falls back to
         # the whole document rather than to nothing.
-        want = [lv["id"] for lv in doc.get("levels", [])
-                if lv.get("name") == self.active_floor] or None
-        model = build_model(doc, levels=want)
+        # R6.a (0197-ruling.md sec4): THE WHOLE BUILDING, by default. D68's
+        # narrowing above rested on every level rendering at one height --
+        # "an image that lied" -- and R6.0 (D50 closed, 0198-report.md)
+        # is what stopped it lying: `elevation_in` now survives the round
+        # trip and `build_model` stacks storeys by it. D68's boundary rule
+        # still governs -- scope is a `build_model` parameter, never a
+        # mesh filter -- and `levels=` stays for D69's panel to ask for
+        # one floor again; this call site simply stops asking.
+        model = build_model(doc)
         dlg = QDialog(self)
         dlg.setWindowTitle("3D view")
         lay = QVBoxLayout(dlg)
