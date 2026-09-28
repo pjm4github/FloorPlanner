@@ -73,6 +73,18 @@ class LevelsMixin:
     def _floor(self, name):
         return next((f for f in self.floors if f.name == name), None)
 
+    def _settle_gesture(self):
+        """R6.c: a gesture belongs to the level it began on, so it is settled
+        BEFORE the level being edited changes -- a drag in progress is
+        dropped, and a ridge released but still awaiting its eaves pick is
+        completed against its own level's walls (`cancel_temp`, the same
+        settling a tool switch gets). Measured before this: the pending
+        ridge survived the switch and took its eaves from a wall of the
+        level switched TO."""
+        view = getattr(self, "view", None)
+        if view is not None:
+            view.cancel_temp()
+
     def _repair_floor_stack(self):
         """The display stack (bottom → top), kept in step with the roster:
         deleted floors drop out, new floors join at the TOP of the ghost
@@ -277,6 +289,7 @@ class LevelsMixin:
         step, no dirty (serialize() is unchanged across a switch)."""
         if self._floor(name) is None or name == self.active_floor:
             return
+        self._settle_gesture()
         self.active_floor = name
         self._sync_floor_state()
         self.status(f"Editing floor '{name}'.")
@@ -306,6 +319,7 @@ class LevelsMixin:
         # R6.0 (0197-ruling.md sec2 item 3): a new level DEFAULTS to the level
         # below's elevation plus its height -- stored and written, never
         # derived on read (D50's own refusal of an invented number)
+        self._settle_gesture()
         below = self.floors[-1] if self.floors else Floor(DEFAULT_FLOOR)
         self.floors.append(Floor(name,
                                  elevation_in=below.elevation_in + below.height_in,
@@ -388,6 +402,7 @@ class LevelsMixin:
                       if getattr(it, "floor", None) == name)
         if self._confirm_floor_delete(name, n_items) is False:
             return
+        self._settle_gesture()
         for it in list(self.scene.items()):  # remove this floor's items
             if getattr(it, "floor", None) == name and it.parentItem() is None:
                 self.scene.removeItem(it)
