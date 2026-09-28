@@ -30,7 +30,7 @@ from floorplanner.model import (  # serialization bridge (aliased)
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
 from floorplanner.macro import *  # noqa: F401
-from floorplanner.roofs import apply_roof_visibility
+from floorplanner.roofs import apply_roof_visibility, sync_roof_clips
 
 
 class LevelsMixin:
@@ -48,11 +48,19 @@ class LevelsMixin:
         show_other_floors) into config's runtime cache, then re-apply
         visibility, floor stacking and repaint.  Cheap; called on init,
         load, and floor ops."""
+        # R6.b: the roster's elevations ride along, and a CHANGE of them
+        # re-composes the building's roofs (one roofscape, in absolute
+        # height) -- only a change, since this runs at every floor switch
+        elevations = {f.name: float(f.elevation_in) for f in self.floors}
+        relifted = elevations != floor_elevations()
         set_floor_state(
             active=self.active_floor,
             reference={f.name for f in self.floors if f.reference},
             show_others=self.show_other_floors,
+            elevations=elevations,
         )
+        if relifted:
+            sync_roof_clips(self.scene)
         apply_floor_visibility(self.scene)
         apply_roof_visibility(self.scene)   # R2c: layered on top, sec2
         self._apply_floor_stacking()

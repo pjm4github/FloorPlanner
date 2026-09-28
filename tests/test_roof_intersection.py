@@ -259,12 +259,19 @@ def test_removing_the_main_unclips_the_wing(scene):
     assert w.seams() == []
 
 
-def test_roofs_on_another_floor_do_not_clip(scene):
+def test_roofs_on_another_floor_compose_in_the_one_roofscape(scene):
+    """R6.b (0186-ruling.md sec4) reverses 0164 sec2's "same floor only":
+    the building has ONE roofscape, so roofs on different floors compose,
+    each at its own level's elevation. A bare scene knows no elevations,
+    so the two compose at one datum -- exactly the same-floor answer;
+    tests/test_r6b_composition.py carries the lifted cases."""
     m = _main(scene)
     w = _wing(scene)
     w.floor = "Second"
     sync_roof_clips(scene)
-    assert not w.is_clipped() and not m.is_clipped()
+    assert w.is_clipped() and m.is_clipped()
+    assert _pts(w.seams()) == {(140.0, 300.0), (260.0, 300.0),
+                               (200.0, round(APEX_Y, 3))}
 
 
 def test_coplanar_warning_reaches_the_item(scene):

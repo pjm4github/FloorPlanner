@@ -71,7 +71,7 @@ from floorplanner.items import (
 )
 from floorplanner.model import Floor
 from floorplanner.vertex import Vertex
-from floorplanner.roofs import RoofItem, nearest_eaves_wall
+from floorplanner.roofs import RoofItem, hold_roof_clips, nearest_eaves_wall
 from floorplanner.rooms import (
     OutlineEdge, RoomItem, poly_area_sqft, room_path_from_corners,
 )
@@ -1221,6 +1221,10 @@ def apply_design_to_scene(target, design, report=None, strict=False,
                             bool(lv.get("reference", False)),
                             float(lv.get("elevation_in", 0.0)),
                             float(lv.get("height_in", 96.0))) for lv in levels]
+        # R6.b: the roofs loaded below compose in ABSOLUTE height, so the
+        # elevations must be in the runtime cache before the first roof
+        # arrives -- not only when `_sync_floor_state` runs after the load
+        set_floor_state(elevations={f.name: f.elevation_in for f in win.floors})
         # active_floor is view state and is not carried by the document; keep
         # the current one when the new roster still has it
         # active_floor is VIEW state. The v5 root is a closed schema, so a saved
@@ -1357,6 +1361,10 @@ def apply_design_to_scene(target, design, report=None, strict=False,
     # roof exists (the host may follow it in the document); a dangling host
     # is reported and the record skipped -- never a silent floating roof.
     roof_by_id, dormer_hosts = {}, []
+    # R6.b: every roof added used to re-clip its floor; composing the whole
+    # building per roof is too dear, so the clips are held for the loop
+    # and the building composes ONCE, after the last host is resolved
+    hold_roof_clips(scene, True)
     for rfd in doc.get("roofs", []) or []:
         p1 = QPointF(*rfd["ridge"][0])
         p2 = QPointF(*rfd["ridge"][1])
@@ -1391,6 +1399,7 @@ def apply_design_to_scene(target, design, report=None, strict=False,
             continue
         item.host = host
         item.rebuild()             # derives the back end against the host
+    hold_roof_clips(scene, False)
 
     # GROUPS (P4.5, defect 3). Rebuilt last, once every member exists, and
     # only from ids the document actually resolved -- a group whose members

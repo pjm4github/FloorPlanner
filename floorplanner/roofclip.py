@@ -310,7 +310,22 @@ def _adjacent(a, b, tol: float = 1e-5) -> bool:
     midpoint of some edge of one lies on an edge of the other (either
     way round -- a short edge against a long one counts). Vertex counting
     is NOT enough: two cells can share exactly one corner and nothing
-    else, and the crossing-point bookkeeping can list a vertex twice."""
+    else, and the crossing-point bookkeeping can list a vertex twice.
+
+    A bounding-box rejection comes first (R6.b, 0200-report.md sec3): an
+    edge midpoint of one cell within `tol` of an edge of the other puts
+    the two boxes within `tol` of each other, so boxes further apart
+    than that cannot be adjacent -- a pure prefilter, no answer changes.
+    Composing a whole building asks this of tens of thousands of pairs
+    that are nowhere near each other; it was 97% of the clip's time."""
+    ax = [p.x() for p in a]
+    bx = [p.x() for p in b]
+    if min(ax) > max(bx) + tol or min(bx) > max(ax) + tol:
+        return False
+    ay = [p.y() for p in a]
+    by = [p.y() for p in b]
+    if min(ay) > max(by) + tol or min(by) > max(ay) + tol:
+        return False
     for x, y in ((a, b), (b, a)):
         n, m = len(x), len(y)
         for i in range(n):
@@ -443,6 +458,49 @@ class RoofGeom:
 # ---------------------------------------------------------------------------
 # the surface
 # ---------------------------------------------------------------------------
+class Lifted:
+    """A roof seen in ABSOLUTE height (R6.b, 0186-ruling.md sec4: "a roof's
+    surface is its level's `elevation_in` plus its own heights ... the same
+    rules, one more term in z; no new geometry class"). Wraps anything with
+    the roof geometry API -- a `RoofItem`, a `RoofGeom` -- and raises its
+    two heights by `dz`, its level's elevation; every other attribute is
+    the wrapped roof's own. Pitch is a DIFFERENCE of the two heights, so it
+    is untouched, and so is every plan quantity: only comparisons BETWEEN
+    roofs change, which is the whole point."""
+    __slots__ = ("_rf", "_dz")
+
+    def __init__(self, rf, dz):
+        object.__setattr__(self, "_rf", rf)
+        object.__setattr__(self, "_dz", float(dz))
+
+    @property
+    def roof(self):
+        return self._rf
+
+    @property
+    def ridge_h_in(self):
+        return self._rf.ridge_h_in + self._dz
+
+    @property
+    def eaves_h_in(self):
+        return self._rf.eaves_h_in + self._dz
+
+    def __getattr__(self, name):
+        return getattr(object.__getattribute__(self, "_rf"), name)
+
+
+def compose_building(roofs_and_elevations, diag=None) -> dict:
+    """R6.b: clip EVERY live roof of the building against every other, in
+    absolute height -- `[(roof, elevation_in of its level), ...]` in,
+    `{id(roof): RoofClip}` out (keyed by the roof given, not by its lifted
+    view). `compute_roof_clips` itself is unchanged; two roofs on one
+    level reduce to exactly what it always gave them, since a common `dz`
+    cancels in every comparison it makes."""
+    lifted = [Lifted(rf, dz) for rf, dz in roofs_and_elevations]
+    per = compute_roof_clips(lifted, diag=diag)
+    return {id(lf.roof): per[id(lf)] for lf in lifted}
+
+
 def _frame(rf):
     ux, uy, nx, ny = rf._axis()
     return rf.p1, ux, uy, nx, ny

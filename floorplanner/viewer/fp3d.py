@@ -897,7 +897,7 @@ def _prism_slab(corners_xyz, drop, bottom_z=None):
 
 
 def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
-                      to_top=False):
+                      to_top=False, level=None):
     """The solid piece of a wall over plan quad `corners_xy` (this file's
     world frame) between `z_lo` and `z_hi`, CAPPED AT THE ROOF SURFACE
     wherever a roof on its level is lower than `z_hi` -- Patrick's own
@@ -946,7 +946,15 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
     *"the walls of the dormer are being drawn down from the dormer. It
     should show only the roof line and intersect with the walls under
     it."* So there are no dormer walls of its own; the house walls under
-    it climb into its roof, the way a gable wall climbs into a gable."""
+    it climb into its roof, the way a gable wall climbs into a gable.
+
+    ACROSS LEVELS (R6.b). `terr` holds every roof of the BUILDING, each
+    entry `(geom, cells, dormer, level)` with `geom` lifted to absolute
+    height, so a wall on one level is capped by whichever roof is really
+    over it, whatever level that roof stands on -- a ground-storey roof
+    rising through the upper storey caps the upper walls it passes. The
+    CLIMB stays on the dormer's own level (`level` is the wall's): a wall
+    a storey below a dormer does not climb through the floor between."""
     if not terr or roofclip_mod is None:
         return [_box(corners_xy, z_lo, z_hi)]
     RC = roofclip_mod
@@ -963,7 +971,8 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         return not (max(cx) < bx0 or min(cx) > bx1
                     or max(cy) < by0 or min(cy) > by1)
 
-    nearby = [(geom, [c for c in cells if near(c)], dm) for geom, cells, dm in terr]
+    nearby = [(geom, [c for c in cells if near(c)], dm and lid == level)
+              for geom, cells, dm, lid in terr]
     nearby = [(g, cs, dm) for g, cs, dm in nearby if cs]
     if not nearby:
         return [_box(corners_xy, z_lo, z_hi)]
@@ -1551,7 +1560,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     # (Patrick, 2026-09-13: "clip the walls to the roof when viewing in 3D"),
     # so the walls need every roof's territory and surface before any wall
     # prism is built. The roof section below reuses `clips`/`riser_parts`.
-    clips, riser_parts, terr_by_level = {}, [], {}
+    clips, riser_parts, terr_all = {}, [], []
     if roofs:
         # The wall endpoints this roof's nearest-eaves search needs, in world
         # (x, y) -- a Qt-free duplicate of `roofs.py`'s `nearest_eaves_wall`
@@ -1614,19 +1623,31 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             # a dormer climb into its roof rather than being capped by it
             dormer_ids = {rf.get("id") for rf in doc.get("roofs", [])
                           if rf.get("host") is not None}
-            for lid, pairs in geoms_by_level.items():
-                per = ROOFCLIP.compute_roof_clips([g for _, g in pairs])
-                for rid, g in pairs:
-                    clips[rid] = (g, per[id(g)])
-                # the walls' own cap (below): each roof's TERRITORY on the
-                # level -- its visible region's cells when clipped, its
-                # whole footprint otherwise
-                terr_by_level[lid] = [
-                    (g, list(per[id(g)].region.cells)
-                     if per[id(g)].region is not None
-                     else [ROOFCLIP.footprint_polygon(g)],
-                     rid in dormer_ids)
-                    for rid, g in pairs]
+            # R6.b (0186-ruling.md sec4, ordered at 0197-ruling.md sec5): ONE
+            # ROOFSCAPE. Every roof of every built level composes against
+            # every other in ABSOLUTE height -- `Lifted` adds the level's
+            # own base to the two heights; the clip itself is unchanged.
+            # The meshes below still lift each roof's own (relative) geom
+            # by its own level base, so nothing in them moves; what changes
+            # is WHICH ground each roof owns, the risers between roofs of
+            # different levels, and which roof caps a wall.
+            every = [(rid, lid, g, ROOFCLIP.Lifted(g, base(lid)))
+                     for lid, pairs in geoms_by_level.items() for rid, g in pairs]
+            if every:
+                per = ROOFCLIP.compute_roof_clips([lf for _, _, _, lf in every])
+                for rid, _lid, g, lf in every:
+                    clips[rid] = (g, per[id(lf)])
+                # the walls' own cap (below): each roof's TERRITORY in the
+                # building -- its visible region's cells when clipped, its
+                # whole footprint otherwise -- with its ABSOLUTE surface
+                # and the level it stands on
+                terr_all = [
+                    (lf, list(per[id(lf)].region.cells)
+                     if per[id(lf)].region is not None
+                     else [ROOFCLIP.footprint_polygon(lf)],
+                     rid in dormer_ids, lid)
+                    for rid, lid, _g, lf in every]
+            if every:
                 # 0174-report.md's own honestly-measured residual, closed
                 # here rather than in roofclip.py: the joining-end
                 # candidacy shape's own width limit can seat one roof's
@@ -1641,14 +1662,15 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 # without touching which roof owns which 2D territory, so
                 # it cannot revisit the D85 regression two wider candidacy
                 # shapes already caused there.
-                z0 = base(lid)
+                # R6.b: absolute heights in, absolute heights out -- the
+                # lifted geoms already carry each level's base
                 for (px, py), (qx, qy), lo_p, lo_q, hi_p, hi_q in \
-                        _cross_roof_risers([(g, per[id(g)]) for _, g in pairs], ROOFCLIP):
+                        _cross_roof_risers([(lf, per[id(lf)])
+                                            for _, _, _, lf in every], ROOFCLIP):
                     # plan (x, y) -> this file's own world frame (x, -y, z)
                     riser_parts.append(_riser_quad(
                         (px, -py), (qx, -qy),
-                        z0 + lo_p - ROOF_T, z0 + lo_q - ROOF_T,
-                        z0 + hi_p, z0 + hi_q))
+                        lo_p - ROOF_T, lo_q - ROOF_T, hi_p, hi_q))
         else:
             model.info.append("roof clip unavailable (roofclip.py not "
                               "found) -- roofs drawn unclipped")
@@ -1720,11 +1742,13 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
 
         # each solid piece of the wall, capped at the roof surface where a
         # roof on this level is lower than the piece's top (`_wall_under_roofs`)
-        terr = terr_by_level.get(w["level"]) or []
+        terr = terr_all
 
-        def piece(corners, za, zb, to_top, terr=terr, z0=z0, t=t):
-            return _wall_under_roofs(corners, za, zb, terr, z0, ROOFCLIP, t,
-                                     to_top)
+        def piece(corners, za, zb, to_top, terr=terr, t=t, level=w["level"]):
+            # R6.b: the territories carry ABSOLUTE surfaces, so the base
+            # the cap is measured from is the building's datum, 0
+            return _wall_under_roofs(corners, za, zb, terr, 0.0, ROOFCLIP, t,
+                                     to_top, level)
 
         parts, cursor = [], 0.0
         for (s0, s1, sill, head) in cuts:

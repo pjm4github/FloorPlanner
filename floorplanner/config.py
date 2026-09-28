@@ -36,6 +36,7 @@ __all__ = [
     "FONT_DIR", "FONT_FAMILY", "load_fonts",
     "ICON_DIR", "FURN_DIR", "FURN_MIME", "tool_icon",
     "DEFAULT_FLOOR", "FLOOR_GHOST", "ROOF_CLIP_INK", "active_floor", "set_floor_state",
+    "floor_elevation", "floor_elevations",
     "floor_display_mode", "apply_floor_visibility",
 ]
 
@@ -534,6 +535,7 @@ _FLOOR_STATE = {
     "active": DEFAULT_FLOOR,             # the one editable floor
     "reference": set(),                  # floors shown as a gray backdrop
     "show_others": False,                # ghost the rest in gray (else hidden)
+    "elevations": {},                    # R6.b: floor name -> elevation_in
 }
 
 
@@ -541,7 +543,8 @@ def active_floor() -> str:
     return _FLOOR_STATE["active"]
 
 
-def set_floor_state(active=None, reference=None, show_others=None):
+def set_floor_state(active=None, reference=None, show_others=None,
+                    elevations=None):
     """Update the runtime floor cache (called by MainWindow._sync_floor_state)."""
     if active is not None:
         _FLOOR_STATE["active"] = active
@@ -549,6 +552,20 @@ def set_floor_state(active=None, reference=None, show_others=None):
         _FLOOR_STATE["reference"] = set(reference)
     if show_others is not None:
         _FLOOR_STATE["show_others"] = bool(show_others)
+    if elevations is not None:
+        _FLOOR_STATE["elevations"] = {k: float(v) for k, v in elevations.items()}
+
+
+def floor_elevation(floor) -> float:
+    """R6.b (0186-ruling.md sec4): the named floor's `elevation_in`, the term
+    that makes a roof's height absolute. 0.0 for a floor the cache does
+    not know -- a bare scene with no window, where every roof then
+    composes at one datum exactly as a single level always did."""
+    return float(_FLOOR_STATE["elevations"].get(floor, 0.0))
+
+
+def floor_elevations() -> dict:
+    return dict(_FLOOR_STATE["elevations"])
 
 
 def floor_display_mode(floor) -> str:

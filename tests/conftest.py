@@ -65,7 +65,7 @@ def _reset_settings():
     def _reset():
         _fp.SETTINGS.update(_fp.DEFAULT_SETTINGS)
         _fp.set_floor_state(active=_fp.DEFAULT_FLOOR, reference=set(),
-                            show_others=False)
+                            show_others=False, elevations={})
     _reset()
     yield
     _reset()

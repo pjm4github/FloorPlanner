@@ -15,9 +15,9 @@ from floorplanner.rooms import _wall_endpoints_match  # star skips underscores
 from floorplanner.roofs import (
     RoofEndMarkerItem, RoofGripItem, RoofItem, eaves_spans_per_side,
 )
-from floorplanner.roofs import (  # R5b: the Dormer tool
-    DORMER_MIN_SPAN_IN, MIN_RIDGE_LEN_IN, dormer_defaults, host_roof_at,
-    snap_to_trace, upslope_direction,
+from floorplanner.roofs import (  # R5b: the Dormer tool; R6.b: the hold
+    DORMER_MIN_SPAN_IN, MIN_RIDGE_LEN_IN, dormer_defaults, hold_roof_clips,
+    host_roof_at, snap_to_trace, upslope_direction,
 )
 from floorplanner.items import *  # noqa: F401
 
@@ -509,6 +509,7 @@ class PlanView(QGraphicsView):
                                     span_in=DORMER_MIN_SPAN_IN, marker_end=0,
                                     host=host)
                     item.floor = host.floor
+                    hold_roof_clips(self.scene(), True)   # R6.b: once, at release
                     self.scene().addItem(item)
                     self._temp_dormer = item
                     self._dormer_dragged = False
@@ -561,6 +562,7 @@ class PlanView(QGraphicsView):
                     # STAGE 1: start the ridge, same anchor snap a wall gets
                     p = self._snap_start(sp)
                     item = RoofItem(p, p)
+                    hold_roof_clips(self.scene(), True)   # R6.b: once, at release
                     self.scene().addItem(item)
                     self._temp_roof = item
                     e.accept()
@@ -811,15 +813,18 @@ class PlanView(QGraphicsView):
             item, self._temp_dormer = self._temp_dormer, None
             if not self._dormer_dragged:
                 self.scene().removeItem(item)
+                hold_roof_clips(self.scene(), False)
                 self.win.status("Dormer too narrow; drag along the trace to "
                                 "set its width.")
             else:
+                hold_roof_clips(self.scene(), False)
                 self.win.finish_roof_dormer(item)
             e.accept()
             return
 
         if self._temp_roof is not None and e.button() == Qt.MouseButton.LeftButton:
             item, self._temp_roof = self._temp_roof, None
+            hold_roof_clips(self.scene(), False)          # R6.b: the drag is over
             if item.length() < MIN_WALL_LEN:
                 self.scene().removeItem(item)
                 self.win.status("Roof ridge too short; try again.")
@@ -939,12 +944,14 @@ class PlanView(QGraphicsView):
         if self._temp_dormer is not None:          # R5b: a drag in progress
             self.scene().removeItem(self._temp_dormer)
             self._temp_dormer = None
+            hold_roof_clips(self.scene(), False)
         if self._temp_roof is not None:
             # STILL BEING DRAGGED (the ridge itself not yet released) --
             # matches the wall tool's own precedent exactly: an
             # in-progress drag is free to cancel.
             self.scene().removeItem(self._temp_roof)
             self._temp_roof = None
+            hold_roof_clips(self.scene(), False)
         if self._roof_awaiting_eaves is not None:
             # NOT the same case. The ridge is already released and drawn
             # -- with a full eave/gable preview, per Patrick's own report

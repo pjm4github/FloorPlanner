@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QDialog, QGraphicsItem, QMenu
 from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.roofclip import (
-    Pt, _contains, compute_roof_clips, footprint_polygon, meet_along,
+    Pt, _contains, compose_building, footprint_polygon, meet_along,
     rising_reach, surface_height,
 )
 from floorplanner.walls import WallItem
@@ -933,6 +933,26 @@ def sync_bound_roofs(scene, floor=None):
     return out
 
 
+_CLIP_HOLD = "roof_clip_hold"
+
+
+def hold_roof_clips(scene, on: bool):
+    """R6.b, the cost (0200-report.md sec3): composing the whole building is
+    about ten times one level's clip -- 1.66 s on his two-level wiscaway
+    against 0.15 s -- so a gesture that rebuilds a roof at every step
+    must not re-compose at every step. `hold_roof_clips(scene, True)`
+    makes `sync_roof_clips` a no-op; `False` releases the hold AND
+    composes once. Held while a plan loads (every roof added used to
+    re-clip) and while a grip, a ridge or a dormer is being dragged (the
+    dragged roof is selected or new, so it draws unclipped anyway; the
+    others catch up at the release)."""
+    if scene is None:
+        return
+    scene.setProperty(_CLIP_HOLD, bool(on))
+    if not on:
+        sync_roof_clips(scene)
+
+
 def sync_roof_clips(scene, floor=None, exclude=None):
     """R4d (0164-ruling.md): recompute every roof's intersection clip on
     `floor` (every floor when None) from the roofs as they are now, and
@@ -940,18 +960,23 @@ def sync_roof_clips(scene, floor=None, exclude=None):
     (so a grip drag or a dialog apply re-clips live), on a roof entering
     or leaving a scene, and never from paint. `exclude` is a roof on its
     way out of the scene."""
-    if scene is None:
+    if scene is None or scene.property(_CLIP_HOLD):
         return
-    by_floor = {}
-    for it in scene.items():
-        if (not isinstance(it, RoofItem) or sip.isdeleted(it) or it is exclude
-                or (floor is not None and it.floor != floor)):
-            continue
-        by_floor.setdefault(it.floor, []).append(it)
-    for roofs in by_floor.values():
-        clips = compute_roof_clips(roofs)
-        for rf in roofs:
-            rf.apply_clip(clips[id(rf)])
+    # R6.b (0186-ruling.md sec4, ordered at 0197-ruling.md sec5): THE BUILDING
+    # HAS ONE ROOFSCAPE. Every live roof composes against every other in
+    # ABSOLUTE height -- its level's elevation plus its own heights -- so
+    # `floor` no longer scopes anything (kept in the signature: every
+    # caller names the floor it edited, and the answer is the same
+    # building either way). A bare scene knows no elevations and composes
+    # at one datum, exactly as one level always did.
+    roofs = [it for it in scene.items()
+             if isinstance(it, RoofItem) and not sip.isdeleted(it)
+             and it is not exclude]
+    if not roofs:
+        return
+    clips = compose_building([(rf, floor_elevation(rf.floor)) for rf in roofs])
+    for rf in roofs:
+        rf.apply_clip(clips[id(rf)])
 
 
 class RoofItem(QGraphicsItem):
@@ -1650,6 +1675,7 @@ class RoofGripItem(QGraphicsItem):
     def mousePressEvent(self, e):
         if e.button() == Qt.MouseButton.LeftButton:
             self._dragging = True
+            hold_roof_clips(self.scene(), True)      # R6.b: compose at release
             e.accept()
         else:
             super().mousePressEvent(e)
@@ -1665,6 +1691,7 @@ class RoofGripItem(QGraphicsItem):
         if self._dragging and e.button() == Qt.MouseButton.LeftButton:
             self._dragging = False
             self.apply_drag(e.scenePos())
+            hold_roof_clips(self.scene(), False)     # ...once, here
             e.accept()
         else:
             super().mouseReleaseEvent(e)
