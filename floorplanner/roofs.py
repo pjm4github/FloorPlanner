@@ -63,6 +63,20 @@ def _roofs_editable() -> bool:
     return bool(SETTINGS.get("edit_roofs", True))
 
 
+def _roof_hittable(roof) -> bool:
+    """R6.c (0197-ruling.md sec5; D67's own rule: "an inactive floor may be
+    drawn; it may not be hit-tested, selected, banded, or dragged"): a roof
+    answers a geometric query only while roofs are editable AND its level
+    is the one being edited. A roof of another level drawn over this plan
+    (R6.a's covering roof, or any ghosted floor's) is "shown, not
+    editable" exactly as `edit_roofs` off is, and for the same reason
+    `setEnabled(False)` is not enough: a manual scan (`scene.items(pt)`)
+    sees a disabled item. Measured before this (`docs/evidence/
+    r6c-roof-tool-levels-probe.before.txt`): a ridge pressed on a lower
+    level's ghosted roof line never started."""
+    return _roofs_editable() and floor_display_mode(roof.floor) == "active"
+
+
 def apply_roof_visibility(scene):
     """Show roof / Edit roof (0145-ruling.md sec2), layered on each roof's
     OWN floor display mode -- recomputed fresh here rather than read off
@@ -1416,12 +1430,13 @@ class RoofItem(QGraphicsItem):
         return QPolygonF([e1a, e1b, e2b, e2a])
 
     def shape(self) -> QPainterPath:
-        if not _roofs_editable():
+        if not _roof_hittable(self):
             # "shown, not editable": empty, not just disabled -- a manual
             # scan (RoomItem._outranked_at, the ridge tool's own marker
             # pre-check) must miss this ridge exactly as setEnabled(False)
             # already makes Qt's own automatic dispatch miss it. boundingRect
-            # is untouched, so paint() keeps drawing at full extent.
+            # is untouched, so paint() keeps drawing at full extent. R6.c:
+            # the same for a roof of a level that is not being edited.
             return QPainterPath()
         stroker = QPainterPathStroker()
         stroker.setWidth(8.0)
@@ -1642,7 +1657,7 @@ class RoofGripItem(QGraphicsItem):
 
     def shape(self) -> QPainterPath:
         path = QPainterPath()
-        if not _roofs_editable() or not self.isVisible():
+        if not _roof_hittable(self.roof) or not self.isVisible():
             return path            # same "shown, not editable" reasoning
         h = self._hit_half()
         path.addRect(QRectF(-h, -h, 2.0 * h, 2.0 * h))
@@ -1755,7 +1770,7 @@ class RoofEndMarkerItem(QGraphicsItem):
         return QRectF(-r, -r, 2.0 * r, 2.0 * r)
 
     def shape(self) -> QPainterPath:
-        if not _roofs_editable():
+        if not _roof_hittable(self.roof):
             return QPainterPath()   # same "shown, not editable" reasoning
         path = QPainterPath()
         path.addEllipse(QPointF(0.0, 0.0), self._hit_radius(), self._hit_radius())

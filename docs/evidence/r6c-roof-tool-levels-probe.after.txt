@@ -1,0 +1,38 @@
+
+== upper level active, show other floors = False ==
+   roof default  ridge@(150,510)  visible=True  enabled=False hit shape empty=True  marker hit shape empty=True
+   roof default  ridge@(1426,272)  visible=False enabled=False hit shape empty=True  marker hit shape empty=True
+   roof upper    ridge@(132,492)  visible=True  enabled=True  hit shape empty=False marker hit shape empty=False
+   roof upper    ridge@(366,756)  visible=True  enabled=True  hit shape empty=False marker hit shape empty=False
+   roof upper    ridge@(414,276)  visible=True  enabled=True  hit shape empty=False marker hit shape empty=False
+   roof upper    ridge@(738,756)  visible=True  enabled=True  hit shape empty=False marker hit shape empty=False
+   walls visible by floor: {'default': 0, 'upper': 44}
+   2. the lower roof answers a hit query on its own ghosted line: False
+      ridge tool, press on the lower roof's ghosted line at (991,708), drag 96in: a ridge started = True; roofs 6 -> 7
+      control, the same drag on blank canvas at (128.11054141975302, 124.00134141937849): a ridge started = True; roofs 7 -> 8
+   3. start snap asked 2in from 136 wall ends only the lower level has: snapped to a wall END 0 times, to a lower wall's BODY 0 times
+   4. (no lower-only wall is under the cursor: wall=False, blank run=True)
+   5. dormer tool, press at (864,330) where only the lower roof ridge@(150,510) owns the ground (shown=True): roofs 6 -> 6; status: "Dormer: the roof here is on level 'default' -- switch to that level to put a dormer on it."
+   6. upper roof ridge@(132,492) selected, then the level switched to 'default': visible=True enabled=False selected=False grips showing=0
+   7. ridge sketched on 'upper', awaiting eaves, then the level switched: still awaiting = False; the pending roof's floor 'upper', visible=True, in the scene=True
+      then an eaves click on a 'default' wall: the pick was taken = False; the roof's floor 'upper', spans [282.0, 282.0]
+   8. (no lower-only wall is under the cursor)
+
+== upper level active, show other floors = True ==
+   roof default  ridge@(150,510)  visible=True  enabled=False hit shape empty=True  marker hit shape empty=True
+   roof default  ridge@(1426,272)  visible=True  enabled=False hit shape empty=True  marker hit shape empty=True
+   roof upper    ridge@(132,492)  visible=True  enabled=True  hit shape empty=False marker hit shape empty=False
+   roof upper    ridge@(366,756)  visible=True  enabled=True  hit shape empty=False marker hit shape empty=False
+   roof upper    ridge@(414,276)  visible=True  enabled=True  hit shape empty=False marker hit shape empty=False
+   roof upper    ridge@(738,756)  visible=True  enabled=True  hit shape empty=False marker hit shape empty=False
+   walls visible by floor: {'default': 122, 'upper': 44}
+   2. the lower roof answers a hit query on its own ghosted line: False
+      ridge tool, press on the lower roof's ghosted line at (991,708), drag 96in: a ridge started = True; roofs 6 -> 7
+      control, the same drag on blank canvas at (127.89177401204554, 124.00134141937849): a ridge started = True; roofs 7 -> 8
+   3. start snap asked 2in from 136 wall ends only the lower level has: snapped to a wall END 0 times, to a lower wall's BODY 0 times
+   4. ridge sketched on blank (127.89177401204554, 124.00134141937849)-(247.89177401204554, 124.00134141937849) (floor upper), eaves click on the lower-only wall at (554,840): the pick was TAKEN = False
+   5. dormer tool, press at (864,330) where only the lower roof ridge@(150,510) owns the ground (shown=True): roofs 6 -> 6; status: "Dormer: the roof here is on level 'default' -- switch to that level to put a dormer on it."
+   6. upper roof ridge@(132,492) selected, then the level switched to 'default': visible=True enabled=False selected=False grips showing=0
+   7. ridge sketched on 'upper', awaiting eaves, then the level switched: still awaiting = False; the pending roof's floor 'upper', visible=True, in the scene=True
+      then an eaves click on a 'default' wall: the pick was taken = False; the roof's floor 'upper', spans [282.0, 282.0]
+   8. Door tool, click on the lower-only wall at (554,840) from the upper level: lower-level openings 56 -> 57

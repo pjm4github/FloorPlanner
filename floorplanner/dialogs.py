@@ -882,11 +882,11 @@ class _EndOnCanvas(QWidget):
         tip_l = pt(-reach_l, self.eaves_h - slope_l * self.oh_l)
         tip_r = pt(reach_r, self.eaves_h - slope_r * self.oh_r)
 
-        # ground line
+        # the level's base line (the ground only on a level at elevation 0)
         p.setPen(QPen(QColor(90, 90, 90), 1.5))
         p.drawLine(QPointF(margin * 0.4, base_y), QPointF(w - margin * 0.4, base_y))
         # wall-top reference, dashed (0140-ruling.md sec3: shown as reference,
-        # not the datum -- R/H are measured from the ground line above)
+        # not the datum -- R/H are measured from the base line above)
         p.setPen(QPen(QColor(150, 150, 150), 1.0, Qt.PenStyle.DashLine))
         wt_y = base_y - self.wall_top_in * scale
         p.drawLine(QPointF(margin * 0.4, wt_y), QPointF(w - margin * 0.4, wt_y))
@@ -1095,8 +1095,18 @@ class RoofEndOnDialog(QDialog):
             form.addRow("", self.lab_dormer)
         lay.addLayout(form)
 
+        # -- R6.c: where this level stands in the building. Every height
+        # in this dialog is measured from the level's own base
+        # (0140-ruling.md sec3), which is the ground only on a level whose
+        # elevation is 0 -- so on any other level the absolute heights are
+        # said, live, beside the level-relative ones that are typed.
+        self.lab_level = QLabel("")
+        self.lab_level.setWordWrap(True)
+        self.lab_level.setStyleSheet("color: #1d4ed8;")
+        lay.addWidget(self.lab_level)
+
         note = QLabel("Both heights measured from the level's own base "
-                      "(the ground line); the wall top is shown for "
+                      "(the base line); the wall top is shown for "
                       "reference. Editing any two derives the third -- "
                       "the derived field is marked — derived. A span is "
                       "the ridge-to-wall-centreline distance; the overhang "
@@ -1219,6 +1229,31 @@ class RoofEndOnDialog(QDialog):
         self.canvas.set_values(self.canvas.span_l, self.canvas.span_r,
                                self.sp_oh_l.value(), self.sp_oh_r.value(),
                                self.sp_ridge.value(), self.sp_eaves.value())
+        self._refresh_level_note()
+
+    # -- R6.c: the level's base, and the heights in the building ----------
+    def level_base_in(self) -> float:
+        """The elevation of the base of the level this roof stands on."""
+        return float(floor_elevation(getattr(self.roof, "floor", None)))
+
+    def absolute_heights(self):
+        """`(eaves, ridge)` in the building: the level's base plus the two
+        heights as currently typed -- what R6.b composes with."""
+        base = self.level_base_in()
+        return base + self.sp_eaves.value(), base + self.sp_ridge.value()
+
+    def _refresh_level_note(self):
+        base = self.level_base_in()
+        if abs(base) < 1e-9:
+            self.lab_level.setText("")
+            self.lab_level.setVisible(False)
+            return
+        eaves, ridge = self.absolute_heights()
+        self.lab_level.setVisible(True)
+        self.lab_level.setText(
+            f"Level '{self.roof.floor}' has its base at {fmt_in(base)}: in the "
+            f"building the eaves stand at {fmt_in(eaves)} and the ridge at "
+            f"{fmt_in(ridge)}.")
 
     def _refresh_labels(self):
         derived = self._derived()

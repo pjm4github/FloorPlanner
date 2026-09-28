@@ -487,9 +487,24 @@ class PlanView(QGraphicsView):
                 else:
                     host = host_roof_at(self.scene(), sp, active_floor())
                     if host is None:
-                        self.win.status("Dormer: press on a roof plane -- the "
-                                        "orange clip trace is where the face "
-                                        "goes (Esc cancels).")
+                        # R6.c: a roof of another level may be drawn here
+                        # (R6.a's covering roof); it cannot host from this
+                        # level, and the refusal says where it lives
+                        other = next(
+                            (rf for rf in self.scene().items()
+                             if isinstance(rf, RoofItem) and rf.isVisible()
+                             and rf.floor != active_floor()
+                             and host_roof_at(self.scene(), sp, rf.floor) is rf),
+                            None)
+                        if other is not None:
+                            self.win.status(
+                                f"Dormer: the roof here is on level "
+                                f"'{other.floor}' -- switch to that level to "
+                                "put a dormer on it.")
+                        else:
+                            self.win.status("Dormer: press on a roof plane -- the "
+                                            "orange clip trace is where the face "
+                                            "goes (Esc cancels).")
                         e.accept()
                         return
                     tol = max(12.0, 20.0 / max(self.transform().m11(), 1e-6))
@@ -531,10 +546,14 @@ class PlanView(QGraphicsView):
                 if self._roof_awaiting_eaves is not None:
                     # STAGE 2: this press is the eaves pick, not a new ridge
                     # (0139-ruling.md sec1/sec3: "pick a ridge line, pick an
-                    # eaves line"). Same wall lookup as _place_opening.
+                    # eaves line"). R6.c: a wall of the roof's OWN level only
+                    # -- with other floors shown, a ghosted wall of another
+                    # level is under the cursor too, and the pick used to
+                    # take it and measure the span to it.
+                    pending = self._roof_awaiting_eaves
                     wall = None
                     for it in self.scene().items(sp):
-                        if isinstance(it, WallItem):
+                        if isinstance(it, WallItem) and it.floor == pending.floor:
                             wall = it
                             break
                     if wall is None:
