@@ -1,0 +1,33 @@
+floors: [('default', 0.0, 96.0), ('upper', 100.0, 196.0)]
+room ceilings by floor: {'default': [96.0, 120.0], 'upper': [96.0]}
+
+== as drawn: L2 at 100 ==
+   default  +    0  ridge@(150, 510)  stored eaves/ridge   96.0/ 296.0  absolute   96.0/ 296.0
+            room-top binding measures eaves 120.0 (27 room(s), fallback=False); dialog seeds eaves 96.0 ridge 296.0 pitch 45.3 wall-top line 96.0; dormer default eaves 120.0 slope 1.0101
+            composed region 96292 in2, clip trace 5725 in
+   default  +    0  ridge@(1426, 272)  stored eaves/ridge   96.0/ 296.0  absolute   96.0/ 296.0
+            room-top binding measures eaves 120.0 (7 room(s), fallback=False); dialog seeds eaves 96.0 ridge 296.0 pitch 43.6 wall-top line 96.0; dormer default eaves 144.0 slope 0.9524
+            composed region 177732 in2, clip trace 1116 in
+   upper    +  100  ridge@(132, 492)  stored eaves/ridge   25.0/ 235.1  absolute  125.0/ 335.1
+            room-top binding measures eaves 96.0 (9 room(s), fallback=False); dialog seeds eaves 25.0 ridge 235.1 pitch 45.0 wall-top line 96.0; dormer default eaves 120.0 slope 1.0003
+            composed region 233861 in2, clip trace 1440 in
+   upper    +  100  ridge@(366, 756)  stored eaves/ridge   96.0/ 199.4  absolute  196.0/ 299.4
+            room-top binding measures eaves 96.0 (5 room(s), fallback=False); dialog seeds eaves 96.0 ridge 199.4 pitch 45.4 wall-top line 96.0; dormer default eaves 120.0 slope 1.014
+            composed region 36043 in2, clip trace 456 in
+   upper    +  100  ridge@(414, 276)  stored eaves/ridge   96.0/ 179.0  absolute  196.0/ 279.0
+            room-top binding measures eaves 96.0 (3 room(s), fallback=False); dialog seeds eaves 96.0 ridge 179.0 pitch 44.7 wall-top line 96.0; dormer default eaves 120.0 slope 0.9881
+            composed region 19903 in2, clip trace 4757 in
+   upper    +  100  ridge@(738, 756)  stored eaves/ridge   96.0/ 188.6  absolute  196.0/ 288.6
+            room-top binding measures eaves 96.0 (5 room(s), fallback=False); dialog seeds eaves 96.0 ridge 188.6 pitch 40.6 wall-top line 96.0; dormer default eaves 120.0 slope 0.8569
+            composed region 35958 in2, clip trace 432 in
+   walls the R3b dash marks, by floor: {'default': '4 of 122', 'upper': '1 of 44'}
+
+== L2 moved to 0 ==
+   every level-relative reading (stored heights, the binding, the dialog's four seeds, the dormer default, the trace): CHANGED
+   walls the R3b dash marks: {'default': '4 of 122', 'upper': '0 of 44'} -- CHANGED
+   composed regions (the one reading that uses the elevation): {'default@150': 345589, 'default@1426': 177732, 'upper@132': 23580, 'upper@366': 20236, 'upper@414': 12950, 'upper@738': 19701}
+
+== L2 moved to 250 ==
+   every level-relative reading (stored heights, the binding, the dialog's four seeds, the dormer default, the trace): IDENTICAL to L2 at 100
+   walls the R3b dash marks: {'default': '4 of 122', 'upper': '1 of 44'} -- identical
+   composed regions (the one reading that uses the elevation): {'default@150': 96292, 'default@1426': 177732, 'upper@132': 233861, 'upper@366': 36043, 'upper@414': 19903, 'upper@738': 35958}

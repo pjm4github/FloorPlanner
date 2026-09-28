@@ -1,0 +1,55 @@
+vertices: 96 live Vertex objects; 0 held by walls of two floors; the document has 21 positions where a floor-1 and a floor-2 vertex coincide
+
+== second floor active, show other floors = True ==
+   visible by floor {'default': 150, 'second': 46}; enabled by floor {'second': 46}
+   rubber band over the whole plan selects {'second': 46}
+   select-all selects                       {'second': 41}
+   SELECT on a floor-1 furnishing at (755,740) selects {}
+   a mouse click there selects              {}
+   room 'BR2' (floor second): interior_walls returns a wall of floor 'default', (936,792)-(948,792) interior
+   room 'BR2' (floor second): interior_walls returns a wall of floor 'default', (936,876)-(936,792) interior
+   band {'second': 46} -> group: 1 group(s), members by floor {'default': 2, 'second': 41}
+      after the group drag: floor 1 MOVED, floor 2 moved
+         floor 1 vertices: 3 changed
+            (936.0, 792.0)  ->  (1009.0, 829.0)
+            (936.0, 876.0)  ->  (997.0, 829.0)
+         floor 1 walls: 6 changed
+            (((888.0, 792.0), (936.0, 792.0)), 'interior')  ->  (((1009.0, 829.0), (1098.0, 792.0)), 'interior')
+            (((888.0, 876.0), (936.0, 876.0)), 'interior')  ->  (((888.0, 792.0), (997.0, 829.0)), 'interior')
+         floor 1 rooms: 4 changed
+            ('Hall', ((948.0, 732.0), (1032.0, 732.0), (1080.0, 732.0), (1098.0, 732.0), (1098.0, 792.0), (948.0, 792.0)))  ->  ('Hall', ((948.0, 732.0), (1032.0, 732.0), (1080.0, 732.0), (1098.0, 732.0), (1098.0, 792.0), (1009.0, 829.0)))
+            ('LOUNGE', ((888.0, 876.0), (936.0, 876.0), (936.0, 792.0), (948.0, 792.0), (1098.0, 792.0), (1098.0, 864.0), (1098.0, 936.0), (888.0, 936.0)))  ->  ('LOUNGE', ((888.0, 876.0), (997.0, 913.0), (997.0, 829.0), (1009.0, 829.0), (1098.0, 792.0), (1098.0, 864.0), (1098.0, 936.0), (888.0, 936.0)))
+      after undo (1 step(s)): floor 1 UNCHANGED, floor 2 unchanged
+   a floor-2 wall with both ends over floor-1 vertices, (888,534)-(1032,534), dragged:
+      after the wall drag: floor 1 UNCHANGED, floor 2 moved
+      after undo (1 step(s)): floor 1 UNCHANGED, floor 2 unchanged
+   band, then three arrow nudges:
+      after the nudge: floor 1 UNCHANGED, floor 2 unchanged
+      after undo (0 step(s)): floor 1 UNCHANGED, floor 2 unchanged
+
+== second floor active, show other floors = False ==
+   visible by floor {'second': 46}; enabled by floor {'second': 46}
+   rubber band over the whole plan selects {'second': 46}
+   select-all selects                       {'second': 41}
+   SELECT on a floor-1 furnishing at (755,740) selects {}
+   a mouse click there selects              {}
+   room 'BR2' (floor second): interior_walls returns a wall of floor 'default', (936,792)-(948,792) interior
+   room 'BR2' (floor second): interior_walls returns a wall of floor 'default', (936,876)-(936,792) interior
+   band {'second': 46} -> group: 1 group(s), members by floor {'default': 2, 'second': 41}
+      after the group drag: floor 1 MOVED, floor 2 moved
+         floor 1 vertices: 3 changed
+            (936.0, 792.0)  ->  (1009.0, 829.0)
+            (936.0, 876.0)  ->  (997.0, 829.0)
+         floor 1 walls: 6 changed
+            (((888.0, 792.0), (936.0, 792.0)), 'interior')  ->  (((1009.0, 829.0), (1098.0, 792.0)), 'interior')
+            (((888.0, 876.0), (936.0, 876.0)), 'interior')  ->  (((888.0, 792.0), (997.0, 829.0)), 'interior')
+         floor 1 rooms: 4 changed
+            ('Hall', ((948.0, 732.0), (1032.0, 732.0), (1080.0, 732.0), (1098.0, 732.0), (1098.0, 792.0), (948.0, 792.0)))  ->  ('Hall', ((948.0, 732.0), (1032.0, 732.0), (1080.0, 732.0), (1098.0, 732.0), (1098.0, 792.0), (1009.0, 829.0)))
+            ('LOUNGE', ((888.0, 876.0), (936.0, 876.0), (936.0, 792.0), (948.0, 792.0), (1098.0, 792.0), (1098.0, 864.0), (1098.0, 936.0), (888.0, 936.0)))  ->  ('LOUNGE', ((888.0, 876.0), (997.0, 913.0), (997.0, 829.0), (1009.0, 829.0), (1098.0, 792.0), (1098.0, 864.0), (1098.0, 936.0), (888.0, 936.0)))
+      after undo (1 step(s)): floor 1 UNCHANGED, floor 2 unchanged
+   a floor-2 wall with both ends over floor-1 vertices, (888,534)-(1032,534), dragged:
+      after the wall drag: floor 1 UNCHANGED, floor 2 moved
+      after undo (1 step(s)): floor 1 UNCHANGED, floor 2 unchanged
+   band, then three arrow nudges:
+      after the nudge: floor 1 UNCHANGED, floor 2 unchanged
+      after undo (0 step(s)): floor 1 UNCHANGED, floor 2 unchanged
