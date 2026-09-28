@@ -26,6 +26,9 @@ vertices: 96 live Vertex objects; 0 held by walls of two floors; the document ha
    band, then three arrow nudges:
       after the nudge: floor 1 UNCHANGED, floor 2 unchanged
       after undo (0 step(s)): floor 1 UNCHANGED, floor 2 unchanged
+   band, grouped, then three arrow nudges:
+      after the nudge: floor 1 MOVED, floor 2 moved
+      after undo (1 step(s)): floor 1 UNCHANGED, floor 2 unchanged
 
 == second floor active, show other floors = False ==
    visible by floor {'second': 46}; enabled by floor {'second': 46}
@@ -53,3 +56,6 @@ vertices: 96 live Vertex objects; 0 held by walls of two floors; the document ha
    band, then three arrow nudges:
       after the nudge: floor 1 UNCHANGED, floor 2 unchanged
       after undo (0 step(s)): floor 1 UNCHANGED, floor 2 unchanged
+   band, grouped, then three arrow nudges:
+      after the nudge: floor 1 MOVED, floor 2 moved
+      after undo (1 step(s)): floor 1 UNCHANGED, floor 2 unchanged

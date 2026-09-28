@@ -203,19 +203,24 @@ def main():
             verdict(win, pristine, f"after undo ({steps} step(s))")
         win.close()
 
-        # ---- band, then an arrow nudge
-        win = fresh(show)
-        pristine = fingerprint(win)
-        win.view.select_in_rect(BAND)
-        win.run_macro("RIGHT RIGHT DOWN")
-        win._commit_if_changed()
-        print("   band, then three arrow nudges:")
-        verdict(win, pristine, "after the nudge")
-        steps = len(win._undo_stack)
-        while win._undo_stack:
-            win.undo()
-        verdict(win, pristine, f"after undo ({steps} step(s))")
-        win.close()
+        # ---- band, then an arrow nudge: `nudge_selected` moves groups and
+        # loose furnishings only, so the bare band is expected to move
+        # nothing; the grouped band is the nudge that can leak
+        for grouped in (False, True):
+            win = fresh(show)
+            pristine = fingerprint(win)
+            win.view.select_in_rect(BAND)
+            if grouped:
+                win.group_selected()
+            win.run_macro("RIGHT RIGHT DOWN")
+            win._commit_if_changed()
+            print(f"   band{', grouped,' if grouped else ','} then three arrow nudges:")
+            verdict(win, pristine, "after the nudge")
+            steps = len(win._undo_stack)
+            while win._undo_stack:
+                win.undo()
+            verdict(win, pristine, f"after undo ({steps} step(s))")
+            win.close()
 
 
 if __name__ == "__main__":

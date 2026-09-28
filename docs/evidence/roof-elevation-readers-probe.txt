@@ -23,11 +23,29 @@ room ceilings by floor: {'default': [96.0, 120.0], 'upper': [96.0]}
    walls the R3b dash marks, by floor: {'default': '4 of 122', 'upper': '1 of 44'}
 
 == L2 moved to 0 ==
-   every level-relative reading (stored heights, the binding, the dialog's four seeds, the dormer default, the trace): CHANGED
-   walls the R3b dash marks: {'default': '4 of 122', 'upper': '0 of 44'} -- CHANGED
-   composed regions (the one reading that uses the elevation): {'default@150': 345589, 'default@1426': 177732, 'upper@132': 23580, 'upper@366': 20236, 'upper@414': 12950, 'upper@738': 19701}
+   stored heights                                       identical on all six roofs
+   room-top binding                                     identical on all six roofs
+   dialog seeds (eaves, ridge, pitch, wall-top line)    identical on all six roofs
+   dormer default                                       identical on all six roofs
+   clip trace length                                    CHANGED on 4: [('default', (150, 510)), ('upper', (132, 492)), ('upper', (366, 756)), ('upper', (738, 756))]
+   composed region                                      CHANGED on 5: [('default', (150, 510)), ('upper', (132, 492)), ('upper', (366, 756)), ('upper', (414, 276)), ('upper', (738, 756))]
+   walls the R3b dash marks                             {'default': '4 of 122', 'upper': '0 of 44'} -- CHANGED
+   composed regions: {'default@150': 345589, 'default@1426': 177732, 'upper@132': 23580, 'upper@366': 20236, 'upper@414': 12950, 'upper@738': 19701}
 
 == L2 moved to 250 ==
-   every level-relative reading (stored heights, the binding, the dialog's four seeds, the dormer default, the trace): IDENTICAL to L2 at 100
-   walls the R3b dash marks: {'default': '4 of 122', 'upper': '1 of 44'} -- identical
-   composed regions (the one reading that uses the elevation): {'default@150': 96292, 'default@1426': 177732, 'upper@132': 233861, 'upper@366': 36043, 'upper@414': 19903, 'upper@738': 35958}
+   stored heights                                       identical on all six roofs
+   room-top binding                                     identical on all six roofs
+   dialog seeds (eaves, ridge, pitch, wall-top line)    identical on all six roofs
+   dormer default                                       identical on all six roofs
+   clip trace length                                    identical on all six roofs
+   composed region                                      identical on all six roofs
+   walls the R3b dash marks                             {'default': '4 of 122', 'upper': '1 of 44'} -- identical
+   composed regions: {'default@150': 96292, 'default@1426': 177732, 'upper@132': 233861, 'upper@366': 36043, 'upper@414': 19903, 'upper@738': 35958}
+
+== in 3D, each roof built alone: where the stored heights land ==
+   default  +    0  stored ridge  296.0  elevation + ridge  296.0  mesh top  296.00  (top - elevation - ridge = +0.00)
+   default  +    0  stored ridge  296.0  elevation + ridge  296.0  mesh top  296.00  (top - elevation - ridge = +0.00)
+   upper    +  100  stored ridge  235.1  elevation + ridge  335.1  mesh top  335.06  (top - elevation - ridge = +0.00)
+   upper    +  100  stored ridge  199.4  elevation + ridge  299.4  mesh top  299.43  (top - elevation - ridge = +0.00)
+   upper    +  100  stored ridge  179.0  elevation + ridge  279.0  mesh top  279.00  (top - elevation - ridge = +0.00)
+   upper    +  100  stored ridge  188.6  elevation + ridge  288.6  mesh top  288.55  (top - elevation - ridge = +0.00)

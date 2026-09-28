@@ -88,6 +88,65 @@ its sibling, *a question nobody posed leaves no red.*
 ONLY multifloor plan in the corpus.** Every multi-floor claim this project makes
 rests on one drawing.
 
+> **OUT OF DATE, corrected 2026‑09‑27 on
+> [`0197-ruling.md`](../handoff/0197-ruling.md) §1's instruction.** That was
+> true of `examples/` when it was written. 0197 §1 counted five multifloor
+> plans on disk (`examples/farmplaceBIGmultifloor.json`,
+> `examples/roundedMultifloor.json`, `fixtures/crossfloor-snap-2026-08-17.json`,
+> `fixtures/wiscaway2026-08-30R1.json`, `…R2.json`), and
+> `fixtures/wiscaway-2level-stacked-floor.json` has since made six. The
+> reproduction below ran on `roundedMultifloor.json` because this record names
+> it; **it has not been run on the other five.**
+
+## REPRODUCED 2026‑09‑27 — measured, not fixed ([`0201-report.md`](../handoff/0201-report.md))
+
+Ordered by [`0197-ruling.md`](../handoff/0197-ruling.md) §5. The probe is
+[`docs/evidence/d67_crossfloor_probe.py`](../evidence/d67_crossfloor_probe.py),
+its output [`d67-crossfloor-probe.txt`](../evidence/d67-crossfloor-probe.txt).
+Second floor active, every result identical with "show other floors" on and
+off.
+
+**His report holds.** Band the second floor, group, drag: **floor 1 moves** —
+3 vertices, 6 walls and 4 room outlines (`Hall`, `LOUNGE` and two more) changed
+on `default`. The same group nudged by the arrow keys moves floor 1 the same
+way.
+
+**The three candidate sites above all measure CLEAN:**
+
+| route | what it selected / moved |
+|---|---|
+| rubber band over the whole plan (`select_in_rect`) | `{'second': 46}` — nothing of floor 1 |
+| select‑all | `{'second': 41}` |
+| `SELECT` and a mouse click where only a floor‑1 furnishing lies (`best_by_priority`) | nothing |
+| a shared `Vertex` across floors | **0** of 96 live vertices is held by walls of two floors, though 21 positions have a floor‑1 and a floor‑2 vertex coincident |
+| one floor‑2 wall with both ends over floor‑1 vertices, dragged | floor 1 unchanged |
+
+Inactive‑floor items are disabled (`enabled by floor {'second': 46}`), which is
+what keeps every selection route off them.
+
+**The leak is a fourth site, not among the three named:
+`RoomItem.interior_walls()` (`floorplanner/rooms.py`) has no floor
+predicate.** It returns every `WallItem` in the scene whose two ends lie inside
+the room's outline. `MainWindow.group_selected` adds `room_walls(room) +
+room.interior_walls()` for every selected room, so grouping the second floor's
+`BR2` adopts two first‑floor partition walls lying inside its outline in plan
+— (936,792)–(948,792) and (936,876)–(936,792) — and the group's members come
+out `{'default': 2, 'second': 41}`. The drag then moves those two walls'
+vertices, and every floor‑1 wall and room outline holding them follows.
+`room_walls` returned nothing of another floor.
+
+**Undo is COMPLETE, not partial.** One step restores both floors to pristine,
+after the drag and after the nudge. **The pre‑committed blocking condition
+below is therefore NOT met** — measured on the snapshot undo the editor runs
+today, which restores the whole document; a `GestureCommand` that recorded
+affected entities would have to be measured again when it exists.
+
+**Not fixed** — the order was a measurement. The fix the measurement points at
+is one predicate (`it.floor == self.floor`) in `interior_walls()`, with this
+probe's gesture as its fail‑first test; whether `group_selected` should also
+refuse any member of another floor, as the rule above reads, is the
+reviewer's to say.
+
 ## THE CONSTRAINT ON PHASE 6 — a design requirement, not a fix
 
 > **P6.b's command classes must carry the ACTIVE FLOOR as part of the settled-

@@ -128,8 +128,7 @@ def main():
         win.set_floor_levels("upper", elev, win._floor("upper").height_in)
         rows = readings(win)
         dash = dashed_walls(win)
-        print(f"
-== L2 moved to {elev:.0f} ==")
+        print(f"\n== L2 moved to {elev:.0f} ==")
         for label, get in READINGS:
             diff = [(r["floor"], r["ridge"]) for r, b in zip(rows, base, strict=True)
                     if get(r) != get(b)]
@@ -140,6 +139,40 @@ def main():
         print("   composed regions:",
               {f"{r['floor']}@{r['ridge'][0]}": r["region"] for r in rows})
     win.close()
+    in_3d()
+
+
+def in_3d():
+    """Where each roof's stored heights LAND in the building: the 3D mesh of
+    each roof built alone (nothing to clip it), its highest point against its
+    level's elevation plus its stored ridge height."""
+    import copy
+    import importlib.util
+    import json
+
+    spec = importlib.util.spec_from_file_location(
+        "fp3d_elevation_probe", os.path.join(ROOT, "floorplanner", "viewer", "fp3d.py"))
+    fp3d = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = fp3d
+    spec.loader.exec_module(fp3d)
+    with open(PLAN, encoding="utf-8") as fh:
+        doc = json.load(fh)
+    levels = {lv["id"]: lv for lv in doc["levels"]}
+    print("\n== in 3D, each roof built alone: where the stored heights land ==")
+    for rec in doc["roofs"]:
+        if rec.get("host"):
+            continue
+        one = copy.deepcopy(doc)
+        one["roofs"] = [rec]
+        model = fp3d.build_model(one, furnishings=False, floors=False)
+        mesh = next(m for m in model.meshes if m.name == "roofs")
+        lv = levels[rec["level"]]
+        elev = float(lv.get("elevation_in", 0.0))
+        top = float(mesh.verts[:, 2].max())
+        print(f"   {lv['name']:8s} +{elev:5.0f}  stored ridge {rec['ridge_h_in']:6.1f}  "
+              f"elevation + ridge {elev + rec['ridge_h_in']:6.1f}  "
+              f"mesh top {top:7.2f}  (top - elevation - ridge = "
+              f"{top - elev - rec['ridge_h_in']:+.2f})")
 
 
 if __name__ == "__main__":
