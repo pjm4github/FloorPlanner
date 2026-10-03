@@ -29,6 +29,7 @@ from floorplanner.roofs import (
 pytestmark = pytest.mark.gui
 
 FIXTURE = "fixtures/wiscaway-2level-stacked-floor.json"
+MANUAL_FIXTURE = "fixtures/r6c-two-level-tool-check.json"
 LOWER, UPPER = "default", "upper"
 LEFT, NONE = Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton
 
@@ -89,6 +90,46 @@ def _two_levels(fp, win, show_others=True, upper_elevation=100.0):
 
 def _accept_dialogs(monkeypatch):
     monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
+
+
+def test_the_tiny_manual_fixture_keeps_every_target_unambiguous(fp, win):
+    """The human check is one operation per reload on a scene whose targets
+    cannot be confused with Wiscaway's 166 walls and six roofs."""
+    win.prepare_headless()
+    win.load_path(MANUAL_FIXTURE)
+
+    assert win.active_floor == UPPER
+    assert {f.name: (f.elevation_in, f.height_in) for f in win.floors} == {
+        LOWER: (0.0, 96.0), UPPER: (120.0, 96.0)}
+    rooms = {it.name: it for it in win.scene.items()
+             if isinstance(it, fp.RoomItem)}
+    assert set(rooms) == {"LOWER - GREY TARGET", "UPPER - SOLID TARGET"}
+    walls = [it for it in win.scene.items() if isinstance(it, fp.WallItem)]
+    roofs = _roofs(win)
+    assert {floor: sum(it.floor == floor for it in walls)
+            for floor in (LOWER, UPPER)} == {LOWER: 4, UPPER: 4}
+    assert {floor: sum(it.floor == floor for it in roofs)
+            for floor in (LOWER, UPPER)} == {LOWER: 1, UPPER: 1}
+
+    win.show_other_floors = True
+    win._sync_floor_state()
+
+    # The exact human targets: each point resolves to only the named level.
+    def walls_at(x, y):
+        return {it.floor for it in win.scene.items(QPointF(x, y))
+                if isinstance(it, fp.WallItem)}
+
+    assert walls_at(180, 300) == {LOWER}, "left box's bottom wall"
+    assert walls_at(540, 300) == {UPPER}, "right box's bottom wall"
+    lower_roof = next(r for r in roofs if r.floor == LOWER)
+    upper_roof = next(r for r in roofs if r.floor == UPPER)
+    assert (lower_roof.p1, lower_roof.p2) == (QPointF(60, 180), QPointF(300, 180))
+    assert (upper_roof.p1, upper_roof.p2) == (QPointF(420, 180), QPointF(660, 180))
+    assert host_roof_at(win.scene, QPointF(180, 120), LOWER) is lower_roof
+    assert host_roof_at(win.scene, QPointF(180, 120), UPPER) is None
+
+    assert lower_roof.isVisible() and not lower_roof.isEnabled()
+    assert upper_roof.isVisible() and upper_roof.isEnabled()
 
 
 # --------------------------------------------------------------------------

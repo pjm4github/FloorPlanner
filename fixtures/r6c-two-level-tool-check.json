@@ -1,0 +1,146 @@
+{
+ "format": "floorplanner-design",
+ "version": 6,
+ "units": "inches",
+ "settings": {
+  "wall_snap_in": 6.0,
+  "rotate_snap_deg": 15.0,
+  "canvas_w_in": 720.0,
+  "canvas_h_in": 420.0,
+  "cost_per_sqft": 150.0,
+  "show_roofs": true,
+  "edit_roofs": true,
+  "vertex_weld_in": 0.6,
+  "join_tol_in": 9.0,
+  "area_basis": "centerline",
+  "editing": {
+   "shuffle": false,
+   "auto_coalesce": true,
+   "auto_weld": true,
+   "auto_bind": true
+  },
+  "active_floor": "upper"
+ },
+ "levels": [
+  {
+   "id": "L1",
+   "name": "default",
+   "elevation_in": 0.0,
+   "height_in": 96.0,
+   "kind": "storey",
+   "reference": false
+  },
+  {
+   "id": "L2",
+   "name": "upper",
+   "elevation_in": 120.0,
+   "height_in": 96.0,
+   "kind": "storey",
+   "reference": false
+  }
+ ],
+ "vertices": [
+  {"id": "v1", "level": "L1", "x": 60.0, "y": 60.0},
+  {"id": "v2", "level": "L1", "x": 60.0, "y": 300.0},
+  {"id": "v3", "level": "L1", "x": 300.0, "y": 60.0},
+  {"id": "v4", "level": "L1", "x": 300.0, "y": 300.0},
+  {"id": "v5", "level": "L2", "x": 420.0, "y": 60.0},
+  {"id": "v6", "level": "L2", "x": 420.0, "y": 300.0},
+  {"id": "v7", "level": "L2", "x": 660.0, "y": 60.0},
+  {"id": "v8", "level": "L2", "x": 660.0, "y": 300.0}
+ ],
+ "walls": [
+  {"id": "w1", "level": "L1", "v1": "v1", "v2": "v3", "type": "exterior", "left": null, "right": "r1", "openings": []},
+  {"id": "w2", "level": "L1", "v1": "v2", "v2": "v1", "type": "exterior", "left": null, "right": "r1", "openings": []},
+  {"id": "w3", "level": "L1", "v1": "v3", "v2": "v4", "type": "exterior", "left": null, "right": "r1", "openings": []},
+  {"id": "w4", "level": "L1", "v1": "v4", "v2": "v2", "type": "exterior", "left": null, "right": "r1", "openings": []},
+  {"id": "w5", "level": "L2", "v1": "v5", "v2": "v7", "type": "exterior", "left": null, "right": "r2", "openings": []},
+  {"id": "w6", "level": "L2", "v1": "v6", "v2": "v5", "type": "exterior", "left": null, "right": "r2", "openings": []},
+  {"id": "w7", "level": "L2", "v1": "v7", "v2": "v8", "type": "exterior", "left": null, "right": "r2", "openings": []},
+  {"id": "w8", "level": "L2", "v1": "v8", "v2": "v6", "type": "exterior", "left": null, "right": "r2", "openings": []}
+ ],
+ "rooms": [
+  {
+   "id": "r1",
+   "level": "L1",
+   "name": "LOWER - GREY TARGET",
+   "category": "interior",
+   "outline": [
+    {"v": "v1", "wall": "w1"},
+    {"v": "v3", "wall": "w3"},
+    {"v": "v4", "wall": "w4"},
+    {"v": "v2", "wall": "w2"}
+   ],
+   "placement": {"state": "placed", "rotation": 0.0, "extracted_from": null},
+   "label": {"offset": [0.0, 54.0], "show_dimensions": false, "show_area": false},
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": "R6.c manual-check target; never edit and save this fixture."
+   }
+  },
+  {
+   "id": "r2",
+   "level": "L2",
+   "name": "UPPER - SOLID TARGET",
+   "category": "interior",
+   "outline": [
+    {"v": "v5", "wall": "w5"},
+    {"v": "v7", "wall": "w7"},
+    {"v": "v8", "wall": "w8"},
+    {"v": "v6", "wall": "w6"}
+   ],
+   "placement": {"state": "placed", "rotation": 0.0, "extracted_from": null},
+   "label": {"offset": [0.0, 54.0], "show_dimensions": false, "show_area": false},
+   "properties": {
+    "room_type": "",
+    "include_sqft": true,
+    "ceiling_height_in": 96.0,
+    "ceiling_type": "Flat",
+    "floor_finish": "Hardwood",
+    "wall_finish": "Painted Drywall",
+    "baseboard": "Standard 3 1/4\"",
+    "crown_molding": false,
+    "hvac": "Forced Air",
+    "electrical": "",
+    "notes": "R6.c manual-check target; never edit and save this fixture."
+   }
+  }
+ ],
+ "furnishings": [],
+ "groups": [],
+ "roofs": [
+  {
+   "id": "rf1",
+   "level": "L1",
+   "ridge": [[60.0, 180.0], [300.0, 180.0]],
+   "eaves_h_in": 96.0,
+   "ridge_h_in": 144.0,
+   "overhang_in": [0.0, 0.0],
+   "span_in": [120.0, 120.0],
+   "eaves_bind": "manual",
+   "gable": [true, true],
+   "marker_end": 1
+  },
+  {
+   "id": "rf2",
+   "level": "L2",
+   "ridge": [[420.0, 180.0], [660.0, 180.0]],
+   "eaves_h_in": 96.0,
+   "ridge_h_in": 144.0,
+   "overhang_in": [0.0, 0.0],
+   "span_in": [120.0, 120.0],
+   "eaves_bind": "manual",
+   "gable": [true, true],
+   "marker_end": 1
+  }
+ ]
+}
