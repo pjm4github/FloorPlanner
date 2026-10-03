@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 52a2870 -->
+<!-- SNAPSHOT-HEAD: 0f833f4 -->
 
 # Session snapshot — read this first
 
@@ -161,260 +161,76 @@ of a level not being edited has an empty hit shape (`_roof_hittable`).
 
 ## THE QUEUE
 
-1. **THE EXTRUDABILITY PREDICATE — BUILT, GREEN, MERGED TO `main`.**
-   `floorplanner/viewer/fp3d.py:extrudability()` plus `tests/test_extrudability.py`,
-   three predicates from [`handoff/0029-ruling.md`](handoff/0029-ruling.md) §2.
-   **Census result:** only `glass_shower` had zero closed filled shapes before
-   the redraw; `boat_trailer` plus six more items (`motorcycle`, `bicycle`,
-   `garden_tractor`, `riding_mower_snow`, `drill_press`, `water_softener`) have
-   a fragmented body, exempted by name pending a ruling on filing — [D79](defects/0079-six-catalog-symbols-extrude-as-disconnected.md)
-   filed for those six (`0034` §5); 73 of 95 have a body with no internal
-   region; the 3% connectivity tolerance's raw values are printed and land in
-   the test's own docstring (`0034` §4 — nothing sits between ~1% and 3%).
-   **D76 reconciliation** ([`0030`](handoff/0030-ruling.md) §4, confirmed not
-   withdrawn by [`0034`](handoff/0034-ruling.md) §1): `walk_in_shower`'s bench
-   is fully contained in the body on all three axes — D76 stands, unamended.
-   **Consequence: a region-shaped mark (nested) inherits D76's invisibility
-   whenever the body is translucent; a `beside` mark (a second top-level ring,
-   sharing the body's material, never enclosed) does not** — the redraw brief
-   is `beside` shapes, not regions. Full detail: [`0032`](handoff/0032-report.md) ·
-   [`0036-report.md`](handoff/0036-report.md).
-2. **THE ARTWORK REDRAWS — BUILT, CHECK PASSED, MERGED
-   ([`0050`](handoff/0050-ruling.md)).** `shower` and `glass_shower` gain a
-   filled door leaf (`glass_shower` also gains its first-ever filled body);
-   `walk_in_shower` gains a fixed glass panel at the opening, alongside its
-   already-correct, already-invisible bench. All three: `build_prism`
-   `beside` shapes, not regions. **Two cameras, both on record** (`0034` §2):
-   room-scale (comparability) — [`before`](evidence/shower-glance-before.png) ·
-   [`after`](evidence/shower-glance-after.png) — and working-distance (the
-   actual glance test) —
-   [`before`](evidence/shower-glance-working-distance-before.png) ·
-   [`after`](evidence/shower-glance-working-distance-after.png), reproducible
-   via `docs/evidence/shower_glance_working_distance.py`. **At working
-   distance the marks are unambiguous. Patrick's check was in the running
-   app** (his own working zoom), so `0034` §2's camera question is answered
-   by construction — [`0050`](handoff/0050-ruling.md) §1. **The branch was 9
-   behind `main` at check time**; brought current in this merge, re-gated on
-   the combined tree (GREEN, `collected=754`), and the extrudability census
-   re-run: `glass_shower` goes from zero filled shapes (predicate 1's only
-   prior failure) to 2, `shower` 2/1 frag/no region, `walk_in_shower` 3/1
-   frag/has region (the pre-existing D76-invisible bench) — all three
-   predicates pass, no new exemptions. `floorplanner/viewer/fp3d.py` has no
-   diff between the branch's fork point and `main`'s tip, so the render is
-   unaffected by anything `main` gained — no after-shot retake needed, per
-   [`0050`](handoff/0050-ruling.md) §3 step 4. Full build notes:
-   [`0033`](handoff/0033-report.md) · [`0036-report.md`](handoff/0036-report.md).
-   Brief: [`handoff/0016-ruling.md`](handoff/0016-ruling.md) §2–3.
-3. **[`handoff/0019-ruling.md`](handoff/0019-ruling.md)'s status board — GREEN,
-   read-back first, priority lowered by [`0029`](handoff/0029-ruling.md) §6**
-   (Patrick has a Cowork skill rendering the same state on demand — a VIEW,
-   not the artifact; `STATUS.md` is still owed, the skill removes the urgency
-   not the requirement). Freeze the closed migration's Status table as
-   history; move forward status to a generated `docs/STATUS.md`. Read-back
-   owed: what identifies a completed unit when recent work has no phase
-   number at all.
-4. **Grid snap — the largest daily-use improvement left, fully specified, read-back
-   owed before any code.** Snap-by-default; shift means unconstrained; the
-   angled-wall rule quantises length along the ray; intersection joins with
-   their two refusals; the live readout shows snapped values. The read-back:
-   clause-by-clause EXISTS/PARTIAL/ABSENT, thresholds with reasons, the shift
-   modifier audit, the angle convention already in the geometry code, and
-   Ctrl's disposition. Spec: [`ROADMAP.md`](ROADMAP.md) A6.
-5. **`Docs-Snapshot` moves out of the `pull_request` CI lane — DONE.**
-   [`handoff/0042-ruling.md`](handoff/0042-ruling.md): the only check this
-   project's CI has ever failed on when the code itself was fine; it read git
-   topology (`HEAD~1`), which a merge-ref reshapes, while the local commit
-   hook already prevents a stale marker from landing at all. `tools/gate.py`'s
-   `_snapshot_check()` now skips it on `GITHUB_EVENT_NAME == "pull_request"`,
-   at the `main()`/`_docs()` call sites only — `_snapshot_head()` and the
-   `HEAD^2` merge-ref logic are untouched, so every existing D78 regression
-   test still exercises the real thing. Two new controls (skip-when-stale,
-   skip-scoped-to-PR). Full receipt: [`handoff/0048-report.md`](handoff/0048-report.md).
-6. **The commit hook splits quick-for-commit / full-for-push — DONE.**
-   [`handoff/0043-ruling.md`](handoff/0043-ruling.md) §4 /
-   [`handoff/0047-ruling.md`](handoff/0047-ruling.md) §4: `.gate-result.json`
-   carries a `mode` field now (`--quick` writes too); `git commit` accepts
-   either mode, `git push` requires `mode == "full"`. All four controls, in
-   the same commit, at both events: no result refused; `--quick` GREEN
-   allowed at commit / refused at push; full GREEN allowed at both; any RED
-   refused; "no result" / "RED" / "quick-at-push" each produce a
-   **different** message. `tests/test_verify_gate_hook.py`, 18 tests against
-   an isolated fixture repo, caught a real `"pushs"` pluralisation bug before
-   it shipped. Full receipt: [`handoff/0049-report.md`](handoff/0049-report.md).
-7. **An orthogonality REPORT — DONE (item B only; item C is a separate,
-   unauthorised repair, still RED).** [`handoff/0055-ruling.md`](handoff/0055-ruling.md):
-   grid snap will NOT fix the off-axis walls Patrick's own export showed
-   Chief flagging — measured as two populations (`L1`'s large angles are
-   likely real architecture, `L2`'s 75 sub-2° deviations are drift, not
-   drawing) produced by operations (move/join/weld/coalesce) relocating a
-   vertex, which snap (constrains cursor input only) cannot touch.
-   `floorplanner/design/validate.py` gains `wall_orthogonality()` /
-   `orthogonality_bands()`, wired into both `tools/validate_design.py` (the
-   corpus census) and a new Edit ▸ "Wall orthogonality report…" dialog.
-   Cross-checked against `0055`'s own corpus numbers (6/2 off-axis walls),
-   not just written to pass — matched. 17 new tests, gate GREEN. Full
-   receipt: [`handoff/0056-report.md`](handoff/0056-report.md). Grid snap
-   itself (item 4 above) is unchanged but its read-back still owes one more
-   clause: does snapping cover the *output* of an operation, or only cursor
-   input? **Item C (a repair) is RED — no ruling exists, none owed here.**
-   **The corpus census B's whole justification depended on — run
-   ([`0057`](handoff/0057-ruling.md) §2 / [`0058-report.md`](handoff/0058-report.md)),
-   then corrected ([`0059-ruling.md`](handoff/0059-ruling.md) /
-   [`0060-report.md`](handoff/0060-report.md)):** 948 walls across 16 v5
-   plans (`docs/evidence/orthogonality_census.py`, 8 files skipped and each
-   named why). **`0058`'s printed table could not reproduce its own 63
-   headline** — the bottom band merged "exactly on axis" with "off by up to
-   0.01°", hiding 12 of the 63. `ORTHOGONALITY_BANDS` now splits that bucket
-   into `0.01-0.1 deg` / `0 < dev < 0.01 deg` / `on axis` (its own row,
-   matched on `deg == 0.0` rather than by range); both printers'
-   column-width bugs (exposed by the longer label) fixed alongside. Re-run:
-   **32 + 19 + 12 = 63, exactly** — the table now produces its own headline.
-   Two more of `0055`'s own claimed numbers independently reproduced (both
-   `wiscaway` files, exact match). **`0059`'s suggested separating
-   measurement (crossfloor plan vs `wiscaway2026-08-09R`'s off-axis rate)
-   run, and it does not separate the two** — `wiscaway2026-08-09R` (no
-   reported cross-floor symptom) has MORE walls over 5° (53) than the
-   crossfloor plan (36), correcting `0058`'s "highest in the corpus" framing;
-   orthogonality severity should not be read as evidence for the cross-floor
-   thread below. **`0037` §3's reachability census also run, folded in for
-   free per `0059` §5 item 3**: every mouse/macro hit-test and selection path
-   shares one root (`items.py`'s `hit_candidates()`) and none filter by
-   `.floor`, versus 100% of `walls.py`'s geometry hot paths, which do. **The
-   census found a live one** ([`0061-ruling.md`](handoff/0061-ruling.md)):
-   `view.py:244` `PlanView._align_to_wall` scans bare `sc.items()`, not
-   `items(pos)`, so — unlike the other reachability sites, which Qt's own
-   visibility filtering already masks — it is NOT masked, and a wall drawn on
-   the active floor could snap its free end onto an open end on a hidden
-   floor, matching Patrick's cross-floor report clause for clause. **Fixed on
-   branch `cross-floor-align-fix`** ([`0062-report.md`](handoff/0062-report.md)):
-   a fail-first test confirmed RED (`500.0` where `505.0` was drawn) then
-   GREEN after `_align_to_wall`/`wall_endpoint_open` both gained the
-   `.floor == active` filter every other hot path already had; the
-   long-untriaged `fixtures/incoming/crossfloor-snap-2026-08-17.json`
-   promoted to `fixtures/` (real corpus evidence, kept; the defect itself
-   covered by the synthetic test). **[PR #34](https://github.com/pjm4github/FloorPlanner/pull/34)
-   open, AMBER, stopped for Patrick's manual check** — *"with the second
-   floor hidden, does a wall you draw still jump to something you cannot
-   see?"* [`0063-ruling.md`](handoff/0063-ruling.md) accepts the fix and adds
-   `wall_endpoint_open`'s `floor=` param as more than asked (a second,
-   previously-unreported half of the same fault, reasoned from the
-   mechanism), but flags the fail-first test as a negative assertion with no
-   positive-control pairing (D43/positive-control family) — **owed on the
-   branch: a control assertion, same scene, active floor, alignment must
-   still fire.** Also flags a fourth `fixtures/incoming/` exit as needed
-   (promoted as measurement subject, no test) — **added to
-   `fixtures/incoming/README.md`.** Three more items named, not built: the
-   four masked reachability sites (no receipt yet), `wall_endpoint_open`'s
-   `floor=None` default (should invert, but changes two existing callers
-   with no receipt). A guide line added to `README.md`'s export section
-   pointing at the orthogonality report before exporting. **Item C (the
-   repair) is no longer RED** — ruled at [`0066`](handoff/0066-ruling.md),
-   read back at [`0079`](handoff/0079-report.md), amended and unblocked at
-   [`0082`](handoff/0082-ruling.md), and BUILT at
-   [`0083`](handoff/0083-report.md) — see THE QUEUE item 8 below.
+> **Trimmed 2026‑10‑03, on Patrick's word — [`handoff/0204-report.md`](handoff/0204-report.md).**
+> Six of this section's eight numbered items were DONE and still carried
+> their whole build narrative. What is open is stated; what is closed is
+> one line and its report. The text as it stood is at
+> `git show 0f833f4:docs/SESSION_SNAPSHOT.md`. The roofline arc — the
+> work actually in flight — is §0, not here.
 
-8. **THE WALL ORTHOGONALITY REPAIR — BUILT, GATED GREEN, AMBER, STOPPED FOR
-   PATRICK'S CHECK.** [`0066-ruling.md`](handoff/0066-ruling.md) item C, read
-   back at [`0079-report.md`](handoff/0079-report.md), amended and unblocked
-   at [`0082-ruling.md`](handoff/0082-ruling.md) (withdrew the
-   refuse-to-start clause, moved the before/after differential onto a stable
-   key, made the conflict predicate re-evaluate per wall against the
-   document as mutated so far). Built exactly to that spec:
-   `validate.py`'s `repair_wall_orthogonality` + `OrthogonalityRepairDialog`
-   + Edit ▸ "Repair wall orthogonality…". The candidate population is the
-   near-axis census itself (`0 < deg <= 1.0`), not a displacement-bounded
-   set — settled by `0079`/`0082` both treating `farmplaceBIGmultifloor`
-   `w24` (0066's own 3.000″ headline outlier) as a genuine candidate,
-   refused only for conflict. **Two findings measured, neither anticipated
-   by either ruling** ([`0083-report.md`](handoff/0083-report.md) §§4-5):
-   "61 of 63" does not hold corpus-wide — `fixtures/incoming/crossfloor-snap-2026-08-17.json`
-   alone carries 37 near-axis walls, and straightening it introduces two
-   genuine new `I14` violations, so `0082`'s own whole-document rollback
-   (correct as specified) withholds all 37 — the honest corpus total is
-   **22 moved, 4 refused, 37 withheld by one file's rollback** (receipt:
-   `docs/evidence/orthogonality_repair_census.py`, new); and a wall the
-   repair REFUSES can still have its own displacement change, because it
-   shares a vertex with a wall the repair DOES move (measured on
-   `wiscaway2026-08-09R`'s `w54`) — a real gap in `0079`/`0082`'s own
-   acceptance clause (f), named for a future ruling, not silently tested
-   around. Chain receipt run per `0082` §3's own instruction: RED under a
-   naive as-loaded predicate (a real six-wall chain, `w53..w59`, ends up
-   WORSE — one wall at 3.25° off axis), GREEN under the built one (every
-   non-refused wall in the chain lands at exactly 0°). 19 new tests
-   (`tests/test_orthogonality_repair.py`), full suite 852 passed, `ruff`
-   clean, gate GREEN. Item 3 (user-settable `T`, the graph solve) is
-   unaffected and stays RED. **[PR #37](https://github.com/pjm4github/FloorPlanner/pull/37)
-   open on `wall-orthogonality-repair`, AMBER, stopped for Patrick's own
-   check** (`0066` §7: run the repair on the plan behind `L2.dxf`,
-   re-export, recount against Chief's 75 — and does the drawing still look
-   like the drawing).
+**OPEN, in order — neither started:**
 
-**Full tiered queue (A2–A5, the command-roster census, Phase 5's remainder,
-etc.):** [`ROADMAP.md`](ROADMAP.md) §3. **`boat_trailer` and the vehicle
-loft** are not in this queue — both behind a read-back, design at
-[`floorplanner/viewer/VIEWER_NOTES.md`](../floorplanner/viewer/VIEWER_NOTES.md)
-§5.
+1. **The status board — GREEN, read-back first.**
+   [`handoff/0019-ruling.md`](handoff/0019-ruling.md), priority lowered by
+   [`0029`](handoff/0029-ruling.md) §6 (Patrick's Cowork skill renders the
+   same state on demand — a view, not the artifact). Freeze the closed
+   migration's Status table as history; move forward status to a generated
+   `docs/STATUS.md`, which does not exist yet. Read-back owed: what
+   identifies a completed unit when recent work has no phase number.
+2. **Grid snap, the inversion — AMBER, fully specified, read-back owed
+   before any code.** Spec: [`ROADMAP.md`](ROADMAP.md) A6 — snap by
+   default, shift means unconstrained, the angled-wall rule quantises
+   length along the ray, intersection joins with their two refusals, the
+   live readout shows snapped values. The read-back: clause by clause
+   EXISTS/PARTIAL/ABSENT, thresholds with reasons, the shift-modifier
+   audit, the angle convention already in the geometry code, Ctrl's
+   disposition — **and one clause more, from [`0056`](handoff/0056-report.md):
+   does snapping cover the OUTPUT of an operation, or only cursor input?**
+   **This is not** [`0108`](handoff/0108-ruling.md)–[`0110`](handoff/0110-ruling.md)'s
+   per-wall "Snap wall to grid" actions, which are built and merged.
 
-**Cross-floor snapping/bleed-through — Patrick's own report
-([`0035`](handoff/0035-ruling.md), [`0036-ruling.md`](handoff/0036-ruling.md),
-[`0037`](handoff/0037-ruling.md)) — GREEN measurement only so far, still not
-started as a fix, does not displace items 1–2 above.** [D67](defects/0067-selection-is-not-scoped-to-the-active-floor.md)
--adjacent. `0037`'s named suspect (the v5 load path never re-syncing floor
-display state) **does not hold** — measured directly on Patrick's own
-submitted plan, both by code reading and by a live headless probe:
-`apply_design_to_scene` already calls `win._sync_floor_state()`
-(`floorplanner/design/bridge.py:1265`, present since 2026‑07‑26). See
-[`0038-report.md`](handoff/0038-report.md). **`0037` §3's narrowed census —
-run** ([`0060-report.md`](handoff/0060-report.md), folded into the
-orthogonality item above per [`0059`](handoff/0059-ruling.md) §5 item 3):
-every mouse/macro reachability path (`items.py`'s `hit_candidates()` and
-everything built on it) trusts Qt's visible/enabled state alone, versus
-`walls.py`'s geometry hot paths, which all check `.floor` directly — a
-structural gap ("a derived property that must be manually re-applied is not
-derived — it is cached," `0037` §5), currently masked because
-`apply_floor_visibility` does run at load. Not a reproduced bug; no fix
-built (AMBER). **Reopens [`0036-ruling.md`](handoff/0036-ruling.md)
-§3's own discriminator** (does the saved document change across the
-gesture?), still unrun — blocked on two facts neither ruling nor the intake
-file states (was `show_others` on; did the wall stay moved after release).
-`fixtures/incoming/crossfloor-snap-2026-08-17.json` has no `.txt` companion
-note; one handoff old, not yet two.
+**Full tiered queue (A2–A5, the command-roster census, Phase 5's
+remainder):** [`ROADMAP.md`](ROADMAP.md) §3.
 
-> **Numbering collision, on the record rather than hidden:
-> [`handoff/0036-ruling.md`](handoff/0036-ruling.md) and this session's own
-> `handoff/0036-report.md` (on branch `shower-identity-redraws`) are two
-> unrelated files sharing one number.** Both legitimately committed on their
-> own branches; neither renamed — doing so would break more citations than it
-> fixes. Numbering continues forward from `0038`.
+**NAMED, NOT BUILT — each waits on its own ruling:**
 
-**`fp2dxf` (a v5 → Chief Architect DXF exporter, built outside this repo) —
-[`0038-ruling.md`](handoff/0038-ruling.md), DONE end to end and MERGED —
-[PR #33](https://github.com/pjm4github/FloorPlanner/pull/33) → `main` at
-`15bd553`. Patrick's check passed.** Accepted in principle:
-pure stdlib, a clean `convert()` API, a real differential-receipt finding
-(both doors import as windows). Thickness reads `STD_T` by path (the
-D73/D74 disease closed, not repeated), all three library-hygiene fixes
-(`SystemExit` → a catchable `ValueError`, `print()` confined to the CLI
-entry point with `convert()` returning warnings/summary on
-`ConvertResult`, explicit `utf-8` on both writes) — all measured done per
-[`0043-report.md`](handoff/0043-report.md), landed on `main` at `5d61f1f`.
-**Everything §5's owed list named is now built on the PR branch**: the zip
-unpacked and deleted, its sample + sidecars → `fixtures/chief-export/`,
-its 16 screenshots → `docs/evidence/chief-export/`, the golden DXF pair
-regenerated against `STD_T` (diff stated in full: only `exterior`
-6.5″→6.0″ and `railing` 3.0″→2.0″ moved), the README split (workflow
-section transcribed, not summarised), the File ▸ Export ▸ Chief Architect
-(DXF)… menu action + completion dialog, and a 7-test golden-file receipt.
-Gate GREEN, ruff clean. **Patrick's own manual check — Chief Architect
-import, confirmed walls/doors/windows arrive as their own kinds — is out
-of Code's reach and is the merge condition**, not claimed done. Full
-receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
+* [D79](defects/0079-six-catalog-symbols-extrude-as-disconnected.md) — six
+  catalog symbols with a fragmented body, exempted by name from the
+  extrudability predicate; `boat_trailer` with them.
+* `boat_trailer` and the vehicle loft — behind a read-back; design at
+  [`floorplanner/viewer/VIEWER_NOTES.md`](../floorplanner/viewer/VIEWER_NOTES.md) §5.
+* The four masked reachability sites, and `wall_endpoint_open`'s
+  `floor=None` default, which should invert but changes two callers
+  ([`0063-ruling.md`](handoff/0063-ruling.md)). Every mouse/macro hit path
+  trusts Qt's visible/enabled state where `walls.py`'s geometry paths check
+  `.floor` — the structural gap [`0037`](handoff/0037-ruling.md) §5 names.
+  **D67's class: its two measured sites are in §0.**
+* The orthogonality repair's clause (f): a wall the repair REFUSES can
+  still move, through a vertex it shares with one the repair does move
+  ([`0083-report.md`](handoff/0083-report.md) §§4–5). And its item 3 — a
+  user-settable `T`, the graph solve — stays RED.
 
-> **A second numbering collision, same session:
-> [`handoff/0038-ruling.md`](handoff/0038-ruling.md) and this session's own
-> `handoff/0038-report.md`** (written earlier, about the cross-floor
-> investigation) **share a number.** Neither renamed. Numbering continues
-> forward from `0039`.
+**CLOSED — one line each; the report is the record.**
+
+| item | outcome | record |
+|---|---|---|
+| The extrudability predicate | built, merged. D76 stands unamended; **a mark nested in a translucent body is invisible — a redraw adds `beside` shapes, never regions** | [`0029`](handoff/0029-ruling.md) §2 · [`0032`](handoff/0032-report.md) · [`0036-report`](handoff/0036-report.md) |
+| The artwork redraws (`shower`, `glass_shower`, `walk_in_shower`) | built, his check passed, merged | [`0016`](handoff/0016-ruling.md) · [`0033`](handoff/0033-report.md) · [`0050-ruling`](handoff/0050-ruling.md) |
+| `Docs-Snapshot` out of the `pull_request` CI lane | done | [`0042`](handoff/0042-ruling.md) · [`0048`](handoff/0048-report.md) |
+| The commit hook: quick for commit, full for push | done | [`0043-ruling`](handoff/0043-ruling.md) · [`0047`](handoff/0047-ruling.md) · [`0049`](handoff/0049-report.md) |
+| The orthogonality report and its corpus census (63 near-axis walls of 948) | done | [`0055`](handoff/0055-ruling.md)–[`0060`](handoff/0060-report.md) |
+| The cross-floor align fix (`_align_to_wall`, `wall_endpoint_open(floor=)`), with its positive control | merged, PR #34 | [`0061`](handoff/0061-ruling.md)–[`0063`](handoff/0063-ruling.md) |
+| The wall orthogonality repair | merged, PR #37. Corpus: 22 moved, 4 refused, 37 withheld by one file's rollback | [`0066`](handoff/0066-ruling.md) · [`0079`](handoff/0079-report.md) · [`0082`](handoff/0082-ruling.md) · [`0083`](handoff/0083-report.md) |
+| `fp2dxf`, the v5 → Chief Architect DXF exporter | merged, PR #33, his Chief import check passed | [`0038-ruling`](handoff/0038-ruling.md) · [`0043-report`](handoff/0043-report.md) · [`0050-report`](handoff/0050-report.md) |
+
+**Patrick's cross-floor report of 2026‑08‑17**
+([`0035`](handoff/0035-ruling.md)–[`0037`](handoff/0037-ruling.md);
+[`0038-report`](handoff/0038-report.md) refuted the load-path suspect):
+its snapping half is the align fix above; its selection half is D67,
+reproduced at [`0201`](handoff/0201-report.md).
+
+**Numbering collisions in this range, neither renamed:** `0036` and `0038`
+each name a ruling and an unrelated report (§0 lists the later ones).
 
 ---
 
@@ -422,7 +238,7 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`52a2870`** at this file's cut — this commit lands [`0203-report.md`](handoff/0203-report.md) (this file trimmed, on Patrick's word). R6.c is built on `roofs-r6c-tool-levels`, [PR #69](https://github.com/pjm4github/FloorPlanner/pull/69), AMBER, stopped for his check — see §0. Every earlier PR through #68 is merged (#59 was closed, superseded by #60); §0's table links each tranche's report. |
+| **`main`** | **`0f833f4`** at this file's cut — [`0203-report.md`](handoff/0203-report.md) landed (§0 trimmed); this commit lands [`0204-report.md`](handoff/0204-report.md) (THE QUEUE trimmed) — both on Patrick's word. R6.c is built on `roofs-r6c-tool-levels`, [PR #69](https://github.com/pjm4github/FloorPlanner/pull/69), AMBER, stopped for his check — see §0. Every earlier PR through #68 is merged (#59 was closed, superseded by #60); §0's table links each tranche's report. |
 | **Branches** | **`roofs-r6c-tool-levels` open, AMBER, [PR #69](https://github.com/pjm4github/FloorPlanner/pull/69) waiting on Patrick's check** (its snapshot is the branch's own cut; at the merge, merge `main` into it, take `main`'s snapshot, and re-cut it as the merged state). Otherwise only `main` on the remote: every merged branch was deleted in its merge step, local and remote. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 32 open** (D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
