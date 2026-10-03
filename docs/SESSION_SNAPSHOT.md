@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 8034a34 -->
+<!-- SNAPSHOT-HEAD: 52a2870 -->
 
 # Session snapshot — read this first
 
@@ -66,146 +66,72 @@ must not be trusted over it.
 
 ## 0. WHERE THE WORK IS
 
-**R5b DORMERS IS CLOSED AND MERGED — [PR #63](https://github.com/pjm4github/FloorPlanner/pull/63)
-landed on `main` by this merge commit on Patrick's word (2026‑09‑24: "this
-looks fine"), the branch deleted in the merge step; report
-[`0192-report.md`](handoff/0192-report.md) on [`0191-ruling.md`](handoff/0191-ruling.md).**
-A dormer is a `roof` record with a `host`, its back end derived where
-the ridge meets the host plane, cheeks and face derived in plan and 3D,
-`roof_clip_spans` reading territories, the Dormer tool `[M]` on the R5a
-trace, `fixtures/dormer-gable-check.json` promoted. **THE UNDO/MACRO/DORMER-FIX TRANCHE IS CLOSED AND MERGED — [PR #64](https://github.com/pjm4github/FloorPlanner/pull/64)
-landed on `main` by this merge commit on Patrick's word (2026‑09‑24:
-"that fixed it, merge PR #64"), the branch deleted in the merge step;
-reports [`0193`](handoff/0193-report.md) (the undo was already there —
-0192 §3 corrected — and pinned; the macro's `DORMER x y width eaves
-ridge [dx dy]` token, recorder and runner) and [`0194`](handoff/0194-report.md)
-(his look at the merged dormer: the back-end grip returns and sets the
-ridge height from the host plane; the dormer's own cheeks and face are
-gone from plan and 3D, and the house walls under a dormer climb into
-its roof). THEN [`0195-ruling.md`](handoff/0195-ruling.md)'s tranche — CLOSED AND
-MERGED, [PR #65](https://github.com/pjm4github/FloorPlanner/pull/65)
-landed on `main` by this merge commit on Patrick's word (2026‑09‑24:
-"that fixed it, merge PR #65"), the branch deleted in the merge step;
-report [`0196-report.md`](handoff/0196-report.md):** the dormer's
-back-end drag clamped to the rising side of the host's surface inside
-its footprint (`roofclip.rising_reach`), three fail-first tests; the
-closure below the dormer's eaves named (R4f's `_cross_roof_risers`) and
-probed by rays; 0194 §1's overclaim corrected; PR #64's merge recorded.
-THEN [`0197-ruling.md`](handoff/0197-ruling.md) OPENED R6 ON HIS
-INSTRUCTION AND MADE D50 ITS GATE — R6.0 IS CLOSED AND MERGED,
-[PR #66](https://github.com/pjm4github/FloorPlanner/pull/66) landed on
-`main` by this merge commit on Patrick's word (2026‑09‑25: "yes the new
-menu is there and the save/reload keeps the correct setting"), the
-branch deleted in the merge step; report [`0198-report.md`](handoff/0198-report.md).**
-`model.Floor` carries `elevation_in`/`height_in`; the loader and every
-writer read them; Floors ▸ <floor> ▸ "Elevation and height…" edits
-both; D50 CLOSED (`closed_by b8475b7`). **R6.a IS CLOSED AND MERGED — [PR #67](https://github.com/pjm4github/FloorPlanner/pull/67)
-landed on `main` by this merge commit on Patrick's word (2026‑09‑27:
-"This is all correct. Go ahead and merge this."), the branch deleted in
-the merge step; report [`0199-report.md`](handoff/0199-report.md).** His
-R6 fixture `fixtures/wiscaway-2level-stacked-floor.json` is promoted
-(L1 at 0″/96″ with two roofs, L2 at 100″/196″ with four); the plan view
-draws this level's roofs solid and any other level's covering roof
-ghosted (`roofs.roof_covers_floor`); the 3D popup builds the whole
-building. **R6.b IS CLOSED AND MERGED — [PR #68](https://github.com/pjm4github/FloorPlanner/pull/68)
-landed on `main` by this merge commit on Patrick's word (2026‑09‑27:
-"merge PR #68"), the branch deleted in the merge step; report
-[`0200-report.md`](handoff/0200-report.md).** The building has one
-roofscape: every live roof composes in absolute height
-(`roofclip.Lifted` / `compose_building`; `compute_roof_clips`
-untouched); the editor and `fp3d` both compose the building; walls are
-capped across levels, the dormer climb stays on its own level; the
-composition costs 0.20 s on his fixture (`_adjacent`'s bounding-box
-prefilter, `hold_roof_clips` during a load and a drag). **THE MEASUREMENTS 0197 §5 ORDERED BEFORE R6.c ARE
-DONE — [`0201-report.md`](handoff/0201-report.md), measurements only, no
-code changed (this commit lands it; 0201 opens with the record of PR
-#68's merge).** (1) **D67 REPRODUCED** on `examples/roundedMultifloor.json`:
-band the second floor, group, drag — floor 1 moves. Its three named
-candidate sites all measure clean; the leak is a fourth,
-`RoomItem.interior_walls()` with no floor predicate, reached through
-`group_selected`. **Undo is complete in one step, so the pre-committed
-blocking condition (a PARTIAL undo) is not met.** Not fixed — the order
-was a measurement; D67 stays open with the reproduction on its record.
-(2) **Two roof paths read the level's elevation, both R6.b's**
-(`sync_roof_clips`, `fp3d.build_model`); the End-On dialog's seeds, the
-room-top binding and the Dormer defaults are level-relative and
-unchanged with L2 at 0″, 100″ and 250″, and land at elevation + height
-in 3D on all six roofs; the R3b dash and the R5a trace move only through
-the composed territory. **R6.c — THE ROOF TOOL ACROSS LEVELS, on his
-word ("proceed with R6.c") — BUILT, AMBER, STOPPED FOR PATRICK'S CHECK:
-[PR #69](https://github.com/pjm4github/FloorPlanner/pull/69) on `roofs-r6c-tool-levels`, report [`0202-report.md`](handoff/0202-report.md).** Measured first on his fixture
-(`docs/evidence/r6c_roof_tool_levels_probe.py`, before and after): a
-ridge pressed on another level's ghosted roof line never started; the
-eaves pick took a ghosted wall of another level; a ridge awaiting its
-eaves survived a level switch and took its eaves from the level
-switched to. Built: a roof of a level not being edited answers no hit
-query (`roofs._roof_hittable`); the eaves pick takes a wall of the
-roof's own level only; a level switch settles the gesture first
-(`levels._settle_gesture`); the Dormer tool's refusal names the level
-the roof is on; the End-On dialog says where an upper level's roof
-stands in the building. **On his word: merge, delete the branch in the
-merge step.** **OPEN FOR HIS RULING:** the D67 fix
-(`interior_walls`, 0201 §1) and the Door/Window tool placing an opening
-on another level's ghosted wall (0202 §4) — both D67's class, neither
-built; and, carried from 0200 §6, the crossed-arm rule reads the plan
-not the height, the R3b wall dash and the R5a trace are still
-same-level, L2's storey height in his fixture is 196″.**
-**On his word: merge PR #64, delete the branch in the merge step.**
-Then R6 multifloor, on his fixture and his display-rule answer
-([`0186`](handoff/0186-ruling.md) §4). his check. Then R6 multifloor, on his fixture and his display-rule answer
-([`0186`](handoff/0186-ruling.md) §4). **THE 3D WALL CLIP IS CLOSED AND
-MERGED** ([PR #62](https://github.com/pjm4github/FloorPlanner/pull/62),
-[`0188`](handoff/0188-report.md)/[`0189`](handoff/0189-report.md)).** `viewer/fp3d.py`: the roof clips are computed
-BEFORE the walls now, and every solid piece of a wall
-(`_wall_under_roofs`) is capped at the surface of the roof whose
-territory (R4d/R4g's visible region; a lone roof's footprint) it lies
-under — the quad split by the territory's cell edges and the roof's own
-plane-change lines so each cap is one exact plane; a piece the roof
-clears keeps its top, a piece wholly above the roof (a window header) is
-gone, a wall no roof reaches keeps its height, and a plan whose roofs
-clear their wall tops builds byte-identically to before. His three-ridge
-fixture at 120″ walls: 0 wall vertices above the owning roof. **On his
-word: merge PR #62, delete the branch in the merge step.** **R5a IS
-CLOSED AND MERGED** — [PR #61](https://github.com/pjm4github/FloorPlanner/pull/61)
-on his word ("OK the dashed lines look good"),
-[`0187-report.md`](handoff/0187-report.md). Then, per
-[`0186`](handoff/0186-ruling.md) §5: the R5b dormer read-back (a report,
-no code — RED until he rules on it), R5b's build, R6 multifloor on his
-fixture and his display-rule answer — never two open AMBER tranches at
-once. 0187 §4 names the `fixtures/incoming/` duplicates (the two promoted
-`w7` files, 23 days, unlisted since 0182) — exit 2 on his word.
+> **Trimmed again 2026‑10‑03, on Patrick's word — [`handoff/0203-report.md`](handoff/0203-report.md).**
+> This section had regrown to 18,600 characters of closed-tranche narrative
+> and §1's `main` row to 13,000. Both now say **where the work is and where
+> to read the rest**. Nothing was moved anywhere new: every sentence removed
+> restated a numbered report. The text as it stood is at
+> `git show 52a2870:docs/SESSION_SNAPSHOT.md`. **Keep it this size:** when a
+> tranche closes, REPLACE its entry with one line and a link; do not append.
 
-**The one-paragraph version of where this is:** 0178 built candidacy-
-widening and a single-coverage-ground anchor; 0179 replaced its rank-
-walking fallback with a prune-and-re-envelope fixed point; 0180 measured
-15% blank and diagnosed the anchor rule certifying only the biggest root
-component; 0181 ruled the criterion — a roof connects to its anchor by
-passing UNDER a winner, never by floating ABOVE one — and ordered one
-more pass. 0182 built it and measured that the rule as written did not
-reach 0% on its own (D85's corner rode its own wedge into B's hidden
-ground; cell-granularity pruning lost ground to nobody; simultaneous
-pruning severed rf3's rake-side body by nothing but rf2's own phantom).
-Two facts closed it, each measured: **a swallowed end that has CROSSED
-its host's ridge names the phantom** (A's end 50" past the apex, rf1's
-49" past the pinch; B's start on A's ridge and rf2's end 13" short of
-rf3's ridge are joins, not overshoots) — phantoms prune first, one at a
-time, shorter overshoot first, orphans only once no phantom remains,
-root orphans certified by the network; and **a joining end's extension
-never comes back up** (B's lens). Results: 0% blank on the three-ridge
-fixture with the partition invariant asserted globally through a new
-`diag` hook (`blank ⊆ root ground of uncertified limbs`, and that set
-empty); on the L the one legal blank is D85's corner; rf1 east of the
-pinch exactly 0; the junction is his v2 picture (rf1 ends at the pinch,
-two rf1/rf2 valleys, the second to the triple point, rf2 on to its end,
-rf3 under rf1 to its rake); the outer-corner seam vertex (441.4, 100)
-RESTORED; the triple point a drawn seam vertex of all three again; the
-floor (D85, poke-through, pinch exclusion, 0 interior jumps, T/L suites,
-`clip_pair` untouched) unmoved. Named limits: 0.11 s → 0.36 s on the
-fixture; four sub-inch slivers at (756, 553) with sub-half-inch steps;
-a join end's cut-off root corner touching hidden ground would certify —
-no fixture exercises it. Tests: three new, five rewritten to the
-restored receipts (the gap test back to 0, the riser test admitting the
-named-correct rake fascia and nothing else).
+**OPEN NOW — R6.c, the roof tool across levels: BUILT, AMBER, STOPPED FOR
+PATRICK'S CHECK.** [PR #69](https://github.com/pjm4github/FloorPlanner/pull/69)
+on `roofs-r6c-tool-levels`, report [`0202-report.md`](handoff/0202-report.md)
+(on his word, "proceed with R6.c"; [`0197-ruling.md`](handoff/0197-ruling.md)
+§5 names the tranche). His check is 0202 §5. **On his word: merge, delete the
+branch in the merge step, record the merge in the report that follows
+(0197 §7).**
+
+**READ THIS BEFORE TOUCHING THE BRANCH.** On 2026‑10‑03 the branch's working
+tree held uncommitted work that is **not this session's** and is not in any
+report: `fixtures/r6c-two-level-tool-check.json` + `.md` (a tiny two-level
+manual-check fixture, dated 2026‑09‑29), a test for it added to
+`tests/test_r6c_roof_tool_levels.py`, and a row in `fixtures/README.md`
+saying it was *"added after the six-step cumulative check on the real
+Wiscaway plan ended in a native Qt crash."* **That crash is not recorded in
+any report and has not been reproduced here** — establish it first.
+`fixtures/incoming/single-floor-90-roof-gable-end-check.json` arrived
+2026‑10‑03, untriaged. All of it was left in place, untouched.
+
+**OPEN FOR HIS RULING, none built:**
+
+* [D67](defects/0067-selection-is-not-scoped-to-the-active-floor.md) —
+  reproduced, mechanism `RoomItem.interior_walls()` with no floor predicate,
+  undo complete; the fix is one predicate ([`0201`](handoff/0201-report.md) §1).
+* The Door/Window tool places an opening on another level's ghosted wall —
+  D67's class, measured 56 → 57 ([`0202`](handoff/0202-report.md) §4).
+* A dormer on a roof of another level, and the R3b wall dash / R5a trace
+  across levels — one decision (0202 §6; [`0200`](handoff/0200-report.md) §6).
+* The crossed-arm rule reads the plan, not the height; L2's storey height in
+  his fixture is 196″ (0200 §5–6).
+* The End-On dialog's level line was built from a finding, not a fault — his
+  to reverse (0202 §2).
+
+**THE ROOFLINE ARC, CLOSED TRANCHES — one line each; the report is the record.**
+
+| tranche | what | PR | report |
+|---|---|---|---|
+| R1–R3b | model, ridge sketch, end-on marker, show/edit, planes and gables, the wall clip line | #48–#53 | [`0139`](handoff/0139-ruling.md)–[`0153`](handoff/0153-report.md) |
+| R4a–R4c | schema, parameters dialog, five grips | #54–#56 | [`0155`](handoff/0155-report.md)–[`0163`](handoff/0163-report.md) |
+| R4d–R4g | intersection clip, mesh clip, the three-ridge envelope, the full footprint | #57, #58, #60 (#59 closed, superseded by #60) | [`0164`](handoff/0164-ruling.md)–[`0185`](handoff/0185-report.md) |
+| R5a | the clip trace on the roof | #61 | [`0187`](handoff/0187-report.md) |
+| 3D wall clip | walls capped under roofs | #62 | [`0188`](handoff/0188-report.md), [`0189`](handoff/0189-report.md) |
+| R5b | dormers; then undo, the `DORMER` macro token, the grip clamp | #63–#65 | [`0190`](handoff/0190-report.md)–[`0196`](handoff/0196-report.md) |
+| R6.0 | D50 closed: a level's elevation and height survive | #66 | [`0198`](handoff/0198-report.md) |
+| R6.a | plan-view roof rule; 3D builds the whole building | #67 | [`0199`](handoff/0199-report.md) |
+| R6.b | one roofscape, composed in absolute height | #68 | [`0200`](handoff/0200-report.md) |
+| (measurements) | D67 reproduced; roof paths and the level's elevation | — | [`0201`](handoff/0201-report.md) |
+
+Everything before the roofline arc — the vessel/enclosure split, the three
+redraws, the wall orthogonality repair, the wall id fix, the snap-to-grid
+features — is merged and closed; `handoff/README.md`'s pair table is its
+trail.
+
+**Named, not ordered:** valley/hip lines; a roof-plan export sheet; yard
+items. **Carried, undated:** room-label rounding
+([`0131`](handoff/0131-ruling.md) §2); delta-snap sites; the D61 family.
+**Numbering collisions on the record:** `0036`, `0043`, `0050`, `0101`,
+`0138`, `0139` — neither renamed after commit.
 
 **Traps for whoever touches `roofclip.py` next:** the fixed point's
 three classes (phantom / root limb / orphan) and the ORDER they prune in
@@ -226,109 +152,10 @@ trace (`roof_clip_trace`) is computed at PAINT time like the wall dash
 (rooms change without the roof hearing), and the join extension it
 carries while clipped is R4d's raw reach -- hundreds of inches -- only
 ever seen through `_drawn_trace`'s region clip; never draw the
-unclipped locus of a clipped roof.
-
-**THE VESSEL/ENCLOSURE SPLIT IS MERGED — PR #31 → `main`, 2026‑08‑16 — AND
-D78 (a CI-only gate bug the merge itself surfaced) IS CLOSED.** Full trail,
-one line per exchange: [`handoff/README.md`](handoff/README.md)'s pair table,
-`0018` through `0028`. Live records: [D75](defects/0075-a-recessed-floor-feature-is-not-representable.md)
-(accepted limit), [D76](defects/0076-an-opaque-mesh-inside-a-translucent-body-does.md)
-(renderer limit, open), [D77](defects/0077-fp3d-py-shot-reports-success-on-a-failed.md)
-(tooling gap, open), D78 (closed).
-
-**THE THREE REDRAWS ARE BUILT, CHECKED AND MERGED — [PR #32](https://github.com/pjm4github/FloorPlanner/pull/32)
-→ `main` at `b6ac4d1`, closing the artwork item open since 2026‑08‑15.**
-[`handoff/0033-report.md`](handoff/0033-report.md) opened it;
-[`0034-ruling.md`](handoff/0034-ruling.md) withdrew `0030`'s D76-contradiction
-claim (the mesh measurement stands) and named the check as **two questions**:
-does it read at a glance, and is the camera working distance. Both answered
-with evidence: room-scale renders (`0031`'s original camera, for
-comparability) AND working-distance renders (furnishings' own bbox, for the
-actual glance test) are both on record —
-[`handoff/0036-report.md`](handoff/0036-report.md). **At working distance the
-marks are unambiguous, and Patrick's check ([`0050-ruling.md`](handoff/0050-ruling.md))
-was in the running app**, so the camera question is answered by construction.
-[D79](defects/0079-six-catalog-symbols-extrude-as-disconnected.md) filed for
-the six fragmented items the predicate found beyond `boat_trailer`. **Brought
-current with `main` (9 then 1 commits behind, in two rounds — see
-[`0053-ruling.md`](handoff/0053-ruling.md) §1), re-gated GREEN on the fully
-combined tree, extrudability census re-run: `glass_shower` 0→2 filled shapes
-(was predicate 1's only failure), `shower` 2 filled/1 frag/no region,
-`walk_in_shower` 3 filled/1 frag/has region (pre-existing D76-invisible
-bench) — all three predicates pass.** See THE QUEUE below.
-
-**A recovery landed 2026‑08‑17** — Code hit its context limit before a
-checkpoint; the gate was GREEN at the limit, so it cost one commit, not a
-lost session. Gate re-run found and fixed one new finding (`B905`), then
-committed GREEN at `5d61f1f`. Full trail:
-[`handoff/0041-ruling.md`](handoff/0041-ruling.md),
-[`handoff/0043-report.md`](handoff/0043-report.md) (numbered `0043`, not
-`0042` — [`handoff/0042-ruling.md`](handoff/0042-ruling.md), Patrick's own
-CI-lane ruling, landed on disk mid-recovery and took the number first).
-
-**[`handoff/0044-ruling.md`](handoff/0044-ruling.md) set the order for
-everything owed after the recovery** — push, the mailbox cherry-pick, a gate
-flap receipt, `0042`'s CI-lane move, `0043`'s hook split, then the DXF
-integration last, on a fresh context. **Done:** the `0033`–`0036-report.md`
-cherry-pick (the mailbox hole `0040` §4 first named is closed) and the flap
-receipt (gate run twice on one unchanged tree, identical both times — no
-flap; Patrick's "seems to be flapping" was the 92.6s of 3x test time, per
-[`0043-ruling.md`](handoff/0043-ruling.md) §1, not nondeterminism, confirmed
-at [`handoff/0047-ruling.md`](handoff/0047-ruling.md) §1). [`0047`](handoff/0047-ruling.md)
-authorised all three held items — push needed no asking (the autonomy policy
-already covers GREEN pushes), the CI-lane move as ruled at `0042`, the hook
-split with four controls instead of one. **Also done:** `main` pushed to
-`origin` (was 3 ahead), the `Docs-Snapshot` check moved out of the
-`pull_request` CI lane ([`handoff/0048-report.md`](handoff/0048-report.md)),
-and the commit hook split — `git commit` accepts a `--quick` or full GREEN
-result, `git push` requires full specifically, 18 new tests against an
-isolated fixture repo covering all 8 cells of `0047`'s table plus
-distinct-message and freshness controls (caught a real pluralisation bug
-before it shipped) — [`handoff/0049-report.md`](handoff/0049-report.md).
-**Everything [`0044`](handoff/0044-ruling.md) §3 / [`0047`](handoff/0047-ruling.md)
-ordered is done except item 6.** [`handoff/0045-ruling.md`](handoff/0045-ruling.md)
-landed alongside — a correction to how Patrick's own shower check is run
-(against the wrong branch), tier NONE, no action item for Code.
-
-**[`0044`](handoff/0044-ruling.md) §3 item 6 / [`0047`](handoff/0047-ruling.md)
-§5's `fp2dxf` DXF integration is BUILT, CHECKED, MERGED — [PR #33](https://github.com/pjm4github/FloorPlanner/pull/33)
-→ `main` at `15bd553`, closing this list's last item.** The zip unpacked and deleted, the golden DXF
-pair regenerated against `STD_T` (diff stated in full: only
-`exterior`/`railing` moved), the README split (the verified Chief Architect
-workflow transcribed, not summarised, into the root `README.md` — not
-`docs/guides/` as [`0052-ruling.md`](handoff/0052-ruling.md) later specified;
-that ruling landed after this branch had already forked and could not be
-seen from it, flagged rather than silently left), the File ▸ "Export ▸ Chief
-Architect (DXF)…" menu action (one flat File-menu entry, not a nested
-submenu — the `▸` is only in the label text) + completion dialog, a 7-test
-golden-file receipt, gate GREEN. **Patrick's own manual check PASSED
-2026‑08‑17** — exported the regenerated `L1.dxf`/`L2.dxf` and imported into
-Chief Architect X17, closing [`0038-ruling.md`](handoff/0038-ruling.md) §8's
-merge condition. Full receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
-
-**THE WALL ORTHOGONALITY REPAIR (item C) IS BUILT, GATED GREEN, AND OPEN AS A
-FOURTH AMBER PR — `wall-orthogonality-repair`, stopped for Patrick's own
-check.** [`0066-ruling.md`](handoff/0066-ruling.md) →
-[`0079-report.md`](handoff/0079-report.md) →
-[`0082-ruling.md`](handoff/0082-ruling.md) (three amendments, unblocking) →
-[`0083-report.md`](handoff/0083-report.md) (built, plus two measured
-findings neither ruling anticipated — see THE QUEUE item 8). Full detail
-there; not restated here beyond the pointer, per this file's own rule that
-an index does not summarise the thing it indexes.
-
-**THE WALL ID/COORDINATE FIX (`0098`–`0102`) IS BUILT, AMBER, BATCHED WITH
-PR #37's CHECK.** [`0103-ruling.md`](handoff/0103-ruling.md) accepted it,
-found and owned a real contradiction in `0100` (§5 vs §6 — now a standing
-rule: naming something as unblocking a person exempts it from its own
-read-back gate, stated in the same sentence), and answered the four
-remaining questions: centre-and-select (not select alone), a dead row is one
-whose id fails a fresh round-trip walk (not just `sip.isdeleted`), Coalesce's
-preview is its own item (RED, pending its own ruling), and the gaps dialog
-is dropped (`0100` §2 was wrong to call it the same treatment — a gap is a
-vertex pair, no wall id). **Owed now: the shared `WallRowList` widget
-(AMBER, tier 2) on both `wall-report-id-fix` (PR #39) and
-`wall-orthogonality-repair` (PR #37); the mailbox hook's duplicate-number
-check (GREEN, tier 3) is being built in this session.**
+unclipped locus of a clipped roof. **Since R6.b** composition is the
+whole building's (`compose_building`, absolute height), and
+`hold_roof_clips` holds it during a load and a drag; **since R6.c** a roof
+of a level not being edited has an empty hit shape (`_roof_hittable`).
 
 ---
 
@@ -595,8 +422,8 @@ receipt: [`handoff/0050-report.md`](handoff/0050-report.md).
 
 | | |
 |---|---|
-| **`main`** | **`8034a34`** at this file's cut — [`0201-report.md`](handoff/0201-report.md) landed; this commit lands [`0202-report.md`](handoff/0202-report.md). **R6.c BUILT on `roofs-r6c-tool-levels`, [PR #69](https://github.com/pjm4github/FloorPlanner/pull/69), AMBER, stopped for his check — see §0.** **THE ROOFLINE PLAN'S R4 TRANCHES ARE ALL DONE: R4a–R4g.** PR #39/#37/#38/#40/#41/#42/#43/#44/#45/#46/#47/#48/#49/#50/#51/#52/#53/#54/#55/#56/#57/#58 all merged. **`0108`-`0110`'s three snap-to-grid features COMPLETE. ITEM C CLOSED** (`0066`/`0137`/`0138-report.md` — zero walls flagged). **THE ROOFLINE PLAN — [`0139-ruling.md`](handoff/0139-ruling.md) (authored `0138`, renumbered on landing), BUILDING. R1/R2/R2b/R2c/R3/R3b/R4a MERGED.** **D83/D84 held, D84 reclassified task→defect** ([`0145-ruling.md`](handoff/0145-ruling.md) §1). **R3b CLOSED** (D85 closed with it — see [`0153-report.md`](handoff/0153-report.md)). **R4 RE-PLANNED into R4a/R4b/R4c — [`0154-ruling.md`](handoff/0154-ruling.md)** (his own five requirements: overhang editing, full JSON persistence, a solid schema, five-grip direct manipulation, an eaves-to-room-top binding). **R4a CLOSED, MERGED — [PR #54](https://github.com/pjm4github/FloorPlanner/pull/54), [`0155`](handoff/0155-report.md)/[`0156-report.md`](handoff/0156-report.md)** (`ruff` + full gate both green on CI; the other three CI jobs stay intentionally disabled per [`0105-ruling.md`](handoff/0105-ruling.md)). The roof footprint enters the schema: `span_in`/`overhang_in` are now `[left, right]` per side (`design-schema.v5.json`, `oneOf` still accepting a pre-R4a bare-number `overhang_in`, no version bump); `eaves_bind: "manual"|"room_top"` gets a field to round-trip (R4b owns the actual `room_top` behaviour). `RoofItem.span_in`/`.overhang_in` are now properties normalising a bare-number assignment to `[v, v]`, so no existing caller broke. `design/bridge.py` no longer re-derives a span on every load — only a pre-R4a document (no `span_in` at all) falls back to the old nearest-wall search, and MATERIALISES the result so the next save owns it. `fp3d.py`'s 3D planes read the per-side fields too, with its own y-flip reversing handedness (world `+normal` = plan-space `span_in[1]`, not `[0]`) — documented at the line it matters and pinned by a dedicated cross-check test. Named consequence landed on schedule: unequal per-side spans with one ridge/eaves height pair now give unequal pitch (a saltbox) — 0139's v1 symmetric-eaves assumption retires here. `roof_clip_spans` (R3b's own function) updated for per-side reach/slope with an explicit switch-side breakpoint at `perp == 0`. Receipt run against the real `fixtures/roofs-r3-orbit-check.json` (no wiscaway-with-roofs file exists in the repo): loaded, walked back out, reloaded, and number-identical on every geometric fact checked, including `fp3d`'s own mesh vertices/faces. 19 new tests. Full suite **1168 passed**, `ruff` clean, gate GREEN. **THE ROOFLINE PLAN'S BUILDABLE TRANCHES ARE ALL DONE: R1/R2/R2b/R2c/R3/R3b/R4a/R4b/R4c** — `0154`'s five requirements each closed by a merged tranche; **R4b CLOSED, MERGED — [PR #55](https://github.com/pjm4github/FloorPlanner/pull/55) at `9d91705` on Patrick's word ("Outline looks right, merge it"), [`0161-report.md`](handoff/0161-report.md).** The parameters dialog ([`0157-report.md`](handoff/0157-report.md)): per-side overhang with a same-both-sides link; gable↔hip per end, the ends named by the marker, with real hip geometry in the 2D overlay, `fp3d`'s mesh (R3's "left open and named" placeholder retires) and R3b's clip line; the `room_top` binding, which locks the eaves field to the covered rooms' HIGHEST ceiling (mismatch reported, no-room fallback reported) and re-syncs at every room-height edit through the room's own Properties door, never on load. **His check ran 2026‑09‑07 and found three things, all fixed on the branch — [`0158-report.md`](handoff/0158-report.md):** the eaves pick mirrored ONE span to the far side, so an off-centre ridge got a lopsided footprint (now measured per side, each to its own wall, mirroring only where there is none); no way to correct an existing roof's spans (the dialog now has "Eaves span, left / right"); and the span was measured to the ridge SEGMENT, inflating it whenever a wall's midpoint projected past a ridge end — a short or shifted 45° wing ridge (now the perpendicular distance to the ridge LINE, so 24" overhang is 24" from the wall along its normal, two 12" grid lines). Re-gated GREEN, PR #55 updated. **His re-check PASSED ("OK that works OK", [`0159-report.md`](handoff/0159-report.md)); one more finding built on the branch: the selection outline now hugs the roof (the eave rectangle, oriented with the ridge — `RoofItem.selection_outline()`), not the axis-aligned bounding box. Outline checked by him, merged. [`0160-ruling.md`](handoff/0160-ruling.md) verified `0158`/`0159` against the branch, endorsed two decisions as precedent (the migration keeps the segment-form search — a migration is not the place for a content correction; pitch's canonical side is LEFT), and names the one look left: select the 45° wing's roof, the outline hugs it; on his word merge PR #55, delete the branch in the merge step, R4c starts — whose eave-edge grips must drag exactly the two `span_in` values the dialog edits. `0160` §3's hygiene line done: `git fetch --prune` removed `origin/roofs-r3b-clip-line` AND `origin/roofs-r4a-schema` — both were unpruned local tracking refs, the remote branches themselves were already gone**; **R4c CLOSED, MERGED — [PR #56](https://github.com/pjm4github/FloorPlanner/pull/56) at `8b33064` on Patrick's word ("All five grips work, merge it"), [`0162`](handoff/0162-report.md)/[`0163-report.md`](handoff/0163-report.md).** Direct manipulation: five grips on a selected roof (two eave edges, two gable ends, the ridge); the eave-edge grips drag exactly the two `span_in` values the dialog edits (`0160` §2's receipt, read back through the dialog in a test); the end grip moves that endpoint along the axis; the ridge slides between byte-identical eave edges (`0140` §4's deferral, due); every drag LANDS ON the grid (`0070` §3's class, tested from an off-grid start); undo is the settled gesture. His check passed on all five; **R4d — ROOF INTERSECTION CLIPPING, [`0164-ruling.md`](handoff/0164-ruling.md) — CLOSED, MERGED, [PR #57](https://github.com/pjm4github/FloorPlanner/pull/57) at `7a76283` on Patrick's word ("The roof seams look good now"), [`0165`](handoff/0165-report.md)/[`0166`](handoff/0166-report.md)/[`0167-report.md`](handoff/0167-report.md):** a pure function of the roofs (`roofclip.py`, nothing stored), the seam as the exact equal-height locus drawn solid, a roof drawing only up to the seam with the far-side island dropped and the other roof showing through, selected = unclipped and deselect re-clips, same floor only, coplanar pairs unclipped with a warning. **His check ran 2026‑09‑07: the seam was right but the joining roof still drew past it where its own surface was the higher one (equal-height L, his 3D view showed A's end poking through B) — fixed on the branch, [`0166-report.md`](handoff/0166-report.md): a roof stops at the seam on its own body's side (anchored reach, seams block), unreached overlap pieces go to the LOWER surface, a joining end extends past its own end edge inside the other roof so the outer corner closes with a hip, and no end line is drawn at a joined end. Re-checked by him and merged.** **R4e — MESH CLIPPING, ordered by his sentence ("then lets enable mesh clipping"; `0164` §2 had it named, not ordered) — CLOSED, MERGED, [PR #58](https://github.com/pjm4github/FloorPlanner/pull/58) at `e780b56` on Patrick's word ("3D view looks right"), [`0168`](handoff/0168-report.md)/[`0169-report.md`](handoff/0169-report.md): `roofclip.py` Qt-free with `RoofGeom` (the document-record twin of `RoofItem`'s geometry), `fp3d.py` loading it by path and building a clipped roof's mesh from its visible cells lifted onto the surface, a lone roof byte-identical to before; checked by him in the 3D view and merged.** **R4f — THE THREE-RIDGE CLIP — [`0170-ruling.md`](handoff/0170-ruling.md), answering [`0169`](handoff/0169-report.md) §2's held case: "multiple roof lines at various ridge peak levels" — REBUILT PROPERLY on his own instruction after researching the standard technique (CGAL's `Envelope_3` / BSP-tree solid-merging literature), AMBER, STOPPED FOR PATRICK'S FOURTH LOOK — [PR #59](https://github.com/pjm4github/FloorPlanner/pull/59) on `roofs-r4f-multi-ridge`, [`0171`](handoff/0171-report.md)/[`0172`](handoff/0172-report.md)/[`0173`](handoff/0173-report.md)/[`0174-report.md`](handoff/0174-report.md). His own fixture, `fixtures/threeRidgeFloorplan.json` (promoted from `incoming/` under exit 1), names the case. Three rounds of patching the PAIRWISE-COMPOSED clip (0171/0172/0173) each fixed a real, measured defect but left a stray visual artifact -- on his own follow-up ask, researched the actual closed-form/standard technique for this problem (CGAL `Envelope_3`, BSP-tree CSG-union merging, the straight-skeleton roof algorithm all converge on the same idea) and rebuilt `compute_roof_clips` from a SINGLE shared 2D cell arrangement, built once from every live roof's plane-change lines and footprint edges at once, instead of folding independently-computed pairwise results -- so two roofs meeting at a corner are structurally forced to share the same vertices rather than each rounding to "close enough" (0171-0173's whole class of crack/sliver bugs). `clip_pair` itself is UNCHANGED and remains the two-roof reference; two roofs still reduce to exactly its answer (all 26 pre-existing tests pass unmodified). One real bug found and fixed in the rebuild itself: a piece reassigned to a fallback owner could get its seam mis-attributed to a roof that was never part of that height-equality crossing (a "seam" whose two heights weren't even equal) -- fixed by only ever drawing a seam between two pieces that kept their OWN true local-max owner. Re-verified exhaustively: 0 gaps in a 400x400 grid over the full footprint union (was a real hole before this session's earlier fixes), 0 double-owned points, 0 seam-height mismatches, the exact triple point unchanged at (681.586, 538.067) height 117.503 on all three surfaces. **A second real, separate bug found along the way**: `fp3d.py`'s gable-end-triangle drawing ignores the roof's own clip region entirely (draws the FULL, unclipped triangle even where another roof has since claimed part of that ground -- ~6% overhang measured on his fixture) -- pre-existing, unrelated to this ruling's own fixes; an attempted 2D-polygon-clip fix was itself broken (a gable triangle's plan-view projection is exactly collinear -- degenerate in 2D, only real once height is added -- so a 2D area clip always sees zero area and silently deletes every gable triangle) and was reverted rather than shipped; left named, not fixed, for a correctly-scoped future pass (needs `clip_segment` on the plan line plus 3D-linear interpolation along the triangle's own straight edges, not a 2D area operation). **HONESTLY MEASURED, NOT FULLY CLOSED**: the joining-end candidacy shape (`_strip`, reused verbatim from `clip_pair`) still has a real residual -- its own width-limited edge can seat a joining roof's eaves height directly next to a host's unrelated, uncompared height (27 such adjacent-cell boundaries measured, none on a DRAWN seam, several within 100in of the true triple point); two wider candidacy shapes were tried and both regressed the D85 two-roof test, so this was left as `clip_pair`'s own proven shape rather than risk a fourth regression. **Also unresolved**: a visual artifact persists near the triple point in the 3D render whose exact cause was not conclusively found despite extensive verification (0 gaps/overlaps at fine grid resolution, all cells convex, all main-surface normals correctly oriented, mesh fully connected) -- likely a further fp3d.py mesh-generation subtlety or a renderer artifact, not the 2D partition, which is now provably exact. Superseded and removed entirely: `_fill_unclaimed_ground`, `_subtract_claimed`, the second `_dedup_cells` call site, `MIN_FILL_AREA`, `FILL_DEDUP_TOL`, `_clip_segment_by_values` -- all were patches on the pairwise-composed architecture, none needed now that there is one arrangement to begin with. His fourth look: does the render still show the same artifact, and (his own research question answered, separately) is the SEAM MAPPING itself now correct -- it is, provably. **R5** dormers — RED behind R4d, its own ruling when Patrick wants it (`0164` §3). Named not ordered: valley/hip lines, a roof-plan export sheet, yard items (deferred, not lost). Carried, undated: room-label rounding ([`0131`](handoff/0131-ruling.md) §2); delta-snap sites; D61-family. Full trail: `handoff/README.md`'s pair table. **Numbering collisions, on the record:** `0036`, `0043`, `0050`, `0101`, `0138`, `0139`; neither renamed after commit, numbering continues forward each time. |
-| **Branches** | **`roofs-r6c-tool-levels` open, AMBER, [PR #69](https://github.com/pjm4github/FloorPlanner/pull/69) waiting on Patrick's check** (its own snapshot is cut for the branch; merge `main` into it and resolve the snapshot as the merged state when it lands). `roofs-r6b-composition` merged and deleted in the merge step, local and remote (AMBER tier, merged on Patrick's word). `roofs-r6a-display` merged and deleted in the merge step, local and remote (AMBER tier, merged on Patrick's word). `roofs-r6-0-d50` merged and deleted in the merge step, local and remote (AMBER tier, merged on Patrick's word). `roofs-r5e-grip-clamp` merged and deleted in the merge step, local and remote (AMBER tier, merged on Patrick's word). `roofs-r5c-undo-macro` merged and deleted in the merge step, local and remote (AMBER tier, merged on Patrick's word). `roofs-r5b-dormers` merged and deleted in the merge step, local and remote (AMBER tier, merged on Patrick's word). `roofs-3d-wall-clip` merged and deleted in the merge step, local and remote (AMBER tier, merged on Patrick's word). `roofs-r5a-clip-trace` merged and deleted in the merge step, local and remote (AMBER tier, merged on Patrick's word). Otherwise only `main` on the remote (verified 2026‑09‑13 after the R4g merge: `roofs-r4g-full-footprint` and `roofs-r4f-multi-ridge` both deleted). `roofs-r4e-mesh-clip` merged and deleted in the merge step, local and remote (AMBER tier, merged on Patrick's word). `roofs-r4d-clip` merged and deleted in the merge step, local and remote (AMBER tier, merged on Patrick's word). `roofs-r4c-grips` merged and deleted in the merge step, local and remote (AMBER tier, merged on Patrick's word). `roofs-r4b-parameters` merged and deleted in the merge step, local and remote (AMBER tier, merged on Patrick's word, `0160` §2). `git fetch --prune` (0160 §3) removed two stale local tracking refs, `origin/roofs-r3b-clip-line` and `origin/roofs-r4a-schema` — the remote branches were already gone. `roofs-r3b-clip-line` merged and deleted, local and remote. `Edit ▸ "Repair wall orthogonality…"` (item C) is already live on `main` (`mainwindow.py:368`) — nothing to build or merge for it. `fp2dxf-door-symbols`/`dimension-cleanup-tranche`/`angled-dimension-lanes`/`dim-row-along-refactor`/`pdf-dimension-and-door-fix`/`export-menu-pdf`/`roofs-r1-model`/`roofs-r2-ridge-sketch`/`roofs-r2b-end-on-marker`/`roofs-r2c-show-edit`/`roofs-r3-planes-gables`/`roofs-r3b-clip-line`/`roofs-r4a-schema` merged and deleted, local and remote. `fp2dxf-integration` deleted earlier, joining the five from [`0053`](handoff/0053-ruling.md) §2 item 4. |
+| **`main`** | **`52a2870`** at this file's cut — this commit lands [`0203-report.md`](handoff/0203-report.md) (this file trimmed, on Patrick's word). R6.c is built on `roofs-r6c-tool-levels`, [PR #69](https://github.com/pjm4github/FloorPlanner/pull/69), AMBER, stopped for his check — see §0. Every earlier PR through #68 is merged (#59 was closed, superseded by #60); §0's table links each tranche's report. |
+| **Branches** | **`roofs-r6c-tool-levels` open, AMBER, [PR #69](https://github.com/pjm4github/FloorPlanner/pull/69) waiting on Patrick's check** (its snapshot is the branch's own cut; at the merge, merge `main` into it, take `main`'s snapshot, and re-cut it as the merged state). Otherwise only `main` on the remote: every merged branch was deleted in its merge step, local and remote. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 32 open** (D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
