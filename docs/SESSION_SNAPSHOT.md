@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 6c2e025 -->
+<!-- SNAPSHOT-HEAD: 2dcc3f4 -->
 
 # Session snapshot — read this first
 
@@ -78,7 +78,7 @@ must not be trusted over it.
 [PR #69](https://github.com/pjm4github/FloorPlanner/pull/69) landed on `main`
 by this merge commit on Patrick's word (2026‑10‑03: "merge PR #69 and keep
 the fixture with the row corrected"), the branch deleted in the merge
-step. The merge is recorded in the report that follows it (0197 §7).
+step; recorded at [`0206-report.md`](handoff/0206-report.md).
 **NEXT, on his word of the same day: grid snap by default, angled walls
 excepted — its read-back first. See THE QUEUE.**
 
@@ -240,7 +240,7 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`6c2e025`** at this file's cut — the `roofs-r6c-tool-levels` tip, landed on `main` by the merge commit this file rides in: **R6.c CLOSED, MERGED on Patrick's word** ("merge PR #69 and keep the fixture with the row corrected"); `main`'s `d4f366a` ([`0205`](handoff/0205-report.md) landed) is its other parent. **Owed next: the report recording this merge, then the grid-snap read-back — see §0 and THE QUEUE.** Every PR through #69 is merged (#59 was closed, superseded by #60). |
+| **`main`** | **`2dcc3f4`** at this file's cut — R6.c closed and merged (PR #69, on his word); this commit lands [`0206-report.md`](handoff/0206-report.md), the record of that merge. **Owed next: the grid-snap read-back — see §0 and THE QUEUE.** Every PR through #69 is merged (#59 was closed, superseded by #60). |
 | **Branches** | **None open.** Only `main` on the remote: every merged branch was deleted in its merge step, local and remote, `roofs-r6c-tool-levels` with this merge. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 32 open** (D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
