@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 0f833f4 -->
+<!-- SNAPSHOT-HEAD: d39dfd6 -->
 
 # Session snapshot — read this first
 
@@ -78,20 +78,25 @@ must not be trusted over it.
 PATRICK'S CHECK.** [PR #69](https://github.com/pjm4github/FloorPlanner/pull/69)
 on `roofs-r6c-tool-levels`, report [`0202-report.md`](handoff/0202-report.md)
 (on his word, "proceed with R6.c"; [`0197-ruling.md`](handoff/0197-ruling.md)
-§5 names the tranche). His check is 0202 §5. **On his word: merge, delete the
+§5 names the tranche). His check is 0202 §5. **Patrick, 2026‑10‑03: "PR #69 didnt crash." His word to merge has not been given** — on it: merge, delete the
 branch in the merge step, record the merge in the report that follows
-(0197 §7).**
+(0197 §7).
 
-**READ THIS BEFORE TOUCHING THE BRANCH.** On 2026‑10‑03 the branch's working
-tree held uncommitted work that is **not this session's** and is not in any
-report: `fixtures/r6c-two-level-tool-check.json` + `.md` (a tiny two-level
-manual-check fixture, dated 2026‑09‑29), a test for it added to
+**THE BRANCH'S UNCOMMITTED WORK — still there, not this session's, owned by
+no report.** `fixtures/r6c-two-level-tool-check.json` + `.md` (a tiny
+two-level manual-check fixture, dated 2026‑09‑29), a test for it in
 `tests/test_r6c_roof_tool_levels.py`, and a row in `fixtures/README.md`
 saying it was *"added after the six-step cumulative check on the real
-Wiscaway plan ended in a native Qt crash."* **That crash is not recorded in
-any report and has not been reproduced here** — establish it first.
-`fixtures/incoming/single-floor-90-roof-gable-end-check.json` arrived
-2026‑10‑03, untriaged. All of it was left in place, untouched.
+Wiscaway plan ended in a native Qt crash."* **By his word above there was no
+crash, so that sentence must not be committed as written.** Whether the
+fixture and its test join PR #69 with the row corrected, or are discarded,
+is his to say ([`0205`](handoff/0205-report.md) §2).
+
+**`fixtures/incoming/single-floor-90-roof-gable-end-check.json` — his own,
+2026‑10‑03, and no defect comes with it.** His words: *"a smaller, easier
+to test work design."* One level, 19 walls all on axis, no rooms, two
+roofs at 90° (rf1 along x; rf2 along y, 36″ overhang, the higher ridge).
+Its exit from `incoming/` is not yet named (0205 §3).
 
 **OPEN FOR HIS RULING, none built:**
 
@@ -168,26 +173,30 @@ of a level not being edited has an empty hit shape (`_roof_hittable`).
 > `git show 0f833f4:docs/SESSION_SNAPSHOT.md`. The roofline arc — the
 > work actually in flight — is §0, not here.
 
-**OPEN, in order — neither started:**
+**OPEN, in order — neither started. Reordered 2026‑10‑03 on his word.**
 
-1. **The status board — GREEN, read-back first.**
+1. **Grid snap by default — FIRST. Patrick, 2026‑10‑03: "I want to close
+   out the snap to grid default (except for off angle walls) so we can
+   close out that feature."** AMBER, fully specified, **read-back owed
+   before any code** ([`ROADMAP.md`](ROADMAP.md) A6, §4 item 1). Spec: snap
+   by default, shift means unconstrained, intersection joins with their two
+   refusals, the live readout shows snapped values. **Out of the close-out
+   by his word: the angled-wall rule** (quantise length along the ray) —
+   named and left open, not dropped from the spec. The read-back: clause by
+   clause EXISTS/PARTIAL/ABSENT, thresholds with reasons, the
+   shift-modifier audit, the angle convention already in the geometry
+   code, Ctrl's disposition — and one clause more, from
+   [`0056`](handoff/0056-report.md): does snapping cover the OUTPUT of an
+   operation, or only cursor input? **This is not**
+   [`0108`](handoff/0108-ruling.md)–[`0110`](handoff/0110-ruling.md)'s
+   per-wall "Snap wall to grid" actions, which are built and merged.
+2. **The status board — GREEN, read-back first.**
    [`handoff/0019-ruling.md`](handoff/0019-ruling.md), priority lowered by
    [`0029`](handoff/0029-ruling.md) §6 (Patrick's Cowork skill renders the
    same state on demand — a view, not the artifact). Freeze the closed
    migration's Status table as history; move forward status to a generated
    `docs/STATUS.md`, which does not exist yet. Read-back owed: what
    identifies a completed unit when recent work has no phase number.
-2. **Grid snap, the inversion — AMBER, fully specified, read-back owed
-   before any code.** Spec: [`ROADMAP.md`](ROADMAP.md) A6 — snap by
-   default, shift means unconstrained, the angled-wall rule quantises
-   length along the ray, intersection joins with their two refusals, the
-   live readout shows snapped values. The read-back: clause by clause
-   EXISTS/PARTIAL/ABSENT, thresholds with reasons, the shift-modifier
-   audit, the angle convention already in the geometry code, Ctrl's
-   disposition — **and one clause more, from [`0056`](handoff/0056-report.md):
-   does snapping cover the OUTPUT of an operation, or only cursor input?**
-   **This is not** [`0108`](handoff/0108-ruling.md)–[`0110`](handoff/0110-ruling.md)'s
-   per-wall "Snap wall to grid" actions, which are built and merged.
 
 **Full tiered queue (A2–A5, the command-roster census, Phase 5's
 remainder):** [`ROADMAP.md`](ROADMAP.md) §3.
@@ -223,6 +232,8 @@ remainder):** [`ROADMAP.md`](ROADMAP.md) §3.
 | The wall orthogonality repair | merged, PR #37. Corpus: 22 moved, 4 refused, 37 withheld by one file's rollback | [`0066`](handoff/0066-ruling.md) · [`0079`](handoff/0079-report.md) · [`0082`](handoff/0082-ruling.md) · [`0083`](handoff/0083-report.md) |
 | `fp2dxf`, the v5 → Chief Architect DXF exporter | merged, PR #33, his Chief import check passed | [`0038-ruling`](handoff/0038-ruling.md) · [`0043-report`](handoff/0043-report.md) · [`0050-report`](handoff/0050-report.md) |
 
+**Confirmed by Patrick, 2026‑10‑03:** *"PR #37 and PR #34 are complete. The cheif architect import is completed and it works."*
+
 **Patrick's cross-floor report of 2026‑08‑17**
 ([`0035`](handoff/0035-ruling.md)–[`0037`](handoff/0037-ruling.md);
 [`0038-report`](handoff/0038-report.md) refuted the load-path suspect):
@@ -238,7 +249,7 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`0f833f4`** at this file's cut — [`0203-report.md`](handoff/0203-report.md) landed (§0 trimmed); this commit lands [`0204-report.md`](handoff/0204-report.md) (THE QUEUE trimmed) — both on Patrick's word. R6.c is built on `roofs-r6c-tool-levels`, [PR #69](https://github.com/pjm4github/FloorPlanner/pull/69), AMBER, stopped for his check — see §0. Every earlier PR through #68 is merged (#59 was closed, superseded by #60); §0's table links each tranche's report. |
+| **`main`** | **`d39dfd6`** at this file's cut — [`0203`](handoff/0203-report.md) and [`0204`](handoff/0204-report.md) landed (this file trimmed); this commit lands [`0205-report.md`](handoff/0205-report.md) (the open list brought to his word of 2026‑10‑03). R6.c is built on `roofs-r6c-tool-levels`, [PR #69](https://github.com/pjm4github/FloorPlanner/pull/69), AMBER, his word to merge not yet given — see §0. Every earlier PR through #68 is merged (#59 was closed, superseded by #60); §0's table links each tranche's report. |
 | **Branches** | **`roofs-r6c-tool-levels` open, AMBER, [PR #69](https://github.com/pjm4github/FloorPlanner/pull/69) waiting on Patrick's check** (its snapshot is the branch's own cut; at the merge, merge `main` into it, take `main`'s snapshot, and re-cut it as the merged state). Otherwise only `main` on the remote: every merged branch was deleted in its merge step, local and remote. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 32 open** (D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
