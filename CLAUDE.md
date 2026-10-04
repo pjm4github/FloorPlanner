@@ -45,7 +45,12 @@ in which phase, so you don't build on top of something about to go.
   moves every wall and room outline that holds it.
 - Headless: **never synthesize Ctrl-modified key events** — it leaks
   `QApplication.keyboardModifiers()`; route shortcuts/arrows through app
-  methods (as `MacroRunner` does).
+  methods (as `MacroRunner` does). **One sanctioned exception:** the v2
+  macro player (`floorplanner/macro2/sink.py`), which sends real modifier
+  key events by Patrick's ruling and re-syncs the global state after every
+  key event (`_sync_global`). The leak is a KeyPress of an ORDINARY key
+  carrying modifiers; nothing but a later KeyPress clears it. Don't copy
+  the pattern elsewhere, and never use `QTest`'s key functions.
 - `fp_extract.py`: a `QApplication` must exist before `QImage` decodes a
   PNG; keep it in a **module global** (a local gets GC'd and crashes
   `MainWindow`); **copy `QImage` buffers** (`arr.copy()`) — a view into a

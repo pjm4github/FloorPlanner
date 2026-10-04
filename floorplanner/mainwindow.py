@@ -29,6 +29,8 @@ from floorplanner.design.verify import (  # P1.6 shadow mode
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
 from floorplanner.macro import *  # noqa: F401
+from floorplanner.macro2.parse import is_v2 as is_v2_macro
+from floorplanner.macro2.player import run_v2 as run_v2_macro
 from floorplanner.csvio import CsvIOMixin
 from floorplanner.imageio import ImageIOMixin
 from floorplanner.levels import LevelsMixin
@@ -2067,5 +2069,13 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
 
     def run_macro(self, text: str) -> dict:
         """Execute a macro string against this window; returns a result dict
-        {ok, steps, log, errors}.  See MacroRunner for the token grammar."""
+        {ok, steps, log, errors}.  See MacroRunner for the token grammar.
+
+        TWO LANGUAGES, SIDE BY SIDE (Patrick's ruling, 0212-report.md sec3):
+        a macro whose first non-blank line is `; fpmacro 2` is the v2 input
+        language (docs/macro-spec/MACRO_SPEC.md) and runs on its own player;
+        anything else is the language `MacroRunner` has always run, and
+        reaches it exactly as before."""
+        if is_v2_macro(text):
+            return run_v2_macro(self, text)
         return MacroRunner(self).run(text)

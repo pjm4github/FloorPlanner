@@ -1,0 +1,16 @@
+; fpmacro 2
+; Macro language v2 -- the player's manual check (docs/handoff/0214-report.md).
+; On an EMPTY plan: Macro > Record / Debug, Load this file, Replay.
+;
+; 1. a wall on the grid, 10' to 30' along y = 10'
+I CLICK 120 120 DRAG 360 120
+; 2. Shift held for the drag: the end follows the cursor -- OFF the grid, not square
+I CLICK 120 240 +DRAG 355 253
+; 3. one press, two segments: constrained to (300,..), then free to (301,451)
+I CLICK 120 360 DRAG 300 364 +DRAG 301 451
+; 4. a door on wall 1: the size dialog opens, is typed into, and is accepted
+D CLICK 240 120
+TYPE 2868
+KEY {Enter}
+; 5. back to the select tool
+S

@@ -82,6 +82,12 @@ def write(key: Key) -> str:
     return spec.char.lower()
 
 
+def qt_name(ident: str):
+    """The `Qt.Key` member name for an expansion key identity
+    (`KeySpec.ident`), or None when the identity is a character."""
+    return _NAMED.get(ident)
+
+
 def named(name: str) -> Key:
     """A `Key` for a canonical name -- the recorder's and converter's door."""
     return Key(True, name)

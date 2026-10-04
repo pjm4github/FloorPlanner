@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 59ab156 -->
+<!-- SNAPSHOT-HEAD: 504d6d7 -->
 
 # Session snapshot — read this first
 
@@ -90,7 +90,14 @@ ANTLR with the generated parser committed. **Three tranches, one open at a
 time. T1, THE LANGUAGE, IS MERGED — [PR #72](https://github.com/pjm4github/FloorPlanner/pull/72), GREEN tier, on green CI,
 [`0213`](handoff/0213-report.md): `floorplanner/macro2/` parses, validates,
 expands to abstract input events and serializes; no Qt delivery yet.
-NEXT: T2 the player (AMBER), then T3 the recorder and converter (AMBER).** `MacroRunner` and the committed `.fpm` files are not
+**
+**T2, THE PLAYER, IS BUILT — AMBER, STOPPED FOR PATRICK'S CHECK: branch `macro2-player` (this snapshot is the branch's own cut).** A macro whose first line is `; fpmacro 2` now RUNS: mouse chains
+with per-segment modifiers (a Shift-drag lands off the grid), `TYPE`/`KEY` into
+dialogs, shortcuts resolved to the window's own actions, and the modifier
+guard. His check: `fixtures/macro2-player-check.fpm`. **On his word: merge,
+delete the branch in the merge step.** Then T3, the recorder and converter
+(AMBER). **OPEN FOR HIS WORD:** carrying v1's high-level commands into v2
+([`0213`](handoff/0213-report.md) §4) — which form, and when.** `MacroRunner` and the committed `.fpm` files are not
 touched. Everything else waiting is in THE QUEUE and
 [`0211`](handoff/0211-report.md) §4.
 
@@ -243,8 +250,8 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`59ab156`** at this file's cut — the `macro2-language` tip, landed on `main` by the merge commit this file rides in: **macro v2 T1 MERGED** ([PR #72](https://github.com/pjm4github/FloorPlanner/pull/72), GREEN tier, green CI). **Owed next: T2, the player — see §0.** Every PR through #72 is merged (#59 was closed, superseded by #60). |
-| **Branches** | **None open.** Only `main` on the remote: every merged branch was deleted in its merge step, local and remote, `macro2-language` with this merge. |
+| **`main`** | **`504d6d7`** at this file's cut — macro v2 T1 merged (PR #72). **This is the `macro2-player` branch's own snapshot: T2 built here, AMBER — see §0.** Every PR through #72 is merged (#59 was closed, superseded by #60). |
+| **Branches** | **`macro2-player` open, AMBER, its PR opens with this commit's push** (its snapshot is the branch's own cut; at the merge, merge `main` into it, take `main`'s snapshot, and re-cut it as the merged state). Otherwise only `main` on the remote. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 32 open** (D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |

@@ -843,8 +843,18 @@ class MacroRecorderDialog(QDialog):
         cur = self.edit.textCursor()
         text = (cur.selection().toPlainText() if cur.hasSelection()
                 else self.edit.toPlainText())
-        # step one recorded line at a time so the canvas updates visibly
-        self._replay_lines = [ln for ln in text.splitlines() if ln.strip()]
+        # A v2 macro (docs/macro-spec/MACRO_SPEC.md) is ONE macro, not a list
+        # of independent lines: KEYDOWN holds across lines, and a dialog one
+        # line opens is driven by the lines after it. The format is the
+        # editor's -- its first non-blank line -- so a selection inside a
+        # v2 macro replays as v2, with the header put back on.
+        from floorplanner.macro2.parse import HEADER, is_v2   # late: no cycle at import
+        if is_v2(self.edit.toPlainText()):
+            body = text if is_v2(text) else HEADER + "\n" + text
+            self._replay_lines = [body]
+        else:
+            # step one recorded line at a time so the canvas updates visibly
+            self._replay_lines = [ln for ln in text.splitlines() if ln.strip()]
         self._replay_idx = 0
         if not self._replay_lines:
             return
