@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: c265210 -->
+<!-- SNAPSHOT-HEAD: 06473ae -->
 
 # Session snapshot — read this first
 
@@ -74,14 +74,14 @@ must not be trusted over it.
 > `git show 52a2870:docs/SESSION_SNAPSHOT.md`. **Keep it this size:** when a
 > tranche closes, REPLACE its entry with one line and a link; do not append.
 
-**OPEN NOW — THE 3‑INCH REACH: a fix to grid snap, BUILT, AMBER, STOPPED FOR
-PATRICK'S CHECK — branch `grid-snap-flat-3in` (this snapshot is the branch's own cut).** His report, 2026‑10‑04: a wall released at 6′
-landed at 5.27′, on an off-grid wall 8.75″ away — *"I expect that wall to NOT
-SNAP … because it is more than 3 inches away"* — and *"fix it."* Every pull of
-a wall gesture now reaches 3″ and no further. His check:
-`fixtures/grid-snap-3in-check.md`. **On his word: merge, delete the branch in
-the merge step, record the merge in the report that follows.** Grid snap by
-default itself (A6) is merged — PR #70, [`0209`](handoff/0209-report.md).
+**NOTHING IS OPEN ON A BRANCH. THE 3‑INCH REACH IS CLOSED AND MERGED** —
+[PR #71](https://github.com/pjm4github/FloorPlanner/pull/71) landed on `main`
+by this merge commit on Patrick's word (2026‑10‑04: "OK that fix is good. commit and push # 71."),
+the branch deleted in the merge step. The merge is recorded in the report
+that follows it (0197 §7). Grid snap by default is closed with it: a wall
+gesture lands on the grid; within 3″ of another wall's end or line it goes
+to that instead; Shift turns both off. **NEXT, his to order — see THE QUEUE
+and [`0210`](handoff/0210-report.md) §6–§7.**
 
 **`fixtures/incoming/single-floor-90-roof-gable-end-check.json` — his own,
 2026‑10‑03, and no defect comes with it.** His words: *"a smaller, easier
@@ -119,6 +119,7 @@ Its exit from `incoming/` is not yet named (0205 §3).
 | (measurements) | D67 reproduced; roof paths and the level's elevation | — | [`0201`](handoff/0201-report.md) |
 | R6.c | the roof tool across levels; `fixtures/r6c-two-level-tool-check.json` its manual check | #69 | [`0202`](handoff/0202-report.md) |
 | A6 | grid snap by default (not roofline; listed here as the arc's last merged tranche): walls land on the grid, Shift unconstrained, 3″ gesture weld | #70 | [`0207`](handoff/0207-report.md), [`0208`](handoff/0208-report.md) |
+| the 3‑inch reach | his report against A6 fixed: every gesture pull reaches 3″; `fixtures/grid-snap-3in-check.json` its manual check | #71 | [`0210`](handoff/0210-report.md) |
 
 Everything before the roofline arc — the vessel/enclosure split, the three
 redraws, the wall orthogonality repair, the wall id fix, the snap-to-grid
@@ -231,8 +232,8 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`c265210`** at this file's cut — [`0209-report.md`](handoff/0209-report.md) landed (PR #70 merged). **This is the `grid-snap-flat-3in` branch's own snapshot: the 3-inch reach fix built here, AMBER — see §0.** Every PR through #70 is merged (#59 was closed, superseded by #60). |
-| **Branches** | **`grid-snap-flat-3in` open, AMBER, its PR opens with this commit's push** (its snapshot is the branch's own cut; at the merge, merge `main` into it, take `main`'s snapshot, and re-cut it as the merged state). Otherwise only `main` on the remote. |
+| **`main`** | **`06473ae`** at this file's cut — the `grid-snap-flat-3in` tip, landed on `main` by the merge commit this file rides in: **the 3-inch reach CLOSED, MERGED on Patrick's word** ("OK that fix is good. commit and push # 71."); `main`'s `6771428` ([`0210`](handoff/0210-report.md) landed) is its other parent. **Owed next: the report recording this merge.** Every PR through #71 is merged (#59 was closed, superseded by #60). |
+| **Branches** | **None open.** Only `main` on the remote: every merged branch was deleted in its merge step, local and remote, `grid-snap-flat-3in` with this merge. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 32 open** (D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
