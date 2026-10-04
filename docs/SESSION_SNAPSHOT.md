@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: fe9bb96 -->
+<!-- SNAPSHOT-HEAD: 040dadd -->
 
 # Session snapshot — read this first
 
@@ -74,16 +74,12 @@ must not be trusted over it.
 > `git show 52a2870:docs/SESSION_SNAPSHOT.md`. **Keep it this size:** when a
 > tranche closes, REPLACE its entry with one line and a link; do not append.
 
-**NOTHING IS OPEN ON A BRANCH. R6.c IS CLOSED AND MERGED** —
-[PR #69](https://github.com/pjm4github/FloorPlanner/pull/69) landed on `main`
-by this merge commit on Patrick's word (2026‑10‑03: "merge PR #69 and keep
-the fixture with the row corrected"), the branch deleted in the merge
-step; recorded at [`0206-report.md`](handoff/0206-report.md).
-**OPEN NOW — GRID SNAP BY DEFAULT (A6), angled walls excepted: BUILT, AMBER,
-STOPPED FOR PATRICK'S CHECK — branch `grid-snap-default` (this snapshot is the branch's own cut).** On his word (2026‑10‑03: "yes to
-all four, proceed with the build"), from the read-back
-[`0207`](handoff/0207-report.md). **On his word: merge, delete the branch in
-the merge step, record the merge in the report that follows.** See THE QUEUE.
+**NOTHING IS OPEN ON A BRANCH. GRID SNAP BY DEFAULT (A6) IS CLOSED AND MERGED** —
+[PR #70](https://github.com/pjm4github/FloorPlanner/pull/70) landed on `main`
+by this merge commit on Patrick's word (2026‑10‑04: "ok that works.  lets merge #70"), the
+branch deleted in the merge step. The merge is recorded in the report that
+follows it (0197 §7). **NEXT, his to order — see THE QUEUE and
+[`0208`](handoff/0208-report.md) §8.**
 
 **`fixtures/incoming/single-floor-90-roof-gable-end-check.json` — his own,
 2026‑10‑03, and no defect comes with it.** His words: *"a smaller, easier
@@ -120,6 +116,7 @@ Its exit from `incoming/` is not yet named (0205 §3).
 | R6.b | one roofscape, composed in absolute height | #68 | [`0200`](handoff/0200-report.md) |
 | (measurements) | D67 reproduced; roof paths and the level's elevation | — | [`0201`](handoff/0201-report.md) |
 | R6.c | the roof tool across levels; `fixtures/r6c-two-level-tool-check.json` its manual check | #69 | [`0202`](handoff/0202-report.md) |
+| A6 | grid snap by default (not roofline; listed here as the arc's last merged tranche): walls land on the grid, Shift unconstrained, 3″ gesture weld | #70 | [`0207`](handoff/0207-report.md), [`0208`](handoff/0208-report.md) |
 
 Everything before the roofline arc — the vessel/enclosure split, the three
 redraws, the wall orthogonality repair, the wall id fix, the snap-to-grid
@@ -167,29 +164,13 @@ of a level not being edited has an empty hit shape (`_roof_hittable`).
 > `git show 0f833f4:docs/SESSION_SNAPSHOT.md`. The roofline arc — the
 > work actually in flight — is §0, not here.
 
-**OPEN, in order — neither started. Reordered 2026‑10‑03 on his word.**
+**OPEN — one item, not started.** (Grid snap by default, A6, which stood
+first here, is CLOSED AND MERGED — PR #70, [`0207`](handoff/0207-report.md),
+[`0208`](handoff/0208-report.md). **Left open by his word, not dropped from
+the spec: the angled-wall rule**, quantising length along the ray; and
+snapping what an OPERATION produces, which A6 never covered.)
 
-1. **Grid snap by default — FIRST. Patrick, 2026‑10‑03: "I want to close
-   out the snap to grid default (except for off angle walls) so we can
-   close out that feature."** **BUILT, AMBER, stopped for his check** (§0):
-   drawing, end-dragging and sliding an axis-aligned wall LAND on the grid;
-   Shift is unconstrained; a gesture welds within 3″, so a 6″ reveal
-   survives; the landing is the same at every zoom; the status bar reads the
-   snapped end, length and heading. Read-back [`0207`](handoff/0207-report.md).
-   The spec, as it stood: read-back owed
-   before any code ([`ROADMAP.md`](ROADMAP.md) A6, §4 item 1). Spec: snap
-   by default, shift means unconstrained, intersection joins with their two
-   refusals, the live readout shows snapped values. **Out of the close-out
-   by his word: the angled-wall rule** (quantise length along the ray) —
-   named and left open, not dropped from the spec. The read-back: clause by
-   clause EXISTS/PARTIAL/ABSENT, thresholds with reasons, the
-   shift-modifier audit, the angle convention already in the geometry
-   code, Ctrl's disposition — and one clause more, from
-   [`0056`](handoff/0056-report.md): does snapping cover the OUTPUT of an
-   operation, or only cursor input? **This is not**
-   [`0108`](handoff/0108-ruling.md)–[`0110`](handoff/0110-ruling.md)'s
-   per-wall "Snap wall to grid" actions, which are built and merged.
-2. **The status board — GREEN, read-back first.**
+1. **The status board — GREEN, read-back first.**
    [`handoff/0019-ruling.md`](handoff/0019-ruling.md), priority lowered by
    [`0029`](handoff/0029-ruling.md) §6 (Patrick's Cowork skill renders the
    same state on demand — a view, not the artifact). Freeze the closed
@@ -248,8 +229,8 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`fe9bb96`** at this file's cut — [`0207-report.md`](handoff/0207-report.md) landed (the grid-snap read-back). **This is the `grid-snap-default` branch's own snapshot: A6 built here, AMBER — see §0.** Every PR through #69 is merged (#59 was closed, superseded by #60). |
-| **Branches** | **`grid-snap-default` open, AMBER, its PR opens with this commit's push** (its snapshot is the branch's own cut; at the merge, merge `main` into it, take `main`'s snapshot, and re-cut it as the merged state). Otherwise only `main` on the remote. |
+| **`main`** | **`040dadd`** at this file's cut — the `grid-snap-default` tip, landed on `main` by the merge commit this file rides in: **grid snap by default CLOSED, MERGED on Patrick's word** ("ok that works.  lets merge #70"); `main`'s `290d6a8` ([`0208`](handoff/0208-report.md) landed) is its other parent. **Owed next: the report recording this merge.** Every PR through #70 is merged (#59 was closed, superseded by #60). |
+| **Branches** | **None open.** Only `main` on the remote: every merged branch was deleted in its merge step, local and remote, `grid-snap-default` with this merge. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 32 open** (D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
