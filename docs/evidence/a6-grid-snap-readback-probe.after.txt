@@ -1,0 +1,50 @@
+wall snap step 6in; JOIN_TOL 9in; rotate snap 15 deg
+
+== A. DRAW from an on-grid start (120,120), cursor released at (247,133) ==
+   none  zoom 0.25: start (120.00,120.00) end (246.00,120.00) ON grid  length 126.00
+   none  zoom 2.0 : start (120.00,120.00) end (246.00,120.00) ON grid  length 126.00
+   Shift zoom 0.25: start (120.00,120.00) end (248.00,132.00) OFF grid length 128.56
+   Shift zoom 2.0 : start (120.00,120.00) end (247.00,133.00) OFF grid length 127.66
+   Ctrl  zoom 0.25: start (120.00,120.00) end (246.00,120.00) ON grid  length 126.00
+   Ctrl  zoom 2.0 : start (120.00,120.00) end (246.00,120.00) ON grid  length 126.00
+
+== B. DRAW from an existing wall end that is OFF the grid, (123,203); press at (124,204), release at (250,206) ==
+   none  zoom 0.25: start (123.00,203.00) OFF grid end (252.00,203.00) OFF grid
+   none  zoom 2.0 : start (123.00,203.00) OFF grid end (252.00,203.00) OFF grid
+   Shift zoom 0.25: start (123.00,203.00) OFF grid end (252.00,208.00) OFF grid
+   Shift zoom 2.0 : start (123.00,203.00) OFF grid end (250.00,206.00) OFF grid
+   Ctrl  zoom 0.25: start (123.00,203.00) OFF grid end (255.00,203.00) OFF grid
+   Ctrl  zoom 2.0 : start (123.00,203.00) OFF grid end (249.00,203.00) OFF grid
+
+== C. DRAG AN END: p2 of a horizontal wall, cursor to 35 right and 7 down ==
+   on-grid wall (120,120)-(240,120)  none : p1 (120.00,120.00) p2 (276.00,120.00) ON grid 
+   on-grid wall (120,120)-(240,120)  Shift: p1 (120.00,120.00) p2 (275.00,127.00) OFF grid  -- the wall is now 7in off its axis over 155in
+   on-grid wall (120,120)-(240,120)  Ctrl : p1 (120.00,120.00) p2 (276.00,120.00) ON grid 
+   OFF-grid wall (123,203)-(243,203) none : p1 (123.00,203.00) p2 (276.00,203.00) OFF grid
+   OFF-grid wall (123,203)-(243,203) Shift: p1 (123.00,203.00) p2 (278.00,210.00) OFF grid  -- the wall is now 7in off its axis over 155in
+   OFF-grid wall (123,203)-(243,203) Ctrl : p1 (123.00,203.00) p2 (279.00,203.00) OFF grid
+
+== D. SLIDE THE BODY of a horizontal wall, cursor 20 down and 9 right ==
+   on-grid wall (120,120)-(240,120)  none : p1 (120.00,138.00) ON grid  p2 (240.00,138.00) ON grid 
+   on-grid wall (120,120)-(240,120)  Ctrl : p1 (120.00,120.00) ON grid  p2 (240.00,120.00) ON grid 
+   OFF-grid wall (123,203)-(243,203) none : p1 (123.00,222.00) OFF grid p2 (243.00,222.00) OFF grid
+   OFF-grid wall (123,203)-(243,203) Ctrl : p1 (123.00,203.00) OFF grid p2 (243.00,203.00) OFF grid
+
+== E. ZOOM: the same scene points, two zooms ==
+   zoom 0.25: draw (120,240)->(425,243) beside an open-ended wall at x=402: end (426.00,240.00) ON grid 
+   zoom 2.0 : draw (120,240)->(425,243) beside an open-ended wall at x=402: end (426.00,240.00) ON grid 
+   zoom 0.25: press at (150,221), 32in from the wall end (123,203): start (150.00,222.00)
+   zoom 2.0 : press at (150,221), 32in from the wall end (123,203): start (150.00,222.00)
+
+== F. TWO ENDS MEETING: a wall drawn toward the end (360,300) of a vertical wall ==
+   released exactly on it at (360,300): end lands (360.00,300.00); gap left 0in; one shared corner = True
+   released 6in short     at (354,300): end lands (354.00,300.00); gap left 6in; one shared corner = False
+   released 12in short    at (348,300): end lands (348.00,300.00); gap left 12in; one shared corner = False
+
+== G. A SHARED CORNER: an L, its horizontal wall slid 24 down ==
+   horizontal (120.00,144.00)-(240.00,144.00); the vertical's top end now (240.00,144.00) -- carried = True
+
+== H. THE READOUT, mid-draw: (120,120) dragged to cursor (247,133), not released ==
+   the wall being drawn: end (246.00,120.00), length 126.00 (its own painted label reads '10\'-6"')
+   status bar message: 'Wall 10\'-6" at 0.0? -- end x 20\'-6", y 10\'-0"'
+   status bar coordinate label: 'x 20\'-6"   y 10\'-0"'  (cursor is at x 20'-7", y 11'-1")

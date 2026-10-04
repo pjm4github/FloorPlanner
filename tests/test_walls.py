@@ -20,9 +20,15 @@ def test_wall_draw_aligns_end_to_orthogonal_wall(fp, win):
     sc = win.scene
     sc.addItem(fp.WallItem(QPointF(300, 0), QPointF(300, 200), "interior"))
     fp.rebuild_all_walls(sc)
-    end = _draw_end(fp, win, (0, 102), (291, 108))
+    # A6 (0207-report.md sec4; Patrick, 2026-10-03: "yes to all four"): the wall's line is ON the grid (x=300),
+    # so nothing pulls -- an end aimed at it lands on it, and one a step
+    # and a half short lands a step short. Before A6 a 9in pull took the
+    # 291 drag to 300 as well, which is what made a 6in reveal undrawable.
+    end = _draw_end(fp, win, (0, 102), (298, 108))
     assert end.x() == pytest.approx(300)   # x lines up with the vertical wall
     assert end.y() == pytest.approx(102)   # stays horizontal
+    short = _draw_end(fp, win, (0, 102), (291, 108))
+    assert short.x() == pytest.approx(288)  # on the grid, not pulled to 300
 
 
 def test_wall_draw_stays_orthogonal_not_diagonal(fp, win):
@@ -30,9 +36,9 @@ def test_wall_draw_stays_orthogonal_not_diagonal(fp, win):
     sc.addItem(fp.WallItem(QPointF(300, 0), QPointF(300, 200), "interior"))
     fp.rebuild_all_walls(sc)
     # drag toward the wall's off-axis bottom endpoint (300, 200)
-    end = _draw_end(fp, win, (0, 100), (305, 195))
+    end = _draw_end(fp, win, (0, 100), (302, 195))
     assert end.y() == pytest.approx(100)   # not pulled diagonally to 200
-    assert end.x() == pytest.approx(300)
+    assert end.x() == pytest.approx(300)   # A6: the grid point aimed at
 
 
 def test_wall_draw_leaves_gap_when_not_meeting(fp, win):
@@ -40,7 +46,7 @@ def test_wall_draw_leaves_gap_when_not_meeting(fp, win):
     sc.addItem(fp.WallItem(QPointF(300, 0), QPointF(300, 200), "interior"))
     fp.rebuild_all_walls(sc)
     # y is past the vertical wall's extent -> aligned x, but a gap remains
-    end = _draw_end(fp, win, (0, 300), (291, 305))
+    end = _draw_end(fp, win, (0, 300), (298, 305))
     assert (end.x(), end.y()) == pytest.approx((300, 300))
 
 
@@ -90,8 +96,22 @@ def test_draw_snaps_to_open_ended_wall(fp, win):
     sc.addItem(w)
     fp.rebuild_all_walls(sc)
     assert fp.wall_endpoint_open(sc, QPointF(300, 200), ignore=(w,))  # dangling
-    end = _draw_end(fp, win, (0, 102), (291, 108))
+    end = _draw_end(fp, win, (0, 102), (298, 108))
     assert end.x() == pytest.approx(300)         # lines up with its projection
+
+
+def test_draw_is_pulled_to_an_open_ended_wall_that_is_off_the_grid(fp, win):
+    """A6 (0207-report.md sec4; Patrick, 2026-10-03: "yes to all four"): the pull
+    survives for a line the grid cannot express -- within the 9in stick,
+    whatever the zoom."""
+    sc = win.scene
+    w = fp.WallItem(QPointF(302, 0), QPointF(302, 200), "interior")
+    sc.addItem(w)
+    fp.rebuild_all_walls(sc)
+    end = _draw_end(fp, win, (0, 102), (295, 108))    # the grid says 294
+    assert end.x() == pytest.approx(302)
+    far = _draw_end(fp, win, (0, 102), (285, 108))    # 288: 14in off, no pull
+    assert far.x() == pytest.approx(288)
 
 
 def test_draw_ignores_fully_joined_wall(fp, win):
@@ -382,7 +402,9 @@ def test_shift_still_free_angles(fp, scene):
     scene.addItem(a)
     a._anchor, a._axis = QPointF(0, 0), QPointF(1, 0)
     t = a._endpoint_target(QPointF(95, 41), Qt.KeyboardModifier.ShiftModifier)
-    assert (t.x(), t.y()) == pytest.approx((96, 42))   # free, grid-only
+    # A6 (0207-report.md sec4; Patrick, 2026-10-03: "yes to all four"): Shift is UNCONSTRAINED --
+    # the cursor itself. It used to land (96, 42): free angle, on the grid.
+    assert (t.x(), t.y()) == pytest.approx((95, 41))
 
 
 # -- wall coalescing: collinear, overlapping, same type, within the grid -------

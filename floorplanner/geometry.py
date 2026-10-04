@@ -13,7 +13,7 @@ from floorplanner.config import SETTINGS, SNAP_STEP
 
 __all__ = [
     "fmt_ftin", "fmt_in", "fmt_ft2", "parse_feet",
-    "grid_snap", "wall_snap", "wall_snap_len", "parse_wwhh",
+    "grid_snap", "wall_snap", "wall_snap_len", "on_wall_grid", "wall_snap_landing", "parse_wwhh",
     "line_intersection", "dist_point_segment", "heading_deg",
     "bring_to_front", "send_to_back", "add_front_back_actions",
     "handle_front_back", "axis_wall_intersection",
@@ -113,6 +113,23 @@ def wall_snap_len(s: float) -> float:
     """Snap a distance along a wall axis to the configured grid."""
     step = SETTINGS["wall_snap_in"]
     return round(s / step) * step
+
+
+def on_wall_grid(v: float) -> bool:
+    """Is the coordinate `v` a multiple of the wall snap step?"""
+    step = SETTINGS["wall_snap_in"]
+    return abs(v / step - round(v / step)) * step < 1e-6
+
+
+def wall_snap_landing(origin: float, s: float) -> float:
+    """A6 (0207-report.md sec4.1): the distance from `origin` that LANDS on
+    the grid nearest `origin + s` -- the absolute coordinate is what is
+    rounded, not the distance. `wall_snap_len(s)` moves BY a grid step and
+    so carries whatever offset `origin` already has, forever
+    (0070-ruling.md sec3's class: land on the grid, never move by it).
+    Only meaningful along a coordinate axis; an angled wall keeps
+    `wall_snap_len`."""
+    return wall_snap_len(origin + s) - origin
 
 
 def parse_wwhh(code: str):

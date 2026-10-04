@@ -18,7 +18,7 @@ from floorplanner.model import DEFAULT_FLOOR  # schema constant (single source)
 
 __all__ = [
     "FOOT", "EXTERIOR_T", "INTERIOR_T", "GRID_MINOR", "GRID_MAJOR",
-    "SNAP_STEP", "WALL_SNAP_DEFAULT", "WALL_SNAP_CHOICES", "ROTATE_SNAP_DEFAULT",
+    "SNAP_STEP", "GESTURE_WELD_IN", "WALL_SNAP_DEFAULT", "WALL_SNAP_CHOICES", "ROTATE_SNAP_DEFAULT",
     "CANVAS_W_DEFAULT", "CANVAS_H_DEFAULT", "MAX_CANVAS_IN",
     "DEFAULT_SETTINGS", "SETTINGS", "editing_enabled", "coerce_setting",
     "SETTINGS_VERSION",
@@ -144,6 +144,14 @@ def coerce_setting(key: str, val, default):
 JOIN_TOL = 9.0            # endpoints within 9" join together
 MIN_WALL_LEN = 6.0
 WALL_PROJECT_STICK = 9.0  # stretch sticks within 9" of an orthogonal wall line
+# A6 (0207-report.md sec4.3, Patrick: "yes to all four"): the weld radius of a
+# GESTURE -- a drawn end coming to rest, a press starting on a wall -- is half
+# the default snap step. Under one step by construction, so a 6" reveal
+# survives; and no smaller, because a release within half a step of a grid
+# point already lands ON it, so two ends aimed at one point coincide exactly.
+# JOIN_TOL stays 9" for the explicit passes (Normalize, Close gap, a
+# pixel-extracted plan), which depend on it.
+GESTURE_WELD_IN = 3.0
 WALL_PROJECT_NEAR = 48.0  # ...only when that wall actually passes within 4'
 ROOM_SIG_MARGIN = 18.0    # walls within 18" of a room's bbox can affect it
 # default stacking: furnishing (3) < translucent room fill/label (4) < wall < opening

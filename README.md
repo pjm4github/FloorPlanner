@@ -18,9 +18,10 @@ console script), plus bundled fonts and artwork.
 ## Features
 
 - **Walls** — exterior (6") and interior (4½") walls drawn by click-drag,
-  orthogonal from the anchor (Shift for free angles). While drawing, the
+  orthogonal from the anchor and **landing on the snap grid** (Shift =
+  unconstrained: off the grid, any angle). While drawing, the
   endpoint snaps to **line up with the projected line of a nearby
-  open-ended wall** (a dangling end) while staying horizontal/vertical;
+  open-ended wall** that is itself off the grid (a dangling end) while staying horizontal/vertical;
   fully-joined walls aren't snap targets and **nothing auto-grows** — any
   gap is left for you to close by hand. Shared endpoints join into mitred
   corners. Dragging a wall's body slides it orthogonally — attached walls
@@ -189,9 +190,9 @@ so no system fonts are needed.
 |---|---|
 | Choose a tool | Toolbar icons or keys **S** E I D W R (Select / Exterior / Interior / Door / Window / Room) |
 | Zoom / pan | Mouse wheel / drag empty space (middle-drag anywhere) |
-| Draw a wall | Click-drag (Shift = free angle, Esc = cancel). Overlapping same-type walls within the snap grid **coalesce** into one shared wall (a boundary between two rooms is a single wall, not a duplicate); the drawn end **welds** onto a wall it lands on, forming a clean T/L joint |
-| Stretch / slide a wall | Drag its end / body in Select mode. A dragged end sticks to the projected line of a nearby orthogonal wall (so you can close a corner) and grid-snaps otherwise; overlapping same-type walls coalesce on release. The end-grab zone is capped at a third of the wall, so even a short wall keeps a grabbable middle to slide perpendicular |
-| Re-angle a wall end | Drag the end with **Shift** = free angle, or **Ctrl** = snap to 15° increments around the anchored end (build 45° and other off-axis walls) |
+| Draw a wall | Click-drag; the end lands on the snap grid (Shift = unconstrained: off the grid, any angle; Esc = cancel). An end released a grid step short of another wall is left there (a reveal); one released on it welds. Overlapping same-type walls within the snap grid **coalesce** into one shared wall (a boundary between two rooms is a single wall, not a duplicate); the drawn end **welds** onto a wall it lands on, forming a clean T/L joint |
+| Stretch / slide a wall | Drag its end / body in Select mode. A dragged end or a slid wall **lands on the snap grid**, even when the wall began off it; an end sticks to the projected line of a nearby orthogonal wall that is itself off the grid (so you can still close a corner there); overlapping same-type walls coalesce on release. The end-grab zone is capped at a third of the wall, so even a short wall keeps a grabbable middle to slide perpendicular |
+| Re-angle a wall end | Drag the end with **Shift** = unconstrained (off the grid, any angle), or **Ctrl** = snap to 15° increments around the anchored end (build 45° and other off-axis walls) |
 | Delete a wall | Right-click → *Delete wall* (or select + Delete). A wall on a room perimeter **fractures**: the room-edge stretch is kept, only the rest is removed; a wall bordering no room is deleted whole |
 | Coalesce + weld on demand | **Edit ▸ Coalesce all walls now** merges overlaps and welds every T/L junction across the plan (toggle auto-coalesce in File ▸ Settings) |
 | Place a door or window | Tool 4 / 5, click a wall, enter WWHH size |

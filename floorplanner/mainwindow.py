@@ -38,19 +38,19 @@ from floorplanner.planio import PlanIOMixin
 class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                  ImageIOMixin, LevelsMixin):
     HINTS = {
-        TOOL_SELECT: ("Select: drag wall BODY to slide it sideways (Ctrl = "
-                      "free move) \u2022 drag wall ENDS to lengthen/shorten "
-                      "(Shift = free angle) \u2022 drag furnishings from the "
+        TOOL_SELECT: ("Select: drag wall BODY to slide it sideways (it "
+                      "lands on the grid) \u2022 drag wall ENDS to lengthen/shorten "
+                      "(Shift = off the grid, any angle) \u2022 drag furnishings from the "
                       "right palette onto the plan \u2022 Ctrl+click toggles "
                       "items in the selection set, Ctrl+drag rubber-bands "
                       "more in, Ctrl+G groups, Ctrl+X/C/V cut-copy-paste "
                       "\u2022 drag empty space to pan \u2022 wheel zoom"),
         TOOL_WALL_EXT: "Exterior wall (6\"): click-drag to draw. Orthogonal "
-                       "from the anchor (Shift = free angle, Ctrl = 15° "
-                       "steps). Esc cancels.",
+                       "from the anchor (Shift = off the grid, any "
+                       "angle; Ctrl = 15° steps). Esc cancels.",
         TOOL_WALL_INT: "Interior wall (4 1/2\"): click-drag to draw. "
-                       "Orthogonal from the anchor (Shift = free angle, "
-                       "Ctrl = 15° steps). Esc cancels.",
+                       "Orthogonal from the anchor (Shift = off the grid, "
+                       "any angle; Ctrl = 15° steps). Esc cancels.",
         TOOL_DOOR: "Door: click on a wall, then enter the WWHH size "
                    "(e.g. 3280 = 32\" x 80\").",
         TOOL_WINDOW: "Window: click on a wall, then enter the WWHH size "
@@ -59,7 +59,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                    "then the tool reverts to Select. Ctrl+click the tool to "
                    "keep it active for several rooms.",
         TOOL_ROOF_RIDGE: "Roof ridge: click-drag to sketch the ridge line "
-                         "(Shift = free angle, Ctrl = 15° steps, same as a "
+                         "(Shift = off the grid, any angle; Ctrl = 15° steps, same as a "
                          "wall). Release, then click the eaves wall this "
                          "roof spans over. Esc cancels.",
         TOOL_ROOF_DORMER: "Dormer: press on a roof plane (snaps to the orange "
@@ -896,6 +896,18 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
     def show_coords(self, sp: QPointF):
         self.coord_label.setText(
             f"x {fmt_ftin(sp.x())}   y {fmt_ftin(sp.y())}")
+
+    def show_wall_readout(self, wall, end="p2"):
+        """A6 (0207-report.md sec4.4): while a wall is drawn or an end is
+        dragged, the readout is the SNAPPED end, the length and the heading
+        -- where the wall will be, not where the cursor is."""
+        p = wall.p1 if end == "p1" else wall.p2
+        o = wall.p2 if end == "p1" else wall.p1
+        self.show_coords(p)
+        ang = heading_deg(o, p)
+        self.status(f"Wall {fmt_ftin(wall.length())}"
+                    + (f" at {ang:.1f}°" if ang is not None else "")
+                    + f" -- end x {fmt_ftin(p.x())}, y {fmt_ftin(p.y())}")
 
     def delete_selected(self):
         for it in list(self.scene.selectedItems()):

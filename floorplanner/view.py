@@ -234,11 +234,17 @@ class PlanView(QGraphicsView):
 
     # -- snapping helpers ---------------------------------------------------------
     def _snap_start(self, sp: QPointF) -> QPointF:
-        tol = max(6.0, 10.0 / max(self.transform().m11(), 1e-6))
-        q = nearest_wall_endpoint(self.scene(), sp, tol)
-        if q is not None:
+        # A6 (0207-report.md): SCENE-SPACE, never divided by the zoom -- where
+        # a wall starts is committed geometry (defect 13's ruling), and it
+        # used to start on a wall end 32in away at 0.25x and on the grid at
+        # 2x. An OFF-grid end is caught within JOIN_TOL, since the grid
+        # cannot express it; an ON-grid end needs no catch -- a press within
+        # half a step lands on it anyway, and one a full step away is a
+        # different grid point, meant (the 6in reveal).
+        q = nearest_wall_endpoint(self.scene(), sp, JOIN_TOL)
+        if q is not None and not (on_wall_grid(q.x()) and on_wall_grid(q.y())):
             return q
-        hit = nearest_wall_body(self.scene(), sp, tol)
+        hit = nearest_wall_body(self.scene(), sp, GESTURE_WELD_IN)
         if hit is not None:
             return self._grid_snap_t_junction(*hit)
         return wall_snap(sp)
@@ -274,7 +280,11 @@ class PlanView(QGraphicsView):
         if sc is None:
             return pt
         active = active_floor()
-        tol = max(JOIN_TOL, 16.0 / max(self.transform().m11(), 1e-6))
+        # A6: scene-space (it was `16 / zoom` -- the same drawn end landed at
+        # x=402 at 0.25x and x=426 at 2x), and only toward a line that is
+        # OFF the grid: an on-grid line needs no pull, the end lands on it
+        # when aimed at it and a step short when meant short.
+        tol = WALL_PROJECT_STICK
         base = pt.x() if horizontal else pt.y()
         best, bestd = None, tol
         for w in sc.items():
@@ -284,6 +294,8 @@ class PlanView(QGraphicsView):
                 if not wall_endpoint_open(sc, end, ignore=(w, exclude), floor=active):
                     continue
                 c = end.x() if horizontal else end.y()
+                if on_wall_grid(c):
+                    continue
                 d = abs(base - c)
                 if d < bestd:
                     bestd, best = d, c
@@ -296,7 +308,9 @@ class PlanView(QGraphicsView):
         if math.hypot(dx, dy) < 1e-6:
             return QPointF(wall.p1)
         if mods & Qt.KeyboardModifier.ShiftModifier:
-            return wall_snap(QPointF(sp))     # free angle
+            # A6 (0207 sec4.2): Shift means UNCONSTRAINED -- the cursor itself,
+            # no grid, any angle. It used to mean "free angle, on the grid".
+            return QPointF(sp)
         if mods & Qt.KeyboardModifier.ControlModifier:
             # fixed angular increments off the anchor (SETTINGS['rotate_snap_deg'],
             # default 15deg) -- same formula WallItem._angle_snapped_target uses
@@ -310,9 +324,14 @@ class PlanView(QGraphicsView):
         ang = math.atan2(dy, dx)              # orthogonal from the anchor
         a = round(ang / (math.pi / 2)) * (math.pi / 2)
         horizontal = abs(math.cos(a)) > 0.5
-        proj = wall_snap_len(dx * math.cos(a) + dy * math.sin(a))
-        pt = QPointF(wall.p1.x() + math.cos(a) * proj,
-                     wall.p1.y() + math.sin(a) * proj)
+        # A6 (0207 sec4.1): the end LANDS on the grid -- its own coordinate
+        # along the axis is what is rounded, not the length from the anchor,
+        # so a wall drawn from an off-grid corner still ends on the grid
+        # (the corner it started from is not moved).
+        ca, sa = round(math.cos(a)), round(math.sin(a))
+        origin = wall.p1.x() * ca + wall.p1.y() * sa
+        proj = wall_snap_landing(origin, dx * ca + dy * sa)
+        pt = QPointF(wall.p1.x() + ca * proj, wall.p1.y() + sa * proj)
         # align the endpoint with the nearest orthogonal wall, staying H/V
         return self._align_to_wall(wall, pt, horizontal)
 
@@ -660,6 +679,7 @@ class PlanView(QGraphicsView):
             w = self._temp_wall
             w.set_end_vertex("p2", w.end_vertex("p2").relocated_to(
                 self._wall_end_point(w, sp, e.modifiers())))
+            self.win.show_wall_readout(w, "p2")
             w.rebuild()
             e.accept()
             return
@@ -819,7 +839,8 @@ class PlanView(QGraphicsView):
                     # the junction the user meant -- snap to it; else the end
                     # lands as drawn and tier 2 reports (P4.1b's message)
                     snap_end_to_doorway_jamb(self.scene(), w)
-                    weld_wall_ends(self.scene(), w, rebuild=False)
+                    weld_wall_ends(self.scene(), w, rebuild=False,
+                                   tol=GESTURE_WELD_IN)
                     # defect 25 (P4.1b): a drawn end that came to rest inside
                     # a doorway reports at the gesture -- the walk would only
                     # say "torn network" later, blaming a tear, not this draw

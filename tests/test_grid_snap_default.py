@@ -1,0 +1,261 @@
+"""A6 -- grid snap by default (ROADMAP.md A6; read back at 0207-report.md;
+built on Patrick's word, 2026-10-03: "yes to all four, proceed with the
+build"; angled walls excepted by his word of the same day).
+
+The read-back measured that the default snapped the DISTANCE moved, not the
+place landed: an off-grid wall stayed off the grid through every gesture.
+These pin the four decisions and the four acceptance lines, each case taken
+from the read-back's own probe (`docs/evidence/a6_grid_snap_readback_probe.py`)
+and each failing on the code before the build:
+
+  1. the end LANDS on the grid -- draw, end drag, body slide;
+  2. Shift is unconstrained;
+  3. a gesture's weld radius is 3in: a 6in reveal survives, coincident
+     ends still weld;
+  4. the readout is the snapped end, the length and the heading;
+  and the same landing at every zoom.
+"""
+import pytest
+from PyQt6.QtCore import QEvent, QPointF, Qt
+from PyQt6.QtGui import QMouseEvent
+from PyQt6.QtWidgets import QApplication
+
+pytestmark = pytest.mark.gui
+
+LEFT, NONE = Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton
+NOMOD = Qt.KeyboardModifier.NoModifier
+SHIFT = Qt.KeyboardModifier.ShiftModifier
+CTRL = Qt.KeyboardModifier.ControlModifier
+
+
+def _zoom(win, z):
+    win.resize(1400, 1000)
+    win.prepare_headless()
+    win.view.resetTransform()
+    win.view.scale(z, z)
+    win.view.centerOn(QPointF(300.0, 230.0))
+
+
+def _send(win, etype, p, button, buttons, mods):
+    vp = win.view.viewport()
+    pos = win.view.mapFromScene(QPointF(*p))
+    assert vp.rect().contains(pos), f"{p} is outside the viewport"
+    QApplication.sendEvent(vp, QMouseEvent(
+        etype, QPointF(pos), QPointF(vp.mapToGlobal(pos)), button, buttons, mods))
+
+
+def _drag(win, a, b, mods=NOMOD, release=True):
+    _send(win, QEvent.Type.MouseButtonPress, a, LEFT, LEFT, mods)
+    _send(win, QEvent.Type.MouseMove, b, NONE, LEFT, mods)
+    if release:
+        _send(win, QEvent.Type.MouseButtonRelease, b, LEFT, NONE, mods)
+
+
+def _wall(fp, win, a, b):
+    w = fp.WallItem(QPointF(*a), QPointF(*b), "interior")
+    win.scene.addItem(w)
+    fp.rebuild_all_walls(win.scene)
+    return w
+
+
+def _walls(fp, win):
+    return [it for it in win.scene.items() if isinstance(it, fp.WallItem)]
+
+
+def _draw(fp, win, a, b, mods=NOMOD):
+    before = set(map(id, _walls(fp, win)))
+    win.set_tool(fp.TOOL_WALL_INT)
+    _drag(win, a, b, mods)
+    win.set_tool(fp.TOOL_SELECT)
+    return next(w for w in _walls(fp, win) if id(w) not in before)
+
+
+def _on_grid(v, step=6.0):
+    return abs(v / step - round(v / step)) < 1e-6
+
+
+# --------------------------------------------------------------------------
+# 1. the end LANDS on the grid
+# --------------------------------------------------------------------------
+def test_a_wall_drawn_from_an_off_grid_corner_ends_on_the_grid(fp, win):
+    """Before: (123,203) -> end (249,203), 126in of length and x off the
+    grid. Now the end's own x is rounded; the corner it started from is not
+    moved, so y stays 203."""
+    _zoom(win, 2.0)
+    _wall(fp, win, (123, 303), (123, 203))
+    w = _draw(fp, win, (124, 204), (250, 206))
+    assert (w.p1.x(), w.p1.y()) == pytest.approx((123.0, 203.0)), "started on the corner"
+    assert w.p2.x() == pytest.approx(252.0) and _on_grid(w.p2.x())
+    assert w.p2.y() == pytest.approx(203.0), "square to the corner it began at"
+
+
+def test_an_end_dragged_on_an_off_grid_wall_lands_on_the_grid(fp, win):
+    """Before: p2 went 243 -> 279 (36in, a whole number of steps, still off
+    the grid). Now 276."""
+    _zoom(win, 2.0)
+    w = _wall(fp, win, (123, 203), (243, 203))
+    _drag(win, (243, 203), (278, 210))
+    assert w.p2.x() == pytest.approx(276.0) and _on_grid(w.p2.x())
+    assert w.p2.y() == pytest.approx(203.0), "along its own axis"
+    assert (w.p1.x(), w.p1.y()) == pytest.approx((123.0, 203.0)), "the far end did not move"
+
+
+def test_an_off_grid_wall_slid_sideways_comes_onto_the_grid(fp, win):
+    """Before: y went 203 -> 221 (18in). Now 222."""
+    _zoom(win, 2.0)
+    w = _wall(fp, win, (123, 203), (243, 203))
+    _drag(win, (183, 203), (192, 223))
+    assert w.p1.y() == pytest.approx(222.0) and w.p2.y() == pytest.approx(222.0)
+    assert _on_grid(w.p1.y())
+    assert (w.p1.x(), w.p2.x()) == pytest.approx((123.0, 243.0)), "slid, not shifted along"
+
+
+def test_a_drag_that_is_not_a_slide_leaves_an_off_grid_wall_alone(fp, win):
+    """Landing on the grid is for a wall that is MOVED. A drag along the
+    wall, or a click that wobbled under an inch sideways, moves nothing --
+    found at the build: without this an off-grid wall jumped to its grid
+    line on any touch (`dragWallFuseStraggler.fpm` line 5 shifted the
+    interior column 1.44in)."""
+    _zoom(win, 2.0)
+    w = _wall(fp, win, (123, 203), (243, 203))
+    _drag(win, (183, 203), (223, 203))              # 40in ALONG the wall
+    assert (w.p1.y(), w.p2.y()) == pytest.approx((203.0, 203.0))
+    _drag(win, (183, 203), (183, 203.5))            # a half-inch wobble
+    assert (w.p1.y(), w.p2.y()) == pytest.approx((203.0, 203.0))
+    _drag(win, (183, 203), (183, 204.5))            # a real, small slide
+    assert (w.p1.y(), w.p2.y()) == pytest.approx((204.0, 204.0)),         "the nearest grid line is reachable by a small deliberate drag"
+
+
+def test_an_on_grid_wall_behaves_exactly_as_before(fp, win):
+    _zoom(win, 2.0)
+    w = _draw(fp, win, (120, 120), (247, 133))
+    assert (w.p1.x(), w.p1.y(), w.p2.x(), w.p2.y()) == pytest.approx((120, 120, 246, 120))
+    _drag(win, (246, 120), (281, 127))
+    assert (w.p2.x(), w.p2.y()) == pytest.approx((282.0, 120.0))
+    _drag(win, (200, 120), (209, 140))
+    assert (w.p1.y(), w.p2.y()) == pytest.approx((138.0, 138.0))
+
+
+def test_an_angled_wall_is_left_out_of_it(fp, win):
+    """His word: "except for off angle walls". An angled wall's end still
+    moves by whole steps of LENGTH along its own axis, as before."""
+    _zoom(win, 2.0)
+    w = _wall(fp, win, (120, 120), (204, 204))            # 45 degrees
+    length0 = w.length()
+    _drag(win, (204, 204), (230, 230))
+    grown = w.length() - length0
+    assert grown > 1.0
+    assert _on_grid(w.length()), "length in whole steps along the ray"
+    assert abs((w.p2.x() - w.p1.x()) - (w.p2.y() - w.p1.y())) < 1e-6, "still 45 degrees"
+
+
+# --------------------------------------------------------------------------
+# 2. Shift is unconstrained
+# --------------------------------------------------------------------------
+def test_shift_draws_to_the_cursor_itself_off_the_grid(fp, win):
+    _zoom(win, 2.0)
+    w = _draw(fp, win, (120, 120), (247, 133), SHIFT)
+    assert (w.p2.x(), w.p2.y()) == pytest.approx((247.0, 133.0), abs=0.6), \
+        "the cursor, to within a pixel -- before A6 this was (246, 132)"
+    assert not (_on_grid(w.p2.x()) and _on_grid(w.p2.y()))
+
+
+def test_ctrl_still_gives_fifteen_degree_steps(fp, win):
+    _zoom(win, 2.0)
+    w = _draw(fp, win, (120, 120), (220, 204), CTRL)       # ~40 degrees -> 45
+    assert (w.p2.x() - 120) == pytest.approx(w.p2.y() - 120, abs=1e-6)
+
+
+# --------------------------------------------------------------------------
+# 3. a gesture's weld radius is under one step
+# --------------------------------------------------------------------------
+def test_a_six_inch_reveal_survives_and_coincident_ends_still_weld(fp, win):
+    _zoom(win, 2.0)
+    other = _wall(fp, win, (360, 300), (360, 400))
+    short = _draw(fp, win, (240, 300), (354, 300))
+    assert short.p2.x() == pytest.approx(354.0), "left 6in short -- before A6 it was pulled to 360"
+    assert not any(v is ov for v in (short._v1, short._v2)
+                   for ov in (other._v1, other._v2))
+
+    other2 = _wall(fp, win, (360, 60), (360, 160))
+    onit = _draw(fp, win, (240, 160), (360, 160))
+    assert (onit.p2.x(), onit.p2.y()) == pytest.approx((360.0, 160.0))
+    assert any(v is ov for v in (onit._v1, onit._v2)
+               for ov in (other2._v1, other2._v2)), "one shared corner"
+
+
+def test_the_explicit_weld_pass_keeps_its_nine_inches(fp, scene):
+    """Normalize, Close gap and a pixel-extracted plan depend on JOIN_TOL;
+    only the gesture's radius changed."""
+    from floorplanner.walls import weld_wall_ends
+    a = fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior")
+    b = fp.WallItem(QPointF(126, 0), QPointF(126, 100), "interior")
+    scene.addItem(a)
+    scene.addItem(b)
+    fp.rebuild_all_walls(scene)
+    weld_wall_ends(scene, a)                               # default radius
+    assert a.p2.x() == pytest.approx(126.0)
+    assert fp.GESTURE_WELD_IN < fp.SETTINGS["wall_snap_in"] < fp.JOIN_TOL
+
+
+def test_a_shared_corner_still_carries_both_walls(fp, win):
+    _zoom(win, 2.0)
+    a = _wall(fp, win, (120, 120), (240, 120))
+    b = _wall(fp, win, (240, 120), (240, 240))
+    fp.share_coincident_ends(win.scene, a.floor)
+    _drag(win, (180, 120), (180, 144))
+    assert (a.p2.x(), a.p2.y()) == pytest.approx((240.0, 144.0))
+    assert (b.p1.x(), b.p1.y()) == pytest.approx((240.0, 144.0))
+
+
+# --------------------------------------------------------------------------
+# the same landing at every zoom
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("zoom", [0.25, 2.0])
+def test_a_drawn_end_lands_the_same_at_every_zoom(fp, win, zoom):
+    """Before: beside an open-ended wall at x=402 the end landed at 402 at
+    0.25x and at 426 at 2x -- the pull was 16 pixels wide, not 9 inches."""
+    _zoom(win, zoom)
+    _wall(fp, win, (402, 60), (402, 150))
+    w = _draw(fp, win, (120, 240), (425, 243))
+    assert (w.p2.x(), w.p2.y()) == pytest.approx((426.0, 240.0))
+
+
+@pytest.mark.parametrize("zoom", [0.25, 2.0])
+def test_a_wall_starts_in_the_same_place_at_every_zoom(fp, win, zoom):
+    """Before: a press 32in from a wall end started ON that end at 0.25x and
+    on the grid at 2x."""
+    _zoom(win, zoom)
+    _wall(fp, win, (123, 303), (123, 203))
+    w = _draw(fp, win, (152, 220), (300, 220))
+    assert (w.p1.x(), w.p1.y()) == pytest.approx((150.0, 222.0))
+
+
+def test_an_off_grid_corner_is_still_caught_at_the_start(fp, win):
+    """The grid cannot express an off-grid corner, so a press within 9in of
+    one starts on it -- in scene inches, at any zoom."""
+    for zoom in (0.25, 2.0):
+        _zoom(win, zoom)
+        got = win.view._snap_start(QPointF(128.0, 208.0))
+        assert (got.x(), got.y()) == pytest.approx((126.0, 210.0)), "no corner there yet"
+    _wall(fp, win, (123, 303), (123, 203))
+    for zoom in (0.25, 2.0):
+        _zoom(win, zoom)
+        got = win.view._snap_start(QPointF(128.0, 208.0))
+        assert (got.x(), got.y()) == pytest.approx((123.0, 203.0))
+
+
+# --------------------------------------------------------------------------
+# 4. the readout
+# --------------------------------------------------------------------------
+def test_the_readout_shows_the_snapped_wall_not_the_cursor(fp, win):
+    _zoom(win, 2.0)
+    win.set_tool(fp.TOOL_WALL_INT)
+    _drag(win, (120, 120), (247, 133), release=False)
+    msg = win.statusBar().currentMessage()
+    assert fp.fmt_ftin(126.0) in msg, "the snapped length"
+    assert "0.0" in msg, "the heading"
+    assert fp.fmt_ftin(246.0) in msg and fp.fmt_ftin(120.0) in msg, "the snapped end"
+    assert win.coord_label.text() == f"x {fp.fmt_ftin(246.0)}   y {fp.fmt_ftin(120.0)}", \
+        "the coordinate label follows the end, not the pointer at (247, 133)"
+    win.view.cancel_temp()

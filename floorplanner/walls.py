@@ -540,7 +540,14 @@ def split_body_landings(scene, floor=None, max_passes=6):
     return made
 
 
-def _snap_wall_ends(scene, wall):
+def _axis_aligned(u) -> bool:
+    """Does the unit vector `u` run along a coordinate axis? A6's landing
+    rule applies only there; an angled wall has no single grid coordinate
+    to land on (and is out of A6 by Patrick's word, 0205-report.md)."""
+    return abs(u.x()) < 1e-9 or abs(u.y()) < 1e-9
+
+
+def _snap_wall_ends(scene, wall, tol=JOIN_TOL):
     """Move each free end of `wall` onto a nearby wall's end, or onto the body
     of a wall it stops on (T-junction), within JOIN_TOL. Never grows a wall
     toward a far one -- if it doesn't reach, the gap is left for the user.
@@ -549,17 +556,22 @@ def _snap_wall_ends(scene, wall):
     retired. It stays a COORDINATE snap on purpose: closing a 9" gap is a
     geometry repair, not topology, and it is the only way a drawn or
     pixel-extracted plan closes its junctions at all. The topology follows in
-    `share_coincident_ends`, once the ends actually coincide."""
+    `share_coincident_ends`, once the ends actually coincide.
+
+    `tol` is JOIN_TOL for the explicit passes. A GESTURE passes
+    `GESTURE_WELD_IN` (A6, 0207-report.md sec4.3): under one grid step, so an
+    end released 6in short of another is left there -- a reveal -- where
+    9in used to pull it shut."""
     moved = 0
     for attr, other in (("p1", "p2"), ("p2", "p1")):
         p = getattr(wall, attr)
-        q = nearest_wall_endpoint(scene, p, JOIN_TOL, exclude=wall)
+        q = nearest_wall_endpoint(scene, p, tol + 1e-9, exclude=wall)
         if q is None:
-            hit = nearest_wall_body(scene, p, JOIN_TOL, exclude=wall)
+            hit = nearest_wall_body(scene, p, tol, exclude=wall)
             if hit is not None:
                 target, q = hit
                 ip = axis_wall_intersection(target, getattr(wall, other), p)
-                if ip is not None and QLineF(ip, p).length() <= JOIN_TOL * 2:
+                if ip is not None and QLineF(ip, p).length() <= tol * 2:
                     q = ip
         if q is not None:
             if QLineF(q, p).length() > 1e-9:
@@ -568,7 +580,7 @@ def _snap_wall_ends(scene, wall):
     return moved
 
 
-def weld_wall_ends(scene, wall, rebuild=True):
+def weld_wall_ends(scene, wall, rebuild=True, tol=JOIN_TOL):
     """Weld ONE wall's ends -- P3.4 (iii)'s replacement for
     `WallItem.join_endpoints`, called on draw release.
 
@@ -583,7 +595,7 @@ def weld_wall_ends(scene, wall, rebuild=True):
     (`normalize_walls`) -- and a drag makes it at press anyway (P3.4 (ii))."""
     if scene is None or wall is None or wall.scene() is None:
         return
-    _snap_wall_ends(scene, wall)
+    _snap_wall_ends(scene, wall, tol)
     share_coincident_ends(scene, wall.floor)
     if rebuild:
         wall.rebuild()
@@ -1913,7 +1925,7 @@ class WallItem(QGraphicsItem):
         never fuses to another wall's endpoint or body.  Shift = free re-angle;
         Ctrl = re-angle in fixed increments (45 deg etc.)."""
         if mods & Qt.KeyboardModifier.ShiftModifier:
-            return wall_snap(QPointF(sp))          # free re-angle, grid only
+            return QPointF(sp)      # A6: unconstrained -- no grid, any angle
         if mods & Qt.KeyboardModifier.ControlModifier:
             return self._angle_snapped_target(sp)
         return self._axis_target(sp)
@@ -1937,7 +1949,14 @@ class WallItem(QGraphicsItem):
         o, u = self._anchor, self._axis
         s = (sp.x() - o.x()) * u.x() + (sp.y() - o.y()) * u.y()
         proj = self._project_to_orthogonal(o, u, s)
-        s = proj if proj is not None else wall_snap_len(s)
+        if proj is not None:
+            s = proj
+        elif _axis_aligned(u):
+            # A6 (0207 sec4.1): the end LANDS on the grid -- its coordinate
+            # along the axis is rounded, not its distance from the anchor
+            s = wall_snap_landing(o.x() * u.x() + o.y() * u.y(), s)
+        else:
+            s = wall_snap_len(s)    # an angled wall: out of A6, unchanged
         if s < MIN_WALL_LEN:                        # never collapse the wall
             s = MIN_WALL_LEN
         return QPointF(o.x() + u.x() * s, o.y() + u.y() * s)
@@ -1976,6 +1995,12 @@ class WallItem(QGraphicsItem):
             sp_ = (p.x() - o.x()) * u.x() + (p.y() - o.y()) * u.y()
             if sp_ <= MIN_WALL_LEN:                 # behind / at the anchor
                 continue
+            if _axis_aligned(u) and on_wall_grid(p.x() * u.x() + p.y() * u.y()):
+                # A6: a line that is ON the grid needs no stick -- the end
+                # lands on it when aimed at it, and a step short when meant
+                # short (the 6in reveal). The stick is for a line the grid
+                # cannot express.
+                continue
             d = abs(sp_ - s)                         # drag distance to the line
             if d <= best_d and \
                     dist_point_segment(p, w.p1, w.p2) <= WALL_PROJECT_NEAR:
@@ -1988,7 +2013,7 @@ class WallItem(QGraphicsItem):
         and sticking to an orthogonal wall's projected line, WITHOUT fusing to
         neighbours -- so the corner can be pulled away to open a side."""
         if mods & Qt.KeyboardModifier.ShiftModifier:
-            return wall_snap(QPointF(sp))
+            return QPointF(sp)      # A6: unconstrained -- no grid, any angle
         if mods & Qt.KeyboardModifier.ControlModifier:
             return self._angle_snapped_target(sp)
         return self._axis_target(sp)
@@ -2316,21 +2341,39 @@ class WallItem(QGraphicsItem):
                   else self._endpoint_target)
         if self._mode in ("p1", "p2"):
             self._drag_end_to(self._mode, target(sp, e.modifiers()))
+            sc = self.scene()
+            win = sc.parent() if sc is not None else None
+            if hasattr(win, "show_wall_readout"):
+                win.show_wall_readout(self, self._mode)
         elif self._mode == "move":
             delta = QPointF(sp.x() - self._press.x(), sp.y() - self._press.y())
-            if e.modifiers() & Qt.KeyboardModifier.ControlModifier:
-                # Ctrl: move freely in any direction
-                np1 = wall_snap(QPointF(self._o1.x() + delta.x(),
-                                        self._o1.y() + delta.y()))
-                dx, dy = np1.x() - self._o1.x(), np1.y() - self._o1.y()
+            # slide only orthogonally to the wall: each end rides the line
+            # projected perpendicular from its starting point, so attached
+            # rooms stay rectangular instead of shearing. (A "Ctrl: move
+            # freely" branch stood here; a Ctrl press on the body toggles
+            # selection and never starts a drag, so it could not be reached
+            # -- 0207-report.md sec3, removed with A6.)
+            ux, uy = self._slide_u.x(), self._slide_u.y()
+            nx_, ny_ = -uy, ux
+            s = delta.x() * nx_ + delta.y() * ny_
+            if _axis_aligned(self._slide_u):
+                # A6 (0207 sec4.1): the wall LANDS on the grid -- its own
+                # coordinate across is rounded, not the distance slid, so
+                # an off-grid wall comes onto the grid when it is moved.
+                # WHEN IT IS MOVED: a drag with under an inch of sideways
+                # travel -- a click that wobbled, a drag ALONG the wall --
+                # is not a slide and moves nothing. Without this an off-grid
+                # wall jumped to its grid line on any touch; measured on
+                # `dragWallFuseStraggler.fpm`, whose line 5 drags down the
+                # interior column and shifted it 1.44in sideways.
+                if abs(s) < SNAP_STEP:
+                    s = 0.0
+                else:
+                    s = wall_snap_landing(
+                        self._o1.x() * nx_ + self._o1.y() * ny_, s)
             else:
-                # slide only orthogonally to the wall: each end rides the
-                # line projected perpendicular from its starting point, so
-                # attached rooms stay rectangular instead of shearing
-                ux, uy = self._slide_u.x(), self._slide_u.y()
-                nx_, ny_ = -uy, ux
-                s = wall_snap_len(delta.x() * nx_ + delta.y() * ny_)
-                dx, dy = nx_ * s, ny_ * s
+                s = wall_snap_len(s)    # an angled wall: out of A6
+            dx, dy = nx_ * s, ny_ * s
             # P3.3: MOVE THE VERTICES. One move per corner carries the whole
             # collinear side (self + the open-wall gap + any collinear
             # neighbour) AND every promoted corner joint, because they are all

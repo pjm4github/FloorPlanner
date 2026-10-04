@@ -85,7 +85,12 @@ def test_shift_gives_a_free_angle_ridge_same_as_a_wall(fp, win, monkeypatch):
     assert len(roofs) == 1
     r = roofs[0]
     assert (r.p1.x(), r.p1.y()) == (0.0, 0.0)
-    assert (r.p2.x(), r.p2.y()) == (120.0, 120.0)     # true 45deg, not snapped square
+    # A6 (0207-report.md sec4.2): Shift is the raw cursor, so the end is
+    # wherever the pointer's pixel is -- 45deg to within a pixel, never
+    # snapped square and no longer rounded onto the grid
+    assert r.p2.x() == pytest.approx(120.0, abs=1.5)
+    assert r.p2.y() == pytest.approx(120.0, abs=1.5)
+    assert abs(r.p2.x() - r.p2.y()) < 2.0
 
 
 def test_ctrl_gives_a_15_degree_stepped_ridge_same_as_a_wall(fp, win, monkeypatch):
