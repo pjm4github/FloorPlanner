@@ -14,6 +14,7 @@ dependencies = [
     "PyQt6==6.11.0",
     "PyQt6-sip==13.11.1",
     "numpy>=1.24",                    # fp_extract.py + Import-from-image
+    "antlr4-python3-runtime==4.11.1", # macro language v2 parser; == the ANTLR tool version
 ]
 
 [project.optional-dependencies]
@@ -36,7 +37,8 @@ fp3d = "floorplanner.viewer.fp3d:main"
 [tool.setuptools]
 # the app package (+ the design subpackage), plus the top-level shim and
 # headless tools as modules
-packages = ["floorplanner", "floorplanner.design", "floorplanner.viewer"]
+packages = ["floorplanner", "floorplanner.design", "floorplanner.viewer",
+            "floorplanner.macro2", "floorplanner.macro2._generated"]
 py-modules = ["FloorPlanner", "fp_macro", "fp_extract"]
 
 [tool.setuptools.package-data]

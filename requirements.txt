@@ -3,3 +3,6 @@ PyQt6-sip==13.11.1
 # fp_extract.py (PNG -> plan) and the Import-from-image feature in
 # mainwindow/items; not pinned exactly so the 3.10 floor stays installable
 numpy>=1.24
+# the macro language v2 parser (floorplanner/macro2): pinned to the ANTLR
+# TOOL version that generated floorplanner/macro2/_generated (MACRO_SPEC.md sec1)
+antlr4-python3-runtime==4.11.1
