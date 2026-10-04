@@ -1,0 +1,25 @@
+; fpmacro 2
+; Draw a wall, select it, label it
+I CLICK 100 100 DRAG 400 100
+I CLICK 400 100 +DRAG 400 300
+S
+S +CLICK 250 100
+CLICK 10 10 DRAG 100 10 +DRAG 100 90
+^CLICK 10 10 +DRAG 200 80   ; ctrl at press, shift during drag
+RCLICK 5 5
+DCLICK 200 150
+TYPE Hello World
+TYPE "Hello World"
+TYPE +DRAG 10 10
+TYPE   two leading spaces ; not a comment
+KEY {Enter}
+KEY ^c ^v   ; copy, paste
+KEY ^+z +{F5} {+} {;} {{} {}} !{Tab}
+KEYDOWN {Space}
+CLICK 100 100 DRAG 300 250
+KEYUP {Space}
+MOVE 50 60
++WHEEL 0 -120
+WAIT 250
+TYPE
+X MOVE 1.5 -2.25
