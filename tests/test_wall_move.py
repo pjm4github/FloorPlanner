@@ -847,14 +847,17 @@ def test_orthogonal_stick_is_zoom_independent(fp, win):
         results.append(a._project_to_orthogonal(o, u, 200.0))  # 30" short
     assert results[0] == results[1] == results[2], \
         f"where the end lands depends on zoom: {results}"
-    # the scene-space rule is the vocabulary's own 9" (WALL_PROJECT_STICK ==
-    # JOIN_TOL, the schema's gesture tolerance): 30" away never sticks...
+    # the scene-space rule is WALL_PROJECT_STICK -- 3" since 0210-report.md
+    # (it was 9"; Patrick: an end more than 3in from a wall must not snap to
+    # it): 30" away never sticks...
     assert results[1] is None
-    # ...and 5" away always does, at any zoom
+    # ...2" away always does, at any zoom...
     for zoom in (0.25, 4.0):
         win.view.resetTransform()
         win.view.scale(zoom, zoom)
-        assert a._project_to_orthogonal(o, u, 225.0) == pytest.approx(230.0)
+        assert a._project_to_orthogonal(o, u, 228.0) == pytest.approx(230.0)
+        # ...and 5" away never does, where it did under the 9" reach
+        assert a._project_to_orthogonal(o, u, 225.0) is None
 
 
 def test_a_partial_side_slide_steps_the_neighbours_outline(fp, scene):

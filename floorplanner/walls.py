@@ -142,7 +142,8 @@ def nearest_wall_endpoint(scene, p: QPointF, tol: float, exclude=None):
     return best
 
 
-def nearest_wall_body(scene, p: QPointF, tol: float, exclude=None):
+def nearest_wall_body(scene, p: QPointF, tol: float, exclude=None,
+                      exact=False):
     """Closest (wall, centreline point) within reach of `p`, or None.
 
     This is the fuse target for T-junctions: a wall end that stops at (or
@@ -163,7 +164,12 @@ def nearest_wall_body(scene, p: QPointF, tol: float, exclude=None):
             s = max(0.0, min(length, s))
             q = it.point_at(s)
             d = QLineF(p, q).length()
-            if d <= max(tol, it.t * 0.5 + 1.0) and d < best_d:
+            # `exact` (0210-report.md): a GESTURE reaches `tol` and no further.
+            # The default widens to the wall's own half thickness plus an
+            # inch, which is 3.25in on an interior wall -- and that caught a
+            # drawn end the 3in rule says is out of reach.
+            reach = tol if exact else max(tol, it.t * 0.5 + 1.0)
+            if d <= reach + 1e-9 and d < best_d:
                 best_d, best = d, (it, QPointF(q))
     return best
 
@@ -567,7 +573,8 @@ def _snap_wall_ends(scene, wall, tol=JOIN_TOL):
         p = getattr(wall, attr)
         q = nearest_wall_endpoint(scene, p, tol + 1e-9, exclude=wall)
         if q is None:
-            hit = nearest_wall_body(scene, p, tol, exclude=wall)
+            hit = nearest_wall_body(scene, p, tol, exclude=wall,
+                                    exact=tol < JOIN_TOL)
             if hit is not None:
                 target, q = hit
                 ip = axis_wall_intersection(target, getattr(wall, other), p)
@@ -1973,7 +1980,8 @@ class WallItem(QGraphicsItem):
         wall's final position must not depend on zoom. It used to widen by
         `16.0 / view_scale` (64" at 0.25x), which is exactly the zoom-
         dependent geometry defect 13 measured. The value is the vocabulary's
-        own: WALL_PROJECT_STICK (9", == JOIN_TOL, the schema's gesture
+        own: WALL_PROJECT_STICK (3" since 0210-report.md -- it was 9", the
+        schema's gesture
         tolerance -- the same radius draw-release already snaps ends within).
         The ~20px endpoint CATCH radius in `mousePressEvent` stays
         zoom-scaled by the same ruling: it only decides what you grabbed."""
@@ -1994,12 +2002,6 @@ class WallItem(QGraphicsItem):
                 continue
             sp_ = (p.x() - o.x()) * u.x() + (p.y() - o.y()) * u.y()
             if sp_ <= MIN_WALL_LEN:                 # behind / at the anchor
-                continue
-            if _axis_aligned(u) and on_wall_grid(p.x() * u.x() + p.y() * u.y()):
-                # A6: a line that is ON the grid needs no stick -- the end
-                # lands on it when aimed at it, and a step short when meant
-                # short (the 6in reveal). The stick is for a line the grid
-                # cannot express.
                 continue
             d = abs(sp_ - s)                         # drag distance to the line
             if d <= best_d and \

@@ -187,16 +187,21 @@ def test_align_to_wall_does_not_snap_to_a_hidden_floor(fp, win):
     behind this whole thread -- minimal and deterministic where the real
     151-wall plan is neither, and it reproduces the mechanism directly."""
     sc = win.scene
-    hidden = fp.WallItem(QPointF(500, 500), QPointF(620, 500), "interior")
+    # 0210-report.md: a wall pulls only when it passes within 4ft of where
+    # the end would land, so both walls here sit 20in from the drawn end
+    # (they stood 200in and 400in off when any open end in the plan pulled)
+    hidden = fp.WallItem(QPointF(500, 320), QPointF(620, 320), "interior")
     hidden.floor = "Upper"
     sc.addItem(hidden)
     assert win.active_floor == fp.DEFAULT_FLOOR
     assert fp.floor_display_mode("Upper") == "hidden"       # unmistakably not shown
 
     # a wall drawn on the active floor, its free end within snap tolerance
-    # of the hidden wall's open end (500, 500) -- calls the production
+    # of the hidden wall's open end (500, 320) -- calls the production
     # predicate directly rather than restating its math
-    pt = QPointF(505, 300)
+    # 2in off, inside the gesture's 3in reach (0210-report.md: every pull is
+    # 3in now; this stood 5in off when the reach was 9in or more)
+    pt = QPointF(502, 300)
     aligned = win.view._align_to_wall(None, pt, horizontal=True)
     assert aligned.x() == pytest.approx(pt.x()), (
         "a new wall's endpoint snapped to an open end on a hidden floor")
@@ -206,9 +211,9 @@ def test_align_to_wall_does_not_snap_to_a_hidden_floor(fp, win):
     # the assertion above is a pure negative ("nothing happened") and
     # cannot tell a working filter apart from alignment having quietly
     # stopped firing at all (D43's own shape). This must still snap.
-    near = fp.WallItem(QPointF(500, 700), QPointF(620, 700), "interior")
+    near = fp.WallItem(QPointF(500, 280), QPointF(620, 280), "interior")
     sc.addItem(near)
-    aligned2 = win.view._align_to_wall(None, QPointF(505, 300), horizontal=True)
+    aligned2 = win.view._align_to_wall(None, QPointF(502, 300), horizontal=True)
     assert aligned2.x() == pytest.approx(500.0), (
         "alignment stopped snapping to an open end on the ACTIVE floor")
 

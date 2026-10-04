@@ -237,14 +237,14 @@ class PlanView(QGraphicsView):
         # A6 (0207-report.md): SCENE-SPACE, never divided by the zoom -- where
         # a wall starts is committed geometry (defect 13's ruling), and it
         # used to start on a wall end 32in away at 0.25x and on the grid at
-        # 2x. An OFF-grid end is caught within JOIN_TOL, since the grid
-        # cannot express it; an ON-grid end needs no catch -- a press within
-        # half a step lands on it anyway, and one a full step away is a
-        # different grid point, meant (the 6in reveal).
-        q = nearest_wall_endpoint(self.scene(), sp, JOIN_TOL)
-        if q is not None and not (on_wall_grid(q.x()) and on_wall_grid(q.y())):
+        # 2x. A wall end within the gesture's 3in reach is caught, on the
+        # grid or off it; further away the press lands on the grid. (It
+        # was 9in toward an off-grid end until 0210-report.md: one reach
+        # for every pull.)
+        q = nearest_wall_endpoint(self.scene(), sp, GESTURE_WELD_IN + 1e-6)
+        if q is not None:
             return q
-        hit = nearest_wall_body(self.scene(), sp, GESTURE_WELD_IN)
+        hit = nearest_wall_body(self.scene(), sp, GESTURE_WELD_IN, exact=True)
         if hit is not None:
             return self._grid_snap_t_junction(*hit)
         return wall_snap(sp)
@@ -281,10 +281,11 @@ class PlanView(QGraphicsView):
             return pt
         active = active_floor()
         # A6: scene-space (it was `16 / zoom` -- the same drawn end landed at
-        # x=402 at 0.25x and x=426 at 2x), and only toward a line that is
-        # OFF the grid: an on-grid line needs no pull, the end lands on it
-        # when aimed at it and a step short when meant short.
-        tol = WALL_PROJECT_STICK
+        # x=402 at 0.25x and x=426 at 2x) and 3in, the one reach of every
+        # gesture pull (0210-report.md). `base` is already on the grid, so
+        # an on-grid line is either under it or a full step away; only an
+        # off-grid line can sit inside the reach, and then the end goes to it.
+        tol = WALL_PROJECT_STICK + 1e-6
         base = pt.x() if horizontal else pt.y()
         best, bestd = None, tol
         for w in sc.items():
@@ -294,7 +295,14 @@ class PlanView(QGraphicsView):
                 if not wall_endpoint_open(sc, end, ignore=(w, exclude), floor=active):
                     continue
                 c = end.x() if horizontal else end.y()
-                if on_wall_grid(c):
+                # NEARBY means nearby (0210-report.md): the wall itself must
+                # pass within WALL_PROJECT_NEAR of where the end would land --
+                # the same limit, measured the same way, as the end drag's
+                # stick. Without it ANY open-ended wall in the plan pulled,
+                # however far off along its line: on the check plan a wall
+                # 7ft away took an end from 5ft-6 to 5ft-3 1/4.
+                land = QPointF(c, pt.y()) if horizontal else QPointF(pt.x(), c)
+                if dist_point_segment(land, w.p1, w.p2) > WALL_PROJECT_NEAR:
                     continue
                 d = abs(base - c)
                 if d < bestd:

@@ -1,0 +1,85 @@
+{
+ "format": "floorplanner-design",
+ "version": 5,
+ "units": "inches",
+ "settings": {
+  "wall_snap_in": 6.0,
+  "rotate_snap_deg": 15.0,
+  "canvas_w_in": 1200.0,
+  "canvas_h_in": 840.0,
+  "cost_per_sqft": 150.0,
+  "show_roofs": true,
+  "edit_roofs": true,
+  "vertex_weld_in": 0.6,
+  "join_tol_in": 9.0,
+  "area_basis": "centerline",
+  "editing": {
+   "shuffle": false,
+   "auto_coalesce": true,
+   "auto_weld": true,
+   "auto_bind": true
+  },
+  "active_floor": "default"
+ },
+ "levels": [
+  {
+   "id": "L1",
+   "name": "default",
+   "elevation_in": 0.0,
+   "height_in": 96.0,
+   "kind": "storey",
+   "reference": false
+  }
+ ],
+ "vertices": [
+  {
+   "id": "v1",
+   "level": "L1",
+   "x": 60.0,
+   "y": 60.0
+  },
+  {
+   "id": "v2",
+   "level": "L1",
+   "x": 60.0,
+   "y": 120.0
+  },
+  {
+   "id": "v3",
+   "level": "L1",
+   "x": 63.25,
+   "y": 180.0
+  },
+  {
+   "id": "v4",
+   "level": "L1",
+   "x": 63.25,
+   "y": 240.0
+  }
+ ],
+ "walls": [
+  {
+   "id": "w1",
+   "level": "L1",
+   "v1": "v1",
+   "v2": "v2",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  },
+  {
+   "id": "w2",
+   "level": "L1",
+   "v1": "v3",
+   "v2": "v4",
+   "type": "interior",
+   "left": null,
+   "right": null,
+   "openings": []
+  }
+ ],
+ "rooms": [],
+ "furnishings": [],
+ "groups": []
+}

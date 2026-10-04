@@ -231,18 +231,56 @@ def test_a_wall_starts_in_the_same_place_at_every_zoom(fp, win, zoom):
     assert (w.p1.x(), w.p1.y()) == pytest.approx((150.0, 222.0))
 
 
-def test_an_off_grid_corner_is_still_caught_at_the_start(fp, win):
-    """The grid cannot express an off-grid corner, so a press within 9in of
-    one starts on it -- in scene inches, at any zoom."""
-    for zoom in (0.25, 2.0):
-        _zoom(win, zoom)
-        got = win.view._snap_start(QPointF(128.0, 208.0))
-        assert (got.x(), got.y()) == pytest.approx((126.0, 210.0)), "no corner there yet"
+def test_an_off_grid_corner_is_caught_at_the_start_within_three_inches(fp, win):
+    """The grid cannot express an off-grid corner, so a press within the
+    gesture's 3in reach starts on it -- in scene inches, at any zoom -- and
+    a press further off starts on the grid (0210-report.md: it was 9in)."""
     _wall(fp, win, (123, 303), (123, 203))
     for zoom in (0.25, 2.0):
         _zoom(win, zoom)
-        got = win.view._snap_start(QPointF(128.0, 208.0))
+        got = win.view._snap_start(QPointF(125.0, 205.0))          # 2.8in off
         assert (got.x(), got.y()) == pytest.approx((123.0, 203.0))
+        got = win.view._snap_start(QPointF(128.0, 208.0))          # 7.1in off
+        assert (got.x(), got.y()) == pytest.approx((126.0, 210.0)), \
+            "not caught -- it was, when the reach was 9in"
+
+
+# --------------------------------------------------------------------------
+# 0210: one reach for every pull -- Patrick's own report
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("zoom", [0.25, 2.0])
+def test_an_end_released_more_than_three_inches_from_an_off_grid_wall_is_not_pulled(
+        fp, win, zoom):
+    """His report, 2026-10-04: a wall drawn toward a vertical wall and
+    released at 6ft landed at 5.27ft -- on the vertical wall, 8.75in away
+    -- "I expect that wall to NOT SNAP to the veritcal wall because it is
+    more than 3 inches away". The vertical wall is off the grid (63.25in),
+    and a pull toward an off-grid target had a 9in reach."""
+    _zoom(win, zoom)
+    v = _wall(fp, win, (63.25, 60), (63.25, 96))
+    w = _draw(fp, win, (96, 72), (72, 72))
+    assert min(w.p1.x(), w.p2.x()) == pytest.approx(72.0), "6ft, where it was released"
+    assert not any(a is b for a in (w._v1, w._v2) for b in (v._v1, v._v2))
+
+
+def test_an_end_aimed_at_an_off_grid_wall_still_reaches_it(fp, win):
+    """The other half: within 3in the end goes to the wall, so an off-grid
+    wall can still be met. The grid point nearest any line is never more
+    than 3in from it, so an end aimed at the wall is always in reach."""
+    _zoom(win, 2.0)
+    _wall(fp, win, (63.25, 60), (63.25, 96))
+    w = _draw(fp, win, (96, 72), (66, 72))          # the grid says 66: 2.75in off
+    assert min(w.p1.x(), w.p2.x()) == pytest.approx(63.25)
+
+
+def test_a_dragged_end_more_than_three_inches_from_an_off_grid_wall_is_not_pulled(fp, win):
+    _zoom(win, 2.0)
+    _wall(fp, win, (63.25, 60), (63.25, 96))
+    w = _wall(fp, win, (120, 72), (84, 72))
+    _drag(win, (84, 72), (71, 72))                  # 7.75in from the wall
+    assert w.p2.x() == pytest.approx(72.0), "the grid, not the wall 8.75in away"
+    _drag(win, (72, 72), (65, 72))                  # 1.75in from it
+    assert w.p2.x() == pytest.approx(63.25), "within reach: onto the wall's line"
 
 
 # --------------------------------------------------------------------------
@@ -259,3 +297,23 @@ def test_the_readout_shows_the_snapped_wall_not_the_cursor(fp, win):
     assert win.coord_label.text() == f"x {fp.fmt_ftin(246.0)}   y {fp.fmt_ftin(120.0)}", \
         "the coordinate label follows the end, not the pointer at (247, 133)"
     win.view.cancel_temp()
+
+
+def test_the_check_macro_lands_all_four_ends_where_the_instructions_say(fp, win):
+    """`fixtures/grid-snap-3in-check.json` + `.fpm` + `.md`: Patrick's own
+    manual check, replayed verbatim. Two vertical walls, one on the grid
+    (x=60) and one off it (x=63.25, the value in his report); four walls
+    drawn toward them. The third is his case: released at 6ft, 8.75in from
+    the off-grid wall, and left there."""
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent / "fixtures"
+    win.prepare_headless()
+    win.load_path(str(root / "grid-snap-3in-check.json"))
+    assert sorted(round(w.p1.x(), 2) for w in _walls(fp, win)) == [60.0, 63.25]
+    for line in (root / "grid-snap-3in-check.fpm").read_text().splitlines():
+        if line.strip():
+            res = win.run_macro(line)
+            assert res["ok"], res
+    drawn = {round(w.p1.y()): min(w.p1.x(), w.p2.x()) for w in _walls(fp, win)
+             if abs(w.p1.y() - w.p2.y()) < 1e-6}
+    assert drawn == pytest.approx({72: 72.0, 96: 66.0, 192: 72.0, 216: 63.25})

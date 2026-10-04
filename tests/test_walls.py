@@ -102,14 +102,17 @@ def test_draw_snaps_to_open_ended_wall(fp, win):
 
 def test_draw_is_pulled_to_an_open_ended_wall_that_is_off_the_grid(fp, win):
     """A6 (0207-report.md sec4; Patrick, 2026-10-03: "yes to all four"): the pull
-    survives for a line the grid cannot express -- within the 9in stick,
-    whatever the zoom."""
+    survives for a line the grid cannot express -- within 3in, the one
+    reach of every gesture pull (0210-report.md; it was 9in), whatever
+    the zoom."""
     sc = win.scene
     w = fp.WallItem(QPointF(302, 0), QPointF(302, 200), "interior")
     sc.addItem(w)
     fp.rebuild_all_walls(sc)
-    end = _draw_end(fp, win, (0, 102), (295, 108))    # the grid says 294
+    end = _draw_end(fp, win, (0, 102), (301, 108))    # the grid says 300: 2in off
     assert end.x() == pytest.approx(302)
+    near = _draw_end(fp, win, (0, 102), (295, 108))   # 294: 8in off -- NOT pulled
+    assert near.x() == pytest.approx(294)
     far = _draw_end(fp, win, (0, 102), (285, 108))    # 288: 14in off, no pull
     assert far.x() == pytest.approx(288)
 

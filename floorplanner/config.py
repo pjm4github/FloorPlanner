@@ -143,7 +143,14 @@ def coerce_setting(key: str, val, default):
         return default
 JOIN_TOL = 9.0            # endpoints within 9" join together
 MIN_WALL_LEN = 6.0
-WALL_PROJECT_STICK = 9.0  # stretch sticks within 9" of an orthogonal wall line
+# ONE REACH FOR EVERY PULL OF A GESTURE: 3in. (0210-report.md; Patrick, 2026-10-04: "I expect that wall to NOT SNAP to the
+# veritcal wall because it is more than 3 inches away" -- and "fix it").
+# It was 9in toward a wall that is itself off the grid, on the reasoning that
+# the grid cannot land an end there -- and so an end released 8.75in from an
+# off-grid wall was dragged onto it. Half a step is enough: the grid point
+# nearest any line is never more than 3in from it, so an end AIMED at a wall
+# is always within reach, and one released further off was meant to be.
+WALL_PROJECT_STICK = 3.0  # an end sticks within 3" of an orthogonal wall line
 # A6 (0207-report.md sec4.3, Patrick: "yes to all four"): the weld radius of a
 # GESTURE -- a drawn end coming to rest, a press starting on a wall -- is half
 # the default snap step. Under one step by construction, so a 6" reveal
