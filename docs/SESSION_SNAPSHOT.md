@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: eef0ef5 -->
+<!-- SNAPSHOT-HEAD: 7cf8ca3 -->
 
 # Session snapshot — read this first
 
@@ -89,8 +89,8 @@ three answers, [`0212`](handoff/0212-report.md).** A macro whose first line is
 merged by this commit ("fold all three into #73 and merge"), [PR #73](https://github.com/pjm4github/FloorPlanner/pull/73) —
 the player ([`0214`](handoff/0214-report.md)), application commands
 `@NAME arg …` ([`0215`](handoff/0215-report.md)) and the v2 recorder
-([`0216`](handoff/0216-report.md)). The merge is recorded in the report that
-follows it. **STILL OWED: the legacy converter (`fp_macro.py --convert`) and
+([`0216`](handoff/0216-report.md)). The merge is recorded at
+[`0217-report.md`](handoff/0217-report.md). **STILL OWED: the legacy converter (`fp_macro.py --convert`) and
 the v2 section of `docs/macro_language.md`** — the rest of the spec's Task 5
 and the plan's T3. `MacroRunner` and the committed `.fpm` files are not
 touched. Everything else waiting is in THE QUEUE and
@@ -245,7 +245,7 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`eef0ef5`** at this file's cut — the `macro2-player` tip (player, application commands and recorder, folded), landed on `main` by the merge commit this file rides in: **macro v2 MERGED on Patrick's word** ("fold all three into #73 and merge"); `main`'s `1cf2c66` ([`0216`](handoff/0216-report.md) landed) is its other parent. **Owed next: the report recording this merge; then the legacy converter and docs.** Every PR through #73 is merged (#59 was closed, superseded by #60). |
+| **`main`** | **`7cf8ca3`** at this file's cut — macro v2 merged (PR #73: player, application commands, recorder, on his word); this commit lands [`0217-report.md`](handoff/0217-report.md), the record of that merge. **Owed next: the legacy converter and the v2 docs — see §0.** Every PR through #73 is merged (#59 was closed, superseded by #60). |
 | **Branches** | **None open.** Only `main` on the remote: `macro2-player`, `macro2-commands` and `macro2-recorder` were deleted in this merge step, local and remote, like every merged branch before them. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 32 open** (D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
