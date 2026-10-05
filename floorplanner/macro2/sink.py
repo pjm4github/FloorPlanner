@@ -67,6 +67,38 @@ def qt_mods(mods):
     return out
 
 
+def mods_from_qt(qmods) -> frozenset:
+    """The `Mod` set of a Qt modifier mask -- the recorder's door."""
+    return frozenset(m for m, q in _MOD.items() if qmods & q)
+
+
+_BUTTON_NAME = {v: k for k, v in _BUTTON.items()}
+_KEY_NAME = {}                       # Qt.Key -> canonical name, built lazily
+
+
+def button_name(qbutton):
+    return _BUTTON_NAME.get(qbutton)
+
+
+def key_from_qt(qkey):
+    """The v2 `Key` for a Qt key code, or None for a key the language has
+    no way to write. Enter and Return are one key, as on the keyboard."""
+    if not _KEY_NAME:
+        for name in keys.named_keys():
+            _KEY_NAME[getattr(Qt.Key, keys.qt_name(name))] = name
+        _KEY_NAME[Qt.Key.Key_Enter] = "Enter"
+    try:
+        qk = Qt.Key(qkey)
+    except ValueError:
+        return None
+    if qk in _KEY_NAME:
+        return keys.named(_KEY_NAME[qk])
+    code = int(qk.value)
+    if 32 < code < 256:
+        return keys.char(chr(code).lower())
+    return None
+
+
 def qt_key(ident: str):
     """The `Qt.Key` for an expansion key identity: a canonical key name, or
     an upper-cased character (sec6.2: in the Latin-1 range Qt key codes are

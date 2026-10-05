@@ -88,6 +88,11 @@ def qt_name(ident: str):
     return _NAMED.get(ident)
 
 
+def named_keys():
+    """Every canonical key name."""
+    return list(_NAMED)
+
+
 def named(name: str) -> Key:
     """A `Key` for a canonical name -- the recorder's and converter's door."""
     return Key(True, name)

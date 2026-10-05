@@ -887,7 +887,9 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
     def open_macro_recorder(self):
         """Open (or re-show) the non-modal macro recorder / debugger window."""
         if self._recorder_dialog is None:
-            self._recorder_dialog = MacroRecorderDialog(self)
+            # v2 by default (0216-report.md): it records Shift and Alt on the
+            # mouse, which the legacy format cannot say
+            self._recorder_dialog = MacroRecorderDialog(self, fmt="v2")
         self._recorder_dialog.show()
         self._recorder_dialog.raise_()
         self._recorder_dialog.activateWindow()

@@ -713,9 +713,19 @@ class MacroRecorderDialog(QDialog):
                    TOOL_DOOR: "D", TOOL_WINDOW: "W", TOOL_ROOM: "R",
                    TOOL_ROOF_RIDGE: "G", TOOL_ROOF_DORMER: "M"}
 
-    def __init__(self, win):
+    def __init__(self, win, fmt="legacy"):
         super().__init__(win)
         self.win = win
+        # TWO FORMATS (docs/macro-spec/MACRO_SPEC.md sec9; 0216-report.md).
+        # "legacy" is this dialog's own recorder, unchanged. "v2" feeds the
+        # same event filter into `macro2.recorder.Recorder`, which records
+        # what the legacy one cannot: Shift and Alt on the mouse, a modifier
+        # changing mid-drag, double clicks, the middle button, the wheel.
+        # The constructor default stays legacy (its tests construct it
+        # bare); the application opens it as v2.
+        self.fmt = fmt
+        self._v2 = None                  # the v2 Recorder while recording v2
+        self._v2_button = None           # the button of the v2 chain in flight
         self.setWindowTitle("Macro Recorder / Debug")
         self.setModal(False)
         self.setWindowFlag(Qt.WindowType.Window, True)
@@ -741,6 +751,13 @@ class MacroRecorderDialog(QDialog):
 
         self.nl_check = QCheckBox("New line after each mouse action")
         self.nl_check.setChecked(True)
+        self.v2_check = QCheckBox(
+            "Record in the v2 format (; fpmacro 2) -- captures Shift, Alt, "
+            "double clicks and the wheel")
+        self.v2_check.setChecked(fmt == "v2")
+        self.v2_check.setToolTip(
+            "Applies to an EMPTY editor. A macro already in the editor keeps "
+            "its own format: recording continues in whichever it is.")
         self.status_lbl = QLabel("Idle.")
 
         self.b_start = QPushButton("Start")
@@ -767,6 +784,7 @@ class MacroRecorderDialog(QDialog):
         lay = QVBoxLayout(self)
         lay.addWidget(self.edit)
         lay.addWidget(self.nl_check)
+        lay.addWidget(self.v2_check)
         lay.addLayout(row)
         lay.addWidget(self.status_lbl)
         self.resize(600, 440)
@@ -796,6 +814,7 @@ class MacroRecorderDialog(QDialog):
         self._press_scene = None
         self._last_key_ev = None
         self._last_key_sig = None
+        self._begin_format()
         self.win._recorder = self
         app = QApplication.instance()
         app.removeEventFilter(self)        # ensure exactly one installation
@@ -810,6 +829,9 @@ class MacroRecorderDialog(QDialog):
         if not self._recording:
             return
         self._end_modal_line()             # close any open PUP line
+        if self._v2 is not None:
+            self._v2.stop()                # nothing gathered is lost
+            self._v2 = None
         QApplication.instance().removeEventFilter(self)
         self.win._recorder = None
         self._recording = False
@@ -825,6 +847,8 @@ class MacroRecorderDialog(QDialog):
         if not self._recording:
             return
         self._paused = not self._paused
+        if self._paused and self._v2 is not None:
+            self._v2.flush()
         self.status_lbl.setText("Paused." if self._paused else "Recording…")
         self._sync_buttons()
 
@@ -915,7 +939,62 @@ class MacroRecorderDialog(QDialog):
         self.status_lbl.setText(f"Saved {path}")
 
     # -- hooks called by the instrumented app --------------------------------
+    # -- v2 (docs/macro-spec/MACRO_SPEC.md sec9) -----------------------------
+    def _begin_format(self):
+        """Decide the format of this recording. A macro already in the
+        editor keeps its own -- one file is one language -- and only an
+        empty editor takes the checkbox."""
+        from floorplanner.macro2.parse import HEADER, is_v2   # late: import cycle
+        from floorplanner.macro2.recorder import Recorder
+        text = self.edit.toPlainText()
+        if text.strip():
+            self.fmt = "v2" if is_v2(text) else "legacy"
+            self.v2_check.setChecked(self.fmt == "v2")
+        else:
+            self.fmt = "v2" if self.v2_check.isChecked() else "legacy"
+        self._v2 = None
+        self._v2_button = None
+        if self.fmt == "v2":
+            if not text.strip():
+                self.edit.setPlainText(HEADER + "\n")
+            self._v2 = Recorder(self._v2_emit, self._v2_retract,
+                                drag_px=float(QApplication.startDragDistance()))
+
+    def _v2_emit(self, line):
+        self._newline()                    # one command to a line, always
+        cur = self.edit.textCursor()
+        cur.movePosition(QTextCursor.MoveOperation.End)
+        cur.insertText(line + "\n")
+        self.edit.setTextCursor(cur)
+        self.edit.ensureCursorVisible()
+
+    def _v2_retract(self, line) -> bool:
+        """Remove the last line if it is exactly `line` (a CLICK about to
+        become a DCLICK)."""
+        text = self.edit.toPlainText()
+        tail = line + "\n"
+        if not text.endswith(tail):
+            return False
+        self.edit.setPlainText(text[:-len(tail)])
+        return True
+
+    def _v2_on(self, name, *args) -> bool:
+        """A hook in v2 mode: the action becomes one application command
+        (sec14), `@NAME args`. Returns True when v2 handled it."""
+        if self._v2 is None:
+            return False
+        if self._active():
+            self._end_modal_line()
+            self._v2.command(name, args)
+        return True
+
     def on_tool(self, tool):
+        if self._v2 is not None:
+            code = self._TOOL_CODES.get(tool)
+            if self._active() and code:
+                self._end_modal_line()
+                self._v2.tool(code)
+            return
         if self._active():
             self._end_modal_line()
             code = self._TOOL_CODES.get(tool)
@@ -923,6 +1002,8 @@ class MacroRecorderDialog(QDialog):
                 self._append(code)
 
     def on_place(self, kind, scene_pt):
+        if self._v2_on("PLACE", kind, round(scene_pt.x()), round(scene_pt.y())):
+            return
         if self._active():
             self._end_modal_line()
             self._append(f"PLACE {kind} {round(scene_pt.x())} "
@@ -941,6 +1022,9 @@ class MacroRecorderDialog(QDialog):
         # door/window size came from a dialog, not keystrokes — capture the
         # value into a self-contained DOOR/WINDOW token so replay needs no
         # dialog (the raw click for this tool is suppressed in _capture).
+        if self._v2_on("DOOR" if kind == "door" else "WINDOW",
+                       round(scene_pt.x()), round(scene_pt.y()), code):
+            return
         if self._active():
             self._end_modal_line()
             tok = "DOOR" if kind == "door" else "WINDOW"
@@ -965,12 +1049,17 @@ class MacroRecorderDialog(QDialog):
         default = upslope_direction(item.host, p) if item.host is not None else None
         if default is None or abs(ux - default[0]) > 1e-6 or abs(uy - default[1]) > 1e-6:
             tok += f" {ux:.4f} {uy:.4f}"
+        if self._v2 is not None:           # the same values, as @DORMER
+            self._v2.command("DORMER", tok.split()[1:])
+            return
         self._append(tok, newline=self.nl_check.isChecked())
 
     def on_open(self, path):
         # the file came from a modal QFileDialog the event stream cannot
         # see -- capture it into a self-contained "^O path" token, exactly
         # the on_opening/on_room pattern, so replay needs no dialog
+        if self._v2_on("OPEN", path):
+            return
         if self._active():
             self._end_modal_line()
             self._append(f'^O "{path}"', newline=True)
@@ -978,6 +1067,8 @@ class MacroRecorderDialog(QDialog):
     def on_save_as(self, path):
         # File > Save As (or a first Ctrl+S falling through to it): the
         # chosen file rides in the token, same as on_open
+        if self._v2_on("SAVE", path):
+            return
         if self._active():
             self._end_modal_line()
             self._append(f'^+S "{path}"', newline=True)
@@ -988,6 +1079,8 @@ class MacroRecorderDialog(QDialog):
         # replay is absolute however the user flipped it. Row 37's fix --
         # before this, a replayed session that toggled shuffle replayed in
         # the wrong mode, silently.
+        if self._v2_on("SHUFFLE", "on" if on else "off"):
+            return
         if self._active():
             self._end_modal_line()
             self._append(f'^H "{"on" if on else "off"}"', newline=True)
@@ -998,6 +1091,12 @@ class MacroRecorderDialog(QDialog):
         # equivalent rides the SAME LINE as a comment --
         #     PUP 200 300 DOWN ENTER # ^F "Top Floor"
         # -- every other route records the real token.
+        if self._v2 is not None:
+            # v2: through a context menu the recorded RCLICK + KEY strokes
+            # already replay the switch; every other route is one command
+            if self._active() and not self._modal_line:
+                self._v2.command("FLOOR", (name,))
+            return
         if self._active():
             if self._modal_line:
                 self._append(f'# ^F "{name}"')
@@ -1009,12 +1108,16 @@ class MacroRecorderDialog(QDialog):
     def on_new_floor(self, name):
         # New floor: the typed name rides in the token (the dialog is modal;
         # the event stream cannot see it)
+        if self._v2_on("NEWFLOOR", name):
+            return
         if self._active():
             self._end_modal_line()
             self._append(f'^+F "{name}"', newline=True)
 
     def on_room(self, name, scene_pt):
         # room name came from a dialog — capture it into a ROOM token.
+        if self._v2_on("ROOM", name, round(scene_pt.x()), round(scene_pt.y())):
+            return
         if self._active():
             self._end_modal_line()
             tok = f'"{name}"' if " " in name else name
@@ -1049,6 +1152,9 @@ class MacroRecorderDialog(QDialog):
         if et in (QEvent.Type.KeyPress, QEvent.Type.ShortcutOverride):
             self._capture_key(obj, ev)
             return
+        if obj is self.win.view.viewport() and self._v2 is not None:
+            self._capture_v2_mouse(et, ev)
+            return
         if obj is self.win.view.viewport():
             if et == QEvent.Type.MouseButtonPress and \
                     ev.button() == Qt.MouseButton.LeftButton:
@@ -1077,6 +1183,91 @@ class MacroRecorderDialog(QDialog):
                 # below while the menu is open)
                 sp = self.win.view.mapToScene(ev.pos())
                 self.on_popup(sp)
+    _V2_MOUSE = (QEvent.Type.MouseButtonPress, QEvent.Type.MouseMove,
+                 QEvent.Type.MouseButtonRelease, QEvent.Type.MouseButtonDblClick)
+
+    def _capture_v2_mouse(self, et, ev):
+        """v2: every mouse event on the canvas, with its modifiers, goes to
+        the `Recorder` in SCENE coordinates (sec5.1), which builds the chain."""
+        from floorplanner.macro2 import sink as v2s        # late: import cycle
+        view = self.win.view
+        px = 1.0 / max(view.transform().m11(), 1e-9)       # scene units a pixel
+        if et == QEvent.Type.Wheel:
+            sp = view.mapToScene(ev.position().toPoint())
+            d = ev.angleDelta()
+            self._v2.wheel(d.x(), d.y(), sp.x(), sp.y(),
+                           v2s.mods_from_qt(ev.modifiers()), px)
+            return
+        if et == QEvent.Type.ContextMenu:
+            # a right click is recorded from the context-menu event it raises;
+            # the keys that drive the menu follow as KEY / TYPE lines
+            sp = view.mapToScene(ev.pos())
+            self._end_modal_line()
+            self._v2.click("right", sp.x(), sp.y(),
+                           v2s.mods_from_qt(ev.modifiers()), px)
+            self._modal_line = True
+            return
+        if et not in self._V2_MOUSE:
+            return
+        sp = view.mapToScene(ev.position().toPoint())
+        mods = v2s.mods_from_qt(ev.modifiers())
+        if et == QEvent.Type.MouseMove:
+            if self._v2_button is not None:
+                self._v2.move(sp.x(), sp.y(), mods)
+            return
+        name = v2s.button_name(ev.button())
+        if name not in ("left", "middle", "back", "forward"):
+            return
+        if et == QEvent.Type.MouseButtonRelease:
+            if self._v2_button == name:
+                self._v2.release(sp.x(), sp.y(), mods)
+                self._v2_button = None
+            return
+        # a press. Door / window / room / dormer clicks are recorded by their
+        # hooks with the dialog's value (an application command), so the raw
+        # click is skipped -- the legacy recorder's own rule.
+        if name == "left" and self.win.tool in (TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM,
+                                                TOOL_ROOF_DORMER):
+            self._v2_button = None
+            return
+        self._end_modal_line()
+        self._v2_button = name
+        if et == QEvent.Type.MouseButtonDblClick:
+            self._v2.dblclick(name, sp.x(), sp.y(), mods, px)
+        else:
+            self._v2.press(name, sp.x(), sp.y(), mods, px)
+
+    def _v2_key(self, ev, in_modal):
+        """v2: one key press. In a menu or dialog, printable characters
+        gather into a TYPE line and every other key is a KEY stroke. On the
+        canvas every key is a stroke -- except the ones an app hook already
+        records as something better."""
+        from floorplanner.macro2 import sink as v2s        # late: import cycle
+        from floorplanner.macro2.ast import Mod
+        key = v2s.key_from_qt(ev.key())
+        if key is None:
+            return
+        mods = v2s.mods_from_qt(ev.modifiers())
+        text = ev.text()
+        if in_modal:
+            if text and text.isprintable() and not (mods - {Mod.SHIFT}):
+                self._v2.text(text)
+            else:
+                self._v2.key(key, mods)
+            return
+        if Mod.CTRL in mods and ev.key() in self._CARET_KEYS:
+            name = ("+" if Mod.SHIFT in mods else "") + self._CARET_KEYS[ev.key()]
+            if name in CARET_HOOK_TOKENS:
+                return        # Open / Save As / floors / shuffle: the hook writes @...
+            if name == "N":
+                self._v2.command("NEW", ())     # no confirm prompt on replay
+                return
+        if not mods and any(
+                s.matches(QKeySequence(ev.key())) == QKeySequence.SequenceMatch.ExactMatch
+                for act in self.win._tool_actions.values() for s in act.shortcuts()):
+            return            # a tool's own key: on_tool writes the letter
+        self._v2.key(key, mods)
+
     def _capture_key(self, obj, ev):
         # ShortcutOverride TOO (P4.2): a keystroke that matches a menu
         # QAction shortcut — Ctrl+G group, Ctrl+Shift+G ungroup, Del,
@@ -1134,7 +1325,11 @@ class MacroRecorderDialog(QDialog):
         # modal keystrokes only for a PUP-opened menu/dialog; tool-driven
         # dialogs (door/window size, room name) already record their value
         # via on_opening/on_room, so don't double-capture them
-        if in_modal:
+        if self._v2 is not None:
+            if not in_modal:
+                self._end_modal_line()
+            self._v2_key(ev, in_modal)
+        elif in_modal:
             self._emit_modal_key(ev)
         else:
             self._emit_key(ev)
@@ -1189,6 +1384,11 @@ class MacroRecorderDialog(QDialog):
 
     def _end_modal_line(self):
         # close out a PUP line (flush any typed text, drop to a new line)
+        if self._v2 is not None:
+            if self._modal_line:
+                self._v2.flush()
+                self._modal_line = False
+            return
         if self._modal_line:
             self._flush_type()
             self._newline()
