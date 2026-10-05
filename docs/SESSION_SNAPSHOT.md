@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: bfbdc2e -->
+<!-- SNAPSHOT-HEAD: b4aed3f -->
 
 # Session snapshot — read this first
 
@@ -103,8 +103,18 @@ delete the branch in the merge step.** **
 **NO PR YET**: never two AMBER tranches open at once, so its PR opens when
 #73 merges. [`0215-report.md`](handoff/0215-report.md); his grammar and
 spec gained §14. Twenty commands, run by `MacroRunner`'s own handlers.
-His check: `fixtures/macro2-commands-check.fpm`. Then T3, the recorder
-and converter (AMBER).** `MacroRunner` and the committed `.fpm` files are not
+His check: `fixtures/macro2-commands-check.fpm` — **he ran it; it built the
+room** (his screen, [`0216`](handoff/0216-report.md) §1).**
+**THE v2 RECORDER IS BUILT ON TOP OF THAT — on his report ("the shift key is
+not captured in the recorder"), branch `macro2-recorder`, STACKED on
+`macro2-commands`, pushed, NO PR YET. [`0216-report.md`](handoff/0216-report.md).**
+The Macro ▸ Record / Debug dialog now records v2 by default: Shift and Alt
+on the mouse, a modifier changing mid-drag, double clicks, the middle
+button, the wheel; a door, a room, a dormer as one `@COMMAND`. A macro
+already in the editor keeps its own format. **STILL OWED OF T3: the legacy
+converter (`fp_macro.py --convert`) and `docs/macro_language.md`.**
+**THREE BRANCHES ARE STACKED, ONE PR OPEN (#73). On his word each lands in
+turn: #73, then `macro2-commands`, then `macro2-recorder`.** `MacroRunner` and the committed `.fpm` files are not
 touched. Everything else waiting is in THE QUEUE and
 [`0211`](handoff/0211-report.md) §4.
 
@@ -257,8 +267,8 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`bfbdc2e`** at this file's cut — [`0214`](handoff/0214-report.md) landed; this commit lands [`0215-report.md`](handoff/0215-report.md). **Macro v2 T2 (the player) is on [PR #73](https://github.com/pjm4github/FloorPlanner/pull/73), AMBER, waiting on his check; application commands are built on `macro2-commands`, stacked on it, no PR until #73 merges — see §0.** Every PR through #72 is merged (#59 was closed, superseded by #60). |
-| **Branches** | **`macro2-player` open, AMBER, [PR #73](https://github.com/pjm4github/FloorPlanner/pull/73) waiting on Patrick's check. `macro2-commands` pushed, STACKED on it, deliberately WITHOUT a PR** (one AMBER tranche open at a time): when #73 merges, merge `main` into `macro2-commands`, open its PR, and stop for his check. Each branch's snapshot is its own cut. Otherwise only `main` on the remote. |
+| **`main`** | **`b4aed3f`** at this file's cut — [`0215`](handoff/0215-report.md) landed; this commit lands [`0216-report.md`](handoff/0216-report.md). **Macro v2: the player is on [PR #73](https://github.com/pjm4github/FloorPlanner/pull/73), AMBER, waiting on his word; application commands (`macro2-commands`) and the v2 recorder (`macro2-recorder`) are built and stacked on it, no PR until the one below merges — see §0.** Every PR through #72 is merged (#59 was closed, superseded by #60). |
+| **Branches** | **`macro2-player` open, AMBER, [PR #73](https://github.com/pjm4github/FloorPlanner/pull/73) waiting on Patrick's word. `macro2-commands` is pushed, stacked on it; `macro2-recorder` is pushed, stacked on that; both deliberately WITHOUT a PR** (one AMBER tranche open at a time). To land: merge #73; merge `main` into `macro2-commands`, open its PR, his check, merge; the same for `macro2-recorder`. Each branch's snapshot is its own cut. Otherwise only `main` on the remote. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 32 open** (D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
