@@ -34,6 +34,12 @@ WHEEL   : 'WHEEL' ;
 // Timing
 WAIT    : 'WAIT' ;
 
+// Application command (spec sec 14): '@' and an uppercase name, then its
+// arguments to the end of the line. The '@' is what keeps a name such as
+// DOOR from being read as the tool letters D O O R. Switches mode so the
+// arguments are not tokenized as tool letters, modifiers or numbers.
+APPCMD  : '@' [A-Z] [A-Z0-9_]* -> pushMode(ARG_MODE) ;
+
 // Single-letter tool selection (e.g. I = wall, S = select). Keywords
 // above win by longest match, so "CLICK" is never read as tool "C".
 TOOL    : [A-Z] ;
@@ -80,3 +86,19 @@ mode TEXT_BODY_MODE;
 
 TEXT        : ~[\r\n]+ ;
 BODY_NL     : '\r'? '\n' -> popMode, type(NL) ;
+
+// ---------------------------------------------------------------------
+// ARG_MODE: arguments of an application command, up to end of line
+// ---------------------------------------------------------------------
+mode ARG_MODE;
+
+ARG_NL      : '\r'? '\n' -> popMode, type(NL) ;
+ARG_WS      : [ \t]+ -> skip ;
+ARG_COMMENT : ';' ~[\r\n]* -> skip ;
+
+// "Living Room", "plans/my den.json" -- no escapes; cannot contain a quote
+ASTRING     : '"' ~["\r\n]* '"' ;
+
+// A bare argument: a name, a number, a path, a feet-inches length (12'6").
+// It may CONTAIN a quote but not start with one, and cannot contain ';'.
+AWORD       : ~[ \t\r\n";] ~[ \t\r\n;]* ;

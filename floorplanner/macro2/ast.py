@@ -111,6 +111,16 @@ class Wait:
 
 
 @dataclass(frozen=True)
+class AppCommand:
+    """`@NAME arg ...` (sec14): the application acts directly. `args` are
+    the argument texts with any double quotes removed."""
+    name: str
+    args: tuple
+    line: int = field(default=0, compare=False)
+    col: int = field(default=0, compare=False)
+
+
+@dataclass(frozen=True)
 class Line:
     """`[TOOL] [command]` (sec4). At least one of the two is present."""
     tool: str | None

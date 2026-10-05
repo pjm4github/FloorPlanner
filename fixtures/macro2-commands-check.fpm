@@ -1,0 +1,23 @@
+; fpmacro 2
+; Macro language v2 -- application commands, the manual check
+; (docs/handoff/0215-report.md; docs/macro-spec/MACRO_SPEC.md sec 14).
+; On an EMPTY plan: Macro > Record / Debug, Load this file, Replay.
+;
+; 1. four walls, by command -- no mouse is simulated
+@WALL 0 0 240 0 ext
+@WALL 240 0 240 180 ext
+@WALL 240 180 0 180 ext
+@WALL 0 180 0 0 ext
+; 2. the room is named; a quoted argument keeps its space
+@ROOM "Living Room" 120 90
+; 3. a door, with its size given -- no dialog opens
+@DOOR 120 0 3680
+; 4. a sofa and an armchair, the second placed in feet and inches
+@PLACE sofa 120 140 0
+@PLACE armchair 4' 6' 90
+; 5. commands and input in one macro: a free-angle wall drawn with Shift held
+I CLICK 60 90 +DRAG 177 133
+; 6. select the sofa and turn it
+S @SELECT 120 140
+@ROTATE 90
+@DESELECT

@@ -10,7 +10,7 @@ Round trip: `serialize(parse(serialize(ast))) == serialize(ast)`.
 """
 from __future__ import annotations
 
-from floorplanner.macro2 import ast, keys
+from floorplanner.macro2 import appcmd, ast, keys
 from floorplanner.macro2.ast import MOD_ORDER
 from floorplanner.macro2.parse import HEADER
 
@@ -48,6 +48,8 @@ def command(cmd) -> str:
         return "KEYUP " + keys.write(cmd.key)
     if isinstance(cmd, ast.Wait):
         return "WAIT " + number(cmd.ms)
+    if isinstance(cmd, ast.AppCommand):
+        return " ".join(["@" + cmd.name, *(appcmd.quote(a) for a in cmd.args)])
     raise TypeError(f"not a v2 command: {cmd!r}")
 
 

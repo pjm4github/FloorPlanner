@@ -118,6 +118,12 @@ def _command(ctx, errors):
         return ast.KeyDown(_key(ctx.keyDown().keyName()))
     if ctx.keyUp() is not None:
         return ast.KeyUp(_key(ctx.keyUp().keyName()))
+    if ctx.appCommand() is not None:
+        c = ctx.appCommand()
+        tok = c.APPCMD().symbol
+        args = tuple(a.getText()[1:-1] if a.ASTRING() is not None else a.getText()
+                     for a in c.appArg())
+        return ast.AppCommand(tok.text[1:], args, tok.line, tok.column)
     c = ctx.wait()
     return ast.Wait(_num(c.ms), c.ms.line, c.ms.column)
 

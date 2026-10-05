@@ -2,12 +2,13 @@
 
 The whole macro is validated BEFORE anything runs, and every error is
 reported with its position. Syntax errors and repeated modifiers come from
-`parse`; this adds the three that need the AST: an unknown tool letter, an
-unknown `{Name}`, and a negative `WAIT`.
+`parse`; this adds the ones that need the AST: an unknown tool letter, an
+unknown `{Name}`, a negative `WAIT`, and -- for an application command
+(sec14) -- an unknown name or a wrong number of arguments.
 """
 from __future__ import annotations
 
-from floorplanner.macro2 import ast, keys
+from floorplanner.macro2 import appcmd, ast, keys
 from floorplanner.macro2.parse import ParseResult, parse
 
 
@@ -34,6 +35,15 @@ def validate(macro: ast.Macro, tools) -> list:
         if isinstance(ln.command, ast.Wait) and ln.command.ms < 0:
             errors.append(ast.MacroError(
                 ln.command.line, ln.command.col, "WAIT cannot be negative"))
+        if isinstance(ln.command, ast.AppCommand):
+            c = ln.command
+            if c.name not in appcmd.COMMANDS:
+                errors.append(ast.MacroError(
+                    c.line, c.col, f"unknown application command '@{c.name}'"))
+            else:
+                msg = appcmd.arity_error(c.name, len(c.args))
+                if msg is not None:
+                    errors.append(ast.MacroError(c.line, c.col, msg))
     return errors
 
 

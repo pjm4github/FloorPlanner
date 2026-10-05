@@ -31,6 +31,7 @@ command
     | keyDown
     | keyUp
     | wait
+    | appCommand
     ;
 
 // ---- Mouse ----------------------------------------------------------
@@ -95,4 +96,16 @@ keyUp
 
 wait
     : WAIT ms=NUMBER
+    ;
+
+// ---- Application commands (spec sec 14) -----------------------------
+
+// @NAME arg arg ...  -- the application acts directly; no input is simulated.
+appCommand
+    : APPCMD appArg*
+    ;
+
+appArg
+    : ASTRING
+    | AWORD
     ;

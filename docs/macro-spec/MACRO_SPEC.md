@@ -54,6 +54,8 @@ Do these in order.
   across steps.
 - `TYPE` takes the rest of the line literally. `KEY` sends keystrokes with
   modifiers and `{Named}` keys.
+- An **application command** (`@PLACE sofa 120 96`) makes the application
+  act directly instead of simulating input (Section 14).
 
 ---
 
@@ -75,6 +77,9 @@ Keywords are case-sensitive and uppercase:
 
 `CLICK` `RCLICK` `MCLICK` `DCLICK` `XCLICK1` `XCLICK2` `DRAG` `MOVE`
 `WHEEL` `TYPE` `KEY` `KEYDOWN` `KEYUP` `WAIT`
+
+An application command is not a keyword: it is `@` followed by an
+uppercase name (Section 14).
 
 ### 3.3 Tool letters
 
@@ -510,4 +515,98 @@ KEY {Enter}
 KEYDOWN {Space}
 CLICK 300 300 DRAG 500 400
 KEYUP {Space}
+```
+
+---
+
+## 14. Application commands
+
+*Added 2026-10-04 on Patrick's instruction: "carry v1's high level commands
+as a single command using the form @COMMAND".*
+
+```
+appCommand := @NAME { argument }
+argument   := "quoted text" | bare-word
+```
+
+An application command makes the application **act directly** — place a
+furnishing, cut a door, open a file — where every other line of this
+language simulates input. It is how a macro says *what it wants* rather
+than *where to click*, and how a recorder writes down an action whose
+parameters came from a dialog without having to replay the dialog.
+
+### 14.1 Syntax
+
+- `@` and an uppercase name (`[A-Z][A-Z0-9_]*`), then arguments separated by
+  spaces or tabs, to the end of the line. The `@` is what keeps a name such
+  as `DOOR` from being read as the tool letters `D O O R`.
+- An argument is a **bare word** or a **double-quoted string**. Quotes are
+  needed only when the text is empty, starts with a quote, or contains a
+  space, a tab or a semicolon. There are no escapes; a quoted string cannot
+  contain a double quote.
+- A bare word may *contain* a quote, so the feet-and-inches length `12'6"`
+  is one argument. Numbers are plain inches (`120`) or feet-inches (`10'`,
+  `12'6"`); they are the application's to read, not the grammar's.
+- `;` starts a comment, as on an ordinary line.
+- A tool letter may precede it: `S @SELECT 120 96`.
+
+### 14.2 The commands
+
+These are the existing macro language's own commands
+(`docs/macro_language.md`), run by its own handlers, so `@PLACE` here and
+`PLACE` there cannot drift apart.
+
+| Command | Arguments | Action |
+|---|---|---|
+| `@PLACE` | `kind x y [rot]` | add a furnishing centred at (x, y) |
+| `@WALL` | `x1 y1 x2 y2 [ext\|int]` | add a wall (default exterior) |
+| `@DOOR` / `@WINDOW` | `x y WWHH` | cut an opening into the wall under (x, y) |
+| `@ROOM` | `name x y` | name the enclosed area containing (x, y) |
+| `@DORMER` | `x y width eaves ridge [dx dy]` | add a gable dormer on the roof plane at (x, y) |
+| `@SELECT` | `x y` | select the editable item at a point |
+| `@SELECTALL` / `@DESELECT` | | select everything / clear the selection |
+| `@ROTATE` | `deg` | rotate the selected furnishings |
+| `@MOVETO` | `x y` | move the selection so its first item is centred at (x, y) |
+| `@DELETE` | | delete the selection |
+| `@ZOOMFIT` | | fit the view to the walls |
+| `@OPEN` / `@SAVE` | `path` | load / save a plan |
+| `@NEW` | | clear the plan |
+| `@SHOT` | `path` | snapshot the canvas (`.svg` is vector, anything else PNG) |
+| `@FLOOR` | `name` | switch to a floor |
+| `@NEWFLOOR` | `name` | create a floor, or switch to it if it exists |
+| `@SHUFFLE` | `on\|off` | set shuffle mode |
+
+**Not carried, because this language already says them:** the existing
+`CLICK`, `RCLICK`, `DRAG`, `MOVE`, `PRESS`, `RELEASE` (a mouse chain,
+Section 5); `TYPE`, `WAIT`, `ENTER`, `ESC`, the arrows and the shortcut
+carets such as `^Z` (`KEY`, Section 6); `TOOL` and the digit tool codes (a
+tool letter, Section 4); and `PUP` (`RCLICK`, then `KEY`).
+
+### 14.3 Semantics
+
+- No input is simulated: no mouse, key or modifier event is sent, the
+  pointer position does not change, and a key held by `KEYDOWN` stays held
+  across the command.
+- **Validation** (Section 8.3) adds two errors, found before anything runs:
+  an unknown command name, and a wrong number of arguments.
+- What an argument must *be* — a number, a catalog id, a file that exists —
+  is judged when the command runs. A failure there **aborts the macro** and
+  is reported with its line; nothing after it runs, and every held key is
+  released.
+- Canonical form (Section 10): `@NAME`, a single space between arguments,
+  each argument bare unless it must be quoted.
+
+### 14.4 Example
+
+```
+; fpmacro 2
+@WALL 0 0 240 0 ext
+@WALL 240 0 240 180 ext
+@WALL 240 180 0 180 ext
+@WALL 0 180 0 0 ext
+@ROOM "Living Room" 120 90
+@DOOR 120 0 3680
+@PLACE sofa 120 140 0
+I CLICK 60 90 +DRAG 177 133     ; and a free-angle wall, by input
+@SHOT den.svg
 ```

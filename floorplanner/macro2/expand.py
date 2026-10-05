@@ -16,6 +16,7 @@ Event kinds:
     dblclick  the double-click event             .button .x .y .mods
     wheel     one wheel event at the pointer     .dx .dy .x .y .mods
     wait      process events for .ms milliseconds
+    command   an application command (sec14)    .text (the name), .args
 
 `.mods` is the modifier state the event CARRIES. For a modifier key's own
 key_down / key_up it is the state AFTER the change (sec7), which is what Qt
@@ -44,6 +45,7 @@ class InputEvent:
     dy: float = 0.0
     ms: float = 0.0
     tool: str | None = None
+    args: tuple = ()
     line: int = 0
 
 
@@ -183,6 +185,10 @@ class _Expander:
                 self.key_up(cmd.key)
             elif isinstance(cmd, ast.Wait):
                 self.emit("wait", ms=cmd.ms)
+            elif isinstance(cmd, ast.AppCommand):
+                # no input is simulated, so no modifier or pointer state is
+                # touched: a held key stays held across it
+                self.emit("command", text=cmd.name, args=cmd.args)
         self.finish()
 
 

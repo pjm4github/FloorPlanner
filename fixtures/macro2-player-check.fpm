@@ -6,7 +6,11 @@
 I CLICK 120 120 DRAG 360 120
 ; 2. Shift held for the drag: the end follows the cursor -- OFF the grid, not square
 I CLICK 120 240 +DRAG 355 253
-; 3. one press, two segments: constrained to (300,..), then free to (301,451)
+; 3. one press, the modifier changing mid-drag: the cursor goes to (300,364)
+;    with no modifier, then on to (301,451) with Shift held. It is still ONE
+;    wall -- a wall runs straight from the press to the release, and the
+;    middle point is only where the cursor passed. It ends at (301,451), off
+;    the grid, because Shift was down when the button came up.
 I CLICK 120 360 DRAG 300 364 +DRAG 301 451
 ; 4. a door on wall 1: the size dialog opens, is typed into, and is accepted
 D CLICK 240 120

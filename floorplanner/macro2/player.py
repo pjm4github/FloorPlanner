@@ -24,7 +24,7 @@ from PyQt6.QtCore import QEventLoop, QTimer
 from PyQt6.QtWidgets import QApplication
 
 from floorplanner.macro import MacroRunner
-from floorplanner.macro2 import keys
+from floorplanner.macro2 import appcmd, keys
 from floorplanner.macro2.expand import InputEvent, expand, release_all
 from floorplanner.macro2.sink import QtEventSink
 from floorplanner.macro2.validate import check
@@ -41,6 +41,17 @@ class Player:
         self.log = []
         self.errors = []
         self.warnings = []
+
+    def _command(self, name, args):
+        """sec14: an application command is run by the EXISTING language's
+        own handler -- `MacroRunner._dispatch`, given the arguments as its
+        token stream -- so `@PLACE` and `PLACE` cannot drift apart. A handler
+        that does not consume every argument means a count the table let
+        through wrongly; that is an error, not something to ignore."""
+        toks = list(args)
+        used = MacroRunner(self.win)._dispatch(appcmd.legacy_token(name), toks, 0)
+        if used != len(toks):
+            raise ValueError(f"@{name}: {len(toks) - used} argument(s) not understood")
 
     def _result(self, steps):
         return {"ok": not self.errors, "steps": steps, "log": self.log,
@@ -63,7 +74,7 @@ class Player:
 
     # -- the pump -----------------------------------------------------------
     def _deliver(self, events):
-        sink = QtEventSink(self.win, TOOLS, self.step_px)
+        sink = QtEventSink(self.win, TOOLS, self.step_px, self._command)
         queue = deque(events)
         loop = QEventLoop()
         state = {"mods": frozenset(), "held": set(), "done": False}

@@ -57,12 +57,12 @@ def test_the_spec_example_parses_with_zero_errors():
     text = EXAMPLES.read_text(encoding="utf-8")
     res = parse(text)
     assert res.errors == ()
-    assert len(res.macro.lines) == 23, "every non-comment line became a Line"
+    assert len(res.macro.lines) == 26, "every non-comment line became a Line"
     assert is_v2(text)
 
 
 def test_the_example_validates_except_for_its_tool_x():
-    """Its last line is `X MOVE 1.5 -2.25`. No tool has the letter X, so it
+    """Line 25 is `X MOVE 1.5 -2.25`. No tool has the letter X, so it
     PARSES (item 1) and fails VALIDATION (sec8.3) -- on that line only."""
     res = check(EXAMPLES.read_text(encoding="utf-8"), TOOLS)
     assert [(e.line, e.message) for e in res.errors] == [

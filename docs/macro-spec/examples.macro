@@ -23,3 +23,6 @@ MOVE 50 60
 WAIT 250
 TYPE
 X MOVE 1.5 -2.25
+@PLACE sofa 120 96 0        ; an application command (sec 14)
+@ROOM "Living Room" 10' 12'6"
+S @SELECTALL

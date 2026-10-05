@@ -99,5 +99,15 @@ class MacroParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by MacroParser#appCommand.
+    def visitAppCommand(self, ctx:MacroParser.AppCommandContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by MacroParser#appArg.
+    def visitAppArg(self, ctx:MacroParser.AppArgContext):
+        return self.visitChildren(ctx)
+
+
 
 del MacroParser

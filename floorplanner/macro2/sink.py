@@ -80,8 +80,9 @@ def qt_key(ident: str):
 
 
 class QtEventSink:
-    def __init__(self, win, tools, step_px: float = 8.0):
+    def __init__(self, win, tools, step_px: float = 8.0, run_command=None):
         self.win = win
+        self.run_command = run_command     # (name, args) -> None; sec14
         self.view = win.view
         self.tools = tools                 # letter -> the app's tool constant
         self.step_px = max(1.0, float(step_px))
@@ -237,6 +238,8 @@ class QtEventSink:
                 QPointF(pos), QPointF(vp.mapToGlobal(pos)), QPoint(),
                 QPoint(int(ev.dx), int(ev.dy)), self.buttons, qt_mods(ev.mods),
                 Qt.ScrollPhase.NoScrollPhase, False))
+        elif k == "command":
+            self.run_command(ev.text, ev.args)
         # "wait" is the player's: it is a pause between deliveries
 
     def drag_points(self, ev):
