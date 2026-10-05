@@ -16,6 +16,12 @@ load a plan, edit it, "see" the result, and save it. It's a two-part tool:
               (Part 2, CLI)             (Part 1, in-app hook)        (token engine)
 ```
 
+**There are two macro formats, side by side.** A macro whose first non-blank
+line is `; fpmacro 2` is **macro language v2** — see
+[Macro language v2](#macro-language-v2) below. Anything else is the original
+token language described first, and runs exactly as it always has. Both go
+through the same `run_macro`, the same driver and the same recorder window.
+
 ## Coordinates
 
 Positions are in **scene inches** (1 unit = 1 inch), matching the saved JSON
@@ -35,7 +41,7 @@ include spaces (e.g. a room name `"Living Room"`). A bad token is recorded in
 |-------|--------|
 | `S` `E` `I` `D` `W` `R` | **S**elect / **E**xterior-wall / **I**nterior-wall / **D**oor / **W**indow / **R**oom tool |
 | `G` `M` | Roof rid**g**e / roof dor**m**er tool (`G` because `R` is Room's; `M` for dorMer) |
-| `TOOL <name>` | same, by name: `select extwall intwall door window room` |
+| `TOOL <name>` | same, by name: `select extwall intwall door window room roofridge roofdormer` |
 
 (The legacy digit codes `1`–`6` are still accepted for older macros.)
 
@@ -51,6 +57,9 @@ Spaces separate them, e.g. `^C ^V`. A `+` after the caret adds Shift.
 | `^G` / `^+G` | group / ungroup the selection |
 | `^A` | select all editable items |
 | `^S` | save to the current file (set by the driver's `--out`) |
+| `^O "path"` / `^+S "path"` | open that plan / save to that file |
+| `^F "name"` / `^+F "name"` | switch to that floor (bare `^F`: the default floor) / create it, or switch to it if it exists |
+| `^H "on"` / `^H "off"` | set shuffle mode (bare `^H` toggles) |
 
 ### Keyboard
 
@@ -127,6 +136,72 @@ These build items directly — handy for an AI that knows *what* it wants, not
 | `SHOT path` | snapshot the canvas; `.svg` → vector, anything else → PNG |
 | `WAIT` | flush pending events |
 
+## Macro language v2
+
+The second format, specified in
+[`macro-spec/MACRO_SPEC.md`](macro-spec/MACRO_SPEC.md) (the grammar beside it
+wins on syntax). It exists because the original language cannot say a
+Shift-drag: v2 carries every modifier, on every part of a drag.
+
+A v2 macro **starts with the line `; fpmacro 2`** and has **one command per
+line**, optionally after a tool letter. `;` starts a comment.
+
+```
+; fpmacro 2
+I CLICK 120 120 DRAG 360 120        ; a wall, with the Interior-wall tool
+I CLICK 120 240 +DRAG 355 253       ; Shift held for the drag: off the grid
+D CLICK 240 120                     ; the Door tool; its size dialog opens...
+TYPE 2868
+KEY {Enter}                         ; ...and is answered
+S KEY ^z                            ; Select tool, then a real Ctrl+Z
+@PLACE sofa 120 140 0               ; an application command: no input simulated
+```
+
+| Line | Action |
+|------|--------|
+| `S` `E` `I` `D` `W` `R` `G` `M` | the same tool letters, alone or before a command on the same line |
+| `CLICK x y` | left click. Also `RCLICK` (right — opens the context menu), `MCLICK`, `DCLICK` (double), `XCLICK1`, `XCLICK2` |
+| `CLICK x y DRAG x y DRAG x y …` | a **chain**: press at the first point, release at the last. The button is never held between lines |
+| `+` `^` `!` `#` before `CLICK` / `DRAG` / `MOVE` / `WHEEL` | Shift / Ctrl / Alt / Meta, **for that segment only**: `CLICK 10 10 DRAG 100 10 +DRAG 100 90` presses Shift partway through |
+| `MOVE x y` | move the pointer, no button held |
+| `WHEEL dx dy` | one wheel event at the pointer; 120 is a notch |
+| `TYPE text` | type the rest of the line literally — quotes, `;` and all |
+| `KEY strokes` | keystrokes: `KEY ^c ^v`, `KEY +^g`, named keys in braces — `{Enter}` `{Esc}` `{Tab}` `{Space}` `{Delete}` `{Up}` `{F5}` … |
+| `KEYDOWN key` / `KEYUP key` | hold a key across lines (`KEYDOWN {Shift}`); released when the macro ends, whatever happens |
+| `WAIT ms` | process events for that long |
+| `@NAME arg …` | an **application command** — the high-level words above, run by the same handlers: `@PLACE` `@WALL` `@DOOR` `@WINDOW` `@ROOM` `@DORMER` `@SELECT` `@SELECTALL` `@DESELECT` `@ROTATE` `@MOVETO` `@DELETE` `@ZOOMFIT` `@OPEN` `@SAVE` `@NEW` `@SHOT`, and `@FLOOR name`, `@NEWFLOOR name`, `@SHUFFLE on\|off` |
+
+What differs from the original language, beyond the syntax:
+
+- **The whole macro is checked before anything runs.** A syntax error, an
+  unknown tool letter, key name or command, or a wrong argument count stops it
+  with every error listed by line — nothing is executed. A command that fails
+  while running aborts the rest. (The original skips a bad token and carries on.)
+- **Input is real input.** Modifiers are real key presses; `KEY ^z` is the
+  application's own Ctrl+Z; a click that opens a dialog really opens it, and the
+  `TYPE` / `KEY` lines after it drive it. A menu or dialog still open when the
+  macro ends is closed, with a warning.
+- **Numbers on mouse lines are plain inches** (`120`, `-12.5`); feet-and-inches
+  (`10'6"`) is accepted only in an application command's arguments.
+
+### Converting an existing macro to v2
+
+```bash
+python fp_macro.py --convert edits.fpm other.fpm
+```
+
+rewrites each file as v2 and keeps the original beside it as `edits.fpm.bak`.
+It runs nothing and prints a JSON report. A file already in v2 is left alone;
+so is one whose `.bak` already exists.
+
+Every token of the original language has a v2 form except these, which are
+**reported and written into the new file as a `; NOT CONVERTED` comment** where
+they stood (the exit code is then 1): a `PRESS` with no `RELEASE` after it, a
+`RELEASE` alone, a bare `^F`, and anything the original engine would itself have
+refused. Two conversions are reported as `notes` because they are now real
+input: `^S` (with no current file, Ctrl+S opens Save As) and `RCLICK` (it opens
+the context menu). `^N` and `^A` become `@NEW` and `@SELECTALL`.
+
 ## The driver: `fp_macro.py`
 
 ```
@@ -140,6 +215,7 @@ python fp_macro.py [options]
       --png PATH      write a PNG snapshot (repeatable)
       --shot PATH     write a snapshot, format by extension (repeatable)
       --repl          read macro lines from stdin, one run per line
+      --convert FILE… rewrite original-format macro files as v2 (keeps FILE.bak)
       --window        show a real window instead of rendering offscreen
       --summary {counts,full,none}   how much layout to print (default counts)
   -q, --quiet         suppress the JSON result on stdout
@@ -195,8 +271,14 @@ python fp_macro.py --in den.json --repl
 Rather than writing tokens by hand, open the **Macro ▸ Record / Debug…** window
 (or the ● Record toolbar button). It's a non-modal recorder/debugger:
 
+- **Record in the v2 format** — ticked by default: the recording is a v2
+  macro, with Shift and Alt on the mouse, a modifier changing mid-drag, double
+  clicks and the wheel captured, and dialog-driven actions written as one
+  `@COMMAND`. Unticked, it records the original language as described below. A
+  macro already in the editor keeps its own format.
 - **Start** — begins capture; switch to the plan window and interact. Mouse
-  clicks/drags become `CLICK`/`DRAG`, tool changes become `1`–`6`, palette
+  clicks/drags become `CLICK`/`DRAG`, tool changes become their letters
+  (`S` `E` `I` …), palette
   drops become `PLACE kind x y`, and keys (arrows, `^C`/`^V`/…, `DEL`, `ESC`)
   become their tokens. Actions whose parameters come from a **dialog** rather
   than keystrokes are captured as self-contained tokens with the value baked
@@ -213,8 +295,11 @@ Rather than writing tokens by hand, open the **Macro ▸ Record / Debug…** win
   mouse/place action so the macro reads one action per line.
 - **Pause / Resume** — temporarily stop/continue capturing.
 - **Stop** — end capture. Now edit the text freely.
-- **Replay** — select a portion of the text (or all) and replay it one line at
-  a time so you can watch it run. Enabled only when text is selected.
+- **Replay** — select a portion of the text (or all) and replay it. The lines
+  the selection touches are replayed **whole and from the top down**, whichever
+  way the selection was dragged. The original language steps one line at a time
+  so you can watch it run; a v2 selection runs as one macro. Enabled only when
+  text is selected.
 - **Save As…** — write the macro to a `.fpm` file for later use with
   `fp_macro.py --file`.
 

@@ -23,6 +23,9 @@ Examples
 
   # interactive line-by-line session (one macro line per stdin line)
   python fp_macro.py --in plan.json --repl
+
+  # rewrite existing-format macro files as macro language v2 (keeps FILE.bak)
+  python fp_macro.py --convert edits.fpm other.fpm
 """
 import argparse
 import json
@@ -69,6 +72,48 @@ def _do_exports(win, args) -> list:
     return exports
 
 
+def _convert_files(paths, quiet: bool) -> int:
+    """Rewrite each existing-format macro file as macro language v2
+    (docs/macro-spec/MACRO_SPEC.md sec11), the original kept beside it as
+    FILE.bak. A file already in v2 is left alone, and so is one whose .bak
+    exists -- that copy may be the only original. Anything with no v2 form
+    is reported, and written into the new file as a `; NOT CONVERTED`
+    comment where it stood; the exit code is then 1."""
+    import shutil
+
+    from floorplanner.macro2 import is_v2
+    from floorplanner.macro2.convert import convert
+
+    files, ok = [], True
+    for path in paths:
+        entry = {"path": path}
+        files.append(entry)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                text = f.read()
+            if is_v2(text):
+                entry["status"] = "already v2"
+                continue
+            bak = path + ".bak"
+            if os.path.exists(bak):
+                raise FileExistsError(f"{bak} exists; not overwritten")
+            conv = convert(text)
+            shutil.copy2(path, bak)
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
+                f.write(conv.text)
+            entry.update(status="converted", backup=bak,
+                         lines=len(conv.macro.lines),
+                         not_converted=[str(p) for p in conv.problems],
+                         notes=[str(n) for n in conv.notes])
+            ok = ok and conv.ok
+        except (OSError, UnicodeDecodeError) as ex:
+            entry.update(status="error", error=f"{type(ex).__name__}: {ex}")
+            ok = False
+    if not quiet:
+        print(json.dumps({"ok": ok, "files": files}, indent=2))
+    return 0 if ok else 1
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         prog="fp_macro.py",
@@ -88,6 +133,9 @@ def main(argv=None) -> int:
                     help="write a snapshot, format by extension (repeatable)")
     ap.add_argument("--repl", action="store_true",
                     help="read macro lines from stdin, one run per line")
+    ap.add_argument("--convert", nargs="+", metavar="FILE",
+                    help="rewrite existing-format macro files as macro "
+                         "language v2, keeping FILE.bak; runs nothing")
     ap.add_argument("--window", action="store_true",
                     help="show a real window instead of rendering offscreen")
     ap.add_argument("--summary", choices=["counts", "full", "none"],
@@ -96,6 +144,9 @@ def main(argv=None) -> int:
     ap.add_argument("-q", "--quiet", action="store_true",
                     help="suppress the JSON result on stdout")
     args = ap.parse_args(argv)
+
+    if args.convert:
+        return _convert_files(args.convert, args.quiet)
 
     app, FP, win = _build_window(args.window)
 

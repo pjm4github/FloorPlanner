@@ -692,6 +692,84 @@ class MacroRunner:
             return False
 
 
+class _LineNumberArea(QWidget):
+    """The gutter of a `MacroEdit`; the editor paints it."""
+
+    def __init__(self, editor):
+        super().__init__(editor)
+        self._editor = editor
+
+    def sizeHint(self):
+        return QSize(self._editor.line_number_width(), 0)
+
+    def paintEvent(self, e):
+        self._editor.paint_line_numbers(e)
+
+
+class MacroEdit(QPlainTextEdit):
+    """The recorder window's text editor, with LINE NUMBERS in a gutter on
+    its left (Patrick, 2026-10-05) -- a v2 error names its line, and the
+    gutter is where a marker for that line will go. Numbers are 1-based,
+    one per line of the macro, as `MacroError.line` counts them."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._gutter = _LineNumberArea(self)
+        self.blockCountChanged.connect(self._fit_gutter)
+        self.updateRequest.connect(self._scroll_gutter)
+        self._fit_gutter()
+
+    def line_number_width(self) -> int:
+        digits = max(2, len(str(self.blockCount())))
+        return 10 + self.fontMetrics().horizontalAdvance("9") * digits
+
+    def _fit_gutter(self, *_):
+        self.setViewportMargins(self.line_number_width(), 0, 0, 0)
+
+    def _scroll_gutter(self, rect, dy):
+        if dy:
+            self._gutter.scroll(0, dy)
+        else:
+            self._gutter.update(0, rect.y(), self._gutter.width(), rect.height())
+
+    def setFont(self, font):
+        super().setFont(font)
+        self._fit_gutter()
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        cr = self.contentsRect()
+        self._gutter.setGeometry(cr.left(), cr.top(), self.line_number_width(), cr.height())
+
+    def visible_line_numbers(self) -> list:
+        """(line number, top y in the gutter) of every line now on screen."""
+        out = []
+        block = self.firstVisibleBlock()
+        offset = self.contentOffset()
+        bottom = self.viewport().height()
+        while block.isValid():
+            top = round(self.blockBoundingGeometry(block).translated(offset).top())
+            if top > bottom:
+                break
+            if block.isVisible():
+                out.append((block.blockNumber() + 1, top))
+            block = block.next()
+        return out
+
+    def paint_line_numbers(self, e):
+        p = QPainter(self._gutter)
+        pal = self.palette()
+        p.fillRect(e.rect(), pal.color(QPalette.ColorRole.AlternateBase))
+        p.setPen(pal.color(QPalette.ColorRole.PlaceholderText))
+        p.setFont(self.font())
+        h = self.fontMetrics().height()
+        w = self._gutter.width() - 5
+        for n, top in self.visible_line_numbers():
+            if top + h >= e.rect().top() and top <= e.rect().bottom():
+                p.drawText(0, top, w, h, Qt.AlignmentFlag.AlignRight, str(n))
+        p.end()
+
+
 class MacroRecorderDialog(QDialog):
     """A non-modal window that records mouse/keyboard/tool actions performed
     in the FloorPlanner window as macro tokens, lets you edit them, replay a
@@ -743,7 +821,7 @@ class MacroRecorderDialog(QDialog):
         self._replay_lines = []
         self._replay_idx = 0
 
-        self.edit = QPlainTextEdit()
+        self.edit = MacroEdit()
         self.edit.setFont(QFont("DejaVu Sans Mono", 10))
         self.edit.setPlaceholderText(
             "Recorded macro tokens appear here.  Edit freely; select a "
@@ -863,10 +941,30 @@ class MacroRecorderDialog(QDialog):
         super().closeEvent(e)
 
     # -- replay --------------------------------------------------------------
-    def replay(self):
+    def _selected_lines(self) -> str:
+        """The selection as WHOLE LINES, top to bottom, whichever way it
+        was dragged (Patrick, 2026-10-05: selected from the bottom up, a
+        macro "doesnt replay corectly"). A drag rarely starts or ends at a
+        line's edge, and half a line is a different macro -- `LICK 120 96`
+        is not a click -- so every line the selection touches is taken
+        whole, in document order. A selection that stops at the very start
+        of a line does not take that line."""
         cur = self.edit.textCursor()
-        text = (cur.selection().toPlainText() if cur.hasSelection()
-                else self.edit.toPlainText())
+        if not cur.hasSelection():
+            return self.edit.toPlainText()
+        doc = self.edit.document()
+        start, end = cur.selectionStart(), cur.selectionEnd()
+        block, last = doc.findBlock(start), doc.findBlock(end)
+        if end == last.position() and last.blockNumber() > block.blockNumber():
+            last = last.previous()
+        lines = []
+        while block.isValid() and block.blockNumber() <= last.blockNumber():
+            lines.append(block.text())
+            block = block.next()
+        return "\n".join(lines)
+
+    def replay(self):
+        text = self._selected_lines()
         # A v2 macro (docs/macro-spec/MACRO_SPEC.md) is ONE macro, not a list
         # of independent lines: KEYDOWN holds across lines, and a dialog one
         # line opens is driven by the lines after it. The format is the

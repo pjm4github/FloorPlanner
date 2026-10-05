@@ -302,6 +302,74 @@ def test_the_dialog_replays_a_v2_selection_whole(fp, win):
     dlg._replay_timer.stop()
 
 
+@pytest.mark.parametrize("anchor, pos, want", [
+    ("CLICK 120 120", "+DRAG 355", "top down, mid-line to mid-line"),
+    ("+DRAG 355", "CLICK 120 120", "bottom up: the same two lines"),
+    ("DRAG 355 253", "I CLICK 120 120", "bottom up, to the start of the top line"),
+])
+def test_the_dialog_replays_whole_lines_top_down_however_they_were_selected(
+        fp, win, anchor, pos, want):
+    """Patrick, 2026-10-05: lines selected from the bottom up did not replay
+    correctly. Every line the selection touches is replayed whole, in the
+    order it is written, whichever end the drag began at."""
+    win.prepare_headless()
+    dlg = fp.MacroRecorderDialog(win)
+    text = HEADER + "\nS\nI CLICK 120 120 DRAG 360 120\nCLICK 120 240 +DRAG 355 253\nS\n"
+    dlg.edit.setPlainText(text)
+    cur = dlg.edit.textCursor()
+    cur.setPosition(text.index(anchor))
+    cur.setPosition(text.index(pos), cur.MoveMode.KeepAnchor)
+    dlg.edit.setTextCursor(cur)
+    dlg.replay()
+    dlg._replay_timer.stop()
+    assert dlg._replay_lines == [
+        HEADER + "\nI CLICK 120 120 DRAG 360 120\nCLICK 120 240 +DRAG 355 253"], want
+
+
+def test_a_selection_ending_at_a_line_start_does_not_take_that_line(fp, win):
+    win.prepare_headless()
+    dlg = fp.MacroRecorderDialog(win)
+    text = "CLICK 1 1\nCLICK 2 2\nCLICK 3 3\n"              # the existing format too
+    dlg.edit.setPlainText(text)
+    cur = dlg.edit.textCursor()
+    cur.setPosition(text.index("CLICK 3"))                  # bottom up, from a line start
+    cur.setPosition(text.index("LICK 2"), cur.MoveMode.KeepAnchor)
+    dlg.edit.setTextCursor(cur)
+    dlg.replay()
+    dlg._replay_timer.stop()
+    assert dlg._replay_lines == ["CLICK 2 2"]
+
+
+def test_the_recorder_window_numbers_its_lines(fp, win):
+    """Patrick, 2026-10-05: line numbers in the recorder window, so that an
+    error can point at its line. One number per macro line, 1-based -- the
+    way a v2 error counts -- in a gutter that widens with the count."""
+    win.prepare_headless()
+    dlg = fp.MacroRecorderDialog(win)
+    dlg.resize(500, 400)
+    dlg.show()
+    edit = dlg.edit
+    edit.setPlainText(HEADER + "\nCLICK 1 1\nCLICK 2 2")
+    QApplication.processEvents()
+    seen = edit.visible_line_numbers()
+    assert [n for n, _ in seen] == [1, 2, 3]
+    tops = [top for _, top in seen]
+    assert tops == sorted(tops) and len(set(tops)) == 3
+    narrow = edit.line_number_width()
+    assert narrow > 0 and edit.viewportMargins().left() == narrow
+    assert edit._gutter.width() == narrow and not edit._gutter.grab().isNull()
+    edit.setPlainText("\n".join(["CLICK 1 1"] * 1200))
+    QApplication.processEvents()
+    assert edit.line_number_width() > narrow            # four digits now
+    assert edit.viewportMargins().left() == edit.line_number_width()
+    edit.verticalScrollBar().setValue(1000)
+    QApplication.processEvents()
+    assert edit.visible_line_numbers()[0][0] == 1001    # numbers follow the scroll
+    res = win.run_macro(HEADER + "\nCLICK 1 1\nBOGUS 1")
+    assert res["errors"][0].startswith("line 3:")       # the line the gutter shows as 3
+    dlg.close()
+
+
 def test_the_v2_point_is_scene_inches_whatever_the_zoom(fp, win):
     """sec5.1: scene coordinates, so the same macro draws the same wall
     zoomed out and zoomed in."""
