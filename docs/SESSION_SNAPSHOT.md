@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: eb021a8 -->
+<!-- SNAPSHOT-HEAD: 1aab8bc -->
 
 # Session snapshot — read this first
 
@@ -74,7 +74,7 @@ must not be trusted over it.
 > `git show 52a2870:docs/SESSION_SNAPSHOT.md`. **Keep it this size:** when a
 > tranche closes, REPLACE its entry with one line and a link; do not append.
 
-**ONE BRANCH IS OPEN, `d67-floor-scope`, FOR HIS CHECK; THE GABLE-END TRANCHE IS READ BACK, NOT BUILT (see below). THE 3‑INCH REACH IS CLOSED AND MERGED** —
+**TWO BRANCHES ARE STACKED FOR HIS CHECK: `d67-floor-scope` (PR #76) and `gable-end-walls` on it, no PR of its own (see below). THE 3‑INCH REACH IS CLOSED AND MERGED** —
 [PR #71](https://github.com/pjm4github/FloorPlanner/pull/71) landed on `main`
 by this merge commit on Patrick's word (2026‑10‑04: "OK that fix is good. commit and push # 71."),
 the branch deleted in the merge step; recorded at
@@ -107,10 +107,11 @@ touched. Everything else waiting is in THE QUEUE and
 
 **`fixtures/single-floor-90-roof-gable-end-check.json` — his own, PROMOTED
 2026‑10‑06 as THE GABLE-END CHECK PLAN** ([`0223`](handoff/0223-report.md) §2); `incoming/` is empty.
-**The gable-end tranche is read back at 0223 §3 and NOT BUILT:** no
-roof-material triangle at a gable end; the exterior wall under the gable
-climbs to the roof. On his word, or on the read-back standing unanswered,
-it is built as `gable-end-walls` stacked on `d67-floor-scope`.
+**The gable-end tranche is BUILT on `gable-end-walls`, stacked on
+`d67-floor-scope`, AMBER, waiting on his check — [`0224`](handoff/0224-report.md):**
+no roof-material triangle at a gable end; the exterior wall perpendicular
+to the ridge beneath it climbs to the roof. Land in turn or fold into #76,
+his word.
 
 **OPEN FOR HIS RULING (the first is built, not merged):**
 
@@ -254,8 +255,8 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`eb021a8`** at this file's cut — the macro arc complete (PR #75, [`0222`](handoff/0222-report.md)); this commit lands [`0223-report.md`](handoff/0223-report.md) and promotes the gable-end fixture. **Owed next: his check of `d67-floor-scope`; the gable-end tranche (0223 §3).** Every PR through #75 is merged (#59 was closed, superseded by #60). |
-| **Branches** | **One open: `d67-floor-scope`** — the D67 pair, one predicate each; its PR waits on his check. |
+| **`main`** | **`1aab8bc`** at this file's cut — the macro arc complete (PR #75); this commit lands [`0224-report.md`](handoff/0224-report.md). **Owed next: his check of `d67-floor-scope` (PR #76) and `gable-end-walls` stacked on it.** Every PR through #75 is merged (#59 was closed, superseded by #60). |
+| **Branches** | **Two open, stacked: `d67-floor-scope`** (PR #76 — the D67 pair) **and `gable-end-walls`** on it (the 3D gable ends, no PR of its own); both wait on his check. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 32 open** (D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
