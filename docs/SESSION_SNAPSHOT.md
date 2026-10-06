@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 985beb1 -->
+<!-- SNAPSHOT-HEAD: 62dc27d -->
 
 # Session snapshot — read this first
 
@@ -74,7 +74,7 @@ must not be trusted over it.
 > `git show 52a2870:docs/SESSION_SNAPSHOT.md`. **Keep it this size:** when a
 > tranche closes, REPLACE its entry with one line and a link; do not append.
 
-**ONE BRANCH IS OPEN, `macro2-error-marker`, FOR HIS CHECK (see below). THE 3‑INCH REACH IS CLOSED AND MERGED** —
+**NOTHING IS OPEN ON A BRANCH. THE 3‑INCH REACH IS CLOSED AND MERGED** —
 [PR #71](https://github.com/pjm4github/FloorPlanner/pull/71) landed on `main`
 by this merge commit on Patrick's word (2026‑10‑04: "OK that fix is good. commit and push # 71."),
 the branch deleted in the merge step; recorded at
@@ -95,9 +95,12 @@ legacy converter (`fp_macro.py --convert`), the v2 docs, whole-line top-down
 Replay and the recorder window's line numbers merged as
 [PR #74](https://github.com/pjm4github/FloorPlanner/pull/74) on his word
 ("line numbers look good, push the branch and merge") —
-[`0218`](handoff/0218-report.md), [`0219`](handoff/0219-report.md). **The error indicator in that gutter is BUILT on
-`macro2-error-marker`, AMBER, waiting on his check —
-[`0220-report.md`](handoff/0220-report.md).**
+[`0218`](handoff/0218-report.md), [`0219`](handoff/0219-report.md). **The error indicator in that gutter, and his rule that a v2 error lets
+the lines before it run and stops there (spec sec8.3 amended), are MERGED —
+[PR #75](https://github.com/pjm4github/FloorPlanner/pull/75), on his word
+("Go ahead and land # 75"); [`0220`](handoff/0220-report.md),
+[`0221`](handoff/0221-report.md), the merge recorded at
+[`0222`](handoff/0222-report.md).**
 `MacroRunner` and the committed `.fpm` files are not
 touched. Everything else waiting is in THE QUEUE and
 [`0211`](handoff/0211-report.md) §4.
@@ -251,8 +254,8 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`985beb1`** at this file's cut — macro v2 complete (PR #74, [`0219`](handoff/0219-report.md)); [`0220-report.md`](handoff/0220-report.md) landed; this commit, on `macro2-error-marker`, is the work it reports. Every PR through #74 is merged (#59 was closed, superseded by #60). |
-| **Branches** | **One open: `macro2-error-marker`** — the error indicator in the recorder window's gutter; its PR waits on his check. |
+| **`main`** | **`62dc27d`** at this file's cut — the tip of `macro2-error-marker`; this commit merges `main` (0221 landed) into it and is what lands on `main` as PR #75's merge, on his word. Every PR through #75 is merged (#59 was closed, superseded by #60). |
+| **Branches** | **None open.** `macro2-error-marker` is deleted in this merge step, local and remote, like every merged branch before it. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 32 open** (D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
