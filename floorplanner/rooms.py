@@ -536,8 +536,11 @@ class RoomItem(QGraphicsItem):
         if sc is None or self.path.isEmpty():
             return []
         band = self._boundary_band()
+        # D67 (0201-report.md sec1): the room's OWN floor only. Without this
+        # a group made on the upper floor took the lower floor's partitions
+        # standing under the room in plan, and the drag moved both floors.
         return [it for it in sc.items()
-                if isinstance(it, WallItem)
+                if isinstance(it, WallItem) and it.floor == self.floor
                 and not it._hit.intersects(band)
                 and self.path.contains(it.p1) and self.path.contains(it.p2)]
 

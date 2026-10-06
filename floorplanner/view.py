@@ -1025,13 +1025,15 @@ class PlanView(QGraphicsView):
 
     # -- door / window placement ---------------------------------------------------
     def _place_opening(self, sp: QPointF, kind: str):
+        # D67's class (0202-report.md sec4): a wall of the ACTIVE level only.
+        # Another level's ghosted wall under the cursor is drawn, not
+        # offered -- it took the first wall here and cut the lower level.
         wall = None
         for it in self.scene().items(sp):
-            if isinstance(it, WallItem):
-                wall = it
-                break
             if isinstance(it, OpeningItem):
-                wall = it.wall
+                it = it.wall
+            if isinstance(it, WallItem) and it.floor == active_floor():
+                wall = it
                 break
         if wall is None:
             self.win.status(f"Click on a wall to place a {kind}.")
