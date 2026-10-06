@@ -32,7 +32,8 @@ Conventions
   from assets/furnishings/manifest.json + materials.json, read as data.  This
   file states no furnishing dimension of its own.
 * A roof (0139-ruling.md's roofline plan) is two sloped planes off its ridge
-  plus gable-end triangles; ridge/eaves heights are measured from the
+  with open gable ends (the wall beneath climbs to the roof) and sloped
+  hip faces; ridge/eaves heights are measured from the
   level's own base, pitch is DERIVED (rise over the ridge-to-eaves run, not
   the overhang tip), and the eaves span is re-derived from the nearest
   parallel wall on the fly -- it is a live-scene affordance, not a document
@@ -793,65 +794,6 @@ def _cross_roof_risers(geoms_and_clips, roofclip_mod):
     return risers
 
 
-def _gable_fascia_pieces(geom, apex, ea, eb, clip, z0, roofclip_mod):
-    """The owned sub-shapes of an UNJOINED gable end's fascia triangle
-    (apex, ea, eb) -- 0174-report.md sec5's own named method, built at
-    R4g (0176-ruling.md sec4). In PLAN the whole triangle is exactly
-    COLLINEAR (`_eave_ends()` offsets `ea`/`eb` from the same axis point
-    `apex` sits on, in opposite perpendicular directions), so a 2D-area
-    clip against `clip.region` (tried at R4f) always measures zero area
-    and silently drops the whole triangle. The fix clips the DEGENERATE
-    PLAN LINE itself instead (`clip.region.clip_segment`, a 1D operation
-    that is never degenerate on a line), then rebuilds each surviving
-    piece from two INDEPENDENTLY evaluated height profiles along that
-    same line: the roof's own TOP surface (`surface_height`, correctly
-    kinked at the ridge -- this is exactly what the apex-ea/apex-eb
-    edges already are) for the top, and the fascia's own straight BASE
-    edge (linear from eb's height to ea's height, unrelated to the kink
-    -- the original ea-eb edge, unclipped) for the bottom. A surviving
-    range that spans the apex's own position is split there first, so
-    the apex is never approximated away by a single quad's flat top."""
-    rc = roofclip_mod
-    raw = clip.region.clip_segment(eb, ea)
-    if not raw:
-        return []
-    ux, uy = ea.x() - eb.x(), ea.y() - eb.y()
-    length = math.hypot(ux, uy)
-    if length < 1e-9:
-        return []
-    ux, uy = ux / length, uy / length
-
-    def t_of(pt):
-        return ((pt.x() - eb.x()) * ux + (pt.y() - eb.y()) * uy) / length
-
-    def pt_at(t):
-        return rc.Pt(eb.x() + ux * length * t, eb.y() + uy * length * t)
-
-    t_apex = t_of(apex)
-    base_eb, base_ea = rc.surface_height(geom, eb), rc.surface_height(geom, ea)
-
-    def bottom_h(t):
-        return base_eb + t * (base_ea - base_eb)
-
-    def top_h(t):
-        return rc.surface_height(geom, pt_at(t))
-
-    pieces = []
-    for p, q in raw:
-        tp, tq = t_of(p), t_of(q)
-        lo, hi = min(tp, tq), max(tp, tq)
-        splits = sorted({lo, hi} | ({t_apex} if lo < t_apex < hi else set()))
-        for t0, t1 in zip(splits, splits[1:], strict=False):
-            p0, p1 = pt_at(t0), pt_at(t1)
-            pieces.append([
-                (p0.x(), -p0.y(), z0 + bottom_h(t0)),
-                (p1.x(), -p1.y(), z0 + bottom_h(t1)),
-                (p1.x(), -p1.y(), z0 + top_h(t1)),
-                (p0.x(), -p0.y(), z0 + top_h(t0)),
-            ])
-    return pieces
-
-
 def _prism_slab(corners_xyz, drop, bottom_z=None):
     """`_box` generalised to a TOP RING WHOSE Z VARIES PER VERTEX -- a roof
     plane is not horizontal, so its top ring cannot be described by one z0.
@@ -897,7 +839,7 @@ def _prism_slab(corners_xyz, drop, bottom_z=None):
 
 
 def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
-                      to_top=False, level=None):
+                      to_top=False, level=None, gable_dir=None):
     """The solid piece of a wall over plan quad `corners_xy` (this file's
     world frame) between `z_lo` and `z_hi`, CAPPED AT THE ROOF SURFACE
     wherever a roof on its level is lower than `z_hi` -- Patrick's own
@@ -954,7 +896,22 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
     over it, whatever level that roof stands on -- a ground-storey roof
     rising through the upper storey caps the upper walls it passes. The
     CLIMB stays on the dormer's own level (`level` is the wall's): a wall
-    a storey below a dormer does not climb through the floor between."""
+    a storey below a dormer does not climb through the floor between.
+
+    THE GABLE WALL CLIMBS (Patrick, 2026-10-06, on his gable-end check plan:
+    *"I want the roof to extend out as speced, then the wall which is
+    covered by the roof to extend up to meet the roof"*). `gable_dir` is
+    the wall's own plan direction when the wall is EXTERIOR, else None. A
+    piece of such a wall whose owner is a roof (not a dormer) and whose
+    direction is PERPENDICULAR to that roof's ridge (within
+    `GABLE_WALL_ANGLE_TOL_DEG`) climbs exactly as a wall under a dormer
+    does -- its top is the roof's underside wherever that is above the
+    piece's base, however far above the wall's own height. That is the
+    gable: the roof no longer closes its end with a triangle of roof
+    material, so the wall beneath the rake must rise to it, to the ridge.
+    Interior walls do not climb -- a partition under the ridge stops at
+    the ceiling, as before -- and a wall parallel to the ridge (an eaves
+    wall) meets the roof at the eaves as before."""
     if not terr or roofclip_mod is None:
         return [_box(corners_xy, z_lo, z_hi)]
     RC = roofclip_mod
@@ -1003,12 +960,25 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
                     best, best_d = (geom, dm), d
         return best
 
+    def gable_wall_of(geom):
+        """Is the wall a gable wall of `geom`: exterior, and perpendicular
+        to its ridge?"""
+        if gable_dir is None:
+            return False
+        rx, ry = geom.p2.x() - geom.p1.x(), geom.p2.y() - geom.p1.y()
+        ln = math.hypot(rx, ry)
+        if ln < 1e-9:
+            return False
+        cos = abs(gable_dir[0] * rx + gable_dir[1] * ry) / ln
+        return cos <= math.sin(math.radians(GABLE_WALL_ANGLE_TOL_DEG))
+
     out, touched = [], False
     for pc in pieces:
         geom, dormer = owner_of(pc)
         if geom is None:
             out.append(("flat", pc))
             continue
+        climb = to_top and (dormer or gable_wall_of(geom))
         def cap_z(v, geom=geom):
             return z_base + RC.surface_height(geom, v) - WALL_CAP_BELOW_ROOF_IN
 
@@ -1017,9 +987,10 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
             planar = [q for cell in planar for q in RC._split_by_line(cell, pt, d)]
         for sub in planar:
             hs = [cap_z(v) for v in sub]
-            if dormer and to_top:
-                # the wall climbs into the dormer's roof: its top is the
-                # dormer plane wherever that is above the base
+            if climb:
+                # the wall climbs into the roof -- a dormer's, or the roof
+                # whose gable this wall is: its top is the roof plane
+                # wherever that is above the base
                 kept, _ = RC._clip_by_values(sub, [h - z_lo for h in hs])
                 if len(kept) >= 3 and RC._area(kept) > RC.MIN_CELL_AREA:
                     touched = True
@@ -1087,6 +1058,7 @@ def _dist_point_segment(p, a, b):
 
 
 ROOF_EAVES_ANGLE_TOL_DEG = 20.0   # matches roofs.py's EAVES_SEARCH_ANGLE_TOL_DEG
+GABLE_WALL_ANGLE_TOL_DEG = 15.0   # a wall this close to perpendicular to a ridge is its gable wall
 ROOF_DEFAULT_HALF_SPAN_IN = 144.0  # matches roofs.py's DEFAULT_HALF_SPAN_IN
 
 
@@ -1744,11 +1716,16 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         # roof on this level is lower than the piece's top (`_wall_under_roofs`)
         terr = terr_all
 
-        def piece(corners, za, zb, to_top, terr=terr, t=t, level=w["level"]):
+        # the gable climb (`_wall_under_roofs`): an exterior wall's plan
+        # direction, in PLAN space (the y-flip undone, as the roofs are)
+        gable_dir = (ux, -uy) if wtype == "exterior" else None
+
+        def piece(corners, za, zb, to_top, terr=terr, t=t, level=w["level"],
+                  gable_dir=gable_dir):
             # R6.b: the territories carry ABSOLUTE surfaces, so the base
             # the cap is measured from is the building's datum, 0
             return _wall_under_roofs(corners, za, zb, terr, 0.0, ROOFCLIP, t,
-                                     to_top, level)
+                                     to_top, level, gable_dir)
 
         parts, cursor = [], 0.0
         for (s0, s1, sill, head) in cuts:
@@ -1822,26 +1799,13 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                     ring = [(c.x(), -c.y(), z0 + ROOFCLIP.surface_height(geom, c))
                             for c in piece]
                     roof_parts.append(_prism_slab(ring, ROOF_T))
-                # R4g (0176-ruling.md sec4, closing 0174-report.md sec5's
-                # named residual): a genuine 3+-way junction can let a
-                # THIRD roof's territory reach an unjoined gable end
-                # (`clip.ext[end]` only reports whether THIS end's own
-                # ridge point is swallowed, not whether the roof's nearby
-                # TOP SURFACE was ceded elsewhere -- measured on his
-                # fixture, ~6% of one gable triangle fell outside its own
-                # roof's final region). `_gable_fascia_pieces` clips the
-                # triangle's own DEGENERATE PLAN LINE (never zero-area,
-                # unlike the 2D-area clip tried and reverted at R4f) and
-                # rebuilds each surviving piece from the roof's own top
-                # surface and its straight base edge, independently.
-                e1a, e1b, e2a, e2b = geom._eave_ends()
-                for end, (apex, ea, eb) in enumerate(
-                        ((geom.p1, e1a, e2a), (geom.p2, e1b, e2b))):
-                    if clip.ext[end] > 1e-6 or not geom.gable[end]:
-                        continue
-                    for ring in _gable_fascia_pieces(geom, apex, ea, eb, clip,
-                                                     z0, ROOFCLIP):
-                        roof_parts.append(_prism_slab(ring, ROOF_T))
+                # A GABLE END IS OPEN (Patrick, 2026-10-06; 0223-report.md
+                # sec3): no roof-material triangle closes it -- the wall
+                # under it climbs to the roof instead (`_wall_under_roofs`,
+                # THE GABLE WALL CLIMBS). This retires R3's "gables closed"
+                # line and R4g's `_gable_fascia_pieces`, which clipped that
+                # triangle's degenerate plan line against the region; the
+                # history is in 0174-report.md sec5 and 0176-ruling.md sec4.
                 for w in clip.warnings:
                     model.info.append(f"roof {rid}: {w}")
                 n_roof += 1
@@ -1909,10 +1873,14 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             roof_parts.append(_prism_slab([r1, r2, e_pos2, e_pos1], ROOF_T))
             roof_parts.append(_prism_slab([r1, e_neg1, e_neg2, r2], ROOF_T))
 
-            # the end faces: a vertical gable triangle, or (R4b) the sloped
-            # hip face -- one triangle either way, apex at the ridge end
+            # the end faces: (R4b) a hip end's sloped face, one triangle
+            # with its apex at the ridge end. A GABLE END IS OPEN (Patrick,
+            # 2026-10-06): the roof ends at the ridge end as drawn, and the
+            # exterior wall beneath climbs to meet it (`_wall_under_roofs`).
             ends = ((r1, e_pos1, e_neg1), (r2, e_pos2, e_neg2))
-            for apex, ep, en in ends:
+            for end, (apex, ep, en) in enumerate(ends):
+                if end < len(gable) and gable[end]:
+                    continue
                 roof_parts.append(_prism_slab([apex, ep, en], ROOF_T))
             n_roof += 1
 

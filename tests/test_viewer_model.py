@@ -679,16 +679,21 @@ def test_roof_plane_slope_matches_the_derived_pitch(fp3d):
     assert got_pitch == pytest.approx(want_pitch)
 
 
-def test_roof_gable_ends_close_by_default(fp3d):
-    """The R3 acceptance line itself ("gables closed"): with `gable`
-    defaulting `[True, True]`, both ridge ends get a closing vertical
-    triangle -- checked by face count, since `_prism_slab` gives a
-    deterministic 12 triangles per quad plane and 8 per triangular gable."""
+def test_roof_gable_ends_are_open(fp3d):
+    """Patrick, 2026-10-06 (0223-report.md sec3), REVERSING R3's "gables
+    closed" acceptance line: *"The current 3D rendering creates a wrapped
+    around roof on the gables - thats not what I want - instead I want the
+    roof to extend out as speced, then the wall which is covered by the
+    roof to extend up to meet the roof."* With `gable` defaulting
+    `[True, True]` the roof is its two planes and nothing else -- 12
+    triangles per quad plane from `_prism_slab`, no triangle of roof
+    material at either end. The wall beneath is what closes a gable now
+    (`test_the_gable_wall_climbs_to_the_roof_on_his_check_plan`)."""
     doc = _roof_doc(_RIDGE)
     model = fp3d.build_model(doc, furnishings=False, floors=False)
     mesh = _roof_mesh(model)
-    assert len(mesh.faces) == 2 * 12 + 2 * 8, \
-        f"expected two planes + two gable closures, got {len(mesh.faces)} faces"
+    assert len(mesh.faces) == 2 * 12, \
+        f"expected two planes and no gable closure, got {len(mesh.faces)} faces"
     assert not model.info, f"a default all-gable roof should need no note: {model.info}"
 
 
@@ -704,8 +709,8 @@ def test_roof_hip_end_builds_a_sloped_end_face_past_the_ridge_end(fp3d):
                     gable=[True, False])
     model = fp3d.build_model(doc, furnishings=False, floors=False)
     mesh = _roof_mesh(model)
-    assert len(mesh.faces) == 2 * 12 + 2 * 8, \
-        "a hip end closes with one triangle, exactly as a gable end does"
+    assert len(mesh.faces) == 2 * 12 + 1 * 8, \
+        "a hip end closes with one triangle; the gable end at p1 is open"
     assert not model.info and not model.notes
     # _RIDGE runs along +x from x=50 to x=250 (world y flipped): the hip at
     # end 1 (p2) pushes that end's eave corners to x = 250 + span, still at
@@ -857,7 +862,7 @@ def test_a_legacy_roof_with_no_span_in_still_derives_a_symmetric_span(fp3d):
     model = fp3d.build_model(_roof_doc(_RIDGE), furnishings=False, floors=False)
     assert not model.notes, model.notes
     mesh = _roof_mesh(model)
-    assert len(mesh.faces) == 2 * 12 + 2 * 8    # same shape as the R3 receipt
+    assert len(mesh.faces) == 2 * 12            # two planes, open gables
 
 
 # --------------------------------------------------------------------------
@@ -892,8 +897,93 @@ def test_a_lone_roof_builds_exactly_as_before_r4e(fp3d):
     """The unclipped path is untouched: same faces as R3's own count."""
     model = fp3d.build_model(_two_roof_doc([_MAIN]), furnishings=False, floors=False)
     mesh = _roof_mesh(model)
-    assert len(mesh.faces) == 2 * 12 + 2 * 8
+    assert len(mesh.faces) == 2 * 12            # two planes, open gables
     assert not model.info
+
+
+# --------------------------------------------------------------------------
+# the gable wall climbs (Patrick, 2026-10-06; 0223-report.md sec3)
+# --------------------------------------------------------------------------
+GABLE_CHECK = ROOT / "fixtures" / "single-floor-90-roof-gable-end-check.json"
+
+
+def _mesh(model, name):
+    return next(m for m in model.meshes if m.name == name)
+
+
+def _zmax_near(mesh, axis, value, tol=4.0):
+    v = mesh.verts
+    near = v[abs(v[:, axis] - value) < tol]
+    assert len(near), f"no vertices near {'xyz'[axis]}={value}"
+    return float(near[:, 2].max())
+
+
+def test_the_gable_wall_climbs_to_the_roof_on_his_check_plan(fp3d):
+    """His own check plan, `fixtures/single-floor-90-roof-gable-end-check.json`
+    (fixtures/README.md). `rf1`'s ridge (y=216, 165.75in) ends at x=168,
+    12in past the gable walls `w2`/`w4` at x=180; `rf2`'s (x=534, 210in)
+    ends past `w11` (y=120) and `w19` (y=408). Each gable wall's top
+    follows the roof's underside up to the ridge -- `WALL_CAP_BELOW_ROOF_IN`
+    under the surface, as every capped wall is -- where before it stopped
+    at the 96in storey and a roof triangle hid the gap."""
+    doc = json.loads(GABLE_CHECK.read_text(encoding="utf-8"))
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    assert not model.notes and not model.info, (model.notes, model.info)
+    ext = _mesh(model, "walls:exterior")
+    cap = fp3d.WALL_CAP_BELOW_ROOF_IN
+    # rf1's west gable: the wall at x=180 peaks under the ridge at y=216
+    assert _zmax_near(ext, 0, 180.0) == pytest.approx(165.75 - cap)
+    v = ext.verts
+    at_peak = v[(abs(v[:, 0] - 180.0) < 4.0) & (abs(v[:, 2] - (165.75 - cap)) < 1e-6)]
+    assert {round(float(y), 3) for y in at_peak[:, 1]} == {-216.0}
+    # rf2's two gable walls peak under its ridge
+    assert _zmax_near(ext, 1, -120.0) == pytest.approx(210.0 - cap)
+    assert _zmax_near(ext, 1, -408.0) == pytest.approx(210.0 - cap)
+    # the interior partition under rf1's ridge does NOT climb
+    inner = _mesh(model, "walls:interior")
+    assert _zmax_near(inner, 1, -216.0) == pytest.approx(96.0)
+
+
+def test_no_roof_face_closes_the_gable_on_his_check_plan(fp3d):
+    """The other half of his sentence: the roof "extends out as speced"
+    and stops. At rf1's rake tip, x=168, the roof mesh has only the two
+    planes' own end edges: two slab ends, each `ROOF_T` thick along its
+    slope. Measured by AREA in that plane: the two slab ends come to about
+    4 x (128.6 + 138.8) = 1070 sq in; the gable triangle they used to sit
+    beside was (108 + 120) x 69.75 / 2 = 7951 sq in more."""
+    doc = json.loads(GABLE_CHECK.read_text(encoding="utf-8"))
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    roof = _mesh(model, "roofs")
+    v, faces = roof.verts, roof.faces
+    in_plane = [f for f in faces if all(abs(float(v[i, 0]) - 168.0) < 1e-6 for i in f)]
+    assert in_plane, "the roof does reach x=168"
+    area = 0.0
+    for a, b, c in in_plane:
+        (y1, z1), (y2, z2), (y3, z3) = ((float(v[i, 1]), float(v[i, 2])) for i in (a, b, c))
+        area += abs((y2 - y1) * (z3 - z1) - (y3 - y1) * (z2 - z1)) / 2.0
+    assert 900.0 < area < 1300.0, f"{area:.0f} sq in of roof face at the rake tip"
+    assert float(v[abs(v[:, 0] - 168.0) < 1e-6][:, 2].max()) == pytest.approx(165.75)
+
+
+def test_a_wall_parallel_to_the_ridge_does_not_climb(fp3d):
+    """The rule is exterior AND perpendicular to the ridge. An exterior
+    eaves wall -- parallel to the ridge, under the slope -- is capped at
+    the roof where the roof is lower and otherwise keeps its own height,
+    exactly as before; it never rises above it."""
+    doc = _roof_doc(_RIDGE)                     # ridge along x, y=100, 96/132
+    doc["vertices"] = [{"id": "a", "x": 80.0, "y": 120.0}, {"id": "b", "x": 220.0, "y": 120.0},
+                       {"id": "c", "x": 100.0, "y": 40.0}, {"id": "d", "x": 100.0, "y": 160.0}]
+    doc["walls"] = [
+        {"id": "par", "level": "L1", "v1": "a", "v2": "b", "type": "exterior"},
+        {"id": "perp", "level": "L1", "v1": "c", "v2": "d", "type": "exterior"},
+    ]
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    ext = _mesh(model, "walls:exterior")
+    v = ext.verts
+    par = v[abs(v[:, 1] + 120.0) < 4.0]
+    assert float(par[:, 2].max()) <= 96.0 + 1e-6
+    perp = v[abs(v[:, 0] - 100.0) < 4.0]
+    assert float(perp[:, 2].max()) == pytest.approx(132.0 - fp3d.WALL_CAP_BELOW_ROOF_IN)
 
 
 def test_a_clipped_wing_stops_at_the_seam_in_3d(fp3d):

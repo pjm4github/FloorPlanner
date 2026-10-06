@@ -114,12 +114,16 @@ def test_no_wall_vertex_rises_above_the_roof_surface(fp3d):
     assert v0[:, 2].max() == pytest.approx(WALL_H)
 
 
-def test_the_gable_wall_top_follows_the_slope_and_flattens_under_the_ridge(fp3d):
-    """The x=0 wall runs across the roof: capped at the eaves height at its
-    two corners (plan y=0/200), rising along the slope to the wall top at
-    |perp| = PERP_THRESH, and FLAT at the wall top from there to the ridge
-    -- the roof clears the wall there, so the wall is not cut. Those three
-    kinds of vertex must all exist, at the right heights."""
+def test_the_gable_wall_top_follows_the_slope_all_the_way_to_the_ridge(fp3d):
+    """The x=0 wall runs across the roof, perpendicular to the ridge: it is
+    the GABLE WALL, and it CLIMBS (Patrick, 2026-10-06, 0223-report.md
+    sec3: *"the wall which is covered by the roof to extend up to meet the
+    roof"*). Capped at the eaves underside at its two corners (plan
+    y=0/200), its top follows the slope the whole way and peaks under the
+    ridge at the ridge's underside -- ABOVE the 96in storey. Before this
+    the wall flattened at its own top at |perp| = PERP_THRESH and a roof
+    triangle hid the gable above it; that version of this test is in the
+    history."""
     v = _wall_verts(_build(fp3d, _doc([_roof()])))
     g = v[np.abs(v[:, 0]) <= EXT_T / 2 + 1e-6]          # the x=0 wall's own verts
     assert len(g) >= 8
@@ -130,10 +134,14 @@ def test_the_gable_wall_top_follows_the_slope_and_flattens_under_the_ridge(fp3d)
 
     assert has(0.0, EAVES_H - CAP_DROP) and has(-200.0, EAVES_H - CAP_DROP), \
         "corners not at the eaves underside"
-    assert has(-(100.0 - PERP_THRESH), WALL_H), "no crossing vertex, low side"
-    assert has(-(100.0 + PERP_THRESH), WALL_H), "no crossing vertex, high side"
-    assert has(-100.0, WALL_H), "the wall under the ridge should stay at its top"
-    assert not np.any(g[:, 2] > WALL_H + 1e-6)
+    assert has(-100.0, RIDGE_H - CAP_DROP), "the gable wall must peak under the ridge"
+    assert g[:, 2].max() == pytest.approx(RIDGE_H - CAP_DROP)
+    assert not has(-(100.0 - PERP_THRESH), WALL_H), \
+        "the wall still flattens at its own top: it did not climb"
+    # every vertex of the wall's top sits on the roof's underside: the top
+    # IS the slope, not a flat at any height
+    top = g[g[:, 2] > 1e-6]
+    assert np.allclose(top[:, 2], [_surface_z(x, y) for x, y, _ in top], atol=1e-6)
 
 
 def test_the_eaves_wall_with_no_overhang_is_capped_by_the_continued_plane(fp3d):
@@ -152,12 +160,28 @@ def test_the_eaves_wall_with_no_overhang_is_capped_by_the_continued_plane(fp3d):
 # --------------------------------------------------------------------------
 # what must NOT change
 # --------------------------------------------------------------------------
-def test_a_roof_that_clears_every_wall_top_builds_the_walls_byte_identically(fp3d):
+def test_a_roof_that_clears_every_wall_top_leaves_the_eaves_walls_byte_identical(fp3d):
+    """A roof whose underside clears every wall top cuts nothing -- the
+    walls PARALLEL to its ridge (the eaves walls, plan y=0 and y=200)
+    build byte-identically to a plan with no roof. The two GABLE walls
+    (x=0, x=300) are the exception since 2026-10-06: they climb to the
+    roof even when it clears them, which is the whole point of the climb."""
     hi = _roof(eaves_h=WALL_H + CAP_DROP + 2.0, ridge_h=142.0)   # underside clears 96
-    with_roof = _wall_verts(_build(fp3d, _doc([hi])))
-    without = _wall_verts(_build(fp3d, _doc([]), roofs=False))
+
+    def eaves_only(doc):
+        doc["walls"] = [w for w in doc["walls"] if w["id"] in ("w1", "w3")]
+        return doc
+
+    with_roof = _wall_verts(_build(fp3d, eaves_only(_doc([hi]))))
+    without = _wall_verts(_build(fp3d, eaves_only(_doc([])), roofs=False))
     assert with_roof.shape == without.shape
     assert np.array_equal(with_roof, without)
+    # and the gable walls, with the same roof, do climb
+    v = _wall_verts(_build(fp3d, _doc([hi])))
+    gable = v[np.abs(v[:, 0]) <= EXT_T / 2 + 1e-6]
+    assert gable[:, 2].max() == pytest.approx(142.0 - CAP_DROP), "the gable wall climbed"
+    v0 = _wall_verts(_build(fp3d, _doc([]), roofs=False))
+    assert v0[:, 2].max() == pytest.approx(WALL_H)
 
 
 def test_a_wall_the_roof_does_not_reach_keeps_its_height(fp3d):
