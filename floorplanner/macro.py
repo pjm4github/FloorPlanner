@@ -705,12 +705,38 @@ class _LineNumberArea(QWidget):
     def paintEvent(self, e):
         self._editor.paint_line_numbers(e)
 
+    def event(self, e):
+        if e.type() == QEvent.Type.ToolTip:
+            msg = self._editor.error_at(e.pos().y())
+            if msg:
+                QToolTip.showText(e.globalPos(), msg, self)
+            else:
+                QToolTip.hideText()
+            return True
+        return super().event(e)
+
+
+class _ErrorData(QTextBlockUserData):
+    """The message of a line that failed, carried BY THE BLOCK so it stays
+    with its line when lines above are edited."""
+
+    def __init__(self, message: str):
+        super().__init__()
+        self.message = message
+
 
 class MacroEdit(QPlainTextEdit):
     """The recorder window's text editor, with LINE NUMBERS in a gutter on
-    its left (Patrick, 2026-10-05) -- a v2 error names its line, and the
-    gutter is where a marker for that line will go. Numbers are 1-based,
-    one per line of the macro, as `MacroError.line` counts them."""
+    its left (Patrick, 2026-10-05) -- 1-based, one per line of the macro,
+    as `MacroError.line` counts them -- and an ERROR INDICATOR in that
+    gutter (Patrick, 2026-10-06: "so an error can highlight the broken line
+    number with an error indicator"): the number of a line that failed is
+    drawn white on red, the line itself is tinted, and the gutter's tooltip
+    on it is the error. `mark_error` sets one; `clear_errors` clears them
+    all, which the dialog does when a replay or a recording starts."""
+
+    ERROR_BG = QColor(224, 64, 64)                # the gutter marker
+    ERROR_LINE = QColor(255, 224, 224)            # the line's tint
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -756,17 +782,74 @@ class MacroEdit(QPlainTextEdit):
             block = block.next()
         return out
 
+    # -- errors --------------------------------------------------------------
+    def mark_error(self, line: int, message: str):
+        """Mark 1-based `line` as failed with `message`. A line already
+        marked keeps its first message. Out-of-range lines are ignored."""
+        block = self.document().findBlockByNumber(line - 1)
+        if not block.isValid() or block.userData() is not None:
+            return
+        block.setUserData(_ErrorData(message))
+        self._tint_errors()
+
+    def clear_errors(self):
+        block = self.document().firstBlock()
+        while block.isValid():
+            block.setUserData(None)
+            block = block.next()
+        self._tint_errors()
+
+    def error_lines(self) -> dict:
+        """{1-based line: message} of every marked line, in order."""
+        out = {}
+        block = self.document().firstBlock()
+        while block.isValid():
+            data = block.userData()
+            if data is not None:
+                out[block.blockNumber() + 1] = data.message
+            block = block.next()
+        return out
+
+    def error_at(self, y: int):
+        """The message of the marked line drawn at gutter row `y`, else None."""
+        h = self.fontMetrics().height()
+        errors = self.error_lines()
+        for n, top in self.visible_line_numbers():
+            if top <= y < top + h:
+                return errors.get(n)
+        return None
+
+    def _tint_errors(self):
+        sels = []
+        block = self.document().firstBlock()
+        while block.isValid():
+            if block.userData() is not None:
+                sel = QTextEdit.ExtraSelection()
+                sel.format.setBackground(self.ERROR_LINE)
+                sel.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+                sel.cursor = QTextCursor(block)
+                sels.append(sel)
+            block = block.next()
+        self.setExtraSelections(sels)
+        self._gutter.update()
+
     def paint_line_numbers(self, e):
         p = QPainter(self._gutter)
         pal = self.palette()
         p.fillRect(e.rect(), pal.color(QPalette.ColorRole.AlternateBase))
-        p.setPen(pal.color(QPalette.ColorRole.PlaceholderText))
         p.setFont(self.font())
         h = self.fontMetrics().height()
         w = self._gutter.width() - 5
+        errors = self.error_lines()
         for n, top in self.visible_line_numbers():
-            if top + h >= e.rect().top() and top <= e.rect().bottom():
-                p.drawText(0, top, w, h, Qt.AlignmentFlag.AlignRight, str(n))
+            if top + h < e.rect().top() or top > e.rect().bottom():
+                continue
+            if n in errors:
+                p.fillRect(0, top, self._gutter.width(), h, self.ERROR_BG)
+                p.setPen(Qt.GlobalColor.white)
+            else:
+                p.setPen(pal.color(QPalette.ColorRole.PlaceholderText))
+            p.drawText(0, top, w, h, Qt.AlignmentFlag.AlignRight, str(n))
         p.end()
 
 
@@ -889,6 +972,7 @@ class MacroRecorderDialog(QDialog):
             return
         self._recording = True
         self._paused = False
+        self.edit.clear_errors()
         self._press_scene = None
         self._last_key_ev = None
         self._last_key_sig = None
@@ -942,29 +1026,36 @@ class MacroRecorderDialog(QDialog):
 
     # -- replay --------------------------------------------------------------
     def _selected_lines(self) -> str:
+        return "\n".join(self._selected_blocks()[1])
+
+    def _selected_blocks(self):
         """The selection as WHOLE LINES, top to bottom, whichever way it
         was dragged (Patrick, 2026-10-05: selected from the bottom up, a
         macro "doesnt replay corectly"). A drag rarely starts or ends at a
         line's edge, and half a line is a different macro -- `LICK 120 96`
         is not a click -- so every line the selection touches is taken
         whole, in document order. A selection that stops at the very start
-        of a line does not take that line."""
+        of a line does not take that line.
+
+        Returns (the 1-based line number of the first, the lines)."""
         cur = self.edit.textCursor()
         if not cur.hasSelection():
-            return self.edit.toPlainText()
+            return 1, self.edit.toPlainText().split("\n")
         doc = self.edit.document()
         start, end = cur.selectionStart(), cur.selectionEnd()
         block, last = doc.findBlock(start), doc.findBlock(end)
         if end == last.position() and last.blockNumber() > block.blockNumber():
             last = last.previous()
-        lines = []
+        first, lines = block.blockNumber() + 1, []
         while block.isValid() and block.blockNumber() <= last.blockNumber():
             lines.append(block.text())
             block = block.next()
-        return "\n".join(lines)
+        return first, lines
 
     def replay(self):
-        text = self._selected_lines()
+        first, lines = self._selected_blocks()
+        text = "\n".join(lines)
+        self.edit.clear_errors()
         # A v2 macro (docs/macro-spec/MACRO_SPEC.md) is ONE macro, not a list
         # of independent lines: KEYDOWN holds across lines, and a dialog one
         # line opens is driven by the lines after it. The format is the
@@ -974,9 +1065,13 @@ class MacroRecorderDialog(QDialog):
         if is_v2(self.edit.toPlainText()):
             body = text if is_v2(text) else HEADER + "\n" + text
             self._replay_lines = [body]
+            # a v2 error names its line IN THE BODY; this maps it to the editor
+            self._replay_doc_lines = [first - 1 - (0 if body is text else 1)]
         else:
             # step one recorded line at a time so the canvas updates visibly
-            self._replay_lines = [ln for ln in text.splitlines() if ln.strip()]
+            self._replay_lines = [ln for ln in lines if ln.strip()]
+            self._replay_doc_lines = [first + i for i, ln in enumerate(lines)
+                                      if ln.strip()]
         self._replay_idx = 0
         if not self._replay_lines:
             return
@@ -992,10 +1087,29 @@ class MacroRecorderDialog(QDialog):
             self._sync_buttons()
             return
         line = self._replay_lines[self._replay_idx]
+        doc_line = self._replay_doc_lines[self._replay_idx]
         self._replay_idx += 1
         res = self.win.run_macro(line)
         if res["errors"]:
             self.status_lbl.setText("Replay: " + "; ".join(res["errors"][:2]))
+            self._mark_errors(res["errors"], line, doc_line)
+
+    _V2_LINE = re.compile(r"^line (\d+)")
+
+    def _mark_errors(self, errors, text, doc_line):
+        """Put each error on its line in the editor. A v2 error says
+        `line N`, N counted in the text that was run, and `doc_line` is
+        what to add to reach the editor's line. The existing language's
+        errors name a token, not a line -- but it is replayed one line at a
+        time, so the line is the one just run: `doc_line` itself."""
+        from floorplanner.macro2.parse import is_v2       # late: import cycle
+        if is_v2(text):
+            for err in errors:
+                m = self._V2_LINE.match(err)
+                if m:
+                    self.edit.mark_error(int(m.group(1)) + doc_line, err)
+        else:
+            self.edit.mark_error(doc_line, "; ".join(errors))
 
     # -- load ----------------------------------------------------------------
     def load_from(self):

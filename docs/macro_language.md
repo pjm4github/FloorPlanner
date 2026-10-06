@@ -299,7 +299,9 @@ Rather than writing tokens by hand, open the **Macro ▸ Record / Debug…** win
   the selection touches are replayed **whole and from the top down**, whichever
   way the selection was dragged. The original language steps one line at a time
   so you can watch it run; a v2 selection runs as one macro. Enabled only when
-  text is selected.
+  text is selected. **A line that fails is marked in the line-number gutter**
+  (its number white on red, the line tinted); hover the marker for the error.
+  The marks clear on the next Replay or Start.
 - **Save As…** — write the macro to a `.fpm` file for later use with
   `fp_macro.py --file`.
 

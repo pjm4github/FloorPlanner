@@ -370,6 +370,100 @@ def test_the_recorder_window_numbers_its_lines(fp, win):
     dlg.close()
 
 
+def _dialog(fp, win, text):
+    win.prepare_headless()
+    dlg = fp.MacroRecorderDialog(win)
+    dlg.resize(500, 400)
+    dlg.show()
+    dlg.edit.setPlainText(text)
+    QApplication.processEvents()
+    return dlg
+
+
+def _replay_all(dlg):
+    dlg.replay()
+    dlg._replay_timer.stop()
+    while dlg._replay_idx < len(dlg._replay_lines):
+        dlg._replay_step()
+
+
+def test_a_v2_error_marks_its_line_in_the_gutter(fp, win):
+    """Patrick, 2026-10-06: "so an error can highlight the broken line
+    number with an error indicator". Nothing of a v2 macro runs when a line
+    is bad; the line is marked, tinted, and its tooltip is the error."""
+    dlg = _dialog(fp, win, HEADER + "\nCLICK 1 1\n\nBOGUS 1\nCLICK 2 2\n")
+    dlg.edit.selectAll()
+    _replay_all(dlg)
+    errors = dlg.edit.error_lines()
+    assert list(errors) == [4]
+    assert errors[4].startswith("line 4:")
+    assert dlg.status_lbl.text().startswith("Replay: line 4:")
+    assert len(dlg.edit.extraSelections()) == 1
+    assert dlg.edit.extraSelections()[0].cursor.blockNumber() == 3
+    rows = dict(dlg.edit.visible_line_numbers())
+    assert dlg.edit.error_at(rows[4]) == errors[4]              # the tooltip
+    assert dlg.edit.error_at(rows[3]) is None
+    assert not dlg.edit._gutter.grab().isNull()
+    dlg.close()
+
+
+def test_a_v2_error_in_a_selection_without_the_header_still_lands_on_its_line(fp, win):
+    """The header is put back on for the run, so the error's line is one
+    more than the selection's; the marker is on the editor's line."""
+    text = HEADER + "\nS\nCLICK 1 1\nKEY {Nope}\nCLICK 2 2\n"
+    dlg = _dialog(fp, win, text)
+    cur = dlg.edit.textCursor()
+    cur.setPosition(text.index("CLICK 1 1"))
+    cur.setPosition(text.index("CLICK 2 2"), cur.MoveMode.KeepAnchor)
+    dlg.edit.setTextCursor(cur)
+    _replay_all(dlg)
+    assert list(dlg.edit.error_lines()) == [4]
+    dlg.close()
+
+
+def test_an_existing_format_error_marks_the_line_that_was_being_replayed(fp, win):
+    """The existing language's errors name a token, not a line; it is
+    replayed one line at a time, so the line is the one just run. Blank
+    lines are skipped by the replay and counted by the gutter."""
+    dlg = _dialog(fp, win, "CLICK 1 1\n\nFOO 1 2\nCLICK 2 2\nBAR\n")
+    dlg.edit.selectAll()
+    _replay_all(dlg)
+    errors = dlg.edit.error_lines()
+    assert list(errors) == [3, 5]
+    assert errors[3].startswith("FOO:") and errors[5].startswith("BAR:")
+    dlg.close()
+
+
+def test_errors_are_cleared_by_the_next_replay_and_by_recording(fp, win):
+    dlg = _dialog(fp, win, "FOO\nCLICK 2 2\n")
+    dlg.edit.selectAll()
+    _replay_all(dlg)
+    assert dlg.edit.error_lines() == {1: "FOO: unknown command"}
+    cur = dlg.edit.textCursor()                      # replay the good line only
+    cur.setPosition(dlg.edit.toPlainText().index("CLICK"))
+    cur.movePosition(cur.MoveOperation.EndOfLine, cur.MoveMode.KeepAnchor)
+    dlg.edit.setTextCursor(cur)
+    _replay_all(dlg)
+    assert dlg.edit.error_lines() == {} and dlg.edit.extraSelections() == []
+    dlg.edit.mark_error(1, "x")
+    dlg.start()
+    assert dlg.edit.error_lines() == {}
+    dlg.stop()
+    dlg.close()
+
+
+def test_a_marker_stays_with_its_line_when_lines_are_inserted_above(fp, win):
+    dlg = _dialog(fp, win, "CLICK 1 1\nFOO\n")
+    dlg.edit.mark_error(2, "bad")
+    cur = dlg.edit.textCursor()
+    cur.setPosition(0)
+    cur.insertText("; a comment\n; another\n")
+    assert dlg.edit.error_lines() == {4: "bad"}
+    dlg.edit.mark_error(99, "nowhere")               # out of range: ignored
+    assert list(dlg.edit.error_lines()) == [4]
+    dlg.close()
+
+
 def test_the_v2_point_is_scene_inches_whatever_the_zoom(fp, win):
     """sec5.1: scene coordinates, so the same macro draws the same wall
     zoomed out and zoomed in."""
