@@ -252,11 +252,13 @@ def test_a_command_that_fails_when_it_runs_aborts_with_its_line(fp, win, clean_m
 
 
 @pytest.mark.gui
-def test_a_wrong_count_stops_the_whole_macro_before_it_starts(fp, win, clean_mods):
-    res = _run(win, "@PLACE sofa 120 96\n@DOOR 120 0")
-    assert not res["ok"] and res["steps"] == 0
+def test_a_wrong_count_is_found_first_and_stops_the_macro_at_its_line(fp, win, clean_mods):
+    """sec8.3 as amended (Patrick, 2026-10-06): the error is found before
+    anything runs and reported with its line; the lines before it run."""
+    res = _run(win, "@PLACE sofa 120 96\n@DOOR 120 0\n@PLACE sofa 240 96")
+    assert not res["ok"] and res["steps"] == 1
     assert res["errors"] == ["line 3:0 @DOOR takes 3 arguments, not 2"]
-    assert res["counts"]["furnishings"] == 0, "validated whole, before anything ran"
+    assert res["counts"]["furnishings"] == 1, "the line before ran; the rest did not"
 
 
 @pytest.mark.gui

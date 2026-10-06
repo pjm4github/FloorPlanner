@@ -359,7 +359,7 @@ empty text.
 ### 8.3 Validation
 
 Validate the whole macro before executing anything. Report every error
-with its line and column, then abort. Validation errors:
+with its line and column. Validation errors:
 
 - Syntax errors from ANTLR. Install an error listener that collects errors
   instead of printing them.
@@ -367,6 +367,12 @@ with its line and column, then abort. Validation errors:
 - Unknown `{Name}`.
 - A repeated modifier prefix within one token group (`++CLICK`).
 - A negative `WAIT`.
+
+*Amended 2026-10-06 on Patrick's instruction: "the runner should play as
+many lines as possible and stop on the error line".* The lines **before the
+first line with an error run**; that line and everything after it do not.
+Every error is still reported, so a macro with three bad lines names all
+three while running up to the first. (As first written, nothing ran.)
 
 ### 8.4 WAIT
 
@@ -587,8 +593,8 @@ tool letter, Section 4); and `PUP` (`RCLICK`, then `KEY`).
 - No input is simulated: no mouse, key or modifier event is sent, the
   pointer position does not change, and a key held by `KEYDOWN` stays held
   across the command.
-- **Validation** (Section 8.3) adds two errors, found before anything runs:
-  an unknown command name, and a wrong number of arguments.
+- **Validation** (Section 8.3) adds two errors, found before the macro
+  runs: an unknown command name, and a wrong number of arguments.
 - What an argument must *be* — a number, a catalog id, a file that exists —
   is judged when the command runs. A failure there **aborts the macro** and
   is reported with its line; nothing after it runs, and every held key is

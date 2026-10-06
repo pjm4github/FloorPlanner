@@ -67,11 +67,26 @@ def test_a_macro_without_the_header_still_runs_on_the_existing_engine(fp, win):
     assert res["ok"] and res["counts"] == {"walls": 1, "rooms": 0, "furnishings": 1}
 
 
-def test_the_legacy_words_are_errors_in_v2_and_nothing_runs(fp, win):
-    res = _run(win, "I CLICK 120 120 DRAG 360 120\nWALL 0 0 240 0 ext")
-    assert not res["ok"] and res["steps"] == 0
+def test_the_legacy_words_are_errors_in_v2_and_the_lines_before_run(fp, win):
+    """sec8.3 as amended (Patrick, 2026-10-06: "play as many lines as
+    possible and stop on the error line"): the wall on line 2 is drawn; the
+    bad line 3 and what follows are not."""
+    res = _run(win, "I CLICK 120 120 DRAG 360 120\nWALL 0 0 240 0 ext\n@WALL 0 0 100 0")
+    assert not res["ok"] and res["steps"] == 1            # line 2 alone
     assert all(e.startswith("line 3:") for e in res["errors"]), res["errors"]
-    assert _walls(fp, win) == [], "validated whole, before anything ran (sec8.3)"
+    assert _walls(fp, win) == [(120.0, 120.0, 360.0, 120.0)]
+
+
+def test_every_error_is_reported_and_nothing_from_the_first_bad_line_runs(fp, win):
+    res = _run(win, "@WALL 0 0 240 0\nQ CLICK 1 1\n@WALL 0 60 240 60\nKEY {Nope}\n@WALL 0 120 240 120")
+    assert [e.split()[1] for e in res["errors"]] == ["3:0", "5:4"]
+    assert res["counts"]["walls"] == 1 and res["steps"] == 1
+
+
+def test_an_error_on_the_first_command_line_runs_nothing(fp, win):
+    res = _run(win, "Q CLICK 1 1\n@WALL 0 0 240 0")
+    assert not res["ok"] and res["steps"] == 0 and res["counts"]["walls"] == 0
+    assert res["errors"] == ["line 2:0 unknown tool letter 'Q'"]
 
 
 # --------------------------------------------------------------------------
@@ -389,15 +404,17 @@ def _replay_all(dlg):
 
 def test_a_v2_error_marks_its_line_in_the_gutter(fp, win):
     """Patrick, 2026-10-06: "so an error can highlight the broken line
-    number with an error indicator". Nothing of a v2 macro runs when a line
-    is bad; the line is marked, tinted, and its tooltip is the error."""
+    number with an error indicator". The lines before the bad one run; it
+    is marked, tinted, its tooltip is the error, and the error STAYS on the
+    status line when the replay ends (his word: "keep the error message on
+    the bottom of the macro window (instead of filling in replay complete)")."""
     dlg = _dialog(fp, win, HEADER + "\nCLICK 1 1\n\nBOGUS 1\nCLICK 2 2\n")
     dlg.edit.selectAll()
     _replay_all(dlg)
     errors = dlg.edit.error_lines()
     assert list(errors) == [4]
     assert errors[4].startswith("line 4:")
-    assert dlg.status_lbl.text().startswith("Replay: line 4:")
+    assert dlg.status_lbl.text().startswith("Replay stopped: line 4:")
     assert len(dlg.edit.extraSelections()) == 1
     assert dlg.edit.extraSelections()[0].cursor.blockNumber() == 3
     rows = dict(dlg.edit.visible_line_numbers())
@@ -461,6 +478,24 @@ def test_a_marker_stays_with_its_line_when_lines_are_inserted_above(fp, win):
     assert dlg.edit.error_lines() == {4: "bad"}
     dlg.edit.mark_error(99, "nowhere")               # out of range: ignored
     assert list(dlg.edit.error_lines()) == [4]
+    dlg.close()
+
+
+def test_his_macro_with_a_bad_line_11_draws_lines_7_to_10(fp, win):
+    """Patrick's own case, 2026-10-06: the commands check macro with
+    `@WALL 0 300 0` as line 11 -- "the mark should appear on that line but
+    lines 7 through 10 should show on the canvas"."""
+    import pathlib
+    path = pathlib.Path(__file__).resolve().parent.parent / "fixtures" / "macro2-commands-check.fpm"
+    lines = path.read_text(encoding="utf-8").splitlines()[:10]
+    lines += ["@WALL 0 300 0", "; 2. the room is named; a quoted argument keeps its space",
+              '@ROOM "Living Room" 120 90', "@DESELECT"]
+    dlg = _dialog(fp, win, "\n".join(lines) + "\n")
+    dlg.edit.selectAll()
+    _replay_all(dlg)
+    assert win.scene_summary()["counts"] == {"walls": 4, "rooms": 0, "furnishings": 0}
+    assert list(dlg.edit.error_lines()) == [11]
+    assert "line 11:" in dlg.status_lbl.text() and "complete" not in dlg.status_lbl.text()
     dlg.close()
 
 

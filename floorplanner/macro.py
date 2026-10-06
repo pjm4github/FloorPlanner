@@ -1083,7 +1083,8 @@ class MacroRecorderDialog(QDialog):
     def _replay_step(self):
         if self._replay_idx >= len(self._replay_lines):
             self._replay_timer.stop()
-            self.status_lbl.setText("Replay complete.")
+            if not self.edit.error_lines():          # an error stays on show
+                self.status_lbl.setText("Replay complete.")
             self._sync_buttons()
             return
         line = self._replay_lines[self._replay_idx]
@@ -1091,7 +1092,7 @@ class MacroRecorderDialog(QDialog):
         self._replay_idx += 1
         res = self.win.run_macro(line)
         if res["errors"]:
-            self.status_lbl.setText("Replay: " + "; ".join(res["errors"][:2]))
+            self.status_lbl.setText("Replay stopped: " + "; ".join(res["errors"][:2]))
             self._mark_errors(res["errors"], line, doc_line)
 
     _V2_LINE = re.compile(r"^line (\d+)")

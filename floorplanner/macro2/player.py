@@ -2,8 +2,11 @@
 
     text -> check (parse + validate) -> expand -> [InputEvent] -> QtEventSink
 
-NOTHING runs unless the whole macro is valid (sec8.3): every syntax and
-validation error is returned, positioned, and no event is delivered.
+THE WHOLE MACRO IS CHECKED FIRST (sec8.3), and every syntax and validation
+error is returned, positioned. Then -- Patrick's ruling of 2026-10-06, "the
+runner should play as many lines as possible and stop on the error line" --
+THE LINES BEFORE THE FIRST BAD ONE RUN, and nothing from it on. The spec's
+original text aborted before anything ran; sec8.3 carries the amendment.
 
 DELIVERY IS A TIMER-DRIVEN PUMP inside a local event loop, not a plain
 `for` loop. A delivered event can open a modal dialog -- a door's size
@@ -62,8 +65,14 @@ class Player:
         res = check(text, TOOLS)
         if res.errors:
             self.errors = [str(e) for e in res.errors]
-            self.log = [f"ERR {e}" for e in self.errors]
-            return self._result(0)
+            # everything up to the first bad line runs; it is a valid macro
+            # on its own, or nothing runs at all (a syntax error can only be
+            # on its own line, so the prefix re-checks clean)
+            first = min(e.line for e in res.errors)
+            res = check("\n".join(text.splitlines()[:first - 1]), TOOLS)
+            if res.errors or not res.macro.lines:
+                self.log = [f"ERR {e}" for e in self.errors]
+                return self._result(0)
         events, warnings = expand(res.macro)
         self.warnings = list(warnings)
         self._deliver(events)

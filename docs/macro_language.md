@@ -174,9 +174,10 @@ S KEY ^z                            ; Select tool, then a real Ctrl+Z
 What differs from the original language, beyond the syntax:
 
 - **The whole macro is checked before anything runs.** A syntax error, an
-  unknown tool letter, key name or command, or a wrong argument count stops it
-  with every error listed by line — nothing is executed. A command that fails
-  while running aborts the rest. (The original skips a bad token and carries on.)
+  unknown tool letter, key name or command, or a wrong argument count is
+  reported by line — every one of them — and **the lines before the first bad
+  line run; it and the rest do not.** A command that fails while running aborts
+  the rest. (The original skips a bad token and carries on.)
 - **Input is real input.** Modifiers are real key presses; `KEY ^z` is the
   application's own Ctrl+Z; a click that opens a dialog really opens it, and the
   `TYPE` / `KEY` lines after it drive it. A menu or dialog still open when the
