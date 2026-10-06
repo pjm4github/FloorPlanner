@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: bacf5c5 -->
+<!-- SNAPSHOT-HEAD: 7444eec -->
 
 # Session snapshot — read this first
 
@@ -96,8 +96,8 @@ Replay and the recorder window's line numbers merged as
 [PR #74](https://github.com/pjm4github/FloorPlanner/pull/74) on his word
 ("line numbers look good, push the branch and merge") —
 [`0218`](handoff/0218-report.md), [`0219`](handoff/0219-report.md). **The error indicator in that gutter is BUILT on
-`macro2-error-marker`, AMBER, waiting on his check —
-[`0220-report.md`](handoff/0220-report.md).**
+`macro2-error-marker`, AMBER, waiting on his check; with it, on his ruling, a v2 error now lets the lines before it run and stops there (spec sec8.3 amended) —
+[`0220`](handoff/0220-report.md), [`0221`](handoff/0221-report.md).**
 `MacroRunner` and the committed `.fpm` files are not
 touched. Everything else waiting is in THE QUEUE and
 [`0211`](handoff/0211-report.md) §4.
@@ -251,8 +251,8 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`bacf5c5`** at this file's cut — macro v2 complete (PR #74, [`0219`](handoff/0219-report.md)); this commit lands [`0220-report.md`](handoff/0220-report.md). **Owed next: his check of `macro2-error-marker` — see §0.** Every PR through #74 is merged (#59 was closed, superseded by #60). |
-| **Branches** | **One open: `macro2-error-marker`** — the error indicator in the recorder window's gutter; its PR waits on his check. |
+| **`main`** | **`7444eec`** at this file's cut — macro v2 complete (PR #74, [`0219`](handoff/0219-report.md)); this commit lands [`0221-report.md`](handoff/0221-report.md). **Owed next: his check of `macro2-error-marker` (PR #75) — see §0.** Every PR through #74 is merged (#59 was closed, superseded by #60). |
+| **Branches** | **One open: `macro2-error-marker`** (PR #75, two commits) — the error indicator in the recorder window's gutter, and the stop-at-the-error rule; waits on his check. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 32 open** (D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
