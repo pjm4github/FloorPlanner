@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 687bdc0 -->
+<!-- SNAPSHOT-HEAD: d1323af -->
 
 # Session snapshot — read this first
 
@@ -102,12 +102,14 @@ the lines before it run and stops there (spec sec8.3 amended), are MERGED —
 [`0221`](handoff/0221-report.md), the merge recorded at
 [`0222`](handoff/0222-report.md).**
 `MacroRunner` and the committed `.fpm` files are not
-touched. **The four-way crossing fault ([`0208`](handoff/0208-report.md) §4)
-is NOT REPRODUCED — 96 runs, seven configurations, two commits, one state;
-no defect filed; the instrument is `docs/evidence/fourway_crossing_probe.py`
-([`0226`](handoff/0226-report.md)) — his word on closing it is owed.**
-Everything else waiting is in THE QUEUE and
-[`0211`](handoff/0211-report.md) §4.
+touched. **The four-way crossing fault ([`0208`](handoff/0208-report.md) §4) is
+CLOSED AS NOT REPRODUCED, no defect, on his word ("close it as not
+reproduced, no defect") — 96 runs, one state ([`0226`](handoff/0226-report.md),
+[`0227`](handoff/0227-report.md)); the instrument stays in `docs/evidence/`.**
+Of [`0211`](handoff/0211-report.md) §4's queue, TWO ITEMS REMAIN: parallel
+walls 6″ apart merging ([`0210`](handoff/0210-report.md) §6) and the status
+board (THE QUEUE below); plus the `roofs-r3-planes-gables.png` re-shot, his
+display needed.
 
 **`fixtures/single-floor-90-roof-gable-end-check.json` — his own, PROMOTED
 2026‑10‑06 as THE GABLE-END CHECK PLAN** ([`0223`](handoff/0223-report.md) §2); `incoming/` is empty.
@@ -256,7 +258,7 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`687bdc0`** at this file's cut — PR #76 merged and recorded ([`0225`](handoff/0225-report.md), D67 closed); this commit lands [`0226-report.md`](handoff/0226-report.md), the four-way crossing fault not reproduced. **Owed next: his word on 0226 §5.** Every PR through #76 is merged (#59 was closed, superseded by #60). |
+| **`main`** | **`d1323af`** at this file's cut — the four-way crossing fault not reproduced ([`0226`](handoff/0226-report.md)); this commit lands [`0227-report.md`](handoff/0227-report.md), closing it on his word. **Owed next: his word on the two remaining queue items.** Every PR through #76 is merged (#59 was closed, superseded by #60). |
 | **Branches** | **None open.** Only `main` on the remote; `d67-floor-scope` and `gable-end-walls` were deleted in the merge step, local and remote. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 31 open** (D67 CLOSED 2026‑10‑07, `closed_by cdc54de`, [`0225`](handoff/0225-report.md); D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
