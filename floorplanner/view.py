@@ -841,7 +841,14 @@ class PlanView(QGraphicsView):
                 # shuffle -- the wall lands exactly where drawn, nothing snaps,
                 # and the doorway report stays quiet (an unwelded end is the
                 # chosen state, not a tear).
-                merge_wall(self.scene(), w)
+                # A GESTURE merges at GESTURE_WELD_IN, not the grid step
+                # (Patrick's report, 0210-report.md sec6: two parallel walls
+                # drawn 6in apart merged into one, so a 6in gap could not be
+                # drawn) -- A6's own rule: within 3in of another wall's line
+                # it goes to that; a 6in reveal survives. Load and Edit >
+                # Coalesce keep the grid-step tolerance, as JOIN_TOL stays
+                # 9in for the explicit passes.
+                merge_wall(self.scene(), w, perp_tol=GESTURE_WELD_IN)
                 if w.scene() is not None and editing_enabled("auto_weld"):
                     # ruling 2, tier 1: a jamb within the join tolerance is
                     # the junction the user meant -- snap to it; else the end
