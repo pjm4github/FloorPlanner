@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 0c8219a -->
+<!-- SNAPSHOT-HEAD: cdc54de -->
 
 # Session snapshot — read this first
 
@@ -241,7 +241,7 @@ remainder):** [`ROADMAP.md`](ROADMAP.md) §3.
 ([`0035`](handoff/0035-ruling.md)–[`0037`](handoff/0037-ruling.md);
 [`0038-report`](handoff/0038-report.md) refuted the load-path suspect):
 its snapping half is the align fix above; its selection half is D67,
-reproduced at [`0201`](handoff/0201-report.md).
+reproduced at [`0201`](handoff/0201-report.md) and CLOSED at `cdc54de`.
 
 **Numbering collisions in this range, neither renamed:** `0036` and `0038`
 each name a ruling and an unrelated report (§0 lists the later ones).
@@ -252,10 +252,10 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`0c8219a`** at this file's cut — the tip of `d67-floor-scope` with `gable-end-walls` folded in; this commit merges `main` (0224 landed) into it and is what lands on `main` as PR #76's merge, on his word. D67 CLOSES with it ([`0225`](handoff/0225-report.md)). Every PR through #76 is merged (#59 was closed, superseded by #60). |
-| **Branches** | **None open.** `d67-floor-scope` and `gable-end-walls` are deleted in this merge step, local and remote. |
+| **`main`** | **`cdc54de`** at this file's cut — PR #76 merged on his word (the D67 pair, and the 3D gable ends folded in); this commit lands [`0225-report.md`](handoff/0225-report.md) and CLOSES D67. Every PR through #76 is merged (#59 was closed, superseded by #60). |
+| **Branches** | **None open.** Only `main` on the remote; `d67-floor-scope` and `gable-end-walls` were deleted in the merge step, local and remote. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **86 records, 32 open** (D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
+| **Records** | **86 records, 31 open** (D67 CLOSED 2026‑10‑07, `closed_by cdc54de`, [`0225`](handoff/0225-report.md); D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |

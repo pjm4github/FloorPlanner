@@ -4,8 +4,8 @@ id: 67
 title: "Selection is not scoped to the active floor -- an inactive floor is drawn AND draggable"
 
 # maps directly onto GitHub Issues fields
-state: open
-state_reason: null
+state: closed
+state_reason: completed
 labels:
   - type:defect
   - area:ui
@@ -13,11 +13,11 @@ milestone: null
 
 # ours; becomes body prose after migration
 opened: 2026-08-11
-closed: null
-closed_by: null
+closed: 2026-10-07
+closed_by: cdc54de
 rank: 68
 related: [11, 12, 53]
-state_source: report
+state_source: ruling
 github_issue: null
 ---
 
@@ -177,3 +177,17 @@ visible and correctable; a half-restoring undo is neither.
 *(Open — filed 2026‑08‑11, reported by Patrick.)* **Filed, not fixed**, on the
 reviewer's instruction. The candidate sites are leads for whoever takes it and
 are explicitly **unmeasured**.
+
+## Closed — 2026‑10‑07, `cdc54de`, PR #76 on Patrick's word
+
+**The leak was a fourth site, not the three named above** —
+[`handoff/0201-report.md`](../handoff/0201-report.md) §1 measured all
+three clean and found `RoomItem.interior_walls()` with no floor predicate;
+[`handoff/0202-report.md`](../handoff/0202-report.md) §4 found the same
+class in the Door/Window tool's wall lookup. **Fixed, one predicate each**
+([`handoff/0223-report.md`](../handoff/0223-report.md) §1): the room's own
+floor's walls; a wall of the active level. `tests/test_d67_floor_scope.py`
+replays both probes' gestures, red before and green after, with two
+positive controls. Merged at `cdc54de` with the 3D gable-end tranche folded
+in, his word *"fold into #76 and land"*
+([`handoff/0225-report.md`](../handoff/0225-report.md)).
