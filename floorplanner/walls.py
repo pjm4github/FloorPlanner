@@ -2417,7 +2417,10 @@ class WallItem(QGraphicsItem):
                 # a mixed-corner STEP inserted at press collapses to nothing
                 # when the drag ends where it began (P4.2)
                 collapse_degenerate_outline_edges(self.scene(), self.floor)
-            merge_wall(self.scene(), self)          # fuse if it now overlaps
+            # fuse if it now overlaps -- at the GESTURE tolerance (A6's 3in;
+            # 0210-report.md sec6), so a wall slid to one grid step from a
+            # parallel one stays a wall, not a merge
+            merge_wall(self.scene(), self, perp_tol=GESTURE_WELD_IN)
             sc_after = self.scene()
             if (endpoint_edit and sc_after is not None
                     and editing_enabled("auto_weld")):

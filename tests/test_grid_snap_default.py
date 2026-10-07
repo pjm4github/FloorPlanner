@@ -317,3 +317,62 @@ def test_the_check_macro_lands_all_four_ends_where_the_instructions_say(fp, win)
     drawn = {round(w.p1.y()): min(w.p1.x(), w.p2.x()) for w in _walls(fp, win)
              if abs(w.p1.y() - w.p2.y()) < 1e-6}
     assert drawn == pytest.approx({72: 72.0, 96: 66.0, 192: 72.0, 216: 63.25})
+
+
+# --------------------------------------------------------------------------
+# 6. two parallel walls one grid step apart stay two walls
+#    (Patrick's report, 0210-report.md sec6: "two parallel same-type walls
+#    6in apart merge into one ... a 6in gap between parallel walls cannot be
+#    drawn today"; built on his word, "start on the parallel walls 6in
+#    apart merging"). A GESTURE merges at GESTURE_WELD_IN, the same 3in
+#    rule a gesture's weld already follows; the load-time and explicit
+#    passes keep the grid-step tolerance.
+# --------------------------------------------------------------------------
+def _spans(fp, win):
+    return sorted((round(w.p1.y(), 2), round(min(w.p1.x(), w.p2.x()), 2),
+                   round(max(w.p1.x(), w.p2.x()), 2)) for w in _walls(fp, win))
+
+
+def test_two_parallel_walls_drawn_one_grid_step_apart_are_two_walls(fp, win):
+    win.prepare_headless()
+    _draw(fp, win, (120, 120), (360, 120))
+    _draw(fp, win, (120, 126), (360, 126))
+    assert _spans(fp, win) == [(120.0, 120.0, 360.0), (126.0, 120.0, 360.0)]
+
+
+def test_a_wall_drawn_within_three_inches_of_a_parallel_one_still_merges(fp, win):
+    """The positive control: the merge is still there, at the gesture
+    tolerance. An off-grid wall 2in away (placed, not drawn, so the grid
+    does not move it) absorbs the one drawn beside it into a single wall."""
+    win.prepare_headless()
+    _wall(fp, win, (120, 122), (360, 122))
+    _draw(fp, win, (120, 120), (360, 120))
+    spans = _spans(fp, win)
+    assert len(spans) == 1, spans
+
+
+def test_a_wall_slid_to_one_grid_step_from_a_parallel_one_stays_a_wall(fp, win):
+    """The drag release (`WallItem.mouseReleaseEvent`) merges at the same
+    tolerance as the draw release."""
+    win.prepare_headless()
+    _wall(fp, win, (120, 120), (360, 120))
+    w = _wall(fp, win, (120, 144), (360, 144))
+    win.set_tool(fp.TOOL_SELECT)
+    _drag(win, (240, 144), (240, 126))               # slide it to y=126
+    assert w.scene() is not None
+    assert _spans(fp, win) == [(120.0, 120.0, 360.0), (126.0, 120.0, 360.0)]
+
+
+def test_the_explicit_pass_keeps_the_grid_step_tolerance(fp, win):
+    """What does NOT change: Edit > Coalesce all walls (`normalize_walls`,
+    and the legacy loader's `merge_all`) still fuses parallel same-type
+    walls within the grid step, as it always has -- the explicit passes
+    keep their tolerance, as JOIN_TOL keeps 9in. (A v5 document is applied
+    faithfully on load and is not merged there at all.)"""
+    from floorplanner.walls import normalize_walls
+    win.prepare_headless()
+    _wall(fp, win, (120, 120), (360, 120))
+    _wall(fp, win, (120, 125), (360, 125))           # 5in: under the step, over 3in
+    assert len(_walls(fp, win)) == 2, "the control: placed, not merged"
+    merged, *_rest = normalize_walls(win.scene)
+    assert merged == 1 and len(_walls(fp, win)) == 1

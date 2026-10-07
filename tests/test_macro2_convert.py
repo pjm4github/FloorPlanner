@@ -213,7 +213,10 @@ COMMITTED = {
     "examples/fiveRoomTestMacro.fpm": ("examples/fiveRoomTest.json", 16),
     "examples/fiveRoomDragSplit.fpm": ("examples/fiveRoomTest.json", 19),
     "examples/fiveRoomDragSplit2.fpm": ("examples/fiveRoomTest.json", 16),
-    "examples/dragWallFuseStraggler.fpm": ("examples/fiveRoomTest.json", 18),
+    # 19 since 0228: at this replay geometry (not the macro's own 1200x800, see
+    # test_extract_join.py) one slide used to merge into a parallel wall 6in
+    # away; a gesture now merges at 3in, so it stays a wall. Both engines agree.
+    "examples/dragWallFuseStraggler.fpm": ("examples/fiveRoomTest.json", 19),
     "examples/multifloor.fpm": (None, 12),
     "fixtures/w7offgrid.fpm": (None, 9),
     "fixtures/grid-snap-3in-check.fpm": ("fixtures/grid-snap-3in-check.json", 6),
