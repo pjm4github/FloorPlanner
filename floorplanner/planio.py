@@ -116,8 +116,8 @@ class PlanIOMixin:
                         if bad else
                         f"This v5 file reports {len(errs)} invariant "
                         f"violation(s); it has been opened unchanged.")
-                self._report(head + "  " + "; ".join(errs[:3]), interactive,
-                             "Malformed design file")
+                self._report_problems("Malformed design file", head, errs, data,
+                                      interactive)
             return None
         design, rep = import_legacy(data)
         apply_design_to_scene(self, design)
@@ -198,6 +198,32 @@ class PlanIOMixin:
         if interactive:
             QMessageBox.information(self, title, text)
         self.status(text)
+
+    def _report_problems(self, title, head, messages, doc, interactive):
+        """Tell the user WHERE (Patrick, 2026-10-07): the violations as a
+        non-modal list that takes the view to each one (`problems.py`),
+        instead of a message box running the first three together. The
+        status line carries the same first three, so a scripted caller
+        reads what it always did."""
+        self.status(head + "  " + "; ".join(messages[:3]))
+        if not interactive:
+            return None
+        from floorplanner.problems import DesignProblemsDialog   # late: UI, no cycle
+        old = getattr(self, "_problems_dialog", None)
+        if old is not None:
+            try:
+                old.close()
+            except RuntimeError:                   # already deleted on close
+                pass
+        dlg = DesignProblemsDialog(self, title, head, list(messages), doc)
+        self._problems_dialog = dlg
+        dlg.show()
+        return dlg
+
+    def zoom_to_spot(self, spot):
+        """Switch to the level and fit the view to a `design.locate.Spot`."""
+        from floorplanner.problems import zoom_to_spot   # late: UI, no cycle
+        return zoom_to_spot(self, spot)
 
     def _finish_open(self):
         """After `_reset_undo` has declared the loaded plan the clean baseline,
