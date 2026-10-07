@@ -1,0 +1,167 @@
+dragWallFuseStraggler.fpm, 9 lines; window 1200x800; one window; wait 0 ms; PYTHONHASHSEED=random
+control -- the state after each prefix (one run each):
+   0 lines: 0 walls, state f9065fa7
+   1 lines: 16 walls, state 6eebef53
+   2 lines: 18 walls, state 51662354
+   3 lines: 18 walls, state 143c7ee5
+   4 lines: 16 walls, state cf230a4d
+   5 lines: 16 walls, state cf230a4d
+   6 lines: 18 walls, state 937174de
+after 6 lines, 14 runs: 1 distinct state(s)
+   14 run(s): 18 walls, state 937174de; around the crossing:
+      (148.0, 158.0, 334.56, 158.0)
+      (148.0, 270.03, 148.0, 158.0)
+      (148.0, 270.03, 334.56, 270.03)
+      (334.56, 158.0, 820.0, 158.0)
+      (334.56, 270.03, 820.0, 270.03)
+      (340.56, 158.0, 340.56, 421.91)
+      (340.56, 421.91, 340.56, 578.0)
+      (340.56, 421.91, 496.56, 421.91)
+      (496.56, 578.0, 340.56, 578.0)
+      (820.0, 158.0, 820.0, 270.03)
+      (820.0, 270.03, 826.0, 270.03)
+      (826.0, 270.03, 826.0, 578.0)
+
+dragWallFuseStraggler.fpm, 9 lines; window 1200x800; fresh window per run; wait 0 ms; PYTHONHASHSEED=random
+control -- the state after each prefix (one run each):
+   0 lines: 0 walls, state f9065fa7
+   1 lines: 16 walls, state 6eebef53
+   2 lines: 18 walls, state 51662354
+   3 lines: 18 walls, state 143c7ee5
+   4 lines: 16 walls, state cf230a4d
+   5 lines: 16 walls, state cf230a4d
+   6 lines: 18 walls, state 937174de
+after 6 lines, 14 runs: 1 distinct state(s)
+   14 run(s): 18 walls, state 937174de; around the crossing:
+      (148.0, 158.0, 334.56, 158.0)
+      (148.0, 270.03, 148.0, 158.0)
+      (148.0, 270.03, 334.56, 270.03)
+      (334.56, 158.0, 820.0, 158.0)
+      (334.56, 270.03, 820.0, 270.03)
+      (340.56, 158.0, 340.56, 421.91)
+      (340.56, 421.91, 340.56, 578.0)
+      (340.56, 421.91, 496.56, 421.91)
+      (496.56, 578.0, 340.56, 578.0)
+      (820.0, 158.0, 820.0, 270.03)
+      (820.0, 270.03, 826.0, 270.03)
+      (826.0, 270.03, 826.0, 578.0)
+
+dragWallFuseStraggler.fpm, 9 lines; window 1200x800 shown; one window; wait 250 ms; PYTHONHASHSEED=random
+control -- the state after each prefix (one run each):
+   0 lines: 0 walls, state f9065fa7
+   1 lines: 16 walls, state 6eebef53
+   2 lines: 18 walls, state 51662354
+   3 lines: 18 walls, state 143c7ee5
+   4 lines: 16 walls, state cf230a4d
+   5 lines: 16 walls, state cf230a4d
+   6 lines: 18 walls, state 937174de
+after 6 lines, 10 runs: 1 distinct state(s)
+   10 run(s): 18 walls, state 937174de; around the crossing:
+      (148.0, 158.0, 334.56, 158.0)
+      (148.0, 270.03, 148.0, 158.0)
+      (148.0, 270.03, 334.56, 270.03)
+      (334.56, 158.0, 820.0, 158.0)
+      (334.56, 270.03, 820.0, 270.03)
+      (340.56, 158.0, 340.56, 421.91)
+      (340.56, 421.91, 340.56, 578.0)
+      (340.56, 421.91, 496.56, 421.91)
+      (496.56, 578.0, 340.56, 578.0)
+      (820.0, 158.0, 820.0, 270.03)
+      (820.0, 270.03, 826.0, 270.03)
+      (826.0, 270.03, 826.0, 578.0)
+
+dragWallFuseStraggler.fpm, 9 lines; window 1200x800; one window; wait 0 ms; PYTHONHASHSEED=7
+control -- the state after each prefix (one run each):
+   0 lines: 0 walls, state f9065fa7
+   1 lines: 16 walls, state 6eebef53
+   2 lines: 18 walls, state 51662354
+   3 lines: 18 walls, state 143c7ee5
+   4 lines: 16 walls, state cf230a4d
+   5 lines: 16 walls, state cf230a4d
+   6 lines: 18 walls, state 937174de
+after 6 lines, 10 runs: 1 distinct state(s)
+   10 run(s): 18 walls, state 937174de; around the crossing:
+      (148.0, 158.0, 334.56, 158.0)
+      (148.0, 270.03, 148.0, 158.0)
+      (148.0, 270.03, 334.56, 270.03)
+      (334.56, 158.0, 820.0, 158.0)
+      (334.56, 270.03, 820.0, 270.03)
+      (340.56, 158.0, 340.56, 421.91)
+      (340.56, 421.91, 340.56, 578.0)
+      (340.56, 421.91, 496.56, 421.91)
+      (496.56, 578.0, 340.56, 578.0)
+      (820.0, 158.0, 820.0, 270.03)
+      (820.0, 270.03, 826.0, 270.03)
+      (826.0, 270.03, 826.0, 578.0)
+
+dragWallFuseStraggler.fpm, 9 lines; window 1200x800; fresh window per run; wait 0 ms; PYTHONHASHSEED=99
+control -- the state after each prefix (one run each):
+   0 lines: 0 walls, state f9065fa7
+   1 lines: 16 walls, state 6eebef53
+   2 lines: 18 walls, state 51662354
+   3 lines: 18 walls, state 143c7ee5
+   4 lines: 16 walls, state cf230a4d
+   5 lines: 16 walls, state cf230a4d
+   6 lines: 18 walls, state 937174de
+after 6 lines, 10 runs: 1 distinct state(s)
+   10 run(s): 18 walls, state 937174de; around the crossing:
+      (148.0, 158.0, 334.56, 158.0)
+      (148.0, 270.03, 148.0, 158.0)
+      (148.0, 270.03, 334.56, 270.03)
+      (334.56, 158.0, 820.0, 158.0)
+      (334.56, 270.03, 820.0, 270.03)
+      (340.56, 158.0, 340.56, 421.91)
+      (340.56, 421.91, 340.56, 578.0)
+      (340.56, 421.91, 496.56, 421.91)
+      (496.56, 578.0, 340.56, 578.0)
+      (820.0, 158.0, 820.0, 270.03)
+      (820.0, 270.03, 826.0, 270.03)
+      (826.0, 270.03, 826.0, 578.0)
+=== on fe9bb96, the commit 0208 measured against (pre-A6 main)
+dragWallFuseStraggler.fpm, 9 lines; window 1200x800; one window; wait 0 ms; PYTHONHASHSEED=random
+control -- the state after each prefix (one run each):
+   0 lines: 0 walls, state f9065fa7
+   1 lines: 16 walls, state 6eebef53
+   2 lines: 18 walls, state 51662354
+   3 lines: 18 walls, state 143c7ee5
+   4 lines: 16 walls, state cf230a4d
+   5 lines: 16 walls, state cf230a4d
+   6 lines: 18 walls, state 937174de
+after 6 lines, 14 runs: 1 distinct state(s)
+   14 run(s): 18 walls, state 937174de; around the crossing:
+      (148.0, 158.0, 334.56, 158.0)
+      (148.0, 270.03, 148.0, 158.0)
+      (148.0, 270.03, 334.56, 270.03)
+      (334.56, 158.0, 820.0, 158.0)
+      (334.56, 270.03, 820.0, 270.03)
+      (340.56, 158.0, 340.56, 421.91)
+      (340.56, 421.91, 340.56, 578.0)
+      (340.56, 421.91, 496.56, 421.91)
+      (496.56, 578.0, 340.56, 578.0)
+      (820.0, 158.0, 820.0, 270.03)
+      (820.0, 270.03, 826.0, 270.03)
+      (826.0, 270.03, 826.0, 578.0)
+
+dragWallFuseStraggler.fpm, 9 lines; window 1200x800 shown; fresh window per run; wait 0 ms; PYTHONHASHSEED=random
+control -- the state after each prefix (one run each):
+   0 lines: 0 walls, state f9065fa7
+   1 lines: 16 walls, state 6eebef53
+   2 lines: 18 walls, state 51662354
+   3 lines: 18 walls, state 143c7ee5
+   4 lines: 16 walls, state cf230a4d
+   5 lines: 16 walls, state cf230a4d
+   6 lines: 18 walls, state 937174de
+after 6 lines, 14 runs: 1 distinct state(s)
+   14 run(s): 18 walls, state 937174de; around the crossing:
+      (148.0, 158.0, 334.56, 158.0)
+      (148.0, 270.03, 148.0, 158.0)
+      (148.0, 270.03, 334.56, 270.03)
+      (334.56, 158.0, 820.0, 158.0)
+      (334.56, 270.03, 820.0, 270.03)
+      (340.56, 158.0, 340.56, 421.91)
+      (340.56, 421.91, 340.56, 578.0)
+      (340.56, 421.91, 496.56, 421.91)
+      (496.56, 578.0, 340.56, 578.0)
+      (820.0, 158.0, 820.0, 270.03)
+      (820.0, 270.03, 826.0, 270.03)
+      (826.0, 270.03, 826.0, 578.0)
