@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: d1323af -->
+<!-- SNAPSHOT-HEAD: 20d4e46 -->
 
 # Session snapshot — read this first
 
@@ -74,7 +74,7 @@ must not be trusted over it.
 > `git show 52a2870:docs/SESSION_SNAPSHOT.md`. **Keep it this size:** when a
 > tranche closes, REPLACE its entry with one line and a link; do not append.
 
-**NOTHING IS OPEN ON A BRANCH. THE 3‑INCH REACH IS CLOSED AND MERGED** —
+**ONE BRANCH IS OPEN, `parallel-walls-6in`, FOR HIS CHECK (see below). THE 3‑INCH REACH IS CLOSED AND MERGED** —
 [PR #71](https://github.com/pjm4github/FloorPlanner/pull/71) landed on `main`
 by this merge commit on Patrick's word (2026‑10‑04: "OK that fix is good. commit and push # 71."),
 the branch deleted in the merge step; recorded at
@@ -106,10 +106,12 @@ touched. **The four-way crossing fault ([`0208`](handoff/0208-report.md) §4) is
 CLOSED AS NOT REPRODUCED, no defect, on his word ("close it as not
 reproduced, no defect") — 96 runs, one state ([`0226`](handoff/0226-report.md),
 [`0227`](handoff/0227-report.md)); the instrument stays in `docs/evidence/`.**
-Of [`0211`](handoff/0211-report.md) §4's queue, TWO ITEMS REMAIN: parallel
-walls 6″ apart merging ([`0210`](handoff/0210-report.md) §6) and the status
-board (THE QUEUE below); plus the `roofs-r3-planes-gables.png` re-shot, his
-display needed.
+Of [`0211`](handoff/0211-report.md) §4's queue: **parallel walls 6″ apart
+merging ([`0210`](handoff/0210-report.md) §6) is BUILT on `parallel-walls-6in`,
+AMBER, waiting on his check — a gesture merges at A6's 3″, the explicit
+passes keep the grid step ([`0228`](handoff/0228-report.md))**; the status
+board remains (THE QUEUE below); plus the `roofs-r3-planes-gables.png`
+re-shot, his display needed.
 
 **`fixtures/single-floor-90-roof-gable-end-check.json` — his own, PROMOTED
 2026‑10‑06 as THE GABLE-END CHECK PLAN** ([`0223`](handoff/0223-report.md) §2); `incoming/` is empty.
@@ -258,8 +260,8 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`d1323af`** at this file's cut — the four-way crossing fault not reproduced ([`0226`](handoff/0226-report.md)); this commit lands [`0227-report.md`](handoff/0227-report.md), closing it on his word. **Owed next: his word on the two remaining queue items.** Every PR through #76 is merged (#59 was closed, superseded by #60). |
-| **Branches** | **None open.** Only `main` on the remote; `d67-floor-scope` and `gable-end-walls` were deleted in the merge step, local and remote. |
+| **`main`** | **`20d4e46`** at this file's cut — the four-way crossing fault closed ([`0227`](handoff/0227-report.md)); this commit lands [`0228-report.md`](handoff/0228-report.md). **Owed next: his check of `parallel-walls-6in`.** Every PR through #76 is merged (#59 was closed, superseded by #60). |
+| **Branches** | **One open: `parallel-walls-6in`** — a gesture merges parallel walls at 3″, not the grid step; its PR waits on his check. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 31 open** (D67 CLOSED 2026‑10‑07, `closed_by cdc54de`, [`0225`](handoff/0225-report.md); D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
