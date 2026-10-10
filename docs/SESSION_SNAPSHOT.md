@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 64d479a -->
+<!-- SNAPSHOT-HEAD: f22dc80 -->
 
 # Session snapshot — read this first
 
@@ -74,7 +74,7 @@ must not be trusted over it.
 > `git show 52a2870:docs/SESSION_SNAPSHOT.md`. **Keep it this size:** when a
 > tranche closes, REPLACE its entry with one line and a link; do not append.
 
-**TWO BRANCHES ARE STACKED FOR HIS CHECK: `parallel-walls-6in` (PR #77) and `design-problems` on it, no PR of its own (see below). THE 3‑INCH REACH IS CLOSED AND MERGED** —
+**THREE BRANCHES ARE STACKED FOR HIS CHECK: `parallel-walls-6in` (PR #77), `design-problems` on it, `wall-properties` on that; one PR (see below). THE 3‑INCH REACH IS CLOSED AND MERGED** —
 [PR #71](https://github.com/pjm4github/FloorPlanner/pull/71) landed on `main`
 by this merge commit on Patrick's word (2026‑10‑04: "OK that fix is good. commit and push # 71."),
 the branch deleted in the merge step; recorded at
@@ -114,7 +114,12 @@ board remains (THE QUEUE below); plus the `roofs-r3-planes-gables.png`
 re-shot, his display needed. **NEW, his ask of 2026‑10‑07, BUILT on
 `design-problems` stacked on `parallel-walls-6in`, AMBER: the "Malformed
 design file" report is a non-modal list of every violation, each row
-zooming the view to the place it names ([`0229`](handoff/0229-report.md)).**
+zooming the view to the place it names ([`0229`](handoff/0229-report.md)). **And
+his ask of 2026‑10‑10, BUILT on `wall-properties` stacked on `design-problems`,
+AMBER: the wall-properties dialog on double-click — name, type, end points
+corner by corner, the joined-corners checkbox, cancel reverts, a profile
+placeholder; walls and vertices gain an optional `name` document field, HIS TO
+REVERSE ([`0230`](handoff/0230-report.md) §2).**
 
 **`fixtures/single-floor-90-roof-gable-end-check.json` — his own, PROMOTED
 2026‑10‑06 as THE GABLE-END CHECK PLAN** ([`0223`](handoff/0223-report.md) §2); `incoming/` is empty.
@@ -263,8 +268,8 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`64d479a`** at this file's cut — [`0228`](handoff/0228-report.md) landed; this commit lands [`0229-report.md`](handoff/0229-report.md). **Owed next: his check of `parallel-walls-6in` (PR #77) and `design-problems` stacked on it.** Every PR through #76 is merged (#59 was closed, superseded by #60). |
-| **Branches** | **Two open, stacked: `parallel-walls-6in`** (PR #77 — a gesture merges parallel walls at 3″) **and `design-problems`** on it (the violations report that zooms to each problem, no PR of its own); both wait on his check. |
+| **`main`** | **`f22dc80`** at this file's cut — [`0229`](handoff/0229-report.md) landed; this commit lands [`0230-report.md`](handoff/0230-report.md). **Owed next: his check of the three stacked branches (PR #77 and the two on it).** Every PR through #76 is merged (#59 was closed, superseded by #60). |
+| **Branches** | **Three open, stacked: `parallel-walls-6in`** (PR #77 — a gesture merges parallel walls at 3″) **← `design-problems`** (the violations report that zooms to each problem) **← `wall-properties`** (the wall-properties dialog); one PR; all wait on his check. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 31 open** (D67 CLOSED 2026‑10‑07, `closed_by cdc54de`, [`0225`](handoff/0225-report.md); D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
