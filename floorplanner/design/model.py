@@ -81,12 +81,13 @@ class Level(_Node):
 @dataclass
 class Vertex(_Node):
     FIELDS: ClassVar = [("id", RAW), ("level", RAW), ("x", RAW), ("y", RAW),
-                        ("locked", RAW)]
+                        ("locked", RAW), ("name", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     x: Any = _MISSING
     y: Any = _MISSING
     locked: Any = _MISSING
+    name: Any = _MISSING
 
 
 @dataclass
@@ -114,7 +115,8 @@ class Wall(_Node):
     FIELDS: ClassVar = [("id", RAW), ("level", RAW), ("v1", RAW), ("v2", RAW),
                         ("type", RAW), ("left", RAW), ("right", RAW),
                         ("openings", _list(Opening)), ("thickness_in", RAW),
-                        ("finish_left", RAW), ("finish_right", RAW)]
+                        ("finish_left", RAW), ("finish_right", RAW),
+                        ("name", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     v1: Any = _MISSING
@@ -126,6 +128,7 @@ class Wall(_Node):
     thickness_in: Any = _MISSING
     finish_left: Any = _MISSING
     finish_right: Any = _MISSING
+    name: Any = _MISSING
 
 
 @dataclass

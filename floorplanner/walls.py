@@ -1331,6 +1331,24 @@ class WallItem(QGraphicsItem):
             self._uid = f"W{next(_WALL_UIDS)}"
         return self._uid
 
+    @property
+    def name(self) -> str:
+        """A user-given name (Patrick, 2026-10-10: the wall-properties
+        dialog). Lives in the document's optional `name` field, which rides
+        the round trip in `_v5_extra` like `thickness_in`; empty = unnamed."""
+        extra = getattr(self, "_v5_extra", None) or {}
+        return str(extra.get("name") or "")
+
+    @name.setter
+    def name(self, value: str):
+        extra = dict(getattr(self, "_v5_extra", None) or {})
+        value = (value or "").strip()
+        if value:
+            extra["name"] = value
+        else:
+            extra.pop("name", None)
+        self._v5_extra = extra
+
     # -- vertices (P3.1) -----------------------------------------------------
     # p1/p2 read through to the vertex table; ASSIGNMENT IS SPLIT-ON-WRITE --
     # it mints a fresh vertex for this end and leaves any sharer where it was,
@@ -2526,6 +2544,32 @@ class WallItem(QGraphicsItem):
             return []
         return report_self_intersections(
             sc, rooms_holding(sc, {id(v) for v in moved}))
+
+    def mouseDoubleClickEvent(self, e):
+        """The wall's property sheet (Patrick, 2026-10-10: "a dialog box when
+        I double click on a wall"). The press that precedes a double-click
+        has already armed a drag; disarm it, since the dialog takes over."""
+        if self.group() is not None or e.button() != Qt.MouseButton.LeftButton:
+            super().mouseDoubleClickEvent(e)
+            return
+        self._mode = None
+        self.open_properties()
+        e.accept()
+
+    def open_properties(self):
+        """Open the wall-properties dialog; apply on OK, nothing on Cancel.
+        Returns the dialog's result code."""
+        from floorplanner.wallprops import WallPropertiesDialog   # late (UI, above walls)
+        sc = self.scene()
+        view = sc.views()[0] if sc is not None and sc.views() else None
+        dlg = WallPropertiesDialog(self, view)
+        code = dlg.exec()
+        if code == QDialog.DialogCode.Accepted:
+            dlg.apply()
+            win = sc.parent() if sc is not None else None
+            if hasattr(win, "_commit_if_changed"):
+                win._commit_if_changed()
+        return code
 
     def contextMenuEvent(self, e):
         from floorplanner.rooms import detach_wall_from_room  # late (cycle)

@@ -61,7 +61,7 @@ from floorplanner.config import (
 )
 from floorplanner.design.canonical import canonicalize
 from floorplanner.design.legacy import (
-    MIN_SPAN, ON_SEG_TOL, WELD_TOL, VertexTable, split_params, weld_endpoints,
+    MIN_SPAN, ON_SEG_TOL, WELD_TOL, VertexTable, _d, split_params, weld_endpoints,
 )
 from floorplanner.design.model import Design
 from floorplanner.geometry import parse_wwhh
@@ -494,6 +494,27 @@ def _new_walk_report() -> dict:
             "openings_failed": [], "openings_failed_ids": set()}
 
 
+def _name_rows(vt, items):
+    """Stamp each vertex row of `vt` with the name of the live corner at its
+    position, if that corner was named. First name at a position wins."""
+    named = []
+    for it in items:
+        if isinstance(it, WallItem):
+            named += [it.end_vertex(a) for a in ("p1", "p2")]
+        elif isinstance(it, RoomItem):
+            named += [e.v for e in it.outline]
+    named = [v for v in named if v is not None and v.name]
+    if not named:
+        return
+    for row in vt.rows:
+        if row.get("name"):
+            continue
+        for v in named:
+            if _d((row["x"], row["y"]), (v.x, v.y)) <= vt.tol:
+                row["name"] = v.name
+                break
+
+
 def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
     """This level's walls, split at every junction and room corner, as v5 wall
     dicts.  Openings are re-anchored from absolute `s` to {from, offset_in} on
@@ -917,6 +938,10 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
             # I10: emit only the vertices some wall or outline actually uses
             used = {v for w in lw for v in (w["v1"], w["v2"])}
             used |= {e["v"] for rm in lr for e in rm["outline"]}
+            # a corner's NAME (vertex.py): the walk rebuilt its rows from
+            # coordinates, so the live vertices' names are matched back onto
+            # them by position, at the table's own weld tolerance
+            _name_rows(vt, part)
             vertices += [row for row in vt.rows if row["id"] in used]
             lw_all += lw
             lr_all += lr
@@ -1251,7 +1276,8 @@ def apply_design_to_scene(target, design, report=None, strict=False,
     # fresh uids, NOT the document's ids: those are canonical (renumbered by
     # geometry at every save), and a live uid is persistent. P3.1 settled that
     # the two id spaces stay separate and `canonicalize` bridges them.
-    vmap = {vid: Vertex(p.x(), p.y()) for vid, p in pos.items()}
+    vmap = {v["id"]: Vertex(float(v["x"]), float(v["y"]), name=v.get("name") or None)
+            for v in doc.get("vertices", [])}
 
     wmap = {}
     for wd in doc.get("walls", []):

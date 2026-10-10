@@ -59,11 +59,18 @@ _UIDS = itertools.count(1)
 class Vertex:
     """One corner. Identity is the point; `uid` names it for the document."""
 
-    __slots__ = ("_uid", "_pt")
+    __slots__ = ("_uid", "_pt", "name")
 
-    def __init__(self, x: float, y: float, uid: str = None):
+    def __init__(self, x: float, y: float, uid: str = None, name: str = None):
         self._uid = uid
         self._pt = QPointF(x, y)
+        # A USER-GIVEN NAME (Patrick, 2026-10-10: the wall-properties dialog
+        # names a corner "on a vertex by vertex basis"). Carried by the
+        # document's vertex record (`name`, optional) and by a relocation,
+        # since the corner keeps its identity; a detach mints a NEW corner
+        # with no name, as it mints a new uid. The one field here that is
+        # set in place: renaming a corner renames it for every holder.
+        self.name = name or None
 
     @classmethod
     def at(cls, p) -> "Vertex":
@@ -124,7 +131,10 @@ class Vertex:
             x, y = p[0], p[1]
         if x == mine.x() and y == mine.y():
             return self
-        return Vertex(x, y, uid=self.uid)
+        return Vertex(x, y, uid=self.uid, name=self.name)
 
     def __repr__(self):
-        return f"Vertex({self._uid or '<unnamed>'} @ {self.x:.3f}, {self.y:.3f})"
+        label = self._uid or '<unnamed>'
+        if self.name:
+            label += f" '{self.name}'"
+        return f"Vertex({label} @ {self.x:.3f}, {self.y:.3f})"

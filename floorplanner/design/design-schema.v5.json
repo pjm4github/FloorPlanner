@@ -194,7 +194,8 @@
         "level": { "$ref": "#/$defs/id" },
         "x":     { "type": "number" },
         "y":     { "type": "number" },
-        "locked": { "description": "Pinned by the user; snapping, welding and cleanup must not move it.", "type": "boolean", "default": false }
+        "locked": { "description": "Pinned by the user; snapping, welding and cleanup must not move it.", "type": "boolean", "default": false },
+        "name": { "description": "A user-given name for the corner (the wall-properties dialog). Optional; omitted when empty.", "type": "string" }
       }
     },
 
@@ -223,7 +224,8 @@
         "finish_left":  { "description": "Per-side finish. A shared wall can be tile on the bath side and paint on the bedroom side — v4 could not express this because wall_finish lived on the room.", "type": "string" },
         "finish_right": { "type": "string" },
 
-        "openings": { "type": "array", "items": { "$ref": "#/$defs/opening" } }
+        "openings": { "type": "array", "items": { "$ref": "#/$defs/opening" } },
+        "name": { "description": "A user-given name for the wall (the wall-properties dialog). Optional; omitted when empty.", "type": "string" }
       },
 
       "allOf": [
