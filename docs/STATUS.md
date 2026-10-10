@@ -5,12 +5,13 @@
 
 **Generated from the record** — one `**Landed:**` line per merge in [`handoff/`](handoff/), the defect register's front matter, and [`ROADMAP.md`](ROADMAP.md) §3's RED table. This file says whether a thing is DONE; [`SESSION_SNAPSHOT.md`](SESSION_SNAPSHOT.md) keeps the order and the why ([`handoff/0019-ruling.md`](handoff/0019-ruling.md) §4). A box that is not derived from the record is not on this board.
 
-**76 landed, 1 closed unmerged; 31 defects open, 55 closed.**
+**77 landed, 1 closed unmerged; 31 defects open, 55 closed.**
 
 ## Landed
 
 | PR | date | commit | tier | what it rested on | record |
 |---|---|---|---|---|---|
+| [#78](https://github.com/pjm4github/FloorPlanner/pull/78) | 2026-10-10 | `0d1e91b` | GREEN | on green CI (pytest full gate, ruff); no check of his owed, by the charter | [`0234`](handoff/0234-report.md) |
 | [#77](https://github.com/pjm4github/FloorPlanner/pull/77) | 2026-10-10 | `53d676d` | — | see this report | [`0231`](handoff/0231-report.md) |
 | [#76](https://github.com/pjm4github/FloorPlanner/pull/76) | 2026-10-07 | `cdc54de` | — | see this report | [`0225`](handoff/0225-report.md) |
 | [#75](https://github.com/pjm4github/FloorPlanner/pull/75) | 2026-10-06 | `48a9fe4` | — | see this report | [`0222`](handoff/0222-report.md) |

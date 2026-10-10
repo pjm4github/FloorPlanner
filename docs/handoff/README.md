@@ -373,5 +373,6 @@ this table is not a second copy of it.
 | [`0231-report.md`](./0231-report.md) | report: PR #77 merged on his word with three tranches folded in — the parallel-walls merge rule, the violations report that zooms to each problem, the wall-properties dialog |
 | [`0232-report.md`](./0232-report.md) | READ-BACK: the status board — what the record can and cannot say about a completed unit today, measured; the four answers 0019 §4 asked for; a recommendation, nothing built |
 | [`0233-report.md`](./0233-report.md) | report: the status board built — `docs/STATUS.md` generated from one `**Landed:**` line per merge, gate-checked; 77 PRs on the board from #1; the migration table frozen; the pair table generated; the mailbox is the record |
+| [`0234-report.md`](./0234-report.md) | report: PR #78 merged on green CI — the status board is on `main`, and this is the first landing recorded by its own line |
 
 <!-- PAIRS:END -->
