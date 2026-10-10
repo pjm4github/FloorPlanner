@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 53d676d -->
+<!-- SNAPSHOT-HEAD: 458fb03 -->
 
 # Session snapshot — read this first
 
@@ -205,13 +205,18 @@ first here, is CLOSED AND MERGED — PR #70, [`0207`](handoff/0207-report.md),
 the spec: the angled-wall rule**, quantising length along the ray; and
 snapping what an OPERATION produces, which A6 never covered.)
 
-1. **The status board — GREEN, read-back first.**
-   [`handoff/0019-ruling.md`](handoff/0019-ruling.md), priority lowered by
-   [`0029`](handoff/0029-ruling.md) §6 (Patrick's Cowork skill renders the
-   same state on demand — a view, not the artifact). Freeze the closed
-   migration's Status table as history; move forward status to a generated
-   `docs/STATUS.md`, which does not exist yet. Read-back owed: what
-   identifies a completed unit when recent work has no phase number.
+1. **The status board — GREEN; the read-back is DONE and waits on his word:
+   [`0232`](handoff/0232-report.md).** [`handoff/0019-ruling.md`](handoff/0019-ruling.md),
+   priority lowered by [`0029`](handoff/0029-ruling.md) §6. Measured: nothing
+   in `progress/` identifies a unit and `progress/tasks/` holds zero files;
+   76 merged PRs, 47 named in `main`'s subjects, 52 in `handoff/`, nine
+   nowhere; the migration plan's six `☐` rows still unmoved, P5.2 still
+   lying; `handoff/README.md`'s pair table stale at 0116. Recommended: a
+   `**Landed:**` line per merge report as the source, `tools/status_index.py`
+   generating `docs/STATUS.md`, `--check` in the gate, a backfill of the 32
+   merge reports, then 0019's freeze and move. One question is his (0232 §5
+   item 5): whether `progress/tasks/` is written again or the mailbox is
+   declared the record.
 
 **Full tiered queue (A2–A5, the command-roster census, Phase 5's
 remainder):** [`ROADMAP.md`](ROADMAP.md) §3.
@@ -264,7 +269,7 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`53d676d`** at this file's cut — PR #77 merged on his word (parallel walls, the violations report, the wall-properties dialog); this commit lands [`0231-report.md`](handoff/0231-report.md), the record of that merge. **Owed next: his word — the status board is the queue's last item.** Every PR through #77 is merged (#59 was closed, superseded by #60). |
+| **`main`** | **`458fb03`** at this file's cut — PR #77 merged and recorded ([`0231`](handoff/0231-report.md)); this commit lands [`0232-report.md`](handoff/0232-report.md), the status-board read-back. **Owed next: his word on 0232 §5.** Every PR through #77 is merged (#59 was closed, superseded by #60). |
 | **Branches** | **None open.** Only `main` on the remote; `parallel-walls-6in`, `design-problems` and `wall-properties` were deleted in the merge step, local and remote. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **86 records, 31 open** (D67 CLOSED 2026‑10‑07, `closed_by cdc54de`, [`0225`](handoff/0225-report.md); D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
