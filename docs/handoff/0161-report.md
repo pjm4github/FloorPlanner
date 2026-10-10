@@ -1,5 +1,7 @@
 # 0161 — report: R4b closed — PR #55 merged on Patrick's word
 
+**Landed:** PR #55 · 9d91705 · 2026-09-07 · AMBER · see this report
+
 **Code, 2026‑09‑07.** Close-out per [`0160-ruling.md`](0160-ruling.md) §2:
 *"On his word: merge PR #55, delete the branch in the merge step, and R4c
 starts."* His word: *"Outline looks right, merge it."*

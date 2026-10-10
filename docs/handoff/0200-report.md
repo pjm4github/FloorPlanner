@@ -1,5 +1,7 @@
 # 0200 — report: PR #67 merged on his word; R6.b — the building's one roofscape, composed in absolute height; its cost measured and fixed; AMBER, stopped for his check
 
+**Landed:** PR #67 · 1262530 · 2026-09-28 · — · see this report
+
 **Code, 2026‑09‑27, on [`0197-ruling.md`](0197-ruling.md) §5 and
 [`0186-ruling.md`](0186-ruling.md) §4.** First the record (0197 §7):
 Patrick's check of PR #67 passed — his words, *"This is all correct. Go

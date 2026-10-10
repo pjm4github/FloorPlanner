@@ -1,5 +1,7 @@
 # 0193 — report: R5b merged on his word; the undo (already there, and 0192 corrected) and the macro's DORMER token; AMBER, stopped for his check
 
+**Landed:** PR #63 · 919c48c · 2026-09-24 · — · see this report
+
 **Code, 2026‑09‑24.** Patrick's check of R5b passed — his words, in full:
 *"this looks fine. lets do the undo. also make sure that the script tool
 has commands to handle tha dormer."* On the first sentence PR #63

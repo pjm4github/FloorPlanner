@@ -1,5 +1,7 @@
 # 0167 — report: R4d closed — PR #57 merged on Patrick's word; mesh clipping ordered as R4e
 
+**Landed:** PR #57 · 7a76283 · 2026-09-07 · AMBER · see this report
+
 **Code, 2026‑09‑07.** His word after the re-check of [`0166`](0166-report.md):
 *"The roof seams look good now. Lets merge it then lets enable mesh
 clipping."* With his 3D view of the same corner attached — the poke-through

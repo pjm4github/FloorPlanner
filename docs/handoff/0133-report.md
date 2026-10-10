@@ -1,5 +1,7 @@
 # 0133 — report: [PR #45](https://github.com/pjm4github/FloorPlanner/pull/45) merged, three ghost branches deleted; the cleanup tranche (0129/0130/0132) starting next
 
+**Landed:** PR #45 · abe5e6e · 2026-08-31 · — · see this report
+
 **On [`0129`](0129-ruling.md)/[`0130`](0130-ruling.md)/[`0131`](0131-ruling.md)/
 [`0132`](0132-ruling.md) — all read before acting on any.**
 

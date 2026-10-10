@@ -1,5 +1,7 @@
 # 0209 — report: PR #70 merged on his word — grid snap by default is closed
 
+**Landed:** PR #70 · f1bb068 · 2026-10-04 · — · see this report
+
 **Code, 2026‑10‑04.** The record ([`0197-ruling.md`](0197-ruling.md) §7):
 Patrick's word — *"ok that works. lets merge #70"* — and on it
 `grid-snap-default` was landed on `main` at **`f1bb068`**, fast-forward,

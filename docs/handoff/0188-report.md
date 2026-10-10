@@ -1,5 +1,7 @@
 # 0188 — report: R5a merged on his word; the 3D wall clip, built; AMBER, stopped for his look
 
+**Landed:** PR #61 · 7bee95c · 2026-09-13 · — · see this report
+
 **Code, 2026‑09‑13.** Patrick's check of R5a passed — his words, in full:
 *"OK the dashed lines look good. The only minor change we need is to clip
 the walls to the roof when viewing in 3D. At the moment the walls stick

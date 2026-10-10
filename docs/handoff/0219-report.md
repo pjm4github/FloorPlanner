@@ -1,5 +1,7 @@
 # 0219 — report: PR #74 merged on his word — the legacy converter, the v2 docs, whole-line replay and the recorder window's line numbers; the macro spec's six tasks are done
 
+**Landed:** PR #74 · b849dff · 2026-10-05 · — · see this report
+
 **Code, 2026‑10‑05.** The record ([`0197-ruling.md`](0197-ruling.md) §7).
 [`0218`](0218-report.md) put the branch to him for his check. He ran it
 and said, in two messages:

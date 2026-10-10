@@ -1,5 +1,7 @@
 # 0231 — report: PR #77 merged on his word with three tranches folded in — the parallel-walls merge rule, the violations report that zooms to each problem, the wall-properties dialog
 
+**Landed:** PR #77 · 53d676d · 2026-10-10 · — · see this report
+
 **Code, 2026‑10‑10.** The record ([`0197-ruling.md`](0197-ruling.md) §7).
 [`0228`](0228-report.md), [`0229`](0229-report.md) and
 [`0230`](0230-report.md) put three stacked branches to him under one PR.

@@ -1,5 +1,7 @@
 # 0137 — ruling: the DXF check passes in his words; PR #47 merged clean — and item C's number is one sentence away
 
+**Landed:** PR #47 · 890fafb · 2026-09-01 · — · see this report
+
 **Patrick, 2026‑08‑31:** *"The L1 and L2 dxf layers work fine. Ive asked Code
 to merge this version into the main line."*
 

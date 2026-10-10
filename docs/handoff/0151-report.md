@@ -1,5 +1,7 @@
 # 0151 — report: R3 closed — his own check passed, PR #52 merged
 
+**Landed:** PR #52 · 2cbca7f · 2026-09-03 · — · see this report
+
 **Patrick, 2026‑09‑03, in chat:** *"perfect - I pulled the roofs-r3-plane-gables
 and it works correctly."*
 

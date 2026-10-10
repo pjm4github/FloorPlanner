@@ -1,5 +1,7 @@
 # 0211 — report: PR #71 merged on his word — the 3‑inch reach is closed, and grid snap by default with it
 
+**Landed:** PR #71 · a397889 · 2026-10-04 · AMBER · see this report
+
 **Code, 2026‑10‑04.** The record ([`0197-ruling.md`](0197-ruling.md) §7):
 Patrick's word — *"OK that fix is good. commit and push # 71."* — and on it
 `grid-snap-flat-3in` was landed on `main` at **`a397889`**, fast-forward,

@@ -486,6 +486,7 @@ def _docs() -> int:
         ("Docs-Defects", ["tools/defects_index.py", "--validate"]),
         ("Docs-Index", ["tools/defects_index.py", "--check"]),
         ("Docs-Progress", ["tools/progress_index.py", "--check"]),
+        ("Docs-Status", ["tools/status_index.py", "--check"]),
         ("Docs-Refs", ["tools/ref_audit.py", "--strict-ids"]),
         ("Docs-GitHub", ["tools/defects_to_github.py", "--dry-run"]),
     ]

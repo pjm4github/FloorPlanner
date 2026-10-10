@@ -80,6 +80,18 @@ before.
 ---
 
 
+## THE MAILBOX IS THE RECORD NOW — Patrick's word, 2026‑10‑10
+
+Measured at [`../handoff/0232-report.md`](../handoff/0232-report.md) §1:
+[`tasks/`](tasks/) received **no file at all** after it was built — every
+unit since then was recorded in [`../handoff/`](../handoff/) and nowhere
+else. Asked whether `tasks/` should be written again or the mailbox declared
+the record, his word was *"the mailbox is the record now."* So: **a unit of
+work is recorded by its handoff report; a merge by the `**Landed:**` line
+under that report's title**, which [`../STATUS.md`](../STATUS.md) is
+generated from (`tools/status_index.py`). `tasks/` and its generated index
+stay as built and receive nothing; the historical logs above are frozen.
+
 ## An append-only shared file serialises parallel branches — measured 2026-08-07
 
 **Every conflict in the GREEN batch was in this one file, and there were no

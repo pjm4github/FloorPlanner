@@ -1,5 +1,7 @@
 # 0122 — report: [PR #43](https://github.com/pjm4github/FloorPlanner/pull/43) merged — D81/D82 closed; the 45° labeling gap confirmed as [`0119`](0119-ruling.md)/[`0120`](0120-ruling.md)'s own scope, next as its own effort
 
+**Landed:** PR #43 · 36fb6b5 · 2026-08-30 · — · see this report
+
 **Patrick, direct, 2026‑08‑30:** *"the pdf-dimention-and-door-fix looks pretty
 good. lets merge that. The walls at 45 degrees are not labeled correctly yet
 in the PDF but lets merge then setup another focused effort to clean that

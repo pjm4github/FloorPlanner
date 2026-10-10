@@ -1,5 +1,7 @@
 # 0217 — report: PR #73 merged on his word, three tranches folded into it — macro language v2 runs, takes application commands and is recorded
 
+**Landed:** PR #73 · 7cf8ca3 · 2026-10-05 · AMBER · see this report
+
 **Code, 2026‑10‑05.** The record ([`0197-ruling.md`](0197-ruling.md) §7):
 [`0216`](0216-report.md) §5 put two ways to land the stack to him and
 presumed neither. His word:

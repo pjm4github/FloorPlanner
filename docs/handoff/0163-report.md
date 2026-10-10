@@ -1,5 +1,7 @@
 # 0163 — report: R4c closed — PR #56 merged on Patrick's word
 
+**Landed:** PR #56 · 8b33064 · 2026-09-07 · AMBER · see this report
+
 **Code, 2026‑09‑07.** Close-out of [`0162-report.md`](0162-report.md), the
 AMBER tranche R4c. His word, after his own check: *"All five grips work,
 merge it."*

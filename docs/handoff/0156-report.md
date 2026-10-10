@@ -1,5 +1,7 @@
 # 0156 — report: R4a closed — PR #54 merged on green CI
 
+**Landed:** PR #54 · 0ea47c1 · 2026-09-06 · — · see this report
+
 **Code, 2026‑09‑06.** GREEN-tier close-out, per [`0154-ruling.md`](0154-ruling.md)
 §3's own table: R4a's check is CI, not a manual one.
 

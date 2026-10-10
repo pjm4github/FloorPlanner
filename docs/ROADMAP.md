@@ -161,6 +161,9 @@ Order: G1, G3, G2, G4. G1 and G3 are independent; G2 informs G4.
 | item | what it needs |
 |---|---|
 | **Phase 5 — Yard catalog** | artwork scope: which kinds, drawn by whom. D46 closes with it |
+| **P5.1 — Site levels, categories, area accounting** | moved here from the frozen migration table 2026‑10‑10 ([`handoff/0019-ruling.md`](handoff/0019-ruling.md) §3 TWO, built at [`0232`](handoff/0232-report.md)); not started |
+| **P5.3 — Site schedule fields + reports** | moved here with P5.1; not started |
+| **P6.3 — Scene index + viewport update final pass** | moved here with P5.1; Phase 6 is parked (below), and this pass with it |
 | ~~**Phase 5 — settable wall types**~~ | **DONE — merged 2026‑08‑11 (PR #26).** The 2D symbol was indeed the design choice, and the first answer was wrong: see the PR #26 follow-up, which refutes thickness as the identity channel |
 | **Phase 6 — command undo** | **PARKED 2026‑08‑12 — see the park record below.** It does **not** retire `snapshot()`, and neither D42's applier consolidation nor D45's `_edge_wall` folds in here; both claims were refuted by measurement. P6.a/P6.b stay merged and dormant. Two named conditions reopen it |
 | **Phase 7 — Build menu 7.1 / 7.2** | 7.2 needs `level.kind` additions, now permitted by R‑B but not yet specified |

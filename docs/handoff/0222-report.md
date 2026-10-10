@@ -1,5 +1,7 @@
 # 0222 — report: PR #75 merged on his word, after his check — the error indicator in the recorder window's gutter, and the stop-at-the-error rule
 
+**Landed:** PR #75 · 48a9fe4 · 2026-10-06 · — · see this report
+
 **Code, 2026‑10‑06.** The record ([`0197-ruling.md`](0197-ruling.md) §7).
 [`0220`](0220-report.md) and [`0221`](0221-report.md) put the branch to
 him for his check. He ran it and said:

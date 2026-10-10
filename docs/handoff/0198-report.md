@@ -1,5 +1,7 @@
 # 0198 — report: PR #65 merged on his word (the record 0197 §7 owed); R6.0 — D50 measured, closed, and its receipt across all five multifloor plans; AMBER, stopped for his check
 
+**Landed:** PR #65 · 299576a · 2026-09-25 · — · see this report
+
 **Code, 2026‑09‑25, on [`0197-ruling.md`](0197-ruling.md).** First the record
 [`0197`](0197-ruling.md) §7 names: Patrick's check of PR #65 passed — his
 words, *"that fixed it, merge PR #65"* — and on that word

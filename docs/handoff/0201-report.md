@@ -1,5 +1,7 @@
 # 0201 — report: PR #68 merged on his word; D67 REPRODUCED (a fourth site, undo complete); the roof paths and the level's elevation, measured on his fixture — measurements only, nothing fixed
 
+**Landed:** PR #68 · 297587c · 2026-09-28 · — · see this report
+
 **Code, 2026‑09‑27, on [`0197-ruling.md`](0197-ruling.md) §5.** First the
 record (0197 §7): Patrick's check of PR #68 passed — his words, *"merge PR
 #68"* — and on that word `roofs-r6b-composition` was landed on `main` at

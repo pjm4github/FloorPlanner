@@ -1,5 +1,7 @@
 # 0143 — report: R2 closed — Patrick's own check passed, PR #49 merged
 
+**Landed:** PR #49 · 8cbdf55 · 2026-09-01 · — · see this report
+
 **Patrick, 2026‑09‑01, in the running app:** *"I am able to click and drag a
 roof ridge. The drawing of the 45 ridge should be able to use the CNTRL and
 the SHIFT key. Currently the SHIFT key works but the CONTROL key doesn't. I

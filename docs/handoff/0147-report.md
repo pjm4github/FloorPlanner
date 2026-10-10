@@ -1,5 +1,7 @@
 # 0147 — report: R2b merged, D84 reclassified, R2c starting
 
+**Landed:** PR #50 · 07b8f46 · 2026-09-02 · — · see this report
+
 **Code, 2026‑09‑02, answering [`0145`](0145-ruling.md) and
 [`0146`](0146-ruling.md).**
 

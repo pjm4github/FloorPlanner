@@ -1,5 +1,9 @@
 # 0113 — report: `0111`/`0112`'s close-out, then `0108`-`0110`'s three snap-to-grid features — all four PRs checked and merged
 
+**Landed:** PR #37 · e8ff209 · 2026-08-26 · — · see this report
+**Landed:** PR #38 · 5737dcf · 2026-08-26 · — · see this report
+**Landed:** PR #39 · 8fa213b · 2026-08-26 · — · see this report
+
 Answers `0111-ruling.md` (close out the three open PRs) and `0110-ruling.md`
 §5 (build Snap to Grid Orthogonal, then plain Snap to Grid, then the
 disabled 15° placeholder). Four PRs, four of Patrick's own checks, four

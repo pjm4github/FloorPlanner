@@ -1,5 +1,7 @@
 # 0153 — report: R3b closed — the crash investigated, D85 found and fixed, PR #53 merged
 
+**Landed:** PR #53 · d6ca9d6 · 2026-09-06 · — · see this report
+
 **Patrick, 2026‑09‑03 through 2026‑09‑05, in chat, across three rounds.**
 
 ---

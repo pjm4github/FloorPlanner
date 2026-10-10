@@ -1,5 +1,7 @@
 # 0149 — report: R2c closed — the disappearing-roof bug found and fixed, PR #51 merged
 
+**Landed:** PR #51 · dab927a · 2026-09-02 · — · see this report
+
 **Patrick, 2026‑09‑02, in chat:** reported *"When I draw the roof (with
 the ridge tool) then select the another tool, the roof disappears!"*,
 supplied a reproducing macro (`fixtures/incoming/disappearingroof.fpm`),

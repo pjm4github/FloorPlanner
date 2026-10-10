@@ -33,6 +33,7 @@
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | The module layout roster, phase-history pointers, extract/join and floors mechanics, and the performance measurements moved out of `CLAUDE.md` at [`handoff/0085-ruling.md`](handoff/0085-ruling.md) — `CLAUDE.md` itself is traps only now. |
 | [`design-schema.v5.md`](design-schema.v5.md) | A **pointer**, not a stub. The schema itself was vendored into the package at P0.7 and lives at `floorplanner/design/design-schema.v5.json`; this file remains so references to the old location still resolve. |
 | [`defects/`](defects/) | The defect register — **one file per record**. See below. |
+| [`STATUS.md`](STATUS.md) | **The status board — GENERATED** by `tools/status_index.py` from the mailbox's `**Landed:**` lines, the defect register and `ROADMAP.md` §3; `--check` runs in the gate. Says whether a thing is DONE; the snapshot keeps the order and the why ([`handoff/0019-ruling.md`](handoff/0019-ruling.md)). |
 | [`SANITY_CHECK.md`](SANITY_CHECK.md) | The three manual gates and their outcomes. The only checks a human has to perform by hand. |
 | [`macro_language.md`](macro_language.md) | The headless macro grammar and driver — the interface a script or an AI system drives the editor through. |
 | [`../floorplanner/viewer/VIEWER_NOTES.md`](../floorplanner/viewer/VIEWER_NOTES.md) | The 3D viewer track: architecture, the renderer decision, and the hard-won specifics. Lives beside its code on purpose. |

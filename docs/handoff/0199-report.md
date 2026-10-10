@@ -1,5 +1,7 @@
 # 0199 — report: PR #66 merged on his word; his R6 fixture, promoted; R6.a built — the plan view's multifloor roof rule and the whole-building 3D default; AMBER, stopped for his check
 
+**Landed:** PR #66 · c1f64f3 · 2026-09-25 · — · see this report
+
 **Code, 2026‑09‑25, on [`0197-ruling.md`](0197-ruling.md) §3–§5.** First the
 record, as 0197 §7 has it for every merge: Patrick's check of PR #66
 passed — his words, *"yes the new menu is there and the save/reload keeps

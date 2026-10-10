@@ -1,5 +1,7 @@
 # 0169 — report: R4e closed — PR #58 merged on Patrick's word; one item named for later
 
+**Landed:** PR #58 · e780b56 · 2026-09-09 · AMBER · see this report
+
 **Code, 2026‑09‑08.** His word, with the plan of the same corner attached:
 *"3D view looks right, merge it. There is still an issue that we need to
 come back to when there are multiple roof lines at various ridge peak

@@ -1,5 +1,7 @@
 # 0196 — report: PR #64 merged on his word (the record 0194 owed); 0195's clamp built and its closure demand answered; AMBER, stopped for his check
 
+**Landed:** PR #64 · d86bfd3 · 2026-09-24 · — · see this report
+
 **Code, 2026‑09‑24, on [`0195-ruling.md`](0195-ruling.md).** First the
 record [`0195`](0195-ruling.md) §4 names as owed: Patrick's check of PR #64
 passed — his words, *"that fixed it, merge PR #64"* — and on that word

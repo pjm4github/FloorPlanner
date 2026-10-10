@@ -1,5 +1,7 @@
 # 0206 — report: PR #69 merged on his word — R6.c is closed; the check fixture kept with its row corrected
 
+**Landed:** PR #69 · 2dcc3f4 · 2026-10-03 · AMBER · see this report
+
 **Code, 2026‑10‑03.** The record ([`0197-ruling.md`](0197-ruling.md) §7):
 Patrick's word — *"merge PR #69 and keep the fixture with the row
 corrected"* — and on it `roofs-r6c-tool-levels` was landed on `main` at

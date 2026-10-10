@@ -1,5 +1,7 @@
 # 0214 — report: PR #72 merged (GREEN, on green CI); macro language v2, T2 — the player; the modifier leak measured exactly and guarded; AMBER, stopped for his check
 
+**Landed:** PR #72 · 504d6d7 · 2026-10-04 · GREEN · see this report
+
 **Code, 2026‑10‑04.** The record ([`0197-ruling.md`](0197-ruling.md) §7):
 **PR #72, macro v2 T1, is merged** — GREEN tier, so on green CI rather
 than on his word ([`ROADMAP.md`](../ROADMAP.md) §1): CI's `ruff` job and

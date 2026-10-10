@@ -14,6 +14,15 @@ Seven phases. Every task is small enough to finish and verify in one sitting, an
 
 ## Status
 
+> **FROZEN 2026‑10‑10 — this table is the acceptance record of a migration that
+> closed on 2026‑08‑11, and it does not change again** ([`handoff/0019-ruling.md`](handoff/0019-ruling.md)
+> §3 ONE). Its six forward rows (P5.1–P6.3) left it the same day, per §3 TWO,
+> corrected once in the move: P5.2 **landed** (PRs #26, #27, 2026‑08‑12 — see
+> [`STATUS.md`](STATUS.md)); P6.1 and P6.2 **parked** (2026‑08‑12,
+> [`ROADMAP.md`](ROADMAP.md)); P5.1, P5.3 and P6.3 **open**, now rows of
+> `ROADMAP.md` §3's RED table, which [`STATUS.md`](STATUS.md) renders. What is
+> done is read from `STATUS.md`, generated; nothing is ticked here.
+
 | | Task | Gate |
 |---|---|---|
 | ☑ | **P0.0** Point `CLAUDE.md` at this plan | ruff |
@@ -52,12 +61,6 @@ Seven phases. Every task is small enough to finish and verify in one sitting, an
 | ☑ | **P4.4** Concept rooms, `nominal_size`, duplicate-as-template — *ticked 2026‑08‑04 on Patrick's acceptance ("it works perfectly"), merged at **PR #6** (merge commit `ae9f0ad`; 5 sub-commits `868e315` … `da38c46`: census + the four rulings, the `^H` chord + token, duplicate-as-template, concept rooms, the record). Acceptance met: a one-room file validates against the schema and all fifteen invariants and loads into an existing design as a floating room (pinned against a **second** `MainWindow`, so "an existing design" is genuinely another document). The **carried census note resolves** — `_copy_spec` + `_perimeter_span` deleted, so P4.5 inherits the binding/outline duality with its clipboard consumer resolved; register row 37 closed with `^H`. Census 576 → 598.* | ruff + pytest |
 | ☑ | **P4.5** Group semantics + z-order — *ticked 2026‑08‑06 on Patrick's mini-gate (**all ten items run and passed**, including item 10 — Align to grid and Distribute on a plan with shared party walls — and the cross-cutting dashed-edge watch) and the reviewer's acceptance. Merged at **PR #10** (merge commit `4b379fc`; 45 sub-commits `fbbebf4` … `1c6ff61`). Acceptance met on all five: `test_group_survives_roundtrip` flips xfail → pass (defect 3); `test_a_clipped_band_leaves_every_room_coherent` passes **as a consequence of the mechanism, not as a fix** (§2a's required wording, and literally true — a split simply stopped happening); `…_still_copies_them` rewritten into its opposite; the three duplicate-on-group tests replaced; the twenty-room test widened to **creates no OBJECTS at all**. Headline number: group the whole 20-room plan, move, ungroup → **189 → 189 scene items, zero new objects**, against the review's ≥106 duplicate walls and ≥149 duplicate openings on that same gesture. Defects 3, 11a and 23 closed; register row 36 closed at source; rows 47, 48, 49 filed. The P3.1 split-on-write shim retired entirely, its guarantee moved to the gate (`end_assign=0`). Census 619 → 633, xfails 2 → 1 (the survivor is deliberate, against row 47).*<br><br>**⚠ CARVE-OUT — DEFECT 11 IS ONLY HALF CLOSED, and this row says so rather than letting the tick imply otherwise.** P4.5's charter named the z-order collapse. **11a landed** — a room raised on a ghost floor no longer escapes its floor band (measured z −99996 → +10 against an active floor at 4; fixed by re-basing the raise into the item's own band, openings deliberately exempt). **THE RUNTIME COLLAPSE DID NOT LAND.** It hangs `test_drag_split_macro_keeps_every_room_rectilinear` at the first drag, bisected to `geometry.py`, trigger is the MAGNITUDE of the z step (`×1.0` completes, `×Z_STACK_BAND` hangs); the work was reverted and nothing of it is on the branch. **The agreed rule carries forward intact (ruling 4, unchanged): z = `floor_term + stack_term + type_term`, the backdrop's −1e9 becomes a TYPE TERM rather than a magic number, `bring_to_front`'s full-scene max scan dies with it, and the band arithmetic becomes NAMED CONSTANTS with the inequality `max(type_term) < STACK_BAND` and `max(stack_term) < FLOOR_BAND` written beside them and PINNED BY A TEST** — otherwise it is three schemes again the first time someone raises a type constant. Proposed next step unchanged: instrument the drag with a bounded event counter to find the consumer, rather than choosing constants to avoid a symptom. **The SERIALIZATION half stays blocked** on the schema ruling (v5 has no stacking-index field and all four objects set `additionalProperties: false`), and returns to Patrick as its own decision. **Both halves go to the post-P4.5 queue, second after row 47.** | ruff + pytest |
 | | **▲ PHASE 4 COMPLETE — 2026‑08‑06.** P4.1, P4.1b, P4.2, P4.3, P4.4 and P4.5 all merged and ticked (PRs #2, #3, #4, #5, #6, #10). Rooms are movable units, groups move the real items, the split-on-write shim is gone, and `main` is green on py3.10, py3.13, the deep-invariants job and ruff. **Carried out of the phase, not silently dropped:** defect 11's runtime z-order collapse (see the P4.5 row) and register rows 47, 48, 49. | |
-| ☐ | **P5.1** Site levels, categories, area accounting | ruff + pytest |
-| ☐ | **P5.2** Landscape wall types + gates | ruff + pytest |
-| ☐ | **P5.3** Site schedule fields + reports | ruff + pytest |
-| ☐ | **P6.1** `QUndoStack` + commands | ruff + pytest |
-| ☐ | **P6.2** Retire snapshot undo | ruff + pytest |
-| ☐ | **P6.3** Scene index + viewport update final pass | ratios recorded |
 
 ---
 

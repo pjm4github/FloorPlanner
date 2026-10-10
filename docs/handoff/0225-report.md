@@ -1,5 +1,7 @@
 # 0225 — report: PR #76 merged on his word with the gable-end tranche folded in — the D67 pair and the open gable ends; D67 CLOSED
 
+**Landed:** PR #76 · cdc54de · 2026-10-07 · — · see this report
+
 **Code, 2026‑10‑07.** The record ([`0197-ruling.md`](0197-ruling.md) §7).
 [`0223`](0223-report.md) put the D67 pair to him on `d67-floor-scope`
 (PR #76) and [`0224`](0224-report.md) the gable-end tranche on

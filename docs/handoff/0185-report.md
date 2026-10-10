@@ -1,5 +1,7 @@
 # 0185 — report: R4g closed and merged on his word; where the roofline plan stands for the next session
 
+**Landed:** PR #60 · c52396b · 2026-09-13 · — · see this report
+
 **Patrick, 2026‑09‑13, on [`0184`](0184-report.md):** *"that looks
 absolutely perfect!"* — the short-ridge fixture's 3D view and plan. On
 that word PR #60 (`roofs-r4g-full-footprint`) was landed on `main` at
