@@ -80,8 +80,62 @@ def test_convert_raises_valueerror_not_systemexit_on_a_non_v5_doc(tmp_path):
     """pytest.raises(ValueError) does NOT catch SystemExit (it is not an
     Exception subclass) -- if the old bug were present this test would
     ERROR, not pass, which is the differential this receipt needs."""
-    with pytest.raises(ValueError, match="v5"):
+    with pytest.raises(ValueError, match="version 5 or 6"):
         convert({"format": "x"}, tmp_path / "out.pdf", _MINIMAL_META)
+
+
+# ---------------------------------------------------------------------------
+# (2b) a version-6 document -- a plan with a roof -- converts
+# ---------------------------------------------------------------------------
+
+def _rect_doc_with_roof():
+    """`_rect_doc` as `design_document()` writes it the moment the plan has a
+    roof: `version` 6 and a `roofs` block (the schema's own enum; R-B)."""
+    doc = _rect_doc()
+    doc["version"] = 6
+    doc["roofs"] = [{"id": "rf1", "level": _MINIMAL_LEVEL["id"],
+                     "ridge": [[0.0, 100.0], [300.0, 100.0]],
+                     "eaves_h_in": 96.0, "ridge_h_in": 132.0, "overhang_in": 12.0,
+                     "span_in": [100.0, 100.0], "gable": [True, True]}]
+    return doc
+
+
+def test_a_version_6_document_with_a_roof_converts(tmp_path):
+    """Patrick, 2026-10-11: *"When I try and save them it says 'This is not
+    version 5'"* -- every plan of his with a roof is written as version 6
+    and was refused here. The plan sheets do not draw roofs, so a 6 reads
+    exactly as a 5: same sheets, no warning."""
+    pytest.importorskip("reportlab")
+    out = tmp_path / "out.pdf"
+    result = convert(_rect_doc_with_roof(), out, _MINIMAL_META)
+    assert out.exists() and result.sheets == ["sheet P1: Main"] and result.warnings == []
+
+
+def test_a_version_the_schema_does_not_know_is_still_refused(tmp_path):
+    doc = _rect_doc()
+    doc["version"] = 7
+    with pytest.raises(ValueError, match="version=7"):
+        convert(doc, tmp_path / "out.pdf", _MINIMAL_META)
+
+
+def test_the_app_exports_a_plan_with_a_roof(fp, win, tmp_path):
+    """His exact path: File > Export > PDF plan set on a plan with a roof.
+    `design_document()` writes version 6; the export must write the file,
+    not the status line's "PDF export failed"."""
+    pytest.importorskip("reportlab")
+    from PyQt6.QtCore import QPointF
+    win.prepare_headless()
+    res = win.run_macro("WALL 0 0 300 0 ext WALL 300 0 300 200 ext "
+                        "WALL 300 200 0 200 ext WALL 0 200 0 0 ext")
+    assert res["ok"], res
+    roof = fp.RoofItem(QPointF(0.0, 100.0), QPointF(300.0, 100.0))
+    win.scene.addItem(roof)
+    assert win.design_document()["version"] == 6, "the plan with a roof is a 6"
+    out = tmp_path / "plan.pdf"
+    result = win.export_pdf_path(str(out), _MINIMAL_META, interactive=False)
+    assert result is not None, win.statusBar().currentMessage()
+    assert out.exists() and out.stat().st_size > 0
+    assert "failed" not in win.statusBar().currentMessage().lower()
 
 
 # ---------------------------------------------------------------------------

@@ -137,6 +137,21 @@ def _one_opening_doc(kind, door_type=None, hinge="v1", swings_toward="left"):
     }
 
 
+def test_a_version_6_document_with_a_roof_converts_and_7_is_refused(tmp_path):
+    """The same fault fp2pdf had, the same day (2026-10-11): a plan with a
+    roof is written as version 6 and was refused as "not v5"."""
+    doc = _one_opening_doc("door", door_type="hinged")
+    doc["version"] = 6
+    doc["roofs"] = [{"id": "rf1", "level": "L1", "ridge": [[0.0, 50.0], [200.0, 50.0]],
+                     "eaves_h_in": 96.0, "ridge_h_in": 132.0, "overhang_in": 12.0,
+                     "span_in": [50.0, 50.0], "gable": [True, True]}]
+    result = fp2dxf.convert(doc, tmp_path)
+    assert result is not None and list(tmp_path.glob("*.dxf"))
+    doc["version"] = 7
+    with pytest.raises(ValueError, match="version=7"):
+        fp2dxf.convert(doc, tmp_path)
+
+
 def test_door_symbol_dispatch_is_exhaustive_over_the_real_catalog():
     """0135-ruling.md sec2's own receipt: dispatch is exhaustive over
     `config.py:DOOR_TYPES` itself -- fails the moment a new catalog type

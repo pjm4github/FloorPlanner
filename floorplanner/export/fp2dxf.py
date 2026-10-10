@@ -550,9 +550,16 @@ class ConvertResult:
     warnings: list[str] = field(default_factory=list)
 
 
+#: the document versions this reader accepts -- the schema's own enum (5; 6 adds roofs)
+SUPPORTED_VERSIONS = (5, 6)
+
+
 def convert(doc: dict, outdir: Path, only_levels=None,
             thickness_overrides=None) -> ConvertResult:
-    if doc.get("format") != "floorplanner-design" or doc.get("version") != 5:
+    if doc.get("format") != "floorplanner-design" or doc.get("version") not in SUPPORTED_VERSIONS:
+        # version 6 = 5 plus an optional `roofs` block (the schema's enum);
+        # a plan with a roof was refused here until 2026-10-11 (fp2pdf.py
+        # says why, the same fault, the same day)
         # A NORMAL EXCEPTION, NOT `raise SystemExit` (0038-ruling.md SS4):
         # this is a library call from a Qt menu handler as well as the CLI,
         # and an unhandled exception inside a Qt override presents as a
@@ -560,7 +567,9 @@ def convert(doc: dict, outdir: Path, only_levels=None,
         # THAT is catchable. `SystemExit` inside a Qt call stack is not
         # something a `try/except Exception` around the menu action would
         # even see coming.
-        raise ValueError("not a floorplanner-design v5 document")
+        raise ValueError(
+            f"not a floorplanner-design document of version 5 or 6 "
+            f"(format={doc.get('format')!r}, version={doc.get('version')!r})")
     ctx = Ctx(doc)
     if thickness_overrides:
         ctx.thickness.update(thickness_overrides)

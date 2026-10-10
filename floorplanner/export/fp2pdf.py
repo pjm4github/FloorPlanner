@@ -944,15 +944,27 @@ class ConvertResult:
     warnings: list[str] = field(default_factory=list)
 
 
+#: the document versions this reader accepts -- the schema's own enum: 5, and
+#: 6 = 5 plus an optional `roofs` block, which the plan sheets do not draw
+SUPPORTED_VERSIONS = (5, 6)
+
+
 def convert(doc, out: Path, meta, only_levels=None,
             thickness_overrides=None, include_concept=False) -> ConvertResult:
-    if doc.get("format") != "floorplanner-design" or doc.get("version") != 5:
+    if doc.get("format") != "floorplanner-design" or doc.get("version") not in SUPPORTED_VERSIONS:
+        # VERSION 6 IS VERSION 5 PLUS AN OPTIONAL `roofs` BLOCK (the schema's
+        # own enum, R-B; `design_document()` writes 6 the moment a plan has a
+        # roof). Patrick, 2026-10-11: "When I try and save them it says
+        # 'This is not version 5'" -- every plan of his with a roof was
+        # refused here. The plan sheets do not draw roofs, so a 6 reads as a 5.
         # A NORMAL EXCEPTION, NOT `raise SystemExit` (0038-ruling.md sec4 /
         # 0072-ruling.md sec2(2)): this is a library call from a Qt menu
         # handler as well as the CLI, and `SystemExit` inside a Qt call
         # stack is not something a `try/except Exception` around the menu
         # action would even see coming.
-        raise ValueError("not a floorplanner-design v5 document")
+        raise ValueError(
+            f"not a floorplanner-design document of version 5 or 6 "
+            f"(format={doc.get('format')!r}, version={doc.get('version')!r})")
     try:
         # DEFERRED, NOT A MODULE-TOP IMPORT (0072-ruling.md sec2(4) / D40):
         # reportlab is optional (requirements-viewer.txt's own precedent --

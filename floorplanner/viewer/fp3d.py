@@ -2237,8 +2237,8 @@ def main(argv=None):
 
     with open(a.design) as fh:
         doc = json.load(fh)
-    if doc.get("format") != "floorplanner-design" or doc.get("version") != 5:
-        print(f"warning: {a.design} is not a v5 design document "
+    if doc.get("format") != "floorplanner-design" or doc.get("version") not in (5, 6):
+        print(f"warning: {a.design} is not a v5/v6 design document "
               f"(format={doc.get('format')!r} version={doc.get('version')!r})",
               file=sys.stderr)
 

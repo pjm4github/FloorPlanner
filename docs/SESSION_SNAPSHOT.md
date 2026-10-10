@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 0d1e91b -->
+<!-- SNAPSHOT-HEAD: 81bf88d -->
 
 # Session snapshot — read this first
 
@@ -74,7 +74,7 @@ must not be trusted over it.
 > `git show 52a2870:docs/SESSION_SNAPSHOT.md`. **Keep it this size:** when a
 > tranche closes, REPLACE its entry with one line and a link; do not append.
 
-**NOTHING IS OPEN ON A BRANCH. THE 3‑INCH REACH IS CLOSED AND MERGED** —
+**ONE BRANCH IS OPEN, `pdf-v6`, GREEN, merging on green CI: the PDF and DXF exporters accept version 6 — every plan with a roof was refused as "not v5" (D87, [`0235`](handoff/0235-report.md)). THE 3‑INCH REACH IS CLOSED AND MERGED** —
 [PR #71](https://github.com/pjm4github/FloorPlanner/pull/71) landed on `main`
 by this merge commit on Patrick's word (2026‑10‑04: "OK that fix is good. commit and push # 71."),
 the branch deleted in the merge step; recorded at
@@ -248,10 +248,10 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`0d1e91b`** at this file's cut — the status board merged (PR #78, GREEN, on green CI); this commit lands [`0234-report.md`](handoff/0234-report.md), the record of that merge, with the first `**Landed:**` line written at a landing. **The queue 0211 §4 opened is empty; his word on what is named.** Every PR through #78 is merged (#59 was closed, superseded by #60). |
-| **Branches** | **None open.** Only `main` on the remote; `status-board` was deleted in the merge step, local and remote. |
+| **`main`** | **`81bf88d`** at this file's cut — the status board merged and recorded ([`0234`](handoff/0234-report.md)); this commit, on `pdf-v6`, is D87's fix ([`0235`](handoff/0235-report.md) records it on `main`). Every PR through #78 is merged (#59 was closed, superseded by #60). |
+| **Branches** | **One open: `pdf-v6`** — the exporters accept version 6 (D87); GREEN, merges on green CI. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **86 records, 31 open** (D67 CLOSED 2026‑10‑07, `closed_by cdc54de`, [`0225`](handoff/0225-report.md); D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
+| **Records** | **87 records, 31 open** (D87 filed and CLOSED 2026‑10‑11 in its own tranche; D67 CLOSED 2026‑10‑07, `closed_by cdc54de`, [`0225`](handoff/0225-report.md); D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |
