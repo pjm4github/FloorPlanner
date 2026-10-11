@@ -375,5 +375,6 @@ this table is not a second copy of it.
 | [`0233-report.md`](./0233-report.md) | report: the status board built — `docs/STATUS.md` generated from one `**Landed:**` line per merge, gate-checked; 77 PRs on the board from #1; the migration table frozen; the pair table generated; the mailbox is the record |
 | [`0234-report.md`](./0234-report.md) | report: PR #78 merged on green CI — the status board is on `main`, and this is the first landing recorded by its own line |
 | [`0235-report.md`](./0235-report.md) | report: the PDF (and DXF) exporters refused every plan with a roof — a version‑6 document read as "not v5"; fixed on `pdf-v6`, D87 filed and closed with it |
+| [`0236-report.md`](./0236-report.md) | report: PR #79 merged on green CI — the PDF and DXF exporters accept a plan with a roof; D87 closed |
 
 <!-- PAIRS:END -->
