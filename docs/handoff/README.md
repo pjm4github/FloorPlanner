@@ -392,5 +392,6 @@ this table is not a second copy of it.
 | [`0250-report.md`](./0250-report.md) | report: the house regenerated from the first-floor plan (iteration 6); a shed's ends are never joined — found on it, fixed on `roof-shed-form`; PR #82 updated, one commit |
 | [`0251-report.md`](./0251-report.md) | report: PR #82 merged on his word — the `shed` roof form, a shed's ends never joined, a dormer's generated side or face yielding to a house wall; 0248's plans A and C closed |
 | [`0252-report.md`](./0252-report.md) | report: 0248's plans B and D built on `roof-openings-ridge-meet` — openings on a dormer record, cut into its generated face; the equal-height ridge meeting in the clip; the viewer's `--shot` given a viewpoint; AMBER, for his check |
+| [`0253-report.md`](./0253-report.md) | report: PR #83 merged on his word — openings on a dormer record, the equal-height ridge meeting, the app's 3D view taking a shot; 0248's plans B and D closed; iteration 10 of the house ordered |
 
 <!-- PAIRS:END -->
