@@ -402,12 +402,19 @@ class RoofGeom:
         takes `span_fallback` both sides -- the caller decides what that
         is (fp3d's own nearest-wall search)."""
         ridge = rec["ridge"]
-        return cls(Pt(ridge[0][0], ridge[0][1]), Pt(ridge[1][0], ridge[1][1]),
-                   rec.get("span_in", span_fallback),
-                   rec.get("overhang_in", 0.0) or 0.0,
-                   rec.get("ridge_h_in", 132.0), rec.get("eaves_h_in", 96.0),
-                   rec.get("gable") or [True, True], rec.get("id"),
-                   rec.get("marker_end", 1))
+        g = cls(Pt(ridge[0][0], ridge[0][1]), Pt(ridge[1][0], ridge[1][1]),
+                rec.get("span_in", span_fallback),
+                rec.get("overhang_in", 0.0) or 0.0,
+                rec.get("ridge_h_in", 132.0), rec.get("eaves_h_in", 96.0),
+                rec.get("gable") or [True, True], rec.get("id"),
+                rec.get("marker_end", 1))
+        # 0248 plan A: a shed has no right plane -- its right span and
+        # overhang are 0 whatever the record says (the item clamps them)
+        g.form = rec.get("form", "gable")
+        if g.form == "shed":
+            g.span_in = [float(g.span_in[0]), 0.0]
+            g.overhang_in = [float(g.overhang_in[0]), 0.0]
+        return g
 
     def marker_pt(self):
         return self.p2 if self.marker_end else self.p1
@@ -1110,6 +1117,16 @@ def compute_roof_clips(roofs, diag=None) -> dict:
     swallowed = {id(rf): [] for rf in live}
     domain = {id(rf): [footprints[id(rf)]] for rf in live}
     for rf in live:
+        if getattr(rf, "form", "gable") == "shed":
+            # A SHED'S ENDS ARE NEVER JOINED (0248 plan A, found on the house
+            # model's shed dormer): its ridge is its high edge and its plane
+            # is constant along it, so "extending" an end that stands inside
+            # a host runs the same plane sideways across the host -- a
+            # phantom the fixed point then prunes to BLANK ground, taking the
+            # host's own front strip with it (measured: the main roof lost
+            # 147 x 72 in beside the dormer). A shed's ends are its sides,
+            # faces in 3D; a shed against a main is a lean-to, not a join.
+            continue
         for end, pt in enumerate((rf.p1, rf.p2)):
             hosts = [other for other in live if other is not rf
                     and _contains(footprints[id(other)], pt)]

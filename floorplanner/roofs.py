@@ -1044,11 +1044,20 @@ class RoofItem(QGraphicsItem):
 
     def __init__(self, p1, p2, eaves_h_in=96.0, ridge_h_in=132.0,
                 overhang_in=0.0, gable=None, span_in=DEFAULT_HALF_SPAN_IN,
-                marker_end=1, eaves_bind="manual", host=None):
+                marker_end=1, eaves_bind="manual", host=None, form="gable"):
         super().__init__()
         # R5b: a DORMER is a roof with a host (the RoofItem it stands on);
         # its back end (`p2`) is derived against the host at every rebuild
         self.host = host
+        # 0248-report.md sec3 plan A: THE FORM. `"gable"` is the roof this
+        # class always was; `"shed"` is ONE plane off the ridge, down the
+        # LEFT side (`span_in[0]`) only -- the right side has no plane, so
+        # its span and overhang are held at 0 by the two setters below,
+        # whatever a grip or a dialog hands them. Every reader of the
+        # geometry already treats a zero side as a zero-width strip (the
+        # slopes guard it; the eave ends collapse onto the ridge), so a
+        # shed needs no second code path in the clip, the item or the mesh.
+        self.form = form if form in ("gable", "shed") else "gable"
         # READ-ONLY properties below, mutated only through `set_ridge` --
         # gate.py's own end-assignment census forbids `.p1 =`/`.p2 =`
         # project-wide (the retired wall split-on-write shim), and its
@@ -1060,9 +1069,9 @@ class RoofItem(QGraphicsItem):
         self.floor = active_floor()      # active floor (load overrides)
         self.eaves_h_in = float(eaves_h_in)
         self.ridge_h_in = float(ridge_h_in)
-        self._overhang_in = self._normalized_pair(overhang_in)
         self.gable = list(gable) if gable is not None else [True, True]
-        self._span_in = self._normalized_pair(span_in)
+        self.overhang_in = overhang_in           # the setters: a shed clamps
+        self.span_in = span_in
         self.marker_end = 1 if marker_end else 0   # R2b: which ridge end
         self.eaves_bind = eaves_bind if eaves_bind in ("manual", "room_top") \
             else "manual"                            # R4a: schema slot only
@@ -1100,7 +1109,10 @@ class RoofItem(QGraphicsItem):
 
     @span_in.setter
     def span_in(self, value):
-        self._span_in = self._normalized_pair(value)
+        pair = self._normalized_pair(value)
+        if getattr(self, "form", "gable") == "shed":
+            pair[1] = 0.0                       # a shed has no right plane
+        self._span_in = pair
 
     @property
     def overhang_in(self):
@@ -1108,7 +1120,24 @@ class RoofItem(QGraphicsItem):
 
     @overhang_in.setter
     def overhang_in(self, value):
-        self._overhang_in = self._normalized_pair(value)
+        pair = self._normalized_pair(value)
+        if getattr(self, "form", "gable") == "shed":
+            pair[1] = 0.0
+        self._overhang_in = pair
+
+    def set_form(self, form: str):
+        """Change the form; a shed drops its right span and overhang to 0,
+        a gable given back a right side takes the left span's value."""
+        form = form if form in ("gable", "shed") else "gable"
+        if form == self.form:
+            return
+        self.form = form
+        if form == "shed":
+            self.span_in = self._span_in           # the setter clamps
+            self.overhang_in = self._overhang_in
+        elif self._span_in[1] < 1.0:
+            self.span_in = [self._span_in[0], self._span_in[0]]
+        self.rebuild()
 
     @property
     def p1(self) -> QPointF:
@@ -1349,6 +1378,8 @@ class RoofItem(QGraphicsItem):
         cursor_n = scene_pt.x() * nx + scene_pt.y() * ny
         perp = wall_snap_len(cursor_n) - origin_n
         reach = perp if side == 0 else -perp
+        if side == 1 and self.form == "shed":
+            return                              # no right plane to drag
         spans = list(self._span_in)
         spans[side] = max(1.0, reach - self._overhang_in[side])
         self.span_in = spans

@@ -1035,6 +1035,13 @@ class RoofEndOnDialog(QDialog):
         # and nothing before R4c could correct it. Editable here so an
         # existing roof can be fixed without redrawing; R4c's eave-edge
         # grips will drag the same two values.
+        # -- 0248-report.md sec3 plan A: the form. A shed is one plane down
+        # the LEFT side; its right span and overhang are 0 and not editable.
+        self.cb_form = QComboBox()
+        self.cb_form.addItems(["Gable (two planes)", "Shed (one plane, left side)"])
+        self.cb_form.setCurrentIndex(1 if getattr(roof, "form", "gable") == "shed" else 0)
+        form.addRow("Form", self.cb_form)
+
         span_l, span_r = (float(v) for v in getattr(roof, "span_in", [144.0, 144.0]))
         self.sp_span_l = QDoubleSpinBox()
         self.sp_span_l.setRange(1.0, 1200.0)
@@ -1043,7 +1050,7 @@ class RoofEndOnDialog(QDialog):
         self.sp_span_l.setValue(span_l)
         form.addRow("Eaves span, left side", self.sp_span_l)
         self.sp_span_r = QDoubleSpinBox()
-        self.sp_span_r.setRange(1.0, 1200.0)
+        self.sp_span_r.setRange(0.0, 1200.0)      # 0 only ever holds on a shed
         self.sp_span_r.setDecimals(1)
         self.sp_span_r.setSuffix(" in")
         self.sp_span_r.setValue(span_r)
@@ -1138,6 +1145,8 @@ class RoofEndOnDialog(QDialog):
         self.sp_eaves.valueChanged.connect(lambda v: self._on_edit("eaves_h", v))
         self.sp_pitch.valueChanged.connect(lambda v: self._on_edit("pitch", v))
         self.ck_bind.toggled.connect(self._on_bind_toggled)
+        self._apply_form_to_widgets()
+        self.cb_form.currentIndexChanged.connect(lambda _i: self._on_form())
         self.sp_span_l.valueChanged.connect(lambda _v: self._on_span())
         self.sp_span_r.valueChanged.connect(lambda _v: self._on_span())
         self.sp_oh_l.valueChanged.connect(lambda v: self._on_overhang(0, v))
@@ -1309,6 +1318,34 @@ class RoofEndOnDialog(QDialog):
     def span_values(self):
         return [float(self.sp_span_l.value()), float(self.sp_span_r.value())]
 
+    # -- 0248 plan A: the form -------------------------------------------------
+    def form_value(self) -> str:
+        return "shed" if self.cb_form.currentIndex() == 1 else "gable"
+
+    def _apply_form_to_widgets(self):
+        """A shed's right side is 0 and locked; a gable's right side is
+        editable, and takes the left span when it was 0."""
+        shed = self.form_value() == "shed"
+        self._programmatic = True
+        was_empty = self.sp_span_r.value() < 1.0          # read before the minimum clamps it
+        self.sp_span_r.setMinimum(0.0 if shed else 1.0)   # before the value: 0 must be legal
+        if shed:
+            self.sp_span_r.setValue(0.0)
+            self.sp_oh_r.setValue(0.0)
+            self.ck_oh_same.setChecked(False)
+        elif was_empty:
+            self.sp_span_r.setValue(self.sp_span_l.value())
+        self._programmatic = False
+        for w in (self.sp_span_r, self.sp_oh_r, self.ck_oh_same):
+            w.setEnabled(not shed)
+        self.canvas.span_l, self.canvas.span_r = self.span_values()
+
+    def _on_form(self):
+        self._apply_form_to_widgets()
+        if self.binding is not None:
+            self._refresh_binding()
+        self._redraw()
+
     def _on_span(self):
         """A span edit moves the wall line on the drawing, changes the
         derived value (pitch is rise over the LEFT span), and -- while
@@ -1349,6 +1386,7 @@ class RoofEndOnDialog(QDialog):
         self-contained; nothing downstream re-derives it)."""
         self.roof.ridge_h_in = float(self.sp_ridge.value())
         self.roof.eaves_h_in = float(self.sp_eaves.value())
+        self.roof.form = self.form_value()        # before the spans: the setters clamp
         self.roof.span_in = self.span_values()
         self.roof.overhang_in = [float(self.sp_oh_l.value()),
                                  float(self.sp_oh_r.value())]

@@ -892,7 +892,7 @@ def _prism_slab(corners_xyz, drop, bottom_z=None, bottom_zs=None):
 DORMER_CHEEK_STEP_IN = 3.0   # the cheek follows the host's slope in pieces this long
 
 
-def _dormer_cheeks(dormer, host, roofclip_mod, t):
+def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=()):
     """THE DORMER'S SIDES, PROJECTED UP TO THE DORMER (Patrick, 2026-10-11,
     after the cheek risers went: *"the dormer sides should be generated so
     that they are projected up to the dormer."*). Along each side of the
@@ -952,6 +952,8 @@ def _dormer_cheeks(dormer, host, roofclip_mod, t):
             mid = Pt((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0)
             if not RC._contains(host_fp, mid):
                 continue                                          # nothing to stand on
+            if _on_a_wall(a, b, walls, RC):
+                continue                                          # plan C: the wall climbs
             ring = [a, b, Pt(b.x() + ix, b.y() + iy), Pt(a.x() + ix, a.y() + iy)]
             base = [RC.surface_height(host, v) - 1.0 for v in ring]   # an inch into the host slab
             parts.append(_prism_slab([(v.x(), -v.y(), top_z) for v in ring], 0.0,
@@ -959,7 +961,37 @@ def _dormer_cheeks(dormer, host, roofclip_mod, t):
     return parts
 
 
-def _dormer_face(dormer, host, roofclip_mod, t):
+def _on_a_wall(a, b, walls, roofclip_mod, tol=0.5):
+    """PLAN C (0248-report.md sec3): is plan segment `a`-`b` inside the body
+    of one of `walls` -- `[(p, q, thickness), ...]`, the house walls of the
+    dormer's level in plan -- both ends within half that wall's thickness
+    (plus `tol`) of its centreline? Then a house wall stands where the
+    dormer's side or face would be generated, and the generated piece
+    yields: the wall beneath a dormer climbs into it already
+    (`_wall_under_roofs`), with its own openings, and a generated piece on
+    the same line would bury them (his house model, 0248 sec2 items 2
+    and 3)."""
+    rc = roofclip_mod
+    sx, sy = b.x() - a.x(), b.y() - a.y()
+    sl = math.hypot(sx, sy)
+    if sl <= rc.EPS:
+        return False
+    for p, q, t in walls or ():
+        reach = t / 2.0 + tol
+        if (rc._dist_to_segment(a, p, q) > reach
+                or rc._dist_to_segment(b, p, q) > reach):
+            continue
+        # ALONG the wall, not across it: a cheek that merely ends against a
+        # wall standing across its line (R2's cheeks at the eaves wall) is
+        # not on that wall
+        wx, wy = q.x() - p.x(), q.y() - p.y()
+        wl = math.hypot(wx, wy)
+        if wl > rc.EPS and abs(sx * wx + sy * wy) / (sl * wl) >= math.cos(math.radians(10.0)):
+            return True
+    return False
+
+
+def _dormer_face(dormer, host, roofclip_mod, t, walls=()):
     """THE DORMER'S FACE, WHEN IT STANDS ON THE ROOF (Patrick, 2026-10-11,
     on his `short-angle-roofR3.json`, the dormer set back from the eaves:
     *"the dormer ends look good when the outside wall beneath it is
@@ -985,43 +1017,52 @@ def _dormer_face(dormer, host, roofclip_mod, t):
     ux, uy, nx, ny = dormer._axis()
     ends = (dormer.p1, dormer.p2)
     rise = [dormer.ridge_h_in - RC.surface_height(host, e) for e in ends]
-    face = ends[0] if rise[0] >= rise[1] else ends[1]
-    sgn = 1.0 if face is ends[0] else -1.0                      # inward along the ridge
-    ix, iy = sgn * ux * t, sgn * uy * t
+    # the face is the end standing highest above the host; a SHED dormer
+    # (0248 plan A) has its high edge ON the host, both ends alike, and
+    # both are faces -- its two sides
+    top_rise = max(rise)
+    faces = [(e, 1.0 if k == 0 else -1.0) for k, e in enumerate(ends)
+             if rise[k] >= top_rise - RC.EPS]
     host_fp = RC.footprint_polygon(host)
     parts = []
-    for side, sign in ((0, 1.0), (1, -1.0)):
-        span = float(dormer.span_in[side])
-        n_seg = max(1, int(math.ceil(span / DORMER_CHEEK_STEP_IN)))
-        stations = [span * k / n_seg for k in range(n_seg + 1)]
+    for face, sgn in faces:
+        ix, iy = sgn * ux * t, sgn * uy * t                      # inward along the ridge
+        for side, sign in ((0, 1.0), (1, -1.0)):
+            span = float(dormer.span_in[side])
+            if span <= RC.EPS:
+                continue                                          # a shed's empty side
+            n_seg = max(1, int(math.ceil(span / DORMER_CHEEK_STEP_IN)))
+            stations = [span * k / n_seg for k in range(n_seg + 1)]
 
-        def at(s, sign=sign):
-            return Pt(face.x() + sign * nx * s, face.y() + sign * ny * s)
+            def at(s, sign=sign, face=face):
+                return Pt(face.x() + sign * nx * s, face.y() + sign * ny * s)
 
-        def gap(q):
-            return RC.surface_height(dormer, q) - 0.5 - RC.surface_height(host, q)
+            def gap(q):
+                return RC.surface_height(dormer, q) - 0.5 - RC.surface_height(host, q)
 
-        for s0, s1 in zip(stations, stations[1:], strict=False):
-            a, b = at(s0), at(s1)
-            ga, gb = gap(a), gap(b)
-            if ga <= RC.EPS and gb <= RC.EPS:
-                continue                                          # the host is above
-            if (ga > 0) != (gb > 0):                              # the host meets the rake
-                f = ga / (ga - gb)
-                cut = Pt(a.x() + (b.x() - a.x()) * f, a.y() + (b.y() - a.y()) * f)
-                if ga > 0:
-                    b = cut
-                else:
-                    a = cut
-            if math.hypot(b.x() - a.x(), b.y() - a.y()) <= RC.EPS:
-                continue
-            mid = Pt((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0)
-            if not RC._contains(host_fp, mid):
-                continue                                          # nothing to stand on
-            ring = [a, b, Pt(b.x() + ix, b.y() + iy), Pt(a.x() + ix, a.y() + iy)]
-            top = [(v.x(), -v.y(), RC.surface_height(dormer, v) - 0.5) for v in ring]
-            base = [RC.surface_height(host, v) - 1.0 for v in ring]
-            parts.append(_prism_slab(top, 0.0, bottom_zs=base))
+            for s0, s1 in zip(stations, stations[1:], strict=False):
+                a, b = at(s0), at(s1)
+                ga, gb = gap(a), gap(b)
+                if ga <= RC.EPS and gb <= RC.EPS:
+                    continue                                      # the host is above
+                if (ga > 0) != (gb > 0):                          # the host meets the rake
+                    f = ga / (ga - gb)
+                    cut = Pt(a.x() + (b.x() - a.x()) * f, a.y() + (b.y() - a.y()) * f)
+                    if ga > 0:
+                        b = cut
+                    else:
+                        a = cut
+                if math.hypot(b.x() - a.x(), b.y() - a.y()) <= RC.EPS:
+                    continue
+                mid = Pt((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0)
+                if not RC._contains(host_fp, mid):
+                    continue                                      # nothing to stand on
+                if _on_a_wall(a, b, walls, RC):
+                    continue                                      # plan C: the wall climbs
+                ring = [a, b, Pt(b.x() + ix, b.y() + iy), Pt(a.x() + ix, a.y() + iy)]
+                top = [(v.x(), -v.y(), RC.surface_height(dormer, v) - 0.5) for v in ring]
+                base = [RC.surface_height(host, v) - 1.0 for v in ring]
+                parts.append(_prism_slab(top, 0.0, bottom_zs=base))
     return parts
 
 
@@ -2036,11 +2077,24 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 # wall material, emitted with the exterior walls below
                 host_of = {rf.get("id"): rf.get("host") for rf in doc.get("roofs", [])}
                 cheek_t = float(WALL_T.get("exterior", 6.0))
-                for rid, _lid, _g, lf in every:
+                # plan C: the house walls of each level, in plan, with their
+                # thickness -- a generated side or face yields to one
+                plan_walls = {}
+                for w in walls:
+                    try:
+                        a, b = vx[w["v1"]], vx[w["v2"]]
+                    except KeyError:
+                        continue
+                    wt = float(w.get("thickness_in") or WALL_T.get(w.get("type", "interior"), 4.5))
+                    plan_walls.setdefault(w.get("level"), []).append(
+                        (ROOFCLIP.Pt(float(a["x"]), float(a["y"])),
+                         ROOFCLIP.Pt(float(b["x"]), float(b["y"])), wt))
+                for rid, lid, _g, lf in every:
                     host_lf = lifted_of.get(host_of.get(rid))
                     if host_lf is not None:
-                        cheek_parts.extend(_dormer_cheeks(lf, host_lf, ROOFCLIP, cheek_t))
-                        cheek_parts.extend(_dormer_face(lf, host_lf, ROOFCLIP, cheek_t))
+                        near = plan_walls.get(lid, [])
+                        cheek_parts.extend(_dormer_cheeks(lf, host_lf, ROOFCLIP, cheek_t, near))
+                        cheek_parts.extend(_dormer_face(lf, host_lf, ROOFCLIP, cheek_t, near))
             if every:
                 # 0174-report.md's own honestly-measured residual, closed
                 # here rather than in roofclip.py: the joining-end
@@ -2299,14 +2353,32 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             edge_z_neg = z0 + edge_h_neg
             r1 = (p1[0], p1[1], ridge_z)
             r2 = (p2[0], p2[1], ridge_z)
-            e_pos1 = (a1[0] + nx * reach_pos, a1[1] + ny * reach_pos, edge_z_pos)
-            e_pos2 = (a2[0] + nx * reach_pos, a2[1] + ny * reach_pos, edge_z_pos)
-            e_neg1 = (a1[0] - nx * reach_neg, a1[1] - ny * reach_neg, edge_z_neg)
-            e_neg2 = (a2[0] - nx * reach_neg, a2[1] - ny * reach_neg, edge_z_neg)
 
-            # the two roof planes -- one on each side of the ridge
-            roof_parts.append(_prism_slab([r1, r2, e_pos2, e_pos1], ROOF_T))
-            roof_parts.append(_prism_slab([r1, e_neg1, e_neg2, r2], ROOF_T))
+            def corner(a, sign, reach, edge_z, end, ext=ext, hip_run=hip_run, z0=z0,
+                       ridge_h=ridge_h, eaves_h=eaves_h, nx=nx, ny=ny):
+                # (loop variables bound as defaults: the repo's idiom, B023)
+                # a side with no plane (a SHED's right side, 0248 plan A)
+                # has its corner ON the ridge line -- and at a hip end that
+                # corner sits on the HIP plane, which descends along the
+                # ridge line too, exactly as `surface_height` says beyond
+                # the ridge end (the clipped path already builds it so);
+                # at ridge height the hip face would be a flat shelf
+                if reach <= 1e-6 and ext[end] > 1e-6 and hip_run > 1e-6:
+                    return (a[0], a[1], z0 + ridge_h - (ridge_h - eaves_h) / hip_run * ext[end])
+                return (a[0] + sign * nx * reach, a[1] + sign * ny * reach, edge_z)
+
+            e_pos1 = corner(a1, 1.0, reach_pos, edge_z_pos, 0)
+            e_pos2 = corner(a2, 1.0, reach_pos, edge_z_pos, 1)
+            e_neg1 = corner(a1, -1.0, reach_neg, edge_z_neg, 0)
+            e_neg2 = corner(a2, -1.0, reach_neg, edge_z_neg, 1)
+
+            # the two roof planes -- one on each side of the ridge; a
+            # SHED (0248 plan A) has only the left one, its right reach 0,
+            # and a zero-width slab is not built (a degenerate ring)
+            if reach_pos > 1e-6:
+                roof_parts.append(_prism_slab([r1, r2, e_pos2, e_pos1], ROOF_T))
+            if reach_neg > 1e-6:
+                roof_parts.append(_prism_slab([r1, e_neg1, e_neg2, r2], ROOF_T))
 
             # the end faces: (R4b) a hip end's sloped face, one triangle
             # with its apex at the ridge end. A GABLE END IS OPEN (Patrick,

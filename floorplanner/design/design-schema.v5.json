@@ -154,8 +154,12 @@
         "ridge_h_in": { "description": "Ridge height, same base datum as `eaves_h_in`. PITCH IS DERIVED from these two heights and the ridge-to-eaves horizontal run -- never stored, so a dialog showing a live pitch and one accepting a typed pitch are the same control recomputing whichever height is unlocked, not two facts that can disagree.", "type": "number" },
         "span_in": {
           "description": "R4a (0154-ruling.md): perpendicular distance from the ridge to the eaves-START line (the plane `eaves_h_in` applies at), per side -- [left, right], where LEFT is the ridge's own +90deg-rotated-in-plan normal and RIGHT is the opposite side; a ridge-relative side, unrelated to the `ridge`-endpoint index `gable`/`marker_end` use. Independent per side so the ridge need not sit centred over what it covers -- with one `ridge_h_in`/`eaves_h_in` pair, unequal sides give unequal pitch (a saltbox), legal as of this tranche. NOT required: a document written before R4a has no such field, and carries the pre-R4a behaviour of re-deriving one shared span from the nearest parallel wall every load -- `apply_design_to_scene` does that once, materialises the result as `[span, span]` on the live roof, and a subsequent save writes it, so a reload never re-derives again.",
-          "type": "array", "prefixItems": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "number", "exclusiveMinimum": 0 }],
+          "type": "array", "prefixItems": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "number", "minimum": 0 }],
           "minItems": 2, "maxItems": 2
+        },
+        "form": {
+          "description": "0248-report.md sec3 plan A: the roof's form. `gable` (default) -- two planes off the ridge, one per side. `shed` -- ONE plane: the ridge is the high edge and the roof descends to the LEFT side only (`span_in[0]`); the right side has no plane, so `span_in[1]` and `overhang_in[1]` are 0 (the only form for which a zero span is legal -- see the conditional below). A shed dormer (a shed with a `host`) stands with its high edge on the host plane and its face at the low edge; both ridge ends are faces. Hip flags apply to a shed as to a gable. Additive optional (ROADMAP R-B): no version bump.",
+          "type": "string", "enum": ["gable", "shed"], "default": "gable"
         },
         "overhang_in": {
           "description": "Eave overhang, plan-perpendicular from the ridge's own footprint, per side -- [left, right], same side convention as `span_in`. R4a migrates a pre-R4a document's single number to `[v, v]` on load (both sides took the one value); the array form is what a document written from here on always carries.",
@@ -182,7 +186,9 @@
           "description": "R5b (0191-ruling.md sec1): the id of the roof this roof STANDS ON -- present only on a DORMER, and its presence is what makes one: a dormer is a roof record like any other (ridge, heights, spans, gable flags), reusing every writer, loader, clip and mesh a roof has, with two derived facts on top. `ridge[0]` is the FACE (the front, where the End-On marker sits, `marker_end` 0); `ridge[1]` is DERIVED -- the point along the ridge line where the host's surface rises to `ridge_h_in` -- and still written here so the document is self-contained (the `eaves_bind` discipline: re-derived by the app on any edit of the dormer or its host, never on load). The two cheeks (along the eaves-start lines, back to where the eaves meet the host plane) and the face are derived geometry, not `walls` records. Must name a roof on the same level; a dangling host is reported and the record skipped on load, never a silent floating roof. Additive optional (ROADMAP R-B): no version bump.",
           "$ref": "#/$defs/id"
         }
-      }
+      },
+      "if": { "properties": { "form": { "const": "shed" } }, "required": ["form"] },
+      "else": { "properties": { "span_in": { "prefixItems": [{}, { "exclusiveMinimum": 0 }] } } }
     },
 
     "vertex": {

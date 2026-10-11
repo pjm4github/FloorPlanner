@@ -222,7 +222,7 @@ class Roof(_Node):
                         ("eaves_h_in", RAW), ("ridge_h_in", RAW),
                         ("overhang_in", RAW), ("span_in", RAW),
                         ("eaves_bind", RAW), ("gable", RAW),
-                        ("marker_end", RAW), ("host", RAW)]
+                        ("marker_end", RAW), ("host", RAW), ("form", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     ridge: Any = _MISSING
@@ -237,6 +237,9 @@ class Roof(_Node):
     # of the roof it stands on. OPTIONAL; presence is what makes it a
     # dormer. Additive (ROADMAP R-B), no version bump.
     host: Any = _MISSING
+    # 0248-report.md sec3 plan A: `"gable"` (default) or `"shed"` -- one plane
+    # off the ridge, down the left side only. OPTIONAL, omitted when gable.
+    form: Any = _MISSING
 
 
 @dataclass
