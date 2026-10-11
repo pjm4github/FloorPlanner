@@ -379,5 +379,6 @@ this table is not a second copy of it.
 | [`0237-report.md`](./0237-report.md) | report: his `short-angle-roof.json` — a joined end's extension given ground in every roof's footprint, drawn across roofs it never reached; fixed on `roof-joined-domain`, D88; and what the lock-up measurement found before he redirected it |
 | [`0238-report.md`](./0238-report.md) | report: PR #80 merged on his word — the joined end's extension grounded in its hosts' footprints; D88 closed; his next rule, the gable end that projects UP, read back before anything is built |
 | [`0239-report.md`](./0239-report.md) | READ-BACK: the gable end that projects UP — what his design shows at the west junction, the mechanism, and the rule as I read it; nothing built |
+| [`0240-report.md`](./0240-report.md) | report: his word on 0239 — "the wall loop test is right", the build ordered; the state saved for a fresh session |
 
 <!-- PAIRS:END -->
