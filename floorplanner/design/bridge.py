@@ -838,6 +838,8 @@ def _roofs_of(items, lid, nid, src=None):
                "marker_end": 1 if it.marker_end else 0}
         if getattr(it, "form", "gable") != "gable":   # plan A: omitted when gable
             rec["form"] = it.form
+        if getattr(it, "openings", None):             # plan B: a dormer's face openings
+            rec["openings"] = [dict(o) for o in it.openings]
         if src is not None:
             src[rec["id"]] = it
         by_item[id(it)] = rec
@@ -1411,7 +1413,8 @@ def apply_design_to_scene(target, design, report=None, strict=False,
                         span_in=span_in,
                         marker_end=int(rfd.get("marker_end", 1)),
                         eaves_bind=rfd.get("eaves_bind", "manual"),
-                        form=rfd.get("form", "gable"))
+                        form=rfd.get("form", "gable"),
+                        openings=rfd.get("openings"))
         item.floor = floor   # never the global
         scene.addItem(item)
         rep["roofs"] += 1

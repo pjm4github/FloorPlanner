@@ -10,7 +10,7 @@ Item {
         anchors.fill: parent
 
         environment: SceneEnvironment {
-            clearColor: "#85d258"
+            clearColor: "#ffffff"
             backgroundMode: SceneEnvironment.Color
             antialiasingMode: SceneEnvironment.MSAA
             antialiasingQuality: SceneEnvironment.High
@@ -24,13 +24,20 @@ Item {
 
         Node {
             id: origin
+            // a settable viewpoint (0252-report.md): the orbit's own two
+            // angles and a zoom, each 0 / 1 for the home view -- what
+            // `fp3dq.py --shot --yaw --pitch --zoom` sets, and what the
+            // OrbitCameraController goes on changing by mouse
+            eulerRotation.x: cfg.pitch
+            eulerRotation.y: cfg.yaw
             PerspectiveCamera {
                 id: camera
-                z: cfg.distance
-                y: cfg.distance * 0.45
+                z: cfg.distance * cfg.zoom
+                y: cfg.distance * 0.45 * cfg.zoom
                 clipNear: 1.0
                 clipFar: cfg.distance * 20
                 eulerRotation.x: -24
+                fieldOfView: cfg.fov          // 60 for the view; a shot may narrow it
             }
         }
 

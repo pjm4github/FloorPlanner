@@ -188,7 +188,7 @@ def model_status(model):
 
 
 def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
-                      parent=None):
+                      parent=None, yaw=0.0, pitch=0.0, zoom=1.0, fov=60.0):
     """The Qt Quick 3D scene for `model`, as a plain QWidget.
 
     Extracted from `main()` so the app can embed the same view it ships as a
@@ -248,14 +248,38 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
     class Cfg(QObject):
         """Scalars QML reads at load."""
 
-        def __init__(self, distance, ao, shadows, status):
+        def __init__(self, distance, ao, shadows, status, yaw=0.0, pitch=0.0, zoom=1.0,
+                     fov=60.0):
             super().__init__()
             self._d, self._ao = distance, ao
             self._s, self._t = shadows, status
+            self._yaw, self._pitch, self._zoom = float(yaw), float(pitch), float(zoom)
+            self._fov = float(fov)
 
         @pyqtProperty(float, constant=True)
         def distance(self):
             return self._d
+
+        # the viewpoint (0252-report.md): the orbit node's two angles and a
+        # zoom factor, 0 / 0 / 1 for the home view
+        @pyqtProperty(float, constant=True)
+        def yaw(self):
+            return self._yaw
+
+        @pyqtProperty(float, constant=True)
+        def pitch(self):
+            return self._pitch
+
+        @pyqtProperty(float, constant=True)
+        def zoom(self):
+            return self._zoom
+
+        @pyqtProperty(float, constant=True)
+        def fov(self):
+            # the camera's vertical field of view: 60 (Qt's default, the
+            # interactive view) or a shot's own -- a long lens, 25-30,
+            # with the camera farther back, for a less distorted picture
+            return self._fov
 
         @pyqtProperty(bool, constant=True)
         def ao(self):
@@ -284,7 +308,7 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
         alpha = m.color[3] if len(m.color) > 3 else 1.0
         entries.append(MeshEntry(g, col, float(alpha), rough, metal))
 
-    cfg = Cfg(span * 1.25, ao, shadows, model_status(model))
+    cfg = Cfg(span * 1.25, ao, shadows, model_status(model), yaw, pitch, zoom, fov)
     url = QUrl.fromLocalFile(QML_PATH)
 
     if container:
@@ -319,7 +343,20 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
     # under a live scene and the view goes black (or takes the process with
     # it). The widget owns them for exactly as long as it exists.
     w._keep = (entries, cfg)
+    w._surface = surface                    # what a shot grabs (QQuickWidget or QQuickView)
     return w
+
+
+def grab_quick_view(widget):
+    """The rendered image of a `Plan3DQuickWidget`: `grabFramebuffer()` on a
+    QQuickWidget, `grabWindow()` on a container's QQuickView. Both need the
+    scene to have rendered at least once -- the caller waits a few frames.
+    Needs a real display (D77): under the offscreen platform the image
+    comes back null, as the pyqtgraph viewer's does."""
+    surface = getattr(widget, "_surface", widget)
+    if hasattr(surface, "grabWindow"):
+        return surface.grabWindow()
+    return surface.grabFramebuffer()
 
 
 def main(argv=None):
@@ -334,6 +371,19 @@ def main(argv=None):
     ap.add_argument("--no-shadows", action="store_true")
     ap.add_argument("--no-furnishings", action="store_true")
     ap.add_argument("--level", action="append", default=None)
+    ap.add_argument("--shot", metavar="PATH",
+                    help="render to PNG and exit (needs a real display; 0252-report.md)")
+    ap.add_argument("--yaw", type=float, default=0.0,
+                    help="orbit the view this many degrees about the vertical (0: the home view)")
+    ap.add_argument("--pitch", type=float, default=0.0,
+                    help="tilt the orbit this many degrees (0: the home view, -24 deg down)")
+    ap.add_argument("--zoom", type=float, default=1.0,
+                    help="camera distance as a multiple of the home distance")
+    ap.add_argument("--fov", type=float, default=60.0,
+                    help="camera field of view in degrees for --shot (60: the view's own; "
+                         "25-30 with --zoom 1 or more for a less distorted picture)")
+    ap.add_argument("--shot-delay", type=int, default=600,
+                    help="milliseconds to let the scene render before the shot")
     a = ap.parse_args(argv)
 
     if a.check:
@@ -365,7 +415,8 @@ def main(argv=None):
     try:
         body = Plan3DQuickWidget(model, ao=not a.no_ao,
                                  shadows=not a.no_shadows,
-                                 container=a.container, parent=win)
+                                 container=a.container, parent=win,
+                                 yaw=a.yaw, pitch=a.pitch, zoom=a.zoom, fov=a.fov)
     except RuntimeError as exc:
         print("")
         print("QML did not load:")
@@ -376,6 +427,25 @@ def main(argv=None):
     win.setCentralWidget(body)
     win.resize(1200, 820)
     win.show()
+    if a.shot:
+        # let the scene render (AO and shadows take a frame or two), grab,
+        # report, and leave the event loop
+        from PyQt6.QtCore import QTimer
+        result = {}
+
+        def shoot():
+            img = grab_quick_view(body)
+            result["ok"] = (not img.isNull()) and img.save(a.shot)
+            app.quit()
+
+        QTimer.singleShot(a.shot_delay, shoot)
+        app.exec()
+        if result.get("ok"):
+            print(f"  wrote {a.shot}")
+            return 0
+        print(f"  could not write {a.shot}: the scene rendered no image "
+              f"(a real display is needed; see D77)")
+        return 3
     return app.exec()
 
 

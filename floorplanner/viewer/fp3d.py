@@ -892,7 +892,7 @@ def _prism_slab(corners_xyz, drop, bottom_z=None, bottom_zs=None):
 DORMER_CHEEK_STEP_IN = 3.0   # the cheek follows the host's slope in pieces this long
 
 
-def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=()):
+def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.0):
     """THE DORMER'S SIDES, PROJECTED UP TO THE DORMER (Patrick, 2026-10-11,
     after the cheek risers went: *"the dormer sides should be generated so
     that they are projected up to the dormer."*). Along each side of the
@@ -924,6 +924,10 @@ def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=()):
     length = dormer.length()
     top_z = dormer.eaves_h_in - 0.5
     host_fp = RC.footprint_polygon(host)
+    # plan B: a SHED dormer's front edge is its face -- its openings are
+    # cut into the side-0 cheek, `u` along the ridge from `ridge[0]`
+    shed = getattr(dormer, "form", "gable") == "shed"
+    bands = _face_openings(openings, length, z_base) if shed else []
     parts = []
     n_seg = max(1, int(math.ceil(length / DORMER_CHEEK_STEP_IN)))
     stations = [length * k / n_seg for k in range(n_seg + 1)]
@@ -931,33 +935,34 @@ def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=()):
         span = float(dormer.span_in[side])
         ox, oy = sign * nx * span, sign * ny * span              # the wall line
         ix, iy = -sign * nx * t, -sign * ny * t                  # inward, the thickness
+        side_bands = bands if side == 0 else []
 
         def at(s, ox=ox, oy=oy):
             return Pt(p1.x() + ux * s + ox, p1.y() + uy * s + oy)
 
         for s0, s1 in zip(stations, stations[1:], strict=False):
-            a, b = at(s0), at(s1)
-            ha, hb = RC.surface_height(host, a), RC.surface_height(host, b)
-            if ha >= top_z - RC.EPS and hb >= top_z - RC.EPS:
-                continue                                          # the host is above
-            if (ha < top_z) != (hb < top_z):                      # the host reaches the eaves
-                f = (top_z - ha) / (hb - ha)
-                cut = Pt(a.x() + (b.x() - a.x()) * f, a.y() + (b.y() - a.y()) * f)
-                if ha < top_z:
-                    b = cut
-                else:
-                    a = cut
-            if math.hypot(b.x() - a.x(), b.y() - a.y()) <= RC.EPS:
-                continue
-            mid = Pt((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0)
-            if not RC._contains(host_fp, mid):
-                continue                                          # nothing to stand on
-            if _on_a_wall(a, b, walls, RC):
-                continue                                          # plan C: the wall climbs
-            ring = [a, b, Pt(b.x() + ix, b.y() + iy), Pt(a.x() + ix, a.y() + iy)]
-            base = [RC.surface_height(host, v) - 1.0 for v in ring]   # an inch into the host slab
-            parts.append(_prism_slab([(v.x(), -v.y(), top_z) for v in ring], 0.0,
-                                     bottom_zs=base))
+            for sa, sb, band in _split_by_bands(s0, s1, lambda s: s, side_bands):
+                a, b = at(sa), at(sb)
+                ha, hb = RC.surface_height(host, a), RC.surface_height(host, b)
+                if ha >= top_z - RC.EPS and hb >= top_z - RC.EPS:
+                    continue                                      # the host is above
+                if (ha < top_z) != (hb < top_z):                  # the host reaches the eaves
+                    f = (top_z - ha) / (hb - ha)
+                    cut = Pt(a.x() + (b.x() - a.x()) * f, a.y() + (b.y() - a.y()) * f)
+                    if ha < top_z:
+                        b = cut
+                    else:
+                        a = cut
+                if math.hypot(b.x() - a.x(), b.y() - a.y()) <= RC.EPS:
+                    continue
+                mid = Pt((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0)
+                if not RC._contains(host_fp, mid):
+                    continue                                      # nothing to stand on
+                if _on_a_wall(a, b, walls, RC):
+                    continue                                      # plan C: the wall climbs
+                ring = [a, b, Pt(b.x() + ix, b.y() + iy), Pt(a.x() + ix, a.y() + iy)]
+                base = [RC.surface_height(host, v) - 1.0 for v in ring]   # an inch into the host slab
+                parts.extend(_face_pieces(ring, [top_z] * 4, base, band))
     return parts
 
 
@@ -991,7 +996,70 @@ def _on_a_wall(a, b, walls, roofclip_mod, tol=0.5):
     return False
 
 
-def _dormer_face(dormer, host, roofclip_mod, t, walls=()):
+def _face_openings(openings, length, z_base):
+    """A dormer's face openings as bands along the face, `[(u0, u1, sill_z,
+    head_z)]` with `u` from the face's left end (plan B, 0248 sec3): the
+    wall convention -- `opening_span` for the anchor, `parse_wwhh` for the
+    size, a window's sill `DEFAULT_SILL` unless the record says, a door's
+    0, the head the sill plus the height unless the record says. A record
+    that cannot be read is skipped (the wall path reports; a dormer has no
+    note channel here)."""
+    bands = []
+    for o in openings or ():
+        try:
+            w, h = parse_wwhh(o["code"])
+        except (KeyError, ValueError):
+            continue
+        u0, u1 = opening_span(o.get("anchor", {}), w, length)
+        u0, u1 = max(0.0, u0), min(length, u1)
+        if u1 - u0 <= 1e-6:
+            continue
+        sill = float(o.get("sill_in", 0.0 if o.get("kind") != "window" else DEFAULT_SILL))
+        head = float(o.get("head_in", sill + h))
+        bands.append((u0, u1, z_base + sill, z_base + head))
+    return bands
+
+
+def _split_by_bands(s0, s1, u_of, bands):
+    """Split station `[s0, s1]` (with `u_of(s)` linear) at every band edge
+    inside it: `[(sa, sb, band_or_None), ...]` in order."""
+    cuts = {s0, s1}
+    ua, ub = sorted((u_of(s0), u_of(s1)))
+    if ub - ua <= 1e-9:
+        return [(s0, s1, None)]
+    for u0, u1, _, _ in bands:
+        for u in (u0, u1):
+            if ua < u < ub:
+                cuts.add(s0 + (s1 - s0) * (u - u_of(s0)) / (u_of(s1) - u_of(s0)))
+    stations = sorted(cuts)
+    out = []
+    for sa, sb in zip(stations, stations[1:], strict=False):
+        um = u_of((sa + sb) / 2.0)
+        band = next((b for b in bands if b[0] - 1e-9 <= um <= b[1] + 1e-9), None)
+        out.append((sa, sb, band))
+    return out
+
+
+def _face_pieces(ring, top, base, band):
+    """The generated-face piece over plan `ring` with per-vertex `top` and
+    `base` z, cut by `band` (sill_z, head_z) -- the part under the sill and
+    the part over the head, as `_prism_slab` parts; the whole piece when
+    there is no band. A part thinner than half an inch is not built."""
+    if band is None:
+        return [_prism_slab([(v.x(), -v.y(), tz) for v, tz in zip(ring, top, strict=False)],
+                            0.0, bottom_zs=base)]
+    _u0, _u1, sill, head = band
+    parts = []
+    if sill > max(base) + 0.5:                              # under the sill
+        parts.append(_prism_slab([(v.x(), -v.y(), min(sill, tz)) for v, tz in zip(ring, top, strict=False)],
+                                 0.0, bottom_zs=base))
+    if head + 0.5 < min(top):                               # over the head
+        parts.append(_prism_slab([(v.x(), -v.y(), tz) for v, tz in zip(ring, top, strict=False)],
+                                 0.0, bottom_zs=[max(head, bz) for bz in base]))
+    return parts
+
+
+def _dormer_face(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.0):
     """THE DORMER'S FACE, WHEN IT STANDS ON THE ROOF (Patrick, 2026-10-11,
     on his `short-angle-roofR3.json`, the dormer set back from the eaves:
     *"the dormer ends look good when the outside wall beneath it is
@@ -1024,6 +1092,12 @@ def _dormer_face(dormer, host, roofclip_mod, t, walls=()):
     faces = [(e, 1.0 if k == 0 else -1.0) for k, e in enumerate(ends)
              if rise[k] >= top_rise - RC.EPS]
     host_fp = RC.footprint_polygon(host)
+    # plan B: the face's openings as bands along it, `u` from its LEFT end
+    # (the span_in[0] side) -- a gable dormer's one face carries them; a
+    # shed dormer's two ends do not (its openings are on its front edge,
+    # `_dormer_cheeks`)
+    span_l, span_r = float(dormer.span_in[0]), float(dormer.span_in[1])
+    bands = _face_openings(openings, span_l + span_r, z_base) if len(faces) == 1 else []
     parts = []
     for face, sgn in faces:
         ix, iy = sgn * ux * t, sgn * uy * t                      # inward along the ridge
@@ -1040,29 +1114,33 @@ def _dormer_face(dormer, host, roofclip_mod, t, walls=()):
             def gap(q):
                 return RC.surface_height(dormer, q) - 0.5 - RC.surface_height(host, q)
 
+            def u_of(s, side=side):
+                return span_l - s if side == 0 else span_l + s
+
             for s0, s1 in zip(stations, stations[1:], strict=False):
-                a, b = at(s0), at(s1)
-                ga, gb = gap(a), gap(b)
-                if ga <= RC.EPS and gb <= RC.EPS:
-                    continue                                      # the host is above
-                if (ga > 0) != (gb > 0):                          # the host meets the rake
-                    f = ga / (ga - gb)
-                    cut = Pt(a.x() + (b.x() - a.x()) * f, a.y() + (b.y() - a.y()) * f)
-                    if ga > 0:
-                        b = cut
-                    else:
-                        a = cut
-                if math.hypot(b.x() - a.x(), b.y() - a.y()) <= RC.EPS:
-                    continue
-                mid = Pt((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0)
-                if not RC._contains(host_fp, mid):
-                    continue                                      # nothing to stand on
-                if _on_a_wall(a, b, walls, RC):
-                    continue                                      # plan C: the wall climbs
-                ring = [a, b, Pt(b.x() + ix, b.y() + iy), Pt(a.x() + ix, a.y() + iy)]
-                top = [(v.x(), -v.y(), RC.surface_height(dormer, v) - 0.5) for v in ring]
-                base = [RC.surface_height(host, v) - 1.0 for v in ring]
-                parts.append(_prism_slab(top, 0.0, bottom_zs=base))
+                for sa, sb, band in _split_by_bands(s0, s1, u_of, bands):
+                    a, b = at(sa), at(sb)
+                    ga, gb = gap(a), gap(b)
+                    if ga <= RC.EPS and gb <= RC.EPS:
+                        continue                                  # the host is above
+                    if (ga > 0) != (gb > 0):                      # the host meets the rake
+                        f = ga / (ga - gb)
+                        cut = Pt(a.x() + (b.x() - a.x()) * f, a.y() + (b.y() - a.y()) * f)
+                        if ga > 0:
+                            b = cut
+                        else:
+                            a = cut
+                    if math.hypot(b.x() - a.x(), b.y() - a.y()) <= RC.EPS:
+                        continue
+                    mid = Pt((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0)
+                    if not RC._contains(host_fp, mid):
+                        continue                                  # nothing to stand on
+                    if _on_a_wall(a, b, walls, RC):
+                        continue                                  # plan C: the wall climbs
+                    ring = [a, b, Pt(b.x() + ix, b.y() + iy), Pt(a.x() + ix, a.y() + iy)]
+                    top = [RC.surface_height(dormer, v) - 0.5 for v in ring]
+                    base = [RC.surface_height(host, v) - 1.0 for v in ring]
+                    parts.extend(_face_pieces(ring, top, base, band))
     return parts
 
 
@@ -2089,12 +2167,14 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                     plan_walls.setdefault(w.get("level"), []).append(
                         (ROOFCLIP.Pt(float(a["x"]), float(a["y"])),
                          ROOFCLIP.Pt(float(b["x"]), float(b["y"])), wt))
+                opens_of = {rf.get("id"): rf.get("openings") or [] for rf in doc.get("roofs", [])}
                 for rid, lid, _g, lf in every:
                     host_lf = lifted_of.get(host_of.get(rid))
                     if host_lf is not None:
                         near = plan_walls.get(lid, [])
-                        cheek_parts.extend(_dormer_cheeks(lf, host_lf, ROOFCLIP, cheek_t, near))
-                        cheek_parts.extend(_dormer_face(lf, host_lf, ROOFCLIP, cheek_t, near))
+                        ops, zb = opens_of.get(rid, []), base(lid)    # plan B: the face openings
+                        cheek_parts.extend(_dormer_cheeks(lf, host_lf, ROOFCLIP, cheek_t, near, ops, zb))
+                        cheek_parts.extend(_dormer_face(lf, host_lf, ROOFCLIP, cheek_t, near, ops, zb))
             if every:
                 # 0174-report.md's own honestly-measured residual, closed
                 # here rather than in roofclip.py: the joining-end
@@ -2740,6 +2820,13 @@ def main(argv=None):
                     help="print stats and the placement report, then exit")
     ap.add_argument("--obj", metavar="PATH", help="write OBJ and exit")
     ap.add_argument("--shot", metavar="PATH", help="render to PNG and exit")
+    ap.add_argument("--azimuth", type=float, default=None,
+                    help="camera azimuth in degrees for --shot (the viewer's own: "
+                         "-60 is the home view, -90 looks at the -y side square on)")
+    ap.add_argument("--elevation", type=float, default=None,
+                    help="camera elevation in degrees for --shot (home: 28)")
+    ap.add_argument("--distance", type=float, default=None,
+                    help="camera distance for --shot as a multiple of the home distance (1.0)")
     a = ap.parse_args(argv)
 
     with open(a.design) as fh:
@@ -2800,6 +2887,13 @@ def main(argv=None):
     win.resize(1200, 820)
     win.show()
     if a.shot:
+        # a repeatable viewpoint for a shot (0252-report.md): the three camera
+        # terms, each defaulting to the home view's own
+        if any(v is not None for v in (a.azimuth, a.elevation, a.distance)):
+            body.view.setCameraPosition(
+                distance=body.view._home * (a.distance if a.distance is not None else 1.0),
+                elevation=a.elevation if a.elevation is not None else 28,
+                azimuth=a.azimuth if a.azimuth is not None else -60)
         for _ in range(3):
             app.processEvents()
         body.view.grabFramebuffer().save(a.shot)

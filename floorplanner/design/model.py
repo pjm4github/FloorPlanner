@@ -222,7 +222,8 @@ class Roof(_Node):
                         ("eaves_h_in", RAW), ("ridge_h_in", RAW),
                         ("overhang_in", RAW), ("span_in", RAW),
                         ("eaves_bind", RAW), ("gable", RAW),
-                        ("marker_end", RAW), ("host", RAW), ("form", RAW)]
+                        ("marker_end", RAW), ("host", RAW), ("form", RAW),
+                        ("openings", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     ridge: Any = _MISSING
@@ -240,6 +241,9 @@ class Roof(_Node):
     # 0248-report.md sec3 plan A: `"gable"` (default) or `"shed"` -- one plane
     # off the ridge, down the left side only. OPTIONAL, omitted when gable.
     form: Any = _MISSING
+    # 0248-report.md sec3 plan B: a DORMER's openings, cut into its generated
+    # face -- the same records a wall carries. OPTIONAL, dormer only.
+    openings: Any = _MISSING
 
 
 @dataclass

@@ -1133,12 +1133,43 @@ def compute_roof_clips(roofs, diag=None) -> dict:
             if not hosts:
                 continue
             overshoots = []
+            meeting = False
+            other = rf.p2 if end == 0 else rf.p1
             for host in hosts:
                 x = _segments_cross(rf.p1, rf.p2, host.p1, host.p2)
-                if x is not None:
-                    d = math.hypot(pt.x() - x.x(), pt.y() - x.y())
-                    if d > 1e-3:
-                        overshoots.append(d)
+                if x is None:
+                    continue
+                d = math.hypot(pt.x() - x.x(), pt.y() - x.y())
+                if d <= 1e-3:
+                    # the ridges TOUCH at this end. A meeting only where the
+                    # host runs on past the point with neither of its own
+                    # ridge ends inside THIS roof's footprint (the house's
+                    # cross gable in the middle of the main); where the
+                    # host's end is swallowed by this roof it is the
+                    # equal-height L (`_l_pair`: A's last 50in run into B),
+                    # whose wing must run on over the corner to the main's
+                    # far eave -- the join, as 0164 built it
+                    swallows_host_end = any(_contains(footprints[id(rf)], e)
+                                            for e in (host.p1, host.p2))
+                    if (not swallows_host_end
+                            and abs(surface_height(rf, pt) - surface_height(host, pt)) <= EPS):
+                        meeting = True
+                    continue
+                if math.hypot(other.x() - x.x(), other.y() - x.y()) <= 1e-3:
+                    continue              # they touch at the OTHER end: no crossing here
+                overshoots.append(d)
+            if meeting and not overshoots:
+                # A MEETING OF RIDGES (0248 plan D, the house model's first
+                # iteration): the end lies ON the host's ridge line at the
+                # host's own height. Not a join -- extending it would run
+                # this roof's planes on behind the host's ridge, where the
+                # host falls away, and draw them there as a fin while the
+                # fixed point pruned this roof's own front body. The planes
+                # meet the host's along the valleys from this point to the
+                # eave corners, which the surfaces give without extension.
+                # And a touch at the far end is not a crossing for this
+                # end: the front end of such a gable stays open as before.
+                continue
             swallowed[id(rf)].append((pt, min(overshoots) if overshoots else None))
             if (not overshoots and surface_height(rf, pt)
                     > max(surface_height(h, pt) for h in hosts) + EPS):

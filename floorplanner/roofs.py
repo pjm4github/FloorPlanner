@@ -1044,8 +1044,14 @@ class RoofItem(QGraphicsItem):
 
     def __init__(self, p1, p2, eaves_h_in=96.0, ridge_h_in=132.0,
                 overhang_in=0.0, gable=None, span_in=DEFAULT_HALF_SPAN_IN,
-                marker_end=1, eaves_bind="manual", host=None, form="gable"):
+                marker_end=1, eaves_bind="manual", host=None, form="gable",
+                openings=None):
         super().__init__()
+        # 0248-report.md sec3 plan B: a DORMER's face openings -- the same
+        # records a wall carries, held as plain dicts and round-tripped;
+        # the 3D builder cuts them into the generated face. Nothing in the
+        # plan draws them yet.
+        self.openings = [dict(o) for o in (openings or [])]
         # R5b: a DORMER is a roof with a host (the RoofItem it stands on);
         # its back end (`p2`) is derived against the host at every rebuild
         self.host = host

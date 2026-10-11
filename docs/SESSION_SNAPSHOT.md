@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 7193574 -->
+<!-- SNAPSHOT-HEAD: 7fdbb48 -->
 
 # Session snapshot — read this first
 
@@ -248,7 +248,7 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`7193574`** at this file's cut — [`0251`](handoff/0251-report.md) landed; this commit lands [`0252-report.md`](handoff/0252-report.md): plans B and D built on `roof-openings-ridge-meet`, the app's 3D view given a shot. **Owed next: his check of the PR; then E and the hip run on his word.** Every PR through #82 is merged (#59 was closed, superseded by #60). |
+| **`main`** | **`7fdbb48`** at this file's cut — [`0252`](handoff/0252-report.md) landed; this commit, on `roof-openings-ridge-meet`, is the build itself: the ridge meeting in the clip, a dormer's `openings` through record, schema, item and 3D builder, the Quick3D shot with its camera and his white background, the two test files. **Owed next: his check of the PR; then E and the hip run on his word.** Every PR through #82 is merged (#59 was closed, superseded by #60). |
 | **Branches** | **One open: `roof-openings-ridge-meet`** — 0248 §3's plans B and D and the Quick3D shot ([`0252`](handoff/0252-report.md)); ONE commit; AMBER, waits on his check. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **88 records, 31 open** (D88 CLOSED 2026‑10‑11, `closed_by 6ee358b`; D87 CLOSED 2026‑10‑11, `closed_by d90f8b4`; D67 CLOSED 2026‑10‑07, `closed_by cdc54de`, [`0225`](handoff/0225-report.md); D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
