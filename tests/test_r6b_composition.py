@@ -294,7 +294,10 @@ def test_a_wall_does_not_climb_into_a_dormer_a_storey_above():
            "walls": [{"id": "w1", "level": "L1", "v1": "a", "v2": "b", "type": "interior"},
                      {"id": "w2", "level": "L2", "v1": "a", "v2": "b", "type": "interior"}],
            "rooms": [], "furnishings": [], "roofs": [host, dormer]}
-    v = _wall_verts(fp3d.build_model(doc, furnishings=False, floors=False))
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    # the drawn walls alone: the dormer's own generated sides and face
+    # (exterior, 0244/0245) stand on the host and are not the question
+    v = next(m for m in model.meshes if m.name == "walls:interior").verts
     lower = v[v[:, 2] <= 96.0 + 1e-6]
     upper = v[v[:, 2] >= 100.0 - 1e-6]
     assert len(lower) + len(upper) == len(v), "nothing between the two storeys"

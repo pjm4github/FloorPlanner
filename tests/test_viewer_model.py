@@ -1167,12 +1167,20 @@ _JUMP_B = {"id": "jb", "level": "L1", "ridge": [[0, 95], [200, 95]],
           "span_in": [50, 50], "gable": [True, True]}
 
 
-def test_a_footprint_edge_jump_needs_exactly_one_riser(fp3d):
-    """The new positive control: A's footprint (y in -50..50) and B's (y in
-    45..145) overlap only in a thin 45..50 strip, where A (its eaves, 100in)
-    is uniformly higher than B (also near its own eaves, ~90-93in) -- no
-    equal-height crossing exists anywhere in the strip, so this is a jump,
-    never a seam, exactly like 0177-ruling.md sec3's own named case."""
+def test_a_footprint_edge_jump_gets_no_riser_the_eave_is_open(fp3d):
+    """The positive control, as it was: A's footprint (y in -50..50) and
+    B's (y in 45..145) overlap only in a thin 45..50 strip, where A (its
+    eaves, 100in) is uniformly higher than B (~90-93in) -- a jump, never
+    a seam, 0177-ruling.md sec3's own named case, the one riser it kept
+    ("a real vertical face on a real footprint edge").
+
+    RETIRED 2026-10-11 by Patrick's word on his `short-angle-roofR2.json`
+    3D view (*"They should not have any spill over on the edge of the
+    roof"*): that face hung from A's eave edge down to B -- roof material
+    hanging from a roof's edge -- and `_cross_roof_risers` no longer
+    emits a riser on any footprint edge of the higher roof. The boundary
+    is still there and still mismatched: with the edge rule off the
+    detector finds exactly the one it used to, on A's eave line y=50."""
     a = fp3d.ROOFCLIP.RoofGeom.from_record(_JUMP_A)
     a.clip_name = "ja"
     b = fp3d.ROOFCLIP.RoofGeom.from_record(_JUMP_B)
@@ -1180,22 +1188,31 @@ def test_a_footprint_edge_jump_needs_exactly_one_riser(fp3d):
     per = fp3d.ROOFCLIP.compute_roof_clips([a, b])
     assert per[id(a)].seams == [] and per[id(b)].seams == []
     risers = fp3d._cross_roof_risers([(a, per[id(a)]), (b, per[id(b)])], fp3d.ROOFCLIP)
-    assert len(risers) == 1
-    (px, py), (qx, qy), lo_p, lo_q, hi_p, hi_q = risers[0]
+    assert risers == []
+    orig = fp3d._on_footprint_edge
+    try:
+        fp3d._on_footprint_edge = lambda *args, **kw: False
+        before = fp3d._cross_roof_risers([(a, per[id(a)]), (b, per[id(b)])], fp3d.ROOFCLIP)
+    finally:
+        fp3d._on_footprint_edge = orig
+    assert len(before) == 1
+    (px, py), (qx, qy), lo_p, lo_q, hi_p, hi_q = before[0]
     assert {round(py, 1), round(qy, 1)} == {50.0}
     assert sorted((round(px, 1), round(qx, 1))) == [0.0, 200.0]
-    assert lo_p == pytest.approx(93.0, abs=0.1) and lo_q == pytest.approx(93.0, abs=0.1)
-    assert hi_p == pytest.approx(100.0, abs=0.1) and hi_q == pytest.approx(100.0, abs=0.1)
+    assert lo_p == pytest.approx(93.0, abs=0.1) and hi_p == pytest.approx(100.0, abs=0.1)
+    assert fp3d._on_footprint_edge(a, fp3d.ROOFCLIP.Pt(px, py), fp3d.ROOFCLIP.Pt(qx, qy), fp3d.ROOFCLIP)
 
 
-def test_a_footprint_edge_jump_has_no_open_slot_in_3d(fp3d):
-    """The visual receipt for the same fixture: the riser's own [lo, hi]
-    range, sampled along the INTERIOR of its edge (never at an endpoint --
-    a vertex, which can never itself be a visible 2D hole), must be fully
-    covered by SOME triangle in the built mesh -- a genuine 3D point-in-
-    triangle test, since a 2D XY-only lookup cannot see a near-vertical
-    riser wall at all (its own XY projection is degenerate, the same class
-    of trap named in 0174-report.md's gable-triangle residual)."""
+def test_a_footprint_edge_jump_is_open_under_the_eave_in_3d(fp3d):
+    """The visual receipt for the same fixture, inverted on 2026-10-11 (see
+    the test above): the old riser's own [lo, hi] range, sampled along the
+    INTERIOR of A's eave edge, is now covered by NO triangle of the built
+    mesh -- the slot under A's eave is open, soffit, not roof -- while A's
+    own surface just inside its eave still is (the control). A genuine 3D
+    point-in-triangle test, since a 2D XY-only lookup cannot see a
+    near-vertical riser wall at all (its own XY projection is degenerate,
+    the same class of trap named in 0174-report.md's gable-triangle
+    residual)."""
     doc = {"levels": [{"id": "L1", "name": "L1", "elevation_in": 0.0,
                        "wall_height_in": 96.0}],
           "walls": [], "rooms": [], "openings": [], "furnishings": [],
@@ -1205,7 +1222,12 @@ def test_a_footprint_edge_jump_has_no_open_slot_in_3d(fp3d):
     b = fp3d.ROOFCLIP.RoofGeom.from_record(_JUMP_B)
     b.clip_name = "jb"
     per = fp3d.ROOFCLIP.compute_roof_clips([a, b])
-    risers = fp3d._cross_roof_risers([(a, per[id(a)]), (b, per[id(b)])], fp3d.ROOFCLIP)
+    orig = fp3d._on_footprint_edge
+    try:
+        fp3d._on_footprint_edge = lambda *args, **kw: False
+        risers = fp3d._cross_roof_risers([(a, per[id(a)]), (b, per[id(b)])], fp3d.ROOFCLIP)
+    finally:
+        fp3d._on_footprint_edge = orig
     assert risers
 
     model = fp3d.build_model(doc, furnishings=False, floors=False)
@@ -1217,12 +1239,19 @@ def test_a_footprint_edge_jump_has_no_open_slot_in_3d(fp3d):
             y = py + (qy - py) * t
             lo = lo_p + (lo_q - lo_p) * t
             hi = hi_p + (hi_q - hi_p) * t
-            for i in range(8):
-                z = lo + (hi - lo) * i / 7
-                assert _point_on_any_triangle(mesh, x, y, z), \
-                    f"gap at plan ({x}, {y}), z={z} (riser range {lo}-{hi})"
+            # strictly inside the old riser's range: above B's surface (lo)
+            # and below the underside of A's own slab at its eave (hi less
+            # ROOF_T) -- the slot the riser used to fill
+            top = hi - fp3d.ROOF_T
+            assert top > lo + 1.0
+            for i in range(1, 4):
+                z = lo + (top - lo) * i / 4
+                assert not _point_on_any_triangle(mesh, x, y, z), \
+                    f"roof material at plan ({x}, {y}), z={z} under A's eave"
             checked += 1
     assert checked > 0
+    # the control: A's own surface 10in inside its eave (y=40, z=110)
+    assert _point_on_any_triangle(mesh, 100.0, 40.0, 110.0)
 
 
 def test_three_ridge_fixture_needs_no_riser_now_the_candidacy_and_reachability_are_fixed(fp3d):
@@ -1247,7 +1276,17 @@ def test_three_ridge_fixture_needs_no_riser_now_the_candidacy_and_reachability_a
     detector reports must be construction imprecision at the degenerate
     corner where rf2's extended ridge, rf3's ridge and rf1's east edge
     all meet (756, 553) -- sub-inch segments with a step under half an
-    inch, the same class the 2D receipt tolerates at 0.2" mid-edge."""
+    inch, the same class the 2D receipt tolerates at 0.2" mid-edge.
+
+    SUPERSEDED FOR THE RAKE at 2026-10-11, Patrick's word on his
+    `short-angle-roofR2.json` 3D view (*"The brown roof material should
+    not cover the gable ends"*): a riser on the HIGHER roof's gable-end
+    line is a sheet of roof material hanging from its rake, and
+    `_cross_roof_risers` no longer emits one. rf3's rake over rf1's low
+    corner is exactly that, so the 30"+ step is GONE from the mesh; the
+    gable end is open and the wall beneath climbs when it is exterior
+    (this fixture's walls are typed interior, so here nothing does). The
+    residue clause stands unchanged."""
     doc = json.loads((ROOT / "fixtures" / "threeRidgeFloorplan.json")
                      .read_text(encoding="utf-8"))
     geoms = []
@@ -1276,8 +1315,9 @@ def test_three_ridge_fixture_needs_no_riser_now_the_candidacy_and_reachability_a
             real.append(((px, py), (qx, qy), hi_p - lo_p, hi_q - lo_q))
         else:
             residue.append(((px, py), (qx, qy), hi_p - lo_p, hi_q - lo_q))
-    # the named-correct face: on rf3's rake, a real step
-    assert any(max(sp, sq) > 30.0 for _p, _q, sp, sq in real), real
+    # the rake face is gone (his word, above): no footprint-edge riser
+    # with a real step remains anywhere on the fixture
+    assert not any(max(sp, sq) > 0.5 for _p, _q, sp, sq in real), real
     for (px, py), (qx, qy), sp, sq in residue:
         assert abs(px - 756.0) < 2.0 and abs(py - 553.0) < 3.0, residue
         assert max(sp, sq) < 0.5, residue

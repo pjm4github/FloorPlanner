@@ -57,10 +57,41 @@ def _wall_verts(model):
     return np.vstack(parts) if parts else np.zeros((0, 3))
 
 
-def test_a_dormer_builds_no_walls_of_its_own(fp3d):
+def test_a_dormer_builds_its_cheeks_on_the_host_roof_and_nothing_down_to_the_floor(fp3d):
+    """0194 deleted the dormer's own walls, which hung DOWN from the dormer
+    to the floor (his word then). On 2026-10-11, the cheek risers gone,
+    his word: *"the dormer sides should be generated so that they are
+    projected up to the dormer."* So the only walls a dormer builds are
+    its two cheeks (`_dormer_cheeks`), exterior wall material standing on
+    the HOST's surface along the dormer's wall lines x=170 and x=230 and
+    rising to half an inch under its eaves (116in), where the host lies
+    below them -- here from the face (y=190, host 101.4) back to y=163,
+    where the host reaches 116 -- and nowhere near the floor."""
     model = fp3d.build_model(_doc(), furnishings=False, floors=False)
     assert not model.notes, model.notes
-    assert len(_wall_verts(model)) == 0
+    assert [m.name for m in model.meshes if m.name.startswith("walls:")] == ["walls:exterior"]
+    v = _wall_verts(model)
+    assert len(v) > 0
+    t = fp3d.WALL_T.get("exterior", 6.0)
+    ys = -v[:, 1]
+    # the cheeks: on the wall lines, from the face back to where the host
+    # reaches the eaves; the face (`_dormer_face`, 0245): across the
+    # width at y=190 and t inward, up to the rake
+    cheeks = v[(ys < 190.0 - t - 1e-6)]
+    xs = {round(float(x), 3) for x in cheeks[:, 0]}
+    assert xs == {170.0, 170.0 + t, 230.0 - t, 230.0}, xs
+    assert cheeks[:, 2].max() == pytest.approx(116.0 - 0.5)
+    assert 162.0 < (-cheeks[:, 1]).min() < 164.0
+    face = v[(abs(ys - 190.0) < 1e-6) | (abs(ys - (190.0 - t)) < 1e-6)]
+    assert face[:, 0].min() == pytest.approx(170.0) and face[:, 0].max() == pytest.approx(230.0)
+    assert face[:, 2].max() == pytest.approx(136.0 - 0.5)          # the ridge, less the half inch
+    assert v[:, 2].min() > 96.0, "a piece reached below the host's eaves"
+    assert ys.max() == pytest.approx(190.0)
+    # every base vertex stands an inch into the host's slab at its own point
+    for x, y, z in v:
+        on_rake = abs(z - (136.0 - DORMER_SLOPE * abs(x - 200.0) - 0.5)) < 1e-6
+        if not on_rake and z < 116.0 - 0.5 - 1e-6:
+            assert z == pytest.approx(150.0 - 0.54 * abs(-y - 100.0) - 1.0, abs=0.3), (x, y, z)
 
 
 def test_a_wall_under_a_dormer_climbs_into_its_roof(fp3d):
@@ -70,7 +101,8 @@ def test_a_wall_under_a_dormer_climbs_into_its_roof(fp3d):
     dormer, where the host plane clears 96in, the wall keeps its top."""
     model = fp3d.build_model(_doc(walls=[WALL]), furnishings=False, floors=False)
     assert not model.notes, model.notes
-    v = _wall_verts(model)
+    # the interior mesh alone: the dormer's own cheeks are exterior wall
+    v = next(m for m in model.meshes if m.name == "walls:interior").verts
     assert len(v) > 8, "the wall was split under the dormer"
     c = fp3d.WALL_CAP_BELOW_ROOF_IN
     under = v[(v[:, 0] > 170.0 + 1e-6) & (v[:, 0] < 230.0 - 1e-6) & (v[:, 2] > 1.0)]
@@ -91,7 +123,7 @@ def test_the_wall_under_a_sill_does_not_climb(fp3d):
                                  "anchor": {"from": "start", "offset_in": 100},
                                  "sill_in": 30.0, "head_in": 80.0}])
     model = fp3d.build_model(_doc(walls=[wall]), furnishings=False, floors=False)
-    v = _wall_verts(model)
+    v = next(m for m in model.meshes if m.name == "walls:interior").verts   # not the dormer's own
     sill = v[np.isclose(v[:, 2], 30.0)]
     assert len(sill) >= 4, "the under-sill piece keeps its own flat top"
     assert v[:, 2].max() == pytest.approx(136.0 - fp3d.WALL_CAP_BELOW_ROOF_IN)
@@ -147,17 +179,41 @@ def _roof_hits(fp3d):
             for name, (a, b) in _GAP_RAYS.items()}
 
 
-def test_the_dormer_is_closed_below_its_eaves_by_the_cross_roof_risers(fp3d, monkeypatch):
-    """The closure, named: R4f's `_cross_roof_risers` -- the double-sided
-    riser quads drawn along every boundary where two roofs' territories
-    meet at UNEQUAL height (a boundary that is not a seam). The dormer's
-    two eaves lines and its face are exactly such boundaries against the
-    host, so the risers span from the host's surface up to the dormer's
-    eaves along all three. Probed: a ray crossing each plane inside the
-    gap hits the mesh; with the risers removed the same rays hit nothing
-    -- so it is the risers, and nothing else, that close the dormer."""
-    with_risers = _roof_hits(fp3d)
-    assert all(n > 0 for n in with_risers.values()), with_risers
+def test_nothing_of_roof_closes_the_dormer_below_its_eaves(fp3d, monkeypatch):
+    """0195-ruling.md sec3 asked what closes the dormer below its eaves and
+    the answer, probed here until 2026-10-11, was R4f's cross-roof risers
+    -- the double-sided quads drawn along every boundary where two roofs'
+    territories meet at unequal height: the dormer's two eaves lines and
+    its face, each a riser from the host's surface up to the dormer.
+
+    NOW NOTHING DOES, by Patrick's word on his `short-angle-roofR2.json`
+    3D view (2026-10-11): *"The brown roof material should not cover the
+    gable ends"*, then, the dormer's cheeks circled, *"They should not
+    have any spill over on the edge of the roof."* A riser on any
+    footprint edge of the higher roof is a sheet of roof material
+    hanging from that edge, and `_cross_roof_risers` no longer emits
+    one: the face is a gable end, open; the cheeks are the dormer's
+    eaves, open. What closes a dormer is what closes a gable: the walls
+    beneath it, which climb into it
+    (`test_a_wall_under_a_dormer_climbs_into_its_roof`). Probed: the
+    rays through all three planes inside the gap hit NO ROOF, risers on
+    or off; the control ray through the dormer's own slab hits. What
+    closes the two eaves planes is WALL -- the generated cheeks
+    (`_dormer_cheeks`, his word of the same day: *"the dormer sides should
+    be generated so that they are projected up to the dormer"*) -- and
+    what closes the face, which stands on the host here, is the generated
+    face (`_dormer_face`): all four rays hit the walls mesh."""
+    hits = _roof_hits(fp3d)
+    assert all(n == 0 for n in hits.values()), hits
     monkeypatch.setattr(fp3d, "_cross_roof_risers", lambda *a, **k: [])
-    without = _roof_hits(fp3d)
-    assert all(n == 0 for n in without.values()), without
+    assert all(n == 0 for n in _roof_hits(fp3d).values())
+    model = fp3d.build_model(_doc(), furnishings=False, floors=False)
+    roof = next(m for m in model.meshes if m.name == "roofs")
+    assert _seg_hits(roof.verts, roof.faces, (200, -180, 120), (200, -180, 140)) > 0   # the dormer's ridge slab
+    walls = next(m for m in model.meshes if m.name == "walls:exterior")
+    wall_hits = {name: _seg_hits(walls.verts, walls.faces, a, b) for name, (a, b) in _GAP_RAYS.items()}
+    assert wall_hits["left eaves plane"] > 0 and wall_hits["right eaves plane"] > 0, wall_hits
+    # and the face too, since it stands on the host (`_dormer_face`, his
+    # word of 2026-10-11 on the set-back dormer: "the dormer face needs
+    # to climb up from the roof itself")
+    assert wall_hits["front, at the ridge"] > 0 and wall_hits["front, near a corner"] > 0, wall_hits

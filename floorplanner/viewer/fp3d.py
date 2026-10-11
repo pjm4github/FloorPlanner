@@ -748,6 +748,22 @@ def _segment_overlap(a1, b1, a2, b2, tol=1e-4):
             (a1.x() + ux * hi, a1.y() + uy * hi))
 
 
+def _on_footprint_edge(geom, p, q, roofclip_mod, tol=1e-3):
+    """Does plan segment `p`-`q` lie on an EDGE of `geom`'s own nominal
+    footprint -- a rake (gable-end line), an eaves line, or a hip end's
+    eave line? Both points within `tol` of the same edge's line, and
+    within the edge's own extent."""
+    rc = roofclip_mod
+    fp = rc.footprint_polygon(geom)
+    n = len(fp)
+    for i in range(n):
+        a, b = fp[i], fp[(i + 1) % n]
+        if (rc._dist_to_segment(p, a, b) <= tol
+                and rc._dist_to_segment(q, a, b) <= tol):
+            return True
+    return False
+
+
 def _cross_roof_risers(geoms_and_clips, roofclip_mod):
     """For every pair of DIFFERENT live roofs on one level, find every
     boundary segment where their final clip regions touch, and -- where
@@ -755,7 +771,32 @@ def _cross_roof_risers(geoms_and_clips, roofclip_mod):
     a real, drawn seam) -- return the riser needed to visually close the
     step between their two separately-extruded skirts. `geoms_and_clips`
     is `[(geom, clip), ...]`; only roofs with a real `clip.region` (i.e.
-    touched by at least one partner) can contribute a boundary at all."""
+    touched by at least one partner) can contribute a boundary at all.
+
+    NO RISER ON AN EDGE OF THE HIGHER ROOF (Patrick, 2026-10-11, on his
+    `short-angle-roofR2.json`, the 3D view, twice: *"the 'brown roof'
+    components wrap around the gable ends and come down to the roof
+    below. The brown roof material should not cover the gable ends"*;
+    then, the gable ends right and the dormer's cheeks circled, *"the
+    gable edges that overlap the roof are still not correct. They should
+    not have any spill over on the edge of the roof."*). Where the higher
+    roof's territory ends at its own footprint edge -- a rake tip, an
+    overhang's end over a lower roof, a dormer's front or its eaves on
+    the host -- the step down to the lower surface was closed with a
+    riser: a vertical sheet of roof material hanging from the roof's
+    edge. Nothing of roof material hangs from a roof's edge: a gable end
+    is open (0223-report.md sec3) and the wall beneath climbs; under an
+    overhang the lower roof runs in to that wall
+    (`_hidden_overhang_pieces`); under an eave there is soffit, or the
+    wall. So a riser on any footprint edge of the roof that is HIGHER
+    there is skipped -- this retires 0177-ruling.md sec3's "real vertical
+    face on a real footprint edge", the one jump it kept, and 0195's
+    dormer closure (its cheeks were two such risers). What remains is
+    the 0174 residual the riser was built for: a mismatched boundary
+    INSIDE both footprints, where the candidacy strip's width limit
+    seats one roof's height next to another's. The lower roof's own
+    edge is not exempt: a riser rising from its edge to a higher roof
+    above it is not hanging from anything."""
     rc = roofclip_mod
     items = [(geom, cell) for geom, clip in geoms_and_clips
             if clip is not None and clip.region is not None
@@ -788,13 +829,16 @@ def _cross_roof_risers(geoms_and_clips, roofclip_mod):
                     h2p, h2q = rc.surface_height(g2, p), rc.surface_height(g2, q)
                     if abs(h1p - h2p) <= rc.EPS and abs(h1q - h2q) <= rc.EPS:
                         continue                   # a real seam -- already flush
+                    higher = g1 if h1p + h1q >= h2p + h2q else g2
+                    if _on_footprint_edge(higher, p, q, rc):
+                        continue                   # nothing hangs from a roof's edge
                     risers.append(((px, py), (qx, qy),
                                   min(h1p, h2p), min(h1q, h2q),
                                   max(h1p, h2p), max(h1q, h2q)))
     return risers
 
 
-def _prism_slab(corners_xyz, drop, bottom_z=None):
+def _prism_slab(corners_xyz, drop, bottom_z=None, bottom_zs=None):
     """`_box` generalised to a TOP RING WHOSE Z VARIES PER VERTEX -- a roof
     plane is not horizontal, so its top ring cannot be described by one z0.
     The bottom ring is the same (x, y), offset straight down in world z by
@@ -803,7 +847,9 @@ def _prism_slab(corners_xyz, drop, bottom_z=None):
     new one. `corners_xy` may be any length >= 3 (a quad for a roof plane, a
     triangle for a gable end) -- both wind and cap by the same fan.
     `bottom_z` instead puts the bottom ring on one flat height -- a wall
-    piece whose top follows the roof surface but whose base is the floor.
+    piece whose top follows the roof surface but whose base is the floor;
+    `bottom_zs` gives the bottom ring its own z per vertex -- a dormer's
+    cheek, standing on the sloped host roof under a flat eaves line.
 
     Winding is normalised the SAME WAY `_box` does: the 2D (x, y) signed
     area alone decides CCW, ignoring z. That still gives the outward
@@ -815,14 +861,19 @@ def _prism_slab(corners_xyz, drop, bottom_z=None):
     as "outward, roughly up" for the sloped cap too.
     """
     p = list(corners_xyz)
+    zb = list(bottom_zs) if bottom_zs is not None else None
     n = len(p)
     a2 = sum(p[i][0] * p[(i + 1) % n][1] - p[(i + 1) % n][0] * p[i][1]
              for i in range(n))
     if a2 < 0:
         p = p[::-1]
+        if zb is not None:
+            zb = zb[::-1]
     top = np.array(p, dtype=float)
     bot = top.copy()
-    if bottom_z is None:
+    if zb is not None:                            # a sloped base, per vertex
+        bot[:, 2] = zb
+    elif bottom_z is None:
         bot[:, 2] -= drop
     else:                                         # a wall's flat base
         bot[:, 2] = bottom_z
@@ -836,6 +887,324 @@ def _prism_slab(corners_xyz, drop, bottom_z=None):
         j = (i + 1) % n
         f += [[i, j, j + n], [i, j + n, i + n]]
     return v, np.array(f, dtype=int)
+
+
+DORMER_CHEEK_STEP_IN = 3.0   # the cheek follows the host's slope in pieces this long
+
+
+def _dormer_cheeks(dormer, host, roofclip_mod, t):
+    """THE DORMER'S SIDES, PROJECTED UP TO THE DORMER (Patrick, 2026-10-11,
+    after the cheek risers went: *"the dormer sides should be generated so
+    that they are projected up to the dormer."*). Along each side of the
+    dormer -- its wall line, `span_in` from the ridge, the overhang not
+    counted -- a wall piece stands on the HOST roof's surface and rises
+    to the dormer's eaves, wherever the host lies below those eaves and
+    inside the host's own footprint: the cheek, wall material, `t` thick
+    inward. It is nothing like 0194's deleted `_dormer_walls`, which hung
+    the dormer's walls DOWN to the floor (his word then: *"the walls of
+    the dormer are being drawn down from the dormer"*); this stands on
+    the roof. The front stays what a gable end is: open, with the house
+    wall beneath it climbing into the dormer (`_wall_under_roofs`).
+
+    Built as a run of short boxes (`DORMER_CHEEK_STEP_IN` along the line),
+    each with its base on the host's surface at its own four corners --
+    the host is planar between its cut lines, so a short box's base is
+    flat to well under a sixteenth -- and its top half an inch under the
+    dormer's eaves, inside the dormer's own slab (`ROOF_T` thick), so no
+    face is shared with a roof and no slot is left. The run is cut at the
+    station where the host reaches the eaves (interpolated), and a box
+    whose midpoint lies outside the host's footprint is skipped: past the
+    host's own eave there is nothing to stand on. `dormer` and `host`
+    are LIFTED geoms (absolute heights); parts come back in this file's
+    world frame (x, -y, z)."""
+    RC = roofclip_mod
+    Pt = RC.Pt
+    ux, uy, nx, ny = dormer._axis()
+    p1 = dormer.p1
+    length = dormer.length()
+    top_z = dormer.eaves_h_in - 0.5
+    host_fp = RC.footprint_polygon(host)
+    parts = []
+    n_seg = max(1, int(math.ceil(length / DORMER_CHEEK_STEP_IN)))
+    stations = [length * k / n_seg for k in range(n_seg + 1)]
+    for side, sign in ((0, 1.0), (1, -1.0)):
+        span = float(dormer.span_in[side])
+        ox, oy = sign * nx * span, sign * ny * span              # the wall line
+        ix, iy = -sign * nx * t, -sign * ny * t                  # inward, the thickness
+
+        def at(s, ox=ox, oy=oy):
+            return Pt(p1.x() + ux * s + ox, p1.y() + uy * s + oy)
+
+        for s0, s1 in zip(stations, stations[1:], strict=False):
+            a, b = at(s0), at(s1)
+            ha, hb = RC.surface_height(host, a), RC.surface_height(host, b)
+            if ha >= top_z - RC.EPS and hb >= top_z - RC.EPS:
+                continue                                          # the host is above
+            if (ha < top_z) != (hb < top_z):                      # the host reaches the eaves
+                f = (top_z - ha) / (hb - ha)
+                cut = Pt(a.x() + (b.x() - a.x()) * f, a.y() + (b.y() - a.y()) * f)
+                if ha < top_z:
+                    b = cut
+                else:
+                    a = cut
+            if math.hypot(b.x() - a.x(), b.y() - a.y()) <= RC.EPS:
+                continue
+            mid = Pt((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0)
+            if not RC._contains(host_fp, mid):
+                continue                                          # nothing to stand on
+            ring = [a, b, Pt(b.x() + ix, b.y() + iy), Pt(a.x() + ix, a.y() + iy)]
+            base = [RC.surface_height(host, v) - 1.0 for v in ring]   # an inch into the host slab
+            parts.append(_prism_slab([(v.x(), -v.y(), top_z) for v in ring], 0.0,
+                                     bottom_zs=base))
+    return parts
+
+
+def _dormer_face(dormer, host, roofclip_mod, t):
+    """THE DORMER'S FACE, WHEN IT STANDS ON THE ROOF (Patrick, 2026-10-11,
+    on his `short-angle-roofR3.json`, the dormer set back from the eaves:
+    *"the dormer ends look good when the outside wall beneath it is
+    climbed. There is one more problem, when the dormer is set back then
+    the dormer face needs to climb up from the roof itself."*). Across
+    the dormer's face line -- the end whose ridge point stands highest
+    above the host; the back end sits ON the host plane -- from one wall
+    line to the other, a run of wall pieces stands on the host's surface
+    and rises to half an inch under the dormer's OWN surface there: its
+    rake, the ridge height at the middle falling to the eaves at the
+    sides. The gable of the dormer, in wall, `t` thick inward along the
+    ridge. Built only where the host lies below the dormer's surface and
+    the point is inside the host's footprint: a face that stands past
+    the host's eave (R2, 6in out) gets nothing here -- the house wall
+    beneath it climbs into the dormer instead (`_wall_under_roofs`), his
+    "outside wall beneath it climbed". Same construction as
+    `_dormer_cheeks`: short boxes, a per-vertex base an inch into the
+    host's slab, the top ring on the dormer's surface per vertex, the run
+    cut where the host meets it, the ridge itself a station so the kink
+    is honoured."""
+    RC = roofclip_mod
+    Pt = RC.Pt
+    ux, uy, nx, ny = dormer._axis()
+    ends = (dormer.p1, dormer.p2)
+    rise = [dormer.ridge_h_in - RC.surface_height(host, e) for e in ends]
+    face = ends[0] if rise[0] >= rise[1] else ends[1]
+    sgn = 1.0 if face is ends[0] else -1.0                      # inward along the ridge
+    ix, iy = sgn * ux * t, sgn * uy * t
+    host_fp = RC.footprint_polygon(host)
+    parts = []
+    for side, sign in ((0, 1.0), (1, -1.0)):
+        span = float(dormer.span_in[side])
+        n_seg = max(1, int(math.ceil(span / DORMER_CHEEK_STEP_IN)))
+        stations = [span * k / n_seg for k in range(n_seg + 1)]
+
+        def at(s, sign=sign):
+            return Pt(face.x() + sign * nx * s, face.y() + sign * ny * s)
+
+        def gap(q):
+            return RC.surface_height(dormer, q) - 0.5 - RC.surface_height(host, q)
+
+        for s0, s1 in zip(stations, stations[1:], strict=False):
+            a, b = at(s0), at(s1)
+            ga, gb = gap(a), gap(b)
+            if ga <= RC.EPS and gb <= RC.EPS:
+                continue                                          # the host is above
+            if (ga > 0) != (gb > 0):                              # the host meets the rake
+                f = ga / (ga - gb)
+                cut = Pt(a.x() + (b.x() - a.x()) * f, a.y() + (b.y() - a.y()) * f)
+                if ga > 0:
+                    b = cut
+                else:
+                    a = cut
+            if math.hypot(b.x() - a.x(), b.y() - a.y()) <= RC.EPS:
+                continue
+            mid = Pt((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0)
+            if not RC._contains(host_fp, mid):
+                continue                                          # nothing to stand on
+            ring = [a, b, Pt(b.x() + ix, b.y() + iy), Pt(a.x() + ix, a.y() + iy)]
+            top = [(v.x(), -v.y(), RC.surface_height(dormer, v) - 0.5) for v in ring]
+            base = [RC.surface_height(host, v) - 1.0 for v in ring]
+            parts.append(_prism_slab(top, 0.0, bottom_zs=base))
+    return parts
+
+
+def _wall_loops(walls, rooms, vx, level):
+    """The closed loops the walls of `level` enclose, in PLAN space (no
+    y-flip): every bounded face of the level's wall graph, plus every
+    room outline of the level. A point inside any of them is INSIDE the
+    level -- enclosed by its walls; outside all of them it is in the
+    open, under nothing of that level but a roof's overhang.
+
+    The faces are walked the standard way: each directed wall edge once,
+    at every vertex turning to the next edge counter-clockwise (by
+    `atan2` on raw plan coordinates) from the one it arrived on, so every
+    face is traced with one orientation and the unbounded face with the
+    other -- the bounded faces are the ones with NEGATIVE signed area in
+    raw plan coordinates (`test_roof_overhang_3d.py` pins the sign on a
+    box). A dangling wall is walked both ways inside its face and adds a
+    zero-area spike; two walls that cross without sharing a vertex are
+    not joined here any more than they are joined in the plan, so the
+    loop they would bound does not exist. Each loop is `[(x, y), ...]`,
+    for `_pip`."""
+    edges = set()
+    for w in walls:
+        if w.get("level") != level:
+            continue
+        a, b = w.get("v1"), w.get("v2")
+        if a is None or b is None or a == b or a not in vx or b not in vx:
+            continue
+        pa, pb = vx[a], vx[b]
+        if math.hypot(float(pb["x"]) - float(pa["x"]),
+                      float(pb["y"]) - float(pa["y"])) < 1e-9:
+            continue
+        edges.add((a, b))
+        edges.add((b, a))
+    around = {}
+    for a, b in edges:
+        around.setdefault(a, []).append(b)
+    xy = {vid: (float(vx[vid]["x"]), float(vx[vid]["y"])) for vid in around}
+    for a, nbrs in around.items():
+        ax, ay = xy[a]
+        nbrs.sort(key=lambda b: math.atan2(xy[b][1] - ay, xy[b][0] - ax))
+    loops = []
+    seen = set()
+    for start in sorted(edges):
+        if start in seen:
+            continue
+        ring, cur = [], start
+        while cur not in seen:
+            seen.add(cur)
+            a, b = cur
+            ring.append(xy[a])
+            nbrs = around[b]
+            k = nbrs.index(a)
+            cur = (b, nbrs[(k + 1) % len(nbrs)])
+        if len(ring) < 3:
+            continue
+        signed = sum(ring[i][0] * ring[(i + 1) % len(ring)][1]
+                     - ring[(i + 1) % len(ring)][0] * ring[i][1]
+                     for i in range(len(ring))) / 2.0
+        if signed < -1e-6:
+            loops.append(ring)
+    for r in rooms:
+        if r.get("level") != level:
+            continue
+        ring = []
+        for e in r.get("outline", []):
+            v = vx.get(e.get("v"))
+            if v is not None:
+                ring.append((float(v["x"]), float(v["y"])))
+        if len(ring) >= 3:
+            loops.append(ring)
+    return loops
+
+
+def _hidden_overhang_pieces(geom, lifted, clip, terr, loops_of, roofclip_mod):
+    """THE LOWER ROOF RUNS UNDER THE OVERHANG (Patrick, 2026-10-11, on his
+    `short-angle-roof.json`, 0239-report.md read back and ordered at
+    0240-report.md: *"When the gable ends overhang the walls they should
+    not project the roof down. Instead the gable end that they cover
+    should be projected up ... I want to see the lower roof intersect the
+    upper floor then the gable ends of that floor project up to the
+    second floor roof."*). The plan's clip hides a roof wherever a
+    higher roof covers it, and until this the 3D mesh was the visible
+    region and nothing else -- so under an upper roof's 12-inch gable
+    overhang the lower roof stopped 12 inches short of the gable wall it
+    should meet, with a vertical cut face, and the upper roof's open
+    gable-end slab stood over a gap. The plan is right to show the upper
+    roof there; the 3D builder is where the lower roof's hidden ground
+    exists physically.
+
+    THE RULE: the cells of this roof's OWN NOMINAL FOOTPRINT that the
+    clip hid are meshed at the roof's own surface wherever the covering
+    roof merely overhangs them -- the cell's centroid lies OUTSIDE EVERY
+    WALL LOOP OF THE COVERING ROOF'S LEVEL (`_wall_loops`; his word:
+    "the wall loop test is right"). Inside those loops the hidden ground
+    is inside the upper storey, where it stays unbuilt, exactly as before
+    (a joined end's closing ground under the second floor). The roof
+    model has no overhang of its own on a gable end -- the ridge end is
+    the rake tip -- so the walls are the only statement of where the
+    covering level ends, and an eaves overhang comes out the same way.
+    Nothing beyond the nominal footprint is considered: a joined end's
+    extension is the clip's own ground, not the roof's.
+
+    THE SEAM: where this roof's surface would rise ABOVE the covering
+    roof's inside such a cell (a steep lower roof under a shallow upper
+    eave), the cell is cut at the equal-height line and only the part
+    below is built -- to the seam, not through it (`_clip_by_values` on
+    the height difference, the same exact cut the clip's seams are).
+
+    `geom` is the roof's own (relative) geometry, `lifted` the same in
+    absolute height, `clip` its `RoofClip`; `terr` is `build_model`'s
+    territory list `[(lifted, cells, dormer, level), ...]` for every roof
+    of the building, `loops_of(level)` the covering level's wall loops.
+    A cell under no other roof (blank ground the clip erased) is left as
+    it was; a cell covered by a DORMER is not under an overhang -- the
+    dormer stands on this roof -- and is left too; and a covering level
+    WITH NO WALL LOOPS AT ALL states nothing about where it ends, so
+    nothing is built under its roofs (the wall-less roof fixtures of
+    `test_viewer_model.py` build as before). Returns the pieces
+    to mesh as plan polygons, each split by the roof's own plane-change
+    lines so it lies in one plane. Empty whenever nothing is hidden
+    outside the covering walls, which is every design before his."""
+    RC = roofclip_mod
+    own = list(clip.region.cells)
+    fp = RC.footprint_polygon(geom)
+    xs = [p.x() for p in fp]
+    ys = [p.y() for p in fp]
+    bx0, bx1, by0, by1 = min(xs) - 1.0, max(xs) + 1.0, min(ys) - 1.0, max(ys) + 1.0
+
+    def near(cell):
+        cx = [c.x() for c in cell]
+        cy = [c.y() for c in cell]
+        return not (max(cx) < bx0 or min(cx) > bx1
+                    or max(cy) < by0 or min(cy) > by1)
+
+    others = [(lf, [c for c in cells if near(c)], dm, lid)
+              for lf, cells, dm, lid in terr if lf is not lifted]
+    others = [(lf, cs, dm, lid) for lf, cs, dm, lid in others if cs]
+    if not others:
+        return []
+    pieces = [fp]
+    for cells in [own] + [cs for _, cs, _, _ in others]:
+        for cell in cells:
+            n = len(cell)
+            for i in range(n):
+                a, b = cell[i], cell[(i + 1) % n]
+                d = RC.Pt(b.x() - a.x(), b.y() - a.y())
+                if math.hypot(d.x(), d.y()) <= RC.EPS:
+                    continue
+                pieces = [q for pc in pieces for q in RC._split_by_line(pc, a, d)]
+    for pt, d in RC._cut_lines(geom):
+        pieces = [q for pc in pieces for q in RC._split_by_line(pc, pt, d)]
+
+    out = []
+    for pc in pieces:
+        c = RC._centroid(pc)
+        if any(RC._contains(cell, c) for cell in own):
+            continue                                # visible: built already
+        coverer = None
+        for lf, cells, dm, lid in others:
+            if any(RC._contains(cell, c) for cell in cells):
+                h = RC.surface_height(lf, c)
+                if coverer is None or h > coverer[0]:
+                    coverer = (h, lf, dm, lid)
+        if coverer is None:
+            continue                                # blank ground: as before
+        _h, cover, dormer, lid = coverer
+        if dormer:
+            continue                                # a dormer stands on it
+        loops = loops_of(lid)
+        if not loops:
+            continue                                # no walls: nothing stated
+        if any(_pip((c.x(), c.y()), loop) for loop in loops):
+            continue                                # inside the upper storey
+        vals = [RC.surface_height(cover, v) - RC.surface_height(lifted, v)
+                for v in pc]
+        if min(vals) >= -RC.EPS:
+            out.append(pc)
+            continue
+        under, _ = RC._clip_by_values(pc, vals)
+        if len(under) >= 3 and RC._area(under) > RC.MIN_CELL_AREA:
+            out.append(under)
+    return out
 
 
 def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
@@ -946,18 +1315,33 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
                 pieces = [q for pc in pieces for q in RC._split_by_line(pc, a, d)]
 
     def owner_of(pc):
+        # THE LOWEST ROOF OVER A PIECE OWNS IT. Territories do not overlap
+        # except where a roof's hidden strip under another's overhang was
+        # added to its territory (`_hidden_overhang_pieces`, 0242): there
+        # the wall meets the lower roof first, and is capped by it -- the
+        # eaves wall under the overhang keeps the same profile as beside
+        # it (Patrick's "strange step where the overhang sits", 2026-10-11).
         c = RC._centroid(pc)
+        best, best_h = (None, False), None
         for geom, cells, dm in nearby:
             if any(RC._contains(cell, c) for cell in cells):
-                return geom, dm
-        best, best_d = (None, False), None
+                h = RC.surface_height(geom, c)
+                if best_h is None or h < best_h:
+                    best, best_h = (geom, dm), h
+        if best[0] is not None:
+            return best
+        best_d = None
         for geom, cells, dm in nearby:
             for cell in cells:
                 n = len(cell)
                 d = min(RC._dist_to_segment(c, cell[i], cell[(i + 1) % n])
                         for i in range(n))
-                if d <= t and (best_d is None or d < best_d):
-                    best, best_d = (geom, dm), d
+                if d > t:
+                    continue
+                h = RC.surface_height(geom, c)
+                if (best_d is None or d < best_d - RC.EPS
+                        or (abs(d - best_d) <= RC.EPS and h < best_h)):
+                    best, best_d, best_h = (geom, dm), d, h
         return best
 
     def gable_wall_of(geom):
@@ -1532,7 +1916,16 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     # (Patrick, 2026-09-13: "clip the walls to the roof when viewing in 3D"),
     # so the walls need every roof's territory and surface before any wall
     # prism is built. The roof section below reuses `clips`/`riser_parts`.
-    clips, riser_parts, terr_all = {}, [], []
+    clips, riser_parts, terr_all, hidden_of, lifted_of = {}, [], [], {}, {}
+    cheek_parts = []
+    loop_cache = {}
+
+    def loops_of(level_id):
+        """The wall loops of a level, in plan (`_wall_loops`), built once."""
+        if level_id not in loop_cache:
+            loop_cache[level_id] = _wall_loops(walls, rooms, vx, level_id)
+        return loop_cache[level_id]
+
     if roofs:
         # The wall endpoints this roof's nearest-eaves search needs, in world
         # (x, y) -- a Qt-free duplicate of `roofs.py`'s `nearest_eaves_wall`
@@ -1609,6 +2002,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 per = ROOFCLIP.compute_roof_clips([lf for _, _, _, lf in every])
                 for rid, _lid, g, lf in every:
                     clips[rid] = (g, per[id(lf)])
+                    lifted_of[rid] = lf
                 # the walls' own cap (below): each roof's TERRITORY in the
                 # building -- its visible region's cells when clipped, its
                 # whole footprint otherwise -- with its ABSOLUTE surface
@@ -1619,6 +2013,34 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                      else [ROOFCLIP.footprint_polygon(lf)],
                      rid in dormer_ids, lid)
                     for rid, lid, _g, lf in every]
+                # THE LOWER ROOF RUNS UNDER THE OVERHANG (0240-report.md
+                # sec1): each clipped roof's own-footprint cells the clip
+                # hid, outside the covering level's walls, computed HERE
+                # -- against the territories as the clip gave them -- so
+                # the roof section meshes them and the walls beneath are
+                # capped by the roof really over them: the strip joins
+                # its roof's territory for `_wall_under_roofs`.
+                for rid, _lid, g, lf in every:
+                    c = per[id(lf)]
+                    if c.region is not None:
+                        pcs = _hidden_overhang_pieces(g, lf, c, terr_all, loops_of, ROOFCLIP)
+                        if pcs:
+                            hidden_of[rid] = pcs
+                if hidden_of:
+                    terr_all = [
+                        (lf, cells + hidden_of.get(rid, []), dm, lid)
+                        for (lf, cells, dm, lid), (rid, _l, _g, _lf)
+                        in zip(terr_all, every, strict=True)]
+                # THE DORMER'S SIDES AND FACE, projected up to the dormer
+                # from the host roof (`_dormer_cheeks`, `_dormer_face`);
+                # wall material, emitted with the exterior walls below
+                host_of = {rf.get("id"): rf.get("host") for rf in doc.get("roofs", [])}
+                cheek_t = float(WALL_T.get("exterior", 6.0))
+                for rid, _lid, _g, lf in every:
+                    host_lf = lifted_of.get(host_of.get(rid))
+                    if host_lf is not None:
+                        cheek_parts.extend(_dormer_cheeks(lf, host_lf, ROOFCLIP, cheek_t))
+                        cheek_parts.extend(_dormer_face(lf, host_lf, ROOFCLIP, cheek_t))
             if every:
                 # 0174-report.md's own honestly-measured residual, closed
                 # here rather than in roofclip.py: the joining-end
@@ -1742,6 +2164,8 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             by_type.setdefault(wtype, []).extend(parts)
             n_wall += 1
 
+    if cheek_parts:                       # a dormer's sides and face are exterior wall
+        by_type.setdefault("exterior", []).extend(cheek_parts)
     for wtype, parts in by_type.items():
         v, f = _merge(parts)
         model.meshes.append(
@@ -1756,7 +2180,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     # in the editor. The overhang continues the SAME plane at the SAME slope
     # past the eaves line, which is why one quad (ridge to outer edge) is the
     # whole plane rather than a separate flat overhang strip.
-    n_roof = 0
+    n_roof = n_overhang = 0
     if roofs:
         roof_parts = list(riser_parts)
         for rf in doc.get("roofs", []):
@@ -1799,6 +2223,17 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                     ring = [(c.x(), -c.y(), z0 + ROOFCLIP.surface_height(geom, c))
                             for c in piece]
                     roof_parts.append(_prism_slab(ring, ROOF_T))
+                # THE LOWER ROOF RUNS UNDER THE OVERHANG (0240-report.md
+                # sec1): the cells of this roof's own footprint the clip
+                # hid, built at its own surface wherever the roof covering
+                # them merely overhangs the walls of its level, cut at the
+                # seam where this surface would rise above the cover's
+                # (computed with the clips above, so the walls saw them).
+                for piece in hidden_of.get(rid, []):
+                    ring = [(c.x(), -c.y(), z0 + ROOFCLIP.surface_height(geom, c))
+                            for c in piece]
+                    roof_parts.append(_prism_slab(ring, ROOF_T))
+                    n_overhang += 1
                 # A GABLE END IS OPEN (Patrick, 2026-10-06; 0223-report.md
                 # sec3): no roof-material triangle closes it -- the wall
                 # under it climbs to the roof instead (`_wall_under_roofs`,
