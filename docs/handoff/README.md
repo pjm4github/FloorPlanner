@@ -382,5 +382,6 @@ this table is not a second copy of it.
 | [`0240-report.md`](./0240-report.md) | report: his word on 0239 — "the wall loop test is right", the build ordered; the state saved for a fresh session |
 | [`0241-report.md`](./0241-report.md) | report: the lower roof runs under the overhang — 0240 §1 built on `roof-overhang-build`, AMBER; measured on his design and on every roof fixture, including two the order expected unchanged and the rule reaches |
 | [`0242-report.md`](./0242-report.md) | report: his 3D view of the gable ends — the brown wrap is the cross-roof riser on the higher roof's gable-end line; gone, on `roof-overhang-build` with 0241's build, PR #81; his `short-angle-roofR2.json` (a dormer added) promoted |
+| [`0243-report.md`](./0243-report.md) | report: his second 3D look — the dormer's cheek spill and the step under the overhang; no riser on any edge of the higher roof, and the hidden strip is its roof's territory for the wall cap; PR #81 updated, one commit |
 
 <!-- PAIRS:END -->
