@@ -1384,7 +1384,11 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
     over it, whatever level that roof stands on -- a ground-storey roof
     rising through the upper storey caps the upper walls it passes. The
     CLIMB stays on the dormer's own level (`level` is the wall's): a wall
-    a storey below a dormer does not climb through the floor between.
+    a storey below a dormer does not climb through the floor between --
+    and, since 0254, the same for the GABLE climb below: a first-floor
+    gable wall does not climb into a second-floor roof through the
+    storey above (his house model's iteration 10: its header rose from
+    the window head to the rake, through the upper wall and its window).
 
     THE GABLE WALL CLIMBS (Patrick, 2026-10-06, on his gable-end check plan:
     *"I want the roof to extend out as speced, then the wall which is
@@ -1416,16 +1420,16 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         return not (max(cx) < bx0 or min(cx) > bx1
                     or max(cy) < by0 or min(cy) > by1)
 
-    nearby = [(geom, [c for c in cells if near(c)], dm and lid == level)
+    nearby = [(geom, [c for c in cells if near(c)], dm and lid == level, lid == level)
               for geom, cells, dm, lid in terr]
-    nearby = [(g, cs, dm) for g, cs, dm in nearby if cs]
+    nearby = [(g, cs, dm, same) for g, cs, dm, same in nearby if cs]
     if not nearby:
         return [_box(corners_xy, z_lo, z_hi)]
 
     # split the quad by every nearby cell edge: each piece then lies wholly
     # inside or outside every cell
     pieces = [quad]
-    for _, cells, _ in nearby:
+    for _, cells, _, _ in nearby:
         for cell in cells:
             n = len(cell)
             for i in range(n):
@@ -1441,16 +1445,16 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         # eaves wall under the overhang keeps the same profile as beside
         # it (Patrick's "strange step where the overhang sits", 2026-10-11).
         c = RC._centroid(pc)
-        best, best_h = (None, False), None
-        for geom, cells, dm in nearby:
+        best, best_h = (None, False, False), None
+        for geom, cells, dm, same in nearby:
             if any(RC._contains(cell, c) for cell in cells):
                 h = RC.surface_height(geom, c)
                 if best_h is None or h < best_h:
-                    best, best_h = (geom, dm), h
+                    best, best_h = (geom, dm, same), h
         if best[0] is not None:
             return best
         best_d = None
-        for geom, cells, dm in nearby:
+        for geom, cells, dm, same in nearby:
             for cell in cells:
                 n = len(cell)
                 d = min(RC._dist_to_segment(c, cell[i], cell[(i + 1) % n])
@@ -1460,7 +1464,7 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
                 h = RC.surface_height(geom, c)
                 if (best_d is None or d < best_d - RC.EPS
                         or (abs(d - best_d) <= RC.EPS and h < best_h)):
-                    best, best_d, best_h = (geom, dm), d, h
+                    best, best_d, best_h = (geom, dm, same), d, h
         return best
 
     def gable_wall_of(geom):
@@ -1477,11 +1481,18 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
 
     out, touched = [], False
     for pc in pieces:
-        geom, dormer = owner_of(pc)
+        geom, dormer, same_level = owner_of(pc)
         if geom is None:
             out.append(("flat", pc))
             continue
-        climb = to_top and (dormer or gable_wall_of(geom))
+        # THE CLIMB STAYS ON THE WALL'S OWN LEVEL, for a gable as for a
+        # dormer (iteration 10 of his house model, 0254-report.md): a
+        # first-floor gable wall under a SECOND-floor roof climbed through
+        # the storey above -- its header rose from the window head to the
+        # rake, through the second-floor wall and its window. The roof a
+        # wall climbs into is a roof of its own level; a roof of another
+        # level caps it like any other, where it is lower than the top.
+        climb = to_top and (dormer or (same_level and gable_wall_of(geom)))
         def cap_z(v, geom=geom):
             return z_base + RC.surface_height(geom, v) - WALL_CAP_BELOW_ROOF_IN
 
