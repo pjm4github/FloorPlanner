@@ -377,5 +377,6 @@ this table is not a second copy of it.
 | [`0235-report.md`](./0235-report.md) | report: the PDF (and DXF) exporters refused every plan with a roof — a version‑6 document read as "not v5"; fixed on `pdf-v6`, D87 filed and closed with it |
 | [`0236-report.md`](./0236-report.md) | report: PR #79 merged on green CI — the PDF and DXF exporters accept a plan with a roof; D87 closed |
 | [`0237-report.md`](./0237-report.md) | report: his `short-angle-roof.json` — a joined end's extension given ground in every roof's footprint, drawn across roofs it never reached; fixed on `roof-joined-domain`, D88; and what the lock-up measurement found before he redirected it |
+| [`0238-report.md`](./0238-report.md) | report: PR #80 merged on his word — the joined end's extension grounded in its hosts' footprints; D88 closed; his next rule, the gable end that projects UP, read back before anything is built |
 
 <!-- PAIRS:END -->

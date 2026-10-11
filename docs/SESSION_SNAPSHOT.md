@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 6d86798 -->
+<!-- SNAPSHOT-HEAD: 6ee358b -->
 
 # Session snapshot — read this first
 
@@ -74,7 +74,7 @@ must not be trusted over it.
 > `git show 52a2870:docs/SESSION_SNAPSHOT.md`. **Keep it this size:** when a
 > tranche closes, REPLACE its entry with one line and a link; do not append.
 
-**ONE BRANCH IS OPEN, `roof-joined-domain`, AMBER, FOR HIS CHECK: D88 — a joined roof end's extension was given ground in every roof's footprint and drawn across roofs it never reached (his `short-angle-roof.json`, promoted as the base case for the roof rules to come) — fixed by one word in the clipper ([`0237`](handoff/0237-report.md)). The roof-editor lock-up he reported measured as compose cost doubling per roof (15 roofs: 32 s a release), no hang; parked as its own tranche (0237 §0). D87 is MERGED, PR #79 ([`0236`](handoff/0236-report.md)). THE 3‑INCH REACH IS CLOSED AND MERGED** —
+**NOTHING IS OPEN ON A BRANCH. D88 — a joined roof end's extension drawn across roofs it never reached — is FIXED and MERGED, PR #80 on his word ("the roofs look right"), on his `short-angle-roof.json`, now the base-case fixture for the roof rules to come ([`0237`](handoff/0237-report.md), [`0238`](handoff/0238-report.md)). **HIS NEXT RULE IS READ BACK AT [`0239`](handoff/0239-report.md), NOT BUILT: the gable end under an overhanging upper roof projects UP to it, the upper roof does not project down.** The roof-editor lock-up he reported measured as compose cost doubling per roof (15 roofs: 32 s a release), no hang; parked as its own tranche (0237 §0). D87 is MERGED, PR #79 ([`0236`](handoff/0236-report.md)). THE 3‑INCH REACH IS CLOSED AND MERGED** —
 [PR #71](https://github.com/pjm4github/FloorPlanner/pull/71) landed on `main`
 by this merge commit on Patrick's word (2026‑10‑04: "OK that fix is good. commit and push # 71."),
 the branch deleted in the merge step; recorded at
@@ -248,10 +248,10 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`6d86798`** at this file's cut — [`0237`](handoff/0237-report.md) and D88's record landed; this commit, on `roof-joined-domain`, is D88's fix and his fixture. **Owed next: his check of `roof-joined-domain`.** Every PR through #79 is merged (#59 was closed, superseded by #60). |
-| **Branches** | **One open: `roof-joined-domain`** — D88, a joined end's extension grounded in its hosts' footprints only; AMBER, waits on his check. |
+| **`main`** | **`6ee358b`** at this file's cut — D88's fix merged (PR #80, on his word); this commit lands [`0238-report.md`](handoff/0238-report.md), the record of that merge, and closes D88 (`closed_by 6ee358b`). **Owed next: the read-back of his gable-up rule ([`0239`](handoff/0239-report.md)).** Every PR through #80 is merged (#59 was closed, superseded by #60). |
+| **Branches** | **None open.** Only `main` on the remote; `roof-joined-domain` was deleted in the merge step, local and remote. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
-| **Records** | **88 records, 31 open** (D88 filed and CLOSED 2026‑10‑11 in its own tranche; D87 CLOSED 2026‑10‑11, `closed_by d90f8b4`; D67 CLOSED 2026‑10‑07, `closed_by cdc54de`, [`0225`](handoff/0225-report.md); D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
+| **Records** | **88 records, 31 open** (D88 CLOSED 2026‑10‑11, `closed_by 6ee358b`; D87 CLOSED 2026‑10‑11, `closed_by d90f8b4`; D67 CLOSED 2026‑10‑07, `closed_by cdc54de`, [`0225`](handoff/0225-report.md); D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |
 | **THE MIGRATION** | **CLOSED 2026‑08‑11** — closing statement with its evidence in [`ROADMAP.md`](ROADMAP.md). Everything after it is features or cleanup. |
 | **PHASE 6** | **PARKED 2026‑08‑12, Patrick's ruling** — see §2. |

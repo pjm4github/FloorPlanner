@@ -14,7 +14,7 @@ milestone: null
 # ours; becomes body prose after migration
 opened: 2026-10-11
 closed: 2026-10-11
-closed_by: null
+closed_by: 6ee358b
 rank: 88
 related: [85]
 state_source: ruling
