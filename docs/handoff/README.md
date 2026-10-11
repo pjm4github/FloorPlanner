@@ -398,5 +398,6 @@ this table is not a second copy of it.
 | [`0256-report.md`](./0256-report.md) | report: his two reports on iteration 11's shed dormer — the End-On dialog refused it ("never meets the host roof") and OK did nothing, and its ridge grip shrank it on every move; a shed's ridge is its high edge, on the host; both fixed, folded into `window-sill-endon`'s one commit; AMBER |
 | [`0257-report.md`](./0257-report.md) | report: PR #84 merged on his word, the stack folded in — the gable climb's level check, his four fixes, the shed dormer's dialog and grip; iteration 11 of the house stands |
 | [`0258-report.md`](./0258-report.md) | report: 0248's plan E and its item 6 built on his word — the hip run settable per end; a `post` furnishing that rises to the roof over it; the porch floor as an exterior room; iteration 12 of the house — on `porch-posts-hip-run`, AMBER, for his check |
+| [`0259-report.md`](./0259-report.md) | report: PR #85 merged on his word — the hip run per end, the post that rises to the roof over it, the porch floor; 0248's plan E and item 6 closed; iteration 12 of the house stands |
 
 <!-- PAIRS:END -->

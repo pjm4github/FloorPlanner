@@ -5,12 +5,13 @@
 
 **Generated from the record** — one `**Landed:**` line per merge in [`handoff/`](handoff/), the defect register's front matter, and [`ROADMAP.md`](ROADMAP.md) §3's RED table. This file says whether a thing is DONE; [`SESSION_SNAPSHOT.md`](SESSION_SNAPSHOT.md) keeps the order and the why ([`handoff/0019-ruling.md`](handoff/0019-ruling.md) §4). A box that is not derived from the record is not on this board.
 
-**83 landed, 1 closed unmerged; 31 defects open, 57 closed.**
+**84 landed, 1 closed unmerged; 31 defects open, 57 closed.**
 
 ## Landed
 
 | PR | date | commit | tier | what it rested on | record |
 |---|---|---|---|---|---|
+| [#85](https://github.com/pjm4github/FloorPlanner/pull/85) | 2026-10-11 | `180c486` | AMBER | checked by Patrick on the house model's porch in the app: "the porch looks right" | [`0259`](handoff/0259-report.md) |
 | [#84](https://github.com/pjm4github/FloorPlanner/pull/84) | 2026-10-11 | `7a0a4bf` | AMBER | checked by Patrick on the house model's shed dormer in the app: "the shed dormer looks right, fold and land #84" | [`0257`](handoff/0257-report.md) |
 | [#83](https://github.com/pjm4github/FloorPlanner/pull/83) | 2026-10-11 | `32fd37d` | AMBER | checked by Patrick on the house model's shots: "The dormers and roofs look right" | [`0253`](handoff/0253-report.md) |
 | [#82](https://github.com/pjm4github/FloorPlanner/pull/82) | 2026-10-11 | `c93c392` | AMBER | checked by Patrick on the house model's iterations 6–9: "The dormers and roofs look right" | [`0251`](handoff/0251-report.md) |
