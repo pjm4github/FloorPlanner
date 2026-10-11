@@ -1134,9 +1134,19 @@ def compute_roof_clips(roofs, diag=None) -> dict:
             strip = _strip(rf, footprints[id(rf)], rf_ext_poly)
             if not strip:
                 continue
-            for other in live:
-                if other is rf:
-                    continue
+            # THE EXTENSION'S GROUND LIES IN ITS HOSTS' FOOTPRINTS AND NOWHERE
+            # ELSE -- the roofs whose footprint holds the swallowed END, the
+            # ones it is converging with there (0176/0177's three-way
+            # junction: rf2's planes run on over rf3 to their valley because
+            # rf2's end stands inside rf3 too). It used to be given ground in
+            # EVERY other live roof's footprint, so an end joined only to a
+            # roof above it ran on under that roof, came out the far side,
+            # and was drawn across roofs it never reached -- Patrick's
+            # `short-angle-roof.json`, 2026-10-11 (0237-report.md): two short
+            # first-floor roofs, each joined to the low second-floor roof
+            # over its inner end, drawn across the 45-degree roof and across
+            # each other. A roof the end never entered gets none of it.
+            for other in hosts:
                 piece = _convex_intersection(strip, footprints[id(other)])
                 if piece:
                     domain[id(rf)].append(piece)
