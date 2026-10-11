@@ -385,5 +385,6 @@ this table is not a second copy of it.
 | [`0243-report.md`](./0243-report.md) | report: his second 3D look — the dormer's cheek spill and the step under the overhang; no riser on any edge of the higher roof, and the hidden strip is its roof's territory for the wall cap; PR #81 updated, one commit |
 | [`0244-report.md`](./0244-report.md) | report: the dormer's sides, projected up to the dormer — generated cheeks standing on the host roof; PR #81 updated, one commit |
 | [`0245-report.md`](./0245-report.md) | report: the set-back dormer's face climbs from the roof itself — `_dormer_face`; his `short-angle-roofR3.json` promoted; PR #81 updated, one commit |
+| [`0246-report.md`](./0246-report.md) | report: PR #81 merged on his word — the lower roof under the overhang, nothing of roof hanging from a roof's edge, the dormer's sides and face projected up from the roof; the roof-wrap bug closed |
 
 <!-- PAIRS:END -->
