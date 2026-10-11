@@ -854,6 +854,9 @@ def _roofs_of(items, lid, nid, src=None):
                "marker_end": 1 if it.marker_end else 0}
         if getattr(it, "form", "gable") != "gable":   # plan A: omitted when gable
             rec["form"] = it.form
+        runs = list(getattr(it, "hip_run_in", None) or [None, None])
+        if any(r is not None for r in runs):          # 0258: only once an end is set
+            rec["hip_run_in"] = [None if r is None else float(r) for r in runs]
         if getattr(it, "openings", None):             # plan B: a dormer's face openings
             rec["openings"] = [dict(o) for o in it.openings]
         if src is not None:
@@ -1435,7 +1438,8 @@ def apply_design_to_scene(target, design, report=None, strict=False,
                         marker_end=int(rfd.get("marker_end", 1)),
                         eaves_bind=rfd.get("eaves_bind", "manual"),
                         form=rfd.get("form", "gable"),
-                        openings=rfd.get("openings"))
+                        openings=rfd.get("openings"),
+                        hip_run_in=rfd.get("hip_run_in"))
         item.floor = floor   # never the global
         scene.addItem(item)
         rep["roofs"] += 1

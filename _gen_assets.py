@@ -716,6 +716,11 @@ FURNISHINGS = [
       L(4, 4, 44, 52, 0.4), L(44, 4, 4, 52, 0.4),               # cab X
       L(6, 56.5, 22, 56.5, 1.3), L(26, 56.5, 42, 56.5, 1.3),    # sliding doors
       Ci(40, 30, 1.3, "none", 0.6)]),                           # call panel
+    # 0258 (0248 sec3 plan E): a porch post -- a 6x6 column, drawn in plan as
+    # the section every framing plan draws, a square with its diagonals
+    ("post", "Post 6x6", "Framing", 6, 6,
+     [R(0.5, 0.5, 5, 5, 0, sw=1.0),
+      L(0.5, 0.5, 5.5, 5.5, 0.4), L(5.5, 0.5, 0.5, 5.5, 0.4)]),
 ]
 
 # --------------------------------------------------------------- 3D solids
@@ -910,6 +915,10 @@ SOLIDS = {
     # number here.
     "stairs":                (108,      0, "box",       "wood"),
     "elevator":               (96,      0, "box",       "metal"),
+    # 0258 (plan E): a post is a COLUMN, which the viewer builds from its
+    # level to the underside of the roof standing over it; 96 is only what
+    # it is drawn at when no roof stands over it.
+    "post":                   (96,      0, "column",    "wood"),
 }
 
 # Material properties, ONCE.  Colour is (r, g, b, a) in 0..1.  These values are
@@ -1054,7 +1063,7 @@ def main():
                   "gas_water_heater", "electric_water_heater", "water_softener",
                   "gas_tank", "oil_tank", "electric_panel", "car_charger",
                   "battery_wall", "well_pump", "heat_exchanger"]),
-        ("Framing", ["stairs", "elevator"]),
+        ("Framing", ["stairs", "elevator", "post"]),
     ]
     groups_out = [{"name": "All",
                    "items": [f"{fid}.svg" for fid, *_ in FURNISHINGS]}]

@@ -96,7 +96,8 @@
       "well_pump.svg",
       "heat_exchanger.svg",
       "stairs.svg",
-      "elevator.svg"
+      "elevator.svg",
+      "post.svg"
     ]
   },
   {
@@ -264,7 +265,8 @@
     "name": "Framing",
     "items": [
       "stairs.svg",
-      "elevator.svg"
+      "elevator.svg",
+      "post.svg"
     ]
   }
 ]

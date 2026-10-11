@@ -70,9 +70,9 @@ def _furn_mesh(model):
 # --------------------------------------------------------------------------
 
 def test_every_catalog_entry_carries_a_solid(manifest):
-    """height_in, elevation_in, form and material on all 95 -- height_in most
+    """height_in, elevation_in, form and material on all 96 -- height_in most
     of all, because it is the one field with no safe default."""
-    assert len(manifest) == 95, "catalog size changed; check this on purpose"
+    assert len(manifest) == 96, "catalog size changed; check this on purpose (96: the post, 0258)"
     missing = {}
     for e in manifest:
         absent = [f for f in ("height_in", "elevation_in", "form", "material")
@@ -435,8 +435,10 @@ def test_every_catalog_symbol_either_extrudes_or_is_reported(fp3d, manifest):
          "pos": [i * 200.0, 0.0], "rotation": 0.0}
         for i, it in enumerate(manifest)]
     model = fp3d.build_model(doc)
+    # the forms with a generator of their own (box, slab; column since 0258)
+    # are built directly -- everything else extrudes its symbol or falls back
     pending = {i["id"] for i in manifest
-               if (i.get("form") or "box") not in ("box", "slab")}
+               if (i.get("form") or "box") not in ("box", "slab", "column")}
     got = set(model.stats["prism_kinds"]) | set(model.stats["box_fallback_kinds"])
     assert got == pending, f"unaccounted: {pending ^ got}"
     assert model.stats["furnishings"] == len(manifest)

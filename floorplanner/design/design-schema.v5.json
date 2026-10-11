@@ -174,9 +174,15 @@
           "type": "string", "enum": ["manual", "room_top"], "default": "manual"
         },
         "gable": {
-          "description": "One flag per ridge endpoint (index-aligned with `ridge`): true = a vertical gable-end triangle at that end; false = that end is a HIP. R4b (0154-ruling.md sec3) gives the flag its UI (the parameters dialog, per end) and its geometry: a hip end runs the roof PAST that ridge end -- the ridge stays where it was sketched -- by a hip run equal to the mean of the two `span_in` sides (the side span itself on every symmetric roof, so all faces share one pitch), plus the mean of the two `overhang_in` sides; the end face is the sloped triangle from the ridge end down to that end eave. Nothing more is stored for it: the run is derived from the spans, the same discipline as pitch.",
+          "description": "One flag per ridge endpoint (index-aligned with `ridge`): true = a vertical gable-end triangle at that end; false = that end is a HIP. R4b (0154-ruling.md sec3) gives the flag its UI (the parameters dialog, per end) and its geometry: a hip end runs the roof PAST that ridge end -- the ridge stays where it was sketched -- by a hip run equal to the mean of the two `span_in` sides (the side span itself on every symmetric roof, so all faces share one pitch), plus the mean of the two `overhang_in` sides; the end face is the sloped triangle from the ridge end down to that end eave. The run is derived from the spans unless `hip_run_in` (0258-report.md) says otherwise for that end.",
           "type": "array", "prefixItems": [{ "type": "boolean" }, { "type": "boolean" }],
           "minItems": 2, "maxItems": 2, "default": [true, true]
+        },
+        "hip_run_in": {
+          "description": "0258-report.md (0248-report.md sec2 item 6): the HIP RUN per ridge endpoint (index-aligned with `ridge` and `gable`) -- how far along the ridge axis a hip end runs past the ridge end, in inches. `null` at an end means the derived run, the mean of the two `span_in` sides, which is all a roof had before and is what a record without this key means. Settable because a one-plane porch roof on a long span wants a short hip, and the mean cannot say so. Ignored at a gable end. Additive optional (ROADMAP R-B): no version bump; omitted while both ends are derived.",
+          "type": "array",
+          "prefixItems": [{ "oneOf": [{ "type": "number", "minimum": 0 }, { "type": "null" }] }, { "oneOf": [{ "type": "number", "minimum": 0 }, { "type": "null" }] }],
+          "minItems": 2, "maxItems": 2
         },
         "marker_end": {
           "description": "R2b (0140-ruling.md, the End-On marker): which `ridge` endpoint (0 or 1, index-aligned) the End-On marker sits at -- document state so it survives reload, same idea as a room label's offset. Optional: roofs written before R2b default to 1.",

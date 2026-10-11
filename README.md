@@ -60,7 +60,7 @@ console script), plus bundled fonts and artwork.
   properties plus every furnishing and opening in the room, in an aligned
   table you can copy as TSV for Excel. Rooms can be copied and pasted
   elsewhere with their walls and openings.
-- **Furnishings** — a bundled CC0 library of 95 top-view symbols across
+- **Furnishings** — a bundled CC0 library of 96 top-view symbols across
   **Living** (sofas, chairs, tables, TV stand, **large-screen TV**, **gas
   fireplace**, bookshelf), **Dining** (tables, chairs, **buffet**, **china
   hutch**), **Kitchen** (appliances, sink, standard

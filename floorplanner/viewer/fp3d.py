@@ -677,6 +677,29 @@ class Model:
     stats: dict = field(default_factory=dict)
 
 
+def _roof_underside_at(lifted_of, x, y, above_z):
+    """0258 (plan E): the height of the underside of the LOWEST roof standing
+    over PLAN point `(x, y)` (the document's frame) higher than `above_z` -- `lifted_of` is
+    `build_model`'s `{id: Lifted}` of every roof in absolute height; a
+    roof counts when its footprint (hip ends and overhangs included) holds
+    the point. None when no roof stands over it. The underside is the
+    surface less `ROOF_T`, the thickness the roof slab is drawn with."""
+    if ROOFCLIP is None or not lifted_of:
+        return None
+    pt = ROOFCLIP.Pt(x, y)
+    best = None
+    for lf in lifted_of.values():
+        try:
+            if not ROOFCLIP._contains(ROOFCLIP.footprint_polygon(lf), pt):
+                continue
+            z = float(ROOFCLIP.surface_height(lf, pt)) - ROOF_T
+        except Exception:                 # a degenerate roof: not a post's problem
+            continue
+        if z > above_z and (best is None or z < best):
+            best = z
+    return best
+
+
 def _box(corners_xy, z0, z1):
     """Prism over a 4-point plan quad, wound so every normal points OUTWARD.
 
@@ -1591,8 +1614,8 @@ ROOF_DEFAULT_HALF_SPAN_IN = 144.0  # matches roofs.py's DEFAULT_HALF_SPAN_IN
 # also THE FALLBACK: a form whose own generator does not exist yet is drawn from
 # its plan symbol rather than as a rectangle. See PRISM IS THE FALLBACK below.
 KNOWN_FORMS = ("box", "slab", "seat", "bed", "basin", "enclosure", "vessel",
-               "vehicle", "planting", "prism")
-BUILT_FORMS = ("box", "slab", "prism")
+               "vehicle", "planting", "prism", "column")
+BUILT_FORMS = ("box", "slab", "prism", "column")
 
 
 def _plan_quad(place, x0, x1, y0, y1):
@@ -1735,6 +1758,12 @@ def build_solid(form, place, w, d, h, z0, outline=None):
     every other caller of THIS function keeps one material per item, exactly
     as before."""
     z1 = z0 + h
+    if form == "column":
+        # 0258 (plan E): a post -- the plan footprint as one prism from the
+        # underside to `h` above it, where `build_model` has already made
+        # `h` the height to the roof over it (`_roof_underside_at`), or the
+        # catalog's own height when nothing stands over it
+        return [_box(_plan_quad(place, -w / 2, w / 2, -d / 2, d / 2), z0, z1)]
     if form == "prism":
         body, region = build_prism(place, w, d, h, z0,
                                    outline or ([], (0.0, 0.0)))
@@ -2433,9 +2462,14 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             # each side plane becomes a trapezoid, still planar because the
             # extended corner keeps its side's own perp offset and height.
             gable = rf.get("gable") or [True, True]
-            hip_run = (span_left + span_right) / 2.0
             hip_oh = (oh_left + oh_right) / 2.0
-            ext = [0.0 if (i < len(gable) and gable[i]) else hip_run + hip_oh
+            # 0258: the hip run is the END'S OWN `hip_run_in` when the record
+            # says, else the mean of the spans (`RoofItem.hip_extension`)
+            runs_raw = rf.get("hip_run_in") or [None, None]
+            hip_runs = [((span_left + span_right) / 2.0)
+                        if (i >= len(runs_raw) or runs_raw[i] is None) else float(runs_raw[i])
+                        for i in (0, 1)]
+            ext = [0.0 if (i < len(gable) and gable[i]) else hip_runs[i] + hip_oh
                    for i in (0, 1)]
             a1 = (p1[0] - ux * ext[0], p1[1] - uy * ext[0])
             a2 = (p2[0] + ux * ext[1], p2[1] + uy * ext[1])
@@ -2447,7 +2481,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             r1 = (p1[0], p1[1], ridge_z)
             r2 = (p2[0], p2[1], ridge_z)
 
-            def corner(a, sign, reach, edge_z, end, ext=ext, hip_run=hip_run, z0=z0,
+            def corner(a, sign, reach, edge_z, end, ext=ext, hip_runs=hip_runs, z0=z0,
                        ridge_h=ridge_h, eaves_h=eaves_h, nx=nx, ny=ny):
                 # (loop variables bound as defaults: the repo's idiom, B023)
                 # a side with no plane (a SHED's right side, 0248 plan A)
@@ -2456,8 +2490,8 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 # ridge line too, exactly as `surface_height` says beyond
                 # the ridge end (the clipped path already builds it so);
                 # at ridge height the hip face would be a flat shelf
-                if reach <= 1e-6 and ext[end] > 1e-6 and hip_run > 1e-6:
-                    return (a[0], a[1], z0 + ridge_h - (ridge_h - eaves_h) / hip_run * ext[end])
+                if reach <= 1e-6 and ext[end] > 1e-6 and hip_runs[end] > 1e-6:
+                    return (a[0], a[1], z0 + ridge_h - (ridge_h - eaves_h) / hip_runs[end] * ext[end])
                 return (a[0] + sign * nx * reach, a[1] + sign * ny * reach, edge_z)
 
             e_pos1 = corner(a1, 1.0, reach_pos, edge_z_pos, 0)
@@ -2496,6 +2530,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         parts = {}
         unknown_kind, unknown_mat, unknown_form, pending_form = (
             set(), set(), set(), set())
+        no_roof_posts = set()
         outline_dir = _assets_dir()
         _OUTLINE_CACHE.clear()      # per build, so a test can swap the catalog
         for fu in doc.get("furnishings", []):
@@ -2558,6 +2593,18 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             # anything floor-bearing, non-zero for the wall-hung and
             # counter-mounted items, which used to sit on the floor.
             z = base(fu.get("level")) + elev
+            if catalog_form == "column":
+                # 0258 (plan E): a post rises from its level to the ROOF
+                # ABOVE IT -- the lowest roof whose footprint covers the
+                # point, its underside there; the catalog's height only
+                # when no roof stands over it (said in the report)
+                # (the lifted geoms are in the DOCUMENT's plan frame, y down,
+                # as `from_record` builds them -- not this mesh's world frame)
+                top = _roof_underside_at(lifted_of, float(pos[0]), float(pos[1]), z + 12.0)
+                if top is None:
+                    no_roof_posts.add(kind)
+                else:
+                    fh = top - z
             if form == "prism" and outline is None:      # an explicit `prism`
                 outline = load_outline(kind, specs, outline_dir)
             # THE PRISM IS ATTEMPTED HERE RATHER THAN INSIDE `build_solid`, so
@@ -2597,6 +2644,10 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             col = _colour(materials, mat) or UNKNOWN_C
             model.meshes.append(Mesh(f"furnishings:{mat}", v, f, col,
                                      translucent=col[3] < 1.0))
+        if no_roof_posts:
+            model.info.append(
+                "post kind(s) with no roof over them, drawn at the catalog "
+                "height: " + ", ".join(sorted(no_roof_posts)))
         if unknown_kind:
             model.notes.append(
                 "furnishing kind(s) in no catalog, drawn at the default box "

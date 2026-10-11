@@ -1045,8 +1045,14 @@ class RoofItem(QGraphicsItem):
     def __init__(self, p1, p2, eaves_h_in=96.0, ridge_h_in=132.0,
                 overhang_in=0.0, gable=None, span_in=DEFAULT_HALF_SPAN_IN,
                 marker_end=1, eaves_bind="manual", host=None, form="gable",
-                openings=None):
+                openings=None, hip_run_in=None):
         super().__init__()
+        # 0258-report.md (0248 sec2 item 6): THE HIP RUN, per end, settable.
+        # `[end0, end1]`, each a length along the ridge axis or None = the
+        # derived run (the mean of the two spans, R4b's rule, which is all a
+        # roof had before). A porch's one-plane roof wanted a short hip on a
+        # long span and could not say so.
+        self.hip_run_in = hip_run_in
         # 0248-report.md sec3 plan B: a DORMER's face openings -- the same
         # records a wall carries, held as plain dicts and round-tripped;
         # the 3D builder cuts them into the generated face. Nothing in the
@@ -1108,6 +1114,23 @@ class RoofItem(QGraphicsItem):
             return [float(a), float(b)]
         v = float(value)
         return [v, v]
+
+    @property
+    def hip_run_in(self):
+        return list(self._hip_run_in)
+
+    @hip_run_in.setter
+    def hip_run_in(self, value):
+        """`[a, b]` with None for a derived end; a bare number sets both."""
+        if value is None:
+            self._hip_run_in = [None, None]
+        elif isinstance(value, (list, tuple)):
+            a, b = value
+            self._hip_run_in = [None if a is None else max(0.0, float(a)),
+                                None if b is None else max(0.0, float(b))]
+        else:
+            v = max(0.0, float(value))
+            self._hip_run_in = [v, v]
 
     @property
     def span_in(self):
@@ -1208,18 +1231,21 @@ class RoofItem(QGraphicsItem):
             sc.removeItem(d)
         sc.removeItem(self)
 
-    def hip_extension(self, end: int, gable=None, span=None):
+    def hip_extension(self, end: int, gable=None, span=None, run=None):
         """`(run, overhang)` along the ridge axis, beyond ridge end `end`
         (0 = `p1`, 1 = `p2`), that a HIP end adds to the footprint:
-        `(0, 0)` for a gable end. The run is the mean of the two side spans,
-        the overhang the mean of the two side overhangs (class docstring).
-        `gable`/`span` override the stored values -- the parameters dialog
+        `(0, 0)` for a gable end. The run is the end's own `hip_run_in`
+        when set (0258), else the mean of the two side spans; the overhang
+        the mean of the two side overhangs (class docstring). `gable`/
+        `span`/`run` override the stored values -- the parameters dialog
         previews an edit before it is applied."""
         flags = self.gable if gable is None else gable
         spans = self._span_in if span is None else span
+        runs = self._hip_run_in if run is None else run
         if flags[end]:
             return 0.0, 0.0
-        return ((spans[0] + spans[1]) / 2.0,
+        own = runs[end] if runs is not None and end < len(runs) else None
+        return (((spans[0] + spans[1]) / 2.0) if own is None else float(own),
                 (self._overhang_in[0] + self._overhang_in[1]) / 2.0)
 
     def _axis(self):

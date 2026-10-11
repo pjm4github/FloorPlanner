@@ -1328,5 +1328,19 @@
     "material": "metal",
     "region_material": null,
     "price": 40000.0
+  },
+  {
+    "id": "post",
+    "name": "Post 6x6",
+    "category": "Framing",
+    "file": "post.svg",
+    "width_in": 6,
+    "depth_in": 6,
+    "height_in": 96,
+    "elevation_in": 0,
+    "form": "column",
+    "material": "wood",
+    "region_material": null,
+    "price": 0.0
   }
 ]

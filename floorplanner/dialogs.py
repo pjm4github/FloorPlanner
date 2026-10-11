@@ -1137,6 +1137,26 @@ class RoofEndOnDialog(QDialog):
         self.cb_end_other.addItems(["Gable", "Hip"])
         self.cb_end_other.setCurrentIndex(0 if gable[1 - self._marker_end] else 1)
         form.addRow("Other end", self.cb_end_other)
+        # -- 0258 (0248 sec2 item 6): the hip run per end. Enabled while that
+        # end is a hip; seeded with the end's own run when the record says,
+        # else the derived one (the mean of the spans); OK writes an end's
+        # run only where it differs from the derived value, so an untouched
+        # end stays derived and follows the spans.
+        self.sp_run = {}
+        for end, label in ((self._marker_end, "Hip run, end with the marker"),
+                           (1 - self._marker_end, "Hip run, other end")):
+            sp = QDoubleSpinBox()
+            sp.setRange(0.0, 1200.0)
+            sp.setDecimals(1)
+            sp.setSuffix(" in")
+            stored = list(getattr(roof, "hip_run_in", None) or [None, None])
+            sp.setValue(float(stored[end]) if stored[end] is not None
+                        else (span_l + span_r) / 2.0)
+            sp.setToolTip("How far the hip runs past this ridge end; the mean "
+                          "of the two spans unless set here")
+            form.addRow(label, sp)
+            self.sp_run[end] = sp
+        self._refresh_run_fields()
         if self._dormer:
             # R5b: a dormer's eaves are its cheek top, not a room's ceiling,
             # and its back end is DERIVED into the host -- neither is a
@@ -1395,8 +1415,30 @@ class RoofEndOnDialog(QDialog):
         self._refresh_binding()
 
     def _on_ends(self):
+        self._refresh_run_fields()
         if self.binding is not None:
             self._refresh_binding()
+
+    # -- 0258: the hip run per end ----------------------------------------------
+    def _derived_run(self) -> float:
+        return (self.sp_span_l.value() + self.sp_span_r.value()) / 2.0
+
+    def _refresh_run_fields(self):
+        flags = self.gable_flags()
+        for end, sp in self.sp_run.items():
+            sp.setEnabled(not flags[end])
+
+    def hip_runs(self):
+        """`[end0, end1]`: the run typed for a HIP end that differs from the
+        derived mean, else None (derived)."""
+        out = [None, None]
+        for end, sp in self.sp_run.items():
+            if not sp.isEnabled():
+                continue
+            v = float(sp.value())
+            if abs(v - self._derived_run()) > 0.05:
+                out[end] = v
+        return out
 
     # -- R4b: per-side eaves span -------------------------------------------
     def span_values(self):
@@ -1486,6 +1528,7 @@ class RoofEndOnDialog(QDialog):
         self.roof.overhang_in = [float(self.sp_oh_l.value()),
                                  float(self.sp_oh_r.value())]
         self.roof.gable = self.gable_flags()
+        self.roof.hip_run_in = self.hip_runs()        # 0258: after the spans
         self.roof.eaves_bind = "room_top" if self.ck_bind.isChecked() else "manual"
         if self._dormer:
             if self.dormer_meet_in() is None:

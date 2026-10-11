@@ -375,7 +375,7 @@ class RoofGeom:
     accept the pre-R4a bare-number shape the way the loader does."""
 
     def __init__(self, p1, p2, span_in, overhang_in, ridge_h_in, eaves_h_in,
-                 gable=None, name=None, marker_end=1):
+                 gable=None, name=None, marker_end=1, hip_run_in=None):
         # read-only, like RoofItem's: the gate's end-assignment census
         # polices the literal `.p1 =` spelling project-wide
         self._p1, self._p2 = Pt(p1), Pt(p2)
@@ -389,6 +389,9 @@ class RoofGeom:
         # roof with no single-coverage ground of its own -- `roofs.py`'s
         # own end-index convention, 0 = p1, 1 = p2
         self.marker_end = 1 if marker_end else 0
+        # 0258: the hip run per end, None = derived (the mean of the spans)
+        runs = list(hip_run_in) if isinstance(hip_run_in, (list, tuple)) else [None, None]
+        self.hip_run_in = [None if r is None else float(r) for r in (runs + [None, None])[:2]]
 
     @staticmethod
     def _pair(value):
@@ -407,7 +410,7 @@ class RoofGeom:
                 rec.get("overhang_in", 0.0) or 0.0,
                 rec.get("ridge_h_in", 132.0), rec.get("eaves_h_in", 96.0),
                 rec.get("gable") or [True, True], rec.get("id"),
-                rec.get("marker_end", 1))
+                rec.get("marker_end", 1), rec.get("hip_run_in"))
         # 0248 plan A: a shed has no right plane -- its right span and
         # overhang are 0 whatever the record says (the item clamps them)
         g.form = rec.get("form", "gable")
@@ -435,12 +438,14 @@ class RoofGeom:
         ln = math.hypot(dx, dy) or 1.0
         return dx / ln, dy / ln, -dy / ln, dx / ln
 
-    def hip_extension(self, end, gable=None, span=None):
+    def hip_extension(self, end, gable=None, span=None, run=None):
         flags = self.gable if gable is None else gable
         spans = self.span_in if span is None else span
+        runs = self.hip_run_in if run is None else run
         if flags[end]:
             return 0.0, 0.0
-        return ((spans[0] + spans[1]) / 2.0,
+        own = runs[end] if runs is not None and end < len(runs) else None
+        return (((spans[0] + spans[1]) / 2.0) if own is None else float(own),
                 (self.overhang_in[0] + self.overhang_in[1]) / 2.0)
 
     def _extended_ridge(self, gable=None):

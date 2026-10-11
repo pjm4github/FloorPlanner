@@ -223,7 +223,7 @@ class Roof(_Node):
                         ("overhang_in", RAW), ("span_in", RAW),
                         ("eaves_bind", RAW), ("gable", RAW),
                         ("marker_end", RAW), ("host", RAW), ("form", RAW),
-                        ("openings", RAW)]
+                        ("openings", RAW), ("hip_run_in", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     ridge: Any = _MISSING
@@ -244,6 +244,10 @@ class Roof(_Node):
     # 0248-report.md sec3 plan B: a DORMER's openings, cut into its generated
     # face -- the same records a wall carries. OPTIONAL, dormer only.
     openings: Any = _MISSING
+    # 0258-report.md (0248 sec2 item 6): the hip run per end, `[end0, end1]`,
+    # a length or null (= derived, the mean of the spans). OPTIONAL, omitted
+    # while both ends are derived.
+    hip_run_in: Any = _MISSING
 
 
 @dataclass
