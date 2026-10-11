@@ -394,5 +394,6 @@ this table is not a second copy of it.
 | [`0252-report.md`](./0252-report.md) | report: 0248's plans B and D built on `roof-openings-ridge-meet` — openings on a dormer record, cut into its generated face; the equal-height ridge meeting in the clip; the viewer's `--shot` given a viewpoint; AMBER, for his check |
 | [`0253-report.md`](./0253-report.md) | report: PR #83 merged on his word — openings on a dormer record, the equal-height ridge meeting, the app's 3D view taking a shot; 0248's plans B and D closed; iteration 10 of the house ordered |
 | [`0254-report.md`](./0254-report.md) | report: iteration 10 of the house — the dormers' windows; a first-floor gable wall climbed through the second storey, fixed on `roof-gable-climb-level`; AMBER, for his check |
+| [`0255-report.md`](./0255-report.md) | report: his four fixes — the End-On dialog no longer takes the app down on the porch's shed roof; the window's elevation is a property on its sheet with a plan default; the schema audited against everything the app writes; iteration 11 of the house — on `window-sill-endon`, stacked on `roof-gable-climb-level`; AMBER, for his check |
 
 <!-- PAIRS:END -->
