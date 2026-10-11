@@ -384,5 +384,6 @@ this table is not a second copy of it.
 | [`0242-report.md`](./0242-report.md) | report: his 3D view of the gable ends — the brown wrap is the cross-roof riser on the higher roof's gable-end line; gone, on `roof-overhang-build` with 0241's build, PR #81; his `short-angle-roofR2.json` (a dormer added) promoted |
 | [`0243-report.md`](./0243-report.md) | report: his second 3D look — the dormer's cheek spill and the step under the overhang; no riser on any edge of the higher roof, and the hidden strip is its roof's territory for the wall cap; PR #81 updated, one commit |
 | [`0244-report.md`](./0244-report.md) | report: the dormer's sides, projected up to the dormer — generated cheeks standing on the host roof; PR #81 updated, one commit |
+| [`0245-report.md`](./0245-report.md) | report: the set-back dormer's face climbs from the roof itself — `_dormer_face`; his `short-angle-roofR3.json` promoted; PR #81 updated, one commit |
 
 <!-- PAIRS:END -->
