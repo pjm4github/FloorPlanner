@@ -396,5 +396,6 @@ this table is not a second copy of it.
 | [`0254-report.md`](./0254-report.md) | report: iteration 10 of the house — the dormers' windows; a first-floor gable wall climbed through the second storey, fixed on `roof-gable-climb-level`; AMBER, for his check |
 | [`0255-report.md`](./0255-report.md) | report: his four fixes — the End-On dialog no longer takes the app down on the porch's shed roof; the window's elevation is a property on its sheet with a plan default; the schema audited against everything the app writes; iteration 11 of the house — on `window-sill-endon`, stacked on `roof-gable-climb-level`; AMBER, for his check |
 | [`0256-report.md`](./0256-report.md) | report: his two reports on iteration 11's shed dormer — the End-On dialog refused it ("never meets the host roof") and OK did nothing, and its ridge grip shrank it on every move; a shed's ridge is its high edge, on the host; both fixed, folded into `window-sill-endon`'s one commit; AMBER |
+| [`0257-report.md`](./0257-report.md) | report: PR #84 merged on his word, the stack folded in — the gable climb's level check, his four fixes, the shed dormer's dialog and grip; iteration 11 of the house stands |
 
 <!-- PAIRS:END -->
