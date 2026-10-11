@@ -389,5 +389,6 @@ this table is not a second copy of it.
 | [`0247-report.md`](./0247-report.md) | report: his word on 0241 §2 — the overhang rule stays as it is on the three-ridge and two-level fixtures; nothing built |
 | [`0248-report.md`](./0248-report.md) | report: his house picture built as a design — `fixtures/incoming/house_cutout.json`, four iterations with renders; where the roof and dormer tools fell short, and the plan proposed |
 | [`0249-report.md`](./0249-report.md) | report: 0248's plans A and C built on `roof-shed-form` — the `shed` roof form, and a dormer's generated side or face yielding to a house wall; the house model regenerated with both; AMBER, for his check |
+| [`0250-report.md`](./0250-report.md) | report: the house regenerated from the first-floor plan (iteration 6); a shed's ends are never joined — found on it, fixed on `roof-shed-form`; PR #82 updated, one commit |
 
 <!-- PAIRS:END -->
