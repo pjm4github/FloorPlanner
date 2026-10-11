@@ -388,5 +388,6 @@ this table is not a second copy of it.
 | [`0246-report.md`](./0246-report.md) | report: PR #81 merged on his word — the lower roof under the overhang, nothing of roof hanging from a roof's edge, the dormer's sides and face projected up from the roof; the roof-wrap bug closed |
 | [`0247-report.md`](./0247-report.md) | report: his word on 0241 §2 — the overhang rule stays as it is on the three-ridge and two-level fixtures; nothing built |
 | [`0248-report.md`](./0248-report.md) | report: his house picture built as a design — `fixtures/incoming/house_cutout.json`, four iterations with renders; where the roof and dormer tools fell short, and the plan proposed |
+| [`0249-report.md`](./0249-report.md) | report: 0248's plans A and C built on `roof-shed-form` — the `shed` roof form, and a dormer's generated side or face yielding to a house wall; the house model regenerated with both; AMBER, for his check |
 
 <!-- PAIRS:END -->
