@@ -380,5 +380,6 @@ this table is not a second copy of it.
 | [`0238-report.md`](./0238-report.md) | report: PR #80 merged on his word — the joined end's extension grounded in its hosts' footprints; D88 closed; his next rule, the gable end that projects UP, read back before anything is built |
 | [`0239-report.md`](./0239-report.md) | READ-BACK: the gable end that projects UP — what his design shows at the west junction, the mechanism, and the rule as I read it; nothing built |
 | [`0240-report.md`](./0240-report.md) | report: his word on 0239 — "the wall loop test is right", the build ordered; the state saved for a fresh session |
+| [`0241-report.md`](./0241-report.md) | report: the lower roof runs under the overhang — 0240 §1 built on `roof-overhang-build`, AMBER; measured on his design and on every roof fixture, including two the order expected unchanged and the rule reaches |
 
 <!-- PAIRS:END -->
