@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 6ee358b -->
+<!-- SNAPSHOT-HEAD: d54ccfc -->
 
 # Session snapshot — read this first
 
@@ -248,7 +248,7 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`6ee358b`** at this file's cut — D88's fix merged (PR #80, on his word); this commit lands [`0238-report.md`](handoff/0238-report.md), the record of that merge, and closes D88 (`closed_by 6ee358b`). **Owed next: the read-back of his gable-up rule ([`0239`](handoff/0239-report.md)).** Every PR through #80 is merged (#59 was closed, superseded by #60). |
+| **`main`** | **`d54ccfc`** at this file's cut — D88 merged and recorded ([`0238`](handoff/0238-report.md)); this commit lands [`0239-report.md`](handoff/0239-report.md), the read-back of his gable-up rule, with a headless 3D renderer as evidence. **Owed next: his word on 0239 §3–§4.** Every PR through #80 is merged (#59 was closed, superseded by #60). |
 | **Branches** | **None open.** Only `main` on the remote; `roof-joined-domain` was deleted in the merge step, local and remote. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **88 records, 31 open** (D88 CLOSED 2026‑10‑11, `closed_by 6ee358b`; D87 CLOSED 2026‑10‑11, `closed_by d90f8b4`; D67 CLOSED 2026‑10‑07, `closed_by cdc54de`, [`0225`](handoff/0225-report.md); D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
