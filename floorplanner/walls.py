@@ -403,7 +403,7 @@ def apply_merge_plan_to_scene(scene, plan, rebuild=True):
                 continue
             op = src.openings[po.index]
             specs.append((op if src is surv else None, op.kind, op.code,
-                          po.s, op.door_type, op.swing))
+                          po.s, op.data()))
         rooms = list(surv.rooms)               # the survivor borders them all
         for w in m.absorbed:
             if sip.isdeleted(w):
@@ -418,7 +418,7 @@ def apply_merge_plan_to_scene(scene, plan, rebuild=True):
         _adopt_end(surv, "p1", m.v1, m.p1)
         _adopt_end(surv, "p2", m.v2, m.p2)
         keep = []
-        for op, kind, code, s, door_type, swing in specs:
+        for op, kind, code, s, data in specs:
             if op is not None:                 # the survivor's own: it rides on
                 op.s = s
                 keep.append(op)
@@ -429,7 +429,7 @@ def apply_merge_plan_to_scene(scene, plan, rebuild=True):
                 report_opening_failure(surv.scene(), surv, kind, code, s,
                                        f"{exc} (merging collinear walls)")
                 continue
-            new.door_type, new.swing = door_type, swing
+            new.adopt(data)
             keep.append(new)
         for op in surv.openings:               # deduped away (defect 9)
             if op not in keep and not sip.isdeleted(op):
@@ -758,7 +758,7 @@ def apply_split_plan_to_scene(scene, split, rebuild=True):
             report_opening_failure(seg.scene(), seg, op.kind, op.code, s,
                                    f"{exc} (splitting a wall)")
             continue
-        new.door_type, new.swing = op.door_type, op.swing
+        new.adopt(op.data())
         seg.openings.append(new)
         op.setParentItem(None)
         if op.scene() is not None:
@@ -2812,6 +2812,14 @@ class OpeningItem(QGraphicsItem):
         self.width, self.height = 32.0, 80.0
         self.door_type = "LH"
         self.swing = -1                   # -1 / +1 : which face it swings to
+        # 0255: the window's sill over its level's base; None = the plan's
+        # default (`DEFAULT_SILL_IN` in model.py), which the 3D builder, the
+        # DXF export and the property sheet all use when the record does
+        # not say. Written only once it is set, so a record that never said
+        # goes on not saying. `_v5_extra` carries the opening keys the scene
+        # does not model (`head_in`) across a round trip, as a wall's does.
+        self.sill_in = None
+        self._v5_extra = {}
         self.anchor_v = None              # the Vertex this is dimensioned off
         self.offset_in = 0.0              # ...to the opening's NEAR EDGE
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
@@ -2907,10 +2915,36 @@ class OpeningItem(QGraphicsItem):
         self.code = code.strip()
         self.prepareGeometryChange()
         self.width, self.height = w, h
+        self._v5_extra.pop("head_in", None)   # a head the record said was for the old height
         if centre is not None:
             self.s = centre
         if rebuild:
             self.wall.rebuild()           # re-cuts the gap, re-syncs children
+
+    def set_sill(self, sill_in):
+        """0255: the window's sill over the level (None = the plan's default).
+        A head the record carried was measured from the old sill: dropped."""
+        self.sill_in = None if sill_in is None else float(sill_in)
+        self._v5_extra.pop("head_in", None)
+        self.update()
+
+    def data(self) -> dict:
+        """What a copy of this opening carries besides kind, code and station:
+        the door's type and swing, the window's sill, the unmodelled keys.
+        Every site that re-makes an opening (a merge, a split, an extract,
+        a paste) takes this and hands it to `adopt`, so a new field is
+        carried everywhere by being named here once."""
+        return {"door_type": self.door_type, "swing": self.swing,
+                "sill_in": self.sill_in, "extra": dict(self._v5_extra)}
+
+    def adopt(self, data: dict):
+        """The inverse of `data`; a dict from an older clipboard (no sill) is
+        fine -- the window then sits at the plan's default."""
+        self.door_type = data.get("door_type", self.door_type)
+        self.swing = data.get("swing", self.swing)
+        sill = data.get("sill_in")
+        self.sill_in = None if sill is None else float(sill)
+        self._v5_extra = dict(data.get("extra") or {})
 
     def set_door_type(self, name: str):
         """Change the door type; garage doors auto-size an undersized
@@ -3141,6 +3175,9 @@ class OpeningItem(QGraphicsItem):
             self.set_code(dlg.code())
         except ValueError as ex:
             QMessageBox.warning(v, "Invalid size", str(ex))
+            return
+        if self.kind == "window":            # 0255: the sill is the sheet's too
+            self.set_sill(dlg.sill_in())
 
     def contextMenuEvent(self, e):
         menu = QMenu()

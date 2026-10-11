@@ -364,3 +364,117 @@ def test_a_sheds_ends_are_never_joined_so_the_host_keeps_its_ground_beside_a_she
     assert min(xs) >= 350.0 - 1e-6 and max(xs) <= 494.0 + 1e-6, "the shed ran sideways"
     assert not per[id(geoms["rf_main"])].warnings and not per[id(geoms["rf_shed"])].warnings
 
+
+
+# ---------------------------------------------------------------------------
+# 0255-report.md: the End-On dialog on a shed does not take the application down
+# ---------------------------------------------------------------------------
+
+def test_the_end_on_dialog_opens_and_draws_a_shed_with_a_hip_end(scene):
+    """His porch roof: a shed (right span 0, right overhang 0) with a hip
+    at one end. Opening its End-On dialog divided the rise by the right
+    span in the canvas's paint and took the application down (a Python
+    error inside a paint event is fatal under PyQt6). The canvas keeps the
+    zero, draws the one slope and the high wall under the ridge, and the
+    right side's pitch is the wall's, 90."""
+    from PyQt6.QtGui import QImage, QPainter
+
+    from floorplanner.dialogs import RoofEndOnDialog
+    rf = RoofItem(QPointF(74, 312), QPointF(124, 312), eaves_h_in=117.9, ridge_h_in=131.0,
+                  overhang_in=[12.0, 0.0], gable=[False, True], span_in=[157.0, 0.0], form="shed")
+    scene.addItem(rf)
+    dlg = RoofEndOnDialog(rf)
+    assert dlg.form_value() == "shed"
+    assert dlg.canvas.shed and dlg.canvas.span_r == 0.0
+    assert dlg.canvas.pitch_deg(1) == 90.0
+    assert dlg.canvas.pitch_deg(0) == pytest.approx(4.77, abs=0.05)
+    # the paint itself, through a real painter: this is the line that crashed
+    img = QImage(400, 300, QImage.Format.Format_ARGB32)
+    p = QPainter(img)
+    dlg.canvas.render(p)
+    p.end()
+    # every edit path redraws; none of them may divide by the zero either
+    dlg.sp_ridge.setValue(140.0)
+    dlg.sp_oh_l.setValue(18.0)
+    dlg.cb_end_marker.setCurrentIndex(1)
+    p = QPainter(img)
+    dlg.canvas.render(p)
+    p.end()
+    assert dlg.apply() and rf.span_in == [157.0, 0.0] and rf.form == "shed"
+    # and a gable's drawing is what it was: both spans at least 1 on the canvas
+    dlg.cb_form.setCurrentIndex(0)
+    assert not dlg.canvas.shed and dlg.canvas.span_r == pytest.approx(157.0)
+
+
+def test_the_end_on_dialog_accepts_a_shed_dormer_whose_high_edge_lies_on_the_host(scene):
+    """His report on iteration 11 (0256): the dialog on the house's shed
+    dormer said "never meets the host roof" and OK did nothing. A shed
+    dormer's ridge is its HIGH EDGE on the host plane, parallel to the
+    host's ridge: nothing to meet along it. It stands while the host is at
+    or above that height at both ends; it floats, and is refused, above."""
+    from PyQt6.QtWidgets import QDialog
+
+    from floorplanner.dialogs import RoofEndOnDialog
+    host = RoofItem(QPointF(124, 156), QPointF(699, 156), eaves_h_in=48.0, ridge_h_in=204.0,
+                    span_in=[156.0, 156.0])
+    scene.addItem(host)
+    top = 204.0 - (214.4 - 156.0)                 # the host's surface on the ridge line: 145.6
+    d = RoofItem(QPointF(350, 214.4), QPointF(494, 214.4), eaves_h_in=108.0, ridge_h_in=top,
+                 span_in=[97.6, 0.0], form="shed", host=host)
+    scene.addItem(d)
+    dlg = RoofEndOnDialog(d)
+    assert dlg.dormer_meet_in() == pytest.approx(0.0, abs=0.01)
+    assert "on the host roof" in dlg.lab_dormer.text()
+    marker = dlg.cb_end_marker if dlg._marker_end == 0 else dlg.cb_end_other
+    assert not marker.isEnabled() and not dlg.cb_end_other.isEnabled(), "both ends are faces"
+    assert dlg.apply() is True
+    assert d.p2.x() == pytest.approx(494.0), "nothing derived: the second end is the second face"
+    dlg.accept()
+    assert dlg.result() == QDialog.DialogCode.Accepted
+    # above the host along the edge: it would float -- refused, as before
+    dlg2 = RoofEndOnDialog(d)
+    dlg2.sp_ridge.setValue(top + 2.0)
+    assert dlg2.dormer_meet_in() is None and "float" in dlg2.lab_dormer.text()
+    assert dlg2.apply() is False
+    dlg2.accept()
+    assert dlg2.result() != QDialog.DialogCode.Accepted
+    # under the host: buried, the plane emerges lower down -- stands
+    dlg2.sp_ridge.setValue(top - 10.0)
+    assert dlg2.dormer_meet_in() == pytest.approx(10.0, abs=0.01)
+    assert "under the host" in dlg2.lab_dormer.text() and dlg2.apply() is True
+
+
+def test_a_sheds_ridge_grip_moves_the_high_edge_and_does_not_creep(scene):
+    """His report (0256): dragging the shed dormer's ridge grip shrank the
+    dormer on every mouse move -- the gable rebalance clamped the right
+    span's share to at least 1in with nothing on the right to give. A
+    shed's ridge is its high edge: it goes where the cursor is, the eave
+    line stays, the span follows; the same cursor twice moves nothing."""
+    host = RoofItem(QPointF(124, 156), QPointF(699, 156), eaves_h_in=48.0, ridge_h_in=204.0,
+                    span_in=[156.0, 156.0])
+    scene.addItem(host)
+    # a plain shed first: ridge along x at y=100, its one plane down +y to the eave at y=200
+    rf = RoofItem(QPointF(0, 100), QPointF(200, 100), span_in=[100.0, 0.0], form="shed")
+    scene.addItem(rf)
+    rf.drag_ridge(QPointF(100, 126))                 # the high edge to y=126 (on the 6in grid)
+    assert rf.p1.y() == pytest.approx(126.0) and rf.p2.y() == pytest.approx(126.0)
+    assert rf.span_in == [pytest.approx(74.0), 0.0], "the eave line stays at y=200"
+    rf.drag_ridge(QPointF(100, 126))                 # the same cursor: no creep
+    assert rf.p1.y() == pytest.approx(126.0) and rf.span_in[0] == pytest.approx(74.0)
+    rf.drag_ridge(QPointF(100, 42))                  # away from the eave: the span grows
+    assert rf.p1.y() == pytest.approx(42.0) and rf.span_in[0] == pytest.approx(158.0)
+    # the house's shed dormer: the high edge keeps to the host's surface
+    top = 204.0 - (214.4 - 156.0)
+    d = RoofItem(QPointF(350, 214.4), QPointF(494, 214.4), eaves_h_in=108.0, ridge_h_in=top,
+                 span_in=[97.6, 0.0], form="shed", host=host)
+    scene.addItem(d)
+    d.drag_ridge(QPointF(422, 204))                  # up-slope by about 10in
+    assert d.p1.y() == pytest.approx(204.0) and d.p2.x() == pytest.approx(494.0)
+    assert d.ridge_h_in == pytest.approx(204.0 - (204.0 - 156.0))
+    assert d.span_in[0] == pytest.approx(97.6 + 10.4)
+    before = (d.p1.y(), d.ridge_h_in, d.span_in[0])
+    d.drag_ridge(QPointF(422, 204))
+    assert (d.p1.y(), d.ridge_h_in, d.span_in[0]) == pytest.approx(before)
+    # and its second end is a face, dragged like any end: longer along the ridge
+    d.drag_end(1, QPointF(530, 204))
+    assert d.p2.x() > 494.0 and d.p1.x() == pytest.approx(350.0)

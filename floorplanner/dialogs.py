@@ -756,6 +756,28 @@ class OpeningPropertiesDialog(QDialog):
         hint.setWordWrap(True)
         form.addRow("", hint)
 
+        # -- 0255: the window's elevation. The sill over this level's floor,
+        # a property of the window; a record that never said sits at the
+        # plan's default, which seeds the field, and OK writes the value.
+        self.sp_sill = None
+        if kind == "window":
+            from floorplanner.model import DEFAULT_SILL_IN
+            said = getattr(opening, "sill_in", None)
+            self.sp_sill = QDoubleSpinBox()
+            self.sp_sill.setRange(0.0, 600.0)
+            self.sp_sill.setDecimals(1)
+            self.sp_sill.setSuffix(" in")
+            self.sp_sill.setValue(float(DEFAULT_SILL_IN if said is None else said))
+            form.addRow("Sill height", self.sp_sill)
+            sill_hint = QLabel(
+                f"The sill above this level's floor; the head is the sill plus "
+                f"the height. A window that was never set sits at the plan's "
+                f"default, {DEFAULT_SILL_IN:g}″"
+                + (" — this one has not been set." if said is None else "."))
+            sill_hint.setStyleSheet("color: #666;")
+            sill_hint.setWordWrap(True)
+            form.addRow("", sill_hint)
+
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
                                    | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
@@ -764,6 +786,11 @@ class OpeningPropertiesDialog(QDialog):
 
     def code(self) -> str:
         return self.ed_code.text().strip()
+
+    def sill_in(self):
+        """The sill as typed, inches over the level; None on a sheet with no
+        sill row (a door, a gate)."""
+        return None if self.sp_sill is None else float(self.sp_sill.value())
 
 
 class ConceptRoomDialog(QDialog):
@@ -828,7 +855,14 @@ class _EndOnCanvas(QWidget):
     sec2: "the End-On drawing shows both slopes when they differ") -- the
     overhang continues each slope past its wall line to the eave tip, and
     the right side gets its own pitch label whenever it differs from the
-    left. Left is drawn on the left: `span_in[0]`'s side."""
+    left. Left is drawn on the left: `span_in[0]`'s side.
+
+    0255-report.md: a SHED (0248 plan A) has no right side -- its right
+    span is 0 and stays 0 here (the gable clamp to 1 would draw a plane
+    that does not exist). It is drawn as the one slope down the left and
+    the high wall under the ridge; nothing divides by the right span. The
+    porch roof of his house opened this dialog on a zero and the division
+    in `paintEvent` took the application down."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -846,15 +880,22 @@ class _EndOnCanvas(QWidget):
 
     def set_values(self, span_l, span_r, oh_l, oh_r, ridge_h, eaves_h,
                    wall_top_in=None):
-        self.span_l, self.span_r = max(1.0, span_l), max(1.0, span_r)
+        self.span_l, self.span_r = max(1.0, span_l), max(0.0, span_r)
         self.oh_l, self.oh_r = max(0.0, oh_l), max(0.0, oh_r)
         self.ridge_h, self.eaves_h = ridge_h, eaves_h
         if wall_top_in is not None:
             self.wall_top_in = float(wall_top_in)
         self.update()
 
+    @property
+    def shed(self) -> bool:
+        """One plane: no right span (the shed form)."""
+        return self.span_r < 1e-9
+
     def pitch_deg(self, side: int) -> float:
         span = self.span_l if side == 0 else self.span_r
+        if span < 1e-9:
+            return 90.0                  # a shed's right side is its high wall
         return math.degrees(math.atan2(max(0.0, self.ridge_h - self.eaves_h),
                                        span))
 
@@ -875,7 +916,9 @@ class _EndOnCanvas(QWidget):
             return QPointF(cx + x_in * scale, base_y - y_in * scale)
 
         rise = self.ridge_h - self.eaves_h
-        slope_l, slope_r = rise / self.span_l, rise / self.span_r
+        shed = self.shed
+        slope_l = rise / self.span_l
+        slope_r = 0.0 if shed else rise / self.span_r
         ridge_pt = pt(0.0, self.ridge_h)
         eave_l = pt(-self.span_l, self.eaves_h)
         eave_r = pt(self.span_r, self.eaves_h)
@@ -894,12 +937,21 @@ class _EndOnCanvas(QWidget):
         # continued past each wall line to the overhang tip
         p.setPen(QPen(QColor(133, 77, 14), 2.4))
         p.drawLine(tip_l, ridge_pt)
-        p.drawLine(ridge_pt, tip_r)
+        if not shed:
+            p.drawLine(ridge_pt, tip_r)
         p.setPen(QPen(QColor(60, 60, 60), 1.2))
         p.drawLine(QPointF(eave_l.x(), base_y), eave_l)
-        p.drawLine(QPointF(eave_r.x(), base_y), eave_r)
+        if shed:
+            p.drawLine(QPointF(cx, base_y), ridge_pt)   # the high wall under the ridge
+        else:
+            p.drawLine(QPointF(eave_r.x(), base_y), eave_r)
 
         p.setPen(QPen(QColor(20, 20, 20)))
+        if shed:
+            p.drawText(ridge_pt + QPointF(-64, -6), f"R {fmt_in(self.ridge_h)}")
+            p.drawText(eave_l + QPointF(-70, 4), f"H {fmt_in(self.eaves_h)}")
+            p.drawText(eave_l + QPointF(-70, 20), f"P {self.pitch_deg(0):.1f}°")
+            return
         p.drawText(ridge_pt + QPointF(6, -6), f"R {fmt_in(self.ridge_h)}")
         p.drawText(eave_r + QPointF(6, 4), f"H {fmt_in(self.eaves_h)}")
         p.drawText(eave_l + QPointF(-70, 20), f"P {self.pitch_deg(0):.1f}°")
@@ -1178,24 +1230,56 @@ class RoofEndOnDialog(QDialog):
             self._refresh_dormer_note()
 
     # -- R5b: the dormer's derived back end and its refusal ---------------
+    #: a shed dormer's high edge may sit this far under the host surface
+    #: and still count as ON it (the drawing's own half-inch)
+    SHED_EDGE_TOL_IN = 0.5
+
     def dormer_meet_in(self):
-        """Inches from the face along the ridge to where the host's plane
-        rises to the ridge height as currently typed; None = it never does
-        (the dormer cannot stand: refused, 0191-ruling.md sec1)."""
-        from floorplanner.roofclip import meet_along  # late: cycle guard
+        """A GABLE dormer: inches from the face along the ridge to where the
+        host's plane rises to the ridge height as currently typed; None = it
+        never does (the dormer cannot stand: refused, 0191-ruling.md sec1).
+
+        A SHED dormer (0256-report.md, his report on iteration 11's dormer):
+        its ridge is its HIGH EDGE, lying on the host plane parallel to the
+        host's ridge -- there is nothing to meet along it, and `meet_along`
+        answered None at its first step (the host is already at that
+        height), so this dialog refused every shed dormer and OK did
+        nothing. A shed dormer stands while the host surface at BOTH ridge
+        ends is at or above the typed ridge height (the edge on the roof,
+        or buried under it, where the clip hides what is buried); the value
+        is that clearance, 0 when the edge lies on the roof, None when it
+        would float above the host."""
+        from floorplanner.roofclip import Pt, meet_along, surface_height  # late: cycle guard
         host = getattr(self.roof, "host", None)
         if host is None:
             return None
+        if self.form_value() == "shed":
+            under = min(surface_height(host, Pt(p.x(), p.y())) - float(self.sp_ridge.value())
+                        for p in (self.roof.p1, self.roof.p2))
+            return max(0.0, under) if under >= -self.SHED_EDGE_TOL_IN else None
         ux, uy, _, _ = self.roof._axis()
         return meet_along(host, self.roof.p1, QPointF(ux, uy),
                           float(self.sp_ridge.value()))
 
     def _refresh_dormer_note(self):
         t = self.dormer_meet_in()
-        if t is None:
+        shed = self.form_value() == "shed"
+        if t is None and shed:
+            self.lab_dormer.setText(
+                "This ridge height stands above the host roof along the high "
+                "edge -- the dormer would float. Lower the ridge (or raise the "
+                "eaves) to continue.")
+        elif t is None:
             self.lab_dormer.setText(
                 "This ridge height never meets the host roof -- the dormer "
                 "cannot stand. Lower the ridge (or the pitch) to continue.")
+        elif shed:
+            self.lab_dormer.setText(
+                "High edge on the host roof; both ends are faces."
+                if t < self.SHED_EDGE_TOL_IN else
+                f"High edge {fmt_ftin(t)} under the host roof's surface: the "
+                f"dormer's plane emerges from the roof lower down; both ends "
+                f"are faces.")
         else:
             self.lab_dormer.setText(
                 f"Back end derived: the ridge meets the host roof "
@@ -1338,6 +1422,15 @@ class RoofEndOnDialog(QDialog):
         self._programmatic = False
         for w in (self.sp_span_r, self.sp_oh_r, self.ck_oh_same):
             w.setEnabled(not shed)
+        if self._dormer:
+            # a shed dormer's ends are BOTH faces (0248 plan A): the marker
+            # end is no more a choice than the derived one; a gable dormer's
+            # marker end (its face) keeps the gable/hip choice it had
+            marker = self.cb_end_marker if self._marker_end == 0 else self.cb_end_other
+            if shed:
+                marker.setCurrentIndex(0)
+            marker.setEnabled(not shed)
+            marker.setToolTip("A shed dormer's ends are both faces" if shed else "")
         self.canvas.span_l, self.canvas.span_r = self.span_values()
 
     def _on_form(self):
@@ -1345,6 +1438,8 @@ class RoofEndOnDialog(QDialog):
         if self.binding is not None:
             self._refresh_binding()
         self._redraw()
+        if self._dormer:
+            self._refresh_dormer_note()      # a shed's standing rule is its own
 
     def _on_span(self):
         """A span edit moves the wall line on the drawing, changes the

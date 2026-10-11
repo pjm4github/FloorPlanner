@@ -130,7 +130,9 @@ ROOF_C = (0.52, 0.30, 0.06, 1.0)         # roof-brown -- matches roofs.py's
                                           # 2D ink (QColor(133, 77, 14)), so
                                           # plan and 3D read as the same roof
 
-DEFAULT_SILL = 36.0              # window sill when the document doesn't say
+DEFAULT_SILL = 36.0              # window sill when the document doesn't say -- the twin of
+                                 # model.DEFAULT_SILL_IN (this module is Qt-free and standalone;
+                                 # tests/test_opening_sill.py pins the two equal)
 SLAB_T = 1.0                     # floor slab thickness, drawn below z0
 ROOF_T = 4.0                      # roof-plane thickness, drawn below its top
 # how far below a roof's TOP surface a wall under it is capped: the slab's

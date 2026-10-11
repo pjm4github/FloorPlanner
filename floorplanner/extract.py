@@ -55,7 +55,7 @@ def _copy_edge_stretch(scene, room, edge, a: QPointF, b: QPointF):
             report_opening_failure(scene, c, op.kind, op.code, op.s - s0,
                                    f"{exc} (extracting a room)")
             continue
-        nop.door_type, nop.swing = op.door_type, op.swing
+        nop.adopt(op.data())
         c.openings.append(nop)
     return c
 

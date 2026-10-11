@@ -101,6 +101,10 @@ EXTERIOR_NAMES = ("porch", "deck", "patio", "terrace", "lanai")
 # Written down here so it is a known limit, not a mystery discovered later.
 _WALL_MODELLED = frozenset(("id", "level", "v1", "v2", "type", "left", "right",
                             "openings"))
+# 0255: an opening's keys the scene models; the rest (`head_in`) ride on the
+# item as `_v5_extra`, the wall's and the room's discipline
+_OPENING_MODELLED = frozenset(("id", "kind", "code", "anchor", "door_type",
+                               "hinge", "swings_toward", "sill_in"))
 _ROOM_MODELLED = frozenset(("id", "level", "name", "outline", "label",
                             "properties", "placement",
                             # P4.4: modelled on the item, like `placement`
@@ -534,6 +538,10 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
                 [{"kind": o.kind, "code": o.code, "s": float(o.s),
                   "width": float(o.width), "door_type": o.door_type,
                   "swing": float(o.swing),
+                  # 0255: the window's sill (None = never said) and the
+                  # unmodelled keys, written back as they came
+                  "sill_in": getattr(o, "sill_in", None),
+                  "extra": dict(getattr(o, "_v5_extra", None) or {}),
                   # R4b: the end this opening is ACTUALLY dimensioned off, and
                   # its stored offset -- carried so the emit can honour them
                   # rather than recompute a nearer-end anchor over the top
@@ -643,13 +651,21 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
                         f"segment can hold it")
                     rep["openings_failed_ids"].add(oid)
                 near1 = frm != "v2"
-                if o["kind"] == "door":
+                # 0255: a GATE is drawn as the door it is (walls.py:
+                # "constructed exactly as a door and paints exactly as a
+                # door"), so its type and swing are written too -- they
+                # were lost on every save before, and a reloaded gate
+                # swung the default way
+                if o["kind"] in ("door", "gate"):
                     dt = o["door_type"]
                     rec["door_type"] = dt
                     m = ({"LH": "v1", "RH": "v2"} if near1
                          else {"LH": "v2", "RH": "v1"})
                     rec["hinge"] = m.get(dt, "none")
                     rec["swings_toward"] = "left" if o["swing"] < 0 else "right"
+                if o.get("sill_in") is not None:        # 0255: only once set
+                    rec["sill_in"] = float(o["sill_in"])
+                rec.update(o.get("extra") or {})        # head_in, as it came
                 if _sig(rec) in {_sig(x) for x in seg_ops}:
                     rep["openings_deduped"] += 1   # stacked identical opening
                     continue
@@ -1320,6 +1336,11 @@ def apply_design_to_scene(target, design, report=None, strict=False,
             # a round trip look like an edit.
             op.door_type = od.get("door_type", op.door_type)
             op.swing = -1 if od.get("swings_toward", "left") == "left" else 1
+            # 0255: the sill as the record says (None = the plan's default,
+            # never materialised), and the keys the scene does not model
+            sill = od.get("sill_in")
+            op.sill_in = None if sill is None else float(sill)
+            op._v5_extra = {k: v for k, v in od.items() if k not in _OPENING_MODELLED}
             wall.openings.append(op)
 
     # rendering only, and deliberately BEFORE any RoomItem exists: refresh_rooms

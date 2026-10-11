@@ -278,9 +278,9 @@
           }
         },
 
-        "sill_in":   { "description": "Sill height above the level. Windows only.", "type": "number", "minimum": 0 },
-        "head_in":   { "type": "number", "minimum": 0 },
-        "door_type": { "description": "Catalog leaf type; meaningful only when kind == \"door\".", "type": "string" },
+        "sill_in":   { "description": "Sill height above the level's base -- the window's elevation, a property of the window (0255-report.md: the opening's property sheet). Absent means THE PLAN'S DEFAULT, 36 in (`DEFAULT_SILL_IN` in model.py), which every reader uses alike -- the 3D builder, the DXF export, the sheet (which seeds its field with it and writes what is set). Windows only.", "type": "number", "minimum": 0, "default": 36 },
+        "head_in":   { "description": "Head height above the level's base. Absent means the sill plus the size code's height, which is what the app always means: nothing in it writes this key. A value a document carries rides through a round trip unchanged until the window's size or sill is edited, when it is dropped as stale.", "type": "number", "minimum": 0 },
+        "door_type": { "description": "Catalog leaf type; meaningful only when kind is \"door\" or \"gate\" (a gate is drawn as the door it is, 0255-report.md: its type and swing are written like a door's).", "type": "string" },
         "hinge":     { "description": "Hinged end, named by vertex so handedness is unambiguous under wall reversal (v4's LH/RH was not).", "enum": ["v1", "v2", "none"] },
         "swings_toward": { "description": "Side the leaf opens into, relative to v1->v2. Replaces the bare swing: -1|1.", "enum": ["left", "right", "none"] }
       }

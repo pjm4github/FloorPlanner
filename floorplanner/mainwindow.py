@@ -1605,7 +1605,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                     "p2": [it.p2.x(), it.p2.y()],
                     "openings": [{
                         "kind": op.kind, "code": op.code, "s": op.s,
-                        "door_type": op.door_type, "swing": op.swing,
+                        **op.data(),
                     } for op in it.openings],
                 })
                 xs += [it.p1.x(), it.p2.x()]
@@ -1891,8 +1891,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                                            od["code"], od["s"],
                                            f"{exc} (pasting)")
                     continue
-                op.door_type = od["door_type"]
-                op.swing = od["swing"]
+                op.adopt(od)
                 wall.openings.append(op)
             wall.rebuild()
             pasted.append(wall)

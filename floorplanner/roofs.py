@@ -1179,7 +1179,14 @@ class RoofItem(QGraphicsItem):
         direction, meets the host's plane at `ridge_h_in` (0191-ruling.md
         sec1: derived, still written). Left where it is when the ridge
         cannot meet the host -- the dialog refuses that state before it is
-        applied, so it is only ever transient (a drag in progress)."""
+        applied, so it is only ever transient (a drag in progress).
+
+        A SHED dormer derives nothing (0256-report.md): its ridge is its
+        high edge, lying ON the host plane parallel to the host's ridge,
+        and both its ends are faces -- the sketched `p2` is the second face,
+        not a point to find."""
+        if getattr(self, "form", "gable") == "shed":
+            return
         dx, dy = self._p2.x() - self._p1.x(), self._p2.y() - self._p1.y()
         ln = math.hypot(dx, dy)
         if ln < 1e-9:
@@ -1404,7 +1411,9 @@ class RoofItem(QGraphicsItem):
         cursor_u = scene_pt.x() * ux + scene_pt.y() * uy
         cursor_u += GRIP_END_OFFSET_IN if end == 0 else -GRIP_END_OFFSET_IN
         landed = wall_snap_len(cursor_u) - origin_u        # along, from p1
-        if end == 1 and self.is_dormer():
+        if end == 1 and self.is_dormer() and self.form != "shed":
+            # (a SHED dormer's second end is its second face, not a derived
+            # point -- 0256-report.md; it is dragged like any roof end below)
             # R5b, Patrick's look at the first dormer (2026-09-24: "a missing
             # control knob on the ridge of the dormer where it meets the
             # roof"): the back end is derived from the ridge height, so its
@@ -1451,6 +1460,30 @@ class RoofItem(QGraphicsItem):
         cursor_n = scene_pt.x() * nx + scene_pt.y() * ny
         d = wall_snap_len(cursor_n) - origin_n
         span_l, span_r = self._span_in
+        if self.form == "shed":
+            # 0256-report.md (his report: "every mouse move shrinks the
+            # vertical limits of the dormer"): a shed has no right plane, so
+            # the gable clamp `1.0 - span_r` with span_r = 0 forced d >= 1
+            # and every move walked the ridge an inch toward the eave. A
+            # shed's ridge is its HIGH EDGE: the drag moves that edge, the
+            # eave line stays, the one span follows (never under 1in).
+            d = min(span_l - 1.0, d)
+            if abs(d) < 1e-9:
+                return
+            p1 = QPointF(self.p1.x() + nx * d, self.p1.y() + ny * d)
+            p2 = QPointF(self.p2.x() + nx * d, self.p2.y() + ny * d)
+            if self.is_dormer():
+                # a shed DORMER's high edge lies ON the host: the edge keeps
+                # to the host's surface where it lands (the End-On dialog's
+                # standing rule), refused where the host there is not above
+                # the face
+                h = min(surface_height(self.host, Pt(p.x(), p.y())) for p in (p1, p2))
+                if h <= self.eaves_h_in + 1.0:
+                    return
+                self.ridge_h_in = float(h)
+            self.span_in = [span_l - d, 0.0]
+            self.set_ridge(p1, p2)
+            return
         d = max(1.0 - span_r, min(span_l - 1.0, d))
         self.span_in = [span_l - d, span_r + d]
         self.set_ridge(QPointF(self.p1.x() + nx * d, self.p1.y() + ny * d),

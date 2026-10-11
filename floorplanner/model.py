@@ -24,13 +24,18 @@ import math
 from dataclasses import dataclass, field
 
 __all__ = [
-    "FILE_FORMAT", "FILE_VERSION", "DEFAULT_FLOOR",
+    "FILE_FORMAT", "FILE_VERSION", "DEFAULT_FLOOR", "DEFAULT_SILL_IN",
     "Opening", "Wall", "Room", "Furnishing", "Floor", "Project",
 ]
 
 FILE_FORMAT = "floorplanner-json"
 FILE_VERSION = 4          # v4: every item carries a "floor"; top-level "floors" list
 DEFAULT_FLOOR = "default"
+# 0255-report.md: a WINDOW's sill over its level's base when the record does
+# not say -- the one number every reader agrees on (the 3D builder keeps its
+# own copy, Qt-free and standalone; tests/test_opening_sill.py pins them
+# equal). The property sheet seeds its field with it and writes what is set.
+DEFAULT_SILL_IN = 36.0
 
 Coord = tuple[float, float]
 
