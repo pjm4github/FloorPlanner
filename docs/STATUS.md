@@ -5,12 +5,13 @@
 
 **Generated from the record** — one `**Landed:**` line per merge in [`handoff/`](handoff/), the defect register's front matter, and [`ROADMAP.md`](ROADMAP.md) §3's RED table. This file says whether a thing is DONE; [`SESSION_SNAPSHOT.md`](SESSION_SNAPSHOT.md) keeps the order and the why ([`handoff/0019-ruling.md`](handoff/0019-ruling.md) §4). A box that is not derived from the record is not on this board.
 
-**80 landed, 1 closed unmerged; 31 defects open, 57 closed.**
+**81 landed, 1 closed unmerged; 31 defects open, 57 closed.**
 
 ## Landed
 
 | PR | date | commit | tier | what it rested on | record |
 |---|---|---|---|---|---|
+| [#82](https://github.com/pjm4github/FloorPlanner/pull/82) | 2026-10-11 | `c93c392` | AMBER | checked by Patrick on the house model's iterations 6–9: "The dormers and roofs look right" | [`0251`](handoff/0251-report.md) |
 | [#81](https://github.com/pjm4github/FloorPlanner/pull/81) | 2026-10-11 | `37b58d6` | AMBER | checked by Patrick on his own designs: "the dormers look right" | [`0246`](handoff/0246-report.md) |
 | [#80](https://github.com/pjm4github/FloorPlanner/pull/80) | 2026-10-11 | `6ee358b` | AMBER | checked by Patrick on his own design: "the roofs look right" | [`0238`](handoff/0238-report.md) |
 | [#79](https://github.com/pjm4github/FloorPlanner/pull/79) | 2026-10-11 | `d90f8b4` | GREEN | on green CI (pytest full gate, ruff); his check is saving a PDF of a plan with a roof | [`0236`](handoff/0236-report.md) |
