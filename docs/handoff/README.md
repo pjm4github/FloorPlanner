@@ -401,5 +401,6 @@ this table is not a second copy of it.
 | [`0259-report.md`](./0259-report.md) | report: PR #85 merged on his word — the hip run per end, the post that rises to the roof over it, the porch floor; 0248's plan E and item 6 closed; iteration 12 of the house stands |
 | [`0260-report.md`](./0260-report.md) | report: the compose cost built on his word, from the parked patch and past it — the arrangement built from one set of disjoint cells, a neighbour graph for the walk; 15 roofs 32 s → 8 s; the clip pinned as a function of the roofs alone — on `roofclip-cost`, AMBER, for his check |
 | [`0261-report.md`](./0261-report.md) | report: PR #86 merged on his word — the compose cost: the arrangement from one set of disjoint cells and the neighbour graph, 15 roofs 32 s → 8 s; the clip pinned a function of the roofs alone; the parked patch deleted |
+| [`0262-report.md`](./0262-report.md) | report: his `wiscaway2026-10-11R2.json` given the shed dormer between the front gables and the porch roof, as the house model's iteration 11 has them — a new file beside his, nothing of the tools changed |
 
 <!-- PAIRS:END -->
