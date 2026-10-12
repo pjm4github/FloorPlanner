@@ -132,14 +132,12 @@ class FurnishingItem(QGraphicsItem):
             return
         # 0264: the furnishing's document id under its footprint, in the
         # callout ink, while Show > Item callouts is on
-        from floorplanner.annotations import callout_colour, callout_text, callouts_shown
+        from floorplanner.annotations import callout_font, callout_text, callouts_shown, draw_callout
         if callouts_shown() and callout_text(self):
-            f = QFont()
-            f.setPixelSize(7)
-            painter.setFont(f)
-            painter.setPen(QPen(callout_colour(), 0))
-            painter.drawText(QRectF(-self.w / 2 - 20, self.d / 2 + 1, self.w + 40, 10),
-                             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, callout_text(self))
+            # 0267: the one callout font, under the footprint
+            lod = max(option.levelOfDetailFromTransform(painter.worldTransform()), 1e-6)
+            h = QFontMetricsF(callout_font(lod)).height()
+            draw_callout(painter, lod, QPointF(0.0, self.d / 2 + h), callout_text(self), "center")
         r = furnishing_renderer(self.kind)
         if r is not None:
             r.render(painter, rect)

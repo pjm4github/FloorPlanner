@@ -41,6 +41,7 @@ from floorplanner.geometry import fmt_ftin, wall_snap_len
 __all__ = [
     "TextAnnotationItem", "DimensionItem", "DimensionKnob", "DatumItem", "ANNOTATION_Z",
     "callout_colour", "callouts_shown", "document_id", "session_label", "callout_text",
+    "CALLOUT_PX", "callout_font", "draw_callout",
     "set_report_open", "format_length",
     "sync_annotation_visibility",
     "annotation_items", "datum_on", "nearest_datum", "MEASURE_SNAP_IN",
@@ -91,6 +92,41 @@ def document_id(item) -> str:
     if not ids:
         return ""
     return ids if isinstance(ids, str) else "/".join(ids)
+
+
+#: 0267 (his screen): ONE size for every item annotation -- this many view
+#: pixels whatever the zoom, whatever the item -- and one colour
+CALLOUT_PX = 9.0
+
+
+def callout_font(lod: float) -> QFont:
+    """The item annotations' one font: `CALLOUT_PX` view pixels, so a
+    wall's, a corner's, an opening's, a room's, a furnishing's and a
+    roof's all read the same size at any zoom (`lod` is the painter's
+    scale, scene inches to pixels)."""
+    f = QFont()
+    f.setPixelSize(max(2, int(round(CALLOUT_PX / max(lod, 1e-6)))))
+    return f
+
+
+def draw_callout(painter, lod: float, at: QPointF, text: str, align: str = "left"):
+    """Draw one item annotation at `at` (the painter's own coordinates) in
+    the one font and the one colour, never clipped: `align` "left" puts
+    the text's left baseline at `at`, "center" its middle, "right" its
+    right end. The painter's font and pen are left set to the callout's."""
+    if not text:
+        return
+    f = callout_font(lod)
+    painter.setFont(f)
+    painter.setPen(QPen(callout_colour(), 0))
+    fm = QFontMetricsF(f)
+    w = fm.horizontalAdvance(text)
+    x = at.x()
+    if align == "center":
+        x -= w / 2.0
+    elif align == "right":
+        x -= w
+    painter.drawText(QPointF(x, at.y()), text)
 
 
 def callout_text(item) -> str:

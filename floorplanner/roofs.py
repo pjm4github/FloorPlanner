@@ -1624,14 +1624,12 @@ class RoofItem(QGraphicsItem):
         clipped = self.is_clipped()
         # 0264: the roof's document id at its ridge's middle, in the callout
         # ink, while Show > Item callouts is on
-        from floorplanner.annotations import callout_colour, callout_text, callouts_shown
+        from floorplanner.annotations import callout_text, callouts_shown, draw_callout
         if not ghost and callouts_shown() and callout_text(self):
-            f = QFont()
-            f.setPixelSize(9)
-            painter.setFont(f)
-            painter.setPen(QPen(callout_colour(), 0))
+            # 0267: the one callout font, beside the ridge's middle
+            lod = max(option.levelOfDetailFromTransform(painter.worldTransform()), 1e-6)
             m = QPointF((self.p1.x() + self.p2.x()) / 2.0, (self.p1.y() + self.p2.y()) / 2.0)
-            painter.drawText(QPointF(m.x() + 4.0, m.y() - 4.0), callout_text(self))
+            draw_callout(painter, lod, QPointF(m.x() + 4.0 / lod, m.y() - 4.0 / lod), callout_text(self))
         # the dashed lines: both eaves, each end's own line (a gable line
         # across the ridge end, or -- for a hip end, R4b -- the END EAVE
         # beyond it plus the two hip lines down to its corners), then the

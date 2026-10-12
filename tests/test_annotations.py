@@ -433,3 +433,60 @@ def test_the_house_model_file_with_annotations_validates(fp, scene):
     doc = design_from_scene(scene).to_dict()
     text = json.dumps(doc)
     assert '"annotations"' in text and schema_errors(json.loads(text)) == []
+
+
+def test_every_item_annotation_paints_in_the_one_font_size_and_colour(fp, scene, add_walls, first_furnishing, monkeypatch):
+    """0267 (his screen): the item annotations were "small for wall and
+    vertices but too big and clipped for doors, rooms, openings,
+    furnishings" -- now ONE font (`CALLOUT_PX` view pixels at any zoom) and
+    ONE colour for a wall, a corner, an opening, a room, a furnishing and a
+    roof, so the eye can filter them by size and colour."""
+    import floorplanner.annotations as ann
+    from PyQt6.QtGui import QImage, QPainter
+    from PyQt6.QtWidgets import QStyleOptionGraphicsItem
+
+    add_walls(scene, 120, 120, 240, 180)
+    wall = next(w for w in scene.items() if isinstance(w, fp.WallItem))
+    wall.openings.append(fp.OpeningItem(wall, "door", "3280", 100.0))
+    centre = QPointF(240, 210)
+    res = fp.detect_room(scene, centre)
+    room = fp.RoomItem(fp.unique_room_name(scene, "Den"), centre, res[0], res[1], corners=res[2])
+    scene.addItem(room)
+    furn = fp.FurnishingItem(first_furnishing, QPointF(200, 200), 0)
+    scene.addItem(furn)
+    roof = fp.RoofItem(QPointF(120, 150), QPointF(360, 150))
+    scene.addItem(roof)
+    items = [wall, wall.openings[0], room, furn, roof]
+
+    calls = []
+    real = ann.draw_callout
+
+    def spy(painter, lod, at, text, align="left"):
+        calls.append((lod, text, ann.callout_font(lod).pixelSize()))
+        real(painter, lod, at, text, align)
+    monkeypatch.setattr(ann, "draw_callout", spy)
+
+    ink = ann.callout_colour()
+
+    def near_ink(px):                         # antialiased glyphs under a scaled painter: close is ink
+        return (abs(((px >> 16) & 255) - ink.red()) <= 40 and abs(((px >> 8) & 255) - ink.green()) <= 40
+                and abs((px & 255) - ink.blue()) <= 40)
+    for scale in (1.0, 3.0):
+        calls.clear()
+        for it in items:                      # each alone: nothing paints over its text
+            img = QImage(1600, 1600, QImage.Format.Format_ARGB32)
+            img.fill(0xFFFFFFFF)
+            p = QPainter(img)
+            p.scale(scale, scale)
+            p.translate(it.pos())
+            it.paint(p, QStyleOptionGraphicsItem())
+            p.end()
+            # the offscreen platform's font engine draws NOTHING below five
+            # pixels (the windows platform draws the 3 px / 3x case with the
+            # same ink as 9 px / 1x), so the ink is checked at 1x only
+            assert scale != 1.0 or any(near_ink(img.pixel(x, y)) for x in range(1600) for y in range(0, 1600, 2)),                 (type(it).__name__, "painted in the one colour")
+        labels = {t.split()[0] for _, t, _ in calls}
+        assert {s[0] for s in labels} >= {"W", "V", "O", "R", "F"} and any(s.startswith("RF") for s in labels), labels
+        sizes = {px for _, _, px in calls}
+        assert sizes == {round(ann.CALLOUT_PX / scale)}, (scale, sizes)
+        assert {round(lod, 6) for lod, _, _ in calls} == {scale}, "every kind reads the painter's own scale"

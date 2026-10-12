@@ -883,16 +883,6 @@ class RoomItem(QGraphicsItem):
                              | Qt.AlignmentFlag.AlignTop, self.name)
             self._paint_open_edges(painter, option, ghost=True)
             return
-        # 0264: the room's document id under its name, in the callout ink,
-        # while Show > Item callouts is on
-        from floorplanner.annotations import callout_colour, callout_text, callouts_shown
-        if callouts_shown() and callout_text(self):
-            r = self._label_rect()
-            painter.setFont(self._font)
-            painter.setPen(QPen(callout_colour(), 0))
-            painter.drawText(r.translated(0.0, r.height()), Qt.AlignmentFlag.AlignHCenter
-                             | Qt.AlignmentFlag.AlignTop, callout_text(self))
-            painter.setPen(Qt.PenStyle.NoPen)
         floating = self.placement_state == "floating"
         # a floating room reads distinctly -- warm fill + dashed boundary --
         # so "extracted, not yet joined" is visible at a glance (P4.2)
@@ -942,6 +932,14 @@ class RoomItem(QGraphicsItem):
                          + (" (floating)" if floating else ""))
         if self.show_dims:
             self._paint_dims(painter)
+        # 0264: the room's session label under its name while Show > Item
+        # callouts is on; 0267: the one callout font and colour, painted LAST
+        # so the fill does not tint it
+        from floorplanner.annotations import callout_font, callout_text, callouts_shown, draw_callout
+        if callouts_shown() and callout_text(self):
+            lod = max(option.levelOfDetailFromTransform(painter.worldTransform()), 1e-6)
+            h = QFontMetricsF(callout_font(lod)).height()
+            draw_callout(painter, lod, QPointF(r.center().x(), r.bottom() + h), callout_text(self), "center")
 
     def _paint_dims(self, painter):
         """Double-headed arrows along every wall edge enclosing the room.

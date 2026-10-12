@@ -1774,31 +1774,25 @@ class WallItem(QGraphicsItem):
         # -- the ids the problem report names, so a reported wall can be
         # found on the plan. The text is set clear of the wall body on
         # the side away from the length label.
-        from floorplanner.annotations import callout_colour, callout_text, callouts_shown
+        from floorplanner.annotations import callout_font, callout_text, callouts_shown, draw_callout
         if floor_display_mode(self.floor) == "active" and callouts_shown():
             u = self.unit()
             n = QPointF(-u.y(), u.x())
             mid = QPointF((self.p1.x() + self.p2.x()) / 2,
                           (self.p1.y() + self.p2.y()) / 2)
-            f = QFont()
-            f.setPixelSize(max(2, int(11.0 / lod)))
-            painter.setFont(f)
-            painter.setPen(QPen(callout_colour(), 0))
-            fm = QFontMetricsF(f)
+            h = QFontMetricsF(callout_font(lod)).height()
             text = callout_text(self)
             if text:
-                w = fm.horizontalAdvance(text)
-                h = fm.height()
-                off = self.t / 2 + 4.0 / lod + h
+                # clear of the body, on the side away from the length label
+                off = self.t / 2 + 4.0 / lod + h / 2
                 c = QPointF(mid.x() - n.x() * off, mid.y() - n.y() * off)
-                painter.drawText(QRectF(c.x() - w / 2 - 2, c.y() - h / 2, w + 4, h),
-                                 Qt.AlignmentFlag.AlignCenter, text)
+                draw_callout(painter, lod, QPointF(c.x(), c.y() + h * 0.35), text, "center")
             for end in ("p1", "p2"):
                 v = self.end_vertex(end)
                 vtext = callout_text(v) if v is not None else ""
                 if vtext:
                     q = getattr(self, end)
-                    painter.drawText(QPointF(q.x() + 5.0 / lod, q.y() - 5.0 / lod), vtext)
+                    draw_callout(painter, lod, QPointF(q.x() + 5.0 / lod, q.y() - 5.0 / lod), vtext)
 
     # -- interaction ----------------------------------------------------------
     def _view_scale(self) -> float:
@@ -3073,27 +3067,26 @@ class OpeningItem(QGraphicsItem):
         # WWHH label, kept clear of the swing side -- the opening's callout
         # (0263): in the plan's callout ink, and only while Show > Item
         # callouts is on (the selected opening keeps it)
-        from floorplanner.annotations import callout_colour, callouts_shown
+        from floorplanner.annotations import callout_text, callouts_shown, draw_callout
         f = QFont()
         f.setPixelSize(6)
         painter.setFont(f)
-        # the size code is part of the opening's symbol and always draws; it
-        # takes the callout ink while the layer is on, its own grey otherwise
-        label_ink = callout_colour() if callouts_shown() else QColor(70, 70, 90)
-        painter.setPen(QPen(label_ink if not self.isSelected()
+        # the size code is part of the opening's symbol and always draws, in
+        # its own grey; the SESSION LABEL is the item annotation (0267): the
+        # one callout font and colour, on the other side of the wall from
+        # the code so neither covers the other
+        painter.setPen(QPen(QColor(70, 70, 90) if not self.isSelected()
                             else QColor(0, 122, 255), 0))
         label = (self.code if self.kind in ("window", "gate")
                  else f"{self.code} {self.door_type}")
-        if callouts_shown():                 # 0264/0265: the opening's session label
-            from floorplanner.annotations import callout_text
-            lab = callout_text(self)
-            if lab:
-                label = f"{lab}  {label}"
         if self.kind == "door" and self.swing < 0:
-            ty = t / 2 + 9
+            ty, cy = t / 2 + 9, -t / 2 - 3
         else:
-            ty = -t / 2 - 3
+            ty, cy = -t / 2 - 3, t / 2 + 9
         painter.drawText(QPointF(-w / 2, ty), label)
+        if callouts_shown() and floor_display_mode(self.wall.floor) == "active":
+            lod = max(option.levelOfDetailFromTransform(painter.worldTransform()), 1e-6)
+            draw_callout(painter, lod, QPointF(-w / 2, cy), callout_text(self))
 
         if self.isSelected():
             painter.setPen(QPen(QColor(0, 122, 255), 0, Qt.PenStyle.DashLine))
