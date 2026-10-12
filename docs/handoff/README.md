@@ -399,5 +399,6 @@ this table is not a second copy of it.
 | [`0257-report.md`](./0257-report.md) | report: PR #84 merged on his word, the stack folded in — the gable climb's level check, his four fixes, the shed dormer's dialog and grip; iteration 11 of the house stands |
 | [`0258-report.md`](./0258-report.md) | report: 0248's plan E and its item 6 built on his word — the hip run settable per end; a `post` furnishing that rises to the roof over it; the porch floor as an exterior room; iteration 12 of the house — on `porch-posts-hip-run`, AMBER, for his check |
 | [`0259-report.md`](./0259-report.md) | report: PR #85 merged on his word — the hip run per end, the post that rises to the roof over it, the porch floor; 0248's plan E and item 6 closed; iteration 12 of the house stands |
+| [`0260-report.md`](./0260-report.md) | report: the compose cost built on his word, from the parked patch and past it — the arrangement built from one set of disjoint cells, a neighbour graph for the walk; 15 roofs 32 s → 8 s; the clip pinned as a function of the roofs alone — on `roofclip-cost`, AMBER, for his check |
 
 <!-- PAIRS:END -->
