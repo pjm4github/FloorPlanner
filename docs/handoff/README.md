@@ -407,5 +407,6 @@ this table is not a second copy of it.
 | [`0265-report.md`](./0265-report.md) | report: his word on the callouts — the SESSION LABELS, always (W7, V12), adopted from the file's ids when a plan opens so the two match; the Malformed-design report translated to them; folded into PR #87's one commit; AMBER |
 | [`0266-report.md`](./0266-report.md) | report: PR #87 merged on his word — annotations, measurements with their four knobs and a datum, the session-label callouts, the Show menu; the knobs made small and black on his screen before the merge; his annotation-display clean-up next |
 | [`0267-report.md`](./0267-report.md) | report: his annotation-display clean-up — ONE font size and ONE colour for every item annotation; the opening's label off its size code; the room's painted last so the fill does not tint it |
+| [`0268-report.md`](./0268-report.md) | report: the PDF plan set renders the plan's DRAWN dimensions in place of the auto rows, and its text annotations while Show ▸ Annotations is on |
 
 <!-- PAIRS:END -->
