@@ -406,5 +406,6 @@ this table is not a second copy of it.
 | [`0264-report.md`](./0264-report.md) | report: his review of 0263 — the item callouts are the items' document ids, on when a plan opens; the measure gets its four knobs (move, rotate about the other, slide the end, slide the label); folded into PR #87's one commit; AMBER |
 | [`0265-report.md`](./0265-report.md) | report: his word on the callouts — the SESSION LABELS, always (W7, V12), adopted from the file's ids when a plan opens so the two match; the Malformed-design report translated to them; folded into PR #87's one commit; AMBER |
 | [`0266-report.md`](./0266-report.md) | report: PR #87 merged on his word — annotations, measurements with their four knobs and a datum, the session-label callouts, the Show menu; the knobs made small and black on his screen before the merge; his annotation-display clean-up next |
+| [`0267-report.md`](./0267-report.md) | report: his annotation-display clean-up — ONE font size and ONE colour for every item annotation; the opening's label off its size code; the room's painted last so the fill does not tint it |
 
 <!-- PAIRS:END -->
