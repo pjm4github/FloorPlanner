@@ -113,7 +113,7 @@ class _EndRow:
         self.vertex = vertex
         self.orig = QPointF(vertex.point())
         self.ed_name = QLineEdit(vertex.name or "")
-        self.ed_name.setPlaceholderText(vertex.uid)
+        self.ed_name.setPlaceholderText(vertex.uid)        # 0265: the session label
         self.ed_x = QLineEdit(length_text(vertex.x))
         self.ed_y = QLineEdit(length_text(vertex.y))
         self.echo = QLabel("")
@@ -180,7 +180,13 @@ class WallPropertiesDialog(QDialog):
                  if k != "name"}
         if extra:
             form.addRow("Document fields", QLabel(", ".join(f"{k}={v}" for k, v in sorted(extra.items()))))
-        form.addRow("Id", QLabel(wall.uid))
+        # 0265: the session label (what the plan's callouts say and the report
+        # is translated into); the file's id beside it only when they differ
+        from floorplanner import labels as _labels
+        from floorplanner.annotations import document_id
+        did = document_id(wall)
+        shown = wall.uid if (not did or _labels.matches(wall.uid, did)) else f"{wall.uid}  (file: {did})"
+        form.addRow("Id", QLabel(shown))
         lay.addLayout(form)
 
         ends = QGroupBox("End points — a plain number is inches; 10'6\" is feet-and-inches")

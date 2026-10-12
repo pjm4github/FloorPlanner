@@ -30,6 +30,7 @@ from floorplanner.model import (  # serialization bridge (aliased)
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
 from floorplanner.macro import *  # noqa: F401
+from floorplanner.annotations import sync_annotation_visibility
 from floorplanner.roofs import apply_roof_visibility, sync_roof_clips
 
 
@@ -63,6 +64,7 @@ class LevelsMixin:
             sync_roof_clips(self.scene)
         apply_floor_visibility(self.scene)
         apply_roof_visibility(self.scene)   # R2c: layered on top, sec2
+        sync_annotation_visibility(self.scene)   # 0263: the Show switches, on top
         self._apply_floor_stacking()
         self.scene.update()
         if hasattr(self, "floor_label"):

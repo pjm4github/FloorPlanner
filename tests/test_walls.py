@@ -516,6 +516,10 @@ def test_a_cross_junction_paints_with_no_seam(fp, scene):
     `< 190` threshold from CLAUDE.md is used where it actually belongs: on the
     negative half, where an antialiased 1-px dark line reads well under 190 but
     nowhere near 100."""
+    # 0264: the item-callout layer (on by default) writes each wall's document
+    # id beside its middle -- at this cross, over the junction this test
+    # scans. The layer is a display overlay; this test measures the walls.
+    fp.SETTINGS["show_callouts"] = False
     scene.addItem(fp.WallItem(QPointF(0, 100), QPointF(200, 100), "interior"))
     scene.addItem(fp.WallItem(QPointF(100, 0), QPointF(100, 200), "interior"))
     fp.rebuild_all_walls(scene)

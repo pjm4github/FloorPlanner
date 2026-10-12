@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import *  # noqa: F401
 
 from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
+from floorplanner import labels as _labels   # 0265: the session labels
 from floorplanner.vertex import Vertex
 from floorplanner.walls import (
     WallItem, _CornerIndex, rebuild_all_walls, report_gesture_fault,
@@ -346,9 +347,18 @@ class RoomItem(QGraphicsItem):
     editing and panning inside the room keep working.  Right-click the
     name for dimensions / properties / rename / delete."""
 
+    @property
+    def uid(self) -> str:
+        """The room's session label (`R2`), minted on first read; a load
+        adopts the file's own id (labels.py)."""
+        if getattr(self, "_uid", None) is None:
+            self._uid = _labels.mint("R")
+        return self._uid
+
     def __init__(self, name: str, anchor: QPointF, path: QPainterPath,
                  area_sqft: float, properties=None, corners=None):
         super().__init__()
+        self._uid = None                  # 0265: the session label, R<n>
         self.name = name
         self.floor = active_floor()             # active floor (load overrides)
         self.anchor = QPointF(anchor)
@@ -873,6 +883,16 @@ class RoomItem(QGraphicsItem):
                              | Qt.AlignmentFlag.AlignTop, self.name)
             self._paint_open_edges(painter, option, ghost=True)
             return
+        # 0264: the room's document id under its name, in the callout ink,
+        # while Show > Item callouts is on
+        from floorplanner.annotations import callout_colour, callout_text, callouts_shown
+        if callouts_shown() and callout_text(self):
+            r = self._label_rect()
+            painter.setFont(self._font)
+            painter.setPen(QPen(callout_colour(), 0))
+            painter.drawText(r.translated(0.0, r.height()), Qt.AlignmentFlag.AlignHCenter
+                             | Qt.AlignmentFlag.AlignTop, callout_text(self))
+            painter.setPen(Qt.PenStyle.NoPen)
         floating = self.placement_state == "floating"
         # a floating room reads distinctly -- warm fill + dashed boundary --
         # so "extracted, not yet joined" is visible at a glance (P4.2)

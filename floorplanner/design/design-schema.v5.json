@@ -104,7 +104,12 @@
         "edit_roofs": {
           "description": "R2c: the Roof menu's own Edit-roof switch. True implies `show_roofs: true`. False leaves roofs rendered but fully inert -- every mouse/keyboard event passes through to the floor tools underneath, as if no roof existed.",
           "type": "boolean", "default": true
-        }
+        },
+        "show_annotations": { "description": "0263-report.md: the Show menu's Annotations switch -- the plan's texts shown or hidden.", "type": "boolean", "default": true },
+        "show_dimensions":  { "description": "0263: the Show menu's Measurements switch -- the measures and the datum shown or hidden.", "type": "boolean", "default": true },
+        "show_callouts":    { "description": "0263/0264: the Show menu's Item callouts switch -- every item of the active floor writes its DOCUMENT ID (and its name where set): walls, corners, openings, rooms, furnishings, roofs -- the ids the validator's report names, so a reported problem can be found on the plan. ON whenever a plan is opened, whatever this says; the user unchecks it for the session.", "type": "boolean", "default": true },
+        "callout_color":    { "description": "0263: the ink the item callouts are drawn in, as `#rrggbb`.", "type": "string", "default": "#005AC8" },
+        "dimension_units":  { "description": "0263: how a measure writes its length -- feet and inches, or inches.", "enum": ["ftin", "in"], "default": "ftin" }
       }
     },
 
@@ -451,17 +456,21 @@
     },
 
     "annotation": {
+      "description": "0263-report.md gives the block its first writer and reader. `text`: a text at `pos` (its left baseline), `rotation` degrees. `dimension`: a measurement from `pos` to `p2`, drawn as one thin line parallel to that segment `offset_in` off it (to its left; negative = right), a slash at each end, the length written in the plan's `dimension_units`. `datum`: the level's datum point at `pos`, which the Measure tool snaps to. `leader` is reserved. The Show menu's switches (`show_annotations`, `show_dimensions`) hide and show them without changing the record.",
       "type": "object",
       "required": ["id", "level", "kind", "pos"],
       "additionalProperties": false,
       "properties": {
-        "id":       { "$ref": "#/$defs/id" },
-        "level":    { "$ref": "#/$defs/id" },
-        "kind":     { "enum": ["text", "dimension", "leader"] },
-        "pos":      { "$ref": "#/$defs/point" },
-        "text":     { "type": "string" },
-        "rotation": { "type": "number", "default": 0 },
-        "refs":     { "type": "array", "items": { "$ref": "#/$defs/id" } }
+        "id":        { "$ref": "#/$defs/id" },
+        "level":     { "$ref": "#/$defs/id" },
+        "kind":      { "enum": ["text", "dimension", "leader", "datum"] },
+        "pos":       { "$ref": "#/$defs/point" },
+        "p2":        { "description": "A dimension's second measured point.", "$ref": "#/$defs/point" },
+        "offset_in": { "description": "A dimension's line, this far off the measured segment on its left (negative: its right).", "type": "number" },
+        "label_t":   { "description": "Where a dimension's label sits along its line, 0 at `pos`'s end to 1 at `p2`'s; absent = the middle.", "type": "number", "minimum": 0, "maximum": 1 },
+        "text":      { "type": "string" },
+        "rotation":  { "type": "number", "default": 0 },
+        "refs":      { "type": "array", "items": { "$ref": "#/$defs/id" } }
       }
     }
   }

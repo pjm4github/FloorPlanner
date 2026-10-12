@@ -28,6 +28,7 @@ __all__ = [
     "WALL_Z", "CLICK_SLOP", "OPENING_Z", "canvas_rect",
     "TOOL_SELECT", "TOOL_WALL_EXT", "TOOL_WALL_INT", "TOOL_DOOR",
     "TOOL_WINDOW", "TOOL_ROOM", "TOOL_ROOF_RIDGE", "TOOL_ROOF_DORMER",
+    "TOOL_TEXT", "TOOL_MEASURE", "TOOL_DATUM",
     "DOOR_TYPES", "GARAGE_DEFAULTS", "ROOM_CELL",
     "ROOM_TYPES", "CEILING_TYPES", "FLOOR_FINISHES", "WALL_FINISHES",
     "HVAC_TYPES", "DEFAULT_ROOM_PROPS", "APP_NAME", "APP_VERSION", "APP_URL",
@@ -80,6 +81,14 @@ DEFAULT_SETTINGS = {
     # already wrote stays visible and editable without a migration.
     "show_roofs": True,
     "edit_roofs": True,
+    # 0263-report.md: the Show menu's three switches, the callout ink and
+    # the measurement units -- plan settings, saved with the file
+    "show_annotations": True,         # texts on the plan
+    "show_dimensions": True,          # measurements and the datum
+    "show_callouts": True,            # the items' callouts: their document ids
+    #                                   (and names) -- on when a plan is opened
+    "callout_color": "#005AC8",       # the callouts' ink (blue)
+    "dimension_units": "ftin",        # "ftin" (feet and inches) | "in" (inches)
 }
 SETTINGS = dict(DEFAULT_SETTINGS)
 
@@ -176,7 +185,7 @@ def canvas_rect() -> QRectF:
 
 
 (TOOL_SELECT, TOOL_WALL_EXT, TOOL_WALL_INT, TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM,
- TOOL_ROOF_RIDGE, TOOL_ROOF_DORMER) = range(8)
+ TOOL_ROOF_RIDGE, TOOL_ROOF_DORMER, TOOL_TEXT, TOOL_MEASURE, TOOL_DATUM) = range(11)
 
 DOOR_TYPES = ["LH", "RH", "BIFOLD", "POCKET", "SLIDER", "FRENCH", "DOORWAY",
               "GARAGE-1", "GARAGE-2"]
@@ -332,7 +341,7 @@ def _read_legacy_ini_value(path: Path, key: str):
 #: (below) means an existing user's file has NO absent keys for a new
 #: default to fall through to, so this version marker plus
 #: `_SETTINGS_MIGRATIONS` is the only thing that can still reach them.
-SETTINGS_VERSION = 2
+SETTINGS_VERSION = 3
 
 
 def _migrate_v1_to_v2(data: dict) -> dict:
@@ -356,7 +365,17 @@ def _migrate_v1_to_v2(data: dict) -> dict:
 #: rule: a table that only gets written the day it is first needed is a
 #: table nobody remembered to write. `(1, _migrate_v1_to_v2)` is that
 #: table's first real row.
-_SETTINGS_MIGRATIONS = [(1, _migrate_v1_to_v2)]
+def _migrate_v2_to_v3(data: dict) -> dict:
+    """0263-report.md: the Show menu's switches, the callout ink and the
+    measurement units added to `DEFAULT_SETTINGS` -- a v2 file gains them
+    at their defaults on the next read, `setdefault` as the row above."""
+    for key in ("show_annotations", "show_dimensions", "show_callouts",
+                "callout_color", "dimension_units"):
+        data.setdefault(key, DEFAULT_SETTINGS[key])
+    return data
+
+
+_SETTINGS_MIGRATIONS = [(1, _migrate_v1_to_v2), (2, _migrate_v2_to_v3)]
 
 
 def _default_settings_fingerprint() -> str:

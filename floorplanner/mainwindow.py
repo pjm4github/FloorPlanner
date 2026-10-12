@@ -18,6 +18,11 @@ from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
 from floorplanner.roofs import RoofEndMarkerItem, RoofItem, eaves_spans_per_side
+from floorplanner.annotations import (  # 0263: annotations, measurements, callouts
+    DatumItem, DimensionItem, TextAnnotationItem, callout_colour,
+    sync_annotation_visibility,
+)
+from floorplanner.design.bridge import stamp_document_ids   # 0264: the callouts' ids
 from floorplanner.items import *  # noqa: F401
 from floorplanner.model import (  # serialization bridge (aliased)
     DEFAULT_FLOOR, Floor,
@@ -68,6 +73,15 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                           "clip trace), drag along it to set the width "
                           "(Shift = free direction), release to set the "
                           "heights. Esc cancels.",
+        TOOL_TEXT: "Annotation: click where the text goes, then type it. "
+                   "Drag a text to move it; double-click to edit it.",
+        TOOL_MEASURE: "Measure: press on the first point and drag to the second "
+                      "-- each end snaps to a corner, a wall, an opening's jamb "
+                      "or the datum; both on one wall and the measure runs "
+                      "along it. Drag a finished measure to set it off the "
+                      "wall. Esc cancels.",
+        TOOL_DATUM: "Datum: click to place this level's datum point; the Measure "
+                    "tool snaps to it, so a run of measures can share one end.",
     }
 
     def __init__(self):
@@ -177,6 +191,8 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             (TOOL_ROOM, "Room Name", "R", "room"),
             (TOOL_ROOF_RIDGE, "Roof Ridge", "G", "roof"),
             (TOOL_ROOF_DORMER, "Roof Dormer", "M", "dormer"),
+            (TOOL_TEXT, "Annotation", "T", "text"),
+            (TOOL_MEASURE, "Measure", "L", "measure"),
         ]
         for tool, label, key, icon in defs:
             a = QAction(tool_icon(icon), label, self)
@@ -187,6 +203,13 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             group.addAction(a)
             tb.addAction(a)
             self._tool_actions[tool] = a
+        # 0263: the Datum tool has no toolbar button (Show > Place datum), but
+        # it is one of the exclusive group all the same, so choosing it
+        # unchecks the others and `set_tool` has an action to check
+        a = QAction("Datum", self)
+        a.setCheckable(True)
+        group.addAction(a)
+        self._tool_actions[TOOL_DATUM] = a
         self._tool_actions[TOOL_SELECT].setChecked(True)
 
         tb.addSeparator()
@@ -396,6 +419,34 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self.a_3d.triggered.connect(self.show_3d_view)
         m_view.addAction(self.a_3d)
 
+        # 0263: the Show menu -- annotations, measurements and the items'
+        # callouts, each its own switch; the measurement units; the callout
+        # ink; the datum. All plan settings, saved with the file.
+        m_show = self.menuBar().addMenu("S&how")
+        self.a_show_annotations = QAction("&Annotations", self)
+        self.a_show_dimensions = QAction("&Measurements", self)
+        self.a_show_callouts = QAction("&Item callouts", self)
+        for act, key in ((self.a_show_annotations, "show_annotations"),
+                         (self.a_show_dimensions, "show_dimensions"),
+                         (self.a_show_callouts, "show_callouts")):
+            act.setCheckable(True)
+            act.setChecked(bool(SETTINGS.get(key, True)))
+            act.toggled.connect(lambda on, k=key: self._set_show_flag(k, on))
+            m_show.addAction(act)
+        m_show.addSeparator()
+        self.a_dim_ftin = QAction("Measurements in &feet and inches", self)
+        self.a_dim_ftin.setCheckable(True)
+        self.a_dim_ftin.setChecked(SETTINGS.get("dimension_units", "ftin") != "in")
+        self.a_dim_ftin.toggled.connect(self._set_dimension_units)
+        m_show.addAction(self.a_dim_ftin)
+        a_colour = QAction("Item callout &colour\u2026", self)
+        a_colour.triggered.connect(self.pick_callout_colour)
+        m_show.addAction(a_colour)
+        m_show.addSeparator()
+        a_datum = QAction("Place &datum", self)
+        a_datum.triggered.connect(lambda: self.set_tool(TOOL_DATUM))
+        m_show.addAction(a_datum)
+
         m_rooms = self.menuBar().addMenu("&Rooms")
         a_concept = QAction("&New concept room…", self)      # P4.4
         a_concept.triggered.connect(lambda: self.new_concept_room())
@@ -592,6 +643,61 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self._update_title()
         self._sync_editing_ui()
         self._sync_roof_ui()
+        self._sync_show_ui()
+
+    # -- 0263: the Show menu -------------------------------------------------
+    def _sync_show_ui(self):
+        """Point the Show menu's checks at the document's flags (a load,
+        New, an undo) and apply them to the scene."""
+        pairs = ((getattr(self, "a_show_annotations", None), "show_annotations"),
+                 (getattr(self, "a_show_dimensions", None), "show_dimensions"),
+                 (getattr(self, "a_show_callouts", None), "show_callouts"))
+        for act, key in pairs:
+            if act is not None:
+                act.blockSignals(True)
+                act.setChecked(bool(SETTINGS.get(key, True)))
+                act.blockSignals(False)
+        act = getattr(self, "a_dim_ftin", None)
+        if act is not None:
+            act.blockSignals(True)
+            act.setChecked(SETTINGS.get("dimension_units", "ftin") != "in")
+            act.blockSignals(False)
+        sync_annotation_visibility(self.scene)
+        self.scene.update()
+
+    def _set_show_flag(self, key, on):
+        on = bool(on)
+        if bool(SETTINGS.get(key, True)) == on:
+            return
+        SETTINGS[key] = on
+        if not on and key == "show_annotations" and self.tool == TOOL_TEXT:
+            self.set_tool(TOOL_SELECT)
+        if not on and key == "show_dimensions" and self.tool in (TOOL_MEASURE, TOOL_DATUM):
+            self.set_tool(TOOL_SELECT)
+        sync_annotation_visibility(self.scene)
+        self.scene.update()
+        self._mark_dirty()
+        what = {"show_annotations": "Annotations", "show_dimensions": "Measurements",
+                "show_callouts": "Item callouts"}[key]
+        self.status(f"{what} {'shown' if on else 'hidden'}.")
+
+    def _set_dimension_units(self, ftin):
+        units = "ftin" if ftin else "in"
+        if SETTINGS.get("dimension_units", "ftin") == units:
+            return
+        SETTINGS["dimension_units"] = units
+        self.scene.update()
+        self._mark_dirty()
+        self.status("Measurements in feet and inches." if ftin else "Measurements in inches.")
+
+    def pick_callout_colour(self):
+        c = QColorDialog.getColor(callout_colour(), self, "Item callout colour")
+        if not c.isValid():
+            return
+        SETTINGS["callout_color"] = c.name()
+        self.scene.update()
+        self._mark_dirty()
+        self.status(f"Item callouts in {c.name()}.")
 
     def _sync_editing_ui(self):
         """Point the toolbar's shuffle toggle at the document's flag. Called
@@ -928,7 +1034,8 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                 # a bordering room survives via its stored outline; the
                 # vacated edge becomes an open edge (P4.1)
                 delete_wall(self.scene, it, settle=False)
-            elif isinstance(it, (RoomItem, FurnishingItem, GroupItem, RoofItem)):
+            elif isinstance(it, (RoomItem, FurnishingItem, GroupItem, RoofItem,
+                                 TextAnnotationItem, DimensionItem, DatumItem)):
                 self.scene.removeItem(it)
             elif isinstance(it, RoofEndMarkerItem):
                 # deleting the MARKER means deleting the roof it marks --
@@ -1752,7 +1859,13 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         # the same quiescent point, and walking the scene twice here would
         # double the per-edit cost for nothing.
         rep = {}
-        state = self.snapshot(report=rep)
+        ids = {}
+        state = self.snapshot(report=rep, ids_out=ids)
+        # 0264: the callouts write the ids this very walk minted -- the ids
+        # the next save writes and the problem report names
+        stamp_document_ids(self.scene, ids)
+        if SETTINGS.get("show_callouts", True):
+            self.scene.update()
         self.verify_settled(doc=state, walk_report=rep)
         if state == self._committed_state:
             return

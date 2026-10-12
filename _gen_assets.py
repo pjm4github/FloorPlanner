@@ -1202,6 +1202,19 @@ def main():
             '<path d="M8 15.5 L8 10.5 L13 5.5 L18 10.5 L18 9.2" fill="none" '
             'stroke="#1f2937" stroke-width="1.8" stroke-linejoin="round" '
             'stroke-linecap="round"/>'],
+        "text": [
+            # 0263: the Annotation tool -- a capital T
+            '<path d="M5 5 L19 5 L19 8.5 L13.6 8.5 L13.6 19.5 L10.4 19.5 L10.4 8.5 '
+            'L5 8.5 Z" fill="#1f2937"/>'],
+        "measure": [
+            # 0263: the Measure tool -- one thin line with a slash at each end
+            '<line x1="3" y1="13" x2="21" y2="13" stroke="#1f2937" stroke-width="1.4"/>',
+            '<line x1="1.5" y1="16" x2="6" y2="10" stroke="#1f2937" stroke-width="1.6" '
+            'stroke-linecap="round"/>',
+            '<line x1="18" y1="16" x2="22.5" y2="10" stroke="#1f2937" stroke-width="1.6" '
+            'stroke-linecap="round"/>',
+            '<line x1="4" y1="7" x2="4" y2="19" stroke="#9ca3af" stroke-width="1"/>',
+            '<line x1="20" y1="7" x2="20" y2="19" stroke="#9ca3af" stroke-width="1"/>'],
         "record": [
             # the universal red "record" dot
             '<circle cx="12" cy="12" r="7" fill="#dc2626" stroke="#991b1b" '

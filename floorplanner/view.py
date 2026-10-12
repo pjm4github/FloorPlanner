@@ -20,6 +20,9 @@ from floorplanner.roofs import (  # R5b: the Dormer tool; R6.b: the hold
     host_roof_at, snap_to_trace, upslope_direction,
 )
 from floorplanner.items import *  # noqa: F401
+from floorplanner.annotations import (  # 0263: the Annotation, Measure and Datum tools
+    MEASURE_SNAP_IN, DatumItem, DimensionItem, TextAnnotationItem, datum_on, nearest_datum,
+)
 
 
 class FurnishingList(QListWidget):
@@ -90,6 +93,36 @@ class FurnishingList(QListWidget):
         drag.exec(Qt.DropAction.CopyAction)
 
 
+def _project_on_wall(wall, p: QPointF) -> QPointF:
+    """`p` projected onto `wall`'s centreline (0263: a measure with both
+    ends on one wall runs parallel to it)."""
+    dx, dy = wall.p2.x() - wall.p1.x(), wall.p2.y() - wall.p1.y()
+    ln2 = dx * dx + dy * dy
+    if ln2 < 1e-9:
+        return QPointF(wall.p1)
+    t = ((p.x() - wall.p1.x()) * dx + (p.y() - wall.p1.y()) * dy) / ln2
+    return QPointF(wall.p1.x() + dx * t, wall.p1.y() + dy * t)
+
+
+def _nearest_jamb(scene, p: QPointF, tol: float):
+    """0263: the nearest opening jamb (an opening's end on its wall's
+    centreline) within `tol` -- `(point, wall)` or None. Openings on the
+    active floor only, like the wall snaps."""
+    best, best_d = None, tol
+    if scene is None:
+        return None
+    for it in scene.items():
+        if not isinstance(it, WallItem) or it.floor != active_floor():
+            continue
+        for op in it.openings:
+            for s in (op.s - op.width / 2.0, op.s + op.width / 2.0):
+                q = it.point_at(s)
+                d = math.hypot(q.x() - p.x(), q.y() - p.y())
+                if d < best_d:
+                    best, best_d = (QPointF(q), it), d
+    return best
+
+
 class FurnishingPalette(QToolBox):
     """Right-hand palette: one expandable tab per room group from
     assets/furnishings/groups.json (a furnishing may appear in several
@@ -129,6 +162,8 @@ class PlanView(QGraphicsView):
         self._pan_last = None
         self._temp_wall = None
         self._temp_roof = None            # ridge being dragged, or None
+        self._temp_dim = None             # 0263: a measure being dragged, or None
+        self._dim_walls = (None, None)    # ...and the wall each end snapped to
         self._roof_awaiting_eaves = None  # ridge fixed, awaiting the eaves pick
         self._temp_dormer = None          # R5b: dormer being dragged, or None
         self._dormer_dragged = False
@@ -248,6 +283,30 @@ class PlanView(QGraphicsView):
         if hit is not None:
             return self._grid_snap_t_junction(*hit)
         return wall_snap(sp)
+
+    def _measure_snap(self, sp: QPointF):
+        """0263: where a measure's end lands -- `(point, wall)`: the datum,
+        a corner (wall end), an opening's jamb, a wall's centreline (with
+        the wall, so a measure with both ends on one wall runs along it),
+        else the grid. The reach is one grid step (`MEASURE_SNAP_IN`), in
+        scene inches: a measure's end must land ON the item, and a quick
+        gesture lands near it."""
+        reach = MEASURE_SNAP_IN + 1e-6
+        q = nearest_datum(self.scene(), sp, reach)
+        if q is not None:
+            return q, None
+        q = nearest_wall_endpoint(self.scene(), sp, reach)
+        if q is not None:
+            return q, None
+        jamb = _nearest_jamb(self.scene(), sp, reach)
+        if jamb is not None:
+            return jamb
+        hit = nearest_wall_body(self.scene(), sp, reach, exact=True)
+        if hit is not None:
+            # on the wall's line, and on the grid ALONG it (0070 sec3: on the
+            # grid, never by it -- the wall tool's own T-junction rule)
+            return self._grid_snap_t_junction(*hit), hit[0]
+        return wall_snap(sp), None
 
     @staticmethod
     def _grid_snap_t_junction(wall, q: QPointF) -> QPointF:
@@ -469,6 +528,36 @@ class PlanView(QGraphicsView):
                 #     this gesture. Deferring the show is what makes the
                 #     ctrl-click half testable at all.
                 self._rubber_origin = pos
+                e.accept()
+                return
+            if tool == TOOL_TEXT:
+                # 0263: a text at the click; the dialog asks for it
+                text, ok = QInputDialog.getText(self, "Annotation", "Text:")
+                if ok and text.strip():
+                    item = TextAnnotationItem(wall_snap(sp), text.strip())
+                    self.scene().addItem(item)
+                    self.win.status("Annotation placed. Drag it to move it; "
+                                    "double-click to edit it.")
+                e.accept()
+                return
+            if tool == TOOL_DATUM:
+                # one per level: placing another moves it
+                p = self._measure_snap(sp)[0]
+                d = datum_on(self.scene(), active_floor())
+                if d is None:
+                    self.scene().addItem(DatumItem(p))
+                else:
+                    d.setPos(p)
+                self.win.status("Datum placed. The Measure tool snaps to it.")
+                self.win.set_tool(TOOL_SELECT)
+                e.accept()
+                return
+            if tool == TOOL_MEASURE:
+                p, w = self._measure_snap(sp)
+                item = DimensionItem(p, p)
+                self.scene().addItem(item)
+                self._temp_dim = item
+                self._dim_walls = (w, None)
                 e.accept()
                 return
             if tool in (TOOL_WALL_EXT, TOOL_WALL_INT):
@@ -721,6 +810,20 @@ class PlanView(QGraphicsView):
             e.accept()
             return
 
+        if self._temp_dim is not None:
+            # 0263: the second end snaps like the first; on one wall the
+            # measure runs along that wall (parallel to what it measures)
+            q, w = self._measure_snap(sp)
+            a = self._temp_dim.a
+            w0 = self._dim_walls[0]
+            if w0 is not None and w is w0:
+                q = _project_on_wall(w0, q)
+                a = _project_on_wall(w0, a)
+            self._dim_walls = (w0, w)
+            self._temp_dim.set_points(a, q)
+            e.accept()
+            return
+
         if self._temp_roof is not None:
             # SAME snap math as a wall drag (0139-ruling.md sec1: "the ridge
             # tool calls that machinery") -- `_wall_end_point` only reads
@@ -877,6 +980,18 @@ class PlanView(QGraphicsView):
             e.accept()
             return
 
+        if self._temp_dim is not None and e.button() == Qt.MouseButton.LeftButton:
+            item, self._temp_dim = self._temp_dim, None
+            self._dim_walls = (None, None)
+            if item.length() < 1.0:
+                self.scene().removeItem(item)
+                self.win.status("Measure: drag from the first point to the second.")
+            else:
+                self.win.status(f"Measured {item.label()}. Drag the measure to set "
+                                "it off the wall; Delete removes it.")
+            e.accept()
+            return
+
         if self._temp_roof is not None and e.button() == Qt.MouseButton.LeftButton:
             item, self._temp_roof = self._temp_roof, None
             hold_roof_clips(self.scene(), False)          # R6.b: the drag is over
@@ -996,6 +1111,10 @@ class PlanView(QGraphicsView):
         if self._temp_wall is not None:
             self.scene().removeItem(self._temp_wall)
             self._temp_wall = None
+        if self._temp_dim is not None:              # 0263: a measure in progress
+            self.scene().removeItem(self._temp_dim)
+            self._temp_dim = None
+            self._dim_walls = (None, None)
         if self._temp_dormer is not None:          # R5b: a drag in progress
             self.scene().removeItem(self._temp_dormer)
             self._temp_dormer = None

@@ -72,6 +72,7 @@ from floorplanner.items import (
 from floorplanner.model import Floor
 from floorplanner.vertex import Vertex
 from floorplanner.roofs import RoofItem, hold_roof_clips, nearest_eaves_wall
+from floorplanner import labels as _labels   # 0265: session labels adopted on load
 from floorplanner.rooms import (
     OutlineEdge, RoomItem, poly_area_sqft, room_path_from_corners,
 )
@@ -498,6 +499,59 @@ def _new_walk_report() -> dict:
             "openings_failed": [], "openings_failed_ids": set()}
 
 
+def _note_vertices(vt, items, note):
+    """0264: `note(row id, live Vertex)` for every table row a live corner
+    of `items` sits on (the same position match `_name_rows` uses)."""
+    live = []
+    for it in items:
+        if isinstance(it, WallItem):
+            live += [it.end_vertex(a) for a in ("p1", "p2")]
+        elif isinstance(it, RoomItem):
+            live += [e.v for e in it.outline]
+    live = [v for v in live if v is not None]
+    for row in vt.rows:
+        for v in live:
+            if _d((row["x"], row["y"]), (v.x, v.y)) <= vt.tol:
+                note(row["id"], v)
+
+
+def stamp_document_ids(scene, ids):
+    """0264: write `doc_id` onto every live item the walk named --
+    `ids` is `design_from_scene`'s `ids_out`, `{id(live): [doc ids]}`;
+    the live objects are found again by identity among the scene's
+    items, their openings and their corners. An item the walk did not
+    name keeps whatever it had."""
+    if scene is None or not ids:
+        return
+    live = {}
+    for it in scene.items():
+        live[id(it)] = it
+        if isinstance(it, WallItem):
+            for op in it.openings:
+                live[id(op)] = op
+            for a in ("p1", "p2"):
+                v = it.end_vertex(a)
+                if v is not None:
+                    live[id(v)] = v
+        elif isinstance(it, RoomItem):
+            for e in it.outline:
+                if e.v is not None:
+                    live[id(e.v)] = e.v
+    for key, doc_ids in ids.items():
+        obj = live.get(key)
+        if obj is None or not doc_ids:
+            continue
+        distinct = list(dict.fromkeys(doc_ids))
+        try:
+            # a WALL the walk split carries every segment's id; everything
+            # else (a corner the table named in two partitions, say) takes
+            # the first -- one id, always a string, for the dialog and the
+            # callout alike
+            obj.doc_id = distinct if (isinstance(obj, WallItem) and len(distinct) > 1) else distinct[0]
+        except AttributeError:
+            pass
+
+
 def _name_rows(vt, items):
     """Stamp each vertex row of `vt` with the name of the live corner at its
     position, if that corner was named. First name at a position wins."""
@@ -550,6 +604,14 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
                 key=lambda o: o["s"]),
             "extra": getattr(w, "_v5_extra", None) or {}}
            for w in w_items]
+    # 0264: which live opening each raw opening dict came from, by the dict's
+    # identity -- a side map, never a key in the dict itself: `_weld_delta`
+    # deep-copies `raw` for its probe, and a QGraphicsItem cannot be copied
+    live_opening = {}
+    for w, wi in zip(raw, w_items, strict=True):
+        by_s = sorted(wi.openings, key=lambda o: float(o.s))
+        for od, o in zip(w["openings"], by_s, strict=True):
+            live_opening[id(od)] = o
     if weld_check:
         rep["unwelded_ends"] += _weld_delta(raw)
 
@@ -670,6 +732,9 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
                     rep["openings_deduped"] += 1   # stacked identical opening
                     continue
                 seg_ops.append(rec)
+                live = live_opening.get(id(o))
+                if src is not None and live is not None:
+                    src[("op", id(live))] = (oid, live)              # 0264
 
             key = (*sorted((v1, v2)),)
             if src is not None:
@@ -830,6 +895,18 @@ def _furnishings_of(items, lid, nid, rooms, poly, src=None):
     return out
 
 
+def _annotations_of(items, lid, nid):
+    """This level's annotations (0263): texts, measures and the datum, each
+    item's own record, in a stable order (kind, then position)."""
+    from floorplanner.annotations import DatumItem, DimensionItem, TextAnnotationItem
+    out = []
+    kinds = (TextAnnotationItem, DimensionItem, DatumItem)
+    for it in _ordered(items, kinds, lambda a: (a.kind, round(a.to_record("", "")["pos"][0], 3),
+                                                round(a.to_record("", "")["pos"][1], 3))):
+        out.append(it.to_record(nid("an"), lid))
+    return out
+
+
 def _roofs_of(items, lid, nid, src=None):
     """This level's roofs (0139-ruling.md P1.1, R2's first writer).
 
@@ -873,7 +950,7 @@ def _roofs_of(items, lid, nid, src=None):
 
 
 # ------------------------------------------------------------------ public API
-def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
+def design_from_scene(source, floors=None, report=None, strict=False, ids_out=None) -> Design:
     """Walk the live scene into a v5 `Design`.
 
     `source` is a `MainWindow` (preferred -- it owns the authoritative floor
@@ -905,6 +982,7 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
     buckets = _by_floor(scene)
     levels, vertices, walls, rooms, furnishings, roofs = [], [], [], [], [], []
     groups = []                            # P4.5, defect 3
+    annotations = []                       # 0263: texts, measures, the datum
     # id(wall dict object) -> live WallItem (0101-ruling.md), ACROSS ALL
     # LEVELS -- unlike `of_item` a few lines below (per-level on purpose,
     # consumed within the same iteration for that level's own groups),
@@ -946,6 +1024,12 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
             wsrc, rsrc = {}, {}
             lw = _walls_of(part, lid, nid, vt, rep, src=wsrc)
             lr = _rooms_of(part, lid, nid, vt, lw, rep, src=rsrc)
+            # 0264: the document ids of this partition's live corners, by
+            # position against the table the walk just built
+            _note_vertices(vt, part, _note)
+            for key, val in wsrc.items():
+                if isinstance(key, tuple) and key and key[0] == "op":
+                    _note(val[0], val[1])          # an opening's id, its live item
             for rec in lw:
                 live = wsrc.get((*sorted((rec["v1"], rec["v2"])),))
                 if live is not None:
@@ -992,6 +1076,9 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         rooms += lr_all
         furnishings += lf
         roofs += lroofs
+        annotations += _annotations_of(items, lid, nid)
+        if ids_out is not None:               # 0264: id(live) -> [document ids]
+            ids_out.update(of_item)
 
     n = rep["unwelded_ends"]
     if n and strict:
@@ -1028,6 +1115,7 @@ def design_from_scene(source, floors=None, report=None, strict=False) -> Design:
         "settings": settings, "levels": levels, "vertices": vertices,
         "walls": walls, "rooms": rooms, "furnishings": furnishings,
         **({"roofs": roofs} if roofs else {}),
+        **({"annotations": annotations} if annotations else {}),
         # DEFECT 3 CLOSES AT P4.5. The old note here said a grouped wall
         # "has no single id -- it splits into segments", and that is still
         # true: the answer is that membership is a SET of document objects,
@@ -1301,6 +1389,9 @@ def apply_design_to_scene(target, design, report=None, strict=False,
     # the two id spaces stay separate and `canonicalize` bridges them.
     vmap = {v["id"]: Vertex(float(v["x"]), float(v["y"]), name=v.get("name") or None)
             for v in doc.get("vertices", [])}
+    for vid, v in vmap.items():                  # 0264/0265: the file's own ids, and the
+        v.doc_id = vid                           # session label adopted from them
+        v._uid = _labels.adopt("V", vid)
 
     wmap = {}
     for wd in doc.get("walls", []):
@@ -1309,6 +1400,8 @@ def apply_design_to_scene(target, design, report=None, strict=False,
         wall.set_end_vertex("p2", vmap[wd["v2"]])
         wall.floor = lname.get(wd["level"], DEFAULT_FLOOR)   # never the global
         wall._v5_extra = {k: v for k, v in wd.items() if k not in _WALL_MODELLED}
+        wall.doc_id = wd.get("id")                            # 0264
+        wall._uid = _labels.adopt("W", wd.get("id"))         # 0265
         scene.addItem(wall)
         wmap[wd["id"]] = wall
         rep["walls"] += 1
@@ -1344,6 +1437,8 @@ def apply_design_to_scene(target, design, report=None, strict=False,
             sill = od.get("sill_in")
             op.sill_in = None if sill is None else float(sill)
             op._v5_extra = {k: v for k, v in od.items() if k not in _OPENING_MODELLED}
+            op.doc_id = od.get("id")                           # 0264
+            op._uid = _labels.adopt("O", od.get("id"))        # 0265
             wall.openings.append(op)
 
     # rendering only, and deliberately BEFORE any RoomItem exists: refresh_rooms
@@ -1376,6 +1471,8 @@ def apply_design_to_scene(target, design, report=None, strict=False,
         room.show_dims = bool((rd.get("label") or {}).get("show_dimensions",
                                                           False))
         room.label_offset = QPointF(0.0, 0.0)
+        room.doc_id = rd.get("id")                             # 0264
+        room._uid = _labels.adopt("R", rd.get("id"))          # 0265
         scene.addItem(room)
         rmap[rd["id"]] = room
         for e in room.outline:                  # the outline IS the binding --
@@ -1398,9 +1495,19 @@ def apply_design_to_scene(target, design, report=None, strict=False,
                                float(fd.get("rotation", 0.0)),
                                fd.get("state") or {})
         item.floor = lname.get(fd["level"], DEFAULT_FLOOR)   # never the global
+        item.doc_id = fd.get("id")                             # 0264
+        item._uid = _labels.adopt("F", fd.get("id"))          # 0265
         scene.addItem(item)
         fmap[fd["id"]] = item
         rep["furnishings"] += 1
+
+    # ANNOTATIONS (0263): texts, measures, the datum -- each its own item
+    from floorplanner.annotations import item_from_record
+    for ad in doc.get("annotations", []) or []:
+        item = item_from_record(ad, lname.get(ad.get("level"), DEFAULT_FLOOR))
+        if item is None:
+            continue
+        scene.addItem(item)
 
     # ROOFS (0139-ruling.md R1's block, R2's first reader; R4a re-plans the
     # footprint into the schema -- 0154-ruling.md). A document written
@@ -1441,6 +1548,8 @@ def apply_design_to_scene(target, design, report=None, strict=False,
                         openings=rfd.get("openings"),
                         hip_run_in=rfd.get("hip_run_in"))
         item.floor = floor   # never the global
+        item.doc_id = rfd.get("id")                            # 0264
+        item._uid = _labels.adopt("RF", rfd.get("id"))        # 0265
         scene.addItem(item)
         rep["roofs"] += 1
         roof_by_id[rfd.get("id")] = item

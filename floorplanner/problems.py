@@ -15,12 +15,15 @@ or a test can call it without the dialog.
 """
 from __future__ import annotations
 
+import re
+
 from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
     QPushButton, QVBoxLayout,
 )
 
+from floorplanner.annotations import set_report_open   # 0265
 from floorplanner.design.locate import locate
 
 #: the least the view shows around a problem, in inches, so a single vertex
@@ -45,8 +48,13 @@ class DesignProblemsDialog(QDialog):
         lbl.setWordWrap(True)
         lay.addWidget(lbl)
         self.list = QListWidget()
+        # 0265: the rows say the SESSION LABELS (W7, O15) the screen shows,
+        # translated from the document ids the validator names; the original
+        # message rides as data for the zoom, which resolves document ids
+        self._label_of = _session_labels_of(getattr(win, "scene", None))
         for m in messages:
-            QListWidgetItem(m, self.list)
+            it = QListWidgetItem(_with_session_labels(m, self._label_of), self.list)
+            it.setData(Qt.ItemDataRole.UserRole, m)
         self.list.setToolTip("Select a problem to go to it; double-click or "
                              "Zoom to fits the view to the place it names.")
         lay.addWidget(self.list, 1)
@@ -70,7 +78,29 @@ class DesignProblemsDialog(QDialog):
 
     @property
     def messages(self):
+        """The validator's own messages (document ids), as given."""
+        return [self.list.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.list.count())]
+
+    @property
+    def shown_messages(self):
+        """The rows as displayed: the session labels."""
         return [self.list.item(i).text() for i in range(self.list.count())]
+
+    def showEvent(self, e):
+        # 0265: while this report is open a callout whose label differs from
+        # the file's id shows both, so the zoom lands on what the screen says
+        set_report_open(True)
+        sc = getattr(self.win, "scene", None)
+        if sc is not None:
+            sc.update()
+        super().showEvent(e)
+
+    def closeEvent(self, e):
+        set_report_open(False)
+        sc = getattr(self.win, "scene", None)
+        if sc is not None:
+            sc.update()
+        super().closeEvent(e)
 
     def _on_row(self, row: int):
         self.b_zoom.setEnabled(row >= 0)
@@ -81,7 +111,7 @@ class DesignProblemsDialog(QDialog):
         item = self.list.currentItem()
         if item is None:
             return None
-        spot = locate(self.doc, item.text())
+        spot = locate(self.doc, item.data(Qt.ItemDataRole.UserRole) or item.text())
         if spot is None:
             self.where.setText("Nothing in this message can be placed on the design.")
             return None
@@ -93,6 +123,52 @@ class DesignProblemsDialog(QDialog):
             text += f"; not in the document: {', '.join(spot.missing)}"
         self.where.setText(text + ".")
         return spot
+
+
+def _session_labels_of(scene) -> dict:
+    """`{document id: session label}` for everything on the scene that was
+    stamped with a document id (a load, or the settle's walk)."""
+    out = {}
+    if scene is None:
+        return out
+    from floorplanner.rooms import RoomItem
+    from floorplanner.walls import WallItem
+
+    def note(obj):
+        did = getattr(obj, "doc_id", None)
+        if not did:
+            return
+        uid = getattr(obj, "uid", None)
+        if not uid:
+            return
+        for d in (did if isinstance(did, list) else [did]):
+            out.setdefault(d, uid)
+    for it in scene.items():
+        note(it)
+        if isinstance(it, WallItem):
+            for op in it.openings:
+                note(op)
+            for a in ("p1", "p2"):
+                v = it.end_vertex(a)
+                if v is not None:
+                    note(v)
+        elif isinstance(it, RoomItem):
+            for e in it.outline:
+                if e.v is not None:
+                    note(e.v)
+    return out
+
+
+def _with_session_labels(message: str, label_of: dict) -> str:
+    """The message with each document id it names replaced by the session
+    label of the thing it is (0265); an id with no label stays as it is."""
+    from floorplanner.design.locate import subjects
+    out = message
+    for s in subjects(message):
+        lab = label_of.get(s)
+        if lab and lab != s:
+            out = re.sub(rf"\b{re.escape(s)}\b", lab, out)
+    return out
 
 
 def zoom_to_spot(win, spot) -> QRectF:

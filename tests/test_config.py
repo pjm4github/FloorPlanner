@@ -188,8 +188,8 @@ def test_changing_DEFAULT_SETTINGS_requires_a_version_bump(fp):
     (0078 sec2) -- this is the only thing standing between that and a
     default nobody can ever change again."""
     from floorplanner.config import _default_settings_fingerprint
-    assert fp.SETTINGS_VERSION == 2
-    assert _default_settings_fingerprint() == "070767e835d45bdc"
+    assert fp.SETTINGS_VERSION == 3            # 3: 0263, the Show menu's settings
+    assert _default_settings_fingerprint() == "9a07ca3a28f6c234"
 
 
 def test_a_v1_settings_file_migrates_show_and_edit_roofs_on_load(
@@ -208,9 +208,27 @@ def test_a_v1_settings_file_migrates_show_and_edit_roofs_on_load(
     assert fp.app_settings().value("edit_roofs") is True
 
     on_disk = json.loads(fp.settings_file().read_text(encoding="utf-8"))
-    assert on_disk["version"] == 2
+    assert on_disk["version"] == fp.SETTINGS_VERSION      # every step, to the current
     assert on_disk["show_roofs"] is True
     assert on_disk["edit_roofs"] is True
+
+
+def test_a_v2_settings_file_migrates_the_show_menus_settings_on_load(
+        fp, sandboxed_config):
+    """0263: the second row -- a v2 file (R2c's) lacks the Show menu's three
+    switches, the callout ink and the measurement units; it gains all five
+    at their defaults on the next read and is rewritten at version 3."""
+    fp.settings_file().parent.mkdir(parents=True, exist_ok=True)
+    v2 = {"version": 2, "wall_snap_in": 6.0, "show_roofs": True, "edit_roofs": True}
+    fp.settings_file().write_text(json.dumps(v2), encoding="utf-8")
+
+    assert fp.app_settings().value("show_callouts") is True
+    assert fp.app_settings().value("callout_color") == "#005AC8"
+    assert fp.app_settings().value("dimension_units") == "ftin"
+
+    on_disk = json.loads(fp.settings_file().read_text(encoding="utf-8"))
+    assert on_disk["version"] == 3
+    assert on_disk["show_annotations"] is True and on_disk["show_dimensions"] is True
 
 
 # ---------------------------------------------------------------------------

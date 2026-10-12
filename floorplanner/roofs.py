@@ -1058,6 +1058,7 @@ class RoofItem(QGraphicsItem):
         # the 3D builder cuts them into the generated face. Nothing in the
         # plan draws them yet.
         self.openings = [dict(o) for o in (openings or [])]
+        self._uid = None                  # 0265: the session label, RF<n>
         # R5b: a DORMER is a roof with a host (the RoofItem it stands on);
         # its back end (`p2`) is derived against the host at every rebuild
         self.host = host
@@ -1230,6 +1231,15 @@ class RoofItem(QGraphicsItem):
         for d in self.dormers():
             sc.removeItem(d)
         sc.removeItem(self)
+
+    @property
+    def uid(self) -> str:
+        """The roof's session label (`RF1`), minted on first read; a load
+        adopts the file's own id (labels.py)."""
+        if getattr(self, "_uid", None) is None:
+            from floorplanner import labels as _labels
+            self._uid = _labels.mint("RF")
+        return self._uid
 
     def hip_extension(self, end: int, gable=None, span=None, run=None):
         """`(run, overhang)` along the ridge axis, beyond ridge end `end`
@@ -1612,6 +1622,16 @@ class RoofItem(QGraphicsItem):
         ghost = floor_display_mode(self.floor) != "active"
         ink = FLOOR_GHOST if ghost else QColor(133, 77, 14)  # roof-brown
         clipped = self.is_clipped()
+        # 0264: the roof's document id at its ridge's middle, in the callout
+        # ink, while Show > Item callouts is on
+        from floorplanner.annotations import callout_colour, callout_text, callouts_shown
+        if not ghost and callouts_shown() and callout_text(self):
+            f = QFont()
+            f.setPixelSize(9)
+            painter.setFont(f)
+            painter.setPen(QPen(callout_colour(), 0))
+            m = QPointF((self.p1.x() + self.p2.x()) / 2.0, (self.p1.y() + self.p2.y()) / 2.0)
+            painter.drawText(QPointF(m.x() + 4.0, m.y() - 4.0), callout_text(self))
         # the dashed lines: both eaves, each end's own line (a gable line
         # across the ridge end, or -- for a hip end, R4b -- the END EAVE
         # beyond it plus the two hip lines down to its corners), then the

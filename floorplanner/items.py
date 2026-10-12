@@ -44,6 +44,7 @@ class FurnishingItem(QGraphicsItem):
         spec = furnishing_spec(kind) or {
             "name": kind, "width_in": 24.0, "depth_in": 24.0}
         self.kind = kind
+        self._uid = None                  # 0265: the session label, F<n>
         self.floor = active_floor()      # active floor (load overrides)
         self.name = spec["name"]
         self.w = float(spec["width_in"])
@@ -111,6 +112,15 @@ class FurnishingItem(QGraphicsItem):
             path.addEllipse(c, r * 1.8, r * 1.8)
         return path
 
+    @property
+    def uid(self) -> str:
+        """The furnishing's session label (`F4`), minted on first read; a
+        load adopts the file's own id (labels.py)."""
+        if getattr(self, "_uid", None) is None:
+            from floorplanner import labels as _labels
+            self._uid = _labels.mint("F")
+        return self._uid
+
     def paint(self, painter, option, widget=None):
         rect = QRectF(-self.w / 2, -self.d / 2, self.w, self.d)
         if floor_display_mode(self.floor) != "active":
@@ -120,6 +130,16 @@ class FurnishingItem(QGraphicsItem):
             painter.setBrush(QBrush(QColor(176, 176, 176, 40)))
             painter.drawRect(rect)
             return
+        # 0264: the furnishing's document id under its footprint, in the
+        # callout ink, while Show > Item callouts is on
+        from floorplanner.annotations import callout_colour, callout_text, callouts_shown
+        if callouts_shown() and callout_text(self):
+            f = QFont()
+            f.setPixelSize(7)
+            painter.setFont(f)
+            painter.setPen(QPen(callout_colour(), 0))
+            painter.drawText(QRectF(-self.w / 2 - 20, self.d / 2 + 1, self.w + 40, 10),
+                             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, callout_text(self))
         r = furnishing_renderer(self.kind)
         if r is not None:
             r.render(painter, rect)

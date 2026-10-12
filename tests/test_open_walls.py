@@ -119,6 +119,10 @@ def test_an_open_side_is_drawn_dashed(fp, scene):
 
     Both halves in one test, so the positive cannot go vacuous: the open side
     is dashed, and a side that is still walled shows the solid body instead."""
+    # 0264/0265: the item-callout layer (on by default) writes each wall's
+    # session label beside its middle, across the columns this test scans.
+    # The layer is a display overlay; this test measures the walls.
+    fp.SETTINGS["show_callouts"] = False
     room = _room(fp, scene)                         # 0,0 .. 120,120
     wall = _right_wall(fp, room)
     fp.detach_wall_from_room(scene, wall)

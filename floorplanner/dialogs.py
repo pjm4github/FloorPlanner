@@ -1601,6 +1601,20 @@ class SettingsDialog(QDialog):
         self.ck_weld.setChecked(bool(SETTINGS.get("auto_weld", True)))
         form.addRow("Auto-weld ends", self.ck_weld)
 
+        # -- 0263: the item callouts' ink and the measurements' units (the
+        # Show menu switches the same two; this is where they are typed)
+        from floorplanner.annotations import callout_colour
+        self._callout = callout_colour()
+        self.bt_colour = QPushButton()
+        self.bt_colour.clicked.connect(self._pick_colour)
+        self._show_colour()
+        form.addRow("Item callout colour", self.bt_colour)
+        self.cb_units = QComboBox()
+        self.cb_units.addItem("Feet and inches", "ftin")
+        self.cb_units.addItem("Inches", "in")
+        self.cb_units.setCurrentIndex(1 if SETTINGS.get("dimension_units", "ftin") == "in" else 0)
+        form.addRow("Measurement units", self.cb_units)
+
         note = QLabel("Defaults: 6\" wall snap, 15° rotation snap, "
                       "100' × 70' canvas, $150 / sq ft.\n"
                       "Settings are saved with the plan.")
@@ -1613,7 +1627,22 @@ class SettingsDialog(QDialog):
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
 
+    def _show_colour(self):
+        self.bt_colour.setText(self._callout.name())
+        self.bt_colour.setStyleSheet(f"background: {self._callout.name()}; color: white;")
+
+    def _pick_colour(self):
+        c = QColorDialog.getColor(self._callout, self, "Item callout colour")
+        if c.isValid():
+            self._callout = c
+            self._show_colour()
+
+    def callout_colour_name(self) -> str:
+        return self._callout.name()
+
     def apply(self):
+        SETTINGS["callout_color"] = self._callout.name()          # 0263
+        SETTINGS["dimension_units"] = str(self.cb_units.currentData())
         SETTINGS["wall_snap_in"] = float(self.cb_snap.currentData())
         SETTINGS["rotate_snap_deg"] = float(self.sp_rot.value())
         SETTINGS["canvas_w_in"] = float(self.sp_cw.value()) * FOOT

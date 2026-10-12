@@ -93,6 +93,26 @@ console script), plus bundled fonts and artwork.
   ends at half height or **turns left / right**, and to flip the arrow up
   or down. Move it into a room with a different ceiling and the step count
   re-computes.
+- **Annotations, measurements and item callouts** — the **Show** menu
+  switches three layers on and off independently and saves the choice
+  with the plan. *Annotations*: the **T** tool places a text at a click
+  (drag to move, double-click to edit). *Measurements*: the **L** tool
+  drags a measure from one point to another — each end snaps to a corner,
+  a wall, an opening's jamb or the level's **datum** (*Show ▸ Place
+  datum*), both ends on one wall and the measure runs along it — drawn as
+  one thin line parallel to what it measures with a slash at each end and
+  the length above it, in feet-and-inches or inches (*Show ▸ Measurements
+  in feet and inches*); drag a measure to set it off the wall. Select a
+  measure for its four red knobs: the two callout points (drag to move;
+  **Ctrl**-drag turns the measure about the other point on the rotation
+  snap, **Shift** frees it), the line's end (drag along the line for the
+  length) and the label (drag along the line). *Item callouts* (on when
+  a plan opens): every item's **session label** — `W7`, `V12`, `O3`,
+  `R2`, `F4`, `RF1`, taken from the file's own ids when the plan opens so
+  the two match — and its name where set, in a settable colour (*Show ▸
+  Item callout colour…*, default blue). The *Malformed design file*
+  report says the same labels, so a reported problem can be found on the
+  plan; uncheck the layer for the session.
 - **Groups & multi-select** — Ctrl+drag a rubber band to add items to a
   selection set, or Ctrl+click to toggle individual items. The rubber band
   only takes items it **fully encloses**, so you can lasso a single room
@@ -188,7 +208,7 @@ so no system fonts are needed.
 
 | Action | How |
 |---|---|
-| Choose a tool | Toolbar icons or keys **S** E I D W R (Select / Exterior / Interior / Door / Window / Room) |
+| Choose a tool | Toolbar icons or keys **S** E I D W R G M T L (Select / Exterior / Interior / Door / Window / Room / Roof ridge / Dormer / Annotation / Measure) |
 | Zoom / pan | Mouse wheel / drag empty space (middle-drag anywhere) |
 | Draw a wall | Click-drag; the end lands on the snap grid (Shift = unconstrained: off the grid, any angle; Esc = cancel). An end released a grid step short of another wall is left there (a reveal); one released on it welds. Overlapping same-type walls within the snap grid **coalesce** into one shared wall (a boundary between two rooms is a single wall, not a duplicate); the drawn end **welds** onto a wall it lands on, forming a clean T/L joint |
 | Stretch / slide a wall | Drag its end / body in Select mode. A dragged end or a slid wall **lands on the snap grid**, even when the wall began off it; an end sticks to the projected line of a nearby orthogonal wall that is itself off the grid (so you can still close a corner there); overlapping same-type walls coalesce on release. The end-grab zone is capped at a third of the wall, so even a short wall keeps a grabbable middle to slide perpendicular |

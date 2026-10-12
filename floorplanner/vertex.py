@@ -49,17 +49,16 @@ to a fresh QPointF. (Verified before relying on it: nothing in the codebase
 mutates a `p1`/`p2` in place -- every access is `.x()` / `.y()` or a whole-object
 read.)
 """
-import itertools
+from floorplanner import labels as _labels   # 0265: one session-label mint
 
 from PyQt6.QtCore import QPointF
 
-_UIDS = itertools.count(1)
 
 
 class Vertex:
     """One corner. Identity is the point; `uid` names it for the document."""
 
-    __slots__ = ("_uid", "_pt", "name")
+    __slots__ = ("_uid", "_pt", "name", "doc_id")
 
     def __init__(self, x: float, y: float, uid: str = None, name: str = None):
         self._uid = uid
@@ -71,6 +70,7 @@ class Vertex:
         # with no name, as it mints a new uid. The one field here that is
         # set in place: renaming a corner renames it for every holder.
         self.name = name or None
+        self.doc_id = None         # 0264: the document's id, stamped by a load or a walk
 
     @classmethod
     def at(cls, p) -> "Vertex":
@@ -85,7 +85,7 @@ class Vertex:
         because the hot paths move vertices without ever naming them; only the
         document walk asks."""
         if self._uid is None:
-            self._uid = f"V{next(_UIDS)}"
+            self._uid = _labels.mint("V")
         return self._uid
 
     @property

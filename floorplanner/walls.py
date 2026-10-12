@@ -5,7 +5,7 @@ clipping, and the full-scene rebuild.
 rebuild_all_walls() refreshes rooms and a couple of WallItem actions touch
 room binding; those are LATE imports from floorplanner.rooms so this module
 stays importable before rooms (which imports this one)."""
-import itertools
+from floorplanner import labels as _labels   # 0265: one session-label mint
 import math
 from collections import namedtuple
 
@@ -1279,7 +1279,6 @@ def _compute_wall_junctions(scene, walls=None):
         w.update()
 
 
-_WALL_UIDS = itertools.count(1)
 
 
 class WallItem(QGraphicsItem):
@@ -1328,7 +1327,7 @@ class WallItem(QGraphicsItem):
         `Design` just to name one wall would be the per-event rebuild P3.4
         forbids on the edit path."""
         if self._uid is None:
-            self._uid = f"W{next(_WALL_UIDS)}"
+            self._uid = _labels.mint("W")
         return self._uid
 
     @property
@@ -1769,6 +1768,37 @@ class WallItem(QGraphicsItem):
             painter.setFont(f)
             painter.setPen(QPen(QColor(0, 90, 200), 0))
             painter.drawText(tp, fmt_ftin(self.length()))
+        # THE CALLOUTS (0263, 0264 -- his review): the wall's DOCUMENT ID
+        # and its name, and each corner's, in the plan's callout ink, on
+        # every wall of the active floor while Show > Item callouts is on
+        # -- the ids the problem report names, so a reported wall can be
+        # found on the plan. The text is set clear of the wall body on
+        # the side away from the length label.
+        from floorplanner.annotations import callout_colour, callout_text, callouts_shown
+        if floor_display_mode(self.floor) == "active" and callouts_shown():
+            u = self.unit()
+            n = QPointF(-u.y(), u.x())
+            mid = QPointF((self.p1.x() + self.p2.x()) / 2,
+                          (self.p1.y() + self.p2.y()) / 2)
+            f = QFont()
+            f.setPixelSize(max(2, int(11.0 / lod)))
+            painter.setFont(f)
+            painter.setPen(QPen(callout_colour(), 0))
+            fm = QFontMetricsF(f)
+            text = callout_text(self)
+            if text:
+                w = fm.horizontalAdvance(text)
+                h = fm.height()
+                off = self.t / 2 + 4.0 / lod + h
+                c = QPointF(mid.x() - n.x() * off, mid.y() - n.y() * off)
+                painter.drawText(QRectF(c.x() - w / 2 - 2, c.y() - h / 2, w + 4, h),
+                                 Qt.AlignmentFlag.AlignCenter, text)
+            for end in ("p1", "p2"):
+                v = self.end_vertex(end)
+                vtext = callout_text(v) if v is not None else ""
+                if vtext:
+                    q = getattr(self, end)
+                    painter.drawText(QPointF(q.x() + 5.0 / lod, q.y() - 5.0 / lod), vtext)
 
     # -- interaction ----------------------------------------------------------
     def _view_scale(self) -> float:
@@ -2820,6 +2850,7 @@ class OpeningItem(QGraphicsItem):
         # does not model (`head_in`) across a round trip, as a wall's does.
         self.sill_in = None
         self._v5_extra = {}
+        self._uid = None                  # 0265: the session label, O<n>, minted on first read
         self.anchor_v = None              # the Vertex this is dimensioned off
         self.offset_in = 0.0              # ...to the opening's NEAR EDGE
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
@@ -2920,6 +2951,14 @@ class OpeningItem(QGraphicsItem):
             self.s = centre
         if rebuild:
             self.wall.rebuild()           # re-cuts the gap, re-syncs children
+
+    @property
+    def uid(self) -> str:
+        """The opening's session label (`O3`), minted on first read; a load
+        adopts the file's own id (labels.py)."""
+        if self._uid is None:
+            self._uid = _labels.mint("O")
+        return self._uid
 
     def set_sill(self, sill_in):
         """0255: the window's sill over the level (None = the plan's default).
@@ -3031,14 +3070,25 @@ class OpeningItem(QGraphicsItem):
             self._paint_door(painter, w, t)
             painter.setPen(ink)
 
-        # WWHH label, kept clear of the swing side
+        # WWHH label, kept clear of the swing side -- the opening's callout
+        # (0263): in the plan's callout ink, and only while Show > Item
+        # callouts is on (the selected opening keeps it)
+        from floorplanner.annotations import callout_colour, callouts_shown
         f = QFont()
         f.setPixelSize(6)
         painter.setFont(f)
-        painter.setPen(QPen(QColor(70, 70, 90) if not self.isSelected()
+        # the size code is part of the opening's symbol and always draws; it
+        # takes the callout ink while the layer is on, its own grey otherwise
+        label_ink = callout_colour() if callouts_shown() else QColor(70, 70, 90)
+        painter.setPen(QPen(label_ink if not self.isSelected()
                             else QColor(0, 122, 255), 0))
         label = (self.code if self.kind in ("window", "gate")
                  else f"{self.code} {self.door_type}")
+        if callouts_shown():                 # 0264/0265: the opening's session label
+            from floorplanner.annotations import callout_text
+            lab = callout_text(self)
+            if lab:
+                label = f"{lab}  {label}"
         if self.kind == "door" and self.swing < 0:
             ty = t / 2 + 9
         else:
