@@ -950,3 +950,122 @@ def test_real_wiscaway_r2_wing_vertex_is_absent_from_the_orthogonal_rows():
         "an angled-wing vertex leaked into the X row on the real file")
     assert not any(abs(y - p1[1]) < 1e-6 for y in fy), (
         "an angled-wing vertex leaked into the Y row on the real file")
+
+
+# ---------------------------------------------------------------------------
+# 0268 -- the plan's DRAWN dimensions on the sheet in place of the auto rows;
+# its text annotations while Show > Annotations is on
+# ---------------------------------------------------------------------------
+
+class _Recorder:
+    """A canvas that remembers every call -- the sheet's drawing read back
+    without decompressing a PDF stream."""
+
+    def __init__(self):
+        self.calls = []
+
+    def __getattr__(self, name):
+        def call(*a, **k):
+            self.calls.append((name, a))
+            return 40.0 if name == "stringWidth" else self   # a path records too
+        return call
+
+    def strings(self):
+        return [a[-1] for n, a in self.calls
+                if n in ("drawString", "drawCentredString", "drawRightString")]
+
+
+def _annotated_doc(show_dimensions=True, show_annotations=True, units="ftin"):
+    doc = _rect_doc()
+    doc["settings"] = {"show_dimensions": show_dimensions,
+                       "show_annotations": show_annotations,
+                       "dimension_units": units}
+    doc["annotations"] = [
+        {"id": "an1", "level": "L1", "kind": "dimension",
+         "pos": [0, 0], "p2": [240, 0], "offset_in": -18.0},
+        {"id": "an2", "level": "L1", "kind": "dimension",
+         "pos": [240, 0], "p2": [240, 200], "offset_in": -24.0, "label_t": 0.25},
+        {"id": "an3", "level": "L1", "kind": "text", "pos": [60, 90],
+         "text": "North elevation"},
+        {"id": "an4", "level": "L1", "kind": "datum", "pos": [0, 0]},
+    ]
+    return doc
+
+
+def _render(doc, monkeypatch):
+    rec = _Recorder()
+    auto = []
+    monkeypatch.setattr(fp2pdf.Sheet, "draw_dims", lambda self: auto.append("rows"))
+    monkeypatch.setattr(fp2pdf.Sheet, "draw_angled_dims", lambda self: auto.append("angled"))
+    sheet = fp2pdf.Sheet(rec, doc, _MINIMAL_LEVEL, fp2pdf._default_thickness(),
+                         False, _MINIMAL_META)
+    sheet.render(1, 1)
+    return sheet, rec, auto
+
+
+def test_drawn_dimensions_render_in_place_of_the_auto_rows(monkeypatch):
+    """Patrick (0268): "when dimensioning is drawn on the plan, then render
+    that dimension without the auto dimension feature". Two measures on
+    the plan: both on the sheet with their lengths, and neither auto row."""
+    sheet, rec, auto = _render(_annotated_doc(), monkeypatch)
+    assert auto == [], "the auto rows did not draw"
+    dims = sheet.drawn_dims()
+    assert [d["label"] for d in dims] == ["20'-0\"", "16'-8\""]
+    assert set(rec.strings()) >= {"20'-0\"", "16'-8\"", "Dimensions as drawn on the plan"}
+    assert "dim" not in rec.strings(), "the meta's dimension note yields to the drawn ones"
+    # the line sits where the plan puts it: offset -18 on a left-to-right
+    # measure is ABOVE it on the screen (its right, y down), so above on
+    # the sheet (y up) -- the side survives the flip
+    (x1, y1), (x2, y2) = dims[0]["line"]
+    assert (x1, y1, x2, y2) == (0.0, 18.0, 240.0, 18.0)
+    # a slash at each callout point, an extension line from each measured point
+    assert len(dims[0]["slashes"]) == 2 and len(dims[0]["ext"]) == 2
+    # the vertical one reads bottom to top, its label a quarter along
+    assert dims[1]["rot"] == pytest.approx(90.0)
+    assert dims[1]["label_at"] == pytest.approx((264.0, -50.0))
+
+
+def test_hidden_dimensions_fall_back_to_the_auto_rows(monkeypatch):
+    """Show > Measurements off: the plan shows no measures, so the sheet
+    carries none -- the auto rows draw, as before."""
+    sheet, rec, auto = _render(_annotated_doc(show_dimensions=False), monkeypatch)
+    assert auto == ["rows", "angled"]
+    assert sheet.drawn_dims() == []
+    assert "Dimensions as drawn on the plan" not in rec.strings()
+    assert "dim" in rec.strings()
+
+
+def test_a_plan_without_drawn_dimensions_keeps_the_auto_rows(monkeypatch):
+    sheet, rec, auto = _render(_rect_doc(), monkeypatch)
+    assert auto == ["rows", "angled"]
+
+
+def test_drawn_dimensions_label_in_the_plans_units(monkeypatch):
+    sheet, rec, auto = _render(_annotated_doc(units="in"), monkeypatch)
+    assert [d["label"] for d in sheet.drawn_dims()] == ['240"', '200"']
+
+
+def test_text_annotations_follow_the_show_switch(monkeypatch):
+    """Patrick (0268): "when annotations are displayed then render that
+    annotation for printing to pdf" -- and not while they are hidden."""
+    _, rec, _ = _render(_annotated_doc(show_annotations=True), monkeypatch)
+    assert "North elevation" in rec.strings()
+    _, rec, _ = _render(_annotated_doc(show_annotations=False), monkeypatch)
+    assert "North elevation" not in rec.strings()
+
+
+def test_the_frame_takes_the_drawn_dimensions_in():
+    """A measure well outside the walls still lands on the sheet: the frame
+    grows to hold its line."""
+    doc = _annotated_doc()
+    doc["annotations"][0]["offset_in"] = -120.0
+    sheet = _sheet(doc)
+    assert sheet.by0 <= -120.0
+
+
+def test_convert_writes_a_pdf_with_drawn_dimensions_and_says_so(tmp_path):
+    pytest.importorskip("reportlab")
+    out = tmp_path / "drawn.pdf"
+    result = convert(_annotated_doc(), out, _MINIMAL_META)
+    assert out.exists() and out.stat().st_size > 0
+    assert result.sheets == ["sheet P1: Main (2 dimensions as drawn)"]

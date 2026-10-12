@@ -9,7 +9,13 @@ formatted to a residential designer's transmittal spec:
   * door symbols (leaf + swing arc / slider panels), window glazing lines,
     every opening tagged with its WWHH size code
   * room labels: NAME / clear WxL size / ceiling height
-  * dimension strings (arch ticks, whole-inch feet-inches text, grid-aware
+  * dimension strings -- THE PLAN'S OWN, when it has drawn any (0268,
+    Patrick: "when dimensioning is drawn on the plan, then render that
+    dimension without the auto dimension feature"): each `dimension`
+    annotation of the level as the screen draws it -- one thin line, a
+    slash at each callout point, extension lines, the length in the plan's
+    `dimension_units` -- and NO auto rows; otherwise the auto strings
+    (arch ticks, whole-inch feet-inches text, grid-aware
     decluttering against the document's own wall_snap_in):
       row 1: features -- every wall endpoint (no openings -- 0128-ruling.md)
       row 2: overall, within the same row's own family (0130-ruling.md)
@@ -17,6 +23,7 @@ formatted to a residential designer's transmittal spec:
     off-axis angle family (45 degrees, 135 degrees, ...) gets its own lane
     outside the drawing, for rooms with `label.show_dimensions` on
     (0120-ruling.md)
+  * text annotations, while the plan's Show > Annotations is on (0268)
   * title block: project, level, scale, date, wall-assembly note,
     dimension-reference note, an openings-not-dimensioned note,
     NOT FOR CONSTRUCTION
@@ -94,6 +101,11 @@ SCALE_NAMES = {1 / 48: '1/4" = 1\'-0"', 1 / 64: '3/16" = 1\'-0"',
 
 GRAY_POCHE = 0.82
 GRAY_LT = 0.55
+#: 0268: a DRAWN dimension's geometry, in plan inches -- the screen's own
+#: numbers (annotations.py DIM_TICK_IN / DIM_EXT_GAP_IN), so the sheet
+#: reads as the plan does
+DRAWN_TICK_IN = 4.0                   # the "/" slash, half-length
+DRAWN_EXT_GAP_IN = 2.0                # the extension line starts this far off the point
 
 
 def ftin(v_in: float, dash: bool = True) -> str:
@@ -263,9 +275,16 @@ class Sheet:
         # 0129-ruling.md sec3(a): read the DOCUMENT's own grid, not a
         # hardcoded 6 -- the default is only what config.py:WALL_SNAP_DEFAULT
         # already uses when a plan's settings block omits it.
+        settings = doc.get("settings") or {}
         self.wall_snap_in = float(
-            (doc.get("settings") or {}).get("wall_snap_in")
-            or WALL_SNAP_DEFAULT_IN)
+            settings.get("wall_snap_in") or WALL_SNAP_DEFAULT_IN)
+        # 0268: the level's annotations, and the plan's Show switches --
+        # a hidden kind is not on the plan, so it is not on the sheet
+        self.annotations = [a for a in (doc.get("annotations") or [])
+                            if a.get("level") == level["id"]]
+        self.show_annotations = bool(settings.get("show_annotations", True))
+        self.show_dimensions = bool(settings.get("show_dimensions", True))
+        self.dimension_units = settings.get("dimension_units", "ftin")
         self._frame()
 
     def warn(self, msg: str) -> None:
@@ -298,6 +317,10 @@ class Sheet:
                 x, y = self.pt(vid)
                 xs += [x - t2, x + t2]
                 ys += [y - t2, y + t2]
+        for d in self.drawn_dims():           # 0268: the drawn dimension lines are plan too
+            for x, y in d["page_pts"]:
+                xs.append(x)
+                ys.append(y)
         self.bx0, self.bx1 = min(xs), max(xs)
         self.by0, self.by1 = min(ys), max(ys)
         w_in, h_in = self.bx1 - self.bx0, self.by1 - self.by0
@@ -869,12 +892,97 @@ class Sheet:
                             rot += 180
                         self.text(mx, my, "OPEN", size=5.5, rot=rot,
                                   gray=GRAY_LT)
-        for ann in self.doc.get("annotations") or []:
-            if ann["level"] == self.level["id"] and ann["kind"] == "text" \
-                    and ann.get("text"):
+        # 0268 (Patrick: "when annotations are displayed then render that
+        # annotation for printing to pdf"): the plan's texts, while its
+        # Show > Annotations switch is on
+        if not self.show_annotations:
+            return
+        for ann in self.annotations:
+            if ann.get("kind") == "text" and ann.get("text"):
                 x, y = float(ann["pos"][0]), -float(ann["pos"][1])
                 self.text(x, y, ann["text"], size=6, gray=0.2,
                           rot=-float(ann.get("rotation", 0)), center=False)
+
+    # ---------- the plan's own dimensions (0268) ----------
+    @staticmethod
+    def _flip(pt):
+        """A screen point (y down) on the sheet (y up)."""
+        return (pt[0], -pt[1])
+
+    def drawn_dims(self):
+        """The level's `dimension` annotations, while the plan shows its
+        measurements, each resolved to plan coordinates (y up): the two
+        measured points, the two ends of the dimension line, the label's
+        point and text. Empty when there are none or the switch is off --
+        then the auto rows draw, as before."""
+        if not self.show_dimensions:
+            return []
+        out = []
+        for ann in self.annotations:
+            if ann.get("kind") != "dimension" or not ann.get("p2"):
+                continue
+            # the SCREEN's frame (y down, the offset on the measured line's
+            # left): every point is built there, then flipped, so the sheet
+            # puts the line on the side the plan does
+            ax, ay = float(ann["pos"][0]), float(ann["pos"][1])
+            bx, by = float(ann["p2"][0]), float(ann["p2"][1])
+            dx, dy = bx - ax, by - ay
+            ln = math.hypot(dx, dy)
+            if ln < 1e-6:
+                continue
+            ux, uy = dx / ln, dy / ln
+            nx, ny = -uy, ux
+            o = float(ann.get("offset_in", 18.0))
+            t = min(0.95, max(0.05, float(ann.get("label_t", 0.5))))
+            px, py = ax + nx * o, ay + ny * o
+            qx, qy = bx + nx * o, by + ny * o
+            sgn = 1.0 if o >= 0 else -1.0
+            ext = []
+            for mx, my in ((ax, ay), (bx, by)):
+                ext.append(((mx + nx * sgn * DRAWN_EXT_GAP_IN, my + ny * sgn * DRAWN_EXT_GAP_IN),
+                            (mx + nx * (o + sgn * DRAWN_TICK_IN), my + ny * (o + sgn * DRAWN_TICK_IN))))
+            slashes = []
+            for mx, my in ((px, py), (qx, qy)):
+                slashes.append(((mx + (ux - nx) * DRAWN_TICK_IN, my + (uy - ny) * DRAWN_TICK_IN),
+                                (mx - (ux - nx) * DRAWN_TICK_IN, my - (uy - ny) * DRAWN_TICK_IN)))
+            if self.dimension_units == "in":
+                label = f"{round(ln, 2):g}\""
+            else:
+                label = ftin(ln)
+            # the label's angle on the page (y up), never upside down
+            rot = math.degrees(math.atan2(-uy, ux))
+            if rot > 90 or rot <= -90:
+                rot += 180
+            out.append({
+                "line": (self._flip((px, py)), self._flip((qx, qy))),
+                "ext": [(self._flip(a), self._flip(b)) for a, b in ext],
+                "slashes": [(self._flip(a), self._flip(b)) for a, b in slashes],
+                "label": label,
+                "label_at": self._flip((px + (qx - px) * t, py + (qy - py) * t)),
+                "rot": rot,
+                "page_pts": [self._flip((px, py)), self._flip((qx, qy)), self._flip((ax, ay)), self._flip((bx, by))],
+            })
+        return out
+
+    def draw_drawn_dims(self):
+        """The plan's own dimensions, as the screen draws them: the
+        extension lines, one thin line, a slash at each callout point, the
+        length above the line at its label point."""
+        for d in self.drawn_dims():
+            for (x1, y1), (x2, y2) in d["ext"]:
+                self.line(x1, y1, x2, y2, w=0.4, gray=0.25)
+            (x1, y1), (x2, y2) = d["line"]
+            self.line(x1, y1, x2, y2, w=0.5)
+            for (x1, y1), (x2, y2) in d["slashes"]:
+                self.line(x1, y1, x2, y2, w=0.9)
+            c = self.c
+            c.saveState()
+            c.translate(self.X(d["label_at"][0]), self.Y(d["label_at"][1]))
+            c.rotate(d["rot"])
+            c.setFillGray(0.0)
+            c.setFont("Helvetica", 6.5)
+            c.drawCentredString(0, 2.5, d["label"])
+            c.restoreState()
 
     # ---------- title block ----------
     def title_block(self, sheet_no, total):
@@ -902,7 +1010,9 @@ class Sheet:
         c.setFont("Helvetica", 7.5)
         c.drawString(cols[1] + 8, y0 + TITLE_H - 32,
                      f"SCALE: {self.scale_name}   (11x17 SHEET)")
-        c.drawString(cols[1] + 8, y0 + 15, m["dim_note"])
+        c.drawString(cols[1] + 8, y0 + 15,
+                     "Dimensions as drawn on the plan" if self.drawn_dims()
+                     else m["dim_note"])
         c.setFont("Helvetica", 6)
         c.drawString(cols[1] + 8, y0 + 6,
                      "Openings shown for reference; not dimensioned")
@@ -926,8 +1036,11 @@ class Sheet:
         self.draw_walls()
         self.draw_rooms()
         self.draw_extras()
-        self.draw_dims()
-        self.draw_angled_dims()
+        if self.drawn_dims():                 # 0268: the plan's own, no auto rows
+            self.draw_drawn_dims()
+        else:
+            self.draw_dims()
+            self.draw_angled_dims()
         self.title_block(sheet_no, total)
         self.c.showPage()
 
@@ -989,7 +1102,10 @@ def convert(doc, out: Path, meta, only_levels=None,
     for i, lv in enumerate(levels):
         sheet = Sheet(c, doc, lv, th, include_concept, meta)
         sheet.render(i + 1, len(levels))
-        result.sheets.append(f"sheet P{i + 1}: {lv.get('name', lv['id'])}")
+        n_drawn = len(sheet.drawn_dims())
+        result.sheets.append(
+            f"sheet P{i + 1}: {lv.get('name', lv['id'])}"
+            + (f" ({n_drawn} dimension{'s' if n_drawn != 1 else ''} as drawn)" if n_drawn else ""))
         result.warnings.extend(sheet.warnings)
     c.save()
     return result
