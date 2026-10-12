@@ -369,7 +369,10 @@ def test_no_riser_hangs_from_an_edge_of_the_higher_roof(fp3d, name):
         before = fp3d._cross_roof_risers([(lf, per[id(lf)]) for lf in every.values()], RC)
     finally:
         fp3d._on_footprint_edge = orig
-    assert len(before) == (13 if name == "short-angle-roof.json" else 15)
+    # 13 on the base case; on R2 15 segments of the same boundaries before
+    # 0260's coarser arrangement, 12 since (fewer, longer pieces -- the
+    # boundaries themselves are what the loop below checks, one by one)
+    assert len(before) == (13 if name == "short-angle-roof.json" else 12)
     for (px, py), (qx, qy), *_heights in before:
         p, q = RC.Pt(px, py), RC.Pt(qx, qy)
         assert any(fp3d._on_footprint_edge(lf, p, q, RC) for lf in every.values()), (px, py, qx, qy)

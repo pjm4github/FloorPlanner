@@ -15,7 +15,7 @@ dragged." And one display fact: on a level whose base is not the ground,
 the End-On dialog says where the roof stands in the building.
 """
 import pytest
-from PyQt6.QtCore import QEvent, QPointF, Qt
+from PyQt6.QtCore import QRectF, QEvent, QPointF, Qt
 from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import QApplication, QDialog
 
@@ -184,9 +184,15 @@ def test_on_his_fixture_a_ridge_starts_on_the_lower_roofs_ghosted_line(fp, win):
         for k in range(1, 40):
             c = QPointF(p.x() + (q.x() - p.x()) * k / 40.0,
                         p.y() + (q.y() - p.y()) * k / 40.0)
+            # clear by a margin, not at the exact point: the press goes
+            # through the view's pixels and lands within an inch or two,
+            # and the segment order follows the clip's cells (0260 made
+            # them coarser, and the first segment then sat 4 in from the
+            # next roof)
+            around = QRectF(c.x() - 8.0, c.y() - 8.0, 16.0, 16.0)
             if not any(isinstance(it, (RoofItem, RoofGripItem, RoofEndMarkerItem,
                                        fp.WallItem))
-                       for it in win.scene.items(c)):
+                       for it in win.scene.items(around)):
                 pt = c
                 break
         if pt is not None:

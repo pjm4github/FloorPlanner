@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 0f5d518 -->
+<!-- SNAPSHOT-HEAD: 4a88480 -->
 
 # Session snapshot — read this first
 
@@ -248,7 +248,7 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`0f5d518`** at this file's cut — [`0259`](handoff/0259-report.md) landed; this commit lands [`0260-report.md`](handoff/0260-report.md): the compose cost built on `roofclip-cost`, one commit, AMBER. **Owed next: his check of the PR; then nothing ordered (0248's items 8 and 9 named).** Every PR through #85 is merged (#59 was closed, superseded by #60). |
+| **`main`** | **`4a88480`** at this file's cut — [`0260`](handoff/0260-report.md) landed; this commit, on `roofclip-cost`, is the build itself: the arrangement from one set of disjoint cells, the neighbour graph, `tests/test_roofclip_cost.py`. **Owed next: his check of the PR; then nothing ordered (0248's items 8 and 9 named).** Every PR through #85 is merged (#59 was closed, superseded by #60). |
 | **Branches** | **One open: `roofclip-cost`** — the compose cost ([`0260`](handoff/0260-report.md)); ONE commit; AMBER, waits on his check. |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **88 records, 31 open** (D88 CLOSED 2026‑10‑11, `closed_by 6ee358b`; D87 CLOSED 2026‑10‑11, `closed_by d90f8b4`; D67 CLOSED 2026‑10‑07, `closed_by cdc54de`, [`0225`](handoff/0225-report.md); D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |

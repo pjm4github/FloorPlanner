@@ -697,24 +697,78 @@ def _root_cells(footprint, overlap):
     return [c for c in cells if not _contains(overlap, _centroid(c), tol=-1e-6)]
 
 
+#: THE ADJACENCY MEMO (Patrick, 2026-10-11: "the program eventually locks up
+#: when I select and move roof edges" -- measured at 0237-report.md: a
+#: building compose doubled with every roof added, 0.75 s at 9 roofs, 32 s
+#: at 15, and 97% of it was `_reach` asking `_adjacent` of the SAME pair of
+#: pieces again and again -- 2.3 million calls for 165 thousand distinct
+#: pairs at 12 roofs). Whether two pieces share a boundary depends on the
+#: two polygons and nothing else, and within one envelope round every
+#: `_reach` walks the same `pieces` list, so the answer is remembered per
+#: pair for as long as that list is the one being walked. Keyed by the
+#: list's identity and HELD by reference, so the id cannot be reused by a
+#: later list while the memo lives; a different list starts a new memo.
+#: No answer changes: the memo returns exactly what `_adjacent` would.
+_ADJ_MEMO = {"pieces": None, "memo": {}}
+
+
+def _neighbours(pieces, tol: float = 1e-5):
+    """THE NEIGHBOUR GRAPH, once per piece list (0260-report.md, replacing
+    the per-pair memo above as the thing the walk reads): `nbrs[i]` is
+    every piece sharing a boundary of positive length with piece `i`,
+    found by one sweep over the pieces' bounding boxes sorted on x --
+    `_adjacent` is asked only of pairs whose boxes meet, once. A walk
+    then follows the lists instead of asking the question of every
+    allowed piece from every frontier piece (0237 measured 2.3 million
+    such questions for 165 thousand distinct pairs at 12 roofs, and the
+    memo answered them faster but still one at a time). Keyed by the
+    list's identity and HELD by reference, as the memo was."""
+    cache = _ADJ_MEMO
+    if cache["pieces"] is pieces:
+        return cache["memo"]
+    boxes = [(min(p.x() for p in c), min(p.y() for p in c),
+              max(p.x() for p in c), max(p.y() for p in c)) for c in pieces]
+    n = len(pieces)
+    nbrs = [[] for _ in range(n)]
+    order = sorted(range(n), key=lambda k: boxes[k][0])
+    for a, i in enumerate(order):
+        x0, y0, x1, y1 = boxes[i]
+        for j in order[a + 1:]:
+            bx0, by0, bx1, by1 = boxes[j]
+            if bx0 > x1 + tol:
+                break                       # every later box starts further right
+            if y0 > by1 + tol or by0 > y1 + tol:
+                continue
+            if _adjacent(pieces[i], pieces[j], tol):
+                nbrs[i].append(j)
+                nbrs[j].append(i)
+    cache["pieces"] = pieces
+    cache["memo"] = nbrs
+    return nbrs
+
+
 def _reach(start, pieces, allowed, blocked, no_step=None):
     """Indices reachable from `start` across shared boundaries, staying
     inside `allowed` and never crossing a pair in `blocked` (the two
     pieces a seam separates); `no_step(i, j)`, when given, vetoes the
     directed step i -> j (a joining end's extension climbing back above
-    its host -- `compute_roof_clips`)."""
+    its host -- `compute_roof_clips`). The walk follows `_neighbours`'
+    lists: each step considers a piece's actual neighbours, not every
+    allowed piece."""
+    nbrs = _neighbours(pieces)
     reached = set(start)
     frontier = list(start)
     while frontier:
         i = frontier.pop()
-        for j in allowed:
-            if j in reached or (i, j) in blocked or (j, i) in blocked:
+        for j in nbrs[i]:
+            if j in reached or j not in allowed:
+                continue
+            if (i, j) in blocked or (j, i) in blocked:
                 continue
             if no_step is not None and no_step(i, j):
                 continue
-            if _adjacent(pieces[i], pieces[j]):
-                reached.add(j)
-                frontier.append(j)
+            reached.add(j)
+            frontier.append(j)
     return reached
 
 
@@ -1211,21 +1265,98 @@ def compute_roof_clips(roofs, diag=None) -> dict:
     # its own nominal footprint's edges, and every strip's own edges --
     # a cell must never straddle any of these, or its coverers would not
     # stay constant across it
-    cut_set = []
-    for rf in live:
-        cut_set.extend(_cut_lines(rf))
-        for poly in domain[id(rf)]:
-            m = len(poly)
-            for k in range(m):
-                a, b = poly[k], poly[(k + 1) % m]
-                d = Pt(b.x() - a.x(), b.y() - a.y())
-                if math.hypot(d.x(), d.y()) > EPS:
-                    cut_set.append((a, d))
+    # THE COST (0260-report.md; 0237-report.md sec0 measured a compose
+    # doubling with every roof, 32 s at 15 roofs, 1245 pieces). Every
+    # line used to cut EVERY cell of the whole arrangement -- a roof's
+    # ridge, and the infinite line through each edge of its footprint,
+    # sliced the cells of roofs it never touched, and the piece count
+    # grew with the product of roofs and lines, not with the junctions.
+    # The arrangement is built from ONE set of disjoint cells instead:
+    # each roof's domain polygons are laid down in turn, each new one cut
+    # by the edges of the cells already there that it meets, the cells it
+    # meets cut by its own edges (so no cell straddles a domain boundary,
+    # which is the one invariant the construction needs -- coverers
+    # constant within a cell), and the pieces of it already covered are
+    # dropped (their centroid lies in a cell already placed) rather than
+    # deduplicated by vertex set afterwards. Then each roof's own
+    # plane-change lines (its ridge, its hips) cut only the cells that
+    # meet its domain's bounding box: outside that box the roof covers
+    # nothing on either side of the line. Same ground, fewer pieces;
+    # every promoted fixture's clip is pinned unchanged by the tests, and
+    # the cells are pinned pairwise disjoint.
+    def _box_of(poly):
+        return (min(p.x() for p in poly), min(p.y() for p in poly),
+                max(p.x() for p in poly), max(p.y() for p in poly))
 
-    cells = [list(poly) for rf in live for poly in domain[id(rf)]]
-    for pt, d in cut_set:
-        cells = [piece for cell in cells for piece in _split_by_line(cell, pt, d)]
+    def _meets(a, b):
+        return not (a[2] < b[0] - EPS or b[2] < a[0] - EPS
+                    or a[3] < b[1] - EPS or b[3] < a[1] - EPS)
+
+    def _edge_lines(poly):
+        m = len(poly)
+        out = []
+        for k in range(m):
+            a, b = poly[k], poly[(k + 1) % m]
+            d = Pt(b.x() - a.x(), b.y() - a.y())
+            if math.hypot(d.x(), d.y()) > EPS:
+                out.append((a, d))
+        return out
+
+    cells, boxes = [], []
+    for rf in live:
+        for poly in domain[id(rf)]:
+            pbox = _box_of(poly)
+            poly_lines = _edge_lines(poly)
+            near = [k for k, b in enumerate(boxes) if _meets(b, pbox)]
+            # the new polygon, cut by the edges of every cell it meets
+            pieces_ = [list(poly)]
+            for k in near:
+                for pt, d in _edge_lines(cells[k]):
+                    pieces_ = [piece for c in pieces_ for piece in _split_by_line(c, pt, d)]
+            # the cells it meets, cut by its own edges
+            recut = {}
+            for k in near:
+                parts = [cells[k]]
+                for pt, d in poly_lines:
+                    parts = [piece for c in parts for piece in _split_by_line(c, pt, d)]
+                recut[k] = parts
+            # ground already placed is dropped; the rest is new
+            fresh = [piece for piece in pieces_
+                     if not any(_contains(cells[k], _centroid(piece), tol=-1e-6) for k in near)]
+            if recut:
+                keep, keep_boxes = [], []
+                for k, cell in enumerate(cells):
+                    parts = recut.get(k)
+                    if parts is None:
+                        keep.append(cell)
+                        keep_boxes.append(boxes[k])
+                    else:
+                        keep.extend(parts)
+                        keep_boxes.extend(_box_of(c) for c in parts)
+                cells, boxes = keep, keep_boxes
+            cells.extend(fresh)
+            boxes.extend(_box_of(c) for c in fresh)
+    # the plane-change lines, on the cells each roof's domain can reach
+    for rf in live:
+        lines = _cut_lines(rf)
+        if not lines:
+            continue
+        rbox = _box_of([p for poly in domain[id(rf)] for p in poly])
+        out, out_boxes = [], []
+        for cell, box in zip(cells, boxes, strict=True):
+            if not _meets(box, rbox):
+                out.append(cell)
+                out_boxes.append(box)
+                continue
+            parts = [cell]
+            for pt, d in lines:
+                parts = [piece for c in parts for piece in _split_by_line(c, pt, d)]
+            out.extend(parts)
+            out_boxes.extend(_box_of(c) for c in parts)
+        cells, boxes = out, out_boxes
     cells = _dedup_cells(cells)
+    if diag is not None:
+        diag["cells0"] = [list(c) for c in cells]
 
     # -- ORIGINAL candidacy per cell, fixed for the rest of this function --
     # `orig_root[i]` (single coverer, from candidacy alone) is the anchor-
