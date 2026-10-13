@@ -1107,11 +1107,11 @@ def design_from_scene(source, floors=None, report=None, strict=False, ids_out=No
 
     design_doc = canonicalize({
         "format": "floorplanner-design",
-        # R1's own migration discipline (0139-ruling.md sec1): a document
-        # with no roofs at all stays version 5, no key emitted; roofs bump
-        # it to 6, the only condition that does (design-schema.v5.json's
-        # own `version` description).
-        "version": 6 if roofs else 5,
+        # 0271 (Patrick, 2026-10-12: "use V6 here"): every document this
+        # app writes is version 6 -- the schema's own `version` description
+        # names what 6 holds; a loaded 5 is read as it is and written as 6.
+        # (Before 0271, R1's discipline wrote 5 until a plan had roofs.)
+        "version": 6,
         "units": "inches",
         "settings": settings, "levels": levels, "vertices": vertices,
         "walls": walls, "rooms": rooms, "furnishings": furnishings,

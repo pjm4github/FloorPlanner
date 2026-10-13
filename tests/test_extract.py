@@ -218,6 +218,6 @@ def test_fp_extract_cli_end_to_end(qapp, tmp_path):
     # the fixture is deterministic and, in v5, edge-granular walls are document
     # state. A `>=` bound here would let a planarisation bug that exploded 5
     # runs into 500 spurious segments sail straight through.
-    assert data["format"] == "floorplanner-design" and data["version"] == 5
+    assert data["format"] == "floorplanner-design" and data["version"] == 6   # 0271
     assert len(data["walls"]) == 9, "5 detected runs -> 9 graph edges"
     assert len(data["vertices"]) == 8

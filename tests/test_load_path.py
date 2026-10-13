@@ -258,10 +258,10 @@ def _saved(win, tmp_path, name="out.json"):
     return p, json.loads(p.read_text(encoding="utf-8"))
 
 
-def test_save_writes_v5(fp, win, tmp_path, make_room):
+def test_save_writes_v6(fp, win, tmp_path, make_room):   # 0271: the app writes version 6
     make_room(win.scene, 0, 0, 240, 120, name="Hall")
     _p, doc = _saved(win, tmp_path)
-    assert doc["format"] == "floorplanner-design" and doc["version"] == 5
+    assert doc["format"] == "floorplanner-design" and doc["version"] == 6
     assert check(doc, deep=True) == []
 
 

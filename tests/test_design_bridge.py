@@ -849,9 +849,11 @@ def test_design_from_scene_includes_a_roof_and_bumps_version_to_6(fp, win):
     assert rf["gable"] == [True, True]
 
 
-def test_design_from_scene_with_no_roofs_stays_v5_and_omits_the_key(fp, win):
+def test_design_from_scene_with_no_roofs_is_v6_and_omits_the_key(fp, win):
+    """0271: version 6 whatever the plan holds (before: 5 until roofs);
+    the `roofs` key is still only written when there are roofs."""
     doc, _ = _walk(win)
-    assert doc["version"] == 5
+    assert doc["version"] == 6
     assert "roofs" not in doc
 
 

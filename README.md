@@ -1,15 +1,20 @@
 # Floor Planner
 
-**Version 1.2** — single source of truth: `APP_VERSION` in `floorplanner/config.py`
-(also the JSON `FILE_VERSION`, currently 4, for the on-disk plan format — v4 adds
-multi-floor plans). v1.1 = the package split + model layer; v1.2 = multi-floor
-plans. The planning docs those versions targeted (`CODE_REVIEW.md`,
-`REFACTOR_PLAN.md`, `TODO.md`) are tagged with the baseline version they target
-and now live in `docs/superseded/`.
+A 2D architectural floor-plan editor in Python and PyQt6 — walls, doors and
+windows, rooms that own their walls, true-scale furnishings, roofs with
+dormers, annotations and measurements, multi-floor plans, a 3D view, and
+exports to PDF plan sheets and Chief Architect. Run `python FloorPlanner.py`
+(or the `floorplanner` console script). Everything the app and its tools do is
+listed, with an example each, in **[`docs/COMMANDS.md`](docs/COMMANDS.md)**.
 
-A 2D architectural floor-plan editor written in Python with PyQt6 — the
-`floorplanner/` package (run `python FloorPlanner.py` or the `floorplanner`
-console script), plus bundled fonts and artwork.
+**App version 1.2** (`APP_VERSION` in `floorplanner/config.py`). **The plan
+file is a version‑6 `floorplanner-design` document** — the JSON Schema is
+`floorplanner/design/design-schema.v6.json` ([`docs/design-schema.v6.md`](docs/design-schema.v6.md));
+a version‑5 file opens unchanged and is written back as 6; a v1–v4
+`floorplanner-json` plan is converted on open and reported. The model behind
+it is [`docs/DESIGN_MODEL_v5.md`](docs/DESIGN_MODEL_v5.md): a room owns an
+outline of shared vertices, walls are bindings onto its edges, and vertices
+are the only coordinates in the file.
 
 ![Floor Planner screenshot](docs/screenshot.png)
 
@@ -19,185 +24,134 @@ console script), plus bundled fonts and artwork.
 
 - **Walls** — exterior (6") and interior (4½") walls drawn by click-drag,
   orthogonal from the anchor and **landing on the snap grid** (Shift =
-  unconstrained: off the grid, any angle). While drawing, the
-  endpoint snaps to **line up with the projected line of a nearby
-  open-ended wall** that is itself off the grid (a dangling end) while staying horizontal/vertical;
-  fully-joined walls aren't snap targets and **nothing auto-grows** — any
-  gap is left for you to close by hand. Shared endpoints join into mitred
-  corners. Dragging a wall's body slides it orthogonally — attached walls
-  stretch and shrink so rooms stay rectangular (Ctrl for free movement).
-- **Doors & windows** — placed on a wall with WWHH sizes
-  (`3280` = 32" × 80"), they cut the opening and ride the wall when
-  dragged. Door types: LH, RH, bifold, pocket, slider, French, doorway,
-  and single / double **garage doors** (shown as the opening plus a
-  dashed overhead outline of the open door). When two rooms share a
-  boundary (coincident walls), a door or window belongs to one wall and
-  the wall next to it **opens** for it — a single clean opening, never two
-  stacked on top of each other.
-- **Rooms** — click inside any enclosed area to name it. The room traces
-  its perimeter along the wall centrelines, computes the true interior
-  area, can draw double-headed dimension arrows on every enclosing wall
-  (opposite equal walls dimensioned once), and carries a property sheet
-  (room type, ceiling, finishes, HVAC, notes…). A labelled room **owns its
-  boundary walls**: left-drag the name to move the whole room — walls,
-  doors and windows travel together — and on a shared boundary each room
-  keeps its own wall, so adjacent rooms stay aligned without disturbing one
-  another. Clicking a room's name or any of its walls brings that room to
-  the front. Ctrl-drag the name to nudge just the label; stretch an
-  individual wall to reshape the room as before. A room wall's end-knobs
-  are locked while it belongs to the room — right-click it and **Detach
-  wall from room** to unlock its corners (the wall stays part of the room).
-  Drag a corner along the wall (Shift for any angle) and where it pulls
-  away from its neighbour that side **opens**: the room keeps its shape and
-  its area across the gap, so rooms no longer need a wall on every side.
-  Slide that partly-open wall and the opening travels with it while both
-  adjoining walls stretch; drag the wall back to the corners and the gap
-  closes and the wall fuses back into the room (right-click to detach it
-  again). An open side is **drawn dashed**, by the room itself, from the very
-  outline edge that records it — no placeholder item, so the cue and the fact
-  cannot disagree. Right-click a room name
-  for an **inventory** — its
-  properties plus every furnishing and opening in the room, in an aligned
-  table you can copy as TSV for Excel. Rooms can be copied and pasted
-  elsewhere with their walls and openings.
+  unconstrained: off the grid, any angle). While drawing, the endpoint snaps
+  to line up with the projected line of a nearby open-ended wall; nothing
+  auto-grows — a gap is left for you to close. Shared endpoints join into
+  mitred corners (one shared **vertex** per corner: move it and every wall and
+  room outline that holds it follows). Dragging a wall's body slides it
+  orthogonally and the attached walls stretch (Ctrl for free movement).
+  Overlapping same-type walls **coalesce**; an end released on a wall
+  **welds** a T or L joint. **Edit ▸ Wall orthogonality report** finds the
+  walls a fraction off axis; **Repair wall orthogonality** squares them.
+  Double-click a wall for its **property sheet** (name, type, thickness,
+  length, heading, level, rooms, openings, its id).
+- **Doors & windows** — placed on a wall with WWHH sizes (`3280` = 32" × 80"),
+  they cut the opening and ride the wall when dragged. Door types: LH, RH,
+  bifold, pocket, slider, French, doorway, and single / double **garage
+  doors**. A window carries its **sill height** (a plan default of 36", set
+  per window in its properties). On a shared boundary an opening belongs to
+  one wall and the wall beside it opens for it — one clean opening.
+- **Rooms** — click inside any enclosed area to name it. The room traces its
+  perimeter along the wall centrelines, computes the true interior area, can
+  draw dimension arrows on every enclosing wall, and carries a property sheet
+  (type, ceiling, finishes, HVAC, notes, *include in total square footage*).
+  A labelled room **owns its boundary walls**: drag the name to move the whole
+  room — walls, doors and windows travel together. Detach a wall to unlock its
+  corners; drag a corner along the wall and the side **opens** (drawn dashed);
+  drag it back and it fuses. **Extract** a room to float it as a movable unit
+  and **join** it back; save a floated room as a **template** and load it onto
+  another plan. Right-click a room name for its **inventory** (copy as TSV).
+  **Concept rooms** mark areas with no walls (quarantined on export).
+- **Roofs** — sketch a **ridge** over the house (the heights dialog sets the
+  eaves and ridge; the pitch follows), choose the **form** — gable, **hip**
+  (with a settable run per end) or **shed** — and the eaves span and overhang
+  per side. Sketch a **dormer** on a roof plane: its sides and face are
+  projected up from the host roof, and it takes its own windows. Roofs clip
+  each other along their valleys and seams (a pure clipper, measured fast
+  enough for fifteen roofs); the lower roof runs under the overhang; the
+  **End-On** dialog draws the section it edits. *Roof ▸ Show roof / Edit roof*
+  switch the drawing and the grips.
+- **Floors** — any number of levels, each with an elevation and a wall
+  height; the active floor paints on top and the others ghost beneath
+  (*Floors ▸ Show other floors*). **Ctrl+F** pops the floor selector,
+  **Ctrl+Shift+F** makes a floor, **Ctrl+PgUp/PgDown** cycle. A reference
+  floor (a site or lot level) is skipped by the exporters.
+- **3D view** — **Ctrl+3** renders the current plan read-only: walls cut by
+  their openings, floors, roofs with their dormers, posts running from their
+  level to the roof above, furnishings as blocks. The same builder is the
+  command-line viewer (`floorplanner.viewer.fp3d`, pyqtgraph) and its Qt
+  Quick 3D twin (`fp3dq`), both of which take a camera and write a PNG.
+- **Annotations, measurements, leaders and item callouts** — the **Show** menu
+  switches each layer on and off independently and saves the choice with the
+  plan. *Annotations*: the **T** tool places a text at a click (drag to move,
+  double-click to edit); the **N** tool draws a **leader** — press on the
+  thing to name (the point snaps as a measure's end does), drag to where the
+  text goes, type it: an arrow at the point, the text on a short shoulder,
+  two knobs when selected. *Measurements*: the **L** tool drags a measure
+  from one point to another — each end snaps to a corner, a wall, an
+  opening's jamb or the level's **datum** (*Show ▸ Place datum*), both ends on
+  one wall and the measure runs along it — drawn as one thin line with a
+  slash at each end and the length above it, in feet-and-inches or inches
+  (*Show ▸ Measurements in feet and inches*). Select a measure for its four
+  small black knobs: the two callout points (drag to move; **Ctrl**-drag
+  turns the measure about the other point on the rotation snap, **Shift**
+  frees it), the line's end and the label. *Item callouts* (on when a plan
+  opens): every item's **session label** — `W7`, `V12`, `O3`, `R2`, `F4`,
+  `RF1`, taken from the file's own ids when the plan opens so the two
+  match — and its name where set, in one small font and a settable colour
+  (*Show ▸ Item callout colour…*, default blue). The **Malformed design
+  file** report says the same labels and **zooms to** a reported row.
 - **Furnishings** — a bundled CC0 library of 96 top-view symbols across
-  **Living** (sofas, chairs, tables, TV stand, **large-screen TV**, **gas
-  fireplace**, bookshelf), **Dining** (tables, chairs, **buffet**, **china
-  hutch**), **Kitchen** (appliances, sink, standard
-  **base
-  cabinets** — 24"/36" door bases, drawer base, sink base, corner
-  lazy-susan — 24"/30"/36" **wall cabinets** (drawn dashed, overhead),
-  18"/24"/36" **pantry cabinets**, and **islands** (a 6' island and a 7'
-  island with a sink, each with cabinets and a seating overhang),
-  **Bedroom**, **Bathroom** (tub, shower, luxury walk-in shower, glass
-  walk-in shower, toilet, and 24"/30"/36"/48" **vanity bases**), Laundry,
-  **Office / Storage** (desk, **desk + chair set**, **L-shaped corner
-  desk**, office chair, bookshelf, wardrobe), **Garage**
-  (cars, boat + trailer, **sub-compact garden tractor with a front loader**,
-  a **riding mower with a front snowblower**, workbench, yard equipment),
-  **Shop** (table saw,
-  lathe, jointer, drill press, bandsaw, planer…), **Sunroom** (swim spa,
-  sauna, whirlpool, lounge chairs…), **HVAC** (gas/electric/oil
-  furnaces, water heaters, water softener, gas/oil tanks, electric panel,
-  car charger, battery wall, well pump, heat exchanger) and **Framing**
-  (stairs, residential elevator). Drag one from the
-  right-hand
-  palette onto the plan and it lands at **true scale** (scene units are
-  inches; a 16' SUV takes up 16'). The palette is organised in expandable
-  room sections; placed items move with 1" snap and rotate via a grab
-  handle (Ctrl = snap to the configured increment).
-- **Stairs** — the Framing **stairs** symbol draws the right number of
-  steps for the **ceiling height of the room it sits in** (standard ~7"
-  risers) and shows an **UP / DN** travel arrow. Right-click it to switch
-  between a **full flight** and a **half flight to a landing** that either
-  ends at half height or **turns left / right**, and to flip the arrow up
-  or down. Move it into a room with a different ceiling and the step count
-  re-computes.
-- **Annotations, measurements and item callouts** — the **Show** menu
-  switches three layers on and off independently and saves the choice
-  with the plan. *Annotations*: the **T** tool places a text at a click
-  (drag to move, double-click to edit); the **N** tool draws a **leader**
-  -- press on the thing to name (the point snaps as a measure's end
-  does), drag to where the text goes, release and type it: an arrow at
-  the point, the text on a short shoulder at the other end (drag to
-  move the whole; select it for its two knobs; double-click to edit).
-  *Measurements*: the **L** tool
-  drags a measure from one point to another — each end snaps to a corner,
-  a wall, an opening's jamb or the level's **datum** (*Show ▸ Place
-  datum*), both ends on one wall and the measure runs along it — drawn as
-  one thin line parallel to what it measures with a slash at each end and
-  the length above it, in feet-and-inches or inches (*Show ▸ Measurements
-  in feet and inches*); drag a measure to set it off the wall. Select a
-  measure for its four red knobs: the two callout points (drag to move;
-  **Ctrl**-drag turns the measure about the other point on the rotation
-  snap, **Shift** frees it), the line's end (drag along the line for the
-  length) and the label (drag along the line). *Item callouts* (on when
-  a plan opens): every item's **session label** — `W7`, `V12`, `O3`,
-  `R2`, `F4`, `RF1`, taken from the file's own ids when the plan opens so
-  the two match — and its name where set, in a settable colour (*Show ▸
-  Item callout colour…*, default blue). The *Malformed design file*
-  report says the same labels, so a reported problem can be found on the
-  plan; uncheck the layer for the session.
-- **Groups & multi-select** — Ctrl+drag a rubber band to add items to a
-  selection set, or Ctrl+click to toggle individual items. The rubber band
-  only takes items it **fully encloses**, so you can lasso a single room
-  without grabbing the party walls that run past it — and when a room's
-  interior is enclosed, any edge carried by such a longer wall is copied so
-  the room comes through as a complete, movable loop (the shared wall is
-  left in place). Group the set (Ctrl+G) to move it as one unit — walls,
-  furnishings and the rooms they enclose travel together — then ungroup
-  (Ctrl+Shift+G) to drop everything in place. A selected group also has a
-  **rotation handle**: drag it to spin the whole group about its centre
-  (Ctrl snaps to the rotation increment), e.g. to re-orient a room. Groups
-  can be cut, copied and pasted.
-- **Room import / export (CSV)** — File ▸ Import / Export rooms… reads and
-  writes `Name,Type,X_ft,Y_ft,X_loc_ft,Y_loc_ft,Notes`. Sizes and
-  locations accept feet-and-inches (`12`, `12.5`, `12'6"`); rooms without
-  a location auto-place on the first clear spot. Rooms that fall outside
-  the canvas **grow it to fit** (up to 500'; larger values are rejected as
-  typos). See [`examples/`](examples/) for sample files and previews.
-- **Export to Chief Architect (DXF)** — File ▸ Export ▸ Chief Architect
-  (DXF)… writes a purpose-built DXF R12 file (plus a sidecar) per storey
-  level for Chief Architect X17's **CAD to Walls** importer, so a plan
-  becomes native Chief walls, doors, windows and railings. See
-  [below](#export-to-chief-architect-dxf) for the verified import workflow.
-- **Room boolean operations** — select two rooms (Ctrl+click their names)
-  and the **Rooms** menu treats their perimeters as polygons: *Combine*
-  unions them (dropping the shared interior walls), *Intersect* keeps just
-  the overlap, and *Subtract* removes the second room from the first. Each
-  result is freshly walled and re-detected.
-- **Fragment** — *Rooms ▸ Fragment* splits two overlapping rooms into three
-  pieces — each room minus the overlap, plus the overlap itself — and puts
-  **each piece in its own group with a complete set of walls** (shared
-  edges get a wall per piece). So you can drag any fragment away and it
-  stays a fully enclosed room while the others keep theirs. *Rooms ▸ Align
-  to grid* snaps the selected rooms' walls to the wall-snap grid (keeping
-  them orthogonal); *Rooms ▸ Distribute horizontally / vertically* spaces
-  three or more selected rooms with equal gaps (the outermost two stay
-  put); and *Rooms ▸ Refresh rooms* re-scans the canvas and drops any room
-  whose walls have been moved away, clearing gray areas left behind.
-- **Nudging** — arrow keys move the selected group or furnishing by the
-  wall-snap step; hold Ctrl for a fine 1" step.
-- **Undo / redo** — the **↺ / ↻** toolbar buttons (to the right of the
-  zoom-fit magnifier, also **Ctrl+Z** / **Ctrl+Y**) step back and forward
-  through every canvas operation — drawing and moving walls, openings,
-  rooms, furnishings, groups, room boolean ops, nudges, deletes and pastes.
-  History resets when you start a new plan or open one.
-- **Inventory menu** — itemised, Excel-ready tables for the whole plan:
-  *House* (rooms, doors, windows and walls), *Interior furnishings* and
-  *Yard items* (furnishings split by location — cars, yard equipment and
-  anything in the garage or outside the walls count as yard, each with
-  quantities and AI-sourced prices), and *Total* (a summary with the grand
-  building-plus-furnishings cost). Each opens as an aligned table; **Copy
-  to clipboard (TSV)** emits tab-separated values that paste straight into
-  a spreadsheet.
-- **AI pricing** — the **AI** menu's *Update furnishing prices…* opens a
-  dialog with a drop-down of AI systems (Anthropic Claude) and a fully
-  editable, pre-filled prompt that asks for current US retail prices for
-  the whole catalog. The reply (a JSON `{id: dollars}` map) is written into
-  each furnishing's new `price` field in `manifest.json`, and palette and
-  placed-item tooltips show the cost. The call uses your Anthropic API key
-  (entered in the dialog — optionally remembered on this computer — or read
-  from the `ANTHROPIC_API_KEY` environment variable).
-- **Building totals** — the far right of the toolbar shows a live
-  **Totals: Cost / Sq. Feet** label: the floor area of every room with
-  *Include in total square footage* ticked (in its right-click Properties),
-  priced at the cost per square foot set in Settings. Cost is shown in
-  thousands; it updates as rooms are added, removed, resized, or toggled.
-- **Settings** — File ▸ Settings… controls the wall snap (default 6" on
-  centre), the rotation snap (default 15°), the canvas size (default
-  100' × 70') and the building **cost per square foot** (default $150).
-  Save with the **Save** button; all settings are stored with the plan.
-- **Plans are plain JSON** — human-editable, documented in the module
-  docstring: walls, openings, rooms, furnishings and settings, all lengths
-  in inches.
-- **Where files live** — **Help ▸ About** shows the app version and the
-  OS-standard storage locations: plans open/save by default in
-  `Documents/FloorPlanner`, and the app settings file (preferences,
-  including a remembered AI key) lives in the standard per-user config
-  directory (e.g. `%APPDATA%/FloorPlanner` on Windows, `~/.config/
-  FloorPlanner` on Linux). Per-plan settings stay inside each plan's
-  `.json`. Buttons in the dialog open either folder.
+  Living, Dining, Kitchen (appliances, base, wall and pantry cabinets,
+  islands), Bedroom, Bathroom (fixtures and vanity bases), Laundry, Office /
+  Storage, Garage (cars, boat and trailer, tractor, mower), Shop, Sunroom,
+  HVAC (furnaces, water heaters, tanks, the electric panel, a car charger, a
+  battery wall) and Framing (stairs, an elevator, a **post**). Drag one from
+  the right-hand palette and it lands at **true scale** (a 16' SUV takes up
+  16'); placed items move with 1" snap and rotate via a grab handle (Ctrl =
+  snap to the configured increment).
+- **Stairs** — the Framing stairs symbol draws the right number of steps for
+  the ceiling height of the room it sits in and shows an **UP / DN** arrow;
+  right-click for a full flight, a half flight to a landing that ends or
+  turns left / right, and the travel direction.
+- **Groups & multi-select** — Ctrl+drag a rubber band (it takes only what it
+  fully encloses, so a room can be lassoed without its party walls) or
+  Ctrl+click to toggle items. **Ctrl+G** groups the set to move it as one —
+  walls, furnishings and the rooms they enclose — with a rotation handle;
+  **Ctrl+Shift+G** ungroups. Groups cut, copy and paste.
+- **Room boolean operations** — select two rooms and the **Rooms** menu
+  treats their perimeters as polygons: *Combine*, *Intersect*, *Subtract*,
+  and *Fragment* (three fully walled pieces, each its own group). *Align to
+  grid*, *Distribute horizontally / vertically* and *Refresh rooms* tidy up.
+- **Nudging, undo, clipboard** — arrow keys move the selection by the snap
+  step (Ctrl = 1"); **Ctrl+Z / Ctrl+Y** step through every canvas operation;
+  **Ctrl+X / C / V** cut, copy and paste; **Ctrl+Shift+V** pastes a room.
+- **Inventory menu** — Excel-ready tables for the whole plan: *House* (rooms,
+  doors, windows, walls), *Interior furnishings*, *Yard items* and *Total*
+  (with the building cost at the cost per square foot in Settings); the
+  toolbar shows the live **Totals: Cost / Sq. Feet**.
+- **AI pricing** — **AI ▸ Update furnishing prices…** asks an AI (Anthropic
+  Claude) for current retail prices for the catalog and writes them into each
+  furnishing's `price`; the key comes from the dialog or `ANTHROPIC_API_KEY`.
+- **PDF plan set** — **File ▸ Export ▸ PDF plan set…** writes one 11×17 sheet
+  per level at a standard architectural scale: walls as face pairs, door and
+  window symbols with their size codes, room labels, and dimension strings —
+  **the plan's own drawn measurements** on any level that has them (while
+  shown), else the auto rows along two edges and an angled lane per family;
+  texts and leaders print while *Show ▸ Annotations* is on; a title block.
+- **Export to Chief Architect (DXF)** — **File ▸ Export ▸ Chief Architect
+  (DXF)…** writes a purpose-built DXF R12 file (plus a sidecar) per storey
+  level for Chief Architect X17's **CAD to Walls** importer. See
+  [below](#export-to-chief-architect-dxf) for the verified workflow.
+- **Room import / export (CSV)** — `Name,Type,X_ft,Y_ft,X_loc_ft,Y_loc_ft,Notes`;
+  unlocated rooms auto-place and the canvas grows to fit (to 500').
+- **Import from a PNG** — a raster plan as a calibrated backdrop, its walls
+  extracted into the plan. See [below](#import-a-plan-from-a-png).
+- **Macros** — the editor can be driven with no GUI by a macro (two
+  languages: the original tokens and **v2**, which carries every modifier and
+  checks the whole file first), from the recorder window (**Macro ▸ Record /
+  Debug…**, which writes what you do, including the dialog values of doors,
+  rooms, dormers, texts and leaders as application commands) or from
+  `fp_macro.py`. Both languages, every command, in
+  [`docs/COMMANDS.md`](docs/COMMANDS.md) and [`docs/macro_language.md`](docs/macro_language.md).
+- **Settings** — File ▸ Settings… controls the wall snap (6" on centre), the
+  rotation snap (15°), the canvas size (100' × 70'), the building cost per
+  square foot ($150), auto-coalesce and auto-weld, the callout colour and the
+  measurement units; all saved with the plan.
+- **Where files live** — **Help ▸ About** shows the version, the checkout and
+  the OS-standard folders: plans in `Documents/FloorPlanner`, the app's
+  settings in the per-user config directory (`%APPDATA%/FloorPlanner` on
+  Windows, `~/.config/FloorPlanner` on Linux).
 
 ## Install & run
 
@@ -206,59 +160,40 @@ pip install -r requirements.txt
 python FloorPlanner.py
 ```
 
-Requires Python 3.10+ and PyQt6. Fonts (DejaVu) ship in `assets/fonts`,
-so no system fonts are needed.
+Requires Python 3.10+ and PyQt6. Fonts (DejaVu) ship in `assets/fonts`, so no
+system fonts are needed. `reportlab` is optional (the PDF plan set);
+`pyqtgraph` and Qt Quick 3D are optional (the two command-line 3D viewers).
 
 ## Controls
+
+The complete list — every tool, key, menu, context menu, dialog and
+command-line program, each with an example — is
+**[`docs/COMMANDS.md`](docs/COMMANDS.md)**. The short form:
 
 | Action | How |
 |---|---|
 | Choose a tool | Toolbar icons or keys **S** E I D W R G M T L N (Select / Exterior / Interior / Door / Window / Room / Roof ridge / Dormer / Annotation / Measure / Leader) |
-| Zoom / pan | Mouse wheel / drag empty space (middle-drag anywhere) |
-| Draw a wall | Click-drag; the end lands on the snap grid (Shift = unconstrained: off the grid, any angle; Esc = cancel). An end released a grid step short of another wall is left there (a reveal); one released on it welds. Overlapping same-type walls within the snap grid **coalesce** into one shared wall (a boundary between two rooms is a single wall, not a duplicate); the drawn end **welds** onto a wall it lands on, forming a clean T/L joint |
-| Stretch / slide a wall | Drag its end / body in Select mode. A dragged end or a slid wall **lands on the snap grid**, even when the wall began off it; an end sticks to the projected line of a nearby orthogonal wall that is itself off the grid (so you can still close a corner there); overlapping same-type walls coalesce on release. The end-grab zone is capped at a third of the wall, so even a short wall keeps a grabbable middle to slide perpendicular |
-| Re-angle a wall end | Drag the end with **Shift** = unconstrained (off the grid, any angle), or **Ctrl** = snap to 15° increments around the anchored end (build 45° and other off-axis walls) |
-| Delete a wall | Right-click → *Delete wall* (or select + Delete). A wall on a room perimeter **fractures**: the room-edge stretch is kept, only the rest is removed; a wall bordering no room is deleted whole |
-| Coalesce + weld on demand | **Edit ▸ Coalesce all walls now** merges overlaps and welds every T/L junction across the plan (toggle auto-coalesce in File ▸ Settings) |
-| Place a door or window | Tool 4 / 5, click a wall, enter WWHH size |
-| Name a room | Tool 6, click an enclosed area (one-shot; Ctrl-pick the tool to keep it) |
-| Move a room (with its walls) | Drag the room name (Ctrl-drag = nudge the label only) |
-| Detach a wall from its room | Right-click the wall → *Detach wall from room* |
-| Lock the imported PNG backdrop | Right-click the image → *Lock image* (a padlock badge shows; locked images can't be moved, rescaled, cropped or removed — right-click → *Unlock image* to release) |
-| Room dimensions / properties / inventory | Right-click the room name |
-| Place furniture | Drag from the right palette onto the plan |
-| Rotate furniture | Select it, drag the round handle (Ctrl = snapped) |
-| Multi-select | Ctrl+drag a rubber band (encloses items / a room), Ctrl+click to toggle |
-| Group / ungroup | **Ctrl+G** / **Ctrl+Shift+G** |
-| Rotate a group | Select it, drag the rotation handle (Ctrl = snapped) |
-| Nudge selection | Arrow keys (Ctrl = fine 1" step) |
-| Room boolean ops | Select two rooms, use the **Rooms** menu |
-| Plan inventories (TSV) | **Inventory** menu → House / Interior / Yard / Total |
-| Update furnishing prices (AI) | **AI** menu → *Update furnishing prices…* |
-| About / file locations | **Help** menu → *About FloorPlanner…* |
-| Undo / redo | **Ctrl+Z** / **Ctrl+Y** (or the ↺ / ↻ toolbar buttons) |
-| Cut / copy / paste | **Ctrl+X** / **Ctrl+C** / **Ctrl+V** |
-| Import / export rooms (CSV) | File menu |
-| Delete | Select + **Del** |
-| Zoom to fit | **F** |
+| Zoom / pan / fit | Mouse wheel / drag empty space (middle-drag anywhere) / **F** |
+| Draw a wall | Click-drag; the end lands on the snap grid (Shift = any angle; Esc = cancel); an end released on a wall welds |
+| Stretch / slide / re-angle a wall | Drag its end / body in Select mode; **Shift** = free, **Ctrl** = 15° steps about the anchored end |
+| Place a door or window | **D** / **W**, click a wall, enter the WWHH size |
+| Name a room | **R**, click an enclosed area (one-shot; Ctrl-pick the tool to keep it) |
+| Sketch a roof / dormer | **G** drag the ridge, click the eaves wall, set the heights / **M** drag along a roof plane |
+| Annotate / measure / leader | **T** click and type / **L** drag between two snapped points / **N** press on the thing, drag to the text, type |
+| Move a room with its walls | Drag the room name (Ctrl-drag = the label only) |
+| Properties | Double-click a wall or an opening; right-click a room name |
+| Multi-select / group | Ctrl+drag a rubber band, Ctrl+click to toggle / **Ctrl+G**, **Ctrl+Shift+G** |
+| Nudge / undo / clipboard | Arrows (Ctrl = 1") / **Ctrl+Z**, **Ctrl+Y** / **Ctrl+X**, **Ctrl+C**, **Ctrl+V**, **Ctrl+Shift+V** (a room) |
+| Floors | **Ctrl+F** select, **Ctrl+Shift+F** new, **Ctrl+PgUp / PgDown** cycle |
+| 3D view | **Ctrl+3** |
+| Delete | Select + **Del** (a room's wall fractures; the room-edge stretch stays) |
 | Record / replay a macro | **Macro** menu (or the ● Record toolbar button) |
 
 ## Headless CLI / AI macro driver
 
 The app can be driven with **no GUI** so a script or an AI system can edit a
-plan, snapshot the canvas, and read back the result. It's a two-part tool:
-
-- **In-app hook** — `MainWindow.run_macro(text)` plus `export_canvas`,
-  `load_path`/`save_path` and `scene_summary` (the editor and the driver share
-  the same code paths).
-- **Driver** — `fp_macro.py`, a standalone CLI that boots the app offscreen,
-  runs a macro, writes SVG/PNG snapshots, saves the plan, and prints a JSON
-  summary of the layout.
-
-A macro is a line of space-delimited tokens: menu/shortcut chords like `^C`
-`^V` `^S`, distinct keyboard/mouse/arrow tokens (`CLICK x y`, `DRAG …`, `LEFT`,
-`^UP`), and high-level placement (`PLACE sofa 120 96`, `WALL …`, `DOOR …`,
-`ROOM "Living Room" 60 60`). Positions are in scene inches (1 unit = 1 inch).
+plan, snapshot the canvas, and read back the result: `MainWindow.run_macro`
+in the app, `fp_macro.py` on the command line.
 
 ```bash
 python fp_macro.py --out den.json --svg den.svg --macro "
@@ -267,16 +202,10 @@ python fp_macro.py --out den.json --svg den.svg --macro "
   ROOM Den 120 90  DOOR 120 0 3680  PLACE sofa 120 140 0"
 ```
 
-The SVG snapshot (vector, AI-parseable) plus `--summary full` (the complete
-`floorplanner-json` model) let a downstream AI *see* and *reason about* a change
-before issuing the next macro. Full token reference:
-[`docs/macro_language.md`](docs/macro_language.md).
-
-**Record macros in the GUI.** The **Macro** menu (or the ● Record toolbar
-button) opens a non-modal recorder: click **Start**, interact with the plan
-(draw walls, drop furnishings, copy/paste, nudge…), then **Stop**. Your
-actions are written as macro tokens you can edit; select any portion and
-**Replay** it, or **Save As…** a `.fpm` file to run later with `fp_macro.py`.
+The SVG snapshot plus `--summary full` let a downstream AI see and reason
+about a change before issuing the next macro. The token reference, the v2
+language and the application commands: [`docs/COMMANDS.md`](docs/COMMANDS.md)
+§7–§10 and [`docs/macro_language.md`](docs/macro_language.md).
 
 ## Import a plan from a PNG
 

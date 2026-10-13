@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/pjmoran42/FloorPlanner/schema/design-v5.json",
-  "title": "FloorPlanner design document (v5)",
+  "$id": "https://github.com/pjmoran42/FloorPlanner/schema/design-v6.json",
+  "title": "FloorPlanner design document (v6)",
 
   "description": "A floor/site design. The durable unit is the ROOM: it owns an ordered outline of vertices, its furnishings, and its schedule properties. Walls are OPTIONAL bindings onto outline edges — a wall can be deleted, and the room keeps its shape, name, area and contents; the edge simply becomes open. A room whose walls are bound only to itself is `floating` (a concept room, or one extracted from the plan) and can be moved, rotated and duplicated as a unit without touching the rest of the design. All coordinates are plan inches, x right, y down (Qt scene convention); there is no nested coordinate system anywhere in this document. Vertices are the only place coordinates live, so two walls meeting at a corner reference ONE vertex and cannot drift apart.",
 
@@ -11,7 +11,7 @@
 
   "properties": {
     "format":  { "const": "floorplanner-design" },
-    "version": { "description": "5: pre-roofs. 6: adds the optional `roofs` block (0139-ruling.md R1) -- purely additive, so a version-5 document (no `roofs` key at all) is still valid under this same schema; nothing about it needs migrating to be READ. R1 only widens what this schema ACCEPTS -- `design_document()` still writes 5 until a later tranche gives it roofs to walk; a loaded 5 is left as 5 unless re-saved.", "enum": [5, 6] },
+    "version": { "description": "6: THE DOCUMENT THIS APP WRITES (0271-report.md, Patrick, 2026-10-12: the schema is v6 for this main). Everything since the v5 migration closed is additive and lives here: the optional `roofs` block (0139-ruling.md R1; gable, hip and shed forms, dormers with their own openings, hip runs), the `annotations` block (texts, measurements, leaders, the datum -- 0263, 0270), the openings' `sill_in`/`head_in`, the furnishing `post`, and the settings' Show keys. 5: the pre-roofs document, still ACCEPTED unchanged by this same schema (every block that came after it is optional), so nothing about an existing file needs migrating to be read; the app writes 6 when it saves one.", "enum": [5, 6] },
     "units":   { "enum": ["inches"] },
 
     "settings": { "$ref": "#/$defs/settings" },

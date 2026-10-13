@@ -1,7 +1,7 @@
 """P3.6 -- an opening is dimensioned from a NAMED END, not from `p1`.
 
 The three properties the schema claims for `{from, offset_in}` and absolute `s`
-cannot deliver, quoted from `design-schema.v5.json`:
+cannot deliver, quoted from `design-schema.v6.json`:
 
     "Dimensioned the way a drawing dimensions it: an offset from a NAMED END,
      not an absolute distance from p1. Survives the wall being stretched, split
@@ -330,7 +330,7 @@ def test_every_settable_wall_type_is_in_the_schema_enum():
 
     schema = json.loads(
         (Path(__file__).resolve().parent.parent / "floorplanner" / "design"
-         / "design-schema.v5.json").read_text(encoding="utf-8"))
+         / "design-schema.v6.json").read_text(encoding="utf-8"))
     enum = set(schema["$defs"]["wall"]["properties"]["type"]["enum"])
     offered = {k for k, _ in WALL_TYPE_LABELS}
     assert offered <= enum, f"menu offers types the schema rejects: {offered - enum}"

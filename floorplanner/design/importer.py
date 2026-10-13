@@ -347,7 +347,7 @@ def import_legacy(src, tool="floorplanner.design.importer", design_name=None,
                      f"removed")
 
     doc = canonicalize({
-           "format": "floorplanner-design", "version": 5, "units": "inches",
+           "format": "floorplanner-design", "version": 6, "units": "inches",
            "settings": settings, "levels": levels, "vertices": vertices,
            "walls": walls, "rooms": rooms, "furnishings": furnishings,
            "groups": [],

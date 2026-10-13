@@ -1,4 +1,10 @@
-# v5 design schema — moved
+# v5 design schema — moved, and since 0271 named v6
+
+> **2026‑10‑12 (0271):** the packaged schema is now
+> `floorplanner/design/design-schema.v6.json` — version 6, the document this
+> app writes; a v5 document still validates under it. See
+> [`design-schema.v6.md`](design-schema.v6.md). The text below is kept as it
+> was written.
 
 The v5 JSON Schema (`format: "floorplanner-design"`, Draft 2020-12) was vendored
 into the package at **P0.7**. It now lives at:

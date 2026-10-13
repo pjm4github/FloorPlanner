@@ -31,11 +31,12 @@
 | [`V5_MIGRATION_PLAN.md`](V5_MIGRATION_PLAN.md) | The Status table (every task and its tick), the phase specifications, the risk register and the sequencing rationale. **What is planned and what is done.** |
 | [`DESIGN_MODEL_v5.md`](DESIGN_MODEL_v5.md) | Why the room is the durable unit and walls are an optional binding onto its outline. The rationale behind the schema. |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | The module layout roster, phase-history pointers, extract/join and floors mechanics, and the performance measurements moved out of `CLAUDE.md` at [`handoff/0085-ruling.md`](handoff/0085-ruling.md) — `CLAUDE.md` itself is traps only now. |
-| [`design-schema.v5.md`](design-schema.v5.md) | A **pointer**, not a stub. The schema itself was vendored into the package at P0.7 and lives at `floorplanner/design/design-schema.v5.json`; this file remains so references to the old location still resolve. |
+| [`design-schema.v6.md`](design-schema.v6.md) | A **pointer**, not a stub. The schema itself lives in the package at `floorplanner/design/design-schema.v6.json` (version 6 since [`handoff/0271-report.md`](handoff/0271-report.md); a v5 document still validates under it). [`design-schema.v5.md`](design-schema.v5.md) stays so references to the older name resolve. |
+| [`COMMANDS.md`](COMMANDS.md) | **Every command the app and its tools take, with an example each** -- the tools and keys, every menu and context menu, the dialogs, both macro languages and their application commands, and every command-line program. Written at 0271 against `main`; the one place to look for "how do I ...". |
 | [`defects/`](defects/) | The defect register — **one file per record**. See below. |
 | [`STATUS.md`](STATUS.md) | **The status board — GENERATED** by `tools/status_index.py` from the mailbox's `**Landed:**` lines, the defect register and `ROADMAP.md` §3; `--check` runs in the gate. Says whether a thing is DONE; the snapshot keeps the order and the why ([`handoff/0019-ruling.md`](handoff/0019-ruling.md)). |
 | [`SANITY_CHECK.md`](SANITY_CHECK.md) | The three manual gates and their outcomes. The only checks a human has to perform by hand. |
-| [`macro_language.md`](macro_language.md) | The headless macro grammar and driver — the interface a script or an AI system drives the editor through. |
+| [`macro_language.md`](macro_language.md) | The headless macro grammar and driver — the interface a script or an AI system drives the editor through. (The tool letters T, L and N and the `@TEXT`/`@LEADER`/`@DATUM` commands joined at 0270.) |
 | [`../floorplanner/viewer/VIEWER_NOTES.md`](../floorplanner/viewer/VIEWER_NOTES.md) | The 3D viewer track: architecture, the renderer decision, and the hard-won specifics. Lives beside its code on purpose. |
 
 ## The record — what happened, and what proved it

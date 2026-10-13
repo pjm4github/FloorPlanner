@@ -24,7 +24,7 @@ Qt-free by construction: dict in, dict out.
 """
 
 FORMAT = "floorplanner-design"
-VERSION = 5
+VERSION = 6                   # 0271: the document version this app writes
 
 
 def _room_entry(doc, name):

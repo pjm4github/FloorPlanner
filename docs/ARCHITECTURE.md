@@ -25,6 +25,25 @@ bridges, room-CSV import/export, reference-image import + wall extraction,
 and the floor roster) · `mainwindow.py` (`MainWindow` = UI wiring + edit
 orchestration, inheriting those four mixins) · `app.py` (`main()`).
 
+**Added since the roster above was written (2026‑10‑12, 0271):**
+`vertex.py` (the live `Vertex` store — one shared identity-bearing point per
+corner) · `labels.py` (the session labels `W7`/`V12`/`O3`/`R2`/`F4`/`RF1`, one
+mint, adopted from a file's ids on open) · `annotations.py` (texts, measures
+with their knobs, leaders, the datum; the item callouts' one font and ink) ·
+`wallprops.py` (the wall-properties dialog) · `problems.py` (the Malformed-design
+report that zooms to its rows) · `roofs.py` (`RoofItem`: gable / hip / shed,
+dormers, hip runs, the ridge and dormer tools' geometry) · `roofclip.py` (the
+pure roof-intersection clipper and its disjoint-cell arrangement) ·
+`commands.py` (P6.b's dormant command classes) · `extract.py` (extract / join)
+· `design/` (`model`, `topology`, `canonical`, `validate` + the packaged
+`design-schema.v6.json`, `importer` for v1–v4, `bridge` the scene↔design walk,
+`locate`, `template`, `verify`, `legacy`) · `export/` (`fp2dxf`, `fp2pdf`,
+`_stdt`) · `macro2/` (macro language v2: parser, validator, player, recorder,
+converter) · `viewer/` (`fp3d` the pyqtgraph viewer and the Qt-free 3D builder,
+`fp3dq` the Qt Quick 3D viewer). Dependency direction is unchanged: `vertex`,
+`labels` and `annotations` sit with the scene layer; `design/`, `export/`,
+`macro2/` and `viewer/` import downward only.
+
 Every module carries this same information in its own docstring — this
 roster is a map for someone who hasn't opened any of them yet, not a second
 copy to keep in sync. Submodules use Qt + lower-layer star imports; the
@@ -58,7 +77,7 @@ into the group (`duplicate_wall`) — a known gap, not yet closed.
 ## Floors (multi-floor)
 
 `FILE_VERSION = 4` is the legacy v4 writer, kept only for File ▸ Export
-legacy v4 — the app reads and writes v5 `floorplanner-design`.
+legacy v4 — the app reads v5 and v6 `floorplanner-design` and writes v6 (0271).
 
 Every `WallItem`/`RoomItem`/`FurnishingItem`/`GroupItem` carries a `floor`
 (auto-tagged with the active floor via `active_floor()` at creation;

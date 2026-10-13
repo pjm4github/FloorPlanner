@@ -105,11 +105,11 @@ def test_undo_with_empty_history_is_noop(fp, qapp, win):
 # --------------------------------------------------------------------------
 # P2.3: the snapshot payload is the CANONICAL v5 document
 # --------------------------------------------------------------------------
-def test_snapshot_is_a_canonical_v5_document(fp, qapp, win, make_room):
+def test_snapshot_is_a_canonical_v6_document(fp, qapp, win, make_room):   # 0271
     from floorplanner.design.canonical import canonicalize
     make_room(win.scene, 0, 0, 144, 120, "Den")
     doc = win.snapshot()
-    assert doc["format"] == "floorplanner-design" and doc["version"] == 5
+    assert doc["format"] == "floorplanner-design" and doc["version"] == 6
     assert canonicalize(json.loads(json.dumps(doc))) == doc, "not canonical"
 
 

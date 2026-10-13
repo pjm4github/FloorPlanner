@@ -101,9 +101,11 @@ def test_macro_open_of_a_v5_plan_is_silent_and_clean(fp, win):
     assert not win._is_dirty()
 
 
-def test_macro_save_writes_v5(fp, win, make_room, tmp_path):
+def test_macro_save_writes_v6(fp, win, make_room, tmp_path):
+    """0271: every document this app writes is version 6 (a pre-roofs 5 is
+    still read as it is)."""
     make_room(win.scene, 0, 0, 144, 120, "Den")
     out = tmp_path / "macro.json"
     win.run_macro(f'save "{out}"')
     doc = json.loads(out.read_text(encoding="utf-8"))
-    assert doc["format"] == "floorplanner-design" and doc["version"] == 5
+    assert doc["format"] == "floorplanner-design" and doc["version"] == 6

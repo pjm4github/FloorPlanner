@@ -1,4 +1,4 @@
-"""Validate a v5 design document against the JSON Schema AND the referential
+"""Validate a design document (version 6, or a pre-roofs 5) against the JSON Schema AND the referential
 invariants JSON Schema cannot express.  The invariants are the contract that
 makes this file a source of truth rather than a dump.
 
@@ -50,11 +50,11 @@ cannot tell code from prose -- the same boundary the gate's `end_assign` check
 has. Tripping it with a comment would be a false positive in the one file whose
 Qt-freeness is load-bearing.)"""
 
-SCHEMA_PATH = Path(__file__).with_name("design-schema.v5.json")
+SCHEMA_PATH = Path(__file__).with_name("design-schema.v6.json")
 
 
 def load_schema() -> dict:
-    """The packaged v5 JSON Schema as a dict."""
+    """The packaged JSON Schema (v6; a v5 document validates under it too) as a dict."""
     return json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
 

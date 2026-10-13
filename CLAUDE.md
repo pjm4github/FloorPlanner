@@ -35,10 +35,11 @@ in which phase, so you don't build on top of something about to go.
 - Use a **late (function-local) import only to close a genuine cycle**
   (`walls↔rooms`); otherwise keep imports acyclic (`items ← walls ← rooms`;
   UI imports the scene layer).
-- `snapshot()` (canonical v5 doc), `design_document()` (what gets written:
+- `snapshot()` (canonical v6 doc), `design_document()` (what gets written:
   snapshot + provenance + settings + `active_floor`), and `serialize()`
   (legacy v4, only for File ▸ Export legacy v4) are **three different
-  payloads** — don't reach for one expecting another.
+  payloads** — don't reach for one expecting another. The packaged schema is
+  `floorplanner/design/design-schema.v6.json` (version 6; a v5 file validates).
 - **Everything under `assets/` is generated** by `_gen_assets.py` — never
   hand-edit; edit the generator and re-run it.
 - **A corner is one shared `Vertex`** (`walls.py`/`rooms.py`) — moving it

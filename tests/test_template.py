@@ -189,7 +189,7 @@ def test_save_and_load_template_room(win, tmp_path):
     win.save_template_path(str(path), room)
 
     doc = json.loads(path.read_text(encoding="utf-8"))
-    assert doc["format"] == "floorplanner-design" and doc["version"] == 5
+    assert doc["format"] == "floorplanner-design" and doc["version"] == 6   # 0271
     assert schema_errors(doc) == [], schema_errors(doc)
     assert check(doc, deep=True) == []
     assert len(doc["rooms"]) == 1

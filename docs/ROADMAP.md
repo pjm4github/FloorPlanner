@@ -129,6 +129,12 @@ changing what an existing value means — bumps to v6** and gets its own migrati
 **This unblocks D11's serialization half.** It stays AMBER (z-order is user-visible and D11a
 already bit once), but it is no longer waiting on a decision.
 
+> **2026‑10‑12 (0271), Patrick's word:** the schema is **v6** for this `main` — the file
+> renamed `design-schema.v6.json`, every document the app writes carrying `version: 6`
+> — not because anything broke (nothing did; R‑B's rule stands) but because the
+> additive blocks since the migration (roofs, annotations, sills, the Show settings)
+> are the document now and the number says so. A v5 file still validates and loads.
+
 ---
 
 ## 3. The work, tiered and ordered

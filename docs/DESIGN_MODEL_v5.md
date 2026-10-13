@@ -220,6 +220,8 @@ House total: 4,474.5 sf — 2,367.0 conditioned, 2,107.6 unconditioned (Garage, 
 
 ## 7. Files
 
+> **2026‑10‑12 (0271):** the schema file is `floorplanner/design/design-schema.v6.json`, version 6 — the model below unchanged, with the additive blocks that came after it (roofs, annotations, the openings' sill and head, the Show settings) — and every document the app writes is version 6; a version-5 file still validates and loads. The table is kept as written.
+
 | File | Role |
 |---|---|
 | `floorplanner/design/design-schema.v5.json` | The design-file JSON Schema (2020-12). `format: "floorplanner-design"`, `version: 5`. Vendored into the package at P0.7 (pointer: `docs/design-schema.v5.md`). |
