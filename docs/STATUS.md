@@ -5,12 +5,13 @@
 
 **Generated from the record** — one `**Landed:**` line per merge in [`handoff/`](handoff/), the defect register's front matter, and [`ROADMAP.md`](ROADMAP.md) §3's RED table. This file says whether a thing is DONE; [`SESSION_SNAPSHOT.md`](SESSION_SNAPSHOT.md) keeps the order and the why ([`handoff/0019-ruling.md`](handoff/0019-ruling.md) §4). A box that is not derived from the record is not on this board.
 
-**86 landed, 1 closed unmerged; 31 defects open, 57 closed.**
+**87 landed, 1 closed unmerged; 31 defects open, 57 closed.**
 
 ## Landed
 
 | PR | date | commit | tier | what it rested on | record |
 |---|---|---|---|---|---|
+| [#88](https://github.com/pjm4github/FloorPlanner/pull/88) | 2026-10-12 | `d4083ba` | AMBER | checked by Patrick in the app: "The export looks good. The Item Font side looks good. commit and push that to main" | [`0269`](handoff/0269-report.md) |
 | [#87](https://github.com/pjm4github/FloorPlanner/pull/87) | 2026-10-12 | `aacccc2` | AMBER | checked by Patrick in the app: "The measurements look correct ... the knobs look right, land #87" | [`0266`](handoff/0266-report.md) |
 | [#86](https://github.com/pjm4github/FloorPlanner/pull/86) | 2026-10-11 | `95ebc65` | AMBER | checked by Patrick in the roof editor on his plans: "the roofs look right" | [`0261`](handoff/0261-report.md) |
 | [#85](https://github.com/pjm4github/FloorPlanner/pull/85) | 2026-10-11 | `180c486` | AMBER | checked by Patrick on the house model's porch in the app: "the porch looks right" | [`0259`](handoff/0259-report.md) |

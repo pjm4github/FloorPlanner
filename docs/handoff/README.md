@@ -408,5 +408,6 @@ this table is not a second copy of it.
 | [`0266-report.md`](./0266-report.md) | report: PR #87 merged on his word — annotations, measurements with their four knobs and a datum, the session-label callouts, the Show menu; the knobs made small and black on his screen before the merge; his annotation-display clean-up next |
 | [`0267-report.md`](./0267-report.md) | report: his annotation-display clean-up — ONE font size and ONE colour for every item annotation; the opening's label off its size code; the room's painted last so the fill does not tint it |
 | [`0268-report.md`](./0268-report.md) | report: the PDF plan set renders the plan's DRAWN dimensions in place of the auto rows, and its text annotations while Show ▸ Annotations is on |
+| [`0269-report.md`](./0269-report.md) | report: PR #88 merged on his word, the PDF tranche folded in — the item annotations in one font size and one colour; the plan set's drawn dimensions and its texts by the Show switch |
 
 <!-- PAIRS:END -->
