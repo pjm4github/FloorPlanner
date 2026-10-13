@@ -412,5 +412,6 @@ this table is not a second copy of it.
 | [`0270-report.md`](./0270-report.md) | report: the leader annotation — a text with an arrow to the thing it names; the N tool, two knobs, the document's `leader` kind given its item, on the PDF sheet; 0248's items 8 and 9 stay on the backlog on his word |
 | [`0271-report.md`](./0271-report.md) | report: the documentation and the schema brought to this `main` as version 6, and a README of every command with an example |
 | [`0272-report.md`](./0272-report.md) | report: PR #89 merged on his word, the docs tranche folded in — the leader annotation and the recorder's new tools; the schema at version 6 and the documents brought to this `main`, the command README |
+| [`0273-report.md`](./0273-report.md) | report: the gallery regenerated with four new frames — the roofs, the End-On dialog, the annotations, the 3D view |
 
 <!-- PAIRS:END -->
