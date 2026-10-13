@@ -10,7 +10,7 @@ The whole plan at a glance — walls, rooms, furnishings and the toolbar
 ![Overview](01-overview.png)
 
 ### Furnishings at true scale
-A bundled CC0 library of 70 top-view symbols; drag from the right-hand
+A bundled CC0 library of 96 top-view symbols; drag from the right-hand
 palette and each lands at its real footprint.
 
 ![Furnishings](02-furnishings.png)
@@ -107,3 +107,40 @@ select any portion and **Replay** it, or **Save As** a `.fpm` file to run
 later with `fp_macro.py`.
 
 ![Macro recorder](16-macro-recorder.png)
+
+### Roofs
+Three roof forms on one house: a **gable** over the main block with a
+**dormer** on its south slope (sketched the way the Dormer tool does it —
+its sides and face projected up from the host roof), a **hip** over the
+garage with a settable run per end, and a **shed** over the sunroom. Roofs
+clip each other along their valleys; the grips (*Roof ▸ Edit roof*) move a
+ridge, an end or the eaves.
+
+![Roofs](17-roofs.png)
+
+### The End-On dialog
+The section a roof's parameters edit, drawn as it is edited: ridge and eaves
+heights, the pitch, the form, the eaves span and overhang per side, each end
+gable or hip with its run.
+
+![Roof End-On dialog](18-roof-end-on.png)
+
+### Annotations, measurements, leaders and item callouts
+A **text** (the T tool), two **measures** (the L tool: each end snapped to a
+corner, one thin line with a slash at each callout point, the length in
+feet-and-inches; the selected one shows its four small black knobs), a
+**leader** (the N tool: an arrow at the point, the text on a short
+shoulder), the level's **datum**, and the **item callouts** — every item's
+session label (`W7`, `V12`, `O3`, `R2`, `F4`) in one small font and one
+colour, the labels the Malformed-design report speaks in. The **Show** menu
+switches each layer on its own.
+
+![Annotations](19-annotations.png)
+
+### 3D view
+The same plan rendered by the Qt Quick 3D viewer (**View ▸ 3D view**, or
+`python -m floorplanner.viewer.fp3dq plan.json --shot out.png` from the
+command line): walls cut by their openings, floors, the three roofs and
+the dormer, furnishings as blocks.
+
+![3D view](20-3d-view.png)

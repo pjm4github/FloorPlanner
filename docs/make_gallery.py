@@ -7,7 +7,9 @@ few dialog shots.  Run with:  python docs/make_gallery.py
 import html
 import math
 import os
+import subprocess
 import sys
+import tempfile
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -20,6 +22,9 @@ from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QVBoxLayout,
                              QWidget)
 
 import FloorPlanner as FP
+from floorplanner.annotations import (  # not re-exported by the package
+    DatumItem, DimensionItem, LeaderItem, TextAnnotationItem, sync_annotation_visibility,
+)
 from floorplanner.vertex import Vertex
 
 os.environ.setdefault("QT_QPA_FONTDIR", str(FP.FONT_DIR))
@@ -316,6 +321,9 @@ def build_kitchen():
 # ---------------------------------------------------------------------------
 win, h = build()
 rooms, items, group, stair = h["rooms"], h["items"], h["group"], h["stair"]
+# the item callouts (0264: on whenever a plan opens) are a layer of their own;
+# the classic frames show the plan without them, frame 19 shows them on
+FP.SETTINGS["show_callouts"] = False
 
 # 1. overview (also the README hero)
 frame(win, "01-overview", palette="All", tool=FP.TOOL_SELECT)
@@ -475,5 +483,86 @@ rec.edit.moveCursor(QTextCursor.MoveOperation.Start)
 rec.edit.find('PUP 252 90 DOWN ENTER BACKSPACE TYPE "4466" ENTER')
 rec._sync_buttons()
 shot_widget(rec, "16-macro-recorder", size=(600, 440))
+
+
+
+# --- roofs, annotations, 3D (0273) -------------------------------------------
+def build_roofs(win):
+    """Three roof forms on the demo house: a gable over the main block with
+    a dormer on its south slope (the DORMER macro command builds the dormer
+    the way the Dormer tool does, no dialog), a HIP over the garage, and a
+    SHED over the sunroom. Returns the main roof."""
+    sc = win.scene
+    main = FP.RoofItem(QPointF(-12, 168), QPointF(492, 168),
+                       eaves_h_in=96.0, ridge_h_in=156.0, overhang_in=12.0,
+                       gable=[True, True], span_in=168.0, marker_end=1)
+    sc.addItem(main)
+    garage = FP.RoofItem(QPointF(480, 192), QPointF(756, 192),
+                         eaves_h_in=96.0, ridge_h_in=138.0, overhang_in=12.0,
+                         gable=[False, False], span_in=144.0, marker_end=1,
+                         hip_run_in=[60.0, 60.0])
+    sc.addItem(garage)
+    # a shed: the ridge is its HIGH edge, on the house wall; the one plane
+    # falls to the left of the ridge's direction (south here), its span the
+    # depth to the eaves line and its overhang past that (0262's recipe)
+    sun = FP.RoofItem(QPointF(180, 336), QPointF(492, 336),
+                      eaves_h_in=84.0, ridge_h_in=120.0, overhang_in=[12.0, 0.0],
+                      gable=[True, True], span_in=[240.0, 0.0], marker_end=1,
+                      form="shed")
+    sc.addItem(sun)
+    win._set_show_roofs(True)
+    win._set_edit_roofs(True)
+    res = win.run_macro("DORMER 300 300 72 116 140")
+    assert res["ok"], res["errors"]
+    win._commit_if_changed()
+    return main
+
+
+main_roof = build_roofs(win)
+
+# 17. roofs: the three forms, the dormer, the grips (Roof > Edit roof on)
+frame(win, "17-roofs", rect=(-40, -40, 820, 640), palette="All",
+      select=[main_roof], tool=FP.TOOL_SELECT)
+
+# 18. the End-On dialog: the section the roof's parameters edit
+shot_widget(FP.RoofEndOnDialog(main_roof, win), "18-roof-end-on", size=(980, 620))
+
+# 19. annotations: a text, a measure (selected: its four knobs), a leader,
+#     the datum, and the item callouts in their one font and colour
+FP.SETTINGS["show_callouts"] = True
+win._set_edit_roofs(False)
+win._set_show_roofs(False)
+rooms["Bedroom"].show_dims = False          # the room's own arrows would compete
+rooms["Bedroom"].update()
+sc = win.scene
+sc.addItem(TextAnnotationItem(QPointF(16, -40), "NORTH ELEVATION  -  bedroom wing"))
+dim = DimensionItem(QPointF(0, 0), QPointF(192, 0), offset_in=-30.0)
+sc.addItem(dim)
+sc.addItem(DimensionItem(QPointF(0, 0), QPointF(0, 192), offset_in=30.0))
+sc.addItem(LeaderItem(QPointF(120, 176), QPointF(236, 150), "Dresser: relocate under window"))
+sc.addItem(DatumItem(QPointF(0, 192)))
+sync_annotation_visibility(sc)
+frame(win, "19-annotations", rect=(-70, -70, 340, 300), palette="All",
+      select=[dim], tool=FP.TOOL_SELECT)
+FP.SETTINGS["show_callouts"] = False
+rooms["Bedroom"].show_dims = True
+
+# 20. the 3D view: the same demo plan, rendered by the Qt Quick 3D viewer
+#     (fp3dq --shot, in its own process on the windows platform: Quick 3D
+#     needs a real GPU surface, which the offscreen platform does not give)
+win._set_show_roofs(True)
+tmp = os.path.join(tempfile.gettempdir(), "fp_gallery_demo.json")
+win.save_path(tmp)
+shot = os.path.join(GALLERY, "20-3d-view.png")
+env = dict(os.environ, QT_QPA_PLATFORM="windows")
+res = subprocess.run([sys.executable, "-m", "floorplanner.viewer.fp3dq", tmp,
+                      "--shot", shot, "--yaw", "35", "--pitch", "-22",
+                      "--zoom", "1.15", "--fov", "28", "--shot-delay", "1500"],
+                     env=env, capture_output=True, text=True, timeout=180)
+if res.returncode != 0 or not os.path.exists(shot):
+    print("3D shot FAILED:", res.stdout[-400:], res.stderr[-400:])
+    sys.exit(1)
+print("saved", shot)
+os.remove(tmp)
 
 print("gallery complete")
