@@ -490,3 +490,102 @@ def test_every_item_annotation_paints_in_the_one_font_size_and_colour(fp, scene,
         sizes = {px for _, _, px in calls}
         assert sizes == {round(ann.CALLOUT_PX / scale)}, (scale, sizes)
         assert {round(lod, 6) for lod, _, _ in calls} == {scale}, "every kind reads the painter's own scale"
+
+
+# ---------------------------------------------------------------------------
+# 0270 -- the leader annotation: a text with an arrow to the thing it names
+# ---------------------------------------------------------------------------
+
+def test_the_leader_tool_draws_an_arrow_to_a_snapped_point_and_asks_for_the_text(fp, win, add_walls, monkeypatch):
+    """Patrick (0270): "add a leader annotation". Press on the point (it
+    snaps as a measure's end does), drag to where the text goes, release:
+    the dialog asks for the text; a cancelled dialog leaves nothing; a
+    click without a drag puts the text up and to the right."""
+    from floorplanner.annotations import LeaderItem
+    win.prepare_headless()
+    add_walls(win.scene, 120, 120, 240, 180)
+    monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("Relocate outlet", True)))
+    win.set_tool(fp.TOOL_LEADER)
+    _drag(win, (122.0, 118.0), (200.0, 60.0))
+    leaders = _annots(win.scene, LeaderItem)
+    assert len(leaders) == 1
+    ld = leaders[0]
+    assert ld.tip == QPointF(120, 120), "the tip snapped to the corner"
+    assert ld.anchor.y() == 60.0 and abs(ld.anchor.x() - 200.0) <= 3.0, "the text end on the grid"
+    assert ld.text == "Relocate outlet" and ld.floor == fp.active_floor()
+    assert ld.kind == "leader"
+    # a cancelled dialog leaves nothing behind
+    monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("", False)))
+    _drag(win, (300.0, 200.0), (330.0, 160.0))
+    assert _annots(win.scene, LeaderItem) == [ld]
+    # a click, no drag: the text up and to the right of the point
+    monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("Here", True)))
+    _click(win, (240.0, 240.0))
+    ld2 = next(x for x in _annots(win.scene, LeaderItem) if x is not ld)
+    assert ld2.anchor == QPointF(ld2.tip.x() + 24.0, ld2.tip.y() - 24.0)
+    # Esc mid-drag cancels; Delete removes
+    win.set_tool(fp.TOOL_LEADER)
+    _send(win, QEvent.Type.MouseButtonPress, (250.0, 250.0), LEFT, LEFT)
+    win.view.cancel_temp()
+    assert len(_annots(win.scene, LeaderItem)) == 2
+    ld2.setSelected(True)
+    win.delete_selected()
+    assert _annots(win.scene, LeaderItem) == [ld]
+
+
+def test_a_leader_round_trips_through_the_document_and_follows_the_switch(fp, scene):
+    from floorplanner.annotations import LeaderItem
+    scene.addItem(LeaderItem(QPointF(100, 100), QPointF(160, 40), "Beam above"))
+    out = design_from_scene(scene).to_dict()
+    assert schema_errors(out) == []
+    rec = out["annotations"][0]
+    assert rec["kind"] == "leader" and rec["pos"] == [100.0, 100.0] and rec["p2"] == [160.0, 40.0]
+    assert rec["text"] == "Beam above"
+    scene.clear()
+    apply_design_to_scene(scene, out)
+    ld = _annots(scene, LeaderItem)[0]
+    assert (ld.tip, ld.anchor, ld.text) == (QPointF(100, 100), QPointF(160, 40), "Beam above")
+    assert ld.isVisible()
+    SETTINGS["show_annotations"] = False
+    try:
+        sync_annotation_visibility(scene)
+        assert not ld.isVisible(), "a leader is an annotation: the switch hides it"
+    finally:
+        SETTINGS["show_annotations"] = True
+        sync_annotation_visibility(scene)
+    assert ld.isVisible()
+
+
+def test_a_selected_leader_shows_two_knobs_that_move_its_ends_and_the_body_moves_the_whole(fp, win, add_walls):
+    from floorplanner.annotations import LeaderItem, LeaderKnob
+    win.prepare_headless()
+    add_walls(win.scene, 120, 120, 240, 180)
+    ld = LeaderItem(QPointF(200, 200), QPointF(260, 150), "Note")
+    win.scene.addItem(ld)
+    knobs = [k for k in ld.childItems() if isinstance(k, LeaderKnob)]
+    assert [k.kind for k in knobs] == ["tip", "text"]
+    assert not any(k.isVisible() for k in knobs)
+    ld.setSelected(True)
+    assert all(k.isVisible() for k in knobs)
+    assert knobs[0].pos() == QPointF(200, 200) and knobs[1].pos() == QPointF(260, 150)
+    # the tip knob snaps to the corner it is dropped near; the text knob is free
+    knobs[0].apply_drag(QPointF(122.0, 118.0))
+    assert ld.tip == QPointF(120, 120)
+    knobs[1].apply_drag(QPointF(281.5, 140.25))
+    assert ld.anchor == QPointF(281.5, 140.25)
+    assert knobs[0].pos() == ld.tip and knobs[1].pos() == ld.anchor
+    # the body moves both ends together
+    ld.move_by(10.0, -5.0)
+    assert (ld.tip, ld.anchor) == (QPointF(130, 115), QPointF(291.5, 135.25))
+    # the text sits on the side away from the tip, on the shoulder
+    assert ld._side() == 1.0 and ld.text_origin().x() > ld.anchor.x()
+    ld.set_points(QPointF(400, 200), QPointF(300, 150))
+    assert ld._side() == -1.0 and ld.text_origin().x() < ld.anchor.x()
+    assert ld.boundingRect().contains(ld.tip) and ld.boundingRect().contains(ld._text_rect())
+
+
+def test_a_leader_paints_its_arrow_line_and_text(fp, scene):
+    from floorplanner.annotations import INK, LeaderItem
+    ld = LeaderItem(QPointF(60, 120), QPointF(160, 60), "Beam")
+    scene.addItem(ld)
+    assert _ink_pixels(ld, INK, size=400, shift=(0, 0)) > 60

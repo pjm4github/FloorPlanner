@@ -1215,6 +1215,13 @@ def main():
             'stroke-linecap="round"/>',
             '<line x1="4" y1="7" x2="4" y2="19" stroke="#9ca3af" stroke-width="1"/>',
             '<line x1="20" y1="7" x2="20" y2="19" stroke="#9ca3af" stroke-width="1"/>'],
+        "leader": [
+            # 0270: the Leader tool -- an arrow from the lower left up to a
+            # shoulder, the text as a grey bar above it
+            '<line x1="4.5" y1="18.5" x2="13" y2="9.5" stroke="#1f2937" stroke-width="1.5"/>',
+            '<line x1="13" y1="9.5" x2="21" y2="9.5" stroke="#1f2937" stroke-width="1.5"/>',
+            '<path d="M2.5 20.5 L8.6 18.6 L4.4 14.4 Z" fill="#1f2937"/>',
+            '<line x1="14" y1="6" x2="21" y2="6" stroke="#9ca3af" stroke-width="1.8"/>'],
         "record": [
             # the universal red "record" dot
             '<circle cx="12" cy="12" r="7" fill="#dc2626" stroke="#991b1b" '

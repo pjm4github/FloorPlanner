@@ -23,7 +23,8 @@ formatted to a residential designer's transmittal spec:
     off-axis angle family (45 degrees, 135 degrees, ...) gets its own lane
     outside the drawing, for rooms with `label.show_dimensions` on
     (0120-ruling.md)
-  * text annotations, while the plan's Show > Annotations is on (0268)
+  * text annotations and leaders (a text with an arrow, 0270), while the
+    plan's Show > Annotations is on (0268)
   * title block: project, level, scale, date, wall-assembly note,
     dimension-reference note, an openings-not-dimensioned note,
     NOT FOR CONSTRUCTION
@@ -321,6 +322,12 @@ class Sheet:
             for x, y in d["page_pts"]:
                 xs.append(x)
                 ys.append(y)
+        if self.show_annotations:             # 0270: a leader's two ends as well
+            for ann in self.annotations:
+                if ann.get("kind") == "leader":
+                    for pt in (ann["pos"], ann.get("p2") or ann["pos"]):
+                        xs.append(float(pt[0]))
+                        ys.append(-float(pt[1]))
         self.bx0, self.bx1 = min(xs), max(xs)
         self.by0, self.by1 = min(ys), max(ys)
         w_in, h_in = self.bx1 - self.bx0, self.by1 - self.by0
@@ -902,6 +909,42 @@ class Sheet:
                 x, y = float(ann["pos"][0]), -float(ann["pos"][1])
                 self.text(x, y, ann["text"], size=6, gray=0.2,
                           rot=-float(ann.get("rotation", 0)), center=False)
+            elif ann.get("kind") == "leader" and ann.get("text"):
+                self._draw_leader(ann)
+
+    def _draw_leader(self, ann):
+        """A leader (0270) as the screen draws it: the line from the text's
+        end to the arrow's tip, a filled arrowhead, a short shoulder under
+        the text on the side away from the tip. In page points."""
+        c = self.c
+        tx, ty = self.X(float(ann["pos"][0])), self.Y(-float(ann["pos"][1]))
+        p2 = ann.get("p2") or ann["pos"]
+        ax, ay = self.X(float(p2[0])), self.Y(-float(p2[1]))
+        side = 1.0 if ax >= tx else -1.0
+        sx = ax + side * 8.0
+        c.saveState()
+        c.setLineWidth(0.5)
+        c.setStrokeGray(0.2)
+        c.setFillGray(0.2)
+        c.line(ax, ay, tx, ty)
+        c.line(ax, ay, sx, ay)
+        dx, dy = tx - ax, ty - ay
+        ln = math.hypot(dx, dy) or 1.0
+        ux, uy = dx / ln, dy / ln
+        L, hw = 6.0, 2.2
+        bx, by = tx - ux * L, ty - uy * L
+        p = c.beginPath()
+        p.moveTo(tx, ty)
+        p.lineTo(bx - uy * hw, by + ux * hw)
+        p.lineTo(bx + uy * hw, by - ux * hw)
+        p.close()
+        c.drawPath(p, stroke=0, fill=1)
+        c.setFont("Helvetica", 6)
+        if side > 0:
+            c.drawString(sx + 1.5, ay - 2.0, ann["text"])
+        else:
+            c.drawRightString(sx - 1.5, ay - 2.0, ann["text"])
+        c.restoreState()
 
     # ---------- the plan's own dimensions (0268) ----------
     @staticmethod

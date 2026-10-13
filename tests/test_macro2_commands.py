@@ -289,3 +289,23 @@ def test_the_check_macro_does_what_its_comments_say(fp, win, clean_mods):
     free = next(w for w in win.scene.items() if isinstance(w, fp.WallItem)
                 and w.wall_type == "interior")
     assert free.p1.y() != free.p2.y(), "the Shift-drag, off square"
+
+
+@pytest.mark.gui
+def test_the_annotation_commands_run(fp, win, clean_mods):
+    """0270: @TEXT, @LEADER and @DATUM build the items the tools build."""
+    from floorplanner.annotations import DatumItem, LeaderItem, TextAnnotationItem, datum_on
+    win.prepare_headless()
+    res = win.run_macro(HEADER + '\n@TEXT 60 90 "North elevation"\n'
+                        '@LEADER 240 100 300 60 "Beam above"\n@DATUM 12 36\n@DATUM 24 36')
+    assert res["ok"], res
+    texts = [it for it in win.scene.items() if isinstance(it, TextAnnotationItem)]
+    assert len(texts) == 1 and texts[0].text == "North elevation" and texts[0].pos() == QPointF(60, 90)
+    leaders = [it for it in win.scene.items() if isinstance(it, LeaderItem)]
+    assert len(leaders) == 1 and (leaders[0].tip, leaders[0].anchor, leaders[0].text) == \
+        (QPointF(240, 100), QPointF(300, 60), "Beam above")
+    datums = [it for it in win.scene.items() if isinstance(it, DatumItem)]
+    assert len(datums) == 1 and datum_on(win.scene, fp.active_floor()).pos() == QPointF(24, 36)
+    # a text with nothing in it is a failure, not a blank item
+    res = win.run_macro(HEADER + '\n@TEXT 60 90 ""')
+    assert not res["ok"]

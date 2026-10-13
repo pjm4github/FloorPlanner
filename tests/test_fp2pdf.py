@@ -988,6 +988,8 @@ def _annotated_doc(show_dimensions=True, show_annotations=True, units="ftin"):
         {"id": "an3", "level": "L1", "kind": "text", "pos": [60, 90],
          "text": "North elevation"},
         {"id": "an4", "level": "L1", "kind": "datum", "pos": [0, 0]},
+        {"id": "an5", "level": "L1", "kind": "leader", "pos": [240, 100],
+         "p2": [300, 60], "text": "Beam above"},
     ]
     return doc
 
@@ -1050,8 +1052,11 @@ def test_text_annotations_follow_the_show_switch(monkeypatch):
     annotation for printing to pdf" -- and not while they are hidden."""
     _, rec, _ = _render(_annotated_doc(show_annotations=True), monkeypatch)
     assert "North elevation" in rec.strings()
+    assert "Beam above" in rec.strings(), "a leader (0270) is an annotation too"
+    assert any(n == "drawPath" for n, _ in rec.calls), "the leader's arrowhead"
     _, rec, _ = _render(_annotated_doc(show_annotations=False), monkeypatch)
     assert "North elevation" not in rec.strings()
+    assert "Beam above" not in rec.strings()
 
 
 def test_the_frame_takes_the_drawn_dimensions_in():
@@ -1061,6 +1066,13 @@ def test_the_frame_takes_the_drawn_dimensions_in():
     doc["annotations"][0]["offset_in"] = -120.0
     sheet = _sheet(doc)
     assert sheet.by0 <= -120.0
+    # a leader's text end far off the walls too (0270)
+    doc = _annotated_doc()
+    doc["annotations"][4]["p2"] = [500, -150]
+    sheet = _sheet(doc)
+    assert sheet.bx1 >= 500.0 and sheet.by1 >= 150.0
+    doc["settings"]["show_annotations"] = False
+    assert _sheet(doc).bx1 < 500.0, "hidden, it is not on the sheet and does not stretch it"
 
 
 def test_convert_writes_a_pdf_with_drawn_dimensions_and_says_so(tmp_path):

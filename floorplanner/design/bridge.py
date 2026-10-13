@@ -896,11 +896,12 @@ def _furnishings_of(items, lid, nid, rooms, poly, src=None):
 
 
 def _annotations_of(items, lid, nid):
-    """This level's annotations (0263): texts, measures and the datum, each
-    item's own record, in a stable order (kind, then position)."""
-    from floorplanner.annotations import DatumItem, DimensionItem, TextAnnotationItem
+    """This level's annotations (0263): texts, measures, the datum and the
+    leaders (0270), each item's own record, in a stable order (kind, then
+    position)."""
+    from floorplanner.annotations import DatumItem, DimensionItem, LeaderItem, TextAnnotationItem
     out = []
-    kinds = (TextAnnotationItem, DimensionItem, DatumItem)
+    kinds = (TextAnnotationItem, DimensionItem, DatumItem, LeaderItem)
     for it in _ordered(items, kinds, lambda a: (a.kind, round(a.to_record("", "")["pos"][0], 3),
                                                 round(a.to_record("", "")["pos"][1], 3))):
         out.append(it.to_record(nid("an"), lid))

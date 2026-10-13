@@ -569,6 +569,9 @@ These are the existing macro language's own commands
 | `@DOOR` / `@WINDOW` | `x y WWHH` | cut an opening into the wall under (x, y) |
 | `@ROOM` | `name x y` | name the enclosed area containing (x, y) |
 | `@DORMER` | `x y width eaves ridge [dx dy]` | add a gable dormer on the roof plane at (x, y) |
+| `@TEXT` | `x y "text"` | a text annotation at (x, y) (0270; the Annotation tool's emit) |
+| `@LEADER` | `x1 y1 x2 y2 "text"` | a leader: the arrow's tip at (x1, y1), the text's end at (x2, y2) (0270) |
+| `@DATUM` | `x y` | the level's datum placed at (x, y), or moved there (0270) |
 | `@SELECT` | `x y` | select the editable item at a point |
 | `@SELECTALL` / `@DESELECT` | | select everything / clear the selection |
 | `@ROTATE` | `deg` | rotate the selected furnishings |

@@ -18,8 +18,8 @@ from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
 from floorplanner.roofs import RoofEndMarkerItem, RoofItem, eaves_spans_per_side
-from floorplanner.annotations import (  # 0263: annotations, measurements, callouts
-    DatumItem, DimensionItem, TextAnnotationItem, callout_colour,
+from floorplanner.annotations import (  # 0263: annotations, measurements, callouts; 0270: leaders
+    DatumItem, DimensionItem, LeaderItem, TextAnnotationItem, callout_colour,
     sync_annotation_visibility,
 )
 from floorplanner.design.bridge import stamp_document_ids   # 0264: the callouts' ids
@@ -82,6 +82,10 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                       "wall. Esc cancels.",
         TOOL_DATUM: "Datum: click to place this level's datum point; the Measure "
                     "tool snaps to it, so a run of measures can share one end.",
+        TOOL_LEADER: "Leader: press on the thing to name (snaps to a corner, a wall, "
+                     "a jamb or the datum), drag to where the text goes, release and "
+                     "type the text. Drag a leader to move it; select it for its two "
+                     "knobs; double-click to edit the text. Esc cancels.",
     }
 
     def __init__(self):
@@ -193,6 +197,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             (TOOL_ROOF_DORMER, "Roof Dormer", "M", "dormer"),
             (TOOL_TEXT, "Annotation", "T", "text"),
             (TOOL_MEASURE, "Measure", "L", "measure"),
+            (TOOL_LEADER, "Leader", "N", "leader"),
         ]
         for tool, label, key, icon in defs:
             a = QAction(tool_icon(icon), label, self)
@@ -670,7 +675,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         if bool(SETTINGS.get(key, True)) == on:
             return
         SETTINGS[key] = on
-        if not on and key == "show_annotations" and self.tool == TOOL_TEXT:
+        if not on and key == "show_annotations" and self.tool in (TOOL_TEXT, TOOL_LEADER):
             self.set_tool(TOOL_SELECT)
         if not on and key == "show_dimensions" and self.tool in (TOOL_MEASURE, TOOL_DATUM):
             self.set_tool(TOOL_SELECT)
@@ -1035,7 +1040,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                 # vacated edge becomes an open edge (P4.1)
                 delete_wall(self.scene, it, settle=False)
             elif isinstance(it, (RoomItem, FurnishingItem, GroupItem, RoofItem,
-                                 TextAnnotationItem, DimensionItem, DatumItem)):
+                                 TextAnnotationItem, DimensionItem, DatumItem, LeaderItem)):
                 self.scene.removeItem(it)
             elif isinstance(it, RoofEndMarkerItem):
                 # deleting the MARKER means deleting the roof it marks --

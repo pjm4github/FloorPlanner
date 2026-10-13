@@ -21,7 +21,7 @@ pytestmark = pytest.mark.macro
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 EXAMPLES = ROOT / "docs" / "macro-spec" / "examples.macro"
-TOOLS = frozenset("SEIDWRGM")          # the application's eight (macro.py:120)
+TOOLS = frozenset("SEIDWRGMTLN")       # the application's eleven (macro.py:120; T L N at 0270)
 S, C = Mod.SHIFT, Mod.CTRL
 
 
@@ -57,7 +57,7 @@ def test_the_spec_example_parses_with_zero_errors():
     text = EXAMPLES.read_text(encoding="utf-8")
     res = parse(text)
     assert res.errors == ()
-    assert len(res.macro.lines) == 26, "every non-comment line became a Line"
+    assert len(res.macro.lines) == 30, "every non-comment line became a Line"
     assert is_v2(text)
 
 

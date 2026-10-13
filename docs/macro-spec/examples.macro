@@ -25,4 +25,8 @@ TYPE
 X MOVE 1.5 -2.25
 @PLACE sofa 120 96 0        ; an application command (sec 14)
 @ROOM "Living Room" 10' 12'6"
+T @TEXT 60 90 "North elevation"      ; the annotation tools (0270)
+N @LEADER 240 100 300 60 "Beam above"
+@DATUM 12 36
+L CLICK 0 0 DRAG 240 0               ; a measure is its own drag
 S @SELECTALL

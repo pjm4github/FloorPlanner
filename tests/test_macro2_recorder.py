@@ -421,11 +421,21 @@ def test_dialog_tools_record_one_command_not_a_click_and_a_dialog(fp, win, clean
     dlg.on_floor("default")
     dlg.on_shuffle(True)
     dlg.on_open("plans/my den.json")
+    # 0270: the annotation tools' dialogs, the same way
+    win.set_tool(fp.TOOL_TEXT)
+    dlg.on_text("North elevation", QPointF(60, 90))
+    win.set_tool(fp.TOOL_LEADER)
+    from floorplanner.annotations import LeaderItem
+    dlg.on_leader(LeaderItem(QPointF(240, 100), QPointF(300, 60), "Beam above"))
+    win.set_tool(fp.TOOL_DATUM)
+    dlg.on_datum(QPointF(12, 36))
     dlg.stop()
     assert _lines(dlg) == [
         HEADER, "D @DOOR 120 0 3280", '@ROOM "Living Room" 120 90',
         "@PLACE sofa 120 96", '@NEWFLOOR "Floor 2"', "@FLOOR default",
-        "@SHUFFLE on", '@OPEN "plans/my den.json"']
+        "@SHUFFLE on", '@OPEN "plans/my den.json"',
+        'T @TEXT 60 90 "North elevation"', 'N @LEADER 240 100 300 60 "Beam above"',
+        "@DATUM 12 36"]
     assert parse(dlg.edit.toPlainText()).ok
 
 
@@ -483,3 +493,32 @@ def test_the_application_opens_the_recorder_in_v2(fp, win, clean_mods):
         dlg.stop()
     finally:
         dlg.close()
+
+
+@pytest.mark.gui
+def test_the_annotation_tools_raw_clicks_are_not_recorded_beside_their_commands(fp, win, clean_mods, monkeypatch):
+    """0270: under the Annotation, Leader and Datum tools the raw press and
+    its chain are skipped (the hook writes the command); under the Measure
+    tool the drag IS the record, with its letter."""
+    from PyQt6.QtWidgets import QInputDialog
+    win.prepare_headless()
+    monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("x", True)))
+    dlg = fp.MacroRecorderDialog(win, fmt="v2")
+    dlg.start()
+    for tool in (fp.TOOL_TEXT, fp.TOOL_LEADER, fp.TOOL_DATUM):
+        win.set_tool(tool)
+        _mouse(win, QEvent.Type.MouseButtonPress, 100, 100, LEFT, LEFT)
+        _mouse(win, QEvent.Type.MouseMove, 160, 60, NONE, LEFT)
+        _mouse(win, QEvent.Type.MouseButtonRelease, 160, 60, LEFT, NONE)
+    win.set_tool(fp.TOOL_MEASURE)
+    _mouse(win, QEvent.Type.MouseButtonPress, 0, 0, LEFT, LEFT)
+    _mouse(win, QEvent.Type.MouseMove, 240, 0, NONE, LEFT)
+    _mouse(win, QEvent.Type.MouseButtonRelease, 240, 0, LEFT, NONE)
+    dlg.stop()
+    lines = _lines(dlg)
+    assert len(lines) == 5, lines
+    assert lines[1].startswith("T @TEXT ") and lines[1].endswith(" x"), lines
+    assert lines[2].startswith("N @LEADER ") and lines[2].endswith(" x"), lines
+    assert lines[3].startswith("@DATUM "), lines
+    assert lines[4].startswith("L CLICK ") and " DRAG " in lines[4], lines
+    assert parse(dlg.edit.toPlainText()).ok

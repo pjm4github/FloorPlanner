@@ -20,8 +20,8 @@ from floorplanner.roofs import (  # R5b: the Dormer tool; R6.b: the hold
     host_roof_at, snap_to_trace, upslope_direction,
 )
 from floorplanner.items import *  # noqa: F401
-from floorplanner.annotations import (  # 0263: the Annotation, Measure and Datum tools
-    MEASURE_SNAP_IN, DatumItem, DimensionItem, TextAnnotationItem, datum_on, nearest_datum,
+from floorplanner.annotations import (  # 0263: the Annotation, Measure and Datum tools; 0270: Leader
+    MEASURE_SNAP_IN, DatumItem, DimensionItem, LeaderItem, TextAnnotationItem, datum_on, nearest_datum,
 )
 
 
@@ -163,6 +163,7 @@ class PlanView(QGraphicsView):
         self._temp_wall = None
         self._temp_roof = None            # ridge being dragged, or None
         self._temp_dim = None             # 0263: a measure being dragged, or None
+        self._temp_leader = None          # 0270: a leader being dragged, or None
         self._dim_walls = (None, None)    # ...and the wall each end snapped to
         self._roof_awaiting_eaves = None  # ridge fixed, awaiting the eaves pick
         self._temp_dormer = None          # R5b: dormer being dragged, or None
@@ -538,6 +539,9 @@ class PlanView(QGraphicsView):
                     self.scene().addItem(item)
                     self.win.status("Annotation placed. Drag it to move it; "
                                     "double-click to edit it.")
+                    if self.win._recorder is not None:
+                        # the dialog's text rides in one TEXT token (0270)
+                        self.win._recorder.on_text(text.strip(), item.pos())
                 e.accept()
                 return
             if tool == TOOL_DATUM:
@@ -549,6 +553,8 @@ class PlanView(QGraphicsView):
                 else:
                     d.setPos(p)
                 self.win.status("Datum placed. The Measure tool snaps to it.")
+                if self.win._recorder is not None:
+                    self.win._recorder.on_datum(p)            # one DATUM token (0270)
                 self.win.set_tool(TOOL_SELECT)
                 e.accept()
                 return
@@ -558,6 +564,15 @@ class PlanView(QGraphicsView):
                 self.scene().addItem(item)
                 self._temp_dim = item
                 self._dim_walls = (w, None)
+                e.accept()
+                return
+            if tool == TOOL_LEADER:
+                # 0270: the arrow's point snaps as a measure's end does; the
+                # drag puts the text; the release asks for it
+                p, _ = self._measure_snap(sp)
+                item = LeaderItem(p, p, "")
+                self.scene().addItem(item)
+                self._temp_leader = item
                 e.accept()
                 return
             if tool in (TOOL_WALL_EXT, TOOL_WALL_INT):
@@ -824,6 +839,11 @@ class PlanView(QGraphicsView):
             e.accept()
             return
 
+        if self._temp_leader is not None:
+            self._temp_leader.set_points(self._temp_leader.tip, wall_snap(sp))
+            e.accept()
+            return
+
         if self._temp_roof is not None:
             # SAME snap math as a wall drag (0139-ruling.md sec1: "the ridge
             # tool calls that machinery") -- `_wall_end_point` only reads
@@ -992,6 +1012,26 @@ class PlanView(QGraphicsView):
             e.accept()
             return
 
+        if self._temp_leader is not None and e.button() == Qt.MouseButton.LeftButton:
+            item, self._temp_leader = self._temp_leader, None
+            if (item.anchor - item.tip).manhattanLength() < 1.0:
+                # a click, no drag: the text up and to the right of the point
+                item.set_points(item.tip, QPointF(item.tip.x() + LeaderItem.DEFAULT_OFFSET_IN,
+                                                  item.tip.y() - LeaderItem.DEFAULT_OFFSET_IN))
+            text, ok = QInputDialog.getText(self, "Leader", "Text:")
+            if ok and text.strip():
+                item.set_text(text.strip())
+                self.win.status("Leader placed. Drag it to move it; select it for its "
+                                "two knobs; double-click to edit the text.")
+                if self.win._recorder is not None:
+                    # the tip, the text's end and the dialog's text in one
+                    # LEADER token (0270)
+                    self.win._recorder.on_leader(item)
+            else:
+                self.scene().removeItem(item)
+            e.accept()
+            return
+
         if self._temp_roof is not None and e.button() == Qt.MouseButton.LeftButton:
             item, self._temp_roof = self._temp_roof, None
             hold_roof_clips(self.scene(), False)          # R6.b: the drag is over
@@ -1115,6 +1155,9 @@ class PlanView(QGraphicsView):
             self.scene().removeItem(self._temp_dim)
             self._temp_dim = None
             self._dim_walls = (None, None)
+        if self._temp_leader is not None:           # 0270: a leader in progress
+            self.scene().removeItem(self._temp_leader)
+            self._temp_leader = None
         if self._temp_dormer is not None:          # R5b: a drag in progress
             self.scene().removeItem(self._temp_dormer)
             self._temp_dormer = None

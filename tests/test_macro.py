@@ -773,3 +773,22 @@ def test_floor_select_and_new_record_and_replay(fp, win, qapp):
     win.run_macro('^F "Upper"')
     res = win.run_macro("^F")
     assert res["ok"] and win.active_floor == "Ground"
+
+
+def test_recorder_annotation_hooks_bake_the_dialog_text_in(fp, win):
+    """0270: the Annotation, Leader and Datum tools record one token each,
+    the dialog's text baked in, as the room hook does."""
+    from floorplanner.annotations import LeaderItem
+    dlg = fp.MacroRecorderDialog(win)
+    dlg.start()
+    dlg.on_text("North elevation", QPointF(60, 90))
+    dlg.on_leader(LeaderItem(QPointF(240, 100), QPointF(300, 60), "Beam above"))
+    dlg.on_datum(QPointF(12, 36))
+    dlg.stop()
+    text = dlg.edit.toPlainText()
+    assert 'TEXT 60 90 "North elevation"' in text
+    assert 'LEADER 240 100 300 60 "Beam above"' in text
+    assert "DATUM 12 36" in text
+    # and the tokens run
+    res = win.run_macro(text)
+    assert res["ok"], res

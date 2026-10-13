@@ -96,7 +96,12 @@ console script), plus bundled fonts and artwork.
 - **Annotations, measurements and item callouts** — the **Show** menu
   switches three layers on and off independently and saves the choice
   with the plan. *Annotations*: the **T** tool places a text at a click
-  (drag to move, double-click to edit). *Measurements*: the **L** tool
+  (drag to move, double-click to edit); the **N** tool draws a **leader**
+  -- press on the thing to name (the point snaps as a measure's end
+  does), drag to where the text goes, release and type it: an arrow at
+  the point, the text on a short shoulder at the other end (drag to
+  move the whole; select it for its two knobs; double-click to edit).
+  *Measurements*: the **L** tool
   drags a measure from one point to another — each end snaps to a corner,
   a wall, an opening's jamb or the level's **datum** (*Show ▸ Place
   datum*), both ends on one wall and the measure runs along it — drawn as
@@ -208,7 +213,7 @@ so no system fonts are needed.
 
 | Action | How |
 |---|---|
-| Choose a tool | Toolbar icons or keys **S** E I D W R G M T L (Select / Exterior / Interior / Door / Window / Room / Roof ridge / Dormer / Annotation / Measure) |
+| Choose a tool | Toolbar icons or keys **S** E I D W R G M T L N (Select / Exterior / Interior / Door / Window / Room / Roof ridge / Dormer / Annotation / Measure / Leader) |
 | Zoom / pan | Mouse wheel / drag empty space (middle-drag anywhere) |
 | Draw a wall | Click-drag; the end lands on the snap grid (Shift = unconstrained: off the grid, any angle; Esc = cancel). An end released a grid step short of another wall is left there (a reveal); one released on it welds. Overlapping same-type walls within the snap grid **coalesce** into one shared wall (a boundary between two rooms is a single wall, not a duplicate); the drawn end **welds** onto a wall it lands on, forming a clean T/L joint |
 | Stretch / slide a wall | Drag its end / body in Select mode. A dragged end or a slid wall **lands on the snap grid**, even when the wall began off it; an end sticks to the projected line of a nearby orthogonal wall that is itself off the grid (so you can still close a corner there); overlapping same-type walls coalesce on release. The end-grab zone is capped at a third of the wall, so even a short wall keeps a grabbable middle to slide perpendicular |

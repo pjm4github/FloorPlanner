@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: ca8a718 -->
+<!-- SNAPSHOT-HEAD: 5306fa3 -->
 
 # Session snapshot — read this first
 
@@ -248,8 +248,8 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`ca8a718`** at this file's cut — [`0269`](handoff/0269-report.md) landed there (PR #88's merge recorded); this commit lands [`0270-report.md`](handoff/0270-report.md), the leader annotation built on `leader-annotation` (one commit on this tip, AMBER). **Owed next: his check of that branch; then the docs-and-schema tranche (version 6, the command README) stacked on it, on his words already given.** Every PR through #88 is merged (#59 was closed, superseded by #60). |
-| **Branches** | **`leader-annotation`** — ONE commit on this tip, AMBER, waiting on his check ([`0270`](handoff/0270-report.md)). |
+| **`main`** | **`5306fa3`** at this file's cut — [`0270`](handoff/0270-report.md) landed there (the leader reported). This commit is `leader-annotation`'s one commit on that tip: the leader annotation, AMBER. **Owed next: his check; then the docs-and-schema tranche (version 6, the command README) stacked on this branch.** Every PR through #88 is merged (#59 was closed, superseded by #60). |
+| **Branches** | **`leader-annotation`** — this commit, ONE on `main`'s tip, AMBER, waiting on his check ([`0270`](handoff/0270-report.md)). |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **88 records, 31 open** (D88 CLOSED 2026‑10‑11, `closed_by 6ee358b`; D87 CLOSED 2026‑10‑11, `closed_by d90f8b4`; D67 CLOSED 2026‑10‑07, `closed_by cdc54de`, [`0225`](handoff/0225-report.md); D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |

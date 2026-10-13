@@ -10,6 +10,11 @@
   measured line; it stays parallel.
 * `DatumItem` -- a marked point (one per level) the Measure tool snaps to,
   so a run of dimensions can share one end.
+* `LeaderItem` (0270) -- a text with an ARROW to the thing it names: the
+  Leader tool presses on the point (snapped as the Measure tool snaps),
+  drags to where the text goes, then asks for the text. The text sits on a
+  short shoulder off the line's end, away from the arrow. Movable as a
+  whole; two knobs when selected (the tip, the text); double-click edits.
 
 Every item carries `floor`, so `apply_floor_visibility` ghosts and hides
 it with the level, and `kind`/`to_record`/`from_record` so the bridge
@@ -36,10 +41,11 @@ from PyQt6.QtWidgets import QGraphicsItem, QInputDialog
 from floorplanner.config import (
     FLOOR_GHOST, SETTINGS, WALL_Z, active_floor, floor_display_mode,
 )
-from floorplanner.geometry import fmt_ftin, wall_snap_len
+from floorplanner.geometry import fmt_ftin, wall_snap, wall_snap_len
 
 __all__ = [
     "TextAnnotationItem", "DimensionItem", "DimensionKnob", "DatumItem", "ANNOTATION_Z",
+    "LeaderItem", "LeaderKnob",
     "callout_colour", "callouts_shown", "document_id", "session_label", "callout_text",
     "CALLOUT_PX", "callout_font", "draw_callout",
     "set_report_open", "format_length",
@@ -445,13 +451,7 @@ class DimensionItem(_AnnotationBase):
         """Where a dragged callout point lands: the tool's own snap (the
         datum, a corner, a jamb, a wall, else the grid), or the cursor
         itself when `free` (Shift)."""
-        if free:
-            return QPointF(sp)
-        views = self.scene().views() if self.scene() else []
-        snap = getattr(views[0], "_measure_snap", None) if views else None
-        if snap is None:
-            return QPointF(sp)
-        return snap(sp)[0]
+        return _tool_snap(self, sp, free)
 
     def move_point(self, end: int, sp: QPointF, free: bool = False):
         """Knob 1 (`end` 0) or 2 (`end` 1): that measured point goes where the
@@ -512,6 +512,19 @@ class DimensionItem(_AnnotationBase):
         p2 = rec.get("p2") or rec["pos"]
         return cls(QPointF(*rec["pos"]), QPointF(*p2), float(rec.get("offset_in", DIM_OFFSET_IN)), floor,
                    float(rec.get("label_t", 0.5)))
+
+
+def _tool_snap(item, sp: QPointF, free: bool) -> QPointF:
+    """Where a dragged point lands: the Measure tool's own snap (the datum,
+    a corner, a jamb, a wall, else the grid), or the cursor itself when
+    `free` (Shift)."""
+    if free:
+        return QPointF(sp)
+    views = item.scene().views() if item.scene() else []
+    snap = getattr(views[0], "_measure_snap", None) if views else None
+    if snap is None:
+        return QPointF(sp)
+    return snap(sp)[0]
 
 
 class DimensionKnob(QGraphicsItem):
@@ -620,6 +633,199 @@ class DimensionKnob(QGraphicsItem):
             super().mouseReleaseEvent(e)
 
 
+class LeaderItem(_AnnotationBase):
+    """A leader (0270): a text with an arrow to the thing it names. `tip`
+    is the arrow's point (the Leader tool snaps it as the Measure tool
+    snaps); `anchor` is where the line ends and the text begins -- the text
+    sits on a short horizontal shoulder from the anchor, on the side away
+    from the tip. Drag the body to move the whole; select it for two knobs
+    (the tip, snapped; the text end, free); double-click edits the text."""
+    kind = "leader"
+    SIZE_PX = 12.0               # the text, view pixels at any zoom
+    ARROW_PX = 9.0               # the arrowhead's length, view pixels
+    SHOULDER_PX = 10.0           # the shoulder under the text, view pixels
+    DEFAULT_OFFSET_IN = 24.0     # a click without a drag: the text this far up and right
+
+    def __init__(self, tip: QPointF, anchor: QPointF, text: str = "", floor=None):
+        super().__init__(floor)
+        self.tip = QPointF(tip)
+        self.anchor = QPointF(anchor)
+        self.text = str(text)
+        self._drag = None
+        self.knobs = [LeaderKnob(self, k) for k in LeaderKnob.KINDS]
+
+    def shown(self) -> bool:
+        return bool(SETTINGS.get("show_annotations", True))
+
+    # -- geometry -------------------------------------------------------------
+    def _font(self) -> QFont:
+        f = QFont()
+        f.setPixelSize(max(2, int(self.SIZE_PX / self._view_scale())))
+        return f
+
+    def _side(self) -> float:
+        """+1: the text runs to the right of the anchor; -1: to the left."""
+        return 1.0 if self.anchor.x() >= self.tip.x() else -1.0
+
+    def shoulder_end(self) -> QPointF:
+        lod = self._view_scale()
+        return QPointF(self.anchor.x() + self._side() * self.SHOULDER_PX / lod, self.anchor.y())
+
+    def _text_rect(self) -> QRectF:
+        """The text's box in scene coordinates, on the shoulder."""
+        lod = self._view_scale()
+        fm = QFontMetricsF(self._font())
+        w = max(fm.horizontalAdvance(self.text or " "), 6.0)
+        h = fm.height()
+        e = self.shoulder_end()
+        x = e.x() + 2.0 / lod if self._side() > 0 else e.x() - 2.0 / lod - w
+        return QRectF(x, e.y() - h * 0.8, w, h)
+
+    def text_origin(self) -> QPointF:
+        r = self._text_rect()
+        return QPointF(r.left(), self.anchor.y())
+
+    def _arrow(self):
+        """The arrowhead's three corners: the tip and its base's two ends."""
+        lod = self._view_scale()
+        dx, dy = self.tip.x() - self.anchor.x(), self.tip.y() - self.anchor.y()
+        ln = math.hypot(dx, dy) or 1.0
+        ux, uy = dx / ln, dy / ln
+        L = self.ARROW_PX / lod
+        hw = L * 0.35
+        bx, by = self.tip.x() - ux * L, self.tip.y() - uy * L
+        return (QPointF(self.tip), QPointF(bx - uy * hw, by + ux * hw), QPointF(bx + uy * hw, by - ux * hw))
+
+    def boundingRect(self) -> QRectF:
+        r = QRectF(self.tip, self.anchor).normalized()
+        r = r.united(self._text_rect()).united(QRectF(self.anchor, self.shoulder_end()).normalized())
+        pad = self.ARROW_PX / self._view_scale() + 4.0
+        return r.adjusted(-pad, -pad, pad, pad)
+
+    def shape(self) -> QPainterPath:
+        path = QPainterPath()
+        path.moveTo(self.tip)
+        path.lineTo(self.anchor)
+        path.lineTo(self.shoulder_end())
+        st = QPainterPathStroker()
+        st.setWidth(6.0 / self._view_scale())
+        out = st.createStroke(path)
+        out.addRect(self._text_rect())
+        return out
+
+    def paint(self, painter, option, widget=None):
+        ink = _ink(self, INK)
+        painter.setPen(QPen(ink, 0))
+        painter.setBrush(QBrush(ink))
+        painter.drawLine(self.tip, self.anchor)
+        painter.drawLine(self.anchor, self.shoulder_end())
+        painter.drawPolygon(*self._arrow())
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setFont(self._font())
+        painter.drawText(self.text_origin(), self.text)
+        if self.isSelected():
+            painter.setPen(QPen(SELECT_INK, 0, Qt.PenStyle.DashLine))
+            painter.drawRect(self._text_rect())
+
+    # -- edits ----------------------------------------------------------------
+    def _changed(self):
+        self.prepareGeometryChange()
+        for k in self.knobs:
+            k.sync_position()
+        self.update()
+
+    def set_points(self, tip: QPointF, anchor: QPointF):
+        self.tip, self.anchor = QPointF(tip), QPointF(anchor)
+        self._changed()
+
+    def set_text(self, text: str):
+        self.text = str(text)
+        self._changed()
+
+    def move_tip(self, sp: QPointF, free: bool = False):
+        self.set_points(_tool_snap(self, sp, free), self.anchor)
+
+    def move_anchor(self, sp: QPointF, free: bool = True):
+        self.set_points(self.tip, QPointF(sp) if free else wall_snap(sp))
+
+    def move_by(self, dx: float, dy: float):
+        self.set_points(QPointF(self.tip.x() + dx, self.tip.y() + dy),
+                        QPointF(self.anchor.x() + dx, self.anchor.y() + dy))
+
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+            for k in self.knobs:
+                k.setVisible(bool(value))
+        return super().itemChange(change, value)
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.MouseButton.LeftButton:
+            self._drag = (e.scenePos(), QPointF(self.tip), QPointF(self.anchor))
+            self.setSelected(True)
+            e.accept()
+        else:
+            super().mousePressEvent(e)
+
+    def mouseMoveEvent(self, e):
+        if self._drag is not None:
+            start, tip0, anchor0 = self._drag
+            d = e.scenePos() - start
+            self.set_points(tip0 + d, anchor0 + d)
+            e.accept()
+        else:
+            super().mouseMoveEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        if self._drag is not None and e.button() == Qt.MouseButton.LeftButton:
+            self._drag = None
+            e.accept()
+        else:
+            super().mouseReleaseEvent(e)
+
+    def mouseDoubleClickEvent(self, e):
+        views = self.scene().views() if self.scene() else []
+        parent = views[0] if views else None
+        text, ok = QInputDialog.getText(parent, "Leader", "Text:", text=self.text)
+        if ok and text.strip():
+            self.set_text(text.strip())
+        e.accept()
+
+    # -- the document ---------------------------------------------------------
+    def to_record(self, rid: str, level: str) -> dict:
+        return {"id": rid, "level": level, "kind": "leader",
+                "pos": [float(self.tip.x()), float(self.tip.y())],
+                "p2": [float(self.anchor.x()), float(self.anchor.y())],
+                "text": self.text}
+
+    @classmethod
+    def from_record(cls, rec: dict, floor):
+        p2 = rec.get("p2") or rec["pos"]
+        return cls(QPointF(*rec["pos"]), QPointF(*p2), rec.get("text", ""), floor)
+
+
+class LeaderKnob(DimensionKnob):
+    """A selected leader's two knobs (the measure's knob, re-pointed): the
+    tip, dragged with the tool's snap (Shift frees), and the text end,
+    dragged free."""
+
+    KINDS = ("tip", "text")
+    _TIPS = {
+        "tip": "The arrow's point -- drag to move it (snaps to a corner, a jamb, a wall; Shift: free)",
+        "text": "The text's end -- drag to move the text",
+    }
+
+    def sync_position(self):
+        self.prepareGeometryChange()
+        self.setPos(self.dim.tip if self.kind == "tip" else self.dim.anchor)
+
+    def apply_drag(self, sp: QPointF):
+        free = bool(self._mods & Qt.KeyboardModifier.ShiftModifier)
+        if self.kind == "tip":
+            self.dim.move_tip(sp, free)
+        else:
+            self.dim.move_anchor(sp, True)
+
+
 class DatumItem(_AnnotationBase):
     """The level's datum: a crossed circle the Measure tool snaps to. One
     per level (placing another moves it)."""
@@ -654,12 +860,13 @@ class DatumItem(_AnnotationBase):
         return cls(QPointF(*rec["pos"]), floor)
 
 
-_KINDS = {"text": TextAnnotationItem, "dimension": DimensionItem, "datum": DatumItem}
+_KINDS = {"text": TextAnnotationItem, "dimension": DimensionItem, "datum": DatumItem,
+          "leader": LeaderItem}
 
 
 def item_from_record(rec: dict, floor):
     """The item for a document `annotation` record, or None for a kind this
-    build does not draw (`leader` is in the schema, not yet here)."""
+    build does not know."""
     cls = _KINDS.get(rec.get("kind"))
     return cls.from_record(rec, floor) if cls is not None else None
 

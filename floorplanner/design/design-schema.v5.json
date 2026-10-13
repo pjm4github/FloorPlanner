@@ -456,7 +456,7 @@
     },
 
     "annotation": {
-      "description": "0263-report.md gives the block its first writer and reader. `text`: a text at `pos` (its left baseline), `rotation` degrees. `dimension`: a measurement from `pos` to `p2`, drawn as one thin line parallel to that segment `offset_in` off it (to its left; negative = right), a slash at each end, the length written in the plan's `dimension_units`. `datum`: the level's datum point at `pos`, which the Measure tool snaps to. `leader` is reserved. The Show menu's switches (`show_annotations`, `show_dimensions`) hide and show them without changing the record.",
+      "description": "0263-report.md gives the block its first writer and reader. `text`: a text at `pos` (its left baseline), `rotation` degrees. `dimension`: a measurement from `pos` to `p2`, drawn as one thin line parallel to that segment `offset_in` off it (to its left; negative = right), a slash at each end, the length written in the plan's `dimension_units`. `datum`: the level's datum point at `pos`, which the Measure tool snaps to. `leader` (0270): a text with an arrow to the thing it names -- `pos` is the arrow's tip, `p2` where the line ends and the text begins (on a short shoulder away from the tip), `text` the note. The Show menu's switches (`show_annotations`, `show_dimensions`) hide and show them without changing the record.",
       "type": "object",
       "required": ["id", "level", "kind", "pos"],
       "additionalProperties": false,
@@ -465,7 +465,7 @@
         "level":     { "$ref": "#/$defs/id" },
         "kind":      { "enum": ["text", "dimension", "leader", "datum"] },
         "pos":       { "$ref": "#/$defs/point" },
-        "p2":        { "description": "A dimension's second measured point.", "$ref": "#/$defs/point" },
+        "p2":        { "description": "A dimension's second measured point; a leader's text end.", "$ref": "#/$defs/point" },
         "offset_in": { "description": "A dimension's line, this far off the measured segment on its left (negative: its right).", "type": "number" },
         "label_t":   { "description": "Where a dimension's label sits along its line, 0 at `pos`'s end to 1 at `p2`'s; absent = the middle.", "type": "number", "minimum": 0, "maximum": 1 },
         "text":      { "type": "string" },

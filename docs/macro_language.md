@@ -41,7 +41,8 @@ include spaces (e.g. a room name `"Living Room"`). A bad token is recorded in
 |-------|--------|
 | `S` `E` `I` `D` `W` `R` | **S**elect / **E**xterior-wall / **I**nterior-wall / **D**oor / **W**indow / **R**oom tool |
 | `G` `M` | Roof rid**g**e / roof dor**m**er tool (`G` because `R` is Room's; `M` for dorMer) |
-| `TOOL <name>` | same, by name: `select extwall intwall door window room roofridge roofdormer` |
+| `T` `L` `N` | **T**ext annotation / measure (**L**) / leader (**N**) tool (0270) |
+| `TOOL <name>` | same, by name: `select extwall intwall door window room roofridge roofdormer text measure leader` |
 
 (The legacy digit codes `1`–`6` are still accepted for older macros.)
 
@@ -119,6 +120,9 @@ These build items directly — handy for an AI that knows *what* it wants, not
 | `DOOR x y code` / `WINDOW x y code` | cut an opening into the wall under (x,y); `code` is `WWHH` inches (e.g. `3680`) |
 | `ROOM name x y` | name the enclosed area containing (x,y); the room then owns its walls |
 | `DORMER x y width eaves ridge [dx dy]` | add a gable dormer whose face stands at (x,y) on the roof plane there — snapped to that roof's orange clip trace when within reach — `width` inches wide, cheek top at `eaves` and ridge at `ridge` inches over the level base; the ridge runs up-slope unless `dx dy` give its direction. The back end is derived where the ridge meets the host roof; a ridge the host never meets is an error. This is what the recorder emits for the Dormer tool, dialog values baked in |
+| `TEXT x y "text"` | a text annotation at (x,y). What the recorder emits for the Annotation tool, the dialog's text baked in |
+| `LEADER x1 y1 x2 y2 "text"` | a leader: the arrow's tip at (x1,y1), the text's end at (x2,y2). What the recorder emits for the Leader tool |
+| `DATUM x y` | the level's datum placed at (x,y), or moved there (one per level). What the recorder emits for the Datum tool |
 | `SELECT x y` | select the editable item at a point (prefers furnishing/wall over a room label) |
 | `SELECTALL` / `DESELECT` | select all / clear selection |
 | `ROTATE deg` | rotate selected furnishings by `deg` |
@@ -159,7 +163,7 @@ S KEY ^z                            ; Select tool, then a real Ctrl+Z
 
 | Line | Action |
 |------|--------|
-| `S` `E` `I` `D` `W` `R` `G` `M` | the same tool letters, alone or before a command on the same line |
+| `S` `E` `I` `D` `W` `R` `G` `M` `T` `L` `N` | the same tool letters, alone or before a command on the same line |
 | `CLICK x y` | left click. Also `RCLICK` (right — opens the context menu), `MCLICK`, `DCLICK` (double), `XCLICK1`, `XCLICK2` |
 | `CLICK x y DRAG x y DRAG x y …` | a **chain**: press at the first point, release at the last. The button is never held between lines |
 | `+` `^` `!` `#` before `CLICK` / `DRAG` / `MOVE` / `WHEEL` | Shift / Ctrl / Alt / Meta, **for that segment only**: `CLICK 10 10 DRAG 100 10 +DRAG 100 90` presses Shift partway through |
@@ -169,7 +173,7 @@ S KEY ^z                            ; Select tool, then a real Ctrl+Z
 | `KEY strokes` | keystrokes: `KEY ^c ^v`, `KEY +^g`, named keys in braces — `{Enter}` `{Esc}` `{Tab}` `{Space}` `{Delete}` `{Up}` `{F5}` … |
 | `KEYDOWN key` / `KEYUP key` | hold a key across lines (`KEYDOWN {Shift}`); released when the macro ends, whatever happens |
 | `WAIT ms` | process events for that long |
-| `@NAME arg …` | an **application command** — the high-level words above, run by the same handlers: `@PLACE` `@WALL` `@DOOR` `@WINDOW` `@ROOM` `@DORMER` `@SELECT` `@SELECTALL` `@DESELECT` `@ROTATE` `@MOVETO` `@DELETE` `@ZOOMFIT` `@OPEN` `@SAVE` `@NEW` `@SHOT`, and `@FLOOR name`, `@NEWFLOOR name`, `@SHUFFLE on\|off` |
+| `@NAME arg …` | an **application command** — the high-level words above, run by the same handlers: `@PLACE` `@WALL` `@DOOR` `@WINDOW` `@ROOM` `@DORMER` `@TEXT` `@LEADER` `@DATUM` `@SELECT` `@SELECTALL` `@DESELECT` `@ROTATE` `@MOVETO` `@DELETE` `@ZOOMFIT` `@OPEN` `@SAVE` `@NEW` `@SHOT`, and `@FLOOR name`, `@NEWFLOOR name`, `@SHUFFLE on\|off` |
 
 What differs from the original language, beyond the syntax:
 
@@ -284,8 +288,11 @@ Rather than writing tokens by hand, open the **Macro ▸ Record / Debug…** win
   become their tokens. Actions whose parameters come from a **dialog** rather
   than keystrokes are captured as self-contained tokens with the value baked
   in — placing a door/window records `DOOR x y WWHH` / `WINDOW x y WWHH`,
-  naming a room records `ROOM "name" x y`, and finishing a dormer records
-  `DORMER x y width eaves ridge` — so replay never needs the dialog.
+  naming a room records `ROOM "name" x y`, finishing a dormer records
+  `DORMER x y width eaves ridge`, placing a text annotation records
+  `TEXT x y "text"`, finishing a leader records `LEADER x1 y1 x2 y2 "text"`
+  and placing the datum records `DATUM x y` — so replay never needs the
+  dialog. A measure (`L`) needs none: it records as its own drag.
   A right-click context menu records `PUP x y` followed by the keys you press
   to drive it, all on one line — including any text you type into a dialog it
   opens, captured as `TYPE "..."` (e.g.

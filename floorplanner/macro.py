@@ -63,10 +63,12 @@ class MacroRunner:
     written in feet like 10' or 10'6".
 
     Tokens
-      Tool select   S E I D W R G M    Select / Exterior-wall / Interior-wall /
+      Tool select   S E I D W R G M T L N
+                                       Select / Exterior-wall / Interior-wall /
                                        Door / Window / Room / Roof ridge /
-                                       Roof dormer  (also: TOOL <name>;
-                                       legacy digits 1-6 still work)
+                                       Roof dormer / Text annotation / Measure /
+                                       Leader  (also: TOOL <name>; legacy
+                                       digits 1-6 still work)
       Shortcuts     ^N ^Z ^Y ^X ^C ^V ^G ^A ^S
                                        new / undo / redo / cut / copy / paste /
                                        group / select-all / save-to-current.
@@ -99,6 +101,10 @@ class MacroRunner:
                     over the level base, ridge up-slope unless dx dy give
                     its direction; what the recorder emits for the Dormer
                     tool, dialog values baked in) |
+                    TEXT x y "text"  (a text annotation at x y) |
+                    LEADER x1 y1 x2 y2 "text"  (a leader: the arrow's tip at
+                    x1 y1, the text's end at x2 y2) |
+                    DATUM x y  (the level's datum, placed or moved) |
                     SELECT x y | SELECTALL | DESELECT | ROTATE deg |
                     MOVETO x y | DELETE | ZOOMFIT
       Context menu  PUP x y [UP DOWN LEFT RIGHT ENTER ESC HOME END TAB
@@ -119,13 +125,15 @@ class MacroRunner:
     # that convention).
     _TOOL_CODES = {"S": TOOL_SELECT, "E": TOOL_WALL_EXT, "I": TOOL_WALL_INT,
                    "D": TOOL_DOOR, "W": TOOL_WINDOW, "R": TOOL_ROOM,
-                   "G": TOOL_ROOF_RIDGE, "M": TOOL_ROOF_DORMER}
+                   "G": TOOL_ROOF_RIDGE, "M": TOOL_ROOF_DORMER,
+                   "T": TOOL_TEXT, "L": TOOL_MEASURE, "N": TOOL_LEADER}
     _DIGIT_TOOLS = [TOOL_SELECT, TOOL_WALL_EXT, TOOL_WALL_INT,
                     TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM]
     _TOOL_NAMES = {"select": TOOL_SELECT, "extwall": TOOL_WALL_EXT,
                    "intwall": TOOL_WALL_INT, "door": TOOL_DOOR,
                    "window": TOOL_WINDOW, "room": TOOL_ROOM,
-                   "roofridge": TOOL_ROOF_RIDGE, "roofdormer": TOOL_ROOF_DORMER}
+                   "roofridge": TOOL_ROOF_RIDGE, "roofdormer": TOOL_ROOF_DORMER,
+                   "text": TOOL_TEXT, "measure": TOOL_MEASURE, "leader": TOOL_LEADER}
     # derived from THE TABLE — add rows there, never here
     _CARET_METHODS = {t: s["method"] for t, s in CARET_SHORTCUTS.items()
                       if s["method"]}
@@ -500,6 +508,43 @@ class MacroRunner:
         bind_room_walls(self.win.scene, room)
         return i
 
+    def _cmd_text(self, toks, i):
+        """TEXT x y "text" -- a text annotation at (x, y) (0270; what the
+        recorder emits for the Annotation tool, the dialog's text baked in)."""
+        from floorplanner.annotations import TextAnnotationItem      # late
+        (x, y, text), i = self._take(toks, i, 3)
+        if not text.strip():
+            raise ValueError("TEXT needs a text")
+        self.win.scene.addItem(TextAnnotationItem(
+            QPointF(self._num(x), self._num(y)), text.strip()))
+        return i
+
+    def _cmd_leader(self, toks, i):
+        """LEADER x1 y1 x2 y2 "text" -- a leader whose arrow points at
+        (x1, y1) and whose text starts at (x2, y2) (0270; the Leader tool's
+        emit, the dialog's text baked in)."""
+        from floorplanner.annotations import LeaderItem               # late
+        (x1, y1, x2, y2, text), i = self._take(toks, i, 5)
+        if not text.strip():
+            raise ValueError("LEADER needs a text")
+        self.win.scene.addItem(LeaderItem(
+            QPointF(self._num(x1), self._num(y1)),
+            QPointF(self._num(x2), self._num(y2)), text.strip()))
+        return i
+
+    def _cmd_datum(self, toks, i):
+        """DATUM x y -- the level's datum placed at (x, y), or moved there
+        (one per level, as the Datum tool does)."""
+        from floorplanner.annotations import DatumItem, datum_on     # late
+        (x, y), i = self._take(toks, i, 2)
+        p = QPointF(self._num(x), self._num(y))
+        d = datum_on(self.win.scene, active_floor())
+        if d is None:
+            self.win.scene.addItem(DatumItem(p))
+        else:
+            d.setPos(p)
+        return i
+
     def _cmd_select(self, toks, i):
         (x, y), i = self._take(toks, i, 2)
         pt = QPointF(self._num(x), self._num(y))
@@ -872,7 +917,8 @@ class MacroRecorderDialog(QDialog):
                    Qt.Key.Key_Up: "UP", Qt.Key.Key_Down: "DOWN"}
     _TOOL_CODES = {TOOL_SELECT: "S", TOOL_WALL_EXT: "E", TOOL_WALL_INT: "I",
                    TOOL_DOOR: "D", TOOL_WINDOW: "W", TOOL_ROOM: "R",
-                   TOOL_ROOF_RIDGE: "G", TOOL_ROOF_DORMER: "M"}
+                   TOOL_ROOF_RIDGE: "G", TOOL_ROOF_DORMER: "M",
+                   TOOL_TEXT: "T", TOOL_MEASURE: "L", TOOL_LEADER: "N"}
 
     def __init__(self, win, fmt="legacy"):
         super().__init__(win)
@@ -1338,6 +1384,38 @@ class MacroRecorderDialog(QDialog):
                          f"{round(scene_pt.y())}",
                          newline=self.nl_check.isChecked())
 
+    def on_text(self, text, scene_pt):
+        """A text annotation placed by the Annotation tool (0270): the
+        dialog's text rides in one TEXT token, the on_room pattern."""
+        if self._v2_on("TEXT", round(scene_pt.x()), round(scene_pt.y()), text):
+            return
+        if self._active():
+            self._end_modal_line()
+            self._append(f'TEXT {round(scene_pt.x())} {round(scene_pt.y())} "{text}"',
+                         newline=self.nl_check.isChecked())
+
+    def on_leader(self, item):
+        """A leader finished by the Leader tool (0270): the arrow's tip, the
+        text's end and the dialog's text in one LEADER token."""
+        args = (round(item.tip.x()), round(item.tip.y()),
+                round(item.anchor.x()), round(item.anchor.y()), item.text)
+        if self._v2_on("LEADER", *args):
+            return
+        if self._active():
+            self._end_modal_line()
+            self._append(f'LEADER {args[0]} {args[1]} {args[2]} {args[3]} "{item.text}"',
+                         newline=self.nl_check.isChecked())
+
+    def on_datum(self, scene_pt):
+        """The level's datum placed or moved by the Datum tool (0270): one
+        DATUM token -- the tool has no letter, so its click is the command."""
+        if self._v2_on("DATUM", round(scene_pt.x()), round(scene_pt.y())):
+            return
+        if self._active():
+            self._end_modal_line()
+            self._append(f"DATUM {round(scene_pt.x())} {round(scene_pt.y())}",
+                         newline=self.nl_check.isChecked())
+
     # -- live capture (application event filter) -----------------------------
     def _active(self) -> bool:
         return self._recording and not self._paused
@@ -1387,7 +1465,8 @@ class MacroRecorderDialog(QDialog):
                 # door/window/room clicks are recorded by their dedicated
                 # hooks (with the dialog value), so skip the raw click here
                 if self._press_tool not in (TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM,
-                                            TOOL_ROOF_DORMER):
+                                            TOOL_ROOF_DORMER, TOOL_TEXT,
+                                            TOOL_LEADER, TOOL_DATUM):
                     self._emit_mouse(self._press_scene, end,
                                      self._press_moved, self._press_ctrl)
                 self._press_scene = None
@@ -1440,7 +1519,8 @@ class MacroRecorderDialog(QDialog):
         # hooks with the dialog's value (an application command), so the raw
         # click is skipped -- the legacy recorder's own rule.
         if name == "left" and self.win.tool in (TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM,
-                                                TOOL_ROOF_DORMER):
+                                                TOOL_ROOF_DORMER, TOOL_TEXT,
+                                                TOOL_LEADER, TOOL_DATUM):
             self._v2_button = None
             return
         self._end_modal_line()
