@@ -410,5 +410,6 @@ this table is not a second copy of it.
 | [`0268-report.md`](./0268-report.md) | report: the PDF plan set renders the plan's DRAWN dimensions in place of the auto rows, and its text annotations while Show ▸ Annotations is on |
 | [`0269-report.md`](./0269-report.md) | report: PR #88 merged on his word, the PDF tranche folded in — the item annotations in one font size and one colour; the plan set's drawn dimensions and its texts by the Show switch |
 | [`0270-report.md`](./0270-report.md) | report: the leader annotation — a text with an arrow to the thing it names; the N tool, two knobs, the document's `leader` kind given its item, on the PDF sheet; 0248's items 8 and 9 stay on the backlog on his word |
+| [`0271-report.md`](./0271-report.md) | report: the documentation and the schema brought to this `main` as version 6, and a README of every command with an example |
 
 <!-- PAIRS:END -->
