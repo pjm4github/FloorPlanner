@@ -1,0 +1,3 @@
+after load                         2.0s idle -> settle walks 0, repaints 7, timer armed False
+0.5 s after a furnishing drag      0.5s idle -> settle walks 0, repaints 2, timer armed False
+the next 2 s                       2.0s idle -> settle walks 0, repaints 6, timer armed False

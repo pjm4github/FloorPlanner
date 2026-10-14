@@ -459,12 +459,23 @@ def roof_clip_spans(scene, wall):
              and it.floor == wall.floor]
     if not roofs:
         return []                          # cheap exit before the room scan
+    # 0276 (0275 sec5 step 2): computed once per change of what it reads --
+    # the wall's line and thickness, every roof on the floor (its geometry
+    # and its visible region) and the floor's rooms -- not once per paint
+    key = ((wall.p1.x(), wall.p1.y(), wall.p2.x(), wall.p2.y(), float(wall.t)),
+           tuple((rf.geometry_key(), rf._clip_region) for rf in roofs),
+           floor_rooms_key(scene, wall.floor))
+    memo = getattr(wall, "_roof_spans_memo", None)
+    if memo is not None and memo[0] == key:
+        return list(memo[1])
     ceiling_in = _wall_ceiling_in(scene, wall)
     spans = []
     for rf in roofs:
         spans.extend(_within_territory(
             wall, rf, _clip_spans_against_one_roof(wall, rf, ceiling_in)))
-    return _merge_spans(spans, wall.length())
+    out = _merge_spans(spans, wall.length())
+    wall._roof_spans_memo = (key, list(out))
+    return out
 
 
 def _within_territory(wall, rf, spans):
@@ -632,6 +643,33 @@ class _TraceRoom(NamedTuple):
                 if dist_point_segment(pt, poly[i], poly[(i + 1) % n]) <= margin:
                     return True
         return False
+
+
+def floor_rooms_key(scene, floor):
+    """0275/0276: everything `roof_clip_trace` and `roof_clip_spans` read of
+    `floor` other than the roofs -- as a key, cheap to build and EXACT.
+
+    Each live room contributes ITSELF, the vertex OBJECTS of its outline
+    (a moved corner is a NEW `Vertex` -- `Vertex.relocated_to` -- and a
+    vertex is never moved in place, so identity is position; the key holds
+    them, so no id can be reused while it lives), its no-outline fallback
+    path object, and its ceiling height; the walls contribute the thickest
+    thickness (the trace's margin). One pass over the scene, no geometry:
+    tens of microseconds where the trace it guards costs tens of
+    milliseconds."""
+    from floorplanner.rooms import RoomItem  # late (peer layer)
+    rooms = []
+    t_max = 0.0
+    for it in scene.items():
+        if sip.isdeleted(it) or getattr(it, "floor", None) != floor:
+            continue
+        if isinstance(it, RoomItem):
+            outline = it.outline
+            rooms.append((it, tuple(e.v for e in outline) if outline else it._path,
+                          it.properties.get("ceiling_height_in")))
+        elif isinstance(it, WallItem):
+            t_max = max(t_max, float(it.t))
+    return (tuple(rooms), t_max)
 
 
 def _floor_rooms(scene, floor):
@@ -830,7 +868,7 @@ def snap_to_trace(scene, host, pt: QPointF, tol: float):
     it" rule every roof drag uses, 0070-ruling.md sec3), clamped to the
     segment."""
     best, best_d = None, tol
-    for p, q in roof_clip_trace(scene, host):
+    for p, q in host.clip_trace():
         d = dist_point_segment(pt, p, q)
         if d < best_d:
             dx, dy = q.x() - p.x(), q.y() - p.y()
@@ -967,6 +1005,14 @@ def hold_roof_clips(scene, on: bool):
         sync_roof_clips(scene)
 
 
+def roof_clips_held(scene) -> bool:
+    """True while a roof gesture holds the clips (`hold_roof_clips`): a grip,
+    a ridge or a dormer being dragged, or a plan loading. 0276 (0275 sec5
+    step 3): the settle walk waits for the hold to end, so a gesture is
+    snapshotted once, at its end, however long its frames take."""
+    return scene is not None and bool(scene.property(_CLIP_HOLD))
+
+
 def sync_roof_clips(scene, floor=None, exclude=None):
     """R4d (0164-ruling.md): recompute every roof's intersection clip on
     `floor` (every floor when None) from the roofs as they are now, and
@@ -1047,6 +1093,8 @@ class RoofItem(QGraphicsItem):
                 marker_end=1, eaves_bind="manual", host=None, form="gable",
                 openings=None, hip_run_in=None):
         super().__init__()
+        self._trace_memo = None            # 0276: (key, segments) -- clip_trace()
+        self._drawn_memo = None            # 0276: (key, segments) -- _drawn_trace()
         # 0258-report.md (0248 sec2 item 6): THE HIP RUN, per end, settable.
         # `[end0, end1]`, each a length along the ridge axis or None = the
         # derived run (the mean of the two spans, R4b's rule, which is all a
@@ -1601,21 +1649,53 @@ class RoofItem(QGraphicsItem):
         return [(QPointF(a.x(), a.y()), QPointF(b.x(), b.y()))
                 for a, b in self._clip_region.clip_segment(p, q)]
 
+    def geometry_key(self):
+        """Everything of this roof's own that its clip trace and a wall's
+        roof-clip dashes read: the ridge, the spans and overhangs, the two
+        heights, the form, the ends and their hip runs, the floor. Plain
+        values, compared by value (0276)."""
+        runs = self.hip_run_in or (None, None)
+        return (self.p1.x(), self.p1.y(), self.p2.x(), self.p2.y(),
+                tuple(self.span_in), tuple(self.overhang_in),
+                float(self.eaves_h_in), float(self.ridge_h_in), self.form,
+                tuple(self.gable), tuple(runs), self.floor)
+
+    def clip_trace(self):
+        """`roof_clip_trace(scene, self)`, computed ONCE per change of what
+        it reads (0276; 0275-report.md measured it at 27 ms a roof, run
+        from every paint of every roof, 214 of a repaint's 246 ms): this
+        roof's geometry, whether it is clipped and its join extension, and
+        its floor's rooms and walls (`floor_rooms_key`). R5a's own worry --
+        "rooms change without the roof hearing about it" -- is answered by
+        the key, not by recomputing: the roof need not hear, it compares."""
+        sc = self.scene()
+        if sc is None or sip.isdeleted(self):
+            return []
+        key = (self.geometry_key(), self.is_clipped(), tuple(self._clip_ext),
+               floor_rooms_key(sc, self.floor))
+        memo = self._trace_memo
+        if memo is None or memo[0] != key:
+            memo = self._trace_memo = (key, roof_clip_trace(sc, self))
+        return list(memo[1])
+
     def _drawn_trace(self):
         """R5a (0186-ruling.md sec2): the clip trace as drawn -- the
-        roof's own locus (`roof_clip_trace`), cut to the visible region
-        while clipped, exactly as the plan lines are. Computed at paint
-        time, like the wall's own dashes: rooms change without the roof
-        hearing about it, and this is a handful of segments against a
-        handful of outlines, not the junction-clip work CLAUDE.md keeps
-        out of `paint()`."""
-        segs = roof_clip_trace(self.scene(), self)
+        roof's own locus (`clip_trace`), cut to the visible region while
+        clipped, exactly as the plan lines are. Asked for at paint time and
+        answered from the cache (0276): the trace is computed when what it
+        reads changes, the cut when the region does."""
+        segs = self.clip_trace()
         if not self.is_clipped():
             return segs
+        key = (segs, self._clip_region)
+        memo = self._drawn_memo
+        if memo is not None and memo[0][1] is key[1] and memo[0][0] == segs:
+            return list(memo[1])
         out = []
         for p, q in segs:
             out.extend(self._clipped(p, q))
-        return out
+        self._drawn_memo = (key, out)
+        return list(out)
 
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)

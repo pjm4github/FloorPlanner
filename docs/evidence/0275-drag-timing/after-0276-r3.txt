@@ -1,0 +1,17 @@
+one snapshot() (the settle walk's document): 100 ms
+one sync_roof_clips (compose the building, 13 roofs): 460 ms
+paint() cost by item class, one pass over the visible scene:
+  WallItem                 50 items      32.4 ms  (  0.65 ms each)
+  RoofItem                  8 items       6.9 ms  (  0.86 ms each)
+  RoomItem                 10 items       3.2 ms  (  0.32 ms each)
+  OpeningItem              16 items       2.0 ms  (  0.12 ms each)
+  FurnishingItem            4 items       0.5 ms  (  0.14 ms each)
+  RoofEndMarkerItem         8 items       0.3 ms  (  0.03 ms each)
+  RoofGripItem              5 items       0.1 ms  (  0.02 ms each)
+
+### AFTER 0276 (the code on this branch, no monkeypatches)
+  idle full repaint: 37.6 ms
+  main roof, ridge grip              frame    50.5 ms  ( 19.8 fps, worst    78) | paints/move 1.00 | settle walks mid-drag  0/30 | release   471 ms
+  main roof, eave grip               frame    65.1 ms  ( 15.4 fps, worst    81) | paints/move 1.00 | settle walks mid-drag  0/30 | release   418 ms
+  dormer, eave grip                  frame    43.9 ms  ( 22.8 fps, worst    64) | paints/move 1.00 | settle walks mid-drag  0/30 | release   429 ms
+  dormer, ridge grip                 frame     0.9 ms  (1123.6 fps, worst    60) | paints/move 0.37 | settle walks mid-drag  0/30 | release   465 ms

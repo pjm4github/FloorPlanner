@@ -520,10 +520,17 @@ def stamp_document_ids(scene, ids):
     `ids` is `design_from_scene`'s `ids_out`, `{id(live): [doc ids]}`;
     the live objects are found again by identity among the scene's
     items, their openings and their corners. An item the walk did not
-    name keeps whatever it had."""
+    name keeps whatever it had.
+
+    Returns how many items' ids CHANGED (0276): the settle walk repaints
+    the callouts only then -- an unconditional repaint emitted
+    `scene.changed`, which re-armed the settle timer, which walked again:
+    a document walk and a full repaint every ~280 ms, forever, with the
+    app idle (measured in 0276-report.md)."""
     if scene is None or not ids:
-        return
+        return 0
     live = {}
+    changed = 0
     for it in scene.items():
         live[id(it)] = it
         if isinstance(it, WallItem):
@@ -547,9 +554,13 @@ def stamp_document_ids(scene, ids):
             # else (a corner the table named in two partitions, say) takes
             # the first -- one id, always a string, for the dialog and the
             # callout alike
-            obj.doc_id = distinct if (isinstance(obj, WallItem) and len(distinct) > 1) else distinct[0]
+            new = distinct if (isinstance(obj, WallItem) and len(distinct) > 1) else distinct[0]
+            if getattr(obj, "doc_id", None) != new:
+                obj.doc_id = new
+                changed += 1
         except AttributeError:
             pass
+    return changed
 
 
 def _name_rows(vt, items):

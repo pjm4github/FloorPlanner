@@ -17,7 +17,7 @@ from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
-from floorplanner.roofs import RoofEndMarkerItem, RoofItem, eaves_spans_per_side
+from floorplanner.roofs import RoofEndMarkerItem, RoofItem, eaves_spans_per_side, roof_clips_held
 from floorplanner.annotations import (  # 0263: annotations, measurements, callouts; 0270: leaders
     DatumItem, DimensionItem, LeaderItem, TextAnnotationItem, callout_colour,
     sync_annotation_visibility,
@@ -166,8 +166,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self._dirty_timer = QTimer(self)
         self._dirty_timer.setSingleShot(True)
         self._dirty_timer.setInterval(180)
-        self._dirty_timer.timeout.connect(self._commit_if_changed)
-        self._dirty_timer.timeout.connect(self._update_totals)   # debounced
+        self._dirty_timer.timeout.connect(self._settle)          # debounced
         self.scene.changed.connect(self._mark_dirty)
         self.scene.selectionChanged.connect(self._sync_template_action)
         self._update_undo_actions()
@@ -1735,6 +1734,20 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
     # -- undo / redo ---------------------------------------------------------
     UNDO_LIMIT = 100
 
+    def _settle(self):
+        """The debounce timer's one slot: the undo snapshot and the totals,
+        once a burst of changes has gone quiet. 0276 (0275-report.md sec5
+        step 3): NOT while a roof gesture holds the clips -- a grip, a
+        ridge or a dormer drag. 0275 measured the timer firing inside every
+        move of a drag whose frames outlasted its 180 ms, adding a 79 ms
+        document walk to each frame and filing a mid-gesture snapshot as
+        an undo step; it now waits, and fires once the gesture releases."""
+        if roof_clips_held(self.scene):
+            self._dirty_timer.start()
+            return
+        self._commit_if_changed()
+        self._update_totals()
+
     def _mark_dirty(self, *args):
         """A scene change happened: (re)start the debounce so a burst of
         changes (e.g. a drag) becomes one undo step once it settles."""
@@ -1868,8 +1881,10 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         state = self.snapshot(report=rep, ids_out=ids)
         # 0264: the callouts write the ids this very walk minted -- the ids
         # the next save writes and the problem report names
-        stamp_document_ids(self.scene, ids)
-        if SETTINGS.get("show_callouts", True):
+        # 0276: repaint ONLY when an id changed -- the repaint emits
+        # scene.changed, which re-arms this very timer; unconditional, it
+        # walked and repainted the whole plan every ~280 ms, idle or not
+        if stamp_document_ids(self.scene, ids) and SETTINGS.get("show_callouts", True):
             self.scene.update()
         self.verify_settled(doc=state, walk_report=rep)
         if state == self._committed_state:
