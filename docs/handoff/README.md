@@ -414,5 +414,6 @@ this table is not a second copy of it.
 | [`0272-report.md`](./0272-report.md) | report: PR #89 merged on his word, the docs tranche folded in — the leader annotation and the recorder's new tools; the schema at version 6 and the documents brought to this `main`, the command README |
 | [`0273-report.md`](./0273-report.md) | report: the gallery regenerated with four new frames — the roofs, the End-On dialog, the annotations, the 3D view |
 | [`0274-report.md`](./0274-report.md) | report: PR #90 merged on his word — the gallery with its four new frames; nothing open on a branch |
+| [`0275-report.md`](./0275-report.md) | report: why the UI is slow under a drag — measured; one function called from `paint()` is 85% of every frame; a recommendation, nothing changed |
 
 <!-- PAIRS:END -->

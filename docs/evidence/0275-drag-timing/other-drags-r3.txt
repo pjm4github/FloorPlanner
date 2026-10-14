@@ -1,0 +1,6 @@
+roofs 13; active floor upper
+  Show roof ON, Edit roof ON     idle repaint  242.9 ms | furnishing drag frame  336.9 ms (  3.0 fps)
+  Show roof ON, Edit roof OFF    idle repaint  256.6 ms | furnishing drag frame  350.1 ms (  2.9 fps)
+  Show roof OFF                  idle repaint   35.5 ms | furnishing drag frame   37.4 ms ( 26.7 fps)
+  floor default    (roofs shown) idle repaint  297.3 ms
+  floor upper      (roofs shown) idle repaint  254.3 ms

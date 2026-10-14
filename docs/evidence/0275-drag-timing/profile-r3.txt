@@ -1,0 +1,195 @@
+load: 1.50 s
+scene items: 428 {'WallItem': 166, 'OpeningItem': 71, 'FurnishingItem': 66, 'RoofGripItem': 65, 'RoomItem': 33, 'RoofItem': 13, 'RoofEndMarkerItem': 13, 'StairItem': 1}
+floors: ['default', 'upper'] active: upper
+  roof floor=default form=shed dormer=False len=12 span=[121, 0]
+  roof floor=default form=shed dormer=False len=162 span=[97, 0]
+  roof floor=default form=shed dormer=False len=180 span=[121, 0]
+  roof floor=default form=shed dormer=False len=162 span=[97, 0]
+  roof floor=default form=shed dormer=False len=12 span=[121, 0]
+  roof floor=default form=gable dormer=False len=612 span=[198, 204]
+  roof floor=default form=gable dormer=False len=336 span=[222, 210]
+  roof floor=upper form=gable dormer=False len=150 span=[198, 186]
+  roof floor=upper form=gable dormer=False len=528 span=[210, 210]
+  roof floor=upper form=gable dormer=False len=174 span=[96, 90]
+  roof floor=upper form=shed dormer=True len=144 span=[115, 0]
+  roof floor=upper form=gable dormer=False len=168 span=[96, 90]
+  roof floor=upper form=gable dormer=False len=252 span=[186, 198]
+
+== MAIN ROOF, ridge grip  (zoom 1.0, 40 moves) ==
+  per move, median ms: handler     0.6 | repaint   662.0 | event loop   462.6 | TOTAL  1128.9  (max 1650)
+  => 0.9 frames/s while dragging
+  release: handler 397 ms, repaint 286 ms
+ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      780    0.037    0.000   30.787    0.039 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:1620(paint)
+      780    0.017    0.000   29.620    0.038 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:1604(_drawn_trace)
+      780    0.103    0.000   29.292    0.038 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:715(roof_clip_trace)
+    42660    0.159    0.000   27.637    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:666(_governing_ceiling)
+   681660    1.896    0.000   27.472    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:626(holds)
+       40    0.140    0.004   26.572    0.664 {built-in method repaint}
+  5899740   17.610    0.000   25.365    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\geometry.py:165(dist_point_segment)
+       40    0.104    0.003   18.740    0.468 {built-in method processEvents}
+     6840    0.234    0.000    6.623    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1685(paint)
+       20    0.003    0.000    5.406    0.270 C:\dev\GitHub\FloorPlanner\floorplanner\mainwindow.py:1837(_commit_if_changed)
+       20    0.002    0.000    5.376    0.269 C:\dev\GitHub\FloorPlanner\floorplanner\planio.py:421(snapshot)
+       20    0.012    0.001    5.329    0.266 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:954(design_from_scene)
+     6840    0.400    0.000    5.271    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:440(roof_clip_spans)
+       40    0.042    0.001    3.732    0.093 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:576(_walls_of)
+ 32583940    3.473    0.000    3.473    0.000 {built-in method x}
+ 32595220    3.384    0.000    3.384    0.000 {built-in method y}
+     6840    0.065    0.000    2.974    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:294(_wall_ceiling_in)
+       40    0.004    0.000    2.844    0.071 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:335(_weld_delta)
+    13680    0.501    0.000    2.801    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:269(_room_ceiling_at)
+       40    1.320    0.033    2.701    0.068 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:68(weld_endpoints)
+   202920    0.109    0.000    1.956    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\rooms.py:452(path)
+   204760    0.702    0.000    1.868    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\rooms.py:437(_derive)
+    47880    0.465    0.000    1.401    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:319(_clip_spans_against_one_roof)
+       40    0.472    0.012    1.358    0.034 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:502(_note_vertices)
+     3720    0.023    0.000    1.142    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:1599(_clipped)
+     3780    0.023    0.000    1.124    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:354(clip_segment)
+    60000    0.532    0.000    1.099    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:224(_clip_segment)
+  2035140    0.680    0.000    1.053    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\rooms.py:445(<genexpr>)
+  3480520    0.686    0.000    1.032    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:44(_d)
+    27120    0.179    0.000    0.998    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\annotations.py:118(draw_callout)
+  7457340    0.889    0.000    0.889    0.000 {built-in method builtins.isinstance}
+  5899740    0.840    0.000    0.840    0.000 {built-in method length}
+       40    0.375    0.009    0.760    0.019 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:186(split_params)
+     1380    0.052    0.000    0.732    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\rooms.py:872(paint)
+      840    0.400    0.000    0.662    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:675(_cut_params)
+    38760    0.634    0.000    0.634    0.000 {built-in method drawLine}
+  5374584    0.609    0.000    0.611    0.000 {built-in method builtins.min}
+  5511324    0.601    0.000    0.601    0.000 {built-in method builtins.max}
+  1780800    0.448    0.000    0.573    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:53(_proj)
+    35400    0.572    0.000    0.572    0.000 {built-in method drawText}
+      780    0.223    0.000    0.566    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:637(_floor_rooms)
+    73140    0.157    0.000    0.526    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1494(unit)
+   140300    0.212    0.000    0.474    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1488(length)
+     3120    0.085    0.000    0.472    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:3034(paint)
+       60    0.007    0.000    0.466    0.008 C:\dev\GitHub\FloorPlanner\floorplanner\view.py:229(drawBackground)
+
+
+
+-- by own time --
+ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+  5899740   17.610    0.000   25.365    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\geometry.py:165(dist_point_segment)
+ 32583940    3.473    0.000    3.473    0.000 {built-in method x}
+ 32595220    3.384    0.000    3.384    0.000 {built-in method y}
+   681660    1.896    0.000   27.472    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:626(holds)
+       40    1.320    0.033    2.701    0.068 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:68(weld_endpoints)
+  7457340    0.889    0.000    0.889    0.000 {built-in method builtins.isinstance}
+  5899740    0.840    0.000    0.840    0.000 {built-in method length}
+   204760    0.702    0.000    1.868    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\rooms.py:437(_derive)
+  3480520    0.686    0.000    1.032    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:44(_d)
+  2035140    0.680    0.000    1.053    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\rooms.py:445(<genexpr>)
+    38760    0.634    0.000    0.634    0.000 {built-in method drawLine}
+  5374584    0.609    0.000    0.611    0.000 {built-in method builtins.min}
+  5511324    0.601    0.000    0.601    0.000 {built-in method builtins.max}
+    35400    0.572    0.000    0.572    0.000 {built-in method drawText}
+    60000    0.532    0.000    1.099    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:224(_clip_segment)
+    13680    0.501    0.000    2.801    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:269(_room_ceiling_at)
+       40    0.472    0.012    1.358    0.034 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:502(_note_vertices)
+    47880    0.465    0.000    1.401    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:319(_clip_spans_against_one_roof)
+  1780800    0.448    0.000    0.573    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:53(_proj)
+      840    0.400    0.000    0.662    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:675(_cut_params)
+     6840    0.400    0.000    5.271    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:440(roof_clip_spans)
+  3784420    0.393    0.000    0.393    0.000 {built-in method math.hypot}
+
+
+
+
+== MAIN ROOF, end grip  (zoom 1.0, 40 moves) ==
+  per move, median ms: handler     0.4 | repaint   294.4 | event loop   185.5 | TOTAL   489.5  (max 704)
+  => 2.0 frames/s while dragging
+  release: handler 410 ms, repaint 305 ms
+
+== MAIN ROOF, eave grip  (zoom 1.0, 40 moves) ==
+  per move, median ms: handler     0.4 | repaint   296.0 | event loop   184.3 | TOTAL   486.6  (max 734)
+  => 2.1 frames/s while dragging
+  release: handler 392 ms, repaint 302 ms
+
+== DORMER (shed), eave grip  (zoom 1.0, 40 moves) ==
+  per move, median ms: handler     0.5 | repaint   591.6 | event loop   427.6 | TOTAL  1046.9  (max 1514)
+  => 1.0 frames/s while dragging
+  release: handler 395 ms, repaint 246 ms
+ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      480    0.033    0.000   30.613    0.064 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:1620(paint)
+      480    0.012    0.000   29.452    0.061 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:1604(_drawn_trace)
+      480    0.102    0.000   29.054    0.061 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:715(roof_clip_trace)
+    42660    0.161    0.000   27.784    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:666(_governing_ceiling)
+   681660    1.930    0.000   27.617    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:626(holds)
+  5899740   17.592    0.000   25.472    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\geometry.py:165(dist_point_segment)
+       40    0.066    0.002   23.825    0.596 {built-in method repaint}
+       40    0.065    0.002   17.373    0.434 {built-in method processEvents}
+       20    0.003    0.000    5.434    0.272 C:\dev\GitHub\FloorPlanner\floorplanner\mainwindow.py:1837(_commit_if_changed)
+       20    0.002    0.000    5.403    0.270 C:\dev\GitHub\FloorPlanner\floorplanner\planio.py:421(snapshot)
+       20    0.013    0.001    5.355    0.268 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:954(design_from_scene)
+     3000    0.112    0.000    4.015    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1685(paint)
+       40    0.064    0.002    3.750    0.094 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:576(_walls_of)
+     3000    0.174    0.000    3.395    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:440(roof_clip_spans)
+ 30706041    3.324    0.000    3.324    0.000 {built-in method x}
+ 30706162    3.245    0.000    3.245    0.000 {built-in method y}
+       40    0.004    0.000    2.826    0.071 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:335(_weld_delta)
+       40    1.312    0.033    2.687    0.067 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:68(weld_endpoints)
+     5700    0.055    0.000    2.591    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:354(clip_segment)
+   155400    1.184    0.000    2.533    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:224(_clip_segment)
+    18000    0.028    0.000    1.484    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:470(_within_territory)
+       40    0.476    0.012    1.365    0.034 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:502(_note_vertices)
+     2700    0.022    0.000    1.249    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:1599(_clipped)
+  3480520    0.679    0.000    1.024    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:44(_d)
+     3000    0.028    0.000    0.975    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:294(_wall_ceiling_in)
+     6000    0.249    0.000    0.900    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:269(_room_ceiling_at)
+   155400    0.196    0.000    0.898    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:174(_centroid)
+  5899740    0.852    0.000    0.852    0.000 {built-in method length}
+       40    0.383    0.010    0.773    0.019 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:186(split_params)
+      840    0.404    0.000    0.671    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:675(_cut_params)
+   316120    0.238    0.000    0.653    0.000 {built-in method builtins.sum}
+  5431904    0.620    0.000    0.622    0.000 {built-in method builtins.min}
+    31920    0.602    0.000    0.602    0.000 {built-in method drawLine}
+  5482114    0.598    0.000    0.598    0.000 {built-in method builtins.max}
+  1780800    0.452    0.000    0.578    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:53(_proj)
+    18000    0.187    0.000    0.553    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:319(_clip_spans_against_one_roof)
+    55860    0.032    0.000    0.491    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\rooms.py:452(path)
+    56920    0.186    0.000    0.470    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\rooms.py:437(_derive)
+       60    0.007    0.000    0.469    0.008 C:\dev\GitHub\FloorPlanner\floorplanner\view.py:229(drawBackground)
+      120    0.026    0.000    0.428    0.004 C:\dev\GitHub\FloorPlanner\floorplanner\view.py:233(vgrid)
+  3689022    0.426    0.000    0.426    0.000 {built-in method builtins.isinstance}
+  3678700    0.376    0.000    0.376    0.000 {built-in method math.hypot}
+    10921    0.073    0.000    0.371    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\annotations.py:118(draw_callout)
+   617160    0.176    0.000    0.352    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:48(_unit)
+  2826062    0.311    0.000    0.311    0.000 {method 'get' of 'dict' objects}
+
+
+
+-- by own time --
+ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+  5899740   17.592    0.000   25.472    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\geometry.py:165(dist_point_segment)
+ 30706041    3.324    0.000    3.324    0.000 {built-in method x}
+ 30706162    3.245    0.000    3.245    0.000 {built-in method y}
+   681660    1.930    0.000   27.617    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:626(holds)
+       40    1.312    0.033    2.687    0.067 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:68(weld_endpoints)
+   155400    1.184    0.000    2.533    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:224(_clip_segment)
+  5899740    0.852    0.000    0.852    0.000 {built-in method length}
+  3480520    0.679    0.000    1.024    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:44(_d)
+  5431904    0.620    0.000    0.622    0.000 {built-in method builtins.min}
+    31920    0.602    0.000    0.602    0.000 {built-in method drawLine}
+  5482114    0.598    0.000    0.598    0.000 {built-in method builtins.max}
+       40    0.476    0.012    1.365    0.034 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:502(_note_vertices)
+  1780800    0.452    0.000    0.578    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:53(_proj)
+  3689022    0.426    0.000    0.426    0.000 {built-in method builtins.isinstance}
+      840    0.404    0.000    0.671    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:675(_cut_params)
+       40    0.383    0.010    0.773    0.019 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:186(split_params)
+  3678700    0.376    0.000    0.376    0.000 {built-in method math.hypot}
+  2826062    0.311    0.000    0.311    0.000 {method 'get' of 'dict' objects}
+     6000    0.249    0.000    0.900    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:269(_room_ceiling_at)
+   316120    0.238    0.000    0.653    0.000 {built-in method builtins.sum}
+  2849520    0.229    0.000    0.229    0.000 {built-in method builtins.abs}
+   155400    0.196    0.000    0.898    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:174(_centroid)
+
+
+
+
+== DORMER (shed), ridge grip  (zoom 1.0, 40 moves) ==
+  per move, median ms: handler     0.2 | repaint   246.3 | event loop    40.1 | TOTAL   298.3  (max 584)
+  => 3.4 frames/s while dragging
+  release: handler 399 ms, repaint 243 ms
+
+idle full-viewport repaint: median 244.1 ms
