@@ -415,5 +415,6 @@ this table is not a second copy of it.
 | [`0273-report.md`](./0273-report.md) | report: the gallery regenerated with four new frames — the roofs, the End-On dialog, the annotations, the 3D view |
 | [`0274-report.md`](./0274-report.md) | report: PR #90 merged on his word — the gallery with its four new frames; nothing open on a branch |
 | [`0275-report.md`](./0275-report.md) | report: why the UI is slow under a drag — measured; one function called from `paint()` is 85% of every frame; a recommendation, nothing changed |
+| [`0276-report.md`](./0276-report.md) | report: 0275's steps 1–3 built — the roof clip trace and the wall dashes out of the per-paint path, the settle walk held through a roof gesture; and a second fault found on the way, the settle walk re-arming itself forever |
 
 <!-- PAIRS:END -->
