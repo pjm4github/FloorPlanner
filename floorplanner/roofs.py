@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QDialog, QGraphicsItem, QMenu
 from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.roofclip import (
-    Pt, _contains, compose_building, footprint_polygon, meet_along,
+    Pt, _contains, compose_building, entry_along, footprint_polygon, meet_along,
     rising_reach, surface_height,
 )
 from floorplanner.walls import WallItem
@@ -1511,11 +1511,27 @@ class RoofItem(QGraphicsItem):
             # the end back short of the cursor. So the drag is clamped to
             # `rising_reach`: the grip tracks the cursor everywhere it can
             # go and stops dead where it cannot.
-            reach = rising_reach(self.host, Pt(self.p1.x(), self.p1.y()),
-                                 Pt(ux, uy))
-            if reach < MIN_RIDGE_LEN_IN:
+            #
+            # 0277 (his garage, wiscaway2026-10-13R1): MEASURED FROM WHERE
+            # THE RIDGE ENTERS THE HOST, not from the face. A dormer whose
+            # face stands past the host's eave line (a garage gable
+            # projecting 48in beyond the main roof) had its reach read from
+            # a point outside the host's footprint -- 0.0, every move
+            # refused, the knob dead and silent -- while its ridge met the
+            # host's slope perfectly well a few feet further in.
+            u = Pt(ux, uy)
+            t0 = entry_along(self.host, Pt(self.p1.x(), self.p1.y()), u)
+            if t0 is None:
+                self._refuse_drag("this roof's ridge never crosses its host roof")
+                return
+            if t0 > 0.0:
+                t0 += 1e-3                     # just inside, where heights are the host's
+            reach = t0 + rising_reach(
+                self.host, Pt(self.p1.x() + ux * t0, self.p1.y() + uy * t0), u)
+            if reach < max(MIN_RIDGE_LEN_IN, t0 + 1e-3):
+                self._refuse_drag("the host roof does not rise along this ridge")
                 return                          # nowhere to rise to: refused
-            a = min(max(MIN_RIDGE_LEN_IN, landed), reach)
+            a = min(max(MIN_RIDGE_LEN_IN, t0, landed), reach)
             pt = QPointF(self.p1.x() + ux * a, self.p1.y() + uy * a)
             h = surface_height(self.host, Pt(pt.x(), pt.y()))
             if h > self.eaves_h_in + 1.0:
@@ -1533,6 +1549,15 @@ class RoofItem(QGraphicsItem):
             a_end = max(landed - ext, MIN_RIDGE_LEN_IN)
             self.set_ridge(self.p1, QPointF(self.p1.x() + ux * a_end,
                                             self.p1.y() + uy * a_end))
+
+    def _refuse_drag(self, why: str):
+        """0277: a grip that cannot follow the cursor says so, in the status
+        bar, instead of doing nothing silently."""
+        sc = self.scene()
+        views = sc.views() if sc is not None else []
+        win = getattr(views[0], "win", None) if views else None
+        if win is not None:
+            win.status(f"Roof grip: {why}.")
 
     def drag_ridge(self, scene_pt: QPointF):
         """Ridge grip: slide the ridge LATERALLY between fixed eave edges

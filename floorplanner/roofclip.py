@@ -623,6 +623,40 @@ def rising_reach(rf, origin, direction, max_t=None):
     return lo
 
 
+def entry_along(rf, origin, direction, max_t=None):
+    """0277: the distance along the ray from `origin` in unit `direction`
+    at which it first lies inside `rf`'s footprint -- 0.0 when `origin` is
+    already inside, None when the ray never enters it. Half-inch steps find
+    the first inside point, bisection then lands on the boundary to
+    ~1e-9 (`rising_reach`'s own method). A dormer whose face stands past
+    its host's eave line -- a garage gable projecting from the main roof --
+    meets the host only from here on."""
+    fp = footprint_polygon(rf)
+    if _contains(fp, origin):
+        return 0.0
+    if max_t is None:
+        max_t = 2.0 * _diagonal(fp) + math.hypot(origin.x() - fp[0].x(),
+                                                 origin.y() - fp[0].y())
+
+    def inside(t):
+        return _contains(fp, Pt(origin.x() + direction.x() * t,
+                                origin.y() + direction.y() * t))
+
+    step, t = 0.5, 0.0
+    while t <= max_t and not inside(t):
+        t += step
+    if t > max_t:
+        return None
+    lo, hi = t - step, t
+    for _ in range(60):
+        mid = (lo + hi) / 2.0
+        if inside(mid):
+            hi = mid
+        else:
+            lo = mid
+    return hi
+
+
 def footprint_polygon(rf, ext=(0.0, 0.0)):
     """The outer eave rectangle (overhang and hip extensions included) --
     the region the roof paints, and the domain of its surface -- as a
