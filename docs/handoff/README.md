@@ -417,5 +417,6 @@ this table is not a second copy of it.
 | [`0275-report.md`](./0275-report.md) | report: why the UI is slow under a drag — measured; one function called from `paint()` is 85% of every frame; a recommendation, nothing changed |
 | [`0276-report.md`](./0276-report.md) | report: 0275's steps 1–3 built — the roof clip trace and the wall dashes out of the per-paint path, the settle walk held through a roof gesture; and a second fault found on the way, the settle walk re-arming itself forever |
 | [`0277-report.md`](./0277-report.md) | report: PR #91 merged on his word; the garage roof's dead knob — a dormer whose face stands past its host's eaves — fixed on `dormer-knob` |
+| [`0278-report.md`](./0278-report.md) | report: PR #92 merged on his word — the garage roof's knob; nothing open on a branch |
 
 <!-- PAIRS:END -->
