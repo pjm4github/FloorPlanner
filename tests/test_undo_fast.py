@@ -39,7 +39,10 @@ def _sig(scene):
             r = it._clip_region
             out[it.geometry_key()] = (None if r is None else round(r.area(), 3)
                                       if hasattr(r, "area") else repr(type(r)),
-                                      sorted((round(p.x(), 3), round(p.y(), 3), round(q.x(), 3), round(q.y(), 3))
+                                      # a seam is an undirected line (drawLine, a stroke);
+                                      # which end a compose lists first varies run to run
+                                      sorted(tuple(sorted(((round(p.x(), 3), round(p.y(), 3)),
+                                                           (round(q.x(), 3), round(q.y(), 3)))))
                                              for p, q in it._seams))
     return out
 
