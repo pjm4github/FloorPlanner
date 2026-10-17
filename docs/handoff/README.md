@@ -420,5 +420,6 @@ this table is not a second copy of it.
 | [`0278-report.md`](./0278-report.md) | report: PR #92 merged on his word — the garage roof's knob; nothing open on a branch |
 | [`0279-report.md`](./0279-report.md) | report: the wall-and-room drag hold, and repaint only what changed — every item audited to paint inside its own box, the screen checked for staleness on eleven kinds of drag |
 | [`0280-report.md`](./0280-report.md) | report: PR #93 merged on his word; his slow Ctrl+Z measured and fixed — the roofs' compose and their traces kept by value across the reload an undo is |
+| [`0281-report.md`](./0281-report.md) | report: PR #94 merged on his word — Ctrl+Z ten times faster; nothing open on a branch |
 
 <!-- PAIRS:END -->

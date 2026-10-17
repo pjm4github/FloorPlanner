@@ -5,12 +5,13 @@
 
 **Generated from the record** — one `**Landed:**` line per merge in [`handoff/`](handoff/), the defect register's front matter, and [`ROADMAP.md`](ROADMAP.md) §3's RED table. This file says whether a thing is DONE; [`SESSION_SNAPSHOT.md`](SESSION_SNAPSHOT.md) keeps the order and the why ([`handoff/0019-ruling.md`](handoff/0019-ruling.md) §4). A box that is not derived from the record is not on this board.
 
-**92 landed, 1 closed unmerged; 31 defects open, 57 closed.**
+**93 landed, 1 closed unmerged; 31 defects open, 57 closed.**
 
 ## Landed
 
 | PR | date | commit | tier | what it rested on | record |
 |---|---|---|---|---|---|
+| [#94](https://github.com/pjm4github/FloorPlanner/pull/94) | 2026-10-17 | `1a0d5cf` | AMBER | checked by Patrick in the app: "undo works now, land #94" | [`0281`](handoff/0281-report.md) |
 | [#93](https://github.com/pjm4github/FloorPlanner/pull/93) | 2026-10-17 | `9a51df6` | AMBER | checked by Patrick in the app: "the drags look right ... land #93" | [`0280`](handoff/0280-report.md) |
 | [#92](https://github.com/pjm4github/FloorPlanner/pull/92) | 2026-10-16 | `c8de4ef` | AMBER | checked by Patrick in the app: "the knob works now, land #92" | [`0278`](handoff/0278-report.md) |
 | [#91](https://github.com/pjm4github/FloorPlanner/pull/91) | 2026-10-16 | `7319fe4` | AMBER | checked by Patrick in the app: "the drag-speed seems fine on #91" | [`0277`](handoff/0277-report.md) |
