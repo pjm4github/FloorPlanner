@@ -102,6 +102,15 @@ class FurnishingItem(QGraphicsItem):
                       self.w + 3, self.d + 3)
         c, r = self._handle()
         rect.setTop(c.y() - r - 1.5)
+        # 0279: the callout under the footprint is painted, so it is bounded
+        # (the view repaints only what changed; outside the box it trails)
+        from floorplanner.annotations import (callout_font, callout_rect, callout_text,
+                                              callouts_shown, view_lod)
+        if callouts_shown() and callout_text(self):
+            lod = view_lod(self)
+            h = QFontMetricsF(callout_font(lod)).height()
+            rect = rect.united(callout_rect(lod, QPointF(0.0, self.d / 2 + h),
+                                            callout_text(self), "center"))
         return rect
 
     def shape(self) -> QPainterPath:

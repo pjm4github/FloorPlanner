@@ -47,7 +47,7 @@ __all__ = [
     "TextAnnotationItem", "DimensionItem", "DimensionKnob", "DatumItem", "ANNOTATION_Z",
     "LeaderItem", "LeaderKnob",
     "callout_colour", "callouts_shown", "document_id", "session_label", "callout_text",
-    "CALLOUT_PX", "callout_font", "draw_callout",
+    "CALLOUT_PX", "callout_font", "draw_callout", "callout_rect", "view_lod",
     "set_report_open", "format_length",
     "sync_annotation_visibility",
     "annotation_items", "datum_on", "nearest_datum", "MEASURE_SNAP_IN",
@@ -113,6 +113,30 @@ def callout_font(lod: float) -> QFont:
     f = QFont()
     f.setPixelSize(max(2, int(round(CALLOUT_PX / max(lod, 1e-6)))))
     return f
+
+
+def callout_rect(lod: float, at: QPointF, text: str, align: str = "left") -> QRectF:
+    """0279: the box `draw_callout` inks for the same arguments -- for an
+    item's `boundingRect`, which must hold everything its paint draws now
+    that the view repaints only what changed (a callout outside the box
+    is left behind as a trail when the item moves)."""
+    if not text:
+        return QRectF()
+    fm = QFontMetricsF(callout_font(lod))
+    w = fm.horizontalAdvance(text)
+    x = at.x() - (w / 2.0 if align == "center" else w if align == "right" else 0.0)
+    pad = 2.0 / max(lod, 1e-6)
+    return QRectF(x - pad, at.y() - fm.ascent() - pad, w + 2 * pad, fm.height() + 2 * pad)
+
+
+def view_lod(item) -> float:
+    """The scale the item is shown at (scene inches to view pixels): the
+    first view's, else 1 -- what a `boundingRect` sizes a pixel-fixed
+    label by."""
+    sc = item.scene()
+    if sc is not None and sc.views():
+        return max(sc.views()[0].transform().m11(), 1e-6)
+    return 1.0
 
 
 def draw_callout(painter, lod: float, at: QPointF, text: str, align: str = "left"):
@@ -368,8 +392,10 @@ class DimensionItem(_AnnotationBase):
         xs = [self.a.x(), self.b.x(), p.x(), q.x()]
         ys = [self.a.y(), self.b.y(), p.y(), q.y()]
         rect = QRectF(min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys))
-        pad = DIM_TICK_IN + 2.0 / self._view_scale()
-        return rect.adjusted(-pad, -pad, pad, pad) | self._label_box()
+        px = 4.0 / self._view_scale()     # 0279: the antialiased pen and glyph edges
+        pad = DIM_TICK_IN + px
+        return (rect.adjusted(-pad, -pad, pad, pad)
+                | self._label_box().adjusted(-px, -px, px, px))
 
     def shape(self) -> QPainterPath:
         """The dimension LINE and the label, thickened enough to grab -- not

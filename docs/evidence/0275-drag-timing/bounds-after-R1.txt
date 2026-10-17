@@ -1,0 +1,24 @@
+
+floor default, nothing selected (zoom 1.0): item classes inking OUTSIDE their boundingRect
+  none
+
+floor default, nothing selected (zoom 3.0): item classes inking OUTSIDE their boundingRect
+  none
+
+floor default, one of each kind selected (zoom 1.0): item classes inking OUTSIDE their boundingRect
+  none
+
+floor default, one of each kind selected (zoom 3.0): item classes inking OUTSIDE their boundingRect
+  none
+
+floor upper, nothing selected (zoom 1.0): item classes inking OUTSIDE their boundingRect
+  none
+
+floor upper, nothing selected (zoom 3.0): item classes inking OUTSIDE their boundingRect
+  none
+
+floor upper, one of each kind selected (zoom 1.0): item classes inking OUTSIDE their boundingRect
+  none
+
+floor upper, one of each kind selected (zoom 3.0): item classes inking OUTSIDE their boundingRect
+  none

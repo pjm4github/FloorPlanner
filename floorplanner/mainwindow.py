@@ -17,7 +17,9 @@ from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
-from floorplanner.roofs import RoofEndMarkerItem, RoofItem, eaves_spans_per_side, roof_clips_held
+from floorplanner.roofs import (
+    RoofEndMarkerItem, RoofItem, eaves_spans_per_side, hold_rooms, roof_clips_held, rooms_held,
+)
 from floorplanner.annotations import (  # 0263: annotations, measurements, callouts; 0270: leaders
     DatumItem, DimensionItem, LeaderItem, TextAnnotationItem, callout_colour,
     sync_annotation_visibility,
@@ -1745,6 +1747,15 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         if roof_clips_held(self.scene):
             self._dirty_timer.start()
             return
+        # 0279: a canvas gesture in progress (a button held on the plan) is
+        # snapshotted once, at its end -- a wall or room drag too; a hold
+        # with no button actually down (a release that went to a modal
+        # dialog) is let go here, so it can never stall the undo record
+        if rooms_held(self.scene):
+            if QApplication.mouseButtons() & Qt.MouseButton.LeftButton:
+                self._dirty_timer.start()
+                return
+            hold_rooms(self.scene, False)
         self._commit_if_changed()
         self._update_totals()
 

@@ -1,0 +1,144 @@
+
+floor default, nothing selected (zoom 1.0): item classes inking OUTSIDE their boundingRect
+  FurnishingItem:glass_shower     1 items | worst    473 px outside, up to   28 px away
+  FurnishingItem:office_set       1 items | worst    411 px outside, up to   19 px away
+  FurnishingItem:base_cab_36      9 items | worst    398 px outside, up to   24 px away
+  FurnishingItem:riding_mower_snow    1 items | worst    396 px outside, up to   34 px away
+  FurnishingItem:vanity_48        1 items | worst    386 px outside, up to   18 px away
+  FurnishingItem:gas_fireplace    1 items | worst    343 px outside, up to   13 px away
+  FurnishingItem:vanity_36        1 items | worst    343 px outside, up to   19 px away
+  FurnishingItem:dining_table     1 items | worst    334 px outside, up to   11 px away
+  FurnishingItem:coffee_table     2 items | worst    316 px outside, up to   13 px away
+  FurnishingItem:wardrobe         1 items | worst    285 px outside, up to    9 px away
+  FurnishingItem:dining_chair     4 items | worst    264 px outside, up to   24 px away
+  FurnishingItem:office_chair     1 items | worst    263 px outside, up to   18 px away
+  FurnishingItem:nightstand       2 items | worst    258 px outside, up to   16 px away
+  FurnishingItem:side_table       6 items | worst    256 px outside, up to   19 px away
+  FurnishingItem:garden_tractor    1 items | worst    248 px outside, up to   25 px away
+  FurnishingItem:bathtub          1 items | worst    233 px outside, up to   11 px away
+  FurnishingItem:armchair         3 items | worst    228 px outside, up to   10 px away
+  FurnishingItem:post             8 items | worst    224 px outside, up to   20 px away
+  FurnishingItem:bed_king         1 items | worst    222 px outside, up to   11 px away
+  OpeningItem:gate                1 items | worst    213 px outside, up to   42 px away
+  FurnishingItem:dresser          1 items | worst    206 px outside, up to   11 px away
+  FurnishingItem:range            1 items | worst    200 px outside, up to   20 px away
+  FurnishingItem:dishwasher       1 items | worst    187 px outside, up to   18 px away
+  FurnishingItem:snowblower       1 items | worst    180 px outside, up to   18 px away
+  FurnishingItem:sink_base_36     1 items | worst    170 px outside, up to   17 px away
+  FurnishingItem:toilet           2 items | worst    168 px outside, up to   13 px away
+  FurnishingItem:sofa             1 items | worst    154 px outside, up to   11 px away
+  FurnishingItem:refrigerator     1 items | worst    150 px outside, up to   15 px away
+  FurnishingItem:washer           1 items | worst    126 px outside, up to   13 px away
+  FurnishingItem:dryer            1 items | worst     94 px outside, up to   10 px away
+  FurnishingItem:kitchen_island    2 items | worst     76 px outside, up to    9 px away
+  RoofItem                        5 items | worst     68 px outside, up to    6 px away
+  FurnishingItem:workbench        1 items | worst     15 px outside, up to    3 px away
+
+floor default, nothing selected (zoom 3.0): item classes inking OUTSIDE their boundingRect
+  OpeningItem:gate                1 items | worst    549 px outside, up to  119 px away
+  FurnishingItem:glass_shower     1 items | worst    441 px outside, up to   10 px away
+  FurnishingItem:office_set       1 items | worst    354 px outside, up to    6 px away
+  FurnishingItem:vanity_48        1 items | worst    350 px outside, up to    8 px away
+  FurnishingItem:base_cab_36      5 items | worst    314 px outside, up to    6 px away
+  FurnishingItem:vanity_36        1 items | worst    305 px outside, up to    8 px away
+  FurnishingItem:dining_table     1 items | worst    296 px outside, up to    8 px away
+  FurnishingItem:coffee_table     1 items | worst    295 px outside, up to    8 px away
+  FurnishingItem:gas_fireplace    1 items | worst    261 px outside, up to    8 px away
+  FurnishingItem:wardrobe         1 items | worst    258 px outside, up to    6 px away
+  FurnishingItem:dining_chair     4 items | worst    233 px outside, up to    9 px away
+  FurnishingItem:side_table       6 items | worst    224 px outside, up to    6 px away
+  FurnishingItem:bathtub          1 items | worst    215 px outside, up to    8 px away
+  FurnishingItem:post             8 items | worst    210 px outside, up to   14 px away
+  FurnishingItem:armchair         2 items | worst    208 px outside, up to    6 px away
+  FurnishingItem:nightstand       2 items | worst    203 px outside, up to    8 px away
+  FurnishingItem:dresser          1 items | worst    187 px outside, up to    8 px away
+  FurnishingItem:office_chair     1 items | worst    182 px outside, up to    6 px away
+  FurnishingItem:bed_king         1 items | worst    172 px outside, up to    8 px away
+  FurnishingItem:toilet           1 items | worst    154 px outside, up to    8 px away
+  FurnishingItem:sofa             1 items | worst    140 px outside, up to    8 px away
+  FurnishingItem:riding_mower_snow    1 items | worst     29 px outside, up to    5 px away
+  DimensionItem:dimension         6 items | worst      2 px outside, up to    2 px away
+
+floor default, one of each kind selected (zoom 1.0): item classes inking OUTSIDE their boundingRect
+  FurnishingItem:glass_shower     1 items | worst    473 px outside, up to   28 px away
+  FurnishingItem:office_set       1 items | worst    411 px outside, up to   19 px away
+  FurnishingItem:base_cab_36      9 items | worst    398 px outside, up to   24 px away
+  FurnishingItem:riding_mower_snow    1 items | worst    396 px outside, up to   34 px away
+  FurnishingItem:vanity_48        1 items | worst    386 px outside, up to   18 px away
+  FurnishingItem:gas_fireplace    1 items | worst    343 px outside, up to   13 px away
+  FurnishingItem:vanity_36        1 items | worst    343 px outside, up to   19 px away
+  FurnishingItem:dining_table     1 items | worst    334 px outside, up to   11 px away
+  FurnishingItem:coffee_table     2 items | worst    316 px outside, up to   13 px away
+  FurnishingItem:wardrobe         1 items | worst    285 px outside, up to    9 px away
+  FurnishingItem:dining_chair     4 items | worst    264 px outside, up to   24 px away
+  FurnishingItem:office_chair     1 items | worst    263 px outside, up to   18 px away
+  FurnishingItem:nightstand       2 items | worst    258 px outside, up to   16 px away
+  FurnishingItem:side_table       6 items | worst    256 px outside, up to   19 px away
+  FurnishingItem:garden_tractor    1 items | worst    248 px outside, up to   25 px away
+  FurnishingItem:bathtub          1 items | worst    233 px outside, up to   11 px away
+  FurnishingItem:armchair         3 items | worst    228 px outside, up to   10 px away
+  FurnishingItem:post             8 items | worst    224 px outside, up to   20 px away
+  FurnishingItem:bed_king         1 items | worst    222 px outside, up to   11 px away
+  OpeningItem:gate                1 items | worst    213 px outside, up to   42 px away
+  FurnishingItem:dresser          1 items | worst    206 px outside, up to   11 px away
+  FurnishingItem:range            1 items | worst    200 px outside, up to   20 px away
+  FurnishingItem:dishwasher       1 items | worst    187 px outside, up to   18 px away
+  FurnishingItem:snowblower       1 items | worst    180 px outside, up to   18 px away
+  FurnishingItem:sink_base_36     1 items | worst    170 px outside, up to   17 px away
+  FurnishingItem:toilet           2 items | worst    168 px outside, up to   13 px away
+  FurnishingItem:sofa             1 items | worst    154 px outside, up to   11 px away
+  FurnishingItem:refrigerator     1 items | worst    150 px outside, up to   15 px away
+  FurnishingItem:washer           1 items | worst    126 px outside, up to   13 px away
+  FurnishingItem:dryer            1 items | worst     94 px outside, up to   10 px away
+  FurnishingItem:kitchen_island    2 items | worst     76 px outside, up to    9 px away
+  RoofItem                        5 items | worst     68 px outside, up to    6 px away
+  FurnishingItem:workbench        1 items | worst     15 px outside, up to    3 px away
+
+floor default, one of each kind selected (zoom 3.0): item classes inking OUTSIDE their boundingRect
+  OpeningItem:gate                1 items | worst    549 px outside, up to  119 px away
+  FurnishingItem:glass_shower     1 items | worst    441 px outside, up to   10 px away
+  FurnishingItem:office_set       1 items | worst    354 px outside, up to    6 px away
+  FurnishingItem:vanity_48        1 items | worst    350 px outside, up to    8 px away
+  FurnishingItem:base_cab_36      5 items | worst    314 px outside, up to    6 px away
+  FurnishingItem:vanity_36        1 items | worst    305 px outside, up to    8 px away
+  FurnishingItem:dining_table     1 items | worst    296 px outside, up to    8 px away
+  FurnishingItem:coffee_table     1 items | worst    295 px outside, up to    8 px away
+  FurnishingItem:gas_fireplace    1 items | worst    261 px outside, up to    8 px away
+  FurnishingItem:wardrobe         1 items | worst    258 px outside, up to    6 px away
+  FurnishingItem:dining_chair     4 items | worst    233 px outside, up to    9 px away
+  FurnishingItem:side_table       6 items | worst    224 px outside, up to    6 px away
+  FurnishingItem:bathtub          1 items | worst    215 px outside, up to    8 px away
+  FurnishingItem:post             8 items | worst    210 px outside, up to   14 px away
+  FurnishingItem:armchair         2 items | worst    208 px outside, up to    6 px away
+  FurnishingItem:nightstand       2 items | worst    203 px outside, up to    8 px away
+  FurnishingItem:dresser          1 items | worst    187 px outside, up to    8 px away
+  FurnishingItem:office_chair     1 items | worst    182 px outside, up to    6 px away
+  FurnishingItem:bed_king         1 items | worst    172 px outside, up to    8 px away
+  FurnishingItem:toilet           1 items | worst    154 px outside, up to    8 px away
+  FurnishingItem:sofa             1 items | worst    140 px outside, up to    8 px away
+  FurnishingItem:riding_mower_snow    1 items | worst     29 px outside, up to    5 px away
+  RoofGripItem:ridge              1 items | worst     12 px outside, up to    1 px away
+  DimensionItem:dimension         6 items | worst      2 px outside, up to    2 px away
+
+floor upper, nothing selected (zoom 1.0): item classes inking OUTSIDE their boundingRect
+  FurnishingItem:vanity_36        1 items | worst    360 px outside, up to   19 px away
+  FurnishingItem:bathtub          1 items | worst    256 px outside, up to   11 px away
+  FurnishingItem:toilet           1 items | worst    190 px outside, up to   11 px away
+  RoofItem                        1 items | worst     75 px outside, up to    6 px away
+
+floor upper, nothing selected (zoom 3.0): item classes inking OUTSIDE their boundingRect
+  FurnishingItem:vanity_36        1 items | worst    265 px outside, up to    8 px away
+  FurnishingItem:bathtub          1 items | worst    183 px outside, up to    6 px away
+  FurnishingItem:toilet           1 items | worst    171 px outside, up to    8 px away
+
+floor upper, one of each kind selected (zoom 1.0): item classes inking OUTSIDE their boundingRect
+  FurnishingItem:vanity_36        1 items | worst    360 px outside, up to   19 px away
+  FurnishingItem:bathtub          1 items | worst    256 px outside, up to   11 px away
+  FurnishingItem:toilet           1 items | worst    190 px outside, up to   11 px away
+  RoofItem                        1 items | worst     75 px outside, up to    6 px away
+
+floor upper, one of each kind selected (zoom 3.0): item classes inking OUTSIDE their boundingRect
+  FurnishingItem:vanity_36        1 items | worst    265 px outside, up to    8 px away
+  FurnishingItem:bathtub          1 items | worst    183 px outside, up to    6 px away
+  FurnishingItem:toilet           1 items | worst    171 px outside, up to    8 px away
+  RoofGripItem:ridge              1 items | worst     12 px outside, up to    1 px away

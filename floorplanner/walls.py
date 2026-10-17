@@ -3009,10 +3009,13 @@ class OpeningItem(QGraphicsItem):
         # huge for wide openings, ballooning any enclosing group's box.)
         w, t = self.width, self.wall.t
         x0, x1, y0, y1 = -w / 2, w / 2, -t / 2, t / 2
-        if self.kind == "door":
+        if self.kind in ("door", "gate"):
+            # 0279: a GATE paints a door's leaf and swing (`_paint_door`)
+            # and was bounded as a window -- its arc reached ~40in past the
+            # box, a trail under a minimal repaint
             dt = self.door_type
             reach = {"LH": w, "RH": w, "FRENCH": w / 2,
-                     "BIFOLD": 0.4 * w}.get(dt, 0.0)
+                     "BIFOLD": 0.4 * w}.get(dt, w if self.kind == "gate" else 0.0)
             if dt in GARAGE_DEFAULTS:
                 reach = min(self.height, 96.0)
             if self.swing < 0:

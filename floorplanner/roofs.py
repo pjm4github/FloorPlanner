@@ -462,10 +462,12 @@ def roof_clip_spans(scene, wall):
     # 0276 (0275 sec5 step 2): computed once per change of what it reads --
     # the wall's line and thickness, every roof on the floor (its geometry
     # and its visible region) and the floor's rooms -- not once per paint
-    key = ((wall.p1.x(), wall.p1.y(), wall.p2.x(), wall.p2.y(), float(wall.t)),
-           tuple((rf.geometry_key(), rf._clip_region) for rf in roofs),
-           floor_rooms_key(scene, wall.floor))
+    own = ((wall.p1.x(), wall.p1.y(), wall.p2.x(), wall.p2.y(), float(wall.t)),
+           tuple((rf.geometry_key(), rf._clip_region) for rf in roofs))
     memo = getattr(wall, "_roof_spans_memo", None)
+    if memo is not None and rooms_held(scene) and memo[0][:2] == own:
+        return list(memo[1])              # 0279: the rooms as at the press
+    key = own + (floor_rooms_key(scene, wall.floor),)
     if memo is not None and memo[0] == key:
         return list(memo[1])
     ceiling_in = _wall_ceiling_in(scene, wall)
@@ -1003,6 +1005,31 @@ def hold_roof_clips(scene, on: bool):
     scene.setProperty(_CLIP_HOLD, bool(on))
     if not on:
         sync_roof_clips(scene)
+
+
+_ROOMS_HOLD = "rooms_hold"
+
+
+def hold_rooms(scene, on: bool):
+    """0279 (0276 sec5, his word "go ahead with the wall and room drag
+    hold"): while a canvas gesture is in progress -- a mouse button down
+    on the plan -- the roof clip traces and the walls' roof-clip dashes
+    take the floor's rooms AS THEY WERE AT THE PRESS. A wall or room drag
+    changes the rooms every frame, and every roof over them recomputed its
+    trace every frame (7 fps on his upper floor); now a roof recomputes
+    only when ITS OWN geometry changes, and everything catches up once, at
+    the release (`False` repaints the scene). The same discipline R6.b
+    holds the compose by."""
+    if scene is None:
+        return
+    was = bool(scene.property(_ROOMS_HOLD))
+    scene.setProperty(_ROOMS_HOLD, bool(on))
+    if was and not on:
+        scene.update()
+
+
+def rooms_held(scene) -> bool:
+    return scene is not None and bool(scene.property(_ROOMS_HOLD))
 
 
 def roof_clips_held(scene) -> bool:
@@ -1599,6 +1626,15 @@ class RoofItem(QGraphicsItem):
                        QPointF(self.p2.x() + nx * d, self.p2.y() + ny * d))
 
     def boundingRect(self) -> QRectF:
+        # 0279: the ridge callout is painted beside the ridge's middle at a
+        # fixed pixel size; on a short roof it reached past `_bounds`
+        from floorplanner.annotations import callout_rect, callout_text, callouts_shown, view_lod
+        if (callouts_shown() and floor_display_mode(self.floor) == "active"
+                and callout_text(self)):
+            lod = view_lod(self)
+            m = QPointF((self.p1.x() + self.p2.x()) / 2.0, (self.p1.y() + self.p2.y()) / 2.0)
+            return self._bounds.united(callout_rect(
+                lod, QPointF(m.x() + 4.0 / lod, m.y() - 4.0 / lod), callout_text(self)))
         return self._bounds
 
     def selection_outline(self) -> QPolygonF:
@@ -1669,6 +1705,22 @@ class RoofItem(QGraphicsItem):
                 out.append((p, q))
         return out
 
+    def _painted_plan_lines(self, clipped: bool):
+        """`[(kind, [(p, q), ...])]`: the plan lines as painted -- cut to the
+        visible region while clipped. 0279: computed once per change of the
+        roof's geometry, its region and its join extension, not on every
+        paint (a clipped roof re-cut its lines on each one, ~4 ms a roof,
+        the bulk of what a room drag's frames still spent on roofs)."""
+        key = (self.geometry_key(), clipped, self._clip_region if clipped else None,
+               tuple(self._clip_ext))
+        memo = getattr(self, "_lines_memo", None)
+        if memo is not None and memo[0][0] == key[0] and memo[0][1] == key[1]                 and memo[0][2] is key[2] and memo[0][3] == key[3]:
+            return memo[1]
+        out = [(kind, self._clipped(p, q) if clipped else [(p, q)])
+               for kind, p, q in self._plan_lines()]
+        self._lines_memo = (key, out)
+        return out
+
     def _clipped(self, p, q):
         """`p`-`q` clipped to the visible region, as QPointF pairs."""
         return [(QPointF(a.x(), a.y()), QPointF(b.x(), b.y()))
@@ -1696,9 +1748,11 @@ class RoofItem(QGraphicsItem):
         sc = self.scene()
         if sc is None or sip.isdeleted(self):
             return []
-        key = (self.geometry_key(), self.is_clipped(), tuple(self._clip_ext),
-               floor_rooms_key(sc, self.floor))
+        own = (self.geometry_key(), self.is_clipped(), tuple(self._clip_ext))
         memo = self._trace_memo
+        if memo is not None and rooms_held(sc) and memo[0][:3] == own:
+            return list(memo[1])          # 0279: the rooms as at the press
+        key = own + (floor_rooms_key(sc, self.floor),)
         if memo is None or memo[0] != key:
             memo = self._trace_memo = (key, roof_clip_trace(sc, self))
         return list(memo[1])
@@ -1745,9 +1799,8 @@ class RoofItem(QGraphicsItem):
         dash = QPen(ink, 1.4, Qt.PenStyle.DashLine)
         heavy = QPen(ink, 3.0, Qt.PenStyle.SolidLine)
         heavy.setCapStyle(Qt.PenCapStyle.RoundCap)
-        for kind, p, q in self._plan_lines():
+        for kind, segs in self._painted_plan_lines(clipped):
             painter.setPen(heavy if kind == "ridge" else dash)
-            segs = self._clipped(p, q) if clipped else [(p, q)]
             for a, b in segs:
                 painter.drawLine(a, b)
         if clipped:
@@ -1871,7 +1924,8 @@ class RoofGripItem(QGraphicsItem):
         return max(self.SIZE, self.HIT_PX / self._view_scale())
 
     def boundingRect(self) -> QRectF:
-        r = self._hit_half() + 2.0
+        # 0279: the ridge grip's diamond (1.4 x SIZE) plus its pen
+        r = max(self._hit_half(), self.SIZE * 1.4) + 3.0
         return QRectF(-r, -r, 2.0 * r, 2.0 * r)
 
     def shape(self) -> QPainterPath:

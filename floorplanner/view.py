@@ -16,7 +16,7 @@ from floorplanner.roofs import (
     RoofEndMarkerItem, RoofGripItem, RoofItem, eaves_spans_per_side,
 )
 from floorplanner.roofs import (  # R5b: the Dormer tool; R6.b: the hold
-    DORMER_MIN_SPAN_IN, MIN_RIDGE_LEN_IN, dormer_defaults, hold_roof_clips,
+    DORMER_MIN_SPAN_IN, MIN_RIDGE_LEN_IN, dormer_defaults, hold_roof_clips, hold_rooms,
     host_roof_at, snap_to_trace, upslope_direction,
 )
 from floorplanner.items import *  # noqa: F401
@@ -155,7 +155,14 @@ class PlanView(QGraphicsView):
         self.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
-        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
+        # 0279 (0275 sec5 step 4, his word "repaint only on what changed"):
+        # each frame repaints the regions items report as changed, not the
+        # whole viewport; every item paints inside its own boundingRect
+        # (docs/evidence/0275-drag-timing/bounds_audit.py), and a gesture's
+        # release repaints everything once (`hold_rooms(..., False)`), so a
+        # paint that depends on ANOTHER item (a roof's trace on the rooms, a
+        # wall's dashes on the roofs) is never left stale past the gesture
+        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.MinimalViewportUpdate)
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
         self.setMouseTracking(True)
         self._panning = False
@@ -475,6 +482,20 @@ class PlanView(QGraphicsView):
         return False
 
     def mousePressEvent(self, e):
+        # 0279: a left button down on the plan holds the rooms for the roof
+        # traces and the wall dashes until it comes up (roofs.hold_rooms)
+        if e.button() == Qt.MouseButton.LeftButton:
+            hold_rooms(self.scene(), True)
+        self._mouse_press(e)
+
+    def mouseReleaseEvent(self, e):
+        try:
+            self._mouse_release(e)
+        finally:
+            if e.button() == Qt.MouseButton.LeftButton:
+                hold_rooms(self.scene(), False)    # ...and repaints, once
+
+    def _mouse_press(self, e):
         pos = e.position().toPoint()
         sp = self.mapToScene(pos)
         tool = self.win.tool
@@ -909,7 +930,7 @@ class PlanView(QGraphicsView):
                 # longer/party wall is left unselected, not duplicated. Nothing
                 # is created, so no rebuild is needed.
 
-    def mouseReleaseEvent(self, e):
+    def _mouse_release(self, e):
         if (self._img_mode == "crop" and self._crop_start is not None
                 and e.button() == Qt.MouseButton.LeftButton):
             rect = QRectF(self._crop_start,

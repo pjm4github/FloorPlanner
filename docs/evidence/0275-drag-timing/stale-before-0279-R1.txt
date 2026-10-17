@@ -1,0 +1,15 @@
+viewport update mode: FullViewportUpdate
+probing with FullViewportUpdate
+  wall body slide (default)              frame   98.6 ms | stale px: worst mid-drag      0, after release      0, after settle      0
+  wall end stretch (default)             frame   88.9 ms | stale px: worst mid-drag      0, after release      0, after settle      0
+  wall body slide (upper)                frame    1.2 ms | stale px: worst mid-drag      0, after release      0, after settle      0
+  wall end stretch (upper)               frame   47.7 ms | stale px: worst mid-drag      0, after release      0, after settle      0
+  room drag by its name (upper)          frame  154.0 ms | stale px: worst mid-drag      0, after release      0, after settle      0
+  furnishing drag (default)              frame   90.2 ms | stale px: worst mid-drag      0, after release      0, after settle      0
+  opening slide (default)                frame   90.2 ms | stale px: worst mid-drag      0, after release      0, after settle      0
+  roof ridge grip (upper main)           frame   74.6 ms | stale px: worst mid-drag      0, after release      0, after settle      0
+  dormer eave grip (upper)               frame   52.0 ms | stale px: worst mid-drag      0, after release      0, after settle      0
+  garage back-end knob (default)         frame  191.8 ms | stale px: worst mid-drag      0, after release      0, after settle      0
+  wall body slide, zoom 3x (default)     frame   33.7 ms | stale px: worst mid-drag      0, after release      0, after settle      0
+
+max stale after release over all gestures: 0 | after settle: 0
