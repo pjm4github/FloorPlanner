@@ -169,3 +169,40 @@ def test_undo_of_a_wall_edit_reuses_the_roofs(fp, win, add_walls, composes):
     win.scene._compose_memo = None
     sync_roof_clips(win.scene)
     assert _sig(win.scene) == kept, "the reused clips equal a fresh compose"
+
+
+# -- 0282: the walk after a restore -------------------------------------------
+
+EXAMPLES = __import__("pathlib").Path(__file__).resolve().parents[1] / "examples"
+
+
+@pytest.mark.parametrize("name", ["symmetricP1.json", "sample_plan.v5.json", "site_demo.json"])
+def test_a_restored_state_snapshots_back_to_itself(fp, win, name):
+    """0282's premise: `load_data` is a faithful apply, so the state an undo
+    restores is the state a walk of the scene would give -- which is why
+    `_restore_state` takes it as the committed state without walking."""
+    import copy
+    win.load_path(str(EXAMPLES / name))
+    state = copy.deepcopy(win._committed_state)
+    win.load_data(state, keep_backdrop=True)
+    assert win.snapshot() == state
+
+
+def test_a_restore_neither_alters_its_state_nor_files_a_spurious_step(fp, win, add_walls, qapp):
+    import copy
+    add_walls(win.scene, 0, 0, 240, 180)
+    win._commit_if_changed()
+    w = next(it for it in win.scene.items() if isinstance(it, fp.WallItem))
+    w.openings.append(fp.OpeningItem(w, "window", "3648", w.length() / 2))
+    w.rebuild()
+    win._commit_if_changed()
+    target = copy.deepcopy(win._undo_stack[-1])
+    win.undo()
+    assert win._committed_state == target, "the restore altered the state it was given"
+    assert win.snapshot() == win._committed_state, "the committed state is the scene's"
+    depth = len(win._undo_stack)
+    win._commit_if_changed()                       # the settle after the undo
+    assert len(win._undo_stack) == depth, "a spurious step was filed"
+    win.redo()
+    assert any(isinstance(o, fp.OpeningItem) for it in win.scene.items()
+               if isinstance(it, fp.WallItem) for o in it.openings), "redo brings the window back"

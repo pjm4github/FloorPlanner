@@ -1943,7 +1943,14 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             self.load_data(state, keep_backdrop=True)   # undo keeps the backdrop
         finally:
             self._restoring = False
-        self._committed_state = self.snapshot()
+        # 0282: the restored state IS the committed state. `load_data` is a
+        # faithful apply (its own docstring), and the round trip is exact --
+        # snapshot(load(state)) == state, pinned on the corpus by
+        # tests/test_undo_fast.py -- so walking the scene again here only
+        # re-derived what was just applied: ~80 ms of every undo. Should a
+        # plan ever round-trip inexactly, the next settle files one extra
+        # step to an equivalent state, never a lost one.
+        self._committed_state = state
         self._update_undo_actions()
 
     def _reset_undo(self):
@@ -1958,7 +1965,12 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self._update_undo_actions()
 
     def undo(self):
-        self._commit_if_changed()        # fold in any pending change first
+        # fold in any pending change first. 0282 tried to skip this walk when
+        # the settle timer was quiet, and must not: `scene.changed` is
+        # delivered on a LATER turn of the event loop, so an edit and a
+        # Ctrl+Z in the same turn find the timer quiet with a change pending
+        # (tests/test_undo.py edits and undoes exactly so) -- the walk stays
+        self._commit_if_changed()
         if not self._undo_stack:
             self.status("Nothing to undo.")
             return
