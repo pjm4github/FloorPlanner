@@ -421,5 +421,6 @@ this table is not a second copy of it.
 | [`0279-report.md`](./0279-report.md) | report: the wall-and-room drag hold, and repaint only what changed — every item audited to paint inside its own box, the screen checked for staleness on eleven kinds of drag |
 | [`0280-report.md`](./0280-report.md) | report: PR #93 merged on his word; his slow Ctrl+Z measured and fixed — the roofs' compose and their traces kept by value across the reload an undo is |
 | [`0281-report.md`](./0281-report.md) | report: PR #94 merged on his word — Ctrl+Z ten times faster; nothing open on a branch |
+| [`0282-report.md`](./0282-report.md) | report: "undo by command" — a correction first: P6.b as built would not make undo faster; the walk after a restore removed (0.34 → 0.26–0.28 s); the reload's remedy put to him |
 
 <!-- PAIRS:END -->
