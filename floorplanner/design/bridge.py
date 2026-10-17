@@ -48,6 +48,7 @@ and one 0.001" float nudge. 31 is the right number for "welds attempted" and the
 wrong number for "geometry that disagrees with itself"; this key is the latter.
 """
 import copy
+import json
 import math
 import warnings
 from collections import defaultdict
@@ -77,7 +78,7 @@ from floorplanner.rooms import (
     OutlineEdge, RoomItem, poly_area_sqft, room_path_from_corners,
 )
 from floorplanner.walls import (
-    OpeningItem, WallItem, rebuild_all_walls,
+    OpeningItem, WallItem, _compute_wall_junctions, _WallIndex, rebuild_all_walls,
 )
 
 # names that make a room exterior rather than interior.  Kept identical to
@@ -1288,6 +1289,224 @@ def _opening_s(frm, off, ow, L):
     return L / 2.0 + off                       # "center": offset of the centre
 
 
+def _build_walls(scene, doc, lname, rep):
+    """0283: the vertices, walls and their openings of `doc` (every
+    record it carries), as the full apply builds them. Returns
+    `(pos, vmap, wmap)`: document vertex id -> point / live `Vertex`,
+    document wall id -> live `WallItem`."""
+    pos = {v["id"]: QPointF(v["x"], v["y"]) for v in doc.get("vertices", [])}
+    # THE DOCUMENT'S VERTEX IDENTITY, CARRIED INTO THE SCENE (P3.5). One live
+    # `Vertex` per document vertex, handed to every wall end and every outline
+    # edge that names it -- so a corner two walls share in the file is one
+    # corner in the scene, and a room's outline is holding the very object its
+    # walls hold. Reconstructing that by WELDING here would be a repair, and
+    # apply must not repair: a file whose corner has drifted 0.3" is malformed
+    # and is reported as such, not quietly closed up
+    # (`test_malformed_v5_is_reported_not_rewelded`).
+    # fresh uids, NOT the document's ids: those are canonical (renumbered by
+    # geometry at every save), and a live uid is persistent. P3.1 settled that
+    # the two id spaces stay separate and `canonicalize` bridges them.
+    vmap = {v["id"]: Vertex(float(v["x"]), float(v["y"]), name=v.get("name") or None)
+            for v in doc.get("vertices", [])}
+    for vid, v in vmap.items():                  # 0264/0265: the file's own ids, and the
+        v.doc_id = vid                           # session label adopted from them
+        v._uid = _labels.adopt("V", vid)
+
+    wmap = {}
+    for wd in doc.get("walls", []):
+        wall = WallItem(pos[wd["v1"]], pos[wd["v2"]], wd.get("type", "interior"))
+        wall.set_end_vertex("p1", vmap[wd["v1"]])
+        wall.set_end_vertex("p2", vmap[wd["v2"]])
+        wall.floor = lname.get(wd["level"], DEFAULT_FLOOR)   # never the global
+        wall._v5_extra = {k: v for k, v in wd.items() if k not in _WALL_MODELLED}
+        wall.doc_id = wd.get("id")                            # 0264
+        wall._uid = _labels.adopt("W", wd.get("id"))         # 0265
+        scene.addItem(wall)
+        wmap[wd["id"]] = wall
+        rep["walls"] += 1
+        L = wall.length()
+        for od in wd.get("openings") or []:
+            a = od["anchor"]
+            ow = parse_wwhh(od["code"])[0]
+            s = _opening_s(a["from"], float(a["offset_in"]), ow, L)
+            try:
+                op = OpeningItem(wall, od["kind"], od["code"], s)
+            except ValueError as exc:
+                # NOT the silent `except ValueError: continue` of the v4 path
+                # (13 sites, replaced by a reported list at P3.6) -- collected,
+                # surfaced, and escalated under strict
+                rep["openings_failed"].append(f"{od['id']}: {exc}")
+                continue
+            # R4b -- FIDELITY: the document's anchor is adopted VERBATIM, not
+            # re-derived. `OpeningItem.__init__` mints against the nearer end,
+            # which is right for an opening that has never had an anchor and
+            # wrong for one that arrived with a deliberate far-end dimension.
+            # Re-basing it here would lose that intent on every load, silently
+            # -- the same category as the clamp this task deletes.
+            op.anchor_v = wall.end_vertex("p1" if a["from"] != "v2" else "p2")
+            op.offset_in = float(a["offset_in"])
+            # v5 carries door_type for DOORS only ("meaningful only when
+            # kind == door"), so absent means "not applicable", not "empty" --
+            # clobbering it would rewrite a window's harmless default and make
+            # a round trip look like an edit.
+            op.door_type = od.get("door_type", op.door_type)
+            op.swing = -1 if od.get("swings_toward", "left") == "left" else 1
+            # 0255: the sill as the record says (None = the plan's default,
+            # never materialised), and the keys the scene does not model
+            sill = od.get("sill_in")
+            op.sill_in = None if sill is None else float(sill)
+            op._v5_extra = {k: v for k, v in od.items() if k not in _OPENING_MODELLED}
+            op.doc_id = od.get("id")                           # 0264
+            op._uid = _labels.adopt("O", od.get("id"))        # 0265
+            wall.openings.append(op)
+
+    # rendering only, and deliberately BEFORE any RoomItem exists: refresh_rooms
+    # returns at `if not rooms` so no flood-fill can overwrite a stored outline
+    return pos, vmap, wmap
+
+
+def _build_rooms(scene, doc, pos, vmap, wmap, lname, rep):
+    """0283: the rooms of `doc`, bound to the walls `wmap` built. Returns
+    document room id -> live `RoomItem`."""
+    rmap = {}
+    for rd in doc.get("rooms", []):
+        corners = [pos[e["v"]] for e in rd["outline"]]
+        cx = sum(c.x() for c in corners) / len(corners)
+        cy = sum(c.y() for c in corners) / len(corners)
+        off = (rd.get("label") or {}).get("offset") or [0.0, 0.0]
+        # v5 stores ONE label offset, relative to the centroid; the scene splits
+        # the same information across anchor + label_offset. Folding it all into
+        # the anchor round-trips exactly (the walk re-derives centroid + offset).
+        room = RoomItem(rd["name"], QPointF(cx + off[0], cy + off[1]),
+                        room_path_from_corners(corners),
+                        poly_area_sqft(corners),
+                        rd.get("properties") or {},
+                        [OutlineEdge(vmap[e["v"]], wmap.get(e.get("wall")))
+                         for e in rd["outline"]])
+        room.floor = lname.get(rd["level"], DEFAULT_FLOOR)   # never the global
+        room._v5_extra = {k: v for k, v in rd.items() if k not in _ROOM_MODELLED}
+        pl = rd.get("placement") or {}
+        room.placement_state = pl.get("state") or "placed"
+        room.extracted_from = pl.get("extracted_from")
+        room.placement_rotation = float(pl.get("rotation") or 0.0)
+        room.category = rd.get("category")           # P4.4, modelled
+        room.nominal_size = rd.get("nominal_size")
+        room.show_dims = bool((rd.get("label") or {}).get("show_dimensions",
+                                                          False))
+        room.label_offset = QPointF(0.0, 0.0)
+        room.doc_id = rd.get("id")                             # 0264
+        room._uid = _labels.adopt("R", rd.get("id"))          # 0265
+        scene.addItem(room)
+        rmap[rd["id"]] = room
+        for e in room.outline:                  # the outline IS the binding --
+            if e.wall is not None:                       # read, not detected
+                room.bind_wall(e.wall)
+            # An edge with `wall: null` -- an archway or a detached side --
+            # stays null. Until P3.5 this branch built a dashed placeholder
+            # item so undo would not silently drop an archway; the outline
+            # carries that fact itself (`RoomItem.open_edges`), so the
+            # placeholder was a second representation of it and went with the
+            # rest of them. Since P3.7 a null edge renders dashed directly,
+            # drawn by the room from its own outline.
+        rep["rooms"] += 1
+
+    return rmap
+
+
+def _build_furnishings(scene, doc, lname, rep):
+    """0283: the furnishings of `doc`. Returns document id -> live item."""
+    fmap = {}
+    for fd in doc.get("furnishings", []):
+        if furnishing_spec(fd["kind"]) is None:
+            rep["unknown_furnishings"].append(fd["kind"] or "?")
+            continue
+        item = make_furnishing(fd["kind"], QPointF(*fd["pos"]),
+                               float(fd.get("rotation", 0.0)),
+                               fd.get("state") or {})
+        item.floor = lname.get(fd["level"], DEFAULT_FLOOR)   # never the global
+        item.doc_id = fd.get("id")                             # 0264
+        item._uid = _labels.adopt("F", fd.get("id"))          # 0265
+        scene.addItem(item)
+        fmap[fd["id"]] = item
+        rep["furnishings"] += 1
+
+    return fmap
+
+
+def _build_annotations(scene, doc, lname):
+    """0283: the annotations of `doc`."""
+    # ANNOTATIONS (0263): texts, measures, the datum -- each its own item
+    from floorplanner.annotations import item_from_record
+    for ad in doc.get("annotations", []) or []:
+        item = item_from_record(ad, lname.get(ad.get("level"), DEFAULT_FLOOR))
+        if item is None:
+            continue
+        scene.addItem(item)
+
+
+
+def _build_roofs(scene, doc, lname, rep):
+    """0283: the roofs of `doc`, dormers resolved to their hosts, the
+    building composed once at the end."""
+    # ROOFS (0139-ruling.md R1's block, R2's first reader; R4a re-plans the
+    # footprint into the schema -- 0154-ruling.md). A document written
+    # before R4a has no `span_in` at all: MATERIALIZE it here, once, the
+    # same way every load used to derive it live -- `nearest_eaves_wall`'s
+    # single shared span becomes `[span, span]` on the live roof, and the
+    # NEXT save writes it, so a second load never re-derives it again.
+    # `overhang_in` migrates the same way, scalar -> `[v, v]`, since it
+    # changed shape at the same tranche. A document already carrying the
+    # array form (this app's own output from here on) is used as-is.
+    # R5b (0191-ruling.md sec1): a dormer's `host` is resolved AFTER every
+    # roof exists (the host may follow it in the document); a dangling host
+    # is reported and the record skipped -- never a silent floating roof.
+    roof_by_id, dormer_hosts = {}, []
+    # R6.b: every roof added used to re-clip its floor; composing the whole
+    # building per roof is too dear, so the clips are held for the loop
+    # and the building composes ONCE, after the last host is resolved
+    hold_roof_clips(scene, True)
+    for rfd in doc.get("roofs", []) or []:
+        p1 = QPointF(*rfd["ridge"][0])
+        p2 = QPointF(*rfd["ridge"][1])
+        floor = lname.get(rfd["level"], DEFAULT_FLOOR)
+        span_raw = rfd.get("span_in")
+        if isinstance(span_raw, (list, tuple)) and len(span_raw) == 2:
+            span_in = [float(span_raw[0]), float(span_raw[1])]
+        else:
+            _, legacy_span = nearest_eaves_wall(scene, p1, p2, floor)
+            span_in = legacy_span                    # RoofItem normalises
+        overhang_raw = rfd.get("overhang_in", 0.0)
+        item = RoofItem(p1, p2, eaves_h_in=float(rfd["eaves_h_in"]),
+                        ridge_h_in=float(rfd["ridge_h_in"]),
+                        overhang_in=overhang_raw,      # RoofItem normalises
+                        gable=list(rfd.get("gable", [True, True])),
+                        span_in=span_in,
+                        marker_end=int(rfd.get("marker_end", 1)),
+                        eaves_bind=rfd.get("eaves_bind", "manual"),
+                        form=rfd.get("form", "gable"),
+                        openings=rfd.get("openings"),
+                        hip_run_in=rfd.get("hip_run_in"))
+        item.floor = floor   # never the global
+        item.doc_id = rfd.get("id")                            # 0264
+        item._uid = _labels.adopt("RF", rfd.get("id"))        # 0265
+        scene.addItem(item)
+        rep["roofs"] += 1
+        roof_by_id[rfd.get("id")] = item
+        if rfd.get("host") is not None:
+            dormer_hosts.append((item, rfd.get("id"), rfd["host"]))
+    for item, rid, hid in dormer_hosts:
+        host = roof_by_id.get(hid)
+        if host is None or host is item or host.floor != item.floor:
+            rep.setdefault("roofs_skipped", []).append(
+                f"{rid}: host {hid!r} is not a roof on its level -- skipped")
+            scene.removeItem(item)
+            rep["roofs"] -= 1
+            continue
+        item.host = host
+        item.rebuild()             # derives the back end against the host
+    hold_roof_clips(scene, False)
+
+
 def apply_design_to_scene(target, design, report=None, strict=False,
                           keep_backdrop=False):
     """Build the scene from a v5 `Design`.  The mirror of `design_from_scene`,
@@ -1387,197 +1606,14 @@ def apply_design_to_scene(target, design, report=None, strict=False,
         win.active_floor = want
         set_floor_state(active=win.active_floor)
 
-    pos = {v["id"]: QPointF(v["x"], v["y"]) for v in doc.get("vertices", [])}
-    # THE DOCUMENT'S VERTEX IDENTITY, CARRIED INTO THE SCENE (P3.5). One live
-    # `Vertex` per document vertex, handed to every wall end and every outline
-    # edge that names it -- so a corner two walls share in the file is one
-    # corner in the scene, and a room's outline is holding the very object its
-    # walls hold. Reconstructing that by WELDING here would be a repair, and
-    # apply must not repair: a file whose corner has drifted 0.3" is malformed
-    # and is reported as such, not quietly closed up
-    # (`test_malformed_v5_is_reported_not_rewelded`).
-    # fresh uids, NOT the document's ids: those are canonical (renumbered by
-    # geometry at every save), and a live uid is persistent. P3.1 settled that
-    # the two id spaces stay separate and `canonicalize` bridges them.
-    vmap = {v["id"]: Vertex(float(v["x"]), float(v["y"]), name=v.get("name") or None)
-            for v in doc.get("vertices", [])}
-    for vid, v in vmap.items():                  # 0264/0265: the file's own ids, and the
-        v.doc_id = vid                           # session label adopted from them
-        v._uid = _labels.adopt("V", vid)
+    pos, vmap, wmap = _build_walls(scene, doc, lname, rep)
 
-    wmap = {}
-    for wd in doc.get("walls", []):
-        wall = WallItem(pos[wd["v1"]], pos[wd["v2"]], wd.get("type", "interior"))
-        wall.set_end_vertex("p1", vmap[wd["v1"]])
-        wall.set_end_vertex("p2", vmap[wd["v2"]])
-        wall.floor = lname.get(wd["level"], DEFAULT_FLOOR)   # never the global
-        wall._v5_extra = {k: v for k, v in wd.items() if k not in _WALL_MODELLED}
-        wall.doc_id = wd.get("id")                            # 0264
-        wall._uid = _labels.adopt("W", wd.get("id"))         # 0265
-        scene.addItem(wall)
-        wmap[wd["id"]] = wall
-        rep["walls"] += 1
-        L = wall.length()
-        for od in wd.get("openings") or []:
-            a = od["anchor"]
-            ow = parse_wwhh(od["code"])[0]
-            s = _opening_s(a["from"], float(a["offset_in"]), ow, L)
-            try:
-                op = OpeningItem(wall, od["kind"], od["code"], s)
-            except ValueError as exc:
-                # NOT the silent `except ValueError: continue` of the v4 path
-                # (13 sites, replaced by a reported list at P3.6) -- collected,
-                # surfaced, and escalated under strict
-                rep["openings_failed"].append(f"{od['id']}: {exc}")
-                continue
-            # R4b -- FIDELITY: the document's anchor is adopted VERBATIM, not
-            # re-derived. `OpeningItem.__init__` mints against the nearer end,
-            # which is right for an opening that has never had an anchor and
-            # wrong for one that arrived with a deliberate far-end dimension.
-            # Re-basing it here would lose that intent on every load, silently
-            # -- the same category as the clamp this task deletes.
-            op.anchor_v = wall.end_vertex("p1" if a["from"] != "v2" else "p2")
-            op.offset_in = float(a["offset_in"])
-            # v5 carries door_type for DOORS only ("meaningful only when
-            # kind == door"), so absent means "not applicable", not "empty" --
-            # clobbering it would rewrite a window's harmless default and make
-            # a round trip look like an edit.
-            op.door_type = od.get("door_type", op.door_type)
-            op.swing = -1 if od.get("swings_toward", "left") == "left" else 1
-            # 0255: the sill as the record says (None = the plan's default,
-            # never materialised), and the keys the scene does not model
-            sill = od.get("sill_in")
-            op.sill_in = None if sill is None else float(sill)
-            op._v5_extra = {k: v for k, v in od.items() if k not in _OPENING_MODELLED}
-            op.doc_id = od.get("id")                           # 0264
-            op._uid = _labels.adopt("O", od.get("id"))        # 0265
-            wall.openings.append(op)
-
-    # rendering only, and deliberately BEFORE any RoomItem exists: refresh_rooms
-    # returns at `if not rooms` so no flood-fill can overwrite a stored outline
     rebuild_all_walls(scene)
 
-    rmap, fmap = {}, {}            # P4.5: document id -> live item, for groups
-    for rd in doc.get("rooms", []):
-        corners = [pos[e["v"]] for e in rd["outline"]]
-        cx = sum(c.x() for c in corners) / len(corners)
-        cy = sum(c.y() for c in corners) / len(corners)
-        off = (rd.get("label") or {}).get("offset") or [0.0, 0.0]
-        # v5 stores ONE label offset, relative to the centroid; the scene splits
-        # the same information across anchor + label_offset. Folding it all into
-        # the anchor round-trips exactly (the walk re-derives centroid + offset).
-        room = RoomItem(rd["name"], QPointF(cx + off[0], cy + off[1]),
-                        room_path_from_corners(corners),
-                        poly_area_sqft(corners),
-                        rd.get("properties") or {},
-                        [OutlineEdge(vmap[e["v"]], wmap.get(e.get("wall")))
-                         for e in rd["outline"]])
-        room.floor = lname.get(rd["level"], DEFAULT_FLOOR)   # never the global
-        room._v5_extra = {k: v for k, v in rd.items() if k not in _ROOM_MODELLED}
-        pl = rd.get("placement") or {}
-        room.placement_state = pl.get("state") or "placed"
-        room.extracted_from = pl.get("extracted_from")
-        room.placement_rotation = float(pl.get("rotation") or 0.0)
-        room.category = rd.get("category")           # P4.4, modelled
-        room.nominal_size = rd.get("nominal_size")
-        room.show_dims = bool((rd.get("label") or {}).get("show_dimensions",
-                                                          False))
-        room.label_offset = QPointF(0.0, 0.0)
-        room.doc_id = rd.get("id")                             # 0264
-        room._uid = _labels.adopt("R", rd.get("id"))          # 0265
-        scene.addItem(room)
-        rmap[rd["id"]] = room
-        for e in room.outline:                  # the outline IS the binding --
-            if e.wall is not None:                       # read, not detected
-                room.bind_wall(e.wall)
-            # An edge with `wall: null` -- an archway or a detached side --
-            # stays null. Until P3.5 this branch built a dashed placeholder
-            # item so undo would not silently drop an archway; the outline
-            # carries that fact itself (`RoomItem.open_edges`), so the
-            # placeholder was a second representation of it and went with the
-            # rest of them. Since P3.7 a null edge renders dashed directly,
-            # drawn by the room from its own outline.
-        rep["rooms"] += 1
-
-    for fd in doc.get("furnishings", []):
-        if furnishing_spec(fd["kind"]) is None:
-            rep["unknown_furnishings"].append(fd["kind"] or "?")
-            continue
-        item = make_furnishing(fd["kind"], QPointF(*fd["pos"]),
-                               float(fd.get("rotation", 0.0)),
-                               fd.get("state") or {})
-        item.floor = lname.get(fd["level"], DEFAULT_FLOOR)   # never the global
-        item.doc_id = fd.get("id")                             # 0264
-        item._uid = _labels.adopt("F", fd.get("id"))          # 0265
-        scene.addItem(item)
-        fmap[fd["id"]] = item
-        rep["furnishings"] += 1
-
-    # ANNOTATIONS (0263): texts, measures, the datum -- each its own item
-    from floorplanner.annotations import item_from_record
-    for ad in doc.get("annotations", []) or []:
-        item = item_from_record(ad, lname.get(ad.get("level"), DEFAULT_FLOOR))
-        if item is None:
-            continue
-        scene.addItem(item)
-
-    # ROOFS (0139-ruling.md R1's block, R2's first reader; R4a re-plans the
-    # footprint into the schema -- 0154-ruling.md). A document written
-    # before R4a has no `span_in` at all: MATERIALIZE it here, once, the
-    # same way every load used to derive it live -- `nearest_eaves_wall`'s
-    # single shared span becomes `[span, span]` on the live roof, and the
-    # NEXT save writes it, so a second load never re-derives it again.
-    # `overhang_in` migrates the same way, scalar -> `[v, v]`, since it
-    # changed shape at the same tranche. A document already carrying the
-    # array form (this app's own output from here on) is used as-is.
-    # R5b (0191-ruling.md sec1): a dormer's `host` is resolved AFTER every
-    # roof exists (the host may follow it in the document); a dangling host
-    # is reported and the record skipped -- never a silent floating roof.
-    roof_by_id, dormer_hosts = {}, []
-    # R6.b: every roof added used to re-clip its floor; composing the whole
-    # building per roof is too dear, so the clips are held for the loop
-    # and the building composes ONCE, after the last host is resolved
-    hold_roof_clips(scene, True)
-    for rfd in doc.get("roofs", []) or []:
-        p1 = QPointF(*rfd["ridge"][0])
-        p2 = QPointF(*rfd["ridge"][1])
-        floor = lname.get(rfd["level"], DEFAULT_FLOOR)
-        span_raw = rfd.get("span_in")
-        if isinstance(span_raw, (list, tuple)) and len(span_raw) == 2:
-            span_in = [float(span_raw[0]), float(span_raw[1])]
-        else:
-            _, legacy_span = nearest_eaves_wall(scene, p1, p2, floor)
-            span_in = legacy_span                    # RoofItem normalises
-        overhang_raw = rfd.get("overhang_in", 0.0)
-        item = RoofItem(p1, p2, eaves_h_in=float(rfd["eaves_h_in"]),
-                        ridge_h_in=float(rfd["ridge_h_in"]),
-                        overhang_in=overhang_raw,      # RoofItem normalises
-                        gable=list(rfd.get("gable", [True, True])),
-                        span_in=span_in,
-                        marker_end=int(rfd.get("marker_end", 1)),
-                        eaves_bind=rfd.get("eaves_bind", "manual"),
-                        form=rfd.get("form", "gable"),
-                        openings=rfd.get("openings"),
-                        hip_run_in=rfd.get("hip_run_in"))
-        item.floor = floor   # never the global
-        item.doc_id = rfd.get("id")                            # 0264
-        item._uid = _labels.adopt("RF", rfd.get("id"))        # 0265
-        scene.addItem(item)
-        rep["roofs"] += 1
-        roof_by_id[rfd.get("id")] = item
-        if rfd.get("host") is not None:
-            dormer_hosts.append((item, rfd.get("id"), rfd["host"]))
-    for item, rid, hid in dormer_hosts:
-        host = roof_by_id.get(hid)
-        if host is None or host is item or host.floor != item.floor:
-            rep.setdefault("roofs_skipped", []).append(
-                f"{rid}: host {hid!r} is not a roof on its level -- skipped")
-            scene.removeItem(item)
-            rep["roofs"] -= 1
-            continue
-        item.host = host
-        item.rebuild()             # derives the back end against the host
-    hold_roof_clips(scene, False)
+    rmap = _build_rooms(scene, doc, pos, vmap, wmap, lname, rep)
+    fmap = _build_furnishings(scene, doc, lname, rep)
+    _build_annotations(scene, doc, lname)
+    _build_roofs(scene, doc, lname, rep)
 
     # GROUPS (P4.5, defect 3). Rebuilt last, once every member exists, and
     # only from ids the document actually resolved -- a group whose members
@@ -1618,3 +1654,191 @@ def apply_design_to_scene(target, design, report=None, strict=False,
             raise ValueError(msg)
         warnings.warn(msg, stacklevel=2)
     return scene
+
+
+# ---------------------------------------------------------------------------
+# 0283 -- RESTORE BY DIFFERENCE (Patrick: "go ahead with option A")
+# ---------------------------------------------------------------------------
+# An undo restores a whole document; `apply_design_to_scene` rebuilt the whole
+# scene from it. `apply_design_difference` rebuilds only what differs between
+# the document the scene shows and the one being restored, and says False --
+# so the caller reloads in full, as before -- whenever it cannot be sure:
+#
+#   * anything outside the six blocks it understands differs (settings,
+#     levels, groups, reference images, provenance ...);
+#   * a vertex is shared between levels, or an unused vertex differs;
+#   * groups exist and the walls, rooms or furnishings they could name differ.
+#
+# THE COMPARISON IS BY CONTENT, NOT BY ID: every walk renumbers the document's
+# ids by geometry, so the same wall can be `w7` in one state and `w8` in the
+# next. Records are compared with their ids removed and every reference
+# (a wall's vertices, a room's outline vertices and walls, a dormer's host)
+# replaced by what it refers to. Vertex SHARING is compared too -- each
+# vertex's coordinates with the number of references it carries -- so a
+# welded corner and two unwelded corners at the same point never compare
+# equal. A spurious difference costs only a larger rebuild; a false equality
+# would be wrong, which is why the rules above err towards the full reload.
+#
+# The unit of rebuild is the LEVEL for the coupled web (vertices, walls with
+# their openings, rooms -- a corner is one shared object across all three),
+# and the level for furnishings and for annotations; the roofs are rebuilt as
+# one roofscape (a dormer names its host). Every item is built by the same
+# helpers the full apply uses, so the two cannot build one differently.
+
+_DIFF_WEB = ("vertices", "walls", "rooms")
+_DIFF_KINDS = ("furnishings", "annotations", "roofs")
+
+
+def _canon(obj) -> str:
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), default=str)
+
+
+def _web_by_level(doc):
+    """`(by_level, orphans, shared, used)`: per level, the id-free canonical
+    walls, rooms and vertex-sharing signature; the canonical unused
+    vertices; the ids of vertices referenced from more than one level; and
+    vertex id -> the levels referencing it."""
+    vx = {v["id"]: v for v in doc.get("vertices", []) or []}
+
+    def vkey(vid):
+        v = vx.get(vid)
+        return None if v is None else {k: x for k, x in v.items() if k != "id"}
+
+    used, refs = {}, {}
+
+    def note(vid, lv):
+        used.setdefault(vid, set()).add(lv)
+        refs[vid] = refs.get(vid, 0) + 1
+
+    walls_by, wkey = {}, {}
+    for w in doc.get("walls", []) or []:
+        lv = w.get("level")
+        note(w["v1"], lv)
+        note(w["v2"], lv)
+        rec = {k: x for k, x in w.items() if k not in ("id", "v1", "v2", "openings")}
+        rec["v1"], rec["v2"] = vkey(w["v1"]), vkey(w["v2"])
+        rec["openings"] = [{k: x for k, x in o.items() if k != "id"}
+                           for o in w.get("openings") or []]
+        c = _canon(rec)
+        wkey[w["id"]] = c
+        walls_by.setdefault(lv, []).append(c)
+    rooms_by = {}
+    for r in doc.get("rooms", []) or []:
+        lv = r.get("level")
+
+        def loop(edges, lv=lv):
+            out = []
+            for e in edges:
+                note(e["v"], lv)
+                d = {k: x for k, x in e.items() if k not in ("v", "wall")}
+                d["v"] = vkey(e["v"])
+                d["wall"] = wkey.get(e.get("wall")) if e.get("wall") else None
+                out.append(d)
+            return out
+        rec = {k: x for k, x in r.items() if k not in ("id", "outline", "holes")}
+        rec["outline"] = loop(r.get("outline") or [])
+        rec["holes"] = [loop(h) for h in r.get("holes") or []]
+        rooms_by.setdefault(lv, []).append(_canon(rec))
+    sharing_by = {}
+    for vid, lvs in used.items():
+        if len(lvs) == 1:
+            sharing_by.setdefault(next(iter(lvs)), []).append(_canon([vkey(vid), refs[vid]]))
+    levels = set(walls_by) | set(rooms_by) | set(sharing_by)
+    by_level = {lv: (sorted(walls_by.get(lv, [])), sorted(rooms_by.get(lv, [])),
+                     sorted(sharing_by.get(lv, []))) for lv in levels}
+    orphans = sorted(_canon(vkey(v)) for v in vx if v not in used)
+    shared = {v for v, lvs in used.items() if len(lvs) > 1}
+    return by_level, orphans, shared, used
+
+
+def _records_by_level(doc, key):
+    out = {}
+    for rec in doc.get(key, []) or []:
+        out.setdefault(rec.get("level"), []).append(
+            _canon({k: x for k, x in rec.items() if k != "id"}))
+    return {lv: sorted(v) for lv, v in out.items()}
+
+
+def _roofs_canon(doc):
+    roofs = doc.get("roofs", []) or []
+    base = {r.get("id"): _canon({k: x for k, x in r.items() if k not in ("id", "host")})
+            for r in roofs}
+    return sorted(_canon([base[r.get("id")], base.get(r.get("host")) if r.get("host") else None])
+                  for r in roofs)
+
+
+def apply_design_difference(win, current, target) -> bool:
+    """Make the scene of `win` -- which shows the document `current` -- show
+    `target`, rebuilding only what differs. True when done; False when the
+    difference is outside what this applies with certainty, and the caller
+    must reload in full (`load_data`). Never partially done on False."""
+    if not isinstance(current, dict) or not isinstance(target, dict):
+        return False
+    for k in set(current) | set(target):
+        if k in _DIFF_WEB or k in _DIFF_KINDS:
+            continue
+        if current.get(k) != target.get(k):
+            return False
+    cw, co, cshared, _ = _web_by_level(current)
+    tw, to, tshared, tused = _web_by_level(target)
+    if co != to or cshared or tshared:
+        return False
+    web = {lv for lv in set(cw) | set(tw) if cw.get(lv) != tw.get(lv)}
+    cf, tf = _records_by_level(current, "furnishings"), _records_by_level(target, "furnishings")
+    furn = {lv for lv in set(cf) | set(tf) if cf.get(lv) != tf.get(lv)}
+    ca, ta = _records_by_level(current, "annotations"), _records_by_level(target, "annotations")
+    ann = {lv for lv in set(ca) | set(ta) if ca.get(lv) != ta.get(lv)}
+    roofs = _roofs_canon(current) != _roofs_canon(target)
+    if (current.get("groups") or target.get("groups")) and (web or furn):
+        return False                    # a group names members by id
+    if not (web or furn or ann or roofs):
+        return True
+    scene = win.scene if not isinstance(win, QGraphicsScene) else win
+    lname = {lv["id"]: lv.get("name", DEFAULT_FLOOR) for lv in target.get("levels") or []}
+    rep = {"walls": 0, "rooms": 0, "furnishings": 0, "roofs": 0,
+           "openings_failed": [], "unknown_furnishings": []}
+
+    def remove(kinds, floor=None):
+        for it in list(scene.items()):
+            if (isinstance(it, kinds) and it.parentItem() is None and it.scene() is scene
+                    and (floor is None or getattr(it, "floor", None) == floor)):
+                scene.removeItem(it)
+
+    for lv in web:
+        floor = lname.get(lv, DEFAULT_FLOOR)
+        remove((WallItem, RoomItem), floor)
+        sub = {"vertices": [v for v in target.get("vertices", []) if tused.get(v["id"]) == {lv}],
+               "walls": [w for w in target.get("walls", []) if w.get("level") == lv],
+               "rooms": [r for r in target.get("rooms", []) if r.get("level") == lv]}
+        pos, vmap, wmap = _build_walls(scene, sub, lname, rep)
+        built = list(wmap.values())
+        index = _WallIndex(scene)
+        for w in built:
+            w.rebuild(cascade=False, index=index)
+        _compute_wall_junctions(scene, built)
+        _build_rooms(scene, sub, pos, vmap, wmap, lname, rep)
+    for lv in furn:
+        remove(FurnishingItem, lname.get(lv, DEFAULT_FLOOR))
+        _build_furnishings(scene, {"furnishings": [f for f in target.get("furnishings", [])
+                                                   if f.get("level") == lv]}, lname, rep)
+    if ann:
+        from floorplanner.annotations import _AnnotationBase
+        for lv in ann:
+            remove(_AnnotationBase, lname.get(lv, DEFAULT_FLOOR))
+            _build_annotations(scene, {"annotations": [a for a in target.get("annotations", []) or []
+                                                       if a.get("level") == lv]}, lname)
+    if roofs:
+        hold_roof_clips(scene, True)
+        remove(RoofItem)
+        hold_roof_clips(scene, False)
+        _build_roofs(scene, target, lname, rep)
+    if not isinstance(win, QGraphicsScene):
+        win._sync_floor_state()
+    from floorplanner.design.verify import rebase   # late: verify imports this
+    rebase(win)
+    rebase_weld_baseline(scene)
+    if rep["openings_failed"]:
+        warnings.warn("apply_design_difference: %d opening(s) could not be placed: %s"
+                      % (len(rep["openings_failed"]), "; ".join(rep["openings_failed"])),
+                      stacklevel=2)
+    return True

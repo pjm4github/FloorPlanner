@@ -1,4 +1,4 @@
-<!-- SNAPSHOT-HEAD: 6ed6049 -->
+<!-- SNAPSHOT-HEAD: e70d35d -->
 
 # Session snapshot — read this first
 
@@ -248,8 +248,8 @@ each name a ruling and an unrelated report (§0 lists the later ones).
 
 | | |
 |---|---|
-| **`main`** | **`6ed6049`** at this file's cut — PR #95 merged there (0282's restore walk); this commit lands [`0283-report.md`](handoff/0283-report.md), the merge recorded and undo by difference built on `undo-diff` (one commit on this tip, AMBER). **Owed next: his check of Ctrl+Z in the app.** Every PR through #95 is merged (#59 was closed, superseded by #60). |
-| **Branches** | **`undo-diff`** — ONE commit on this tip, AMBER, waiting on his check ([`0283`](handoff/0283-report.md)). `undo-restore-walk` merged as PR #95 and deleted. |
+| **`main`** | **`e70d35d`** at this file's cut — [`0283`](handoff/0283-report.md) landed there. This commit is `undo-diff`'s one commit on that tip: undo and redo rebuild only what differs, the full reload the fallback, AMBER. **Owed next: his check.** Every PR through #95 is merged (#59 was closed, superseded by #60). |
+| **Branches** | **`undo-diff`** — this commit, ONE on `main`'s tip, AMBER, waiting on his check ([`0283`](handoff/0283-report.md)). |
 | **Gate** | full mode, re-run for this commit. GREEN — see this commit's own gate run. The **7 deselected are the PERF LANE** (standing P3.8 flap-class ruling). |
 | **Records** | **88 records, 31 open** (D88 CLOSED 2026‑10‑11, `closed_by 6ee358b`; D87 CLOSED 2026‑10‑11, `closed_by d90f8b4`; D67 CLOSED 2026‑10‑07, `closed_by cdc54de`, [`0225`](handoff/0225-report.md); D50 CLOSED 2026‑09‑25, R6.0, `closed_by b8475b7`). D75 an accepted limit, D44's precedent; D76 the non-compositing renderer limit, cross-referenced to D69; D77 a tooling gap in `fp3d.py --shot`. D78 CLOSED (fixed 2026‑08‑16, `handoff/0027-ruling.md`). D80 CLOSED (fixed 2026‑08‑22, closed 2026‑08‑23 on Patrick's own check, `handoff/0088-ruling.md`, merged `main` at `ac6d763`). **D81/D82 CLOSED 2026‑08‑30** — `fp2pdf.py`'s door symbols and dimension-fraction formatting, fixed and merged, `handoff/0122-report.md`. **D83/D84 OPEN, filed 2026‑09‑02** — two macro-recorder gaps Patrick found, held for later, not scheduled. **D85 CLOSED 2026‑09‑05** — a very short roof ridge (or a thin-span one) was unselectable because its shape only covered the ridge, not the dashed eave/gable lines; fixed and confirmed on his own check, merged with R3b. `python tools/gate.py --docs` GREEN. |
 | **Working tree** | see §5 — check `git status --untracked-files=all` before believing a census disagreement. |

@@ -24,14 +24,18 @@ from floorplanner.annotations import (  # 0263: annotations, measurements, callo
     DatumItem, DimensionItem, LeaderItem, TextAnnotationItem, callout_colour,
     sync_annotation_visibility,
 )
-from floorplanner.design.bridge import stamp_document_ids   # 0264: the callouts' ids
+import warnings
+
+from floorplanner.design.bridge import (  # 0264: the callouts' ids; 0283: undo by difference
+    apply_design_difference, stamp_document_ids,
+)
 from floorplanner.items import *  # noqa: F401
 from floorplanner.model import (  # serialization bridge (aliased)
     DEFAULT_FLOOR, Floor,
 )
 from floorplanner.design.validate import check   # defect 28 evidence
 from floorplanner.design.verify import (  # P1.6 shadow mode
-    BASELINE_ATTR as VERIFY_BASELINE_ATTR, DesignVerificationError, verify,
+    BASELINE_ATTR as VERIFY_BASELINE_ATTR, DesignVerificationError, verify, verify_enabled,
 )
 from floorplanner.dialogs import *  # noqa: F401
 from floorplanner.view import *  # noqa: F401
@@ -1940,7 +1944,22 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self._dirty_timer.stop()
         self._restoring = True
         try:
-            self.load_data(state, keep_backdrop=True)   # undo keeps the backdrop
+            # 0283 (option A): rebuild only what differs between the plan on
+            # screen and the state restored; anything it cannot apply with
+            # certainty -- or any failure part-way -- reloads in full, as before
+            done = False
+            try:
+                done = apply_design_difference(self, self._committed_state, state)
+            except Exception as exc:                      # never a half-restore
+                warnings.warn(f"restore by difference failed, reloading: {exc!r}",
+                              stacklevel=2)
+                done = False
+            if done and verify_enabled() and self.snapshot() != state:
+                warnings.warn("restore by difference disagreed with the state; "
+                              "reloading", stacklevel=2)
+                done = False
+            if not done:
+                self.load_data(state, keep_backdrop=True)   # undo keeps the backdrop
         finally:
             self._restoring = False
         # 0282: the restored state IS the committed state. `load_data` is a

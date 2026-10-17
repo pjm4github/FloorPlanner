@@ -15,6 +15,12 @@ win.resize(1600, 1000); win.show()
 win.load_path(sys.argv[1]); app.processEvents()
 sc = win.scene
 win.switch_floor("upper"); win._set_edit_roofs(False); app.processEvents()
+# 0283: the setup settles as its OWN step, so the undo below undoes the drag
+# alone (a settings change in the same step is outside what the partial
+# restore applies, and reloads in full by design)
+_end = time.perf_counter() + 0.6
+while time.perf_counter() < _end:
+    app.processEvents()
 w = next(it for it in sc.items() if isinstance(it, fp.WallItem) and it.uid == "W130")
 print("W130", w.floor, w.wall_type, w.p1, w.p2, flush=True)
 def send(t, sp, b, bs):

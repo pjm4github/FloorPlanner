@@ -1,0 +1,53 @@
+W130 upper interior PyQt6.QtCore.QPointF(420.0, 510.0) PyQt6.QtCore.QPointF(492.0, 510.0)
+body drag: wall PyQt6.QtCore.QPointF(420.0, 510.0),PyQt6.QtCore.QPointF(492.0, 510.0) -> PyQt6.QtCore.QPointF(420.0, 510.0),PyQt6.QtCore.QPointF(492.0, 510.0); undo depth 2
+  under press: OpeningItem
+undo stack depth 2
+undo(): 347 ms (profiled), then the repaint/loop 71 ms
+ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.347    0.347 C:\dev\GitHub\FloorPlanner\floorplanner\mainwindow.py:1986(undo)
+        1    0.000    0.000    0.278    0.278 C:\dev\GitHub\FloorPlanner\floorplanner\mainwindow.py:1865(_commit_if_changed)
+        1    0.000    0.000    0.276    0.276 C:\dev\GitHub\FloorPlanner\floorplanner\planio.py:421(snapshot)
+        1    0.001    0.001    0.274    0.274 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:966(design_from_scene)
+        2    0.002    0.001    0.191    0.096 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:588(_walls_of)
+        2    0.000    0.000    0.146    0.073 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:336(_weld_delta)
+        2    0.068    0.034    0.139    0.069 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:68(weld_endpoints)
+        2    0.024    0.012    0.070    0.035 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:503(_note_vertices)
+        1    0.000    0.000    0.069    0.069 C:\dev\GitHub\FloorPlanner\floorplanner\mainwindow.py:1943(_restore_state)
+        1    0.000    0.000    0.068    0.068 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:1770(apply_design_difference)
+   173207    0.035    0.000    0.053    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:44(_d)
+        2    0.019    0.010    0.039    0.019 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:186(split_params)
+      108    0.002    0.000    0.032    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1621(rebuild)
+    88112    0.023    0.000    0.029    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:53(_proj)
+      108    0.000    0.000    0.026    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1533(_opening_spans)
+      162    0.005    0.000    0.024    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:224(coincident_walls)
+   178789    0.019    0.000    0.019    0.000 {built-in method math.hypot}
+    30680    0.009    0.000    0.018    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:48(_unit)
+   144781    0.016    0.000    0.016    0.000 {method 'get' of 'dict' objects}
+     5301    0.007    0.000    0.016    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1488(length)
+    48222    0.010    0.000    0.015    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\vertex.py:91(x)
+    48222    0.009    0.000    0.014    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\vertex.py:95(y)
+        2    0.002    0.001    0.011    0.006 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:1696(_web_by_level)
+        1    0.001    0.001    0.009    0.009 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:1292(_build_walls)
+   105697    0.008    0.000    0.008    0.000 {built-in method builtins.abs}
+    68982    0.008    0.000    0.008    0.000 {built-in method x}
+    68982    0.007    0.000    0.007    0.000 {built-in method y}
+        1    0.001    0.001    0.007    0.007 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1252(_compute_wall_junctions)
+   4013/2    0.003    0.000    0.007    0.003 C:\Users\pmora\AppData\Local\Programs\Python\Python313\Lib\copy.py:119(deepcopy)
+    506/2    0.000    0.000    0.007    0.003 C:\Users\pmora\AppData\Local\Programs\Python\Python313\Lib\copy.py:192(_deepcopy_list)
+      916    0.000    0.000    0.007    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:1692(_canon)
+  478/168    0.001    0.000    0.006    0.000 C:\Users\pmora\AppData\Local\Programs\Python\Python313\Lib\copy.py:218(_deepcopy_dict)
+      916    0.001    0.000    0.006    0.000 C:\Users\pmora\AppData\Local\Programs\Python\Python313\Lib\json\__init__.py:183(dumps)
+      916    0.001    0.000    0.005    0.000 C:\Users\pmora\AppData\Local\Programs\Python\Python313\Lib\json\encoder.py:183(encode)
+    17268    0.004    0.000    0.005    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1365(p1)
+       54    0.000    0.000    0.005    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1292(__init__)
+        1    0.000    0.000    0.005    0.005 C:\dev\GitHub\FloorPlanner\floorplanner\levels.py:47(_sync_floor_state)
+      668    0.001    0.000    0.004    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1494(unit)
+    15072    0.003    0.000    0.004    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1369(p2)
+      916    0.004    0.000    0.004    0.000 C:\Users\pmora\AppData\Local\Programs\Python\Python313\Lib\json\encoder.py:205(iterencode)
+
+
+
+unprofiled: redo 177 ms, undo 173 ms
+one compose of the building (15 roofs): 0 ms
+one snapshot(): 89 ms
+load_data of the same state: 116 ms without the compose, + 0 ms compose
