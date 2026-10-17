@@ -422,5 +422,6 @@ this table is not a second copy of it.
 | [`0280-report.md`](./0280-report.md) | report: PR #93 merged on his word; his slow Ctrl+Z measured and fixed — the roofs' compose and their traces kept by value across the reload an undo is |
 | [`0281-report.md`](./0281-report.md) | report: PR #94 merged on his word — Ctrl+Z ten times faster; nothing open on a branch |
 | [`0282-report.md`](./0282-report.md) | report: "undo by command" — a correction first: P6.b as built would not make undo faster; the walk after a restore removed (0.34 → 0.26–0.28 s); the reload's remedy put to him |
+| [`0283-report.md`](./0283-report.md) | report: PR #95 merged on his word; undo by difference (option A) built — only what changed is rebuilt, the full reload kept as the fallback |
 
 <!-- PAIRS:END -->
