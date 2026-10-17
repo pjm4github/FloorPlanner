@@ -424,5 +424,6 @@ this table is not a second copy of it.
 | [`0282-report.md`](./0282-report.md) | report: "undo by command" — a correction first: P6.b as built would not make undo faster; the walk after a restore removed (0.34 → 0.26–0.28 s); the reload's remedy put to him |
 | [`0283-report.md`](./0283-report.md) | report: PR #95 merged on his word; undo by difference (option A) built — only what changed is rebuilt, the full reload kept as the fallback |
 | [`0284-report.md`](./0284-report.md) | report: PR #96 merged on his word — undo by difference; nothing open on a branch |
+| [`0285-report.md`](./0285-report.md) | report: the plan's annotations in the DXF — drawn dimensions, texts and leaders, by the plan's Show switches |
 
 <!-- PAIRS:END -->
