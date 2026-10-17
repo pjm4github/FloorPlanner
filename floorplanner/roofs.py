@@ -674,6 +674,33 @@ def floor_rooms_key(scene, floor):
     return (tuple(rooms), t_max)
 
 
+def floor_rooms_value_key(scene, floor):
+    """0281: `floor_rooms_key` by VALUE -- each room's outline coordinates
+    (or its fallback path's polygons) and ceiling, sorted, and the floor's
+    thickest wall. Dearer than the identity key (it reads every corner), so
+    it is built only when the identity key has missed: after a reload,
+    whose new objects carry the same geometry."""
+    from floorplanner.rooms import RoomItem  # late (peer layer)
+    rooms = []
+    t_max = 0.0
+    for it in scene.items():
+        if sip.isdeleted(it) or getattr(it, "floor", None) != floor:
+            continue
+        if isinstance(it, RoomItem):
+            if it.outline:
+                shape = tuple((round(e.v.x, 6), round(e.v.y, 6)) for e in it.outline)
+            else:
+                shape = tuple(tuple((round(q.x(), 6), round(q.y(), 6)) for q in poly)
+                              for poly in it._path.toSubpathPolygons())
+            rooms.append((shape, it.properties.get("ceiling_height_in")))
+        elif isinstance(it, WallItem):
+            t_max = max(t_max, float(it.t))
+    return (tuple(sorted(rooms, key=repr)), t_max)
+
+
+_TRACE_BY_VALUE_MAX = 400
+
+
 def _floor_rooms(scene, floor):
     """Every live room on `floor` as a `_TraceRoom` -- read once per
     trace, not once per point."""
@@ -1061,9 +1088,25 @@ def sync_roof_clips(scene, floor=None, exclude=None):
              and it is not exclude]
     if not roofs:
         return
+    # 0281 (his Ctrl+Z, 3 s on wiscaway2026-10-13R1): THE COMPOSE BY VALUE.
+    # The compose reads each roof's own geometry (`geometry_key`) and its
+    # level's elevation, nothing else -- so the same roofs give the same
+    # clips. An undo reloads the document as NEW objects with the SAME
+    # roofs (a wall, room, opening or furnishing edit touches none) and
+    # recomposed the building from scratch: ~950 ms of a ~1.7 s undo. Now
+    # the last result is kept against the roofs' values and handed back.
+    sig = [(rf.geometry_key(), float(floor_elevation(rf.floor))) for rf in roofs]
+    key = tuple(sorted(sig, key=repr))
+    memo = getattr(scene, "_compose_memo", None)
+    if memo is not None and memo[0] == key and len(set(sig)) == len(sig):
+        for rf, s in zip(roofs, sig, strict=True):
+            rf.apply_clip(memo[1][s])
+        return
     clips = compose_building([(rf, floor_elevation(rf.floor)) for rf in roofs])
     for rf in roofs:
         rf.apply_clip(clips[id(rf)])
+    if len(set(sig)) == len(sig):             # two identical roofs: never cached
+        scene._compose_memo = (key, {s: clips[id(rf)] for rf, s in zip(roofs, sig, strict=True)})
 
 
 class RoofItem(QGraphicsItem):
@@ -1754,7 +1797,20 @@ class RoofItem(QGraphicsItem):
             return list(memo[1])          # 0279: the rooms as at the press
         key = own + (floor_rooms_key(sc, self.floor),)
         if memo is None or memo[0] != key:
-            memo = self._trace_memo = (key, roof_clip_trace(sc, self))
+            # 0281: before computing, the scene's by-VALUE cache -- a reload
+            # (an undo) makes new rooms and a new roof with the same
+            # geometry, which the identity key cannot recognise
+            vkey = own + (floor_rooms_value_key(sc, self.floor),)
+            by_value = getattr(sc, "_trace_by_value", None)
+            if by_value is None:
+                by_value = sc._trace_by_value = {}
+            segs = by_value.get(vkey)
+            if segs is None:
+                segs = roof_clip_trace(sc, self)
+                if len(by_value) >= _TRACE_BY_VALUE_MAX:
+                    by_value.clear()
+                by_value[vkey] = [(QPointF(p), QPointF(q)) for p, q in segs]
+            memo = self._trace_memo = (key, [(QPointF(p), QPointF(q)) for p, q in segs])
         return list(memo[1])
 
     def _drawn_trace(self):

@@ -1,0 +1,53 @@
+W130 upper interior PyQt6.QtCore.QPointF(420.0, 510.0) PyQt6.QtCore.QPointF(492.0, 510.0)
+body drag: wall PyQt6.QtCore.QPointF(420.0, 510.0),PyQt6.QtCore.QPointF(492.0, 510.0) -> PyQt6.QtCore.QPointF(420.0, 510.0),PyQt6.QtCore.QPointF(492.0, 510.0); undo depth 1
+  under press: OpeningItem
+undo stack depth 1
+undo(): 4197 ms (profiled), then the repaint/loop 386 ms
+ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    4.196    4.196 C:\dev\GitHub\FloorPlanner\floorplanner\mainwindow.py:1960(undo)
+        1    0.000    0.000    3.923    3.923 C:\dev\GitHub\FloorPlanner\floorplanner\mainwindow.py:1939(_restore_state)
+        1    0.000    0.000    3.633    3.633 C:\dev\GitHub\FloorPlanner\floorplanner\planio.py:60(load_data)
+        1    0.003    0.003    3.631    3.631 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:1291(apply_design_to_scene)
+       19    0.000    0.000    3.333    0.175 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:1043(sync_roof_clips)
+        2    0.000    0.000    3.333    1.666 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:993(hold_roof_clips)
+        1    0.000    0.000    3.332    3.332 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:504(compose_building)
+        1    0.039    0.039    3.332    3.332 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:958(compute_roof_clips)
+    48804    0.148    0.000    1.123    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:527(surface_height)
+       26    0.020    0.001    1.103    0.042 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:1544(_walk)
+    36800    0.715    0.000    0.997    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:280(_shared_segment)
+        2    0.016    0.008    0.563    0.282 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:1408(_envelope_round)
+        2    0.000    0.000    0.562    0.281 C:\dev\GitHub\FloorPlanner\floorplanner\planio.py:421(snapshot)
+        2    0.002    0.001    0.557    0.278 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:965(design_from_scene)
+93031/93019    0.020    0.000    0.489    0.000 {built-in method builtins.max}
+    48817    0.045    0.000    0.477    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:516(_frame)
+    25105    0.011    0.000    0.463    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:1591(<genexpr>)
+    17787    0.013    0.000    0.459    0.000 {built-in method builtins.any}
+        4    0.004    0.001    0.390    0.098 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:587(_walls_of)
+    47025    0.197    0.000    0.343    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:163(_split_by_line)
+    49348    0.110    0.000    0.328    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:1336(_axis)
+       60    0.006    0.000    0.318    0.005 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:784(_reach)
+    48817    0.103    0.000    0.314    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:1259(length)
+       52    0.000    0.000    0.311    0.006 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:1465(_components)
+       60    0.005    0.000    0.310    0.005 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:749(_neighbours)
+     2396    0.050    0.000    0.299    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:308(_adjacent)
+        4    0.000    0.000    0.299    0.075 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:335(_weld_delta)
+        4    0.138    0.035    0.285    0.071 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:68(weld_endpoints)
+    19714    0.120    0.000    0.278    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:204(_contains)
+        1    0.000    0.000    0.273    0.273 C:\dev\GitHub\FloorPlanner\floorplanner\mainwindow.py:1861(_commit_if_changed)
+   246045    0.223    0.000    0.223    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:1247(p1)
+    35886    0.048    0.000    0.222    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:174(_centroid)
+    65809    0.018    0.000    0.219    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:336(<genexpr>)
+        1    0.000    0.000    0.216    0.216 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1234(rebuild_all_walls)
+      336    0.006    0.000    0.208    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1621(rebuild)
+    53494    0.141    0.000    0.200    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:253(_dist_to_segment)
+  3005981    0.199    0.000    0.199    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:93(x)
+  2990077    0.195    0.000    0.195    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:96(y)
+   217620    0.082    0.000    0.193    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:500(__getattr__)
+      336    0.001    0.000    0.186    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1533(_opening_spans)
+
+
+
+unprofiled: redo 1662 ms, undo 3596 ms
+one compose of the building (15 roofs): 1396 ms
+one snapshot(): 140 ms
+load_data of the same state: 1607 ms without the compose, + 1018 ms compose

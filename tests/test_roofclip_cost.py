@@ -101,6 +101,14 @@ def test_the_clip_is_a_function_of_the_roofs_alone(fp, scene, make_room, monkeyp
         scene.addItem(fp.make_furnishing("sofa", QPointF(i * 90, 900)))
     make_room(scene, 1000, 1000, 240, 240, "Den")
     fp.rebuild_all_walls(scene)
+    # 0281: the roofs did not change, so the compose's by-value cache
+    # answers -- nothing at all is handed to the composer -- with the same
+    # clip; that the walls cannot reach the clip is the cache's premise
+    sync_roof_clips(scene)
+    assert _clip_signature(scene) == before
+    assert handed == [], "the roofs did not change: no compose"
+    # and a recompose forced past the cache is handed roofs alone
+    scene._compose_memo = None
     sync_roof_clips(scene)
     assert _clip_signature(scene) == before
     assert handed and set(handed) == {"RoofItem"}, handed

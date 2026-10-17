@@ -1,0 +1,53 @@
+W130 upper interior PyQt6.QtCore.QPointF(420.0, 510.0) PyQt6.QtCore.QPointF(492.0, 510.0)
+body drag: wall PyQt6.QtCore.QPointF(420.0, 510.0),PyQt6.QtCore.QPointF(492.0, 510.0) -> PyQt6.QtCore.QPointF(420.0, 510.0),PyQt6.QtCore.QPointF(492.0, 510.0); undo depth 1
+  under press: OpeningItem
+undo stack depth 1
+undo(): 842 ms (profiled), then the repaint/loop 76 ms
+ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.842    0.842 C:\dev\GitHub\FloorPlanner\floorplanner\mainwindow.py:1960(undo)
+        1    0.000    0.000    0.574    0.574 C:\dev\GitHub\FloorPlanner\floorplanner\mainwindow.py:1939(_restore_state)
+        2    0.000    0.000    0.537    0.268 C:\dev\GitHub\FloorPlanner\floorplanner\planio.py:421(snapshot)
+        2    0.001    0.001    0.532    0.266 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:965(design_from_scene)
+        4    0.004    0.001    0.370    0.093 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:587(_walls_of)
+        1    0.000    0.000    0.303    0.303 C:\dev\GitHub\FloorPlanner\floorplanner\planio.py:60(load_data)
+        1    0.003    0.003    0.301    0.301 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:1291(apply_design_to_scene)
+        4    0.000    0.000    0.282    0.071 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:335(_weld_delta)
+        4    0.131    0.033    0.269    0.067 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:68(weld_endpoints)
+        1    0.000    0.000    0.267    0.267 C:\dev\GitHub\FloorPlanner\floorplanner\mainwindow.py:1861(_commit_if_changed)
+        1    0.000    0.000    0.220    0.220 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1234(rebuild_all_walls)
+      336    0.006    0.000    0.212    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1621(rebuild)
+      336    0.001    0.000    0.190    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1533(_opening_spans)
+      504    0.035    0.000    0.185    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:224(coincident_walls)
+        4    0.047    0.012    0.136    0.034 C:\dev\GitHub\FloorPlanner\floorplanner\design\bridge.py:502(_note_vertices)
+   346414    0.068    0.000    0.102    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:44(_d)
+    30384    0.041    0.000    0.093    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1488(length)
+        4    0.037    0.009    0.075    0.019 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:186(split_params)
+    11158    0.022    0.000    0.074    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1494(unit)
+   176224    0.044    0.000    0.057    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:53(_proj)
+   379265    0.039    0.000    0.039    0.000 {built-in method math.hypot}
+    61360    0.017    0.000    0.035    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\design\legacy.py:48(_unit)
+   279081    0.032    0.000    0.032    0.000 {method 'get' of 'dict' objects}
+    96444    0.019    0.000    0.029    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\vertex.py:91(x)
+   102780    0.023    0.000    0.029    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1365(p1)
+    96444    0.018    0.000    0.028    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\vertex.py:95(y)
+    91984    0.021    0.000    0.027    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1369(p2)
+   232166    0.026    0.000    0.026    0.000 {built-in method x}
+   232167    0.025    0.000    0.025    0.000 {built-in method y}
+       18    0.000    0.000    0.017    0.001 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:1430(rebuild)
+   224730    0.017    0.000    0.017    0.000 {built-in method builtins.abs}
+      168    0.001    0.000    0.015    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1292(__init__)
+        1    0.002    0.002    0.015    0.015 C:\dev\GitHub\FloorPlanner\floorplanner\walls.py:1252(_compute_wall_junctions)
+        3    0.000    0.000    0.013    0.004 C:\dev\GitHub\FloorPlanner\floorplanner\roofs.py:1319(_derive_back_end)
+        2    0.000    0.000    0.013    0.007 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:547(meet_along)
+   8026/4    0.006    0.000    0.013    0.003 C:\Users\pmora\AppData\Local\Programs\Python\Python313\Lib\copy.py:119(deepcopy)
+   1012/4    0.001    0.000    0.013    0.003 C:\Users\pmora\AppData\Local\Programs\Python\Python313\Lib\copy.py:192(_deepcopy_list)
+      732    0.001    0.000    0.013    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\roofclip.py:563(h)
+   198965    0.013    0.000    0.013    0.000 C:\dev\GitHub\FloorPlanner\floorplanner\vertex.py:99(point)
+        1    0.000    0.000    0.013    0.013 C:\dev\GitHub\FloorPlanner\floorplanner\levels.py:47(_sync_floor_state)
+
+
+
+unprofiled: redo 340 ms, undo 344 ms
+one compose of the building (15 roofs): 0 ms
+one snapshot(): 82 ms
+load_data of the same state: 105 ms without the compose, + 0 ms compose
