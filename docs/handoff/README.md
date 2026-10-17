@@ -418,5 +418,6 @@ this table is not a second copy of it.
 | [`0276-report.md`](./0276-report.md) | report: 0275's steps 1–3 built — the roof clip trace and the wall dashes out of the per-paint path, the settle walk held through a roof gesture; and a second fault found on the way, the settle walk re-arming itself forever |
 | [`0277-report.md`](./0277-report.md) | report: PR #91 merged on his word; the garage roof's dead knob — a dormer whose face stands past its host's eaves — fixed on `dormer-knob` |
 | [`0278-report.md`](./0278-report.md) | report: PR #92 merged on his word — the garage roof's knob; nothing open on a branch |
+| [`0279-report.md`](./0279-report.md) | report: the wall-and-room drag hold, and repaint only what changed — every item audited to paint inside its own box, the screen checked for staleness on eleven kinds of drag |
 
 <!-- PAIRS:END -->
