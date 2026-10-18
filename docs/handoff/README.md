@@ -425,5 +425,6 @@ this table is not a second copy of it.
 | [`0283-report.md`](./0283-report.md) | report: PR #95 merged on his word; undo by difference (option A) built — only what changed is rebuilt, the full reload kept as the fallback |
 | [`0284-report.md`](./0284-report.md) | report: PR #96 merged on his word — undo by difference; nothing open on a branch |
 | [`0285-report.md`](./0285-report.md) | report: the plan's annotations in the DXF — drawn dimensions, texts and leaders, by the plan's Show switches |
+| [`0286-report.md`](./0286-report.md) | report: the Chief workflow's step 10 rewritten — importing `L2.dxf` onto a second floor; folded into PR #97 with his own screenshot edits |
 
 <!-- PAIRS:END -->
