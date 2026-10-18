@@ -426,5 +426,6 @@ this table is not a second copy of it.
 | [`0284-report.md`](./0284-report.md) | report: PR #96 merged on his word — undo by difference; nothing open on a branch |
 | [`0285-report.md`](./0285-report.md) | report: the plan's annotations in the DXF — drawn dimensions, texts and leaders, by the plan's Show switches |
 | [`0286-report.md`](./0286-report.md) | report: the Chief workflow's step 10 rewritten — importing `L2.dxf` onto a second floor; folded into PR #97 with his own screenshot edits |
+| [`0287-report.md`](./0287-report.md) | report: PR #97 merged on his word — the plan's annotations in the DXF, and the second-floor procedure; a gate deadlock of my making, and how it was cleared |
 
 <!-- PAIRS:END -->

@@ -5,12 +5,13 @@
 
 **Generated from the record** — one `**Landed:**` line per merge in [`handoff/`](handoff/), the defect register's front matter, and [`ROADMAP.md`](ROADMAP.md) §3's RED table. This file says whether a thing is DONE; [`SESSION_SNAPSHOT.md`](SESSION_SNAPSHOT.md) keeps the order and the why ([`handoff/0019-ruling.md`](handoff/0019-ruling.md) §4). A box that is not derived from the record is not on this board.
 
-**95 landed, 1 closed unmerged; 31 defects open, 57 closed.**
+**96 landed, 1 closed unmerged; 31 defects open, 57 closed.**
 
 ## Landed
 
 | PR | date | commit | tier | what it rested on | record |
 |---|---|---|---|---|---|
+| [#97](https://github.com/pjm4github/FloorPlanner/pull/97) | 2026-10-18 | `ea5a4bc` | AMBER | checked by Patrick in Chief: "The DXF import into Chief Architect works well"; landed on his choice "Land #97 now" | [`0287`](handoff/0287-report.md) |
 | [#96](https://github.com/pjm4github/FloorPlanner/pull/96) | 2026-10-17 | `bc68e43` | AMBER | checked by Patrick in the app: "land #96, the cntrl+Z looks good!" | [`0284`](handoff/0284-report.md) |
 | [#95](https://github.com/pjm4github/FloorPlanner/pull/95) | 2026-10-17 | `6ed6049` | AMBER | checked by Patrick: "land #95, then go ahead with option A" | [`0283`](handoff/0283-report.md) |
 | [#94](https://github.com/pjm4github/FloorPlanner/pull/94) | 2026-10-17 | `1a0d5cf` | AMBER | checked by Patrick in the app: "undo works now, land #94" | [`0281`](handoff/0281-report.md) |
