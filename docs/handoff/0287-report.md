@@ -38,6 +38,10 @@ floor (Reference Display, Select Reference Floor). These follow Chief's
 standard controls and were not verified in his X17; if his menu names
 differ, step 10 gets corrected.
 
+**On GitHub, #97 reads CLOSED, not merged:** once `main` had `ea5a4bc`, the PR's head was
+force-moved onto it (his command), and GitHub closed the PR without recording a merge. A
+comment on the PR points to `ea5a4bc` and this record. The branch is deleted, local and remote.
+
 **Nothing is open on a branch.** Named, not ordered: his backlog (0248's
 items 8 and 9).
 
