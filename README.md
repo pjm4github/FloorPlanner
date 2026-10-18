@@ -262,9 +262,11 @@ FloorPlanner v5 design ──export──▶ <level>.dxf + <level>.openings.json
 Pick an output folder; the app writes every storey level (site/lot levels
 are skipped) and shows a completion summary listing the files written and
 any warnings (an opening that overran its wall, two openings overlapping on
-one wall, a zero-length wall). Furnishings, reference images and dimension
-annotations are **not** exported — FloorPlanner owns plan topology, Chief
-owns construction build-up (platforms, roof, framing).
+one wall, a zero-length wall). Furnishings, reference images and roofs are
+**not** exported — FloorPlanner owns plan topology, Chief owns construction
+build-up (platforms, roof, framing). The plan's own annotations are, by the
+same rule as the PDF: drawn dimensions while **Show ▸ Dimensions** is on,
+texts and leaders while **Show ▸ Annotations** is on.
 
 **Before exporting, check Edit ▸ "Wall orthogonality report…".** A wall
 that is a fraction of a degree off axis draws as straight in FloorPlanner
@@ -307,6 +309,12 @@ tool that tells you before Chief does.
   door type, hinge and swing — the source of truth for the QC pass below.
   The same data rides on-plan as small magenta `FP-NOTES` text tags next to
   each opening.
+- **Annotations** keep to layers of their own, so they can be frozen apart
+  from the opening tags: drawn dimensions (extension lines, the line, a
+  slash at each end, the length in the plan's units) on `FP-DIMENSIONS`;
+  texts and leaders (line, shoulder, filled arrowhead, text) on
+  `FP-ANNOTATIONS`. They are plain lines and text, not Chief dimension
+  objects, and CAD to Walls leaves both layers alone.
 
 ### The verified Chief Architect X17 import workflow
 
@@ -315,35 +323,42 @@ invisible until CAD to Walls silently does nothing.** Run it once per
 level, on the matching Chief floor; use a fresh Chief plan for the first
 import.
 
-1. **File ▸ Import ▸ Import Drawing.**
+
+1. **File ▸ Import ▸ Import Drawing - Menu.**
+![00-import-drawing-dxf-menu.png](docs/evidence/chief-export/00-import-drawing-dxf-menu.png)
+  Open the file menu and select import drawing (DXF)
+2. **File ▸ Import ▸ Import Drawing.**
    ![Import Drawing dialog](docs/evidence/chief-export/01-import-drawing-dialog.png)
    **Show Import Assistant: ON** · Show For Each File: off ·
    **Create CAD Blocks: OFF** — critical: blocks hide the individual lines
    from CAD to Walls.
-2. **Import Assistant — entity handling.**
+3. **Click next**
+ ![01p5-import-drawing-dialog-next.png](docs/evidence/chief-export/01p5-import-drawing-dialog-next.png)
+4. **Import Assistant — entity handling.**
    ![Entity handling](docs/evidence/chief-export/02-import-assistant-entities.png)
    Convert lines with shared end points into **Polylines: OFF, Boxes:
    OFF** — critical: wall faces share endpoints at every corner by
    construction and must stay discrete LINEs. CAD blocks option is
-   irrelevant (the file contains none); Hatch: off.
-3. **Select Layers.**
+   irrelevant (the file contains none); Hatch: off. click **Next**
+5. **Select Layers.**
    ![Select layers](docs/evidence/chief-export/03-select-layers.png)
    Leave **all layers checked**; leave the *Convert To* column **empty**
-   (it's for terrain elevation data only).
-4. **Layer Mapping.**
+   (it's for terrain elevation data only). click **Next**
+6. **Layer Mapping.**
    ![Layer mapping](docs/evidence/chief-export/04-layer-mapping.png)
    Select **"Chief Architect layers by name"** with **"Import all layer
    attributes"** — this preserves the FP-* layers, colours and linetypes.
    (The default "single layer" flattens everything: wrong.)
-5. **Drawing Unit.**
+7. **Drawing Unit.**
    ![Drawing unit](docs/evidence/chief-export/05-drawing-unit.png)
-   Unit: **in**, drawing is 1:1. Dimension-line options are moot (the file
-   contains none).
+   Unit: **in**, drawing is 1:1. Dimension-line options are moot: the
+   plan's drawn dimensions arrive as plain lines and text on
+   `FP-DIMENSIONS`, not as DXF dimension entities.
 
    After Finish, the drawing appears as coloured line work (black walls,
    red doors, blue windows, cyan rails):
    ![Imported CAD](docs/evidence/chief-export/06-imported-cad-plan-view.png)
-6. **CAD ▸ CAD to Walls… (Ctrl+F3).**
+8. **CAD ▸ CAD to Walls… (Ctrl+F3).**
    ![CAD menu](docs/evidence/chief-export/07-cad-menu-cad-to-walls.png)
    The layer dropdowns list native and imported layers together — pick the
    **FP-** entries only:
@@ -359,11 +374,12 @@ import.
    Set Wall Types: **Wall Type 1 = Siding-6**, **Wall Type 2 =
    Interior-4** (Chief matches a line-pair spacing to a wall type within
    **±1 inch**, so exactness beyond that isn't required — agreement is).
-   Never assign any `FP-X-*` layer. For the record, the first-session
+   Never assign any `FP-X-*` layer, nor `FP-DIMENSIONS` /
+   `FP-ANNOTATIONS` / `FP-NOTES` — they are drawing, not walls. For the record, the first-session
    dialog below used the merged native `Windows`/`Doors` layers — with the
    FP- prefix this ambiguity no longer exists:
    ![First-run dialog](docs/evidence/chief-export/09-convert-dialog-first-run.png)
-7. **Result.** The first-attempt failure mode that motivated the door
+9. **Result.** The first-attempt failure mode that motivated the door
    symbols — both doors arrived as `2640DH` windows (correct width and
    station, wrong class):
    ![Doors as windows](docs/evidence/chief-export/10-first-run-doors-as-windows.png)
@@ -376,20 +392,83 @@ import.
    not literally reproduce sidecar stations; the DXF geometry itself is
    exact. The dashed green perimeter and diagonals are Chief's auto hip
    roof (disable via Auto Rebuild Roofs if unwanted during QC).
-8. **Additional floors.**
-   ![Build Floor menu](docs/evidence/chief-export/13-build-floor-menu.png)
-   **Build ▸ Floor ▸ Build New Floor…** → choose **"Derive new 2nd floor
-   plan from the 1st floor plan"**, accept the floor defaults dialog
-   (Chief's platform build-up; *Finished Ceiling* is the field to true up
-   against the level's height if an exact match is wanted):
-   ![2nd floor defaults](docs/evidence/chief-export/14-2nd-floor-defaults.png)
+10. **Additional floors — importing `L2.dxf` onto a second floor.**
 
-   Delete the derived placeholder walls, then on Floor 2 import that
-   level's DXF with **identical settings** and re-run CAD to Walls.
-   Because every level shares the FloorPlanner origin, floors stack
-   exactly — verify with the Reference Floor toggle:
-   ![Floor 2 converted](docs/evidence/chief-export/15-floor2-converted.png)
-9. **QC and cleanup.**
+    The export writes **one DXF per FloorPlanner floor** (`L1.dxf`,
+    `L2.dxf`, … — named by the level's id), and each one goes onto its
+    **own Chief floor**, not onto a Chief *layer*. Chief's layers are
+    display layers shared by every floor (the `FP-*` layers from `L1.dxf`
+    are the same layers `L2.dxf` will use); which **floor** a drawing lands
+    on is decided only by the floor Chief is showing when you import it.
+
+    **a. Know which file is which floor.** In FloorPlanner, the **Floors**
+    menu lists every floor with its elevation and height, e.g. *Main Level
+    (0" / 108")* and *Upper Level (108" / 96")* in the checked-in sample;
+    **Floors ▸ ⟨floor⟩ ▸ Elevation and height…** shows or sets them. A
+    floor's id is the file name: the sample's *Main Level* is `L1.dxf`,
+    *Upper Level* is `L2.dxf`. A site/lot level has no file (it is
+    skipped); a floor whose elevation is below the first is a basement.
+
+    **b. Finish floor 1 first** — steps 1–9 with `L1.dxf`, through CAD to
+    Walls. Chief derives a new floor from the one below, so floor 1's
+    walls should exist before floor 2 is built.
+
+    **c. Match floor 1's ceiling to FloorPlanner** (optional, for an exact
+    stack): FloorPlanner's floor 2 sits at floor 1's elevation + height
+    (108" in the sample). In Chief, floor 1's **Finished Ceiling** height
+    is the field to set to floor 1's FloorPlanner height (108"); Chief adds
+    its own floor platform on top, so its floor 2 rises by that platform
+    as well — FloorPlanner has no platform thickness, so a few inches of
+    difference in 3D is expected and harmless to the plan.
+
+    **d. Build the second floor.** **Build ▸ Floor ▸ Build New Floor…**
+    ![Build Floor menu](docs/evidence/chief-export/13-build-floor-menu.png)
+    Choose **"Derive new 2nd floor plan from the 1st floor plan"** and
+    accept the floor defaults dialog that follows (*Finished Ceiling* is
+    the field to set to floor 2's FloorPlanner height — 96" in the sample
+    — if an exact match is wanted):
+    ![2nd floor defaults](docs/evidence/chief-export/14-2nd-floor-defaults.png)
+    Chief then **shows floor 2** (the status bar names the current
+    floor). If it does not, move up with
+    the **Up One Floor** toolbar button before going on: the import in
+    step f goes onto **whatever floor is showing**.
+
+    **e. Clear the derived walls.** Deriving copies floor 1's exterior
+    walls up as placeholders. On floor 2, **Edit ▸ Delete Objects** with
+    the scope on **this floor only** and only **Walls** checked removes
+    them (or select and delete them by hand). Don't run it with *All
+    Floors* — that would delete floor 1's converted walls too.
+
+    **f. Import `L2.dxf` on floor 2.** With floor 2 showing, repeat
+    **steps 1–7 with identical settings**, choosing `L2.dxf`: Create CAD
+    Blocks **off**, polylines/boxes **off**, all layers checked, *Chief
+    Architect layers by name* with all layer attributes, unit **in**,
+    1:1. Chief may say the `FP-*` layers already exist — that is expected
+    (they came in with `L1.dxf`); keep the existing ones.
+    **Do not move the imported drawing.** Every FloorPlanner floor shares
+    one origin, so `L2.dxf` lands exactly over `L1.dxf`'s walls; dragging
+    it breaks the stack.
+
+    **g. CAD to Walls on floor 2** — step 8 again, still on floor 2, with
+    the same layer slots (`FP-WALLS`, `FP-WINDOWS`, `FP-DOORS`,
+    `FP-RAILS`) and the same wall types.
+
+    **h. Check the stack.** Turn on Chief's **Reference Floor** display
+    (floor 1 shown greyed under floor 2): the upper walls should sit on
+    the lower walls where FloorPlanner has them stacked.
+    ![Floor 2 converted](docs/evidence/chief-export/15-floor2-converted.png)
+
+    **A third floor** repeats d–h from floor 2 (*Build New Floor* derives
+    floor 3 from floor 2) with `L3.dxf`. **A basement** goes *under* floor
+    1 instead — Chief inserts a floor below the first from the same
+    **Build ▸ Floor** menu — and takes its own file the same way, imported
+    while the basement floor is showing.
+
+    *Verified with screenshots: d's two dialogs and h's result (the
+    sample's `L2.dxf`). The rest of a–h, and the third-floor and basement
+    notes, follow Chief's standard floor handling and have not been
+    re-captured here.*
+11. **QC and cleanup.**
    1. Apply what Chief can't take from geometry alone: window sill/head,
       slider door type, verify hinge/swing (the magenta `FP-NOTES` tags
       carry the same data on-plan).
@@ -402,7 +481,10 @@ import.
 
       CAD to Walls *copies* rather than consumes, so this final sweep
       removes the entire imported underlay, leaving a pure native Chief
-      model.
+      model. That includes the plan's exported dimensions and notes
+      (`FP-DIMENSIONS`, `FP-ANNOTATIONS`); if you want them in the
+      finished model, skip this sweep and turn the other `FP-*` layers'
+      display off instead.
 
 ### Known limitations
 
@@ -414,8 +496,10 @@ import.
 - A gate/door with no recorded hinge/swing gets a defaulted handedness
   (`v1`/`left`) purely so it classifies as a door — fix the handedness in
   QC.
-- Furnishings, reference images and dimension annotations are not
-  exported (deliberate — see above).
+- Furnishings, reference images and roofs are not exported (deliberate —
+  see above). The plan's dimensions, texts and leaders are, as plain CAD
+  lines and text — Chief does not turn them into its own dimension
+  objects.
 - The reverse direction (a Chief-exported DXF → a FloorPlanner design) is
   not implemented; it needs a real Chief-exported DXF sample to tune the
   wall-pairing pass.

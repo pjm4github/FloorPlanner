@@ -94,7 +94,7 @@ picked (the Room and Datum tools hand back to Select after one use).
 | Import from image (PNG)… | Drop a raster plan on the canvas as a backdrop; calibrate, crop and extract walls from its context menu (§5). | `plan.png` |
 | Save / Save As… | Write the plan (Ctrl+S / Ctrl+Shift+S) as a version‑6 design document. | *File ▸ Save As…*, `house.json` |
 | Export ▸ Rooms as CSV… | The rooms as the CSV above. | `rooms.csv` |
-| Export ▸ Chief Architect (DXF)… | One DXF R12 + `.openings.json` sidecar per storey level for Chief's **CAD to Walls** (see the README's workflow). | pick a folder |
+| Export ▸ Chief Architect (DXF)… | One DXF R12 + `.openings.json` sidecar per storey level for Chief's **CAD to Walls** (see the README's workflow). Shown dimensions go on `FP-DIMENSIONS`, shown texts and leaders on `FP-ANNOTATIONS`. | pick a folder |
 | Export ▸ PDF plan set… | One 11×17 sheet per level: walls, openings, rooms, the plan's **drawn** measurements in place of the auto rows when it has any, its texts and leaders while shown; a title block. Options dialog, then a Save As. | `house.pdf` |
 | Export ▸ Legacy v4… | The old `floorplanner-json` v4 file, for the one release that still reads it. | `house-v4.json` |
 | Load template room… / Save template room… | A one-room document: save a **floated** room as a template; load one onto the canvas as a floating room. | *Save template room…* with the bath floated |

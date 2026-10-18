@@ -41,6 +41,12 @@ lines only); `oD2`'s own slider-panel geometry is UNCHANGED (the
 coincidence above). Both `.openings.json` sidecars: only the `door_type`
 field's text changed, stations untouched.
 
+REGENERATED AGAIN, 0285 (Patrick: "go ahead with the DXF export of
+annotations"). **THE DIFF:** the LAYER table grows from 11 to 13 entries
+(`FP-DIMENSIONS`, `FP-ANNOTATIONS`, in both files); the sample's one text
+note (`a1`, on L1) moves from `FP-NOTES` to `FP-ANNOTATIONS`, its point,
+height and text unchanged. Nothing else; both sidecars byte-identical.
+
 COMPARED AS TEXT, NOT RAW BYTES -- measured, not assumed. `convert()`
 writes with `Path.write_text(..., encoding="utf-8")` and no `newline=`
 argument, so on Windows every `\n` it emits becomes `\r\n` on disk; this
@@ -279,3 +285,147 @@ def test_export_dxf_path_reports_a_bad_outdir_without_a_modal(fp, win, tmp_path)
     result = win.export_dxf_path(str(blocker / "sub"), interactive=False)
     assert result is None
     assert "failed" in win.statusBar().currentMessage().lower()
+
+
+# --------------------------------------------------------------------------
+# 0285 -- the plan's annotations in the DXF (Patrick: "go ahead with the DXF
+# export of annotations"): drawn dimensions on FP-DIMENSIONS while Show >
+# Dimensions is on, texts and leaders on FP-ANNOTATIONS while Show >
+# Annotations is on -- the PDF's rule (0268/0270)
+# --------------------------------------------------------------------------
+
+def _entities(text):
+    """The ENTITIES section as a list of {group code: [values]} per entity."""
+    lines = text.splitlines()
+    pairs = list(zip(lines[0::2], lines[1::2], strict=False))
+    start = next(i for i, (c, v) in enumerate(pairs) if c.strip() == "2" and v == "ENTITIES")
+    out, cur = [], None
+    for c, v in pairs[start + 1:]:
+        c = int(c)
+        if c == 0:
+            if cur is not None:
+                out.append(cur)
+            if v in ("ENDSEC", "EOF"):
+                break
+            cur = {0: [v]}
+        else:
+            cur.setdefault(c, []).append(v)
+    return out
+
+
+def _on(ents, layer, kind=None):
+    return [e for e in ents if e[8] == [layer] and (kind is None or e[0] == [kind])]
+
+
+def _xy(e, cx=10, cy=20):
+    return (round(float(e[cx][0]), 3), round(float(e[cy][0]), 3))
+
+
+def _annotated(annotations, **settings):
+    doc = _one_opening_doc("window")
+    doc["walls"][0]["openings"] = []
+    doc["version"] = 6
+    doc["annotations"] = annotations
+    doc["settings"] = settings
+    return doc
+
+
+DIM = {"id": "d1", "level": "L1", "kind": "dimension", "pos": [0, 0], "p2": [120, 0],
+       "offset_in": 18.0}
+LEADER = {"id": "n1", "level": "L1", "kind": "leader", "pos": [100, 50], "p2": [60, 20],
+          "text": "beam above"}
+NOTE = {"id": "t1", "level": "L1", "kind": "text", "pos": [10, 80], "text": "verify"}
+
+
+def _convert(tmp_path, doc):
+    result = convert(doc, tmp_path)
+    return _entities((tmp_path / "L1.dxf").read_text(encoding="utf-8")), result
+
+
+def test_a_drawn_dimension_is_its_extension_lines_line_slashes_and_length(tmp_path):
+    ents, result = _convert(tmp_path, _annotated([DIM]))
+    lines = _on(ents, "FP-DIMENSIONS", "LINE")
+    assert len(lines) == 5                       # 2 extension, the line, 2 slashes
+    # the line: 18" off the measured line on its screen-left, which for a
+    # left-to-right line in y-down is +y on screen, so -18 in the DXF
+    ends = {(_xy(e), _xy(e, 11, 21)) for e in lines}
+    assert ((0.0, -18.0), (120.0, -18.0)) in ends
+    (label,) = _on(ents, "FP-DIMENSIONS", "TEXT")
+    assert label[1] == ["10'-0\""] and label[72] == ["1"]     # centred, ft-in
+    assert "1 annotations" in result.summary[0]
+
+
+def test_the_dimension_geometry_is_the_pdfs(tmp_path):
+    """One leaf (`_annot.py`) for both exporters: the DXF's lines are the
+    PDF sheet's drawn-dimension lines, point for point."""
+    from floorplanner.export import fp2pdf
+    ents, _ = _convert(tmp_path, _annotated([DIM]))
+    got = sorted((_xy(e), _xy(e, 11, 21)) for e in _on(ents, "FP-DIMENSIONS", "LINE"))
+    d = fp2pdf._ANNOT.dimension_geometry(DIM)
+
+    def r(p):
+        return (round(p[0], 3), round(p[1], 3))
+    want = sorted((r(a), r(b)) for a, b in d["ext"] + [d["line"]] + d["slashes"])
+    assert got == want
+
+
+def test_dimension_units_in_inches_label_in_inches(tmp_path):
+    ents, _ = _convert(tmp_path, _annotated([DIM], dimension_units="in"))
+    (label,) = _on(ents, "FP-DIMENSIONS", "TEXT")
+    assert label[1] == ['120"']
+
+
+def test_a_leader_is_its_line_shoulder_arrowhead_and_text(tmp_path):
+    ents, _ = _convert(tmp_path, _annotated([LEADER]))
+    lines = _on(ents, "FP-ANNOTATIONS", "LINE")
+    assert len(lines) == 2                       # the leader and the shoulder
+    assert ((60.0, -20.0), (100.0, -50.0)) in {(_xy(e), _xy(e, 11, 21)) for e in lines}
+    (head,) = _on(ents, "FP-ANNOTATIONS", "SOLID")
+    assert _xy(head) == (100.0, -50.0)           # the arrow points at the tip
+    (txt,) = _on(ents, "FP-ANNOTATIONS", "TEXT")
+    assert txt[1] == ["beam above"]
+    # the text end is left of the tip: shoulder and text run leftward,
+    # the text right-aligned to the shoulder's end
+    assert txt[72] == ["2"] and float(txt[10][0]) < 60.0
+
+
+def test_texts_move_to_their_own_layer(tmp_path):
+    ents, _ = _convert(tmp_path, _annotated([NOTE]))
+    (txt,) = _on(ents, "FP-ANNOTATIONS", "TEXT")
+    assert txt[1] == ["verify"] and _xy(txt) == (10.0, -80.0)
+    assert not [e for e in _on(ents, "FP-NOTES", "TEXT") if e[1] == ["verify"]]
+
+
+def test_what_the_plan_hides_is_not_exported(tmp_path):
+    """The two Show switches act on their own kinds only."""
+    ents, _ = _convert(tmp_path, _annotated([DIM, LEADER, NOTE], show_dimensions=False))
+    assert not _on(ents, "FP-DIMENSIONS")
+    assert len(_on(ents, "FP-ANNOTATIONS", "TEXT")) == 2
+    ents, result = _convert(tmp_path, _annotated([DIM, LEADER, NOTE], show_annotations=False))
+    assert not _on(ents, "FP-ANNOTATIONS")
+    assert len(_on(ents, "FP-DIMENSIONS", "LINE")) == 5
+    assert "1 annotations" in result.summary[0]
+
+
+def test_the_two_layers_are_declared(tmp_path):
+    convert(_annotated([]), tmp_path)
+    text = (tmp_path / "L1.dxf").read_text(encoding="utf-8")
+    assert "\nFP-DIMENSIONS\n" in text and "\nFP-ANNOTATIONS\n" in text
+
+
+def test_the_menu_export_carries_the_plans_annotations(fp, win, tmp_path, make_room):
+    """End to end from the editor: a drawn dimension, a leader and a text on
+    the plan arrive in the DXF the File menu writes."""
+    from PyQt6.QtCore import QPointF
+
+    from floorplanner.annotations import DimensionItem, LeaderItem, TextAnnotationItem
+    make_room(win.scene, 0, 0, 240, 120, name="Den")
+    win.scene.addItem(DimensionItem(QPointF(0, 0), QPointF(240, 0)))
+    win.scene.addItem(LeaderItem(QPointF(120, 60), QPointF(200, 160), "post"))
+    win.scene.addItem(TextAnnotationItem(QPointF(20, 200), "a note"))
+    result = win.export_dxf_path(str(tmp_path), interactive=False)
+    ents = _entities(result.written[0].read_text(encoding="utf-8"))
+    assert _on(ents, "FP-DIMENSIONS", "TEXT")[0][1] == ["20'-0\""]
+    texts = {e[1][0] for e in _on(ents, "FP-ANNOTATIONS", "TEXT")}
+    assert texts == {"post", "a note"}
+    assert _on(ents, "FP-ANNOTATIONS", "SOLID")

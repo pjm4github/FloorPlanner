@@ -158,10 +158,41 @@ LAYERS = {
     "FP-X-OPEN-EDGE":  (2, "DASHED"),
     "FP-ROOM-LABELS":  (7, "CONTINUOUS"),
     "FP-NOTES":        (6, "CONTINUOUS"),
+    # 0285: the plan's own annotations, each on a layer of its own so a CAD
+    # user can freeze them apart from the opening tags on FP-NOTES
+    "FP-DIMENSIONS":   (3, "CONTINUOUS"),
+    "FP-ANNOTATIONS":  (7, "CONTINUOUS"),
 }
 
 ROOM_LABEL_H = 8.0   # text height, inches
 NOTE_H = 4.0
+#: 0285: a leader's arrowhead and the shoulder under its text, plan inches
+LEADER_ARROW_IN = 6.0                  # arrowhead length
+LEADER_ARROW_HALF_IN = 2.0             # arrowhead half-width
+LEADER_SHOULDER_IN = 8.0               # the short horizontal under the text
+
+
+def _load_annot_module():
+    """`_annot.py` -- the drawn dimensions' geometry and the ft-in label,
+    the leaf shared with `fp2pdf.py` (0285), loaded BY PATH like `_stdt.py`
+    so the two exporters draw a dimension the same way."""
+    path = Path(__file__).resolve().parent / "_annot.py"
+    spec = importlib.util.spec_from_file_location("_fp2dxf_annot", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_annot_cache = None
+
+
+def _annot():
+    """The `_annot.py` leaf, loaded on first use -- nothing runs merely by
+    importing this file (0077-ruling.md sec5)."""
+    global _annot_cache
+    if _annot_cache is None:
+        _annot_cache = _load_annot_module()
+    return _annot_cache
 
 
 # --------------------------------------------------------------------------
@@ -198,12 +229,31 @@ class DxfR12:
             + g(40, r) + g(50, a_start) + g(51, a_end))
 
     def text(self, layer: str, x: float, y: float, h: float,
-             s: str, rot: float = 0.0) -> None:
+             s: str, rot: float = 0.0, align: int = 0) -> None:
+        """TEXT at (x, y). `align` is R12's horizontal justification
+        (group 72): 0 left at the insertion point (the default, and the
+        only form written before 0285), 1 centred on it, 2 right-aligned
+        to it -- a justified TEXT carries its point as the alignment point
+        (11/21/31) as well."""
         g = self._g
+        ent = (g(0, "TEXT") + g(8, layer)
+               + g(10, x) + g(20, y) + g(30, 0.0)
+               + g(40, h) + g(1, s) + g(50, rot))
+        if align:
+            ent += g(72, align) + g(11, x) + g(21, y) + g(31, 0.0)
+        self._ent.append(ent)
+
+    def solid(self, layer: str, pts) -> None:
+        """A filled triangle (R12 SOLID; its fourth corner repeats the
+        third) -- a leader's arrowhead."""
+        g = self._g
+        (x1, y1), (x2, y2), (x3, y3) = pts
         self._ent.append(
-            g(0, "TEXT") + g(8, layer)
-            + g(10, x) + g(20, y) + g(30, 0.0)
-            + g(40, h) + g(1, s) + g(50, rot))
+            g(0, "SOLID") + g(8, layer)
+            + g(10, x1) + g(20, y1) + g(30, 0.0)
+            + g(11, x2) + g(21, y2) + g(31, 0.0)
+            + g(12, x3) + g(22, y3) + g(32, 0.0)
+            + g(13, x3) + g(23, y3) + g(33, 0.0))
 
     def dumps(self) -> str:
         g = self._g
@@ -538,6 +588,76 @@ def emit_room(ctx: Ctx, dxf: DxfR12, room: dict) -> None:
              ROOM_LABEL_H, room["name"])
 
 
+def emit_leader(dxf: DxfR12, ann: dict) -> None:
+    """A leader (0270) as the screen and the PDF draw it: the line from the
+    text's end (`p2`) to the arrow's tip (`pos`), a filled arrowhead at the
+    tip, a short shoulder under the text on the side away from the tip,
+    the text beside the shoulder. Plan inches, y up."""
+    tx, ty = float(ann["pos"][0]), -float(ann["pos"][1])
+    p2 = ann.get("p2") or ann["pos"]
+    ax, ay = float(p2[0]), -float(p2[1])
+    side = 1.0 if ax >= tx else -1.0
+    sx = ax + side * LEADER_SHOULDER_IN
+    lay = "FP-ANNOTATIONS"
+    dxf.line(lay, ax, ay, tx, ty)
+    dxf.line(lay, ax, ay, sx, ay)
+    dx, dy = tx - ax, ty - ay
+    ln = math.hypot(dx, dy)
+    if ln > 1e-6:
+        ux, uy = dx / ln, dy / ln
+        L, hw = min(LEADER_ARROW_IN, ln), LEADER_ARROW_HALF_IN
+        bx, by = tx - ux * L, ty - uy * L
+        dxf.solid(lay, [(tx, ty), (bx - uy * hw, by + ux * hw),
+                        (bx + uy * hw, by - ux * hw)])
+    gap = 1.5
+    dxf.text(lay, sx + side * gap, ay - NOTE_H * 0.35, NOTE_H, ann["text"],
+             align=0 if side > 0 else 2)
+
+
+def emit_dimension(dxf: DxfR12, ann: dict, units: str) -> bool:
+    """A drawn dimension (0263) as the screen draws it -- extension lines,
+    the dimension line, a slash at each end, the length centred above the
+    line -- from the geometry `_annot.py` shares with `fp2pdf.py`. False
+    for a record with nothing to draw."""
+    d = _annot().dimension_geometry(ann, units)
+    if d is None:
+        return False
+    lay = "FP-DIMENSIONS"
+    for (x1, y1), (x2, y2) in d["ext"] + [d["line"]] + d["slashes"]:
+        dxf.line(lay, x1, y1, x2, y2)
+    # the label sits just above the line: lift it along the line's normal
+    r = math.radians(d["rot"])
+    lift = NOTE_H * 0.6
+    lx = d["label_at"][0] - math.sin(r) * lift
+    ly = d["label_at"][1] + math.cos(r) * lift
+    dxf.text(lay, lx, ly, NOTE_H, d["label"], d["rot"], align=1)
+    return True
+
+
+def emit_annotations(dxf: DxfR12, anns, settings: dict) -> int:
+    """The level's annotations, by the plan's Show switches -- what the
+    plan hides is not exported, as on the PDF (0268): the drawn dimensions
+    while Show > Dimensions is on, the texts and leaders while Show >
+    Annotations is on. Returns how many were written."""
+    show_ann = bool(settings.get("show_annotations", True))
+    show_dim = bool(settings.get("show_dimensions", True))
+    units = settings.get("dimension_units", "ftin")
+    n = 0
+    for ann in anns:
+        kind = ann.get("kind")
+        if kind == "dimension" and show_dim:
+            n += emit_dimension(dxf, ann, units)
+        elif kind == "text" and show_ann and ann.get("text"):
+            p = (float(ann["pos"][0]), -float(ann["pos"][1]))
+            dxf.text("FP-ANNOTATIONS", p[0], p[1], NOTE_H,
+                     ann["text"], -float(ann.get("rotation", 0)))
+            n += 1
+        elif kind == "leader" and show_ann and ann.get("text"):
+            emit_leader(dxf, ann)
+            n += 1
+    return n
+
+
 @dataclass
 class ConvertResult:
     """Everything a caller needs to show a completion summary -- a GUI menu
@@ -591,11 +711,9 @@ def convert(doc: dict, outdir: Path, only_levels=None,
         for room in doc["rooms"]:
             if room["level"] == lid:
                 emit_room(ctx, dxf, room)
-        for ann in doc.get("annotations", []) or []:
-            if ann["level"] == lid and ann["kind"] == "text" and ann.get("text"):
-                p = (float(ann["pos"][0]), -float(ann["pos"][1]))
-                dxf.text("FP-NOTES", p[0], p[1], NOTE_H,
-                         ann["text"], -float(ann.get("rotation", 0)))
+        n_ann = emit_annotations(
+            dxf, [a for a in doc.get("annotations", []) or [] if a.get("level") == lid],
+            doc.get("settings") or {})
 
         out = outdir / f"{lid}.dxf"
         # ENCODING NAMED EXPLICITLY (0038-ruling.md SS4): the platform
@@ -609,8 +727,9 @@ def convert(doc: dict, outdir: Path, only_levels=None,
             json.dumps(sidecar, indent=2), encoding="utf-8")
         result.written.append(out)
         result.summary.append(
-            f"level {lid!r}: {n_walls} walls, {len(sidecar)} openings "
-            f"-> {out.name}")
+            f"level {lid!r}: {n_walls} walls, {len(sidecar)} openings"
+            + (f", {n_ann} annotations" if n_ann else "")
+            + f" -> {out.name}")
     result.warnings = ctx.warnings
     return result
 

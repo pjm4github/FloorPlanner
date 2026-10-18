@@ -102,32 +102,23 @@ SCALE_NAMES = {1 / 48: '1/4" = 1\'-0"', 1 / 64: '3/16" = 1\'-0"',
 
 GRAY_POCHE = 0.82
 GRAY_LT = 0.55
+def _load_annot_module():
+    """`_annot.py` -- the drawn dimensions' geometry and the ft-in label, a
+    leaf shared with `fp2dxf.py` (0285), loaded BY PATH as `_stdt.py` is.
+    Standard library only, so loading it at import runs nothing else."""
+    path = Path(__file__).resolve().parent / "_annot.py"
+    spec = importlib.util.spec_from_file_location("_fp2pdf_annot", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_ANNOT = _load_annot_module()
 #: 0268: a DRAWN dimension's geometry, in plan inches -- the screen's own
-#: numbers (annotations.py DIM_TICK_IN / DIM_EXT_GAP_IN), so the sheet
-#: reads as the plan does
-DRAWN_TICK_IN = 4.0                   # the "/" slash, half-length
-DRAWN_EXT_GAP_IN = 2.0                # the extension line starts this far off the point
-
-
-def ftin(v_in: float, dash: bool = True) -> str:
-    """246.5 -> 20'-6 1/2\" """
-    neg = v_in < 0
-    v = abs(v_in)
-    whole = math.floor(v + 1e-9)
-    frac = v - whole
-    sixt = round(frac * 16)
-    if sixt == 16:
-        whole, sixt = whole + 1, 0
-    ft, inch = divmod(whole, 12)
-    fs = ""
-    if sixt:
-        num, den = sixt, 16
-        while num % 2 == 0:
-            num, den = num // 2, den // 2
-        fs = f" {num}/{den}"
-    sep = "-" if dash else " "
-    s = f"{ft}'{sep}{inch}{fs}\"" if ft else f"{inch}{fs}\""
-    return ("-" if neg else "") + s
+#: numbers, now kept once in `_annot.py` (0285)
+DRAWN_TICK_IN = _ANNOT.DRAWN_TICK_IN
+DRAWN_EXT_GAP_IN = _ANNOT.DRAWN_EXT_GAP_IN
+ftin = _ANNOT.ftin
 
 
 def parse_code(code: str) -> tuple[float, float]:
@@ -947,11 +938,6 @@ class Sheet:
         c.restoreState()
 
     # ---------- the plan's own dimensions (0268) ----------
-    @staticmethod
-    def _flip(pt):
-        """A screen point (y down) on the sheet (y up)."""
-        return (pt[0], -pt[1])
-
     def drawn_dims(self):
         """The level's `dimension` annotations, while the plan shows its
         measurements, each resolved to plan coordinates (y up): the two
@@ -962,49 +948,10 @@ class Sheet:
             return []
         out = []
         for ann in self.annotations:
-            if ann.get("kind") != "dimension" or not ann.get("p2"):
-                continue
-            # the SCREEN's frame (y down, the offset on the measured line's
-            # left): every point is built there, then flipped, so the sheet
-            # puts the line on the side the plan does
-            ax, ay = float(ann["pos"][0]), float(ann["pos"][1])
-            bx, by = float(ann["p2"][0]), float(ann["p2"][1])
-            dx, dy = bx - ax, by - ay
-            ln = math.hypot(dx, dy)
-            if ln < 1e-6:
-                continue
-            ux, uy = dx / ln, dy / ln
-            nx, ny = -uy, ux
-            o = float(ann.get("offset_in", 18.0))
-            t = min(0.95, max(0.05, float(ann.get("label_t", 0.5))))
-            px, py = ax + nx * o, ay + ny * o
-            qx, qy = bx + nx * o, by + ny * o
-            sgn = 1.0 if o >= 0 else -1.0
-            ext = []
-            for mx, my in ((ax, ay), (bx, by)):
-                ext.append(((mx + nx * sgn * DRAWN_EXT_GAP_IN, my + ny * sgn * DRAWN_EXT_GAP_IN),
-                            (mx + nx * (o + sgn * DRAWN_TICK_IN), my + ny * (o + sgn * DRAWN_TICK_IN))))
-            slashes = []
-            for mx, my in ((px, py), (qx, qy)):
-                slashes.append(((mx + (ux - nx) * DRAWN_TICK_IN, my + (uy - ny) * DRAWN_TICK_IN),
-                                (mx - (ux - nx) * DRAWN_TICK_IN, my - (uy - ny) * DRAWN_TICK_IN)))
-            if self.dimension_units == "in":
-                label = f"{round(ln, 2):g}\""
-            else:
-                label = ftin(ln)
-            # the label's angle on the page (y up), never upside down
-            rot = math.degrees(math.atan2(-uy, ux))
-            if rot > 90 or rot <= -90:
-                rot += 180
-            out.append({
-                "line": (self._flip((px, py)), self._flip((qx, qy))),
-                "ext": [(self._flip(a), self._flip(b)) for a, b in ext],
-                "slashes": [(self._flip(a), self._flip(b)) for a, b in slashes],
-                "label": label,
-                "label_at": self._flip((px + (qx - px) * t, py + (qy - py) * t)),
-                "rot": rot,
-                "page_pts": [self._flip((px, py)), self._flip((qx, qy)), self._flip((ax, ay)), self._flip((bx, by))],
-            })
+            d = _ANNOT.dimension_geometry(ann, self.dimension_units)   # 0285: shared with fp2dxf
+            if d is not None:
+                d["page_pts"] = d.pop("pts")
+                out.append(d)
         return out
 
     def draw_drawn_dims(self):
