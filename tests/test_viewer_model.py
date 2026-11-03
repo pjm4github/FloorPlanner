@@ -1344,3 +1344,47 @@ def test_roof_geom_matches_the_editor_item_on_the_same_data(fp3d):
     for g, i in zip(geom._eave_ends(), item._eave_ends(), strict=True):
         assert (g.x(), g.y()) == pytest.approx((i.x(), i.y()))
     assert geom.hip_extension(0) == item.hip_extension(0)
+
+
+# --------------------------------------------------------------------------
+# partition (no 3D volume) and beam (a ceiling beam) -- Patrick, 2026-11
+# --------------------------------------------------------------------------
+def _square_doc(mid_type):
+    """A 200x200 room of exterior walls plus one mid wall of `mid_type`
+    running north-south across the middle."""
+    V = [{"id": "a", "x": 0, "y": 0}, {"id": "b", "x": 200, "y": 0},
+         {"id": "c", "x": 200, "y": 200}, {"id": "d", "x": 0, "y": 200},
+         {"id": "m0", "x": 100, "y": 0}, {"id": "m1", "x": 100, "y": 200}]
+
+    def wall(wid, v1, v2, t):
+        return {"id": wid, "level": "L1", "v1": v1, "v2": v2, "type": t}
+    return {"format": "floorplanner-design", "version": 6, "units": "inches",
+            "settings": {},
+            "levels": [{"id": "L1", "name": "L1", "elevation_in": 0.0,
+                        "height_in": 96.0, "kind": "storey", "reference": False}],
+            "vertices": V, "rooms": [], "furnishings": [], "groups": [],
+            "roofs": [],
+            "walls": [wall("w1", "a", "b", "exterior"),
+                      wall("w2", "b", "c", "exterior"),
+                      wall("w3", "c", "d", "exterior"),
+                      wall("w4", "d", "a", "exterior"),
+                      wall("mid", "m0", "m1", mid_type)]}
+
+
+def test_a_partition_builds_no_3d_volume(fp3d):
+    model = fp3d.build_model(_square_doc("partition"), furnishings=False, floors=False)
+    names = [m.name for m in model.meshes]
+    assert "walls:exterior" in names            # the real walls are built
+    assert "walls:partition" not in names       # the partition is not
+
+
+def test_a_beam_is_a_box_hung_below_the_ceiling(fp3d):
+    model = fp3d.build_model(_square_doc("beam"), furnishings=False, floors=False)
+    beam = _mesh(model, "walls:beam")           # raises if absent
+    zs = [float(z) for _x, _y, z in beam.verts.tolist()]
+    # the level ceiling is 96; the beam's top is there and it drops BEAM_DROP_IN
+    assert max(zs) == pytest.approx(96.0)
+    assert min(zs) == pytest.approx(96.0 - fp3d.BEAM_DROP_IN)
+    xs = [float(x) for x, _y, _z in beam.verts.tolist()]
+    assert min(xs) == pytest.approx(100.0 - fp3d.WALL_T["beam"] / 2.0)
+    assert max(xs) == pytest.approx(100.0 + fp3d.WALL_T["beam"] / 2.0)

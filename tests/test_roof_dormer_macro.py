@@ -134,8 +134,8 @@ def test_dormer_token_with_a_ridge_the_host_never_meets_is_an_error(fp, win):
     assert _dormers(win) == []
 
 
-def test_tool_letter_m_and_the_name_switch_to_the_dormer_tool(fp, win):
-    win.run_macro("M")
+def test_tool_letter_h_and_the_name_switch_to_the_dormer_tool(fp, win):
+    win.run_macro("H")
     assert win.tool == fp.TOOL_ROOF_DORMER
     win.run_macro("S")
     win.run_macro("TOOL roofdormer")
@@ -160,7 +160,7 @@ def test_recorder_emits_a_self_contained_dormer_token(fp, win, monkeypatch):
     monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.DialogCode.Accepted)
     dlg = fp.MacroRecorderDialog(win)
     dlg.start()
-    win.set_tool(fp.TOOL_ROOF_DORMER)                    # -> "M"
+    win.set_tool(fp.TOOL_ROOF_DORMER)                    # -> "H"
     left = Qt.MouseButton.LeftButton
     _send_mouse(win, QEvent.Type.MouseButtonPress, 204.0, TRACE_Y, left, left)
     _send_mouse(win, QEvent.Type.MouseMove, 240.0, TRACE_Y, Qt.MouseButton.NoButton, left)
@@ -168,7 +168,7 @@ def test_recorder_emits_a_self_contained_dormer_token(fp, win, monkeypatch):
                 Qt.MouseButton.NoButton)
     dlg.stop()
     toks = dlg.edit.toPlainText().split()
-    assert toks[0] == "M"
+    assert toks[0] == "H"
     assert "DORMER" in toks and "CLICK" not in toks and "DRAG" not in toks
     i = toks.index("DORMER")
     assert toks[i + 1:i + 4] == ["204", "177", "36"]

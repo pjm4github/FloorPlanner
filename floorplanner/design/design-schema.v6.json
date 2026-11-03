@@ -189,6 +189,21 @@
           "prefixItems": [{ "oneOf": [{ "type": "number", "minimum": 0 }, { "type": "null" }] }, { "oneOf": [{ "type": "number", "minimum": 0 }, { "type": "null" }] }],
           "minItems": 2, "maxItems": 2
         },
+        "end_overhang_in": {
+          "description": "The per-ENDPOINT overhang (index-aligned with `ridge` and `gable`), in inches along the ridge axis: the RAKE overhang past a gable end, and a dormer's FACE eave at its own end (`ridge[0]`, the face). Non-negative. Applies only at a GABLE end -- a hip end has its own run + overhang (`hip_run_in`) and ignores it. The roof plane continues flat past a gable end, so the ridge holds its height out to the rake and only the painted eaves and the gable (end) line reach further out; the eaves-start footprint the `room_top` binding reads is unchanged. Additive optional (ROADMAP R-B): no version bump; omitted when both ends are 0.",
+          "type": "array", "prefixItems": [{ "type": "number", "minimum": 0 }, { "type": "number", "minimum": 0 }],
+          "minItems": 2, "maxItems": 2, "default": [0, 0]
+        },
+        "wall_span_in": {
+          "description": "DORMER_CONROLS.md control C: the dormer's two vertical WALL offsets from the ridge, `[left, right]` in inches, same side convention as `span_in`. Decoupled from `span_in` (the eaves-start line, which with the heights sets the pitch): a wall slides between the ridge and the roof line without changing the dormer's pitch -- the plan-view rule that only the dialog changes pitch. Each at least 1in off the ridge. Additive optional (ROADMAP R-B): no version bump; omitted while the walls sit on the eaves line (`span_in`), which is what a record without this key means.",
+          "type": "array", "prefixItems": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "number", "exclusiveMinimum": 0 }],
+          "minItems": 2, "maxItems": 2
+        },
+        "box_half_in": {
+          "description": "DORMER_CONROLS.md control B (left/right): the dormer frame's half-width per side, `[left, right]` in inches (same side convention as `span_in`). It CLIPS the roof lines -- each is drawn out only to this width -- so the frame, dragged in, trims the diagonal roof lines; limited on the outside by the host roof's lower edge. Additive optional (ROADMAP R-B): no version bump; omitted while the frame is not clipped in (a record without it draws the roof lines to their full valley).",
+          "type": "array", "prefixItems": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "number", "exclusiveMinimum": 0 }],
+          "minItems": 2, "maxItems": 2
+        },
         "marker_end": {
           "description": "R2b (0140-ruling.md, the End-On marker): which `ridge` endpoint (0 or 1, index-aligned) the End-On marker sits at -- document state so it survives reload, same idea as a room label's offset. Optional: roofs written before R2b default to 1.",
           "type": "integer", "enum": [0, 1], "default": 1
@@ -234,8 +249,8 @@
         "v2":    { "$ref": "#/$defs/id" },
 
         "type": {
-          "description": "There is deliberately no `open` type: an outline edge with no wall IS the open edge. Landscape types carry no openings and no finishes.",
-          "enum": ["exterior", "interior", "partition", "railing", "fence", "hedge", "retaining"]
+          "description": "There is deliberately no `open` type: an outline edge with no wall IS the open edge. Landscape types carry no openings and no finishes. `partition` divides rooms in plan but builds no 3D volume; `beam` is a ceiling beam in 3D that does NOT divide a room (it is never a room-outline edge).",
+          "enum": ["exterior", "interior", "partition", "railing", "fence", "hedge", "retaining", "beam"]
         },
         "thickness_in": { "description": "Override; omitted = the standard for `type`.", "type": "number", "minimum": 0 },
 

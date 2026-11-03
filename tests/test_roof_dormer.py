@@ -71,6 +71,47 @@ def _pts(segs):
     return sorted({(round(p.x(), 3), round(p.y(), 3)) for s in segs for p in s})
 
 
+def test_the_dormer_outside_walls_draw_at_the_exterior_thickness(scene):
+    """Patrick, 2026-11: the cheek and face walls must be 'the same size as
+    the actual outside walls on the plan view' -- drawn as EXTERIOR_T-wide
+    bands, not the old thin line. Rendered and measured across the face wall,
+    away from the ridge."""
+    from PyQt6.QtGui import QImage, QPainter
+    from PyQt6.QtWidgets import QStyleOptionGraphicsItem
+
+    from floorplanner.config import EXTERIOR_T
+    host = _host(scene)
+    d = _dormer(scene, host)
+    d.rebuild()
+    br = d.boundingRect()
+    s = 8.0                                        # px per inch
+    img = QImage(int(br.width() * s) + 40, int(br.height() * s) + 40,
+                 QImage.Format.Format_ARGB32)
+    img.fill(0xFFFFFFFF)
+    p = QPainter(img)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+    p.translate(20, 20)
+    p.scale(s, s)
+    p.translate(-br.x(), -br.y())
+    d.paint(p, QStyleOptionGraphicsItem(), None)
+    p.end()
+    # the face wall runs across p1 (y=190); sample a vertical line at x=185
+    # (inside the span, clear of the ridge at x=200) and measure the band of
+    # exterior-wall-fill pixels (~QColor(60, 62, 68))
+    x = int((185 - br.x()) * s) + 20
+    ys = [y for y in range(img.height())
+          if _is_wall_fill(img.pixelColor(x, y))]
+    assert ys, "no wall-fill band rendered across the face"
+    thick_in = (max(ys) - min(ys) + 1) / s
+    assert thick_in == pytest.approx(EXTERIOR_T, abs=1.0), thick_in
+    assert thick_in > 4.0, f"still the thin line, not a wall band: {thick_in}"
+
+
+def _is_wall_fill(c):
+    return (abs(c.red() - 60) < 40 and abs(c.green() - 62) < 40
+            and abs(c.blue() - 68) < 45 and c.red() + c.green() + c.blue() < 260)
+
+
 # --------------------------------------------------------------------------
 # the derived back end
 # --------------------------------------------------------------------------
@@ -154,16 +195,19 @@ def test_a_dormer_draws_only_its_roof_lines(scene):
     host = _host(scene)
     d = _dormer(scene, host)
     kinds = [k for k, _, _ in d._plan_lines()]
-    assert kinds.count("dash") == 3 and kinds.count("ridge") == 1
+    # the two side eaves, the front (face) gable line and the ridge
+    assert kinds.count("eave") == 2 and kinds.count("end0") == 1
+    assert kinds.count("ridge") == 1 and len(kinds) == 4
     assert not hasattr(d, "cheek_lines")
 
 
-def test_a_selected_dormer_shows_all_five_grips(scene):
+def test_a_selected_dormer_shows_its_dormer_controls_and_the_ridge(scene):
     _room(scene)
     host = _host(scene)
     d = _dormer(scene, host)
     d.setSelected(True)
-    assert {g.kind for g in d.grips if g.isVisible()} == set(d.grips[0].KINDS)
+    vis = {g.kind for g in d.grips if g.isVisible()}
+    assert vis == set(d.grips[0].DORMER_KINDS) | {"ridge"}
 
 
 def test_the_back_end_grip_sets_the_ridge_height_from_the_host_plane(scene):
@@ -250,6 +294,92 @@ def test_deleting_the_host_deletes_its_dormers(scene):
     host.remove_with_dormers()
     left = [it for it in scene.items() if isinstance(it, RoofItem)]
     assert d not in left and host not in left and other in left
+
+
+# --------------------------------------------------------------------------
+# the blue dot's own menu (2026-11): edit / delete / outline, so a roof in a
+# crowded plan can be read from its marker
+# --------------------------------------------------------------------------
+class _FakeCtxEvent:
+    def screenPos(self):
+        from PyQt6.QtCore import QPoint
+        return QPoint(0, 0)
+    def accept(self):
+        pass
+
+
+def _pick_menu_action(monkeypatch, label):
+    """Make the next QMenu.exec choose the action whose text is `label`."""
+    from PyQt6.QtWidgets import QMenu
+    def fake_exec(self, *a):
+        return next((ac for ac in self.actions() if ac.text() == label), None)
+    monkeypatch.setattr(QMenu, "exec", fake_exec)
+
+
+def test_the_marker_menu_toggles_the_outline(scene, monkeypatch):
+    host = _host(scene)
+    assert host._show_outline is False
+    _pick_menu_action(monkeypatch, "Show outline")
+    host.marker.contextMenuEvent(_FakeCtxEvent())
+    assert host._show_outline is True
+    _pick_menu_action(monkeypatch, "Hide outline")   # label flips once shown
+    host.marker.contextMenuEvent(_FakeCtxEvent())
+    assert host._show_outline is False
+
+
+def test_the_marker_menu_deletes_the_roof_and_its_dormers(scene, monkeypatch):
+    host = _host(scene)
+    d = _dormer(scene, host)
+    _pick_menu_action(monkeypatch, "Delete roof")
+    host.marker.contextMenuEvent(_FakeCtxEvent())
+    left = [it for it in scene.items() if isinstance(it, RoofItem)]
+    assert host not in left and d not in left
+
+
+def test_a_dormer_marker_menu_names_the_dormer(scene, monkeypatch):
+    host = _host(scene)
+    d = _dormer(scene, host)
+    labels = []
+    from PyQt6.QtWidgets import QMenu
+    def grab(self, *a):
+        labels.extend(ac.text() for ac in self.actions())
+        return None
+    monkeypatch.setattr(QMenu, "exec", grab)
+    d.marker.contextMenuEvent(_FakeCtxEvent())
+    assert labels == ["Edit dormer…", "Delete dormer", "Show outline"]
+
+
+def _violet_pixels(roof):
+    """Paint `roof` alone into a 400x400 image, its footprint filling the
+    frame, and count the outline's violet pixels (blue > red > green)."""
+    from PyQt6.QtCore import QPointF
+    from PyQt6.QtGui import QImage, QPainter
+    from PyQt6.QtWidgets import QStyleOptionGraphicsItem
+    br = roof.selection_outline().boundingRect()
+    img = QImage(400, 400, QImage.Format.Format_ARGB32)
+    img.fill(0xFFFFFFFF)
+    p = QPainter(img)
+    p.translate(QPointF(10.0, 10.0))
+    s = 380.0 / max(br.width(), br.height(), 1.0)
+    p.scale(s, s)
+    p.translate(QPointF(-br.x(), -br.y()))
+    roof.paint(p, QStyleOptionGraphicsItem(), None)
+    p.end()
+    n = 0
+    for y in range(400):
+        for x in range(400):
+            c = img.pixelColor(x, y)
+            if c.blue() > c.red() > c.green() and c.blue() - c.green() > 40:
+                n += 1
+    return n
+
+
+def test_the_shown_outline_paints_the_footprint(scene):
+    # the violet footprint highlight appears only once the outline is shown
+    host = _host(scene)
+    assert _violet_pixels(host) == 0
+    host.toggle_outline()
+    assert _violet_pixels(host) > 0
 
 
 # --------------------------------------------------------------------------

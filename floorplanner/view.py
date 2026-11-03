@@ -659,6 +659,14 @@ class PlanView(QGraphicsView):
                                             "goes (Esc cancels).")
                         e.accept()
                         return
+                    if e.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                        # Build Dormer: one Shift+click near the host's ridge
+                        # builds a whole gable dormer down to the eaves, its
+                        # cheeks at the host's pitch, no drag and no dialog
+                        # (its own helper derives every value from the point).
+                        self._build_dormer_auto(host, wall_snap(sp))
+                        e.accept()
+                        return
                     tol = max(12.0, 20.0 / max(self.transform().m11(), 1e-6))
                     p = snap_to_trace(self.scene(), host, sp, tol) or wall_snap(sp)
                     d = upslope_direction(host, p)
@@ -755,6 +763,72 @@ class PlanView(QGraphicsView):
                 return
 
         super().mousePressEvent(e)
+
+    def _build_dormer_auto(self, host, apex):
+        """Build Dormer (the M tool's Shift+click): from one point `apex`
+        near the host's ridge, build a full gable dormer whose face drops
+        straight down-slope to the host's eave, whose two cheeks take the
+        host's own pitch, and whose ridge apex sits at `apex` -- no drag,
+        no dialog. The half-span is the up-slope run from the eave to the
+        apex, so the cheek pitch (and so the gable-end pitch) equals the
+        host's by construction; `ridge_h` is the host's surface at the apex
+        and the dormer's eaves sit on the host's eaves. Refused with a
+        status line, nothing built, when `apex` is on the ridge line, too
+        close to the eaves, or where the ridge cannot meet the host."""
+        from floorplanner.roofclip import Pt, surface_height
+        d = upslope_direction(host, apex)
+        if d is None:
+            self.win.status("Build dormer: Shift+click on a roof SLOPE, not "
+                            "on the ridge line.")
+            return
+        _, _, nx, ny = host._axis()
+        signed = (apex.x() - host.p1.x()) * nx + (apex.y() - host.p1.y()) * ny
+        side = 0 if signed >= 0 else 1
+        run = host.span_in[side] - abs(signed)
+        if run < DORMER_MIN_SPAN_IN:
+            self.win.status("Build dormer: Shift+click higher up the slope -- "
+                            "too close to the eaves to build one here.")
+            return
+        face = QPointF(apex.x() - d[0] * run, apex.y() - d[1] * run)
+        item = RoofItem(face, QPointF(apex.x(), apex.y()),
+                        eaves_h_in=host.eaves_h_in,
+                        ridge_h_in=surface_height(host, Pt(apex.x(), apex.y())),
+                        overhang_in=0.0, gable=[True, True],
+                        span_in=run, marker_end=0, host=host)
+        item.floor = host.floor
+        try:
+            hold_roof_clips(self.scene(), True)
+            self.scene().addItem(item)
+            item.rebuild()                   # derive the back end, sync the clip
+            hold_roof_clips(self.scene(), False)
+            self.win.finish_roof_dormer(item, auto=True)
+        except Exception:
+            # A single click must never take the app down (PyQt6 aborts the
+            # process on an unhandled exception in the mouse-event override --
+            # CLAUDE.md). The roof compose (`roofclip`) is the fragile step;
+            # if it raises, drop the half-built dormer, re-compose the roofs
+            # that remain, and report -- with the full traceback printed and
+            # logged so the state that triggered it can be fixed.
+            import os
+            import traceback
+            tb = traceback.format_exc()
+            traceback.print_exc()
+            try:
+                root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                with open(os.path.join(root, "dormer_crash.log"), "a",
+                          encoding="utf-8") as fh:
+                    fh.write(tb + "\n")
+            except OSError:
+                pass
+            sc = self.scene()
+            if sc is not None and not sip.isdeleted(item) and item.scene() is sc:
+                sc.removeItem(item)          # drop it before re-composing
+            try:
+                hold_roof_clips(sc, False)   # clears the hold and re-composes
+            except Exception:
+                traceback.print_exc()
+            self.win.status("Build dormer failed here -- the dormer was not "
+                            "placed (details written to dormer_crash.log).")
 
     def mouseMoveEvent(self, e):
         pos = e.position().toPoint()

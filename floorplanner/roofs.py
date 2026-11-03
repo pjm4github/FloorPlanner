@@ -836,6 +836,7 @@ def roof_clip_trace(scene, roof):
 
 DORMER_EAVES_ABOVE_CEILING_IN = 24.0   # default cheek top over the trace's ceiling
 DORMER_MIN_SPAN_IN = 6.0               # half-width below which a drag is a slip
+_SHED_EDGE_TOL_IN = 0.5                # a shed dormer's high edge may sit this far under the host
 
 
 def host_roof_at(scene, pt: QPointF, floor):
@@ -1161,7 +1162,8 @@ class RoofItem(QGraphicsItem):
     def __init__(self, p1, p2, eaves_h_in=96.0, ridge_h_in=132.0,
                 overhang_in=0.0, gable=None, span_in=DEFAULT_HALF_SPAN_IN,
                 marker_end=1, eaves_bind="manual", host=None, form="gable",
-                openings=None, hip_run_in=None):
+                openings=None, hip_run_in=None, end_overhang_in=None,
+                wall_span_in=None, box_half_in=None):
         super().__init__()
         self._trace_memo = None            # 0276: (key, segments) -- clip_trace()
         self._drawn_memo = None            # 0276: (key, segments) -- _drawn_trace()
@@ -1203,6 +1205,9 @@ class RoofItem(QGraphicsItem):
         self.gable = list(gable) if gable is not None else [True, True]
         self.overhang_in = overhang_in           # the setters: a shed clamps
         self.span_in = span_in
+        self.end_overhang_in = end_overhang_in   # per-end rake / face overhang
+        self.wall_span_in = wall_span_in         # control C: the dormer walls
+        self.box_half_in = box_half_in           # control B: the frame half-width
         self.marker_end = 1 if marker_end else 0   # R2b: which ridge end
         self.eaves_bind = eaves_bind if eaves_bind in ("manual", "room_top") \
             else "manual"                            # R4a: schema slot only
@@ -1217,9 +1222,14 @@ class RoofItem(QGraphicsItem):
         self._clip_ext = (0.0, 0.0)
         self.clip_warnings = []
         self._syncing_clips = False
+        # the marker menu's "Outline": a persistent, on-demand highlight of
+        # this roof's footprint, so a blue dot in a crowded plan can be tied
+        # to the region it governs. Off by default; toggled per roof, not saved.
+        self._show_outline = False
         self.marker = RoofEndMarkerItem(self)
         # R4c (0154-ruling.md sec3): five grips, shown only while selected
-        self.grips = [RoofGripItem(self, kind) for kind in RoofGripItem.KINDS]
+        self.grips = [RoofGripItem(self, kind) for kind
+                      in RoofGripItem.KINDS + RoofGripItem.DORMER_KINDS]
         self.rebuild()
 
     @staticmethod
@@ -1272,6 +1282,62 @@ class RoofItem(QGraphicsItem):
         if getattr(self, "form", "gable") == "shed":
             pair[1] = 0.0
         self._overhang_in = pair
+
+    @property
+    def end_overhang_in(self):
+        return list(self._end_overhang_in)
+
+    @end_overhang_in.setter
+    def end_overhang_in(self, value):
+        """Per-END overhang `[end0, end1]` along the ridge axis -- the rake
+        (gable overhang) at each GABLE end, and a dormer's FACE eave at its
+        own end (`end0`). The plane continues flat past a gable end, so the
+        ridge holds to the rake (`surface_height`'s gable branch is unchanged)
+        and only the painted eaves and the end line reach further out. A hip
+        end ignores it (it has its own run/overhang). Non-negative; `None`
+        and a bare number normalise like the other pairs. Default `[0, 0]`,
+        so a roof written before this field round-trips unchanged."""
+        if value is None:
+            self._end_overhang_in = [0.0, 0.0]
+            return
+        pair = self._normalized_pair(value)
+        self._end_overhang_in = [max(0.0, pair[0]), max(0.0, pair[1])]
+
+    @property
+    def wall_span_in(self):
+        """DORMER_CONROLS.md control C: the dormer's two vertical WALL offsets
+        `[left, right]` from the ridge -- the black cheek walls. Decoupled
+        from `span_in` (the roof's eaves line, which sets the pitch): moving a
+        wall slides it between the ridge and the roof line WITHOUT changing the
+        pitch (the spec's central rule). `None` (the default and what a record
+        without the field means) falls back to `span_in`, so a wall that was
+        never moved sits on the eaves line exactly as before."""
+        if getattr(self, "_wall_span_in", None) is None:
+            return list(self._span_in)
+        return list(self._wall_span_in)
+
+    @wall_span_in.setter
+    def wall_span_in(self, value):
+        if value is None:
+            self._wall_span_in = None
+            return
+        pair = self._normalized_pair(value)
+        if getattr(self, "form", "gable") == "shed":
+            pair[1] = 0.0                        # a shed has no right plane
+        self._wall_span_in = pair
+
+    @property
+    def box_half_in(self):
+        """DORMER_CONROLS.md control B (left/right): the blue frame's half-width
+        per side `[left, right]`. It CLIPS the roof lines -- drawn only out to
+        this width -- so stretching the frame in trims the diagonal roof lines.
+        `None` (the default, and a record without the field) means no clip: the
+        roof lines run to their full valley."""
+        return None if getattr(self, "_box_half_in", None) is None else list(self._box_half_in)
+
+    @box_half_in.setter
+    def box_half_in(self, value):
+        self._box_half_in = None if value is None else self._normalized_pair(value)
 
     def set_form(self, form: str):
         """Change the form; a shed drops its right span and overhang to 0,
@@ -1339,6 +1405,27 @@ class RoofItem(QGraphicsItem):
             t = max(t, 1.0)
             self._p2 = QPointF(self._p1.x() + ux * t, self._p1.y() + uy * t)
 
+    def dormer_stands(self) -> bool:
+        """Whether this dormer meets its host and can stand (0191-ruling.md
+        sec1). A GABLE dormer's ridge must rise along its own axis to meet
+        the host's plane at `ridge_h_in`; a SHED dormer's high edge must lie
+        on or just under (`_SHED_EDGE_TOL_IN`) the host at both ends. The
+        End-On dialog refuses the same states before `apply` (`dormer_meet_in`);
+        the Shift-build path (`view._build_dormer_auto`), which has no dialog
+        to refuse in, asks this of the finished item instead. False for a roof
+        with no live host."""
+        from floorplanner.roofclip import Pt, meet_along, surface_height
+        host = self.host
+        if host is None or sip.isdeleted(host):
+            return False
+        if self.form == "shed":
+            under = min(surface_height(host, Pt(p.x(), p.y())) - self.ridge_h_in
+                        for p in (self.p1, self.p2))
+            return under >= -_SHED_EDGE_TOL_IN
+        ux, uy, _, _ = self._axis()
+        return meet_along(host, Pt(self.p1.x(), self.p1.y()),
+                          Pt(ux, uy), self.ridge_h_in) is not None
+
     def remove_with_dormers(self):
         """Delete this roof and every dormer standing on it (0191-ruling.md
         sec1) -- one gesture. Roof deletion has no undo today (none did
@@ -1349,6 +1436,13 @@ class RoofItem(QGraphicsItem):
         for d in self.dormers():
             sc.removeItem(d)
         sc.removeItem(self)
+
+    def toggle_outline(self):
+        """Show or hide this roof's footprint outline (the marker menu's
+        'Outline') -- an on-demand highlight of the region the roof governs,
+        independent of selection and not persisted."""
+        self._show_outline = not getattr(self, "_show_outline", False)
+        self.update()
 
     @property
     def uid(self) -> str:
@@ -1391,7 +1485,13 @@ class RoofItem(QGraphicsItem):
         ux, uy, _, _ = self._axis()
         r1, o1 = self.hip_extension(0, gable)
         r2, o2 = self.hip_extension(1, gable)
-        e1, e2 = r1 + o1, r2 + o2
+        # a GABLE end's rake / face overhang pushes its eaves and end line
+        # out along the axis (the plane continues flat, so the ridge holds
+        # to the rake); a hip end has its own run + overhang and ignores it.
+        flags = self.gable if gable is None else gable
+        eo = self._end_overhang_in
+        e1 = r1 + o1 + (eo[0] if flags[0] else 0.0)
+        e2 = r2 + o2 + (eo[1] if flags[1] else 0.0)
         return (QPointF(self.p1.x() - ux * e1, self.p1.y() - uy * e1),
                 QPointF(self.p2.x() + ux * e2, self.p2.y() + uy * e2))
 
@@ -1402,8 +1502,12 @@ class RoofItem(QGraphicsItem):
         and pushed past a hip end along the axis (R4b: `hip_extension`)."""
         _, _, nx, ny = self._axis()
         a1, a2 = self._extended_ridge()
-        reach_l = self._span_in[0] + self._overhang_in[0]
-        reach_r = self._span_in[1] + self._overhang_in[1]
+        # DORMER_CONROLS.md: the eave reaches wall + overhang (control C + E);
+        # `wall_span_in` defaults to `span_in`, so a plain roof is unchanged
+        # while a dormer with pulled-in walls truncates its roof at the eave.
+        wall = self.wall_span_in
+        reach_l = wall[0] + self._overhang_in[0]
+        reach_r = wall[1] + self._overhang_in[1]
         return (QPointF(a1.x() + nx * reach_l, a1.y() + ny * reach_l),
                QPointF(a2.x() + nx * reach_l, a2.y() + ny * reach_l),
                QPointF(a1.x() - nx * reach_r, a1.y() - ny * reach_r),
@@ -1506,10 +1610,18 @@ class RoofItem(QGraphicsItem):
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
-            # the grips exist only for a selected roof -- a deselected roof
-            # shows its plan lines and its marker, nothing to grab
+            # the grips exist only for a selected roof. A DORMER shows its own
+            # A-G controls (the dormer kinds plus the ridge, which is G) and
+            # NOT the universal eave/end grips -- those duplicated the frame
+            # and walls as extra blue knobs; a plain roof shows the universal
+            # five and none of the dormer controls.
+            dormer = self.is_dormer()
             for g in getattr(self, "grips", ()):
-                g.setVisible(bool(value))
+                if dormer:
+                    vis = g.kind in RoofGripItem.DORMER_KINDS or g.kind == "ridge"
+                else:
+                    vis = g.kind in RoofGripItem.KINDS
+                g.setVisible(bool(value) and vis)
             # R4d: selected = unclipped; deselect re-clips (the region is
             # still current -- nothing moved -- so a repaint is the re-clip)
             self.update()
@@ -1550,6 +1662,84 @@ class RoofItem(QGraphicsItem):
         spans = list(self._span_in)
         spans[side] = max(1.0, reach - self._overhang_in[side])
         self.span_in = spans
+        self.rebuild()
+
+    # -- the dormer controls (the six grips of the Build-Dormer picture) -----
+    # `drag_eave` above moves a side's OUTER eave and lets the span change;
+    # these move each of the dormer's own lines independently: the WALL (the
+    # span line), the SOFFIT (the per-side eave = overhang), the SETBACK (the
+    # face along the ridge) and the FACE eave (the per-end overhang, `end0`).
+    def _perp_of(self, scene_pt: QPointF) -> float:
+        """(Snapped) perpendicular distance of `scene_pt` from the ridge, in
+        the +left normal's sense -- the quantity every side grip lands on."""
+        _, _, nx, ny = self._axis()
+        origin_n = self.p1.x() * nx + self.p1.y() * ny
+        return wall_snap_len(scene_pt.x() * nx + scene_pt.y() * ny) - origin_n
+
+    def drag_wall(self, side: int, scene_pt: QPointF):
+        """Control C -- the side WALL grip: move this side's vertical wall to
+        the cursor. The wall is `wall_span_in`, decoupled from `span_in` (the
+        roof's eaves line and its pitch): the roof is untouched, so the PITCH
+        does not change (DORMER_CONROLS.md: the only way to change the pitch is
+        the dialog). Wall stays >= 1in off the ridge."""
+        if side == 1 and self.form == "shed":
+            return                               # a shed has no right plane
+        reach = self._perp_of(scene_pt)
+        reach = reach if side == 0 else -reach
+        walls = self.wall_span_in
+        walls[side] = max(1.0, reach)
+        dv = self._face_valley_perp(side)        # the roof line is the limit
+        if dv is not None:
+            walls[side] = min(walls[side], dv)
+        self.wall_span_in = walls
+        self.rebuild()
+
+    def _eave_reach(self, side):
+        """Control E's result: the EAVE reach from the ridge on a side -- the
+        wall (C) plus its overhang. The dormer roof reaches this far; its side
+        eave (green) is drawn here."""
+        return self.wall_span_in[side] + self._overhang_in[side]
+
+    def drag_soffit(self, side: int, scene_pt: QPointF):
+        """Control E -- the side EAVE grip: the eave OVERHANG beyond this side's
+        WALL (C). The eave sits at wall + overhang; dragged in to the wall the
+        overhang is 0, dragged out it extends to the roof line (the valley)."""
+        if side == 1 and self.form == "shed":
+            return
+        reach = self._perp_of(scene_pt)
+        reach = reach if side == 0 else -reach
+        wall = self.wall_span_in[side]
+        dv = self._face_valley_perp(side)        # the eave stops at the roof line
+        hi = dv if dv is not None else max(reach, wall)
+        ohs = list(self._overhang_in)
+        ohs[side] = max(0.0, min(hi, reach) - wall)
+        self.overhang_in = ohs
+        self.rebuild()
+
+    def drag_setback(self, scene_pt: QPointF):
+        """Control D -- the gable FACE grip: slide the face (`p1`) along the
+        ridge to the cursor; the back end re-derives (a dormer). The grip sits
+        ON the face wall, so the cursor is read directly. The face stays at
+        least `MIN_RIDGE_LEN_IN` off the back."""
+        ux, uy, _, _ = self._axis()
+        target = wall_snap_len(scene_pt.x() * ux + scene_pt.y() * uy)
+        back_u = self.p2.x() * ux + self.p2.y() * uy
+        target = min(target, back_u - MIN_RIDGE_LEN_IN)
+        delta = target - (self.p1.x() * ux + self.p1.y() * uy)
+        self.set_ridge(QPointF(self.p1.x() + ux * delta, self.p1.y() + uy * delta),
+                       self.p2)
+
+    def drag_face_eave(self, scene_pt: QPointF):
+        """Face-EAVE grip: set the FACE overhang (`end_overhang_in[0]`) -- how
+        far the eave projects down-slope past the face. The grip rides on the
+        eave line; dragged up past the face it clamps to 0 (it cannot pass the
+        face, the picture's rule)."""
+        ux, uy, _, _ = self._axis()
+        cursor_u = wall_snap_len(scene_pt.x() * ux + scene_pt.y() * uy)
+        face_u = self.p1.x() * ux + self.p1.y() * uy
+        eos = list(self._end_overhang_in)
+        eos[0] = max(0.0, face_u - cursor_u)
+        self.end_overhang_in = eos
         self.rebuild()
 
     def drag_end(self, end: int, scene_pt: QPointF):
@@ -1663,10 +1853,38 @@ class RoofItem(QGraphicsItem):
             self.span_in = [span_l - d, 0.0]
             self.set_ridge(p1, p2)
             return
+        if self.is_dormer():
+            # DORMER_CONROLS.md controls A/G: move the ridge laterally HOLDING
+            # the pitch. span_in (the eaves line, and so the roof-line angle)
+            # is unchanged -- the roof translates with the ridge; the walls (C)
+            # stay where they are, so `wall_span_in` shifts the opposite way
+            # and the walls run up to the new roof-line intersections. Clamped
+            # so neither wall drops under 1in off the new ridge.
+            walls = self.wall_span_in
+            d = max(-(walls[1] - 1.0), min(walls[0] - 1.0, d))
+            if abs(d) < 1e-9:
+                return
+            self.wall_span_in = [walls[0] - d, walls[1] + d]
+            self.set_ridge(QPointF(self.p1.x() + nx * d, self.p1.y() + ny * d),
+                           QPointF(self.p2.x() + nx * d, self.p2.y() + ny * d))
+            return
         d = max(1.0 - span_r, min(span_l - 1.0, d))
         self.span_in = [span_l - d, span_r + d]
         self.set_ridge(QPointF(self.p1.x() + nx * d, self.p1.y() + ny * d),
                        QPointF(self.p2.x() + nx * d, self.p2.y() + ny * d))
+
+    def drag_box_top(self, scene_pt: QPointF):
+        """DORMER_CONROLS.md control B (top): move the APEX up or down the host
+        slope, HOLDING the pitch -- the whole dormer roof grows or shrinks with
+        the ridge, the roof lines keep their angle. Reuses the back-end meet
+        logic to set the ridge height from the host, then raises the eaves with
+        it so the pitch (and the roof-line angle) is unchanged."""
+        if self._span_in[0] <= _CLIP_EPS_IN or self.ridge_h_in <= self.eaves_h_in:
+            return
+        pitch = (self.ridge_h_in - self.eaves_h_in) / self._span_in[0]
+        self.drag_end(1, scene_pt)               # sets ridge_h from the host meet
+        self.eaves_h_in = self.ridge_h_in - pitch * self._span_in[0]
+        self.rebuild()
 
     def boundingRect(self) -> QRectF:
         # 0279: the ridge callout is painted beside the ridge's middle at a
@@ -1686,6 +1904,220 @@ class RoofItem(QGraphicsItem):
         extension is inside it too). Axis-aligned only when the ridge is."""
         e1a, e1b, e2a, e2b = self._eave_ends()
         return QPolygonF([e1a, e1b, e2b, e2a])
+
+    def _dormer_wall_lines(self):
+        """A DORMER's three standing walls in plan (`[(a, b), ...]`): the face
+        wall across the span at the face, and the two cheek walls running up
+        the slope from the face to where each meets the host (the host surface
+        rising to the dormer's own eaves height, `meet_along`). Drawn solid
+        black (the outside-wall format). `[]` for a roof with no host.
+        Memoised on this roof's and its host's geometry (paint reads it)."""
+        host = self.host
+        if host is None or sip.isdeleted(host):
+            return []
+        key = (self.geometry_key(), host.geometry_key(), tuple(self.wall_span_in))
+        memo = getattr(self, "_wall_memo", None)
+        if memo is not None and memo[0] == key:
+            return memo[1]
+        from floorplanner.roofclip import Pt, meet_along
+        ux, uy, nx, ny = self._axis()
+        p1, p2 = self.p1, self.p2
+        # control C: the black side walls stand at `wall_span_in`; each runs up
+        # the slope from the face and is TRUNCATED where the roof line crosses
+        # it (the valley at this wall's perp) -- past there the dormer roof has
+        # met the host and there is no wall. The face wall closes the front.
+        s0, s1 = self.wall_span_in
+        left = QPointF(p1.x() + nx * s0, p1.y() + ny * s0) if s0 > _CLIP_EPS_IN else None
+        right = QPointF(p1.x() - nx * s1, p1.y() - ny * s1) if s1 > _CLIP_EPS_IN else None
+        out = []
+        if left is not None and right is not None:
+            out.append((left, right))              # the face wall, wall to wall
+        elif left is not None:
+            out.append((QPointF(p1), left))        # a shed: ridge to its one side
+        for side, start in ((0, left), (1, right)):
+            if start is None:
+                continue
+            sign = 1.0 if side == 0 else -1.0
+            dv = self._face_valley_perp(side)
+            if dv is not None and dv > _CLIP_EPS_IN and self.wall_span_in[side] < dv:
+                # the valley at this wall's perp -- where the roof line crosses
+                # the wall and the wall ends
+                corner = QPointF(p1.x() + sign * nx * dv, p1.y() + sign * ny * dv)
+                f = self.wall_span_in[side] / dv
+                out.append((start, QPointF(p2.x() + (corner.x() - p2.x()) * f,
+                                           p2.y() + (corner.y() - p2.y()) * f)))
+            else:
+                t = meet_along(host, Pt(start.x(), start.y()), Pt(ux, uy),
+                               self.eaves_h_in)
+                if t is None or t <= 0.0:
+                    t = self.length()
+                out.append((start, QPointF(start.x() + ux * t, start.y() + uy * t)))
+        self._wall_memo = (key, out)
+        return out
+
+    def _valley_perp(self, host, sign, pitch):
+        """The perpendicular distance from the ridge, at the FACE, where this
+        side's cheek plane (sloping at `pitch` from the ridge) meets the host
+        surface -- the roof line's outer reach. None when the face does not
+        stand above the host, or the cheek never comes down to it."""
+        from floorplanner.roofclip import Pt, surface_height
+        _, _, nx, ny = self._axis()
+        p1 = self.p1
+
+        def f(d):
+            pt = Pt(p1.x() + sign * nx * d, p1.y() + sign * ny * d)
+            return (self.ridge_h_in - pitch * d) - surface_height(host, pt)
+
+        if f(0.0) <= 0.0:                       # the face is not above the host
+            return None
+        hi = (self.ridge_h_in - self.eaves_h_in) / pitch + self.length() + 240.0
+        if f(hi) > 0.0:                         # never comes down to the host
+            return None
+        lo = 0.0
+        for _ in range(60):
+            mid = (lo + hi) / 2.0
+            if f(mid) > 0.0:
+                lo = mid
+            else:
+                hi = mid
+        return hi
+
+    def _face_valley_perp(self, side):
+        """This side's roof-line reach at the face (`_valley_perp` with the
+        current pitch) -- the outer limit for the wall (C) and the eave (E).
+        None when there is no host or no valley."""
+        host = self.host
+        if host is None or sip.isdeleted(host) or self._span_in[side] <= _CLIP_EPS_IN:
+            return None
+        pitch = (self.ridge_h_in - self.eaves_h_in) / self._span_in[side]
+        if pitch <= _CLIP_EPS_IN:
+            return None
+        return self._valley_perp(host, 1.0 if side == 0 else -1.0, pitch)
+
+    def _host_edge_perp(self, side):
+        """How far this side's frame can reach before it leaves the host's
+        footprint -- the spec's limit ("the roof's lower edge it sits on").
+        None with no host or a face off the host."""
+        host = self.host
+        if host is None or sip.isdeleted(host):
+            return None
+        from floorplanner.roofclip import Pt, _contains, footprint_polygon
+        _, _, nx, ny = self._axis()
+        sign = 1.0 if side == 0 else -1.0
+        fp = footprint_polygon(host)
+        p1 = self.p1
+        if not _contains(fp, Pt(p1.x(), p1.y())):
+            return None
+        d, step = 0.0, 6.0
+        while d < 4000.0 and _contains(fp, Pt(p1.x() + sign * nx * (d + step),
+                                              p1.y() + sign * ny * (d + step))):
+            d += step
+        return d
+
+    def drag_box_side(self, side: int, scene_pt: QPointF):
+        """DORMER_CONROLS.md control B (left/right): stretch the frame's edge.
+        It clips the roof line, so it stays between this side's WALL and the
+        host's lower edge."""
+        reach = self._perp_of(scene_pt)
+        reach = reach if side == 0 else -reach
+        box = self.box_half_in
+        if box is None:
+            dv = self._face_valley_perp(side)
+            box = [dv or self._span_in[0], None]
+            box[1] = self._face_valley_perp(1) or self._span_in[1]
+        lo = self.wall_span_in[side]
+        hi = self._host_edge_perp(side)
+        box[side] = max(lo, reach if hi is None else min(hi, reach))
+        self.box_half_in = box
+        self.rebuild()
+
+    def _dormer_roof_lines(self):
+        """DORMER_CONROLS.md: the two brown ROOF LINES -- where the dormer roof
+        meets the host (the valleys). Returns `(solid, dashed)` segment lists.
+        The full valley runs from the apex to the face corner (set by the pitch
+        and the host); the EAVE (E = span + overhang) sets how far the roof
+        actually CONTACTS the host -- SOLID from the apex down to where the
+        eave meets the valley, DASHED beyond (where the roof line would be if
+        the eaves, the walls or the ridge were changed). `[]` with no host."""
+        host = self.host
+        if host is None or sip.isdeleted(host):
+            return [], []
+        box = self.box_half_in
+        key = (self.geometry_key(), host.geometry_key(),
+               None if box is None else tuple(box), tuple(self.wall_span_in))
+        memo = getattr(self, "_roofline_memo", None)
+        if memo is not None and memo[0] == key:
+            return memo[1]
+        _, _, nx, ny = self._axis()
+        p1, p2 = self.p1, self.p2
+        span = self._span_in
+        wall = self.wall_span_in                        # control C: the walls
+        solid, dashed = [], []
+        for side in (0, 1):
+            if span[side] <= _CLIP_EPS_IN:
+                continue
+            sign = 1.0 if side == 0 else -1.0
+            pitch = (self.ridge_h_in - self.eaves_h_in) / span[side]
+            if pitch <= _CLIP_EPS_IN:
+                continue
+            dv = self._valley_perp(host, sign, pitch)
+            if dv is None or dv <= _CLIP_EPS_IN:
+                continue
+            # control B clips the line's OUTER end: it is drawn out to the frame
+            # half-width, never past the valley
+            qmax = dv if box is None else min(dv, box[side])
+            # SOLID down to where the roof line crosses the wall (where the
+            # cheek wall is truncated), DASHED below -- the projected valley
+            qe = min(wall[side], qmax)
+            # the valley runs from the apex (perp 0) to the corner (perp dv);
+            # the point at perp q is that fraction of the way out
+            cx = p1.x() + sign * nx * dv - p2.x()
+            cy = p1.y() + sign * ny * dv - p2.y()
+            if qe > _CLIP_EPS_IN:
+                te = qe / dv
+                solid.append((QPointF(p2),
+                              QPointF(p2.x() + cx * te, p2.y() + cy * te)))
+            if qmax > qe + _CLIP_EPS_IN:
+                te, tm = qe / dv, qmax / dv
+                dashed.append((QPointF(p2.x() + cx * te, p2.y() + cy * te),
+                               QPointF(p2.x() + cx * tm, p2.y() + cy * tm)))
+        out = (solid, dashed)
+        self._roofline_memo = (key, out)
+        return out
+
+    def _dormer_eave_lines(self):
+        """DORMER_CONROLS.md controls E and F: the dormer's eave outline as
+        `(green_sides, orange_face)`. Each side eave (E) is the green line at
+        `wall + overhang` from the face eave corner up to where it meets the
+        host (the roof line). The face eave (F) is the orange line across the
+        front, down-slope of the face by `end_overhang_in[0]`, joining the two
+        green corners -- so the three meet at the corners."""
+        host = self.host
+        if host is None or sip.isdeleted(host):
+            return [], []
+        ux, uy, nx, ny = self._axis()
+        p1, p2 = self.p1, self.p2
+        eo = self.end_overhang_in[0]
+        face = QPointF(p1.x() - ux * eo, p1.y() - uy * eo)   # the face eave line
+        box = self.box_half_in
+        green, corner = [], {}
+        for side in (0, 1):
+            sign = 1.0 if side == 0 else -1.0
+            e = self._eave_reach(side)
+            corner[side] = QPointF(face.x() + sign * nx * e, face.y() + sign * ny * e)
+            dv = self._face_valley_perp(side)
+            if dv is None or dv <= _CLIP_EPS_IN:
+                green.append((corner[side],
+                              QPointF(p1.x() + sign * nx * e, p1.y() + sign * ny * e)))
+                continue
+            qmax = dv if box is None else min(dv, box[side])
+            qe = min(e, qmax)
+            vx = p1.x() + sign * nx * dv - p2.x()
+            vy = p1.y() + sign * ny * dv - p2.y()
+            t = qe / dv
+            green.append((corner[side], QPointF(p2.x() + vx * t, p2.y() + vy * t)))
+        orange = [(corner[0], corner[1])] if 0 in corner and 1 in corner else []
+        return green, orange
 
     def shape(self) -> QPainterPath:
         if not _roof_hittable(self):
@@ -1725,15 +2157,18 @@ class RoofItem(QGraphicsItem):
             e2a = QPointF(e2a.x() - ux * ext0, e2a.y() - uy * ext0)
             e1b = QPointF(e1b.x() + ux * ext1, e1b.y() + uy * ext1)
             e2b = QPointF(e2b.x() + ux * ext1, e2b.y() + uy * ext1)
-        lines = [("dash", e1a, e1b), ("dash", e2a, e2b)]
+        # the end-0 line is a dormer's FACE eave, end-1 its back; kinds kept
+        # specific so paint() can colour a dormer's eaves (green sides, orange
+        # face) while every other roof draws them all as one brown dash.
+        lines = [("eave", e1a, e1b), ("eave", e2a, e2b)]
         if not joined0:
-            lines.append(("dash", e1a, e2a))
+            lines.append(("end0", e1a, e2a))
             if not self.gable[0]:
-                lines += [("dash", self.p1, e1a), ("dash", self.p1, e2a)]
+                lines += [("hip", self.p1, e1a), ("hip", self.p1, e2a)]
         if not joined1:
-            lines.append(("dash", e1b, e2b))
+            lines.append(("end1", e1b, e2b))
             if not self.gable[1]:
-                lines += [("dash", self.p2, e1b), ("dash", self.p2, e2b)]
+                lines += [("hip", self.p2, e1b), ("hip", self.p2, e2b)]
         lines.append(("ridge", self.p1, self.p2))
         return lines
 
@@ -1777,6 +2212,7 @@ class RoofItem(QGraphicsItem):
         runs = self.hip_run_in or (None, None)
         return (self.p1.x(), self.p1.y(), self.p2.x(), self.p2.y(),
                 tuple(self.span_in), tuple(self.overhang_in),
+                tuple(self.end_overhang_in),
                 float(self.eaves_h_in), float(self.ridge_h_in), self.form,
                 tuple(self.gable), tuple(runs), self.floor)
 
@@ -1845,6 +2281,16 @@ class RoofItem(QGraphicsItem):
             lod = max(option.levelOfDetailFromTransform(painter.worldTransform()), 1e-6)
             m = QPointF((self.p1.x() + self.p2.x()) / 2.0, (self.p1.y() + self.p2.y()) / 2.0)
             draw_callout(painter, lod, QPointF(m.x() + 4.0 / lod, m.y() - 4.0 / lod), callout_text(self))
+        if getattr(self, "_show_outline", False) and not ghost:
+            # the marker menu's "Outline": the roof's full footprint (eave
+            # rectangle, hips and overhang included), a bold violet border on
+            # a translucent fill, drawn UNDER the roof's own lines so they
+            # still read. On regardless of selection, until toggled off.
+            out_ink = QColor(150, 40, 200)
+            painter.setPen(QPen(out_ink, 2.0, Qt.PenStyle.SolidLine))
+            painter.setBrush(QBrush(QColor(150, 40, 200, 40)))
+            painter.drawPolygon(self.selection_outline())
+            painter.setBrush(Qt.BrushStyle.NoBrush)
         # the dashed lines: both eaves, each end's own line (a gable line
         # across the ridge end, or -- for a hip end, R4b -- the END EAVE
         # beyond it plus the two hip lines down to its corners), then the
@@ -1855,11 +2301,69 @@ class RoofItem(QGraphicsItem):
         dash = QPen(ink, 1.4, Qt.PenStyle.DashLine)
         heavy = QPen(ink, 3.0, Qt.PenStyle.SolidLine)
         heavy.setCapStyle(Qt.PenCapStyle.RoundCap)
+        # a dormer's own lines read like the picture: its two side eaves
+        # GREEN, its face eave ORANGE, both dashed; the ridge and slopes stay
+        # brown; its three standing walls are added solid black below. Every
+        # other roof (and any ghosted one) draws every line brown as before.
+        dormer = self.is_dormer() and not ghost
+        green = QPen(QColor(0, 150, 0), 1.6, Qt.PenStyle.DashLine)
+        orange = QPen(QColor(230, 120, 20), 1.6, Qt.PenStyle.DashLine)
         for kind, segs in self._painted_plan_lines(clipped):
-            painter.setPen(heavy if kind == "ridge" else dash)
+            if dormer and kind in ("eave", "end0", "end1"):
+                continue                # a dormer's eaves are drawn explicitly
+            pen = heavy if kind == "ridge" else dash
+            painter.setPen(pen)
             for a, b in segs:
                 painter.drawLine(a, b)
-        if clipped:
+        if dormer:
+            # control E (green side eaves, at wall + overhang) and control F
+            # (the orange face eave, joining their front corners)
+            green_e, orange_e = self._dormer_eave_lines()
+            painter.setPen(green)
+            for a, b in green_e:
+                painter.drawLine(a, b)
+            painter.setPen(orange)
+            for a, b in orange_e:
+                painter.drawLine(a, b)
+            # the ROOF LINES (the valleys where the dormer roof meets the host):
+            # SOLID brown where the roof contacts the host (out to the eave),
+            # DASHED brown beyond -- where the line would be if the eaves, the
+            # walls or the ridge changed. These stand in for a dormer's clip
+            # seam, so the generic seam draw below is skipped for a dormer.
+            solid_rl, dashed_rl = self._dormer_roof_lines()
+            rl_solid = QPen(ink, 2.0, Qt.PenStyle.SolidLine)
+            rl_solid.setCapStyle(Qt.PenCapStyle.RoundCap)
+            painter.setPen(rl_solid)
+            for a, b in solid_rl:
+                painter.drawLine(a, b)
+            painter.setPen(QPen(ink, 1.4, Qt.PenStyle.DashLine))
+            for a, b in dashed_rl:
+                painter.drawLine(a, b)
+            # control C: the dormer's three outside walls (face + two cheeks),
+            # drawn as FULL-THICKNESS BANDS in the exterior-wall format, not
+            # thin lines -- Patrick, 2026-11: "the same size as the actual
+            # outside walls on the plan view." Each segment becomes a rectangle
+            # EXTERIOR_T wide, centred on the wall line, filled and outlined
+            # exactly as walls.py draws an exterior wall.
+            half = EXTERIOR_T / 2.0
+            band = QPainterPath()
+            for a, b in self._dormer_wall_lines():
+                dx, dy = b.x() - a.x(), b.y() - a.y()
+                ln = math.hypot(dx, dy)
+                if ln < 1e-6:
+                    continue
+                ox, oy = -dy / ln * half, dx / ln * half
+                band.addPolygon(QPolygonF([
+                    QPointF(a.x() + ox, a.y() + oy), QPointF(b.x() + ox, b.y() + oy),
+                    QPointF(b.x() - ox, b.y() - oy), QPointF(a.x() - ox, a.y() - oy)]))
+            band.setFillRule(Qt.FillRule.WindingFill)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(QColor(60, 62, 68)))     # exterior-wall fill
+            painter.drawPath(band)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(QColor(25, 25, 25), 0))      # exterior-wall edge
+            painter.drawPath(band)
+        if clipped and not dormer:
             seam_pen = QPen(ink, 2.0, Qt.PenStyle.SolidLine)   # a real edge
             seam_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
             painter.setPen(seam_pen)
@@ -1904,13 +2408,21 @@ class RoofItem(QGraphicsItem):
 
     def contextMenuEvent(self, e):
         menu = QMenu()
-        a_heights = menu.addAction("Roof parameters…")
-        a_del = menu.addAction("Delete roof")
+        if self.is_dormer():
+            a_heights = menu.addAction("Edit dormer…")
+            a_del = menu.addAction("Delete dormer")
+        else:
+            a_heights = menu.addAction("Roof parameters…")
+            a_del = menu.addAction("Delete roof")
+        a_outline = menu.addAction(
+            "Hide outline" if getattr(self, "_show_outline", False) else "Show outline")
         chosen = menu.exec(e.screenPos())
         if chosen is a_heights:
             self.open_end_on_dialog()
         elif chosen is a_del:
             self.remove_with_dormers()
+        elif chosen is a_outline:
+            self.toggle_outline()
         e.accept()
 
 
@@ -1929,6 +2441,12 @@ class RoofGripItem(QGraphicsItem):
     every other drag. Hit region view-scaled, same as the marker."""
 
     KINDS = ("eave_l", "eave_r", "end_0", "end_1", "ridge")
+    # the six Build-Dormer controls -- shown only on a selected DORMER, beside
+    # the five universal grips above (the two side walls, the two side eaves,
+    # the gable-face setback, the face eave)
+    DORMER_KINDS = ("wall_l", "wall_r", "soffit_l", "soffit_r",
+                    "setback", "face_eave", "apex", "box_top",
+                    "box_l", "box_r")
     SIZE = 5.0               # drawn half-size, scene inches
     HIT_PX = 12.0            # clickable half-size, view pixels
     _TIPS = {
@@ -1937,6 +2455,27 @@ class RoofGripItem(QGraphicsItem):
         "end_0": "Roof end -- drag along the ridge to lengthen or shorten",
         "end_1": "Roof end -- drag along the ridge to lengthen or shorten",
         "ridge": "Ridge -- drag sideways between the eaves",
+        "wall_l": "Side wall -- drag to set this side's span",
+        "wall_r": "Side wall -- drag to set this side's span",
+        "soffit_l": "Side eave -- drag to set this side's overhang",
+        "soffit_r": "Side eave -- drag to set this side's overhang",
+        "setback": "Gable face -- drag along the roof to set the setback",
+        "face_eave": "Face eave -- drag down-slope to set the front overhang",
+        "apex": "Apex -- drag to move the ridge left/right; double-click to edit",
+        "box_top": "Grow the dormer up or down the roof (keeps the pitch)",
+        "box_l": "Frame edge -- drag in to clip this side's roof line",
+        "box_r": "Frame edge -- drag in to clip this side's roof line",
+    }
+    # the dormer controls carry the picture's colours; everything else blue
+    # DORMER_CONROLS.md: A apex white, C walls yellow, E eaves green, D face
+    # purple, F face eave orange, B frame blue
+    _COLORS = {
+        "wall_l": QColor(201, 149, 0), "wall_r": QColor(201, 149, 0),  # C walls
+        "soffit_l": QColor(0, 150, 0), "soffit_r": QColor(0, 150, 0),  # E eaves
+        "setback": QColor(147, 51, 234),                              # D face
+        "face_eave": QColor(230, 120, 20),                            # F front eave
+        "box_top": QColor(0, 120, 215),                               # B frame
+        "box_l": QColor(0, 120, 215), "box_r": QColor(0, 120, 215),   # B frame
     }
 
     def __init__(self, roof, kind: str):
@@ -1954,6 +2493,9 @@ class RoofGripItem(QGraphicsItem):
 
     def sync_position(self):
         self.prepareGeometryChange()
+        if self.kind in RoofGripItem.DORMER_KINDS:
+            self.setPos(self._dormer_pos())
+            return
         e1a, e1b, e2a, e2b = self.roof._eave_ends()
         a, b = {
             "eave_l": (e1a, e1b), "eave_r": (e2a, e2b),
@@ -1969,6 +2511,58 @@ class RoofGripItem(QGraphicsItem):
             mx += ux * GRIP_END_OFFSET_IN * sign
             my += uy * GRIP_END_OFFSET_IN * sign
         self.setPos(QPointF(mx, my))
+
+    def _dormer_pos(self) -> QPointF:
+        """The six dormer controls' positions: the two side walls on the span
+        line (0.45 along the ridge), the two side eaves on the soffit line
+        (0.68 along, so they clear the walls), the setback handle inside the
+        face, and the face eave on its own eave line down-slope of the face."""
+        r = self.roof
+        ux, uy, nx, ny = r._axis()
+        p1, p2 = r.p1, r.p2
+        span, eo = r.span_in, r.end_overhang_in
+        wall = r.wall_span_in                          # control C: the walls
+
+        def along(f):
+            return (p1.x() + (p2.x() - p1.x()) * f, p1.y() + (p2.y() - p1.y()) * f)
+
+        if self.kind in ("wall_l", "wall_r"):          # C: on the black cheek wall
+            s = 0 if self.kind == "wall_l" else 1
+            sign = 1.0 if s == 0 else -1.0
+            base = QPointF(p1.x() + sign * nx * wall[s], p1.y() + sign * ny * wall[s])
+            for a, b in r._dormer_wall_lines()[1:]:    # skip the face wall
+                if abs(a.x() - base.x()) < 1e-6 and abs(a.y() - base.y()) < 1e-6:
+                    return QPointF((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0)
+            return base
+        if self.kind == "soffit_l":                    # E: the eave, beyond the wall
+            ax, ay = along(0.68)
+            e0 = r._eave_reach(0)
+            return QPointF(ax + nx * e0, ay + ny * e0)
+        if self.kind == "soffit_r":
+            ax, ay = along(0.68)
+            e1 = r._eave_reach(1)
+            return QPointF(ax - nx * e1, ay - ny * e1)
+        if self.kind == "setback":                     # D: on the face wall, at p1
+            return QPointF(p1)
+        if self.kind == "apex":                        # A: the apex (back end)
+            return QPointF(p2)
+        if self.kind == "box_top":
+            # B top: beyond the apex, at the same ALONG offset as the end-1
+            # grip (so `drag_box_top` can reuse `drag_end(1)`'s math), shifted
+            # to the side so it does not sit on that grip
+            return QPointF(p2.x() + ux * GRIP_END_OFFSET_IN + nx * GRIP_END_OFFSET_IN,
+                           p2.y() + uy * GRIP_END_OFFSET_IN + ny * GRIP_END_OFFSET_IN)
+        if self.kind in ("box_l", "box_r"):
+            # B left/right: on the frame edge, at the mid-ridge, out at the box
+            # half-width (the valley when the frame is not clipped in)
+            s = 0 if self.kind == "box_l" else 1
+            box = r.box_half_in
+            edge = (box[s] if box is not None else r._face_valley_perp(s)) or span[s]
+            sign = 1.0 if s == 0 else -1.0
+            ax, ay = along(0.5)
+            return QPointF(ax + sign * nx * edge, ay + sign * ny * edge)
+        # face_eave: on the face eave line, down-slope of the face by eo[0]
+        return QPointF(p1.x() - ux * eo[0], p1.y() - uy * eo[0])
 
     def _view_scale(self) -> float:
         sc = self.scene()
@@ -1996,8 +2590,11 @@ class RoofGripItem(QGraphicsItem):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         s = self.SIZE
         painter.setBrush(QBrush(QColor(255, 255, 255)))
-        painter.setPen(QPen(QColor(0, 120, 215), 1.5))
-        if self.kind == "ridge":
+        painter.setPen(QPen(self._COLORS.get(self.kind, QColor(0, 120, 215)), 1.5))
+        if self.kind == "apex":                    # A: a white filled circle
+            r = s * 1.5
+            painter.drawEllipse(QRectF(-r, -r, 2.0 * r, 2.0 * r))
+        elif self.kind == "ridge":
             d = s * 1.4
             painter.drawPolygon(QPolygonF([QPointF(0, -d), QPointF(d, 0),
                                            QPointF(0, d), QPointF(-d, 0)]))
@@ -2013,6 +2610,26 @@ class RoofGripItem(QGraphicsItem):
             self.roof.drag_end(0, scene_pt)
         elif self.kind == "end_1":
             self.roof.drag_end(1, scene_pt)
+        elif self.kind == "wall_l":
+            self.roof.drag_wall(0, scene_pt)
+        elif self.kind == "wall_r":
+            self.roof.drag_wall(1, scene_pt)
+        elif self.kind == "soffit_l":
+            self.roof.drag_soffit(0, scene_pt)
+        elif self.kind == "soffit_r":
+            self.roof.drag_soffit(1, scene_pt)
+        elif self.kind == "setback":
+            self.roof.drag_setback(scene_pt)
+        elif self.kind == "face_eave":
+            self.roof.drag_face_eave(scene_pt)
+        elif self.kind == "box_top":
+            self.roof.drag_box_top(scene_pt)
+        elif self.kind == "box_l":
+            self.roof.drag_box_side(0, scene_pt)
+        elif self.kind == "box_r":
+            self.roof.drag_box_side(1, scene_pt)
+        elif self.kind in ("ridge", "apex"):       # A and G both move the ridge
+            self.roof.drag_ridge(scene_pt)
         else:
             self.roof.drag_ridge(scene_pt)
 
@@ -2039,6 +2656,17 @@ class RoofGripItem(QGraphicsItem):
             e.accept()
         else:
             super().mouseReleaseEvent(e)
+
+    def mouseDoubleClickEvent(self, e):
+        # DORMER_CONROLS.md control A: double-click the apex opens the dormer's
+        # parameters dialog (where the pitch lives)
+        if self.kind == "apex" and e.button() == Qt.MouseButton.LeftButton:
+            self._dragging = False
+            hold_roof_clips(self.scene(), False)     # a press started a hold
+            self.roof.open_end_on_dialog()
+            e.accept()
+        else:
+            super().mouseDoubleClickEvent(e)
 
 
 class RoofEndMarkerItem(QGraphicsItem):
@@ -2077,13 +2705,20 @@ class RoofEndMarkerItem(QGraphicsItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setZValue(WALL_Z + 2)        # above the ridge it marks
         self.setToolTip("Roof end marker -- drag to the other ridge end, "
-                        "right-click (or double-click) for heights")
+                        "double-click for heights, right-click to edit, "
+                        "delete or outline")
         self._dragging = False
         self.sync_position()
 
     def sync_position(self):
         self.prepareGeometryChange()
-        self.setPos(self.roof.p2 if self.roof.marker_end else self.roof.p1)
+        # a DORMER's marker sits at its APEX (p2 -- where the ridge meets the
+        # host), the point that names the dormer; marker_end stays 0 (its face
+        # is still p1 for the standing rule and openings)
+        if self.roof.is_dormer():
+            self.setPos(self.roof.p2)
+        else:
+            self.setPos(self.roof.p2 if self.roof.marker_end else self.roof.p1)
 
     def _view_scale(self) -> float:
         sc = self.scene()
@@ -2139,7 +2774,28 @@ class RoofEndMarkerItem(QGraphicsItem):
             super().mouseReleaseEvent(e)
 
     def contextMenuEvent(self, e):
-        self.roof.open_end_on_dialog()
+        # the blue dot's own menu (Patrick, 2026-11): edit, delete, and an
+        # "outline" that highlights the footprint this roof governs -- so a
+        # dot in a crowded plan can be read. The roof body carries the same
+        # menu (`RoofItem.contextMenuEvent`); double-click still opens the
+        # dialog straight.
+        roof = self.roof
+        menu = QMenu()
+        if roof.is_dormer():
+            a_edit = menu.addAction("Edit dormer…")
+            a_del = menu.addAction("Delete dormer")
+        else:
+            a_edit = menu.addAction("Roof parameters…")
+            a_del = menu.addAction("Delete roof")
+        a_outline = menu.addAction(
+            "Hide outline" if getattr(roof, "_show_outline", False) else "Show outline")
+        chosen = menu.exec(e.screenPos())
+        if chosen is a_edit:
+            roof.open_end_on_dialog()
+        elif chosen is a_del:
+            roof.remove_with_dormers()
+        elif chosen is a_outline:
+            roof.toggle_outline()
         e.accept()
 
     def mouseDoubleClickEvent(self, e):

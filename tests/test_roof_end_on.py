@@ -188,6 +188,12 @@ def test_marker_right_click_opens_the_end_on_dialog(fp, win, monkeypatch):
                     eaves_h_in=96.0, span_in=100.0)
     win.scene.addItem(roof)
 
+    # 2026-11: the marker's right-click now opens a MENU (edit / delete /
+    # outline); "Roof parameters..." is the door to the End-On dialog.
+    def _pick_parameters(self, *a, **k):
+        return next(a for a in self.actions() if "parameters" in a.text().lower())
+    monkeypatch.setattr(QMenu, "exec", _pick_parameters)
+
     def _accept_and_edit(dlg_self):
         dlg_self.sp_ridge.setValue(160.0)
         return QDialog.DialogCode.Accepted

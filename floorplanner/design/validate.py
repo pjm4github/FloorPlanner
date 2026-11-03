@@ -16,7 +16,8 @@ import re
 from pathlib import Path
 
 STD_T = {"exterior": 6.0, "interior": 4.5, "partition": 3.5,
-         "railing": 2.0, "fence": 2.0, "hedge": 18.0, "retaining": 8.0}
+         "railing": 2.0, "fence": 2.0, "hedge": 18.0, "retaining": 8.0,
+         "beam": 5.5}
 """THE NORMATIVE wall thickness by type, in inches -- ONE TABLE (D73).
 
 The schema calls this a contract: `wall.thickness_in` is documented as

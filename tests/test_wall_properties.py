@@ -163,6 +163,95 @@ def test_the_type_change_takes_effect(fp, win):
     assert walls[2].wall_type == "interior" and walls[2].t == fp.STD_T["interior"]
 
 
+def test_the_properties_dialog_offers_partition_and_beam(fp, win):
+    win.prepare_headless()
+    walls, _ = _square(fp, win)
+    dlg = WallPropertiesDialog(walls[0], win)
+    assert dlg.cb_type.findData("partition") >= 0
+    assert dlg.cb_type.findData("beam") >= 0
+    dlg.cb_type.setCurrentIndex(dlg.cb_type.findData("beam"))
+    dlg.apply()
+    assert walls[0].wall_type == "beam" and walls[0].t == fp.STD_T["beam"]
+
+
+def _busiest_row_segments(fp, win, wall_type):
+    """Render a single horizontal wall of `wall_type` and return the number of
+    dark runs on the row carrying the most ink -- 1 for a solid body, many for
+    a dashed one."""
+    from PyQt6.QtCore import QPointF, QRectF
+    from PyQt6.QtGui import QImage, QPainter
+    sc = win.scene
+    for it in list(sc.items()):
+        if isinstance(it, fp.WallItem):
+            sc.removeItem(it)
+    w = fp.WallItem(QPointF(0, 100), QPointF(300, 100), wall_type)
+    sc.addItem(w)
+    fp.rebuild_all_walls(sc)
+    W, H = 320, 120
+    img = QImage(W, H, QImage.Format.Format_ARGB32)
+    img.fill(0xFFFFFFFF)
+    p = QPainter(img)
+    sc.render(p, QRectF(0, 0, W, H), QRectF(-10, 40, 320, 120))
+    p.end()
+    most, segs = 0, 1
+    for y in range(H):
+        xs = [x for x in range(W)
+              if sum(img.pixelColor(x, y).getRgb()[:3]) / 3 < 190]
+        if len(xs) > most:                       # the row carrying the wall
+            most = len(xs)
+            segs = sum(1 for i, x in enumerate(xs) if i == 0 or x - xs[i - 1] > 1)
+    return segs
+
+
+def test_a_beam_and_a_partition_draw_dashed_in_plan_an_interior_wall_solid(fp, win):
+    win.prepare_headless()
+    # an interior wall's body is one solid run; a beam and a partition are
+    # each drawn as a dashed line (many runs on the busiest row)
+    assert _busiest_row_segments(fp, win, "interior") == 1
+    assert _busiest_row_segments(fp, win, "beam") > 5
+    assert _busiest_row_segments(fp, win, "partition") > 5
+
+
+def _dash_ink(fp, win, wall_type):
+    """The mean colour of one wall's dash pixels, sampled on the row carrying
+    the dash line -- so the blue length label off to the side is not mixed in.
+    """
+    from PyQt6.QtCore import QPointF, QRectF
+    from PyQt6.QtGui import QImage, QPainter
+    sc = win.scene
+    for it in list(sc.items()):
+        if isinstance(it, fp.WallItem):
+            sc.removeItem(it)
+    sc.addItem(fp.WallItem(QPointF(0, 100), QPointF(300, 100), wall_type))
+    fp.rebuild_all_walls(sc)
+    W, H = 320, 120
+    img = QImage(W, H, QImage.Format.Format_ARGB32)
+    img.fill(0xFFFFFFFF)
+    p = QPainter(img)
+    sc.render(p, QRectF(0, 0, W, H), QRectF(-10, 40, 320, 120))
+    p.end()
+    best_xs = []
+    for y in range(H):
+        xs = [x for x in range(W)
+              if sum(img.pixelColor(x, y).getRgb()[:3]) / 3 < 190]
+        if len(xs) > len(best_xs):               # the row carrying the dash
+            best_xs, best_y = xs, y
+    assert best_xs, f"no dash pixels for {wall_type}"
+    chans = [img.pixelColor(x, best_y).getRgb()[:3] for x in best_xs]
+    n = len(chans)
+    return (sum(c[0] for c in chans) / n,
+            sum(c[1] for c in chans) / n,
+            sum(c[2] for c in chans) / n)
+
+
+def test_a_beam_is_brown_and_a_partition_is_grey(fp, win):
+    win.prepare_headless()
+    br, bg, bb = _dash_ink(fp, win, "beam")
+    pr, pg, pb = _dash_ink(fp, win, "partition")
+    assert br - bb > 25, f"beam should read brown (red>>blue), got {(br, bg, bb)}"
+    assert abs(pr - pb) < 15, f"partition should read grey, got {(pr, pg, pb)}"
+
+
 # --------------------------------------------------------------------------
 # the double-click, and one undo step
 # --------------------------------------------------------------------------

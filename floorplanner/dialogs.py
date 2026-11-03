@@ -25,23 +25,43 @@ class GapReviewDialog(QDialog):
     mistake. Same discipline as P2.1's conversion report: report to a human,
     repair only on their say-so."""
 
+    #: red highlight box padding around a gap, in inches, and the least the
+    #: view shows around one so a 1" gap is not fitted to the whole window
+    MARKER_PAD_IN = 18.0
+    MIN_VIEW_IN = 8 * 12.0
+
     def __init__(self, win):
         super().__init__(win)
         self.win = win
         self.setWindowTitle("Review wall gaps")
-        self.resize(520, 340)
+        self.resize(560, 360)
+        # NON-MODAL (Patrick, 2026-11): the user edits the plan to fix a gap by
+        # hand while this stays open, then rescans -- same pattern as the
+        # design-problems report. WA_DeleteOnClose, so the red marker is torn
+        # down with the window.
+        self.setModal(False)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        self._marker = None
         lay = QVBoxLayout(self)
         self.info = QLabel()
         self.info.setWordWrap(True)
         lay.addWidget(self.info)
         self.listw = QListWidget()
+        self.listw.currentRowChanged.connect(self._on_row)
         lay.addWidget(self.listw)
         row = QHBoxLayout()
+        self.b_zoom = QPushButton("Zoom to problem")
+        self.b_zoom.clicked.connect(self._zoom_to_selected)
+        row.addWidget(self.b_zoom)
         self.b_close = QPushButton("Close selected gap")
         self.b_close.clicked.connect(self._close_selected)
         row.addWidget(self.b_close)
+        self.b_rescan = QPushButton("Rescan")
+        self.b_rescan.clicked.connect(self.refresh)
+        row.addWidget(self.b_rescan)
+        row.addStretch(1)
         b_done = QPushButton("Done")
-        b_done.clicked.connect(self.accept)
+        b_done.clicked.connect(self.close)
         row.addWidget(b_done)
         lay.addLayout(row)
         self.refresh()
@@ -50,6 +70,7 @@ class GapReviewDialog(QDialog):
         import warnings
         from floorplanner.design.bridge import design_from_scene
         from floorplanner.design.validate import near_vertex_gaps
+        self._clear_marker()                    # a rescan drops the stale box
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             doc = design_from_scene(self.win).to_dict()
@@ -65,13 +86,73 @@ class GapReviewDialog(QDialog):
             self.info.setText(
                 f"{len(self.gaps)} pair(s) of corners sit close together "
                 f"without sharing a corner. Some may be deliberate (a "
-                f"reveal, a pilaster gap) -- those need no action. Closing "
-                f"a gap welds the two corners into one, at the first point.")
+                f"reveal, a pilaster gap) -- those need no action. 'Zoom to "
+                f"problem' boxes the pair in red; 'Close selected gap' welds "
+                f"them; or edit the walls by hand and press 'Rescan'.")
             self.listw.setCurrentRow(0)
         else:
             self.info.setText("No near-vertex gaps -- every pair of corners "
                               "is either welded or genuinely apart.")
-        self.b_close.setEnabled(bool(self.gaps))
+        has = bool(self.gaps)
+        self.b_close.setEnabled(has)
+        self.b_zoom.setEnabled(has)
+
+    def _gap_rect(self, a, b):
+        """The scene rectangle around a gap pair, padded so both corners and
+        their surroundings show."""
+        r = QRectF(QPointF(*a), QPointF(*b)).normalized().adjusted(
+            -self.MARKER_PAD_IN, -self.MARKER_PAD_IN,
+            self.MARKER_PAD_IN, self.MARKER_PAD_IN)
+        if r.width() < self.MIN_VIEW_IN:
+            r.adjust(-(self.MIN_VIEW_IN - r.width()) / 2.0, 0,
+                     (self.MIN_VIEW_IN - r.width()) / 2.0, 0)
+        if r.height() < self.MIN_VIEW_IN:
+            r.adjust(0, -(self.MIN_VIEW_IN - r.height()) / 2.0,
+                     0, (self.MIN_VIEW_IN - r.height()) / 2.0)
+        return r
+
+    def _clear_marker(self):
+        if self._marker is not None:
+            try:
+                self.win.scene.removeItem(self._marker)
+            except RuntimeError:
+                pass
+            self._marker = None
+
+    def _show_marker(self, a, b):
+        """Draw a red box around the gap pair itself (tight, not the padded
+        view rect), on top of everything, on whatever floor is shown."""
+        self._clear_marker()
+        box = QRectF(QPointF(*a), QPointF(*b)).normalized().adjusted(
+            -self.MARKER_PAD_IN / 2.0, -self.MARKER_PAD_IN / 2.0,
+            self.MARKER_PAD_IN / 2.0, self.MARKER_PAD_IN / 2.0)
+        pen = QPen(QColor(220, 30, 30), 2.0)
+        pen.setCosmetic(True)                   # 2px at any zoom
+        self._marker = self.win.scene.addRect(box, pen)
+        self._marker.setZValue(10_000)          # above walls, rooms, roofs
+
+    def _zoom_to_selected(self):
+        i = self.listw.currentRow()
+        if i < 0 or i >= len(self.gaps):
+            return
+        lvl, a, b, _dist = self.gaps[i]
+        name = self._levels.get(lvl, lvl)
+        if (self.win._floor(name) is not None
+                and name != self.win.active_floor):
+            self.win.switch_floor(name)
+        rect = self._gap_rect(a, b)
+        self.win.view.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
+        self.win.view.centerOn(rect.center())
+        self._show_marker(a, b)
+
+    def _on_row(self, _row):
+        # a stale red box must not linger on a different pair; it reappears
+        # only when the user zooms to the newly selected one
+        self._clear_marker()
+
+    def closeEvent(self, e):
+        self._clear_marker()
+        super().closeEvent(e)
 
     def _close_selected(self):
         i = self.listw.currentRow()

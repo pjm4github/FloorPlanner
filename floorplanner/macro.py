@@ -125,7 +125,7 @@ class MacroRunner:
     # that convention).
     _TOOL_CODES = {"S": TOOL_SELECT, "E": TOOL_WALL_EXT, "I": TOOL_WALL_INT,
                    "D": TOOL_DOOR, "W": TOOL_WINDOW, "R": TOOL_ROOM,
-                   "G": TOOL_ROOF_RIDGE, "M": TOOL_ROOF_DORMER,
+                   "G": TOOL_ROOF_RIDGE, "H": TOOL_ROOF_DORMER,
                    "T": TOOL_TEXT, "L": TOOL_MEASURE, "N": TOOL_LEADER}
     _DIGIT_TOOLS = [TOOL_SELECT, TOOL_WALL_EXT, TOOL_WALL_INT,
                     TOOL_DOOR, TOOL_WINDOW, TOOL_ROOM]
@@ -917,7 +917,7 @@ class MacroRecorderDialog(QDialog):
                    Qt.Key.Key_Up: "UP", Qt.Key.Key_Down: "DOWN"}
     _TOOL_CODES = {TOOL_SELECT: "S", TOOL_WALL_EXT: "E", TOOL_WALL_INT: "I",
                    TOOL_DOOR: "D", TOOL_WINDOW: "W", TOOL_ROOM: "R",
-                   TOOL_ROOF_RIDGE: "G", TOOL_ROOF_DORMER: "M",
+                   TOOL_ROOF_RIDGE: "G", TOOL_ROOF_DORMER: "H",
                    TOOL_TEXT: "T", TOOL_MEASURE: "L", TOOL_LEADER: "N"}
 
     def __init__(self, win, fmt="legacy"):

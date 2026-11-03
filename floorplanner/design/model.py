@@ -223,7 +223,9 @@ class Roof(_Node):
                         ("overhang_in", RAW), ("span_in", RAW),
                         ("eaves_bind", RAW), ("gable", RAW),
                         ("marker_end", RAW), ("host", RAW), ("form", RAW),
-                        ("openings", RAW), ("hip_run_in", RAW)]
+                        ("openings", RAW), ("hip_run_in", RAW),
+                        ("end_overhang_in", RAW), ("wall_span_in", RAW),
+                        ("box_half_in", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     ridge: Any = _MISSING
@@ -248,6 +250,18 @@ class Roof(_Node):
     # a length or null (= derived, the mean of the spans). OPTIONAL, omitted
     # while both ends are derived.
     hip_run_in: Any = _MISSING
+    # The per-END overhang `[end0, end1]` along the ridge axis -- the rake
+    # (gable overhang) at a gable end, and a dormer's FACE eave at `end0`.
+    # OPTIONAL, additive, omitted when both are 0 (so a roof written before
+    # this field round-trips unchanged).
+    end_overhang_in: Any = _MISSING
+    # DORMER_CONROLS.md control C: the dormer's vertical WALL offsets
+    # `[left, right]`, decoupled from `span_in` (the eaves line / pitch).
+    # OPTIONAL, dormer only, omitted while the walls sit on the eaves line.
+    wall_span_in: Any = _MISSING
+    # DORMER_CONROLS.md control B: the frame half-width `[left, right]` that
+    # clips the roof lines. OPTIONAL, dormer only, omitted while unclipped.
+    box_half_in: Any = _MISSING
 
 
 @dataclass
