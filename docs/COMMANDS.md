@@ -43,7 +43,7 @@ picked (the Room and Datum tools hand back to Select after one use).
 | **W** | Window | Click a wall, type the WWHH code; the sill height comes from the plan default (36″) and can be changed in its properties. | `W`, click the north wall, `4048`. |
 | **R** | Room name | Click inside an enclosed area, type the name. One-shot; **Ctrl**-pick the tool to keep it. | `R`, click the big area, `Living Room`. |
 | **G** | Roof ridge | Press on the eaves wall, drag the ridge, release, then click the eaves wall the roof spans over; the heights dialog opens (*Roof ▸ Sketch ridge*). | `G`, drag along the house, click the far wall, set eaves 96″ / ridge 150″. |
-| **M** | Roof dormer | Press on a roof plane (snaps to the orange clip trace), drag along it for the width (**Shift** = free direction), release, set the heights. | `M`, drag 60″ along the front slope. |
+| **H** | Roof dormer | Press on a roof plane (snaps to the orange clip trace), drag along it for the width (**Shift** = free direction), release, set the heights. **Shift+click** (no drag) builds a whole gable dormer in one go: its face drops down-slope to the eaves, both cheeks take the roof's pitch, and the ridge apex sits where you clicked — no dialog. | `H`, drag 60″ along the front slope; or **Shift**-click near the ridge. |
 | **T** | Annotation (text) | Click where the text goes, type it. Drag to move; double-click to edit. | `T`, click above the porch, `North elevation`. |
 | **L** | Measure | Press on the first point, drag to the second. Each end snaps to the datum, a corner, an opening's jamb or a wall's centreline; both ends on one wall and the measure runs along it. Drag the measure to set it off the wall; select it for its four knobs (points 1 and 2 move and snap — **Ctrl** rotates about the other point, **Shift** frees; knob 3 slides the line's end; knob 4 slides the label). | `L`, drag corner to corner: `20'-0"`. |
 | **N** | Leader | Press on the thing to name (snaps as a measure's end does), drag to where the text goes, release, type the text. An arrow at the point, the text on a short shoulder; drag the body to move it; select it for its two knobs; double-click to edit. A click without a drag puts the text 24″ up and right. | `N`, press on the post, drag away, `Relocate this post`. |
@@ -159,7 +159,7 @@ picked (the Room and Datum tools hand back to Select after one use).
 | Item | Action | Example |
 |---|---|---|
 | Sketch ridge [G] | The ridge tool (§2). | — |
-| Sketch dormer [M] | The dormer tool (§2). | — |
+| Sketch dormer [H] | The dormer tool (§2). | — |
 | Show roof | Draw the roofs on the plan. | — |
 | Edit roof | Show the roofs' grips (implies Show roof). | untick to edit walls under a roof |
 
@@ -207,6 +207,8 @@ the pointer.
 | the floor selector (Ctrl+F) | 3D view… | The 3D view, from the floor popup. |
 | a roof (while *Edit roof* is on) | Roof parameters… | The End-On dialog: ridge and eaves heights, pitch, **Form** (gable / hip / shed), eaves span and overhang per side, each end gable or hip with its **hip run**, a dormer's standing rule; the canvas draws the end-on section. |
 | | Delete roof | — |
+| a dormer (while *Edit roof* is on) | Edit dormer… | The same End-On dialog, titled for the dormer. |
+| | Delete dormer | Removes just that dormer. |
 | the imported image | Calibrate scale (2 points)… | Click two points a known distance apart, type the distance. |
 | | Crop to region | Drag-select the part to keep. |
 | | Extract walls | Detect the walls (shown as a blue ghost): **Yes** adds them. |
@@ -243,7 +245,7 @@ reference is [`macro_language.md`](macro_language.md).
 
 | Token | Action | Example |
 |---|---|---|
-| `S` `E` `I` `D` `W` `R` `G` `M` `T` `L` `N` | Pick a tool (Select / Exterior / Interior / Door / Window / Room / Roof ridge / Dormer / Text / Measure / Leader). Also `TOOL <name>` (`select extwall intwall door window room roofridge roofdormer text measure leader`) and the digits `1`–`6`. | `I CLICK 120 120 DRAG 360 120` |
+| `S` `E` `I` `D` `W` `R` `G` `H` `T` `L` `N` | Pick a tool (Select / Exterior / Interior / Door / Window / Room / Roof ridge / Dormer / Text / Measure / Leader). Also `TOOL <name>` (`select extwall intwall door window room roofridge roofdormer text measure leader`) and the digits `1`–`6`. | `I CLICK 120 120 DRAG 360 120` |
 | `^N` `^Z` `^Y` `^+Z` `^X` `^C` `^V` `^G` `^+G` `^A` `^S` `^H` | New / undo / redo / cut / copy / paste / group / ungroup / select all / save / toggle shuffle. | `^C MOVE 300 300 ^V` |
 | `^O "path"` / `^+S "path"` | Open / save that file. | `^O "plans/den.json"` |
 | `^F "name"` / `^F` / `^+F "name"` | Switch to a floor / the default floor / create (or switch to) a floor. | `^+F "Upper"` |

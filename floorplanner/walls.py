@@ -33,7 +33,9 @@ LANDSCAPE_TYPES = ("railing", "fence", "hedge", "retaining")
 
 WALL_TYPE_LABELS = [
     ("exterior", "Exterior wall"), ("interior", "Interior wall"),
-    ("partition", "Partition"), ("railing", "Railing"),
+    # `partition` divides rooms in plan but builds no 3D volume; `beam` is a
+    # ceiling beam in 3D that does NOT divide a room (2026-11, Patrick).
+    ("partition", "Partition"), ("beam", "Beam"), ("railing", "Railing"),
     ("fence", "Fence"), ("hedge", "Hedge"), ("retaining", "Retaining wall"),
 ]
 
@@ -1691,19 +1693,38 @@ class WallItem(QGraphicsItem):
             fill, outline = QColor(60, 62, 68), QColor(25, 25, 25)
         else:
             fill, outline = QColor(150, 152, 158), QColor(25, 25, 25)
-        # fill the body with NO outline so overlapping walls read as one solid
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QBrush(fill))
-        painter.drawPath(self._path)
-        # dark outline, clipped to the wall-network's outer boundary so the
-        # seams INSIDE a T/cross/L junction don't show (one solid wall)
-        painter.save()
-        if self._outline_clip is not None:
-            painter.setClipPath(self._outline_clip)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(outline, 0))
-        painter.drawPath(self._path)
-        painter.restore()
+        if self.wall_type in ("beam", "partition"):
+            # DASHED, NOT A SOLID BODY (Patrick, 2026-11): a BEAM is overhead
+            # and a PARTITION is a light, non-structural divider -- both read
+            # as a dashed plan line rather than a wall you build. They stay
+            # ordinary walls otherwise: selection, the endpoint knobs, the
+            # length label and the callouts below all still apply, so a
+            # partition edits and moves like any wall. The two are drawn in
+            # DIFFERENT inks so they are told apart at a glance: a beam in
+            # timber brown (its 3D colour), a partition in grey.
+            if ghost:
+                ink = FLOOR_GHOST
+            elif self.wall_type == "beam":
+                ink = QColor(115, 84, 51)        # stained-timber brown (cf. 3D)
+            else:
+                ink = QColor(90, 90, 90)         # partition grey
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(ink, 0, Qt.PenStyle.DashLine))
+            painter.drawPath(self._path)
+        else:
+            # fill the body with NO outline so overlapping walls read as one solid
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QBrush(fill))
+            painter.drawPath(self._path)
+            # dark outline, clipped to the wall-network's outer boundary so the
+            # seams INSIDE a T/cross/L junction don't show (one solid wall)
+            painter.save()
+            if self._outline_clip is not None:
+                painter.setClipPath(self._outline_clip)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(outline, 0))
+            painter.drawPath(self._path)
+            painter.restore()
 
         # DECORATION ALONG THE RUN (D74) -- what says which type this is, now
         # that thickness has been ruled unable to. Drawn OUTSIDE the junction

@@ -947,6 +947,15 @@ def _roofs_of(items, lid, nid, src=None):
         runs = list(getattr(it, "hip_run_in", None) or [None, None])
         if any(r is not None for r in runs):          # 0258: only once an end is set
             rec["hip_run_in"] = [None if r is None else float(r) for r in runs]
+        eo = [float(v) for v in getattr(it, "end_overhang_in", [0.0, 0.0])]
+        if any(v != 0.0 for v in eo):                 # omitted when both ends are 0
+            rec["end_overhang_in"] = eo
+        ws = getattr(it, "_wall_span_in", None)        # control C, dormers only
+        if ws is not None and [float(v) for v in ws] != rec["span_in"]:
+            rec["wall_span_in"] = [float(ws[0]), float(ws[1])]
+        bh = getattr(it, "_box_half_in", None)         # control B, dormers only
+        if bh is not None:
+            rec["box_half_in"] = [float(bh[0]), float(bh[1])]
         if getattr(it, "openings", None):             # plan B: a dormer's face openings
             rec["openings"] = [dict(o) for o in it.openings]
         if src is not None:
@@ -1224,6 +1233,11 @@ def face_at(scene, point, floor=None):
 
     lid = "L1"
     items = _by_floor(scene).get(floor or active_floor(), [])
+    # A BEAM does not divide a room (Patrick, 2026-11): keep it out of the
+    # graph that detection walks, so a beam drawn across a room is not a
+    # boundary of it. It is still serialized and drawn like any other wall.
+    items = [it for it in items
+             if not (isinstance(it, WallItem) and it.wall_type == "beam")]
     seq = defaultdict(int)
 
     def nid(prefix):
@@ -1485,7 +1499,10 @@ def _build_roofs(scene, doc, lname, rep):
                         eaves_bind=rfd.get("eaves_bind", "manual"),
                         form=rfd.get("form", "gable"),
                         openings=rfd.get("openings"),
-                        hip_run_in=rfd.get("hip_run_in"))
+                        hip_run_in=rfd.get("hip_run_in"),
+                        end_overhang_in=rfd.get("end_overhang_in"),
+                        wall_span_in=rfd.get("wall_span_in"),
+                        box_half_in=rfd.get("box_half_in"))
         item.floor = floor   # never the global
         item.doc_id = rfd.get("id")                            # 0264
         item._uid = _labels.adopt("RF", rfd.get("id"))        # 0265

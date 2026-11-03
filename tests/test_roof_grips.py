@@ -59,10 +59,15 @@ def _eaves(rf):
 # --------------------------------------------------------------------------
 def test_five_grips_hidden_until_the_roof_is_selected(scene):
     rf = _roof(scene)
-    assert [g.kind for g in rf.grips] == list(RoofGripItem.KINDS)
+    universal = [g for g in rf.grips if g.kind in RoofGripItem.KINDS]
+    assert [g.kind for g in universal] == list(RoofGripItem.KINDS)
     assert not any(g.isVisible() for g in rf.grips)
     rf.setSelected(True)
-    assert all(g.isVisible() for g in rf.grips)
+    # a plain roof shows the five universal grips; the six dormer controls
+    # stay hidden -- it has no host
+    assert all(g.isVisible() for g in universal)
+    assert not any(g.isVisible() for g in rf.grips
+                   if g.kind in RoofGripItem.DORMER_KINDS)
     rf.setSelected(False)
     assert not any(g.isVisible() for g in rf.grips)
 

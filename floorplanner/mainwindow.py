@@ -78,7 +78,8 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         TOOL_ROOF_DORMER: "Dormer: press on a roof plane (snaps to the orange "
                           "clip trace), drag along it to set the width "
                           "(Shift = free direction), release to set the "
-                          "heights. Esc cancels.",
+                          "heights. Shift+click builds a full gable dormer "
+                          "to the eaves at the roof's pitch. Esc cancels.",
         TOOL_TEXT: "Annotation: click where the text goes, then type it. "
                    "Drag a text to move it; double-click to edit it.",
         TOOL_MEASURE: "Measure: press on the first point and drag to the second "
@@ -199,7 +200,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             (TOOL_WINDOW, "Window", "W", "window"),
             (TOOL_ROOM, "Room Name", "R", "room"),
             (TOOL_ROOF_RIDGE, "Roof Ridge", "G", "roof"),
-            (TOOL_ROOF_DORMER, "Roof Dormer", "M", "dormer"),
+            (TOOL_ROOF_DORMER, "Roof Dormer", "H", "dormer"),
             (TOOL_TEXT, "Annotation", "T", "text"),
             (TOOL_MEASURE, "Measure", "L", "measure"),
             (TOOL_LEADER, "Leader", "N", "leader"),
@@ -495,7 +496,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         # R5b (0191-ruling.md sec2): its OWN tool, not an overloaded press
         # on the ridge tool -- a crossing ridge legitimately starts inside
         # another roof's region, and that press must stay a ridge
-        self.a_dormer = QAction("Sketch &dormer  [M]", self)
+        self.a_dormer = QAction("Sketch &dormer  [H]", self)
         self.a_dormer.triggered.connect(lambda: self.set_tool(TOOL_ROOF_DORMER))
         m_roof.addAction(self.a_dormer)
         m_roof.addSeparator()
@@ -945,21 +946,35 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                     f"eaves {fmt_in(item.eaves_h_in)}).")
         return item
 
-    def finish_roof_dormer(self, item):
+    def finish_roof_dormer(self, item, auto=False):
         """Roof ▸ Sketch dormer…'s second half (R5b, 0191-ruling.md sec2):
         the face and width are set by the drag, the host by the press; the
         End-On dialog -- its fourth door -- sets the heights, seeded with
         the dormer defaults the tool already put on the item. The dialog
         REFUSES a ridge that cannot meet the host (above the host's own
         ridge): `apply` returns False and the dormer is dropped, exactly
-        as a cancelled ridge is."""
-        dlg = RoofEndOnDialog(item, self)
-        if dlg.exec() != QDialog.DialogCode.Accepted or not dlg.apply():
-            self.scene.removeItem(item)
-            self.status("Dormer cancelled." if dlg.result() != QDialog.DialogCode.Accepted
-                        else "Dormer dropped: its ridge cannot meet the host roof "
-                             "(ridge height too high).")
-            return None
+        as a cancelled ridge is.
+
+        `auto` is the Build-Dormer path (`view._build_dormer_auto`), which
+        derives every value from one Shift+click: there is no dialog, so the
+        finished item is validated by `dormer_stands()` and dropped if its
+        ridge cannot meet the host. The status line and the macro record are
+        the sketched dormer's, so a Build-Dormer plays back as one DORMER
+        token like any other."""
+        if auto:
+            if not item.dormer_stands():
+                self.scene.removeItem(item)
+                self.status("Dormer dropped: its ridge cannot meet the host "
+                            "roof here.")
+                return None
+        else:
+            dlg = RoofEndOnDialog(item, self)
+            if dlg.exec() != QDialog.DialogCode.Accepted or not dlg.apply():
+                self.scene.removeItem(item)
+                self.status("Dormer cancelled." if dlg.result() != QDialog.DialogCode.Accepted
+                            else "Dormer dropped: its ridge cannot meet the host roof "
+                                 "(ridge height too high).")
+                return None
         self.status(f"Dormer added ({fmt_ftin(item.span_in[0] + item.span_in[1])} "
                     f"wide, ridge {fmt_in(item.ridge_h_in)}, "
                     f"eaves {fmt_in(item.eaves_h_in)}).")
@@ -1684,8 +1699,19 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         """Edit ▸ Review wall gaps… -- defect 34's REVIEW, deliberately not a
         repair. Lists the document's near-vertex pairs in the (0.6", 9.0")
         band; the user closes chosen pairs one at a time. A deliberate 6"
-        reveal left alone stays exactly as drawn."""
-        GapReviewDialog(self).exec()
+        reveal left alone stays exactly as drawn.
+
+        NON-MODAL (2026-11): so the user can zoom to a gap (a red box marks
+        it), edit the walls by hand, and rescan without closing the dialog.
+        A reference is kept so it is not garbage-collected while open."""
+        old = getattr(self, "_gap_dialog", None)
+        if old is not None:
+            try:
+                old.close()
+            except RuntimeError:                 # already deleted on close
+                pass
+        self._gap_dialog = GapReviewDialog(self)
+        self._gap_dialog.show()
 
     def review_wall_orthogonality(self):
         """Edit ▸ Wall orthogonality report… -- 0055-ruling.md item B, a

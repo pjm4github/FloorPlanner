@@ -375,7 +375,8 @@ class RoofGeom:
     accept the pre-R4a bare-number shape the way the loader does."""
 
     def __init__(self, p1, p2, span_in, overhang_in, ridge_h_in, eaves_h_in,
-                 gable=None, name=None, marker_end=1, hip_run_in=None):
+                 gable=None, name=None, marker_end=1, hip_run_in=None,
+                 end_overhang_in=None, wall_span_in=None):
         # read-only, like RoofItem's: the gate's end-assignment census
         # polices the literal `.p1 =` spelling project-wide
         self._p1, self._p2 = Pt(p1), Pt(p2)
@@ -384,6 +385,14 @@ class RoofGeom:
         self.ridge_h_in = float(ridge_h_in)
         self.eaves_h_in = float(eaves_h_in)
         self.gable = list(gable) if gable is not None else [True, True]
+        # the per-end rake / face overhang (RoofItem.end_overhang_in), 0 both
+        # ends when absent -- so a record without it clips exactly as before
+        self.end_overhang_in = ([0.0, 0.0] if end_overhang_in is None
+                                else self._pair(end_overhang_in))
+        # DORMER_CONROLS.md control C: the dormer wall offsets; None (absent)
+        # means the walls sit on the eaves line (`span_in`), as before
+        self.wall_span_in = (list(self.span_in) if wall_span_in is None
+                             else self._pair(wall_span_in))
         self.clip_name = name
         # R4g (0177-ruling.md sec1): the reachability fallback anchor for a
         # roof with no single-coverage ground of its own -- `roofs.py`'s
@@ -410,13 +419,15 @@ class RoofGeom:
                 rec.get("overhang_in", 0.0) or 0.0,
                 rec.get("ridge_h_in", 132.0), rec.get("eaves_h_in", 96.0),
                 rec.get("gable") or [True, True], rec.get("id"),
-                rec.get("marker_end", 1), rec.get("hip_run_in"))
+                rec.get("marker_end", 1), rec.get("hip_run_in"),
+                rec.get("end_overhang_in"), rec.get("wall_span_in"))
         # 0248 plan A: a shed has no right plane -- its right span and
         # overhang are 0 whatever the record says (the item clamps them)
         g.form = rec.get("form", "gable")
         if g.form == "shed":
             g.span_in = [float(g.span_in[0]), 0.0]
             g.overhang_in = [float(g.overhang_in[0]), 0.0]
+            g.wall_span_in = [float(g.wall_span_in[0]), 0.0]
         return g
 
     def marker_pt(self):
@@ -452,15 +463,20 @@ class RoofGeom:
         ux, uy, _, _ = self._axis()
         r1, o1 = self.hip_extension(0, gable)
         r2, o2 = self.hip_extension(1, gable)
-        e1, e2 = r1 + o1, r2 + o2
+        flags = self.gable if gable is None else gable
+        eo = self.end_overhang_in
+        e1 = r1 + o1 + (eo[0] if flags[0] else 0.0)
+        e2 = r2 + o2 + (eo[1] if flags[1] else 0.0)
         return (Pt(self.p1.x() - ux * e1, self.p1.y() - uy * e1),
                 Pt(self.p2.x() + ux * e2, self.p2.y() + uy * e2))
 
     def _eave_ends(self):
         _, _, nx, ny = self._axis()
         a1, a2 = self._extended_ridge()
-        reach_l = self.span_in[0] + self.overhang_in[0]
-        reach_r = self.span_in[1] + self.overhang_in[1]
+        # the eave reaches wall + overhang (DORMER_CONROLS.md); wall_span_in
+        # defaults to span_in, so a plain roof is unchanged
+        reach_l = self.wall_span_in[0] + self.overhang_in[0]
+        reach_r = self.wall_span_in[1] + self.overhang_in[1]
         return (Pt(a1.x() + nx * reach_l, a1.y() + ny * reach_l),
                 Pt(a2.x() + nx * reach_l, a2.y() + ny * reach_l),
                 Pt(a1.x() - nx * reach_r, a1.y() - ny * reach_r),

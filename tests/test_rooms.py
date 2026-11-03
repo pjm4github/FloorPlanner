@@ -390,6 +390,42 @@ def _on_grid(v, step):
     return abs(v - round(v / step) * step) < 0.01
 
 
+def test_a_partition_divides_a_room_but_a_beam_does_not(fp, win):
+    """Patrick, 2026-11: a partition is a room boundary (detection reads a
+    room either side of it); a beam is not (a beam drawn across a room leaves
+    it whole, because `bridge.face_at` keeps beams out of the graph)."""
+    sc = win.scene
+
+    def wall(a, b, t):
+        w = fp.WallItem(QPointF(*a), QPointF(*b), t)
+        sc.addItem(w)
+        return w
+
+    for a, b in (((0, 0), (200, 0)), ((200, 0), (200, 200)),
+                 ((200, 200), (0, 200)), ((0, 200), (0, 0))):
+        wall(a, b, "exterior")
+    fp.rebuild_all_walls(sc)
+    whole = fp.detect_room(sc, QPointF(120, 100))
+    assert whole is not None
+    full = whole[1]
+
+    # a BEAM across the middle divides nothing
+    beam = wall((100, 0), (100, 200), "beam")
+    fp.rebuild_all_walls(sc)
+    across = fp.detect_room(sc, QPointF(120, 100))
+    assert across is not None and across[1] == pytest.approx(full)
+
+    # swap it for a PARTITION: now each side is its own, half-size room
+    sc.removeItem(beam)
+    wall((100, 0), (100, 200), "partition")
+    fp.rebuild_all_walls(sc)
+    left = fp.detect_room(sc, QPointF(50, 100))
+    right = fp.detect_room(sc, QPointF(150, 100))
+    assert left is not None and right is not None
+    assert left[1] == pytest.approx(full / 2, rel=0.02)
+    assert right[1] == pytest.approx(full / 2, rel=0.02)
+
+
 def test_align_rooms_to_grid_snaps_walls(fp, win):
     sc = win.scene
     corners = [(1, 2), (157, 2), (157, 98), (1, 98)]    # off-grid room

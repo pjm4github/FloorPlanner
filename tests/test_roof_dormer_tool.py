@@ -6,9 +6,9 @@ dialog. Driven through the view exactly as tests/test_roof_ridge_tool.py
 drives the ridge tool.
 """
 import pytest
-from PyQt6.QtCore import QEvent, QPointF, Qt
+from PyQt6.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt6.QtGui import QMouseEvent, QPainterPath
-from PyQt6.QtWidgets import QApplication, QDialog
+from PyQt6.QtWidgets import QApplication, QDialog, QMenu
 
 pytestmark = pytest.mark.gui
 
@@ -155,10 +155,95 @@ def test_roof_menu_offers_sketch_dormer_and_the_macro_letter_round_trips(fp, win
     texts = [a.text() for a in m_roof.actions()]
     assert any("dormer" in t.lower() for t in texts), texts
     from floorplanner.macro import MacroRecorderDialog, MacroRunner
-    assert MacroRunner._TOOL_CODES["M"] == fp.TOOL_ROOF_DORMER
-    assert MacroRecorderDialog._TOOL_CODES[fp.TOOL_ROOF_DORMER] == "M"
+    assert MacroRunner._TOOL_CODES["H"] == fp.TOOL_ROOF_DORMER
+    assert MacroRecorderDialog._TOOL_CODES[fp.TOOL_ROOF_DORMER] == "H"
     assert MacroRunner._TOOL_NAMES["roofdormer"] == fp.TOOL_ROOF_DORMER
     assert labels
+
+
+def test_shift_click_builds_a_full_gable_dormer_to_the_eaves(fp, win):
+    """Build Dormer (the M tool's Shift+click): one point near the host's
+    ridge builds a whole gable dormer whose face drops down-slope to the
+    eaves, whose cheeks take the host's pitch, and whose ridge apex sits at
+    the click -- no drag, no dialog. Host: eaves 80, ridge 150, span 100,
+    so pitch 0.7. Shift+click at (204, 150), 50in down-slope from the ridge
+    (y = 100): the run to the eave (y = 200) is 100 - 50 = 50."""
+    win.prepare_headless()
+    host = _house(fp, win)
+    win.set_tool(fp.TOOL_ROOF_DORMER)
+    shift = Qt.KeyboardModifier.ShiftModifier
+    left = Qt.MouseButton.LeftButton
+    _send_mouse(win, QEvent.Type.MouseButtonPress, 204.0, 150.0, left, left, shift)
+    _send_mouse(win, QEvent.Type.MouseButtonRelease, 204.0, 150.0, left,
+                Qt.MouseButton.NoButton, shift)
+    roofs = _roofs(win)
+    assert len(roofs) == 2, "one Shift+click built one dormer, no dialog"
+    d = next(r for r in roofs if r.is_dormer())
+    assert d.host is host
+    assert d.marker_end == 0
+    assert d.p1.x() == pytest.approx(204.0) and d.p1.y() == pytest.approx(200.0), \
+        "the face drops straight down-slope to the host's eave line"
+    assert d.eaves_h_in == pytest.approx(80.0), "the dormer's eaves are the host's"
+    assert d.ridge_h_in == pytest.approx(115.0), "ridge = host surface at the click"
+    assert d.span_in == [50.0, 50.0], "half-span = the up-slope run to the eave"
+    cheek_pitch = (d.ridge_h_in - d.eaves_h_in) / d.span_in[0]
+    assert cheek_pitch == pytest.approx(0.7), "both cheeks take the host's pitch"
+    assert d.p2.x() == pytest.approx(204.0) and d.p2.y() == pytest.approx(150.0), \
+        "the ridge apex is derived back onto the click point"
+
+
+def test_shift_click_on_the_ridge_line_builds_nothing(fp, win):
+    host = _house(fp, win)
+    win.view._build_dormer_auto(host, QPointF(200.0, 100.0))   # on the ridge
+    assert len(_roofs(win)) == 1
+
+
+def test_shift_click_too_close_to_the_eave_builds_nothing(fp, win):
+    host = _house(fp, win)
+    win.view._build_dormer_auto(host, QPointF(204.0, 199.0))   # 1in off the eave
+    assert len(_roofs(win)) == 1
+
+
+class _CtxEvent:
+    """The two things RoofItem.contextMenuEvent reads off its event."""
+    def screenPos(self):
+        return QPoint(0, 0)
+
+    def accept(self):
+        pass
+
+
+def _menu_labels(item, monkeypatch):
+    captured = {}
+
+    def fake_exec(self, *a):
+        captured["labels"] = [act.text() for act in self.actions()]
+        return None
+
+    monkeypatch.setattr(QMenu, "exec", fake_exec)
+    item.contextMenuEvent(_CtxEvent())
+    return captured["labels"]
+
+
+def test_a_dormers_context_menu_offers_edit_and_delete_dormer(fp, win, monkeypatch):
+    from floorplanner.roofs import RoofItem
+    win.prepare_headless()
+    host = _house(fp, win)
+    d = RoofItem(QPointF(200, TRACE_Y), QPointF(200, TRACE_Y - 12), eaves_h_in=120.0,
+                 ridge_h_in=132.0, overhang_in=0.0, span_in=18.0, marker_end=0, host=host)
+    d.floor = fp.DEFAULT_FLOOR
+    win.scene.addItem(d)
+    labels = _menu_labels(d, monkeypatch)
+    assert labels[0].startswith("Edit dormer")
+    assert labels[1] == "Delete dormer"
+
+
+def test_a_plain_roofs_context_menu_is_unchanged(fp, win, monkeypatch):
+    win.prepare_headless()
+    host = _house(fp, win)
+    labels = _menu_labels(host, monkeypatch)
+    assert labels[0].startswith("Roof parameters")
+    assert labels[1] == "Delete roof"
 
 
 def test_hiding_roofs_leaves_the_dormer_tool(fp, win):

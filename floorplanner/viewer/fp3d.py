@@ -86,7 +86,7 @@ def _load_wall_thickness():
         spec.loader.exec_module(mod)
         return dict(mod.STD_T)
     except (OSError, AttributeError, ImportError):
-        return {"exterior": 6.0, "interior": 4.5, "partition": 3.5}
+        return {"exterior": 6.0, "interior": 4.5, "partition": 3.5, "beam": 5.5}
 
 
 def _load_roofclip():
@@ -114,12 +114,19 @@ WALL_T = _load_wall_thickness()  # thickness by type, inches -- the MODEL's
 WALL_H = {                       # height by type; None = full level height
     "exterior": None, "interior": None, "partition": None,
     "railing": 36.0, "fence": 72.0, "hedge": 48.0, "retaining": 24.0,
+    # `beam` is handled on its own path (hung below the ceiling); this entry
+    # only keeps the table complete.
+    "beam": None,
 }
+# a BEAM hangs this far below the ceiling (its top is the level ceiling); a
+# drafting default, tune freely (cf. WALL_DECOR's note in walls.py)
+BEAM_DROP_IN = 10.0
 WALL_C = {                       # r, g, b, a
     "exterior": (0.82, 0.79, 0.74, 1.0), "interior": (0.90, 0.88, 0.85, 1.0),
     "partition": (0.93, 0.92, 0.90, 1.0), "railing": (0.62, 0.50, 0.38, 1.0),
     "fence": (0.58, 0.44, 0.30, 1.0), "hedge": (0.33, 0.53, 0.31, 1.0),
     "retaining": (0.58, 0.55, 0.50, 1.0),
+    "beam": (0.45, 0.33, 0.20, 1.0),         # stained-timber brown
 }
 FLOOR_C = {                      # by room category
     "interior": (0.74, 0.66, 0.56, 1.0), "exterior": (0.70, 0.72, 0.74, 1.0),
@@ -947,7 +954,6 @@ def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=
     ux, uy, nx, ny = dormer._axis()
     p1 = dormer.p1
     length = dormer.length()
-    top_z = dormer.eaves_h_in - 0.5
     host_fp = RC.footprint_polygon(host)
     # plan B: a SHED dormer's front edge is its face -- its openings are
     # cut into the side-0 cheek, `u` along the ridge from `ridge[0]`
@@ -957,8 +963,15 @@ def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=
     n_seg = max(1, int(math.ceil(length / DORMER_CHEEK_STEP_IN)))
     stations = [length * k / n_seg for k in range(n_seg + 1)]
     for side, sign in ((0, 1.0), (1, -1.0)):
-        span = float(dormer.span_in[side])
-        ox, oy = sign * nx * span, sign * ny * span              # the wall line
+        # DORMER_CONROLS.md control C: the wall stands at `wall_span_in`, not
+        # the eaves line; its top is the roof surface over the wall (the pitch
+        # comes from `span_in`), so a wall pulled in from the eaves is taller.
+        wall = float(dormer.wall_span_in[side])
+        pitch_span = float(dormer.span_in[side])
+        slope = ((dormer.ridge_h_in - dormer.eaves_h_in) / pitch_span
+                 if pitch_span > RC.EPS else 0.0)
+        top_z = dormer.ridge_h_in - slope * wall - 0.5
+        ox, oy = sign * nx * wall, sign * ny * wall              # the wall line
         ix, iy = -sign * nx * t, -sign * ny * t                  # inward, the thickness
         side_bands = bands if side == 0 else []
 
@@ -1127,7 +1140,7 @@ def _dormer_face(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.
     for face, sgn in faces:
         ix, iy = sgn * ux * t, sgn * uy * t                      # inward along the ridge
         for side, sign in ((0, 1.0), (1, -1.0)):
-            span = float(dormer.span_in[side])
+            span = float(dormer.wall_span_in[side])               # control C: the walls
             if span <= RC.EPS:
                 continue                                          # a shed's empty side
             n_seg = max(1, int(math.ceil(span / DORMER_CHEEK_STEP_IN)))
@@ -1191,6 +1204,8 @@ def _wall_loops(walls, rooms, vx, level):
     for w in walls:
         if w.get("level") != level:
             continue
+        if w.get("type") == "beam":
+            continue                    # a beam is not an enclosing wall
         a, b = w.get("v1"), w.get("v2")
         if a is None or b is None or a == b or a not in vx or b not in vx:
             continue
@@ -1318,6 +1333,30 @@ def _hidden_overhang_pieces(geom, lifted, clip, terr, loops_of, roofclip_mod):
                 pieces = [q for pc in pieces for q in RC._split_by_line(pc, a, d)]
     for pt, d in RC._cut_lines(geom):
         pieces = [q for pc in pieces for q in RC._split_by_line(pc, pt, d)]
+    # A DORMER STANDS ONLY WITHIN ITS CHEEK-WALL BOX. Split the pieces along
+    # each covering dormer's wall-box edges (±wall_span off its ridge, face
+    # wall at p1 to apex at p2), so the strip under its EAVE OVERHANG parts
+    # from the box as its own piece. Without this the whole hidden region is
+    # one piece, centred in the box, and the overhang strip is skipped with
+    # it -- the host then stops at the overhang, not the cheek walls
+    # (Patrick, 2026-11: "the host roof must project all the way to the cheek
+    # walls ... the cheek wall eaves are truncating the host roof").
+    for lf, _cs, dm, _lid in others:
+        if not dm:
+            continue
+        _, _, nx, ny = lf._axis()
+        wl, wr = lf.wall_span_in
+        bp1, bp2 = lf.p1, lf.p2
+        box = [RC.Pt(bp1.x() + nx * wl, bp1.y() + ny * wl),
+               RC.Pt(bp2.x() + nx * wl, bp2.y() + ny * wl),
+               RC.Pt(bp2.x() - nx * wr, bp2.y() - ny * wr),
+               RC.Pt(bp1.x() - nx * wr, bp1.y() - ny * wr)]
+        for i in range(4):
+            a, b = box[i], box[(i + 1) % 4]
+            d = RC.Pt(b.x() - a.x(), b.y() - a.y())
+            if math.hypot(d.x(), d.y()) <= RC.EPS:
+                continue
+            pieces = [q for pc in pieces for q in RC._split_by_line(pc, a, d)]
 
     out = []
     for pc in pieces:
@@ -1334,12 +1373,30 @@ def _hidden_overhang_pieces(geom, lifted, clip, terr, loops_of, roofclip_mod):
             continue                                # blank ground: as before
         _h, cover, dormer, lid = coverer
         if dormer:
-            continue                                # a dormer stands on it
-        loops = loops_of(lid)
-        if not loops:
-            continue                                # no walls: nothing stated
-        if any(_pip((c.x(), c.y()), loop) for loop in loops):
-            continue                                # inside the upper storey
+            # A dormer stands on this roof only within its CHEEK-WALL box
+            # (±wall_span off the ridge, face wall at p1 to the apex at p2);
+            # there the host stays unbuilt. Under the dormer's EAVE OVERHANG
+            # (wall_span -> wall_span+overhang, and the face-eave rake beyond
+            # p1) the host must project all the way to the cheek walls, so
+            # those cells fall through to the same seam rebuild as any
+            # overhang (Patrick, 2026-11: "the host roof must project all the
+            # way to the cheek walls ... the cheek wall eaves are truncating
+            # the host roof under the eaves").
+            _, _, nx, ny = cover._axis()
+            p1, p2 = cover.p1, cover.p2
+            wl, wr = cover.wall_span_in
+            wall_fp = [RC.Pt(p1.x() + nx * wl, p1.y() + ny * wl),
+                       RC.Pt(p2.x() + nx * wl, p2.y() + ny * wl),
+                       RC.Pt(p2.x() - nx * wr, p2.y() - ny * wr),
+                       RC.Pt(p1.x() - nx * wr, p1.y() - ny * wr)]
+            if RC._contains(wall_fp, c):
+                continue                            # the dormer box stands here
+        else:
+            loops = loops_of(lid)
+            if not loops:
+                continue                            # no walls: nothing stated
+            if any(_pip((c.x(), c.y()), loop) for loop in loops):
+                continue                            # inside the upper storey
         vals = [RC.surface_height(cover, v) - RC.surface_height(lifted, v)
                 for v in pc]
         if min(vals) >= -RC.EPS:
@@ -2268,6 +2325,28 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         t = float(w.get("thickness_in") or WALL_T.get(wtype, 4.5))
         z0 = base(w["level"])
         z1 = top(w["level"])
+        # A PARTITION divides rooms in plan but builds NO 3D volume
+        # (Patrick, 2026-11). It is still a real wall everywhere else -- it
+        # splits the wall graph, so detection reads rooms either side of it.
+        if wtype == "partition":
+            continue
+        # A BEAM is a ceiling beam: a box hung `BEAM_DROP_IN` below the level
+        # ceiling, running the wall's full length at its own width, no
+        # openings. It is not a divider (excluded from the room graph in
+        # `bridge.face_at`), so it carries no left/right rooms.
+        if wtype == "beam":
+            # p1/p2 are already this file's world frame (pt() flipped y), and
+            # _box takes world-frame corners -- same convention as quad() below
+            half = t / 2.0
+            corners = [(p1[0] + nx * half, p1[1] + ny * half),
+                       (p2[0] + nx * half, p2[1] + ny * half),
+                       (p2[0] - nx * half, p2[1] - ny * half),
+                       (p1[0] - nx * half, p1[1] - ny * half)]
+            bz1 = top(w["level"])
+            bz0 = bz1 - BEAM_DROP_IN
+            by_type.setdefault("beam", []).append(_box(corners, bz0, bz1))
+            n_wall += 1
+            continue
         cap = WALL_H.get(wtype)
         if cap is not None:
             z1 = min(z1, z0 + cap)
@@ -2469,8 +2548,18 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             hip_runs = [((span_left + span_right) / 2.0)
                         if (i >= len(runs_raw) or runs_raw[i] is None) else float(runs_raw[i])
                         for i in (0, 1)]
-            ext = [0.0 if (i < len(gable) and gable[i]) else hip_runs[i] + hip_oh
-                   for i in (0, 1)]
+            # the per-end RAKE overhang (a GABLE end's `end_overhang_in`, and a
+            # dormer's face eave): a gable end extends BOTH its ridge end and
+            # its eaves flat along the axis, so the plane overhangs the gable
+            # wall; a hip end extends only its eaves (`hip_ext`, its ridge end
+            # is the apex). `RoofItem._extended_ridge`, mirrored Qt-free.
+            eo_raw = rf.get("end_overhang_in") or [0.0, 0.0]
+            end_oh = ([float(eo_raw[0]), float(eo_raw[1])]
+                      if isinstance(eo_raw, (list, tuple)) else [float(eo_raw)] * 2)
+            hip_ext = [0.0 if (i < len(gable) and gable[i]) else hip_runs[i] + hip_oh
+                       for i in (0, 1)]
+            rake = [end_oh[i] if (i < len(gable) and gable[i]) else 0.0 for i in (0, 1)]
+            ext = [hip_ext[i] + rake[i] for i in (0, 1)]
             a1 = (p1[0] - ux * ext[0], p1[1] - uy * ext[0])
             a2 = (p2[0] + ux * ext[1], p2[1] + uy * ext[1])
 
@@ -2478,11 +2567,11 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             ridge_z = z0 + ridge_h
             edge_z_pos = z0 + edge_h_pos
             edge_z_neg = z0 + edge_h_neg
-            r1 = (p1[0], p1[1], ridge_z)
-            r2 = (p2[0], p2[1], ridge_z)
+            r1 = (p1[0] - ux * rake[0], p1[1] - uy * rake[0], ridge_z)
+            r2 = (p2[0] + ux * rake[1], p2[1] + uy * rake[1], ridge_z)
 
-            def corner(a, sign, reach, edge_z, end, ext=ext, hip_runs=hip_runs, z0=z0,
-                       ridge_h=ridge_h, eaves_h=eaves_h, nx=nx, ny=ny):
+            def corner(a, sign, reach, edge_z, end, hip_ext=hip_ext, hip_runs=hip_runs,
+                       z0=z0, ridge_h=ridge_h, eaves_h=eaves_h, nx=nx, ny=ny):
                 # (loop variables bound as defaults: the repo's idiom, B023)
                 # a side with no plane (a SHED's right side, 0248 plan A)
                 # has its corner ON the ridge line -- and at a hip end that
@@ -2490,8 +2579,8 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 # ridge line too, exactly as `surface_height` says beyond
                 # the ridge end (the clipped path already builds it so);
                 # at ridge height the hip face would be a flat shelf
-                if reach <= 1e-6 and ext[end] > 1e-6 and hip_runs[end] > 1e-6:
-                    return (a[0], a[1], z0 + ridge_h - (ridge_h - eaves_h) / hip_runs[end] * ext[end])
+                if reach <= 1e-6 and hip_ext[end] > 1e-6 and hip_runs[end] > 1e-6:
+                    return (a[0], a[1], z0 + ridge_h - (ridge_h - eaves_h) / hip_runs[end] * hip_ext[end])
                 return (a[0] + sign * nx * reach, a[1] + sign * ny * reach, edge_z)
 
             e_pos1 = corner(a1, 1.0, reach_pos, edge_z_pos, 0)

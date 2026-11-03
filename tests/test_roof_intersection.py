@@ -1077,7 +1077,7 @@ def test_0184_the_open_end_draws_its_end_line_and_the_pinch_is_unchanged(scene):
     assert rf2.is_clipped() and rf2._clip_ext == (0.0, 0.0)
     e1a, e1b, e2a, e2b = rf2._eave_ends()
     kinds = [(kind, p, q) for kind, p, q in rf2._plan_lines()]
-    end_lines = [(p, q) for kind, p, q in kinds if kind == "dash"
+    end_lines = [(p, q) for kind, p, q in kinds if kind in ("end0", "end1")
                  and {(round(p.x(), 3), round(p.y(), 3)), (round(q.x(), 3), round(q.y(), 3))}
                  == {(round(e1b.x(), 3), round(e1b.y(), 3)), (round(e2b.x(), 3), round(e2b.y(), 3))}]
     assert len(end_lines) == 1, kinds

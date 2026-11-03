@@ -800,6 +800,42 @@ def test_near_vertex_gaps_lists_the_band_and_only_the_band(fp, win):
     assert dists == [1.5, 6.0], f"listed {dists}"
 
 
+def test_the_gap_dialog_zooms_boxes_and_rescans(fp, win):
+    """Patrick, 2026-11: 'Zoom to problem' fits the view to the gap and draws
+    a red box around it; the dialog is non-modal so the walls can be edited by
+    hand; Rescan and Close both re-detect and drop the stale box."""
+    from PyQt6.QtWidgets import QGraphicsRectItem
+
+    from floorplanner.dialogs import GapReviewDialog
+    sc = win.scene
+    sc.addItem(fp.WallItem(QPointF(0, 0), QPointF(120, 0), "interior"))
+    sc.addItem(fp.WallItem(QPointF(121.5, 0), QPointF(240, 0), "interior"))
+    fp.rebuild_all_walls(sc)
+    dlg = GapReviewDialog(win)
+    try:
+        assert not dlg.isModal()
+        assert dlg.b_zoom.isEnabled() and dlg.b_rescan.isEnabled()
+        assert len(dlg.gaps) == 1
+
+        def markers():
+            return [it for it in sc.items() if isinstance(it, QGraphicsRectItem)]
+        assert markers() == []                       # nothing drawn until asked
+        dlg.listw.setCurrentRow(0)
+        dlg._zoom_to_selected()
+        box = markers()
+        assert len(box) == 1 and box[0].zValue() >= 1000   # a red box, on top
+        dlg.refresh()                                  # Rescan drops the box
+        assert markers() == []
+        # the box also goes when the dialog closes
+        dlg.listw.setCurrentRow(0)
+        dlg._zoom_to_selected()
+        assert len(markers()) == 1
+        dlg.close()
+        assert markers() == []
+    finally:
+        dlg.close()
+
+
 def test_close_gap_welds_one_pair_and_leaves_the_reveal(fp, win):
     from floorplanner.design.validate import near_vertex_gaps
     sc = win.scene
