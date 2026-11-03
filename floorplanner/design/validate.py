@@ -460,7 +460,15 @@ def near_vertex_gaps(d, lo=None, hi=None):
     vertices are exempt: their distance to the plan is their position, not
     a gap.
 
-    Returns [(level_id, (ax, ay), (bx, by), dist)], nearest first."""
+    A WALL IS NOT A GAP (Patrick, 2026-11): the two ENDS of one wall segment
+    are 6" apart because the wall is 6" long, not because two separate walls
+    nearly meet -- so a pair joined by a wall is excluded. Without this, a run
+    of short segments listed every consecutive pair, and "closing" one welded
+    the wall to zero length and surfaced the next as an identical gap, so a
+    real fix read as doing nothing.
+
+    Returns [(level_id, (ax, ay), (bx, by), dist, a_id, b_id)], nearest first;
+    the vertex ids let a caller name the walls each corner holds."""
     s = d.get("settings") or {}
     lo = float(s.get("vertex_weld_in", 0.6)) if lo is None else lo
     hi = float(s.get("join_tol_in", 9.0)) if hi is None else hi
@@ -475,6 +483,7 @@ def near_vertex_gaps(d, lo=None, hi=None):
         if w["id"] in floatw:
             floatv.add(w["v1"])
             floatv.add(w["v2"])
+    connected = {frozenset((w["v1"], w["v2"])) for w in d["walls"]}
     out = []
     V = d["vertices"]
     for i, a in enumerate(V):
@@ -483,10 +492,12 @@ def near_vertex_gaps(d, lo=None, hi=None):
         for b in V[i + 1:]:
             if b["id"] in floatv or a.get("level") != b.get("level"):
                 continue
+            if frozenset((a["id"], b["id"])) in connected:
+                continue                        # a wall joins them: not a gap
             dd = math.dist((a["x"], a["y"]), (b["x"], b["y"]))
             if lo < dd < hi:
                 out.append((a.get("level"), (a["x"], a["y"]),
-                            (b["x"], b["y"]), dd))
+                            (b["x"], b["y"]), dd, a["id"], b["id"]))
     return sorted(out, key=lambda t: t[3])
 
 

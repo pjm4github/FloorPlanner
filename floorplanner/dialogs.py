@@ -71,17 +71,45 @@ class GapReviewDialog(QDialog):
         from floorplanner.design.bridge import design_from_scene
         from floorplanner.design.validate import near_vertex_gaps
         self._clear_marker()                    # a rescan drops the stale box
+        rep = {}
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            doc = design_from_scene(self.win).to_dict()
+            doc = design_from_scene(self.win, report=rep).to_dict()
         self._levels = {lv["id"]: lv["name"] for lv in doc.get("levels", [])}
+        # 2026-11: each gap names its two VERTICES and the WALL(s) each holds,
+        # in the session labels the plan shows (W7, V12). `wall_items` comes
+        # from THIS walk, so the doc ids line up with the live items.
+        from floorplanner.problems import _session_labels_of  # late (UI)
+        label_of = _session_labels_of(self.win.scene)   # doc id -> W7 / V12
+        wall_items = rep.get("wall_items", {})
+        held = {}
+        for w in doc["walls"]:
+            held.setdefault(w["v1"], []).append(w["id"])
+            held.setdefault(w["v2"], []).append(w["id"])
+
+        def _ids(vid):
+            # the vertex label covers an open room corner (no wall) too; the
+            # wall labels come from the live items of this same walk
+            vlabel = label_of.get(vid, vid)
+            wls = []
+            for wid in held.get(vid, []):
+                wi = wall_items.get(wid)
+                if wi is not None and not sip.isdeleted(wi):
+                    wls.append(getattr(wi, "uid", None) or label_of.get(wid, wid))
+                else:
+                    wls.append(label_of.get(wid, wid))
+            return vlabel, (", ".join(wls) or "free")
+
         self.gaps = near_vertex_gaps(doc)
         self.listw.clear()
-        for lvl, a, b, dist in self.gaps:
+        for lvl, a, b, dist, aid, bid in self.gaps:
+            va, wa = _ids(aid)
+            vb, wb = _ids(bid)
             self.listw.addItem(
                 f"{self._levels.get(lvl, lvl)}: "
-                f"({fmt_ftin(a[0])}, {fmt_ftin(a[1])}) and "
-                f"({fmt_ftin(b[0])}, {fmt_ftin(b[1])}) are {dist:.2f}\" apart")
+                f"{va} [{wa}] ({fmt_ftin(a[0])}, {fmt_ftin(a[1])}) and "
+                f"{vb} [{wb}] ({fmt_ftin(b[0])}, {fmt_ftin(b[1])}) "
+                f"are {dist:.2f}\" apart")
         if self.gaps:
             self.info.setText(
                 f"{len(self.gaps)} pair(s) of corners sit close together "
@@ -135,7 +163,7 @@ class GapReviewDialog(QDialog):
         i = self.listw.currentRow()
         if i < 0 or i >= len(self.gaps):
             return
-        lvl, a, b, _dist = self.gaps[i]
+        lvl, a, b, _dist, _aid, _bid = self.gaps[i]
         name = self._levels.get(lvl, lvl)
         if (self.win._floor(name) is not None
                 and name != self.win.active_floor):
@@ -158,7 +186,7 @@ class GapReviewDialog(QDialog):
         i = self.listw.currentRow()
         if i < 0 or i >= len(self.gaps):
             return
-        lvl, a, b, dist = self.gaps[i]
+        lvl, a, b, dist, _aid, _bid = self.gaps[i]
         n = close_gap(self.win.scene, QPointF(*a), QPointF(*b),
                       floor=self._levels.get(lvl))
         self.win.status(f"Closed a {dist:.2f}\" gap ({n} corner(s) welded)."
