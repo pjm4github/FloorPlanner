@@ -798,6 +798,31 @@ def test_near_vertex_gaps_lists_the_band_and_only_the_band(fp, win):
     gaps = near_vertex_gaps(_gap_doc(win))
     dists = sorted(round(g[3], 2) for g in gaps)
     assert dists == [1.5, 6.0], f"listed {dists}"
+    # each gap carries its two vertex ids (so a caller can name the walls)
+    for g in gaps:
+        assert len(g) == 6 and g[4] and g[5] and g[4] != g[5]
+
+
+def test_a_wall_is_not_a_gap(fp, win):
+    """Patrick, 2026-11: the two ENDS of one wall are 6\" apart because the
+    wall is 6\" long, not because two walls nearly meet -- so a pair joined by
+    a wall is excluded. Before the fix, a short wall listed as a gap, and
+    'closing' it welded the wall to zero length and surfaced the next short
+    segment as an identical gap, so a real fix read as doing nothing."""
+    from floorplanner.design.validate import near_vertex_gaps
+    sc = win.scene
+    # a 6" wall whose two ends ARE in the band, joined to a long one; nothing
+    # here is a gap -- every in-band pair is the ends of one wall
+    sc.addItem(fp.WallItem(QPointF(0, 0), QPointF(0, 6), "interior"))
+    sc.addItem(fp.WallItem(QPointF(0, 6), QPointF(120, 6), "interior"))
+    fp.rebuild_all_walls(sc)
+    assert near_vertex_gaps(_gap_doc(win)) == [], "a wall listed as a gap"
+    # a genuine near-miss between SEPARATE walls is still listed
+    sc.addItem(fp.WallItem(QPointF(0, 60), QPointF(60, 60), "interior"))
+    sc.addItem(fp.WallItem(QPointF(64, 60), QPointF(120, 60), "interior"))
+    fp.rebuild_all_walls(sc)
+    dists = sorted(round(g[3], 2) for g in near_vertex_gaps(_gap_doc(win)))
+    assert dists == [4.0], f"the real 4\" gap must still list: {dists}"
 
 
 def test_the_gap_dialog_zooms_boxes_and_rescans(fp, win):
@@ -846,7 +871,7 @@ def test_close_gap_welds_one_pair_and_leaves_the_reveal(fp, win):
     fp.rebuild_all_walls(sc)
     gaps = near_vertex_gaps(_gap_doc(win))
     assert len(gaps) == 2
-    lvl, a, b, dist = gaps[0]                     # nearest first: the 1.5"
+    lvl, a, b, dist, _aid, _bid = gaps[0]         # nearest first: the 1.5"
     assert dist == pytest.approx(1.5)
     n = fp.close_gap(sc, QPointF(*a), QPointF(*b))
     assert n >= 1                                 # something really welded
@@ -903,7 +928,7 @@ def test_close_gap_leaves_outlines_holding_their_walls_corners(fp, win,
     rb = make_room(sc, 121.5, 0, 120, 120, "B")
     gaps = near_vertex_gaps(_gap_doc(win))
     assert len(gaps) == 2, f"precondition: two 1.5\" pairs, got {gaps}"
-    for _lvl, a, b, _dist in list(gaps):
+    for _lvl, a, b, _dist, _aid, _bid in list(gaps):
         assert fp.close_gap(sc, QPointF(*a), QPointF(*b)) >= 1
     assert near_vertex_gaps(_gap_doc(win)) == []
     for room in (ra, rb):
