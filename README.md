@@ -7,6 +7,30 @@ exports to PDF plan sheets and Chief Architect. Run `python FloorPlanner.py`
 (or the `floorplanner` console script). Everything the app and its tools do is
 listed, with an example each, in **[`docs/COMMANDS.md`](docs/COMMANDS.md)**.
 
+The goal of the tool is to make **a complete architectural design tool** that is accessible to an average user that doesn't want to spend the money or time to buy a professional tool for building a complete set of architectural building documents but rather wants to spend the time emersed in a concept called a “living ergonomics sandbox”. This is a tool that treats a home not as a floor plan but as a set of lived experiences you can prototype before committing to walls, furniture, windows, or orientation and decorations.
+
+**The core idea**
+
+Most design tools answer “where does it go?” This one answers “what is it like to be there?” You model your space (or import a plan), then move through it as an occupant doing specific things — waking up, cooking, reading at 4pm in February, hearing the dishwasher from the bedroom — and the tool shows you what you’d see, hear, and physically reach from that position.
+
+**Three experiential layers**
+
+_Space / body_. A first-person “walkthrough mannequin” sized to you: your height, reach, seated eye level, stride. As you move it, the tool flags clearances that feel tight, counters that are too high for your elbow angle, sightlines blocked by a kitchen island, the number of steps from bed to bathroom. You can swap the mannequin for a child, an elderly parent, or someone using a walker and see the same room re-scored.
+
+_Sight_. A sun and daylight simulator tied to your actual latitude and orientation, so you can scrub a time-of-year/time-of-day slider and watch where light lands on a reading chair or where glare hits a screen. Window placement becomes something you tune by sitting in a virtual chair rather than by drawing on an elevation. Layer in artificial lighting zones and you can test evening scenes too.
+
+_Sound_. A rough acoustic model — not studio-grade, but enough to show how a hard-floored open plan carries conversation, where an HVAC return or a laundry room leaks noise, how a rug or a bookshelf wall changes reverberation. You place sources (TV, range hood, kids’ room, a road outside) and listen from any point, ideally through headphones with simple spatialization.
+
+_How you experiment_
+
+The key interaction is parametric what-ifs: drag a wall six inches, rotate the sofa, change a window to a door, and the sight/sound/reach feedback updates live. Save “scenarios” (morning routine, hosting dinner, working from home) and compare them side by side, each with a small scorecard — daylight hours at the desk, decibels in the bedroom, steps per typical day, unreachable cabinets.
+
+_Inputs and outputs_
+
+Input is a plan plus a few personal facts (body dimensions, daily routines, what you find annoying). Output is less a drawing than a set of annotated moments — “at 7:30am in January the kitchen has no direct light,” “the bedroom hears the dishwasher at ~45 dB.” Those are the things you’d otherwise discover only after moving in.
+
+That being said, the tool strives to validate that the design choices while still conforming to the [international building code](https://codes.iccsafe.org/content/IBC2021V2.0).
+
 **App version 1.2** (`APP_VERSION` in `floorplanner/config.py`). **The plan
 file is a version‑6 `floorplanner-design` document** — the JSON Schema is
 `floorplanner/design/design-schema.v6.json` ([`docs/design-schema.v6.md`](docs/design-schema.v6.md));
