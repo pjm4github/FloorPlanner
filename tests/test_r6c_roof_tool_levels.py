@@ -126,7 +126,9 @@ def test_the_tiny_manual_fixture_keeps_every_target_unambiguous(fp, win):
     assert (lower_roof.p1, lower_roof.p2) == (QPointF(60, 180), QPointF(300, 180))
     assert (upper_roof.p1, upper_roof.p2) == (QPointF(420, 180), QPointF(660, 180))
     assert host_roof_at(win.scene, QPointF(180, 120), LOWER) is lower_roof
-    assert host_roof_at(win.scene, QPointF(180, 120), UPPER) is None
+    # 2026-11 (Patrick): the dormer builder LOOKS DOWN a level, so a query from
+    # UPPER (which has no roof there) finds the roof on the floor below it
+    assert host_roof_at(win.scene, QPointF(180, 120), UPPER) is lower_roof
 
     assert lower_roof.isVisible() and not lower_roof.isEnabled()
     assert upper_roof.isVisible() and upper_roof.isEnabled()
@@ -280,19 +282,47 @@ def test_switching_level_drops_a_ridge_still_being_dragged(fp, win):
 # --------------------------------------------------------------------------
 # the dormer tool: a host on this level, or a refusal that names the level
 # --------------------------------------------------------------------------
-def test_the_dormer_tool_names_the_level_of_a_roof_it_cannot_reach(fp, win):
+def _shift_press(win, p):
+    vp = win.view.viewport()
+    pos = win.view.mapFromScene(QPointF(*p))
+    QApplication.sendEvent(vp, QMouseEvent(
+        QEvent.Type.MouseButtonPress, QPointF(pos), QPointF(vp.mapToGlobal(pos)),
+        LEFT, LEFT, Qt.KeyboardModifier.ShiftModifier))
+
+
+def test_the_dormer_tool_hosts_on_the_roof_one_floor_below(fp, win):
+    """2026-11 (Patrick): the dormer builder LOOKS DOWN a level when there is no
+    host roof on the floor it is drawn on, so a dormer drawn on the upper storey
+    hosts on the roof of the floor below. Its own `level` is where it is drawn;
+    its geometry is anchored to the host's level. Built via Shift+click (the
+    no-dialog Build-Dormer path)."""
     _two_levels(fp, win, show_others=True)
     lower = _roof(win, (0, 200), (400, 200), LOWER)
     win.switch_floor(UPPER)
     assert lower.isVisible()
-    assert host_roof_at(win.scene, QPointF(200, 250), UPPER) is None
+    # look-down: a query from UPPER finds the host on the floor below
+    assert host_roof_at(win.scene, QPointF(200, 220), UPPER) is lower
     win.set_tool(fp.TOOL_ROOF_DORMER)
 
-    _drag(win, (200, 250), (236, 250))           # on the lower roof's slope
+    _shift_press(win, (200, 220))                # Build Dormer on the lower roof
 
-    assert len(_roofs(win)) == 1, "no dormer: the roof is not this level's"
+    dormers = [r for r in _roofs(win) if r.is_dormer()]
+    assert len(dormers) == 1, "a dormer is built, hosted on the floor below"
+    assert dormers[0].host is lower and dormers[0].floor == UPPER
+
+
+def test_the_dormer_tool_still_names_a_roof_it_cannot_reach(fp, win):
+    """The refusal stays for a roof the look-down does NOT reach -- one ABOVE
+    the drawn floor (the look-down only goes down), or none at all."""
+    _two_levels(fp, win, show_others=True)
+    _roof(win, (0, 200), (400, 200), UPPER)      # the only roof is one floor UP
+    win.switch_floor(LOWER)
+    win.set_tool(fp.TOOL_ROOF_DORMER)
+
+    _drag(win, (200, 220), (236, 220))           # over the upper roof's plane
+    assert len([r for r in _roofs(win) if r.is_dormer()]) == 0
     msg = win.statusBar().currentMessage()
-    assert f"'{LOWER}'" in msg and "switch" in msg
+    assert f"'{UPPER}'" in msg and "switch" in msg
 
     _drag(win, (200, 900), (236, 900))           # where no roof is at all
     assert "press on a roof plane" in win.statusBar().currentMessage()

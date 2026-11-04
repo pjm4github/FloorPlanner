@@ -839,14 +839,9 @@ DORMER_MIN_SPAN_IN = 6.0               # half-width below which a drag is a slip
 _SHED_EDGE_TOL_IN = 0.5                # a shed dormer's high edge may sit this far under the host
 
 
-def host_roof_at(scene, pt: QPointF, floor):
-    """The roof on `floor` whose drawn territory (R4d's visible region, or
-    a lone roof's whole footprint) holds `pt` -- the roof a dormer pressed
-    there stands on. A dormer cannot host another (v1: named, not
-    built), so dormers are skipped. None when no roof is under `pt`."""
-    if scene is None:
-        return None
-    p = Pt(pt.x(), pt.y())
+def _host_roof_on(scene, p, floor):
+    """The non-dormer roof on exactly `floor` whose drawn territory (R4d's
+    visible region, or a lone roof's whole footprint) holds plan point `p`."""
     for it in scene.items():
         if (not isinstance(it, RoofItem) or sip.isdeleted(it)
                 or it.floor != floor or it.is_dormer()):
@@ -858,6 +853,35 @@ def host_roof_at(scene, pt: QPointF, floor):
         elif _contains(footprint_polygon(it), p):
             return it
     return None
+
+
+def _floor_below(floor):
+    """The floor one level down from `floor` -- the one whose elevation is the
+    greatest strictly below it. None when `floor` is the lowest or unknown."""
+    elevs = floor_elevations()
+    here = elevs.get(floor)
+    if here is None:
+        return None
+    lower = [(el, name) for name, el in elevs.items() if el < here - 1e-6]
+    return max(lower)[1] if lower else None
+
+
+def host_roof_at(scene, pt: QPointF, floor):
+    """The roof a dormer pressed at `pt` on `floor` stands on. Tries `floor`
+    first; when no roof is there, LOOKS DOWN a level (Patrick, 2026-11: a
+    dormer drawn on the storey its gable occupies finds its host roof on the
+    floor below -- its geometry is then anchored to the host's level, while
+    its own `level` is where it is drawn and edited). A dormer cannot host
+    another (v1: named, not built), so dormers are skipped. None when no roof
+    is under `pt` on this floor or the one below."""
+    if scene is None:
+        return None
+    p = Pt(pt.x(), pt.y())
+    hit = _host_roof_on(scene, p, floor)
+    if hit is not None:
+        return hit
+    below = _floor_below(floor)
+    return _host_roof_on(scene, p, below) if below is not None else None
 
 
 def dormer_defaults(scene, host, pt: QPointF):

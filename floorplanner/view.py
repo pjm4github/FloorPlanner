@@ -683,7 +683,10 @@ class PlanView(QGraphicsView):
                                     overhang_in=0.0, gable=[True, True],
                                     span_in=DORMER_MIN_SPAN_IN, marker_end=0,
                                     host=host)
-                    item.floor = host.floor
+                    # the dormer's floor is where it is DRAWN (the storey its
+                    # gable occupies), not the host's -- the host may be a level
+                    # down (2026-11); its geometry anchors to the host in 3D
+                    item.floor = active_floor()
                     hold_roof_clips(self.scene(), True)   # R6.b: once, at release
                     self.scene().addItem(item)
                     self._temp_dormer = item
@@ -795,7 +798,7 @@ class PlanView(QGraphicsView):
                         ridge_h_in=surface_height(host, Pt(apex.x(), apex.y())),
                         overhang_in=0.0, gable=[True, True],
                         span_in=run, marker_end=0, host=host)
-        item.floor = host.floor
+        item.floor = active_floor()              # the DRAWN floor; host may be a level down
         try:
             hold_roof_clips(self.scene(), True)
             self.scene().addItem(item)

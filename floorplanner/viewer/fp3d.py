@@ -2233,6 +2233,9 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             # a dormer climb into its roof rather than being capped by it
             dormer_ids = {rf.get("id") for rf in doc.get("roofs", [])
                           if rf.get("host") is not None}
+            host_of = {rf.get("id"): rf.get("host") for rf in doc.get("roofs", [])}
+            level_of = {rid: lid for lid, pairs in geoms_by_level.items()
+                        for rid, _g in pairs}
             # R6.b (0186-ruling.md sec4, ordered at 0197-ruling.md sec5): ONE
             # ROOFSCAPE. Every roof of every built level composes against
             # every other in ABSOLUTE height -- `Lifted` adds the level's
@@ -2241,7 +2244,20 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             # by its own level base, so nothing in them moves; what changes
             # is WHICH ground each roof owns, the risers between roofs of
             # different levels, and which roof caps a wall.
-            every = [(rid, lid, g, ROOFCLIP.Lifted(g, base(lid)))
+            #
+            # A DORMER IS ANCHORED TO ITS HOST'S LEVEL (Patrick, 2026-11): its
+            # own `level` is where it is drawn and edited (which floor's walls
+            # climb into it), but its geometry sits on the host roof, so it
+            # lifts by the HOST's base, not its own -- re-levelling the drawn
+            # floor does not move it. The territory below keeps the dormer's
+            # drawn `lid`, so a same-level wall still climbs into it.
+            def _lift_base(rid, lid):
+                if rid in dormer_ids:
+                    host_lid = level_of.get(host_of.get(rid))
+                    if host_lid is not None:
+                        return base(host_lid)
+                return base(lid)
+            every = [(rid, lid, g, ROOFCLIP.Lifted(g, _lift_base(rid, lid)))
                      for lid, pairs in geoms_by_level.items() for rid, g in pairs]
             if every:
                 per = ROOFCLIP.compute_roof_clips([lf for _, _, _, lf in every])
@@ -2279,7 +2295,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 # THE DORMER'S SIDES AND FACE, projected up to the dormer
                 # from the host roof (`_dormer_cheeks`, `_dormer_face`);
                 # wall material, emitted with the exterior walls below
-                host_of = {rf.get("id"): rf.get("host") for rf in doc.get("roofs", [])}
+                # (`host_of`/`level_of` are built above, with the lift)
                 cheek_t = float(WALL_T.get("exterior", 6.0))
                 # plan C: the house walls of each level, in plan, with their
                 # thickness -- a generated side or face yields to one
@@ -2298,7 +2314,9 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                     host_lf = lifted_of.get(host_of.get(rid))
                     if host_lf is not None:
                         near = plan_walls.get(lid, [])
-                        ops, zb = opens_of.get(rid, []), base(lid)    # plan B: the face openings
+                        # the face openings lift in the dormer's frame, which is
+                        # its HOST's level (the dormer is anchored there)
+                        ops, zb = opens_of.get(rid, []), _lift_base(rid, lid)
                         cheek_parts.extend(_dormer_cheeks(lf, host_lf, ROOFCLIP, cheek_t, near, ops, zb))
                         cheek_parts.extend(_dormer_face(lf, host_lf, ROOFCLIP, cheek_t, near, ops, zb))
             if every:

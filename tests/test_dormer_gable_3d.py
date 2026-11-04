@@ -93,3 +93,60 @@ def test_a_window_in_the_climbing_wall_stays_a_void(fp3d):
     v = verts
     near = v[(abs(v[:, 0] - 200.0) < 14.0) & (abs(v[:, 1] + 240.0) < 14.0)]
     assert float(near[:, 2].max()) > 220.0
+
+
+def _cross_level_doc():
+    """A dormer drawn on the UPPER floor (L2) but hosted on a roof on the floor
+    BELOW (L1), with an L2 wall under its face carrying a window. The dormer is
+    anchored to the host's level, so it renders where it would if drawn on L1;
+    the L2 wall climbs into it (same drawn level) and its window shows."""
+    V = [{"id": "wa", "x": 160.0, "y": 240.0}, {"id": "wb", "x": 240.0, "y": 240.0}]
+    wall = {"id": "w1", "level": "L2", "v1": "wa", "v2": "wb", "type": "exterior",
+            "openings": [{"id": "o1", "kind": "window", "code": "2020",
+                          "anchor": {"from": "v1", "offset_in": 30.0}, "sill_in": 60.0}]}
+    host = {"id": "h", "level": "L1", "ridge": [[-40.0, 100.0], [440.0, 100.0]],
+            "eaves_h_in": 96.0, "ridge_h_in": 300.0, "overhang_in": [0.0, 0.0],
+            "span_in": [170.0, 170.0], "gable": [True, True], "marker_end": 1}
+    dormer = {"id": "d", "level": "L2", "ridge": [[200.0, 240.0], [200.0, 160.0]],
+              "eaves_h_in": 180.0, "ridge_h_in": 240.0, "overhang_in": [0.0, 0.0],
+              "span_in": [40.0, 40.0], "wall_span_in": [40.0, 40.0],
+              "gable": [True, True], "marker_end": 0, "host": "h"}
+    return {"format": "floorplanner-design", "version": 6, "units": "inches",
+            "settings": {},
+            "levels": [{"id": "L1", "name": "default", "elevation_in": 0.0,
+                        "height_in": 96.0, "kind": "storey", "reference": False},
+                       {"id": "L2", "name": "upper", "elevation_in": 100.0,
+                        "height_in": 196.0, "kind": "storey", "reference": False}],
+            "vertices": V, "walls": [wall], "rooms": [], "furnishings": [],
+            "groups": [], "roofs": [host, dormer]}
+
+
+def test_a_cross_level_dormer_renders_and_shows_the_floor_below_window(fp3d):
+    import numpy as np
+    model = fp3d.build_model(_cross_level_doc(), furnishings=False, floors=False)
+    ext = _ext(model)
+    v = ext.verts
+    # the dormer is anchored to its HOST's level (L1 elev 0), so its ridge is at
+    # ~240 absolute even though it is drawn on L2 -- the L2 wall climbs to close
+    # the gable there
+    near = v[(abs(v[:, 0] - 200.0) < 14.0) & (abs(v[:, 1] + 240.0) < 14.0)]
+    assert len(near) and float(near[:, 2].max()) > 220.0, (
+        f"cross-level gable did not close: {float(near[:, 2].max()) if len(near) else None}")
+    # the L2 wall's window (absolute 160..180) is a void in the climbing wall
+    verts, faces = ext.verts, ext.faces
+    a = np.array([200.0, -235.0, 170.0])
+    b = np.array([200.0, -245.0, 170.0])
+    d = b - a
+    v0, v1, v2 = verts[faces[:, 0]], verts[faces[:, 1]], verts[faces[:, 2]]
+    e1, e2 = v1 - v0, v2 - v0
+    pv = np.cross(d, e2)
+    det = np.einsum("ij,ij->i", e1, pv)
+    ok = np.abs(det) > 1e-12
+    inv = np.where(ok, 1.0 / np.where(ok, det, 1.0), 0.0)
+    tv = a - v0
+    u = np.einsum("ij,ij->i", tv, pv) * inv
+    q = np.cross(tv, e1)
+    w = np.einsum("j,ij->i", d, q) * inv
+    tt = np.einsum("ij,ij->i", e2, q) * inv
+    hit = ok & (u >= -1e-9) & (w >= -1e-9) & (u + w <= 1 + 1e-9) & (tt >= 0) & (tt <= 1)
+    assert int(hit.sum()) == 0, "the floor-below window is covered in the cross-level gable"
