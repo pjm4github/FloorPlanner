@@ -1979,6 +1979,59 @@ class RoofItem(QGraphicsItem):
         self._wall_memo = (key, out)
         return out
 
+    def dormer_face_window_spans(self):
+        """Phase C (0291): each of the dormer's own face windows as a
+        `(start, end)` segment along its face wall in plan -- a READ-ONLY
+        projection of `self.openings` (the single record the dormer owns and
+        the End-On dialog edits; `fp3d._face_openings` reads the same list for
+        3D). `[]` for a roof with no host, no face wall, or no openings.
+
+        The face wall is `_dormer_wall_lines()[0]` and the anchor is resolved
+        along its OWN plan length, from its left end -- the twin of
+        `viewer.fp3d.opening_span`, kept local so the scene layer never imports
+        the Qt-free viewer. A window whose code will not parse, or that lands
+        wholly off the face, is skipped (the dialog validates on entry)."""
+        host = self.host
+        if host is None or sip.isdeleted(host):
+            return []
+        ops = getattr(self, "openings", None)
+        if not ops:
+            return []
+        lines = self._dormer_wall_lines()
+        if not lines:
+            return []
+        a, b = lines[0]                      # the face wall, left -> right
+        dx, dy = b.x() - a.x(), b.y() - a.y()
+        length = math.hypot(dx, dy)
+        if length < _CLIP_EPS_IN:
+            return []
+        ux, uy = dx / length, dy / length
+
+        def _span(anchor, width):
+            frm = anchor.get("from", "v1")
+            off = float(anchor.get("offset_in", 0.0))
+            if frm == "v2":
+                s0 = length - off - width
+            elif frm == "center":
+                s0 = length / 2.0 + off - width / 2.0
+            else:
+                s0 = off
+            return s0, s0 + width
+
+        out = []
+        for o in ops:
+            try:
+                w, _h = parse_wwhh(o["code"])
+            except (KeyError, ValueError, TypeError):
+                continue
+            u0, u1 = _span(o.get("anchor", {}), w)
+            u0, u1 = max(0.0, u0), min(length, u1)
+            if u1 - u0 <= 1e-6:
+                continue
+            out.append((QPointF(a.x() + ux * u0, a.y() + uy * u0),
+                        QPointF(a.x() + ux * u1, a.y() + uy * u1)))
+        return out
+
     def _valley_perp(self, host, sign, pitch):
         """The perpendicular distance from the ridge, at the FACE, where this
         side's cheek plane (sloping at `pitch` from the ridge) meets the host
@@ -2387,6 +2440,32 @@ class RoofItem(QGraphicsItem):
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.setPen(QPen(QColor(25, 25, 25), 0))      # exterior-wall edge
             painter.drawPath(band)
+            # Phase C (0291): the dormer's OWN face windows as a READ-ONLY
+            # SHADOW on the face band -- a projection of `self.openings`,
+            # editable only in the dormer's End-On dialog. A ghosted blue so it
+            # reads as "a window here, not yours to drag"; the floor's own
+            # storey windows (wall openings) are untouched and stay normal.
+            spans = self.dormer_face_window_spans()
+            if spans:
+                glass = QColor(37, 99, 235)                  # read-only blue
+                fill = QColor(glass)
+                fill.setAlpha(55)
+                for a, b in spans:
+                    dx, dy = b.x() - a.x(), b.y() - a.y()
+                    ln = math.hypot(dx, dy)
+                    if ln < 1e-6:
+                        continue
+                    ox, oy = -dy / ln * half, dx / ln * half
+                    poly = QPolygonF([
+                        QPointF(a.x() + ox, a.y() + oy), QPointF(b.x() + ox, b.y() + oy),
+                        QPointF(b.x() - ox, b.y() - oy), QPointF(a.x() - ox, a.y() - oy)])
+                    painter.setPen(Qt.PenStyle.NoPen)
+                    painter.setBrush(QBrush(fill))
+                    painter.drawPolygon(poly)
+                    painter.setBrush(Qt.BrushStyle.NoBrush)
+                    painter.setPen(QPen(glass, 0, Qt.PenStyle.DashLine))
+                    painter.drawPolygon(poly)
+                    painter.drawLine(a, b)                   # the glazing line
         if clipped and not dormer:
             seam_pen = QPen(ink, 2.0, Qt.PenStyle.SolidLine)   # a real edge
             seam_pen.setCapStyle(Qt.PenCapStyle.RoundCap)

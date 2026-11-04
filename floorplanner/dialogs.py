@@ -1108,6 +1108,86 @@ class FloorLevelsDialog(QDialog):
         return float(self.sp_elev.value()), float(self.sp_height.value())
 
 
+def _mint_opening_id():
+    """A fresh, schema-valid opening id (`^[A-Za-z][A-Za-z0-9_-]*$`), unique
+    enough for a dormer's own face windows -- the dialog is their only in-app
+    author, so nothing else is minting into the same list."""
+    import uuid
+    return "dwin" + uuid.uuid4().hex[:10]
+
+
+class _DormerWindowDialog(QDialog):
+    """One window on a dormer's face (Phase C, 0291). The fields the dormer's
+    single `opening` record carries -- a WWHH size code (as a wall opening),
+    which end of the face the offset is measured from, the offset to the near
+    edge (or, from the centre, of the window's centre), and the sill above the
+    dormer's level base. Returns the same dict shape `fp3d._face_openings`
+    consumes; the size code is validated here so a bad one never reaches the
+    record (a dormer has no error channel the way a wall does)."""
+
+    def __init__(self, opening=None, parent=None):
+        super().__init__(parent)
+        from floorplanner.model import DEFAULT_SILL_IN
+        self.setWindowTitle("Dormer window")
+        o = dict(opening or {})
+        self._id = o.get("id")              # preserved on edit, minted on create
+        anchor = o.get("anchor", {}) or {}
+        form = QFormLayout(self)
+        self.ed_code = QLineEdit(str(o.get("code", "3040")))
+        self.ed_code.setToolTip('Width then height in inches, e.g. 4860 = 48" '
+                                'wide by 60" tall.')
+        form.addRow("Size (WWHH)", self.ed_code)
+        self.cb_from = QComboBox()
+        self.cb_from.addItem("Left end of face", "v1")
+        self.cb_from.addItem("Right end of face", "v2")
+        self.cb_from.addItem("Centre of face", "center")
+        self.cb_from.setCurrentIndex(
+            {"v1": 0, "v2": 1, "center": 2}.get(anchor.get("from", "v1"), 0))
+        form.addRow("Position from", self.cb_from)
+        self.sp_off = QDoubleSpinBox()
+        self.sp_off.setRange(-1200.0, 1200.0)
+        self.sp_off.setDecimals(1)
+        self.sp_off.setSuffix(" in")
+        self.sp_off.setValue(float(anchor.get("offset_in", 0.0)))
+        self.sp_off.setToolTip("To the window's near edge from the chosen end; "
+                               "from the centre, the offset of its centre.")
+        form.addRow("Offset", self.sp_off)
+        self.sp_sill = QDoubleSpinBox()
+        self.sp_sill.setRange(0.0, 400.0)
+        self.sp_sill.setDecimals(1)
+        self.sp_sill.setSuffix(" in")
+        self.sp_sill.setValue(float(o.get("sill_in", DEFAULT_SILL_IN)))
+        self.sp_sill.setToolTip("Height of the sill above this dormer's level "
+                                "base, as a wall window's sill is.")
+        form.addRow("Sill above floor", self.sp_sill)
+        self.lab_err = QLabel("")
+        self.lab_err.setStyleSheet("color: #b45309;")
+        self.lab_err.setWordWrap(True)
+        form.addRow("", self.lab_err)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                   | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        form.addRow(buttons)
+
+    def accept(self):
+        try:
+            parse_wwhh(self.ed_code.text())
+        except (ValueError, TypeError):
+            self.lab_err.setText("Size must be 4 to 6 digits, width then "
+                                 "height (e.g. 3040 or 4860).")
+            return
+        super().accept()
+
+    def opening(self):
+        return {"id": self._id or _mint_opening_id(),
+                "kind": "window",
+                "code": self.ed_code.text().strip(),
+                "anchor": {"from": self.cb_from.currentData(),
+                           "offset_in": float(self.sp_off.value())},
+                "sill_in": float(self.sp_sill.value())}
+
+
 class RoofEndOnDialog(QDialog):
     """The End-On marker's dialog (0140-ruling.md, R2b): a live end-on
     drawing with three editable values -- ridge height, eaves height,
@@ -1151,6 +1231,9 @@ class RoofEndOnDialog(QDialog):
         super().__init__(parent)
         self.roof = roof
         self._dormer = getattr(roof, "host", None) is not None
+        # Phase C (0291): a working copy of the dormer's own face windows,
+        # edited through the list below and written back in `apply()`.
+        self._face_openings = [dict(o) for o in (getattr(roof, "openings", None) or [])]
         self.setWindowTitle("Dormer parameters (end-on)" if self._dormer
                             else "Roof parameters (end-on)")
         self._recent = list(self._FIELDS)   # last element = most recent edit
@@ -1283,6 +1366,12 @@ class RoofEndOnDialog(QDialog):
             form.addRow("", self.lab_dormer)
         lay.addLayout(form)
 
+        # Phase C (0291): the dormer's own face windows -- a list editor,
+        # only for a dormer. Its records are the single source the plan shadow
+        # and the 3D face both read.
+        if self._dormer:
+            self._build_windows_ui(lay)
+
         # -- R6.c: where this level stands in the building. Every height
         # in this dialog is measured from the level's own base
         # (0140-ruling.md sec3), which is the ground only on a level whose
@@ -1413,6 +1502,68 @@ class RoofEndOnDialog(QDialog):
             self.lab_dormer.setText(
                 f"Back end derived: the ridge meets the host roof "
                 f"{fmt_ftin(t)} behind the face.")
+
+    # -- Phase C (0291): the dormer's own face windows --------------------
+    def _build_windows_ui(self, lay):
+        box = QGroupBox("Dormer face windows")
+        v = QVBoxLayout(box)
+        self.lst_windows = QListWidget()
+        self.lst_windows.setToolTip(
+            "The dormer's OWN windows, cut into its face. They show on the "
+            "plan as a read-only shadow and in 3D; the storey's wall windows "
+            "below are separate and edited on the wall.")
+        self.lst_windows.itemDoubleClicked.connect(lambda _i: self._edit_window())
+        v.addWidget(self.lst_windows)
+        row = QHBoxLayout()
+        b_add = QPushButton("Add window…")
+        b_edit = QPushButton("Edit…")
+        b_rem = QPushButton("Remove")
+        b_add.clicked.connect(self._add_window)
+        b_edit.clicked.connect(self._edit_window)
+        b_rem.clicked.connect(self._remove_window)
+        for b in (b_add, b_edit, b_rem):
+            row.addWidget(b)
+        row.addStretch(1)
+        v.addLayout(row)
+        lay.addWidget(box)
+        self._refill_windows()
+
+    def _window_label(self, o):
+        anchor = o.get("anchor", {}) or {}
+        end = {"v1": "left", "v2": "right", "center": "centre"}.get(
+            anchor.get("from", "v1"), "left")
+        off = float(anchor.get("offset_in", 0.0))
+        sill = o.get("sill_in", None)
+        tail = f", sill {fmt_in(float(sill))}" if sill is not None else ""
+        return f"{o.get('code', '????')}  ({end} {fmt_in(off)}{tail})"
+
+    def _refill_windows(self):
+        self.lst_windows.clear()
+        for o in self._face_openings:
+            self.lst_windows.addItem(self._window_label(o))
+
+    def _add_window(self):
+        dlg = _DormerWindowDialog(None, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._face_openings.append(dlg.opening())
+            self._refill_windows()
+            self.lst_windows.setCurrentRow(len(self._face_openings) - 1)
+
+    def _edit_window(self):
+        r = self.lst_windows.currentRow()
+        if not (0 <= r < len(self._face_openings)):
+            return
+        dlg = _DormerWindowDialog(self._face_openings[r], self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._face_openings[r] = dlg.opening()
+            self._refill_windows()
+            self.lst_windows.setCurrentRow(r)
+
+    def _remove_window(self):
+        r = self.lst_windows.currentRow()
+        if 0 <= r < len(self._face_openings):
+            del self._face_openings[r]
+            self._refill_windows()
 
     def accept(self):
         if self._dormer and self.dormer_meet_in() is None:
@@ -1643,6 +1794,9 @@ class RoofEndOnDialog(QDialog):
             if self.dormer_meet_in() is None:
                 return False             # refused: the caller drops the dormer
             self.roof.eaves_bind = "manual"
+            # Phase C (0291): the dormer's own face windows, the single record
+            # the plan shadow and the 3D face both read.
+            self.roof.openings = [dict(o) for o in self._face_openings]
         self.roof.rebuild()
         return True
 
