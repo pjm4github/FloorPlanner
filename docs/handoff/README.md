@@ -429,5 +429,6 @@ this table is not a second copy of it.
 | [`0287-report.md`](./0287-report.md) | report: PR #97 merged on his word — the plan's annotations in the DXF, and the second-floor procedure; a gate deadlock of my making, and how it was cleared |
 | [`0288-report.md`](./0288-report.md) | report: PR #98 merged — dormer plan controls, partition/beam wall types, and the wall-gap review tool |
 | [`0289-report.md`](./0289-report.md) | report: PR #99 merged — a wall is not a gap, and each gap names its walls and vertices |
+| [`0290-report.md`](./0290-report.md) | report: PR #100 merged — dormer gable ends & shed fronts close in 3D (a wall under a dormer climbs into it) |
 
 <!-- PAIRS:END -->

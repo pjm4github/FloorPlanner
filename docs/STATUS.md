@@ -5,12 +5,13 @@
 
 **Generated from the record** — one `**Landed:**` line per merge in [`handoff/`](handoff/), the defect register's front matter, and [`ROADMAP.md`](ROADMAP.md) §3's RED table. This file says whether a thing is DONE; [`SESSION_SNAPSHOT.md`](SESSION_SNAPSHOT.md) keeps the order and the why ([`handoff/0019-ruling.md`](handoff/0019-ruling.md) §4). A box that is not derived from the record is not on this board.
 
-**98 landed, 1 closed unmerged; 31 defects open, 57 closed.**
+**99 landed, 1 closed unmerged; 31 defects open, 57 closed.**
 
 ## Landed
 
 | PR | date | commit | tier | what it rested on | record |
 |---|---|---|---|---|---|
+| [#100](https://github.com/pjm4github/FloorPlanner/pull/100) | 2026-11-04 | `617182b` | AMBER | checked by Patrick on the 3D render (the front dormers' gable ends now close); landed as the foundation for the cross-level window work, his word "Land #100 now" | [`0290`](handoff/0290-report.md) |
 | [#99](https://github.com/pjm4github/FloorPlanner/pull/99) | 2026-11-02 | `0438669` | AMBER | checked by Patrick in the app ("The gaps look right"); landed on his word "merge #99" | [`0289`](handoff/0289-report.md) |
 | [#98](https://github.com/pjm4github/FloorPlanner/pull/98) | 2026-11-02 | `23237a0` | AMBER | his word on the pieces he checked in the app ("The partitioning looks perfect"; "the tool works perfectly" for the marker menu); landed on his order "accept the PR and merge this branch into main" | [`0288`](handoff/0288-report.md) |
 | [#97](https://github.com/pjm4github/FloorPlanner/pull/97) | 2026-10-18 | `ea5a4bc` | AMBER | checked by Patrick in Chief: "The DXF import into Chief Architect works well"; landed on his choice "Land #97 now" | [`0287`](handoff/0287-report.md) |
