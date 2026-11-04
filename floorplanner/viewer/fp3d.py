@@ -1561,9 +1561,36 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         cos = abs(gable_dir[0] * rx + gable_dir[1] * ry) / ln
         return cos <= math.sin(math.radians(GABLE_WALL_ANGLE_TOL_DEG))
 
+    def dormer_over(pc):
+        """A WALL UNDER A DORMER RISES TO THE DORMER (Patrick, 2026-11: the
+        gable ends of his front dormers were open). `owner_of` caps a wall at
+        the LOWEST roof over it; where a dormer stands on a host, that lowest
+        roof is the HOST, so the wall stopped at the host surface and the
+        dormer gable above it was left open -- and `_dormer_face` yields the
+        gable to `_on_a_wall` expecting this very climb. A piece inside a
+        SAME-LEVEL dormer's territory must instead climb to THAT dormer's
+        surface, closing the gable (the wall's own window stays a void, so the
+        0248 invariant holds -- no dormer face is generated). Returns the
+        covering same-level dormer whose surface is highest here, or None."""
+        c = RC._centroid(pc)
+        best, best_h = None, None
+        for geom, cells, dm_same, _same in nearby:
+            if dm_same and any(RC._contains(cell, c) for cell in cells):
+                h = RC.surface_height(geom, c)
+                if best_h is None or h > best_h:
+                    best, best_h = geom, h
+        return best
+
     out, touched = [], False
     for pc in pieces:
         geom, dormer, same_level = owner_of(pc)
+        # a wall piece under a same-level dormer climbs INTO the dormer, not
+        # up to the lower host it caps against (above) -- only for the pieces
+        # that climb (`to_top`); an under-sill band is unaffected
+        if to_top:
+            d_over = dormer_over(pc)
+            if d_over is not None:
+                geom, dormer, same_level = d_over, True, True
         if geom is None:
             out.append(("flat", pc))
             continue
