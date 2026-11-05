@@ -2355,10 +2355,16 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                         (ROOFCLIP.Pt(float(a["x"]), float(a["y"])),
                          ROOFCLIP.Pt(float(b["x"]), float(b["y"])), wt))
                 opens_of = {rf.get("id"): rf.get("openings") or [] for rf in doc.get("roofs", [])}
+                # P3 (0293 §2c): the generated cheek/face yields to a house wall
+                # on its line from ANY level, not the dormer's own `level` -- a
+                # wall on any floor climbs into the dormer by absolute height (P1),
+                # so which floor it is drawn on must not change the 3D. This is
+                # what makes a promotion a byte-identical `build_model` (0293 §3).
+                all_plan_walls = [w for ws in plan_walls.values() for w in ws]
                 for rid, lid, _g, lf in every:
                     host_lf = lifted_of.get(host_of.get(rid))
                     if host_lf is not None:
-                        near = plan_walls.get(lid, [])
+                        near = all_plan_walls
                         # the face openings lift in the dormer's frame, which is
                         # its HOST's level (the dormer is anchored there)
                         ops, zb = opens_of.get(rid, []), _lift_base(rid, lid)
@@ -2561,6 +2567,15 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     n_roof = n_overhang = 0
     if roofs:
         roof_parts = list(riser_parts)
+        # P3 (0293 §2c): a dormer's roof SECTION is anchored to the HOST's level
+        # base, not its own -- the same base the clip's `_lift_base` used -- so
+        # re-levelling the dormer does not move it (the byte-identical
+        # `build_model` promotion receipt, 0293 §3). `base(lid)` for any other roof.
+        _roof_by_id = {r.get("id"): r for r in doc.get("roofs", [])}
+
+        def _roof_z0(rf):
+            h = _roof_by_id.get(rf.get("host"))
+            return base((h or rf).get("level"))
         for rf in doc.get("roofs", []):
             rid = rf.get("id", "?")
             lid = rf.get("level")
@@ -2592,7 +2607,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 # roofs' cells meet at equal height; a JOINED end (clip.ext
                 # > 0 there) gets no end face -- it is inside the other
                 # roof; an unjoined GABLE end keeps its vertical triangle.
-                z0 = base(lid)
+                z0 = _roof_z0(rf)
                 pieces = list(clip.region.cells)
                 for pt, d in ROOFCLIP._cut_lines(geom):
                     pieces = [q for cell in pieces
@@ -2686,7 +2701,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             a1 = (p1[0] - ux * ext[0], p1[1] - uy * ext[0])
             a2 = (p2[0] + ux * ext[1], p2[1] + uy * ext[1])
 
-            z0 = base(lid)
+            z0 = _roof_z0(rf)
             ridge_z = z0 + ridge_h
             edge_z_pos = z0 + edge_h_pos
             edge_z_neg = z0 + edge_h_neg

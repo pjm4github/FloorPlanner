@@ -675,7 +675,7 @@ class PlanView(QGraphicsView):
                                         "on the ridge line.")
                         e.accept()
                         return
-                    eaves_h, slope = dormer_defaults(self.scene(), host, p)
+                    eaves_h, slope = dormer_defaults(self.scene(), host, p, active_floor())
                     item = RoofItem(p, QPointF(p.x() + d[0] * MIN_RIDGE_LEN_IN,
                                                p.y() + d[1] * MIN_RIDGE_LEN_IN),
                                     eaves_h_in=eaves_h,

@@ -116,6 +116,14 @@ def apply_roof_visibility(scene):
         # another level (R6.c owns the roof tool across levels).
         covering = (mode == "hidden" and it.floor != active
                     and roof_covers_floor(scene, it, active))
+        # P3 (0295 §1): a DORMER is shown (ghosted) on its OTHER legal level too
+        # -- the host's and the one above -- regardless of "show other floors" or
+        # rooms, since a dormer is a fact about the roof it stands on (the same
+        # reasoning R6.a used for a roof over a room). Editable only on its own
+        # level still (`_roof_hittable`, unchanged).
+        if (not covering and mode == "hidden" and it.floor != active
+                and it.is_dormer() and active in legal_dormer_levels(it)):
+            covering = True
         it.setVisible((mode != "hidden" or covering) and show)
         it.setEnabled(mode == "active" and show and edit)
         if not edit:
@@ -946,6 +954,33 @@ def _floor_below(floor):
     return max(lower)[1] if lower else None
 
 
+def _level_above(floor):
+    """The level one up from `floor` -- the one whose elevation is the least
+    strictly above it. None when `floor` is the top or unknown. The mirror of
+    `_floor_below`."""
+    elevs = floor_elevations()
+    here = elevs.get(floor)
+    if here is None:
+        return None
+    higher = [(el, name) for name, el in elevs.items() if el > here + 1e-6]
+    return min(higher)[1] if higher else None
+
+
+def legal_dormer_levels(roof):
+    """The levels a dormer may be DRAWN and EDITED on (0296 §1): its host's own
+    level and the one directly above the host by elevation -- only those that
+    EXIST. `[]` for a non-dormer or a roof with no live host; the dormer's own
+    `level` is always among them (`host_roof_at` placed it there)."""
+    host = getattr(roof, "host", None)
+    if host is None or sip.isdeleted(host):
+        return []
+    levels = [host.floor]
+    above = _level_above(host.floor)
+    if above is not None and above not in levels:
+        levels.append(above)
+    return levels
+
+
 def host_roof_at(scene, pt: QPointF, floor):
     """The roof a dormer pressed at `pt` on `floor` stands on. Tries `floor`
     first; when no roof is there, LOOKS DOWN a level (Patrick, 2026-11: a
@@ -964,21 +999,28 @@ def host_roof_at(scene, pt: QPointF, floor):
     return _host_roof_on(scene, p, below) if below is not None else None
 
 
-def dormer_defaults(scene, host, pt: QPointF):
-    """`(eaves_h_in, slope)` for a dormer whose face stands at `pt` on
-    `host` (0190-report.md sec3, adopted): the cheek top is the governing
-    ceiling there (R3b's own rule, the trace's height) plus
-    `DORMER_EAVES_ABOVE_CEILING_IN`; the slope is the host's own pitch on
-    the side `pt` lies, so the dormer's ridge follows the host's pitch by
-    default (`ridge_h = eaves_h + span * slope`)."""
-    rooms = _floor_rooms(scene, host.floor) if scene is not None else []
-    margin = _trace_margin_in(scene, host.floor) if scene is not None else 0.0
+def dormer_defaults(scene, host, pt: QPointF, drawn_floor=None):
+    """`(eaves_h_in, slope)` for a dormer whose face stands at `pt` on `host`
+    (0190-report.md sec3). The cheek top is the governing ceiling plus
+    `DORMER_EAVES_ABOVE_CEILING_IN`; the slope is the host's own pitch on the
+    side `pt` lies, so the dormer's ridge follows the host's pitch by default
+    (`ridge_h = eaves_h + span * slope`).
+
+    P3 (0293 §5 P3 iii, closing M3): the ceiling is read from the DRAWN level's
+    rooms -- the floor whose gable the dormer forms -- not the host's (a level
+    below), and converted into the HOST's datum (the dormer's frame, where
+    `fp3d` lifts it): `(base_drawn − base_host) + ceiling`. `drawn_floor`
+    defaults to the host's floor, a same-level dormer (no shift)."""
+    floor = drawn_floor if drawn_floor is not None else host.floor
+    rooms = _floor_rooms(scene, floor) if scene is not None else []
+    margin = _trace_margin_in(scene, floor) if scene is not None else 0.0
     ceiling = _governing_ceiling(rooms, pt, margin)
+    base_shift = float(floor_elevation(floor)) - float(floor_elevation(host.floor))
     _, _, nx, ny = host._axis()
     perp = (pt.x() - host.p1.x()) * nx + (pt.y() - host.p1.y()) * ny
     span = host.span_in[0] if perp >= 0 else host.span_in[1]
     slope = ((host.ridge_h_in - host.eaves_h_in) / span) if span > _CLIP_EPS_IN else 0.0
-    return ceiling + DORMER_EAVES_ABOVE_CEILING_IN, slope
+    return base_shift + ceiling + DORMER_EAVES_ABOVE_CEILING_IN, slope
 
 
 def upslope_direction(host, pt: QPointF):
@@ -2964,9 +3006,26 @@ class RoofEndMarkerItem(QGraphicsItem):
         # dialog straight.
         roof = self.roof
         menu = QMenu()
+        move_actions = {}
         if roof.is_dormer():
             a_edit = menu.addAction("Edit dormer…")
             a_del = menu.addAction("Delete dormer")
+            # P3 (0295 §1, 0296 §1): move the dormer between its two legal
+            # levels -- the host's and the one directly above. Only EXISTING
+            # levels; on a one-layer plan nothing to move to, so disabled with
+            # the note (0296 §1). The current level is ticked.
+            legal = legal_dormer_levels(roof)
+            sub = menu.addMenu("Move to level")
+            if len(legal) <= 1:
+                sub.setEnabled(False)
+                sub.setTitle(f"Move to level (add a level above '{roof.floor}' first)")
+            else:
+                for lv in legal:
+                    a = sub.addAction(lv)
+                    a.setCheckable(True)
+                    a.setChecked(lv == roof.floor)
+                    if lv != roof.floor:
+                        move_actions[a] = lv
         else:
             a_edit = menu.addAction("Roof parameters…")
             a_del = menu.addAction("Delete roof")
@@ -2979,6 +3038,10 @@ class RoofEndMarkerItem(QGraphicsItem):
             roof.remove_with_dormers()
         elif chosen is a_outline:
             roof.toggle_outline()
+        elif chosen in move_actions:
+            v = roof._view()
+            if v is not None:
+                v.win.move_dormer_to_level(roof, move_actions[chosen])
         e.accept()
 
     def mouseDoubleClickEvent(self, e):

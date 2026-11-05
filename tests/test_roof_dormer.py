@@ -346,7 +346,11 @@ def test_a_dormer_marker_menu_names_the_dormer(scene, monkeypatch):
         return None
     monkeypatch.setattr(QMenu, "exec", grab)
     d.marker.contextMenuEvent(_FakeCtxEvent())
-    assert labels == ["Edit dormer…", "Delete dormer", "Show outline"]
+    # P3 (0295 §1): the dormer marker menu gains a "Move to level" submenu
+    # (disabled here -- a bare scene has no level above to move to).
+    assert labels[:2] == ["Edit dormer…", "Delete dormer"]
+    assert labels[-1] == "Show outline"
+    assert any("Move to level" in x for x in labels)
 
 
 def _violet_pixels(roof):
