@@ -432,5 +432,10 @@ this table is not a second copy of it.
 | [`0290-report.md`](./0290-report.md) | report: PR #100 merged — dormer gable ends & shed fronts close in 3D (a wall under a dormer climbs into it) |
 | [`0291-report.md`](./0291-report.md) | report: PR #101 merged — cross-level dormers (host a floor below, anchor to the host's level) |
 | [`0292-report.md`](./0292-report.md) | report: PR #102 merged — dormer-window editor + read-only plan shadow (Phase C) |
+| [`0293-ruling.md`](./0293-ruling.md) | ruling: the 1½-storey — a roof shapes the storey it rises THROUGH, not only the one it stands on; the dormer's level, datum and walls |
+| [`0294-ruling.md`](./0294-ruling.md) | ruling: windows are authored on the DORMER FACE — 0293 §4's window item withdrawn; the plan-view stack; the cut into the climbing wall |
+| [`0295-ruling.md`](./0295-ruling.md) | ruling: the four views of a 1½-storey — one display rule, the "move dormer to layer" arrows, and two readings for him to confirm |
+| [`0296-ruling.md`](./0296-ruling.md) | ruling: the DORMER WALL — a wall type minted from the dormer, on the storey above the host, editable only from the dormer; promotion exists only once that storey does |
+| [`0297-ruling.md`](./0297-ruling.md) | ruling: THE 1½-STOREY ARC, consolidated — the one file Code picks up; phases, checkpoints, receipts, stop points |
 
 <!-- PAIRS:END -->
