@@ -308,9 +308,19 @@ def test_the_promoted_dormer_fixtures_are_unchanged_by_plan_c(fp3d):
     """R2's dormer face stands past the eaves wall (6in, more than half a
     thickness) and R3's on bare roof; the dormer-gable-check fixture has
     no walls under its dormer: none has a wall on a generated line, so the
-    walls meshes are byte-identical with the yield switched off."""
+    FACE YIELD adds or removes nothing -- the walls:exterior VERTEX COUNT is
+    unchanged with `_on_a_wall` off.
+
+    CHANGED ASSERTION, P1 (0297 §2): `_on_a_wall` now has a SECOND role -- the
+    stacked-climb bound in `_wall_under_roofs` -- so on a TWO-level plan toggling
+    it also moves the climbing-wall tops (a wall under the storey above is no
+    longer bounded at its base). The mesh is byte-identical only where no storey
+    stands above (dormer-gable-check, one level); R2/R3 (L2 present) keep the
+    same vertex count -- the face-yield invariant -- but not the same positions.
+    Named per 0297 §6."""
     for name in ("short-angle-roofR2.json", "short-angle-roofR3.json", "dormer-gable-check.json"):
         doc = json.loads((FIXTURES / name).read_text(encoding="utf-8"))
+        single_level = len({w.get("level") for w in doc.get("walls", [])}) <= 1
         on = fp3d.build_model(doc, furnishings=False, floors=False)
         orig = fp3d._on_a_wall
         try:
@@ -320,7 +330,9 @@ def test_the_promoted_dormer_fixtures_are_unchanged_by_plan_c(fp3d):
             fp3d._on_a_wall = orig
         a = next(m for m in on.meshes if m.name == "walls:exterior").verts
         b = next(m for m in off.meshes if m.name == "walls:exterior").verts
-        assert a.shape == b.shape and (a == b).all(), name
+        assert a.shape == b.shape, name            # the face yield adds/removes nothing
+        if single_level:
+            assert (a == b).all(), name            # no storey above: the bound never fires
 
 
 def test_a_sheds_ends_are_never_joined_so_the_host_keeps_its_ground_beside_a_shed_dormer(fp3d):
