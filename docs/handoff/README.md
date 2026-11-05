@@ -437,5 +437,6 @@ this table is not a second copy of it.
 | [`0295-ruling.md`](./0295-ruling.md) | ruling: the four views of a 1½-storey — one display rule, the "move dormer to layer" arrows, and two readings for him to confirm |
 | [`0296-ruling.md`](./0296-ruling.md) | ruling: the DORMER WALL — a wall type minted from the dormer, on the storey above the host, editable only from the dormer; promotion exists only once that storey does |
 | [`0297-ruling.md`](./0297-ruling.md) | ruling: THE 1½-STOREY ARC, consolidated — the one file Code picks up; phases, checkpoints, receipts, stop points |
+| [`0298-report.md`](./0298-report.md) | report: checkpoint 0 of the 1½-storey arc — the load fix recorded, the three unmeasured items measured, the ground cleared |
 
 <!-- PAIRS:END -->
