@@ -431,5 +431,6 @@ this table is not a second copy of it.
 | [`0289-report.md`](./0289-report.md) | report: PR #99 merged — a wall is not a gap, and each gap names its walls and vertices |
 | [`0290-report.md`](./0290-report.md) | report: PR #100 merged — dormer gable ends & shed fronts close in 3D (a wall under a dormer climbs into it) |
 | [`0291-report.md`](./0291-report.md) | report: PR #101 merged — cross-level dormers (host a floor below, anchor to the host's level) |
+| [`0292-report.md`](./0292-report.md) | report: PR #102 merged — dormer-window editor + read-only plan shadow (Phase C) |
 
 <!-- PAIRS:END -->

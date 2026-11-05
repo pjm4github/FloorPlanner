@@ -5,12 +5,13 @@
 
 **Generated from the record** — one `**Landed:**` line per merge in [`handoff/`](handoff/), the defect register's front matter, and [`ROADMAP.md`](ROADMAP.md) §3's RED table. This file says whether a thing is DONE; [`SESSION_SNAPSHOT.md`](SESSION_SNAPSHOT.md) keeps the order and the why ([`handoff/0019-ruling.md`](handoff/0019-ruling.md) §4). A box that is not derived from the record is not on this board.
 
-**100 landed, 1 closed unmerged; 31 defects open, 57 closed.**
+**101 landed, 1 closed unmerged; 31 defects open, 57 closed.**
 
 ## Landed
 
 | PR | date | commit | tier | what it rested on | record |
 |---|---|---|---|---|---|
+| [#102](https://github.com/pjm4github/FloorPlanner/pull/102) | 2026-11-04 | `e584c29` | AMBER | checked by Patrick in-app (the editor adds a dormer-face window; the dialog shows it) and verified end-to-end headless; landed on his word "Land #102 + fix load bug, then wall-gable windows" | [`0292`](handoff/0292-report.md) |
 | [#101](https://github.com/pjm4github/FloorPlanner/pull/101) | 2026-11-04 | `7857a7f` | AMBER | checked by Patrick in the app on the cross-level dormer render ("that looks good"), merged by fast-forward onto PR #100's foundation | [`0291`](handoff/0291-report.md) |
 | [#100](https://github.com/pjm4github/FloorPlanner/pull/100) | 2026-11-04 | `617182b` | AMBER | checked by Patrick on the 3D render (the front dormers' gable ends now close); landed as the foundation for the cross-level window work, his word "Land #100 now" | [`0290`](handoff/0290-report.md) |
 | [#99](https://github.com/pjm4github/FloorPlanner/pull/99) | 2026-11-02 | `0438669` | AMBER | checked by Patrick in the app ("The gaps look right"); landed on his word "merge #99" | [`0289`](handoff/0289-report.md) |
