@@ -439,5 +439,6 @@ this table is not a second copy of it.
 | [`0297-ruling.md`](./0297-ruling.md) | ruling: THE 1½-STOREY ARC, consolidated — the one file Code picks up; phases, checkpoints, receipts, stop points |
 | [`0298-report.md`](./0298-report.md) | report: checkpoint 0 of the 1½-storey arc — the load fix recorded, the three unmeasured items measured, the ground cleared |
 | [`0299-report.md`](./0299-report.md) | report: P1 of the 1½-storey arc — the stacked climb (3D), built on a branch, receipts verbatim |
+| [`0300-report.md`](./0300-report.md) | report: PR #104 merged — the floor dialog derives the base from the floor below |
 
 <!-- PAIRS:END -->
