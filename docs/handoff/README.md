@@ -440,5 +440,6 @@ this table is not a second copy of it.
 | [`0298-report.md`](./0298-report.md) | report: checkpoint 0 of the 1½-storey arc — the load fix recorded, the three unmeasured items measured, the ground cleared |
 | [`0299-report.md`](./0299-report.md) | report: P1 of the 1½-storey arc — the stacked climb (3D), built on a branch, receipts verbatim |
 | [`0300-report.md`](./0300-report.md) | report: PR #104 merged — the floor dialog derives the base from the floor below |
+| [`0301-report.md`](./0301-report.md) | report: P2 of the 1½-storey arc — the dash and the knee line (plan), built on a branch |
 
 <!-- PAIRS:END -->
