@@ -454,16 +454,24 @@ def roof_clip_spans(scene, wall):
     Qt virtual override)."""
     if scene is None or sip.isdeleted(wall):
         return []
+    # P2 (0297 §2, 0293 §2b): EVERY live roof, in ABSOLUTE height -- a roof on
+    # another level caps a wall it passes over (an L1 roof rising through an L2
+    # wall, 0293 §1 M2's 0 dashes), not only a roof on the wall's own floor. The
+    # affine clip (`_clip_spans_against_one_roof`) is unchanged: the per-roof
+    # ceiling is shifted by the two levels' base difference, so its comparison
+    # (roof height vs ceiling) is absolute (`Lifted`/`floor_elevation`, 0186 §4 --
+    # ONE arithmetic). Same floor -> the shift is 0 -> byte-identical.
     roofs = [it for it in scene.items()
-             if isinstance(it, RoofItem) and not sip.isdeleted(it)
-             and it.floor == wall.floor]
+             if isinstance(it, RoofItem) and not sip.isdeleted(it)]
     if not roofs:
         return []                          # cheap exit before the room scan
+    wall_base = float(floor_elevation(wall.floor))
     # 0276 (0275 sec5 step 2): computed once per change of what it reads --
-    # the wall's line and thickness, every roof on the floor (its geometry
-    # and its visible region) and the floor's rooms -- not once per paint
+    # the wall's line and thickness, every roof (its geometry, its visible
+    # region and its level base) and the wall-floor's rooms -- not once per paint
     own = ((wall.p1.x(), wall.p1.y(), wall.p2.x(), wall.p2.y(), float(wall.t)),
-           tuple((rf.geometry_key(), rf._clip_region) for rf in roofs))
+           tuple((rf.geometry_key(), rf._clip_region, float(floor_elevation(rf.floor)))
+                 for rf in roofs))
     memo = getattr(wall, "_roof_spans_memo", None)
     if memo is not None and rooms_held(scene) and memo[0][:2] == own:
         return list(memo[1])              # 0279: the rooms as at the press
@@ -473,8 +481,9 @@ def roof_clip_spans(scene, wall):
     ceiling_in = _wall_ceiling_in(scene, wall)
     spans = []
     for rf in roofs:
+        adj = ceiling_in + wall_base - float(floor_elevation(rf.floor))
         spans.extend(_within_territory(
-            wall, rf, _clip_spans_against_one_roof(wall, rf, ceiling_in)))
+            wall, rf, _clip_spans_against_one_roof(wall, rf, adj)))
     out = _merge_spans(spans, wall.length())
     wall._roof_spans_memo = (key, list(out))
     return out
@@ -820,6 +829,77 @@ def roof_clip_trace(scene, roof):
                         QPointF(p.x() + dx * t1, p.y() + dy * t1))
                        for t0, t1 in runs)
     return out
+
+
+def _room_trace(room):
+    """`room` as a `_TraceRoom` -- its ceiling and outline, for the knee line."""
+    from floorplanner.rooms import RoomItem  # late (peer layer)
+    if not isinstance(room, RoomItem) or sip.isdeleted(room):
+        return None
+    ceiling = float(room.properties.get(
+        "ceiling_height_in", DEFAULT_ROOM_PROPS["ceiling_height_in"]))
+    polys = [[QPointF(q) for q in poly]
+             for poly in room.path.toSubpathPolygons() if len(poly) >= 2]
+    return _TraceRoom(ceiling, room.path, polys)
+
+
+def room_ceiling_break_lines(scene, room):
+    """P2 (0297 §2, 0293 §2b): the KNEE LINE of `room` -- `[(p, q)]` scene
+    segments where any roof's surface, in ABSOLUTE height, crosses this room's
+    ceiling plane (`base + ceiling`), drawn INSIDE the room outline. His ask
+    (2026-11-05): "walls that have a full height ceiling should get the dashed
+    line that indicates where a flat ceiling starts." A DERIVED OVERLAY, never a
+    wall and never stored -- the discipline of R3b's wall dash (`roof_clip_spans`)
+    and R5a's roof trace (`roof_clip_trace`); it reads absolute height the one way
+    3D does (`floor_elevation`), so a roof on a LOWER level draws the line in a
+    room above. `[]` when no roof crosses the ceiling over the room. Memoised on
+    the roofs (geometry, territory, level base) and the floor's rooms (0276), held
+    during a drag (0279) -- paint must not recompose (0281)."""
+    if scene is None or sip.isdeleted(room):
+        return []
+    roofs = [it for it in scene.items()
+             if isinstance(it, RoofItem) and not sip.isdeleted(it)]
+    if not roofs:
+        return []
+    roof_sig = tuple((rf.geometry_key(), rf._clip_region, float(floor_elevation(rf.floor)))
+                     for rf in roofs)
+    memo = getattr(room, "_knee_memo", None)
+    if memo is not None and rooms_held(scene) and memo[0][0] == roof_sig:
+        return list(memo[1])
+    key = (roof_sig, floor_rooms_key(scene, room.floor))
+    if memo is not None and memo[0] == key:
+        return list(memo[1])
+    tr = _room_trace(room)
+    if tr is None:
+        room._knee_memo = (key, [])
+        return []
+    ceiling_abs = float(floor_elevation(room.floor)) + tr.ceiling
+    margin = _trace_margin_in(scene, room.floor)
+    rooms = [tr]
+    out = []
+    for rf in roofs:
+        h = ceiling_abs - float(floor_elevation(rf.floor))        # roof-relative height
+        join_ext = rf._clip_ext if rf.is_clipped() else (0.0, 0.0)
+        region = rf._clip_region
+        for p, q in _trace_to_scene(rf, _trace_lines_local(rf, h, join_ext)):
+            dx, dy = q.x() - p.x(), q.y() - p.y()
+            seg_len = math.hypot(dx, dy)
+            if seg_len < _CLIP_EPS_IN:
+                continue
+            ts = [0.0] + _cut_params(p, q, rooms, margin) + [1.0]
+            for t0, t1 in zip(ts, ts[1:], strict=False):
+                if (t1 - t0) * seg_len < _CLIP_EPS_IN:
+                    continue
+                tm = (t0 + t1) / 2.0
+                mid = QPointF(p.x() + dx * tm, p.y() + dy * tm)
+                if not tr.holds(mid, margin):
+                    continue
+                if region is not None and not region.contains(mid):
+                    continue
+                out.append((QPointF(p.x() + dx * t0, p.y() + dy * t0),
+                            QPointF(p.x() + dx * t1, p.y() + dy * t1)))
+    room._knee_memo = (key, list(out))
+    return list(out)
 
 
 # ---------------------------------------------------------------------------

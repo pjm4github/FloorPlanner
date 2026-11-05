@@ -895,6 +895,21 @@ class RoomItem(QGraphicsItem):
             painter.drawPath(self.path)
             painter.setPen(Qt.PenStyle.NoPen)
         self._paint_open_edges(painter, option, ghost=False)
+        # P2 (0293 §2b): the KNEE LINE -- where a roof's surface crosses this
+        # room's ceiling plane (in absolute height, so a roof a level below
+        # draws it too), dashed in the roof-clip ink, the same fact R3b dashes
+        # along a wall. A derived overlay read at paint time (held during a
+        # drag, memoised -- paint must not recompose, 0281), never a wall.
+        sc = self.scene()
+        if sc is not None:
+            from floorplanner.roofs import room_ceiling_break_lines  # late: rooms<->roofs cycle
+            knee = room_ceiling_break_lines(sc, self)
+            if knee:
+                painter.setPen(QPen(ROOF_CLIP_INK, 1.6, Qt.PenStyle.DashLine))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                for p, q in knee:
+                    painter.drawLine(p, q)
+                painter.setPen(Qt.PenStyle.NoPen)
         if self.isSelected():
             # D53 CONSTRAINT 3: SELECTION AND FLOATING MUST NOT SHARE A VISUAL
             # CHANNEL. A floating room already paints a DASHED orange boundary
