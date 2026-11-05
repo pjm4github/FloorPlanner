@@ -1070,41 +1070,86 @@ class _EndOnCanvas(QWidget):
 
 class FloorLevelsDialog(QDialog):
     """Floors ▸ <floor> ▸ Elevation and height… (R6.0, 0197-ruling.md sec2,
-    closing D50): the storey's own two numbers, both measured in inches
-    from the building's datum -- the elevation of the level's base, and
-    the storey height (its wall top in 3D). A basement's elevation may be
-    negative. Nothing here is derived: what is typed is what is written."""
+    closing D50): the storey's two numbers, in inches from the building's
+    datum -- the base and the storey height (its wall top in 3D).
 
-    def __init__(self, floor, parent=None):
+    The BASE is DERIVED from the floor below by default (his word, 2026-11-05):
+    a storey sits on the one beneath it, so its base IS that floor's top, shown
+    read-only. Untick "Sits on the floor below" to set a custom base -- a
+    basement (a negative base), a split level, a deliberate gap. The LOWEST
+    floor has no floor below, so its base (the building's datum) is always
+    editable. `below_top` is the floor-below's top (`levels.py` computes it);
+    None for the lowest floor. A lower floor's height change re-derives the
+    stack above it (`set_floor_levels`)."""
+
+    def __init__(self, floor, parent=None, below_top=None):
         super().__init__(parent)
         self.setWindowTitle(f"Floor '{floor.name}': elevation and height")
+        self._below_top = None if below_top is None else float(below_top)
         form = QFormLayout(self)
+
+        self.ck_stack = QCheckBox("Sits on the floor below")
+        stacks = (self._below_top is not None
+                  and abs(float(floor.elevation_in) - self._below_top) < 0.5)
+        self.ck_stack.setChecked(stacks)
+        if self._below_top is None:
+            self.ck_stack.setVisible(False)      # the lowest floor: nothing to sit on
+        form.addRow("", self.ck_stack)
+
         self.sp_elev = QDoubleSpinBox()
         self.sp_elev.setRange(-1200.0, 2400.0)
         self.sp_elev.setDecimals(1)
         self.sp_elev.setSuffix(" in")
-        self.sp_elev.setValue(float(floor.elevation_in))
+        self.sp_elev.setValue(self._below_top if stacks else float(floor.elevation_in))
         form.addRow("Elevation of the level's base", self.sp_elev)
+
         self.sp_height = QDoubleSpinBox()
         self.sp_height.setRange(12.0, 600.0)
         self.sp_height.setDecimals(1)
         self.sp_height.setSuffix(" in")
         self.sp_height.setValue(float(floor.height_in))
         form.addRow("Storey height", self.sp_height)
-        note = QLabel("Both from the building's datum, in inches. A new floor "
-                      "starts at the floor below's elevation plus its height; "
-                      "edit either here. The 3D view stacks levels by elevation "
-                      "and reads the storey height as the level's wall top.")
-        note.setWordWrap(True)
-        note.setStyleSheet("color: #666;")
-        form.addRow(note)
+
+        self.note = QLabel("")
+        self.note.setWordWrap(True)
+        self.note.setStyleSheet("color: #666;")
+        form.addRow(self.note)
+
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
                                    | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
 
+        self.ck_stack.toggled.connect(self._on_stack_toggled)
+        self._refresh()
+
+    def _derived(self) -> bool:
+        return self._below_top is not None and self.ck_stack.isChecked()
+
+    def _on_stack_toggled(self, on):
+        if on and self._below_top is not None:
+            self.sp_elev.setValue(self._below_top)
+        self._refresh()
+
+    def _refresh(self):
+        derived = self._derived()
+        self.sp_elev.setEnabled(not derived)     # derived -> greyed, read from the floor below
+        if self._below_top is None:
+            self.note.setText("The lowest floor: its base is the building's datum. The "
+                              "3D view stacks levels by elevation and reads the storey "
+                              "height as the level's wall top.")
+        elif derived:
+            self.note.setText(f"Base derived from the floor below (its top, "
+                              f"{fmt_in(self._below_top)}). Untick to set a custom base "
+                              f"-- a basement, a split level.")
+        else:
+            self.note.setText("Custom base. Tick 'Sits on the floor below' to keep it on "
+                              "the floor beneath (its elevation plus its height).")
+
     def values(self):
+        if self._derived():
+            return self._below_top, float(self.sp_height.value())
         return float(self.sp_elev.value()), float(self.sp_height.value())
 
 

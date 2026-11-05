@@ -125,6 +125,46 @@ def test_the_levels_dialog_seeds_from_the_floor_and_returns_what_was_typed(fp, w
     assert dlg.values() == (-36.0, 102.0)
 
 
+def test_the_levels_dialog_derives_the_base_from_the_floor_below(fp, win):
+    from floorplanner.dialogs import FloorLevelsDialog
+    win.prepare_headless()
+    win.new_floor_named("Upper")                   # default (0, 96), Upper (96, 96)
+    assert win._floor_below_top(win._floor("Upper")) == 96.0
+    dlg = FloorLevelsDialog(win._floor("Upper"), win, below_top=96.0)
+    assert dlg.ck_stack.isChecked() and not dlg.sp_elev.isEnabled()   # derived, read-only
+    assert dlg.values() == (96.0, 96.0)
+    dlg.sp_height.setValue(120.0)
+    assert dlg.values() == (96.0, 120.0)           # base stays derived; height follows
+    dlg.ck_stack.setChecked(False)                 # untick -> a custom base
+    assert dlg.sp_elev.isEnabled()
+    dlg.sp_elev.setValue(-36.0)
+    assert dlg.values() == (-36.0, 120.0)
+
+
+def test_the_lowest_floor_keeps_an_editable_base(fp, win):
+    from floorplanner.dialogs import FloorLevelsDialog
+    win.prepare_headless()
+    win.new_floor_named("Upper")
+    low = win.floors[0]
+    assert win._floor_below_top(low) is None       # nothing below the lowest floor
+    dlg = FloorLevelsDialog(low, win, below_top=None)
+    assert not dlg.ck_stack.isVisible() and dlg.sp_elev.isEnabled()
+
+
+def test_raising_a_lower_floors_height_carries_the_stack_above_it(fp, win):
+    win.prepare_headless()
+    win.new_floor_named("Upper")                   # default (0,96), Upper (96,96)
+    win.new_floor_named("Attic")                   # Attic (192,96), stacking
+    # raise the lowest floor's height 96 -> 120: the stack above follows up
+    assert win.set_floor_levels(win.floors[0].name, 0.0, 120.0)
+    assert win._floor("Upper").elevation_in == 120.0        # 0 + 120
+    assert win._floor("Attic").elevation_in == 216.0        # 120 + 96
+    # a floor given a CUSTOM base is not carried by a lower floor's change
+    win.set_floor_levels("Attic", 300.0, 96.0)              # custom base (!= Upper's top 216)
+    win.set_floor_levels("Upper", 120.0, 100.0)            # Upper height 96 -> 100
+    assert win._floor("Attic").elevation_in == 300.0        # stays where it was put
+
+
 # --------------------------------------------------------------------------
 # the other two writers: the v4 project and the legacy importer
 # --------------------------------------------------------------------------

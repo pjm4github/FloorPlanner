@@ -355,17 +355,43 @@ class LevelsMixin:
         self._sync_floor_state()
         self._commit_floor_change()
 
+    def _floor_below_top(self, f):
+        """The top (elevation + height) of the real storey directly below `f`
+        by elevation -- the floor `f` sits on -- or None when `f` is the lowest.
+        Reference floors (tracing overlays) do not count as a storey below."""
+        below = [g for g in self.floors
+                 if not g.reference and g is not f
+                 and g.elevation_in < f.elevation_in - 1e-6]
+        if not below:
+            return None
+        g = max(below, key=lambda g: g.elevation_in)
+        return g.elevation_in + g.height_in
+
     def set_floor_levels(self, name, elevation_in, height_in):
         """R6.0 (D50): set a floor's storey elevation and height -- a roster
         edit, so an undo step and dirty like rename/reference. The
         non-interactive core of `edit_floor_levels` (also what a test
         drives). Returns False when the floor is unknown or the height is
-        not positive."""
+        not positive.
+
+        His word, 2026-11-05: a storey sits on the one below, so a change to a
+        lower floor's height (or base) RE-DERIVES the stack above it -- every
+        real storey whose base equalled the floor-below's top follows it up,
+        bottom-up by elevation; a floor with a custom base is left where it is."""
         f = self._floor(name)
         if f is None or float(height_in) <= 0.0:
             return False
-        f.elevation_in = float(elevation_in)
+        storeys = sorted([g for g in self.floors if not g.reference],
+                         key=lambda g: g.elevation_in)
+        old_top = {id(g): g.elevation_in + g.height_in for g in storeys}
+        sits_on = {id(storeys[i]): storeys[i - 1] for i in range(1, len(storeys))
+                   if abs(storeys[i].elevation_in - old_top[id(storeys[i - 1])]) < 0.5}
+        f.elevation_in = float(elevation_in)      # f is what was asked; never re-derived
         f.height_in = float(height_in)
+        for i in range(1, len(storeys)):          # bottom-up: carry the stack ABOVE f
+            g = storeys[i]
+            if g is not f and sits_on.get(id(g)) is storeys[i - 1]:
+                g.elevation_in = storeys[i - 1].elevation_in + storeys[i - 1].height_in
         self._sync_floor_state()
         self._commit_floor_change()
         self.status(f"Floor '{name}': elevation {fmt_in(f.elevation_in)}, "
@@ -378,7 +404,7 @@ class LevelsMixin:
         f = self._floor(name)
         if f is None:
             return
-        dlg = FloorLevelsDialog(f, self)
+        dlg = FloorLevelsDialog(f, self, below_top=self._floor_below_top(f))
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.set_floor_levels(name, *dlg.values())
 
