@@ -1511,11 +1511,31 @@ def _build_roofs(scene, doc, lname, rep):
         roof_by_id[rfd.get("id")] = item
         if rfd.get("host") is not None:
             dormer_hosts.append((item, rfd.get("id"), rfd["host"]))
+    # Cross-level dormers (PR #101): a dormer's host may be on its own floor OR
+    # the floor directly below it -- `roofs.host_roof_at` looks DOWN a level when
+    # the dormer is drawn on the storey its gable occupies, and `fp3d` then
+    # anchors the dormer to the host's level. The load must accept the same
+    # range, or a saved cross-level dormer is dropped on reload (0292 sec2). The
+    # floor-below is read from this doc's own level elevations, not the live
+    # global, so the resolution does not depend on load order.
+    _elev = {lv.get("name", DEFAULT_FLOOR): float(lv.get("elevation_in", 0.0))
+             for lv in (doc.get("levels") or [])}
+
+    def _one_floor_below(floor):
+        here = _elev.get(floor)
+        if here is None:
+            return None
+        lower = [(el, nm) for nm, el in _elev.items() if el < here - 1e-6]
+        return max(lower)[1] if lower else None
+
     for item, rid, hid in dormer_hosts:
         host = roof_by_id.get(hid)
-        if host is None or host is item or host.floor != item.floor:
+        ok = (host is not None and host is not item
+              and host.floor in (item.floor, _one_floor_below(item.floor)))
+        if not ok:
             rep.setdefault("roofs_skipped", []).append(
-                f"{rid}: host {hid!r} is not a roof on its level -- skipped")
+                f"{rid}: host {hid!r} is not a roof on its level or the one "
+                f"below -- skipped")
             scene.removeItem(item)
             rep["roofs"] -= 1
             continue
