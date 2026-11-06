@@ -116,6 +116,14 @@ def apply_roof_visibility(scene):
         # another level (R6.c owns the roof tool across levels).
         covering = (mode == "hidden" and it.floor != active
                     and roof_covers_floor(scene, it, active))
+        # P3 (0295 §1): a DORMER is shown (ghosted) on its OTHER legal level too
+        # -- the host's and the one above -- regardless of "show other floors" or
+        # rooms, since a dormer is a fact about the roof it stands on (the same
+        # reasoning R6.a used for a roof over a room). Editable only on its own
+        # level still (`_roof_hittable`, unchanged).
+        if (not covering and mode == "hidden" and it.floor != active
+                and it.is_dormer() and active in legal_dormer_levels(it)):
+            covering = True
         it.setVisible((mode != "hidden" or covering) and show)
         it.setEnabled(mode == "active" and show and edit)
         if not edit:
@@ -454,16 +462,24 @@ def roof_clip_spans(scene, wall):
     Qt virtual override)."""
     if scene is None or sip.isdeleted(wall):
         return []
+    # P2 (0297 §2, 0293 §2b): EVERY live roof, in ABSOLUTE height -- a roof on
+    # another level caps a wall it passes over (an L1 roof rising through an L2
+    # wall, 0293 §1 M2's 0 dashes), not only a roof on the wall's own floor. The
+    # affine clip (`_clip_spans_against_one_roof`) is unchanged: the per-roof
+    # ceiling is shifted by the two levels' base difference, so its comparison
+    # (roof height vs ceiling) is absolute (`Lifted`/`floor_elevation`, 0186 §4 --
+    # ONE arithmetic). Same floor -> the shift is 0 -> byte-identical.
     roofs = [it for it in scene.items()
-             if isinstance(it, RoofItem) and not sip.isdeleted(it)
-             and it.floor == wall.floor]
+             if isinstance(it, RoofItem) and not sip.isdeleted(it)]
     if not roofs:
         return []                          # cheap exit before the room scan
+    wall_base = float(floor_elevation(wall.floor))
     # 0276 (0275 sec5 step 2): computed once per change of what it reads --
-    # the wall's line and thickness, every roof on the floor (its geometry
-    # and its visible region) and the floor's rooms -- not once per paint
+    # the wall's line and thickness, every roof (its geometry, its visible
+    # region and its level base) and the wall-floor's rooms -- not once per paint
     own = ((wall.p1.x(), wall.p1.y(), wall.p2.x(), wall.p2.y(), float(wall.t)),
-           tuple((rf.geometry_key(), rf._clip_region) for rf in roofs))
+           tuple((rf.geometry_key(), rf._clip_region, float(floor_elevation(rf.floor)))
+                 for rf in roofs))
     memo = getattr(wall, "_roof_spans_memo", None)
     if memo is not None and rooms_held(scene) and memo[0][:2] == own:
         return list(memo[1])              # 0279: the rooms as at the press
@@ -473,8 +489,9 @@ def roof_clip_spans(scene, wall):
     ceiling_in = _wall_ceiling_in(scene, wall)
     spans = []
     for rf in roofs:
+        adj = ceiling_in + wall_base - float(floor_elevation(rf.floor))
         spans.extend(_within_territory(
-            wall, rf, _clip_spans_against_one_roof(wall, rf, ceiling_in)))
+            wall, rf, _clip_spans_against_one_roof(wall, rf, adj)))
     out = _merge_spans(spans, wall.length())
     wall._roof_spans_memo = (key, list(out))
     return out
@@ -822,6 +839,77 @@ def roof_clip_trace(scene, roof):
     return out
 
 
+def _room_trace(room):
+    """`room` as a `_TraceRoom` -- its ceiling and outline, for the knee line."""
+    from floorplanner.rooms import RoomItem  # late (peer layer)
+    if not isinstance(room, RoomItem) or sip.isdeleted(room):
+        return None
+    ceiling = float(room.properties.get(
+        "ceiling_height_in", DEFAULT_ROOM_PROPS["ceiling_height_in"]))
+    polys = [[QPointF(q) for q in poly]
+             for poly in room.path.toSubpathPolygons() if len(poly) >= 2]
+    return _TraceRoom(ceiling, room.path, polys)
+
+
+def room_ceiling_break_lines(scene, room):
+    """P2 (0297 §2, 0293 §2b): the KNEE LINE of `room` -- `[(p, q)]` scene
+    segments where any roof's surface, in ABSOLUTE height, crosses this room's
+    ceiling plane (`base + ceiling`), drawn INSIDE the room outline. His ask
+    (2026-11-05): "walls that have a full height ceiling should get the dashed
+    line that indicates where a flat ceiling starts." A DERIVED OVERLAY, never a
+    wall and never stored -- the discipline of R3b's wall dash (`roof_clip_spans`)
+    and R5a's roof trace (`roof_clip_trace`); it reads absolute height the one way
+    3D does (`floor_elevation`), so a roof on a LOWER level draws the line in a
+    room above. `[]` when no roof crosses the ceiling over the room. Memoised on
+    the roofs (geometry, territory, level base) and the floor's rooms (0276), held
+    during a drag (0279) -- paint must not recompose (0281)."""
+    if scene is None or sip.isdeleted(room):
+        return []
+    roofs = [it for it in scene.items()
+             if isinstance(it, RoofItem) and not sip.isdeleted(it)]
+    if not roofs:
+        return []
+    roof_sig = tuple((rf.geometry_key(), rf._clip_region, float(floor_elevation(rf.floor)))
+                     for rf in roofs)
+    memo = getattr(room, "_knee_memo", None)
+    if memo is not None and rooms_held(scene) and memo[0][0] == roof_sig:
+        return list(memo[1])
+    key = (roof_sig, floor_rooms_key(scene, room.floor))
+    if memo is not None and memo[0] == key:
+        return list(memo[1])
+    tr = _room_trace(room)
+    if tr is None:
+        room._knee_memo = (key, [])
+        return []
+    ceiling_abs = float(floor_elevation(room.floor)) + tr.ceiling
+    margin = _trace_margin_in(scene, room.floor)
+    rooms = [tr]
+    out = []
+    for rf in roofs:
+        h = ceiling_abs - float(floor_elevation(rf.floor))        # roof-relative height
+        join_ext = rf._clip_ext if rf.is_clipped() else (0.0, 0.0)
+        region = rf._clip_region
+        for p, q in _trace_to_scene(rf, _trace_lines_local(rf, h, join_ext)):
+            dx, dy = q.x() - p.x(), q.y() - p.y()
+            seg_len = math.hypot(dx, dy)
+            if seg_len < _CLIP_EPS_IN:
+                continue
+            ts = [0.0] + _cut_params(p, q, rooms, margin) + [1.0]
+            for t0, t1 in zip(ts, ts[1:], strict=False):
+                if (t1 - t0) * seg_len < _CLIP_EPS_IN:
+                    continue
+                tm = (t0 + t1) / 2.0
+                mid = QPointF(p.x() + dx * tm, p.y() + dy * tm)
+                if not tr.holds(mid, margin):
+                    continue
+                if region is not None and not region.contains(mid):
+                    continue
+                out.append((QPointF(p.x() + dx * t0, p.y() + dy * t0),
+                            QPointF(p.x() + dx * t1, p.y() + dy * t1)))
+    room._knee_memo = (key, list(out))
+    return list(out)
+
+
 # ---------------------------------------------------------------------------
 # R5b (0191-ruling.md): dormers -- a roof with a host
 # ---------------------------------------------------------------------------
@@ -866,6 +954,33 @@ def _floor_below(floor):
     return max(lower)[1] if lower else None
 
 
+def _level_above(floor):
+    """The level one up from `floor` -- the one whose elevation is the least
+    strictly above it. None when `floor` is the top or unknown. The mirror of
+    `_floor_below`."""
+    elevs = floor_elevations()
+    here = elevs.get(floor)
+    if here is None:
+        return None
+    higher = [(el, name) for name, el in elevs.items() if el > here + 1e-6]
+    return min(higher)[1] if higher else None
+
+
+def legal_dormer_levels(roof):
+    """The levels a dormer may be DRAWN and EDITED on (0296 §1): its host's own
+    level and the one directly above the host by elevation -- only those that
+    EXIST. `[]` for a non-dormer or a roof with no live host; the dormer's own
+    `level` is always among them (`host_roof_at` placed it there)."""
+    host = getattr(roof, "host", None)
+    if host is None or sip.isdeleted(host):
+        return []
+    levels = [host.floor]
+    above = _level_above(host.floor)
+    if above is not None and above not in levels:
+        levels.append(above)
+    return levels
+
+
 def host_roof_at(scene, pt: QPointF, floor):
     """The roof a dormer pressed at `pt` on `floor` stands on. Tries `floor`
     first; when no roof is there, LOOKS DOWN a level (Patrick, 2026-11: a
@@ -884,21 +999,28 @@ def host_roof_at(scene, pt: QPointF, floor):
     return _host_roof_on(scene, p, below) if below is not None else None
 
 
-def dormer_defaults(scene, host, pt: QPointF):
-    """`(eaves_h_in, slope)` for a dormer whose face stands at `pt` on
-    `host` (0190-report.md sec3, adopted): the cheek top is the governing
-    ceiling there (R3b's own rule, the trace's height) plus
-    `DORMER_EAVES_ABOVE_CEILING_IN`; the slope is the host's own pitch on
-    the side `pt` lies, so the dormer's ridge follows the host's pitch by
-    default (`ridge_h = eaves_h + span * slope`)."""
-    rooms = _floor_rooms(scene, host.floor) if scene is not None else []
-    margin = _trace_margin_in(scene, host.floor) if scene is not None else 0.0
+def dormer_defaults(scene, host, pt: QPointF, drawn_floor=None):
+    """`(eaves_h_in, slope)` for a dormer whose face stands at `pt` on `host`
+    (0190-report.md sec3). The cheek top is the governing ceiling plus
+    `DORMER_EAVES_ABOVE_CEILING_IN`; the slope is the host's own pitch on the
+    side `pt` lies, so the dormer's ridge follows the host's pitch by default
+    (`ridge_h = eaves_h + span * slope`).
+
+    P3 (0293 §5 P3 iii, closing M3): the ceiling is read from the DRAWN level's
+    rooms -- the floor whose gable the dormer forms -- not the host's (a level
+    below), and converted into the HOST's datum (the dormer's frame, where
+    `fp3d` lifts it): `(base_drawn − base_host) + ceiling`. `drawn_floor`
+    defaults to the host's floor, a same-level dormer (no shift)."""
+    floor = drawn_floor if drawn_floor is not None else host.floor
+    rooms = _floor_rooms(scene, floor) if scene is not None else []
+    margin = _trace_margin_in(scene, floor) if scene is not None else 0.0
     ceiling = _governing_ceiling(rooms, pt, margin)
+    base_shift = float(floor_elevation(floor)) - float(floor_elevation(host.floor))
     _, _, nx, ny = host._axis()
     perp = (pt.x() - host.p1.x()) * nx + (pt.y() - host.p1.y()) * ny
     span = host.span_in[0] if perp >= 0 else host.span_in[1]
     slope = ((host.ridge_h_in - host.eaves_h_in) / span) if span > _CLIP_EPS_IN else 0.0
-    return ceiling + DORMER_EAVES_ABOVE_CEILING_IN, slope
+    return base_shift + ceiling + DORMER_EAVES_ABOVE_CEILING_IN, slope
 
 
 def upslope_direction(host, pt: QPointF):
@@ -2382,9 +2504,13 @@ class RoofItem(QGraphicsItem):
         # GREEN, its face eave ORANGE, both dashed; the ridge and slopes stay
         # brown; its three standing walls are added solid black below. Every
         # other roof (and any ghosted one) draws every line brown as before.
-        dormer = self.is_dormer() and not ghost
-        green = QPen(QColor(0, 150, 0), 1.6, Qt.PenStyle.DashLine)
-        orange = QPen(QColor(230, 120, 20), 1.6, Qt.PenStyle.DashLine)
+        # P3 (0295 §1): a dormer shown GHOSTED on its other legal level still
+        # draws its whole outline (cheeks, face, roof lines, wall bands) -- in
+        # the ghost ink -- so the reference reads as the same dormer, not a bare
+        # ridge. Only the colour changes with `ghost`; the geometry is the same.
+        dormer = self.is_dormer()
+        green = QPen(FLOOR_GHOST if ghost else QColor(0, 150, 0), 1.6, Qt.PenStyle.DashLine)
+        orange = QPen(FLOOR_GHOST if ghost else QColor(230, 120, 20), 1.6, Qt.PenStyle.DashLine)
         for kind, segs in self._painted_plan_lines(clipped):
             if dormer and kind in ("eave", "end0", "end1"):
                 continue                # a dormer's eaves are drawn explicitly
@@ -2434,18 +2560,23 @@ class RoofItem(QGraphicsItem):
                     QPointF(a.x() + ox, a.y() + oy), QPointF(b.x() + ox, b.y() + oy),
                     QPointF(b.x() - ox, b.y() - oy), QPointF(a.x() - ox, a.y() - oy)]))
             band.setFillRule(Qt.FillRule.WindingFill)
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QBrush(QColor(60, 62, 68)))     # exterior-wall fill
-            painter.drawPath(band)
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.setPen(QPen(QColor(25, 25, 25), 0))      # exterior-wall edge
-            painter.drawPath(band)
+            if ghost:                                        # a reference outline
+                painter.setPen(QPen(FLOOR_GHOST, 1.0, Qt.PenStyle.SolidLine))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawPath(band)
+            else:
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QBrush(QColor(60, 62, 68)))     # exterior-wall fill
+                painter.drawPath(band)
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.setPen(QPen(QColor(25, 25, 25), 0))      # exterior-wall edge
+                painter.drawPath(band)
             # Phase C (0291): the dormer's OWN face windows as a READ-ONLY
             # SHADOW on the face band -- a projection of `self.openings`,
             # editable only in the dormer's End-On dialog. A ghosted blue so it
             # reads as "a window here, not yours to drag"; the floor's own
             # storey windows (wall openings) are untouched and stay normal.
-            spans = self.dormer_face_window_spans()
+            spans = self.dormer_face_window_spans() if not ghost else []
             if spans:
                 glass = QColor(37, 99, 235)                  # read-only blue
                 fill = QColor(glass)
@@ -2884,9 +3015,26 @@ class RoofEndMarkerItem(QGraphicsItem):
         # dialog straight.
         roof = self.roof
         menu = QMenu()
+        move_actions = {}
         if roof.is_dormer():
             a_edit = menu.addAction("Edit dormer…")
             a_del = menu.addAction("Delete dormer")
+            # P3 (0295 §1, 0296 §1): move the dormer between its two legal
+            # levels -- the host's and the one directly above. Only EXISTING
+            # levels; on a one-layer plan nothing to move to, so disabled with
+            # the note (0296 §1). The current level is ticked.
+            legal = legal_dormer_levels(roof)
+            sub = menu.addMenu("Move to level")
+            if len(legal) <= 1:
+                sub.setEnabled(False)
+                sub.setTitle(f"Move to level (add a level above '{roof.floor}' first)")
+            else:
+                for lv in legal:
+                    a = sub.addAction(lv)
+                    a.setCheckable(True)
+                    a.setChecked(lv == roof.floor)
+                    if lv != roof.floor:
+                        move_actions[a] = lv
         else:
             a_edit = menu.addAction("Roof parameters…")
             a_del = menu.addAction("Delete roof")
@@ -2899,6 +3047,10 @@ class RoofEndMarkerItem(QGraphicsItem):
             roof.remove_with_dormers()
         elif chosen is a_outline:
             roof.toggle_outline()
+        elif chosen in move_actions:
+            v = roof._view()
+            if v is not None:
+                v.win.move_dormer_to_level(roof, move_actions[chosen])
         e.accept()
 
     def mouseDoubleClickEvent(self, e):

@@ -442,5 +442,6 @@ this table is not a second copy of it.
 | [`0300-report.md`](./0300-report.md) | report: PR #104 merged — the floor dialog derives the base from the floor below |
 | [`0301-report.md`](./0301-report.md) | report: P2 of the 1½-storey arc — the dash and the knee line (plan), built on a branch |
 | [`0302-report.md`](./0302-report.md) | report: P3 of the 1½-storey arc — the dormer's level, datum, dialog and the four views |
+| [`0303-report.md`](./0303-report.md) | report: P1–P3 of the 1½-storey arc MERGED into `main` after check session A |
 
 <!-- PAIRS:END -->

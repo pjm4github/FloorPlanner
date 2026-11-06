@@ -1409,7 +1409,7 @@ def _hidden_overhang_pieces(geom, lifted, clip, terr, loops_of, roofclip_mod):
 
 
 def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
-                      to_top=False, level=None, gable_dir=None):
+                      to_top=False, level=None, gable_dir=None, storey_above=None):
     """The solid piece of a wall over plan quad `corners_xy` (this file's
     world frame) between `z_lo` and `z_hi`, CAPPED AT THE ROOF SURFACE
     wherever a roof on its level is lower than `z_hi` -- Patrick's own
@@ -1502,7 +1502,11 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         return not (max(cx) < bx0 or min(cx) > bx1
                     or max(cy) < by0 or min(cy) > by1)
 
-    nearby = [(geom, [c for c in cells if near(c)], dm and lid == level, lid == level)
+    # P1 (0297 §2): the climb is granted by ABSOLUTE height from any level, so
+    # `nearby` carries the roof's own dormer flag `dm` (not `dm and lid==level`)
+    # and `same` (lid==level) only as information; the climb no longer gates on
+    # it -- the storey-above bound (`above_bounds`) replaces the level test.
+    nearby = [(geom, [c for c in cells if near(c)], dm, lid == level)
               for geom, cells, dm, lid in terr]
     nearby = [(g, cs, dm, same) for g, cs, dm, same in nearby if cs]
     if not nearby:
@@ -1568,14 +1572,17 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         roof is the HOST, so the wall stopped at the host surface and the
         dormer gable above it was left open -- and `_dormer_face` yields the
         gable to `_on_a_wall` expecting this very climb. A piece inside a
-        SAME-LEVEL dormer's territory must instead climb to THAT dormer's
-        surface, closing the gable (the wall's own window stays a void, so the
-        0248 invariant holds -- no dormer face is generated). Returns the
-        covering same-level dormer whose surface is highest here, or None."""
+        dormer's territory must instead climb to THAT dormer's surface, closing
+        the gable (the wall's own window stays a void, so the 0248 invariant
+        holds -- no dormer face is generated). P1 (0297 §2): the dormer may be on
+        ANY level, not only the wall's -- an upper-floor wall climbs into a
+        dormer hosted a floor below; the storey-above bound stops it where a
+        higher storey stands. Returns the covering dormer whose surface is
+        highest here, or None."""
         c = RC._centroid(pc)
         best, best_h = None, None
-        for geom, cells, dm_same, _same in nearby:
-            if dm_same and any(RC._contains(cell, c) for cell in cells):
+        for geom, cells, dm, _same in nearby:
+            if dm and any(RC._contains(cell, c) for cell in cells):
                 h = RC.surface_height(geom, c)
                 if best_h is None or h > best_h:
                     best, best_h = geom, h
@@ -1583,27 +1590,51 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
 
     out, touched = [], False
     for pc in pieces:
-        geom, dormer, same_level = owner_of(pc)
-        # a wall piece under a same-level dormer climbs INTO the dormer, not
-        # up to the lower host it caps against (above) -- only for the pieces
-        # that climb (`to_top`); an under-sill band is unaffected
+        geom, dormer, _same = owner_of(pc)
+        # a wall piece under a dormer climbs INTO the dormer, not up to the lower
+        # host it caps against (above) -- only for the pieces that climb
+        # (`to_top`); an under-sill band is unaffected
         if to_top:
             d_over = dormer_over(pc)
             if d_over is not None:
-                geom, dormer, same_level = d_over, True, True
+                geom, dormer = d_over, True
         if geom is None:
             out.append(("flat", pc))
             continue
-        # THE CLIMB STAYS ON THE WALL'S OWN LEVEL, for a gable as for a
-        # dormer (iteration 10 of his house model, 0254-report.md): a
-        # first-floor gable wall under a SECOND-floor roof climbed through
-        # the storey above -- its header rose from the window head to the
-        # rake, through the second-floor wall and its window. The roof a
-        # wall climbs into is a roof of its own level; a roof of another
-        # level caps it like any other, where it is lower than the top.
-        climb = to_top and (dormer or (same_level and gable_wall_of(geom)))
+        # P1 (0297 §2, 0293 §2a): the climb is granted by ABSOLUTE height from
+        # whatever level the roof stands on -- a gable wall, or any wall inside a
+        # dormer's territory -- and BOUNDED at the base of the storey above
+        # wherever that storey stands over the piece (`above_bounds`): a wall of
+        # it on the line (`_on_a_wall`, reused) or a room of it over the piece.
+        # Where nothing of the storey above is there, the climb runs to the roof
+        # as before. This replaces the old same-level test, and so delivers
+        # 0254's fix (an L1 gable no longer climbs through L2 to an L2 roof) by
+        # the bound rather than by the level: L1 stops at L2's base and L2 closes
+        # the gable with its own wall and window (0290 §3 item 2, 0293 §2a).
+        climb = to_top and (dormer or gable_wall_of(geom))
         def cap_z(v, geom=geom):
             return z_base + RC.surface_height(geom, v) - WALL_CAP_BELOW_ROOF_IN
+
+        def above_bounds(sub):
+            """The base of the storey directly above, where that storey stands
+            over `sub` -- a room of it over the piece (its enclosing loops), or a
+            wall of it ALONG the piece's line (`_on_a_wall`'s predicate, on a
+            short segment through the centroid down the wall direction so the
+            test is 'along the wall', as `_on_a_wall` requires). None otherwise."""
+            if storey_above is None:
+                return None
+            ab_base, ab_walls, ab_loops = storey_above
+            c = RC._centroid(sub)
+            if any(_pip((c.x(), c.y()), loop) for loop in ab_loops):
+                return ab_base
+            if ab_walls and gable_dir is not None:
+                gx, gy = gable_dir
+                gl = math.hypot(gx, gy) or 1.0
+                ax, ay = gx / gl * 3.0, gy / gl * 3.0
+                if _on_a_wall(Pt(c.x() - ax, c.y() - ay),
+                              Pt(c.x() + ax, c.y() + ay), ab_walls, RC):
+                    return ab_base
+            return None
 
         planar = [pc]
         for pt, d in RC._cut_lines(geom):
@@ -1611,6 +1642,14 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         for sub in planar:
             hs = [cap_z(v) for v in sub]
             if climb:
+                bnd = above_bounds(sub)
+                if bnd is not None:
+                    # the storey above stands here: the wall stops at its base
+                    # (that storey's wall climbs the rest). A flat piece.
+                    if bnd > z_lo + RC.EPS:
+                        touched = True
+                        out.append(("boxto", (sub, bnd)))
+                    continue
                 # the wall climbs into the roof -- a dormer's, or the roof
                 # whose gable this wall is: its top is the roof plane
                 # wherever that is above the base
@@ -1643,6 +1682,12 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         if kind == "flat":
             world = [(v.x(), -v.y()) for v in ring]
             solid = _extrude(world, z_lo, z_hi)
+            if solid is not None:
+                parts.append(solid)
+        elif kind == "boxto":
+            sub, top_z = ring                       # P1: a flat cap at the storey-above base
+            world = [(v.x(), -v.y()) for v in sub]
+            solid = _extrude(world, z_lo, top_z)
             if solid is not None:
                 parts.append(solid)
         else:
@@ -2310,10 +2355,16 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                         (ROOFCLIP.Pt(float(a["x"]), float(a["y"])),
                          ROOFCLIP.Pt(float(b["x"]), float(b["y"])), wt))
                 opens_of = {rf.get("id"): rf.get("openings") or [] for rf in doc.get("roofs", [])}
+                # P3 (0293 §2c): the generated cheek/face yields to a house wall
+                # on its line from ANY level, not the dormer's own `level` -- a
+                # wall on any floor climbs into the dormer by absolute height (P1),
+                # so which floor it is drawn on must not change the 3D. This is
+                # what makes a promotion a byte-identical `build_model` (0293 §3).
+                all_plan_walls = [w for ws in plan_walls.values() for w in ws]
                 for rid, lid, _g, lf in every:
                     host_lf = lifted_of.get(host_of.get(rid))
                     if host_lf is not None:
-                        near = plan_walls.get(lid, [])
+                        near = all_plan_walls
                         # the face openings lift in the dormer's frame, which is
                         # its HOST's level (the dormer is anchored there)
                         ops, zb = opens_of.get(rid, []), _lift_base(rid, lid)
@@ -2349,6 +2400,37 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
 
 
     # ---- walls -----------------------------------------------------------
+    # P1 (0297 §2): per level, the storey DIRECTLY ABOVE it -- its base
+    # (absolute), its plan walls (for `_on_a_wall`) and its enclosing loops
+    # (walls + rooms, for the room-over-piece test). `_wall_under_roofs` bounds
+    # a wall's climb at that base wherever the storey above stands over it.
+    _bases = sorted({base(lid) for lid in lv})
+
+    def _storey_above(level_id):
+        here = base(level_id)
+        higher = [e for e in _bases if e > here + 1e-6]
+        if not higher:
+            return None
+        ab = higher[0]
+        ab_levels = [lid for lid in lv if abs(base(lid) - ab) < 1e-6]
+        ab_walls = []
+        for aw in walls:
+            if aw.get("level") not in ab_levels or aw.get("type") in ("beam", "partition"):
+                continue
+            try:
+                a, b = vx[aw["v1"]], vx[aw["v2"]]
+            except KeyError:
+                continue
+            awt = float(aw.get("thickness_in") or WALL_T.get(aw.get("type", "interior"), 4.5))
+            ab_walls.append((ROOFCLIP.Pt(float(a["x"]), float(a["y"])),
+                             ROOFCLIP.Pt(float(b["x"]), float(b["y"])), awt))
+        ab_loops = []
+        for lid in ab_levels:
+            ab_loops.extend(_wall_loops(walls, rooms, vx, lid))
+        return (ab, ab_walls, ab_loops)
+
+    above_cache = {lid: _storey_above(lid) for lid in lv} if ROOFCLIP is not None else {}
+
     by_type = {}
     for w in walls:
         if w.get("level") not in lv:
@@ -2442,12 +2524,14 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         # direction, in PLAN space (the y-flip undone, as the roofs are)
         gable_dir = (ux, -uy) if wtype == "exterior" else None
 
+        storey_above = above_cache.get(w["level"])
+
         def piece(corners, za, zb, to_top, terr=terr, t=t, level=w["level"],
-                  gable_dir=gable_dir):
+                  gable_dir=gable_dir, storey_above=storey_above):
             # R6.b: the territories carry ABSOLUTE surfaces, so the base
             # the cap is measured from is the building's datum, 0
             return _wall_under_roofs(corners, za, zb, terr, 0.0, ROOFCLIP, t,
-                                     to_top, level, gable_dir)
+                                     to_top, level, gable_dir, storey_above)
 
         parts, cursor = [], 0.0
         for (s0, s1, sill, head) in cuts:
@@ -2483,6 +2567,15 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     n_roof = n_overhang = 0
     if roofs:
         roof_parts = list(riser_parts)
+        # P3 (0293 §2c): a dormer's roof SECTION is anchored to the HOST's level
+        # base, not its own -- the same base the clip's `_lift_base` used -- so
+        # re-levelling the dormer does not move it (the byte-identical
+        # `build_model` promotion receipt, 0293 §3). `base(lid)` for any other roof.
+        _roof_by_id = {r.get("id"): r for r in doc.get("roofs", [])}
+
+        def _roof_z0(rf):
+            h = _roof_by_id.get(rf.get("host"))
+            return base((h or rf).get("level"))
         for rf in doc.get("roofs", []):
             rid = rf.get("id", "?")
             lid = rf.get("level")
@@ -2514,7 +2607,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 # roofs' cells meet at equal height; a JOINED end (clip.ext
                 # > 0 there) gets no end face -- it is inside the other
                 # roof; an unjoined GABLE end keeps its vertical triangle.
-                z0 = base(lid)
+                z0 = _roof_z0(rf)
                 pieces = list(clip.region.cells)
                 for pt, d in ROOFCLIP._cut_lines(geom):
                     pieces = [q for cell in pieces
@@ -2608,7 +2701,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             a1 = (p1[0] - ux * ext[0], p1[1] - uy * ext[0])
             a2 = (p2[0] + ux * ext[1], p2[1] + uy * ext[1])
 
-            z0 = base(lid)
+            z0 = _roof_z0(rf)
             ridge_z = z0 + ridge_h
             edge_z_pos = z0 + edge_h_pos
             edge_z_neg = z0 + edge_h_neg

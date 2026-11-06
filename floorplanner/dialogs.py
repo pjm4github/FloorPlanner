@@ -1276,6 +1276,7 @@ class RoofEndOnDialog(QDialog):
         super().__init__(parent)
         self.roof = roof
         self._dormer = getattr(roof, "host", None) is not None
+        self._level_combo = None          # P3: the dormer's "Edited on level" selector
         # Phase C (0291): a working copy of the dormer's own face windows,
         # edited through the list below and written back in `apply()`.
         self._face_openings = [dict(o) for o in (getattr(roof, "openings", None) or [])]
@@ -1287,9 +1288,14 @@ class RoofEndOnDialog(QDialog):
 
         lay = QVBoxLayout(self)
         self.canvas = _EndOnCanvas(self)
+        self.canvas.setMaximumHeight(200)       # a reference sketch, not the bulk
         lay.addWidget(self.canvas)
 
-        form = QFormLayout()
+        # Two columns (Patrick, 2026-11-05: "the dialog window opens across my
+        # entire screen"): heights/form/spans/overhang on the LEFT, ends/hips and
+        # the dormer's level on the RIGHT, so the box is about half as tall.
+        form = QFormLayout()              # left column
+        form_r = QFormLayout()            # right column (ends, hips, dormer level)
         self.sp_ridge = QDoubleSpinBox()
         self.sp_ridge.setRange(0.0, 600.0)
         self.sp_ridge.setSuffix(" in")
@@ -1310,7 +1316,7 @@ class RoofEndOnDialog(QDialog):
         form.addRow(self.lab_pitch, self.sp_pitch)
 
         # -- R4b: the room-top binding (0154-ruling.md sec2, item 5) --
-        self.ck_bind = QCheckBox("Bind eaves height to the room top")
+        self.ck_bind = QCheckBox("Bind eaves to the room top")
         self.ck_bind.setChecked(getattr(roof, "eaves_bind", "manual") == "room_top")
         form.addRow("", self.ck_bind)
         self.lab_bind = QLabel("")
@@ -1369,18 +1375,18 @@ class RoofEndOnDialog(QDialog):
         self.cb_end_marker = QComboBox()
         self.cb_end_marker.addItems(["Gable", "Hip"])
         self.cb_end_marker.setCurrentIndex(0 if gable[self._marker_end] else 1)
-        form.addRow("End with the marker", self.cb_end_marker)
+        form_r.addRow("End with the marker", self.cb_end_marker)
         self.cb_end_other = QComboBox()
         self.cb_end_other.addItems(["Gable", "Hip"])
         self.cb_end_other.setCurrentIndex(0 if gable[1 - self._marker_end] else 1)
-        form.addRow("Other end", self.cb_end_other)
+        form_r.addRow("Other end", self.cb_end_other)
         # -- 0258 (0248 sec2 item 6): the hip run per end. Enabled while that
         # end is a hip; seeded with the end's own run when the record says,
         # else the derived one (the mean of the spans); OK writes an end's
         # run only where it differs from the derived value, so an untouched
         # end stays derived and follows the spans.
         self.sp_run = {}
-        for end, label in ((self._marker_end, "Hip run, end with the marker"),
+        for end, label in ((self._marker_end, "Hip run, marker end"),
                            (1 - self._marker_end, "Hip run, other end")):
             sp = QDoubleSpinBox()
             sp.setRange(0.0, 1200.0)
@@ -1391,7 +1397,7 @@ class RoofEndOnDialog(QDialog):
                         else (span_l + span_r) / 2.0)
             sp.setToolTip("How far the hip runs past this ridge end; the mean "
                           "of the two spans unless set here")
-            form.addRow(label, sp)
+            form_r.addRow(label, sp)
             self.sp_run[end] = sp
         self._refresh_run_fields()
         if self._dormer:
@@ -1408,8 +1414,59 @@ class RoofEndOnDialog(QDialog):
             self.lab_dormer = QLabel("")
             self.lab_dormer.setWordWrap(True)
             self.lab_dormer.setStyleSheet("color: #b45309;")
-            form.addRow("", self.lab_dormer)
-        lay.addLayout(form)
+            form_r.addRow("", self.lab_dormer)
+            # P3 (0293 §5 P3 ii): "Pinned to" and "Edited on level". The host's
+            # level and pitch; a selector over the two legal levels that EXIST
+            # (the host's and the one above), current ticked -- OK promotes or
+            # demotes (apply()). Disabled with a note on a one-layer plan.
+            from floorplanner.roofs import legal_dormer_levels  # late: cycle guard
+            host = roof.host
+            hp = max(0.0, host.ridge_h_in - host.eaves_h_in)
+            hspan = host.span_in[0] if host.span_in[0] > 1e-6 else 1.0
+            host_pitch = math.degrees(math.atan2(hp, hspan))
+            lab_pin = QLabel(f"Host roof on level '{host.floor}' (pitch "
+                             f"{host_pitch:.1f}°); the dormer's heights are "
+                             f"measured from its base.")
+            lab_pin.setWordWrap(True)
+            lab_pin.setMaximumWidth(240)
+            lab_pin.setStyleSheet("color: #1d4ed8;")
+            form_r.addRow("Pinned to", lab_pin)
+            self._level_combo = QComboBox()
+            legal = legal_dormer_levels(roof)
+            for lv in legal:
+                self._level_combo.addItem(lv, lv)
+            if roof.floor in legal:
+                self._level_combo.setCurrentIndex(legal.index(roof.floor))
+            if len(legal) <= 1:
+                self._level_combo.setEnabled(False)
+                self._level_combo.setToolTip(
+                    f"Add a level above '{roof.floor}' to move the dormer")
+            form_r.addRow("Edited on level", self._level_combo)
+        # keep the fields narrow so two columns do not widen the box: a spin
+        # box with a 3-digit value and a suffix needs ~110px, not the ~400 it
+        # claims by default, and the wrapped notes wrap rather than stretch.
+        for sb in (self.sp_ridge, self.sp_eaves, self.sp_pitch, self.sp_span_l,
+                   self.sp_span_r, self.sp_oh_l, self.sp_oh_r,
+                   *self.sp_run.values()):
+            sb.setFixedWidth(110)
+        for cb in (self.cb_form, self.cb_end_marker, self.cb_end_other):
+            cb.setFixedWidth(190)
+        if self._level_combo is not None:
+            self._level_combo.setFixedWidth(190)
+        for lb in (getattr(self, "lab_dormer", None),
+                   getattr(self, "lab_bind", None)):
+            if lb is not None:
+                lb.setMaximumWidth(240)
+        # the two columns side by side; the trailing stretch keeps them at
+        # their natural width (left-packed) instead of spreading across the box
+        form.setFormAlignment(Qt.AlignmentFlag.AlignTop)
+        form_r.setFormAlignment(Qt.AlignmentFlag.AlignTop)
+        cols = QHBoxLayout()
+        cols.addLayout(form)
+        cols.addSpacing(24)
+        cols.addLayout(form_r)
+        cols.addStretch(1)
+        lay.addLayout(cols)
 
         # Phase C (0291): the dormer's own face windows -- a list editor,
         # only for a dormer. Its records are the single source the plan shadow
@@ -1424,6 +1481,7 @@ class RoofEndOnDialog(QDialog):
         # said, live, beside the level-relative ones that are typed.
         self.lab_level = QLabel("")
         self.lab_level.setWordWrap(True)
+        self.lab_level.setMaximumWidth(640)
         self.lab_level.setStyleSheet("color: #1d4ed8;")
         lay.addWidget(self.lab_level)
 
@@ -1436,6 +1494,7 @@ class RoofEndOnDialog(QDialog):
                       "grid lines). A hip end runs the roof past that "
                       "ridge end by the side span.")
         note.setWordWrap(True)
+        note.setMaximumWidth(640)
         note.setStyleSheet("color: #666;")
         lay.addWidget(note)
 
@@ -1553,6 +1612,7 @@ class RoofEndOnDialog(QDialog):
         box = QGroupBox("Dormer face windows")
         v = QVBoxLayout(box)
         self.lst_windows = QListWidget()
+        self.lst_windows.setMaximumHeight(96)   # a few rows, not a tall panel
         self.lst_windows.setToolTip(
             "The dormer's OWN windows, cut into its face. They show on the "
             "plan as a read-only shadow and in 3D; the storey's wall windows "
@@ -1651,8 +1711,15 @@ class RoofEndOnDialog(QDialog):
 
     # -- R6.c: the level's base, and the heights in the building ----------
     def level_base_in(self) -> float:
-        """The elevation of the base of the level this roof stands on."""
-        return float(floor_elevation(getattr(self.roof, "floor", None)))
+        """The elevation of the base the roof's heights are measured from. For a
+        DORMER that is the HOST's level (P3, 0293 §2c): `fp3d` lifts a dormer by
+        the host's base, so the dialog's absolute heights must read the host's
+        datum too -- M1 (0298 §2) measured the dialog overstating a cross-level
+        dormer's heights by the storey elevation. Any other roof: its own level."""
+        host = getattr(self.roof, "host", None)
+        floor = (host.floor if host is not None and not sip.isdeleted(host)
+                 else getattr(self.roof, "floor", None))
+        return float(floor_elevation(floor))
 
     def absolute_heights(self):
         """`(eaves, ridge)` in the building: the level's base plus the two
@@ -1661,7 +1728,18 @@ class RoofEndOnDialog(QDialog):
         return base + self.sp_eaves.value(), base + self.sp_ridge.value()
 
     def _refresh_level_note(self):
+        host = getattr(self.roof, "host", None)
         base = self.level_base_in()
+        if self._dormer and host is not None and not sip.isdeleted(host):
+            eaves, ridge = self.absolute_heights()
+            drawn = getattr(self.roof, "floor", None)
+            self.lab_level.setVisible(True)
+            self.lab_level.setText(
+                f"Drawn and edited on level '{drawn}'; pinned to the host roof on "
+                f"level '{host.floor}', whose base at {fmt_in(base)} is this "
+                f"dormer's datum. In the building the eaves stand at "
+                f"{fmt_in(eaves)} and the ridge at {fmt_in(ridge)}.")
+            return
         if abs(base) < 1e-9:
             self.lab_level.setText("")
             self.lab_level.setVisible(False)
@@ -1843,6 +1921,14 @@ class RoofEndOnDialog(QDialog):
             # the plan shadow and the 3D face both read.
             self.roof.openings = [dict(o) for o in self._face_openings]
         self.roof.rebuild()
+        # P3 (0293 §5 P3 ii): the "Edited on level" selector -- a promote/demote
+        # applied through the win, so it syncs visibility and is an undo step.
+        if self._dormer and self._level_combo is not None:
+            target = self._level_combo.currentData()
+            if target and target != self.roof.floor:
+                v = self.roof._view()
+                if v is not None:
+                    v.win.move_dormer_to_level(self.roof, target)
         return True
 
 

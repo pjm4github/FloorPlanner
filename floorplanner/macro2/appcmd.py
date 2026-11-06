@@ -31,6 +31,7 @@ COMMANDS = {
     "WINDOW": (3, 3),       # x y WWHH
     "ROOM": (3, 3),         # name x y
     "DORMER": (5, 7),       # x y width eaves ridge [dx dy]
+    "MOVEDORMER": (3, 3),   # x y level   (P3: promote/demote the dormer near x,y)
     "TEXT": (3, 3),         # x y "text"        (0270: the Annotation tool's emit)
     "LEADER": (5, 5),       # x1 y1 x2 y2 "text" (0270: the Leader tool's emit)
     "DATUM": (2, 2),        # x y               (0270: the Datum tool's emit)

@@ -112,6 +112,42 @@ def test_a_first_floor_gable_wall_stops_at_its_own_top_under_a_second_floor_roof
     assert _hits(ext, *ray(100.0, 105.0)) > 0 and _hits(ext, *ray(100.0, 125.0)) > 0
 
 
+def _two_storey_low_roof():
+    """P1 (0297 §2): the SAME two-storey body, but the gable roof is on the
+    FIRST floor and rises THROUGH the second storey (ridge at absolute 268 over
+    L1 base 0, eaves at 120 = L2's base). The front walls at y=200 on both
+    levels are its gable walls; the second-floor one has a 48x48 window at sill
+    52 (172..220 absolute)."""
+    doc = _two_storey_gable()
+    doc["roofs"] = [{"id": "rf", "level": "L1", "ridge": [[100.0, 0.0], [100.0, 200.0]],
+                     "eaves_h_in": 120.0, "ridge_h_in": 268.0, "overhang_in": [0.0, 0.0],
+                     "span_in": [100.0, 100.0], "eaves_bind": "manual",
+                     "gable": [True, True], "marker_end": 1}]
+    return doc
+
+
+def test_an_upper_wall_climbs_into_a_first_floor_roof_and_its_window_shows(fp3d):
+    """P1 (0297 §2): a roof shapes the storey it rises THROUGH. A gable roof on
+    the FIRST floor rises through the second storey; the SECOND-floor gable wall
+    climbs into it -- by ABSOLUTE height, a roof a level below -- and its window
+    shows. (The first-floor gable wall is bounded at the second storey's base;
+    the roof-on-L2 test above pins that side.)"""
+    model = fp3d.build_model(_two_storey_low_roof(), furnishings=False, floors=False)
+    assert not model.notes, model.notes
+    ext = next(m for m in model.meshes if m.name == "walls:exterior")
+    v = ext.verts
+    front = v[abs(-v[:, 1] - 200.0) < 4.0]
+    # the second-floor gable wall climbs into the L1 roof, above its own top (228)
+    assert front[:, 2].max() > 228.0 + 1.0
+    assert front[:, 2].max() == pytest.approx(268.0 - fp3d.WALL_CAP_BELOW_ROOF_IN, abs=2.0)
+
+    # its window (sill 172, head 220 absolute) is a VOID; beside it, wall
+    def ray(x, z):
+        return (x, -207.0, z), (x, -193.0, z)
+    assert _hits(ext, *ray(100.0, 196.0)) == 0
+    assert _hits(ext, *ray(60.0, 196.0)) > 0
+
+
 def test_a_single_storey_gable_wall_still_climbs_into_its_own_roof(fp3d):
     """The gable-end check plan (0223): one level, the wall climbs to the
     rake as before -- byte-identical walls with the level check in place."""

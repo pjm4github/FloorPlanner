@@ -408,6 +408,29 @@ class LevelsMixin:
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.set_floor_levels(name, *dlg.values())
 
+    def move_dormer_to_level(self, roof, name):
+        """P3 (0293 §5 P3 ii, 0295 §1, 0296 §1): promote/demote a dormer to
+        another LEGAL level -- its host's own level or the one directly above the
+        host. An edit of `level` ALONE: under the host-datum rule (0293 §2c) the
+        dormer's geometry does not move (a byte-identical `build_model`), only
+        which floor's plan shows its grips and marker. It changes the document,
+        so it is an undo step and dirty. Returns False when the move is not legal
+        (not a dormer, the same level, or a level that is not one of the two)."""
+        from floorplanner.roofs import legal_dormer_levels
+        if roof is None or sip.isdeleted(roof) or not roof.is_dormer():
+            return False
+        if name == roof.floor or name not in legal_dormer_levels(roof):
+            return False
+        roof.setSelected(False)           # not editable from the level it leaves
+        roof.floor = name
+        self._sync_floor_state()          # re-applies apply_roof_visibility
+        self._commit_if_changed()         # undo step + dirty (roof.level changed)
+        self.status(f"Dormer moved to level '{name}'.")
+        rec = getattr(self, "_recorder", None)
+        if rec is not None and hasattr(rec, "on_move_dormer"):
+            rec.on_move_dormer(roof, name)
+        return True
+
     def toggle_reference_floor(self, name):
         f = self._floor(name)
         if f is None:

@@ -497,6 +497,29 @@ class MacroRunner:
         ux, uy, _, _ = item._axis()
         return meet_along(item.host, item.p1, Pt(ux, uy), item.ridge_h_in) is not None
 
+    def _cmd_movedormer(self, toks, i):
+        """MOVEDORMER x y level (P3, 0293 §5 P3 vi): promote/demote the dormer
+        whose marker (its face point `p1`) is nearest (x, y) to another LEGAL
+        level -- the marker menu's "Move to level" and the dialog selector, made
+        replayable. The DORMER token does not carry a level (the dormer is built
+        on its host's floor); this is the token a promotion records."""
+        from floorplanner.roofs import RoofItem   # late: roofs imports walls
+        (x, y, level), i = self._take(toks, i, 3)
+        self.win._set_show_roofs(True)
+        self.win._set_edit_roofs(True)
+        pt = QPointF(self._num(x), self._num(y))
+        best, best_d = None, None
+        for it in self.win.scene.items():
+            if isinstance(it, RoofItem) and it.is_dormer():
+                d = math.hypot(it.p1.x() - pt.x(), it.p1.y() - pt.y())
+                if best_d is None or d < best_d:
+                    best, best_d = it, d
+        if best is None or best_d > 24.0:
+            raise ValueError(f"no dormer near ({x}, {y})")
+        if not self.win.move_dormer_to_level(best, str(level)):
+            raise ValueError(f"cannot move the dormer at ({x}, {y}) to level '{level}'")
+        return i
+
     def _cmd_room(self, toks, i):
         (name, x, y), i = self._take(toks, i, 3)
         res = detect_room(self.win.scene, QPointF(self._num(x), self._num(y)))
@@ -1312,6 +1335,21 @@ class MacroRecorderDialog(QDialog):
             self._v2.command("DORMER", tok.split()[1:])
             return
         self._append(tok, newline=self.nl_check.isChecked())
+
+    def on_move_dormer(self, roof, name):
+        """A dormer promoted/demoted to another level (P3): the marker's face
+        point and the target level ride in a MOVEDORMER token, so replay finds
+        the dormer there and moves it -- no dialog, no selection state."""
+        if not self._active():
+            return
+        self._end_modal_line()
+        p = roof.p1
+        args = [str(round(p.x())), str(round(p.y())), str(name)]
+        if self._v2 is not None:
+            self._v2.command("MOVEDORMER", args)
+            return
+        self._append("MOVEDORMER " + " ".join(args),
+                     newline=self.nl_check.isChecked())
 
     def on_open(self, path):
         # the file came from a modal QFileDialog the event stream cannot

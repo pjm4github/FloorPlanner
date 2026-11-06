@@ -113,11 +113,43 @@ def test_an_eaves_wall_clips_uniformly_along_its_whole_run(scene):
     assert spans == [pytest.approx((0.0, 180.0))]
 
 
-def test_a_roof_on_a_different_floor_does_not_clip(scene):
+def test_a_roof_on_another_floor_clips_by_absolute_height(scene):
+    """CHANGED ASSERTION, P2 (0297 §2, 0293 §2b): a roof clips a wall by
+    ABSOLUTE height, not floor identity -- a roof on another level that passes
+    below the wall's ceiling caps it (0293 §1 M2: an L2 wall under the L1 roof
+    used to get 0 dashes). In a BARE scene every level composes at one datum
+    (the compose's own rule -- it knows no elevations), so an 'upstairs' roof at
+    that datum clips exactly as a same-floor roof does; real elevations shift
+    each roof's ceiling by the two levels' base difference (pinned with a window
+    in `test_levels_elevation.py`). This replaces 'a different floor never clips'."""
     wall = _gable_wall(scene)
     _roof(scene, floor="upstairs")
     _room(scene)
-    assert roof_clip_spans(scene, wall) == []
+    assert roof_clip_spans(scene, wall) != []
+
+
+def test_a_room_gets_a_knee_line_where_the_roof_crosses_its_ceiling(scene):
+    """P2 (0297 §2, 0293 §2b): the KNEE LINE -- where the roof's surface drops
+    through the room's ceiling plane, inside the room outline. The roof crosses
+    the 96in ceiling PERP_THRESH off the ridge (y=100), so the line lies at
+    y = 100 +/- PERP_THRESH, one segment per slope."""
+    from floorplanner.roofs import room_ceiling_break_lines
+    room = _room(scene)
+    _roof(scene)                          # ridge 132, eaves 80, ceiling 96
+    knee = room_ceiling_break_lines(scene, room)
+    assert knee
+    ys = sorted({round(p.y(), 2) for s in knee for p in s})
+    assert ys == [pytest.approx(100.0 - PERP_THRESH, abs=0.5),
+                  pytest.approx(100.0 + PERP_THRESH, abs=0.5)]
+
+
+def test_no_knee_line_when_the_whole_roof_is_above_the_ceiling(scene):
+    """A roof whose eaves already clear the ceiling never crosses it, so there
+    is no knee line -- the full-height-ceiling case."""
+    from floorplanner.roofs import room_ceiling_break_lines
+    room = _room(scene)
+    _roof(scene, eaves_h=100.0, ridge_h=140.0)    # both above CEILING_IN
+    assert room_ceiling_break_lines(scene, room) == []
 
 
 def test_the_lower_of_two_bordering_rooms_governs(scene):

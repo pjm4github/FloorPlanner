@@ -1012,6 +1012,16 @@ def design_from_scene(source, floors=None, report=None, strict=False, ids_out=No
     # FULLY ACCUMULATED `walls` list -- so it must accumulate too, not
     # reset per floor.
     wall_of_item = {}
+    # P3 (0293 §2c): a dormer may be DRAWN on a different level from its host
+    # (its host roof stands a storey below). `_roofs_of` names a dormer's host
+    # by the id this walk minted, but only within its OWN level's roofs -- a
+    # cross-level host is on another floor's bucket, never in that pass's
+    # `by_item`, so the link is dropped and `build_model` then re-datums the
+    # dormer to its own level (it pops up a storey). These two accumulate every
+    # roof item's minted id and every record's live item ACROSS ALL LEVELS, so a
+    # final pass below can resolve a host wherever it stands.
+    roof_id_of_item = {}                   # id(live RoofItem) -> minted "rfN"
+    roof_live_of_recid = {}                # minted "rfN" -> live RoofItem
     for f in roster:                       # LEVELS OUTER -- see the module note
         lid = nid("L")
         # R6.0 (D50): the roster's own elevation and height, not literals
@@ -1082,6 +1092,8 @@ def design_from_scene(source, floors=None, report=None, strict=False, ids_out=No
         lroofs = _roofs_of(items, lid, nid, src=rfsrc)
         for rfid_, live in rfsrc.items():
             _note(rfid_, live)
+            roof_id_of_item[id(live)] = rfid_      # P3: cross-level host resolve
+            roof_live_of_recid[rfid_] = live
         # ...and the groups themselves: a membership list over what the walk
         # emitted, per the schema's "a group NEVER copies anything".
         for g in _ordered(items, GroupItem, lambda g: (id(g),)):
@@ -1101,6 +1113,21 @@ def design_from_scene(source, floors=None, report=None, strict=False, ids_out=No
         annotations += _annotations_of(items, lid, nid)
         if ids_out is not None:               # 0264: id(live) -> [document ids]
             ids_out.update(of_item)
+
+    # P3 (0293 §2c): resolve every dormer's host across ALL levels, now that
+    # each level's roofs are minted. `_roofs_of` already set a SAME-level host;
+    # this re-sets it (idempotent there) and, crucially, sets a CROSS-LEVEL host
+    # the per-level pass could not see -- so a dormer drawn a storey above its
+    # host keeps its `host` through the round trip and stays datumed to the host
+    # (no storey-high pop-up in 3D). A host no longer in the scene leaves the
+    # link as the per-level pass left it.
+    for r in roofs:
+        live = roof_live_of_recid.get(r["id"])
+        host_item = getattr(live, "host", None) if live is not None else None
+        if host_item is not None:
+            hid = roof_id_of_item.get(id(host_item))
+            if hid is not None:
+                r["host"] = hid
 
     n = rep["unwelded_ends"]
     if n and strict:
