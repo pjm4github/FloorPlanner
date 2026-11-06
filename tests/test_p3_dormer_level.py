@@ -123,3 +123,29 @@ def test_a_cross_level_dormer_keeps_its_host_through_a_scene_round_trip(fp, win,
                    for me in m.meshes if me.verts is not None and len(me.verts))
     # datumed to the host (L1 base 0), not lifted to L2's base: identical extent
     assert maxz(out) == pytest.approx(maxz(_doc()))
+
+
+def test_a_promoted_dormer_paints_its_full_outline_ghosted_on_the_host_level(fp, win):
+    """Regression (Patrick, 2026-11-05): a dormer promoted to L2 is shown
+    GHOSTED on L1 (its host's level), but `paint()` gated the whole dormer
+    branch on `not ghost`, so the ghosted copy drew only its ridge/slopes --
+    the cheek/face wall bands and the coloured eaves were MISSING. The ghosted
+    dormer must now run its full outline branch (in the ghost ink). Proven by
+    spying on `_dormer_eave_lines`, which is reached ONLY inside that branch."""
+    from PyQt6.QtCore import QRectF
+    from PyQt6.QtGui import QImage, QPainter
+
+    d = _dormer(win)                                    # drawn on L1, host rf1
+    win.move_dormer_to_level(d, "L2")
+    win.switch_floor("L1")                              # view L1: d ghosts here
+
+    calls = []
+    orig = d._dormer_eave_lines
+    d._dormer_eave_lines = lambda *a, **k: (calls.append(1), orig(*a, **k))[1]
+
+    img = QImage(240, 240, QImage.Format.Format_ARGB32)
+    img.fill(0xFFFFFFFF)
+    p = QPainter(img)
+    win.scene.render(p, QRectF(0, 0, 240, 240), d.sceneBoundingRect())
+    p.end()
+    assert calls            # the dormer's own outline branch ran while ghosted

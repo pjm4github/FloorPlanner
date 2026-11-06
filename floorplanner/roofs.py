@@ -2504,9 +2504,13 @@ class RoofItem(QGraphicsItem):
         # GREEN, its face eave ORANGE, both dashed; the ridge and slopes stay
         # brown; its three standing walls are added solid black below. Every
         # other roof (and any ghosted one) draws every line brown as before.
-        dormer = self.is_dormer() and not ghost
-        green = QPen(QColor(0, 150, 0), 1.6, Qt.PenStyle.DashLine)
-        orange = QPen(QColor(230, 120, 20), 1.6, Qt.PenStyle.DashLine)
+        # P3 (0295 §1): a dormer shown GHOSTED on its other legal level still
+        # draws its whole outline (cheeks, face, roof lines, wall bands) -- in
+        # the ghost ink -- so the reference reads as the same dormer, not a bare
+        # ridge. Only the colour changes with `ghost`; the geometry is the same.
+        dormer = self.is_dormer()
+        green = QPen(FLOOR_GHOST if ghost else QColor(0, 150, 0), 1.6, Qt.PenStyle.DashLine)
+        orange = QPen(FLOOR_GHOST if ghost else QColor(230, 120, 20), 1.6, Qt.PenStyle.DashLine)
         for kind, segs in self._painted_plan_lines(clipped):
             if dormer and kind in ("eave", "end0", "end1"):
                 continue                # a dormer's eaves are drawn explicitly
@@ -2556,18 +2560,23 @@ class RoofItem(QGraphicsItem):
                     QPointF(a.x() + ox, a.y() + oy), QPointF(b.x() + ox, b.y() + oy),
                     QPointF(b.x() - ox, b.y() - oy), QPointF(a.x() - ox, a.y() - oy)]))
             band.setFillRule(Qt.FillRule.WindingFill)
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QBrush(QColor(60, 62, 68)))     # exterior-wall fill
-            painter.drawPath(band)
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.setPen(QPen(QColor(25, 25, 25), 0))      # exterior-wall edge
-            painter.drawPath(band)
+            if ghost:                                        # a reference outline
+                painter.setPen(QPen(FLOOR_GHOST, 1.0, Qt.PenStyle.SolidLine))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawPath(band)
+            else:
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QBrush(QColor(60, 62, 68)))     # exterior-wall fill
+                painter.drawPath(band)
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.setPen(QPen(QColor(25, 25, 25), 0))      # exterior-wall edge
+                painter.drawPath(band)
             # Phase C (0291): the dormer's OWN face windows as a READ-ONLY
             # SHADOW on the face band -- a projection of `self.openings`,
             # editable only in the dormer's End-On dialog. A ghosted blue so it
             # reads as "a window here, not yours to drag"; the floor's own
             # storey windows (wall openings) are untouched and stay normal.
-            spans = self.dormer_face_window_spans()
+            spans = self.dormer_face_window_spans() if not ghost else []
             if spans:
                 glass = QColor(37, 99, 235)                  # read-only blue
                 fill = QColor(glass)
