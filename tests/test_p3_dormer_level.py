@@ -99,3 +99,27 @@ def test_promotion_leaves_build_model_byte_identical(fp3d):
     next(r for r in d2["roofs"] if r.get("host"))["level"] = "L2"
     b = verts(d2)
     assert a.shape == b.shape and (a == b).all()
+
+
+def test_a_cross_level_dormer_keeps_its_host_through_a_scene_round_trip(fp, win, fp3d):
+    """Regression (Patrick, 2026-11-05): promoting a dormer to the storey above
+    its host and serialising dropped the `host` -- `_roofs_of` names the host by
+    the id its OWN level's walk minted, but the host is a floor below, in another
+    bucket, so the per-level pass could not see it. With `host` gone, 3D re-datums
+    the dormer to its own level and it POPS UP a storey. The cross-level resolve
+    pass in `design_from_scene` keeps the link; 3D stays datumed to the host."""
+    import numpy as np
+
+    d = _dormer(win)                                    # drawn on L1, host rf1
+    win.move_dormer_to_level(d, "L2")                   # a storey above its host
+    out = win.design_document()
+    dormer = next(r for r in out["roofs"] if r.get("level") == "L2")
+    host = next(r for r in out["roofs"] if r.get("level") == "L1")
+    assert dormer.get("host") == host["id"]             # the link survived
+
+    def maxz(doc):
+        m = fp3d.build_model(doc, furnishings=False, floors=True)
+        return max(float(np.asarray(me.verts)[:, 2].max())
+                   for me in m.meshes if me.verts is not None and len(me.verts))
+    # datumed to the host (L1 base 0), not lifted to L2's base: identical extent
+    assert maxz(out) == pytest.approx(maxz(_doc()))
