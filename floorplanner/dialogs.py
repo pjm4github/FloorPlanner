@@ -1272,11 +1272,12 @@ class RoofEndOnDialog(QDialog):
 
     _FIELDS = ("pitch", "ridge_h", "eaves_h")   # order = initial recency
 
-    def __init__(self, roof: RoofItem, parent=None):
+    def __init__(self, roof: RoofItem, parent=None, select_opening=None):
         super().__init__(parent)
         self.roof = roof
         self._dormer = getattr(roof, "host", None) is not None
         self._level_combo = None          # P3: the dormer's "Edited on level" selector
+        self._select_opening = select_opening   # P5 §2: a window to pre-select
         # Phase C (0291): a working copy of the dormer's own face windows,
         # edited through the list below and written back in `apply()`.
         self._face_openings = [dict(o) for o in (getattr(roof, "openings", None) or [])]
@@ -1646,6 +1647,14 @@ class RoofEndOnDialog(QDialog):
         self.lst_windows.clear()
         for o in self._face_openings:
             self.lst_windows.addItem(self._window_label(o))
+        # P5 §2: a double-click on a plan `DormerWindowItem` opens the dialog with
+        # that window selected in the list (its elevation view's door from plan).
+        sel = getattr(self, "_select_opening", None)
+        if sel is not None:
+            for i, o in enumerate(self._face_openings):
+                if o.get("id") == sel:
+                    self.lst_windows.setCurrentRow(i)
+                    break
 
     def _add_window(self):
         dlg = _DormerWindowDialog(None, self)

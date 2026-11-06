@@ -1376,6 +1376,9 @@ class RoofItem(QGraphicsItem):
         # R4c (0154-ruling.md sec3): five grips, shown only while selected
         self.grips = [RoofGripItem(self, kind) for kind
                       in RoofGripItem.KINDS + RoofGripItem.DORMER_KINDS]
+        # P5 §2: a dormer's face windows as hit-testable plan items, kept in
+        # step with `openings` by `sync_windows()` (called from `rebuild`).
+        self.windows = []
         self.rebuild()
 
     @staticmethod
@@ -1722,6 +1725,8 @@ class RoofItem(QGraphicsItem):
             marker.sync_position()
         for g in getattr(self, "grips", ()):
             g.sync_position()
+        if hasattr(self, "windows"):          # P5 §2: keep the face windows in step
+            self.sync_windows()
         # R4d: any change to this roof's true rectangle re-clips the floor
         if self.scene() is not None and hasattr(self, "grips"):
             sync_roof_clips(self.scene(), self.floor)
@@ -2154,6 +2159,67 @@ class RoofItem(QGraphicsItem):
                         QPointF(a.x() + ux * u1, a.y() + uy * u1)))
         return out
 
+    def face_window_span(self, opening):
+        """P5 §2 (0294 §2): ONE opening's `(a_pt, b_pt)` segment along the face
+        wall in plan, or None when it has no host/face, will not parse, or lands
+        wholly off the face. The twin of `dormer_face_window_spans` for a single
+        record -- the plan `DormerWindowItem` reads it per window."""
+        host = self.host
+        if host is None or sip.isdeleted(host):
+            return None
+        lines = self._dormer_wall_lines()
+        if not lines:
+            return None
+        a, b = lines[0]
+        dx, dy = b.x() - a.x(), b.y() - a.y()
+        length = math.hypot(dx, dy)
+        if length < _CLIP_EPS_IN:
+            return None
+        ux, uy = dx / length, dy / length
+        try:
+            w, _h = parse_wwhh(opening["code"])
+        except (KeyError, ValueError, TypeError):
+            return None
+        anchor = opening.get("anchor", {}) or {}
+        frm = anchor.get("from", "v1")
+        off = float(anchor.get("offset_in", 0.0))
+        if frm == "v2":
+            u0 = length - off - w
+        elif frm == "center":
+            u0 = length / 2.0 + off - w / 2.0
+        else:
+            u0 = off
+        u1 = u0 + w
+        u0, u1 = max(0.0, u0), min(length, u1)
+        if u1 - u0 <= 1e-6:
+            return None
+        return (QPointF(a.x() + ux * u0, a.y() + uy * u0),
+                QPointF(a.x() + ux * u1, a.y() + uy * u1))
+
+    def sync_windows(self):
+        """P5 §2: reconcile the dormer's `DormerWindowItem` children with its
+        `openings` -- one hit-testable band per face window whose span is valid.
+        Called from `rebuild()`, so the End-On dialog's `apply()` (which sets
+        `openings` then rebuilds) refreshes them. A no-op for a non-dormer."""
+        want = {}
+        if self.is_dormer():
+            for o in (getattr(self, "openings", None) or []):
+                oid = o.get("id")
+                if oid is not None and self.face_window_span(o) is not None:
+                    want[oid] = o
+        have = {it.opening_id: it for it in getattr(self, "windows", [])
+                if not sip.isdeleted(it)}
+        for oid, it in have.items():
+            if oid not in want:
+                sc = self.scene()
+                if sc is not None:
+                    sc.removeItem(it)
+        self.windows = []
+        for oid in want:
+            it = have.get(oid) or DormerWindowItem(self, oid)
+            it.sync_geometry()
+            self.windows.append(it)
+
     def _valley_perp(self, host, sign, pitch):
         """The perpendicular distance from the ridge, at the FACE, where this
         side's cheek plane (sloping at `pitch` from the ridge) meets the host
@@ -2571,32 +2637,10 @@ class RoofItem(QGraphicsItem):
                 painter.setBrush(Qt.BrushStyle.NoBrush)
                 painter.setPen(QPen(QColor(25, 25, 25), 0))      # exterior-wall edge
                 painter.drawPath(band)
-            # Phase C (0291): the dormer's OWN face windows as a READ-ONLY
-            # SHADOW on the face band -- a projection of `self.openings`,
-            # editable only in the dormer's End-On dialog. A ghosted blue so it
-            # reads as "a window here, not yours to drag"; the floor's own
-            # storey windows (wall openings) are untouched and stay normal.
-            spans = self.dormer_face_window_spans() if not ghost else []
-            if spans:
-                glass = QColor(37, 99, 235)                  # read-only blue
-                fill = QColor(glass)
-                fill.setAlpha(55)
-                for a, b in spans:
-                    dx, dy = b.x() - a.x(), b.y() - a.y()
-                    ln = math.hypot(dx, dy)
-                    if ln < 1e-6:
-                        continue
-                    ox, oy = -dy / ln * half, dx / ln * half
-                    poly = QPolygonF([
-                        QPointF(a.x() + ox, a.y() + oy), QPointF(b.x() + ox, b.y() + oy),
-                        QPointF(b.x() - ox, b.y() - oy), QPointF(a.x() - ox, a.y() - oy)])
-                    painter.setPen(Qt.PenStyle.NoPen)
-                    painter.setBrush(QBrush(fill))
-                    painter.drawPolygon(poly)
-                    painter.setBrush(Qt.BrushStyle.NoBrush)
-                    painter.setPen(QPen(glass, 0, Qt.PenStyle.DashLine))
-                    painter.drawPolygon(poly)
-                    painter.drawLine(a, b)                   # the glazing line
+            # P5 §2 (0294 §2): the dormer's OWN face windows are drawn (and hit)
+            # by their `DormerWindowItem` children (`sync_windows`), a second row
+            # just inside the face -- not a read-only band painted here. The glance
+            # tells the dormer row from the storey wall's own window below it.
         if clipped and not dormer:
             seam_pen = QPen(ink, 2.0, Qt.PenStyle.SolidLine)   # a real edge
             seam_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
@@ -2627,13 +2671,15 @@ class RoofItem(QGraphicsItem):
         sc = self.scene()
         return sc.views()[0] if sc and sc.views() else None
 
-    def open_end_on_dialog(self):
+    def open_end_on_dialog(self, select_opening=None):
         """The dialog's SECOND door (0140-ruling.md sec1: "selecting any
         ridge still reaches the same dialog ... one dialog, two doors") --
         the marker's own right-click is the first. R4b: the same dialog is
-        now the parameters dialog (0154-ruling.md sec3), still one dialog."""
+        now the parameters dialog (0154-ruling.md sec3), still one dialog.
+        P5 §2: a `DormerWindowItem`'s double-click opens it with THAT window
+        (`select_opening`, an opening id) selected in the window list."""
         from floorplanner.dialogs import RoofEndOnDialog  # late: cycle guard
-        dlg = RoofEndOnDialog(self, self._view())
+        dlg = RoofEndOnDialog(self, self._view(), select_opening=select_opening)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             dlg.apply()
             v = self._view()
@@ -3061,3 +3107,235 @@ class RoofEndMarkerItem(QGraphicsItem):
         if e.button() == Qt.MouseButton.LeftButton:
             self.roof.open_end_on_dialog()
         e.accept()
+
+
+class DormerWindowItem(QGraphicsItem):
+    """P5 §2 (0294 §2): one of a dormer's OWN face windows, as a hit-testable
+    plan band -- the SECOND ROW. A Qt CHILD of its `RoofItem` (like the grips and
+    the marker), reconciled with `openings` by `RoofItem.sync_windows`. It draws a
+    band PARALLEL to the face, offset to the UP-SLOPE side (into the dormer) by
+    half the face wall's thickness plus a fixed screen gutter, so it never lies on
+    the house wall's own storey window below; two short ties say "this face". Its
+    mark is CATEGORICAL (a dashed outline with a small gable triangle at its
+    centre, in dormer blue), not a weight on the shared face line. A face on NO
+    wall (set-back) still reads as the dormer's row, just inside the face.
+
+    Drag ALONG the face moves the anchor offset (snapped, never across); the
+    width, sill, head and kind are the End-On dialog's, reached by a double-click.
+    Drawn and hittable only while the dormer's level is active and roofs are
+    editable (`_roof_hittable`); ghosted with the dormer otherwise."""
+
+    GUTTER_PX = 11.0        # screen gap from the face line to the band
+    BAND_HALF_PX = 4.0      # the band's half-thickness, view pixels
+    GLYPH_PX = 5.0          # the gable triangle's half-size, view pixels
+    HIT_PX = 7.0            # clickable half-thickness, view pixels
+
+    def __init__(self, roof, opening_id):
+        super().__init__(roof)
+        self.roof = roof
+        self.opening_id = opening_id
+        self.setZValue(WALL_Z + 1.2)        # above the roof, below the grips/marker
+        self._dragging = False
+        self._a = self._b = None            # the band ends, scene coords
+        self._fa = self._fb = None          # the face ends (for the ties)
+        self.setToolTip("Dormer face window -- drag along the face to move it; "
+                        "double-click to edit its size and sill")
+        self.sync_geometry()
+
+    def opening(self):
+        for o in (getattr(self.roof, "openings", None) or []):
+            if o.get("id") == self.opening_id:
+                return o
+        return None
+
+    def _view_scale(self) -> float:
+        sc = self.scene()
+        if sc and sc.views():
+            return max(sc.views()[0].transform().m11(), 1e-6)
+        return 1.0
+
+    def _offset_in(self) -> float:
+        return EXTERIOR_T / 2.0 + self.GUTTER_PX / self._view_scale()
+
+    def sync_geometry(self):
+        """Recompute the band from the opening's face span and the up-slope
+        offset. Leaves the ends None (and nothing drawn/hit) when the opening is
+        gone or off the face -- `sync_windows` then drops the item."""
+        self.prepareGeometryChange()
+        o = self.opening()
+        span = self.roof.face_window_span(o) if o is not None else None
+        if span is None:
+            self._a = self._b = self._fa = self._fb = None
+            return
+        fa, fb = span
+        ux, uy, _, _ = self.roof._axis()           # +u is into the dormer
+        off = self._offset_in()
+        self._fa, self._fb = fa, fb
+        self._a = QPointF(fa.x() + ux * off, fa.y() + uy * off)
+        self._b = QPointF(fb.x() + ux * off, fb.y() + uy * off)
+
+    def _band_poly(self, half) -> QPolygonF:
+        a, b = self._a, self._b
+        dx, dy = b.x() - a.x(), b.y() - a.y()
+        ln = math.hypot(dx, dy) or 1.0
+        ox, oy = -dy / ln * half, dx / ln * half     # perpendicular, scene
+        return QPolygonF([QPointF(a.x() + ox, a.y() + oy), QPointF(b.x() + ox, b.y() + oy),
+                          QPointF(b.x() - ox, b.y() - oy), QPointF(a.x() - ox, a.y() - oy)])
+
+    def boundingRect(self) -> QRectF:
+        if self._a is None:
+            return QRectF()
+        half = max(self.BAND_HALF_PX, self.HIT_PX) / self._view_scale() + self.GLYPH_PX / self._view_scale()
+        pts = [self._a, self._b, self._fa, self._fb]
+        xs = [p.x() for p in pts]
+        ys = [p.y() for p in pts]
+        return QRectF(min(xs) - half - 2, min(ys) - half - 2,
+                      max(xs) - min(xs) + 2 * half + 4, max(ys) - min(ys) + 2 * half + 4)
+
+    def shape(self) -> QPainterPath:
+        path = QPainterPath()
+        if self._a is None or not _roof_hittable(self.roof):
+            return path                              # shown, not editable
+        path.addPolygon(self._band_poly(self.HIT_PX / self._view_scale()))
+        path.closeSubpath()
+        return path
+
+    def paint(self, painter, option, widget=None):
+        if self._a is None:
+            return
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        ghost = floor_display_mode(self.roof.floor) != "active"
+        ink = FLOOR_GHOST if ghost else QColor(37, 99, 235)    # dormer blue
+        vs = self._view_scale()
+        half = self.BAND_HALF_PX / vs
+        # the two ties, face -> band (so the row is read as "this face")
+        painter.setPen(QPen(ink, 1.0, Qt.PenStyle.SolidLine))
+        painter.drawLine(self._fa, self._a)
+        painter.drawLine(self._fb, self._b)
+        # the band: a dashed outline, a faint fill
+        poly = self._band_poly(half)
+        fill = QColor(ink)
+        fill.setAlpha(45)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QBrush(fill))
+        painter.drawPolygon(poly)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(ink, 1.2, Qt.PenStyle.DashLine))
+        painter.drawPolygon(poly)
+        # the categorical mark: a small gable triangle at the band's centre
+        cx = (self._a.x() + self._b.x()) / 2.0
+        cy = (self._a.y() + self._b.y()) / 2.0
+        g = self.GLYPH_PX / vs
+        painter.setPen(QPen(ink, 1.2, Qt.PenStyle.SolidLine))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawPolygon(QPolygonF([QPointF(cx - g, cy + g * 0.7),
+                                       QPointF(cx, cy - g),
+                                       QPointF(cx + g, cy + g * 0.7)]))
+
+    # -- editing -----------------------------------------------------------
+    def mousePressEvent(self, e):
+        if e.button() == Qt.MouseButton.LeftButton and _roof_hittable(self.roof):
+            self._dragging = True
+            e.accept()
+        else:
+            super().mousePressEvent(e)
+
+    def mouseMoveEvent(self, e):
+        if not self._dragging:
+            super().mouseMoveEvent(e)
+            return
+        o = self.opening()
+        lines = self.roof._dormer_wall_lines()
+        if o is None or not lines:
+            e.accept()
+            return
+        fa, fb = lines[0]
+        dx, dy = fb.x() - fa.x(), fb.y() - fa.y()
+        length = math.hypot(dx, dy) or 1.0
+        ux, uy = dx / length, dy / length
+        try:
+            w, _h = parse_wwhh(o["code"])
+        except (KeyError, ValueError, TypeError):
+            w = 0.0
+        # project the cursor onto the face; the window CENTRES on it, snapped,
+        # its left edge clamped to the face (0294 §2: along, never across)
+        s = (e.scenePos().x() - fa.x()) * ux + (e.scenePos().y() - fa.y()) * uy
+        u0 = wall_snap_len(s - w / 2.0)
+        u0 = max(0.0, min(length - w, u0))
+        anchor = dict(o.get("anchor", {}) or {})
+        frm = anchor.get("from", "v1")
+        if frm == "v2":
+            anchor["offset_in"] = length - u0 - w
+        elif frm == "center":
+            anchor["offset_in"] = (u0 + w / 2.0) - length / 2.0
+        else:
+            anchor["offset_in"] = u0
+        o["anchor"] = anchor
+        self.roof.rebuild()                 # re-syncs this item's geometry too
+        e.accept()
+
+    def mouseReleaseEvent(self, e):
+        if self._dragging and e.button() == Qt.MouseButton.LeftButton:
+            self._dragging = False
+            v = self.roof._view()
+            if v is not None and hasattr(v, "win"):
+                v.win._commit_if_changed()  # the settled gesture is the undo step
+            e.accept()
+        else:
+            super().mouseReleaseEvent(e)
+
+    def mouseDoubleClickEvent(self, e):
+        self._dragging = False
+        if e.button() == Qt.MouseButton.LeftButton:
+            self.roof.open_end_on_dialog(select_opening=self.opening_id)
+        e.accept()
+
+    def contextMenuEvent(self, e):
+        if not _roof_hittable(self.roof):
+            return
+        menu = QMenu()
+        a_edit = menu.addAction("Edit window…")
+        a_dup = menu.addAction("Duplicate window")
+        a_del = menu.addAction("Delete window")
+        chosen = menu.exec(e.screenPos())
+        if chosen is a_edit:
+            self.roof.open_end_on_dialog(select_opening=self.opening_id)
+        elif chosen is a_dup:
+            self._duplicate()
+        elif chosen is a_del:
+            self._delete()
+        e.accept()
+
+    def _commit(self):
+        self.roof.rebuild()
+        v = self.roof._view()
+        if v is not None and hasattr(v, "win"):
+            v.win._commit_if_changed()
+
+    def _duplicate(self):
+        o = self.opening()
+        if o is None:
+            return
+        from floorplanner.dialogs import _mint_opening_id  # late: cycle guard
+        clone = dict(o)
+        clone["anchor"] = dict(o.get("anchor", {}) or {})
+        clone["id"] = _mint_opening_id()
+        # nudge it a foot along the face so the copy is visible, not stacked
+        anchor = clone["anchor"]
+        anchor["offset_in"] = float(anchor.get("offset_in", 0.0)) + 12.0
+        self.roof.openings = list(self.roof.openings) + [clone]
+        self._commit()
+
+    def _delete(self):
+        o = self.opening()
+        if o is None:
+            return
+        self.roof.openings = [x for x in self.roof.openings if x is not o]
+        self._commit()
+
+    def keyPressEvent(self, e):
+        if e.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+            self._delete()
+            e.accept()
+        else:
+            super().keyPressEvent(e)
