@@ -2196,6 +2196,25 @@ class RoofItem(QGraphicsItem):
         return (QPointF(a.x() + ux * u0, a.y() + uy * u0),
                 QPointF(a.x() + ux * u1, a.y() + uy * u1))
 
+    def dormer_sill_floor_in(self) -> float:
+        """P5 (Patrick, 2026-11-06): the floor a dormer window's sill is measured
+        FROM, as a height above the dormer's datum (its host's base). A dormer is
+        a half-storey over a room: its window sits ABOVE that room's ceiling, so
+        the sill reads from the TOP of the ceiling of the storey the dormer is
+        over -- the HOST floor's height above the datum -- not from the ground.
+        The window is clamped to `[this floor, the ridge]` (sill never below the
+        floor it is on, head never above the dormer roof line). 0 for a
+        non-dormer or when the host floor's height is unknown."""
+        host = self.host
+        if host is None or sip.isdeleted(host):
+            return 0.0
+        v = self._view()
+        win = getattr(v, "win", None) if v is not None else None
+        for f in getattr(win, "floors", []) if win is not None else ():
+            if getattr(f, "name", None) == host.floor:
+                return float(getattr(f, "height_in", 0.0))
+        return float(SETTINGS.get("ceiling_height_in", 96.0))
+
     def sync_windows(self):
         """P5 §2: reconcile the dormer's `DormerWindowItem` children with its
         `openings` -- one hit-testable band per face window whose span is valid.

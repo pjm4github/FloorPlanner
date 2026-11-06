@@ -87,3 +87,37 @@ def test_duplicate_adds_a_second_opening(fp, win):
     d.windows[0]._duplicate()
     assert len(d.openings) == 2
     assert len({o["id"] for o in d.openings}) == 2     # a fresh id, not a clash
+
+
+def test_the_sill_is_referenced_from_the_dormer_floor(fp, win):
+    """P5 (Patrick, 2026-11-06): a dormer window's sill reads from the DORMER's
+    own floor -- the top of the ceiling of the storey it sits over (the host
+    floor's height) -- not the ground. The record stores the host-datum number;
+    the dialog edits above the dormer floor (0294 §1c, a display conversion)."""
+    from floorplanner.dialogs import _DormerWindowDialog
+    d = _dormer(win, [_window("w1")])
+    win.switch_floor("L1")
+    assert d.dormer_sill_floor_in() == 96.0            # L1's height, the attic floor
+    # a window stored at sill_in 150 shows as 150-96 = 54 above the dormer floor
+    o = dict(_window("w1"))
+    o["sill_in"] = 150.0
+    dlg = _DormerWindowDialog(o, None, sill_floor_in=d.dormer_sill_floor_in(),
+                              ceiling_in=d.ridge_h_in)
+    assert dlg.sp_sill.value() == pytest.approx(54.0)
+    dlg.sp_sill.setValue(30.0)                          # 30 above the dormer floor
+    assert dlg.opening()["sill_in"] == pytest.approx(126.0)   # stored above the datum
+
+
+def test_a_window_past_the_ridge_is_refused(fp, win):
+    from floorplanner.dialogs import _DormerWindowDialog
+    d = _dormer(win, [_window("w1")])
+    win.switch_floor("L1")
+    dlg = _DormerWindowDialog(_window("w1"), None, sill_floor_in=96.0,
+                              ceiling_in=float(d.ridge_h_in))
+    dlg.ed_code.setText("3080")                        # 80" tall
+    dlg.sp_sill.setValue(dlg.sp_sill.maximum())        # as high as allowed
+    dlg.sp_sill.setValue(100.0)                        # head would pass the ridge
+    before = dlg.lab_err.text()
+    dlg.accept()                                       # refused: an error, not accept
+    assert dlg.lab_err.text() and dlg.lab_err.text() != before
+    assert "too tall" in dlg.lab_err.text().lower() or "ridge" in dlg.lab_err.text().lower()

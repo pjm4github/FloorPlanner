@@ -1170,13 +1170,21 @@ class _DormerWindowDialog(QDialog):
     consumes; the size code is validated here so a bad one never reaches the
     record (a dormer has no error channel the way a wall does)."""
 
-    def __init__(self, opening=None, parent=None):
+    def __init__(self, opening=None, parent=None, sill_floor_in=0.0, ceiling_in=None):
         super().__init__(parent)
         from floorplanner.model import DEFAULT_SILL_IN
         self.setWindowTitle("Dormer window")
         o = dict(opening or {})
         self._id = o.get("id")              # preserved on edit, minted on create
         anchor = o.get("anchor", {}) or {}
+        # P5 (Patrick, 2026-11-06): the sill is EDITED from the dormer's own
+        # floor -- the top of the ceiling of the storey it sits over -- and
+        # STORED as the host-datum number (`sill_floor_in` is that floor above
+        # the datum; a display conversion, not a second record, 0294 §1c). The
+        # window is clamped to `[floor, ridge]`: sill never below the floor it is
+        # on, head never above the dormer roof line (`ceiling_in`, the ridge).
+        self._floor_in = float(sill_floor_in)
+        self._ceiling_in = float(ceiling_in) if ceiling_in is not None else None
         form = QFormLayout(self)
         self.ed_code = QLineEdit(str(o.get("code", "3040")))
         self.ed_code.setToolTip('Width then height in inches, e.g. 4860 = 48" '
@@ -1198,13 +1206,24 @@ class _DormerWindowDialog(QDialog):
                                "from the centre, the offset of its centre.")
         form.addRow("Offset", self.sp_off)
         self.sp_sill = QDoubleSpinBox()
-        self.sp_sill.setRange(0.0, 400.0)
+        hi = (self._ceiling_in - self._floor_in) if self._ceiling_in is not None else 400.0
+        self.sp_sill.setRange(0.0, max(0.0, hi))
         self.sp_sill.setDecimals(1)
         self.sp_sill.setSuffix(" in")
-        self.sp_sill.setValue(float(o.get("sill_in", DEFAULT_SILL_IN)))
-        self.sp_sill.setToolTip("Height of the sill above this dormer's level "
-                                "base, as a wall window's sill is.")
-        form.addRow("Sill above floor", self.sp_sill)
+        # the stored sill is above the host datum; show it above the dormer floor
+        stored = float(o.get("sill_in", self._floor_in + DEFAULT_SILL_IN))
+        self.sp_sill.setValue(max(0.0, stored - self._floor_in))
+        self.sp_sill.setToolTip("Height of the sill above the DORMER's own floor "
+                                "(the top of the ceiling of the storey below). The "
+                                "window must fit under the dormer's roof line.")
+        form.addRow("Sill above dormer floor", self.sp_sill)
+        if self._ceiling_in is not None:
+            note = QLabel(f"The dormer floor is {fmt_in(self._floor_in)} above the "
+                          f"datum and the ridge is at {fmt_in(self._ceiling_in)}; the "
+                          f"window fits between -- sill 0 sits on the dormer floor.")
+            note.setWordWrap(True)
+            note.setStyleSheet("color: #666;")
+            form.addRow("", note)
         self.lab_err = QLabel("")
         self.lab_err.setStyleSheet("color: #b45309;")
         self.lab_err.setWordWrap(True)
@@ -1217,20 +1236,32 @@ class _DormerWindowDialog(QDialog):
 
     def accept(self):
         try:
-            parse_wwhh(self.ed_code.text())
+            _w, h = parse_wwhh(self.ed_code.text())
         except (ValueError, TypeError):
             self.lab_err.setText("Size must be 4 to 6 digits, width then "
                                  "height (e.g. 3040 or 4860).")
             return
+        # P5: the head may not rise above the dormer roof line (the ridge)
+        if self._ceiling_in is not None:
+            head = self._floor_in + float(self.sp_sill.value()) + h
+            if head > self._ceiling_in + 0.01:
+                room = self._ceiling_in - self._floor_in
+                self.lab_err.setText(
+                    f"The window is too tall for the dormer: its head would reach "
+                    f"{fmt_in(head - self._floor_in)} above the dormer floor, past "
+                    f"the ridge at {fmt_in(room)}. Lower the sill or the height.")
+                return
         super().accept()
 
     def opening(self):
+        # STORE the sill above the host datum (the dormer floor plus the edited
+        # height above it) -- the one record the 3D and the dialog share.
         return {"id": self._id or _mint_opening_id(),
                 "kind": "window",
                 "code": self.ed_code.text().strip(),
                 "anchor": {"from": self.cb_from.currentData(),
                            "offset_in": float(self.sp_off.value())},
-                "sill_in": float(self.sp_sill.value())}
+                "sill_in": self._floor_in + float(self.sp_sill.value())}
 
 
 class RoofEndOnDialog(QDialog):
@@ -1640,7 +1671,10 @@ class RoofEndOnDialog(QDialog):
             anchor.get("from", "v1"), "left")
         off = float(anchor.get("offset_in", 0.0))
         sill = o.get("sill_in", None)
-        tail = f", sill {fmt_in(float(sill))}" if sill is not None else ""
+        # P5: the list shows the sill above the DORMER floor, as the editor does
+        floor_in = self.roof.dormer_sill_floor_in()
+        tail = (f", sill {fmt_in(float(sill) - floor_in)} over the dormer floor"
+                if sill is not None else "")
         return f"{o.get('code', '????')}  ({end} {fmt_in(off)}{tail})"
 
     def _refill_windows(self):
@@ -1656,8 +1690,16 @@ class RoofEndOnDialog(QDialog):
                     self.lst_windows.setCurrentRow(i)
                     break
 
+    def _window_bounds(self):
+        """P5: `(dormer floor above the datum, the ridge)` -- the band the sill is
+        edited within. The ridge is the value being edited now, so the window
+        tracks a dormer the user is reshaping; the floor is the storey below's
+        ceiling top (`dormer_sill_floor_in`)."""
+        return (self.roof.dormer_sill_floor_in(), float(self.sp_ridge.value()))
+
     def _add_window(self):
-        dlg = _DormerWindowDialog(None, self)
+        floor_in, ceiling_in = self._window_bounds()
+        dlg = _DormerWindowDialog(None, self, sill_floor_in=floor_in, ceiling_in=ceiling_in)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self._face_openings.append(dlg.opening())
             self._refill_windows()
@@ -1667,7 +1709,9 @@ class RoofEndOnDialog(QDialog):
         r = self.lst_windows.currentRow()
         if not (0 <= r < len(self._face_openings)):
             return
-        dlg = _DormerWindowDialog(self._face_openings[r], self)
+        floor_in, ceiling_in = self._window_bounds()
+        dlg = _DormerWindowDialog(self._face_openings[r], self,
+                                  sill_floor_in=floor_in, ceiling_in=ceiling_in)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self._face_openings[r] = dlg.opening()
             self._refill_windows()
