@@ -69,3 +69,35 @@ def test_an_exterior_room_has_no_ceiling(fp3d):
 def test_floors_off_builds_no_ceiling(fp3d):
     model = fp3d.build_model(_doc("interior"), furnishings=False, floors=False)
     assert _mesh(model, "ceilings") is None
+
+
+def _doc_under_roof():
+    """The room of `_doc`, now under a low gable roof whose eaves dip below the
+    storey top (96). A flat ceiling at 96 would poke through the roof."""
+    doc = _doc("interior")
+    doc["roofs"] = [{
+        "id": "rf1", "level": "L1", "ridge": [[-30, 60], [150, 60]],
+        "eaves_h_in": 48.0, "ridge_h_in": 72.0, "overhang_in": [0, 0],
+        "span_in": [140, 140], "gable": [True, True], "marker_end": 1}]
+    return doc
+
+
+def test_the_ceiling_does_not_poke_through_the_roof(fp3d):
+    """Patrick, 2026-11-07: "the ceiling of a floor needs to be the lesser of the
+    roof or the ceiling height." Under a low roof the ceiling is clamped to the
+    roof underside, so no ceiling vertex rises above the roof surface over it."""
+    import floorplanner.roofclip as rc
+    doc = _doc_under_roof()
+    model = fp3d.build_model(doc, furnishings=False)
+    ceil = _mesh(model, "ceilings")
+    assert ceil is not None
+    geom = rc.RoofGeom.from_record(doc["roofs"][0], span_fallback=144.0)
+    fp = rc.footprint_polygon(geom)
+    verts = np.asarray(ceil.verts)
+    # the flat ceiling would sit at 96; the roof over the room dips well below it
+    assert float(verts[:, 2].max()) < 96.0
+    for x, y, z in verts:
+        pt = rc.Pt(float(x), -float(y))            # world -> plan
+        if rc._contains(fp, pt):
+            surf = float(rc.surface_height(geom, pt))
+            assert z <= surf + 1e-6                 # at or under the roof surface

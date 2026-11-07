@@ -2117,6 +2117,67 @@ def opening_span(anchor, width, length):
     return s0, s0 + width
 
 
+def _ceiling_pieces(tri_world, cz, lifts, RC):
+    """A room ceiling over the world-frame triangle `tri_world` (plan y already
+    flipped), clipped so its height is the LESSER of the ceiling line `cz` and
+    the underside of any roof standing over it (Patrick, 2026-11-07: a flat
+    ceiling poked through the roof). `lifts` is the lifted roof geoms (absolute
+    height); `RC` is the `roofclip` module or None.
+
+    Returns convex pieces, each a world-frame ring `[(x, y, z)]`. A triangle is
+    convex, so roofclip's convex splitters are safe on it (a whole room can be
+    non-convex -- the caller triangulates first). Each piece is split along
+    every covering roof's cut lines and its knee (where the roof underside
+    crosses `cz`), so the clamped z is planar across it and fan-triangulates."""
+    if RC is None or not lifts:
+        return [[(x, y, cz) for x, y in tri_world]]
+    cov = []
+    for lf in lifts:
+        try:
+            cov.append((lf, RC.footprint_polygon(lf)))
+        except Exception:                 # a degenerate roof: skip it
+            continue
+    if not cov:
+        return [[(x, y, cz) for x, y in tri_world]]
+
+    def under(lf, v):                     # the roof underside at a plan point
+        return float(RC.surface_height(lf, v)) - ROOF_T
+
+    pieces = [[RC.Pt(x, -y) for x, y in tri_world]]     # world -> plan (x, -y)
+    for lf, _fp in cov:
+        for p, d in RC._cut_lines(lf):
+            pieces = [q for cell in pieces
+                      for q in RC._split_by_line(cell, p, d)]
+        split = []
+        for cell in pieces:
+            try:
+                vals = [under(lf, v) - cz for v in cell]
+            except Exception:
+                split.append(cell)
+                continue
+            for signed in (vals, [-x for x in vals]):     # knee: both sides
+                kept, _ = RC._clip_by_values(cell, signed)
+                if len(kept) >= 3 and RC._area(kept) > RC.MIN_CELL_AREA:
+                    split.append(kept)
+        pieces = split
+    out = []
+    for cell in pieces:
+        ring = []
+        for v in cell:
+            z = cz
+            for lf, fp in cov:
+                if not RC._contains(fp, v):
+                    continue
+                try:
+                    z = min(z, under(lf, v))
+                except Exception:
+                    pass
+            ring.append((v.x(), -v.y(), z))                # plan -> world
+        if len(ring) >= 3:
+            out.append(ring)
+    return out
+
+
 def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 floors=True, openings=True, catalog=None, roofs=True):
     """v5 design dict -> Model.  Pure numpy; no Qt, no floorplanner import.
@@ -2155,7 +2216,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     # ---- floor slabs -----------------------------------------------------
     if floors:
         by_colour = {}
-        ceil_colour = {}
+        ceiling_jobs = []
         for r in rooms:
             if r.get("level") not in lv:
                 continue
@@ -2222,31 +2283,18 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             # P5 (Patrick, 2026-11-06: "there are no ceilings/floors over the 1st
             # floor"): an enclosed room's CEILING -- the top of its storey, which
             # over a 1-1/2 storey is the attic floor the dormer sits on. Built for
-            # an interior room only (a porch/site/concept room is open above), and
-            # RAISED by `SLAB_T` above the ceiling line so it never z-fights an
-            # upper storey's floor at the same plane: its underside is the ceiling
-            # seen from the room, its top the floor seen from the attic.
+            # an interior room only (a porch/site/concept room is open above). The
+            # geometry is stashed and built once `lifted_of` is known, below, so
+            # the ceiling can be clamped to the roof underside (Patrick,
+            # 2026-11-07: a flat ceiling poked through the roof).
             if cat == "interior" and not floating:
                 cin = r.get("ceiling_in")
                 cz = base(r["level"]) + float(cin) if cin is not None else top(r["level"])
-                cv_lo = np.array([(x, y, cz) for x, y in poly])
-                cv_hi = np.array([(x, y, cz + SLAB_T) for x, y in poly])
-                cf = []
-                for (i, j, k) in tris:
-                    cf.append([i + n, j + n, k + n])          # top: the attic floor
-                    cf.append([i, k, j])                      # bottom: the ceiling
-                for i in range(n):
-                    j = (i + 1) % n
-                    cf += [[i, j, j + n], [i, j + n, i + n]]
-                ceil_colour.setdefault(CEILING_C, []).append(
-                    (np.vstack([cv_lo, cv_hi]), np.array(cf, dtype=int)))
+                ceiling_jobs.append((poly, tris, cz))
 
         for (col, translucent), parts in by_colour.items():
             v, f = _merge(parts)
             model.meshes.append(Mesh("floors", v, f, col, translucent))
-        for col, parts in ceil_colour.items():
-            v, f = _merge(parts)
-            model.meshes.append(Mesh("ceilings", v, f, col))
 
     # ---- roof clips, FIRST -------------------------------------------------
     # Computed before the walls: the walls are capped at the roof surface
@@ -2450,6 +2498,35 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             model.info.append("roof clip unavailable (roofclip.py not "
                               "found) -- roofs drawn unclipped")
 
+    # ---- ceilings, clipped to the roof -----------------------------------
+    # Built HERE, after `lifted_of` is known: a ceiling is the LESSER of its
+    # storey's ceiling line and the underside of the roof above it (Patrick,
+    # 2026-11-07), so an attic ceiling follows the roof slope and no ceiling
+    # pokes through. Each room triangle (triangulated above -- a room may be
+    # non-convex) is clipped to the roof and fan-built into a thin slab whose
+    # underside is the ceiling and whose top is the attic floor over it.
+    if floors and ceiling_jobs:
+        lifts = list(lifted_of.values())
+        ceil_parts = []
+        for poly, tris, cz in ceiling_jobs:
+            for (i, j, k) in tris:
+                for ring in _ceiling_pieces(
+                        [poly[i], poly[j], poly[k]], cz, lifts, ROOFCLIP):
+                    m = len(ring)
+                    lo = np.array([(x, y, z) for x, y, z in ring])
+                    hi = np.array([(x, y, z + SLAB_T) for x, y, z in ring])
+                    cf = []
+                    for a in range(1, m - 1):             # fan (convex piece)
+                        cf.append([m, a + m, a + 1 + m])  # top: the attic floor
+                        cf.append([0, a + 1, a])          # bottom: the ceiling
+                    for a in range(m):                    # edge band
+                        b = (a + 1) % m
+                        cf += [[a, b, b + m], [a, b + m, a + m]]
+                    ceil_parts.append(
+                        (np.vstack([lo, hi]), np.array(cf, dtype=int)))
+        if ceil_parts:
+            v, f = _merge(ceil_parts)
+            model.meshes.append(Mesh("ceilings", v, f, CEILING_C))
 
     # ---- walls -----------------------------------------------------------
     # P1 (0297 §2): per level, the storey DIRECTLY ABOVE it -- its base
