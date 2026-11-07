@@ -249,10 +249,19 @@
         "v2":    { "$ref": "#/$defs/id" },
 
         "type": {
-          "description": "There is deliberately no `open` type: an outline edge with no wall IS the open edge. Landscape types carry no openings and no finishes. `partition` divides rooms in plan but builds no 3D volume; `beam` is a ceiling beam in 3D that does NOT divide a room (it is never a room-outline edge).",
-          "enum": ["exterior", "interior", "partition", "railing", "fence", "hedge", "retaining", "beam"]
+          "description": "There is deliberately no `open` type: an outline edge with no wall IS the open edge. Landscape types carry no openings and no finishes. `partition` divides rooms in plan but builds no 3D volume; `beam` is a ceiling beam in 3D that does NOT divide a room (it is never a room-outline edge). `dormer` (0296) is a wall MINTED from a dormer -- its face or a cheek -- on the storey ABOVE the host; it closes the attic room but is editable only from the dormer, and its vertices are derived from the dormer at every rebuild (`bound_to` names which dormer and part).",
+          "enum": ["exterior", "interior", "partition", "railing", "fence", "hedge", "retaining", "beam", "dormer"]
         },
         "thickness_in": { "description": "Override; omitted = the standard for `type`.", "type": "number", "minimum": 0 },
+        "bound_to": {
+          "description": "0296: REQUIRED when `type` is `dormer` and forbidden otherwise. Names the dormer this wall is minted from and which part of it this wall is, so a load re-binds it and the dormer re-derives its vertices.",
+          "type": "object", "additionalProperties": false,
+          "required": ["roof", "part"],
+          "properties": {
+            "roof": { "$ref": "#/$defs/id" },
+            "part": { "enum": ["face", "cheek_left", "cheek_right"] }
+          }
+        },
 
         "left": {
           "description": "Room on the LEFT of the v1->v2 direction — with x right and y down, the (dy, -dx) side, i.e. the side on your left walking v1 to v2 on screen. null = no room that side (outdoors, or a free-standing wall). MAINTAINED INDEX: must agree exactly with which rooms name this wall in their outline (invariant I6).",
@@ -277,6 +286,11 @@
               "finish_right": false
             }
           }
+        },
+        {
+          "if": { "properties": { "type": { "const": "dormer" } }, "required": ["type"] },
+          "then": { "required": ["bound_to"] },
+          "else": { "properties": { "bound_to": false } }
         }
       ]
     },
