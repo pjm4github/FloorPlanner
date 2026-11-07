@@ -74,6 +74,29 @@ def test_a_dormer_face_window_over_a_wall_changes_the_mesh(fp3d):
     assert withw != base, "the dormer face window did not cut the climbing wall (0292's 0)"
 
 
+def test_a_climb_band_header_above_the_roof_builds_nothing(fp3d):
+    """Regression (Patrick, 2026-11-07): nothing rendered in 3D -- a climb-band
+    window HEADER whose whole span lies ABOVE the roof capped nothing, so
+    `_wall_under_roofs` fell to its box fallback and extruded it to the
+    `_CLIMB_TOP_IN` sentinel (~100000); the model's z-extent exploded and the view
+    auto-fit to a speck. Such a header must build NOTHING. Driven directly: a low
+    gable roof and a gable-wall header piece carried above it with the sentinel
+    nominal top."""
+    from floorplanner import roofclip as RC
+    geom = RC.RoofGeom.from_record(
+        {"ridge": [[-100, 0], [100, 0]], "span_in": [50, 50], "overhang_in": [0, 0],
+         "ridge_h_in": 20.0, "eaves_h_in": 10.0, "gable": [True, True], "marker_end": 1})
+    lf = RC.Lifted(geom, 0.0)
+    terr = [(lf, [RC.footprint_polygon(lf)], False, "L1")]
+    quad = [(-5, -3), (5, -3), (5, 3), (-5, 3)]        # a wall over the ridge
+    z_lo = 50.0                                        # above the roof (max ~20)
+    parts = fp3d._wall_under_roofs(
+        quad, z_lo, z_lo + fp3d._CLIMB_TOP_IN, terr, 0.0, RC, 6.0,
+        to_top=True, level="L1", gable_dir=(0.0, 1.0), storey_above=None)
+    tops = [v[2] for part in parts for v in part[0]]
+    assert not tops or max(tops) < 1000.0, f"the sentinel leaked: {max(tops)}"
+
+
 def test_the_dormer_face_window_is_a_void_in_the_climbing_wall(fp3d):
     model = fp3d.build_model(_doc(dormer_window=True), furnishings=False, floors=False)
     verts, faces = _ext(model).verts, _ext(model).faces

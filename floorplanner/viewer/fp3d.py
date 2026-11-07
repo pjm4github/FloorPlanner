@@ -1689,6 +1689,14 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
                     for v in kept]
             out.append(("capped", ring))
     if not touched:
+        # P5 §3 / P4: a CLIMB-BAND HEADER (its nominal top is the `_CLIMB_TOP_IN`
+        # sentinel far above any roof) that capped NOTHING lies wholly ABOVE the
+        # roof -- there is no wall there, so it builds nothing. Without this the
+        # `_box` fallback would extrude it up to ~100000 and blow the model's
+        # z-extent (the dormer walls on the storey above hit this). A real wall
+        # piece keeps the old meaning: no roof intrudes, so the full box stands.
+        if z_hi - z_lo >= _CLIMB_TOP_IN - 1.0:
+            return []
         return [_box(corners_xy, z_lo, z_hi)]       # nothing to cap: as before
     parts = []
     for kind, ring in out:
