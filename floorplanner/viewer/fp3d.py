@@ -133,6 +133,7 @@ FLOOR_C = {                      # by room category
     "site": (0.52, 0.70, 0.42, 1.0), "concept": (0.55, 0.60, 0.85, 0.45),
 }
 FLOATING_C = (0.95, 0.72, 0.28, 1.0)     # a room that is not placed
+CEILING_C = (0.86, 0.84, 0.80, 1.0)      # a room's ceiling / the attic floor over it
 ROOF_C = (0.52, 0.30, 0.06, 1.0)         # roof-brown -- matches roofs.py's
                                           # 2D ink (QColor(133, 77, 14)), so
                                           # plan and 3D read as the same roof
@@ -2146,6 +2147,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     # ---- floor slabs -----------------------------------------------------
     if floors:
         by_colour = {}
+        ceil_colour = {}
         for r in rooms:
             if r.get("level") not in lv:
                 continue
@@ -2209,9 +2211,34 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 (np.vstack([v_lo, v_hi]), np.array(f, dtype=int)))
             n_floor += 1
 
+            # P5 (Patrick, 2026-11-06: "there are no ceilings/floors over the 1st
+            # floor"): an enclosed room's CEILING -- the top of its storey, which
+            # over a 1-1/2 storey is the attic floor the dormer sits on. Built for
+            # an interior room only (a porch/site/concept room is open above), and
+            # RAISED by `SLAB_T` above the ceiling line so it never z-fights an
+            # upper storey's floor at the same plane: its underside is the ceiling
+            # seen from the room, its top the floor seen from the attic.
+            if cat == "interior" and not floating:
+                cin = r.get("ceiling_in")
+                cz = base(r["level"]) + float(cin) if cin is not None else top(r["level"])
+                cv_lo = np.array([(x, y, cz) for x, y in poly])
+                cv_hi = np.array([(x, y, cz + SLAB_T) for x, y in poly])
+                cf = []
+                for (i, j, k) in tris:
+                    cf.append([i + n, j + n, k + n])          # top: the attic floor
+                    cf.append([i, k, j])                      # bottom: the ceiling
+                for i in range(n):
+                    j = (i + 1) % n
+                    cf += [[i, j, j + n], [i, j + n, i + n]]
+                ceil_colour.setdefault(CEILING_C, []).append(
+                    (np.vstack([cv_lo, cv_hi]), np.array(cf, dtype=int)))
+
         for (col, translucent), parts in by_colour.items():
             v, f = _merge(parts)
             model.meshes.append(Mesh("floors", v, f, col, translucent))
+        for col, parts in ceil_colour.items():
+            v, f = _merge(parts)
+            model.meshes.append(Mesh("ceilings", v, f, col))
 
     # ---- roof clips, FIRST -------------------------------------------------
     # Computed before the walls: the walls are capped at the roof surface
