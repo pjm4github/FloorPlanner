@@ -133,6 +133,7 @@ FLOOR_C = {                      # by room category
     "site": (0.52, 0.70, 0.42, 1.0), "concept": (0.55, 0.60, 0.85, 0.45),
 }
 FLOATING_C = (0.95, 0.72, 0.28, 1.0)     # a room that is not placed
+CEILING_C = (0.86, 0.84, 0.80, 1.0)      # a room's ceiling / the attic floor over it
 ROOF_C = (0.52, 0.30, 0.06, 1.0)         # roof-brown -- matches roofs.py's
                                           # 2D ink (QColor(133, 77, 14)), so
                                           # plan and 3D read as the same roof
@@ -149,6 +150,10 @@ ROOF_T = 4.0                      # roof-plane thickness, drawn below its top
 # the roof in 3D view at some angles" (two coplanar faces fighting);
 # "move the walls down just a little"
 WALL_CAP_BELOW_ROOF_IN = ROOF_T + 0.5
+# P5 §3: a nominal top for a climb-band window header -- far above any roof
+# surface, so the climb caps it at the real surface and a non-climbing cell
+# yields empty (never an inverted box). Any value above the tallest building.
+_CLIMB_TOP_IN = 100000.0
 
 
 # --------------------------------------------------------------------------
@@ -1097,7 +1102,8 @@ def _face_pieces(ring, top, base, band):
     return parts
 
 
-def _dormer_face(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.0):
+def _dormer_face(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.0,
+                 face_cuts_out=None):
     """THE DORMER'S FACE, WHEN IT STANDS ON THE ROOF (Patrick, 2026-10-11,
     on his `short-angle-roofR3.json`, the dormer set back from the eaves:
     *"the dormer ends look good when the outside wall beneath it is
@@ -1174,7 +1180,14 @@ def _dormer_face(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.
                     if not RC._contains(host_fp, mid):
                         continue                                  # nothing to stand on
                     if _on_a_wall(a, b, walls, RC):
-                        continue                                  # plan C: the wall climbs
+                        # plan C: the wall climbs. P5 §3 (0294 §3): the dormer's
+                        # face opening over this sub-segment is cut into THAT
+                        # climbing wall instead of the (absent) generated face --
+                        # record its plan segment and band (sill_z/head_z absolute)
+                        # for the wall loop. One projection, shared arithmetic.
+                        if face_cuts_out is not None and band is not None:
+                            face_cuts_out.append((a, b, band))
+                        continue
                     ring = [a, b, Pt(b.x() + ix, b.y() + iy), Pt(a.x() + ix, a.y() + iy)]
                     top = [RC.surface_height(dormer, v) - 0.5 for v in ring]
                     base = [RC.surface_height(host, v) - 1.0 for v in ring]
@@ -2134,6 +2147,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     # ---- floor slabs -----------------------------------------------------
     if floors:
         by_colour = {}
+        ceil_colour = {}
         for r in rooms:
             if r.get("level") not in lv:
                 continue
@@ -2197,9 +2211,34 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 (np.vstack([v_lo, v_hi]), np.array(f, dtype=int)))
             n_floor += 1
 
+            # P5 (Patrick, 2026-11-06: "there are no ceilings/floors over the 1st
+            # floor"): an enclosed room's CEILING -- the top of its storey, which
+            # over a 1-1/2 storey is the attic floor the dormer sits on. Built for
+            # an interior room only (a porch/site/concept room is open above), and
+            # RAISED by `SLAB_T` above the ceiling line so it never z-fights an
+            # upper storey's floor at the same plane: its underside is the ceiling
+            # seen from the room, its top the floor seen from the attic.
+            if cat == "interior" and not floating:
+                cin = r.get("ceiling_in")
+                cz = base(r["level"]) + float(cin) if cin is not None else top(r["level"])
+                cv_lo = np.array([(x, y, cz) for x, y in poly])
+                cv_hi = np.array([(x, y, cz + SLAB_T) for x, y in poly])
+                cf = []
+                for (i, j, k) in tris:
+                    cf.append([i + n, j + n, k + n])          # top: the attic floor
+                    cf.append([i, k, j])                      # bottom: the ceiling
+                for i in range(n):
+                    j = (i + 1) % n
+                    cf += [[i, j, j + n], [i, j + n, i + n]]
+                ceil_colour.setdefault(CEILING_C, []).append(
+                    (np.vstack([cv_lo, cv_hi]), np.array(cf, dtype=int)))
+
         for (col, translucent), parts in by_colour.items():
             v, f = _merge(parts)
             model.meshes.append(Mesh("floors", v, f, col, translucent))
+        for col, parts in ceil_colour.items():
+            v, f = _merge(parts)
+            model.meshes.append(Mesh("ceilings", v, f, col))
 
     # ---- roof clips, FIRST -------------------------------------------------
     # Computed before the walls: the walls are capped at the roof surface
@@ -2208,6 +2247,10 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     # prism is built. The roof section below reuses `clips`/`riser_parts`.
     clips, riser_parts, terr_all, hidden_of, lifted_of = {}, [], [], {}, {}
     cheek_parts = []
+    # P5 §3 (0294 §3): where a dormer's face yields to a climbing wall, the
+    # face openings are collected here (plan segment + band, sill_z/head_z
+    # absolute) and cut into that wall as climb-band voids in the wall loop.
+    wall_face_cuts = []
     loop_cache = {}
 
     def loops_of(level_id):
@@ -2369,7 +2412,8 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                         # its HOST's level (the dormer is anchored there)
                         ops, zb = opens_of.get(rid, []), _lift_base(rid, lid)
                         cheek_parts.extend(_dormer_cheeks(lf, host_lf, ROOFCLIP, cheek_t, near, ops, zb))
-                        cheek_parts.extend(_dormer_face(lf, host_lf, ROOFCLIP, cheek_t, near, ops, zb))
+                        cheek_parts.extend(_dormer_face(lf, host_lf, ROOFCLIP, cheek_t, near, ops, zb,
+                                                        face_cuts_out=wall_face_cuts))
             if every:
                 # 0174-report.md's own honestly-measured residual, closed
                 # here rather than in roofclip.py: the joining-end
@@ -2503,8 +2547,36 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 sill = float(o.get("sill_in", 0.0 if o.get("kind") != "window"
                                    else DEFAULT_SILL))
                 head = float(o.get("head_in", sill + oh))
-                cuts.append((s0, s1, sill, min(head, z1 - z0)))
+                cuts.append((s0, s1, sill, min(head, z1 - z0), False))
                 n_open += 1
+        # P5 §3 (0294 §3): a dormer face opening whose face yields to THIS wall
+        # (recorded in `wall_face_cuts` during the roof pass) becomes a CLIMB-BAND
+        # void -- its head is NOT clamped to the wall top and its header climbs to
+        # the dormer surface, because the band sits ABOVE the storey top. Sill and
+        # head arrive absolute (host datum); rebase to this wall's z0.
+        if wall_face_cuts:
+            wa = vx.get(w["v1"])
+            wb = vx.get(w["v2"])
+            if wa is not None and wb is not None:
+                wax, way = float(wa["x"]), float(wa["y"])
+                wdx, wdy = float(wb["x"]) - wax, float(wb["y"]) - way
+                wl = math.hypot(wdx, wdy)
+                if wl > 1e-6:
+                    wux, wuy = wdx / wl, wdy / wl
+                    for (fa, fb, band) in wall_face_cuts:
+                        sa = (fa.x() - wax) * wux + (fa.y() - way) * wuy
+                        sb = (fb.x() - wax) * wux + (fb.y() - way) * wuy
+                        pa = abs(-(fa.x() - wax) * wuy + (fa.y() - way) * wux)
+                        pb = abs(-(fb.x() - wax) * wuy + (fb.y() - way) * wux)
+                        if max(pa, pb) > t:                 # not on this wall
+                            continue
+                        c0, c1 = sorted((sa, sb))
+                        c0, c1 = max(0.0, c0), min(L, c1)
+                        if c1 - c0 <= 1e-6:
+                            continue
+                        _u0, _u1, sill_z, head_z = band
+                        cuts.append((c0, c1, sill_z - z0, head_z - z0, True))
+                        n_open += 1
         cuts.sort()
 
         # loop variables bound as defaults (the repo's idiom, cf.
@@ -2534,12 +2606,23 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                                      to_top, level, gable_dir, storey_above)
 
         parts, cursor = [], 0.0
-        for (s0, s1, sill, head) in cuts:
+        for (s0, s1, sill, head, climb_band) in cuts:
             if s0 - cursor > 1e-6:
                 parts += piece(quad(cursor, s0), z0, z1, True)     # solid pier
             if sill > 1e-6:
-                parts += piece(quad(s0, s1), z0, z0 + sill, False)  # under sill
-            if z0 + head < z1 - 1e-6:
+                # under the sill: a block to min(surface, sill) -- `to_top=False`
+                # already caps it at the roof where the roof is lower (0294 §3)
+                parts += piece(quad(s0, s1), z0, z0 + sill, False)
+            if climb_band:
+                # P5 §3: the header is ABOVE the storey top and climbs to the
+                # dormer surface. `to_top=True` caps it at the surface in the
+                # dormer's territory; the nominal top MUST stay ABOVE the base
+                # (`z0 + head`) so a cell OUTSIDE the climb (the host's own
+                # territory, where this wall does not climb) yields EMPTY -- the
+                # wall ended at the host surface below -- rather than extruding an
+                # inverted box over the void (z_lo > z_hi fills the window).
+                parts += piece(quad(s0, s1), z0 + head, z0 + head + _CLIMB_TOP_IN, True)
+            elif z0 + head < z1 - 1e-6:
                 parts += piece(quad(s0, s1), z0 + head, z1, True)  # header
             cursor = max(cursor, s1)
         if L - cursor > 1e-6:
