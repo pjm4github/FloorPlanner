@@ -1392,7 +1392,9 @@ class RoofItem(QGraphicsItem):
         # storey ABOVE the host, kept in step by `sync_dormer_walls()`.
         self._bound_walls = []
         self._syncing_walls = False
-        self.dormer_walls_on = True        # minted when the storey above exists
+        # which of the dormer's walls are minted (0296: three checkboxes, all on
+        # by default once the storey above exists); a load may narrow it
+        self.dormer_wall_parts = {"face", "cheek_left", "cheek_right"}
         self.rebuild()
 
     @staticmethod
@@ -2228,47 +2230,57 @@ class RoofItem(QGraphicsItem):
         host = self.host
         above = _level_above(host.floor) if (host is not None and not sip.isdeleted(host)) else None
         want = {}
-        if (above is not None and self.is_dormer()
-                and getattr(self, "dormer_walls_on", True)):
+        parts_on = getattr(self, "dormer_wall_parts", None)
+        if parts_on is None:
+            parts_on = {"face", "cheek_left", "cheek_right"}
+        if above is not None and self.is_dormer() and parts_on:
             lines = self._dormer_wall_lines()
             for part, line in zip(("face", "cheek_left", "cheek_right"), lines,
                                   strict=False):
+                if part not in parts_on:
+                    continue
                 a, b = line
                 if math.hypot(b.x() - a.x(), b.y() - a.y()) > _CLIP_EPS_IN:
                     want[part] = (a, b)
-        have = {getattr(w, "bound_part", None): w
-                for w in self._bound_walls if not sip.isdeleted(w)}
         sc = self.scene()
-        # ADOPT a loaded dormer wall (its `bound_to` rode in on `_v5_extra`) whose
-        # endpoints match one of my derived lines -- so a save/reload re-binds the
-        # walls to this dormer instead of leaving them orphaned beside freshly
-        # minted duplicates. Matched by geometry (each part's endpoints are unique).
-        if sc is not None and len(have) < len(want):
-            from floorplanner.walls import WallItem as _WI
-            for part, (a, b) in want.items():
-                if part in have:
+        # EVERY scene wall that belongs to this dormer, grouped by part -- walls I
+        # already bound, walls loaded with my `bound_to` (on `_v5_extra` or already
+        # a `bound_to_roof`), and unbound walls whose endpoints match a derived
+        # line. Grouping like this lets a save/reload re-adopt AND an undo restore
+        # (which can leave a restored wall beside a freshly minted one) DEDUP to
+        # one wall per part -- the "resurrected wall" P4.5's undo note warns of.
+        mine = {}                          # part -> [candidate walls]
+        my_id = getattr(self, "doc_id", None)
+        if sc is not None:
+            for w in sc.items():
+                if not (isinstance(w, WallItem) and w.wall_type == "dormer"
+                        and not sip.isdeleted(w)):
                     continue
-                for w in sc.items():
-                    if (isinstance(w, _WI) and w.wall_type == "dormer"
-                            and not sip.isdeleted(w)
-                            and getattr(w, "bound_to_roof", None) is None
-                            and _endpoints_match(w, a, b)):
-                        w.bound_to_roof = self
-                        w.bound_part = part
-                        have[part] = w
-                        break
+                part = None
+                if getattr(w, "bound_to_roof", None) is self:
+                    part = getattr(w, "bound_part", None)
+                elif getattr(w, "bound_to_roof", None) is None:
+                    bt = (getattr(w, "_v5_extra", None) or {}).get("bound_to") or {}
+                    if my_id is not None and bt.get("roof") == my_id and bt.get("part") in want:
+                        part = bt["part"]
+                    else:
+                        for p, (a, b) in want.items():
+                            if _endpoints_match(w, a, b):
+                                part = p
+                                break
+                if part is not None:
+                    mine.setdefault(part, []).append(w)
         self._syncing_walls = True
         try:
-            for part, w in have.items():
-                if part not in want and sc is not None:
-                    sc.removeItem(w)
             self._bound_walls = []
             for part, (a, b) in want.items():
-                w = have.get(part)
-                if w is None or sip.isdeleted(w):
+                cands = mine.pop(part, [])
+                w = next((c for c in cands if not sip.isdeleted(c)), None)
+                for extra in cands:        # DEDUP: one wall per part, drop the rest
+                    if extra is not w and not sip.isdeleted(extra) and sc is not None:
+                        sc.removeItem(extra)
+                if w is None:
                     w = WallItem(a, b, "dormer")
-                    w.bound_to_roof = self
-                    w.bound_part = part
                     w.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
                     if sc is not None:
                         sc.addItem(w)
@@ -2276,8 +2288,15 @@ class RoofItem(QGraphicsItem):
                     w.detach_end("p1", a)
                     w.detach_end("p2", b)
                     w.rebuild()
+                w.bound_to_roof = self
+                w.bound_part = part
                 w.floor = above            # always the storey above the host
                 self._bound_walls.append(w)
+            # parts turned OFF (not wanted) but still in the scene as mine: drop
+            for cands in mine.values():
+                for w in cands:
+                    if not sip.isdeleted(w) and sc is not None:
+                        sc.removeItem(w)
         finally:
             self._syncing_walls = False
 

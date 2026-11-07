@@ -96,3 +96,43 @@ def test_deleting_the_dormer_removes_its_walls(fp, win):
     assert len(_dormer_walls(win.scene)) == 3
     d.remove_with_dormers()
     assert _dormer_walls(win.scene) == []
+
+
+def test_a_wall_can_be_opted_out_and_the_choice_round_trips(fp, win):
+    """0296: the dialog's three checkboxes. A wall turned off is not minted, and
+    the choice survives a save/reload (written as `dormer_walls`)."""
+    import FloorPlanner as _fp
+    d = _dormer(win)
+    d.dormer_wall_parts = {"cheek_left", "cheek_right"}      # face off
+    d.rebuild()
+    assert {w.bound_part for w in _dormer_walls(win.scene)} == {"cheek_left", "cheek_right"}
+    out = win.design_document()
+    dormer_rec = next(r for r in out["roofs"] if r.get("host"))
+    assert sorted(dormer_rec["dormer_walls"]) == ["cheek_left", "cheek_right"]
+    w2 = _fp.MainWindow()
+    w2.load_data(out)
+    assert {w.bound_part for w in _dormer_walls(w2.scene)} == {"cheek_left", "cheek_right"}
+
+
+def test_all_walls_on_writes_no_dormer_walls_key(fp, win):
+    _dormer(win)                                            # default: all three on
+    out = win.design_document()
+    dormer_rec = next(r for r in out["roofs"] if r.get("host"))
+    assert "dormer_walls" not in dormer_rec                 # clean record when all on
+
+
+def test_undo_of_a_dormer_edit_does_not_duplicate_the_walls(fp):
+    """0296's undo note: a dormer edit now writes to the walls on another floor,
+    which are derived AND serialized. Undo must not leave a restored wall beside a
+    re-minted one (the "resurrected wall"). A plan with dormer walls reloads in
+    full on undo, which adopts them -- so the count stays 3."""
+    import FloorPlanner as _fp
+    win = _fp.MainWindow()
+    d = _dormer(win)
+    win._commit_if_changed()                                # baseline
+    assert len(_dormer_walls(win.scene)) == 3
+    d.ridge_h_in = 250.0
+    d.rebuild()
+    win._commit_if_changed()                                # the edit, an undo step
+    win.undo()
+    assert len(_dormer_walls(win.scene)) == 3               # not 6

@@ -968,6 +968,12 @@ def _roofs_of(items, lid, nid, src=None):
             rec["box_half_in"] = [float(bh[0]), float(bh[1])]
         if getattr(it, "openings", None):             # plan B: a dormer's face openings
             rec["openings"] = [dict(o) for o in it.openings]
+        # 0296: which of a dormer's walls are minted -- written only when NARROWED
+        # from the default (all three), so an ordinary dormer's record is clean
+        # and a load defaults to all on
+        parts = getattr(it, "dormer_wall_parts", None)
+        if parts is not None and set(parts) != {"face", "cheek_left", "cheek_right"}:
+            rec["dormer_walls"] = sorted(parts)
         if src is not None:
             src[rec["id"]] = it
         by_item[id(it)] = rec
@@ -1556,6 +1562,8 @@ def _build_roofs(scene, doc, lname, rep):
         scene.addItem(item)
         rep["roofs"] += 1
         roof_by_id[rfd.get("id")] = item
+        if rfd.get("dormer_walls") is not None:        # 0296: which walls are on
+            item.dormer_wall_parts = set(rfd["dormer_walls"])
         if rfd.get("host") is not None:
             dormer_hosts.append((item, rfd.get("id"), rfd["host"]))
     # Cross-level dormers (PR #101): a dormer's host may be on its own floor OR
@@ -1857,6 +1865,14 @@ def apply_design_difference(win, current, target) -> bool:
     difference is outside what this applies with certainty, and the caller
     must reload in full (`load_data`). Never partially done on False."""
     if not isinstance(current, dict) or not isinstance(target, dict):
+        return False
+    # 0296: a plan with DORMER WALLS reloads in FULL on undo. They are derived
+    # from the dormer and re-minted on load, so the diff path -- which rebuilds a
+    # level's wall web AND re-mints from the dormer -- would leave the restored
+    # wall beside a fresh one (P4.5's "resurrected wall"). The full reload adopts
+    # them (one per part); declining here is the discipline's "whenever unsure".
+    if any(w.get("type") == "dormer"
+           for doc in (current, target) for w in (doc.get("walls") or [])):
         return False
     for k in set(current) | set(target):
         if k in _DIFF_WEB or k in _DIFF_KINDS:

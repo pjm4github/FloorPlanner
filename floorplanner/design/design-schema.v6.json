@@ -208,6 +208,11 @@
           "description": "R2b (0140-ruling.md, the End-On marker): which `ridge` endpoint (0 or 1, index-aligned) the End-On marker sits at -- document state so it survives reload, same idea as a room label's offset. Optional: roofs written before R2b default to 1.",
           "type": "integer", "enum": [0, 1], "default": 1
         },
+        "dormer_walls": {
+          "description": "0296: which of a DORMER's three minted walls are on (the dialog's checkboxes). Written only when narrowed from the default -- omitted = all three on. A `dormer` wall record names this dormer in its `bound_to`.",
+          "type": "array", "items": { "enum": ["face", "cheek_left", "cheek_right"] },
+          "uniqueItems": true
+        },
         "openings": {
           "description": "0248-report.md sec3 plan B: the openings in a DORMER's generated face (the gable face of a gable dormer; the low front edge of a shed dormer) -- the same `opening` records a wall carries, cut into the generated face the way a wall's are cut. The face is dimensioned like a wall: `v1` is its LEFT end (the `span_in[0]` side for a gable dormer; the `ridge[0]` end of the front edge for a shed dormer), `v2` the right, `center` its middle; `sill_in`/`head_in` are heights above the HOST roof's level base -- the dormer's datum, where `fp3d` lifts the dormer (0291 §1) -- as a wall's are above its own level base. Only on a dormer (a record with `host`; the conditional below enforces it); the plan view draws them as a read-only shadow on the dormer's floor (Phase C, PR #102). Additive optional (ROADMAP R-B): no version bump.",
           "type": "array", "items": { "$ref": "#/$defs/opening" }
