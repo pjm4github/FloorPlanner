@@ -116,7 +116,7 @@ class Wall(_Node):
                         ("type", RAW), ("left", RAW), ("right", RAW),
                         ("openings", _list(Opening)), ("thickness_in", RAW),
                         ("finish_left", RAW), ("finish_right", RAW),
-                        ("name", RAW)]
+                        ("name", RAW), ("bound_to", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     v1: Any = _MISSING
@@ -129,6 +129,7 @@ class Wall(_Node):
     finish_left: Any = _MISSING
     finish_right: Any = _MISSING
     name: Any = _MISSING
+    bound_to: Any = _MISSING    # 0296: {roof, part} for a `dormer` wall
 
 
 @dataclass

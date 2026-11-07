@@ -63,6 +63,15 @@ def _roofs_editable() -> bool:
     return bool(SETTINGS.get("edit_roofs", True))
 
 
+def _endpoints_match(wall, a: QPointF, b: QPointF, tol: float = 0.5) -> bool:
+    """True when `wall`'s two ends are `a` and `b` (either order) within `tol`
+    inches -- P4's geometry match for adopting a loaded dormer wall."""
+    p1, p2 = wall.p1, wall.p2
+    def near(u, v):
+        return math.hypot(u.x() - v.x(), u.y() - v.y()) <= tol
+    return (near(p1, a) and near(p2, b)) or (near(p1, b) and near(p2, a))
+
+
 def _roof_hittable(roof) -> bool:
     """R6.c (0197-ruling.md sec5; D67's own rule: "an inactive floor may be
     drawn; it may not be hit-tested, selected, banded, or dragged"): a roof
@@ -1379,6 +1388,11 @@ class RoofItem(QGraphicsItem):
         # P5 §2: a dormer's face windows as hit-testable plan items, kept in
         # step with `openings` by `sync_windows()` (called from `rebuild`).
         self.windows = []
+        # P4 (0296): a dormer's own walls (face + two cheeks) minted on the
+        # storey ABOVE the host, kept in step by `sync_dormer_walls()`.
+        self._bound_walls = []
+        self._syncing_walls = False
+        self.dormer_walls_on = True        # minted when the storey above exists
         self.rebuild()
 
     @staticmethod
@@ -1583,7 +1597,9 @@ class RoofItem(QGraphicsItem):
         if sc is None:
             return
         for d in self.dormers():
+            d.remove_dormer_walls()           # P4: its L2 walls go with it
             sc.removeItem(d)
+        self.remove_dormer_walls()            # a dormer removed directly
         sc.removeItem(self)
 
     def toggle_outline(self):
@@ -1727,6 +1743,8 @@ class RoofItem(QGraphicsItem):
             g.sync_position()
         if hasattr(self, "windows"):          # P5 §2: keep the face windows in step
             self.sync_windows()
+        if hasattr(self, "_bound_walls") and self.scene() is not None:
+            self.sync_dormer_walls()          # P4: keep the dormer's L2 walls in step
         # R4d: any change to this roof's true rectangle re-clips the floor
         if self.scene() is not None and hasattr(self, "grips"):
             sync_roof_clips(self.scene(), self.floor)
@@ -2195,6 +2213,81 @@ class RoofItem(QGraphicsItem):
             return None
         return (QPointF(a.x() + ux * u0, a.y() + uy * u0),
                 QPointF(a.x() + ux * u1, a.y() + uy * u1))
+
+    def sync_dormer_walls(self):
+        """P4 (0296): mint/sync the dormer's own walls -- face, cheek_left,
+        cheek_right -- as real `dormer`-type `WallItem`s on the storey ABOVE the
+        host, so the L2 attic room closes against them. Their vertices are DERIVED
+        from `_dormer_wall_lines()` at every rebuild. Minted on by default once the
+        storey above exists; removed when it goes, the roof stops being a dormer,
+        or it is deleted (`remove_dormer_walls`). Read-only -- editable only from
+        the dormer. A no-op for a non-dormer."""
+        from floorplanner.walls import WallItem
+        if getattr(self, "_syncing_walls", False):
+            return
+        host = self.host
+        above = _level_above(host.floor) if (host is not None and not sip.isdeleted(host)) else None
+        want = {}
+        if (above is not None and self.is_dormer()
+                and getattr(self, "dormer_walls_on", True)):
+            lines = self._dormer_wall_lines()
+            for part, line in zip(("face", "cheek_left", "cheek_right"), lines,
+                                  strict=False):
+                a, b = line
+                if math.hypot(b.x() - a.x(), b.y() - a.y()) > _CLIP_EPS_IN:
+                    want[part] = (a, b)
+        have = {getattr(w, "bound_part", None): w
+                for w in self._bound_walls if not sip.isdeleted(w)}
+        sc = self.scene()
+        # ADOPT a loaded dormer wall (its `bound_to` rode in on `_v5_extra`) whose
+        # endpoints match one of my derived lines -- so a save/reload re-binds the
+        # walls to this dormer instead of leaving them orphaned beside freshly
+        # minted duplicates. Matched by geometry (each part's endpoints are unique).
+        if sc is not None and len(have) < len(want):
+            from floorplanner.walls import WallItem as _WI
+            for part, (a, b) in want.items():
+                if part in have:
+                    continue
+                for w in sc.items():
+                    if (isinstance(w, _WI) and w.wall_type == "dormer"
+                            and not sip.isdeleted(w)
+                            and getattr(w, "bound_to_roof", None) is None
+                            and _endpoints_match(w, a, b)):
+                        w.bound_to_roof = self
+                        w.bound_part = part
+                        have[part] = w
+                        break
+        self._syncing_walls = True
+        try:
+            for part, w in have.items():
+                if part not in want and sc is not None:
+                    sc.removeItem(w)
+            self._bound_walls = []
+            for part, (a, b) in want.items():
+                w = have.get(part)
+                if w is None or sip.isdeleted(w):
+                    w = WallItem(a, b, "dormer")
+                    w.bound_to_roof = self
+                    w.bound_part = part
+                    w.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+                    if sc is not None:
+                        sc.addItem(w)
+                else:
+                    w.detach_end("p1", a)
+                    w.detach_end("p2", b)
+                    w.rebuild()
+                w.floor = above            # always the storey above the host
+                self._bound_walls.append(w)
+        finally:
+            self._syncing_walls = False
+
+    def remove_dormer_walls(self):
+        """Drop this dormer's minted walls (used when it is deleted)."""
+        sc = self.scene()
+        for w in getattr(self, "_bound_walls", []):
+            if not sip.isdeleted(w) and sc is not None:
+                sc.removeItem(w)
+        self._bound_walls = []
 
     def dormer_sill_floor_in(self) -> float:
         """P5 (Patrick, 2026-11-06): the floor a dormer window's sill is measured
