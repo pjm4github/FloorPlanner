@@ -128,3 +128,38 @@ def test_the_gable_stays_closed_below_and_above_the_face_window(fp3d):
     assert len(col)
     assert float(col[:, 2].min()) < 10.0           # solid down to the floor
     assert float(col[:, 2].max()) > 220.0          # climbs to the dormer surface above
+
+
+def _ray_hits(model, x, z):
+    """Does a ray across the wall thickness at (x, z) meet any exterior-wall
+    triangle? (the wall's face is at y=240, world y=-240)."""
+    verts, faces = _ext(model).verts, _ext(model).faces
+    a = np.array([x, -235.0, z])
+    b = np.array([x, -245.0, z])
+    d = b - a
+    v0, v1, v2 = verts[faces[:, 0]], verts[faces[:, 1]], verts[faces[:, 2]]
+    e1, e2 = v1 - v0, v2 - v0
+    pv = np.cross(d, e2)
+    det = np.einsum("ij,ij->i", e1, pv)
+    ok = np.abs(det) > 1e-12
+    inv = np.where(ok, 1.0 / np.where(ok, det, 1.0), 0.0)
+    tv = a - v0
+    u = np.einsum("ij,ij->i", tv, pv) * inv
+    q = np.cross(tv, e1)
+    ww = np.einsum("j,ij->i", d, q) * inv
+    tt = np.einsum("ij,ij->i", e2, q) * inv
+    hit = ok & (u >= -1e-9) & (ww >= -1e-9) & (u + ww <= 1 + 1e-9) & (tt >= 0) & (tt <= 1)
+    return int(hit.sum())
+
+
+def test_the_face_window_undersill_fills_up_to_the_sill(fp3d):
+    """Regression (Patrick, 2026-11-08: the dormer window on little-dormer-test
+    "is cut out completely down to the floor"). The wall BELOW a face window can
+    sit ABOVE the host roof (the host surface at the face here is ~132, the sill
+    195); the under-sill used `to_top=False`, which capped it at the host roof
+    and left the gable open from the roof up to the sill -- a slot. It now climbs
+    the gable to the sill, so just below the sill (z=190, above the host roof) is
+    SOLID, while the window itself (z=205) stays a void."""
+    model = fp3d.build_model(_doc(dormer_window=True), furnishings=False, floors=False)
+    assert _ray_hits(model, 200.0, 190.0) > 0, "the gap between roof and sill is open"
+    assert _ray_hits(model, 200.0, 205.0) == 0, "the window is not a void"

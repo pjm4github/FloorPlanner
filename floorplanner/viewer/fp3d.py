@@ -1422,7 +1422,8 @@ def _hidden_overhang_pieces(geom, lifted, clip, terr, loops_of, roofclip_mod):
 
 
 def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
-                      to_top=False, level=None, gable_dir=None, storey_above=None):
+                      to_top=False, level=None, gable_dir=None, storey_above=None,
+                      climb_cap=None):
     """The solid piece of a wall over plan quad `corners_xy` (this file's
     world frame) between `z_lo` and `z_hi`, CAPPED AT THE ROOF SURFACE
     wherever a roof on its level is lower than `z_hi` -- Patrick's own
@@ -1628,6 +1629,10 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         def cap_z(v, geom=geom):
             return z_base + RC.surface_height(geom, v) - WALL_CAP_BELOW_ROOF_IN
 
+        def climb_top(v, cap=climb_cap):
+            tz = cap_z(v)
+            return tz if cap is None else min(tz, cap)
+
         def above_bounds(sub):
             """The base of the storey directly above, where that storey stands
             over `sub` -- a room of it over the piece (its enclosing loops), or a
@@ -1665,11 +1670,16 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
                     continue
                 # the wall climbs into the roof -- a dormer's, or the roof
                 # whose gable this wall is: its top is the roof plane
-                # wherever that is above the base
-                kept, _ = RC._clip_by_values(sub, [h - z_lo for h in hs])
+                # wherever that is above the base. `climb_cap` (P5 §3, 2026-11-08:
+                # a dormer face window sat ABOVE the host roof, so its under-sill
+                # -- built to the host roof by `to_top=False` -- left the gable
+                # open from the roof up to the sill, a slot down to the floor): the
+                # under-sill of a wall-yield face window climbs the gable too, but
+                # only to the SILL, so the wall below the window is solid.
+                kept, _ = RC._clip_by_values(sub, [climb_top(v) - z_lo for v in sub])
                 if len(kept) >= 3 and RC._area(kept) > RC.MIN_CELL_AREA:
                     touched = True
-                    out.append(("capped", [(v.x(), -v.y(), cap_z(v)) for v in kept]))
+                    out.append(("capped", [(v.x(), -v.y(), climb_top(v)) for v in kept]))
                 continue
             if min(hs) >= z_hi - RC.EPS:            # roof clear of the top
                 out.append(("flat", sub))
@@ -2683,21 +2693,30 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
 
         storey_above = above_cache.get(w["level"])
 
-        def piece(corners, za, zb, to_top, terr=terr, t=t, level=w["level"],
-                  gable_dir=gable_dir, storey_above=storey_above):
+        def piece(corners, za, zb, to_top, climb_cap=None, terr=terr, t=t,
+                  level=w["level"], gable_dir=gable_dir, storey_above=storey_above):
             # R6.b: the territories carry ABSOLUTE surfaces, so the base
             # the cap is measured from is the building's datum, 0
             return _wall_under_roofs(corners, za, zb, terr, 0.0, ROOFCLIP, t,
-                                     to_top, level, gable_dir, storey_above)
+                                     to_top, level, gable_dir, storey_above,
+                                     climb_cap=climb_cap)
 
         parts, cursor = [], 0.0
         for (s0, s1, sill, head, climb_band) in cuts:
             if s0 - cursor > 1e-6:
                 parts += piece(quad(cursor, s0), z0, z1, True)     # solid pier
             if sill > 1e-6:
-                # under the sill: a block to min(surface, sill) -- `to_top=False`
-                # already caps it at the roof where the roof is lower (0294 §3)
-                parts += piece(quad(s0, s1), z0, z0 + sill, False)
+                if climb_band:
+                    # P5 §3 (2026-11-08): the wall below a dormer FACE window is
+                    # the gable, which can sit ABOVE the host roof -- it climbs
+                    # into the dormer like the piers do, but capped at the SILL so
+                    # the window stays a hole, not a slot down to the floor.
+                    parts += piece(quad(s0, s1), z0, z0 + sill, True,
+                                   climb_cap=z0 + sill)
+                else:
+                    # under the sill: a block to min(surface, sill) -- `to_top=
+                    # False` already caps it at the roof where the roof is lower.
+                    parts += piece(quad(s0, s1), z0, z0 + sill, False)
             if climb_band:
                 # P5 §3: the header is ABOVE the storey top and climbs to the
                 # dormer surface. `to_top=True` caps it at the surface in the
