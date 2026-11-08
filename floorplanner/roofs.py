@@ -2877,6 +2877,23 @@ class RoofItem(QGraphicsItem):
             self.toggle_outline()
         e.accept()
 
+    def mouseDoubleClickEvent(self, e):
+        # A double-click on a roof's ridge/outline opens its End-On dialog --
+        # the same dialog its right-click menu and its apex grip reach (0140
+        # sec1, "selecting any ridge still reaches the same dialog ... one
+        # dialog, two doors"). This is the door a dormer REACHED BY Alt+click
+        # cycling opens through, without having to find its small apex grip
+        # (2026-11-07). Only in SELECT, and only while the roof is hittable, so
+        # the ridge tool's own double-press is untouched.
+        v = self._view()
+        tool = getattr(getattr(v, "win", None), "tool", None)
+        if (e.button() == Qt.MouseButton.LeftButton
+                and tool in (None, TOOL_SELECT) and _roof_hittable(self)):
+            self.open_end_on_dialog()
+            e.accept()
+        else:
+            super().mouseDoubleClickEvent(e)
+
 
 MIN_RIDGE_LEN_IN = 12.0     # a gable-end drag cannot shorten the ridge past this
 GRIP_END_OFFSET_IN = 18.0   # an end grip sits this far OUTSIDE its end line (clear of the marker at 1:1)

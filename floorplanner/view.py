@@ -20,6 +20,7 @@ from floorplanner.roofs import (  # R5b: the Dormer tool; R6.b: the hold
     host_roof_at, snap_to_trace, upslope_direction,
 )
 from floorplanner.items import *  # noqa: F401
+from floorplanner.items import _hit_rank  # ranked click-cycle order (not in *)
 from floorplanner.annotations import (  # 0263: the Annotation, Measure and Datum tools; 0270: Leader
     MEASURE_SNAP_IN, DatumItem, DimensionItem, LeaderItem, TextAnnotationItem, datum_on, nearest_datum,
 )
@@ -182,6 +183,12 @@ class PlanView(QGraphicsView):
         self._img_ref = None              # the ReferenceImageItem being edited
         self._calib_pts = []              # collected calibration points
         self._crop_start = None           # crop rubber-band start (scene)
+        # click-cycle (Alt+click) through items stacked under one point, so an
+        # item buried under others -- a dormer under its own minted walls, or
+        # under a raised room's walls -- can be reached and selected (2026-11-07)
+        self._cycle_vp = None             # last Alt-click viewport point
+        self._cycle_ids = None            # the stacked candidate ids there
+        self._cycle_i = 0
         # coalesce a wheel burst into one zoom/repaint -- high-res wheels and
         # trackpads emit dozens of wheelEvents per physical notch; with a full
         # viewport repaint per event a large plan stalls for seconds.
@@ -481,6 +488,77 @@ class PlanView(QGraphicsView):
             return not target._label_rect().contains(item_pt)
         return False
 
+    _CYCLE_PX = 4                     # Alt+clicks within this count as "same spot"
+
+    def _stacked_targets(self, pos):
+        """Every SELECTABLE top-level item under a viewport point, in a STABLE
+        priority order (`_hit_rank`, then identity) -- independent of z, so the
+        order a click-cycle walks does not change as lifting churns z. A child
+        (a roof grip, an opening) resolves to its top-level parent (the roof,
+        the wall), so the stack is the real objects, not their handles."""
+        seen, out = set(), []
+        for it in self.items(pos):
+            top = it
+            while top.parentItem() is not None:
+                top = top.parentItem()
+            if id(top) in seen:
+                continue
+            if not (top.flags()
+                    & QGraphicsItem.GraphicsItemFlag.ItemIsSelectable):
+                continue
+            seen.add(id(top))
+            out.append(top)
+        out.sort(key=lambda it: (_hit_rank(it), id(it)))
+        return out
+
+    def _cycle_select(self, pos):
+        """Alt+click selection cycling. The first click takes the top item; a
+        repeat click at the same point advances to the next down and LIFTS it
+        above the others there, so a buried item can be reached. Returns True
+        when it selected something (nothing selectable -> False, fall through)."""
+        cands = self._stacked_targets(pos)
+        if not cands:
+            self._cycle_vp = None
+            return False
+        ids = tuple(id(c) for c in cands)
+        repeat = (self._cycle_vp is not None and ids == self._cycle_ids
+                  and abs(pos.x() - self._cycle_vp.x()) <= self._CYCLE_PX
+                  and abs(pos.y() - self._cycle_vp.y()) <= self._CYCLE_PX)
+        self._cycle_i = (self._cycle_i + 1) % len(cands) if repeat else 0
+        self._cycle_vp, self._cycle_ids = QPoint(pos), ids
+        chosen = cands[self._cycle_i]
+        top_z = max(c.zValue() for c in cands)      # lift above the rest here
+        if chosen.zValue() <= top_z:
+            chosen.setZValue(top_z + 1.0)
+        sc = self.scene()
+        if sc is not None:
+            sc.clearSelection()
+        chosen.setSelected(True)
+        self._announce_cycle(chosen, self._cycle_i, len(cands))
+        return True
+
+    def _announce_cycle(self, item, i, n):
+        from floorplanner.roofs import RoofItem
+        hint = ""
+        if isinstance(item, RoofItem):
+            hint = (" -- double-click it or right-click for Edit dormer"
+                    if item.is_dormer()
+                    else " -- double-click it or right-click for Roof parameters")
+        self.win.status(f"Selected {self._describe(item)} ({i + 1} of {n})"
+                        f"{hint}. Alt+click again to cycle.")
+
+    def _describe(self, item):
+        from floorplanner.rooms import RoomItem
+        from floorplanner.roofs import RoofItem
+        from floorplanner.walls import WallItem
+        if isinstance(item, RoofItem):
+            return "dormer" if item.is_dormer() else "roof"
+        if isinstance(item, WallItem):
+            return f"{item.wall_type} wall"
+        if isinstance(item, RoomItem):
+            return f"room {item.name}" if getattr(item, "name", None) else "room"
+        return type(item).__name__
+
     def mousePressEvent(self, e):
         # 0279: a left button down on the plan holds the rooms for the roof
         # traces and the wall dashes until it comes up (roofs.hold_rooms)
@@ -552,6 +630,19 @@ class PlanView(QGraphicsView):
                 self._rubber_origin = pos
                 e.accept()
                 return
+            if (tool == TOOL_SELECT
+                    and e.modifiers() & Qt.KeyboardModifier.AltModifier):
+                # CLICK-CYCLE (his report 2026-11-07: a wall drawn over a dormer
+                # on L2 blocks reaching it -- a raised room's walls and the
+                # dormer's own minted walls sit above the roof's grips, which
+                # appear only once the roof is selected, so selection can never
+                # start). Alt+click selects the topmost selectable item under the
+                # point; Alt+click AGAIN at the same spot cycles to the next one
+                # down and LIFTS it, so the buried dormer can be reached and
+                # selected -- its grips then appear and its doors open it.
+                if self._cycle_select(pos):
+                    e.accept()
+                    return
             if tool == TOOL_TEXT:
                 # 0263: a text at the click; the dialog asks for it
                 text, ok = QInputDialog.getText(self, "Annotation", "Text:")

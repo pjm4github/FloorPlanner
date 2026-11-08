@@ -36,7 +36,7 @@ picked (the Room and Datum tools hand back to Select after one use).
 
 | Key | Tool | How to use it | Example |
 |---|---|---|---|
-| **S** | Select | Click an item; drag to move; drag an end-knob to stretch; **Ctrl**-drag a rubber band to add what it encloses; **Ctrl**-click toggles one item. | Press `S`, drag a sofa into the den. |
+| **S** | Select | Click an item; drag to move; drag an end-knob to stretch; **Ctrl**-drag a rubber band to add what it encloses; **Ctrl**-click toggles one item; **Alt**-click the topmost item under the cursor, **Alt**-click again at the same spot to cycle down the stack and reach one buried under others (a dormer under its own walls — then double-click its ridge or right-click ▸ Edit dormer). | Press `S`, drag a sofa into the den. |
 | **E** | Exterior wall | Press where the wall starts, drag, release. The end lands on the snap grid; **Shift** = off the grid at any angle; **Esc** cancels. An end released on another wall welds a T or L; one released a grid step short is left as a reveal. | `E`, drag from the corner to 20′ right. |
 | **I** | Interior wall | As Exterior, 4½″ thick. | `I`, drag across the house for a partition. |
 | **D** | Door | Click a wall, type the **WWHH** size code and the leaf type. | `D`, click the hall wall, `3680 RH`. |
