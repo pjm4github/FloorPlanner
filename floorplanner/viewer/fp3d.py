@@ -1657,6 +1657,28 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         planar = [pc]
         for pt, d in RC._cut_lines(geom):
             planar = [q for cell in planar for q in RC._split_by_line(cell, pt, d)]
+        # Split, too, at the edge of the storey above, so a climb piece never
+        # STRADDLES where that storey begins or ends. `above_bounds` judges a
+        # piece by its CENTROID: a header or pier that reaches a few inches past
+        # the end of the storey-above wall (at a gable, the top/bottom wall of
+        # the floor above) would then be capped at that storey's base over its
+        # whole width -- with no wall climbing the overhang -- leaving a thin
+        # vertical hole in the gable at the wall's end (Patrick, 2026-11-08: the
+        # slivers at the ends of the L2 walls). The storey boundary that crosses
+        # a gable wall is a wall of that storey running ACROSS the gable; split
+        # by its line (the ones ALONG the gable only slice the plane uselessly).
+        if climb and gable_dir is not None and storey_above is not None:
+            gx, gy = gable_dir
+            gl = math.hypot(gx, gy) or 1.0
+            for ap, aq, _at in (storey_above[1] or ()):
+                adx, ady = aq.x() - ap.x(), aq.y() - ap.y()
+                al = math.hypot(adx, ady)
+                if al <= RC.EPS:
+                    continue
+                if abs((gx * adx + gy * ady) / (gl * al)) > math.cos(math.radians(45.0)):
+                    continue                       # runs along the gable: skip
+                planar = [c for cell in planar
+                          for c in RC._split_by_line(cell, ap, Pt(adx, ady))]
         for sub in planar:
             hs = [cap_z(v) for v in sub]
             if climb:
