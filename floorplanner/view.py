@@ -488,7 +488,12 @@ class PlanView(QGraphicsView):
             return not target._label_rect().contains(item_pt)
         return False
 
-    _CYCLE_PX = 4                     # Alt+clicks within this count as "same spot"
+    _CYCLE_PX = 14                    # Alt+clicks within this count as "same spot"
+    #: forgiving on purpose: a person clicking "the same spot" twice moves the
+    #: cursor several pixels between clicks, and a radius too tight (4px was) made
+    #: every Alt+click restart at the top of the stack, so the cycle never
+    #: advanced to the item beneath -- the dormer under its wall never arrived
+    #: (his report, 2026-11-07). Matched to the roof marker's own 14px hit.
 
     def _stacked_targets(self, pos):
         """Every SELECTABLE top-level item under a viewport point, in a STABLE

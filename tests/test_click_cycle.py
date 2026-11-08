@@ -6,7 +6,7 @@ to the next one down and lifts it. A roof also opens on a plain double-click of
 its ridge -- the door a cycled-to dormer uses.
 """
 import pytest
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import QPoint, QPointF
 
 from floorplanner.config import active_floor
 from floorplanner.roofs import RoofItem
@@ -49,6 +49,33 @@ def test_alt_click_cycles_through_stacked_items(fp, win):
     assert not first.isSelected()                 # and only one is selected
     assert view._cycle_select(vp)                 # wraps back round
     assert next(it for it in (w1, w2) if it.isSelected()) is first
+
+
+def test_alt_click_cycle_tolerates_cursor_jitter(fp, win):
+    """A person clicking "the same spot" twice moves several pixels between
+    clicks (his report 2026-11-07: a 4px window made every Alt+click restart at
+    the top, so the dormer under the wall never arrived). Clicks a few pixels
+    apart over the same stack still advance the cycle."""
+    win.prepare_headless()
+    sc = win.scene
+    fl = active_floor()
+    c = sc.sceneRect().center()
+    cx, cy = c.x(), c.y()
+    # two walls on the SAME line, so a point and a nearby point share the stack
+    w1 = WallItem(QPointF(cx - 120, cy), QPointF(cx + 120, cy), "exterior")
+    w2 = WallItem(QPointF(cx - 120, cy), QPointF(cx + 120, cy), "interior")
+    for w in (w1, w2):
+        w.floor = fl
+        sc.addItem(w)
+    view = win.view
+    vp = _vp_at(view, QPointF(cx, cy))
+    view._cycle_select(vp)
+    first = next(it for it in (w1, w2) if it.isSelected())
+    # a second click a few pixels along the wall (past the old 4px window, still
+    # over the same stack) must still advance -- not restart at the top
+    view._cycle_select(QPoint(vp.x() + 7, vp.y()))
+    second = next(it for it in (w1, w2) if it.isSelected())
+    assert second is not first                            # still advanced
 
 
 def test_alt_click_reaches_a_roof_buried_under_a_lifted_wall(fp, win):
