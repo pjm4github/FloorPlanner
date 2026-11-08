@@ -454,6 +454,20 @@ def _merge_spans(spans, total):
     return merged
 
 
+def _roof_datum_floor(rf):
+    """The level whose base is a roof's height DATUM. A dormer's `floor` is only
+    its EDITING home (P3, 0295 / 0297 §2): its eaves/ridge heights are measured
+    from its HOST's level, the datum 3D and every absolute-height clip read. So a
+    dormer promoted to the storey above still draws its wall dashes and its knee
+    line from the host's base -- reading `rf.floor` would shift it a whole storey
+    and the crossing vanishes (his report, 2026-11-07: the knee line is gone on
+    L2 when the dormer is edited there). A non-dormer roof is its own floor."""
+    host = rf.host
+    if host is not None and not sip.isdeleted(host):
+        return host.floor
+    return rf.floor
+
+
 def roof_clip_spans(scene, wall):
     """The dotted-line sub-span(s) along `wall` (0145-ruling.md sec3):
     where any roof on the same floor covers it below the room's own
@@ -487,7 +501,8 @@ def roof_clip_spans(scene, wall):
     # the wall's line and thickness, every roof (its geometry, its visible
     # region and its level base) and the wall-floor's rooms -- not once per paint
     own = ((wall.p1.x(), wall.p1.y(), wall.p2.x(), wall.p2.y(), float(wall.t)),
-           tuple((rf.geometry_key(), rf._clip_region, float(floor_elevation(rf.floor)))
+           tuple((rf.geometry_key(), rf._clip_region,
+                  float(floor_elevation(_roof_datum_floor(rf))))
                  for rf in roofs))
     memo = getattr(wall, "_roof_spans_memo", None)
     if memo is not None and rooms_held(scene) and memo[0][:2] == own:
@@ -498,7 +513,7 @@ def roof_clip_spans(scene, wall):
     ceiling_in = _wall_ceiling_in(scene, wall)
     spans = []
     for rf in roofs:
-        adj = ceiling_in + wall_base - float(floor_elevation(rf.floor))
+        adj = ceiling_in + wall_base - float(floor_elevation(_roof_datum_floor(rf)))
         spans.extend(_within_territory(
             wall, rf, _clip_spans_against_one_roof(wall, rf, adj)))
     out = _merge_spans(spans, wall.length())
@@ -878,7 +893,8 @@ def room_ceiling_break_lines(scene, room):
              if isinstance(it, RoofItem) and not sip.isdeleted(it)]
     if not roofs:
         return []
-    roof_sig = tuple((rf.geometry_key(), rf._clip_region, float(floor_elevation(rf.floor)))
+    roof_sig = tuple((rf.geometry_key(), rf._clip_region,
+                      float(floor_elevation(_roof_datum_floor(rf))))
                      for rf in roofs)
     memo = getattr(room, "_knee_memo", None)
     if memo is not None and rooms_held(scene) and memo[0][0] == roof_sig:
@@ -895,7 +911,7 @@ def room_ceiling_break_lines(scene, room):
     rooms = [tr]
     out = []
     for rf in roofs:
-        h = ceiling_abs - float(floor_elevation(rf.floor))        # roof-relative height
+        h = ceiling_abs - float(floor_elevation(_roof_datum_floor(rf)))   # roof-relative height (dormer: host datum)
         join_ext = rf._clip_ext if rf.is_clipped() else (0.0, 0.0)
         region = rf._clip_region
         for p, q in _trace_to_scene(rf, _trace_lines_local(rf, h, join_ext)):
