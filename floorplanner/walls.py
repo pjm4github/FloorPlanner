@@ -1689,7 +1689,9 @@ class WallItem(QGraphicsItem):
         ghost = floor_display_mode(self.floor) != "active"
         if ghost:                            # non-active floor: flat gray, no UI
             fill, outline = FLOOR_GHOST, FLOOR_GHOST
-        elif self.wall_type == "exterior":
+        elif self.wall_type in ("exterior", "dormer"):
+            # a DORMER wall (0296) is exterior material on the storey above the
+            # host; it reads as an exterior wall, with the categorical mark below
             fill, outline = QColor(60, 62, 68), QColor(25, 25, 25)
         else:
             fill, outline = QColor(150, 152, 158), QColor(25, 25, 25)
@@ -1725,6 +1727,13 @@ class WallItem(QGraphicsItem):
             painter.setPen(QPen(outline, 0))
             painter.drawPath(self._path)
             painter.restore()
+            # 0296: a DORMER wall carries a CATEGORICAL mark (not colour alone,
+            # WA 2026-08-12) -- a dashed dormer-blue centreline down its run --
+            # so it is told apart from a drawn exterior wall and reads as "the
+            # dormer's, edited from the dormer".
+            if self.wall_type == "dormer" and not ghost:
+                painter.setPen(QPen(QColor(37, 99, 235), 0, Qt.PenStyle.DashLine))
+                painter.drawLine(self.p1, self.p2)
 
         # DECORATION ALONG THE RUN (D74) -- what says which type this is, now
         # that thickness has been ruled unable to. Drawn OUTSIDE the junction

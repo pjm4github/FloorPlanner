@@ -116,7 +116,7 @@ class Wall(_Node):
                         ("type", RAW), ("left", RAW), ("right", RAW),
                         ("openings", _list(Opening)), ("thickness_in", RAW),
                         ("finish_left", RAW), ("finish_right", RAW),
-                        ("name", RAW)]
+                        ("name", RAW), ("bound_to", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     v1: Any = _MISSING
@@ -129,6 +129,7 @@ class Wall(_Node):
     finish_left: Any = _MISSING
     finish_right: Any = _MISSING
     name: Any = _MISSING
+    bound_to: Any = _MISSING    # 0296: {roof, part} for a `dormer` wall
 
 
 @dataclass
@@ -225,7 +226,7 @@ class Roof(_Node):
                         ("marker_end", RAW), ("host", RAW), ("form", RAW),
                         ("openings", RAW), ("hip_run_in", RAW),
                         ("end_overhang_in", RAW), ("wall_span_in", RAW),
-                        ("box_half_in", RAW)]
+                        ("box_half_in", RAW), ("dormer_walls", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     ridge: Any = _MISSING
@@ -262,6 +263,8 @@ class Roof(_Node):
     # DORMER_CONROLS.md control B: the frame half-width `[left, right]` that
     # clips the roof lines. OPTIONAL, dormer only, omitted while unclipped.
     box_half_in: Any = _MISSING
+    # 0296: which of a dormer's minted walls are on. OPTIONAL, omitted = all.
+    dormer_walls: Any = _MISSING
 
 
 @dataclass

@@ -1422,7 +1422,8 @@ def _hidden_overhang_pieces(geom, lifted, clip, terr, loops_of, roofclip_mod):
 
 
 def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
-                      to_top=False, level=None, gable_dir=None, storey_above=None):
+                      to_top=False, level=None, gable_dir=None, storey_above=None,
+                      climb_cap=None):
     """The solid piece of a wall over plan quad `corners_xy` (this file's
     world frame) between `z_lo` and `z_hi`, CAPPED AT THE ROOF SURFACE
     wherever a roof on its level is lower than `z_hi` -- Patrick's own
@@ -1628,6 +1629,10 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         def cap_z(v, geom=geom):
             return z_base + RC.surface_height(geom, v) - WALL_CAP_BELOW_ROOF_IN
 
+        def climb_top(v, cap=climb_cap):
+            tz = cap_z(v)
+            return tz if cap is None else min(tz, cap)
+
         def above_bounds(sub):
             """The base of the storey directly above, where that storey stands
             over `sub` -- a room of it over the piece (its enclosing loops), or a
@@ -1652,6 +1657,28 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         planar = [pc]
         for pt, d in RC._cut_lines(geom):
             planar = [q for cell in planar for q in RC._split_by_line(cell, pt, d)]
+        # Split, too, at the edge of the storey above, so a climb piece never
+        # STRADDLES where that storey begins or ends. `above_bounds` judges a
+        # piece by its CENTROID: a header or pier that reaches a few inches past
+        # the end of the storey-above wall (at a gable, the top/bottom wall of
+        # the floor above) would then be capped at that storey's base over its
+        # whole width -- with no wall climbing the overhang -- leaving a thin
+        # vertical hole in the gable at the wall's end (Patrick, 2026-11-08: the
+        # slivers at the ends of the L2 walls). The storey boundary that crosses
+        # a gable wall is a wall of that storey running ACROSS the gable; split
+        # by its line (the ones ALONG the gable only slice the plane uselessly).
+        if climb and gable_dir is not None and storey_above is not None:
+            gx, gy = gable_dir
+            gl = math.hypot(gx, gy) or 1.0
+            for ap, aq, _at in (storey_above[1] or ()):
+                adx, ady = aq.x() - ap.x(), aq.y() - ap.y()
+                al = math.hypot(adx, ady)
+                if al <= RC.EPS:
+                    continue
+                if abs((gx * adx + gy * ady) / (gl * al)) > math.cos(math.radians(45.0)):
+                    continue                       # runs along the gable: skip
+                planar = [c for cell in planar
+                          for c in RC._split_by_line(cell, ap, Pt(adx, ady))]
         for sub in planar:
             hs = [cap_z(v) for v in sub]
             if climb:
@@ -1665,11 +1692,16 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
                     continue
                 # the wall climbs into the roof -- a dormer's, or the roof
                 # whose gable this wall is: its top is the roof plane
-                # wherever that is above the base
-                kept, _ = RC._clip_by_values(sub, [h - z_lo for h in hs])
+                # wherever that is above the base. `climb_cap` (P5 §3, 2026-11-08:
+                # a dormer face window sat ABOVE the host roof, so its under-sill
+                # -- built to the host roof by `to_top=False` -- left the gable
+                # open from the roof up to the sill, a slot down to the floor): the
+                # under-sill of a wall-yield face window climbs the gable too, but
+                # only to the SILL, so the wall below the window is solid.
+                kept, _ = RC._clip_by_values(sub, [climb_top(v) - z_lo for v in sub])
                 if len(kept) >= 3 and RC._area(kept) > RC.MIN_CELL_AREA:
                     touched = True
-                    out.append(("capped", [(v.x(), -v.y(), cap_z(v)) for v in kept]))
+                    out.append(("capped", [(v.x(), -v.y(), climb_top(v)) for v in kept]))
                 continue
             if min(hs) >= z_hi - RC.EPS:            # roof clear of the top
                 out.append(("flat", sub))
@@ -1689,6 +1721,14 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
                     for v in kept]
             out.append(("capped", ring))
     if not touched:
+        # P5 §3 / P4: a CLIMB-BAND HEADER (its nominal top is the `_CLIMB_TOP_IN`
+        # sentinel far above any roof) that capped NOTHING lies wholly ABOVE the
+        # roof -- there is no wall there, so it builds nothing. Without this the
+        # `_box` fallback would extrude it up to ~100000 and blow the model's
+        # z-extent (the dormer walls on the storey above hit this). A real wall
+        # piece keeps the old meaning: no roof intrudes, so the full box stands.
+        if z_hi - z_lo >= _CLIMB_TOP_IN - 1.0:
+            return []
         return [_box(corners_xy, z_lo, z_hi)]       # nothing to cap: as before
     parts = []
     for kind, ring in out:
@@ -2109,6 +2149,67 @@ def opening_span(anchor, width, length):
     return s0, s0 + width
 
 
+def _ceiling_pieces(tri_world, cz, lifts, RC):
+    """A room ceiling over the world-frame triangle `tri_world` (plan y already
+    flipped), clipped so its height is the LESSER of the ceiling line `cz` and
+    the underside of any roof standing over it (Patrick, 2026-11-07: a flat
+    ceiling poked through the roof). `lifts` is the lifted roof geoms (absolute
+    height); `RC` is the `roofclip` module or None.
+
+    Returns convex pieces, each a world-frame ring `[(x, y, z)]`. A triangle is
+    convex, so roofclip's convex splitters are safe on it (a whole room can be
+    non-convex -- the caller triangulates first). Each piece is split along
+    every covering roof's cut lines and its knee (where the roof underside
+    crosses `cz`), so the clamped z is planar across it and fan-triangulates."""
+    if RC is None or not lifts:
+        return [[(x, y, cz) for x, y in tri_world]]
+    cov = []
+    for lf in lifts:
+        try:
+            cov.append((lf, RC.footprint_polygon(lf)))
+        except Exception:                 # a degenerate roof: skip it
+            continue
+    if not cov:
+        return [[(x, y, cz) for x, y in tri_world]]
+
+    def under(lf, v):                     # the roof underside at a plan point
+        return float(RC.surface_height(lf, v)) - ROOF_T
+
+    pieces = [[RC.Pt(x, -y) for x, y in tri_world]]     # world -> plan (x, -y)
+    for lf, _fp in cov:
+        for p, d in RC._cut_lines(lf):
+            pieces = [q for cell in pieces
+                      for q in RC._split_by_line(cell, p, d)]
+        split = []
+        for cell in pieces:
+            try:
+                vals = [under(lf, v) - cz for v in cell]
+            except Exception:
+                split.append(cell)
+                continue
+            for signed in (vals, [-x for x in vals]):     # knee: both sides
+                kept, _ = RC._clip_by_values(cell, signed)
+                if len(kept) >= 3 and RC._area(kept) > RC.MIN_CELL_AREA:
+                    split.append(kept)
+        pieces = split
+    out = []
+    for cell in pieces:
+        ring = []
+        for v in cell:
+            z = cz
+            for lf, fp in cov:
+                if not RC._contains(fp, v):
+                    continue
+                try:
+                    z = min(z, under(lf, v))
+                except Exception:
+                    pass
+            ring.append((v.x(), -v.y(), z))                # plan -> world
+        if len(ring) >= 3:
+            out.append(ring)
+    return out
+
+
 def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 floors=True, openings=True, catalog=None, roofs=True):
     """v5 design dict -> Model.  Pure numpy; no Qt, no floorplanner import.
@@ -2147,7 +2248,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     # ---- floor slabs -----------------------------------------------------
     if floors:
         by_colour = {}
-        ceil_colour = {}
+        ceiling_jobs = []
         for r in rooms:
             if r.get("level") not in lv:
                 continue
@@ -2214,31 +2315,18 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             # P5 (Patrick, 2026-11-06: "there are no ceilings/floors over the 1st
             # floor"): an enclosed room's CEILING -- the top of its storey, which
             # over a 1-1/2 storey is the attic floor the dormer sits on. Built for
-            # an interior room only (a porch/site/concept room is open above), and
-            # RAISED by `SLAB_T` above the ceiling line so it never z-fights an
-            # upper storey's floor at the same plane: its underside is the ceiling
-            # seen from the room, its top the floor seen from the attic.
+            # an interior room only (a porch/site/concept room is open above). The
+            # geometry is stashed and built once `lifted_of` is known, below, so
+            # the ceiling can be clamped to the roof underside (Patrick,
+            # 2026-11-07: a flat ceiling poked through the roof).
             if cat == "interior" and not floating:
                 cin = r.get("ceiling_in")
                 cz = base(r["level"]) + float(cin) if cin is not None else top(r["level"])
-                cv_lo = np.array([(x, y, cz) for x, y in poly])
-                cv_hi = np.array([(x, y, cz + SLAB_T) for x, y in poly])
-                cf = []
-                for (i, j, k) in tris:
-                    cf.append([i + n, j + n, k + n])          # top: the attic floor
-                    cf.append([i, k, j])                      # bottom: the ceiling
-                for i in range(n):
-                    j = (i + 1) % n
-                    cf += [[i, j, j + n], [i, j + n, i + n]]
-                ceil_colour.setdefault(CEILING_C, []).append(
-                    (np.vstack([cv_lo, cv_hi]), np.array(cf, dtype=int)))
+                ceiling_jobs.append((poly, tris, cz))
 
         for (col, translucent), parts in by_colour.items():
             v, f = _merge(parts)
             model.meshes.append(Mesh("floors", v, f, col, translucent))
-        for col, parts in ceil_colour.items():
-            v, f = _merge(parts)
-            model.meshes.append(Mesh("ceilings", v, f, col))
 
     # ---- roof clips, FIRST -------------------------------------------------
     # Computed before the walls: the walls are capped at the roof surface
@@ -2442,6 +2530,35 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             model.info.append("roof clip unavailable (roofclip.py not "
                               "found) -- roofs drawn unclipped")
 
+    # ---- ceilings, clipped to the roof -----------------------------------
+    # Built HERE, after `lifted_of` is known: a ceiling is the LESSER of its
+    # storey's ceiling line and the underside of the roof above it (Patrick,
+    # 2026-11-07), so an attic ceiling follows the roof slope and no ceiling
+    # pokes through. Each room triangle (triangulated above -- a room may be
+    # non-convex) is clipped to the roof and fan-built into a thin slab whose
+    # underside is the ceiling and whose top is the attic floor over it.
+    if floors and ceiling_jobs:
+        lifts = list(lifted_of.values())
+        ceil_parts = []
+        for poly, tris, cz in ceiling_jobs:
+            for (i, j, k) in tris:
+                for ring in _ceiling_pieces(
+                        [poly[i], poly[j], poly[k]], cz, lifts, ROOFCLIP):
+                    m = len(ring)
+                    lo = np.array([(x, y, z) for x, y, z in ring])
+                    hi = np.array([(x, y, z + SLAB_T) for x, y, z in ring])
+                    cf = []
+                    for a in range(1, m - 1):             # fan (convex piece)
+                        cf.append([m, a + m, a + 1 + m])  # top: the attic floor
+                        cf.append([0, a + 1, a])          # bottom: the ceiling
+                    for a in range(m):                    # edge band
+                        b = (a + 1) % m
+                        cf += [[a, b, b + m], [a, b + m, a + m]]
+                    ceil_parts.append(
+                        (np.vstack([lo, hi]), np.array(cf, dtype=int)))
+        if ceil_parts:
+            v, f = _merge(ceil_parts)
+            model.meshes.append(Mesh("ceilings", v, f, CEILING_C))
 
     # ---- walls -----------------------------------------------------------
     # P1 (0297 §2): per level, the storey DIRECTLY ABOVE it -- its base
@@ -2598,21 +2715,30 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
 
         storey_above = above_cache.get(w["level"])
 
-        def piece(corners, za, zb, to_top, terr=terr, t=t, level=w["level"],
-                  gable_dir=gable_dir, storey_above=storey_above):
+        def piece(corners, za, zb, to_top, climb_cap=None, terr=terr, t=t,
+                  level=w["level"], gable_dir=gable_dir, storey_above=storey_above):
             # R6.b: the territories carry ABSOLUTE surfaces, so the base
             # the cap is measured from is the building's datum, 0
             return _wall_under_roofs(corners, za, zb, terr, 0.0, ROOFCLIP, t,
-                                     to_top, level, gable_dir, storey_above)
+                                     to_top, level, gable_dir, storey_above,
+                                     climb_cap=climb_cap)
 
         parts, cursor = [], 0.0
         for (s0, s1, sill, head, climb_band) in cuts:
             if s0 - cursor > 1e-6:
                 parts += piece(quad(cursor, s0), z0, z1, True)     # solid pier
             if sill > 1e-6:
-                # under the sill: a block to min(surface, sill) -- `to_top=False`
-                # already caps it at the roof where the roof is lower (0294 §3)
-                parts += piece(quad(s0, s1), z0, z0 + sill, False)
+                if climb_band:
+                    # P5 §3 (2026-11-08): the wall below a dormer FACE window is
+                    # the gable, which can sit ABOVE the host roof -- it climbs
+                    # into the dormer like the piers do, but capped at the SILL so
+                    # the window stays a hole, not a slot down to the floor.
+                    parts += piece(quad(s0, s1), z0, z0 + sill, True,
+                                   climb_cap=z0 + sill)
+                else:
+                    # under the sill: a block to min(surface, sill) -- `to_top=
+                    # False` already caps it at the roof where the roof is lower.
+                    parts += piece(quad(s0, s1), z0, z0 + sill, False)
             if climb_band:
                 # P5 §3: the header is ABOVE the storey top and climbs to the
                 # dormer surface. `to_top=True` caps it at the surface in the

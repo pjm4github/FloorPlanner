@@ -143,6 +143,43 @@ def test_a_room_gets_a_knee_line_where_the_roof_crosses_its_ceiling(scene):
                   pytest.approx(100.0 + PERP_THRESH, abs=0.5)]
 
 
+def test_a_dormers_knee_line_ignores_its_editing_level(scene):
+    """His report, 2026-11-07: when a dormer is edited (promoted) to the storey
+    ABOVE its host, its knee line vanished -- the clip read `rf.floor` (the
+    editing home) as the height datum instead of the HOST's level, shifting the
+    roof a whole storey so the crossing fell outside the room. A dormer's datum
+    is its host's base regardless of which legal level it is edited on (P3,
+    0295), so the knee must be IDENTICAL on both."""
+    from floorplanner.config import floor_elevations, set_floor_state
+    from floorplanner.roofs import room_ceiling_break_lines
+    saved = floor_elevations()
+    try:
+        set_floor_state(elevations={"low": 0.0, "high": 50.0})
+        room = _room(scene)                   # ceiling 96, on "low"
+        room.floor = "low"
+        host = _roof(scene, eaves_h=200.0, ridge_h=260.0, floor="low")  # no knee
+        dormer = _roof(scene, floor="low")    # ridge 132, eaves 80 -> crosses 96
+        dormer.host = host                    # now a dormer, datum = host's "low"
+        dormer._clip_region = None            # isolate the datum, not host visibility
+        assert dormer.is_dormer()
+
+        dormer.floor = "low"                  # edited on the host's own level
+        room._knee_memo = None
+        on_low = room_ceiling_break_lines(scene, room)
+        assert on_low                         # the dormer crosses the ceiling
+
+        dormer.floor = "high"                 # promoted to the storey above
+        room._knee_memo = None
+        on_high = room_ceiling_break_lines(scene, room)
+        # same datum (the host) -> byte-identical knee, not an empty one
+        assert len(on_high) == len(on_low)
+        for (a0, a1), (b0, b1) in zip(on_high, on_low, strict=True):
+            assert a0.x() == pytest.approx(b0.x()) and a0.y() == pytest.approx(b0.y())
+            assert a1.x() == pytest.approx(b1.x()) and a1.y() == pytest.approx(b1.y())
+    finally:
+        set_floor_state(elevations=saved)
+
+
 def test_no_knee_line_when_the_whole_roof_is_above_the_ceiling(scene):
     """A roof whose eaves already clear the ceiling never crosses it, so there
     is no knee line -- the full-height-ceiling case."""

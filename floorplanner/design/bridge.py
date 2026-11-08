@@ -102,7 +102,7 @@ EXTERIOR_NAMES = ("porch", "deck", "patio", "terrace", "lanai")
 # by the walk, applied on load, and no longer stashed.
 # Written down here so it is a known limit, not a mystery discovered later.
 _WALL_MODELLED = frozenset(("id", "level", "v1", "v2", "type", "left", "right",
-                            "openings"))
+                            "openings", "bound_to"))
 # 0255: an opening's keys the scene models; the rest (`head_in`) ride on the
 # item as `_v5_extra`, the wall's and the room's discipline
 _OPENING_MODELLED = frozenset(("id", "kind", "code", "anchor", "door_type",
@@ -598,6 +598,13 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
     warn a human and has no reader on the detection path."""
     w_items = _ordered(items, WallItem, _wall_key)
     r_items = _ordered(items, RoomItem, _room_key)
+    # 0296: a dormer wall carries `bound_to` (the dormer item + part). Kept in a
+    # SIDE MAP keyed by the WallItem's identity -- `raw` below is deep-copied by
+    # `_weld_delta`, and a QGraphicsItem (the dormer) cannot be copied. Resolved
+    # to the dormer's minted id in `design_from_scene`'s cross-level pass.
+    bound_of = {id(wi): (wi.bound_to_roof, wi.bound_part)
+                for wi in w_items if wi.wall_type == "dormer"
+                and getattr(wi, "bound_to_roof", None) is not None}
     raw = [{"p1": [w.p1.x(), w.p1.y()], "p2": [w.p2.x(), w.p2.y()],
             "type": w.wall_type,
             "openings": sorted(
@@ -766,6 +773,9 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
                    "type": w["type"], "left": None, "right": None,
                    "openings": seg_ops}
             rec.update(w["extra"])         # thickness_in / finish_*: unmodelled
+            bound = bound_of.get(id(w_items[i]))
+            if bound is not None:          # 0296: resolved to `bound_to` later
+                rec["_bound_roof_item"], rec["_bound_part"] = bound
             walls.append(rec)
             by_pair[key] = rec
     return walls
@@ -958,6 +968,12 @@ def _roofs_of(items, lid, nid, src=None):
             rec["box_half_in"] = [float(bh[0]), float(bh[1])]
         if getattr(it, "openings", None):             # plan B: a dormer's face openings
             rec["openings"] = [dict(o) for o in it.openings]
+        # 0296: which of a dormer's walls are minted -- written only when NARROWED
+        # from the default (all three), so an ordinary dormer's record is clean
+        # and a load defaults to all on
+        parts = getattr(it, "dormer_wall_parts", None)
+        if parts is not None and set(parts) != {"face", "cheek_left", "cheek_right"}:
+            rec["dormer_walls"] = sorted(parts)
         if src is not None:
             src[rec["id"]] = it
         by_item[id(it)] = rec
@@ -1128,6 +1144,16 @@ def design_from_scene(source, floors=None, report=None, strict=False, ids_out=No
             hid = roof_id_of_item.get(id(host_item))
             if hid is not None:
                 r["host"] = hid
+
+    # 0296: resolve each DORMER WALL's `bound_to` now that the dormers are minted
+    # -- the `_bound_*` temp keys (set in `_walls_of`) become the schema field.
+    for w in walls:
+        item = w.pop("_bound_roof_item", None)
+        part = w.pop("_bound_part", None)
+        if item is not None and part is not None:
+            rid = roof_id_of_item.get(id(item))
+            if rid is not None:
+                w["bound_to"] = {"roof": rid, "part": part}
 
     n = rep["unwelded_ends"]
     if n and strict:
@@ -1536,6 +1562,8 @@ def _build_roofs(scene, doc, lname, rep):
         scene.addItem(item)
         rep["roofs"] += 1
         roof_by_id[rfd.get("id")] = item
+        if rfd.get("dormer_walls") is not None:        # 0296: which walls are on
+            item.dormer_wall_parts = set(rfd["dormer_walls"])
         if rfd.get("host") is not None:
             dormer_hosts.append((item, rfd.get("id"), rfd["host"]))
     # Cross-level dormers (PR #101): a dormer's host may be on its own floor OR
@@ -1837,6 +1865,14 @@ def apply_design_difference(win, current, target) -> bool:
     difference is outside what this applies with certainty, and the caller
     must reload in full (`load_data`). Never partially done on False."""
     if not isinstance(current, dict) or not isinstance(target, dict):
+        return False
+    # 0296: a plan with DORMER WALLS reloads in FULL on undo. They are derived
+    # from the dormer and re-minted on load, so the diff path -- which rebuilds a
+    # level's wall web AND re-mints from the dormer -- would leave the restored
+    # wall beside a fresh one (P4.5's "resurrected wall"). The full reload adopts
+    # them (one per part); declining here is the discipline's "whenever unsure".
+    if any(w.get("type") == "dormer"
+           for doc in (current, target) for w in (doc.get("walls") or [])):
         return False
     for k in set(current) | set(target):
         if k in _DIFF_WEB or k in _DIFF_KINDS:

@@ -1308,6 +1308,7 @@ class RoofEndOnDialog(QDialog):
         self.roof = roof
         self._dormer = getattr(roof, "host", None) is not None
         self._level_combo = None          # P3: the dormer's "Edited on level" selector
+        self._wall_checks = {}            # P4: the "Walls on <level>" checkboxes
         self._select_opening = select_opening   # P5 §2: a window to pre-select
         # Phase C (0291): a working copy of the dormer's own face windows,
         # edited through the list below and written back in `apply()`.
@@ -1474,6 +1475,24 @@ class RoofEndOnDialog(QDialog):
                 self._level_combo.setToolTip(
                     f"Add a level above '{roof.floor}' to move the dormer")
             form_r.addRow("Edited on level", self._level_combo)
+            # 0296: the dormer's own walls on the storey above -- three
+            # checkboxes, on by default, so a wall can be opted out (a hand-drawn
+            # wall already on a line is not welded into by surprise). Enabled only
+            # while a storey above exists (its room is the one they close).
+            self._wall_checks = {}
+            above_exists = len(legal) > 1
+            above_name = legal[-1] if above_exists else "the storey above"
+            on = getattr(roof, "dormer_wall_parts",
+                         {"face", "cheek_left", "cheek_right"})
+            for part, plabel in (("face", "Face"), ("cheek_left", "Left cheek"),
+                                 ("cheek_right", "Right cheek")):
+                cb = QCheckBox(plabel)
+                cb.setChecked(part in on and above_exists)
+                cb.setEnabled(above_exists)
+                if not above_exists:
+                    cb.setToolTip("Add a level above the host to close its attic room")
+                self._wall_checks[part] = cb
+                form_r.addRow(f"Walls on {above_name}" if part == "face" else "", cb)
         # keep the fields narrow so two columns do not widen the box: a spin
         # box with a 3-digit value and a suffix needs ~110px, not the ~400 it
         # claims by default, and the wrapped notes wrap rather than stretch.
@@ -1973,7 +1992,11 @@ class RoofEndOnDialog(QDialog):
             # Phase C (0291): the dormer's own face windows, the single record
             # the plan shadow and the 3D face both read.
             self.roof.openings = [dict(o) for o in self._face_openings]
-        self.roof.rebuild()
+            # 0296: which of the dormer's walls are minted on the storey above
+            if self._wall_checks:
+                self.roof.dormer_wall_parts = {
+                    part for part, cb in self._wall_checks.items() if cb.isChecked()}
+        self.roof.rebuild()                 # re-mints the walls to match
         # P3 (0293 §5 P3 ii): the "Edited on level" selector -- a promote/demote
         # applied through the win, so it syncs visibility and is an undo step.
         if self._dormer and self._level_combo is not None:

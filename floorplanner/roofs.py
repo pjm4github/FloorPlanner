@@ -63,6 +63,15 @@ def _roofs_editable() -> bool:
     return bool(SETTINGS.get("edit_roofs", True))
 
 
+def _endpoints_match(wall, a: QPointF, b: QPointF, tol: float = 0.5) -> bool:
+    """True when `wall`'s two ends are `a` and `b` (either order) within `tol`
+    inches -- P4's geometry match for adopting a loaded dormer wall."""
+    p1, p2 = wall.p1, wall.p2
+    def near(u, v):
+        return math.hypot(u.x() - v.x(), u.y() - v.y()) <= tol
+    return (near(p1, a) and near(p2, b)) or (near(p1, b) and near(p2, a))
+
+
 def _roof_hittable(roof) -> bool:
     """R6.c (0197-ruling.md sec5; D67's own rule: "an inactive floor may be
     drawn; it may not be hit-tested, selected, banded, or dragged"): a roof
@@ -445,6 +454,20 @@ def _merge_spans(spans, total):
     return merged
 
 
+def _roof_datum_floor(rf):
+    """The level whose base is a roof's height DATUM. A dormer's `floor` is only
+    its EDITING home (P3, 0295 / 0297 §2): its eaves/ridge heights are measured
+    from its HOST's level, the datum 3D and every absolute-height clip read. So a
+    dormer promoted to the storey above still draws its wall dashes and its knee
+    line from the host's base -- reading `rf.floor` would shift it a whole storey
+    and the crossing vanishes (his report, 2026-11-07: the knee line is gone on
+    L2 when the dormer is edited there). A non-dormer roof is its own floor."""
+    host = rf.host
+    if host is not None and not sip.isdeleted(host):
+        return host.floor
+    return rf.floor
+
+
 def roof_clip_spans(scene, wall):
     """The dotted-line sub-span(s) along `wall` (0145-ruling.md sec3):
     where any roof on the same floor covers it below the room's own
@@ -478,7 +501,8 @@ def roof_clip_spans(scene, wall):
     # the wall's line and thickness, every roof (its geometry, its visible
     # region and its level base) and the wall-floor's rooms -- not once per paint
     own = ((wall.p1.x(), wall.p1.y(), wall.p2.x(), wall.p2.y(), float(wall.t)),
-           tuple((rf.geometry_key(), rf._clip_region, float(floor_elevation(rf.floor)))
+           tuple((rf.geometry_key(), rf._clip_region,
+                  float(floor_elevation(_roof_datum_floor(rf))))
                  for rf in roofs))
     memo = getattr(wall, "_roof_spans_memo", None)
     if memo is not None and rooms_held(scene) and memo[0][:2] == own:
@@ -489,7 +513,7 @@ def roof_clip_spans(scene, wall):
     ceiling_in = _wall_ceiling_in(scene, wall)
     spans = []
     for rf in roofs:
-        adj = ceiling_in + wall_base - float(floor_elevation(rf.floor))
+        adj = ceiling_in + wall_base - float(floor_elevation(_roof_datum_floor(rf)))
         spans.extend(_within_territory(
             wall, rf, _clip_spans_against_one_roof(wall, rf, adj)))
     out = _merge_spans(spans, wall.length())
@@ -869,7 +893,8 @@ def room_ceiling_break_lines(scene, room):
              if isinstance(it, RoofItem) and not sip.isdeleted(it)]
     if not roofs:
         return []
-    roof_sig = tuple((rf.geometry_key(), rf._clip_region, float(floor_elevation(rf.floor)))
+    roof_sig = tuple((rf.geometry_key(), rf._clip_region,
+                      float(floor_elevation(_roof_datum_floor(rf))))
                      for rf in roofs)
     memo = getattr(room, "_knee_memo", None)
     if memo is not None and rooms_held(scene) and memo[0][0] == roof_sig:
@@ -886,7 +911,7 @@ def room_ceiling_break_lines(scene, room):
     rooms = [tr]
     out = []
     for rf in roofs:
-        h = ceiling_abs - float(floor_elevation(rf.floor))        # roof-relative height
+        h = ceiling_abs - float(floor_elevation(_roof_datum_floor(rf)))   # roof-relative height (dormer: host datum)
         join_ext = rf._clip_ext if rf.is_clipped() else (0.0, 0.0)
         region = rf._clip_region
         for p, q in _trace_to_scene(rf, _trace_lines_local(rf, h, join_ext)):
@@ -1379,6 +1404,13 @@ class RoofItem(QGraphicsItem):
         # P5 §2: a dormer's face windows as hit-testable plan items, kept in
         # step with `openings` by `sync_windows()` (called from `rebuild`).
         self.windows = []
+        # P4 (0296): a dormer's own walls (face + two cheeks) minted on the
+        # storey ABOVE the host, kept in step by `sync_dormer_walls()`.
+        self._bound_walls = []
+        self._syncing_walls = False
+        # which of the dormer's walls are minted (0296: three checkboxes, all on
+        # by default once the storey above exists); a load may narrow it
+        self.dormer_wall_parts = {"face", "cheek_left", "cheek_right"}
         self.rebuild()
 
     @staticmethod
@@ -1583,7 +1615,9 @@ class RoofItem(QGraphicsItem):
         if sc is None:
             return
         for d in self.dormers():
+            d.remove_dormer_walls()           # P4: its L2 walls go with it
             sc.removeItem(d)
+        self.remove_dormer_walls()            # a dormer removed directly
         sc.removeItem(self)
 
     def toggle_outline(self):
@@ -1727,6 +1761,8 @@ class RoofItem(QGraphicsItem):
             g.sync_position()
         if hasattr(self, "windows"):          # P5 §2: keep the face windows in step
             self.sync_windows()
+        if hasattr(self, "_bound_walls") and self.scene() is not None:
+            self.sync_dormer_walls()          # P4: keep the dormer's L2 walls in step
         # R4d: any change to this roof's true rectangle re-clips the floor
         if self.scene() is not None and hasattr(self, "grips"):
             sync_roof_clips(self.scene(), self.floor)
@@ -2195,6 +2231,123 @@ class RoofItem(QGraphicsItem):
             return None
         return (QPointF(a.x() + ux * u0, a.y() + uy * u0),
                 QPointF(a.x() + ux * u1, a.y() + uy * u1))
+
+    def sync_dormer_walls(self):
+        """P4 (0296): mint/sync the dormer's own walls -- face, cheek_left,
+        cheek_right -- as real `dormer`-type `WallItem`s on the storey ABOVE the
+        host, so the L2 attic room closes against them. Their vertices are DERIVED
+        from `_dormer_wall_lines()` at every rebuild. Minted on by default once the
+        storey above exists; removed when it goes, the roof stops being a dormer,
+        or it is deleted (`remove_dormer_walls`). Read-only -- editable only from
+        the dormer. A no-op for a non-dormer."""
+        from floorplanner.walls import WallItem
+        if getattr(self, "_syncing_walls", False):
+            return
+        host = self.host
+        above = _level_above(host.floor) if (host is not None and not sip.isdeleted(host)) else None
+        want = {}
+        parts_on = getattr(self, "dormer_wall_parts", None)
+        if parts_on is None:
+            parts_on = {"face", "cheek_left", "cheek_right"}
+        if above is not None and self.is_dormer() and parts_on:
+            lines = self._dormer_wall_lines()
+            for part, line in zip(("face", "cheek_left", "cheek_right"), lines,
+                                  strict=False):
+                if part not in parts_on:
+                    continue
+                a, b = line
+                if math.hypot(b.x() - a.x(), b.y() - a.y()) > _CLIP_EPS_IN:
+                    want[part] = (a, b)
+        sc = self.scene()
+        # EVERY scene wall that belongs to this dormer, grouped by part -- walls I
+        # already bound, walls loaded with my `bound_to` (on `_v5_extra` or already
+        # a `bound_to_roof`), and unbound walls whose endpoints match a derived
+        # line. Grouping like this lets a save/reload re-adopt AND an undo restore
+        # (which can leave a restored wall beside a freshly minted one) DEDUP to
+        # one wall per part -- the "resurrected wall" P4.5's undo note warns of.
+        mine = {}                          # part -> [candidate walls]
+        my_id = getattr(self, "doc_id", None)
+        if sc is not None:
+            for w in sc.items():
+                if not (isinstance(w, WallItem) and w.wall_type == "dormer"
+                        and not sip.isdeleted(w)):
+                    continue
+                part = None
+                if getattr(w, "bound_to_roof", None) is self:
+                    part = getattr(w, "bound_part", None)
+                elif getattr(w, "bound_to_roof", None) is None:
+                    bt = (getattr(w, "_v5_extra", None) or {}).get("bound_to") or {}
+                    if my_id is not None and bt.get("roof") == my_id and bt.get("part") in want:
+                        part = bt["part"]
+                    else:
+                        for p, (a, b) in want.items():
+                            if _endpoints_match(w, a, b):
+                                part = p
+                                break
+                if part is not None:
+                    mine.setdefault(part, []).append(w)
+        def _reseat(w, attr, p):
+            """Land dormer wall `w`'s `attr` end at the derived point `p`. If that
+            corner is WELDED to another wall -- a hand-drawn knee wall sharing its
+            `Vertex` -- RELOCATE the corner so every holder follows: deform-to-
+            follow (0296 §2), the knee wall tracks the cheek when the dormer moves.
+            A free end DETACHES to a fresh derived corner, the default (so a dormer
+            with no welded wall is byte-identical to the pre-weld sync)."""
+            v = w.end_vertex(attr)
+            sharers = []
+            if sc is not None and v is not None:
+                for other in sc.items():
+                    if (isinstance(other, WallItem) and other is not w
+                            and not sip.isdeleted(other)):
+                        for oattr in ("p1", "p2"):
+                            if other.end_vertex(oattr) is v:
+                                sharers.append((other, oattr))
+            if sharers:
+                new = v.relocated_to(p)
+                w.set_end_vertex(attr, new)
+                for other, oattr in sharers:
+                    other.set_end_vertex(oattr, new)
+                    other.rebuild()
+            else:
+                w.detach_end(attr, p)
+
+        self._syncing_walls = True
+        try:
+            self._bound_walls = []
+            for part, (a, b) in want.items():
+                cands = mine.pop(part, [])
+                w = next((c for c in cands if not sip.isdeleted(c)), None)
+                for extra in cands:        # DEDUP: one wall per part, drop the rest
+                    if extra is not w and not sip.isdeleted(extra) and sc is not None:
+                        sc.removeItem(extra)
+                if w is None:
+                    w = WallItem(a, b, "dormer")
+                    w.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+                    if sc is not None:
+                        sc.addItem(w)
+                else:
+                    _reseat(w, "p1", a)
+                    _reseat(w, "p2", b)
+                    w.rebuild()
+                w.bound_to_roof = self
+                w.bound_part = part
+                w.floor = above            # always the storey above the host
+                self._bound_walls.append(w)
+            # parts turned OFF (not wanted) but still in the scene as mine: drop
+            for cands in mine.values():
+                for w in cands:
+                    if not sip.isdeleted(w) and sc is not None:
+                        sc.removeItem(w)
+        finally:
+            self._syncing_walls = False
+
+    def remove_dormer_walls(self):
+        """Drop this dormer's minted walls (used when it is deleted)."""
+        sc = self.scene()
+        for w in getattr(self, "_bound_walls", []):
+            if not sip.isdeleted(w) and sc is not None:
+                sc.removeItem(w)
+        self._bound_walls = []
 
     def dormer_sill_floor_in(self) -> float:
         """P5 (Patrick, 2026-11-06): the floor a dormer window's sill is measured
@@ -2723,6 +2876,23 @@ class RoofItem(QGraphicsItem):
         elif chosen is a_outline:
             self.toggle_outline()
         e.accept()
+
+    def mouseDoubleClickEvent(self, e):
+        # A double-click on a roof's ridge/outline opens its End-On dialog --
+        # the same dialog its right-click menu and its apex grip reach (0140
+        # sec1, "selecting any ridge still reaches the same dialog ... one
+        # dialog, two doors"). This is the door a dormer REACHED BY Alt+click
+        # cycling opens through, without having to find its small apex grip
+        # (2026-11-07). Only in SELECT, and only while the roof is hittable, so
+        # the ridge tool's own double-press is untouched.
+        v = self._view()
+        tool = getattr(getattr(v, "win", None), "tool", None)
+        if (e.button() == Qt.MouseButton.LeftButton
+                and tool in (None, TOOL_SELECT) and _roof_hittable(self)):
+            self.open_end_on_dialog()
+            e.accept()
+        else:
+            super().mouseDoubleClickEvent(e)
 
 
 MIN_RIDGE_LEN_IN = 12.0     # a gable-end drag cannot shorten the ridge past this

@@ -208,6 +208,11 @@
           "description": "R2b (0140-ruling.md, the End-On marker): which `ridge` endpoint (0 or 1, index-aligned) the End-On marker sits at -- document state so it survives reload, same idea as a room label's offset. Optional: roofs written before R2b default to 1.",
           "type": "integer", "enum": [0, 1], "default": 1
         },
+        "dormer_walls": {
+          "description": "0296: which of a DORMER's three minted walls are on (the dialog's checkboxes). Written only when narrowed from the default -- omitted = all three on. A `dormer` wall record names this dormer in its `bound_to`.",
+          "type": "array", "items": { "enum": ["face", "cheek_left", "cheek_right"] },
+          "uniqueItems": true
+        },
         "openings": {
           "description": "0248-report.md sec3 plan B: the openings in a DORMER's generated face (the gable face of a gable dormer; the low front edge of a shed dormer) -- the same `opening` records a wall carries, cut into the generated face the way a wall's are cut. The face is dimensioned like a wall: `v1` is its LEFT end (the `span_in[0]` side for a gable dormer; the `ridge[0]` end of the front edge for a shed dormer), `v2` the right, `center` its middle; `sill_in`/`head_in` are heights above the HOST roof's level base -- the dormer's datum, where `fp3d` lifts the dormer (0291 §1) -- as a wall's are above its own level base. Only on a dormer (a record with `host`; the conditional below enforces it); the plan view draws them as a read-only shadow on the dormer's floor (Phase C, PR #102). Additive optional (ROADMAP R-B): no version bump.",
           "type": "array", "items": { "$ref": "#/$defs/opening" }
@@ -249,10 +254,19 @@
         "v2":    { "$ref": "#/$defs/id" },
 
         "type": {
-          "description": "There is deliberately no `open` type: an outline edge with no wall IS the open edge. Landscape types carry no openings and no finishes. `partition` divides rooms in plan but builds no 3D volume; `beam` is a ceiling beam in 3D that does NOT divide a room (it is never a room-outline edge).",
-          "enum": ["exterior", "interior", "partition", "railing", "fence", "hedge", "retaining", "beam"]
+          "description": "There is deliberately no `open` type: an outline edge with no wall IS the open edge. Landscape types carry no openings and no finishes. `partition` divides rooms in plan but builds no 3D volume; `beam` is a ceiling beam in 3D that does NOT divide a room (it is never a room-outline edge). `dormer` (0296) is a wall MINTED from a dormer -- its face or a cheek -- on the storey ABOVE the host; it closes the attic room but is editable only from the dormer, and its vertices are derived from the dormer at every rebuild (`bound_to` names which dormer and part).",
+          "enum": ["exterior", "interior", "partition", "railing", "fence", "hedge", "retaining", "beam", "dormer"]
         },
         "thickness_in": { "description": "Override; omitted = the standard for `type`.", "type": "number", "minimum": 0 },
+        "bound_to": {
+          "description": "0296: REQUIRED when `type` is `dormer` and forbidden otherwise. Names the dormer this wall is minted from and which part of it this wall is, so a load re-binds it and the dormer re-derives its vertices.",
+          "type": "object", "additionalProperties": false,
+          "required": ["roof", "part"],
+          "properties": {
+            "roof": { "$ref": "#/$defs/id" },
+            "part": { "enum": ["face", "cheek_left", "cheek_right"] }
+          }
+        },
 
         "left": {
           "description": "Room on the LEFT of the v1->v2 direction — with x right and y down, the (dy, -dx) side, i.e. the side on your left walking v1 to v2 on screen. null = no room that side (outdoors, or a free-standing wall). MAINTAINED INDEX: must agree exactly with which rooms name this wall in their outline (invariant I6).",
@@ -277,6 +291,11 @@
               "finish_right": false
             }
           }
+        },
+        {
+          "if": { "properties": { "type": { "const": "dormer" } }, "required": ["type"] },
+          "then": { "required": ["bound_to"] },
+          "else": { "properties": { "bound_to": false } }
         }
       ]
     },
