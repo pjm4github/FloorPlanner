@@ -210,3 +210,25 @@ def test_undo_of_a_dormer_edit_does_not_duplicate_the_walls(fp):
     win._commit_if_changed()                                # the edit, an undo step
     win.undo()
     assert len(_dormer_walls(win.scene)) == 3               # not 6
+
+
+def test_promoting_a_dormer_reclips_the_host_no_stale_seam(fp, win):
+    """His report, 2026-11-08: brown "leftover roof edge" lines on the seam
+    between the roof and the dormer, STUCK after switching the dormer's edit
+    level. A roof's floor is a COMPOSE INPUT (`sync_roof_clips` reads
+    `floor_elevation(rf.floor)`): a dormer edited on its host's own level
+    penetrates the host and gives it a plan seam; promoted a storey up it is
+    above the host and clears. But `move_dormer_to_level` only re-clipped on an
+    ELEVATION change, which a level move is not -- so the host kept the old
+    level's penetration seam, drawn solid brown while the host floor is active.
+    Re-clipping on the move clears it (and restores it on the way back)."""
+    d = _dormer(win)                       # dormer rf2 + host rf1, both on L1
+    host = d.host
+    win.switch_floor("L1")
+    assert len(host.seams()) == 2          # on its host's level, it penetrates
+
+    win.move_dormer_to_level(d, "L2")      # promote: the host must re-clip
+    assert len(host.seams()) == 0          # the penetration seam is gone, not stale
+
+    win.move_dormer_to_level(d, "L1")      # demote: and it comes back
+    assert len(host.seams()) == 2

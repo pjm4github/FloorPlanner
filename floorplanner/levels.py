@@ -423,6 +423,15 @@ class LevelsMixin:
             return False
         roof.setSelected(False)           # not editable from the level it leaves
         roof.floor = name
+        # A roof's floor is a COMPOSE INPUT (`sync_roof_clips` reads
+        # `floor_elevation(rf.floor)`), so changing a dormer's editing level
+        # must re-clip the roofscape -- otherwise a host roof that gained a
+        # penetration seam while the dormer was composed on its own level keeps
+        # it after the dormer leaves (his report, 2026-11-08: brown "leftover
+        # roof edge" lines on the roof/dormer seam, stuck after a level switch).
+        # `_sync_floor_state` only re-clips on an ELEVATION change, which a
+        # level move is not.
+        sync_roof_clips(self.scene)
         self._sync_floor_state()          # re-applies apply_roof_visibility
         self._commit_if_changed()         # undo step + dirty (roof.level changed)
         self.status(f"Dormer moved to level '{name}'.")
