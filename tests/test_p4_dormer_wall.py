@@ -121,6 +121,80 @@ def test_all_walls_on_writes_no_dormer_walls_key(fp, win):
     assert "dormer_walls" not in dormer_rec                 # clean record when all on
 
 
+def test_a_welded_knee_wall_follows_the_cheek_when_the_dormer_moves(fp, win):
+    """0296 §2 -- WELD / deform-to-follow: a hand-drawn L2 wall whose end sits on a
+    dormer cheek's back end SHARES that cheek's `Vertex`, and FOLLOWS the cheek
+    when the dormer moves. The sync re-derives the cheek's vertices; it must
+    RELOCATE a shared corner (carrying every holder) rather than detach it onto a
+    fresh one (which would strand the knee wall at the old spot)."""
+    from PyQt6.QtCore import QPointF
+    from floorplanner.walls import share_coincident_ends
+    d = _dormer(win)
+    cheek = next(w for w in _dormer_walls(win.scene) if w.bound_part == "cheek_left")
+    back = cheek.p2                                    # the up-slope back end
+    knee = WallItem(QPointF(back), QPointF(back.x() + 40, back.y() + 40), "interior")
+    knee.floor = cheek.floor                           # the storey above (L2)
+    win.scene.addItem(knee)
+    share_coincident_ends(win.scene, cheek.floor)      # weld: fold onto one Vertex
+    assert knee.end_vertex("p1") is cheek.end_vertex("p2"), "not welded"
+
+    d.set_ridge(QPointF(d.p1.x() + 20, d.p1.y()), QPointF(d.p2.x() + 20, d.p2.y()))
+    d.rebuild()                                         # moves the cheek + its sync
+    new_back = cheek.p2
+    assert (new_back.x(), new_back.y()) != (back.x(), back.y())    # the cheek moved
+    # the knee's welded end tracked the cheek, and still shares its corner
+    assert knee.p1.x() == pytest.approx(new_back.x())
+    assert knee.p1.y() == pytest.approx(new_back.y())
+    assert knee.end_vertex("p1") is cheek.end_vertex("p2")
+
+
+def test_a_welded_knee_wall_survives_a_save_and_reload(fp, win):
+    """0296 §2 receipt: save -> reload -> the walls are still bound AND the welded
+    knee wall still shares the cheek's back-end corner, so it follows again. The
+    shared `Vertex` serializes to ONE document vertex, re-shared on load."""
+    from PyQt6.QtCore import QPointF
+    from floorplanner.walls import share_coincident_ends
+    import FloorPlanner as _fp
+    _dormer(win)
+    cheek = next(w for w in _dormer_walls(win.scene) if w.bound_part == "cheek_left")
+    back = cheek.p2
+    knee = WallItem(QPointF(back), QPointF(back.x() + 40, back.y() + 40), "interior")
+    knee.floor = cheek.floor
+    win.scene.addItem(knee)
+    share_coincident_ends(win.scene, cheek.floor)
+    out = win.design_document()
+
+    w2 = _fp.MainWindow()
+    w2.load_data(out)
+    cheek2 = next(w for w in w2.scene.items()
+                  if isinstance(w, WallItem) and w.wall_type == "dormer"
+                  and w.bound_part == "cheek_left")
+    knee2 = next(w for w in w2.scene.items()
+                 if isinstance(w, WallItem) and w.wall_type != "dormer"
+                 and w.floor == cheek2.floor)
+    assert knee2.end_vertex("p1") is cheek2.end_vertex("p2"), "weld lost on reload"
+    # and it still follows a move in the reloaded plan
+    d2 = next(it for it in w2.scene.items()
+              if isinstance(it, RoofItem) and it.is_dormer())
+    d2.set_ridge(QPointF(d2.p1.x() + 20, d2.p1.y()), QPointF(d2.p2.x() + 20, d2.p2.y()))
+    d2.rebuild()
+    assert knee2.p1.x() == pytest.approx(cheek2.p2.x())
+    assert knee2.p1.y() == pytest.approx(cheek2.p2.y())
+
+
+def test_a_free_dormer_wall_end_detaches_to_a_fresh_corner(fp, win):
+    """The non-welded default is unchanged: a cheek end with no wall on it is
+    DETACHED to a derived corner (a fresh `Vertex`), so a dormer with no welded
+    knee wall syncs exactly as before the weld path existed."""
+    from PyQt6.QtCore import QPointF
+    d = _dormer(win)
+    cheek = next(w for w in _dormer_walls(win.scene) if w.bound_part == "cheek_left")
+    v_before = cheek.end_vertex("p2")
+    d.set_ridge(QPointF(d.p1.x() + 15, d.p1.y()), QPointF(d.p2.x() + 15, d.p2.y()))
+    d.rebuild()
+    assert cheek.end_vertex("p2") is not v_before      # a fresh, detached corner
+
+
 def test_undo_of_a_dormer_edit_does_not_duplicate_the_walls(fp):
     """0296's undo note: a dormer edit now writes to the walls on another floor,
     which are derived AND serialized. Undo must not leave a restored wall beside a

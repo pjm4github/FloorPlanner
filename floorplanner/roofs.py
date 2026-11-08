@@ -2286,6 +2286,31 @@ class RoofItem(QGraphicsItem):
                                 break
                 if part is not None:
                     mine.setdefault(part, []).append(w)
+        def _reseat(w, attr, p):
+            """Land dormer wall `w`'s `attr` end at the derived point `p`. If that
+            corner is WELDED to another wall -- a hand-drawn knee wall sharing its
+            `Vertex` -- RELOCATE the corner so every holder follows: deform-to-
+            follow (0296 §2), the knee wall tracks the cheek when the dormer moves.
+            A free end DETACHES to a fresh derived corner, the default (so a dormer
+            with no welded wall is byte-identical to the pre-weld sync)."""
+            v = w.end_vertex(attr)
+            sharers = []
+            if sc is not None and v is not None:
+                for other in sc.items():
+                    if (isinstance(other, WallItem) and other is not w
+                            and not sip.isdeleted(other)):
+                        for oattr in ("p1", "p2"):
+                            if other.end_vertex(oattr) is v:
+                                sharers.append((other, oattr))
+            if sharers:
+                new = v.relocated_to(p)
+                w.set_end_vertex(attr, new)
+                for other, oattr in sharers:
+                    other.set_end_vertex(oattr, new)
+                    other.rebuild()
+            else:
+                w.detach_end(attr, p)
+
         self._syncing_walls = True
         try:
             self._bound_walls = []
@@ -2301,8 +2326,8 @@ class RoofItem(QGraphicsItem):
                     if sc is not None:
                         sc.addItem(w)
                 else:
-                    w.detach_end("p1", a)
-                    w.detach_end("p2", b)
+                    _reseat(w, "p1", a)
+                    _reseat(w, "p2", b)
                     w.rebuild()
                 w.bound_to_roof = self
                 w.bound_part = part

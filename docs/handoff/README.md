@@ -444,5 +444,6 @@ this table is not a second copy of it.
 | [`0302-report.md`](./0302-report.md) | report: P3 of the 1½-storey arc — the dormer's level, datum, dialog and the four views |
 | [`0303-report.md`](./0303-report.md) | report: P1–P3 of the 1½-storey arc MERGED into `main` after check session A |
 | [`0304-report.md`](./0304-report.md) | report: P5 of the 1½-storey arc — windows on the dormer face (plan item + 3D cut) |
+| [`0305-report.md`](./0305-report.md) | report: P4 of the 1½-storey arc — the `dormer` wall type |
 
 <!-- PAIRS:END -->
