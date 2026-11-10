@@ -26,6 +26,11 @@ viewer = [
     "pyqtgraph>=0.13",
     "PyOpenGL>=3.1",
 ]
+# The schema viewer (tools/schema_viewer.py).  Install with:
+#     pip install -e ".[schema-viewer]"
+schema-viewer = [
+    "jsonschema>=4.23",
+]
 
 [project.urls]
 Homepage = "https://github.com/pjm4github/FloorPlanner"

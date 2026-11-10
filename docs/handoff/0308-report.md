@@ -4,7 +4,11 @@
 standing item **#3** (the dimensioned gable-end window elevation — [`0294`](0294-ruling.md)
 §4, named-not-ordered), begun on his word "Start #3." Built on branch
 `gable-elevation`, cut from `main` (69dcefa, the #1 merge, [`0307`](0307-report.md));
-AMBER, **not merged** — awaiting his check in the app.
+AMBER, **MERGED** into `main` 2026-11-09 by a two-parent local merge on his word
+("Merge #106, and sweep in the schema_viewer.py and the corrected pyproject.toml"),
+which also swept in his orthogonal `tools/schema_viewer.py` and its `schema-viewer`
+optional dependency. (No `**Landed:**` line: a two-parent merge's landing commit is
+not on `main`'s first-parent chain.)
 
 ## 1. HIS ORDER (2026‑11‑09)
 
@@ -59,7 +63,6 @@ for the end wall, a dormer face window, and a gui test that the dialog grows an
 
 ## 5. NEXT
 
-Awaiting his check — the Elevation tab, a dormer and a plain gable, in the app;
-on his word, merge. More elevation parameters are his to order ([`0294`](0294-ruling.md)
+Checked and MERGED (his word). More elevation parameters are his to order ([`0294`](0294-ruling.md)
 §4): live tracking of the spinboxes, head-below-ridge, offsets from the corners,
 the pitch, the second gable end. 0248's items 8–9 named, not ordered.

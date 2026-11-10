@@ -1068,6 +1068,113 @@ class _EndOnCanvas(QWidget):
             p.drawText(eave_r + QPointF(6, 20), f"P' {self.pitch_deg(1):.1f}°")
 
 
+class _ElevationCanvas(QWidget):
+    """#3 (0294 §4): the End-On dialog's ELEVATION tab -- the roof's gable end
+    seen straight-on, to scale, with its window(s) LOCATED by dimensions. Reads
+    `RoofItem.gable_elevation()` (a dormer face, or a plain gable end's wall).
+    The MINIMAL locating set (his order 2026-11-09): per window its size (W×H),
+    its sill above the floor, and its centre's offset from the gable centreline.
+    More parameters land here as he orders them."""
+
+    _WALL = QColor(60, 60, 60)
+    _ROOF = QColor(133, 77, 14)
+    _GLASS = QColor(191, 219, 254)
+    _DIM = QColor(37, 99, 235)
+    _CENTRE = QColor(150, 150, 150)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.data = None
+        self.setMinimumHeight(260)
+
+    def set_data(self, data):
+        self.data = data
+        self.update()
+
+    def sizeHint(self):
+        return QSize(460, 300)
+
+    def paintEvent(self, _ev):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        w, h = self.width(), self.height()
+        p.fillRect(0, 0, w, h, QColor(255, 255, 255))
+        e = self.data
+        if not e or e.get("width_in", 0.0) <= 0.0 or e.get("ridge_in", 0.0) <= 0.0:
+            p.setPen(QPen(QColor(120, 120, 120)))
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
+                       "No gable end to draw for this roof.")
+            return
+        W = float(e["width_in"])
+        ridge = float(e["ridge_in"])
+        eaves = max(0.0, min(float(e["eaves_in"]), ridge))
+        apex = float(e.get("apex_in", 0.0))
+        ml, mr, mt, mb = 54.0, 20.0, 22.0, 34.0
+        scale = min((w - ml - mr) / W, (h - mt - mb) / ridge)
+        scale = max(scale, 0.01)
+        cx = ml + (w - ml - mr) / 2.0
+        base_y = h - mb
+
+        def X(xin):
+            return cx + xin * scale
+
+        def Y(yin):
+            return base_y - yin * scale
+
+        # the floor baseline + its absolute datum label
+        p.setPen(QPen(self._WALL, 1.4))
+        p.drawLine(QPointF(ml * 0.5, base_y), QPointF(w - mr * 0.5, base_y))
+        p.setPen(QPen(QColor(90, 90, 90)))
+        f = p.font()
+        f.setPointSize(8)
+        p.setFont(f)
+        p.drawText(QPointF(ml * 0.5, base_y + 18),
+                   f"floor {fmt_in(float(e.get('floor_abs_in', 0.0)))}")
+        # the gable centreline (dashed, through the ridge apex)
+        p.setPen(QPen(self._CENTRE, 1.0, Qt.PenStyle.DashLine))
+        p.drawLine(QPointF(X(apex), base_y), QPointF(X(apex), Y(ridge)))
+        # the gable outline: a rectangle to the eaves, a triangle to the ridge
+        half = W / 2.0
+        p.setPen(QPen(self._WALL, 1.6))
+        p.drawLine(QPointF(X(-half), base_y), QPointF(X(-half), Y(eaves)))
+        p.drawLine(QPointF(X(half), base_y), QPointF(X(half), Y(eaves)))
+        p.setPen(QPen(self._ROOF, 2.4))
+        p.drawLine(QPointF(X(-half), Y(eaves)), QPointF(X(apex), Y(ridge)))
+        p.drawLine(QPointF(X(apex), Y(ridge)), QPointF(X(half), Y(eaves)))
+        p.setPen(QPen(QColor(20, 20, 20)))
+        p.drawText(QPointF(X(apex) + 4, Y(ridge) - 2), f"R {fmt_in(ridge)}")
+
+        for wd in e.get("windows", []):
+            c = float(wd["centre_in"])
+            ww, hh = float(wd["w_in"]), float(wd["h_in"])
+            sill, head = float(wd["sill_in"]), float(wd["head_in"])
+            x0, x1 = X(c - ww / 2.0), X(c + ww / 2.0)
+            y0, y1 = Y(head), Y(sill)
+            r = QRectF(QPointF(x0, y0), QPointF(x1, y1))
+            p.fillRect(r, self._GLASS)
+            p.setPen(QPen(self._WALL, 1.2))
+            p.drawRect(r)
+            # size label, centred in the window
+            p.setPen(QPen(QColor(20, 20, 20)))
+            p.drawText(r, Qt.AlignmentFlag.AlignCenter, f"{fmt_in(ww)}×{fmt_in(hh)}")
+            # sill dimension: a vertical tick from the floor to the sill
+            p.setPen(QPen(self._DIM, 1.0))
+            dx = x0 - 6.0
+            p.drawLine(QPointF(dx, base_y), QPointF(dx, y1))
+            p.drawLine(QPointF(dx - 3, base_y), QPointF(dx + 3, base_y))
+            p.drawLine(QPointF(dx - 3, y1), QPointF(dx + 3, y1))
+            p.save()
+            p.translate(dx - 4, (base_y + y1) / 2.0)
+            p.rotate(-90)
+            p.drawText(QPointF(0, 0), f"sill {fmt_in(sill)}")
+            p.restore()
+            # centre-offset dimension: a horizontal tick from centreline to centre
+            oy = base_y - 14.0
+            p.drawLine(QPointF(X(apex), oy), QPointF(X(c), oy))
+            p.drawLine(QPointF(X(c), oy - 3), QPointF(X(c), oy + 3))
+            p.drawText(QPointF((X(apex) + X(c)) / 2.0 - 10, oy - 4), fmt_in(abs(c - apex)))
+
+
 class FloorLevelsDialog(QDialog):
     """Floors ▸ <floor> ▸ Elevation and height… (R6.0, 0197-ruling.md sec2,
     closing D50): the storey's two numbers, in inches from the building's
@@ -1319,7 +1426,15 @@ class RoofEndOnDialog(QDialog):
         self._programmatic = False
         self.binding = None                 # RoomTopBinding while bound
 
-        lay = QVBoxLayout(self)
+        # #3 (0294 §4): the dialog is now tabbed -- "Parameters" (everything that
+        # was here) and "Elevation" (the gable end to scale). The buttons sit
+        # below the tabs, on the outer layout.
+        outer = QVBoxLayout(self)
+        self.tabs = QTabWidget()
+        outer.addWidget(self.tabs)
+        _params = QWidget()
+        lay = QVBoxLayout(_params)
+        self.tabs.addTab(_params, "Parameters")
         self.canvas = _EndOnCanvas(self)
         self.canvas.setMaximumHeight(200)       # a reference sketch, not the bulk
         lay.addWidget(self.canvas)
@@ -1549,11 +1664,27 @@ class RoofEndOnDialog(QDialog):
         note.setStyleSheet("color: #666;")
         lay.addWidget(note)
 
+        # #3 (0294 §4): the ELEVATION tab -- this roof's gable end, to scale,
+        # with its window(s) located. A dormer draws its own face + openings; a
+        # plain gable roof draws the gable end and the gable-end wall's windows.
+        self.elev_canvas = _ElevationCanvas(self)
+        _elev_page = QWidget()
+        _elev_lay = QVBoxLayout(_elev_page)
+        _elev_lay.addWidget(self.elev_canvas)
+        _elev_note = QLabel("The gable end, straight on and to scale. Each window "
+                            "is located by its size, its sill above the floor, and "
+                            "its offset from the gable centreline.")
+        _elev_note.setWordWrap(True)
+        _elev_note.setStyleSheet("color: #666;")
+        _elev_lay.addWidget(_elev_note)
+        self.tabs.addTab(_elev_page, "Elevation")
+        self.tabs.currentChanged.connect(lambda _i: self._refresh_elevation())
+
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
                                    | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        lay.addWidget(buttons)
+        outer.addWidget(buttons)
 
         spans = [float(v) for v in getattr(roof, "span_in", [144.0, 144.0])]
         self.canvas.span_l, self.canvas.span_r = spans
@@ -1579,6 +1710,15 @@ class RoofEndOnDialog(QDialog):
         self.ck_oh_same.toggled.connect(self._on_oh_same_toggled)
         self.cb_end_marker.currentIndexChanged.connect(lambda _i: self._on_ends())
         self.cb_end_other.currentIndexChanged.connect(lambda _i: self._on_ends())
+        self._refresh_elevation()
+
+    def _refresh_elevation(self):
+        """#3: feed the Elevation tab this roof's gable-end drawing. Reads the
+        roof's stored geometry (the tab reflects the saved state; live spinbox
+        tracking is a later parameter, his to order)."""
+        canvas = getattr(self, "elev_canvas", None)
+        if canvas is not None:
+            canvas.set_data(self.roof.gable_elevation())
 
     # -- the three-way recompute (0139-ruling.md sec2 / 0140-ruling.md sec2) --
     def _spin(self, field):
