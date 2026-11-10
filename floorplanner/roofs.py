@@ -2247,7 +2247,7 @@ class RoofItem(QGraphicsItem):
         return (QPointF(a.x() + ux * u0, a.y() + uy * u0),
                 QPointF(a.x() + ux * u1, a.y() + uy * u1))
 
-    def gable_elevation(self):
+    def gable_elevation(self, end=None):
         """#3 (0294 §4): the data for the End-On dialog's ELEVATION tab -- this
         roof's gable end seen straight-on, to scale, with its window(s) LOCATED.
         A dict, or None when there is no gable end to draw.
@@ -2260,7 +2260,14 @@ class RoofItem(QGraphicsItem):
         (for the label). A window's `centre_in` is its centre's horizontal
         offset from the gable centreline (+ toward `span_in[1]`/`p2`),
         `sill_in`/`head_in` its heights above the floor. `apex_in` is the
-        ridge peak's own offset from that centreline (0 when symmetric).
+        ridge peak's own offset from that centreline (0 when symmetric). `end`
+        is the END INDEX drawn (0 = p1, 1 = p2), the dormer's face always 0.
+
+        `end` (his order 2026-11-10): EITHER gable end may be drawn -- 0 (p1) or
+        1 (p2); a live gable end is required, so a hip or non-gabled `end` falls
+        back to a drawable one. None keeps the prior pick (the window-carrying
+        end, else the marker). The drawing stays in the roof's ridge frame (the
+        apex leans toward `span_in[1]` for both ends -- not mirrored per side).
 
         The minimal LOCATING set (his order 2026-11-09): per window its width,
         height, sill-above-floor and centre offset; more parameters land here
@@ -2296,7 +2303,7 @@ class RoofItem(QGraphicsItem):
                 sill = (float(sill) if sill is not None else floor + DEFAULT_SILL_IN) - floor
                 windows.append({"centre_in": along - width / 2.0, "w_in": float(w),
                                 "h_in": float(h), "sill_in": sill, "head_in": sill + float(h)})
-            return {"kind": "dormer", "width_in": width,
+            return {"kind": "dormer", "width_in": width, "end": 0,
                     "eaves_in": float(self.eaves_h_in) - floor,
                     "ridge_in": float(self.ridge_h_in) - floor,
                     "floor_abs_in": float(floor_elevation(host.floor)) + floor,
@@ -2312,7 +2319,7 @@ class RoofItem(QGraphicsItem):
         ux, uy = dx / L, dy / L
         span_l, span_r = (float(v) for v in getattr(self, "span_in", [144.0, 144.0]))
         width = span_l + span_r
-        wall = self._gable_end_wall(gable, (ux, uy))
+        wall, end = self._gable_end_wall(gable, (ux, uy), end=end)
         windows = []
         if wall is not None:
             wl = wall.length() or 1.0
@@ -2327,7 +2334,7 @@ class RoofItem(QGraphicsItem):
                 windows.append({"centre_in": float(op.s) - wl / 2.0,
                                 "w_in": float(op.width), "h_in": hh,
                                 "sill_in": sill, "head_in": sill + hh})
-        return {"kind": "gable", "width_in": width,
+        return {"kind": "gable", "width_in": width, "end": end,
                 "eaves_in": float(self.eaves_h_in),
                 "ridge_in": float(self.ridge_h_in),
                 "floor_abs_in": float(floor_elevation(self.floor)),
@@ -2335,24 +2342,35 @@ class RoofItem(QGraphicsItem):
                 "shed": getattr(self, "form", "gable") == "shed",
                 "windows": windows}
 
-    def _gable_end_wall(self, gable, axis):
+    def _gable_end_wall(self, gable, axis, end=None):
         """The exterior wall standing across a gable end of this (plain) roof --
         perpendicular to the ridge, within the eaves width, long enough to be the
-        end wall. Of the live gable ends, prefer the one whose wall carries
-        windows, else the `marker_end`. None when the scene has no such wall."""
-        sc = self.scene()
-        if sc is None:
-            return None
+        end wall. Returns `(wall, end)`: the wall (or None when the scene carries
+        none) and the END INDEX searched (0 = p1, 1 = p2).
+
+        With `end` a live gable end, ONLY that end is searched (#3's per-end
+        elevation, 2026-11-10). Otherwise, of the live gable ends, the one whose
+        wall carries windows is preferred, else the `marker_end`; `end` then
+        reports whichever end that resolved to (so the triangle still draws when
+        no wall is found)."""
         ux, uy = axis
         width = sum(float(v) for v in getattr(self, "span_in", [144.0, 144.0])) or 1.0
-        ends = [(0, self.p1), (1, self.p2)]
-        # the marker end first, so a tie falls to the roof's canonical end
         mk = 1 if getattr(self, "marker_end", 1) else 0
-        ends.sort(key=lambda e: 0 if e[0] == mk else 1)
-        best = None
-        for end_i, end_pt in ends:
-            if not gable[end_i]:
-                continue
+        # which end(s) to search, and the fallback end to report with no wall
+        if end is not None and 0 <= int(end) <= 1 and gable[int(end)]:
+            order = [int(end)]
+        else:
+            order = [e for e in (mk, 1 - mk) if gable[e]]   # marker end first
+        if not order:
+            return None, mk
+        fallback = order[0]
+        sc = self.scene()
+        if sc is None:
+            return None, fallback
+        pts = {0: self.p1, 1: self.p2}
+        best = None                                          # (wall, end)
+        for end_i in order:
+            end_pt = pts[end_i]
             cand = None
             for it in sc.items():
                 if (not isinstance(it, WallItem) or sip.isdeleted(it)
@@ -2375,11 +2393,13 @@ class RoofItem(QGraphicsItem):
                     cand = (key, it)
             if cand is not None:
                 # prefer an end that actually has windows
-                if best is None or (len(cand[1].openings) and not len(best.openings)):
-                    best = cand[1]
-                if len(best.openings):
+                if best is None or (len(cand[1].openings) and not len(best[0].openings)):
+                    best = (cand[1], end_i)
+                if len(best[0].openings):
                     break
-        return best
+        if best is not None:
+            return best
+        return None, fallback
 
     def sync_dormer_walls(self):
         """P4 (0296): mint/sync the dormer's own walls -- face, cheek_left,
