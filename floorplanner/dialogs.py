@@ -1670,15 +1670,48 @@ class RoofEndOnDialog(QDialog):
         self.elev_canvas = _ElevationCanvas(self)
         _elev_page = QWidget()
         _elev_lay = QVBoxLayout(_elev_page)
+        # #3 (2026-11-10): EITHER gable end may be drawn, and the blue dot marks
+        # which. The selector lists the roof's LIVE gable ends (a dormer has one
+        # face -> no selector; one gable end -> a single, disabled entry; none ->
+        # the canvas says so). Picking an end moves the blue end-marker to that
+        # ridge end as a live indicator -- restored to the roof's real marker end
+        # when the dialog closes (`_restore_marker_dot`), so merely LOOKING at the
+        # far end never rewrites which end the roof calls its marker.
+        self.cb_elev_end = None
+        self._marker_dot_home = True
+        _gf = list(getattr(roof, "gable", [True, True]))
+        self._elev_end = (self._marker_end if _gf[self._marker_end]
+                          else (0 if _gf[0] else 1))
+        if not self._dormer:
+            _end_row = QHBoxLayout()
+            _end_row.addWidget(QLabel("Gable end"))
+            self.cb_elev_end = QComboBox()
+            for _e in (self._marker_end, 1 - self._marker_end):
+                if _gf[_e]:
+                    self.cb_elev_end.addItem(
+                        "Marker end (blue dot)" if _e == self._marker_end
+                        else "Other end", _e)
+            self.cb_elev_end.setEnabled(self.cb_elev_end.count() > 1)
+            _idx = self.cb_elev_end.findData(self._elev_end)
+            if _idx >= 0:
+                self.cb_elev_end.setCurrentIndex(_idx)
+            _end_row.addWidget(self.cb_elev_end)
+            _end_row.addStretch(1)
+            _elev_lay.addLayout(_end_row)
+            self.cb_elev_end.currentIndexChanged.connect(lambda _i: self._on_elev_end())
+            if self._elev_end != self._marker_end:
+                self._place_marker_dot(self._elev_end)   # marker end is a hip
         _elev_lay.addWidget(self.elev_canvas)
         _elev_note = QLabel("The gable end, straight on and to scale. Each window "
                             "is located by its size, its sill above the floor, and "
-                            "its offset from the gable centreline.")
+                            "its offset from the gable centreline. The blue dot in "
+                            "the plan marks the end shown here.")
         _elev_note.setWordWrap(True)
         _elev_note.setStyleSheet("color: #666;")
         _elev_lay.addWidget(_elev_note)
         self.tabs.addTab(_elev_page, "Elevation")
         self.tabs.currentChanged.connect(lambda _i: self._refresh_elevation())
+        self.finished.connect(self._restore_marker_dot)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
                                    | QDialogButtonBox.StandardButton.Cancel)
@@ -1713,12 +1746,51 @@ class RoofEndOnDialog(QDialog):
         self._refresh_elevation()
 
     def _refresh_elevation(self):
-        """#3: feed the Elevation tab this roof's gable-end drawing. Reads the
-        roof's stored geometry (the tab reflects the saved state; live spinbox
-        tracking is a later parameter, his to order)."""
+        """#3: feed the Elevation tab this roof's gable-end drawing, for the end
+        the selector names. Reads the roof's stored geometry (the tab reflects
+        the saved state; live spinbox tracking is a later parameter, his to
+        order)."""
         canvas = getattr(self, "elev_canvas", None)
         if canvas is not None:
-            canvas.set_data(self.roof.gable_elevation())
+            canvas.set_data(self.roof.gable_elevation(end=getattr(self, "_elev_end", None)))
+
+    def _on_elev_end(self):
+        """#3 (2026-11-10): the Elevation tab's end selector changed -- redraw
+        that end and move the blue dot to it, so the plan shows which end."""
+        if self.cb_elev_end is None:
+            return
+        data = self.cb_elev_end.currentData()
+        if data is None:
+            return
+        self._elev_end = int(data)
+        self._place_marker_dot(self._elev_end)
+        self._refresh_elevation()
+
+    def _place_marker_dot(self, end):
+        """Move the roof's blue end-marker to `end` (p1/p2) as a live indicator
+        of the drawn end. Transient (the dialog is modal): `_restore_marker_dot`
+        puts it back at the roof's real marker end when the dialog closes."""
+        self._marker_dot_home = (end == self._marker_end)
+        marker = getattr(self.roof, "marker", None)
+        if marker is None:
+            return
+        try:
+            marker.setPos(self.roof.p1 if end == 0 else self.roof.p2)
+        except RuntimeError:
+            pass                        # the C++ marker went away -- nothing to move
+
+    def _restore_marker_dot(self, *_):
+        """On close, snap the blue dot back to the roof's real marker end --
+        viewing the far end never changed `marker_end`, only the dot's position."""
+        if getattr(self, "_marker_dot_home", True):
+            return
+        marker = getattr(self.roof, "marker", None)
+        if marker is None:
+            return
+        try:
+            marker.sync_position()
+        except RuntimeError:
+            pass
 
     # -- the three-way recompute (0139-ruling.md sec2 / 0140-ruling.md sec2) --
     def _spin(self, field):
