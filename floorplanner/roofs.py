@@ -927,10 +927,25 @@ def room_ceiling_break_lines(scene, room):
                 mid = QPointF(p.x() + dx * tm, p.y() + dy * tm)
                 if not tr.holds(mid, margin):
                     continue
-                if region is not None and not region.contains(mid):
-                    continue
-                out.append((QPointF(p.x() + dx * t0, p.y() + dy * t0),
-                            QPointF(p.x() + dx * t1, p.y() + dy * t1)))
+                a = QPointF(p.x() + dx * t0, p.y() + dy * t0)
+                b = QPointF(p.x() + dx * t1, p.y() + dy * t1)
+                # A roof governs a room's ceiling only where it is the DRAWN
+                # roof (its clip region). CLIP each knee segment to that region,
+                # never the all-or-nothing midpoint test it replaces (#1,
+                # 2026-11-09): a dormer sits in the host roof, SMALLER than the
+                # attic it pops out of, so the host's own knee -- where the main
+                # slope drops to the attic knee wall -- runs BESIDE the dormer.
+                # The old test dropped a whole knee segment whenever its
+                # midpoint fell in the dormer, so the host knee vanished across
+                # the whole attic (his wiscaway L2: 14in -> 109in). Splitting at
+                # the region boundary keeps the host knee where the host is
+                # drawn and removes it only where the dormer actually stands;
+                # the dormer's own knee is unchanged.
+                for c, d2 in (region.clip_segment(a, b) if region is not None
+                              else [(a, b)]):
+                    if math.hypot(d2.x() - c.x(), d2.y() - c.y()) < _CLIP_EPS_IN:
+                        continue
+                    out.append((QPointF(c.x(), c.y()), QPointF(d2.x(), d2.y())))
     room._knee_memo = (key, list(out))
     return list(out)
 

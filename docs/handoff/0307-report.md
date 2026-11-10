@@ -1,11 +1,18 @@
-# 0307 — report: #1 the L2 attic knee line — the host roof's knee survives beside a dormer, built on a branch
+# 0307 — report: #1 the L2 attic knee line — the host roof's knee survives beside a dormer
+
+**MERGED** into `main` 2026-11-09 by a two-parent local merge of
+`l2-knee-under-dormer` (the merge commit on `main`; PR
+[#105](https://github.com/pjm4github/FloorPlanner/pull/105)), on his word after
+his own check — "That checks out fine. The attic rooms look fine too." Recorded
+here and in the snapshot, like the arc's own local merges (no `**Landed:**` line:
+a two-parent merge's landing commit is not on `main`'s first-parent chain).
 
 **Code, 2026‑11‑09.** The record ([`0197-ruling.md`](0197-ruling.md) §7). His
 standing item **#1** (the L2 knee line), unblocked when P4 closed the attic room
 against the dormer walls ([`0305`](0305-report.md) §2, [`0306`](0306-report.md)
 §1). Built on branch `l2-knee-under-dormer`, cut from `main` (c218b6e, the P4
-merge, [`0306`](0306-report.md)); AMBER, **not merged** — awaiting his check in
-the app.
+merge, [`0306`](0306-report.md)); AMBER, **merged on his word after his own
+check** (header).
 
 ## 1. HIS WORD, AND THE FAULT
 
@@ -70,6 +77,6 @@ Gate: full mode, GREEN.
 
 ## 5. NEXT
 
-Awaiting his check — the host knee beside a dormer in the L2 attic, in the app;
-on his word, merge. His other standing item **#3** (a dimensioned gable-end
-window elevation) is separate; 0248's items 8–9 named, not ordered.
+Checked and MERGED (his word — "the attic rooms look fine too"). His other
+standing item **#3** (a dimensioned gable-end window elevation) is separate;
+0248's items 8–9 named, not ordered.
