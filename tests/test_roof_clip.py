@@ -189,6 +189,36 @@ def test_no_knee_line_when_the_whole_roof_is_above_the_ceiling(scene):
     assert room_ceiling_break_lines(scene, room) == []
 
 
+def test_the_host_knee_survives_beside_a_dormer(scene):
+    """#1, his word 2026-11-09 ("the dormer is a smaller section than the
+    attic"): a dormer sits WITHIN the host roof, so the host's own knee -- where
+    the main slope drops to the attic knee wall -- runs BESIDE the dormer across
+    the rest of the room. The host roof is the DRAWN roof there (its clip region
+    is the room minus the dormer strip); the dormer carves a central gap out of
+    it. The old all-or-nothing midpoint test dropped the whole knee segment
+    because its midpoint fell in the dormer gap, so the host knee vanished
+    across the entire attic. Clipping the segment to the region keeps the two
+    stretches either side and removes only the dormer's own width."""
+    from floorplanner.roofclip import ClipRegion
+    from floorplanner.roofs import room_ceiling_break_lines
+    room = _room(scene)
+    rf = _roof(scene)                         # knee at y = 100 +/- PERP_THRESH
+    # the host's territory: the room MINUS a central dormer strip x in [110,190]
+    gap_lo, gap_hi = 110.0, 190.0
+    rf._clip_region = ClipRegion([
+        [QPointF(0, 0), QPointF(gap_lo, 0), QPointF(gap_lo, 200), QPointF(0, 200)],
+        [QPointF(gap_hi, 0), QPointF(300, 0), QPointF(300, 200), QPointF(gap_hi, 200)]])
+    room._knee_memo = None
+    knee = room_ceiling_break_lines(scene, room)
+    assert knee, "the host knee was dropped wholesale under the dormer"
+    xs = [x for s in knee for x in (s[0].x(), s[1].x())]
+    # it reaches BOTH sides of the dormer, and nothing crosses the gap's middle
+    assert min(xs) < gap_lo and max(xs) > gap_hi
+    for p, q in knee:
+        mx = (p.x() + q.x()) / 2.0
+        assert not (gap_lo + 1.0 < mx < gap_hi - 1.0), "a knee segment runs through the dormer"
+
+
 def test_the_lower_of_two_bordering_rooms_governs(scene):
     """A wall between two rooms of different ceiling heights: clipped by the
     MORE restrictive one, not whichever happens to be found first -- the
