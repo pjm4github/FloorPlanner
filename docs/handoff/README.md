@@ -450,5 +450,6 @@ this table is not a second copy of it.
 | [`0308-report.md`](./0308-report.md) | report: #3 the gable-end window elevation — the End-On dialog's Elevation tab, built on a branch |
 | [`0309-report.md`](./0309-report.md) | report: either gable end in the Elevation tab — the End-On dialog, on a branch |
 | [`0310-report.md`](./0310-report.md) | report: the schema viewer swept to `main` — tidy graph, field-expand, cross-view highlight, and an edit-source/reload loop |
+| [`0311-report.md`](./0311-report.md) | report: the gable-end Elevation tab reads the walls under the gable and draws their doors AND windows, to scale with measurements — on a branch |
 
 <!-- PAIRS:END -->
