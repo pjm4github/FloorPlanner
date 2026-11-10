@@ -448,5 +448,6 @@ this table is not a second copy of it.
 | [`0306-report.md`](./0306-report.md) | report: P4 of the 1½-storey arc MERGED — the `dormer` wall type, plus three 2026‑11‑08 render fixes |
 | [`0307-report.md`](./0307-report.md) | report: #1 the L2 attic knee line — the host roof's knee survives beside a dormer |
 | [`0308-report.md`](./0308-report.md) | report: #3 the gable-end window elevation — the End-On dialog's Elevation tab, built on a branch |
+| [`0309-report.md`](./0309-report.md) | report: either gable end in the Elevation tab — the End-On dialog, on a branch |
 
 <!-- PAIRS:END -->
