@@ -2247,6 +2247,140 @@ class RoofItem(QGraphicsItem):
         return (QPointF(a.x() + ux * u0, a.y() + uy * u0),
                 QPointF(a.x() + ux * u1, a.y() + uy * u1))
 
+    def gable_elevation(self):
+        """#3 (0294 §4): the data for the End-On dialog's ELEVATION tab -- this
+        roof's gable end seen straight-on, to scale, with its window(s) LOCATED.
+        A dict, or None when there is no gable end to draw.
+
+        `kind` 'dormer': the dormer's own FACE gable and its `openings` (the
+        windows the dialog edits). `kind` 'gable': a plain gable roof's end and
+        the gable-end WALL's openings (the exterior wall perpendicular to the
+        ridge at that end, found in the scene). Heights are measured from the
+        elevation's own floor; `floor_abs_in` is that floor's absolute elevation
+        (for the label). A window's `centre_in` is its centre's horizontal
+        offset from the gable centreline (+ toward `span_in[1]`/`p2`),
+        `sill_in`/`head_in` its heights above the floor. `apex_in` is the
+        ridge peak's own offset from that centreline (0 when symmetric).
+
+        The minimal LOCATING set (his order 2026-11-09): per window its width,
+        height, sill-above-floor and centre offset; more parameters land here
+        as he orders them (0294 §4)."""
+        from floorplanner.model import DEFAULT_SILL_IN
+        if self.is_dormer():
+            host = self.host
+            if host is None or sip.isdeleted(host):
+                return None
+            lines = self._dormer_wall_lines()
+            if not lines:
+                return None
+            a, b = lines[0]                       # the face wall, left -> right
+            width = math.hypot(b.x() - a.x(), b.y() - a.y())
+            if width < _CLIP_EPS_IN:
+                return None
+            ux, uy = (b.x() - a.x()) / width, (b.y() - a.y()) / width
+            floor = float(self.dormer_sill_floor_in())
+            span_l, span_r = (float(v) for v in getattr(self, "span_in", [width / 2, width / 2]))
+            apex = (span_l - (span_l + span_r) / 2.0) if (span_l + span_r) > 0 else 0.0
+            windows = []
+            for o in (getattr(self, "openings", None) or []):
+                seg = self.face_window_span(o)
+                if seg is None:
+                    continue
+                try:
+                    w, h = parse_wwhh(o["code"])
+                except (KeyError, ValueError, TypeError):
+                    continue
+                p, q = seg
+                along = ((p.x() + q.x()) / 2.0 - a.x()) * ux + ((p.y() + q.y()) / 2.0 - a.y()) * uy
+                sill = o.get("sill_in", None)
+                sill = (float(sill) if sill is not None else floor + DEFAULT_SILL_IN) - floor
+                windows.append({"centre_in": along - width / 2.0, "w_in": float(w),
+                                "h_in": float(h), "sill_in": sill, "head_in": sill + float(h)})
+            return {"kind": "dormer", "width_in": width,
+                    "eaves_in": float(self.eaves_h_in) - floor,
+                    "ridge_in": float(self.ridge_h_in) - floor,
+                    "floor_abs_in": float(floor_elevation(host.floor)) + floor,
+                    "apex_in": apex, "shed": getattr(self, "form", "gable") == "shed",
+                    "windows": windows}
+
+        gable = list(getattr(self, "gable", [True, True]))
+        if not any(gable):
+            return None
+        p1, p2 = self.p1, self.p2
+        dx, dy = p2.x() - p1.x(), p2.y() - p1.y()
+        L = math.hypot(dx, dy) or 1.0
+        ux, uy = dx / L, dy / L
+        span_l, span_r = (float(v) for v in getattr(self, "span_in", [144.0, 144.0]))
+        width = span_l + span_r
+        wall = self._gable_end_wall(gable, (ux, uy))
+        windows = []
+        if wall is not None:
+            wl = wall.length() or 1.0
+            for op in wall.openings:
+                try:
+                    _w, h = parse_wwhh(op.code)
+                except (ValueError, TypeError, AttributeError):
+                    h = None
+                sill = getattr(op, "sill_in", None)
+                sill = float(sill) if sill is not None else DEFAULT_SILL_IN
+                hh = float(h) if h is not None else 0.0
+                windows.append({"centre_in": float(op.s) - wl / 2.0,
+                                "w_in": float(op.width), "h_in": hh,
+                                "sill_in": sill, "head_in": sill + hh})
+        return {"kind": "gable", "width_in": width,
+                "eaves_in": float(self.eaves_h_in),
+                "ridge_in": float(self.ridge_h_in),
+                "floor_abs_in": float(floor_elevation(self.floor)),
+                "apex_in": span_l - width / 2.0,
+                "shed": getattr(self, "form", "gable") == "shed",
+                "windows": windows}
+
+    def _gable_end_wall(self, gable, axis):
+        """The exterior wall standing across a gable end of this (plain) roof --
+        perpendicular to the ridge, within the eaves width, long enough to be the
+        end wall. Of the live gable ends, prefer the one whose wall carries
+        windows, else the `marker_end`. None when the scene has no such wall."""
+        sc = self.scene()
+        if sc is None:
+            return None
+        ux, uy = axis
+        width = sum(float(v) for v in getattr(self, "span_in", [144.0, 144.0])) or 1.0
+        ends = [(0, self.p1), (1, self.p2)]
+        # the marker end first, so a tie falls to the roof's canonical end
+        mk = 1 if getattr(self, "marker_end", 1) else 0
+        ends.sort(key=lambda e: 0 if e[0] == mk else 1)
+        best = None
+        for end_i, end_pt in ends:
+            if not gable[end_i]:
+                continue
+            cand = None
+            for it in sc.items():
+                if (not isinstance(it, WallItem) or sip.isdeleted(it)
+                        or it.floor != self.floor
+                        or getattr(it, "wall_type", None) not in ("exterior", "dormer")):
+                    continue
+                a, b = it.p1, it.p2
+                wdx, wdy = b.x() - a.x(), b.y() - a.y()
+                wl = math.hypot(wdx, wdy)
+                if wl < 0.5 * width:
+                    continue
+                if abs((wdx / wl) * ux + (wdy / wl) * uy) > 0.25:   # not perpendicular
+                    continue
+                mx, my = (a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0
+                along = abs((mx - end_pt.x()) * ux + (my - end_pt.y()) * uy)
+                if along > width:
+                    continue
+                key = (-len(it.openings), along)
+                if cand is None or key < cand[0]:
+                    cand = (key, it)
+            if cand is not None:
+                # prefer an end that actually has windows
+                if best is None or (len(cand[1].openings) and not len(best.openings)):
+                    best = cand[1]
+                if len(best.openings):
+                    break
+        return best
+
     def sync_dormer_walls(self):
         """P4 (0296): mint/sync the dormer's own walls -- face, cheek_left,
         cheek_right -- as real `dormer`-type `WallItem`s on the storey ABOVE the
