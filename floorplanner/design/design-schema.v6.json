@@ -45,6 +45,7 @@
     "reference_images": { "type": "array", "items": { "$ref": "#/$defs/reference_image" } },
     "annotations": { "type": "array", "items": { "$ref": "#/$defs/annotation" } },
     "roofs":       { "type": "array", "items": { "$ref": "#/$defs/roof" } },
+    "cameras":     { "type": "array", "items": { "$ref": "#/$defs/camera" } },
 
     "provenance": {
       "description": "How this document came to be, written ONCE at import and never mutated afterwards. Present only on documents converted from a legacy v1-v4 file, where the load-time weld changed real coordinates: it is the audit trail answering 'why is this room a different size than it was in v4?'. Stable, so it is safe to include in the dict equality used for the dirty flag.",
@@ -505,6 +506,20 @@
         "text":      { "type": "string" },
         "rotation":  { "type": "number", "default": 0 },
         "refs":      { "type": "array", "items": { "$ref": "#/$defs/id" } }
+      }
+    },
+
+    "camera": {
+      "description": "0313-report.md: a VIEWPOINT placed on the plan. The user drops a camera in a room or by a wall, aims it, and opens an ELEVATION of the wall it faces. `pos` is the camera point; `rotation` is the aim direction in degrees (0 = +x, Qt scene convention, y down). OPTIONAL block, present only once a camera is placed; a document written before it has none, and still validates.",
+      "type": "object",
+      "required": ["id", "level", "pos"],
+      "additionalProperties": false,
+      "properties": {
+        "id":       { "$ref": "#/$defs/id" },
+        "level":    { "$ref": "#/$defs/id" },
+        "pos":      { "description": "Plan coordinates of the camera.", "$ref": "#/$defs/point" },
+        "rotation": { "description": "Aim direction in degrees (0 = +x).", "type": "number", "default": 0 },
+        "name":     { "type": "string" }
       }
     }
   }

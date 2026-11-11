@@ -174,6 +174,20 @@ class Furnishing(_Node):
 
 
 @dataclass
+class Camera(_Node):
+    """0313: a plan VIEWPOINT -- a camera the user drops, aims (`rotation`, the
+    aim in degrees, 0 = +x), and opens an elevation from. OPTIONAL block,
+    additive (no version bump), the same RAW-passthrough shape furnishings use."""
+    FIELDS: ClassVar = [("id", RAW), ("level", RAW), ("pos", RAW),
+                        ("rotation", RAW), ("name", RAW)]
+    id: Any = _MISSING
+    level: Any = _MISSING
+    pos: Any = _MISSING
+    rotation: Any = _MISSING
+    name: Any = _MISSING
+
+
+@dataclass
 class Group(_Node):
     FIELDS: ClassVar = [("id", RAW), ("level", RAW), ("name", RAW),
                         ("members", RAW), ("rotation", RAW)]
@@ -289,7 +303,7 @@ class Design(_Node):
                         ("furnishings", _list(Furnishing)),
                         ("groups", _list(Group)), ("reference_images", RAW),
                         ("annotations", RAW), ("roofs", _list(Roof)),
-                        ("provenance", Provenance)]
+                        ("cameras", _list(Camera)), ("provenance", Provenance)]
     format: Any = _MISSING
     version: Any = _MISSING
     units: Any = _MISSING
@@ -303,4 +317,5 @@ class Design(_Node):
     reference_images: Any = _MISSING
     annotations: Any = _MISSING
     roofs: Any = _MISSING
+    cameras: Any = _MISSING
     provenance: Any = _MISSING

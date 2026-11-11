@@ -675,6 +675,19 @@ class PlanView(QGraphicsView):
                 self.win.set_tool(TOOL_SELECT)
                 e.accept()
                 return
+            if tool == TOOL_CAMERA:
+                # 0313: drop a viewpoint; aim it with its handle, double-click
+                # it (or right-click -> Open elevation) for the wall's elevation
+                from floorplanner.cameras import CameraItem
+                cam = CameraItem(sp)
+                self.scene().addItem(cam)
+                if not getattr(self.win, "_cameras_visible", True):
+                    cam.setVisible(False)
+                self.win.status("Camera placed. Drag the round handle to aim it; "
+                                "double-click it for the elevation.")
+                self.win.set_tool(TOOL_SELECT)
+                e.accept()
+                return
             if tool == TOOL_MEASURE:
                 p, w = self._measure_snap(sp)
                 item = DimensionItem(p, p)
