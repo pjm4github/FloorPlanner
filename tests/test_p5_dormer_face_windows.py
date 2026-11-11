@@ -163,3 +163,23 @@ def test_the_face_window_undersill_fills_up_to_the_sill(fp3d):
     model = fp3d.build_model(_doc(dormer_window=True), furnishings=False, floors=False)
     assert _ray_hits(model, 200.0, 190.0) > 0, "the gap between roof and sill is open"
     assert _ray_hits(model, 200.0, 205.0) == 0, "the window is not a void"
+
+
+def test_a_host_door_under_a_dormer_window_is_not_filled(fp3d):
+    """Regression (Patrick, 2026-11, little-dormer-test): the L1 front DOOR under
+    a front dormer was filled solid in 3D. The dormer face window's climb-band
+    under-sill (the gable wall below the window) ran all the way to the floor over
+    the host wall, closing the door. The host wall is already built with its own
+    openings, so over a host opening the climb-band must start ABOVE the host wall
+    top, leaving the door its hole -- while the gable above the door stays solid."""
+    doc = _doc(dormer_window=True)
+    doc["walls"][0]["openings"] = [
+        {"id": "hd", "kind": "door", "code": "3080",   # a door, centred under the window
+         "anchor": {"from": "center", "offset_in": 0.0}}]
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    # the door (0..80) is a VOID -- a ray across the wall thickness at mid-door
+    # meets no exterior triangle
+    assert _ray_hits(model, 200.0, 40.0) == 0, "the host door under the dormer window is filled"
+    # the gable ABOVE the door head (z=150, between the 96 wall top and the 195
+    # sill) is solid -- the wall still climbs to the window
+    assert _ray_hits(model, 200.0, 150.0) > 0, "the gable above the door is open"

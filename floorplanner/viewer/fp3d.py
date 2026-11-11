@@ -2733,8 +2733,25 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                     # the gable, which can sit ABOVE the host roof -- it climbs
                     # into the dormer like the piers do, but capped at the SILL so
                     # the window stays a hole, not a slot down to the floor.
-                    parts += piece(quad(s0, s1), z0, z0 + sill, True,
-                                   climb_cap=z0 + sill)
+                    # It must NOT re-fill a DOOR or WINDOW already cut in the HOST
+                    # wall below it, though (Patrick, 2026-11: an L1 door under a
+                    # front dormer was filled solid in 3D). The host wall is built
+                    # with its own openings by the ordinary loop, so OVER a host
+                    # opening the gable starts above the host wall top (leaving
+                    # that opening its hole and header); elsewhere it fills from
+                    # z0 exactly as before (a plain gable below a dormer window).
+                    top_z = z0 + sill
+                    host = [(c0, c1) for (c0, c1, _cs, _ch, cb) in cuts
+                            if not cb and c1 > s0 + 1e-6 and c0 < s1 - 1e-6]
+                    edges = sorted({s0, s1} | {e for (c0, c1) in host
+                                               for e in (c0, c1) if s0 < e < s1})
+                    for a, b in zip(edges, edges[1:], strict=False):
+                        mid = 0.5 * (a + b)
+                        over = any(c0 - 1e-6 <= mid <= c1 + 1e-6 for (c0, c1) in host)
+                        band_base = z1 if over else z0
+                        if top_z > band_base + 1e-6:
+                            parts += piece(quad(a, b), band_base, top_z, True,
+                                           climb_cap=top_z)
                 else:
                     # under the sill: a block to min(surface, sill) -- `to_top=
                     # False` already caps it at the roof where the roof is lower.
