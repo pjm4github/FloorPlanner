@@ -93,6 +93,102 @@ def test_gable_end_wall_returns_the_requested_end_index(scene):
     assert (wall1, end1) == (w1, 1)
 
 
+# -- his order 2026-11-11: doors AND windows, and every wall under the gable --
+
+def test_a_door_in_the_gable_end_sits_on_the_floor(scene):
+    """A door in the gable-end wall is read AS a door -- on the floor (sill 0),
+    its real height, kind 'door' -- not floated at the window sill default."""
+    rf = _gable(scene)
+    w = WallItem(QPointF(0, 0), QPointF(0, 200), "exterior")
+    w.floor = DEFAULT_FLOOR
+    w.openings.append(fp.OpeningItem(w, "door", "3680", 100.0))   # 36x80, centred
+    scene.addItem(w)
+    e = rf.gable_elevation(end=0)
+    assert e["windows"] == []                      # doors are kept separate
+    assert len(e["doors"]) == 1
+    d = e["doors"][0]
+    assert d["kind"] == "door"
+    assert d["w_in"] == pytest.approx(36.0)
+    assert d["h_in"] == pytest.approx(80.0)        # height is real, not 0
+    assert d["sill_in"] == pytest.approx(0.0)      # on the floor
+    assert d["head_in"] == pytest.approx(80.0)
+    assert d["centre_in"] == pytest.approx(0.0, abs=0.5)
+
+
+def test_a_door_and_a_window_go_to_their_own_lists(scene):
+    """A gable-end wall carrying a door and a window puts each in its own list."""
+    rf = _gable(scene)
+    w = WallItem(QPointF(0, 0), QPointF(0, 200), "exterior")
+    w.floor = DEFAULT_FLOOR
+    w.openings.append(fp.OpeningItem(w, "door", "3680", 60.0))
+    w.openings.append(fp.OpeningItem(w, "window", "3030", 150.0))
+    scene.addItem(w)
+    e = rf.gable_elevation(end=0)
+    assert [o["kind"] for o in e["windows"]] == ["window"]
+    assert [o["kind"] for o in e["doors"]] == ["door"]
+
+
+def test_collinear_gable_segments_are_all_read(scene):
+    """A gable end built from TWO collinear exterior segments (split by a tee or
+    a drawn gap) shows the openings from BOTH walls -- not just one."""
+    rf = _gable(scene)
+    lo = WallItem(QPointF(0, 0), QPointF(0, 82), "exterior")       # lower segment
+    lo.floor = DEFAULT_FLOOR
+    lo.openings.append(fp.OpeningItem(lo, "window", "2430", 40.0))
+    scene.addItem(lo)
+    hi = WallItem(QPointF(0, 118), QPointF(0, 200), "exterior")    # upper segment
+    hi.floor = DEFAULT_FLOOR
+    hi.openings.append(fp.OpeningItem(hi, "door", "3080", 40.0))    # within the 82" segment
+    scene.addItem(hi)
+    e = rf.gable_elevation(end=0)
+    assert len(e["windows"]) == 1 and len(e["doors"]) == 1     # one from each segment
+    # both openings land inside the gable's half-width (not off the end)
+    assert all(abs(o["centre_in"]) <= 100.0 for o in e["windows"] + e["doors"])
+
+
+def test_both_storeys_under_the_gable_are_read(scene):
+    """A two-storey gable end: the roof's OWN floor AND the floor above both
+    stand under it, so an upper-storey window is read and LIFTED to its true
+    height -- its floor-to-floor rise plus its own sill -- not floated at the
+    ground-floor sill (his order 2026-11-11: both floors on the elevation)."""
+    from floorplanner.config import set_floor_state
+    set_floor_state(elevations={DEFAULT_FLOOR: 0.0, "upper": 96.0})
+    rf = _gable(scene)                                   # on DEFAULT_FLOOR
+    lo = WallItem(QPointF(0, 0), QPointF(0, 200), "exterior")   # ground gable wall
+    lo.floor = DEFAULT_FLOOR
+    lo.openings.append(fp.OpeningItem(lo, "window", "3648", 100.0))   # sill default 36
+    scene.addItem(lo)
+    hi = WallItem(QPointF(0, 0), QPointF(0, 200), "exterior")   # storey above, stacked
+    hi.floor = "upper"
+    hi.openings.append(fp.OpeningItem(hi, "window", "6048", 100.0))
+    scene.addItem(hi)
+
+    e = rf.gable_elevation(end=0)
+    assert len(e["windows"]) == 2                        # both storeys are read
+    by_w = {round(w["w_in"]): w for w in e["windows"]}
+    assert by_w[36]["sill_in"] == pytest.approx(36.0)    # ground floor, at its own sill
+    assert by_w[60]["sill_in"] == pytest.approx(96.0 + 36.0)         # lifted one storey
+    assert by_w[60]["head_in"] == pytest.approx(96.0 + 36.0 + 48.0)
+
+
+def test_an_upper_storey_door_sits_on_its_own_floor(scene):
+    """A door on the floor above sits on THAT storey's floor -- sill at the
+    floor-to-floor rise, not 0 -- so it draws in the gable, not the ground."""
+    from floorplanner.config import set_floor_state
+    set_floor_state(elevations={DEFAULT_FLOOR: 0.0, "upper": 108.0})
+    rf = _gable(scene)
+    hi = WallItem(QPointF(0, 0), QPointF(0, 200), "exterior")
+    hi.floor = "upper"
+    hi.openings.append(fp.OpeningItem(hi, "door", "3680", 100.0))
+    scene.addItem(hi)
+    e = rf.gable_elevation(end=0)
+    assert e["windows"] == []
+    assert len(e["doors"]) == 1
+    d = e["doors"][0]
+    assert d["sill_in"] == pytest.approx(108.0)          # on the upper floor
+    assert d["head_in"] == pytest.approx(108.0 + 80.0)
+
+
 # -- the dialog: the selector and the blue dot ----------------------------
 
 @pytest.mark.gui

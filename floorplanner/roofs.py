@@ -2302,13 +2302,14 @@ class RoofItem(QGraphicsItem):
                 sill = o.get("sill_in", None)
                 sill = (float(sill) if sill is not None else floor + DEFAULT_SILL_IN) - floor
                 windows.append({"centre_in": along - width / 2.0, "w_in": float(w),
-                                "h_in": float(h), "sill_in": sill, "head_in": sill + float(h)})
+                                "h_in": float(h), "sill_in": sill,
+                                "head_in": sill + float(h), "kind": "window"})
             return {"kind": "dormer", "width_in": width, "end": 0,
                     "eaves_in": float(self.eaves_h_in) - floor,
                     "ridge_in": float(self.ridge_h_in) - floor,
                     "floor_abs_in": float(floor_elevation(host.floor)) + floor,
                     "apex_in": apex, "shed": getattr(self, "form", "gable") == "shed",
-                    "windows": windows}
+                    "windows": windows, "doors": []}
 
         gable = list(getattr(self, "gable", [True, True]))
         if not any(gable):
@@ -2319,34 +2320,115 @@ class RoofItem(QGraphicsItem):
         ux, uy = dx / L, dy / L
         span_l, span_r = (float(v) for v in getattr(self, "span_in", [144.0, 144.0]))
         width = span_l + span_r
+        apex_in = span_l - width / 2.0
         wall, end = self._gable_end_wall(gable, (ux, uy), end=end)
-        windows = []
-        if wall is not None:
-            wl = wall.length() or 1.0
-            for op in wall.openings:
-                try:
-                    _w, h = parse_wwhh(op.code)
-                except (ValueError, TypeError, AttributeError):
-                    h = None
-                sill = getattr(op, "sill_in", None)
-                sill = float(sill) if sill is not None else DEFAULT_SILL_IN
-                hh = float(h) if h is not None else 0.0
-                windows.append({"centre_in": float(op.s) - wl / 2.0,
-                                "w_in": float(op.width), "h_in": hh,
-                                "sill_in": sill, "head_in": sill + hh})
+        end_pt = p1 if end == 0 else p2
+        windows, doors = self._gable_end_openings(wall, end_pt, (ux, uy), apex_in, width)
         return {"kind": "gable", "width_in": width, "end": end,
                 "eaves_in": float(self.eaves_h_in),
                 "ridge_in": float(self.ridge_h_in),
                 "floor_abs_in": float(floor_elevation(self.floor)),
-                "apex_in": span_l - width / 2.0,
+                "apex_in": apex_in,
                 "shed": getattr(self, "form", "gable") == "shed",
-                "windows": windows}
+                "windows": windows, "doors": doors}
+
+    def _gable_floors(self):
+        """The storeys standing under this gable end, as `{floor_name: rise}` --
+        the roof's OWN floor (rise 0) and EVERY floor above it by elevation
+        (rise = its elevation above the roof floor), so a two-storey gable shows
+        both floors' openings, each lifted to its true height (his order
+        2026-11-11: both floors on the elevation). A bare scene with no elevation
+        cache yields just the roof's own floor at rise 0 -- a single level draws
+        exactly as before."""
+        base = float(floor_elevation(self.floor))
+        floors = {self.floor: 0.0}
+        for name, el in floor_elevations().items():
+            if float(el) > base + 1e-6:
+                floors[name] = float(el) - base
+        return floors
+
+    def _gable_end_openings(self, primary, end_pt, axis, apex_in, width):
+        """Every DOOR and WINDOW in the wall(s) standing under this gable end --
+        the gable-end wall `primary` AND any COLLINEAR segments of it (a gable
+        wall split by a doorway or a tee leaves more than one `WallItem` on the
+        same line), ACROSS every storey under the gable (the roof's floor and the
+        floors above it -- a second-storey gable window is read and lifted to its
+        true height), so no opening is dropped (his order 2026-11-11). Each is
+        located in the elevation's own frame:
+
+          * `centre_in` -- the opening centre's offset from the gable centreline,
+            + toward the primary wall's p2; it reduces to the old `s - length/2`
+            for a single wall centred on the ridge;
+          * `sill_in` / `head_in` -- heights above the elevation floor, LIFTED by
+            the opening's own storey (an upper floor's window rides at its
+            floor-to-floor height plus its sill); a `door` or `gate` sits ON its
+            storey's floor, a window on its own sill (its record's, else
+            `DEFAULT_SILL_IN`);
+          * `w_in` / `h_in` -- the opening's size (`OpeningItem.width/height`,
+            set for every kind, so a door's height is real, not 0);
+          * `kind` -- 'window' | 'door' | 'gate'.
+
+        Returns `(windows, doors)` -- two SEPARATE lists (his word 2026-11-11, so
+        a reader never has to tell them apart by a tag); each is empty when there
+        is no end wall (a bare gable still draws its triangle). A gate rides with
+        the doors -- it sits on the floor and draws the same."""
+        from floorplanner.model import DEFAULT_SILL_IN
+        windows, doors = [], []
+        sc = self.scene()
+        if primary is None or sc is None:
+            return windows, doors
+        floors = self._gable_floors()           # storey name -> its lift above the floor
+        ux, uy = axis
+        px, py = -uy, ux                                   # the width (perp) axis
+        pa, pb = primary.p1, primary.p2
+        if (pb.x() - pa.x()) * px + (pb.y() - pa.y()) * py < 0:
+            px, py = -px, -py                              # sign it to the wall's p1->p2
+        pmx, pmy = (pa.x() + pb.x()) / 2.0, (pa.y() + pb.y()) / 2.0
+        a0 = (pmx - end_pt.x()) * ux + (pmy - end_pt.y()) * uy   # the gable line's depth
+        for it in sc.items():
+            if (not isinstance(it, WallItem) or sip.isdeleted(it)
+                    or it.floor not in floors
+                    or getattr(it, "wall_type", None) not in ("exterior", "dormer")):
+                continue
+            rise = floors[it.floor]             # lift this storey's openings to true height
+            a, b = it.p1, it.p2
+            wdx, wdy = b.x() - a.x(), b.y() - a.y()
+            wl = math.hypot(wdx, wdy)
+            if wl < _CLIP_EPS_IN:
+                continue
+            if abs((wdx / wl) * ux + (wdy / wl) * uy) > 0.25:    # not perpendicular
+                continue
+            mx, my = (a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0
+            if abs((mx - end_pt.x()) * ux + (my - end_pt.y()) * uy - a0) > 12.0:
+                continue                                         # a different gable line
+            if abs((mx - end_pt.x()) * px + (my - end_pt.y()) * py) > width / 2.0 + wl / 2.0 + 1.0:
+                continue                                         # outside this gable's width
+            dxr, dyr = wdx / wl, wdy / wl
+            for op in it.openings:
+                cx = a.x() + float(op.s) * dxr
+                cy = a.y() + float(op.s) * dyr
+                kind = getattr(op, "kind", "window")
+                h = float(getattr(op, "height", 0.0) or 0.0)
+                if kind == "window":
+                    s = getattr(op, "sill_in", None)
+                    sill = (float(s) if s is not None else DEFAULT_SILL_IN) + rise
+                else:                                 # door / gate: on ITS storey's floor
+                    sill = rise
+                (windows if kind == "window" else doors).append(
+                    {"centre_in": (cx - end_pt.x()) * px + (cy - end_pt.y()) * py + apex_in,
+                     "w_in": float(op.width), "h_in": h,
+                     "sill_in": sill, "head_in": sill + h, "kind": kind})
+        windows.sort(key=lambda d: d["centre_in"])
+        doors.sort(key=lambda d: d["centre_in"])
+        return windows, doors
 
     def _gable_end_wall(self, gable, axis, end=None):
         """The exterior wall standing across a gable end of this (plain) roof --
         perpendicular to the ridge, within the eaves width, long enough to be the
-        end wall. Returns `(wall, end)`: the wall (or None when the scene carries
-        none) and the END INDEX searched (0 = p1, 1 = p2).
+        end wall. The anchor for the whole gable line; the roof's own floor wins,
+        but a floor above is accepted when that end has no wall on the roof's own
+        floor (an open lower storey). Returns `(wall, end)`: the wall (or None
+        when the scene carries none) and the END INDEX searched (0 = p1, 1 = p2).
 
         With `end` a live gable end, ONLY that end is searched (#3's per-end
         elevation, 2026-11-10). Otherwise, of the live gable ends, the one whose
@@ -2367,6 +2449,7 @@ class RoofItem(QGraphicsItem):
         sc = self.scene()
         if sc is None:
             return None, fallback
+        floors = self._gable_floors()            # the roof's floor and every floor above
         pts = {0: self.p1, 1: self.p2}
         best = None                                          # (wall, end)
         for end_i in order:
@@ -2374,21 +2457,22 @@ class RoofItem(QGraphicsItem):
             cand = None
             for it in sc.items():
                 if (not isinstance(it, WallItem) or sip.isdeleted(it)
-                        or it.floor != self.floor
+                        or it.floor not in floors
                         or getattr(it, "wall_type", None) not in ("exterior", "dormer")):
                     continue
                 a, b = it.p1, it.p2
                 wdx, wdy = b.x() - a.x(), b.y() - a.y()
                 wl = math.hypot(wdx, wdy)
-                if wl < 0.5 * width:
-                    continue
+                if wl < max(24.0, 0.30 * width):   # a gable wall split by a door is
+                    continue                       # two segments; keep both, skip stubs
                 if abs((wdx / wl) * ux + (wdy / wl) * uy) > 0.25:   # not perpendicular
                     continue
                 mx, my = (a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0
                 along = abs((mx - end_pt.x()) * ux + (my - end_pt.y()) * uy)
                 if along > width:
                     continue
-                key = (-len(it.openings), along)
+                # the roof's own floor anchors first, then the most-glazed, nearest
+                key = (it.floor != self.floor, -len(it.openings), along)
                 if cand is None or key < cand[0]:
                     cand = (key, it)
             if cand is not None:

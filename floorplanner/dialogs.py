@@ -1070,15 +1070,19 @@ class _EndOnCanvas(QWidget):
 
 class _ElevationCanvas(QWidget):
     """#3 (0294 §4): the End-On dialog's ELEVATION tab -- the roof's gable end
-    seen straight-on, to scale, with its window(s) LOCATED by dimensions. Reads
-    `RoofItem.gable_elevation()` (a dormer face, or a plain gable end's wall).
-    The MINIMAL locating set (his order 2026-11-09): per window its size (W×H),
-    its sill above the floor, and its centre's offset from the gable centreline.
-    More parameters land here as he orders them."""
+    seen straight-on, to scale, with every DOOR and WINDOW in the wall(s) under
+    it LOCATED by dimensions. Reads `RoofItem.gable_elevation()` (a dormer face,
+    or a plain gable end's wall(s)). Per opening: its size (W×H), its height
+    above the floor (a window's sill; a door/gate sits on the floor, so its head
+    height), and its centre's offset from the gable centreline. A window draws as
+    glass with a muntin cross, a door/gate as a panel on the floor with a leaf
+    stile. More parameters land here as he orders them (his order 2026-11-11:
+    read the walls under the gable and show their doors and windows)."""
 
     _WALL = QColor(60, 60, 60)
     _ROOF = QColor(133, 77, 14)
     _GLASS = QColor(191, 219, 254)
+    _DOOR = QColor(214, 211, 203)
     _DIM = QColor(37, 99, 235)
     _CENTRE = QColor(150, 150, 150)
 
@@ -1144,29 +1148,50 @@ class _ElevationCanvas(QWidget):
         p.setPen(QPen(QColor(20, 20, 20)))
         p.drawText(QPointF(X(apex) + 4, Y(ridge) - 2), f"R {fmt_in(ridge)}")
 
-        for wd in e.get("windows", []):
+        for wd in list(e.get("windows", [])) + list(e.get("doors", [])):
             c = float(wd["centre_in"])
             ww, hh = float(wd["w_in"]), float(wd["h_in"])
             sill, head = float(wd["sill_in"]), float(wd["head_in"])
+            kind = wd.get("kind", "window")
+            if ww <= 0.0 or hh <= 0.0:
+                continue
             x0, x1 = X(c - ww / 2.0), X(c + ww / 2.0)
             y0, y1 = Y(head), Y(sill)
             r = QRectF(QPointF(x0, y0), QPointF(x1, y1))
-            p.fillRect(r, self._GLASS)
-            p.setPen(QPen(self._WALL, 1.2))
-            p.drawRect(r)
-            # size label, centred in the window
+            if kind == "window":
+                p.fillRect(r, self._GLASS)
+                p.setPen(QPen(self._WALL, 1.2))
+                p.drawRect(r)
+                # a muntin cross, so a window reads as a window
+                p.setPen(QPen(self._WALL, 0.5))
+                p.drawLine(QPointF((x0 + x1) / 2.0, y0), QPointF((x0 + x1) / 2.0, y1))
+                p.drawLine(QPointF(x0, (y0 + y1) / 2.0), QPointF(x1, (y0 + y1) / 2.0))
+            else:                                      # a door / gate: a panel on the floor
+                p.fillRect(r, self._DOOR)
+                p.setPen(QPen(self._WALL, 1.4))
+                p.drawRect(r)
+                # a leaf stile near the latch edge, so it reads as a door
+                p.setPen(QPen(self._WALL, 0.6))
+                kx = x0 + (x1 - x0) * 0.82
+                p.drawLine(QPointF(kx, y0 + 3.0), QPointF(kx, y1 - 3.0))
+            # size label, centred
             p.setPen(QPen(QColor(20, 20, 20)))
             p.drawText(r, Qt.AlignmentFlag.AlignCenter, f"{fmt_in(ww)}×{fmt_in(hh)}")
-            # sill dimension: a vertical tick from the floor to the sill
+            # height dimension on the left: a window shows its sill above the
+            # floor; a door/gate sits on the floor, so it shows its head height.
             p.setPen(QPen(self._DIM, 1.0))
             dx = x0 - 6.0
-            p.drawLine(QPointF(dx, base_y), QPointF(dx, y1))
+            if kind == "window":
+                ytop, label = y1, f"sill {fmt_in(sill)}"
+            else:
+                ytop, label = y0, f"head {fmt_in(head)}"
+            p.drawLine(QPointF(dx, base_y), QPointF(dx, ytop))
             p.drawLine(QPointF(dx - 3, base_y), QPointF(dx + 3, base_y))
-            p.drawLine(QPointF(dx - 3, y1), QPointF(dx + 3, y1))
+            p.drawLine(QPointF(dx - 3, ytop), QPointF(dx + 3, ytop))
             p.save()
-            p.translate(dx - 4, (base_y + y1) / 2.0)
+            p.translate(dx - 4, (base_y + ytop) / 2.0)
             p.rotate(-90)
-            p.drawText(QPointF(0, 0), f"sill {fmt_in(sill)}")
+            p.drawText(QPointF(0, 0), label)
             p.restore()
             # centre-offset dimension: a horizontal tick from centreline to centre
             oy = base_y - 14.0
@@ -1702,10 +1727,12 @@ class RoofEndOnDialog(QDialog):
             if self._elev_end != self._marker_end:
                 self._place_marker_dot(self._elev_end)   # marker end is a hip
         _elev_lay.addWidget(self.elev_canvas)
-        _elev_note = QLabel("The gable end, straight on and to scale. Each window "
-                            "is located by its size, its sill above the floor, and "
-                            "its offset from the gable centreline. The blue dot in "
-                            "the plan marks the end shown here.")
+        _elev_note = QLabel("The gable end, straight on and to scale. Every door "
+                            "and window in the wall(s) under the gable is drawn and "
+                            "located by its size, its height above the floor (a "
+                            "window's sill, a door's head), and its offset from the "
+                            "gable centreline. The blue dot in the plan marks the "
+                            "end shown here.")
         _elev_note.setWordWrap(True)
         _elev_note.setStyleSheet("color: #666;")
         _elev_lay.addWidget(_elev_note)
