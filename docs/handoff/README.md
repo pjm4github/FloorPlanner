@@ -452,5 +452,6 @@ this table is not a second copy of it.
 | [`0310-report.md`](./0310-report.md) | report: the schema viewer swept to `main` — tidy graph, field-expand, cross-view highlight, and an edit-source/reload loop |
 | [`0311-report.md`](./0311-report.md) | report: the gable-end Elevation tab reads the walls under the gable and draws their doors AND windows, to scale with measurements — on a branch |
 | [`0312-report.md`](./0312-report.md) | report: the L1 door under a front dormer no longer fills in 3D — swept to `main` |
+| [`0313-report.md`](./0313-report.md) | report: plan CAMERAS — a placeable viewpoint that opens an elevation of the wall it faces — on a branch |
 
 <!-- PAIRS:END -->
