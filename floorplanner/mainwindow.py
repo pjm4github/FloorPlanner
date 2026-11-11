@@ -93,12 +93,17 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                      "a jamb or the datum), drag to where the text goes, release and "
                      "type the text. Drag a leader to move it; select it for its two "
                      "knobs; double-click to edit the text. Esc cancels.",
+        TOOL_CAMERA: "Camera: click in a room or by a wall to drop a viewpoint, then "
+                     "drag its round handle to aim it. Double-click the camera (or "
+                     "right-click → Open elevation) for an elevation of the wall "
+                     "it faces. View ▸ Show cameras hides them all.",
     }
 
     def __init__(self):
         super().__init__()
         self.tool = TOOL_SELECT
         self._room_sticky = False        # one-shot Room tool unless Ctrl-set
+        self._cameras_visible = True     # 0313: View ▸ Show cameras toggle
         self.last_door = "3280"
         self.last_window = "3648"
         self.current_path = None
@@ -221,6 +226,12 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         a.setCheckable(True)
         group.addAction(a)
         self._tool_actions[TOOL_DATUM] = a
+        # 0313: the Camera tool has no toolbar button (View ▸ Place camera), but
+        # it joins the exclusive group so choosing it unchecks the others
+        a = QAction("Camera", self)
+        a.setCheckable(True)
+        group.addAction(a)
+        self._tool_actions[TOOL_CAMERA] = a
         self._tool_actions[TOOL_SELECT].setChecked(True)
 
         tb.addSeparator()
@@ -429,6 +440,20 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self.a_3d.setShortcut(QKeySequence("Ctrl+3"))
         self.a_3d.triggered.connect(self.show_3d_view)
         m_view.addAction(self.a_3d)
+
+        # 0313: plan CAMERAS -- a placeable viewpoint that opens an elevation of
+        # the wall it faces. "Place camera" starts the tool; "Show cameras" is
+        # the switch to hide them all.
+        m_view.addSeparator()
+        a_cam = QAction("Place &camera", self)
+        a_cam.setShortcut(QKeySequence("C"))
+        a_cam.triggered.connect(lambda: self.set_tool(TOOL_CAMERA))
+        m_view.addAction(a_cam)
+        self.a_show_cameras = QAction("Show c&ameras", self)
+        self.a_show_cameras.setCheckable(True)
+        self.a_show_cameras.setChecked(self._cameras_visible)
+        self.a_show_cameras.toggled.connect(self._set_cameras_visible)
+        m_view.addAction(self.a_show_cameras)
 
         # 0263: the Show menu -- annotations, measurements and the items'
         # callouts, each its own switch; the measurement units; the callout
@@ -1014,6 +1039,16 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
                                      & Qt.KeyboardModifier.ControlModifier)
         if self._recorder is not None:
             self._recorder.on_tool(tool)
+
+    def _set_cameras_visible(self, on):
+        """0313: View ▸ Show cameras -- hide or show every plan camera at once.
+        Session UI state (a placed camera still saves with the plan); new
+        cameras placed while hidden start hidden (view.py)."""
+        from floorplanner.cameras import CameraItem
+        self._cameras_visible = bool(on)
+        for it in self.scene.items():
+            if isinstance(it, CameraItem):
+                it.setVisible(self._cameras_visible)
 
     def open_macro_recorder(self):
         """Open (or re-show) the non-modal macro recorder / debugger window."""

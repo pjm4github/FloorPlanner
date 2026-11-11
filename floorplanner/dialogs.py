@@ -1200,6 +1200,279 @@ class _ElevationCanvas(QWidget):
             p.drawText(QPointF((X(apex) + X(c)) / 2.0 - 10, oy - 4), fmt_in(abs(c - apex)))
 
 
+class _WallElevationCanvas(QWidget):
+    """0313: the elevation a plan CAMERA sees -- the whole wall PLANE it faces,
+    floor to ceiling, with every DOOR and WINDOW located to scale. Reads
+    `CameraItem.elevation()`: `faces[]` (each `label`, `width_in`, `windows[]`,
+    `doors[]`), laid left->right as the camera sees them; `left_return`/
+    `right_return` (the side walls that turn toward the camera) draw as short
+    labelled return ticks at the two ends.
+
+    For legibility each wall carries just its W-number on top; its width is a
+    blue dimension along the bottom, and a RUN of walls too narrow to dimension
+    on their own is aggregated into a single group dimension. The seams between
+    walls on one plane are faint grey so they don't fight the elevation; one blue
+    height dimension down the left gives the storey height. A window draws as
+    glass with a muntin cross, a door/gate as a floor panel, each with its size
+    and sill/head. The twin of `_ElevationCanvas`, flat-ceilinged (a roof-capped
+    top is a follow-on)."""
+
+    _WALL = QColor(60, 60, 60)
+    _GLASS = QColor(191, 219, 254)
+    _DOOR = QColor(214, 211, 203)
+    _DIM = QColor(37, 99, 235)
+    _CENTRE = QColor(150, 150, 150)
+    _RET = QColor(120, 120, 120)
+    _SEAM = QColor(205, 205, 205)          # faint seam between walls on one plane
+    _MIN_DIM_PX = 36.0                      # narrower than this -> grouped dimension
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.data = None
+        self.setMinimumHeight(260)
+
+    def set_data(self, data):
+        self.data = data
+        self.update()
+
+    def sizeHint(self):
+        return QSize(560, 320)
+
+    @staticmethod
+    def _run_width(e) -> float:
+        return sum(float(fc.get("width_in", 0.0)) for fc in e.get("faces", []))
+
+    def paintEvent(self, _ev):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        w, h = self.width(), self.height()
+        p.fillRect(0, 0, w, h, QColor(255, 255, 255))
+        e = self.data
+        W = self._run_width(e) if e else 0.0
+        H = float(e.get("height_in", 0.0)) if e else 0.0
+        if not e or W <= 0.0 or H <= 0.0:
+            p.setPen(QPen(QColor(120, 120, 120)))
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
+                       "The camera faces no wall — aim it at a wall.")
+            return
+        ml, mr, mt, mb = 52.0, 40.0, 30.0, 54.0
+        scale = max(min((w - ml - mr) / W, (h - mt - mb) / H), 0.01)
+        run_px = W * scale
+        left_px = (w - run_px) / 2.0           # centre the run
+        base_y = h - mb
+        f = p.font()
+        f.setPointSize(8)
+        p.setFont(f)
+
+        def X(xin):                            # inches from the run's LEFT end
+            return left_px + xin * scale
+
+        def Y(yin):
+            return base_y - yin * scale
+
+        faces = e.get("faces", [])
+        edges = [0.0]                          # cumulative run inches at each seam
+        for fc in faces:
+            edges.append(edges[-1] + float(fc.get("width_in", 0.0)))
+
+        # the floor baseline + its absolute datum label
+        p.setPen(QPen(self._WALL, 1.4))
+        p.drawLine(QPointF(X(0.0) - 26, base_y), QPointF(X(W) + 26, base_y))
+        p.setPen(QPen(QColor(90, 90, 90)))
+        p.drawText(QPointF(6, base_y + 15),
+                   f"floor {fmt_in(float(e.get('floor_abs_in', 0.0)))}")
+
+        # the openings on every faced wall (drawn first, under the wall outline)
+        for i, fc in enumerate(faces):
+            mid = 0.5 * (edges[i] + edges[i + 1])
+            for wd in list(fc.get("windows", [])) + list(fc.get("doors", [])):
+                self._draw_opening(p, X, Y, base_y, mid, wd)
+
+        # the run outline (bold) + faint seams where one wall meets the next
+        p.setPen(QPen(self._WALL, 1.6))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRect(QRectF(QPointF(X(0.0), Y(H)), QPointF(X(W), base_y)))
+        p.setPen(QPen(self._SEAM, 1.0))
+        for i in range(1, len(faces)):
+            x = X(edges[i])
+            p.drawLine(QPointF(x, Y(H)), QPointF(x, base_y))
+
+        # the wall labels on top -- just W-number, where the panel is wide enough
+        p.setPen(QPen(QColor(20, 20, 20)))
+        fm = p.fontMetrics()
+        for i, fc in enumerate(faces):
+            lbl = fc.get("label", "")
+            x0, x1 = X(edges[i]), X(edges[i + 1])
+            if lbl and (x1 - x0) >= fm.horizontalAdvance(lbl) + 4:
+                p.drawText(QRectF(x0, Y(H) - 17, x1 - x0, 15),
+                           Qt.AlignmentFlag.AlignCenter, lbl)
+
+        # the storey height (blue, far left) and the per-wall widths (blue, below,
+        # narrow walls aggregated into one dimension)
+        self._draw_height_dim(p, X, Y, base_y, H)
+        self._draw_width_dims(p, X, base_y, edges, scale)
+
+        # the return walls -- short ticks turning toward the camera, labelled
+        self._draw_return(p, X(0.0), base_y, -1, e.get("left_return"))
+        self._draw_return(p, X(W), base_y, +1, e.get("right_return"))
+
+    def _draw_width_dims(self, p, X, base_y, edges, scale):
+        """A blue dimension string under the run: one dimension per wall, but any
+        RUN of walls too narrow to carry their own number is aggregated and the
+        group dimensioned once."""
+        n = len(edges) - 1
+        groups, i = [], 0
+        while i < n:                           # (a, b) inclusive face-index spans
+            if (edges[i + 1] - edges[i]) * scale >= self._MIN_DIM_PX:
+                groups.append((i, i))
+                i += 1
+            else:
+                j = i
+                while j < n and (edges[j + 1] - edges[j]) * scale < self._MIN_DIM_PX:
+                    j += 1
+                groups.append((i, j - 1))
+                i = j
+        dim_y = base_y + 22.0
+        p.setPen(QPen(self._DIM, 1.0))
+        for a, b in groups:
+            xL, xR = X(edges[a]), X(edges[b + 1])
+            p.drawLine(QPointF(xL, dim_y), QPointF(xR, dim_y))
+            p.drawLine(QPointF(xL, dim_y - 4), QPointF(xL, dim_y + 4))
+            p.drawLine(QPointF(xR, dim_y - 4), QPointF(xR, dim_y + 4))
+            p.drawText(QRectF(xL, dim_y + 2, xR - xL, 14),
+                       Qt.AlignmentFlag.AlignCenter,
+                       fmt_in(edges[b + 1] - edges[a]))
+
+    def _draw_height_dim(self, p, X, Y, base_y, H):
+        """A single blue height dimension down the left of the run -- floor to the
+        storey ceiling (the top label no longer carries the height)."""
+        x = X(0.0) - 18.0
+        top = Y(H)
+        p.setPen(QPen(self._DIM, 1.0))
+        p.drawLine(QPointF(x, base_y), QPointF(x, top))
+        p.drawLine(QPointF(x - 4, base_y), QPointF(x + 4, base_y))
+        p.drawLine(QPointF(x - 4, top), QPointF(x + 4, top))
+        p.save()
+        p.translate(x - 4, 0.5 * (base_y + top))
+        p.rotate(-90)
+        p.drawText(QRectF(-26, -14, 52, 13), Qt.AlignmentFlag.AlignCenter, fmt_in(H))
+        p.restore()
+
+    def _draw_opening(self, p, X, Y, base_y, mid_in, wd):
+        c = mid_in + float(wd["centre_in"])    # the opening's centre, in run inches
+        ww, hh = float(wd["w_in"]), float(wd["h_in"])
+        sill, head = float(wd["sill_in"]), float(wd["head_in"])
+        kind = wd.get("kind", "window")
+        if ww <= 0.0 or hh <= 0.0:
+            return
+        x0, x1 = X(c - ww / 2.0), X(c + ww / 2.0)
+        y0, y1 = Y(head), Y(sill)
+        r = QRectF(QPointF(x0, y0), QPointF(x1, y1))
+        if kind == "window":
+            p.fillRect(r, self._GLASS)
+            p.setPen(QPen(self._WALL, 1.2))
+            p.drawRect(r)
+            p.setPen(QPen(self._WALL, 0.5))
+            p.drawLine(QPointF((x0 + x1) / 2.0, y0), QPointF((x0 + x1) / 2.0, y1))
+            p.drawLine(QPointF(x0, (y0 + y1) / 2.0), QPointF(x1, (y0 + y1) / 2.0))
+        else:
+            p.fillRect(r, self._DOOR)
+            p.setPen(QPen(self._WALL, 1.4))
+            p.drawRect(r)
+            p.setPen(QPen(self._WALL, 0.6))
+            kx = x0 + (x1 - x0) * 0.82
+            p.drawLine(QPointF(kx, y0 + 3.0), QPointF(kx, y1 - 3.0))
+        p.setPen(QPen(QColor(20, 20, 20)))
+        p.drawText(r, Qt.AlignmentFlag.AlignCenter, f"{fmt_in(ww)}×{fmt_in(hh)}")
+        # height dimension on the left: a window its sill, a door its head
+        p.setPen(QPen(self._DIM, 1.0))
+        dx = x0 - 6.0
+        if kind == "window":
+            ytop, label = y1, f"sill {fmt_in(sill)}"
+        else:
+            ytop, label = y0, f"head {fmt_in(head)}"
+        p.drawLine(QPointF(dx, base_y), QPointF(dx, ytop))
+        p.drawLine(QPointF(dx - 3, base_y), QPointF(dx + 3, base_y))
+        p.drawLine(QPointF(dx - 3, ytop), QPointF(dx + 3, ytop))
+        p.save()
+        p.translate(dx - 4, (base_y + ytop) / 2.0)
+        p.rotate(-90)
+        p.drawText(QPointF(0, 0), label)
+        p.restore()
+
+    def _draw_return(self, p, x, base_y, side, ret):
+        """A side wall that turns the corner toward the camera: a short tick
+        angling down-and-out from the run's end, with its W-number."""
+        if not ret:
+            return
+        ex, ey = x + side * 26.0, base_y + 18.0
+        p.setPen(QPen(self._RET, 1.4))
+        p.drawLine(QPointF(x, base_y), QPointF(ex, ey))
+        p.setPen(QPen(QColor(70, 70, 70)))
+        lbl = ret.get("label", "")
+        flags = (Qt.AlignmentFlag.AlignRight if side < 0 else Qt.AlignmentFlag.AlignLeft)
+        box = (QRectF(ex - 48, ey + 1, 46, 14) if side < 0
+               else QRectF(ex + 2, ey + 1, 46, 14))
+        p.drawText(box, flags | Qt.AlignmentFlag.AlignVCenter, lbl)
+
+
+class CameraElevationDialog(QDialog):
+    """0313: the elevation of the wall a plan CAMERA faces, straight on and to
+    scale. Non-modal; constructed `(camera, view)`. A "Refresh" re-reads the
+    camera (aim or move it, then refresh) and the note names the wall or says the
+    camera faces open space."""
+
+    def __init__(self, camera, view=None, parent=None):
+        super().__init__(parent or view)
+        self.camera = camera
+        self.setWindowTitle("Camera elevation")
+        self.setModal(False)
+        lay = QVBoxLayout(self)
+        self.canvas = _WallElevationCanvas(self)
+        lay.addWidget(self.canvas, 1)
+        self.note = QLabel("")
+        self.note.setWordWrap(True)
+        self.note.setStyleSheet("color: #555;")
+        lay.addWidget(self.note)
+        row = QHBoxLayout()
+        row.addStretch(1)
+        b_refresh = QPushButton("Refresh")
+        b_refresh.clicked.connect(self.refresh)
+        row.addWidget(b_refresh)
+        b_close = QPushButton("Close")
+        b_close.clicked.connect(self.close)
+        row.addWidget(b_close)
+        lay.addLayout(row)
+        self.resize(520, 360)
+        self.refresh()
+
+    def refresh(self):
+        data = None
+        try:
+            data = self.camera.elevation()
+        except Exception as exc:                         # never let a draw crash the app
+            self.note.setText(f"Could not build the elevation: {exc}")
+        self.canvas.set_data(data)
+        if data is None:
+            self.note.setText("The camera faces no wall. Aim it at a wall "
+                              "(drag the handle), then Refresh.")
+        else:
+            faces = data.get("faces", [])
+            nd = sum(len(fc.get("doors", [])) for fc in faces)
+            nw = sum(len(fc.get("windows", [])) for fc in faces)
+            width = sum(float(fc.get("width_in", 0.0)) for fc in faces)
+            labels = ", ".join(fc.get("label", "") for fc in faces)
+            room = data.get("room_name", "")
+            where = f"{room}: " if room else ""
+            rets = [r["label"] for r in (data.get("left_return"),
+                                         data.get("right_return")) if r]
+            ret_txt = (f" Returns: {', '.join(rets)}." if rets else "")
+            self.note.setText(
+                f"{where}wall {labels} — {fmt_in(width)} wide, "
+                f"{nw} window(s), {nd} door(s).{ret_txt} Straight-on, to scale; "
+                "heights from the floor. Move or aim the camera, then Refresh.")
+
+
 class FloorLevelsDialog(QDialog):
     """Floors ▸ <floor> ▸ Elevation and height… (R6.0, 0197-ruling.md sec2,
     closing D50): the storey's two numbers, in inches from the building's

@@ -70,6 +70,7 @@ from floorplanner.items import (
     FurnishingItem, GroupItem, ReferenceImageItem, furnishing_spec,
     make_furnishing,
 )
+from floorplanner.cameras import CameraItem   # 0313: plan viewpoints
 from floorplanner.model import Floor
 from floorplanner.vertex import Vertex
 from floorplanner.roofs import RoofItem, hold_roof_clips, nearest_eaves_wall
@@ -930,6 +931,16 @@ def _annotations_of(items, lid, nid):
     return out
 
 
+def _cameras_of(items, lid, nid):
+    """This level's cameras (0313): a viewpoint record each (id, level, pos, aim),
+    position-ordered so the document is deterministic."""
+    out = []
+    for it in _ordered(items, CameraItem,
+                       lambda c: (round(c.pos().x(), 3), round(c.pos().y(), 3))):
+        out.append(it.to_record(nid("cam"), lid))
+    return out
+
+
 def _roofs_of(items, lid, nid, src=None):
     """This level's roofs (0139-ruling.md P1.1, R2's first writer).
 
@@ -1021,6 +1032,7 @@ def design_from_scene(source, floors=None, report=None, strict=False, ids_out=No
     levels, vertices, walls, rooms, furnishings, roofs = [], [], [], [], [], []
     groups = []                            # P4.5, defect 3
     annotations = []                       # 0263: texts, measures, the datum
+    cameras = []                           # 0313: plan viewpoints
     # id(wall dict object) -> live WallItem (0101-ruling.md), ACROSS ALL
     # LEVELS -- unlike `of_item` a few lines below (per-level on purpose,
     # consumed within the same iteration for that level's own groups),
@@ -1127,6 +1139,7 @@ def design_from_scene(source, floors=None, report=None, strict=False, ids_out=No
         furnishings += lf
         roofs += lroofs
         annotations += _annotations_of(items, lid, nid)
+        cameras += _cameras_of(items, lid, nid)
         if ids_out is not None:               # 0264: id(live) -> [document ids]
             ids_out.update(of_item)
 
@@ -1191,6 +1204,7 @@ def design_from_scene(source, floors=None, report=None, strict=False, ids_out=No
         "walls": walls, "rooms": rooms, "furnishings": furnishings,
         **({"roofs": roofs} if roofs else {}),
         **({"annotations": annotations} if annotations else {}),
+        **({"cameras": cameras} if cameras else {}),
         # DEFECT 3 CLOSES AT P4.5. The old note here said a grouped wall
         # "has no single id -- it splits into segments", and that is still
         # true: the answer is that membership is a SET of document objects,
@@ -1511,6 +1525,15 @@ def _build_annotations(scene, doc, lname):
         scene.addItem(item)
 
 
+def _build_cameras(scene, doc, lname, rep):
+    """0313: the cameras of `doc` -- each a viewpoint item on its level."""
+    for cd in doc.get("cameras", []) or []:
+        item = CameraItem.from_record(cd, lname.get(cd.get("level"), DEFAULT_FLOOR))
+        item._uid = _labels.adopt("C", cd.get("id"))
+        scene.addItem(item)
+        rep["cameras"] = rep.get("cameras", 0) + 1
+
+
 
 def _build_roofs(scene, doc, lname, rep):
     """0283: the roofs of `doc`, dormers resolved to their hosts, the
@@ -1705,6 +1728,7 @@ def apply_design_to_scene(target, design, report=None, strict=False,
     rmap = _build_rooms(scene, doc, pos, vmap, wmap, lname, rep)
     fmap = _build_furnishings(scene, doc, lname, rep)
     _build_annotations(scene, doc, lname)
+    _build_cameras(scene, doc, lname, rep)
     _build_roofs(scene, doc, lname, rep)
 
     # GROUPS (P4.5, defect 3). Rebuilt last, once every member exists, and
@@ -1778,7 +1802,7 @@ def apply_design_to_scene(target, design, report=None, strict=False,
 # helpers the full apply uses, so the two cannot build one differently.
 
 _DIFF_WEB = ("vertices", "walls", "rooms")
-_DIFF_KINDS = ("furnishings", "annotations", "roofs")
+_DIFF_KINDS = ("furnishings", "annotations", "roofs", "cameras")
 
 
 def _canon(obj) -> str:
@@ -1888,14 +1912,16 @@ def apply_design_difference(win, current, target) -> bool:
     furn = {lv for lv in set(cf) | set(tf) if cf.get(lv) != tf.get(lv)}
     ca, ta = _records_by_level(current, "annotations"), _records_by_level(target, "annotations")
     ann = {lv for lv in set(ca) | set(ta) if ca.get(lv) != ta.get(lv)}
+    cc, tc = _records_by_level(current, "cameras"), _records_by_level(target, "cameras")
+    cam = {lv for lv in set(cc) | set(tc) if cc.get(lv) != tc.get(lv)}
     roofs = _roofs_canon(current) != _roofs_canon(target)
     if (current.get("groups") or target.get("groups")) and (web or furn):
         return False                    # a group names members by id
-    if not (web or furn or ann or roofs):
+    if not (web or furn or ann or roofs or cam):
         return True
     scene = win.scene if not isinstance(win, QGraphicsScene) else win
     lname = {lv["id"]: lv.get("name", DEFAULT_FLOOR) for lv in target.get("levels") or []}
-    rep = {"walls": 0, "rooms": 0, "furnishings": 0, "roofs": 0,
+    rep = {"walls": 0, "rooms": 0, "furnishings": 0, "roofs": 0, "cameras": 0,
            "openings_failed": [], "unknown_furnishings": []}
 
     def remove(kinds, floor=None):
@@ -1927,6 +1953,11 @@ def apply_design_difference(win, current, target) -> bool:
             remove(_AnnotationBase, lname.get(lv, DEFAULT_FLOOR))
             _build_annotations(scene, {"annotations": [a for a in target.get("annotations", []) or []
                                                        if a.get("level") == lv]}, lname)
+    if cam:
+        for lv in cam:
+            remove(CameraItem, lname.get(lv, DEFAULT_FLOOR))
+            _build_cameras(scene, {"cameras": [c for c in target.get("cameras", []) or []
+                                               if c.get("level") == lv]}, lname, rep)
     if roofs:
         hold_roof_clips(scene, True)
         remove(RoofItem)
