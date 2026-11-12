@@ -455,5 +455,6 @@ this table is not a second copy of it.
 | [`0313-report.md`](./0313-report.md) | report: plan CAMERAS — a placeable viewpoint that opens an elevation of the wall it faces — on a branch |
 | [`0314-report.md`](./0314-report.md) | report: the plan CAMERA now elevations the whole ROOM wall it faces, labelled for reading — on branch `plan-cameras` |
 | [`0315-report.md`](./0315-report.md) | report: the plan CAMERA now SHOWS the furnishings and/or the cabinetry it faces, as to-scale silhouettes — on branch `camera-content` |
+| [`0316-report.md`](./0316-report.md) | report: annotation numbers (W/O/V/R/F/RF/C) now SURVIVE a save/open cycle, and a FIND tool jumps to any of them — on branch `find-and-labels` |
 
 <!-- PAIRS:END -->
