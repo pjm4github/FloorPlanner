@@ -186,7 +186,7 @@ class Camera(_Node):
     FIELDS: ClassVar = [("id", RAW), ("level", RAW), ("pos", RAW),
                         ("rotation", RAW), ("name", RAW),
                         ("show_furnishings", RAW), ("show_cabinetry", RAW),
-                        ("uid", RAW)]
+                        ("show_house_side", RAW), ("uid", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     pos: Any = _MISSING
@@ -194,6 +194,7 @@ class Camera(_Node):
     name: Any = _MISSING
     show_furnishings: Any = _MISSING
     show_cabinetry: Any = _MISSING
+    show_house_side: Any = _MISSING      # 0317: whole-house-side elevation mode
     uid: Any = _MISSING                  # 0316: the persisted session label (C<n>)
 
 

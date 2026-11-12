@@ -320,4 +320,82 @@ def test_the_glyph_grows_a_badge_per_active_switch(scene):
     assert len(cam._badges()) == 1
     cam.set_show_cabinetry(True)
     assert len(cam._badges()) == 2
+    cam.set_show_house_side(True)                 # 0317: a third switch, a third badge
+    assert len(cam._badges()) == 3
     assert cam.boundingRect().height() > plain.height()
+
+
+# -- 0317: the whole-house-side elevation (a camera outside a room) ------------
+def _house(scene):
+    """The DEN house: a 180x100 rectangle whose y=0 wall is split into two
+    exterior segments (78 + 102) at a doorway; a room detected inside."""
+    def _w(p1, p2, kind="exterior"):
+        w = WallItem(QPointF(*p1), QPointF(*p2), kind)
+        w.floor = DEFAULT_FLOOR
+        scene.addItem(w)
+        return w
+    wA = _w((0, 0), (78, 0))                       # the side a camera above faces...
+    _w((78, 0), (180, 0))                          # ...split into two segments
+    _w((180, 0), (180, 100))
+    _w((180, 100), (0, 100))
+    _w((0, 100), (0, 0))
+    wA.openings.append(fp.OpeningItem(wA, "door", "3080", 40.0))
+    fp.rebuild_all_walls(scene)
+    centre = QPointF(90, 50)
+    res = fp.detect_room(scene, centre)
+    assert res is not None
+    room = fp.RoomItem(fp.unique_room_name(scene, "DEN"), centre,
+                       res[0], res[1], corners=res[2])
+    scene.addItem(room)
+    fp.bind_room_walls(scene, room)
+    return room
+
+
+def test_outside_a_room_without_the_switch_reads_one_wall(scene):
+    """A camera above the house, switch OFF: the single wall its aim ray hits."""
+    _house(scene)
+    cam = CameraItem(QPointF(90, -60), rotation=90.0, floor=DEFAULT_FLOOR)   # above, aimed down
+    scene.addItem(cam)
+    assert not cam.show_house_side
+    e = cam.elevation()
+    assert e is not None and len(e["faces"]) == 1
+    assert e["left_return"] is None and e["right_return"] is None
+
+
+def test_the_house_side_switch_elevations_the_whole_side(scene):
+    """Switch ON: BOTH exterior segments of the side it faces, left->right, and
+    neither the far wall of the house nor the two side (return) walls."""
+    _house(scene)
+    cam = CameraItem(QPointF(90, -60), rotation=90.0, floor=DEFAULT_FLOOR)
+    scene.addItem(cam)
+    cam.set_show_house_side(True)
+    e = cam.elevation()
+    assert e is not None
+    widths = sorted(fc["width_in"] for fc in e["faces"])
+    assert widths == [pytest.approx(78.0), pytest.approx(102.0)]
+    assert len(e["faces"]) == 2                    # not the far wall, not the sides
+
+
+def test_inside_a_room_the_house_side_switch_is_a_no_op(scene):
+    """The switch only widens an OUTSIDE view -- inside a room the room elevation
+    stands whether it is on or off."""
+    _house(scene)
+    cam = CameraItem(QPointF(90, 40), rotation=270.0, floor=DEFAULT_FLOOR,
+                     show_house_side=True)         # inside the room, aimed up
+    scene.addItem(cam)
+    e = cam.elevation()
+    assert e is not None and len(e["faces"]) == 2  # the room's far wall, two segments
+
+
+def test_the_house_side_switch_round_trips(fp, scene):
+    """The switch serializes, validates against the v6 schema, and reloads."""
+    from floorplanner.design.bridge import apply_design_to_scene, design_from_scene
+    from floorplanner.design.validate import schema_errors
+    scene.addItem(CameraItem(QPointF(72, 48), rotation=0.0, show_house_side=True))
+    out = design_from_scene(scene).to_dict()
+    assert schema_errors(out) == []
+    assert out["cameras"][0]["show_house_side"] is True
+    scene.clear()
+    apply_design_to_scene(scene, out)
+    cam = [it for it in scene.items() if isinstance(it, CameraItem)][0]
+    assert cam.show_house_side

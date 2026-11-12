@@ -42,6 +42,7 @@ _FILL = QColor(37, 99, 235, 40)       # translucent wedge
 # the elevation, so the badge and its content read as one.
 _FURN_C = QColor(13, 118, 102)        # furnishings: teal
 _CAB_C = QColor(166, 124, 64)         # cabinetry: wood tan
+_HOUSE_C = QColor(96, 125, 160)       # whole house side: slate blue
 _BADGE_W = 13.0
 _BADGE_H = 11.0
 _BADGE_GAP = 3.0
@@ -72,7 +73,8 @@ class CameraItem(QGraphicsItem):
     "Open elevation…", opens the straight-on elevation of the wall it faces."""
 
     def __init__(self, pos: QPointF, rotation: float = 0.0, floor=None, name: str = "",
-                 show_furnishings: bool = False, show_cabinetry: bool = False):
+                 show_furnishings: bool = False, show_cabinetry: bool = False,
+                 show_house_side: bool = False):
         super().__init__()
         self._uid = None                 # the session label, C<n>
         self.floor = floor if floor is not None else active_floor()
@@ -83,6 +85,10 @@ class CameraItem(QGraphicsItem):
         # changes shape to show which are on.
         self.show_furnishings = bool(show_furnishings)
         self.show_cabinetry = bool(show_cabinetry)
+        # 0317: outside a room, elevation the WHOLE SIDE of the house -- every
+        # exterior wall whose outside turns toward the camera, not just the one
+        # wall the aim ray hits. A no-op while the camera sits inside a room.
+        self.show_house_side = bool(show_house_side)
         self._rotating = False
         self._rot_offset = 0.0
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
@@ -137,6 +143,8 @@ class CameraItem(QGraphicsItem):
             items.append(_FURN_C)
         if self.show_cabinetry:
             items.append(_CAB_C)
+        if self.show_house_side:
+            items.append(_HOUSE_C)
         if not items:
             return []
         total = len(items) * _BADGE_W + (len(items) - 1) * _BADGE_GAP
@@ -235,6 +243,19 @@ class CameraItem(QGraphicsItem):
             painter.setBrush(QBrush(ink))
             for hx in (midx - r.width() * 0.16, midx + r.width() * 0.16):
                 painter.drawEllipse(QPointF(hx, hy), 0.7, 0.7)  # handles
+        elif ink == _HOUSE_C:                    # house: a gabled silhouette + door
+            eave = r.top() + r.height() * 0.42
+            body = QRectF(r.left(), eave, r.width(), r.bottom() - eave)
+            painter.drawRect(body)
+            roof = QPolygonF([QPointF(r.left() - 0.5, eave),
+                              QPointF(r.center().x(), r.top()),
+                              QPointF(r.right() + 0.5, eave)])
+            painter.drawPolygon(roof)
+            dw = r.width() * 0.26
+            painter.setBrush(QBrush(ink))
+            painter.drawRect(QRectF(r.center().x() - dw / 2.0,
+                                    body.bottom() - body.height() * 0.55,
+                                    dw, body.height() * 0.55))      # a door
         else:                                    # armchair: body, back, two arms
             painter.drawRoundedRect(r, 2.0, 2.0)
             back = r.top() + r.height() * 0.42
@@ -308,6 +329,9 @@ class CameraItem(QGraphicsItem):
         a_cab = menu.addAction("Show cabinetry")
         a_cab.setCheckable(True)
         a_cab.setChecked(self.show_cabinetry)
+        a_house = menu.addAction("View whole house side")
+        a_house.setCheckable(True)
+        a_house.setChecked(self.show_house_side)
         menu.addSeparator()
         a_cw = menu.addAction("Rotate 90° CW")
         a_ccw = menu.addAction("Rotate 90° CCW")
@@ -320,6 +344,8 @@ class CameraItem(QGraphicsItem):
             self.set_show_furnishings(a_furn.isChecked())
         elif chosen is a_cab:
             self.set_show_cabinetry(a_cab.isChecked())
+        elif chosen is a_house:
+            self.set_show_house_side(a_house.isChecked())
         elif chosen is a_cw:
             self.setRotation((self.rotation() + 90.0) % 360.0)
         elif chosen is a_ccw:
@@ -343,6 +369,15 @@ class CameraItem(QGraphicsItem):
         if on != self.show_cabinetry:
             self.prepareGeometryChange()
             self.show_cabinetry = on
+            self.update()
+
+    def set_show_house_side(self, on: bool):
+        """0317: turn the whole-house-side switch on/off -- the glyph grows a
+        house badge and an outside-a-room elevation widens to the full side."""
+        on = bool(on)
+        if on != self.show_house_side:
+            self.prepareGeometryChange()
+            self.show_house_side = on
             self.update()
 
     def open_elevation(self):
@@ -451,11 +486,10 @@ class CameraItem(QGraphicsItem):
         `faces`, each with its own label and openings. The side walls that turn
         the corner toward the camera at the run's two ends come back as
         `left_return`/`right_return` (their labels), drawn as short return ticks.
-        Outside any room it falls back to the single faced wall (one face, no
-        returns), so a camera in the yard still reads an exterior wall."""
-        wall = self.faced_wall()
-        if wall is None:
-            return None
+        Outside a room it reads the single faced wall (one face, no returns) --
+        OR, with the WHOLE-HOUSE-SIDE switch on (0317), every exterior wall whose
+        outside turns toward the camera, laid left->right: the full side of the
+        house as an exterior elevation, jogs and wings included."""
         ang = math.radians(self.rotation())
         dx, dy = math.cos(ang), math.sin(ang)
         rx, ry = -dy, dx
@@ -481,53 +515,93 @@ class CameraItem(QGraphicsItem):
 
         room = self._room_at(self.pos())
         faces, left_ret, right_ret = [], None, None
-        outline = list(getattr(room, "outline", []) or []) if room is not None else []
-        idx = next((i for i, e in enumerate(outline) if e.wall is wall), None)
 
-        if idx is None:                          # outside a room, or wall off-outline
-            rec = self._face_record(wall, dx, dy)
-            if rec is None:
-                return None
-            faces = [(edge_u(wall.p1, wall.p2), rec, wall)]
+        # 0317: outside a room with the WHOLE-HOUSE-SIDE switch on, the elevation
+        # is EVERY exterior wall whose outside turns toward the camera (the full
+        # side of the house, jogs and wings included), not just the one wall the
+        # aim ray hits. A wall qualifies when it runs across the view, stands in
+        # front, and SEPARATES the camera-side outdoors from an interior room --
+        # which drops the far side of the house (its camera-facing side is
+        # indoors) and the return walls (they run along the view, not across).
+        if room is None and self.show_house_side:
+            sc = self.scene()
+            eps = 4.0
+            for it in (sc.items() if sc is not None else []):
+                if (not isinstance(it, WallItem) or sip.isdeleted(it)
+                        or it.floor != self.floor
+                        or getattr(it, "wall_type", "") != "exterior"):
+                    continue
+                a, b = it.p1, it.p2
+                if not is_face(a, b) or edge_depth(a, b) <= 1e-6:
+                    continue
+                L = math.hypot(b.x() - a.x(), b.y() - a.y())
+                if L < 1e-6:
+                    continue
+                mx, my = 0.5 * (a.x() + b.x()), 0.5 * (a.y() + b.y())
+                nx, ny = -(b.y() - a.y()) / L, (b.x() - a.x()) / L   # a unit normal
+                if nx * (cx - mx) + ny * (cy - my) < 0:              # flip to face camera
+                    nx, ny = -nx, -ny
+                out_p = QPointF(mx + nx * eps, my + ny * eps)        # toward the camera
+                in_p = QPointF(mx - nx * eps, my - ny * eps)         # into the house
+                if self._room_at(out_p) is None and self._room_at(in_p) is not None:
+                    rec = self._face_record(it, dx, dy)
+                    if rec is not None:
+                        faces.append((edge_u(a, b), rec, it))
+
+        if faces:                                # the whole-house-side run
+            ref_wall = faces[0][2]
         else:
-            n = len(outline)
+            wall = self.faced_wall()             # the single wall the aim ray hits
+            if wall is None:
+                return None
+            ref_wall = wall
+            outline = list(getattr(room, "outline", []) or []) if room is not None else []
+            idx = next((i for i, e in enumerate(outline) if e.wall is wall), None)
 
-            def pts(i):
-                return outline[i].v.point(), outline[(i + 1) % n].v.point()
+            if idx is None:                      # outside a room, or wall off-outline
+                rec = self._face_record(wall, dx, dy)
+                if rec is None:
+                    return None
+                faces = [(edge_u(wall.p1, wall.p2), rec, wall)]
+            else:
+                n = len(outline)
 
-            picked = {}                          # i -> (u, record)
-            stops = []                           # the two bounding (return) edges
-            for step in (+1, -1):                # walk both ways from the faced edge
-                i = idx
-                while True:
-                    a, b = pts(i)
-                    if not is_face(a, b) or edge_depth(a, b) <= 1e-6:
-                        stops.append(outline[i].wall)   # the turn / the near wall
-                        break
-                    if i not in picked and outline[i].wall is not None:
-                        rec = self._face_record(outline[i].wall, dx, dy)
-                        if rec is not None:
-                            picked[i] = (edge_u(a, b), rec, outline[i].wall)
-                    i = (i + step) % n
-                    if i == idx:                 # full loop (degenerate) -- stop
-                        break
-            faces = list(picked.values())
-            # the two bounding walls -> left/right by where each sits along the
-            # view (its midpoint projected onto the camera's right axis).
-            rets = [w for w in stops if w is not None]
-            scored = sorted(((self._wall_u(w, rx, ry, cx, cy), w) for w in rets),
-                            key=lambda t: t[0])
+                def pts(i):
+                    return outline[i].v.point(), outline[(i + 1) % n].v.point()
 
-            def _ret(w):
-                return {"label": getattr(w, "uid", "") or "Wall"}
+                picked = {}                      # i -> (u, record)
+                stops = []                        # the two bounding (return) edges
+                for step in (+1, -1):            # walk both ways from the faced edge
+                    i = idx
+                    while True:
+                        a, b = pts(i)
+                        if not is_face(a, b) or edge_depth(a, b) <= 1e-6:
+                            stops.append(outline[i].wall)   # the turn / the near wall
+                            break
+                        if i not in picked and outline[i].wall is not None:
+                            rec = self._face_record(outline[i].wall, dx, dy)
+                            if rec is not None:
+                                picked[i] = (edge_u(a, b), rec, outline[i].wall)
+                        i = (i + step) % n
+                        if i == idx:             # full loop (degenerate) -- stop
+                            break
+                faces = list(picked.values())
+                # the two bounding walls -> left/right by where each sits along
+                # the view (midpoint projected onto the camera's right axis).
+                rets = [w for w in stops if w is not None]
+                scored = sorted(((self._wall_u(w, rx, ry, cx, cy), w) for w in rets),
+                                key=lambda t: t[0])
 
-            if len(scored) >= 2:
-                left_ret, right_ret = _ret(scored[0][1]), _ret(scored[-1][1])
-            elif len(scored) == 1:               # one return: side by its u sign
-                if scored[0][0] <= 0:
-                    left_ret = _ret(scored[0][1])
-                else:
-                    right_ret = _ret(scored[0][1])
+                def _ret(w):
+                    return {"label": getattr(w, "uid", "") or "Wall"}
+
+                if len(scored) >= 2:
+                    left_ret, right_ret = _ret(scored[0][1]), _ret(scored[-1][1])
+                elif len(scored) == 1:           # one return: side by its u sign
+                    if scored[0][0] <= 0:
+                        left_ret = _ret(scored[0][1])
+                    else:
+                        right_ret = _ret(scored[0][1])
 
         if not faces:
             return None
@@ -549,7 +623,7 @@ class CameraItem(QGraphicsItem):
                        if (self.show_furnishings or self.show_cabinetry) else [])
         return {"room_name": getattr(room, "name", "") or "",
                 "height_in": ceiling,
-                "floor_abs_in": float(floor_elevation(wall.floor)),
+                "floor_abs_in": float(floor_elevation(ref_wall.floor)),
                 "faces": face_recs, "furnishings": furnishings,
                 "left_return": left_ret, "right_return": right_ret}
 
@@ -652,6 +726,8 @@ class CameraItem(QGraphicsItem):
             rec["show_furnishings"] = True
         if self.show_cabinetry:
             rec["show_cabinetry"] = True
+        if self.show_house_side:
+            rec["show_house_side"] = True
         if getattr(self, "_uid", None):  # 0316: the persisted session label (C<n>),
             rec["uid"] = self._uid       # read, never minted, during a walk
         return rec
@@ -661,6 +737,7 @@ class CameraItem(QGraphicsItem):
         it = cls(QPointF(*rec["pos"]), float(rec.get("rotation", 0.0)),
                  floor=floor, name=rec.get("name", ""),
                  show_furnishings=bool(rec.get("show_furnishings", False)),
-                 show_cabinetry=bool(rec.get("show_cabinetry", False)))
+                 show_cabinetry=bool(rec.get("show_cabinetry", False)),
+                 show_house_side=bool(rec.get("show_house_side", False)))
         it.doc_id = rec.get("id")
         return it

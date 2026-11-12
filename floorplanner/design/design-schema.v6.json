@@ -532,6 +532,7 @@
         "name":     { "type": "string" },
         "show_furnishings": { "description": "0315: draw the free-standing furnishings against the faced wall in the elevation. Optional; omitted when off.", "type": "boolean", "default": false },
         "show_cabinetry":   { "description": "0315: draw the built-in cabinetry (casework) against the faced wall in the elevation. Optional; omitted when off.", "type": "boolean", "default": false },
+        "show_house_side":  { "description": "0317: when the camera sits OUTSIDE a room, elevation the whole side of the house -- every exterior wall whose outside turns toward the camera -- instead of the single faced wall. Optional; omitted when off.", "type": "boolean", "default": false },
         "uid":              { "$ref": "#/$defs/uid" }
       }
     }
