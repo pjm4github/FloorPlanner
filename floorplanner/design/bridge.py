@@ -103,15 +103,17 @@ EXTERIOR_NAMES = ("porch", "deck", "patio", "terrace", "lanai")
 # by the walk, applied on load, and no longer stashed.
 # Written down here so it is a known limit, not a mystery discovered later.
 _WALL_MODELLED = frozenset(("id", "level", "v1", "v2", "type", "left", "right",
-                            "openings", "bound_to"))
+                            "openings", "bound_to", "uid"))
 # 0255: an opening's keys the scene models; the rest (`head_in`) ride on the
-# item as `_v5_extra`, the wall's and the room's discipline
+# item as `_v5_extra`, the wall's and the room's discipline. 0316: `uid` is
+# modelled (set from the live item's session label) so it is NOT stashed in
+# `_v5_extra` and re-emitted stale over the top of the live value.
 _OPENING_MODELLED = frozenset(("id", "kind", "code", "anchor", "door_type",
-                               "hinge", "swings_toward", "sill_in"))
+                               "hinge", "swings_toward", "sill_in", "uid"))
 _ROOM_MODELLED = frozenset(("id", "level", "name", "outline", "label",
                             "properties", "placement",
                             # P4.4: modelled on the item, like `placement`
-                            "category", "nominal_size"))
+                            "category", "nominal_size", "uid"))
 # settings keys the walk re-emits itself; anything else in a document's
 # settings (e.g. `name`) is likewise retained rather than lost
 WALK_SETTINGS = frozenset(DEFAULT_SETTINGS) | {"vertex_weld_in", "join_tol_in",
@@ -586,6 +588,29 @@ def _name_rows(vt, items):
                 break
 
 
+def _label_rows(vt, items):
+    """0316: stamp each vertex row with the SESSION LABEL (uid) of the live
+    corner at its position, so a V-number survives a save/open cycle -- the
+    same position match `_name_rows` uses, but for every corner (not only
+    named ones). First at a position wins. `_persist_labels` later drops a
+    uid the canonical id already recovers, so a clean plan's vertices stay
+    bare."""
+    live = []
+    for it in items:
+        if isinstance(it, WallItem):
+            live += [it.end_vertex(a) for a in ("p1", "p2")]
+        elif isinstance(it, RoomItem):
+            live += [e.v for e in it.outline]
+    live = [v for v in live if v is not None and getattr(v, "_uid", None)]
+    for row in vt.rows:
+        if row.get("uid"):
+            continue
+        for v in live:
+            if _d((row["x"], row["y"]), (v.x, v.y)) <= vt.tol:
+                row["uid"] = v._uid               # never mint in a walk
+                break
+
+
 def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
     """This level's walls, split at every junction and room corner, as v5 wall
     dicts.  Openings are re-anchored from absolute `s` to {from, offset_in} on
@@ -753,6 +778,8 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
                     continue
                 seg_ops.append(rec)
                 live = live_opening.get(id(o))
+                if live is not None and getattr(live, "_uid", None):
+                    rec["uid"] = live._uid         # 0316: persisted session label
                 if src is not None and live is not None:
                     src[("op", id(live))] = (oid, live)              # 0264
 
@@ -774,6 +801,14 @@ def _walls_of(items, lid, nid, vt, rep, src=None, weld_check=True):
                    "type": w["type"], "left": None, "right": None,
                    "openings": seg_ops}
             rec.update(w["extra"])         # thickness_in / finish_*: unmodelled
+            # 0316: the persisted session label. Read `_uid` (never mint here --
+            # a walk must not assign labels, only report the ones items carry),
+            # so an undisplayed/programmatic scene emits none. A split wall
+            # stamps every segment it became; `_persist_labels` drops the
+            # duplicates, and `snapshot()` strips the lot (undo/dirty are
+            # label-free). It rides the FILE, via `design_document()`.
+            if getattr(w_items[i], "_uid", None):
+                rec["uid"] = w_items[i]._uid
             bound = bound_of.get(id(w_items[i]))
             if bound is not None:          # 0296: resolved to `bound_to` later
                 rec["_bound_roof_item"], rec["_bound_part"] = bound
@@ -861,6 +896,8 @@ def _rooms_of(items, lid, nid, vt, walls, rep, src=None):
         # was never loaded from a v5 document. (`placement` left the stash at
         # P4.2 -- it is modelled above.)
         rec.update(getattr(r, "_v5_extra", None) or {})
+        if getattr(r, "_uid", None):      # 0316: the persisted session label
+            rec["uid"] = r._uid
         if src is not None:               # which scene room (P4.5)
             src[rec["id"]] = r
         rooms.append(rec)
@@ -912,6 +949,8 @@ def _furnishings_of(items, lid, nid, rooms, poly, src=None):
         state = dict(it.extra_state())
         if state:
             rec["state"] = state
+        if getattr(it, "_uid", None):     # 0316: the persisted session label
+            rec["uid"] = it._uid
         if src is not None:               # which scene item (P4.5)
             src[rec["id"]] = it
         out.append(rec)
@@ -985,6 +1024,8 @@ def _roofs_of(items, lid, nid, src=None):
         parts = getattr(it, "dormer_wall_parts", None)
         if parts is not None and set(parts) != {"face", "cheek_left", "cheek_right"}:
             rec["dormer_walls"] = sorted(parts)
+        if getattr(it, "_uid", None):     # 0316: the persisted session label
+            rec["uid"] = it._uid
         if src is not None:
             src[rec["id"]] = it
         by_item[id(it)] = rec
@@ -999,6 +1040,68 @@ def _roofs_of(items, lid, nid, src=None):
 
 
 # ------------------------------------------------------------------ public API
+def _persist_labels(doc):
+    """0316: keep each record's SESSION LABEL (`uid`) only where a reload
+    cannot recover it from the geometric `id`, and only once.
+
+    `canonicalize` has just renumbered every `id` by geometry, so a record
+    whose uid matches its canonical id -- the two spellings of one number
+    (`labels.matches`, `w7` is `W7`) -- needs no stored label: a load adopts
+    the same number straight from the id. Dropping those keeps an unedited
+    plan's records bare and a file byte-identical on open->save. A uid is
+    dropped too when an earlier record of the same kind already carried it:
+    one scene wall split into several SEGMENT records stamps its label on
+    each, and only the first (in canonical/geometric order) keeps it, so no
+    two records ever claim one label. What remains is exactly the labels the
+    id cannot give back, each on a single record -- which is what makes a
+    Find by W/O/... number stable across save/open."""
+    def prune(records):
+        seen = set()
+        for rec in records:
+            uid = rec.get("uid")
+            if not uid:
+                continue
+            if _labels.matches(uid, rec.get("id")) or uid in seen:
+                rec.pop("uid", None)
+            else:
+                seen.add(uid)
+    prune(doc.get("vertices") or [])
+    prune(doc.get("walls") or [])
+    # openings are one global sequence across all walls (canonical.py renumbers
+    # them o1..oN in wall order), so they dedupe against that one sequence
+    prune([o for w in doc.get("walls") or [] for o in w.get("openings") or []])
+    prune(doc.get("rooms") or [])
+    prune(doc.get("furnishings") or [])
+    prune(doc.get("roofs") or [])
+    prune(doc.get("cameras") or [])
+    return doc
+
+
+def strip_labels(doc):
+    """0316: remove every record's session label (`uid`) from `doc`, in place.
+
+    The session labels are a FILE concern -- they ride `design_document()` so a
+    W/O/... number survives save/open. They must NOT be in `snapshot()`, which
+    defines the dirty flag and the undo comparison: a label is PER LIVE ITEM,
+    so a plan held as one long wall and the same plan held as that wall's split
+    segments carry different labels, and `snapshot()` is required to planarise
+    both to ONE document (granularity invariance, `snapshot`'s own docstring).
+    Stripping here keeps that invariant and keeps an edit that only re-mints a
+    label from reading as a change."""
+    def drop(records):
+        for rec in records:
+            rec.pop("uid", None)
+    drop(doc.get("vertices") or [])
+    drop(doc.get("walls") or [])
+    drop([o for w in doc.get("walls") or [] for o in w.get("openings") or []])
+    drop(doc.get("rooms") or [])
+    drop(doc.get("furnishings") or [])
+    drop(doc.get("roofs") or [])
+    drop([o for rf in doc.get("roofs") or [] for o in rf.get("openings") or []])
+    drop(doc.get("cameras") or [])
+    return doc
+
+
 def design_from_scene(source, floors=None, report=None, strict=False, ids_out=None) -> Design:
     """Walk the live scene into a v5 `Design`.
 
@@ -1109,6 +1212,7 @@ def design_from_scene(source, floors=None, report=None, strict=False, ids_out=No
             # coordinates, so the live vertices' names are matched back onto
             # them by position, at the table's own weld tolerance
             _name_rows(vt, part)
+            _label_rows(vt, part)                    # 0316: the V-number, persisted
             vertices += [row for row in vt.rows if row["id"] in used]
             lw_all += lw
             lr_all += lr
@@ -1218,6 +1322,7 @@ def design_from_scene(source, floors=None, report=None, strict=False, ids_out=No
     # keyed by identity are still these ones -- read the id it wrote.
     rep["wall_items"] = {w["id"]: wall_of_item[id(w)] for w in walls
                          if id(w) in wall_of_item}
+    _persist_labels(design_doc)        # 0316: strip a uid the id already recovers
     return Design.from_dict(design_doc)
 
 
@@ -1387,11 +1492,12 @@ def _build_walls(scene, doc, lname, rep):
     # fresh uids, NOT the document's ids: those are canonical (renumbered by
     # geometry at every save), and a live uid is persistent. P3.1 settled that
     # the two id spaces stay separate and `canonicalize` bridges them.
-    vmap = {v["id"]: Vertex(float(v["x"]), float(v["y"]), name=v.get("name") or None)
-            for v in doc.get("vertices", [])}
-    for vid, v in vmap.items():                  # 0264/0265: the file's own ids, and the
-        v.doc_id = vid                           # session label adopted from them
-        v._uid = _labels.adopt("V", vid)
+    vmap = {}
+    for vd in doc.get("vertices", []):           # 0264/0265/0316: the file's ids, and
+        vx = Vertex(float(vd["x"]), float(vd["y"]), name=vd.get("name") or None)
+        vx.doc_id = vd["id"]                      # the session label from the stored
+        vx._uid = _labels.adopt("V", vd.get("uid") or vd["id"])   # `uid`, else the id
+        vmap[vd["id"]] = vx
 
     wmap = {}
     for wd in doc.get("walls", []):
@@ -1401,7 +1507,7 @@ def _build_walls(scene, doc, lname, rep):
         wall.floor = lname.get(wd["level"], DEFAULT_FLOOR)   # never the global
         wall._v5_extra = {k: v for k, v in wd.items() if k not in _WALL_MODELLED}
         wall.doc_id = wd.get("id")                            # 0264
-        wall._uid = _labels.adopt("W", wd.get("id"))         # 0265
+        wall._uid = _labels.adopt("W", wd.get("uid") or wd.get("id"))   # 0265/0316
         scene.addItem(wall)
         wmap[wd["id"]] = wall
         rep["walls"] += 1
@@ -1438,7 +1544,7 @@ def _build_walls(scene, doc, lname, rep):
             op.sill_in = None if sill is None else float(sill)
             op._v5_extra = {k: v for k, v in od.items() if k not in _OPENING_MODELLED}
             op.doc_id = od.get("id")                           # 0264
-            op._uid = _labels.adopt("O", od.get("id"))        # 0265
+            op._uid = _labels.adopt("O", od.get("uid") or od.get("id"))   # 0265/0316
             wall.openings.append(op)
 
     # rendering only, and deliberately BEFORE any RoomItem exists: refresh_rooms
@@ -1476,7 +1582,7 @@ def _build_rooms(scene, doc, pos, vmap, wmap, lname, rep):
                                                           False))
         room.label_offset = QPointF(0.0, 0.0)
         room.doc_id = rd.get("id")                             # 0264
-        room._uid = _labels.adopt("R", rd.get("id"))          # 0265
+        room._uid = _labels.adopt("R", rd.get("uid") or rd.get("id"))   # 0265/0316
         scene.addItem(room)
         rmap[rd["id"]] = room
         for e in room.outline:                  # the outline IS the binding --
@@ -1506,7 +1612,7 @@ def _build_furnishings(scene, doc, lname, rep):
                                fd.get("state") or {})
         item.floor = lname.get(fd["level"], DEFAULT_FLOOR)   # never the global
         item.doc_id = fd.get("id")                             # 0264
-        item._uid = _labels.adopt("F", fd.get("id"))          # 0265
+        item._uid = _labels.adopt("F", fd.get("uid") or fd.get("id"))   # 0265/0316
         scene.addItem(item)
         fmap[fd["id"]] = item
         rep["furnishings"] += 1
@@ -1529,7 +1635,7 @@ def _build_cameras(scene, doc, lname, rep):
     """0313: the cameras of `doc` -- each a viewpoint item on its level."""
     for cd in doc.get("cameras", []) or []:
         item = CameraItem.from_record(cd, lname.get(cd.get("level"), DEFAULT_FLOOR))
-        item._uid = _labels.adopt("C", cd.get("id"))
+        item._uid = _labels.adopt("C", cd.get("uid") or cd.get("id"))   # 0316
         scene.addItem(item)
         rep["cameras"] = rep.get("cameras", 0) + 1
 
@@ -1581,7 +1687,7 @@ def _build_roofs(scene, doc, lname, rep):
                         box_half_in=rfd.get("box_half_in"))
         item.floor = floor   # never the global
         item.doc_id = rfd.get("id")                            # 0264
-        item._uid = _labels.adopt("RF", rfd.get("id"))        # 0265
+        item._uid = _labels.adopt("RF", rfd.get("uid") or rfd.get("id"))   # 0265/0316
         scene.addItem(item)
         rep["roofs"] += 1
         roof_by_id[rfd.get("id")] = item

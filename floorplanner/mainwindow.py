@@ -426,6 +426,13 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         a_ortho_repair = QAction("Repair wall orthogonality…", self)  # 0066/0082 item C
         a_ortho_repair.triggered.connect(self.repair_wall_orthogonality)
         m_edit.addAction(a_ortho_repair)
+        m_edit.addSeparator()
+        # 0316: Find item -- locate an annotated item by its W/O/... number (or
+        # name) and zoom to it. Ctrl+F, freed by moving floor Select to Ctrl+L.
+        self.a_find = QAction("&Find item…", self)
+        self.a_find.setShortcut(QKeySequence("Ctrl+F"))
+        self.a_find.triggered.connect(self.find_item)
+        m_edit.addAction(self.a_find)
 
         # A VIEW MENU, and 3D view is its first item (D53). It had NO menu-bar
         # entry, no shortcut and no toolbar button: `show_3d_view`'s only two
@@ -1049,6 +1056,20 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         for it in self.scene.items():
             if isinstance(it, CameraItem):
                 it.setVisible(self._cameras_visible)
+
+    def find_item(self):
+        """0316: Edit ▸ Find item (Ctrl+F) -- a non-modal dialog that finds an
+        annotated item by its session label (W47, O3, R2, …) or its name and
+        zooms the view to it. Rebuilt each time so its list reflects the plan as
+        it now stands; one is kept open at a time."""
+        from floorplanner.find import FindDialog
+        dlg = getattr(self, "_find_dialog", None)
+        if dlg is not None:
+            dlg.close()
+        self._find_dialog = FindDialog(self)
+        self._find_dialog.show()
+        self._find_dialog.raise_()
+        self._find_dialog.activateWindow()
 
     def open_macro_recorder(self):
         """Open (or re-show) the non-modal macro recorder / debugger window."""

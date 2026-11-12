@@ -721,10 +721,11 @@ def test_ctrl_s_with_no_file_skips_instead_of_failing(fp, win):
 
 def test_floor_select_and_new_record_and_replay(fp, win, qapp):
     # The P4.2 Floors-menu spec (supersedes the one-session-old cycle
-    # design, deliberately): Ctrl+F pops the floor selector (default floor
+    # design, deliberately): Ctrl+L pops the floor selector (default floor
     # first and PRE-HIGHLIGHTED, so ENTER with no arrows selects it);
-    # Ctrl+Shift+F is New floor. Macro side: ^F "name" switches, BARE ^F
-    # returns to the default (roster's first, whatever its name), and
+    # Ctrl+Shift+L is New floor -- both moved off Ctrl+F (0316) so Find can
+    # have it; the MACRO tokens are unchanged. Macro side: ^F "name" switches,
+    # BARE ^F returns to the default (roster's first, whatever its name), and
     # ^+F "name" creates -- idempotently, so replays repeat cleanly.
     from floorplanner.macro import MacroRecorderDialog
     # runner: ^+F creates + switches; repeat is a switch, not a failure
@@ -760,9 +761,10 @@ def test_floor_select_and_new_record_and_replay(fp, win, qapp):
         dlg.stop()
         dlg.deleteLater()
         qapp.processEvents()
-    # the menu actions carry the spec'd shortcuts
-    assert win.a_select_floor.shortcut().toString() == "Ctrl+F"
-    assert win.a_new_floor.shortcut().toString() == "Ctrl+Shift+F"
+    # the menu actions carry the spec'd shortcuts (0316: moved to L for LEVEL,
+    # freeing Ctrl+F for Edit ▸ Find item)
+    assert win.a_select_floor.shortcut().toString() == "Ctrl+L"
+    assert win.a_new_floor.shortcut().toString() == "Ctrl+Shift+L"
     # renamed default is still the bare-^F target: rename via the roster
     win.floors[0].name = "Ground"
     for it in win.scene.items():
