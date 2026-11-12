@@ -37,6 +37,15 @@ _REACH = 60.0                         # the wedge / aim-arrow length
 _FOV_DEG = 22.0                       # half-angle of the field-of-view wedge
 _INK = QColor(37, 99, 235)            # camera blue
 _FILL = QColor(37, 99, 235, 40)       # translucent wedge
+# content badges (0315): drawn under the body when a switch is on, so the glyph
+# shows what the elevation will carry. The same two inks mark the silhouettes in
+# the elevation, so the badge and its content read as one.
+_FURN_C = QColor(13, 118, 102)        # furnishings: teal
+_CAB_C = QColor(166, 124, 64)         # cabinetry: wood tan
+_BADGE_W = 13.0
+_BADGE_H = 11.0
+_BADGE_GAP = 3.0
+_BADGE_TOP = _BODY_H / 2 + 3.0        # just below the camera body
 
 
 def _ray_segment_t(ox, oy, dx, dy, ax, ay, bx, by):
@@ -62,12 +71,18 @@ class CameraItem(QGraphicsItem):
     right-click or the 90° steps also turn it. Double-click, or right-click ->
     "Open elevation…", opens the straight-on elevation of the wall it faces."""
 
-    def __init__(self, pos: QPointF, rotation: float = 0.0, floor=None, name: str = ""):
+    def __init__(self, pos: QPointF, rotation: float = 0.0, floor=None, name: str = "",
+                 show_furnishings: bool = False, show_cabinetry: bool = False):
         super().__init__()
         self._uid = None                 # the session label, C<n>
         self.floor = floor if floor is not None else active_floor()
         self.name = name or ""
         self.doc_id = None
+        # per-camera elevation content switches (0315): show the furnishings
+        # and/or the cabinetry standing against the faced wall. The plan glyph
+        # changes shape to show which are on.
+        self.show_furnishings = bool(show_furnishings)
+        self.show_cabinetry = bool(show_cabinetry)
         self._rotating = False
         self._rot_offset = 0.0
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
@@ -112,6 +127,26 @@ class CameraItem(QGraphicsItem):
     def _handle_visible(self) -> bool:
         return self.isSelected() and self.group() is None
 
+    # -- content badges (glyph shape per active switch) -----------------------
+    def _badges(self) -> list:
+        """(rect, ink) for each active content switch, in a row below the body
+        -- furnishings left, cabinetry right. Drives both paint and the bounds,
+        so the glyph's silhouette grows as switches turn on."""
+        items = []
+        if self.show_furnishings:
+            items.append(_FURN_C)
+        if self.show_cabinetry:
+            items.append(_CAB_C)
+        if not items:
+            return []
+        total = len(items) * _BADGE_W + (len(items) - 1) * _BADGE_GAP
+        x = -total / 2.0
+        out = []
+        for ink in items:
+            out.append((QRectF(x, _BADGE_TOP, _BADGE_W, _BADGE_H), ink))
+            x += _BADGE_W + _BADGE_GAP
+        return out
+
     # -- geometry -------------------------------------------------------------
     def boundingRect(self) -> QRectF:
         half = _REACH * math.tan(math.radians(_FOV_DEG)) + 2.0
@@ -119,6 +154,11 @@ class CameraItem(QGraphicsItem):
                       _REACH + _BODY_W, 2 * max(half, _BODY_H / 2 + 2.0))
         c, r = self._handle()
         rect.setTop(min(rect.top(), c.y() - r - 1.5))
+        badges = self._badges()
+        if badges:                               # badges are counter-rotated to
+            total = len(badges) * _BADGE_W + (len(badges) - 1) * _BADGE_GAP
+            rr = math.hypot(total / 2.0, _BADGE_TOP + _BADGE_H) + 2.0
+            rect = rect.united(QRectF(-rr, -rr, 2 * rr, 2 * rr))  # upright at any aim
         return rect
 
     def shape(self) -> QPainterPath:
@@ -153,6 +193,15 @@ class CameraItem(QGraphicsItem):
         painter.drawRoundedRect(QRectF(-_BODY_W / 2, -_BODY_H / 2, _BODY_W, _BODY_H), 3, 3)
         painter.setBrush(QBrush(ink))
         painter.drawEllipse(QPointF(_BODY_W / 2 - _LENS_R, 0.0), _LENS_R, _LENS_R)
+        # content badges -- the glyph grows a pictogram per active switch; drawn
+        # counter-rotated so they sit upright just below the camera at ANY aim
+        badges = self._badges()
+        if badges:
+            painter.save()
+            painter.rotate(-self.rotation())
+            for br, bink in badges:
+                self._draw_badge(painter, br, bink if active else FLOOR_GHOST)
+            painter.restore()
         # selection box + rotator handle
         if self._handle_visible():
             painter.setPen(QPen(_INK, 0, Qt.PenStyle.DashLine))
@@ -165,6 +214,37 @@ class CameraItem(QGraphicsItem):
             painter.drawEllipse(c, hr, hr)
             painter.setBrush(QBrush(_INK))
             painter.drawEllipse(c, hr * 0.35, hr * 0.35)
+
+    @staticmethod
+    def _draw_badge(painter, r: QRectF, ink: QColor):
+        """A tiny pictogram in `r`: an armchair for furnishings (teal), a base
+        cabinet for cabinetry (wood). The fill is a wash of the ink so the badge
+        reads as a filled shape at plan zoom."""
+        wash = QColor(ink)
+        wash.setAlpha(70)
+        painter.setPen(QPen(ink, 0))
+        painter.setBrush(QBrush(wash))
+        if ink == _CAB_C:                        # base cabinet: box, counter, doors
+            painter.drawRect(r)
+            ctop = r.top() + r.height() * 0.22
+            painter.drawLine(QPointF(r.left() - 0.5, ctop),
+                             QPointF(r.right() + 0.5, ctop))   # overhanging counter
+            midx = r.center().x()
+            painter.drawLine(QPointF(midx, ctop), QPointF(midx, r.bottom()))  # door split
+            hy = ctop + (r.bottom() - ctop) * 0.3
+            painter.setBrush(QBrush(ink))
+            for hx in (midx - r.width() * 0.16, midx + r.width() * 0.16):
+                painter.drawEllipse(QPointF(hx, hy), 0.7, 0.7)  # handles
+        else:                                    # armchair: body, back, two arms
+            painter.drawRoundedRect(r, 2.0, 2.0)
+            back = r.top() + r.height() * 0.42
+            painter.drawLine(QPointF(r.left() + r.width() * 0.22, back),
+                             QPointF(r.right() - r.width() * 0.22, back))   # seat line
+            ax = r.width() * 0.2
+            painter.drawLine(QPointF(r.left() + ax, back),
+                             QPointF(r.left() + ax, r.bottom() - 1.0))      # left arm
+            painter.drawLine(QPointF(r.right() - ax, back),
+                             QPointF(r.right() - ax, r.bottom() - 1.0))     # right arm
 
     # -- rotation interaction (cloned from FurnishingItem) --------------------
     def hoverMoveEvent(self, e):
@@ -220,6 +300,15 @@ class CameraItem(QGraphicsItem):
         menu = QMenu()
         a_elev = menu.addAction("Open elevation…")
         menu.addSeparator()
+        # content switches -- checkable, each shows its set in the elevation and
+        # changes the plan glyph so the camera shows what it will draw
+        a_furn = menu.addAction("Show furnishings")
+        a_furn.setCheckable(True)
+        a_furn.setChecked(self.show_furnishings)
+        a_cab = menu.addAction("Show cabinetry")
+        a_cab.setCheckable(True)
+        a_cab.setChecked(self.show_cabinetry)
+        menu.addSeparator()
         a_cw = menu.addAction("Rotate 90° CW")
         a_ccw = menu.addAction("Rotate 90° CCW")
         menu.addSeparator()
@@ -227,6 +316,10 @@ class CameraItem(QGraphicsItem):
         chosen = menu.exec(e.screenPos())
         if chosen is a_elev:
             self.open_elevation()
+        elif chosen is a_furn:
+            self.set_show_furnishings(a_furn.isChecked())
+        elif chosen is a_cab:
+            self.set_show_cabinetry(a_cab.isChecked())
         elif chosen is a_cw:
             self.setRotation((self.rotation() + 90.0) % 360.0)
         elif chosen is a_ccw:
@@ -235,6 +328,22 @@ class CameraItem(QGraphicsItem):
             if self.scene() is not None:
                 self.scene().removeItem(self)
         e.accept()
+
+    def set_show_furnishings(self, on: bool):
+        """Turn the furnishings content switch on/off -- redraws the glyph (whose
+        shape shows the active modes) and marks the plan dirty (scene.changed)."""
+        on = bool(on)
+        if on != self.show_furnishings:
+            self.prepareGeometryChange()
+            self.show_furnishings = on
+            self.update()
+
+    def set_show_cabinetry(self, on: bool):
+        on = bool(on)
+        if on != self.show_cabinetry:
+            self.prepareGeometryChange()
+            self.show_cabinetry = on
+            self.update()
 
     def open_elevation(self):
         """Open (or report) the elevation of the wall this camera faces. Late
@@ -379,7 +488,7 @@ class CameraItem(QGraphicsItem):
             rec = self._face_record(wall, dx, dy)
             if rec is None:
                 return None
-            faces = [(edge_u(wall.p1, wall.p2), rec)]
+            faces = [(edge_u(wall.p1, wall.p2), rec, wall)]
         else:
             n = len(outline)
 
@@ -398,7 +507,7 @@ class CameraItem(QGraphicsItem):
                     if i not in picked and outline[i].wall is not None:
                         rec = self._face_record(outline[i].wall, dx, dy)
                         if rec is not None:
-                            picked[i] = (edge_u(a, b), rec)
+                            picked[i] = (edge_u(a, b), rec, outline[i].wall)
                     i = (i + step) % n
                     if i == idx:                 # full loop (degenerate) -- stop
                         break
@@ -423,15 +532,25 @@ class CameraItem(QGraphicsItem):
         if not faces:
             return None
         faces.sort(key=lambda t: t[0])           # left -> right as the camera sees
-        face_recs = [rec for _u, rec in faces]
+        face_recs = [rec for _u, rec, _w in faces]
+        # per-face run metadata (run origin + along-wall axis), to place the
+        # furnishings / cabinetry that stand against each wall
+        face_meta, x0 = [], 0.0
+        for _u, rec, fw in faces:
+            m = self._face_meta(fw, rx, ry, cx, cy, x0)
+            if m is not None:
+                face_meta.append(m)
+            x0 += rec["width_in"]
         ceiling = self._ceiling_of(room)
         heads = [o["head_in"] for rec in face_recs for o in rec["windows"] + rec["doors"]]
         if heads:
             ceiling = max(ceiling, max(heads) + 6.0)     # never clip an opening
+        furnishings = (self._items_against(face_meta)
+                       if (self.show_furnishings or self.show_cabinetry) else [])
         return {"room_name": getattr(room, "name", "") or "",
                 "height_in": ceiling,
                 "floor_abs_in": float(floor_elevation(wall.floor)),
-                "faces": face_recs,
+                "faces": face_recs, "furnishings": furnishings,
                 "left_return": left_ret, "right_return": right_ret}
 
     def _wall_u(self, wall, rx, ry, cx, cy) -> float:
@@ -441,6 +560,87 @@ class CameraItem(QGraphicsItem):
         mx, my = 0.5 * (a.x() + b.x()), 0.5 * (a.y() + b.y())
         return (mx - cx) * rx + (my - cy) * ry
 
+    @staticmethod
+    def _face_meta(wall, rx, ry, cx, cy, x0):
+        """A faced wall's run mapping: the endpoint that sits at the LEFT of the
+        drawing (smaller camera-right projection), the along-wall axis pointing
+        toward the right, the wall normal, the wall length, and `x0` (the face's
+        left edge in run inches). A scene point projected onto this wall maps to
+        `x0 + (p - left)·axis`."""
+        a, b = wall.p1, wall.p2
+        ua = (a.x() - cx) * rx + (a.y() - cy) * ry
+        ub = (b.x() - cx) * rx + (b.y() - cy) * ry
+        left, right = (a, b) if ua <= ub else (b, a)
+        L = math.hypot(right.x() - left.x(), right.y() - left.y())
+        if L < 1e-6:
+            return None
+        ux, uy = (right.x() - left.x()) / L, (right.y() - left.y()) / L
+        return {"lx": left.x(), "ly": left.y(), "ux": ux, "uy": uy,
+                "nx": -uy, "ny": ux, "L": L, "x0": x0}
+
+    def _items_against(self, face_meta, tol=12.0):
+        """The furnishings / cabinetry standing against the faced walls, as
+        elevation records. An item is placed on the face whose wall it is most
+        flush against (its back within `tol` of the wall, on the camera's side),
+        its footprint PROJECTED onto that wall for the run span and its
+        `elevation_in`/`height_in` for the vertical. Each toggle admits its own
+        set (casework = cabinetry; the rest = furnishings)."""
+        from floorplanner.catalog import furnishing_spec
+        from floorplanner.items import FurnishingItem
+        sc = self.scene()
+        if sc is None or not face_meta:
+            return []
+        px, py = self.pos().x(), self.pos().y()
+        out = []
+        for it in sc.items():
+            if not isinstance(it, FurnishingItem) or sip.isdeleted(it):
+                continue
+            if getattr(it, "floor", None) != self.floor:
+                continue
+            spec = furnishing_spec(it.kind)
+            if spec is None:
+                continue
+            casework = bool(spec.get("casework"))
+            if (casework and not self.show_cabinetry) or \
+               (not casework and not self.show_furnishings):
+                continue
+            h = float(spec.get("height_in", 0.0) or 0.0)
+            if h <= 0.0:
+                continue
+            elev = float(spec.get("elevation_in", 0.0) or 0.0)
+            icx, icy = it.pos().x(), it.pos().y()
+            th = math.radians(it.rotation())
+            ex, ey = math.cos(th), math.sin(th)      # item local x axis
+            fx, fy = -math.sin(th), math.cos(th)     # item local y axis
+            hw, hd = it.w / 2.0, it.d / 2.0
+            best = None                              # (gap, run_x0, run_x1)
+            for m in face_meta:
+                relx, rely = icx - m["lx"], icy - m["ly"]
+                t = relx * m["ux"] + rely * m["uy"]              # centre along wall
+                dperp = relx * m["nx"] + rely * m["ny"]          # signed clearance
+                half_al = abs(hw * (ex * m["ux"] + ey * m["uy"])) + \
+                    abs(hd * (fx * m["ux"] + fy * m["uy"]))
+                half_pp = abs(hw * (ex * m["nx"] + ey * m["ny"])) + \
+                    abs(hd * (fx * m["nx"] + fy * m["ny"]))
+                a0, a1 = t - half_al, t + half_al
+                if a1 <= 0.0 or a0 >= m["L"]:                    # off the wall span
+                    continue
+                gap = abs(dperp) - half_pp
+                if gap > tol:                                    # too far off the wall
+                    continue
+                cam_side = (px - m["lx"]) * m["nx"] + (py - m["ly"]) * m["ny"]
+                if dperp * cam_side < 0 and abs(dperp) > half_pp:
+                    continue                                     # behind the wall
+                if best is None or gap < best[0]:
+                    best = (gap, m["x0"] + max(0.0, a0), m["x0"] + min(m["L"], a1))
+            if best is not None:
+                out.append({"label": getattr(it, "uid", "") or it.name,
+                            "name": it.name, "casework": casework,
+                            "x0_in": best[1], "x1_in": best[2],
+                            "sill_in": elev, "head_in": elev + h})
+        out.sort(key=lambda r: r["x0_in"])
+        return out
+
     # -- serialization --------------------------------------------------------
     def to_record(self, cid: str, level: str) -> dict:
         rec = {"id": cid, "level": level,
@@ -448,11 +648,17 @@ class CameraItem(QGraphicsItem):
                "rotation": float(self.rotation())}
         if self.name:
             rec["name"] = self.name
+        if self.show_furnishings:
+            rec["show_furnishings"] = True
+        if self.show_cabinetry:
+            rec["show_cabinetry"] = True
         return rec
 
     @classmethod
     def from_record(cls, rec: dict, floor: str):
         it = cls(QPointF(*rec["pos"]), float(rec.get("rotation", 0.0)),
-                 floor=floor, name=rec.get("name", ""))
+                 floor=floor, name=rec.get("name", ""),
+                 show_furnishings=bool(rec.get("show_furnishings", False)),
+                 show_cabinetry=bool(rec.get("show_cabinetry", False)))
         it.doc_id = rec.get("id")
         return it

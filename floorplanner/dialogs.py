@@ -1225,6 +1225,8 @@ class _WallElevationCanvas(QWidget):
     _RET = QColor(120, 120, 120)
     _SEAM = QColor(205, 205, 205)          # faint seam between walls on one plane
     _MIN_DIM_PX = 36.0                      # narrower than this -> grouped dimension
+    _FURN = QColor(13, 118, 102)           # furnishings silhouette (teal)
+    _CAB = QColor(166, 124, 64)            # cabinetry silhouette (wood)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1296,6 +1298,12 @@ class _WallElevationCanvas(QWidget):
         for i in range(1, len(faces)):
             x = X(edges[i])
             p.drawLine(QPointF(x, Y(H)), QPointF(x, base_y))
+
+        # the furnishings / cabinetry standing against the wall -- to-scale
+        # translucent silhouettes (so the wall and its openings still read),
+        # each at its mounting height; cabinetry wood, furnishings teal
+        for it in e.get("furnishings", []):
+            self._draw_item(p, X, Y, H, it)
 
         # the wall labels on top -- just W-number, where the panel is wide enough
         p.setPen(QPen(QColor(20, 20, 20)))
@@ -1400,6 +1408,29 @@ class _WallElevationCanvas(QWidget):
         p.drawText(QPointF(0, 0), label)
         p.restore()
 
+    def _draw_item(self, p, X, Y, H, it):
+        """One furnishing / cabinetry silhouette: a translucent, to-scale box from
+        its mounting height up to its top (clamped at the ceiling), outlined in
+        its ink (cabinetry wood, furnishings teal), named when it fits."""
+        x0, x1 = X(float(it["x0_in"])), X(float(it["x1_in"]))
+        if x1 - x0 < 1.0:
+            return
+        top = Y(min(float(it["head_in"]), H))
+        bot = Y(max(float(it["sill_in"]), 0.0))
+        ink = self._CAB if it.get("casework") else self._FURN
+        wash = QColor(ink)
+        wash.setAlpha(58)
+        r = QRectF(QPointF(x0, top), QPointF(x1, bot))
+        p.fillRect(r, wash)
+        p.setPen(QPen(ink, 1.2))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRect(r)
+        name = it.get("name", "")
+        if name and (x1 - x0) > 26.0 and (bot - top) > 13.0:
+            p.setPen(QPen(ink.darker(150)))
+            p.drawText(r, int(Qt.AlignmentFlag.AlignCenter) | int(Qt.TextFlag.TextWordWrap),
+                       name)
+
     def _draw_return(self, p, x, base_y, side, ret):
         """A side wall that turns the corner toward the camera: a short tick
         angling down-and-out from the run's end, with its W-number."""
@@ -1467,10 +1498,19 @@ class CameraElevationDialog(QDialog):
             rets = [r["label"] for r in (data.get("left_return"),
                                          data.get("right_return")) if r]
             ret_txt = (f" Returns: {', '.join(rets)}." if rets else "")
+            items = data.get("furnishings", [])
+            ncab = sum(1 for it in items if it.get("casework"))
+            nfur = len(items) - ncab
+            cam = getattr(self.camera, "show_furnishings", False), \
+                getattr(self.camera, "show_cabinetry", False)
+            extra = ""
+            if cam[0] or cam[1]:
+                extra = (f" Against the wall: {nfur} furnishing(s), "
+                         f"{ncab} cabinet(s).")
             self.note.setText(
                 f"{where}wall {labels} — {fmt_in(width)} wide, "
-                f"{nw} window(s), {nd} door(s).{ret_txt} Straight-on, to scale; "
-                "heights from the floor. Move or aim the camera, then Refresh.")
+                f"{nw} window(s), {nd} door(s).{ret_txt}{extra} Straight-on, to "
+                "scale; heights from the floor. Move or aim the camera, then Refresh.")
 
 
 class FloorLevelsDialog(QDialog):

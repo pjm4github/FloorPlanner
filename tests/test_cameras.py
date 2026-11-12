@@ -204,3 +204,118 @@ def test_place_camera_menu_starts_the_tool(win):
     win.set_tool(TOOL_CAMERA)
     assert win.tool == TOOL_CAMERA
     assert win._tool_actions[TOOL_CAMERA].isChecked()
+
+
+# -- 0315: show the furnishings / cabinetry against the faced wall ------------
+
+def _room_with_items(fp, scene, items):
+    """A 180x100 room (far wall split by a doorway) with `items` = [(kind,(x,y))]
+    placed; returns (room, camera-aimed-up). Mirrors the split-wall fixture."""
+    from floorplanner.items import FurnishingItem
+
+    def _w(a, b):
+        w = fp.WallItem(QPointF(*a), QPointF(*b), "interior")
+        scene.addItem(w)
+        return w
+    wA = _w((0, 0), (78, 0))
+    _w((78, 0), (180, 0))
+    _w((180, 0), (180, 100))
+    _w((180, 100), (0, 100))
+    _w((0, 100), (0, 0))
+    wA.openings.append(fp.OpeningItem(wA, "door", "3080", 40.0))
+    fp.rebuild_all_walls(scene)
+    centre = QPointF(90, 50)
+    res = fp.detect_room(scene, centre)
+    room = fp.RoomItem(fp.unique_room_name(scene, "KIT"), centre,
+                       res[0], res[1], corners=res[2])
+    scene.addItem(room)
+    fp.bind_room_walls(scene, room)
+    for kind, pos in items:
+        it = FurnishingItem(kind, QPointF(*pos))
+        scene.addItem(it)
+    cam = CameraItem(QPointF(90, 60), rotation=270.0)
+    scene.addItem(cam)
+    return room, cam
+
+
+def test_is_casework_splits_cabinets_from_furniture():
+    """Built-in cabinets are casework (cabinetry); free-standing pieces are not."""
+    from floorplanner.catalog import is_casework
+    assert is_casework("base_cab_36") and is_casework("wall_cab_36")
+    assert is_casework("vanity_24") and is_casework("kitchen_island")
+    assert not is_casework("sofa") and not is_casework("bed_queen")
+
+
+def test_toggles_off_show_no_items(fp, scene):
+    """With both switches off the elevation carries no furnishings at all."""
+    _room, cam = _room_with_items(fp, scene, [("base_cab_36", (120, 12)),
+                                              ("sofa", (40, 14))])
+    assert cam.show_furnishings is False and cam.show_cabinetry is False
+    assert cam.elevation()["furnishings"] == []
+
+
+def test_cabinetry_toggle_shows_only_casework(fp, scene):
+    """Show cabinetry draws the base cabinet (casework), not the sofa."""
+    _room, cam = _room_with_items(fp, scene, [("base_cab_36", (120, 12)),
+                                              ("sofa", (40, 14))])
+    cam.set_show_cabinetry(True)
+    items = cam.elevation()["furnishings"]
+    assert [it["casework"] for it in items] == [True]
+    base = items[0]
+    assert base["sill_in"] == pytest.approx(0.0)          # base cabinet on the floor
+    assert base["head_in"] == pytest.approx(36.0)
+
+
+def test_furnishings_toggle_shows_only_free_standing(fp, scene):
+    """Show furnishings draws the sofa, not the base cabinet."""
+    _room, cam = _room_with_items(fp, scene, [("base_cab_36", (120, 12)),
+                                              ("sofa", (40, 14))])
+    cam.set_show_furnishings(True)
+    items = cam.elevation()["furnishings"]
+    assert [it["casework"] for it in items] == [False]
+    assert items[0]["name"] == "Sofa"
+
+
+def test_a_wall_cabinet_sits_at_its_mounting_height(fp, scene):
+    """A wall cabinet draws elevated off the floor (its elevation_in ~54\")."""
+    _room, cam = _room_with_items(fp, scene, [("wall_cab_36", (120, 6))])
+    cam.set_show_cabinetry(True)
+    wc = cam.elevation()["furnishings"][0]
+    assert wc["sill_in"] == pytest.approx(54.0)
+    assert wc["head_in"] == pytest.approx(84.0)
+
+
+def test_an_item_away_from_the_wall_is_not_shown(fp, scene):
+    """A piece in the middle of the room (against no wall) is not drawn."""
+    _room, cam = _room_with_items(fp, scene, [("dining_table", (90, 50))])
+    cam.set_show_furnishings(True)
+    assert cam.elevation()["furnishings"] == []
+
+
+def test_content_switches_round_trip(fp, scene):
+    """The two switches serialize, validate, and reload with the camera."""
+    from floorplanner.design.bridge import apply_design_to_scene, design_from_scene
+    from floorplanner.design.validate import schema_errors
+    scene.addItem(CameraItem(QPointF(72, 48), rotation=0.0,
+                             show_furnishings=True, show_cabinetry=True))
+    out = design_from_scene(scene).to_dict()
+    assert schema_errors(out) == []
+    assert out["cameras"][0]["show_furnishings"] is True
+    assert out["cameras"][0]["show_cabinetry"] is True
+    scene.clear()
+    apply_design_to_scene(scene, out)
+    cam = [it for it in scene.items() if isinstance(it, CameraItem)][0]
+    assert cam.show_furnishings and cam.show_cabinetry
+
+
+def test_the_glyph_grows_a_badge_per_active_switch(scene):
+    """Turning a switch on adds a badge and enlarges the glyph's bounds."""
+    cam = CameraItem(QPointF(0, 0))
+    scene.addItem(cam)
+    plain = cam.boundingRect()
+    assert cam._badges() == []
+    cam.set_show_furnishings(True)
+    assert len(cam._badges()) == 1
+    cam.set_show_cabinetry(True)
+    assert len(cam._badges()) == 2
+    assert cam.boundingRect().height() > plain.height()
