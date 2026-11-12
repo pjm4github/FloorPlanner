@@ -179,12 +179,15 @@ class Camera(_Node):
     aim in degrees, 0 = +x), and opens an elevation from. OPTIONAL block,
     additive (no version bump), the same RAW-passthrough shape furnishings use."""
     FIELDS: ClassVar = [("id", RAW), ("level", RAW), ("pos", RAW),
-                        ("rotation", RAW), ("name", RAW)]
+                        ("rotation", RAW), ("name", RAW),
+                        ("show_furnishings", RAW), ("show_cabinetry", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     pos: Any = _MISSING
     rotation: Any = _MISSING
     name: Any = _MISSING
+    show_furnishings: Any = _MISSING
+    show_cabinetry: Any = _MISSING
 
 
 @dataclass

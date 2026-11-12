@@ -15,7 +15,7 @@ except ImportError:               # QtSvg missing: furnishings draw as boxes
 
 __all__ = [
     "furnishing_catalog", "furnishing_spec", "furnishing_groups",
-    "furnishing_renderer",
+    "furnishing_renderer", "is_casework",
     "ANTHROPIC_API_URL", "ANTHROPIC_VERSION", "AI_PROVIDERS",
     "default_pricing_prompt", "parse_price_json", "anthropic_fetch_prices",
     "apply_furnishing_prices", "load_saved_api_key", "save_api_key",
@@ -24,6 +24,25 @@ __all__ = [
 _FURN_CATALOG = None
 _FURN_GROUPS = None
 _FURN_RENDERERS = {}
+
+# 0315: CASEWORK (built-in cabinetry) vs free-standing furnishings. The catalog
+# has no cabinetry flag, so it is keyed off the manifest id: base/wall/drawer/
+# sink/corner cabinets, pantries, vanities, and the kitchen islands. The camera's
+# "Show cabinetry" / "Show furnishings" toggles split the items on this.
+_CASEWORK_PREFIX = ("base_cab", "wall_cab", "drawer_base", "sink_base",
+                    "corner_base", "pantry", "vanity")
+_CASEWORK_EXACT = frozenset({"kitchen_island", "island_sink"})
+
+
+def _is_casework_id(kind: str) -> bool:
+    return kind in _CASEWORK_EXACT or kind.startswith(_CASEWORK_PREFIX)
+
+
+def is_casework(kind: str) -> bool:
+    """True when the furnishing `kind` is built-in cabinetry (casework), not a
+    free-standing furnishing -- the split behind the camera's two toggles."""
+    spec = furnishing_spec(kind)
+    return bool(spec["casework"]) if spec else _is_casework_id(kind)
 
 
 def furnishing_catalog() -> list:
@@ -47,6 +66,11 @@ def furnishing_catalog() -> list:
                     "file": str(ent["file"]),
                     "width_in": float(ent["width_in"]),
                     "depth_in": float(ent["depth_in"]),
+                    # 0315: true height and the height of its BASE off the floor
+                    # (a wall cabinet sits ~54"), for the camera elevation.
+                    "height_in": float(ent.get("height_in", 36.0) or 0.0),
+                    "elevation_in": float(ent.get("elevation_in", 0.0) or 0.0),
+                    "casework": _is_casework_id(str(ent["id"])),
                     "price": float(ent.get("price", 0.0) or 0.0),
                 }
             except (KeyError, TypeError, ValueError):
