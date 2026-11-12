@@ -454,5 +454,6 @@ this table is not a second copy of it.
 | [`0312-report.md`](./0312-report.md) | report: the L1 door under a front dormer no longer fills in 3D — swept to `main` |
 | [`0313-report.md`](./0313-report.md) | report: plan CAMERAS — a placeable viewpoint that opens an elevation of the wall it faces — on a branch |
 | [`0314-report.md`](./0314-report.md) | report: the plan CAMERA now elevations the whole ROOM wall it faces, labelled for reading — on branch `plan-cameras` |
+| [`0315-report.md`](./0315-report.md) | report: the plan CAMERA now SHOWS the furnishings and/or the cabinetry it faces, as to-scale silhouettes — on branch `camera-content` |
 
 <!-- PAIRS:END -->
