@@ -1,6 +1,6 @@
 {
  "format": "floorplanner-design",
- "version": 5,
+ "version": 6,
  "units": "inches",
  "settings": {
   "wall_snap_in": 6.0,
@@ -8,6 +8,13 @@
   "canvas_w_in": 2400.0,
   "canvas_h_in": 1200.0,
   "cost_per_sqft": 300.0,
+  "show_roofs": true,
+  "edit_roofs": true,
+  "show_annotations": true,
+  "show_dimensions": true,
+  "show_callouts": true,
+  "callout_color": "#005AC8",
+  "dimension_units": "ftin",
   "vertex_weld_in": 0.6,
   "join_tol_in": 9.0,
   "area_basis": "centerline",
@@ -1715,7 +1722,10 @@
      "anchor": {
       "from": "v1",
       "offset_in": 47.0
-     }
+     },
+     "door_type": "LH",
+     "hinge": "v1",
+     "swings_toward": "left"
     }
    ]
   },
@@ -5708,6 +5718,17 @@
   }
  ],
  "groups": [],
+ "cameras": [
+  {
+   "id": "cam1",
+   "level": "L1",
+   "pos": [
+    762.0,
+    717.0
+   ],
+   "rotation": 270.0
+  }
+ ],
  "provenance": {
   "migrated_from": {
    "format": "floorplanner-json",
