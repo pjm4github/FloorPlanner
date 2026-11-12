@@ -149,6 +149,8 @@ def test_a_camera_record_round_trips(scene):
     """`to_record`/`from_record` preserve the camera's position and aim."""
     cam = CameraItem(QPointF(72.0, 48.0), rotation=135.0, floor=DEFAULT_FLOOR, name="front")
     rec = cam.to_record("cam1", DEFAULT_FLOOR)
+    # 0316: a camera that has never been labelled (no _uid) stores no `uid` --
+    # the walk reads the label, it never mints one, so this record is unchanged
     assert rec == {"id": "cam1", "level": DEFAULT_FLOOR,
                    "pos": [72.0, 48.0], "rotation": 135.0, "name": "front"}
     back = CameraItem.from_record(rec, DEFAULT_FLOOR)

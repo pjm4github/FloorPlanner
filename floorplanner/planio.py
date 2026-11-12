@@ -431,8 +431,15 @@ class PlanIOMixin:
         bytes". That also makes the comparison granularity-invariant: whether
         the scene holds one long wall or three segments split at junctions, the
         walk planarises to the same document, so scene wall-count is
-        PRESENTATION state and cannot spuriously dirty the plan."""
-        return canonicalize(design_from_scene(self, report=report, ids_out=ids_out).to_dict())
+        PRESENTATION state and cannot spuriously dirty the plan.
+
+        0316: session labels (`uid`) are STRIPPED here. They are a file concern
+        (they ride `design_document()` so a W/O number survives save/open); a
+        label is per live item, so leaving it in would break the granularity
+        invariance above and make a re-minted label read as an edit."""
+        from floorplanner.design.bridge import strip_labels
+        return strip_labels(
+            canonicalize(design_from_scene(self, report=report, ids_out=ids_out).to_dict()))
 
     def design_document(self) -> dict:
         """The v5 document to WRITE (P2.2).

@@ -81,13 +81,14 @@ class Level(_Node):
 @dataclass
 class Vertex(_Node):
     FIELDS: ClassVar = [("id", RAW), ("level", RAW), ("x", RAW), ("y", RAW),
-                        ("locked", RAW), ("name", RAW)]
+                        ("locked", RAW), ("name", RAW), ("uid", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     x: Any = _MISSING
     y: Any = _MISSING
     locked: Any = _MISSING
     name: Any = _MISSING
+    uid: Any = _MISSING                  # 0316: the persisted session label (V<n>)
 
 
 @dataclass
@@ -98,7 +99,7 @@ class Opening(_Node):
     FIELDS: ClassVar = [("id", RAW), ("kind", RAW), ("code", RAW),
                         ("anchor", RAW), ("door_type", RAW), ("hinge", RAW),
                         ("swings_toward", RAW), ("sill_in", RAW),
-                        ("head_in", RAW)]
+                        ("head_in", RAW), ("uid", RAW)]
     id: Any = _MISSING
     kind: Any = _MISSING
     code: Any = _MISSING
@@ -108,6 +109,7 @@ class Opening(_Node):
     swings_toward: Any = _MISSING
     sill_in: Any = _MISSING
     head_in: Any = _MISSING
+    uid: Any = _MISSING                  # 0316: the persisted session label (O<n>)
 
 
 @dataclass
@@ -116,7 +118,7 @@ class Wall(_Node):
                         ("type", RAW), ("left", RAW), ("right", RAW),
                         ("openings", _list(Opening)), ("thickness_in", RAW),
                         ("finish_left", RAW), ("finish_right", RAW),
-                        ("name", RAW), ("bound_to", RAW)]
+                        ("name", RAW), ("bound_to", RAW), ("uid", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     v1: Any = _MISSING
@@ -130,6 +132,7 @@ class Wall(_Node):
     finish_right: Any = _MISSING
     name: Any = _MISSING
     bound_to: Any = _MISSING    # 0296: {roof, part} for a `dormer` wall
+    uid: Any = _MISSING         # 0316: the persisted session label (W<n>)
 
 
 @dataclass
@@ -145,7 +148,7 @@ class Room(_Node):
                         ("category", RAW), ("outline", _list(OutlineEdge)),
                         ("placement", RAW), ("label", RAW), ("properties", RAW),
                         ("area_accounting", RAW), ("holes", RAW),
-                        ("nominal_size", RAW)]
+                        ("nominal_size", RAW), ("uid", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     name: Any = _MISSING
@@ -157,13 +160,14 @@ class Room(_Node):
     area_accounting: Any = _MISSING
     holes: Any = _MISSING
     nominal_size: Any = _MISSING
+    uid: Any = _MISSING                  # 0316: the persisted session label (R<n>)
 
 
 @dataclass
 class Furnishing(_Node):
     FIELDS: ClassVar = [("id", RAW), ("level", RAW), ("kind", RAW),
                         ("room", RAW), ("pos", RAW), ("rotation", RAW),
-                        ("state", RAW)]
+                        ("state", RAW), ("uid", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     kind: Any = _MISSING
@@ -171,6 +175,7 @@ class Furnishing(_Node):
     pos: Any = _MISSING
     rotation: Any = _MISSING
     state: Any = _MISSING
+    uid: Any = _MISSING                  # 0316: the persisted session label (F<n>)
 
 
 @dataclass
@@ -180,7 +185,8 @@ class Camera(_Node):
     additive (no version bump), the same RAW-passthrough shape furnishings use."""
     FIELDS: ClassVar = [("id", RAW), ("level", RAW), ("pos", RAW),
                         ("rotation", RAW), ("name", RAW),
-                        ("show_furnishings", RAW), ("show_cabinetry", RAW)]
+                        ("show_furnishings", RAW), ("show_cabinetry", RAW),
+                        ("uid", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     pos: Any = _MISSING
@@ -188,6 +194,7 @@ class Camera(_Node):
     name: Any = _MISSING
     show_furnishings: Any = _MISSING
     show_cabinetry: Any = _MISSING
+    uid: Any = _MISSING                  # 0316: the persisted session label (C<n>)
 
 
 @dataclass
@@ -243,7 +250,8 @@ class Roof(_Node):
                         ("marker_end", RAW), ("host", RAW), ("form", RAW),
                         ("openings", RAW), ("hip_run_in", RAW),
                         ("end_overhang_in", RAW), ("wall_span_in", RAW),
-                        ("box_half_in", RAW), ("dormer_walls", RAW)]
+                        ("box_half_in", RAW), ("dormer_walls", RAW),
+                        ("uid", RAW)]
     id: Any = _MISSING
     level: Any = _MISSING
     ridge: Any = _MISSING
@@ -282,6 +290,9 @@ class Roof(_Node):
     box_half_in: Any = _MISSING
     # 0296: which of a dormer's minted walls are on. OPTIONAL, omitted = all.
     dormer_walls: Any = _MISSING
+    # 0316: the persisted session label (RF<n>), so a Find by number survives
+    # save/open. OPTIONAL, omitted when the canonical id already recovers it.
+    uid: Any = _MISSING
 
 
 @dataclass

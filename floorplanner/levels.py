@@ -169,15 +169,18 @@ class LevelsMixin:
         m.clear()
         if not hasattr(self, "a_select_floor"):
             # created ONCE (the menu is rebuilt often; the shortcuts must
-            # not be re-registered each time). Ctrl+F pops the floor
-            # selector; Ctrl+Shift+F is New floor. Every switch, from any
-            # route, records as `^F "name"` via the switch_floor hook.
+            # not be re-registered each time). Ctrl+L (L for LEVEL) pops the
+            # floor selector; Ctrl+Shift+L is New floor -- moved off Ctrl+F
+            # on Patrick's word (2026-11-11) so Ctrl+F is free for Edit ▸
+            # Find item. The MACRO token is unchanged: every switch, from any
+            # route, still records as `^F "name"` via the switch_floor hook
+            # (the token names the action, not the key).
             self.a_select_floor = QAction("&Select…", self)
-            self.a_select_floor.setShortcut(QKeySequence("Ctrl+F"))
+            self.a_select_floor.setShortcut(QKeySequence("Ctrl+L"))
             self.a_select_floor.triggered.connect(
                 lambda: self.select_floor_popup())
             self.a_new_floor = QAction("&New…", self)
-            self.a_new_floor.setShortcut(QKeySequence("Ctrl+Shift+F"))
+            self.a_new_floor.setShortcut(QKeySequence("Ctrl+Shift+L"))
             self.a_new_floor.triggered.connect(self.new_floor)
             # quick flip (Patrick's refinement): cycle without the popup.
             # Recording stays deterministic for free -- the switch_floor

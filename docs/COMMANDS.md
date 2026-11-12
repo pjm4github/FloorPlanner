@@ -71,7 +71,8 @@ picked (the Room and Datum tools hand back to Select after one use).
 | **Ctrl+G / Ctrl+Shift+G** | Group / ungroup the selection. | `Ctrl+G` |
 | **Ctrl+A** | Select every editable item. | `Ctrl+A` |
 | **Ctrl+H** | Toggle shuffle mode. | `Ctrl+H` |
-| **Ctrl+F / Ctrl+Shift+F** | The floor selector (the default floor first, **Enter** picks it) / New floor. | `Ctrl+F`, `↓`, `Enter` |
+| **Ctrl+L / Ctrl+Shift+L** | The floor selector (L for LEVEL; the default floor first, **Enter** picks it) / New floor. | `Ctrl+L`, `↓`, `Enter` |
+| **Ctrl+F** | **Find item** — type a label (**W47**, **O3**, **R2**, …) or a name; the match zooms into view, selected. | `Ctrl+F`, `W12`, `Enter` |
 | **Ctrl+PgDown / Ctrl+PgUp** | Next / previous floor. | `Ctrl+PgDown` |
 | **Ctrl+3** | The 3D view of the current plan. | `Ctrl+3` |
 | **Ctrl+Q** | Quit. | `Ctrl+Q` |
@@ -113,6 +114,7 @@ picked (the Room and Datum tools hand back to Select after one use).
 | Review wall gaps… | A dialog listing ends left a grid step short of a wall; **Close selected gap** welds one. | — |
 | Wall orthogonality report… | Every wall's heading and how far off axis it is — run this before a DXF export. | — |
 | Repair wall orthogonality… | Snap the near-axis walls square, by band; **Apply**. | — |
+| Find item… | Ctrl+F: type a label (**W47**, **O3**, **R2**, **V12**, **F4**, **RF1**, **C2**) or a name; the match list zooms + selects on a pick, switching floors if needed. The numbers survive save/open. | `Ctrl+F`, `O3`, `Enter` |
 
 ### View · Show
 
@@ -143,8 +145,8 @@ picked (the Room and Datum tools hand back to Select after one use).
 
 | Item | Action | Example |
 |---|---|---|
-| Select… | Ctrl+F: the floor popup. | `Ctrl+F`, `Enter` |
-| New… | Ctrl+Shift+F: name a new floor (switches to it if it exists). | `Upper` |
+| Select… | Ctrl+L (L for LEVEL): the floor popup. | `Ctrl+L`, `Enter` |
+| New… | Ctrl+Shift+L: name a new floor (switches to it if it exists). | `Upper` |
 | Next floor / Previous floor | Ctrl+PgDown / Ctrl+PgUp. | — |
 | *‹floor›* ▸ Edit this floor | Make it the active floor (the others ghost beneath). | — |
 | *‹floor›* ▸ Rename… | — | `Second` |
@@ -204,7 +206,7 @@ the pointer.
 | | Delete ‹name› | — |
 | stairs | Full flight / Half flight (landing) · Turn left / Turn right / End at landing · Going up / Going down · Delete stairs | The flight's shape, the landing's turn and the travel arrow; the step count follows the room's ceiling. |
 | a group | Cut group / Copy group / Ungroup / Delete group | — |
-| the floor selector (Ctrl+F) | 3D view… | The 3D view, from the floor popup. |
+| the floor selector (Ctrl+L) | 3D view… | The 3D view, from the floor popup. |
 | a roof (while *Edit roof* is on) | Roof parameters… | The End-On dialog: ridge and eaves heights, pitch, **Form** (gable / hip / shed), eaves span and overhang per side, each end gable or hip with its **hip run**, a dormer's standing rule; the canvas draws the end-on section. |
 | | Delete roof | — |
 | a dormer (while *Edit roof* is on) | Edit dormer… | The same End-On dialog, titled for the dormer. |

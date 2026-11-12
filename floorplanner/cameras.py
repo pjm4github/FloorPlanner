@@ -652,6 +652,8 @@ class CameraItem(QGraphicsItem):
             rec["show_furnishings"] = True
         if self.show_cabinetry:
             rec["show_cabinetry"] = True
+        if getattr(self, "_uid", None):  # 0316: the persisted session label (C<n>),
+            rec["uid"] = self._uid       # read, never minted, during a walk
         return rec
 
     @classmethod

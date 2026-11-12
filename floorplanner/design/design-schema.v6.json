@@ -70,6 +70,10 @@
 
     "id":      { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$" },
     "id_null": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+    "uid": {
+      "description": "0316: a SESSION LABEL -- the W/O/V/R/F/RF/C number a user sees for an item (W47, O3, V12, R2, F4, RF1, C2), persisted so a Find/zoom BY THAT NUMBER survives a save/open cycle. The document `id` is renumbered by geometry on every save (`canonical.py`), so it cannot be that stable name; this field carries it. Adopted on load (`labels.adopt`), and written only when the canonical `id` does NOT already recover it (the two spellings of the same number, `labels.matches`), so an unedited plan's records stay clean and a file reproduces byte-for-byte on open->save. Additive optional (ROADMAP R-B): no version bump.",
+      "type": "string", "pattern": "^[A-Za-z]+[0-9]+$"
+    },
     "point":   { "type": "array", "prefixItems": [{ "type": "number" }, { "type": "number" }], "minItems": 2, "maxItems": 2 },
     "size_code": {
       "description": "WWHH / WWWHH / WWWHHH inch size code — \"3680\" = 36\" x 80\".",
@@ -221,7 +225,8 @@
         "host": {
           "description": "R5b (0191-ruling.md sec1): the id of the roof this roof STANDS ON -- present only on a DORMER, and its presence is what makes one: a dormer is a roof record like any other (ridge, heights, spans, gable flags), reusing every writer, loader, clip and mesh a roof has, with two derived facts on top. `ridge[0]` is the FACE (the front, where the End-On marker sits, `marker_end` 0); `ridge[1]` is DERIVED -- the point along the ridge line where the host's surface rises to `ridge_h_in` -- and still written here so the document is self-contained (the `eaves_bind` discipline: re-derived by the app on any edit of the dormer or its host, never on load). The two cheeks (along the eaves-start lines, back to where the eaves meet the host plane) and the face are derived geometry, not `walls` records. Must name a roof on the dormer's own level OR the one directly below it by elevation (PR #101 / 3761819: a dormer drawn on the storey its gable occupies hosts on the roof a floor down, and its geometry is anchored to the host's level while its `level` is where it is drawn and edited); a dangling host, or a host not on one of those two levels, is reported and the record skipped on load, never a silent floating roof. Additive optional (ROADMAP R-B): no version bump.",
           "$ref": "#/$defs/id"
-        }
+        },
+        "uid": { "$ref": "#/$defs/uid" }
       },
       "allOf": [
         { "if": { "properties": { "form": { "const": "shed" } }, "required": ["form"] },
@@ -240,7 +245,8 @@
         "x":     { "type": "number" },
         "y":     { "type": "number" },
         "locked": { "description": "Pinned by the user; snapping, welding and cleanup must not move it.", "type": "boolean", "default": false },
-        "name": { "description": "A user-given name for the corner (the wall-properties dialog). Optional; omitted when empty.", "type": "string" }
+        "name": { "description": "A user-given name for the corner (the wall-properties dialog). Optional; omitted when empty.", "type": "string" },
+        "uid": { "$ref": "#/$defs/uid" }
       }
     },
 
@@ -279,7 +285,8 @@
         "finish_right": { "type": "string" },
 
         "openings": { "type": "array", "items": { "$ref": "#/$defs/opening" } },
-        "name": { "description": "A user-given name for the wall (the wall-properties dialog). Optional; omitted when empty.", "type": "string" }
+        "name": { "description": "A user-given name for the wall (the wall-properties dialog). Optional; omitted when empty.", "type": "string" },
+        "uid": { "$ref": "#/$defs/uid" }
       },
 
       "allOf": [
@@ -328,7 +335,8 @@
         "head_in":   { "description": "Head height above the level's base. Absent means the sill plus the size code's height, which is what the app always means: nothing in it writes this key. A value a document carries rides through a round trip unchanged until the window's size or sill is edited, when it is dropped as stale.", "type": "number", "minimum": 0 },
         "door_type": { "description": "Catalog leaf type; meaningful only when kind is \"door\" or \"gate\" (a gate is drawn as the door it is, 0255-report.md: its type and swing are written like a door's).", "type": "string" },
         "hinge":     { "description": "Hinged end, named by vertex so handedness is unambiguous under wall reversal (v4's LH/RH was not).", "enum": ["v1", "v2", "none"] },
-        "swings_toward": { "description": "Side the leaf opens into, relative to v1->v2. Replaces the bare swing: -1|1.", "enum": ["left", "right", "none"] }
+        "swings_toward": { "description": "Side the leaf opens into, relative to v1->v2. Replaces the bare swing: -1|1.", "enum": ["left", "right", "none"] },
+        "uid": { "$ref": "#/$defs/uid" }
       }
     },
 
@@ -407,7 +415,8 @@
           }
         },
 
-        "properties": { "$ref": "#/$defs/room_properties" }
+        "properties": { "$ref": "#/$defs/room_properties" },
+        "uid": { "$ref": "#/$defs/uid" }
       }
     },
 
@@ -455,7 +464,8 @@
 
         "pos":      { "description": "Plan coordinates of the symbol centre.", "$ref": "#/$defs/point" },
         "rotation": { "type": "number", "default": 0 },
-        "state":    { "description": "Per-kind extra state (stair flight/turn/direction, plant species, …). v4 spread these across the object; nesting keeps the base shape closed.", "type": "object", "additionalProperties": true }
+        "state":    { "description": "Per-kind extra state (stair flight/turn/direction, plant species, …). v4 spread these across the object; nesting keeps the base shape closed.", "type": "object", "additionalProperties": true },
+        "uid":      { "$ref": "#/$defs/uid" }
       }
     },
 
@@ -521,7 +531,8 @@
         "rotation": { "description": "Aim direction in degrees (0 = +x).", "type": "number", "default": 0 },
         "name":     { "type": "string" },
         "show_furnishings": { "description": "0315: draw the free-standing furnishings against the faced wall in the elevation. Optional; omitted when off.", "type": "boolean", "default": false },
-        "show_cabinetry":   { "description": "0315: draw the built-in cabinetry (casework) against the faced wall in the elevation. Optional; omitted when off.", "type": "boolean", "default": false }
+        "show_cabinetry":   { "description": "0315: draw the built-in cabinetry (casework) against the faced wall in the elevation. Optional; omitted when off.", "type": "boolean", "default": false },
+        "uid":              { "$ref": "#/$defs/uid" }
       }
     }
   }
