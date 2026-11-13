@@ -387,6 +387,152 @@ def test_inside_a_room_the_house_side_switch_is_a_no_op(scene):
     assert e is not None and len(e["faces"]) == 2  # the room's far wall, two segments
 
 
+def _two_storey_house(fp, scene):
+    """A 300x180 TWO-STOREY house (L1 at 0, L2 at 108) with a gable roof on L2;
+    rooms detected on each floor. Sets the floor roster -- the caller restores
+    it. Returns nothing; the camera is placed by the test."""
+    from floorplanner.config import set_floor_state
+    from floorplanner.roofs import RoofItem
+
+    def w(a, b, floor):
+        wi = WallItem(QPointF(*a), QPointF(*b), "exterior")
+        wi.floor = floor
+        scene.addItem(wi)
+        return wi
+
+    def storey(floor):
+        s1 = w((0, 0), (150, 0), floor)                 # front, split in two
+        s2 = w((150, 0), (300, 0), floor)
+        w((300, 0), (300, 180), floor)
+        w((300, 180), (0, 180), floor)
+        w((0, 180), (0, 0), floor)
+        return s1, s2
+
+    def detect(floor, name):
+        set_floor_state(active=floor)
+        fp.rebuild_all_walls(scene)
+        res = fp.detect_room(scene, QPointF(150, 90))
+        r = fp.RoomItem(fp.unique_room_name(scene, name), QPointF(150, 90),
+                        res[0], res[1], corners=res[2])
+        r.floor = floor
+        scene.addItem(r)
+        fp.bind_room_walls(scene, r)
+
+    set_floor_state(active="L1", elevations={"L1": 0.0, "L2": 108.0})
+    a1, _b1 = storey("L1")
+    a1.openings.append(fp.OpeningItem(a1, "door", "3680", 75.0))
+    detect("L1", "L1R")
+    storey("L2")
+    detect("L2", "L2R")
+    set_floor_state(active="L2")
+    rf = RoofItem(QPointF(150, 0), QPointF(150, 180),
+                  eaves_h_in=108.0, ridge_h_in=168.0, span_in=[150.0, 150.0])
+    rf.floor = "L2"
+    scene.addItem(rf)
+    set_floor_state(active="L1")
+
+
+def test_the_full_elevation_is_a_hidden_surface_projection_to_the_gable(fp, scene):
+    """0318 (compositional rework): outside a house with a gable roof, the
+    house-side elevation is a composite of 2-D PIECES (mode house_elev) -- walls
+    and roof faces, each a flat polygon with a depth, painted far -> near. The
+    gable wall climbs above a single storey toward the ridge, a roof face is
+    drawn, and the camera-facing openings ride on their walls."""
+    from floorplanner.config import active_floor, floor_elevations, set_floor_state
+    saved_active, saved_elevs = active_floor(), floor_elevations()
+    try:
+        _two_storey_house(fp, scene)
+        cam = CameraItem(QPointF(150, -90), rotation=90.0, floor="L1",
+                         show_house_side=True)                 # above, aimed at a gable end
+        scene.addItem(cam)
+        e = cam.elevation()
+        assert e is not None and e.get("mode") == "house_elev"
+        pieces = e["pieces"]
+        assert pieces, "the composited pieces are non-empty"
+        assert any(pc["kind"] == "roof" for pc in pieces), "a roof face is drawn"
+        assert any(pc["kind"] == "wall" for pc in pieces), "walls are drawn"
+        assert e["floor_abs_in"] == pytest.approx(0.0)        # datum = the lowest foot
+        # the gable climbs well above a plain one-storey wall (toward the ridge)
+        top = max(z for pc in pieces for (_u, z) in pc["outline"])
+        assert top >= 150.0, top
+        assert e["height_in"] >= 150.0
+        assert e["faces"], "the caption still lists the camera-facing walls"
+        kinds = {o["kind"] for pc in pieces if pc["kind"] == "wall"
+                 for o in pc["openings"]}
+        assert "door" in kinds, "the L1 front door is drawn"
+    finally:
+        set_floor_state(active=saved_active, elevations=saved_elevs)
+
+
+def test_a_roof_overhang_is_its_own_geometry_and_degeneracy_is_guarded(fp, scene):
+    """0318 tweak: the elevation eave overhang is the roof's OWN parameters --
+    `overhang_in` * the true slope -- not a drawn-in constant. A roof that stores
+    an overhang drops its fascia below the eaves height and projects the soffit
+    past the wall; one that stores 0 sits flush. A near-vertical stub side (a
+    half-gable's degenerate span) carries no eave, so an overhang set there can
+    never blow the extent up."""
+    from floorplanner.config import active_floor, floor_elevations, set_floor_state
+    from floorplanner.roofs import RoofItem
+    saved_active, saved_elevs = active_floor(), floor_elevations()
+    try:
+        _two_storey_house(fp, scene)
+        rf = next(it for it in scene.items() if isinstance(it, RoofItem))
+        cam = CameraItem(QPointF(150, -90), rotation=90.0, floor="L1",
+                         show_house_side=True)
+        scene.addItem(cam)
+
+        def roof_min_z(e):
+            return min(z for pc in e["pieces"] if pc["kind"] == "roof"
+                       for (_u, z) in pc["outline"])
+
+        # the roof sits on L2 (datum 108), eaves 108 above it -> abs eaves 216
+        rf.overhang_in = [0.0, 0.0]                        # stored 0 -> flush
+        flush = cam.elevation()
+        assert roof_min_z(flush) == pytest.approx(216.0)   # the eaves height itself
+
+        rf.overhang_in = [16.0, 16.0]                      # slope 0.4 -> drop 6.4in
+        over = cam.elevation()
+        assert roof_min_z(over) < 216.0 - 1.0              # fascia dropped below eaves
+        assert over["width_in"] > flush["width_in"] + 1.0  # soffit projects past wall
+
+        # a half-gable stub side (span 1in, slope ~60): the guard gives it no eave,
+        # so a 16in overhang there projects nothing rather than dropping off-drawing
+        rf.span_in = [150.0, 1.0]
+        rf.overhang_in = [16.0, 16.0]
+        assert cam.elevation()["height_in"] < 400.0        # extent stays bounded
+    finally:
+        set_floor_state(active=saved_active, elevations=saved_elevs)
+
+
+def test_the_house_side_draws_only_the_camera_facing_openings(fp, scene):
+    """0318: a window on the FAR wall (its camera-facing side is indoors) must not
+    appear -- the elevation sees only the near side. Openings ride on their front
+    wall piece; the far wall is never a face, so its window never enters."""
+    from floorplanner.config import active_floor, floor_elevations, set_floor_state
+    saved_active, saved_elevs = active_floor(), floor_elevations()
+    try:
+        _two_storey_house(fp, scene)
+        # a window on the BACK wall (y = 180), the side turned AWAY from a camera
+        # placed below the house (large y) and aimed up at the near (y = 0) wall.
+        back = next(w for w in scene.items()
+                    if isinstance(w, WallItem) and w.floor == "L1"
+                    and abs(w.p1.y() - 180) < 1 and abs(w.p2.y() - 180) < 1)
+        back.openings.append(fp.OpeningItem(back, "window", "3048", 150.0))
+        cam = CameraItem(QPointF(150, -90), rotation=90.0, floor="L1",
+                         show_house_side=True)              # above, aimed (+y) at the y=0 wall
+        scene.addItem(cam)
+        e = cam.elevation()
+        assert e is not None and e.get("mode") == "house_elev"
+        labels = {fc.get("label") for fc in e["faces"]}
+        assert getattr(back, "uid", "") not in labels, "the far wall is not a face"
+        # the near front wall's door still shows among the wall pieces' openings
+        kinds = {o["kind"] for pc in e["pieces"] if pc["kind"] == "wall"
+                 for o in pc["openings"]}
+        assert "door" in kinds
+    finally:
+        set_floor_state(active=saved_active, elevations=saved_elevs)
+
+
 def test_the_house_side_switch_round_trips(fp, scene):
     """The switch serializes, validates against the v6 schema, and reloads."""
     from floorplanner.design.bridge import apply_design_to_scene, design_from_scene

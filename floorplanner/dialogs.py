@@ -1250,6 +1250,9 @@ class _WallElevationCanvas(QWidget):
         w, h = self.width(), self.height()
         p.fillRect(0, 0, w, h, QColor(255, 255, 255))
         e = self.data
+        if e and e.get("mode") == "house_elev":  # 0318: the full exterior elevation
+            self._paint_house_elev(p, e)
+            return
         W = self._run_width(e) if e else 0.0
         H = float(e.get("height_in", 0.0)) if e else 0.0
         if not e or W <= 0.0 or H <= 0.0:
@@ -1323,6 +1326,102 @@ class _WallElevationCanvas(QWidget):
         # the return walls -- short ticks turning toward the camera, labelled
         self._draw_return(p, X(0.0), base_y, -1, e.get("left_return"))
         self._draw_return(p, X(W), base_y, +1, e.get("right_return"))
+
+    _OUTLINE = QColor(45, 47, 56)              # 0318: the elevation line ink
+
+    def _paint_house_elev(self, p, e):
+        """0318 (compositional rework, his plan 2026-11-12): the full exterior
+        elevation drawn as a LINE diagram from `CameraItem._house_elevation`. Each
+        piece (a wall or a roof face) is a white-filled polygon on the camera-right
+        (X) / world-height (Z) plane, painted FAR -> NEAR so a nearer form hides
+        what stands behind it. Windows and doors sit on their wall; a dormer's own
+        face windows ride frontmost. No 3D model and no depth buffer -- the
+        whole-wall painter order is exact for vertical planes."""
+        w, h = self.width(), self.height()
+        W = float(e.get("width_in", 0.0))
+        H = float(e.get("height_in", 0.0))
+        pieces = e.get("pieces")
+        extent = e.get("extent")
+        if W <= 0.0 or H <= 0.0 or not pieces or extent is None:
+            p.setPen(QPen(QColor(120, 120, 120)))
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
+                       "The camera faces no wall — aim it at the house.")
+            return
+        ml, mr, mt, mb = 52.0, 40.0, 36.0, 54.0
+        scale = max(min((w - ml - mr) / W, (h - mt - mb) / H), 0.01)
+        left_px = (w - W * scale) / 2.0
+        base_y = h - mb
+        u_min, u_max, z_min, z_max = extent
+        datum = float(e.get("floor_abs_in", z_min))
+        f = p.font()
+        f.setPointSize(8)
+        p.setFont(f)
+
+        def X(u):                              # a camera-right coordinate (inches)
+            return left_px + (u - u_min) * scale
+
+        def Y(z):                              # a world height (inches)
+            return base_y - (z - datum) * scale
+
+        # the pieces (far -> near): each a white polygon that occludes what is
+        # behind it, with its openings drawn over it.
+        white = QColor(255, 255, 255)
+        for pc in pieces:
+            poly = QPolygonF([QPointF(X(u), Y(z)) for u, z in pc["outline"]])
+            p.setBrush(white)
+            p.setPen(QPen(self._OUTLINE, 1.2))
+            p.drawPolygon(poly)
+            for o in pc.get("openings", []):
+                c_in = 0.5 * (float(o["x0"]) + float(o["x1"]))
+                self._draw_opening_simple(
+                    p, X, Y, c_in, float(o["sill"]), float(o["head"]),
+                    float(o["x1"]) - float(o["x0"]),
+                    float(o["head"]) - float(o["sill"]), o.get("kind", "window"))
+
+        # the dormer face windows, frontmost
+        for x0, x1, sill, head, kind in e.get("dormer_windows", []):
+            c_in = 0.5 * (float(x0) + float(x1))
+            self._draw_opening_simple(p, X, Y, c_in, float(sill), float(head),
+                                      float(x1) - float(x0),
+                                      float(head) - float(sill), kind)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+
+        # the floor baseline + its absolute datum label, and the height dimension
+        p.setPen(QPen(self._WALL, 1.6))
+        p.drawLine(QPointF(X(u_min) - 26, base_y), QPointF(X(u_max) + 26, base_y))
+        p.setPen(QPen(QColor(90, 90, 90)))
+        p.drawText(QPointF(6, base_y + 15),
+                   f"floor {fmt_in(datum)}")
+        x = X(u_min) - 18.0
+        top = Y(datum + H)
+        p.setPen(QPen(self._DIM, 1.0))
+        p.drawLine(QPointF(x, base_y), QPointF(x, top))
+        p.drawLine(QPointF(x - 4, base_y), QPointF(x + 4, base_y))
+        p.drawLine(QPointF(x - 4, top), QPointF(x + 4, top))
+        p.save()
+        p.translate(x - 4, 0.5 * (base_y + top))
+        p.rotate(-90)
+        p.drawText(QRectF(-26, -14, 52, 13), Qt.AlignmentFlag.AlignCenter, fmt_in(H))
+        p.restore()
+
+    def _draw_opening_simple(self, p, X, Y, c_in, sill, head, ww, hh, kind):
+        """0318: an opening in the whole-house elevation -- glass (muntin cross) or
+        a door panel, no per-opening dimension (the stacked drawing stays legible
+        with the one overall height dimension)."""
+        if ww <= 0.0 or hh <= 0.0:
+            return
+        r = QRectF(QPointF(X(c_in - ww / 2.0), Y(head)), QPointF(X(c_in + ww / 2.0), Y(sill)))
+        if kind == "window":
+            p.fillRect(r, self._GLASS)
+            p.setPen(QPen(self._WALL, 1.1))
+            p.drawRect(r)
+            p.setPen(QPen(self._WALL, 0.5))
+            p.drawLine(QPointF(r.center().x(), r.top()), QPointF(r.center().x(), r.bottom()))
+            p.drawLine(QPointF(r.left(), r.center().y()), QPointF(r.right(), r.center().y()))
+        else:
+            p.fillRect(r, self._DOOR)
+            p.setPen(QPen(self._WALL, 1.3))
+            p.drawRect(r)
 
     def _draw_width_dims(self, p, X, base_y, edges, scale):
         """A blue dimension string under the run: one dimension per wall, but any
