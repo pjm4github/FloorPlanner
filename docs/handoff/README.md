@@ -462,5 +462,9 @@ this table is not a second copy of it.
 | [`0320-report.md`](./0320-report.md) | report: looking in a dormer window no longer shows an EXTRUSION OF THE ROOF — the host roof is cut at the dormer's eave plane within its footprint; plus the elevation's dormer faces tier in front — on branch `dormer-render-fixes` |
 | [`0321-ruling.md`](./0321-ruling.md) | ruling: the furnishings exception is CONFIRMED by Patrick, the step-1 read is done, and 0319's file list is corrected in two places |
 | [`0322-ruling.md`](./0322-ruling.md) | ruling: a PLAN for parametric furnishings is on disk for Patrick's review; nothing is built, and building it needs the lane widened |
+| [`0323-ruling.md`](./0323-ruling.md) | ruling: parametric furnishings are BUILT (stairs: straight, L, U, adjustable landing) — UN-GATED, no Qt line of it has ever run, and Code's gate is the first real test |
+| [`0324-report.md`](./0324-report.md) | report: Code's full gate of the furnishings lane (STAIRS, 0323) is GREEN — the lane's first real run under Qt/pytest; committed by path on branch `furnishings-stairs`, AMBER |
+| [`0325-ruling.md`](./0325-ruling.md) | ruling: vehicles are LOFTED FROM A SIDE ELEVATION (car, SUV) — un-gated; and two things about the tree that need Code's eyes before anything else |
+| [`0326-report.md`](./0326-report.md) | report: the furnishings lane (STAIRS 0323 + VEHICLES 0325) gated and committed as TWO commits by path on branch `furnishings-lane`; the 0325 §0 tree questions answered; both AMBER, not merged |
 
 <!-- PAIRS:END -->
