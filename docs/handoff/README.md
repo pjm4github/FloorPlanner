@@ -458,5 +458,7 @@ this table is not a second copy of it.
 | [`0316-report.md`](./0316-report.md) | report: annotation numbers (W/O/V/R/F/RF/C) now SURVIVE a save/open cycle, and a FIND tool jumps to any of them — on branch `find-and-labels` |
 | [`0317-report.md`](./0317-report.md) | report: the camera ELEVATIONS THE WHOLE SIDE OF THE HOUSE when placed outside a room — a checkmark and a badge — on branch `camera-house-side` |
 | [`0318-report.md`](./0318-report.md) | report: the whole-house-side elevation now spans ALL LEVELS with the ROOF, DORMERS and GABLE ENDS — built COMPOSITIONALLY, the eave overhang the roof's own geometry — on branch `full-elevation` |
+| [`0319-ruling.md`](./0319-ruling.md) | ruling: a FURNISHINGS LANE is open in the reviewer session, on Patrick's word; it is fenced off from Code's dormer/elevation work, and nothing in it has been touched yet |
+| [`0321-ruling.md`](./0321-ruling.md) | ruling: the furnishings exception is CONFIRMED by Patrick, the step-1 read is done, and 0319's file list is corrected in two places |
 
 <!-- PAIRS:END -->
