@@ -2,6 +2,7 @@
 # (top-view furniture symbol library, CC0).  Furnishing SVGs use a viewBox
 # in INCHES so the app can render them at true scale (1 scene unit = 1").
 import json
+import math
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -945,10 +946,202 @@ MATERIALS = {
                   "roughness": 0.45, "metalness": 0.30},
     "screen":    {"colour": [0.10, 0.11, 0.13, 1.00],
                   "roughness": 0.15, "metalness": 0.20},
+    # Vehicle parts (0325). A side profile names a material PER PART, so a
+    # car is paint, glass, rubber and trim rather than one grey block. The
+    # glass is OPAQUE and dark on purpose: translucent glass around an empty
+    # cabin would show the far side of the car through the near one (D76).
+    "auto_paint":       {"colour": [0.16, 0.30, 0.50, 1.00],
+                         "roughness": 0.30, "metalness": 0.55},
+    "auto_paint_light": {"colour": [0.74, 0.76, 0.78, 1.00],
+                         "roughness": 0.30, "metalness": 0.55},
+    "auto_glass":       {"colour": [0.09, 0.12, 0.16, 1.00],
+                         "roughness": 0.08, "metalness": 0.40},
+    "auto_trim":        {"colour": [0.11, 0.11, 0.12, 1.00],
+                         "roughness": 0.70, "metalness": 0.10},
+    "rubber":           {"colour": [0.05, 0.05, 0.06, 1.00],
+                         "roughness": 0.92, "metalness": 0.00},
+    "lamp":             {"colour": [0.96, 0.95, 0.86, 1.00],
+                         "roughness": 0.20, "metalness": 0.10},
+    "tail_lamp":        {"colour": [0.66, 0.05, 0.05, 1.00],
+                         "roughness": 0.25, "metalness": 0.10},
     # Loud on purpose, and the ONLY entry a viewer may fall back to: an item
     # whose kind, form or material the catalog does not define must LOOK wrong.
     "unknown":   {"colour": [0.85, 0.35, 0.55, 1.00],
                   "roughness": 0.60, "metalness": 0.00},
+}
+
+# ------------------------------------------------------- vehicle side profiles
+# 0325 (Patrick, 2026-11-14: "I want to change the way that the vehicles are
+# rendered so they look like real cars").
+#
+# WHY A SECOND DRAWING.  The plan symbol is a TOP view, and a top view pushed
+# straight up can only ever be a block: a hood, a raked windshield, a wheel
+# arch and the gap under the sills exist in the SIDE view and nowhere else.
+# So a vehicle may carry a second SVG, `<id>.side.svg` -- its side elevation --
+# and the viewer lofts the solid from that instead of extruding the symbol.
+#
+# THE FORMAT, which is the whole contract with the viewer (`fp3d.py`):
+#
+#   viewBox        "0 0 LENGTH HEIGHT" in inches.  The NOSE is at x = 0, the
+#                  ground is the BOTTOM edge (y = HEIGHT), so a point's height
+#                  is HEIGHT - y.  LENGTH and HEIGHT must equal the catalog's
+#                  depth_in and height_in -- checked below, refused if not.
+#   on <svg>       data-belt / data-roof / data-tumble: above the beltline the
+#                  body leans in ("tumblehome") by `tumble` inches a side at
+#                  the roof, pro rata between the two heights.
+#                  data-round-front / data-round-rear: the plan corner radius
+#                  at the nose and the tail -- the top view's rounded ends.
+#   each part      a FILLED closed <polygon> or a <circle>, carrying
+#                    data-part      what it is -- a name, for a reader
+#                    data-material  a MATERIALS name, per PART
+#                    data-inset     inches in from the body side (default 0)
+#                    data-width     OPTIONAL.  Absent: the part spans the
+#                                   vehicle side to side.  Present: it is a
+#                                   PAIR, one slab of that thickness at each
+#                                   side -- a wheel, a pillar, a lamp.
+#
+# TWO RULES A PART MUST OBEY.  (1) No `transform`, and polygons not paths: the
+# reader takes points as written.  (2) At any distance along the vehicle a part
+# is ONE span of height -- the viewer fills between its lowest and highest
+# point there.  A shape that needs a hole or an overhang is two parts.
+#
+# These are generic shapes, authored here -- a mid-size sedan and a mid-size
+# SUV -- not a tracing of any real model.
+def _smooth(points, rounds=2):
+    """Chaikin corner cutting on an OPEN polyline: each round replaces every
+    interior corner with two points, so a few control points become a smooth
+    line that still starts and ends exactly where it was told to."""
+    pts = list(points)
+    for _ in range(rounds):
+        out = [pts[0]]
+        for a, b in zip(pts[:-1], pts[1:], strict=True):
+            out.append((0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1]))
+            out.append((0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1]))
+        out.append(pts[-1])
+        pts = out
+    return pts
+
+
+def _arch(cx, cz, r, floor_z, n=14):
+    """A wheel arch as seen walking from the TAIL toward the NOSE: the arc of
+    radius `r` about the wheel centre, from where it leaves the sill line
+    `floor_z` behind the wheel to where it meets it again in front."""
+    a = math.asin(max(-1.0, min(1.0, (floor_z - cz) / r)))
+    return [(cx + r * math.cos(t), cz + r * math.sin(t))
+            for t in (a + (math.pi - 2 * a) * i / n for i in range(n + 1))]
+
+
+def _side_poly(height, pts, part, material, fill, inset=0.0, width=None):
+    """One side-view part as a <polygon>; `pts` are (distance, HEIGHT) pairs,
+    flipped here into the SVG's y-down frame."""
+    coords = " ".join(f"{x:.2f},{height - z:.2f}" for x, z in pts)
+    extra = f' data-width="{width}"' if width is not None else ""
+    return (f'<polygon points="{coords}" fill="{fill}" stroke="{INK}" '
+            f'stroke-width="0.4" data-part="{part}" data-material="{material}" '
+            f'data-inset="{inset}"{extra}/>')
+
+
+def _side_circle(height, cx, cz, r, part, material, fill, inset, width):
+    return (f'<circle cx="{cx}" cy="{height - cz}" r="{r}" fill="{fill}" '
+            f'stroke="{INK}" stroke-width="0.4" data-part="{part}" '
+            f'data-material="{material}" data-inset="{inset}" '
+            f'data-width="{width}"/>')
+
+
+def _side_profile(*, length, height, paint, wheel_r, wheel_x, sill, arch_r,
+                  top, belt, roof, tumble, round_front, round_rear,
+                  glass, roof_panel, pillars, lamp_z, grille_z):
+    """A car-shaped side profile from a handful of numbers and outlines.
+
+    `top` is the body's upper line, nose to tail, BELOW the windows (hood,
+    beltline, deck); `glass` and `roof_panel` are closed outlines; `pillars`
+    are closed outlines drawn over the glass.  Heights in inches off the
+    ground.  Returns (attrs, [elements]) for `svg_side()`."""
+    H = height
+    front, rear = wheel_x
+    nose, tail = 0.4, length - 0.4         # the lamps stand 0.4 in proud of these
+    upper = _smooth(top)
+    under = ([(tail, upper[-1][1]), (tail, sill + 4.5), (tail - 7.0, sill)]
+             + _arch(rear, wheel_r, arch_r, sill)
+             + _arch(front, wheel_r, arch_r, sill)
+             + [(nose + 7.0, sill), (nose, sill + 2.5)])
+    body = upper + under[1:]
+    parts = [
+        # the dark core seen through the wheel arches, so they are not tunnels
+        _side_poly(H, [(nose + 8, sill + 0.5), (nose + 8, belt - 12),
+                       (tail - 8, belt - 12), (tail - 8, sill + 0.5)],
+                   "chassis", "auto_trim", "#1f2937", inset=9.5),
+        _side_poly(H, body, "body", paint, "#cbd5e1"),
+        _side_poly(H, glass, "glass", "auto_glass", "#334155", inset=1.0),
+        _side_poly(H, roof_panel, "roof", paint, "#cbd5e1", inset=0.6),
+    ]
+    for i, ring in enumerate(pillars):
+        parts.append(_side_poly(H, ring, f"pillar-{i + 1}", paint, "#cbd5e1",
+                                inset=0.7, width=2.6))
+    lz0, lz1 = lamp_z
+    gz0, gz1 = grille_z
+    parts += [
+        _side_poly(H, [(0.0, gz0), (0.0, gz1), (1.2, gz1), (1.2, gz0)],
+                   "grille", "auto_trim", "#1f2937", inset=17.0),
+        _side_poly(H, [(0.0, lz0), (0.0, lz1), (5.0, lz1 + 0.6), (5.0, lz0)],
+                   "headlamp", "lamp", "#fef9c3", inset=-0.25, width=13.0),
+        _side_poly(H, [(length - 5.0, lz0 + 1), (length - 5.0, lz1 + 2.6),
+                       (length, lz1 + 2), (length, lz0 + 1)],
+                   "tail-lamp", "tail_lamp", "#b91c1c", inset=-0.25, width=13.0),
+        _side_poly(H, [(0.0, sill + 2.5), (0.0, sill + 6.5), (2.2, sill + 6.5),
+                       (2.2, sill + 2.5)],
+                   "bumper-front", "auto_trim", "#1f2937", inset=3.0),
+        _side_poly(H, [(length - 2.2, sill + 4.5), (length - 2.2, sill + 8.5),
+                       (length, sill + 8.5), (length, sill + 4.5)],
+                   "bumper-rear", "auto_trim", "#1f2937", inset=3.0),
+    ]
+    for cx in (front, rear):
+        parts.append(_side_circle(H, cx, wheel_r, wheel_r, "tyre", "rubber",
+                                  "#111827", 0.5, 8.5))
+        parts.append(_side_circle(H, cx, wheel_r, round(wheel_r * 0.62, 2), "wheel",
+                                  "metal", "#9ca3af", 0.2, 3.0))
+    attrs = {"data-belt": belt, "data-roof": roof, "data-tumble": tumble,
+             "data-round-front": round_front, "data-round-rear": round_rear}
+    return attrs, parts
+
+
+def svg_side(length, height, attrs, body):
+    extra = "".join(f' {k}="{v}"' for k, v in attrs.items())
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" '
+            f'viewBox="0 0 {length} {height}" width="{length}" '
+            f'height="{height}"{extra}>\n' + "\n".join(body) + "\n</svg>\n")
+
+
+SIDE_PROFILES = {
+    # A three-box sedan: 180 long, 56 high, on a 108 wheelbase.
+    "car": {"length": 180, "height": 56, "spec": _side_profile(
+        length=180, height=56, paint="auto_paint",
+        wheel_r=12.5, wheel_x=(34.0, 142.0), sill=7.5, arch_r=14.5,
+        top=[(0.4, 10.0), (0.4, 23.0), (4.0, 27.0), (28.0, 30.5), (54.0, 34.0),
+             (100.0, 35.2), (150.0, 36.0), (172.0, 35.2), (179.6, 32.0)],
+        belt=35.0, roof=56.0, tumble=6.0, round_front=13.0, round_rear=11.0,
+        glass=[(50.0, 33.6), (77.0, 54.4), (129.0, 54.6), (155.0, 35.8)],
+        roof_panel=[(74.5, 52.9), (78.5, 56.0), (127.5, 56.0), (132.0, 53.0),
+                    (128.5, 54.2), (78.0, 54.0)],
+        pillars=[[(50.0, 33.6), (53.4, 33.6), (80.4, 54.4), (77.0, 54.4)],
+                 [(100.0, 34.6), (104.0, 34.6), (104.0, 54.5), (100.0, 54.5)],
+                 [(151.6, 35.8), (155.0, 35.8), (129.0, 54.6), (125.6, 54.6)]],
+        lamp_z=(22.0, 26.5), grille_z=(13.5, 21.0))},
+    # A two-box SUV: 192 long, 70 high, taller sills and wheels, an upright tail.
+    "suv": {"length": 192, "height": 70, "spec": _side_profile(
+        length=192, height=70, paint="auto_paint_light",
+        wheel_r=15.0, wheel_x=(37.0, 151.0), sill=10.0, arch_r=17.5,
+        top=[(0.4, 13.0), (0.4, 32.0), (4.0, 37.0), (28.0, 40.5), (50.0, 43.5),
+             (100.0, 45.0), (176.0, 46.0), (191.6, 44.0)],
+        belt=45.0, roof=70.0, tumble=5.0, round_front=11.0, round_rear=9.0,
+        glass=[(47.0, 43.2), (70.0, 68.4), (176.0, 68.6), (189.0, 45.4)],
+        roof_panel=[(67.5, 66.8), (71.5, 70.0), (175.0, 70.0), (180.0, 66.6),
+                    (176.0, 68.2), (71.0, 68.0)],
+        pillars=[[(47.0, 43.2), (50.4, 43.2), (73.4, 68.4), (70.0, 68.4)],
+                 [(96.0, 44.6), (100.0, 44.6), (100.0, 68.5), (96.0, 68.5)],
+                 [(140.0, 45.4), (144.0, 45.4), (144.0, 68.5), (140.0, 68.5)],
+                 [(185.4, 45.4), (189.0, 45.4), (176.0, 68.6), (172.4, 68.6)]],
+        lamp_z=(31.0, 36.0), grille_z=(18.0, 30.0))},
 }
 
 # The generator refuses to write a half-authored catalog.  A missing height is
@@ -976,6 +1169,32 @@ def main():
     _all_materials = {m for row in SOLIDS.values()
                       for m in unpack_solid(row)[3:] if m is not None}
     _bad_material = sorted(_all_materials - set(MATERIALS))
+    # 0325: a side profile must belong to a furnishing, match its catalog
+    # length and height exactly, and name only materials that exist
+    _dims = {fid: (d, unpack_solid(SOLIDS[fid])[0])
+             for fid, _n, _c, _w, d, _b in FURNISHINGS if fid in SOLIDS}
+    _bad_side = []
+    for _sid, _sp in SIDE_PROFILES.items():
+        if _sid not in _dims:
+            _bad_side.append(f"{_sid}: no such furnishing")
+            continue
+        if (_sp["length"], _sp["height"]) != _dims[_sid]:
+            _bad_side.append(f"{_sid}: profile is {_sp['length']} x "
+                             f"{_sp['height']}, catalog is {_dims[_sid][0]} x "
+                             f"{_dims[_sid][1]}")
+        _text = svg_side(_sp["length"], _sp["height"], *_sp["spec"])
+        _err = svg_error(_text)
+        if _err:
+            _bad_side.append(f"{_sid}: malformed side SVG ({_err})")
+            continue
+        for _el in ET.fromstring(_text):
+            _m = _el.get("data-material")
+            if _m not in MATERIALS:
+                _bad_side.append(f"{_sid}: part {_el.get('data-part')!r} names "
+                                 f"material {_m!r}, not in MATERIALS")
+    if _bad_side:
+        raise SystemExit("assets not written -- bad vehicle side profile(s):\n"
+                         + "".join(f"  {line}\n" for line in _bad_side))
     if _unauthored or _orphans or _bad_material:
         raise SystemExit(
             "assets not written -- the 3D data model is incomplete:\n"
@@ -1012,6 +1231,9 @@ def main():
                          "height_in": height, "elevation_in": elevation,
                          "form": form, "material": material,
                          "region_material": region_material,
+                         # 0325: the side elevation a vehicle is lofted from
+                         "side_file": (f"{fid}.side.svg"
+                                       if fid in SIDE_PROFILES else None),
                          "price": _prev_price.get(fid, 0.0)})
     # D70: REFUSE BEFORE WRITING ANYTHING, the same shape as the data-model gate
     # above -- a half-written asset tree is worse than none, and this generator is
@@ -1022,6 +1244,9 @@ def main():
             + "".join(f"  {n}: {why} ({err})\n" for n, err, why in _malformed))
     for _path, _text in _pending:
         _path.write_text(_text, encoding="utf-8")
+    for _sid, _sp in SIDE_PROFILES.items():
+        (FURN / f"{_sid}.side.svg").write_text(
+            svg_side(_sp["length"], _sp["height"], *_sp["spec"]), encoding="utf-8")
 
     (FURN / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -1103,6 +1328,13 @@ def main():
         "    a form falls back to `box` and **says so in its report**; an\n"
         "    unrecognised one renders in the loud magenta.\n"
         "  * `material` — a name only, resolved in `materials.json`.\n"
+        "  * `side_file` — for a vehicle, its SIDE ELEVATION (`<id>.side.svg`),\n"
+        "    or null.  viewBox `0 0 LENGTH HEIGHT` in inches, nose at x = 0,\n"
+        "    ground at the bottom edge.  Each part is a filled `<polygon>` or\n"
+        "    `<circle>` with `data-part`, `data-material`, `data-inset` and,\n"
+        "    for a part that exists once at each side (a wheel, a pillar),\n"
+        "    `data-width`.  The 3D viewer lofts the vehicle from it; the plan\n"
+        "    still draws the top-view symbol.  Full contract: `_gen_assets.py`.\n"
         "* `materials.json` holds each material's `colour` (r, g, b, a in 0..1),\n"
         "  `roughness` and `metalness` — **once**, so the properties are not\n"
         "  repeated across 95 catalog entries.  `unknown` is the deliberate\n"
