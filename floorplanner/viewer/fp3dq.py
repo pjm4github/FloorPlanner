@@ -74,6 +74,36 @@ def _to_qt3d(v):
     return out
 
 
+def plan_to_qml_pose(px, py, wz, rot_deg, ctr, pitch_deg=0.0):
+    """A FIRST-PERSON camera pose, from the plan to Qt Quick 3D.
+
+    A plan point is (x, y-DOWN) in inches; `build_model` carries it to the
+    fp3d world frame (x, -y, z-up); the widget then recentres every vertex by
+    `- ctr` (the model's world-frame bbox centre) and `_to_qt3d` rotates z-up
+    -> y-up as (x, y, z) -> (x, z, -y). The camera eye must ride the SAME two
+    steps or it will not sit in the room:
+
+        eye_world = (px, -py, wz)
+        recentred = eye_world - ctr
+        eye_qml   = (recentred.x, recentred.z, -recentred.y)
+                  = (px - ctr[0], wz - ctr[2], py + ctr[1])
+
+    AIM. A plan aim `rot_deg` is 0 = +x, measured in the y-down plane (the same
+    convention CameraItem.rotation() uses). A Qt Quick 3D PerspectiveCamera at
+    eulerRotation.y = 0 looks down -Z; rotating -Z about +Y by yaw gives the
+    forward (-sin yaw, 0, -cos yaw). Requiring that equal the plan aim mapped
+    into QML, (cos rot, 0, sin rot), solves to yaw = -rot - 90 (deg). Checked:
+    rot 0 (+x) -> yaw -90 -> forward (1,0,0); rot 90 (plan +y / south) ->
+    yaw 180 -> forward (0,0,1). `pitch_deg` is eulerRotation.x (0 = level).
+
+    Returns (eyeX, eyeY, eyeZ, yaw_deg, pitch_deg), all floats, QML y-up."""
+    ex = float(px) - float(ctr[0])
+    ey = float(wz) - float(ctr[2])
+    ez = float(py) + float(ctr[1])
+    yaw_q = -float(rot_deg) - 90.0
+    return ex, ey, ez, yaw_q, float(pitch_deg)
+
+
 def _interleaved(verts, faces, rgba):
     """Non-indexed float32 buffer: pos(3) + normal(3) + colour(4), 40B stride.
 
@@ -188,7 +218,8 @@ def model_status(model):
 
 
 def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
-                      parent=None, yaw=0.0, pitch=0.0, zoom=1.0, fov=60.0):
+                      parent=None, yaw=0.0, pitch=0.0, zoom=1.0, fov=60.0,
+                      first_person=False, cam_pose=None):
     """The Qt Quick 3D scene for `model`, as a plain QWidget.
 
     Extracted from `main()` so the app can embed the same view it ships as a
@@ -205,7 +236,7 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
 
     Raises `ImportError` if Qt Quick 3D is unavailable, and `RuntimeError` if
     the QML document fails to load (the caller reports either)."""
-    from PyQt6.QtCore import QByteArray, QObject, QUrl, pyqtProperty
+    from PyQt6.QtCore import QByteArray, QObject, QUrl, pyqtProperty, pyqtSignal
     from PyQt6.QtGui import QColor, QVector3D
     from PyQt6.QtQuick3D import QQuick3DGeometry
     from PyQt6.QtWidgets import QVBoxLayout, QWidget
@@ -249,12 +280,13 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
         """Scalars QML reads at load."""
 
         def __init__(self, distance, ao, shadows, status, yaw=0.0, pitch=0.0, zoom=1.0,
-                     fov=60.0):
+                     fov=60.0, first_person=False):
             super().__init__()
             self._d, self._ao = distance, ao
             self._s, self._t = shadows, status
             self._yaw, self._pitch, self._zoom = float(yaw), float(pitch), float(zoom)
             self._fov = float(fov)
+            self._fp = bool(first_person)
 
         @pyqtProperty(float, constant=True)
         def distance(self):
@@ -293,6 +325,51 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
         def status(self):
             return self._t
 
+        @pyqtProperty(bool, constant=True)
+        def firstPerson(self):
+            # the mode is fixed when the window opens: a first-person view
+            # bound to a plan camera, or the orbit view. The POSE moves live
+            # (see Pose); the MODE does not.
+            return self._fp
+
+    class Pose(QObject):
+        """The first-person camera pose in QML coordinates, pushed LIVE as the
+        plan camera moves -- unlike Cfg's load-once scalars, every field has a
+        NOTIFY so scene.qml re-renders on a set with no mesh rebuild. The
+        first-person camera binds its position/eulerRotation to these."""
+
+        changed = pyqtSignal()
+
+        def __init__(self, ex=0.0, ey=0.0, ez=0.0, yaw=0.0, pitch=0.0):
+            super().__init__()
+            self._ex, self._ey, self._ez = float(ex), float(ey), float(ez)
+            self._yaw, self._pitch = float(yaw), float(pitch)
+
+        def _set(self, ex, ey, ez, yaw, pitch):
+            self._ex, self._ey, self._ez = float(ex), float(ey), float(ez)
+            self._yaw, self._pitch = float(yaw), float(pitch)
+            self.changed.emit()
+
+        @pyqtProperty(float, notify=changed)
+        def eyeX(self):
+            return self._ex
+
+        @pyqtProperty(float, notify=changed)
+        def eyeY(self):
+            return self._ey
+
+        @pyqtProperty(float, notify=changed)
+        def eyeZ(self):
+            return self._ez
+
+        @pyqtProperty(float, notify=changed)
+        def yaw(self):
+            return self._yaw
+
+        @pyqtProperty(float, notify=changed)
+        def pitch(self):
+            return self._pitch
+
     # The catalog's materials, read the same way build_model reads them --
     # data files, no floorplanner import.
     _materials = load_catalog()[1]
@@ -308,7 +385,10 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
         alpha = m.color[3] if len(m.color) > 3 else 1.0
         entries.append(MeshEntry(g, col, float(alpha), rough, metal))
 
-    cfg = Cfg(span * 1.25, ao, shadows, model_status(model), yaw, pitch, zoom, fov)
+    pose = Pose(*plan_to_qml_pose(*cam_pose, ctr)) if cam_pose is not None else Pose()
+
+    cfg = Cfg(span * 1.25, ao, shadows, model_status(model), yaw, pitch, zoom, fov,
+              first_person=first_person)
     url = QUrl.fromLocalFile(QML_PATH)
 
     if container:
@@ -316,6 +396,7 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
         view = QQuickView()
         view.rootContext().setContextProperty("planMeshes", entries)
         view.rootContext().setContextProperty("cfg", cfg)
+        view.rootContext().setContextProperty("pose", pose)
         view.setResizeMode(QQuickView.ResizeMode.SizeRootObjectToView)
         view.setSource(url)
         holder = QWidget.createWindowContainer(view, parent)
@@ -329,6 +410,7 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
         w = QQuickWidget(parent)
         w.rootContext().setContextProperty("planMeshes", entries)
         w.rootContext().setContextProperty("cfg", cfg)
+        w.rootContext().setContextProperty("pose", pose)
         w.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
         w.setSource(url)
         surface = w
@@ -342,8 +424,22 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
     # only from here, so without this attribute they are collected out from
     # under a live scene and the view goes black (or takes the process with
     # it). The widget owns them for exactly as long as it exists.
-    w._keep = (entries, cfg)
+    w._keep = (entries, cfg, pose)
+    w._pose = pose
     w._surface = surface                    # what a shot grabs (QQuickWidget or QQuickView)
+
+    def set_camera_pose(px, py, wz, rot_deg, pitch_deg=0.0):
+        """Push a new plan pose into the live first-person camera -- a handful
+        of property writes, no mesh rebuild. `(px, py)` plan inches, `wz` the
+        eye's world height, `rot_deg` the plan aim (0 = +x). Safe (no-op) on an
+        orbit-mode widget, and after the window is torn down (a deferred push
+        can land late, when the Pose is already gone)."""
+        try:
+            pose._set(*plan_to_qml_pose(px, py, wz, rot_deg, ctr, pitch_deg))
+        except RuntimeError:
+            pass
+
+    w.set_camera_pose = set_camera_pose
     return w
 
 

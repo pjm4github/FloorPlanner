@@ -1775,6 +1775,12 @@ def apply_design_to_scene(target, design, report=None, strict=False,
         val = editing.get(key, settings.get(key, default))
         SETTINGS[key] = coerce_setting(key, val, default)
     if win is not None:
+        # close any live camera 3D views before the scene is rebuilt -- a view
+        # left bound to a camera this reload is about to delete is exactly the
+        # stale-binding re-entrancy behind the 0xC0000409 crash.
+        closer = getattr(win, "close_all_camera_3d_views", None)
+        if closer is not None:
+            closer()
         # settings the walk does not re-emit (a document `name`, anything a
         # later phase adds) would otherwise evaporate on the first save
         win._doc_settings = {k: v for k, v in settings.items()
