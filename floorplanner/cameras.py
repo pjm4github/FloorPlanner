@@ -717,9 +717,17 @@ class CameraItem(QGraphicsItem):
                 # sort by the NEAREST edge, so a roof that comes forward (a wing,
                 # a garage) stacks IN FRONT of a roof set further back behind it.
                 depth = min(pt_depth(q[0], q[1]) for q in poly)
-                pieces.append({"kind": "roof", "depth": depth, "outline": uz})
+                pieces.append({"kind": "roof", "depth": depth, "outline": uz,
+                               "dormer": r.is_dormer()})
 
-        pieces.sort(key=lambda pc: pc["depth"], reverse=True)   # far -> near
+        # Far -> near by depth, BUT a dormer's own faces paint AFTER the main
+        # roofs: a dormer PROJECTS from the slope it sits on, so its gable end
+        # stands in FRONT of that roof, yet the host slope's nearest edge (its
+        # eave) can be more forward than the dormer set mid-slope -- the plain
+        # nearest-edge order would then bury the dormer behind its own host.
+        # Tiering dormers last pulls them forward to the front, matching the 3-D
+        # (Patrick, 2026-11-13: "the gable ends should be pulled forward").
+        pieces.sort(key=lambda pc: (pc.get("dormer", False), -pc["depth"]))
 
         wall_ops = [o for pc in pieces if pc["kind"] == "wall" for o in pc["openings"]]
         all_u = ([u for pc in pieces for u, _z in pc["outline"]]
