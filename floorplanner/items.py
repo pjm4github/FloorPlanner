@@ -13,6 +13,8 @@ from PyQt6.QtWidgets import *  # noqa: F401
 from floorplanner.config import *  # noqa: F401
 from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
+from floorplanner.parametric import registry as _param_registry
+from floorplanner.parametric import stair_geometry as _sg
 from floorplanner.walls import OpeningItem, WallItem, rebuild_all_walls
 from floorplanner.rooms import (
     RoomItem, report_self_intersections, room_owns_walls, walls_cover_room,
@@ -44,6 +46,10 @@ class FurnishingItem(QGraphicsItem):
         spec = furnishing_spec(kind) or {
             "name": kind, "width_in": 24.0, "depth_in": 24.0}
         self.kind = kind
+        # 0323: the item's PARAMETERS (the record's `state`), or None for a
+        # furnishing that has none. A subclass may set it before this runs.
+        if not hasattr(self, "params"):
+            self.params = None
         self._uid = None                  # 0265: the session label, F<n>
         self.floor = active_floor()      # active floor (load overrides)
         self.name = spec["name"]
@@ -235,9 +241,66 @@ class FurnishingItem(QGraphicsItem):
         e.accept()
 
     def extra_state(self) -> dict:
-        """Per-kind state to persist alongside kind/pos/rotation.  Plain
-        furnishings have none; subclasses (e.g. StairItem) override this."""
-        return {}
+        """Per-kind state to persist alongside kind/pos/rotation: the item's
+        parameters, when it has any.  Subclasses (e.g. StairItem) override."""
+        return dict(self.params) if self.params else {}
+
+    # -- parametric furnishings (0323) ---------------------------------------
+    def is_parametric(self) -> bool:
+        """True when this kind has a registered parameter definition."""
+        return _param_registry.is_parametric(self.kind)
+
+    def param_context(self) -> dict:
+        """What a parameter definition may read about where the item stands:
+        its floor and every floor's elevation."""
+        return {"this_floor": self.floor,
+                "this_elev": floor_elevation(self.floor),
+                "elevations": floor_elevations()}
+
+    def draft_state(self) -> dict:
+        """The state a properties dialog starts editing -- a COPY."""
+        return dict(self.params or {})
+
+    def apply_params(self, state: dict):
+        """Take an accepted parameter set. The base item only stores it; a
+        kind whose shape follows its parameters overrides this."""
+        self.params = dict(state or {}) or None
+        self.update()
+
+    def make_properties_dialog(self, parent=None):
+        """The properties dialog for this item, NOT shown -- or None for a
+        kind that has no parameters."""
+        definition = _param_registry.get(self.kind)
+        if definition is None:
+            return None
+        from floorplanner.parametric.dialog import ParametricDialog  # late: Qt widgets
+        return ParametricDialog(definition, self.draft_state(),
+                                self.param_context(), parent)
+
+    def open_properties(self, parent=None) -> bool:
+        """Open the modal properties dialog; apply on OK. True when applied.
+        The dialog edits a draft, so Cancel leaves the item untouched."""
+        if parent is None:
+            sc = self.scene()
+            if sc is not None and sc.views():
+                parent = sc.views()[0].window()
+        dlg = self.make_properties_dialog(parent)
+        if dlg is None:
+            return False
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return False
+        state = dlg.result_state()
+        if state is None:
+            return False
+        self.apply_params(state)
+        return True
+
+    def mouseDoubleClickEvent(self, e):
+        if e.button() == Qt.MouseButton.LeftButton and self.is_parametric():
+            self.open_properties()
+            e.accept()
+            return
+        super().mouseDoubleClickEvent(e)
 
 
 class StairItem(FurnishingItem):
@@ -245,14 +308,29 @@ class StairItem(FurnishingItem):
     height of the room it is placed in.  `flight` is 'full' or 'half';
     a half flight rises to a landing that either ends ('none') or turns
     'left'/'right' for the remaining rise.  `direction` ('up'/'down')
-    flips the travel arrow."""
+    flips the travel arrow.
+
+    THAT IS THE LEGACY STAIR, and a stair keeps drawing that way for as long
+    as `params` is None -- every stair saved before 0323 (Patrick,
+    2026-11-14: "keep existing stairs frozen until I edit").  A stair WITH
+    `params` is PARAMETRIC: straight, L or U, its rise taken from the floor
+    levels or typed in, its tread depth, width, riser count and landing
+    height editable from the properties dialog (double-click).  Its whole
+    shape then comes from `floorplanner.parametric.stair_geometry`, the same
+    calculator the 3D viewer loads."""
 
     def __init__(self, pos: QPointF, rotation: float = 0.0, *,
                  flight: str = "full", turn: str = "left",
-                 direction: str = "up"):
+                 direction: str = "up", params: dict = None):
         self.flight = flight if flight in ("full", "half") else "full"
         self.turn = turn if turn in ("none", "left", "right") else "left"
         self.direction = direction if direction in ("up", "down") else "up"
+        self.params = None
+        self._rise_used = None
+        self._recompute_pending = False
+        if params is not None:
+            self.params = _sg.normalize_state(params)
+            self._sync_legacy_attrs()
         self.n_risers = 14
         self._off = QPointF(0.0, 0.0)
         self._geo = {"rects": [], "steps": [], "arrow": [], "label": ""}
@@ -260,8 +338,73 @@ class StairItem(FurnishingItem):
         self._recompute()
 
     def extra_state(self) -> dict:
-        return {"flight": self.flight, "turn": self.turn,
-                "direction": self.direction}
+        legacy = {"flight": self.flight, "turn": self.turn,
+                  "direction": self.direction}
+        if self.params is None:
+            return legacy
+        # flight / turn / direction are still written, so a build from before
+        # 0323 opens the file and draws a stair on the same side
+        state = dict(self.params)
+        state.update(legacy)
+        return state
+
+    # -- parameters (0323) ---------------------------------------------------
+    def _sync_legacy_attrs(self):
+        """Keep flight / turn / direction telling the truth about a
+        parametric stair, for the code and the older builds that read them."""
+        st = self.params
+        self.flight = "full" if st["type"] == "straight" else "half"
+        if st["type"] != "straight":
+            self.turn = "right" if st["turn_deg"] > 0 else "left"
+        self.direction = st["direction"]
+
+    def _param_geometry(self):
+        """(geometry or None, rise) for a parametric stair, where it stands."""
+        ctx = self.param_context()
+        elevs = list(ctx["elevations"].values())
+        try:
+            geom, rise, _ok = _sg.geometry_from_state(
+                self.params, ctx["this_elev"], elevs)
+        except _sg.StairError:
+            rise, _ok = _sg.effective_rise(self.params, ctx["this_elev"], elevs)
+            return None, rise
+        return geom, rise
+
+    def draft_state(self) -> dict:
+        if self.params is not None:
+            return dict(self.params)
+        # A LEGACY stair opens on its own numbers, so the dialog's picture is
+        # the stair on the plan; nothing changes unless the user accepts.
+        rise = self._ceiling_height()
+        n = self.n_risers
+        st = dict(_sg.STATE_DEFAULTS)
+        st.update(rise_mode="detached", total_rise_in=rise,
+                  tread_depth_in=STAIR_TREAD, stair_width_in=STAIR_WIDTH,
+                  riser_count_mode="manual", riser_count=n,
+                  direction=self.direction)
+        if self.flight == "half":
+            first = max(1, (n - 1) // 2)             # treads below the landing
+            if self.turn in ("left", "right"):
+                st.update(type="L", turn_deg=90 if self.turn == "right" else -90,
+                          landing_mode="custom",
+                          landing_height_in=(first + 1) * rise / n)
+            else:                                    # ended at its landing
+                st.update(total_rise_in=(first + 1) * rise / n,
+                          riser_count=first + 1)
+        return _sg.normalize_state(st)
+
+    def apply_params(self, state: dict):
+        """Take an accepted parameter set and redraw. THE FOOT STAYS WHERE IT
+        IS: the item's position is the centre of its footprint, which moves
+        when the footprint changes, so the position is shifted to keep the
+        first riser on the spot the user put it."""
+        foot = self.mapToScene(self._off)
+        self.params = _sg.normalize_state(state)
+        self._sync_legacy_attrs()
+        self._recompute()
+        moved = self.mapToScene(self._off)
+        self.setPos(self.pos() + (foot - moved))
+        self.update()
 
     # -- geometry ------------------------------------------------------------
     def _ceiling_height(self) -> float:
@@ -317,8 +460,52 @@ class StairItem(FurnishingItem):
         return {"rects": rects, "steps": steps, "line": line,
                 "label_pt": label_pt}
 
+    def _build_parametric(self):
+        """(geo, tooltip) for a parametric stair, in the same shape `_build`
+        returns so one `paint` serves both."""
+        geom, rise = self._param_geometry()
+        self._rise_used = rise
+        if geom is None or geom.tread_count < 1:
+            # nothing drawable: keep a one-tread placeholder so the item can
+            # still be selected and its properties reopened to fix it
+            w = self.params["stair_width_in"] if self.params["stair_width_in"] > 0 else STAIR_WIDTH
+            t = STAIR_TREAD
+            self.n_risers = 0 if geom is None else geom.riser_count
+            return ({"rects": [QRectF(0, 0, w, t)], "steps": [],
+                     "line": [QPointF(w / 2, t * 0.25), QPointF(w / 2, t * 0.75)],
+                     "label_pt": QPointF(w / 2 + 1, t * 0.25)},
+                    "Stairs \u2014 these parameters do not make a stair; "
+                    "double-click to edit")
+        self.n_risers = geom.riser_count
+        plan = _sg.plan(geom)
+        geo = {"rects": [QRectF(x, y, w, h) for x, y, w, h in plan["rects"]],
+               "steps": list(plan["steps"]),
+               "line": [QPointF(x, y) for x, y in plan["line"]],
+               "label_pt": QPointF(*plan["label"])}
+        shape = {"straight": "straight", "L": "L", "U": "U"}[geom.stair_type]
+        tip = (f"Stairs \u2014 {shape}, {geom.riser_count} risers @ "
+               f"{geom.riser_height:.3f}\", {geom.tread_count} treads @ "
+               f"{geom.tread_depth:g}\"; rise {geom.total_rise:g}\" "
+               f"({self.params['rise_mode']}). Double-click to edit.")
+        return geo, tip
+
     def _recompute(self):
+        self._recompute_pending = False
         self.prepareGeometryChange()
+        if self.params is not None:
+            self.params["direction"] = self.direction
+            geo, tip = self._build_parametric()
+            bbox = QRectF(geo["rects"][0])
+            for r in geo["rects"][1:]:
+                bbox = bbox.united(r)
+            self._geo = geo
+            self._bbox = bbox
+            self.w = bbox.width()
+            self.d = bbox.height()
+            self._off = QPointF(-bbox.center().x(), -bbox.center().y())
+            self.setToolTip(tip)
+            self.update()
+            return
         self.n_risers = max(2, round(self._ceiling_height() / STAIR_RISER))
         geo = self._build()
         bbox = QRectF(geo["rects"][0])
@@ -348,7 +535,29 @@ class StairItem(FurnishingItem):
         self._recompute()             # the room under the stair may differ
 
     # -- painting ------------------------------------------------------------
+    def _rise_is_stale(self) -> bool:
+        """A LINKED stair follows the floor levels. Nothing tells the item
+        when a level moves, so it asks as it paints -- one subtraction."""
+        if self.params is None or self.params["rise_mode"] != "linked":
+            return False
+        rise, _ok = _sg.effective_rise(self.params, floor_elevation(self.floor),
+                                       list(floor_elevations().values()))
+        return self._rise_used is None or abs(rise - self._rise_used) > 1e-6
+
+    def _deferred_recompute(self):
+        # The footprint is rebuilt about the item's POSITION, which is its
+        # centre and is what the plan file stores -- so a stair read back
+        # from a file lands exactly where it was saved even when the floor
+        # levels reach the cache after the item is built.
+        if sip.isdeleted(self):
+            return
+        self._recompute()
+
     def paint(self, painter, option, widget=None):
+        if not self._recompute_pending and self._rise_is_stale():
+            # never change geometry inside paint: do it on the next turn
+            self._recompute_pending = True
+            QTimer.singleShot(0, self._deferred_recompute)
         ghost = floor_display_mode(self.floor) != "active"
         painter.save()
         painter.translate(self._off)
@@ -403,7 +612,12 @@ class StairItem(FurnishingItem):
 
     def contextMenuEvent(self, e):
         menu = QMenu()
+        a_props = menu.addAction("Stair properties\u2026")
+        menu.addSeparator()
         m_flight = menu.addMenu("Flight")
+        # a parametric stair's type and turn are set in its properties, where
+        # they are validated; the two menus stay for a legacy stair only
+        m_flight.menuAction().setVisible(self.params is None)
         for label, val in [("Full flight", "full"),
                            ("Half flight (landing)", "half")]:
             a = m_flight.addAction(label)
@@ -412,6 +626,7 @@ class StairItem(FurnishingItem):
             a.setData(("flight", val))
         m_turn = menu.addMenu("Half-flight direction")
         m_turn.setEnabled(self.flight == "half")
+        m_turn.menuAction().setVisible(self.params is None)
         for label, val in [("Turn left", "left"), ("Turn right", "right"),
                            ("End at landing", "none")]:
             a = m_turn.addAction(label)
@@ -437,6 +652,10 @@ class StairItem(FurnishingItem):
         if handle_front_back(self, chosen, a_front, a_back):
             e.accept()
             return
+        if chosen is a_props:
+            self.open_properties()
+            e.accept()
+            return
         data = chosen.data()
         if isinstance(data, tuple):
             setattr(self, data[0], data[1])
@@ -451,17 +670,36 @@ class StairItem(FurnishingItem):
 
 
 def make_furnishing(kind: str, pos: QPointF, rotation: float = 0.0,
-                    state: dict = None):
+                    state: dict = None, *, new: bool = False):
     """Create the right item for a catalog `kind`: a dynamic StairItem for
     'stairs', otherwise a plain FurnishingItem.  `state` carries per-kind
-    extras (e.g. stair flight/turn/direction) from the plan/clipboard."""
+    extras (e.g. stair flight/turn/direction) from the plan/clipboard.
+
+    0323 -- THREE STAIRS, told apart by what they were saved with:
+      * a state carrying PARAMETERS (`type`) -> a parametric stair;
+      * `new=True` and no state -- the user has just dropped one from the
+        palette -> a parametric stair on the defaults, linked to the level
+        above when there is one;
+      * anything else -> the legacy stair, exactly as before, so a plan saved
+        before parameters existed does not move.
+    Any other PARAMETRIC kind keeps the state it was saved with; a plain
+    furnishing has none, as before."""
     state = state or {}
     if kind == "stairs":
+        if _sg.is_parametric_state(state):
+            return StairItem(pos, rotation, params=state)
+        if new and not state:
+            return StairItem(pos, rotation, params=_sg.default_state(
+                floor_elevation(active_floor()),
+                list(floor_elevations().values())))
         return StairItem(pos, rotation,
                          flight=state.get("flight", "full"),
                          turn=state.get("turn", "left"),
                          direction=state.get("direction", "up"))
-    return FurnishingItem(kind, pos, rotation)
+    item = FurnishingItem(kind, pos, rotation)
+    if state and _param_registry.is_parametric(kind):
+        item.params = dict(state)
+    return item
 
 
 class GroupItem(QGraphicsItemGroup):
