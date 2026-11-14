@@ -459,6 +459,8 @@ this table is not a second copy of it.
 | [`0317-report.md`](./0317-report.md) | report: the camera ELEVATIONS THE WHOLE SIDE OF THE HOUSE when placed outside a room — a checkmark and a badge — on branch `camera-house-side` |
 | [`0318-report.md`](./0318-report.md) | report: the whole-house-side elevation now spans ALL LEVELS with the ROOF, DORMERS and GABLE ENDS — built COMPOSITIONALLY, the eave overhang the roof's own geometry — on branch `full-elevation` |
 | [`0319-ruling.md`](./0319-ruling.md) | ruling: a FURNISHINGS LANE is open in the reviewer session, on Patrick's word; it is fenced off from Code's dormer/elevation work, and nothing in it has been touched yet |
+| [`0320-report.md`](./0320-report.md) | report: looking in a dormer window no longer shows an EXTRUSION OF THE ROOF — the host roof is cut at the dormer's eave plane within its footprint; plus the elevation's dormer faces tier in front — on branch `dormer-render-fixes` |
 | [`0321-ruling.md`](./0321-ruling.md) | ruling: the furnishings exception is CONFIRMED by Patrick, the step-1 read is done, and 0319's file list is corrected in two places |
+| [`0322-ruling.md`](./0322-ruling.md) | ruling: a PLAN for parametric furnishings is on disk for Patrick's review; nothing is built, and building it needs the lane widened |
 
 <!-- PAIRS:END -->
