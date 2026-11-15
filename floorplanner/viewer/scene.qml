@@ -9,6 +9,11 @@ Item {
         id: view
         anchors.fill: parent
 
+        // The active camera: a first-person camera bound to the plan camera's
+        // live pose, or the orbit camera about the model centre. The MODE is
+        // fixed when the window opens (cfg.firstPerson); the POSE moves live.
+        camera: cfg.firstPerson ? fpCamera : orbitCamera
+
         environment: SceneEnvironment {
             clearColor: "#ffffff"
             backgroundMode: SceneEnvironment.Color
@@ -31,7 +36,7 @@ Item {
             eulerRotation.x: cfg.pitch
             eulerRotation.y: cfg.yaw
             PerspectiveCamera {
-                id: camera
+                id: orbitCamera
                 z: cfg.distance * cfg.zoom
                 y: cfg.distance * 0.45 * cfg.zoom
                 clipNear: 1.0
@@ -39,6 +44,19 @@ Item {
                 eulerRotation.x: -24
                 fieldOfView: cfg.fov          // 60 for the view; a shot may narrow it
             }
+        }
+
+        // FIRST-PERSON camera: world-positioned (not on the orbit node), its
+        // eye and aim bound to `pose`, which Python pushes live as the plan
+        // camera moves (fp3dq.plan_to_qml_pose maps plan inches/aim -> QML).
+        // A near plane close in, for standing inside a room.
+        PerspectiveCamera {
+            id: fpCamera
+            position: Qt.vector3d(pose.eyeX, pose.eyeY, pose.eyeZ)
+            eulerRotation: Qt.vector3d(pose.pitch, pose.yaw, 0)
+            clipNear: 1.0
+            clipFar: cfg.distance * 20
+            fieldOfView: cfg.fov
         }
 
         DirectionalLight {                       // key, casts the shadows
@@ -84,7 +102,8 @@ Item {
     OrbitCameraController {
         anchors.fill: view
         origin: origin
-        camera: camera
+        camera: orbitCamera
+        enabled: !cfg.firstPerson          // the plan camera drives the first-person view
     }
 
     Text {

@@ -175,6 +175,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self._conversion = None      # P2.1 report, set when a legacy file was
         self._provenance = None      # converted; provenance rides to P2.2's save
         self._doc_settings = {}      # document settings the walk does not model
+        self._camera_3d_views = {}   # id(CameraItem) -> its live 3D view dialog
         self._dirty_timer = QTimer(self)
         self._dirty_timer.setSingleShot(True)
         self._dirty_timer.setInterval(180)
@@ -935,6 +936,97 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         dlg.resize(1100, 780)
         dlg.exec()
         return dlg
+
+    def show_camera_3d_view(self, camera):
+        """A LIVE first-person 3D view rendered from `camera`'s pose, that
+        FOLLOWS the camera as it is moved or turned in the plan (the camera is
+        the controller, the view its live follower -- Phase 1). Non-modal, one
+        window per camera, raised if already open. Called from the camera's
+        "3D view from here" switch (`CameraItem.set_show_3d`).
+
+        Unlike `show_3d_view` (modal, read-only), this window stays open and the
+        camera streams it a new pose on every move/turn -- a handful of property
+        writes, no mesh rebuild (`Plan3DQuickWidget.set_camera_pose`). The plan
+        is read ONCE here; a plan EDIT does not yet refresh an open view (a
+        later step), so this stays as read-only toward the document as the modal
+        viewer is -- only the camera pose is live."""
+        reg = self._camera_3d_views
+        existing = reg.get(id(camera))
+        if existing is not None:
+            existing.raise_()
+            existing.activateWindow()
+            return existing
+        try:
+            from floorplanner.viewer.fp3d import build_model
+            from floorplanner.viewer.fp3dq import Plan3DQuickWidget
+        except ImportError:
+            self.status(self.VIEWER_HINT)
+            return None
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="design_from_scene:")
+            doc = self.design_document()
+        model = build_model(doc)
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"3D view — {camera.name or 'camera'}")
+        lay = QVBoxLayout(dlg)
+        lay.setContentsMargins(0, 0, 0, 0)
+        try:
+            body = Plan3DQuickWidget(model, parent=dlg, first_person=True,
+                                     cam_pose=camera.pose_3d())
+        except ImportError:
+            dlg.deleteLater()
+            self.status(self.VIEWER_HINT)
+            return None
+        except RuntimeError as exc:
+            dlg.deleteLater()
+            self.status(f"3D view could not load its scene: {exc}")
+            return None
+        lay.addWidget(body)
+        dlg.resize(900, 680)
+        # THE BINDING: the camera pushes its pose into this window on every
+        # move/turn (`CameraItem._emit_pose` -> this sink). `body` keeps the
+        # Pose/meshes alive; the lambda holds `body`, the dialog holds `body`.
+        camera._pose_sink = lambda cam, w=body: w.set_camera_pose(*cam.pose_3d())
+        reg[id(camera)] = dlg
+        dlg.finished.connect(lambda _code, c=camera: self._on_camera_3d_closed(c))
+        dlg.show()
+        dlg.raise_()
+        return dlg
+
+    def close_camera_3d_view(self, camera):
+        """Close the live 3D view bound to `camera`, if any (the camera's switch
+        turned off, or the camera deleted)."""
+        dlg = self._camera_3d_views.pop(id(camera), None)
+        camera._pose_sink = None
+        if dlg is not None:
+            dlg.close()
+
+    def _on_camera_3d_closed(self, camera):
+        """The window was closed (its X, or `close_camera_3d_view`): unbind and
+        drop the camera's 3D switch so the glyph's cube badge clears. Guarded:
+        the camera may already be gone (a document reload deleted it)."""
+        self._camera_3d_views.pop(id(camera), None)
+        try:
+            camera._pose_sink = None
+            if getattr(camera, "show_3d", False):
+                camera.prepareGeometryChange()
+                camera.show_3d = False
+                camera.update()
+        except RuntimeError:
+            pass
+
+    def close_all_camera_3d_views(self):
+        """Close every open camera 3D view -- called before the scene is
+        reloaded/cleared, so no view is left bound to a camera about to be
+        deleted (a stale binding firing into a torn-down item is exactly the
+        re-entrancy class behind the 0xC0000409 crash)."""
+        for dlg in list(self._camera_3d_views.values()):
+            try:
+                dlg.close()
+            except RuntimeError:
+                pass
+        self._camera_3d_views.clear()
 
     def new_concept_room(self, at=None):
         """Rooms ▸ New concept room… (and the Room tool's blank-canvas menu):

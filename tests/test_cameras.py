@@ -545,3 +545,42 @@ def test_the_house_side_switch_round_trips(fp, scene):
     apply_design_to_scene(scene, out)
     cam = [it for it in scene.items() if isinstance(it, CameraItem)][0]
     assert cam.show_house_side
+
+
+# -- the live first-person 3D view binding (Phase 1) --------------------------
+def test_pose_3d_is_the_plan_pose_at_a_standing_eye_height(scene):
+    """The 3D eye is the camera's plan position, a standing height above its
+    floor, aimed where the glyph points."""
+    from floorplanner.cameras import CAMERA_EYE_H_IN
+    from floorplanner.config import floor_elevation
+    cam = CameraItem(QPointF(100, 120), rotation=30.0, floor=DEFAULT_FLOOR)
+    scene.addItem(cam)
+    px, py, z, rot = cam.pose_3d()
+    assert (px, py) == (100.0, 120.0)
+    assert z == floor_elevation(DEFAULT_FLOOR) + CAMERA_EYE_H_IN
+    assert rot == 30.0
+
+
+def test_a_bound_3d_view_is_fed_the_new_pose_on_move_and_turn(scene):
+    """With a 3D view bound (its sink installed), moving OR turning the camera
+    pushes the new pose -- the live feed that lets the view follow the camera.
+    The push is DEFERRED off `itemChange` (one event-loop turn later, to avoid a
+    re-entrant QML emit inside Qt's geometry-change stack -- the 0xC0000409
+    crash), so the feed arrives after `processEvents`. `show_3d` is runtime-only
+    and starts off."""
+    from PyQt6.QtWidgets import QApplication
+    cam = CameraItem(QPointF(100, 120), rotation=0.0, floor=DEFAULT_FLOOR)
+    scene.addItem(cam)
+    assert cam.show_3d is False
+    feed = []
+    cam._pose_sink = lambda c: feed.append(c.pose_3d())
+    cam.setPos(QPointF(150, 180))
+    cam.setRotation(90.0)
+    assert feed == [], "the push is deferred, not synchronous inside itemChange"
+    QApplication.processEvents()                 # flush the deferred push
+    assert feed, "a move or a turn must push the pose to a bound view"
+    assert feed[-1][0:2] == (150.0, 180.0)      # the moved position
+    assert feed[-1][3] == 90.0                  # the new aim
+    cam._pose_sink = None                         # unbound: a move is silent, no crash
+    cam.setPos(QPointF(10, 10))
+    QApplication.processEvents()

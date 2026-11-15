@@ -56,6 +56,9 @@ _FILL = QColor(37, 99, 235, 40)       # translucent wedge
 _FURN_C = QColor(13, 118, 102)        # furnishings: teal
 _CAB_C = QColor(166, 124, 64)         # cabinetry: wood tan
 _HOUSE_C = QColor(96, 125, 160)       # whole house side: slate blue
+_3D_C = QColor(124, 92, 196)          # live 3D view: violet (a cube badge)
+# a standing eye, above the camera's floor, for the first-person 3D view
+CAMERA_EYE_H_IN = 65.0
 _BADGE_W = 13.0
 _BADGE_H = 11.0
 _BADGE_GAP = 3.0
@@ -102,6 +105,12 @@ class CameraItem(QGraphicsItem):
         # exterior wall whose outside turns toward the camera, not just the one
         # wall the aim ray hits. A no-op while the camera sits inside a room.
         self.show_house_side = bool(show_house_side)
+        # a live FIRST-PERSON 3D view bound to this camera (runtime only, never
+        # serialized): True while its window is open, so the glyph shows a cube
+        # badge and the item pushes its pose to `_pose_sink` on every move/turn.
+        self.show_3d = False
+        self._pose_sink = None
+        self._pose_pending = False
         self._rotating = False
         self._rot_offset = 0.0
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
@@ -125,6 +134,13 @@ class CameraItem(QGraphicsItem):
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
             return grid_snap(value)
+        # The live feed to a bound 3D view: a move or a turn pushes the new
+        # pose (position already set here; rotation via ItemSendsGeometryChanges,
+        # set at line ~109). A handful of property writes on the far side, no
+        # mesh rebuild -- see `_emit_pose`.
+        if change in (QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged,
+                      QGraphicsItem.GraphicsItemChange.ItemRotationHasChanged):
+            self._emit_pose()
         return super().itemChange(change, value)
 
     # -- rotator handle (cloned from FurnishingItem) --------------------------
@@ -158,6 +174,8 @@ class CameraItem(QGraphicsItem):
             items.append(_CAB_C)
         if self.show_house_side:
             items.append(_HOUSE_C)
+        if self.show_3d:
+            items.append(_3D_C)
         if not items:
             return []
         total = len(items) * _BADGE_W + (len(items) - 1) * _BADGE_GAP
@@ -269,6 +287,16 @@ class CameraItem(QGraphicsItem):
             painter.drawRect(QRectF(r.center().x() - dw / 2.0,
                                     body.bottom() - body.height() * 0.55,
                                     dw, body.height() * 0.55))      # a door
+        elif ink == _3D_C:                       # live 3D view: an isometric cube
+            d = r.width() * 0.26
+            front = QRectF(r.left(), r.top() + d, r.width() - d, r.height() - d)
+            painter.drawRect(front)                                  # front face
+            painter.drawPolygon(QPolygonF([                          # top face
+                front.topLeft(), QPointF(front.left() + d, front.top() - d),
+                QPointF(front.right() + d, front.top() - d), front.topRight()]))
+            painter.drawPolygon(QPolygonF([                          # right face
+                front.topRight(), QPointF(front.right() + d, front.top() - d),
+                QPointF(front.right() + d, front.bottom() - d), front.bottomRight()]))
         else:                                    # armchair: body, back, two arms
             painter.drawRoundedRect(r, 2.0, 2.0)
             back = r.top() + r.height() * 0.42
@@ -345,6 +373,9 @@ class CameraItem(QGraphicsItem):
         a_house = menu.addAction("View whole house side")
         a_house.setCheckable(True)
         a_house.setChecked(self.show_house_side)
+        a_3d = menu.addAction("3D view from here")
+        a_3d.setCheckable(True)
+        a_3d.setChecked(self.show_3d)
         menu.addSeparator()
         a_cw = menu.addAction("Rotate 90° CW")
         a_ccw = menu.addAction("Rotate 90° CCW")
@@ -359,11 +390,15 @@ class CameraItem(QGraphicsItem):
             self.set_show_cabinetry(a_cab.isChecked())
         elif chosen is a_house:
             self.set_show_house_side(a_house.isChecked())
+        elif chosen is a_3d:
+            self.set_show_3d(a_3d.isChecked())
         elif chosen is a_cw:
             self.setRotation((self.rotation() + 90.0) % 360.0)
         elif chosen is a_ccw:
             self.setRotation((self.rotation() - 90.0) % 360.0)
         elif chosen is a_del:
+            if self.show_3d:
+                self.set_show_3d(False)          # close its 3D window first
             if self.scene() is not None:
                 self.scene().removeItem(self)
         e.accept()
@@ -392,6 +427,73 @@ class CameraItem(QGraphicsItem):
             self.prepareGeometryChange()
             self.show_house_side = on
             self.update()
+
+    # -- the live first-person 3D view ----------------------------------------
+    def set_show_3d(self, on: bool):
+        """Open or close a FIRST-PERSON 3D view rendered from this camera's
+        pose. While open the glyph shows a cube badge and the item streams its
+        pose to the view on every move/turn. Runtime only -- never serialized,
+        so a reopened plan starts with no 3D windows."""
+        on = bool(on)
+        if on == self.show_3d:
+            return
+        if on:
+            if self._open_3d_view() is None:     # viewer stack missing, say nothing
+                return
+        else:
+            self._close_3d_view()
+        self.prepareGeometryChange()
+        self.show_3d = on
+        self.update()
+
+    def pose_3d(self):
+        """(plan_x, plan_y, eye world-height, aim degrees) for the 3D camera --
+        a standing eye above this camera's floor, aimed where it points."""
+        z = floor_elevation(self.floor) + CAMERA_EYE_H_IN
+        return (self.pos().x(), self.pos().y(), z, float(self.rotation()))
+
+    def _emit_pose(self):
+        """Schedule a push of the current pose to a bound 3D view, if one is
+        open. DEFERRED, and that is the whole point: `_emit_pose` is called from
+        `itemChange` -- a C++ virtual override, mid-`setPos`/`setRotation`. A
+        SYNCHRONOUS push would emit the Pose's `changed` signal and re-evaluate
+        the QML camera bindings from INSIDE Qt's geometry-change call stack --
+        re-entrancy that crashed the process (0xC0000409, stack-buffer-overrun,
+        his report 2026-11-14: editing with a camera's 3D view open). A
+        single-shot timer runs the push on the next event-loop turn, outside
+        that stack; a pending flag coalesces a drag's many moves into one."""
+        if getattr(self, "_pose_sink", None) is None or self._pose_pending:
+            return
+        self._pose_pending = True
+        QTimer.singleShot(0, self._flush_pose)
+
+    def _flush_pose(self):
+        self._pose_pending = False
+        sink = getattr(self, "_pose_sink", None)
+        if sink is None:
+            return
+        try:
+            sink(self)                           # reads pos()/rotation()/floor
+        except RuntimeError:
+            self._pose_sink = None               # the camera or its view is gone
+
+    def _main_window(self):
+        sc = self.scene()
+        if sc and sc.views():
+            return sc.views()[0].window()
+        return None
+
+    def _open_3d_view(self):
+        win = self._main_window()
+        if win is None or not hasattr(win, "show_camera_3d_view"):
+            return None
+        return win.show_camera_3d_view(self)
+
+    def _close_3d_view(self):
+        win = self._main_window()
+        if win is not None and hasattr(win, "close_camera_3d_view"):
+            win.close_camera_3d_view(self)
+        self._pose_sink = None
 
     def open_elevation(self):
         """Open (or report) the elevation of the wall this camera faces. Late
