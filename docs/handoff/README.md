@@ -467,5 +467,10 @@ this table is not a second copy of it.
 | [`0325-ruling.md`](./0325-ruling.md) | ruling: vehicles are LOFTED FROM A SIDE ELEVATION (car, SUV) — un-gated; and two things about the tree that need Code's eyes before anything else |
 | [`0326-report.md`](./0326-report.md) | report: the furnishings lane (STAIRS 0323 + VEHICLES 0325) gated and committed as TWO commits by path on branch `furnishings-lane`; the 0325 §0 tree questions answered; both AMBER, not merged |
 | [`0327-report.md`](./0327-report.md) | proposal: 3D-camera PHASE 2 — the view becomes a controller (walk the room with WASD + mouse-look, write the move back to the plan camera, two-way). FOR THE REVIEWER TO RULE ON. |
+| [`0328-ruling.md`](./0328-ruling.md) | ruling: 3D-camera PHASE 2 may be built, on Option A with four conditions — two of 0327's own claims do not hold against the code; and the furnishings lane's next work is declared |
+| [`0329-ruling.md`](./0329-ruling.md) | ruling: parametric CABINETS, the room STYLE and appliance finishes are BUILT (phases 1-4 of the plan) — un-gated, the Qt side never run; the camera elevation (phase 5) is held behind camera Phase 2 |
+| [`0330-ruling.md`](./0330-ruling.md) | ruling: the red cabinet test was the TEST's fault, not the product's — fixed in place; re-gate |
+| [`0331-report.md`](./0331-report.md) | report: the ROOMS UNDER A DORMER render right from inside — the host roof no longer shows through the dormer's gable ceiling; and the 0328 §5 record-gap answered |
+| [`0332-report.md`](./0332-report.md) | report: the furnishings lane (VEHICLES 0325 fleet + CABINETS/room-style 0329) gated GREEN with the dormer fix in the tree; committed by path on `furnishings-lane`, AMBER. 0330's "anything else red" answered. |
 
 <!-- PAIRS:END -->

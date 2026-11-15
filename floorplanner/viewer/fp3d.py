@@ -2525,34 +2525,45 @@ def opening_span(anchor, width, length):
     return s0, s0 + width
 
 
-def _ceiling_pieces(tri_world, cz, lifts, RC):
+def _ceiling_pieces(tri_world, cz, lifts, RC, dormer_lf_ids=frozenset()):
     """A room ceiling over the world-frame triangle `tri_world` (plan y already
     flipped), clipped so its height is the LESSER of the ceiling line `cz` and
     the underside of any roof standing over it (Patrick, 2026-11-07: a flat
     ceiling poked through the roof). `lifts` is the lifted roof geoms (absolute
-    height); `RC` is the `roofclip` module or None.
+    height); `RC` is the `roofclip` module or None. `dormer_lf_ids` is the set
+    of `id(lf)` for the dormer roofs among `lifts`.
 
     Returns convex pieces, each a world-frame ring `[(x, y, z)]`. A triangle is
     convex, so roofclip's convex splitters are safe on it (a whole room can be
     non-convex -- the caller triangulates first). Each piece is split along
     every covering roof's cut lines and its knee (where the roof underside
-    crosses `cz`), so the clamped z is planar across it and fan-triangulates."""
+    crosses `cz`), so the clamped z is planar across it and fan-triangulates.
+
+    A DORMER REPLACES THE HOST ROOF WITHIN ITS FOOTPRINT -- the host is cut away
+    there -- so inside a dormer's footprint the host roof's underside must NOT
+    clamp the ceiling; only the dormer's own does. Without this the ceiling
+    dives to follow the (absent) host slope down to the dormer's gable, and the
+    dormer's own roof underside shows through from inside the room (Patrick,
+    2026-11-14, looking into a front dormer: brown roof streaks and a sloped
+    ceiling where the dormer's gable ceiling, flat ceiling and knee wall should
+    read). This is the interior dual of `_hidden_overhang_pieces`' eave cut."""
     if RC is None or not lifts:
         return [[(x, y, cz) for x, y in tri_world]]
     cov = []
     for lf in lifts:
         try:
-            cov.append((lf, RC.footprint_polygon(lf)))
+            cov.append((lf, RC.footprint_polygon(lf), id(lf) in dormer_lf_ids))
         except Exception:                 # a degenerate roof: skip it
             continue
     if not cov:
         return [[(x, y, cz) for x, y in tri_world]]
+    dormer_fps = [fp for _lf, fp, dm in cov if dm]
 
     def under(lf, v):                     # the roof underside at a plan point
         return float(RC.surface_height(lf, v)) - ROOF_T
 
     pieces = [[RC.Pt(x, -y) for x, y in tri_world]]     # world -> plan (x, -y)
-    for lf, _fp in cov:
+    for lf, _fp, _dm in cov:
         for p, d in RC._cut_lines(lf):
             pieces = [q for cell in pieces
                       for q in RC._split_by_line(cell, p, d)]
@@ -2568,14 +2579,29 @@ def _ceiling_pieces(tri_world, cz, lifts, RC):
                 if len(kept) >= 3 and RC._area(kept) > RC.MIN_CELL_AREA:
                     split.append(kept)
         pieces = split
+    # Split along every dormer FOOTPRINT edge too, so each piece lies wholly
+    # inside or outside a dormer -- the host-skip below is then consistent
+    # across the piece (its clamped z stays planar and fan-triangulates).
+    for fp in dormer_fps:
+        n = len(fp)
+        for i in range(n):
+            a, b = fp[i], fp[(i + 1) % n]
+            d = RC.Pt(b.x() - a.x(), b.y() - a.y())
+            if math.hypot(d.x(), d.y()) <= RC.EPS:
+                continue
+            pieces = [q for cell in pieces
+                      for q in RC._split_by_line(cell, a, d)]
     out = []
     for cell in pieces:
         ring = []
         for v in cell:
+            in_dormer = any(RC._contains(fp, v) for fp in dormer_fps)
             z = cz
-            for lf, fp in cov:
+            for lf, fp, dm in cov:
                 if not RC._contains(fp, v):
                     continue
+                if in_dormer and not dm:
+                    continue              # host cut away inside the dormer
                 try:
                     z = min(z, under(lf, v))
                 except Exception:
@@ -2915,11 +2941,21 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     # underside is the ceiling and whose top is the attic floor over it.
     if floors and ceiling_jobs:
         lifts = list(lifted_of.values())
+        # which lifted roofs are dormers (a `host`): inside a dormer's
+        # footprint the host roof is cut away, so it must not clamp the
+        # ceiling -- see `_ceiling_pieces`. Computed here from the doc so it
+        # does not depend on the `if roofs:` block having run.
+        _host_of = {rf.get("id"): rf.get("host")
+                    for rf in doc.get("roofs", [])}
+        dormer_lf_ids = frozenset(
+            id(lf) for rid, lf in lifted_of.items()
+            if _host_of.get(rid) is not None)
         ceil_parts = []
         for poly, tris, cz in ceiling_jobs:
             for (i, j, k) in tris:
                 for ring in _ceiling_pieces(
-                        [poly[i], poly[j], poly[k]], cz, lifts, ROOFCLIP):
+                        [poly[i], poly[j], poly[k]], cz, lifts, ROOFCLIP,
+                        dormer_lf_ids):
                     m = len(ring)
                     lo = np.array([(x, y, z) for x, y, z in ring])
                     hi = np.array([(x, y, z + SLAB_T) for x, y, z in ring])

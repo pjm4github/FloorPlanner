@@ -171,3 +171,49 @@ def test_the_ceiling_does_not_poke_through_the_roof(fp3d):
         if rc._contains(fp, pt):
             surf = float(rc.surface_height(geom, pt))
             assert z <= surf + 1e-6                 # at or under the roof surface
+
+
+def test_a_dormer_ceiling_follows_the_dormer_not_the_host_it_replaces(fp3d):
+    """Regression (Patrick, 2026-11-14, looking into a front dormer from inside
+    the room): brown roof streaks and a ceiling sloping down to the gable, where
+    the dormer's own gable ceiling and knee should read. Inside a dormer's
+    footprint the host roof is CUT AWAY, so the room ceiling must follow the
+    DORMER roof underside (high), not take the min with the (lower, absent) host
+    slope. `_ceiling_pieces` is given which lifts are dormers; the dual of
+    `_hidden_overhang_pieces`' eave cut."""
+    import floorplanner.roofclip as rc
+    # host: a gable, ridge E-W at plan y=200, eaves dropping toward +y
+    host_rec = {"id": "h", "level": "L1", "ridge": [[0, 200], [400, 200]],
+                "eaves_h_in": 120.0, "ridge_h_in": 300.0, "overhang_in": [0, 0],
+                "span_in": [150, 150], "gable": [True, True], "marker_end": 1}
+    # a dormer standing proud of it: ridge N-S at x=200, higher-sitting, its
+    # footprint a sub-rectangle of the host (the dormer's own roof pocket)
+    dormer_rec = {"id": "d", "level": "L1", "ridge": [[200, 320], [200, 240]],
+                  "eaves_h_in": 150.0, "ridge_h_in": 260.0, "overhang_in": [0, 0],
+                  "span_in": [90, 90], "gable": [True, True], "marker_end": 1,
+                  "host": "h", "wall_span_in": [60, 60], "box_half_in": [90, 90],
+                  "end_overhang_in": [0, 0]}
+    host = rc.Lifted(rc.RoofGeom.from_record(host_rec, span_fallback=150.0), 0.0)
+    dormer = rc.Lifted(rc.RoofGeom.from_record(dormer_rec, span_fallback=90.0), 0.0)
+    # a SMALL world-frame triangle (plan y already flipped) on the dormer ridge
+    # (plan x=200, y~280), well inside the footprint, where the host slope sits
+    # clearly BELOW the dormer so min(host, dormer) and the dormer diverge
+    tri = [(190.0, -275.0), (210.0, -275.0), (200.0, -285.0)]
+    cz = 400.0                                       # a high flat ceiling: the roof governs
+    probe = rc.Pt(200.0, 280.0)                      # on the dormer ridge
+    host_under = float(rc.surface_height(host, probe)) - fp3d.ROOF_T
+    dormer_under = float(rc.surface_height(dormer, probe)) - fp3d.ROOF_T
+    assert dormer_under > host_under + 40, "fixture: the dormer must stand above the host here"
+
+    def zmax(dlf):
+        pieces = fp3d._ceiling_pieces(tri, cz, [host, dormer], rc, dlf)
+        return max(z for ring in pieces for (_x, _y, z) in ring)
+
+    # the OLD behaviour (no dormer known) takes min(host, dormer) -> the host
+    # pulls the ceiling well below the dormer it replaces
+    z_old = zmax(frozenset())
+    assert z_old < dormer_under - 30, "without the dormer, the host wrongly governs"
+    # the FIX (the dormer is known) lifts the ceiling to the dormer underside
+    z_fixed = zmax(frozenset([id(dormer)]))
+    assert z_fixed == pytest.approx(dormer_under, abs=2.0)
+    assert z_fixed > z_old + 30, "the dormer ceiling must ride above the host it replaces"
