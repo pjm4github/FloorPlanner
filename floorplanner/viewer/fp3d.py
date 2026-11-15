@@ -1370,6 +1370,47 @@ def _hidden_overhang_pieces(geom, lifted, clip, terr, loops_of, roofclip_mod):
             if math.hypot(d.x(), d.y()) <= RC.EPS:
                 continue
             pieces = [q for pc in pieces for q in RC._split_by_line(pc, a, d)]
+        # ...and along the dormer's whole roof FOOTPRINT, so each piece lies
+        # wholly inside or outside it -- the eave cut below (which hollows the
+        # dormer's room out of the host) then places a piece by its centroid.
+        fpd = RC.footprint_polygon(lf)
+        for i in range(len(fpd)):
+            a, b = fpd[i], fpd[(i + 1) % len(fpd)]
+            d = RC.Pt(b.x() - a.x(), b.y() - a.y())
+            if math.hypot(d.x(), d.y()) <= RC.EPS:
+                continue
+            pieces = [q for pc in pieces for q in RC._split_by_line(pc, a, d)]
+
+    # A DORMER'S ROOM IS ABOVE ITS EAVES. Host roof standing above a covering
+    # dormer's eave plane, within that dormer's footprint, fills the dormer's
+    # room and shows through its open gable face (Patrick, 2026-11-14, looking
+    # in a dormer window: "I see what appears to be an extrusion of the roof").
+    # Clip every host piece to AT OR BELOW the eaves of each dormer over it:
+    # below the eaves the host is untouched, so it still projects to the cheek
+    # walls (his 2026-11 request); above them it is the dormer's room, removed.
+    # The chosen `coverer` can be an UNRELATED higher roof (a wing lapping over
+    # the same ground), so this cut rides on the dormer's FOOTPRINT, not on the
+    # coverer being the dormer -- it is applied to every piece built below.
+    dormer_fps = [(lf, RC.footprint_polygon(lf))
+                  for lf, _cs, dm, _lid in others if dm]
+
+    def _below_dormer_eaves(pc):
+        res = [pc]
+        for lf_d, fpd_d in dormer_fps:
+            res2 = []
+            for q in res:
+                if not RC._contains(fpd_d, RC._centroid(q)):
+                    res2.append(q)
+                    continue
+                vals = [lf_d.eaves_h_in - RC.surface_height(lifted, v) for v in q]
+                if min(vals) >= -RC.EPS:
+                    res2.append(q)
+                    continue
+                under, _ = RC._clip_by_values(q, vals)
+                if len(under) >= 3 and RC._area(under) > RC.MIN_CELL_AREA:
+                    res2.append(under)
+            res = res2
+        return res
 
     out = []
     for pc in pieces:
@@ -1388,13 +1429,12 @@ def _hidden_overhang_pieces(geom, lifted, clip, terr, loops_of, roofclip_mod):
         if dormer:
             # A dormer stands on this roof only within its CHEEK-WALL box
             # (±wall_span off the ridge, face wall at p1 to the apex at p2);
-            # there the host stays unbuilt. Under the dormer's EAVE OVERHANG
-            # (wall_span -> wall_span+overhang, and the face-eave rake beyond
-            # p1) the host must project all the way to the cheek walls, so
-            # those cells fall through to the same seam rebuild as any
-            # overhang (Patrick, 2026-11: "the host roof must project all the
-            # way to the cheek walls ... the cheek wall eaves are truncating
-            # the host roof under the eaves").
+            # there the host stays unbuilt. Beyond the box, under the dormer's
+            # EAVE OVERHANG, the host projects to the cheek walls (Patrick,
+            # 2026-11: "the host roof must project all the way to the cheek
+            # walls ... the cheek wall eaves are truncating the host roof under
+            # the eaves") -- then `_below_dormer_eaves` cuts back whatever of
+            # that would rise above the dormer's own eaves.
             _, _, nx, ny = cover._axis()
             p1, p2 = cover.p1, cover.p2
             wl, wr = cover.wall_span_in
@@ -1413,11 +1453,11 @@ def _hidden_overhang_pieces(geom, lifted, clip, terr, loops_of, roofclip_mod):
         vals = [RC.surface_height(cover, v) - RC.surface_height(lifted, v)
                 for v in pc]
         if min(vals) >= -RC.EPS:
-            out.append(pc)
+            out.extend(_below_dormer_eaves(pc))
             continue
         under, _ = RC._clip_by_values(pc, vals)
         if len(under) >= 3 and RC._area(under) > RC.MIN_CELL_AREA:
-            out.append(under)
+            out.extend(_below_dormer_eaves(under))
     return out
 
 
