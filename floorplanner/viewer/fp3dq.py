@@ -104,6 +104,54 @@ def plan_to_qml_pose(px, py, wz, rot_deg, ctr, pitch_deg=0.0):
     return ex, ey, ez, yaw_q, float(pitch_deg)
 
 
+# --------------------------------------------------------------------------
+# light sources (0333 §3) -- pure, Qt-free, so they test without a display
+# --------------------------------------------------------------------------
+
+# 800 lm -> brightness 1.0 AT THE SOURCE. With Qt Quick 3D's default point-light
+# attenuation (constant 1, quadratic 1, distance scaled by 0.0001), an 800 lm
+# point delivers ~0.52 at 8 ft (96 in): 1 / (1 + 96**2 * 1e-4) = 1 / 1.9216.
+# That sits just above the fill light (0.35) and well below the key (1.15) --
+# a soft pool, not a flood. The factor is derived, not guessed (0333 §3.1);
+# 0334 §1 carries the arithmetic and it is the one knob Patrick tunes by eye.
+LUMENS_PER_BRIGHTNESS = 800.0
+
+
+def _light_to_qml(light, ctr):
+    """One `model.lights` entry -> the QML-frame fields a scene light needs.
+
+    A light rides the SAME two steps the meshes do (this module's geometry
+    hand-off): recentre by `- ctr`, then z-up -> y-up as (x, y, z) -> (x, z, -y)
+    -- `_to_qt3d` on a single point. Brightness scales from lumens by
+    `LUMENS_PER_BRIGHTNESS`. Returns
+    (pos_xyz, (r, g, b), brightness, kind, cone_deg)."""
+    wx, wy, wz = light["pos"]
+    pos = (float(wx) - float(ctr[0]),
+           float(wz) - float(ctr[2]),
+           -(float(wy) - float(ctr[1])))
+    r, g, b = light["colour"]
+    brightness = float(light["lumens"]) / LUMENS_PER_BRIGHTNESS
+    return (pos, (float(r), float(g), float(b)), brightness,
+            str(light.get("kind", "point")), float(light.get("cone_deg", 180.0)))
+
+
+def _emissive_rgb(name):
+    """The glow colour of a light's LENS mesh, or None for every other mesh.
+
+    fp3d names the lens `furnishings:light_emit#rrggbb` (0333 §2); the hex rides
+    in the name. A lens must read as LIT whatever the scene lighting does
+    (0333 §3.4), so the viewer gives it an `emissiveFactor` of this colour and
+    leaves every other mesh un-emissive."""
+    part = name.split(":", 1)[-1]
+    if not part.startswith("light_emit"):
+        return None
+    h = part.split("#", 1)[1] if "#" in part else "ffffff"
+    try:
+        return tuple(int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+    except (ValueError, IndexError):
+        return (1.0, 1.0, 1.0)
+
+
 def _interleaved(verts, faces, rgba):
     """Non-indexed float32 buffer: pos(3) + normal(3) + colour(4), 40B stride.
 
@@ -162,7 +210,12 @@ def _pbr(name, materials=None):
         return WALL_PBR
     if name.startswith("floors"):
         return FLOOR_PBR
-    mat = (materials or {}).get(name.split(":", 1)[-1])
+    # The finish name may carry a colour: `sheen_gloss#f2f2ee`, `light_emit#...`
+    # (0329 §4.1 / 0333 §3.5). The colour rides in the name; the MATERIAL
+    # (roughness/metalness) is the part BEFORE the `#`. Strip it, or every such
+    # finish misses the catalog and gets the default sheen -- the laundry now
+    # uses a sheen by default, so every washer was getting it.
+    mat = (materials or {}).get(name.split(":", 1)[-1].split("#", 1)[0])
     if isinstance(mat, dict):
         return (float(mat.get("roughness", FURN_PBR_DEFAULT[0])),
                 float(mat.get("metalness", FURN_PBR_DEFAULT[1])))
@@ -251,10 +304,11 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
     class MeshEntry(QObject):
         """One mesh, as QML sees it."""
 
-        def __init__(self, geom, color, alpha, rough, metal):
+        def __init__(self, geom, color, alpha, rough, metal, emissive=None):
             super().__init__()
             self._g, self._c = geom, color
             self._a, self._r, self._m = alpha, rough, metal
+            self._e = QVector3D(*emissive) if emissive else QVector3D(0.0, 0.0, 0.0)
 
         @pyqtProperty(QQuick3DGeometry, constant=True)
         def geom(self):
@@ -275,6 +329,41 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
         @pyqtProperty(float, constant=True)
         def metalness(self):
             return self._m
+
+        @pyqtProperty(QVector3D, constant=True)
+        def emissive(self):
+            # (0,0,0) for an ordinary mesh (no emission); the lens colour for a
+            # light's `light_emit` mesh, so it reads as lit (0333 §3.4).
+            return self._e
+
+    class LightEntry(QObject):
+        """One scene light, as QML sees it -- already recentred and remapped to
+        the y-up frame (`_light_to_qml`), brightness scaled from lumens. A point
+        light is omnidirectional; a spot aims straight down and carries a cone
+        (0333 §3)."""
+
+        def __init__(self, pos, color, brightness, cone_deg):
+            super().__init__()
+            self._p = QVector3D(*pos)
+            self._c = color
+            self._b = float(brightness)
+            self._cone = float(cone_deg)
+
+        @pyqtProperty(QVector3D, constant=True)
+        def position(self):
+            return self._p
+
+        @pyqtProperty(QColor, constant=True)
+        def color(self):
+            return self._c
+
+        @pyqtProperty(float, constant=True)
+        def brightness(self):
+            return self._b
+
+        @pyqtProperty(float, constant=True)
+        def coneDeg(self):
+            return self._cone
 
     class Cfg(QObject):
         """Scalars QML reads at load."""
@@ -383,7 +472,18 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
                            m.verts - ctr, m.faces, rgba)
         col = QColor.fromRgbF(*m.color[:3])
         alpha = m.color[3] if len(m.color) > 3 else 1.0
-        entries.append(MeshEntry(g, col, float(alpha), rough, metal))
+        entries.append(MeshEntry(g, col, float(alpha), rough, metal,
+                                 _emissive_rgb(m.name)))
+
+    # The plan's own light sources (0333 §3). Split by kind so scene.qml can
+    # build the right node for each with a plain Repeater3D (no per-item type
+    # switch). An empty `model.lights` leaves both lists empty, and the scene
+    # renders exactly as before -- the three directional lights, nothing added.
+    point_lights, spot_lights = [], []
+    for lt in getattr(model, "lights", []):
+        pos, rgb, brightness, kind, cone = _light_to_qml(lt, ctr)
+        (spot_lights if kind == "spot" else point_lights).append(
+            LightEntry(pos, QColor.fromRgbF(*rgb), brightness, cone))
 
     pose = Pose(*plan_to_qml_pose(*cam_pose, ctr)) if cam_pose is not None else Pose()
 
@@ -395,6 +495,8 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
         from PyQt6.QtQuick import QQuickView
         view = QQuickView()
         view.rootContext().setContextProperty("planMeshes", entries)
+        view.rootContext().setContextProperty("planPointLights", point_lights)
+        view.rootContext().setContextProperty("planSpotLights", spot_lights)
         view.rootContext().setContextProperty("cfg", cfg)
         view.rootContext().setContextProperty("pose", pose)
         view.setResizeMode(QQuickView.ResizeMode.SizeRootObjectToView)
@@ -409,6 +511,8 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
         from PyQt6.QtQuickWidgets import QQuickWidget
         w = QQuickWidget(parent)
         w.rootContext().setContextProperty("planMeshes", entries)
+        w.rootContext().setContextProperty("planPointLights", point_lights)
+        w.rootContext().setContextProperty("planSpotLights", spot_lights)
         w.rootContext().setContextProperty("cfg", cfg)
         w.rootContext().setContextProperty("pose", pose)
         w.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
@@ -424,7 +528,7 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
     # only from here, so without this attribute they are collected out from
     # under a live scene and the view goes black (or takes the process with
     # it). The widget owns them for exactly as long as it exists.
-    w._keep = (entries, cfg, pose)
+    w._keep = (entries, point_lights, spot_lights, cfg, pose)
     w._pose = pose
     w._surface = surface                    # what a shot grabs (QQuickWidget or QQuickView)
 

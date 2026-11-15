@@ -79,6 +79,35 @@ Item {
             color: "#d3e4b4"
         }
 
+        // The plan's own light fixtures (0333 §3). One node per entry in the
+        // lists Python fills from `model.lights`; both lists are empty when the
+        // plan has no lights, so the scene is then exactly the three
+        // directional lights above. NONE of these cast shadows to start with
+        // (0333 §3.2): a shadow-casting point light needs a six-face cube map
+        // every frame, the expensive part -- held off until Patrick has walked
+        // a lit plan and can say it is worth the cost.
+        Repeater3D {
+            model: planPointLights
+            PointLight {
+                position: modelData.position
+                color: modelData.color
+                brightness: modelData.brightness
+                castsShadow: false
+            }
+        }
+        Repeater3D {
+            model: planSpotLights
+            SpotLight {
+                position: modelData.position
+                eulerRotation.x: -90          // aim straight DOWN (0333 §3)
+                color: modelData.color
+                brightness: modelData.brightness
+                coneAngle: modelData.coneDeg
+                innerConeAngle: modelData.coneDeg * 0.7
+                castsShadow: false
+            }
+        }
+
         Repeater3D {
             model: planMeshes
             Model {
@@ -91,6 +120,10 @@ Item {
                     vertexColorsEnabled: true
                     roughness: modelData.roughness
                     metalness: modelData.metalness
+                    // A light's lens glows its own colour so it reads as lit
+                    // whatever the scene lighting does (0333 §3.4); every other
+                    // mesh carries (0,0,0) here and is unaffected.
+                    emissiveFactor: modelData.emissive
                     alphaMode: modelData.alpha < 1.0
                                  ? PrincipledMaterial.Blend
                                  : PrincipledMaterial.Opaque
