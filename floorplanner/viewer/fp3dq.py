@@ -44,6 +44,13 @@ import sys
 
 import numpy as np
 
+# PyQt6.QtCore is base PyQt6 (a hard dependency of the app), NOT the OPTIONAL
+# Qt Quick 3D stack the module-level comment on Plan3DQuickWidget guards -- so
+# the walk bridge (0328, Phase 2), which needs only QtCore, lives at module
+# scope where it can be unit-tested, while every QtQuick3D / QtQuickWidgets
+# import stays inside Plan3DQuickWidget.
+from PyQt6.QtCore import QObject, QTimer, pyqtProperty, pyqtSignal, pyqtSlot
+
 try:                                  # imported as part of the package
     from .fp3d import build_model, load_catalog   # (same geometry core)
 except ImportError:                   # ...or run as a loose script
@@ -150,6 +157,115 @@ def _emissive_rgb(name):
         return tuple(int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
     except (ValueError, IndexError):
         return (1.0, 1.0, 1.0)
+
+
+def qml_pose_to_plan(ex, ez, yaw_q, ctr):
+    """The INVERSE of `plan_to_qml_pose` (0328, 3D-camera Phase 2): a QML camera
+    eye/aim read back to the plan the view EDITS.
+
+    `plan_to_qml_pose` is a pure rigid remap -- `ex = px - ctr[0]`,
+    `ez = py + ctr[1]`, `yaw = -rot - 90` -- so it inverts exactly:
+
+        px  = ex + ctr[0]
+        py  = ez - ctr[1]
+        rot = (-yaw - 90) mod 360
+
+    `ey` (the eye's QML height) and pitch are NOT read back: eye height is fixed
+    (Phase 2 walks in the plan XY plane, C1) and pitch stays view-local (the plan
+    camera owns no pitch). As ARITHMETIC this round-trips to the identity; THROUGH
+    a `CameraItem` it is only within the grid snap step, because `itemChange`
+    snaps `setPos` to the 1-inch grid. Returns `(px, py, rot_deg)`."""
+    px = float(ex) + float(ctr[0])
+    py = float(ez) - float(ctr[1])
+    rot = (-float(yaw_q) - 90.0) % 360.0
+    return px, py, rot
+
+
+class WalkBridge(QObject):
+    """0328 (3D-camera Phase 2, Option B): the QML walk input, handed to Python.
+
+    The ruling adopted Option B -- Python integrates the key/mouse deltas and
+    `fpCamera` stays bound to `pose`; moving in the plan XY plane keeps the eye
+    at 65in BY CONSTRUCTION (C1). QML calls `step(forward, strafe, dyaw, dpitch)`
+    each input tick and `capture()` / `release()` on the capture gesture.
+
+    C2 -- THE WRITE-BACK LEAVES QML FIRST. `step` only ACCUMULATES the deltas and
+    arms a single `QTimer.singleShot(0)`; the CameraItem is moved (and the
+    view-local pitch applied to `pose`) in `_flush`, on the next event-loop turn,
+    OUTSIDE the QML signal handler. A synchronous move there would re-emit
+    `pose.changed` and re-evaluate the QML camera bindings from inside the QML
+    call that triggered it -- the 0xC0000409 re-entrancy shape. The pending
+    deltas coalesce a burst of ticks into one move.
+
+    `forward`/`strafe` are plan inches, `dyaw`/`dpitch` degrees. Yaw writes back
+    to the plan camera (heading); pitch is VIEW-LOCAL (the plan camera has no
+    pitch field) and only touches `pose`. The callbacks are wired by the widget
+    (`set_walk_callbacks` / `set_view_pitch`)."""
+
+    capturedChanged = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+        self._walk_cb = None          # (forward, strafe, dyaw) -> move CameraItem
+        self._capture_cb = None
+        self._release_cb = None
+        self._pitch_cb = None         # (pitch_deg) -> apply to pose (view-local)
+        self._pitch = 0.0
+        self._captured = False
+        self._pending = None          # [forward, strafe, dyaw, dpitch]
+        self._scheduled = False
+
+    @pyqtProperty(bool, notify=capturedChanged)
+    def captured(self):
+        return self._captured
+
+    @pyqtSlot(float, float, float, float)
+    def step(self, forward, strafe, dyaw, dpitch):
+        if self._pending is None:
+            self._pending = [0.0, 0.0, 0.0, 0.0]
+        self._pending[0] += float(forward)
+        self._pending[1] += float(strafe)
+        self._pending[2] += float(dyaw)
+        self._pending[3] += float(dpitch)
+        if not self._scheduled:
+            self._scheduled = True
+            QTimer.singleShot(0, self._flush)
+
+    def _flush(self):
+        self._scheduled = False
+        pend, self._pending = self._pending, None
+        if pend is None:
+            return
+        forward, strafe, dyaw, dpitch = pend
+        if dpitch and self._pitch_cb is not None:
+            self._pitch = max(-89.0, min(89.0, self._pitch + dpitch))
+            try:
+                self._pitch_cb(self._pitch)
+            except RuntimeError:
+                self._pitch_cb = None
+        if (forward or strafe or dyaw) and self._walk_cb is not None:
+            try:
+                self._walk_cb(forward, strafe, dyaw)
+            except RuntimeError:
+                self._walk_cb = None
+
+    @pyqtSlot()
+    def capture(self):
+        if not self._captured:
+            self._captured = True
+            self.capturedChanged.emit()
+        if self._capture_cb is not None:
+            self._capture_cb()
+
+    @pyqtSlot()
+    def release(self):
+        was = self._captured
+        if was:
+            self._captured = False
+            self.capturedChanged.emit()
+        self._pending = None          # drop the half-tick of a pending step
+        if was and self._release_cb is not None:
+            self._release_cb()
 
 
 def _interleaved(verts, faces, rgba):
@@ -289,7 +405,7 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
 
     Raises `ImportError` if Qt Quick 3D is unavailable, and `RuntimeError` if
     the QML document fails to load (the caller reports either)."""
-    from PyQt6.QtCore import QByteArray, QObject, QUrl, pyqtProperty, pyqtSignal
+    from PyQt6.QtCore import QByteArray, QUrl
     from PyQt6.QtGui import QColor, QVector3D
     from PyQt6.QtQuick3D import QQuick3DGeometry
     from PyQt6.QtWidgets import QVBoxLayout, QWidget
@@ -421,6 +537,14 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
             # (see Pose); the MODE does not.
             return self._fp
 
+        @pyqtProperty(bool, constant=True)
+        def walk(self):
+            # 0328 (Phase 2): this first-person view can be WALKED -- captured
+            # for WASD + mouse-look, each step written back to the plan camera.
+            # Tied to first-person mode; the orbit view never walks. The LIVE
+            # capture state is `walkBridge.captured`, which the QML binds to.
+            return self._fp
+
     class Pose(QObject):
         """The first-person camera pose in QML coordinates, pushed LIVE as the
         plan camera moves -- unlike Cfg's load-once scalars, every field has a
@@ -486,6 +610,7 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
             LightEntry(pos, QColor.fromRgbF(*rgb), brightness, cone))
 
     pose = Pose(*plan_to_qml_pose(*cam_pose, ctr)) if cam_pose is not None else Pose()
+    walk_bridge = WalkBridge()
 
     cfg = Cfg(span * 1.25, ao, shadows, model_status(model), yaw, pitch, zoom, fov,
               first_person=first_person)
@@ -499,6 +624,7 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
         view.rootContext().setContextProperty("planSpotLights", spot_lights)
         view.rootContext().setContextProperty("cfg", cfg)
         view.rootContext().setContextProperty("pose", pose)
+        view.rootContext().setContextProperty("walkBridge", walk_bridge)
         view.setResizeMode(QQuickView.ResizeMode.SizeRootObjectToView)
         view.setSource(url)
         holder = QWidget.createWindowContainer(view, parent)
@@ -515,6 +641,7 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
         w.rootContext().setContextProperty("planSpotLights", spot_lights)
         w.rootContext().setContextProperty("cfg", cfg)
         w.rootContext().setContextProperty("pose", pose)
+        w.rootContext().setContextProperty("walkBridge", walk_bridge)
         w.setResizeMode(QQuickWidget.ResizeMode.SizeRootObjectToView)
         w.setSource(url)
         surface = w
@@ -528,22 +655,49 @@ def Plan3DQuickWidget(model, ao=True, shadows=True, container=False,
     # only from here, so without this attribute they are collected out from
     # under a live scene and the view goes black (or takes the process with
     # it). The widget owns them for exactly as long as it exists.
-    w._keep = (entries, point_lights, spot_lights, cfg, pose)
+    w._keep = (entries, point_lights, spot_lights, cfg, pose, walk_bridge)
     w._pose = pose
+    w.walk_bridge = walk_bridge
     w._surface = surface                    # what a shot grabs (QQuickWidget or QQuickView)
 
-    def set_camera_pose(px, py, wz, rot_deg, pitch_deg=0.0):
+    def set_camera_pose(px, py, wz, rot_deg, pitch_deg=None):
         """Push a new plan pose into the live first-person camera -- a handful
         of property writes, no mesh rebuild. `(px, py)` plan inches, `wz` the
         eye's world height, `rot_deg` the plan aim (0 = +x). Safe (no-op) on an
         orbit-mode widget, and after the window is torn down (a deferred push
-        can land late, when the Pose is already gone)."""
+        can land late, when the Pose is already gone).
+
+        0328: `pitch_deg=None` PRESERVES the current view-local pitch -- the
+        plan camera owns no pitch (Phase 2 keeps it view-local), so a plan-side
+        feed (Phase 1's follow, or a walk's write-back echo) must not reset the
+        angle the user is looking up/down at."""
         try:
-            pose._set(*plan_to_qml_pose(px, py, wz, rot_deg, ctr, pitch_deg))
+            keep = pose.pitch if pitch_deg is None else pitch_deg
+            pose._set(*plan_to_qml_pose(px, py, wz, rot_deg, ctr, keep))
         except RuntimeError:
             pass
 
+    def set_view_pitch(pitch_deg):
+        """0328 (Phase 2): set the VIEW-LOCAL pitch on `pose` alone, leaving eye
+        and yaw. The walk's mouse-look writes pitch here (never to the plan
+        camera). Safe (no-op) after teardown."""
+        try:
+            pose._set(pose.eyeX, pose.eyeY, pose.eyeZ, pose.yaw, float(pitch_deg))
+        except RuntimeError:
+            pass
+
+    def set_walk_callbacks(step_cb=None, capture_cb=None, release_cb=None):
+        """0328 (Phase 2): wire the walk bridge to the app. `step_cb(forward,
+        strafe, dyaw)` moves the plan CameraItem (called DEFERRED, off the QML
+        stack -- C2); `capture_cb`/`release_cb` take and drop the undo hold."""
+        walk_bridge._walk_cb = step_cb
+        walk_bridge._capture_cb = capture_cb
+        walk_bridge._release_cb = release_cb
+        walk_bridge._pitch_cb = set_view_pitch
+
     w.set_camera_pose = set_camera_pose
+    w.set_view_pitch = set_view_pitch
+    w.set_walk_callbacks = set_walk_callbacks
     return w
 
 
