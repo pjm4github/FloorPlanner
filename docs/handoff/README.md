@@ -466,5 +466,6 @@ this table is not a second copy of it.
 | [`0324-report.md`](./0324-report.md) | report: Code's full gate of the furnishings lane (STAIRS, 0323) is GREEN — the lane's first real run under Qt/pytest; committed by path on branch `furnishings-stairs`, AMBER |
 | [`0325-ruling.md`](./0325-ruling.md) | ruling: vehicles are LOFTED FROM A SIDE ELEVATION (car, SUV) — un-gated; and two things about the tree that need Code's eyes before anything else |
 | [`0326-report.md`](./0326-report.md) | report: the furnishings lane (STAIRS 0323 + VEHICLES 0325) gated and committed as TWO commits by path on branch `furnishings-lane`; the 0325 §0 tree questions answered; both AMBER, not merged |
+| [`0327-report.md`](./0327-report.md) | proposal: 3D-camera PHASE 2 — the view becomes a controller (walk the room with WASD + mouse-look, write the move back to the plan camera, two-way). FOR THE REVIEWER TO RULE ON. |
 
 <!-- PAIRS:END -->
