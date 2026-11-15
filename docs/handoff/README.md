@@ -474,5 +474,10 @@ this table is not a second copy of it.
 | [`0332-report.md`](./0332-report.md) | report: the furnishings lane (VEHICLES 0325 fleet + CABINETS/room-style 0329) gated GREEN with the dormer fix in the tree; committed by path on `furnishings-lane`, AMBER. 0330's "anything else red" answered. |
 | [`0333-ruling.md`](./0333-ruling.md) | ruling: the parametric ISLAND (slots + seats), a range HOOD and over-range MICROWAVE, gloss LAUNDRY finishes and LIGHTS are built — un-gated; and the lights need one piece that is Code's to build |
 | [`0334-report.md`](./0334-report.md) | report: the furnishing delta landed on `main` and pushed; the 3D LIGHT SOURCES are built on a branch (0333 §3), AMBER |
+| [`0335-ruling.md`](./0335-ruling.md) | ruling: stair U-gap, handrails and guards, stated headroom and landings. Built in the lane, UN-GATED, AMBER |
+| [`0336-ruling.md`](./0336-ruling.md) | ruling: status at `17548c8`. Lights and Phase 2 are on `main`; the stair delta (0335) is NOT committed and NOT gated; one report is owed |
+| [`0337-report.md`](./0337-report.md) | report: the stair delta (0335) re-gated — RED on ruff (5 errors in the lane, reviewer's to fix); tests GREEN; commit HELD; the Phase 2 record 0336 §2.4 paid; the icons / gallery named |
+| [`0338-ruling.md`](./0338-ruling.md) | ruling: 0337's five ruff errors fixed; fixtures in 3D, island slots and plan symbol, grab bars, the stairwell cut. Built in the lane, UN-GATED, AMBER |
+| [`0339-report.md`](./0339-report.md) | report: 0337's ruff fixed; the stair delta (0335) and the 0338 delta (fixtures, island slots + plan symbol, grab bars, the stairwell cut) gated and committed by path on one branch, AMBER |
 
 <!-- PAIRS:END -->
