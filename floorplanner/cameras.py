@@ -452,6 +452,34 @@ class CameraItem(QGraphicsItem):
         z = floor_elevation(self.floor) + CAMERA_EYE_H_IN
         return (self.pos().x(), self.pos().y(), z, float(self.rotation()))
 
+    def apply_walk_step(self, forward: float, strafe: float, dyaw: float):
+        """0328 (3D-camera Phase 2, Option B): move this camera by one WALK step
+        the bound 3D view fed, and WRITE IT BACK -- the view is an editor of the
+        one plan camera (§0 invariant). The step is camera-relative and
+        HORIZONTAL only: `forward` runs along the heading, `strafe` to its right,
+        both plan inches; `dyaw` turns the heading (degrees). The eye height is
+        NOT touched -- `pose_3d` keeps it at `floor_elevation + CAMERA_EYE_H_IN`
+        (65in) regardless, which is C1: moving only in plan XY leaves the eye at
+        standing height by construction. The written position is CLAMPED to
+        `canvas_rect()` (no wander to infinity; no wall collision this phase).
+
+        Called DEFERRED, off the QML input handler (C2: `WalkBridge._flush` on a
+        singleShot), so the `setPos`/`setRotation` here -- and the pose feed they
+        schedule through `itemChange` -> `_emit_pose` -- never run re-entrantly
+        inside a QML emit. `setPos` grid-snaps the position (`itemChange`), so the
+        plan camera lands on the 1-inch grid as any dragged camera does."""
+        ang = math.radians(self.rotation())
+        hx, hy = math.cos(ang), math.sin(ang)        # heading (+x at rot 0, y-down)
+        rx, ry = -math.sin(ang), math.cos(ang)       # the heading's right (y-down)
+        nx = self.pos().x() + forward * hx + strafe * rx
+        ny = self.pos().y() + forward * hy + strafe * ry
+        rect = canvas_rect()
+        nx = min(max(nx, rect.left()), rect.right())
+        ny = min(max(ny, rect.top()), rect.bottom())
+        if dyaw:
+            self.setRotation((self.rotation() + float(dyaw)) % 360.0)
+        self.setPos(QPointF(nx, ny))
+
     def _emit_pose(self):
         """Schedule a push of the current pose to a bound 3D view, if one is
         open. DEFERRED, and that is the whole point: `_emit_pose` is called from

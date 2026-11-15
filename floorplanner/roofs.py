@@ -1254,6 +1254,27 @@ def roof_clips_held(scene) -> bool:
     return scene is not None and bool(scene.property(_CLIP_HOLD))
 
 
+_CAMERA_WALK_HOLD = "camera_walk_hold"
+
+
+def hold_camera_walk(scene, on: bool):
+    """0328 (3D-camera Phase 2): while a first-person 3D view is CAPTURED and the
+    user walks it, the plan `CameraItem` is moved every input tick (the write-back
+    that makes the view an editor of the one plan camera). Each move would
+    otherwise settle as its own undo step; this hold coalesces a whole walk into
+    ONE snapshot, taken when the walk is RELEASED -- `_settle` waits for the hold
+    to drop, exactly as it waits on a roof gesture (`roof_clips_held`). Taken on
+    capture; dropped on release, focus-out, close and reload (C4) so it can never
+    stall the undo record. Mirrors `hold_rooms`/`rooms_held`."""
+    if scene is None:
+        return
+    scene.setProperty(_CAMERA_WALK_HOLD, bool(on))
+
+
+def camera_walk_held(scene) -> bool:
+    return scene is not None and bool(scene.property(_CAMERA_WALK_HOLD))
+
+
 def sync_roof_clips(scene, floor=None, exclude=None):
     """R4d (0164-ruling.md): recompute every roof's intersection clip on
     `floor` (every floor when None) from the roofs as they are now, and

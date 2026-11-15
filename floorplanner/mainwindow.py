@@ -18,7 +18,8 @@ from floorplanner.catalog import *  # noqa: F401
 from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
 from floorplanner.roofs import (
-    RoofEndMarkerItem, RoofItem, eaves_spans_per_side, hold_rooms, roof_clips_held, rooms_held,
+    RoofEndMarkerItem, RoofItem, camera_walk_held, eaves_spans_per_side, hold_camera_walk,
+    hold_rooms, roof_clips_held, rooms_held,
 )
 from floorplanner.annotations import (  # 0263: annotations, measurements, callouts; 0270: leaders
     DatumItem, DimensionItem, LeaderItem, TextAnnotationItem, callout_colour,
@@ -46,6 +47,34 @@ from floorplanner.csvio import CsvIOMixin
 from floorplanner.imageio import ImageIOMixin
 from floorplanner.levels import LevelsMixin
 from floorplanner.planio import PlanIOMixin
+
+
+class _CameraWalkEventFilter(QObject):
+    """0328 (3D-camera Phase 2): the captured-walk key/focus guard on a camera
+    3D dialog.
+
+    C3 -- Esc must RELEASE the walk, not close the dialog. The Phase 1 window is
+    a `QDialog`, which rejects (closes) on Esc. While a walk is captured this
+    filter catches Esc, releases the walk, and CONSUMES the event so the dialog
+    never sees it and stays open. C4 -- a walk left captured when the window
+    loses focus would hold the undo record open; a deactivation / focus-out
+    releases it (not consumed, so the deactivation itself proceeds)."""
+
+    def __init__(self, win, dlg, body):
+        super().__init__(dlg)                    # parented to the dialog: lives with it
+        self._win, self._dlg, self._body = win, dlg, body
+
+    def eventFilter(self, obj, ev):
+        et = ev.type()
+        captured = id(self._dlg) in self._win._camera_walk_captured
+        if (captured and et == QEvent.Type.KeyPress
+                and ev.key() == Qt.Key.Key_Escape):
+            self._body.walk_bridge.release()
+            return True                          # consume: do NOT let QDialog reject (C3)
+        if captured and et in (QEvent.Type.WindowDeactivate,
+                               QEvent.Type.FocusOut):
+            self._body.walk_bridge.release()     # C4: never leave the hold stuck
+        return False
 
 
 class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
@@ -176,6 +205,7 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         self._provenance = None      # converted; provenance rides to P2.2's save
         self._doc_settings = {}      # document settings the walk does not model
         self._camera_3d_views = {}   # id(CameraItem) -> its live 3D view dialog
+        self._camera_walk_captured = set()   # 0328: id(dialog) of any CAPTURED walk
         self._dirty_timer = QTimer(self)
         self._dirty_timer.setSingleShot(True)
         self._dirty_timer.setInterval(180)
@@ -988,11 +1018,41 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         # move/turn (`CameraItem._emit_pose` -> this sink). `body` keeps the
         # Pose/meshes alive; the lambda holds `body`, the dialog holds `body`.
         camera._pose_sink = lambda cam, w=body: w.set_camera_pose(*cam.pose_3d())
+        # 0328 (Phase 2): the VIEW drives too. A captured walk (WASD + mouse-look)
+        # moves the plan CameraItem -- the write-back -- which then re-feeds this
+        # view through the sink above (the plan camera stays the one model). The
+        # bridge applies the step DEFERRED, off the QML input handler (C2); the
+        # capture/release take and drop the one-per-walk undo hold (C4).
+        if hasattr(body, "set_walk_callbacks"):
+            def _walk_step(fwd, strafe, dyaw, cam=camera):
+                cam.apply_walk_step(fwd, strafe, dyaw)
+
+            def _walk_capture(d=dlg):
+                self._camera_walk_captured.add(id(d))
+                hold_camera_walk(self.scene, True)
+
+            def _walk_release(d=dlg):
+                self._release_camera_walk(d)
+
+            body.set_walk_callbacks(step_cb=_walk_step, capture_cb=_walk_capture,
+                                    release_cb=_walk_release)
+            filt = _CameraWalkEventFilter(self, dlg, body)   # parented to dlg; lives with it
+            dlg.installEventFilter(filt)                     # Esc / focus-out (C3 / C4)
         reg[id(camera)] = dlg
-        dlg.finished.connect(lambda _code, c=camera: self._on_camera_3d_closed(c))
+        dlg.finished.connect(
+            lambda _code, c=camera, d=dlg: self._on_camera_3d_closed(c, d))
         dlg.show()
         dlg.raise_()
         return dlg
+
+    def _release_camera_walk(self, dlg):
+        """0328 (Phase 2, C4): drop a dialog's walk capture and, once no walk is
+        left captured, the scene-wide undo hold. The ONE place release, focus-out,
+        close and reload all funnel through, so the hold can never be left stuck
+        and stall the undo record."""
+        self._camera_walk_captured.discard(id(dlg))
+        if not self._camera_walk_captured:
+            hold_camera_walk(self.scene, False)
 
     def close_camera_3d_view(self, camera):
         """Close the live 3D view bound to `camera`, if any (the camera's switch
@@ -1000,12 +1060,15 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         dlg = self._camera_3d_views.pop(id(camera), None)
         camera._pose_sink = None
         if dlg is not None:
+            self._release_camera_walk(dlg)       # C4: drop any held walk first
             dlg.close()
 
-    def _on_camera_3d_closed(self, camera):
+    def _on_camera_3d_closed(self, camera, dlg=None):
         """The window was closed (its X, or `close_camera_3d_view`): unbind and
         drop the camera's 3D switch so the glyph's cube badge clears. Guarded:
         the camera may already be gone (a document reload deleted it)."""
+        if dlg is not None:
+            self._release_camera_walk(dlg)       # C4: a window closed mid-walk
         self._camera_3d_views.pop(id(camera), None)
         try:
             camera._pose_sink = None
@@ -1027,6 +1090,10 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
             except RuntimeError:
                 pass
         self._camera_3d_views.clear()
+        # 0328 (Phase 2, C4): a reload closes every view here -- make sure no
+        # captured walk is left holding the undo record open.
+        self._camera_walk_captured.clear()
+        hold_camera_walk(self.scene, False)
 
     def new_concept_room(self, at=None):
         """Rooms ▸ New concept room… (and the Room tool's blank-canvas menu):
@@ -1923,6 +1990,14 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         document walk to each frame and filing a mid-gesture snapshot as
         an undo step; it now waits, and fires once the gesture releases."""
         if roof_clips_held(self.scene):
+            self._dirty_timer.start()
+            return
+        # 0328 (3D-camera Phase 2): a captured first-person WALK writes the plan
+        # camera every tick; the whole walk is ONE undo step, taken when it
+        # releases. Wait for the hold to drop, exactly as for a roof gesture.
+        # The hold can never stall the record -- it is dropped on release,
+        # focus-out, close and reload (C4).
+        if camera_walk_held(self.scene):
             self._dirty_timer.start()
             return
         # 0279: a canvas gesture in progress (a button held on the plan) is

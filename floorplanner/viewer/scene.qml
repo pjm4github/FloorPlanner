@@ -4,6 +4,73 @@ import QtQuick3D.Helpers
 
 Item {
     id: root
+    focus: true
+
+    // 0328 (3D-camera PHASE 2): the view becomes a CONTROLLER. The machinery
+    // below is inert unless this is a first-person view that can walk
+    // (cfg.walk) and the user has CAPTURED it (walkBridge.captured) by clicking
+    // the view; Esc releases. Input is Option B: QML hands Python the key/mouse
+    // DELTAS (walkBridge.step), Python integrates them and moves the plan
+    // camera, and fpCamera stays bound to `pose` (which the write-back re-feeds).
+    // Moving only in the plane keeps the eye at 65in by construction (C1).
+    property bool walking: cfg.walk && walkBridge.captured
+    property real stepIn: 3.0              // plan inches per tick, walking
+    property real runIn: 8.0               // Shift = run
+    property real yawStep: 2.5             // degrees per tick, Q/E turn
+    property real lookSens: 0.15           // degrees per pixel, mouse-look
+    property bool keyW: false
+    property bool keyA: false
+    property bool keyS: false
+    property bool keyD: false
+    property bool keyQ: false
+    property bool keyE: false
+    property bool keyShift: false
+
+    onWalkingChanged: if (!walking) {       // drop every held key on release
+        keyW = false; keyA = false; keyS = false; keyD = false;
+        keyQ = false; keyE = false; keyShift = false;
+    }
+
+    Keys.onPressed: (event) => {
+        if (event.key === Qt.Key_Escape && walkBridge.captured) {
+            walkBridge.release(); event.accepted = true; return;
+        }
+        if (!root.walking) return;
+        switch (event.key) {
+        case Qt.Key_W: root.keyW = true; event.accepted = true; break;
+        case Qt.Key_A: root.keyA = true; event.accepted = true; break;
+        case Qt.Key_S: root.keyS = true; event.accepted = true; break;
+        case Qt.Key_D: root.keyD = true; event.accepted = true; break;
+        case Qt.Key_Q: root.keyQ = true; event.accepted = true; break;
+        case Qt.Key_E: root.keyE = true; event.accepted = true; break;
+        case Qt.Key_Shift: root.keyShift = true; event.accepted = true; break;
+        }
+    }
+    Keys.onReleased: (event) => {
+        switch (event.key) {
+        case Qt.Key_W: root.keyW = false; event.accepted = true; break;
+        case Qt.Key_A: root.keyA = false; event.accepted = true; break;
+        case Qt.Key_S: root.keyS = false; event.accepted = true; break;
+        case Qt.Key_D: root.keyD = false; event.accepted = true; break;
+        case Qt.Key_Q: root.keyQ = false; event.accepted = true; break;
+        case Qt.Key_E: root.keyE = false; event.accepted = true; break;
+        case Qt.Key_Shift: root.keyShift = false; event.accepted = true; break;
+        }
+    }
+
+    // One bridge.step per tick while captured: WASD translate (camera-relative,
+    // horizontal), Q/E yaw, Shift = run. The deltas integrate in Python.
+    Timer {
+        interval: 16; repeat: true; running: root.walking
+        onTriggered: {
+            var s = root.keyShift ? root.runIn : root.stepIn;
+            var fwd = (root.keyW ? s : 0) - (root.keyS ? s : 0);
+            var strafe = (root.keyD ? s : 0) - (root.keyA ? s : 0);
+            var dyaw = (root.keyE ? root.yawStep : 0) - (root.keyQ ? root.yawStep : 0);
+            if (fwd !== 0 || strafe !== 0 || dyaw !== 0)
+                walkBridge.step(fwd, strafe, dyaw, 0);
+        }
+    }
 
     View3D {
         id: view
@@ -106,10 +173,54 @@ Item {
         enabled: !cfg.firstPerson          // the plan camera drives the first-person view
     }
 
+    // 0328 (Phase 2): click to CAPTURE the walk (grab/hide the cursor, mouse-look
+    // live); Esc releases (Keys.onPressed above). Enabled only on a walkable
+    // first-person view, so the orbit view's own controller is untouched. While
+    // captured, pointer motion is a mouse-look delta: yaw (writes back to the
+    // plan camera) and view-local pitch.
+    MouseArea {
+        id: walkMouse
+        anchors.fill: parent
+        enabled: cfg.walk
+        hoverEnabled: root.walking
+        acceptedButtons: Qt.LeftButton
+        cursorShape: root.walking ? Qt.BlankCursor : Qt.ArrowCursor
+        property real lastX: 0
+        property real lastY: 0
+        property bool have: false
+        onClicked: (mouse) => {
+            if (!walkBridge.captured) {
+                have = false;
+                root.forceActiveFocus();       // WASD needs the keyboard focus
+                walkBridge.capture();
+            }
+        }
+        onPositionChanged: (mouse) => {
+            if (!root.walking) { have = false; return; }
+            if (have) {
+                var dx = mouse.x - lastX;
+                var dy = mouse.y - lastY;
+                if (dx !== 0 || dy !== 0)      // dx -> yaw, dy -> view-local pitch
+                    walkBridge.step(0, 0, dx * root.lookSens, -dy * root.lookSens);
+            }
+            lastX = mouse.x; lastY = mouse.y; have = true;
+        }
+    }
+
     Text {
         anchors { left: parent.left; bottom: parent.bottom; margins: 6 }
         color: "#98a0ac"
         font.pixelSize: 12
         text: cfg.status
+    }
+
+    // the walk hint: how to capture / release, only on a walkable view
+    Text {
+        visible: cfg.walk
+        anchors { right: parent.right; bottom: parent.bottom; margins: 6 }
+        color: "#98a0ac"
+        font.pixelSize: 12
+        text: root.walking ? "WASD move · Q/E turn · Shift run · mouse look · Esc release"
+                           : "click to walk"
     }
 }
