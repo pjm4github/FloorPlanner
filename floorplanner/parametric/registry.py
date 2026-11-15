@@ -36,6 +36,17 @@ class ParametricKind:
         """A QWidget with `set_data(values, derived, context)`, or None."""
         return None
 
+    def to_state(self, values):
+        """What is WRITTEN to the plan file for an accepted parameter set.
+        The default writes everything; a kind whose parameters mostly sit at
+        their defaults overrides this to write only what differs."""
+        return dict(values)
+
+    def footprint(self, state):
+        """(width, depth) of the plan footprint for a stored state, or None
+        when the kind keeps its catalog footprint."""
+        return None
+
 
 def register(definition):
     _KINDS[definition.kind] = definition

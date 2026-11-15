@@ -159,6 +159,46 @@
     "roughness": 0.25,
     "metalness": 0.1
   },
+  "machine_red": {
+    "colour": [
+      0.6,
+      0.09,
+      0.07,
+      1.0
+    ],
+    "roughness": 0.4,
+    "metalness": 0.3
+  },
+  "machine_green": {
+    "colour": [
+      0.12,
+      0.34,
+      0.16,
+      1.0
+    ],
+    "roughness": 0.4,
+    "metalness": 0.3
+  },
+  "machine_yellow": {
+    "colour": [
+      0.86,
+      0.66,
+      0.08,
+      1.0
+    ],
+    "roughness": 0.4,
+    "metalness": 0.3
+  },
+  "gelcoat": {
+    "colour": [
+      0.92,
+      0.93,
+      0.94,
+      1.0
+    ],
+    "roughness": 0.22,
+    "metalness": 0.05
+  },
   "unknown": {
     "colour": [
       0.85,
@@ -167,6 +207,306 @@
       1.0
     ],
     "roughness": 0.6,
+    "metalness": 0.0
+  },
+  "cab_white": {
+    "colour": [
+      0.93,
+      0.93,
+      0.91,
+      1.0
+    ],
+    "roughness": 0.45,
+    "metalness": 0.0
+  },
+  "cab_maple": {
+    "colour": [
+      0.8,
+      0.64,
+      0.42,
+      1.0
+    ],
+    "roughness": 0.55,
+    "metalness": 0.0
+  },
+  "cab_cherry": {
+    "colour": [
+      0.48,
+      0.21,
+      0.13,
+      1.0
+    ],
+    "roughness": 0.5,
+    "metalness": 0.0
+  },
+  "cab_oak": {
+    "colour": [
+      0.66,
+      0.49,
+      0.29,
+      1.0
+    ],
+    "roughness": 0.6,
+    "metalness": 0.0
+  },
+  "cab_walnut": {
+    "colour": [
+      0.33,
+      0.22,
+      0.15,
+      1.0
+    ],
+    "roughness": 0.55,
+    "metalness": 0.0
+  },
+  "cab_espresso": {
+    "colour": [
+      0.17,
+      0.12,
+      0.1,
+      1.0
+    ],
+    "roughness": 0.5,
+    "metalness": 0.0
+  },
+  "cab_grey": {
+    "colour": [
+      0.55,
+      0.57,
+      0.58,
+      1.0
+    ],
+    "roughness": 0.5,
+    "metalness": 0.0
+  },
+  "cab_navy": {
+    "colour": [
+      0.13,
+      0.19,
+      0.32,
+      1.0
+    ],
+    "roughness": 0.5,
+    "metalness": 0.0
+  },
+  "cab_sage": {
+    "colour": [
+      0.54,
+      0.6,
+      0.49,
+      1.0
+    ],
+    "roughness": 0.5,
+    "metalness": 0.0
+  },
+  "cabinet_kick": {
+    "colour": [
+      0.1,
+      0.1,
+      0.1,
+      1.0
+    ],
+    "roughness": 0.8,
+    "metalness": 0.0
+  },
+  "cabinet_glass": {
+    "colour": [
+      0.7,
+      0.8,
+      0.84,
+      1.0
+    ],
+    "roughness": 0.08,
+    "metalness": 0.2
+  },
+  "ct_marble": {
+    "colour": [
+      0.91,
+      0.91,
+      0.89,
+      1.0
+    ],
+    "roughness": 0.2,
+    "metalness": 0.0
+  },
+  "ct_tile": {
+    "colour": [
+      0.8,
+      0.77,
+      0.7,
+      1.0
+    ],
+    "roughness": 0.35,
+    "metalness": 0.0
+  },
+  "ct_quartz": {
+    "colour": [
+      0.84,
+      0.84,
+      0.82,
+      1.0
+    ],
+    "roughness": 0.25,
+    "metalness": 0.0
+  },
+  "ct_granite": {
+    "colour": [
+      0.33,
+      0.31,
+      0.3,
+      1.0
+    ],
+    "roughness": 0.3,
+    "metalness": 0.0
+  },
+  "ct_soapstone": {
+    "colour": [
+      0.22,
+      0.25,
+      0.25,
+      1.0
+    ],
+    "roughness": 0.6,
+    "metalness": 0.0
+  },
+  "ct_laminate": {
+    "colour": [
+      0.72,
+      0.68,
+      0.6,
+      1.0
+    ],
+    "roughness": 0.55,
+    "metalness": 0.0
+  },
+  "ct_butcher_block": {
+    "colour": [
+      0.7,
+      0.5,
+      0.29,
+      1.0
+    ],
+    "roughness": 0.6,
+    "metalness": 0.0
+  },
+  "ct_concrete": {
+    "colour": [
+      0.56,
+      0.56,
+      0.54,
+      1.0
+    ],
+    "roughness": 0.8,
+    "metalness": 0.0
+  },
+  "ct_stainless": {
+    "colour": [
+      0.7,
+      0.72,
+      0.74,
+      1.0
+    ],
+    "roughness": 0.3,
+    "metalness": 0.9
+  },
+  "hw_brushed_nickel": {
+    "colour": [
+      0.68,
+      0.67,
+      0.64,
+      1.0
+    ],
+    "roughness": 0.4,
+    "metalness": 0.9
+  },
+  "hw_chrome": {
+    "colour": [
+      0.82,
+      0.83,
+      0.85,
+      1.0
+    ],
+    "roughness": 0.12,
+    "metalness": 1.0
+  },
+  "hw_matte_black": {
+    "colour": [
+      0.07,
+      0.07,
+      0.08,
+      1.0
+    ],
+    "roughness": 0.75,
+    "metalness": 0.3
+  },
+  "hw_brass": {
+    "colour": [
+      0.76,
+      0.6,
+      0.26,
+      1.0
+    ],
+    "roughness": 0.3,
+    "metalness": 0.9
+  },
+  "sheen_matte": {
+    "colour": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "roughness": 0.9,
+    "metalness": 0.0
+  },
+  "sheen_gloss": {
+    "colour": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "roughness": 0.12,
+    "metalness": 0.1
+  },
+  "sheen_gel_coat": {
+    "colour": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "roughness": 0.22,
+    "metalness": 0.05
+  },
+  "stool_seat": {
+    "colour": [
+      0.2,
+      0.15,
+      0.12,
+      1.0
+    ],
+    "roughness": 0.7,
+    "metalness": 0.0
+  },
+  "light_fixture": {
+    "colour": [
+      0.9,
+      0.9,
+      0.88,
+      1.0
+    ],
+    "roughness": 0.45,
+    "metalness": 0.2
+  },
+  "light_emit": {
+    "colour": [
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "roughness": 0.3,
     "metalness": 0.0
   }
 }

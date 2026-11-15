@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 68 42" width="68" height="42">
+<circle cx="13.5" cy="29.0" r="13.0" fill="#111827" stroke="#374151" stroke-width="0.4" data-part="tyre-front" data-material="rubber" data-half="0.9"/>
+<circle cx="54.5" cy="29.0" r="13.0" fill="#111827" stroke="#374151" stroke-width="0.4" data-part="tyre-rear" data-material="rubber" data-half="0.9"/>
+<circle cx="13.5" cy="29.0" r="11.3" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="rim-front" data-material="metal" data-half="1.0"/>
+<circle cx="54.5" cy="29.0" r="11.3" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="rim-rear" data-material="metal" data-half="1.0"/>
+<polygon points="12.60,29.50 14.40,29.50 20.20,11.00 18.40,11.00" fill="#3b82f6" stroke="#374151" stroke-width="0.4" data-part="fork" data-material="auto_paint" data-half="2.4" data-width="0.9"/>
+<polygon points="18.20,14.00 18.20,1.00 20.20,1.00 20.20,14.00" fill="#3b82f6" stroke="#374151" stroke-width="0.4" data-part="head-tube" data-material="auto_paint" data-half="0.9"/>
+<polygon points="19.50,11.80 19.50,10.20 42.50,10.20 42.50,11.80" fill="#3b82f6" stroke="#374151" stroke-width="0.4" data-part="top-tube" data-material="auto_paint" data-half="0.8"/>
+<polygon points="18.40,14.00 20.40,13.00 34.60,30.40 32.60,31.40" fill="#3b82f6" stroke="#374151" stroke-width="0.4" data-part="down-tube" data-material="auto_paint" data-half="0.8"/>
+<polygon points="41.00,7.50 43.00,7.50 35.00,31.50 33.00,31.50" fill="#3b82f6" stroke="#374151" stroke-width="0.4" data-part="seat-tube" data-material="auto_paint" data-half="0.8"/>
+<polygon points="33.00,32.00 33.00,30.20 54.50,28.00 54.50,29.80" fill="#3b82f6" stroke="#374151" stroke-width="0.4" data-part="chain-stay" data-material="auto_paint" data-half="2.6" data-width="0.8"/>
+<polygon points="41.60,11.60 43.20,10.80 55.20,28.40 53.60,29.20" fill="#3b82f6" stroke="#374151" stroke-width="0.4" data-part="seat-stay" data-material="auto_paint" data-half="2.6" data-width="0.8"/>
+<circle cx="33.5" cy="31.0" r="3.6" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="crank" data-material="metal" data-half="1.6"/>
+<polygon points="31.50,36.50 31.50,35.30 35.50,35.30 35.50,36.50" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="pedal" data-material="auto_trim" data-half="7.0" data-width="3.6"/>
+<polygon points="37.50,7.40 37.50,5.60 47.00,5.00 48.50,7.00" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="saddle" data-material="auto_trim" data-half="2.8"/>
+<polygon points="17.60,1.60 17.60,0.00 20.40,0.00 20.40,1.60" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="handlebar" data-material="metal" data-half="10.0"/>
+<polygon points="17.30,1.90 17.30,0.00 20.70,0.00 20.70,1.90" fill="#111827" stroke="#374151" stroke-width="0.4" data-part="grip" data-material="rubber" data-half="11.0" data-width="3.6"/>
+</svg>

@@ -61,6 +61,20 @@ def _doc(kind, level_z=0.0, rotation=0.0):
                              "pos": [0.0, 0.0], "rotation": rotation}]}
 
 
+def _plan_symbol_only(fp3d, kind):
+    """The real catalog with `kind`'s side elevation taken away (0328).
+
+    The mower is now LOFTED from a side elevation, like every vehicle. The
+    tests below are about the PRISM -- the plan symbol, extruded -- and the
+    mower's symbol is still the best subject for them (a deck plus a handle
+    in strokes, deck at the top). So they build it the way a kind with no
+    side elevation is built, which is exactly the path they pin."""
+    specs, materials, problems = fp3d.load_catalog()
+    specs = dict(specs)
+    specs[kind] = dict(specs[kind], side_file=None)
+    return specs, materials, problems
+
+
 def _furn_mesh(model):
     return next(m for m in model.meshes if m.name.startswith("furnishings"))
 
@@ -72,7 +86,8 @@ def _furn_mesh(model):
 def test_every_catalog_entry_carries_a_solid(manifest):
     """height_in, elevation_in, form and material on all 96 -- height_in most
     of all, because it is the one field with no safe default."""
-    assert len(manifest) == 96, "catalog size changed; check this on purpose (96: the post, 0258)"
+    assert len(manifest) == 103, ("catalog size changed; check this on purpose "
+                                  "(103: the hood, the microwave and five lights, 0333)")
     missing = {}
     for e in manifest:
         absent = [f for f in ("height_in", "elevation_in", "form", "material")
@@ -149,9 +164,11 @@ def test_elevation_places_an_item_off_the_floor(fp3d, manifest):
     LEVEL_Z = 120.0                      # an upper storey, so 0 cannot pass
     for entry, name in ((hung, "wall_cab_30"), (standing, "base_cab_36")):
         model = fp3d.build_model(_doc(name, level_z=LEVEL_Z), floors=False)
-        v = _furn_mesh(model).verts
-        assert v[:, 2].min() == pytest.approx(LEVEL_Z + entry["elevation_in"])
-        assert v[:, 2].max() == pytest.approx(
+        # 0329: a cabinet is several meshes now (one per material), so the
+        # claim is asked of ALL its vertices, not of whichever mesh is first
+        zs = [v[2] for v in _furn_verts(fp3d, model)]
+        assert min(zs) == pytest.approx(LEVEL_Z + entry["elevation_in"])
+        assert max(zs) == pytest.approx(
             LEVEL_Z + entry["elevation_in"] + entry["height_in"])
 
     # and the two really do differ, which is the whole claim
@@ -159,8 +176,8 @@ def test_elevation_places_an_item_off_the_floor(fp3d, manifest):
                               floors=False)
     stand_z = fp3d.build_model(_doc("base_cab_36", level_z=LEVEL_Z),
                                floors=False)
-    assert (_furn_mesh(hung_z).verts[:, 2].min()
-            > _furn_mesh(stand_z).verts[:, 2].min())
+    assert (min(v[2] for v in _furn_verts(fp3d, hung_z))
+            > min(v[2] for v in _furn_verts(fp3d, stand_z)))
 
 
 def test_an_unknown_form_falls_back_visibly_and_is_reported(fp3d):
@@ -322,7 +339,8 @@ def test_a_prism_is_not_a_box(fp3d, manifest):
     must cover materially less than the footprint, or prism is doing nothing
     that the box was not already doing."""
     spec = next(i for i in manifest if i["id"] == "lawnmower")
-    model = fp3d.build_model(_doc("lawnmower"))
+    model = fp3d.build_model(_doc("lawnmower"),
+                             catalog=_plan_symbol_only(fp3d, "lawnmower"))
     assert "lawnmower" in model.stats["prism_kinds"]
     vs = _furn_verts(fp3d, model)
     ys = [v[1] for v in vs]
@@ -357,7 +375,8 @@ def test_a_prism_is_not_MIRRORED_along_the_depth_axis(fp3d):
     `lawnmower` has its deck at the TOP of the symbol (small svg y), so in the
     viewer's world the solid must sit on the POSITIVE y side of the item's
     centre. With the sign flipped this assertion reverses cleanly."""
-    vs = _furn_verts(fp3d, fp3d.build_model(_doc("lawnmower")))
+    vs = _furn_verts(fp3d, fp3d.build_model(
+        _doc("lawnmower"), catalog=_plan_symbol_only(fp3d, "lawnmower")))
     ys = [v[1] for v in vs]
     assert sum(ys) / len(ys) > 0.0, (
         "the mower's deck must land on the +y side; it is mirrored")

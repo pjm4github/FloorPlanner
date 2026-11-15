@@ -54,6 +54,13 @@
       "motorcycle.svg",
       "bicycle.svg",
       "boat.svg",
+      "range_hood.svg",
+      "microwave_otr.svg",
+      "light_recessed.svg",
+      "light_flush.svg",
+      "light_pendant.svg",
+      "light_linear.svg",
+      "light_sconce.svg",
       "workbench.svg",
       "storage_shelves.svg",
       "lawnmower.svg",
@@ -144,6 +151,8 @@
       "pantry_18.svg",
       "pantry_24.svg",
       "pantry_36.svg",
+      "range_hood.svg",
+      "microwave_otr.svg",
       "dining_chair.svg"
     ]
   },
@@ -183,6 +192,16 @@
     "items": [
       "washer.svg",
       "dryer.svg"
+    ]
+  },
+  {
+    "name": "Lighting",
+    "items": [
+      "light_recessed.svg",
+      "light_flush.svg",
+      "light_pendant.svg",
+      "light_linear.svg",
+      "light_sconce.svg"
     ]
   },
   {

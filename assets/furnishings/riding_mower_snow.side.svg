@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 46" width="96" height="46">
+<polygon points="1.00,45.00 1.00,28.00 13.00,30.00 13.00,45.00" fill="#dc2626" stroke="#374151" stroke-width="0.4" data-part="blower" data-material="machine_red" data-inset="2.0"/>
+<polygon points="0.40,44.00 0.40,31.00 2.00,31.00 2.00,44.00" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="auger" data-material="auto_trim" data-inset="3.5"/>
+<polygon points="4.50,29.00 4.50,15.00 2.50,14.50 2.50,11.00 10.50,11.00 10.00,29.00" fill="#dc2626" stroke="#374151" stroke-width="0.4" data-part="chute" data-material="machine_red" data-half="3.2"/>
+<polygon points="13.00,40.00 13.00,36.00 18.00,36.00 18.00,40.00" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="linkage" data-material="metal" data-half="5.0"/>
+<polygon points="18.00,39.00 18.00,35.00 86.00,35.00 86.00,39.00" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="chassis" data-material="auto_trim" data-half="9.0"/>
+<polygon points="18.00,36.00 18.00,17.00 42.00,15.50 44.00,36.00" fill="#15803d" stroke="#374151" stroke-width="0.4" data-part="hood" data-material="machine_green" data-half="14.0"/>
+<polygon points="17.40,33.00 17.40,20.00 18.60,20.00 18.60,33.00" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="grille" data-material="auto_trim" data-half="10.0"/>
+<polygon points="46.00,26.00 46.00,13.00 52.00,11.00 52.00,26.00" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="column" data-material="auto_trim" data-half="4.5"/>
+<polygon points="44.00,37.00 44.00,26.00 86.00,26.00 86.00,37.00" fill="#15803d" stroke="#374151" stroke-width="0.4" data-part="body" data-material="machine_green" data-half="12.0"/>
+<polygon points="56.00,26.00 56.00,21.00 68.00,21.00 70.50,9.00 73.50,9.00 72.50,26.00" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="seat" data-material="auto_trim" data-half="9.0"/>
+<circle cx="31.0" cy="39.0" r="7.0" fill="#111827" stroke="#374151" stroke-width="0.4" data-part="wheel-front" data-material="rubber" data-inset="0.5" data-width="6.0"/>
+<circle cx="75.0" cy="35.0" r="11.0" fill="#111827" stroke="#374151" stroke-width="0.4" data-part="wheel-rear" data-material="rubber" data-inset="0.0" data-width="8.0"/>
+<circle cx="31.0" cy="39.0" r="3.6" fill="#eab308" stroke="#374151" stroke-width="0.4" data-part="hub-front" data-material="machine_yellow" data-inset="0.2" data-width="3.0"/>
+<circle cx="75.0" cy="35.0" r="6.0" fill="#eab308" stroke="#374151" stroke-width="0.4" data-part="hub-rear" data-material="machine_yellow" data-inset="-0.3" data-width="3.0"/>
+</svg>

@@ -23,6 +23,11 @@ Top-view architectural symbols used by the Furnishings palette.
     a form falls back to `box` and **says so in its report**; an
     unrecognised one renders in the loud magenta.
   * `material` — a name only, resolved in `materials.json`.
+  * `cabinet` — for a cabinet or an appliance, the preset it is born
+    as (type, width, depth, front ...), or null.  The 3D viewer builds
+    its doors, drawers, toe kick and countertop from this, the item's
+    own parameters and its room's style; the vocabulary and the
+    arithmetic are `floorplanner/parametric/cabinet_geometry.py`.
   * `side_file` — for a vehicle, its SIDE ELEVATION (`<id>.side.svg`),
     or null.  viewBox `0 0 LENGTH HEIGHT` in inches, nose at x = 0,
     ground at the bottom edge.  Each part is a filled `<polygon>` or

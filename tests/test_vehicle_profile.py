@@ -60,9 +60,15 @@ def _spec(manifest, kind):
 
 
 # -- the file contract -------------------------------------------------------
-def test_the_catalog_names_side_elevations_for_the_car_and_the_suv(manifest):
+VEHICLES = ("car", "suv", "motorcycle", "bicycle", "boat", "boat_trailer",
+            "lawnmower", "garden_tractor", "riding_mower_snow", "snowblower")
+
+
+def test_every_vehicle_in_the_catalog_has_a_side_elevation(manifest):
+    """0328: all ten `vehicle` kinds, and nothing that is not one."""
     named = {i["id"] for i in manifest if i.get("side_file")}
-    assert {"car", "suv"} <= named
+    assert named == set(VEHICLES)
+    assert named == {i["id"] for i in manifest if i.get("form") == "vehicle"}
     assert all("side_file" in i for i in manifest), "the key is on every entry"
 
 
@@ -79,7 +85,7 @@ def test_every_side_elevation_obeys_its_contract(manifest):
         assert vb == [0.0, 0.0, float(item["depth_in"]), float(item["height_in"])], \
             f"{item['id']}: the side view is not the catalog's length x height"
         parts = [el for el in root.iter() if el.get("data-part")]
-        assert len(parts) >= 5, f"{item['id']}: a body, glass and wheels at least"
+        assert len(parts) >= 5, f"{item['id']}: more than a block's worth of parts"
         for el in root.iter():
             assert el.get("transform") is None
         for el in parts:
@@ -88,7 +94,54 @@ def test_every_side_elevation_obeys_its_contract(manifest):
             assert el.get("data-material") in materials, \
                 f"{item['id']}: {el.get('data-part')} names an unknown material"
         checked += 1
-    assert checked >= 2, "PRECONDITION: there are side elevations to check"
+    assert checked == len(VEHICLES), "PRECONDITION: every side elevation was read"
+
+
+@pytest.mark.parametrize("kind", VEHICLES)
+def test_every_vehicle_lofts_inside_its_catalog_box(fp3d, manifest, kind):
+    """The whole fleet: lofted (not a prism, not a box), several materials,
+    every solid wound outward, standing on the floor, and nothing outside
+    the footprint the plan draws or above the catalog height. (No volume
+    bound here: parts overlap inside one another by design -- a dark core
+    behind the wheel arches -- so summed volumes overstate the solid. The
+    car and the SUV have their own bound, on paint and glass alone.)"""
+    spec = _spec(manifest, kind)
+    model = fp3d.build_model(_doc(kind))
+    assert model.stats["side_profile_kinds"] == [kind]
+    assert not model.notes, model.notes
+    meshes = [m for m in model.meshes if m.name.startswith("furnishings:")]
+    assert len(meshes) >= 3, "one material would be the old grey block"
+    assert "furnishings:unknown" not in {m.name for m in meshes}
+    assert "furnishings:vehicle" not in {m.name for m in meshes}
+    for m in meshes:
+        assert _volume(m) > 0.0, f"{m.name} is wound inward"
+    v = np.vstack([m.verts for m in meshes])
+    assert v[:, 0].max() <= spec["width_in"] / 2.0 + 1e-6
+    assert v[:, 0].min() >= -spec["width_in"] / 2.0 - 1e-6
+    assert v[:, 1].max() <= spec["depth_in"] / 2.0 + 1e-6
+    assert v[:, 1].min() >= -spec["depth_in"] / 2.0 - 1e-6
+    assert v[:, 2].max() <= spec["height_in"] + 1e-6
+    assert 0.0 <= v[:, 2].min() < 3.0, "it stands on the floor"
+    assert model.stats["triangles"] > 200, "a block is twelve triangles"
+
+
+def test_a_part_placed_from_the_centreline_ignores_the_body_side(fp3d):
+    """`data-half`: a motorcycle's tyre is 2.5 in either side of centre,
+    whatever the handlebars make the footprint."""
+    model = fp3d.build_model(_doc("motorcycle"))
+    tyre = _mesh(model, "rubber").verts
+    low = tyre[tyre[:, 2] < 20.0]                     # the tyres, not the grips
+    assert np.abs(low[:, 0]).max() == pytest.approx(3.0)
+
+
+def test_a_plan_outline_narrows_the_hull_to_its_bow(fp3d, manifest):
+    """`data-plan`: the boat's top view. The bow is at world +y."""
+    spec = _spec(manifest, "boat")
+    hull = _mesh(fp3d.build_model(_doc("boat")), "gelcoat").verts
+    bow = hull[hull[:, 1] > spec["depth_in"] / 2.0 - 12.0]
+    stern = hull[hull[:, 1] < -spec["depth_in"] / 2.0 + 40.0]
+    assert np.abs(bow[:, 0]).max() < 10.0
+    assert np.abs(stern[:, 0]).max() == pytest.approx(30.0, abs=0.5)
 
 
 # -- what the loft produces --------------------------------------------------

@@ -1,8 +1,10 @@
 # One-shot generator for assets/icons (toolbar) and assets/furnishings
 # (top-view furniture symbol library, CC0).  Furnishing SVGs use a viewBox
 # in INCHES so the app can render them at true scale (1 scene unit = 1").
+import importlib.util
 import json
 import math
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -463,6 +465,30 @@ FURNISHINGS = [
       'Q58 160 58 146 L58 120 C58 74 51 34 34 12 Z" '
       f'fill="none" stroke="{INK}" stroke-width="0.6"/>',
       L(10, 96, 58, 96, 0.8), L(10, 128, 58, 128, 0.8)]),   # thwart seats
+    # 0333: over the range.  Both hang overhead, so both are drawn DASHED,
+    # like a wall cabinet; the filled rectangle is what the 3D falls back to.
+    ("range_hood", "Range Hood 30\"", "Kitchen", 30, 20,
+     [R(0.6, 0.6, 28.8, 18.8, 1.5, "#ffffff", 0.9, "3,2"),
+      R(4, 4, 22, 12, 1, "none", 0.5, "3,2"),
+      Ci(9, 15.5, 1.3, "none", 0.5), Ci(21, 15.5, 1.3, "none", 0.5)]),
+    ("microwave_otr", "Microwave, Over-Range 30\"", "Kitchen", 30, 16,
+     [R(0.6, 0.6, 28.8, 14.8, 1, "#ffffff", 0.9, "3,2"),
+      L(22.5, 0.6, 22.5, 15.4, 0.5, "3,2"),
+      R(3, 3, 17, 9.5, 0.8, "none", 0.5, "3,2")]),
+    # 0333: lights.  A plan symbol each; the fixture's shape, colour and output
+    # are parameters, and ceiling fixtures hang from the room's own ceiling.
+    ("light_recessed", "Recessed Light", "Lighting", 6, 6,
+     [Ci(3, 3, 2.7, "#ffffff", 0.7), L(1, 3, 5, 3, 0.4), L(3, 1, 3, 5, 0.4)]),
+    ("light_flush", "Ceiling Light", "Lighting", 14, 14,
+     [Ci(7, 7, 6.5, "#ffffff", 0.8), Ci(7, 7, 4.2, "none", 0.5),
+      L(2.4, 2.4, 11.6, 11.6, 0.4), L(11.6, 2.4, 2.4, 11.6, 0.4)]),
+    ("light_pendant", "Pendant Light", "Lighting", 12, 12,
+     [Ci(6, 6, 5.5, "#ffffff", 0.8), Ci(6, 6, 1.4, FILL, 0.6)]),
+    ("light_linear", "Linear Light 4'", "Lighting", 48, 6,
+     [R(0.5, 0.5, 47, 5, 1, "#ffffff", 0.8), L(2, 3, 46, 3, 0.4)]),
+    ("light_sconce", "Wall Sconce", "Lighting", 6, 5,
+     [R(0.4, 0.4, 5.2, 1.0, 0.3, FILL, 0.6),
+      Pth("M0.8 1.4 L5.2 1.4 L4.4 4.6 L1.6 4.6 Z", "#ffffff", 0.7)]),
     ("workbench", "Workbench 6'", "Garage", 72, 24,
      [R(0.75, 0.75, 70.5, 22.5, 1, sw=1.2),
       R(3, 3, 66, 18, 0.5, "none", 0.5), Ci(64, 7, 3, "none", 0.8)]),
@@ -806,6 +832,15 @@ SOLIDS = {
     # -- Kitchen.  Base cabinets and counters 36"; wall cabinets 30" tall with
     # their underside 54" up, the standard 18" backsplash above a counter.
     "refrigerator":           (70,      0, "box",       "metal"),
+    "range_hood":             (18,     66, "box",       "metal"),
+    "microwave_otr":          (17,     54, "box",       "metal"),
+    # Lights.  The elevation is a NOMINAL 8 ft ceiling less the fixture: the
+    # viewer hangs a ceiling light from the ceiling of the room it is in.
+    "light_recessed":         (1,      95, "box",       "metal"),
+    "light_flush":            (5,      91, "box",       "metal"),
+    "light_pendant":          (38,     58, "box",       "metal"),
+    "light_linear":           (3,      93, "box",       "metal"),
+    "light_sconce":           (10,     66, "box",       "metal"),
     "range":                  (36,      0, "box",       "metal"),
     "dishwasher":             (34,      0, "box",       "metal"),
     "kitchen_sink":           (10,     26, "basin",     "metal"),
@@ -964,11 +999,41 @@ MATERIALS = {
                          "roughness": 0.20, "metalness": 0.10},
     "tail_lamp":        {"colour": [0.66, 0.05, 0.05, 1.00],
                          "roughness": 0.25, "metalness": 0.10},
+    # Yard machines and the boat (0328): painted sheet metal, and a hull.
+    "machine_red":      {"colour": [0.60, 0.09, 0.07, 1.00],
+                         "roughness": 0.40, "metalness": 0.30},
+    "machine_green":    {"colour": [0.12, 0.34, 0.16, 1.00],
+                         "roughness": 0.40, "metalness": 0.30},
+    "machine_yellow":   {"colour": [0.86, 0.66, 0.08, 1.00],
+                         "roughness": 0.40, "metalness": 0.30},
+    "gelcoat":          {"colour": [0.92, 0.93, 0.94, 1.00],
+                         "roughness": 0.22, "metalness": 0.05},
     # Loud on purpose, and the ONLY entry a viewer may fall back to: an item
     # whose kind, form or material the catalog does not define must LOOK wrong.
     "unknown":   {"colour": [0.85, 0.35, 0.55, 1.00],
                   "roughness": 0.60, "metalness": 0.00},
 }
+
+# ------------------------------------------------------ cabinets and appliances
+# 0329.  A cabinet is built from PARTS -- doors, drawers, toe kick, countertop --
+# by `floorplanner/parametric/cabinet_geometry.py`, which also owns the style
+# vocabulary (finishes, countertops, hardware) and those materials.  It is plain
+# Python with no imports of its own, so it is loaded here BY PATH, exactly as
+# the viewer loads it: importing the package would drag Qt into an asset build
+# that is deliberately Qt-free.  ONE definition; this file only writes it out.
+def _load_cabinet_geometry():
+    path = (Path(__file__).resolve().parent / "floorplanner" / "parametric"
+            / "cabinet_geometry.py")
+    name = "_gen_cabinet_geometry"
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod            # @dataclass looks its module up
+    spec.loader.exec_module(mod)
+    return mod
+
+
+CABINETS = _load_cabinet_geometry()
+MATERIALS.update(CABINETS.MATERIALS)
 
 # ------------------------------------------------------- vehicle side profiles
 # 0325 (Patrick, 2026-11-14: "I want to change the way that the vehicles are
@@ -999,6 +1064,18 @@ MATERIALS = {
 #                                   vehicle side to side.  Present: it is a
 #                                   PAIR, one slab of that thickness at each
 #                                   side -- a wheel, a pillar, a lamp.
+#                    data-half      OPTIONAL.  The part's outer face as a
+#                                   plain distance from the CENTRELINE,
+#                                   instead of an inset from the body side:
+#                                   a motorcycle's wheel is 2.5 in either
+#                                   side of centre whatever the handlebars
+#                                   make the footprint.  Not rounded, not
+#                                   leaned; never wider than the footprint.
+#   data-plan      OPTIONAL, on <svg>: the TOP view's half-width along the
+#                  vehicle, as "distance:halfwidth" pairs joined by straight
+#                  lines -- a boat's pointed bow, a trailer's A-frame.  A part
+#                  placed by data-inset is inset from THIS instead of from
+#                  the straight body side.
 #
 # TWO RULES A PART MUST OBEY.  (1) No `transform`, and polygons not paths: the
 # reader takes points as written.  (2) At any distance along the vehicle a part
@@ -1031,21 +1108,58 @@ def _arch(cx, cz, r, floor_z, n=14):
             for t in (a + (math.pi - 2 * a) * i / n for i in range(n + 1))]
 
 
-def _side_poly(height, pts, part, material, fill, inset=0.0, width=None):
+def _lateral(inset, width, half):
+    out = f' data-inset="{inset}"' if half is None else f' data-half="{half}"'
+    return out + (f' data-width="{width}"' if width is not None else "")
+
+
+def _side_poly(height, pts, part, material, fill, inset=0.0, width=None,
+               half=None):
     """One side-view part as a <polygon>; `pts` are (distance, HEIGHT) pairs,
     flipped here into the SVG's y-down frame."""
     coords = " ".join(f"{x:.2f},{height - z:.2f}" for x, z in pts)
-    extra = f' data-width="{width}"' if width is not None else ""
     return (f'<polygon points="{coords}" fill="{fill}" stroke="{INK}" '
-            f'stroke-width="0.4" data-part="{part}" data-material="{material}" '
-            f'data-inset="{inset}"{extra}/>')
+            f'stroke-width="0.4" data-part="{part}" data-material="{material}"'
+            f'{_lateral(inset, width, half)}/>')
 
 
-def _side_circle(height, cx, cz, r, part, material, fill, inset, width):
+def _side_circle(height, cx, cz, r, part, material, fill, inset=0.0,
+                 width=None, half=None):
     return (f'<circle cx="{cx}" cy="{height - cz}" r="{r}" fill="{fill}" '
             f'stroke="{INK}" stroke-width="0.4" data-part="{part}" '
-            f'data-material="{material}" data-inset="{inset}" '
-            f'data-width="{width}"/>')
+            f'data-material="{material}"{_lateral(inset, width, half)}/>')
+
+
+_SIDE_FILL = {"rubber": "#111827", "auto_trim": "#1f2937", "metal": "#9ca3af",
+              "wood": "#d6b98c", "auto_glass": "#334155", "lamp": "#fef9c3",
+              "tail_lamp": "#b91c1c", "machine_red": "#dc2626",
+              "machine_green": "#15803d", "machine_yellow": "#eab308",
+              "gelcoat": "#f1f5f9", "auto_paint": "#3b82f6",
+              "auto_paint_light": "#cbd5e1"}
+
+
+def _box4(s0, s1, z0, z1):
+    """A rectangle in the side view, as the four corners `_machine` takes."""
+    return [(s0, z0), (s0, z1), (s1, z1), (s1, z0)]
+
+
+def _machine(height, rows, **attrs):
+    """A side profile written out part by part, for the vehicles that are not
+    car-shaped.  Each row is (name, material, shape, lateral): `shape` is a
+    list of (distance, height) corners, or ("circle", cx, cz, r); `lateral`
+    is a dict of inset / width / half.  The drawing fill is looked up from the
+    material, so the side SVG reads as a picture of the thing."""
+    parts = []
+    for name, material, shape, lateral in rows:
+        fill = _SIDE_FILL.get(material, FILL)
+        if shape and shape[0] == "circle":
+            _tag, cx, cz, r = shape
+            parts.append(_side_circle(height, cx, cz, r, name, material, fill,
+                                      **lateral))
+        else:
+            parts.append(_side_poly(height, shape, name, material, fill,
+                                    **lateral))
+    return {f"data-{k.replace('_', '-')}": v for k, v in attrs.items()}, parts
 
 
 def _side_profile(*, length, height, paint, wheel_r, wheel_x, sill, arch_r,
@@ -1142,6 +1256,203 @@ SIDE_PROFILES = {
                  [(140.0, 45.4), (144.0, 45.4), (144.0, 68.5), (140.0, 68.5)],
                  [(185.4, 45.4), (189.0, 45.4), (176.0, 68.6), (172.4, 68.6)]],
         lamp_z=(31.0, 36.0), grille_z=(18.0, 30.0))},
+    # 0328.  The rest of the garage.  None of these is car-shaped, so each is
+    # written out part by part; a part on the centreline uses data-half.
+    "motorcycle": {"length": 84, "height": 48, "spec": _machine(48, [
+        ("tyre-front", "rubber", ("circle", 13.0, 12.5, 12.5), {"half": 2.5}),
+        ("tyre-rear", "rubber", ("circle", 70.0, 12.5, 12.5), {"half": 3.0}),
+        ("wheel-front", "metal", ("circle", 13.0, 12.5, 8.0), {"half": 2.8}),
+        ("wheel-rear", "metal", ("circle", 70.0, 12.5, 8.0), {"half": 3.3}),
+        ("fork", "metal", [(11.5, 12.0), (14.5, 12.0), (26.5, 40.0), (23.5, 40.0)],
+         {"half": 4.5, "width": 1.6}),
+        ("engine", "metal", [(29.0, 7.0), (27.5, 23.0), (53.0, 23.0), (57.0, 8.0)],
+         {"half": 6.0}),
+        ("frame", "auto_trim", [(26.0, 22.0), (24.5, 31.0), (62.0, 26.0),
+                                (70.0, 14.0), (64.0, 12.0), (56.0, 21.0)],
+         {"half": 3.5}),
+        ("tank", "auto_paint", [(27.0, 25.0), (30.0, 35.0), (45.0, 34.0),
+                                (49.0, 27.0)], {"half": 6.5}),
+        ("seat", "auto_trim", [(46.0, 27.0), (47.0, 32.0), (69.0, 31.0),
+                               (74.0, 28.5), (70.0, 26.0)], {"half": 5.5}),
+        ("fender-rear", "auto_paint", [(60.0, 25.5), (62.0, 28.0), (80.0, 27.0),
+                                       (83.5, 23.0), (78.0, 24.0)], {"half": 3.4}),
+        ("fender-front", "auto_paint", [(3.0, 21.0), (8.0, 26.0), (18.0, 26.0),
+                                        (22.0, 22.0), (17.0, 24.0), (8.0, 24.0)],
+         {"half": 3.0}),
+        ("headlamp", "lamp", _box4(18.5, 23.0, 32.0, 38.0), {"half": 3.5}),
+        ("handlebar", "metal", _box4(23.0, 26.5, 40.0, 42.0), {"half": 14.0}),
+        ("grip", "rubber", _box4(22.6, 26.9, 39.6, 42.4),
+         {"half": 16.0, "width": 4.5}),
+        ("mirror", "auto_trim", _box4(21.5, 23.5, 44.0, 48.0),
+         {"half": 14.5, "width": 4.0}),
+        ("exhaust", "metal", [(46.0, 9.0), (46.0, 12.5), (80.0, 15.5),
+                              (80.0, 12.0)], {"half": 9.0, "width": 3.0}),
+        ("tail-lamp", "tail_lamp", _box4(81.5, 83.8, 23.5, 26.5), {"half": 2.5}),
+    ])},
+    "bicycle": {"length": 68, "height": 42, "spec": _machine(42, [
+        ("tyre-front", "rubber", ("circle", 13.5, 13.0, 13.0), {"half": 0.9}),
+        ("tyre-rear", "rubber", ("circle", 54.5, 13.0, 13.0), {"half": 0.9}),
+        ("rim-front", "metal", ("circle", 13.5, 13.0, 11.3), {"half": 1.0}),
+        ("rim-rear", "metal", ("circle", 54.5, 13.0, 11.3), {"half": 1.0}),
+        ("fork", "auto_paint", [(12.6, 12.5), (14.4, 12.5), (20.2, 31.0),
+                                (18.4, 31.0)], {"half": 2.4, "width": 0.9}),
+        ("head-tube", "auto_paint", _box4(18.2, 20.2, 28.0, 41.0), {"half": 0.9}),
+        ("top-tube", "auto_paint", _box4(19.5, 42.5, 30.2, 31.8), {"half": 0.8}),
+        ("down-tube", "auto_paint", [(18.4, 28.0), (20.4, 29.0), (34.6, 11.6),
+                                     (32.6, 10.6)], {"half": 0.8}),
+        ("seat-tube", "auto_paint", [(41.0, 34.5), (43.0, 34.5), (35.0, 10.5),
+                                     (33.0, 10.5)], {"half": 0.8}),
+        ("chain-stay", "auto_paint", [(33.0, 10.0), (33.0, 11.8), (54.5, 14.0),
+                                      (54.5, 12.2)], {"half": 2.6, "width": 0.8}),
+        ("seat-stay", "auto_paint", [(41.6, 30.4), (43.2, 31.2), (55.2, 13.6),
+                                     (53.6, 12.8)], {"half": 2.6, "width": 0.8}),
+        ("crank", "metal", ("circle", 33.5, 11.0, 3.6), {"half": 1.6}),
+        ("pedal", "auto_trim", _box4(31.5, 35.5, 5.5, 6.7),
+         {"half": 7.0, "width": 3.6}),
+        ("saddle", "auto_trim", [(37.5, 34.6), (37.5, 36.4), (47.0, 37.0),
+                                 (48.5, 35.0)], {"half": 2.8}),
+        ("handlebar", "metal", _box4(17.6, 20.4, 40.4, 42.0), {"half": 10.0}),
+        ("grip", "rubber", _box4(17.3, 20.7, 40.1, 42.0),
+         {"half": 11.0, "width": 3.6}),
+    ])},
+    "lawnmower": {"length": 62, "height": 40, "spec": _machine(40, [
+        ("deck", "machine_red", [(1.0, 2.5), (1.0, 8.5), (7.0, 11.0),
+                                 (22.0, 11.0), (27.0, 8.0), (27.0, 2.5)],
+         {"inset": 1.0}),
+        ("engine", "auto_trim", _box4(8.5, 20.5, 11.0, 19.0), {"half": 6.0}),
+        ("engine-cap", "metal", _box4(11.0, 18.0, 19.0, 21.0), {"half": 3.5}),
+        ("wheel-front", "rubber", ("circle", 7.75, 3.5, 3.5),
+         {"inset": 0.4, "width": 3.0}),
+        ("wheel-rear", "rubber", ("circle", 21.75, 3.5, 3.5),
+         {"inset": 0.4, "width": 3.0}),
+        ("handle", "metal", [(26.0, 8.0), (27.6, 8.0), (59.6, 38.2),
+                             (58.0, 38.2)], {"half": 6.5, "width": 1.0}),
+        ("handle-bar", "auto_trim", _box4(57.6, 60.2, 37.6, 40.0), {"half": 6.5}),
+    ])},
+    "snowblower": {"length": 58, "height": 42, "spec": _machine(42, [
+        ("housing", "machine_red", [(1.0, 1.0), (1.0, 20.0), (8.0, 22.0),
+                                    (14.0, 20.0), (14.0, 1.0)], {"inset": 1.0}),
+        ("auger", "auto_trim", _box4(0.4, 2.0, 2.0, 17.0), {"inset": 2.5}),
+        ("chute", "machine_red", [(6.5, 20.0), (6.5, 36.0), (4.0, 36.5),
+                                  (4.0, 40.5), (12.0, 40.5), (11.5, 20.0)],
+         {"half": 3.2}),
+        ("body", "machine_red", _box4(14.0, 31.0, 5.0, 18.0), {"half": 6.5}),
+        ("engine", "auto_trim", _box4(16.0, 29.0, 18.0, 27.0), {"half": 5.5}),
+        ("wheel", "rubber", ("circle", 22.5, 6.5, 6.5),
+         {"inset": 3.5, "width": 4.0}),
+        ("handle", "metal", [(30.0, 18.0), (31.6, 18.0), (55.6, 38.0),
+                             (54.0, 38.0)], {"half": 7.5, "width": 1.0}),
+        ("panel", "auto_trim", _box4(52.5, 56.5, 36.5, 42.0), {"half": 7.5}),
+    ])},
+    "garden_tractor": {"length": 120, "height": 50, "spec": _machine(50, [
+        ("bucket", "machine_yellow", [(1.0, 2.0), (1.0, 14.0), (9.5, 12.0),
+                                      (9.5, 2.0)], {"inset": 2.5}),
+        ("loader-arm", "machine_yellow", [(9.0, 6.0), (9.0, 10.5), (42.0, 31.0),
+                                          (42.0, 26.5)],
+         {"half": 18.0, "width": 4.5}),
+        ("chassis", "auto_trim", _box4(38.0, 112.0, 8.0, 14.5), {"half": 11.0}),
+        ("hood", "machine_green", [(38.0, 14.0), (38.0, 35.0), (66.0, 36.5),
+                                   (68.0, 14.0)], {"half": 14.0}),
+        ("grille", "auto_trim", _box4(37.4, 38.6, 17.0, 32.0), {"half": 11.0}),
+        ("dash", "auto_trim", [(66.0, 30.0), (66.0, 37.0), (72.0, 36.0),
+                               (72.0, 30.0)], {"half": 6.0}),
+        ("platform", "machine_green", _box4(68.0, 104.0, 12.0, 22.0),
+         {"half": 16.0}),
+        ("fender", "machine_green", [(88.0, 22.0), (90.0, 27.5), (115.0, 27.5),
+                                     (117.0, 22.0)], {"inset": 0.5, "width": 10.0}),
+        ("seat", "auto_trim", [(76.0, 22.0), (76.0, 28.0), (88.0, 28.0),
+                               (90.5, 40.0), (93.5, 40.0), (92.5, 22.0)],
+         {"half": 8.0}),
+        ("rops", "auto_trim", _box4(96.0, 98.5, 22.0, 50.0),
+         {"half": 15.0, "width": 2.5}),
+        ("rops-top", "auto_trim", _box4(96.0, 98.5, 47.5, 50.0), {"half": 15.0}),
+        ("wheel-front", "rubber", ("circle", 50.5, 8.5, 8.5),
+         {"inset": 1.0, "width": 7.0}),
+        ("wheel-rear", "rubber", ("circle", 102.5, 12.5, 12.5),
+         {"inset": 0.5, "width": 9.0}),
+        ("hub-front", "machine_yellow", ("circle", 50.5, 8.5, 4.5),
+         {"inset": 0.7, "width": 3.0}),
+        ("hub-rear", "machine_yellow", ("circle", 102.5, 12.5, 7.0),
+         {"inset": 0.2, "width": 3.0}),
+        ("hitch", "metal", _box4(112.0, 119.0, 8.0, 13.0), {"half": 6.0}),
+    ])},
+    "riding_mower_snow": {"length": 96, "height": 46, "spec": _machine(46, [
+        ("blower", "machine_red", [(1.0, 1.0), (1.0, 18.0), (13.0, 16.0),
+                                   (13.0, 1.0)], {"inset": 2.0}),
+        ("auger", "auto_trim", _box4(0.4, 2.0, 2.0, 15.0), {"inset": 3.5}),
+        ("chute", "machine_red", [(4.5, 17.0), (4.5, 31.0), (2.5, 31.5),
+                                  (2.5, 35.0), (10.5, 35.0), (10.0, 17.0)],
+         {"half": 3.2}),
+        ("linkage", "metal", _box4(13.0, 18.0, 6.0, 10.0), {"half": 5.0}),
+        ("chassis", "auto_trim", _box4(18.0, 86.0, 7.0, 11.0), {"half": 9.0}),
+        ("hood", "machine_green", [(18.0, 10.0), (18.0, 29.0), (42.0, 30.5),
+                                   (44.0, 10.0)], {"half": 14.0}),
+        ("grille", "auto_trim", _box4(17.4, 18.6, 13.0, 26.0), {"half": 10.0}),
+        ("column", "auto_trim", [(46.0, 20.0), (46.0, 33.0), (52.0, 35.0),
+                                 (52.0, 20.0)], {"half": 4.5}),
+        ("body", "machine_green", _box4(44.0, 86.0, 9.0, 20.0), {"half": 12.0}),
+        ("seat", "auto_trim", [(56.0, 20.0), (56.0, 25.0), (68.0, 25.0),
+                               (70.5, 37.0), (73.5, 37.0), (72.5, 20.0)],
+         {"half": 9.0}),
+        ("wheel-front", "rubber", ("circle", 31.0, 7.0, 7.0),
+         {"inset": 0.5, "width": 6.0}),
+        ("wheel-rear", "rubber", ("circle", 75.0, 11.0, 11.0),
+         {"inset": 0.0, "width": 8.0}),
+        ("hub-front", "machine_yellow", ("circle", 31.0, 7.0, 3.6),
+         {"inset": 0.2, "width": 3.0}),
+        ("hub-rear", "machine_yellow", ("circle", 75.0, 11.0, 6.0),
+         {"inset": -0.3, "width": 3.0}),
+    ])},
+    # The bow is at distance 0.  `plan` is the hull seen from above; the
+    # gunwales are a PAIR following it, so the cockpit between them is open.
+    "boat": {"length": 168, "height": 60, "spec": _machine(60, [
+        ("hull", "gelcoat", [(2.0, 33.0), (8.0, 20.0), (22.0, 8.0), (48.0, 2.0),
+                             (166.0, 1.0), (166.0, 16.0), (60.0, 15.0),
+                             (30.0, 21.0)], {"inset": 0.0}),
+        ("topsides", "gelcoat", [(2.0, 32.0), (2.0, 36.0), (166.0, 31.0),
+                                 (166.0, 14.0), (60.0, 13.0), (30.0, 19.0)],
+         {"inset": 0.0, "width": 3.0}),
+        ("bow-deck", "gelcoat", [(2.0, 33.5), (2.0, 36.2), (46.0, 35.0),
+                                 (46.0, 32.6)], {"inset": 0.4}),
+        ("transom", "gelcoat", _box4(163.0, 166.0, 1.5, 31.0), {"inset": 0.4}),
+        ("rub-rail", "auto_trim", [(2.0, 35.6), (2.0, 36.6), (166.0, 31.6),
+                                   (166.0, 30.6)], {"inset": -0.4, "width": 1.2}),
+        ("thwart-1", "wood", _box4(92.0, 100.0, 23.0, 25.0), {"inset": 2.5}),
+        ("thwart-2", "wood", _box4(124.0, 132.0, 23.0, 25.0), {"inset": 2.5}),
+        ("windshield", "auto_glass", [(58.0, 34.6), (64.0, 47.0), (66.0, 47.0),
+                                      (62.0, 34.4)], {"inset": 5.0}),
+        ("motor", "auto_trim", [(160.0, 22.0), (160.0, 44.0), (168.0, 43.0),
+                                (168.0, 22.0)], {"half": 5.0}),
+        ("motor-leg", "metal", _box4(164.5, 168.0, 0.5, 22.0), {"half": 1.8}),
+    ], plan="2:0 12:9 28:17 50:24 80:28.5 122:30 150:30 160:27 166:14")},
+    # The coupler is at distance 0.  `plan` is the frame from above: the
+    # tongue, widening through the A-frame to the two side rails.
+    "boat_trailer": {"length": 216, "height": 72, "spec": _machine(72, [
+        ("coupler", "auto_trim", _box4(1.0, 8.0, 13.0, 19.5), {"half": 3.5}),
+        ("tongue", "metal", _box4(4.0, 66.0, 14.0, 18.0), {"half": 2.0}),
+        ("rail", "metal", _box4(8.0, 205.0, 14.0, 18.0),
+         {"inset": 0.0, "width": 3.0}),
+        ("cross-1", "metal", _box4(74.0, 76.5, 14.5, 17.5), {"inset": 0.0}),
+        ("cross-2", "metal", _box4(124.0, 126.5, 14.5, 17.5), {"inset": 0.0}),
+        ("cross-3", "metal", _box4(174.0, 176.5, 14.5, 17.5), {"inset": 0.0}),
+        ("cross-4", "metal", _box4(203.0, 206.0, 14.0, 18.0), {"inset": 0.0}),
+        ("bunk", "wood", _box4(70.0, 200.0, 18.0, 22.0),
+         {"half": 16.5, "width": 3.5}),
+        ("winch-post", "metal", _box4(28.0, 32.0, 18.0, 40.0), {"half": 2.0}),
+        ("winch", "auto_trim", _box4(27.0, 34.0, 34.0, 39.0), {"half": 3.5}),
+        ("bow-stop", "rubber", _box4(32.0, 36.0, 39.0, 42.0), {"half": 4.0}),
+        ("axle", "metal", _box4(144.0, 148.0, 11.0, 14.5), {"half": 30.0}),
+        ("tyre", "rubber", ("circle", 146.0, 13.0, 13.0),
+         {"half": 37.0, "width": 8.0}),
+        ("wheel", "metal", ("circle", 146.0, 13.0, 7.5),
+         {"half": 37.3, "width": 3.0}),
+        ("fender", "auto_trim", [(130.0, 23.5), (133.0, 28.5), (159.0, 28.5),
+                                 (162.0, 23.5), (158.0, 26.6), (134.0, 26.6)],
+         {"half": 38.0, "width": 9.5}),
+        ("tail-lamp", "tail_lamp", _box4(206.0, 211.5, 14.5, 19.0),
+         {"half": 31.0, "width": 6.5}),
+        ("jack", "metal", _box4(40.0, 43.0, 2.0, 22.0), {"half": 6.0, "width": 2.5}),
+    ], plan="0:2 8:2 62:27 216:27")},
 }
 
 # The generator refuses to write a half-authored catalog.  A missing height is
@@ -1192,6 +1503,48 @@ def main():
             if _m not in MATERIALS:
                 _bad_side.append(f"{_sid}: part {_el.get('data-part')!r} names "
                                  f"material {_m!r}, not in MATERIALS")
+            # nothing may be drawn outside the viewBox: the viewer scales the
+            # drawing to the catalog size, so a part past the edge would stand
+            # outside the footprint the plan shows
+            if _el.get("points"):
+                _xy = [float(v) for pt in _el.get("points").split()
+                       for v in pt.split(",")]
+                _xs, _ys = _xy[0::2], _xy[1::2]
+            else:
+                _r = float(_el.get("r"))
+                _xs = [float(_el.get("cx")) - _r, float(_el.get("cx")) + _r]
+                _ys = [float(_el.get("cy")) - _r, float(_el.get("cy")) + _r]
+            if (min(_xs) < -1e-6 or max(_xs) > _sp["length"] + 1e-6
+                    or min(_ys) < -1e-6 or max(_ys) > _sp["height"] + 1e-6):
+                _bad_side.append(f"{_sid}: part {_el.get('data-part')!r} is "
+                                 f"drawn outside the {_sp['length']} x "
+                                 f"{_sp['height']} view")
+    # 0329: a cabinet preset must belong to a furnishing and agree with the
+    # catalog on width, depth and overall height -- the plan symbol, the box
+    # fallback and the parts are three readers of one size
+    _full = {fid: (w, d, unpack_solid(SOLIDS[fid])[0], unpack_solid(SOLIDS[fid])[1])
+             for fid, _n, _c, w, d, _b in FURNISHINGS if fid in SOLIDS}
+    _bad_cab = []
+    for _cid, _preset in CABINETS.PRESETS.items():
+        if _cid not in _full:
+            _bad_cab.append(f"{_cid}: no such furnishing")
+            continue
+        _st = CABINETS.normalize_state({}, _preset)
+        _w, _d, _h, _elev = _full[_cid]
+        _top = _st["height_in"] + (_st["top_thickness_in"] if _st["top_on"] else 0.0)
+        _at = _st["floor_to_bottom_in"] if CABINETS.is_mounted(_st) else 0.0
+        if CABINETS.footprint(_st) != (float(_w), float(_d)):
+            _bad_cab.append(f"{_cid}: preset footprint {CABINETS.footprint(_st)}, "
+                            f"catalog {_w} x {_d}")
+        if _st["type"] == "light":
+            continue        # a light's height is its room's ceiling, not a constant
+        if abs(_top - _h) > 1e-6 or abs(_at - _elev) > 1e-6:
+            _bad_cab.append(f"{_cid}: preset stands {_at} + {_top}, catalog "
+                            f"{_elev} + {_h}")
+    if _bad_cab:
+        raise SystemExit("assets not written -- cabinet preset(s) disagree with "
+                         "the catalog:\n"
+                         + "".join(f"  {line}\n" for line in _bad_cab))
     if _bad_side:
         raise SystemExit("assets not written -- bad vehicle side profile(s):\n"
                          + "".join(f"  {line}\n" for line in _bad_side))
@@ -1234,6 +1587,10 @@ def main():
                          # 0325: the side elevation a vehicle is lofted from
                          "side_file": (f"{fid}.side.svg"
                                        if fid in SIDE_PROFILES else None),
+                         # 0329: what a cabinet or appliance is born as; the
+                         # viewer builds its parts from this plus the item's
+                         # own `state` and its room's style
+                         "cabinet": CABINETS.PRESETS.get(fid),
                          "price": _prev_price.get(fid, 0.0)})
     # D70: REFUSE BEFORE WRITING ANYTHING, the same shape as the data-model gate
     # above -- a half-written asset tree is worse than none, and this generator is
@@ -1266,13 +1623,16 @@ def main():
                      "base_cab_24", "base_cab_36", "drawer_base_18",
                      "sink_base_36", "corner_base_36", "wall_cab_24",
                      "wall_cab_30", "wall_cab_36", "kitchen_island", "island_sink",
-                     "pantry_18", "pantry_24", "pantry_36", "dining_chair"]),
+                     "pantry_18", "pantry_24", "pantry_36", "range_hood",
+                     "microwave_otr", "dining_chair"]),
         ("Bedroom", ["bed_king", "bed_queen", "bed_full", "bed_twin",
                      "nightstand", "dresser", "wardrobe", "armchair",
                      "tv_stand", "desk", "office_chair", "bookshelf"]),
         ("Bathroom", ["bathtub", "shower", "walk_in_shower", "glass_shower",
                       "toilet", "vanity", "vanity_24", "vanity_36", "vanity_48"]),
         ("Laundry", ["washer", "dryer"]),
+        ("Lighting", ["light_recessed", "light_flush", "light_pendant",
+                      "light_linear", "light_sconce"]),
         ("Garage", ["suv", "car", "motorcycle", "bicycle", "boat",
                     "boat_trailer", "garden_tractor", "riding_mower_snow",
                     "workbench", "storage_shelves", "lawnmower", "snowblower",
@@ -1328,6 +1688,11 @@ def main():
         "    a form falls back to `box` and **says so in its report**; an\n"
         "    unrecognised one renders in the loud magenta.\n"
         "  * `material` — a name only, resolved in `materials.json`.\n"
+        "  * `cabinet` — for a cabinet or an appliance, the preset it is born\n"
+        "    as (type, width, depth, front ...), or null.  The 3D viewer builds\n"
+        "    its doors, drawers, toe kick and countertop from this, the item's\n"
+        "    own parameters and its room's style; the vocabulary and the\n"
+        "    arithmetic are `floorplanner/parametric/cabinet_geometry.py`.\n"
         "  * `side_file` — for a vehicle, its SIDE ELEVATION (`<id>.side.svg`),\n"
         "    or null.  viewBox `0 0 LENGTH HEIGHT` in inches, nose at x = 0,\n"
         "    ground at the bottom edge.  Each part is a filled `<polygon>` or\n"

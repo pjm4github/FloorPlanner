@@ -765,6 +765,32 @@ class RoomPropertiesDialog(QDialog):
         form.addRow("Heating / cooling", self.cb_hvac)
         self.ed_elec = QLineEdit(str(p.get("electrical", "")))
         form.addRow("Electrical", self.ed_elec)
+        # 0329: the room's STYLE -- what its cabinets (and, later, its other
+        # furnishings) look like unless one overrides it. "(default)" writes
+        # nothing, so a room nobody has styled keeps no `style` at all.
+        from floorplanner.parametric import cabinet_geometry as _cg
+        stored = p.get("style") if isinstance(p.get("style"), dict) else {}
+        self._style_boxes = {}
+        for key, label, table in (
+                ("cabinet_finish", "Cabinet finish", _cg.FINISHES),
+                ("door_style", "Cabinet door style", _cg.DOOR_STYLES),
+                ("countertop", "Countertop", _cg.COUNTERTOPS),
+                ("hardware", "Cabinet hardware", _cg.HARDWARE)):
+            cb = QComboBox()
+            cb.addItem("(default)", "")
+            for row in table:
+                cb.addItem(row[1], row[0])
+            value = str(stored.get(key, "") or "")
+            idx = cb.findData(value)
+            if idx < 0 and value:          # a key from a newer build: keep it
+                cb.addItem(value, value)
+                idx = cb.count() - 1
+            cb.setCurrentIndex(max(idx, 0))
+            cb.setToolTip("Applies to every cabinet in this room that does "
+                          "not set its own.")
+            form.addRow(label, cb)
+            self._style_boxes[key] = cb
+
         self.ed_notes = QPlainTextEdit(str(p.get("notes", "")))
         self.ed_notes.setFixedHeight(70)
         form.addRow("Notes", self.ed_notes)
@@ -803,6 +829,19 @@ class RoomPropertiesDialog(QDialog):
             "electrical": self.ed_elec.text().strip(),
             "notes": self.ed_notes.toPlainText(),
         })
+        # 0329: a NEW dict every time -- the undo snapshots hold the old one
+        prior = self.room.properties.get("style")
+        style = dict(prior) if isinstance(prior, dict) else {}
+        for key, cb in self._style_boxes.items():
+            value = cb.currentData()
+            if value:
+                style[key] = value
+            else:
+                style.pop(key, None)
+        if style:
+            self.room.properties["style"] = style
+        else:
+            self.room.properties.pop("style", None)
 
 
 class OpeningPropertiesDialog(QDialog):

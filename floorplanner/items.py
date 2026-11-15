@@ -250,21 +250,83 @@ class FurnishingItem(QGraphicsItem):
         """True when this kind has a registered parameter definition."""
         return _param_registry.is_parametric(self.kind)
 
+    def _room_style(self):
+        """0329: the STYLE of the room this item stands in (its
+        `properties["style"]`), or None -- what a cabinet's finish, countertop
+        and hardware fall back to. The smallest room holding the item's
+        centre, the same owner the plan file records."""
+        room = self._owning_room()
+        if room is None:
+            return None
+        style = room.properties.get("style")
+        return dict(style) if isinstance(style, dict) else None
+
+    def _owning_room(self):
+        """The smallest room on this item's floor that holds its centre."""
+        sc = self.scene()
+        if sc is None:
+            return None
+        pt = self.scenePos()
+        best = None
+        for it in sc.items():
+            if (isinstance(it, RoomItem) and it.floor == self.floor
+                    and it.path.contains(pt)):
+                area = abs(it.path.boundingRect().width()
+                           * it.path.boundingRect().height())
+                if best is None or area < best[0]:
+                    best = (area, it)
+        return None if best is None else best[1]
+
+    def _room_ceiling(self) -> float:
+        """0333: the ceiling a ceiling light hangs from -- its room's."""
+        room = self._owning_room()
+        try:
+            return float(room.properties.get("ceiling_height_in")) if room else 96.0
+        except (TypeError, ValueError):
+            return 96.0
+
     def param_context(self) -> dict:
         """What a parameter definition may read about where the item stands:
-        its floor and every floor's elevation."""
+        its floor, every floor's elevation, and its room's style."""
         return {"this_floor": self.floor,
                 "this_elev": floor_elevation(self.floor),
-                "elevations": floor_elevations()}
+                "elevations": floor_elevations(),
+                "room_style": self._room_style(),
+                "ceiling_in": self._room_ceiling()}
 
     def draft_state(self) -> dict:
         """The state a properties dialog starts editing -- a COPY."""
         return dict(self.params or {})
 
+    def _apply_footprint(self):
+        """0329: a kind whose FOOTPRINT follows its parameters (a cabinet's
+        width and depth) resizes here; the plan symbol is drawn into the new
+        rectangle. The item's position is its centre, so it grows both ways."""
+        definition = _param_registry.get(self.kind)
+        if definition is None:
+            return
+        size = definition.footprint(self.params or {})
+        if not size:
+            return
+        w, d = float(size[0]), float(size[1])
+        if abs(w - self.w) > 1e-9 or abs(d - self.d) > 1e-9:
+            self.prepareGeometryChange()
+            self.w, self.d = w, d
+            tip = f"{self.name} \u2014 {fmt_in(self.w)} \u00d7 {fmt_in(self.d)}"
+            if self.price > 0:
+                tip += f"  \u00b7  ${self.price:,.0f}"
+            self.setToolTip(tip + "  \u00b7  double-click to edit")
+
     def apply_params(self, state: dict):
-        """Take an accepted parameter set. The base item only stores it; a
-        kind whose shape follows its parameters overrides this."""
+        """Take an accepted parameter set. The kind decides what is worth
+        WRITING (a cabinet stores only what differs from its preset), and
+        the footprint follows. A kind whose whole shape is its parameters --
+        the stair -- overrides this."""
+        definition = _param_registry.get(self.kind)
+        if definition is not None:
+            state = definition.to_state(state or {})
         self.params = dict(state or {}) or None
+        self._apply_footprint()
         self.update()
 
     def make_properties_dialog(self, parent=None):
@@ -699,6 +761,7 @@ def make_furnishing(kind: str, pos: QPointF, rotation: float = 0.0,
     item = FurnishingItem(kind, pos, rotation)
     if state and _param_registry.is_parametric(kind):
         item.params = dict(state)
+        item._apply_footprint()            # 0329: a cabinet's own width / depth
     return item
 
 

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 50" width="120" height="50">
+<polygon points="1.00,48.00 1.00,36.00 9.50,38.00 9.50,48.00" fill="#eab308" stroke="#374151" stroke-width="0.4" data-part="bucket" data-material="machine_yellow" data-inset="2.5"/>
+<polygon points="9.00,44.00 9.00,39.50 42.00,19.00 42.00,23.50" fill="#eab308" stroke="#374151" stroke-width="0.4" data-part="loader-arm" data-material="machine_yellow" data-half="18.0" data-width="4.5"/>
+<polygon points="38.00,42.00 38.00,35.50 112.00,35.50 112.00,42.00" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="chassis" data-material="auto_trim" data-half="11.0"/>
+<polygon points="38.00,36.00 38.00,15.00 66.00,13.50 68.00,36.00" fill="#15803d" stroke="#374151" stroke-width="0.4" data-part="hood" data-material="machine_green" data-half="14.0"/>
+<polygon points="37.40,33.00 37.40,18.00 38.60,18.00 38.60,33.00" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="grille" data-material="auto_trim" data-half="11.0"/>
+<polygon points="66.00,20.00 66.00,13.00 72.00,14.00 72.00,20.00" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="dash" data-material="auto_trim" data-half="6.0"/>
+<polygon points="68.00,38.00 68.00,28.00 104.00,28.00 104.00,38.00" fill="#15803d" stroke="#374151" stroke-width="0.4" data-part="platform" data-material="machine_green" data-half="16.0"/>
+<polygon points="88.00,28.00 90.00,22.50 115.00,22.50 117.00,28.00" fill="#15803d" stroke="#374151" stroke-width="0.4" data-part="fender" data-material="machine_green" data-inset="0.5" data-width="10.0"/>
+<polygon points="76.00,28.00 76.00,22.00 88.00,22.00 90.50,10.00 93.50,10.00 92.50,28.00" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="seat" data-material="auto_trim" data-half="8.0"/>
+<polygon points="96.00,28.00 96.00,0.00 98.50,0.00 98.50,28.00" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="rops" data-material="auto_trim" data-half="15.0" data-width="2.5"/>
+<polygon points="96.00,2.50 96.00,0.00 98.50,0.00 98.50,2.50" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="rops-top" data-material="auto_trim" data-half="15.0"/>
+<circle cx="50.5" cy="41.5" r="8.5" fill="#111827" stroke="#374151" stroke-width="0.4" data-part="wheel-front" data-material="rubber" data-inset="1.0" data-width="7.0"/>
+<circle cx="102.5" cy="37.5" r="12.5" fill="#111827" stroke="#374151" stroke-width="0.4" data-part="wheel-rear" data-material="rubber" data-inset="0.5" data-width="9.0"/>
+<circle cx="50.5" cy="41.5" r="4.5" fill="#eab308" stroke="#374151" stroke-width="0.4" data-part="hub-front" data-material="machine_yellow" data-inset="0.7" data-width="3.0"/>
+<circle cx="102.5" cy="37.5" r="7.0" fill="#eab308" stroke="#374151" stroke-width="0.4" data-part="hub-rear" data-material="machine_yellow" data-inset="0.2" data-width="3.0"/>
+<polygon points="112.00,42.00 112.00,37.00 119.00,37.00 119.00,42.00" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="hitch" data-material="metal" data-half="6.0"/>
+</svg>

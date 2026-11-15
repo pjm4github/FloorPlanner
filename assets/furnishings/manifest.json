@@ -12,6 +12,7 @@
     "material": "soft",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 650.0
   },
   {
@@ -27,6 +28,7 @@
     "material": "soft",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 480.0
   },
   {
@@ -42,6 +44,7 @@
     "material": "soft",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 300.0
   },
   {
@@ -57,6 +60,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 120.0
   },
   {
@@ -72,6 +76,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 80.0
   },
   {
@@ -87,6 +92,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 180.0
   },
   {
@@ -102,6 +108,7 @@
     "material": "screen",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 300.0
   },
   {
@@ -117,6 +124,7 @@
     "material": "stone",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 2000.0
   },
   {
@@ -132,6 +140,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 450.0
   },
   {
@@ -147,6 +156,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 400.0
   },
   {
@@ -162,6 +172,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 50.0
   },
   {
@@ -177,6 +188,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 350.0
   },
   {
@@ -192,6 +204,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 400.0
   },
   {
@@ -207,6 +220,13 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "appliance",
+      "appliance": "refrigerator",
+      "width_in": 36,
+      "depth_in": 30,
+      "height_in": 70
+    },
     "price": 825.0
   },
   {
@@ -222,6 +242,13 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "appliance",
+      "appliance": "range",
+      "width_in": 30,
+      "depth_in": 26,
+      "height_in": 36
+    },
     "price": 710.0
   },
   {
@@ -237,6 +264,13 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "appliance",
+      "appliance": "dishwasher",
+      "width_in": 24,
+      "depth_in": 24,
+      "height_in": 34
+    },
     "price": 385.0
   },
   {
@@ -252,6 +286,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 240.0
   },
   {
@@ -267,6 +302,11 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "base",
+      "width_in": 24,
+      "depth_in": 24
+    },
     "price": 290.0
   },
   {
@@ -282,6 +322,11 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "base",
+      "width_in": 36,
+      "depth_in": 24
+    },
     "price": 360.0
   },
   {
@@ -297,6 +342,13 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "base",
+      "width_in": 18,
+      "depth_in": 24,
+      "front": "drawers",
+      "drawers": 3
+    },
     "price": 360.0
   },
   {
@@ -312,6 +364,12 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "sink_base",
+      "width_in": 36,
+      "depth_in": 24,
+      "sink": "double"
+    },
     "price": 440.0
   },
   {
@@ -327,6 +385,11 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "corner_base",
+      "width_in": 36,
+      "depth_in": 36
+    },
     "price": 585.0
   },
   {
@@ -342,6 +405,12 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "tall",
+      "width_in": 18,
+      "depth_in": 24,
+      "height_in": 84
+    },
     "price": 610.0
   },
   {
@@ -357,6 +426,12 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "tall",
+      "width_in": 24,
+      "depth_in": 24,
+      "height_in": 84
+    },
     "price": 720.0
   },
   {
@@ -372,6 +447,12 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "tall",
+      "width_in": 36,
+      "depth_in": 24,
+      "height_in": 84
+    },
     "price": 825.0
   },
   {
@@ -387,6 +468,12 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "wall",
+      "width_in": 24,
+      "depth_in": 12,
+      "height_in": 30
+    },
     "price": 250.0
   },
   {
@@ -402,6 +489,12 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "wall",
+      "width_in": 30,
+      "depth_in": 12,
+      "height_in": 30
+    },
     "price": 340.0
   },
   {
@@ -417,6 +510,12 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "wall",
+      "width_in": 36,
+      "depth_in": 12,
+      "height_in": 30
+    },
     "price": 425.0
   },
   {
@@ -432,6 +531,14 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "island",
+      "width_in": 72,
+      "depth_in": 39,
+      "slot_1": "B36",
+      "slot_2": "B36",
+      "seats": 3
+    },
     "price": 1450.0
   },
   {
@@ -447,6 +554,15 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "island",
+      "width_in": 84,
+      "depth_in": 42,
+      "slot_1": "B24",
+      "slot_2": "SB36",
+      "slot_3": "DW24",
+      "seats": 3
+    },
     "price": 2100.0
   },
   {
@@ -462,6 +578,7 @@
     "material": "soft",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 650.0
   },
   {
@@ -477,6 +594,7 @@
     "material": "soft",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 500.0
   },
   {
@@ -492,6 +610,7 @@
     "material": "soft",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 400.0
   },
   {
@@ -507,6 +626,7 @@
     "material": "soft",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 300.0
   },
   {
@@ -522,6 +642,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 100.0
   },
   {
@@ -537,6 +658,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 150.0
   },
   {
@@ -552,6 +674,7 @@
     "material": "porcelain",
     "region_material": "water",
     "side_file": null,
+    "cabinet": null,
     "price": 500.0
   },
   {
@@ -567,6 +690,7 @@
     "material": "glass",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 700.0
   },
   {
@@ -582,6 +706,7 @@
     "material": "glass",
     "region_material": "stone",
     "side_file": null,
+    "cabinet": null,
     "price": 2500.0
   },
   {
@@ -597,6 +722,7 @@
     "material": "glass",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 3000.0
   },
   {
@@ -612,6 +738,7 @@
     "material": "porcelain",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 175.0
   },
   {
@@ -627,6 +754,14 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "sink_base",
+      "width_in": 30,
+      "depth_in": 21,
+      "height_in": 32.5,
+      "sink": "single",
+      "sink_material": "porcelain"
+    },
     "price": 600.0
   },
   {
@@ -642,6 +777,14 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "sink_base",
+      "width_in": 24,
+      "depth_in": 21,
+      "height_in": 32.5,
+      "sink": "single",
+      "sink_material": "porcelain"
+    },
     "price": 450.0
   },
   {
@@ -657,6 +800,14 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "sink_base",
+      "width_in": 36,
+      "depth_in": 21,
+      "height_in": 32.5,
+      "sink": "single",
+      "sink_material": "porcelain"
+    },
     "price": 750.0
   },
   {
@@ -672,6 +823,14 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "sink_base",
+      "width_in": 48,
+      "depth_in": 21,
+      "height_in": 32.5,
+      "sink": "double",
+      "sink_material": "porcelain"
+    },
     "price": 950.0
   },
   {
@@ -687,6 +846,16 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "appliance",
+      "appliance": "washer",
+      "width_in": 27,
+      "depth_in": 30,
+      "height_in": 38,
+      "finish_mode": "custom",
+      "sheen": "gloss",
+      "colour": "white"
+    },
     "price": 500.0
   },
   {
@@ -702,6 +871,16 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": {
+      "type": "appliance",
+      "appliance": "dryer",
+      "width_in": 27,
+      "depth_in": 30,
+      "height_in": 38,
+      "finish_mode": "custom",
+      "sheen": "gloss",
+      "colour": "white"
+    },
     "price": 500.0
   },
   {
@@ -717,6 +896,7 @@
     "material": "vehicle",
     "region_material": null,
     "side_file": "suv.side.svg",
+    "cabinet": null,
     "price": 16000.0
   },
   {
@@ -732,6 +912,7 @@
     "material": "vehicle",
     "region_material": null,
     "side_file": "car.side.svg",
+    "cabinet": null,
     "price": 12000.0
   },
   {
@@ -746,7 +927,8 @@
     "form": "vehicle",
     "material": "vehicle",
     "region_material": null,
-    "side_file": null,
+    "side_file": "motorcycle.side.svg",
+    "cabinet": null,
     "price": 6000.0
   },
   {
@@ -761,7 +943,8 @@
     "form": "vehicle",
     "material": "vehicle",
     "region_material": null,
-    "side_file": null,
+    "side_file": "bicycle.side.svg",
+    "cabinet": null,
     "price": 250.0
   },
   {
@@ -776,8 +959,170 @@
     "form": "vehicle",
     "material": "vehicle",
     "region_material": null,
-    "side_file": null,
+    "side_file": "boat.side.svg",
+    "cabinet": null,
     "price": 4500.0
+  },
+  {
+    "id": "range_hood",
+    "name": "Range Hood 30\"",
+    "category": "Kitchen",
+    "file": "range_hood.svg",
+    "width_in": 30,
+    "depth_in": 20,
+    "height_in": 18,
+    "elevation_in": 66,
+    "form": "box",
+    "material": "metal",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "appliance",
+      "appliance": "hood",
+      "wall_mounted": true,
+      "width_in": 30,
+      "depth_in": 20,
+      "height_in": 18,
+      "floor_to_bottom_in": 66
+    },
+    "price": 0.0
+  },
+  {
+    "id": "microwave_otr",
+    "name": "Microwave, Over-Range 30\"",
+    "category": "Kitchen",
+    "file": "microwave_otr.svg",
+    "width_in": 30,
+    "depth_in": 16,
+    "height_in": 17,
+    "elevation_in": 54,
+    "form": "box",
+    "material": "metal",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "appliance",
+      "appliance": "microwave",
+      "wall_mounted": true,
+      "width_in": 30,
+      "depth_in": 16,
+      "height_in": 17,
+      "floor_to_bottom_in": 54
+    },
+    "price": 0.0
+  },
+  {
+    "id": "light_recessed",
+    "name": "Recessed Light",
+    "category": "Lighting",
+    "file": "light_recessed.svg",
+    "width_in": 6,
+    "depth_in": 6,
+    "height_in": 1,
+    "elevation_in": 95,
+    "form": "box",
+    "material": "metal",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "light",
+      "fixture": "recessed",
+      "width_in": 6,
+      "depth_in": 6,
+      "size_in": 6,
+      "beam": "spot"
+    },
+    "price": 0.0
+  },
+  {
+    "id": "light_flush",
+    "name": "Ceiling Light",
+    "category": "Lighting",
+    "file": "light_flush.svg",
+    "width_in": 14,
+    "depth_in": 14,
+    "height_in": 5,
+    "elevation_in": 91,
+    "form": "box",
+    "material": "metal",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "light",
+      "fixture": "flush",
+      "width_in": 14,
+      "depth_in": 14,
+      "size_in": 14
+    },
+    "price": 0.0
+  },
+  {
+    "id": "light_pendant",
+    "name": "Pendant Light",
+    "category": "Lighting",
+    "file": "light_pendant.svg",
+    "width_in": 12,
+    "depth_in": 12,
+    "height_in": 38,
+    "elevation_in": 58,
+    "form": "box",
+    "material": "metal",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "light",
+      "fixture": "pendant",
+      "width_in": 12,
+      "depth_in": 12,
+      "size_in": 12,
+      "drop_in": 30
+    },
+    "price": 0.0
+  },
+  {
+    "id": "light_linear",
+    "name": "Linear Light 4'",
+    "category": "Lighting",
+    "file": "light_linear.svg",
+    "width_in": 48,
+    "depth_in": 6,
+    "height_in": 3,
+    "elevation_in": 93,
+    "form": "box",
+    "material": "metal",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "light",
+      "fixture": "linear",
+      "width_in": 48,
+      "depth_in": 6,
+      "size_in": 48
+    },
+    "price": 0.0
+  },
+  {
+    "id": "light_sconce",
+    "name": "Wall Sconce",
+    "category": "Lighting",
+    "file": "light_sconce.svg",
+    "width_in": 6,
+    "depth_in": 5,
+    "height_in": 10,
+    "elevation_in": 66,
+    "form": "box",
+    "material": "metal",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "light",
+      "fixture": "sconce",
+      "width_in": 6,
+      "depth_in": 5,
+      "size_in": 6,
+      "floor_to_bottom_in": 66
+    },
+    "price": 0.0
   },
   {
     "id": "workbench",
@@ -792,6 +1137,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 150.0
   },
   {
@@ -807,6 +1153,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 150.0
   },
   {
@@ -821,7 +1168,8 @@
     "form": "vehicle",
     "material": "vehicle",
     "region_material": null,
-    "side_file": null,
+    "side_file": "lawnmower.side.svg",
+    "cabinet": null,
     "price": 150.0
   },
   {
@@ -836,7 +1184,8 @@
     "form": "vehicle",
     "material": "vehicle",
     "region_material": null,
-    "side_file": null,
+    "side_file": "garden_tractor.side.svg",
+    "cabinet": null,
     "price": 13000.0
   },
   {
@@ -851,7 +1200,8 @@
     "form": "vehicle",
     "material": "vehicle",
     "region_material": null,
-    "side_file": null,
+    "side_file": "riding_mower_snow.side.svg",
+    "cabinet": null,
     "price": 1200.0
   },
   {
@@ -866,7 +1216,8 @@
     "form": "vehicle",
     "material": "vehicle",
     "region_material": null,
-    "side_file": null,
+    "side_file": "boat_trailer.side.svg",
+    "cabinet": null,
     "price": 1100.0
   },
   {
@@ -881,7 +1232,8 @@
     "form": "vehicle",
     "material": "vehicle",
     "region_material": null,
-    "side_file": null,
+    "side_file": "snowblower.side.svg",
+    "cabinet": null,
     "price": 500.0
   },
   {
@@ -897,6 +1249,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 70.0
   },
   {
@@ -912,6 +1265,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 35.0
   },
   {
@@ -927,6 +1281,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 300.0
   },
   {
@@ -942,6 +1297,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 500.0
   },
   {
@@ -957,6 +1313,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 2500.0
   },
   {
@@ -972,6 +1329,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 2000.0
   },
   {
@@ -987,6 +1345,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 200.0
   },
   {
@@ -1002,6 +1361,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 1000.0
   },
   {
@@ -1017,6 +1377,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 180.0
   },
   {
@@ -1032,6 +1393,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 300.0
   },
   {
@@ -1047,6 +1409,7 @@
     "material": "soft",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 150.0
   },
   {
@@ -1062,6 +1425,7 @@
     "material": "wood",
     "region_material": "metal",
     "side_file": null,
+    "cabinet": null,
     "price": 3500.0
   },
   {
@@ -1077,6 +1441,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 1500.0
   },
   {
@@ -1092,6 +1457,7 @@
     "material": "porcelain",
     "region_material": "water",
     "side_file": null,
+    "cabinet": null,
     "price": 15000.0
   },
   {
@@ -1107,6 +1473,7 @@
     "material": "porcelain",
     "region_material": "water",
     "side_file": null,
+    "cabinet": null,
     "price": 6500.0
   },
   {
@@ -1122,6 +1489,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 350.0
   },
   {
@@ -1137,6 +1505,7 @@
     "material": "soft",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 120.0
   },
   {
@@ -1152,6 +1521,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 450.0
   },
   {
@@ -1167,6 +1537,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 400.0
   },
   {
@@ -1182,6 +1553,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 180.0
   },
   {
@@ -1197,6 +1569,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 250.0
   },
   {
@@ -1212,6 +1585,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 1200.0
   },
   {
@@ -1227,6 +1601,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 1500.0
   },
   {
@@ -1242,6 +1617,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 2400.0
   },
   {
@@ -1257,6 +1633,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 700.0
   },
   {
@@ -1272,6 +1649,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 600.0
   },
   {
@@ -1287,6 +1665,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 700.0
   },
   {
@@ -1302,6 +1681,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 1500.0
   },
   {
@@ -1317,6 +1697,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 1200.0
   },
   {
@@ -1332,6 +1713,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 500.0
   },
   {
@@ -1347,6 +1729,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 550.0
   },
   {
@@ -1362,6 +1745,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 9200.0
   },
   {
@@ -1377,6 +1761,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 900.0
   },
   {
@@ -1392,6 +1777,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 1200.0
   },
   {
@@ -1407,6 +1793,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 3500.0
   },
   {
@@ -1422,6 +1809,7 @@
     "material": "metal",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 40000.0
   },
   {
@@ -1437,6 +1825,7 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
+    "cabinet": null,
     "price": 0.0
   }
 ]

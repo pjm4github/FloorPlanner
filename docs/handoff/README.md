@@ -472,5 +472,6 @@ this table is not a second copy of it.
 | [`0330-ruling.md`](./0330-ruling.md) | ruling: the red cabinet test was the TEST's fault, not the product's — fixed in place; re-gate |
 | [`0331-report.md`](./0331-report.md) | report: the ROOMS UNDER A DORMER render right from inside — the host roof no longer shows through the dormer's gable ceiling; and the 0328 §5 record-gap answered |
 | [`0332-report.md`](./0332-report.md) | report: the furnishings lane (VEHICLES 0325 fleet + CABINETS/room-style 0329) gated GREEN with the dormer fix in the tree; committed by path on `furnishings-lane`, AMBER. 0330's "anything else red" answered. |
+| [`0333-ruling.md`](./0333-ruling.md) | ruling: the parametric ISLAND (slots + seats), a range HOOD and over-range MICROWAVE, gloss LAUNDRY finishes and LIGHTS are built — un-gated; and the lights need one piece that is Code's to build |
 
 <!-- PAIRS:END -->

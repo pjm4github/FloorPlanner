@@ -657,7 +657,23 @@ _OUTLINE_CACHE = {}
 
 
 def _colour(materials, name):
-    """(r, g, b, a) for a material name, or None if the catalog lacks it."""
+    """(r, g, b, a) for a material name, or None if the catalog lacks it.
+
+    0329: a name may carry its own colour as a "#rrggbb" suffix -- an
+    appliance's custom finish is a SHEEN (a catalog material: its roughness
+    and metalness) in a colour the user chose. The sheen must still exist;
+    the hex replaces its colour and keeps its alpha."""
+    name = str(name)
+    if "#" in name:
+        base, _sep, hexa = name.partition("#")
+        col = _colour(materials, base)
+        if col is None or len(hexa) != 6:
+            return None
+        try:
+            rgb = [int(hexa[i:i + 2], 16) / 255.0 for i in (0, 2, 4)]
+        except ValueError:
+            return None
+        return (rgb[0], rgb[1], rgb[2], col[3])
     m = materials.get(name)
     if not isinstance(m, dict):
         return None
@@ -687,6 +703,11 @@ class Model:
     info: list = field(default_factory=list)       # routine tidying, --verbose
     bbox: tuple = None                             # (min xyz, max xyz)
     stats: dict = field(default_factory=dict)
+    # 0333: the LIGHT SOURCES the plan's light fixtures give off, for a
+    # renderer that can use them -- each {"pos": (x, y, z) world, "colour":
+    # (r, g, b), "lumens", "kind": "point" | "spot" (a spot aims straight
+    # down), "cone_deg", "id"}. Geometry is in `meshes`; this is the light.
+    lights: list = field(default_factory=list)
 
 
 def _roof_underside_at(lifted_of, x, y, above_z):
@@ -1904,14 +1925,25 @@ def load_side_profile(path):
         if len(ring) < 3 or _ring_area(ring) <= 1e-9:
             continue
         width = attr(el, "data-width", None)
+        half = attr(el, "data-half", None)
         parts.append({"ring": ring,
                       "material": el.get("data-material") or "unknown",
                       "inset": attr(el, "data-inset", 0.0),
                       "width": width if width and width > 0 else None,
+                      "half": half if half and half > 0 else None,
                       "name": el.get("data-part") or tag})
     if not parts:
         return None
-    return {"length": length, "height": height,
+    # data-plan: the top view's half-width along the vehicle, "s:half" pairs
+    plan = []
+    for token in (root.get("data-plan") or "").split():
+        pair = token.split(":")
+        try:
+            plan.append((float(pair[0]), float(pair[1])))
+        except (IndexError, ValueError):
+            return None                   # a plan that cannot be read is no plan
+    plan.sort()
+    return {"length": length, "height": height, "plan": plan,
             "belt": attr(root, "data-belt", height),
             "roof": attr(root, "data-roof", height),
             "tumble": attr(root, "data-tumble", 0.0),
@@ -2025,6 +2057,21 @@ def build_vehicle(place, w, d, h, z0, profile):
             return 0.0
         return tumble * min(max((z - belt) / (roof - belt), 0.0), 1.0)
 
+    plan = profile.get("plan") or []
+
+    def side(s):
+        """The body side at `s`, from the centreline: the footprint's half
+        width, or the top view's own outline when the file gives one."""
+        if not plan:
+            return half
+        if s <= plan[0][0]:
+            return min(plan[0][1], half)
+        for (s0, h0), (s1, h1) in zip(plan[:-1], plan[1:], strict=True):
+            if s <= s1:
+                t = 0.0 if s1 - s0 < 1e-12 else (s - s0) / (s1 - s0)
+                return min(h0 + t * (h1 - h0), half)
+        return min(plan[-1][1], half)
+
     def at(s, z, x):
         px, py = place(x, d / 2.0 - s * ks)
         return (px, py, z0 + z * kz)
@@ -2039,8 +2086,13 @@ def build_vehicle(place, w, d, h, z0, profile):
             if span is None:
                 continue
             lo, hi = span
-            edge_lo = half - part["inset"] - rounding(s) - lean(lo)
-            edge_hi = half - part["inset"] - rounding(s) - lean(hi)
+            if part.get("half") is not None:
+                # placed from the CENTRELINE: not rounded, not leaned
+                edge_lo = edge_hi = min(part["half"], half)
+            else:
+                base = side(s) - part["inset"] - rounding(s)
+                edge_lo = min(base - lean(lo), half)
+                edge_hi = min(base - lean(hi), half)
             rows.append((s, lo, hi, edge_lo, edge_hi))
         if len(rows) < 2:
             continue
@@ -2080,6 +2132,60 @@ def load_side(kind, specs, assets_dir=None):
         out = load_side_profile(os.path.join(d, str(spec["side_file"])))
     _SIDE_CACHE[kind] = out
     return out
+
+
+def _load_parametric(filename, name):
+    """A pure calculator from `floorplanner/parametric/`, loaded BY PATH for
+    the reason `roofclip.py` is. None when it cannot be found."""
+    import importlib.util
+    here = os.path.dirname(os.path.abspath(__file__))
+    cand = os.path.join(os.path.dirname(here), "parametric", filename)
+    try:
+        spec = importlib.util.spec_from_file_location(name, cand)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod            # @dataclass looks its module up
+        spec.loader.exec_module(mod)
+        return mod
+    except (OSError, AttributeError, ImportError, SyntaxError):
+        sys.modules.pop(name, None)
+        return None
+
+
+# 0329: cabinets and appliances as PARTS. None when the file is missing: a
+# cabinet then draws as the catalog box it always was, and the report says so.
+CABGEO = _load_parametric("cabinet_geometry.py", "_fp_cabinet_geometry")
+
+
+def build_cabinet(preset, state, room_style, place, floor_z, ceiling_in=96.0):
+    """({material: [(verts, faces), ...]}, light) for a cabinet, an
+    appliance, an island or a light fixture, or ({}, None) when it cannot be
+    built. `light` is the fixture's LIGHT SOURCE in world coordinates (see
+    `Model.lights`), or None for anything that gives off none.
+
+    `preset` is the manifest's `cabinet` entry, `state` the furnishing's own
+    parameters, `room_style` its room's `properties.style`. A part's `f` is
+    distance out from the wall, and the plan symbol is drawn back-up, so it
+    maps to local y as `depth / 2 - f` -- the y flip `build_prism` documents.
+    Heights are above the LEVEL's floor: a wall cabinet's parts already start
+    at its mounting height, so the catalog's `elevation_in` is not added."""
+    cg = CABGEO
+    if cg is None or not preset:
+        return {}, None
+    st = cg.normalize_state(state, preset)
+    _w, d = cg.footprint(st)
+    mats = cg.resolve_materials(st, room_style)
+    out = {}
+    for part in cg.cabinet_parts(st, room_style, ceiling_in):
+        quad = [place(x, d / 2.0 - f) for x, f in part.quad]
+        out.setdefault(mats.get(part.role, "unknown"), []).append(
+            _box(quad, floor_z + part.z0, floor_z + part.z1))
+    light = None
+    src = cg.light_source(st, ceiling_in)
+    if src is not None:
+        lx, lf, lz = src["pos"]
+        wx, wy = place(lx, d / 2.0 - lf)
+        light = dict(src, pos=(wx, wy, floor_z + lz))
+    return out, light
 
 
 def _load_stair_geometry():
@@ -3403,6 +3509,11 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         _OUTLINE_CACHE.clear()      # per build, so a test can swap the catalog
         _SIDE_CACHE.clear()
         by_side, side_failed = set(), set()
+        by_parts = set()
+        room_style_of = {r.get("id"): (r.get("properties") or {}).get("style")
+                         for r in rooms}
+        room_ceiling_of = {r.get("id"): (r.get("properties") or {}).get(
+            "ceiling_height_in") for r in rooms}
         for fu in doc.get("furnishings", []):
             if fu.get("level") not in lv:
                 continue
@@ -3484,6 +3595,31 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                     no_roof_posts.add(kind)
                 else:
                     fh = top - z
+            if spec.get("cabinet"):
+                # 0329: a cabinet or an appliance is built from PARTS -- doors,
+                # drawers, toe kick, countertop -- in the materials its own
+                # parameters and its ROOM'S STYLE resolve to. With the
+                # calculator missing it falls through to the catalog box.
+                try:
+                    ceiling = float(room_ceiling_of.get(fu.get("room"))
+                                    or lv[fu.get("level")].get("height_in", 96.0))
+                except (TypeError, ValueError):
+                    ceiling = 96.0
+                built, light = build_cabinet(
+                    spec["cabinet"], fu.get("state"),
+                    room_style_of.get(fu.get("room")), place,
+                    base(fu.get("level")), ceiling)
+                if light is not None:
+                    model.lights.append(dict(light, id=fu.get("id")))
+                if built:
+                    for part_mat, solids in built.items():
+                        if _colour(materials, part_mat) is None:
+                            unknown_mat.add(part_mat)
+                            part_mat = "unknown"
+                        parts.setdefault(part_mat, []).extend(solids)
+                    by_parts.add(kind)
+                    n_furn += 1
+                    continue
             if side_profile is not None:
                 # 0325: a vehicle with a SIDE ELEVATION is lofted from it --
                 # paint, glass, tyres and trim each in their own material. One
@@ -3552,6 +3688,10 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             col = _colour(materials, mat) or UNKNOWN_C
             model.meshes.append(Mesh(f"furnishings:{mat}", v, f, col,
                                      translucent=col[3] < 1.0))
+        if by_parts:
+            model.info.append(
+                f"{len(by_parts)} cabinet / appliance kind(s) BUILT FROM PARTS "
+                f"in their room's style: " + ", ".join(sorted(by_parts)))
         if by_side:
             model.info.append(
                 f"{len(by_side)} vehicle kind(s) LOFTED FROM THEIR SIDE "
@@ -3617,7 +3757,10 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                    "box_fallback_kinds": sorted(still_box),
                    # 0325: the kinds lofted from a side elevation -- a third
                    # list, so a vehicle is never counted as a prism it is not
-                   "side_profile_kinds": sorted(by_side) if furnishings else []}
+                   "side_profile_kinds": sorted(by_side) if furnishings else [],
+                   # 0329: the kinds built from cabinet PARTS
+                   "cabinet_kinds": sorted(by_parts) if furnishings else [],
+                   "lights": len(model.lights)}
     return model
 
 

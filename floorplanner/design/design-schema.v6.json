@@ -420,6 +420,82 @@
       }
     },
 
+    "room_style": {
+      "description": "0329. A cabinet resolves each choice as: its own parameter, else this, else the default. Values are KEYS from floorplanner/parametric/cabinet_geometry.py, listed here for a reader; they are strings rather than enums so a newer build's added finish does not make an older build reject the file -- an unknown key falls back to the default, in the application.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "cabinet_finish": { "description": "modern_white, maple, cherry, oak, walnut, espresso, grey, navy, sage.", "type": "string" },
+        "door_style":     { "description": "slab, shaker, raised, glass.", "type": "string" },
+        "countertop":     { "description": "marble, tile, quartz, granite, soapstone, laminate, butcher_block, concrete, stainless.", "type": "string" },
+        "hardware":       { "description": "brushed_nickel, chrome, matte_black, brass.", "type": "string" },
+        "backsplash":     { "description": "`countertop` (match it), or any countertop key.", "type": "string" }
+      }
+    },
+
+    "cabinet_state": {
+      "description": "0329. DECLARED, NOT ENFORCED: the keys a cabinet's `furnishing.state` may carry (kinds base_cab_*, drawer_base_*, sink_base_*, corner_base_*, wall_cab_*, pantry_*, vanity*). Every key is optional -- an absent one takes the kind's preset, then the type's default. `furnishing.state` itself stays open; the application validates and falls back (cabinet_geometry.normalize_state).",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "width_in":           { "type": "number", "exclusiveMinimum": 0 },
+        "depth_in":           { "type": "number", "exclusiveMinimum": 0 },
+        "height_in":          { "description": "The cabinet BOX, toe kick included, countertop excluded (34.5 for a base).", "type": "number", "exclusiveMinimum": 0 },
+        "toe_kick_h_in":      { "type": "number", "minimum": 0 },
+        "toe_kick_d_in":      { "type": "number", "minimum": 0 },
+        "floor_to_bottom_in": { "description": "Wall cabinets: the height of the underside above the floor (54 by default).", "type": "number", "minimum": 0 },
+        "front":              { "enum": ["doors", "drawer_over_doors", "drawers", "false_front"] },
+        "doors":              { "enum": ["auto", "1", "2"] },
+        "drawers":            { "type": "integer", "minimum": 2, "maximum": 5 },
+        "hinge":              { "enum": ["left", "right"] },
+        "door_style":         { "description": "`room`, or a room_style door_style key.", "type": "string" },
+        "overlay":            { "enum": ["full", "partial"] },
+        "pulls":              { "enum": ["bar", "knob", "none"] },
+        "finish":             { "description": "`room`, or a room_style cabinet_finish key.", "type": "string" },
+        "hardware":           { "description": "`room`, or a room_style hardware key.", "type": "string" },
+        "top_on":             { "type": "boolean" },
+        "top_thickness_in":   { "type": "number", "minimum": 0 },
+        "top_overhang_in":    { "type": "number", "minimum": 0 },
+        "top_material":       { "description": "`room`, or a room_style countertop key.", "type": "string" },
+        "backsplash_in":      { "type": "number", "minimum": 0 },
+        "sink":               { "enum": ["none", "single", "double"] },
+        "corner_type":        { "enum": ["diagonal", "l_shape", "blind"] },
+        "hand":               { "enum": ["left", "right"] }
+      }
+    },
+
+    "appliance_state": {
+      "description": "0329. DECLARED, NOT ENFORCED: the finish of an appliance (refrigerator, range, dishwasher, washer, dryer). `standard` is stainless; `match` takes the room's cabinet finish; `custom` is a sheen in a colour.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "finish_mode": { "enum": ["standard", "match", "custom"] },
+        "sheen":       { "enum": ["matte", "gloss", "gel_coat"] },
+        "colour":      { "description": "A colour KEY: white, cream, black, slate, red, navy, sage, yellow, copper, sky.", "type": "string" }
+      }
+    },
+
+    "stair_state": {
+      "description": "0323. DECLARED, NOT ENFORCED: the keys a parametric stair's `furnishing.state` carries. A stair with no `type` is a legacy stair (flight / turn / direction only). Full description: docs/furnishing-spec/STAIRS_STATE_AND_USAGE.md.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "type":              { "enum": ["straight", "L", "U"] },
+        "turn_deg":          { "enum": [0, 90, -90, 180, -180] },
+        "direction":         { "enum": ["up", "down"] },
+        "rise_mode":         { "enum": ["linked", "detached"] },
+        "total_rise_in":     { "type": "number" },
+        "tread_depth_in":    { "type": "number" },
+        "stair_width_in":    { "type": "number" },
+        "riser_count_mode":  { "enum": ["auto", "manual"] },
+        "riser_count":       { "type": "integer" },
+        "landing_mode":      { "enum": ["half", "custom"] },
+        "landing_height_in": { "type": "number" },
+        "code_profile":      { "type": "string" },
+        "acknowledged":      { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
     "room_properties": {
       "description": "Schedule data only. NO geometry: v4 shadowed the corner list in here as `perimeter_corners`; corners now come from `outline` and storing them here is a schema error.",
       "type": "object",
@@ -437,6 +513,7 @@
         "hvac":              { "type": "string" },
         "electrical":        { "type": "string" },
         "notes":             { "type": "string" },
+        "style":             { "description": "0329: the room's STYLE -- what its cabinets and other furnishings look like unless one overrides it. Absent means the application defaults.", "$ref": "#/$defs/room_style" },
 
         "surface":       { "description": "Site rooms: lawn, mulch, gravel, pavers, decomposed granite, water, planting soil.", "type": "string" },
         "plant_palette": { "description": "Site rooms: species / cultivar list for a bed.", "type": "array", "items": { "type": "string" } },
@@ -464,7 +541,7 @@
 
         "pos":      { "description": "Plan coordinates of the symbol centre.", "$ref": "#/$defs/point" },
         "rotation": { "type": "number", "default": 0 },
-        "state":    { "description": "Per-kind extra state (stair flight/turn/direction, plant species, …). v4 spread these across the object; nesting keeps the base shape closed.", "type": "object", "additionalProperties": true },
+        "state":    { "description": "Per-kind extra state (stair flight/turn/direction, plant species, …). v4 spread these across the object; nesting keeps the base shape closed. The keys each parametric kind writes are DECLARED in $defs/stair_state, $defs/cabinet_state and $defs/appliance_state; this object stays open and the application validates it.", "type": "object", "additionalProperties": true },
         "uid":      { "$ref": "#/$defs/uid" }
       }
     },

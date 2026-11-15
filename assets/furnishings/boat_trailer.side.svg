@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 72" width="216" height="72" data-plan="0:2 8:2 62:27 216:27">
+<polygon points="1.00,59.00 1.00,52.50 8.00,52.50 8.00,59.00" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="coupler" data-material="auto_trim" data-half="3.5"/>
+<polygon points="4.00,58.00 4.00,54.00 66.00,54.00 66.00,58.00" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="tongue" data-material="metal" data-half="2.0"/>
+<polygon points="8.00,58.00 8.00,54.00 205.00,54.00 205.00,58.00" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="rail" data-material="metal" data-inset="0.0" data-width="3.0"/>
+<polygon points="74.00,57.50 74.00,54.50 76.50,54.50 76.50,57.50" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="cross-1" data-material="metal" data-inset="0.0"/>
+<polygon points="124.00,57.50 124.00,54.50 126.50,54.50 126.50,57.50" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="cross-2" data-material="metal" data-inset="0.0"/>
+<polygon points="174.00,57.50 174.00,54.50 176.50,54.50 176.50,57.50" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="cross-3" data-material="metal" data-inset="0.0"/>
+<polygon points="203.00,58.00 203.00,54.00 206.00,54.00 206.00,58.00" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="cross-4" data-material="metal" data-inset="0.0"/>
+<polygon points="70.00,54.00 70.00,50.00 200.00,50.00 200.00,54.00" fill="#d6b98c" stroke="#374151" stroke-width="0.4" data-part="bunk" data-material="wood" data-half="16.5" data-width="3.5"/>
+<polygon points="28.00,54.00 28.00,32.00 32.00,32.00 32.00,54.00" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="winch-post" data-material="metal" data-half="2.0"/>
+<polygon points="27.00,38.00 27.00,33.00 34.00,33.00 34.00,38.00" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="winch" data-material="auto_trim" data-half="3.5"/>
+<polygon points="32.00,33.00 32.00,30.00 36.00,30.00 36.00,33.00" fill="#111827" stroke="#374151" stroke-width="0.4" data-part="bow-stop" data-material="rubber" data-half="4.0"/>
+<polygon points="144.00,61.00 144.00,57.50 148.00,57.50 148.00,61.00" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="axle" data-material="metal" data-half="30.0"/>
+<circle cx="146.0" cy="59.0" r="13.0" fill="#111827" stroke="#374151" stroke-width="0.4" data-part="tyre" data-material="rubber" data-half="37.0" data-width="8.0"/>
+<circle cx="146.0" cy="59.0" r="7.5" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="wheel" data-material="metal" data-half="37.3" data-width="3.0"/>
+<polygon points="130.00,48.50 133.00,43.50 159.00,43.50 162.00,48.50 158.00,45.40 134.00,45.40" fill="#1f2937" stroke="#374151" stroke-width="0.4" data-part="fender" data-material="auto_trim" data-half="38.0" data-width="9.5"/>
+<polygon points="206.00,57.50 206.00,53.00 211.50,53.00 211.50,57.50" fill="#b91c1c" stroke="#374151" stroke-width="0.4" data-part="tail-lamp" data-material="tail_lamp" data-half="31.0" data-width="6.5"/>
+<polygon points="40.00,70.00 40.00,50.00 43.00,50.00 43.00,70.00" fill="#9ca3af" stroke="#374151" stroke-width="0.4" data-part="jack" data-material="metal" data-half="6.0" data-width="2.5"/>
+</svg>
