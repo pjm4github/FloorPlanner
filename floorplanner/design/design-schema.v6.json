@@ -475,6 +475,27 @@
       }
     },
 
+    "fixture_state": {
+      "description": "0338. DECLARED, NOT ENFORCED: the keys a fixture's `furnishing.state` may carry (kinds toilet, bathtub, bookshelf, gas_fireplace, grab_bar). Every key is optional; the application validates and falls back (cabinet_geometry.normalize_state).",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "width_in":           { "type": "number", "exclusiveMinimum": 0 },
+        "depth_in":           { "type": "number", "exclusiveMinimum": 0 },
+        "height_in":          { "type": "number", "exclusiveMinimum": 0 },
+        "colour":             { "description": "Toilet and bathtub.", "enum": ["white", "cream", "black", "slate"] },
+        "shelves":            { "description": "Bookshelf: shelves between the bottom and the top.", "type": "integer", "minimum": 0, "maximum": 10 },
+        "books":              { "type": "boolean" },
+        "finish":             { "description": "Bookshelf, and a fireplace's mantel: a cabinet finish key, or `room`.", "type": "string" },
+        "surround":           { "enum": ["stone", "brick", "marble", "tile", "white"] },
+        "lit":                { "type": "boolean" },
+        "bar":                { "description": "Grab bar.", "enum": ["horizontal", "vertical"] },
+        "length_in":          { "type": "number", "minimum": 9, "maximum": 60 },
+        "floor_to_bottom_in": { "description": "Grab bar: floor to the underside of its flange.", "type": "number", "minimum": 0 },
+        "hardware":           { "description": "Grab bar: a hardware finish key, or `room`.", "type": "string" }
+      }
+    },
+
     "stair_state": {
       "description": "0323. DECLARED, NOT ENFORCED: the keys a parametric stair's `furnishing.state` carries. A stair with no `type` is a legacy stair (flight / turn / direction only). Full description: docs/furnishing-spec/STAIRS_STATE_AND_USAGE.md.",
       "type": "object",
@@ -491,6 +512,14 @@
         "riser_count":       { "type": "integer" },
         "landing_mode":      { "enum": ["half", "custom"] },
         "landing_height_in": { "type": "number" },
+        "flight_gap_in":     { "description": "0335. U only: the well between the two flights.", "type": "number" },
+        "left_side":         { "description": "0335. As walked going up.", "enum": ["wall", "guard", "open"] },
+        "right_side":        { "enum": ["wall", "guard", "open"] },
+        "handrail":          { "enum": ["both", "left", "right", "none"] },
+        "rail_height_in":    { "type": "number" },
+        "well_opening_in":   { "description": "0335. Stated length of the opening in the floor above; 0 = not stated.", "type": "number" },
+        "bottom_landing_in": { "description": "0335. Stated clear floor at the foot; 0 = not stated.", "type": "number" },
+        "top_landing_in":    { "description": "0335. Stated clear floor at the head; 0 = not stated.", "type": "number" },
         "code_profile":      { "type": "string" },
         "acknowledged":      { "type": "array", "items": { "type": "string" } }
       }
@@ -541,7 +570,7 @@
 
         "pos":      { "description": "Plan coordinates of the symbol centre.", "$ref": "#/$defs/point" },
         "rotation": { "type": "number", "default": 0 },
-        "state":    { "description": "Per-kind extra state (stair flight/turn/direction, plant species, …). v4 spread these across the object; nesting keeps the base shape closed. The keys each parametric kind writes are DECLARED in $defs/stair_state, $defs/cabinet_state and $defs/appliance_state; this object stays open and the application validates it.", "type": "object", "additionalProperties": true },
+        "state":    { "description": "Per-kind extra state (stair flight/turn/direction, plant species, …). v4 spread these across the object; nesting keeps the base shape closed. The keys each parametric kind writes are DECLARED in $defs/stair_state, $defs/cabinet_state, $defs/appliance_state and $defs/fixture_state; this object stays open and the application validates it.", "type": "object", "additionalProperties": true },
         "uid":      { "$ref": "#/$defs/uid" }
       }
     },

@@ -47,6 +47,12 @@ class ParametricKind:
         when the kind keeps its catalog footprint."""
         return None
 
+    def plan_symbol(self, state):
+        """Plan-symbol primitives DRAWN FROM THE PARAMETERS, or None when the
+        kind keeps its catalog symbol (0338: an island shows its own slots
+        and seats)."""
+        return None
+
 
 def register(definition):
     _KINDS[definition.kind] = definition

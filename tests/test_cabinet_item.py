@@ -242,3 +242,52 @@ def test_the_washer_dialog_offers_three_gloss_colours(fp, qapp):
     it.apply_params(dlg.result_state())
     assert it.extra_state() == {"colour": "black"}
     dlg.deleteLater()
+
+
+# -- 0338: fixtures, and the island's own plan symbol --------------------------
+def _painted(scene, item):
+    """Paint the scene to an image; the count of non-white pixels."""
+    from PyQt6.QtGui import QColor, QImage, QPainter
+    img = QImage(240, 240, QImage.Format.Format_ARGB32)
+    img.fill(QColor(255, 255, 255))
+    p = QPainter(img)
+    scene.render(p, source=item.sceneBoundingRect().adjusted(-4, -4, 4, 4))
+    p.end()
+    return sum(1 for x in range(0, 240, 3) for y in range(0, 240, 3)
+               if img.pixelColor(x, y).lightness() < 235)
+
+
+def test_an_island_paints_its_own_symbol_and_the_seats_change_it(fp, qapp, scene):
+    it = fp.make_furnishing("kitchen_island", QPointF(200, 200))
+    scene.addItem(it)
+    none = fp.make_furnishing("kitchen_island", QPointF(600, 200))
+    none.apply_params({"seats": 0})
+    scene.addItem(none)
+    with_stools, bare = _painted(scene, it), _painted(scene, none)
+    assert bare > 0, "the island draws without its catalog SVG"
+    assert with_stools > bare, "three stools add ink"
+    it.apply_params({"seats": 6, "slot_3": "RG30"})
+    assert it.w == 72.0 + 30.0
+    assert _painted(scene, it) > 0
+
+
+@pytest.mark.parametrize("kind", ["toilet", "bathtub", "bookshelf",
+                                  "gas_fireplace", "grab_bar"])
+def test_a_fixture_opens_a_dialog_and_accepts_unchanged(fp, qapp, kind):
+    it = fp.make_furnishing(kind, QPointF(0, 0))
+    assert it.is_parametric() and it.extra_state() == {}
+    dlg = it.make_properties_dialog()
+    assert dlg.windowTitle() == "Fixture Properties"
+    assert dlg._derived["parts"]
+    assert dlg.try_accept()
+    it.apply_params(dlg.result_state())
+    assert it.extra_state() == {}
+    dlg.deleteLater()
+
+
+def test_a_grab_bar_turned_upright_changes_its_footprint(fp, qapp):
+    it = fp.make_furnishing("grab_bar", QPointF(0, 0))
+    assert (it.w, it.d) == (24.0, 3.5)
+    it.apply_params({"bar": "vertical", "length_in": 36.0})
+    assert (it.w, it.d) == (3.0, 3.5)
+    assert it.extra_state() == {"bar": "vertical", "length_in": 36.0}

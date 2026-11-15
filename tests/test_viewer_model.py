@@ -86,8 +86,8 @@ def _furn_mesh(model):
 def test_every_catalog_entry_carries_a_solid(manifest):
     """height_in, elevation_in, form and material on all 96 -- height_in most
     of all, because it is the one field with no safe default."""
-    assert len(manifest) == 103, ("catalog size changed; check this on purpose "
-                                  "(103: the hood, the microwave and five lights, 0333)")
+    assert len(manifest) == 104, ("catalog size changed; check this on purpose "
+                                  "(104: the grab bar, 0338)")
     missing = {}
     for e in manifest:
         absent = [f for f in ("height_in", "elevation_in", "form", "material")
@@ -464,9 +464,14 @@ def test_every_catalog_symbol_either_extrudes_or_is_reported(fp3d, manifest):
     lofted = {i["id"] for i in manifest if i.get("side_file")}
     assert set(model.stats["side_profile_kinds"]) == lofted
     assert lofted <= pending, "PRECONDITION: side elevations belong to pending forms"
+    # 0338: a fixture built from PARTS (the bathtub) is a fourth list -- its
+    # catalog form is still `vessel`, the fallback if the calculator is missing
+    parted = set(model.stats["cabinet_kinds"]) & pending
+    assert parted <= {i["id"] for i in manifest if i.get("cabinet")}
     got = set(model.stats["prism_kinds"]) | set(model.stats["box_fallback_kinds"])
-    assert not (got & lofted), f"counted twice: {got & lofted}"
-    assert got == pending - lofted, f"unaccounted: {(pending - lofted) ^ got}"
+    assert not (got & (lofted | parted)), f"counted twice: {got & (lofted | parted)}"
+    assert got == pending - lofted - parted, \
+        f"unaccounted: {(pending - lofted - parted) ^ got}"
     assert model.stats["furnishings"] == len(manifest)
 
 

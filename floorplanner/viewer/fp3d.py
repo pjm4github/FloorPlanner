@@ -2177,8 +2177,12 @@ def build_cabinet(preset, state, room_style, place, floor_z, ceiling_in=96.0):
     out = {}
     for part in cg.cabinet_parts(st, room_style, ceiling_in):
         quad = [place(x, d / 2.0 - f) for x, f in part.quad]
-        out.setdefault(mats.get(part.role, "unknown"), []).append(
-            _box(quad, floor_z + part.z0, floor_z + part.z1))
+        # 0338: a part's plan outline is a quad or any CONVEX ring (a toilet
+        # bowl, a tub's rounded corner)
+        solid = (_box(quad, floor_z + part.z0, floor_z + part.z1)
+                 if len(quad) == 4
+                 else _ngon_prism(quad, floor_z + part.z0, floor_z + part.z1))
+        out.setdefault(mats.get(part.role, "unknown"), []).append(solid)
     light = None
     src = cg.light_source(st, ceiling_in)
     if src is not None:
@@ -2186,6 +2190,114 @@ def build_cabinet(preset, state, room_style, place, floor_z, ceiling_in=96.0):
         wx, wy = place(lx, d / 2.0 - lf)
         light = dict(src, pos=(wx, wy, floor_z + lz))
     return out, light
+
+
+def _ngon_prism(ring_xy, z0, z1):
+    """Prism over a CONVEX plan ring of any length, wound outward -- `_box`
+    for more than four corners."""
+    p = list(ring_xy)
+    n = len(p)
+    a2 = sum(p[i][0] * p[(i + 1) % n][1] - p[(i + 1) % n][0] * p[i][1]
+             for i in range(n))
+    if a2 < 0:
+        p = p[::-1]
+    v = np.array([(x, y, z0) for x, y in p] + [(x, y, z1) for x, y in p],
+                 dtype=float)
+    f = []
+    for i in range(1, n - 1):
+        f += [[0, i + 1, i], [n, n + i, n + i + 1]]
+    for i in range(n):
+        j = (i + 1) % n
+        f += [[i, j, j + n], [i, j + n, i + n]]
+    return v, np.array(f, dtype=int)
+
+
+def _clip_half(ring, a, b, keep_left):
+    """The part of a convex `ring` on one side of the line a->b."""
+    out = []
+    n = len(ring)
+    ex, ey = b[0] - a[0], b[1] - a[1]
+    sign = 1.0 if keep_left else -1.0
+
+    def side(p):
+        return sign * (ex * (p[1] - a[1]) - ey * (p[0] - a[0]))
+
+    for i in range(n):
+        p, q = ring[i], ring[(i + 1) % n]
+        sp, sq = side(p), side(q)
+        if sp >= 0.0:
+            out.append(p)
+        if (sp > 0.0 and sq < 0.0) or (sp < 0.0 and sq > 0.0):
+            t = sp / (sp - sq)
+            out.append((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
+    return out
+
+
+def _ring_area2(ring):
+    n = len(ring)
+    return sum(ring[i][0] * ring[(i + 1) % n][1]
+               - ring[(i + 1) % n][0] * ring[i][1] for i in range(n))
+
+
+def _minus_convex(ring, hole):
+    """A convex `ring` with the convex `hole` cut out of it, as convex
+    pieces. Peels the ring one hole edge at a time: what lies OUTSIDE edge i
+    is kept, what lies inside goes on to edge i + 1; whatever survives every
+    edge is inside the hole and is dropped."""
+    h = list(hole)
+    if _ring_area2(h) < 0:
+        h = h[::-1]                                  # counter-clockwise
+    pieces, rest = [], list(ring)
+    m = len(h)
+    for i in range(m):
+        if len(rest) < 3:
+            break
+        a, b = h[i], h[(i + 1) % m]
+        outside = _clip_half(rest, a, b, keep_left=False)
+        if len(outside) >= 3 and abs(_ring_area2(outside)) > 1e-6:
+            pieces.append(outside)
+        rest = _clip_half(rest, a, b, keep_left=True)
+    return pieces
+
+
+def _cut_holes(tri, holes):
+    """One floor triangle less every stairwell quad: convex 2D rings."""
+    pieces = [list(tri)]
+    for hole in holes:
+        nxt = []
+        for ring in pieces:
+            nxt.extend(_minus_convex(ring, hole))
+        pieces = nxt
+    return pieces
+
+
+def stair_openings(doc, lv):
+    """[(z_foot, z_head, quad)] -- for every PARAMETRIC stair, the world-frame
+    quads of its stairwell and the heights of its foot and head (0338). A floor between
+    the stair's foot and its head, and its own storey's ceiling, are cut
+    open over these. A legacy stair (no parameters) cuts nothing."""
+    sg = STAIRGEO
+    if sg is None:
+        return []
+    elevs = [float(L.get("elevation_in", 0.0) or 0.0)
+             for L in doc.get("levels", [])]
+    out = []
+    for fu in doc.get("furnishings", []):
+        if fu.get("kind") != "stairs" or fu.get("level") not in lv:
+            continue
+        z0 = float(lv[fu["level"]].get("elevation_in", 0.0) or 0.0)
+        rise, quads = sg.stairwell(fu.get("state"), z0, elevs)
+        if not quads:
+            continue
+        pos = fu.get("pos") or [0, 0]
+        cx, cy = float(pos[0]), -float(pos[1])
+        a = math.radians(-float(fu.get("rotation", 0.0)))
+        ca, sa = math.cos(a), math.sin(a)
+        for q in quads:
+            world = [(cx + x * ca - (-y) * sa, cy + x * sa + (-y) * ca)
+                     for x, y in q]
+            out.append((z0, z0 + rise, world))
+    return out
 
 
 def _load_stair_geometry():
@@ -2757,6 +2869,14 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     if floors:
         by_colour = {}
         ceiling_jobs = []
+        wells = stair_openings(doc, lv)
+        n_well_cuts = 0
+
+        def holes_at(z_lo, z_hi):
+            """Stairwell quads of every stair that passes through a surface
+            somewhere in z_lo..z_hi: above its foot, at or below its head."""
+            return [q for foot, head, q in wells
+                    if foot + 1.0 < z_hi and z_lo <= head + 1.0]
         for r in rooms:
             if r.get("level") not in lv:
                 continue
@@ -2806,18 +2926,28 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             col = FLOATING_C if floating else FLOOR_C.get(cat, FLOOR_C["interior"])
             key = (col, cat == "concept" or floating)
 
-            v_lo = np.array([(x, y, z - SLAB_T) for x, y in poly])
-            v_hi = np.array([(x, y, z) for x, y in poly])
-            n = len(poly)
-            f = []
-            for (i, j, k) in tris:
-                f.append([i + n, j + n, k + n])          # top face
-                f.append([i, k, j])                      # bottom face
-            for i in range(n):                           # edge band
-                j = (i + 1) % n
-                f += [[i, j, j + n], [i, j + n, i + n]]
-            by_colour.setdefault(key, []).append(
-                (np.vstack([v_lo, v_hi]), np.array(f, dtype=int)))
+            # 0338: a floor a stair comes up through is cut open over the
+            # stairwell -- built as convex pieces instead of one indexed slab.
+            holes = holes_at(z, z)
+            if holes:
+                n_well_cuts += 1
+                for (i, j, k) in tris:
+                    for ring in _cut_holes([poly[i], poly[j], poly[k]], holes):
+                        by_colour.setdefault(key, []).append(
+                            _ngon_prism(ring, z - SLAB_T, z))
+            else:
+                v_lo = np.array([(x, y, z - SLAB_T) for x, y in poly])
+                v_hi = np.array([(x, y, z) for x, y in poly])
+                n = len(poly)
+                f = []
+                for (i, j, k) in tris:
+                    f.append([i + n, j + n, k + n])          # top face
+                    f.append([i, k, j])                      # bottom face
+                for i in range(n):                           # edge band
+                    j = (i + 1) % n
+                    f += [[i, j, j + n], [i, j + n, i + n]]
+                by_colour.setdefault(key, []).append(
+                    (np.vstack([v_lo, v_hi]), np.array(f, dtype=int)))
             n_floor += 1
 
             # P5 (Patrick, 2026-11-06: "there are no ceilings/floors over the 1st
@@ -2830,11 +2960,15 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             if cat == "interior" and not floating:
                 cin = r.get("ceiling_in")
                 cz = base(r["level"]) + float(cin) if cin is not None else top(r["level"])
-                ceiling_jobs.append((poly, tris, cz))
+                ceiling_jobs.append((poly, tris, cz, holes_at(cz, cz + SLAB_T)))
 
         for (col, translucent), parts in by_colour.items():
             v, f = _merge(parts)
             model.meshes.append(Mesh("floors", v, f, col, translucent))
+        if n_well_cuts:
+            model.info.append(
+                f"{n_well_cuts} floor(s) cut open over a stairwell "
+                f"({len(wells)} opening quad(s) from parametric stairs)")
 
     # ---- roof clips, FIRST -------------------------------------------------
     # Computed before the walls: the walls are capped at the roof surface
@@ -3057,10 +3191,20 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             id(lf) for rid, lf in lifted_of.items()
             if _host_of.get(rid) is not None)
         ceil_parts = []
-        for poly, tris, cz in ceiling_jobs:
-            for (i, j, k) in tris:
+        for poly, tris, cz, holes in ceiling_jobs:
+            # 0338: a ceiling a stair rises through is cut open over the
+            # stairwell before it is clipped to the roof
+            if holes:
+                cut = []
+                for (i, j, k) in tris:
+                    for piece in _cut_holes([poly[i], poly[j], poly[k]], holes):
+                        cut += [[piece[0], piece[a], piece[a + 1]]
+                                for a in range(1, len(piece) - 1)]
+            else:
+                cut = [[poly[i], poly[j], poly[k]] for (i, j, k) in tris]
+            for tri in cut:
                 for ring in _ceiling_pieces(
-                        [poly[i], poly[j], poly[k]], cz, lifts, ROOFCLIP,
+                        tri, cz, lifts, ROOFCLIP,
                         dormer_lf_ids):
                     m = len(ring)
                     lo = np.array([(x, y, z) for x, y, z in ring])
