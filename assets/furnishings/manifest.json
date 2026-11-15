@@ -124,7 +124,13 @@
     "material": "stone",
     "region_material": null,
     "side_file": null,
-    "cabinet": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "fireplace",
+      "width_in": 48,
+      "depth_in": 20,
+      "height_in": 40
+    },
     "price": 2000.0
   },
   {
@@ -674,7 +680,13 @@
     "material": "porcelain",
     "region_material": "water",
     "side_file": null,
-    "cabinet": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "bathtub",
+      "width_in": 30,
+      "depth_in": 60,
+      "height_in": 20
+    },
     "price": 500.0
   },
   {
@@ -738,8 +750,39 @@
     "material": "porcelain",
     "region_material": null,
     "side_file": null,
-    "cabinet": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "toilet",
+      "width_in": 20,
+      "depth_in": 28,
+      "height_in": 30
+    },
     "price": 175.0
+  },
+  {
+    "id": "grab_bar",
+    "name": "Grab Bar 24\"",
+    "category": "Bathroom",
+    "file": "grab_bar.svg",
+    "width_in": 24,
+    "depth_in": 3.5,
+    "height_in": 3,
+    "elevation_in": 32,
+    "form": "box",
+    "material": "metal",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "grab_bar",
+      "wall_mounted": true,
+      "width_in": 24,
+      "depth_in": 3.5,
+      "height_in": 3,
+      "length_in": 24,
+      "floor_to_bottom_in": 32
+    },
+    "price": 0.0
   },
   {
     "id": "vanity",
@@ -1553,7 +1596,13 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
-    "cabinet": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "bookshelf",
+      "width_in": 36,
+      "depth_in": 12,
+      "height_in": 72
+    },
     "price": 180.0
   },
   {

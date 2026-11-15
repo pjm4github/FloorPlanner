@@ -149,8 +149,25 @@ class StairElevationView(QWidget):
         _font(p, 7.5)
         first = g.flights[0]
         if first.treads >= 1:
+            stated = float(self._values.get("well_opening_in") or 0.0) > 0.0
             p.drawText(QPointF(X(0.0) + 4, Y(h + head) - 4),
-                       f"{_fmt(head)} in min. headroom — not checked")
+                       f"{_fmt(head)} in min. headroom"
+                       + ("" if stated else " — not checked"))
+
+        # handrail / guard top, above the nosing line and the landing
+        if any(sg.side_treatment(g, n)[1] for n in ("left", "right")):
+            rail = g.rail_height
+            p.setPen(QPen(_INK, 1.6))
+            for fi, f in enumerate(g.flights):
+                if f.treads < 1:
+                    continue
+                a = starts.get(fi, 0.0)
+                z_a, z_b = f.z0 + h + rail, f.z0 + (f.treads + 1) * h + rail
+                p.drawLine(QPointF(X(a), Y(z_a)), QPointF(X(a + f.run), Y(z_b)))
+                p.drawLine(QPointF(X(a), Y(f.z0)), QPointF(X(a), Y(z_a)))
+                p.drawLine(QPointF(X(a + f.run), Y(f.z0 + f.treads * h)),
+                           QPointF(X(a + f.run), Y(z_b)))
+            p.setPen(QPen(_HEADROOM, 1.0, Qt.PenStyle.DashLine))
 
         # dimensions
         p.setPen(QPen(_DIM, 1.0))

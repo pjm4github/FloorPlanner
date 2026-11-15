@@ -154,7 +154,12 @@ class FurnishingItem(QGraphicsItem):
             h = QFontMetricsF(callout_font(lod)).height()
             draw_callout(painter, lod, QPointF(0.0, self.d / 2 + h), callout_text(self), "center")
         r = furnishing_renderer(self.kind)
-        if r is not None:
+        definition = _param_registry.get(self.kind)
+        symbol = (definition.plan_symbol(self.params or {})
+                  if definition is not None else None)
+        if symbol is not None:
+            self._paint_plan_symbol(painter, symbol)
+        elif r is not None:
             r.render(painter, rect)
         else:
             painter.setPen(QPen(QColor(55, 65, 81), 1.0))
@@ -293,6 +298,45 @@ class FurnishingItem(QGraphicsItem):
                 "elevations": floor_elevations(),
                 "room_style": self._room_style(),
                 "ceiling_in": self._room_ceiling()}
+
+    def _paint_plan_symbol(self, painter, symbol):
+        """0338: a plan symbol drawn from the item's PARAMETERS -- an island
+        with its own slots, sink, cooktop and one stool per seat. `symbol`
+        is in the cabinet frame (x across, f down from the top edge)."""
+        top = -self.d / 2.0
+        ink = QColor(55, 65, 81)
+
+        def box(x0, f0, x1, f1):
+            return QRectF(QPointF(x0, top + f0), QPointF(x1, top + f1))
+
+        x0, _f0, x1, _f1 = symbol["top"]
+        back = symbol["back"]
+        painter.setPen(QPen(ink, 1.2))
+        painter.setBrush(QBrush(QColor(248, 250, 252)))
+        painter.drawRoundedRect(
+            box(*symbol["top"]).adjusted(0.6, 0.6, -0.6, -0.6), 1.0, 1.0)
+        # where the cabinets end, and where one slot meets the next
+        painter.setPen(QPen(ink, 0.5, Qt.PenStyle.DashLine))
+        painter.drawLine(QPointF(x0 + 0.6, top + back),
+                         QPointF(x1 - 0.6, top + back))
+        for _a, b, _code in symbol.get("slots", ())[1:]:
+            painter.drawLine(QPointF(b, top + 0.6), QPointF(b, top + back))
+        painter.setPen(QPen(ink, 0.7))
+        painter.setBrush(QBrush(QColor(255, 255, 255)))
+        for bx0, bf0, bx1, bf1 in symbol.get("bowls", ()):
+            painter.drawRoundedRect(box(bx0, bf0, bx1, bf1), 1.5, 1.5)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        for hx0, hf0, hx1, hf1 in symbol.get("hobs", ()):
+            painter.drawRect(box(hx0, hf0, hx1, hf1))
+            for u, v in ((0.27, 0.30), (0.73, 0.30), (0.27, 0.72), (0.73, 0.72)):
+                painter.drawEllipse(QPointF(hx0 + (hx1 - hx0) * u,
+                                            top + hf0 + (hf1 - hf0) * v), 2.6, 2.6)
+        # one stool per seat, under the overhang: seat, and its short back
+        painter.setBrush(QBrush(QColor(226, 232, 240)))
+        for sx0, sf0, sx1, sf1 in symbol.get("stools", ()):
+            painter.drawRoundedRect(box(sx0, sf0, sx1, sf1), 2.5, 2.5)
+            painter.drawLine(QPointF(sx0 + 1.5, top + sf1 - 1.6),
+                             QPointF(sx1 - 1.5, top + sf1 - 1.6))
 
     def draft_state(self) -> dict:
         """The state a properties dialog starts editing -- a COPY."""

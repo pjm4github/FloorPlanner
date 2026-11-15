@@ -15,11 +15,11 @@ cancelled dialog leaves the document, and the undo stack, exactly as they
 were.
 """
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QBrush, QColor
+from PyQt6.QtGui import QBrush, QColor, QGuiApplication
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
-    QFormLayout, QGroupBox, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
-    QSpinBox, QVBoxLayout,
+    QFormLayout, QFrame, QGroupBox, QHBoxLayout, QLabel, QListWidget,
+    QListWidgetItem, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
 )
 
 from floorplanner.parametric import findings as F
@@ -62,9 +62,23 @@ class ParametricDialog(QDialog):
 
     # -- construction --------------------------------------------------------
     def _build(self):
+        # The body (preview + parameters + validation) scrolls; the button box
+        # sits OUTSIDE the scroll area so OK / Cancel / Reset are always reachable
+        # even on a short screen (Patrick, 2026-11-15: the dialog opened taller
+        # than the screen and the bottom buttons fell off the edge).
         outer = QVBoxLayout(self)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        body_w = QWidget()
+        scroll.setWidget(body_w)
+        outer.addWidget(scroll, 1)
+
+        body = QVBoxLayout(body_w)
         top = QHBoxLayout()
-        outer.addLayout(top, 1)
+        body.addLayout(top, 1)
 
         self.preview = self.definition.make_preview(self)
         if self.preview is not None:
@@ -75,6 +89,10 @@ class ParametricDialog(QDialog):
 
         box = QGroupBox("Controlling parameters")
         form = QFormLayout(box)
+        # Tight rows so the whole list needs less height (Patrick, 2026-11-15).
+        form.setVerticalSpacing(2)
+        form.setContentsMargins(8, 6, 8, 6)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         for spec in self._specs:
             w = self._make_widget(spec)
             self._widgets[spec.key] = w
@@ -110,7 +128,7 @@ class ParametricDialog(QDialog):
         val_lay.addWidget(self.findings_list)
         self.ack = QCheckBox(ACK_TEXT)
         val_lay.addWidget(self.ack)
-        outer.addWidget(val)
+        body.addWidget(val)
 
         self.buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
@@ -121,7 +139,19 @@ class ParametricDialog(QDialog):
         self.buttons.button(
             QDialogButtonBox.StandardButton.Reset).clicked.connect(self.reset)
         outer.addWidget(self.buttons)
-        self.resize(980, 640)
+        self._size_to_screen(1000, 760)
+
+    def _size_to_screen(self, want_w, want_h):
+        """Open at `want_w x want_h`, but never larger than the available screen
+        (leaving a margin for the title bar / taskbar). When the content needs
+        more than the clamped height the scroll area shows a scrollbar, so the
+        button box below it stays on screen."""
+        screen = self.screen() or QGuiApplication.primaryScreen()
+        if screen is not None:
+            avail = screen.availableGeometry()
+            want_w = min(want_w, avail.width() - 60)
+            want_h = min(want_h, avail.height() - 80)
+        self.resize(max(want_w, 480), max(want_h, 360))
 
     def _make_widget(self, spec):
         if spec.kind == FLOAT:

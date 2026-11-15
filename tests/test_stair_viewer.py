@@ -73,7 +73,8 @@ def test_a_parametric_stair_is_treads_not_a_block(fp3d):
     box = 36.0 * 143.0 * 108.0
     assert 0.0 < _volume(model) < 0.1 * box, "outward-wound, and mostly air"
     assert v[:, 2].min() == pytest.approx(0.0)
-    assert v[:, 2].max() == pytest.approx(108.0 - sg.TREAD_T_IN)
+    # 0335: the tallest thing is now the guard rail, over the top nosing
+    assert v[:, 2].max() == pytest.approx(108.0 + sg.DEFAULT_RAIL_HEIGHT_IN)
     assert v[:, 0].max() - v[:, 0].min() == pytest.approx(36.0)
     assert v[:, 1].max() - v[:, 1].min() == pytest.approx(143.0)
     assert [i for i in model.info if "1 stair(s) built from their parameters" in i]
@@ -83,7 +84,8 @@ def test_a_linked_stair_rises_to_the_next_level(fp3d):
     state = dict(fp3d.STAIRGEO.STATE_DEFAULTS, rise_mode="linked")
     v = _verts(fp3d.build_model(_doc(state)))
     # L2 stands 120 in up: 16 risers, 15 treads of 11 in
-    assert v[:, 2].max() == pytest.approx(120.0 - fp3d.STAIRGEO.TREAD_T_IN)
+    assert v[:, 2].max() == pytest.approx(
+        120.0 + fp3d.STAIRGEO.DEFAULT_RAIL_HEIGHT_IN)     # 0335: the rail
     assert v[:, 1].max() - v[:, 1].min() == pytest.approx(15 * 11.0)
 
 

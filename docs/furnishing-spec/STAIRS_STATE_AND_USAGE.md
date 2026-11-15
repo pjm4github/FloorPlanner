@@ -66,12 +66,30 @@ footprint changes.
 `N` risers; a flight that ends at a floor or a landing has one fewer tread than
 risers. Straight: `N - 1` treads. L or U: `N - 2`, split at the landing.
 
-## Not checked in this release
+## Rails, the U gap, and the stated checks (0335)
 
-Headroom, top and bottom landings and door swings, handrails and guards. They
-are reported as NOT CHECKED and the dialog never says "code compliant".
-The limits are IRC-derived example defaults (7.75 in riser, 10 in tread, 36 in
-width, 151 in rise between landings), not a determination for a jurisdiction.
+| key | values | default | meaning |
+|---|---|---|---|
+| `flight_gap_in` | number >= 0 | 0 | U only. The well between the two flights; the landing spans both flights and the gap. 4.5 fits a 2x4 wall. |
+| `left_side`, `right_side` | `guard`, `wall`, `open` | `guard` | What stands along each side, **as walked going up**. |
+| `handrail` | `both`, `left`, `right`, `none` | `both` | Where a handrail is fitted. A guard's top rail always counts as one. |
+| `rail_height_in` | number | 36 | Top of handrails and guards, above the nosing line and above the landing. |
+| `well_opening_in` | number, 0 = not stated | 0 | Length of the opening in the floor above, back from the top of the stair along its travel. |
+| `bottom_landing_in`, `top_landing_in` | number, 0 = not stated | 0 | Clear floor at the foot and head, in the direction of travel. |
+
+A stair saved before 0335 has none of these keys and takes the defaults: it
+gains guards and rails in 3D. Its plan symbol and footprint do not change.
+
+Checked from the stair itself: a handrail on one side at 4 or more risers,
+rail height 34-38 in, a guard on any open side above 30 in, guard height (34 in
+on a flight, 36 in at a landing), baluster spacing (4 in), and clear width
+between rails (31.5 in with one, 27 in with two; each rail takes 3 in).
+
+Checked only from a figure the user states, and NOT CHECKED until it is given:
+headroom (from `well_opening_in`; the dialog shows the length needed) and the
+top and bottom landings (36 in each). Door swings are never checked, and the
+dialog never says "code compliant". The limits are IRC-derived example
+defaults, not a determination for a jurisdiction.
 
 ## Adding another parametric furnishing
 

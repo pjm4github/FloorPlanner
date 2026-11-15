@@ -38,6 +38,23 @@ STRINGER_DROP_IN = 9.25     # stringer depth below the tread line (a 2x10)
 LANDING_T_IN = 1.5          # landing deck thickness
 POST_IN = 3.5               # landing post, square
 
+# Handrails and guards (0335). Appearance AND the projections the clear-width
+# check reads -- one set of numbers, so the drawing and the check agree.
+SIDES = ("wall", "guard", "open")
+HANDRAILS = ("both", "left", "right", "none")
+RAIL_T_IN = 1.5             # rail section, vertical
+RAIL_W_IN = 1.5             # wall handrail section, across the stair
+WALL_CLEAR_IN = 1.5         # clear space between a wall and its handrail
+GUARD_RAIL_W_IN = 2.0       # guard top rail, across the stair
+GUARD_INSET_IN = 0.5        # guard rail face, in from the stair's edge
+RAIL_POST_IN = 3.0          # newel / guard post, square
+BALUSTER_IN = 1.25          # baluster, square
+BALUSTER_MAX_OPEN_IN = 4.0  # clear space the balusters are spaced to keep
+BRACKET_SPACING_IN = 48.0   # wall brackets, at most this far apart
+RAIL_PROJECTION_IN = 3.0    # what a rail or guard takes from the clear width
+DEFAULT_RAIL_HEIGHT_IN = 36.0
+DEFAULT_FLOOR_T_IN = 12.0   # floor assembly over the stair, when not known
+
 _EPS = 1e-9
 _LEVEL_EPS = 1e-6
 
@@ -66,6 +83,16 @@ class StairCodeProfile:
     max_flight_rise_in: float
     comfort_lo_in: float
     comfort_hi_in: float
+    handrail_min_in: float = 34.0
+    handrail_max_in: float = 38.0
+    handrail_min_risers: int = 4
+    guard_trigger_in: float = 30.0      # a drop over this needs a guard
+    guard_min_in: float = 36.0          # at a landing
+    guard_stair_min_in: float = 34.0    # on a flight, above the nosing line
+    guard_max_open_in: float = 4.0
+    clear_one_rail_in: float = 31.5
+    clear_two_rails_in: float = 27.0
+    min_landing_in: float = 36.0
 
 
 PROFILES = {
@@ -93,6 +120,16 @@ class StairInputs:
     stair_type: str = "straight"
     turn_deg: int = 0
     landing_height: float | None = None     # None = half way up
+    flight_gap: float = 0.0                 # U only: the well between flights
+    # Sides are named AS WALKED GOING UP. The bare-inputs default is a stair
+    # with nothing on it; a stored state's default is guards and two rails.
+    left_side: str = "wall"
+    right_side: str = "wall"
+    handrail: str = "none"
+    rail_height: float = DEFAULT_RAIL_HEIGHT_IN
+    well_opening: float = 0.0               # 0 = not stated
+    top_landing: float = 0.0                # 0 = not stated
+    bottom_landing: float = 0.0             # 0 = not stated
 
 
 @dataclass(frozen=True)
@@ -129,6 +166,11 @@ class StairGeometry:
     landing: tuple | None       # (x, y, w, h) plan rect, or None
     landing_height: float | None
     landing_risers: int         # risers below the landing; 0 when none
+    flight_gap: float = 0.0
+    left_side: str = "wall"
+    right_side: str = "wall"
+    handrail: str = "none"
+    rail_height: float = DEFAULT_RAIL_HEIGHT_IN
 
 
 # --------------------------------------------------------------------------
@@ -189,6 +231,23 @@ def calculate_stair_geometry(inputs, max_riser_height):
                              "riser_count")
     h = H / N
 
+    gap = 0.0
+    if kind == "U":
+        try:
+            gap = float(inputs.flight_gap or 0.0)
+        except (TypeError, ValueError):
+            raise StairError("Gap between flights is not a number",
+                             "flight_gap_in") from None
+        if not math.isfinite(gap) or gap < 0.0:
+            raise StairError("Gap between flights cannot be negative",
+                             "flight_gap_in")
+    try:
+        rail_h = float(inputs.rail_height)
+    except (TypeError, ValueError):
+        rail_h = DEFAULT_RAIL_HEIGHT_IN
+    if not math.isfinite(rail_h) or rail_h <= 0.0:
+        rail_h = DEFAULT_RAIL_HEIGHT_IN
+
     side = 1.0 if turn > 0 else -1.0
     flights, landing, landing_h, n1 = [], None, None, 0
     if kind == "straight":
@@ -223,9 +282,11 @@ def calculate_stair_geometry(inputs, max_riser_height):
             flights.append(Flight(n2, t2, run2, landing_h, origin,
                                   (side, 0.0), (0.0, 1.0)))
         else:                                   # U: back beside the first
-            x0 = 0.0 if side > 0 else -W
-            landing = (x0, run1, 2.0 * W, W)
-            origin = (W, run1) if side > 0 else (-W, run1)
+            # `gap` is the well between the flights -- room for a wall --
+            # and the landing spans both flights and the gap.
+            x0 = 0.0 if side > 0 else -W - gap
+            landing = (x0, run1, 2.0 * W + gap, W)
+            origin = (W + gap, run1) if side > 0 else (-W - gap, run1)
             flights.append(Flight(n2, t2, run2, landing_h, origin,
                                   (0.0, -1.0), (1.0, 0.0)))
 
@@ -247,7 +308,11 @@ def calculate_stair_geometry(inputs, max_riser_height):
         comfort_index=2.0 * h + d,
         footprint_length=bbox[3] - bbox[1], footprint_width=bbox[2] - bbox[0],
         bbox=bbox, flights=tuple(flights), landing=landing,
-        landing_height=landing_h, landing_risers=n1)
+        landing_height=landing_h, landing_risers=n1, flight_gap=gap,
+        left_side=inputs.left_side if inputs.left_side in SIDES else "wall",
+        right_side=inputs.right_side if inputs.right_side in SIDES else "wall",
+        handrail=inputs.handrail if inputs.handrail in HANDRAILS else "none",
+        rail_height=rail_h)
 
 
 def _pt(f, s, a):
@@ -374,7 +439,203 @@ def solids(geom):
                     out.append(("box", [(px, py), (px + POST_IN, py),
                                         (px + POST_IN, py + POST_IN),
                                         (px, py + POST_IN)], 0.0, under))
+    return out + rail_solids(geom)
+
+
+# --------------------------------------------------------------------------
+# handrails and guards (0335)
+# --------------------------------------------------------------------------
+def _left_edge(f, width):
+    """The across-coordinate of flight `f`'s LEFT edge, as walked going up.
+    In this y-down frame a walker heading `u` has `(u.y, -u.x)` on the left."""
+    lx, ly = f.u[1], -f.u[0]
+    return width if f.v[0] * lx + f.v[1] * ly > 0.0 else 0.0
+
+
+def side_treatment(geom, name):
+    """(treatment, has_rail) for the side `name` ('left' / 'right').
+    A guard's top rail IS a rail; on a wall or an open side there is one only
+    where the handrail choice puts it."""
+    treat = geom.left_side if name == "left" else geom.right_side
+    wanted = geom.handrail in (name, "both")
+    return treat, (treat == "guard" or wanted)
+
+
+def landing_edges(geom, name):
+    """The landing's free edges on side `name`: `[((x, y), (x, y)), ...]`.
+    The OUTER side (away from the turn) owns the landing's outside edges; the
+    INNER side owns only the stretch of a U landing that spans the gap."""
+    if geom.landing is None or len(geom.flights) < 2:
+        return []
+    x, y, w, hh = geom.landing
+    W, g = geom.stair_width, geom.flight_gap
+    inner = "left" if geom.turn_deg > 0 else "right"
+    if name == inner:
+        if geom.stair_type == "U" and g > _EPS:
+            x0 = W if geom.turn_deg > 0 else -g
+            return [((x0, y), (x0 + g, y))]
+        return []
+    far = ((x, y + hh), (x + w, y + hh))
+    if geom.stair_type == "L":
+        xo = 0.0 if geom.turn_deg > 0 else W
+        return [((xo, y), (xo, y + hh)), far]
+    return [((x, y), (x, y + hh)), far, ((x + w, y), (x + w, y + hh))]
+
+
+def baluster_count(length):
+    """Balusters in `length` of guard, so the clear space between them never
+    exceeds `BALUSTER_MAX_OPEN_IN`."""
+    return max(1, math.ceil(length / (BALUSTER_IN + BALUSTER_MAX_OPEN_IN) - 1e-9))
+
+
+def guard_opening(geom):
+    """The widest clear space between balusters on a flight."""
+    d = geom.tread_depth
+    return d / baluster_count(d) - BALUSTER_IN
+
+
+def clear_width(geom):
+    """(clear width, sides carrying a rail). Each rail or guard takes
+    `RAIL_PROJECTION_IN` from the nominal width."""
+    n = sum(1 for name in ("left", "right") if side_treatment(geom, name)[1])
+    return geom.stair_width - n * RAIL_PROJECTION_IN, n
+
+
+def _nosing_z(f, s, h, d):
+    """Height of flight `f`'s nosing line `s` along its travel."""
+    return f.z0 + h + s * h / d
+
+
+def rail_solids(geom):
+    """Handrails, guards, posts, balusters and wall brackets, in the shapes
+    `solids` returns. Nothing for a stair whose sides carry nothing."""
+    W, d, h, R = (geom.stair_width, geom.tread_depth, geom.riser_height,
+                  geom.rail_height)
+    out = []
+    for name in ("left", "right"):
+        treat, has_rail = side_treatment(geom, name)
+        if not has_rail:
+            continue
+        for f in geom.flights:
+            if f.treads < 1:
+                continue
+            at_zero = (_left_edge(f, W) == 0.0) == (name == "left")
+
+            def band(i0, i1, at_zero=at_zero):
+                return (i0, i1) if at_zero else (W - i1, W - i0)
+
+            def upright(s0, s1, a, lo, hi, f=f):
+                return ("box", [_pt(f, s0, a[0]), _pt(f, s1, a[0]),
+                                _pt(f, s1, a[1]), _pt(f, s0, a[1])], lo, hi)
+
+            if treat == "wall":
+                a = band(WALL_CLEAR_IN, WALL_CLEAR_IN + RAIL_W_IN)
+            else:
+                a = band(GUARD_INSET_IN, GUARD_INSET_IN + GUARD_RAIL_W_IN)
+            z_a, z_b = _nosing_z(f, 0.0, h, d) + R, _nosing_z(f, f.run, h, d) + R
+            prof = [(0.0, z_a - RAIL_T_IN), (f.run, z_b - RAIL_T_IN),
+                    (f.run, z_b), (0.0, z_a)]
+            out.append(("prism", [(*_pt(f, s, a[0]), z) for s, z in prof],
+                        [(*_pt(f, s, a[1]), z) for s, z in prof]))
+            if treat == "wall":
+                n = max(2, math.ceil(f.run / BRACKET_SPACING_IN) + 1)
+                wall = band(0.0, WALL_CLEAR_IN + RAIL_W_IN / 2.0)
+                for i in range(n):
+                    s = f.run / 2.0
+                    if f.run > 6.0:
+                        s = min(max(f.run * i / (n - 1), 3.0), f.run - 3.0)
+                    under = _nosing_z(f, s, h, d) + R - RAIL_T_IN
+                    out.append(upright(s - 0.5, s + 0.5, wall, under - 2.5, under))
+                continue
+            post = band(0.0, RAIL_POST_IN)
+            out.append(upright(0.0, RAIL_POST_IN, post, f.z0, z_a))
+            two = f.run >= 2.0 * RAIL_POST_IN + BALUSTER_IN
+            if two:
+                out.append(upright(f.run - RAIL_POST_IN, f.run, post,
+                                   f.z0 + f.treads * h, z_b))
+            if treat != "guard":
+                continue
+            bal = band(GUARD_INSET_IN + (GUARD_RAIL_W_IN - BALUSTER_IN) / 2.0,
+                       GUARD_INSET_IN + (GUARD_RAIL_W_IN + BALUSTER_IN) / 2.0)
+            nb = baluster_count(d)
+            for k in range(1, f.treads + 1):
+                for j in range(nb):
+                    s = (k - 1) * d + (j + 0.5) * d / nb
+                    s0, s1 = s - BALUSTER_IN / 2.0, s + BALUSTER_IN / 2.0
+                    if s0 < RAIL_POST_IN or (two and s1 > f.run - RAIL_POST_IN):
+                        continue
+                    out.append(upright(s0, s1, bal, f.z0 + k * h,
+                                       _nosing_z(f, s0, h, d) + R - RAIL_T_IN))
+        if treat != "guard" or geom.landing_height is None:
+            continue
+        lx, ly, lw, lh = geom.landing
+        cx, cy, zl = lx + lw / 2.0, ly + lh / 2.0, geom.landing_height
+        for (x0, y0), (x1, y1) in landing_edges(geom, name):
+            length = math.hypot(x1 - x0, y1 - y0)
+            if length <= _EPS:
+                continue
+            ex, ey = (x1 - x0) / length, (y1 - y0) / length
+            nx, ny = -ey, ex                    # turned to point INTO the landing
+            if (cx - x0) * nx + (cy - y0) * ny < 0.0:
+                nx, ny = -nx, -ny
+
+            def level(t0, t1, i0, i1, lo, hi, x0=x0, y0=y0, ex=ex, ey=ey,
+                      nx=nx, ny=ny):
+                def q(along, inset):
+                    return (x0 + ex * along + nx * inset,
+                            y0 + ey * along + ny * inset)
+                return ("box", [q(t0, i0), q(t1, i0), q(t1, i1), q(t0, i1)],
+                        lo, hi)
+
+            out.append(level(0.0, length, GUARD_INSET_IN,
+                             GUARD_INSET_IN + GUARD_RAIL_W_IN,
+                             zl + R - RAIL_T_IN, zl + R))
+            ends = [0.0]
+            if length >= 2.0 * RAIL_POST_IN:
+                ends.append(length - RAIL_POST_IN)
+            for t in ends:
+                out.append(level(t, min(t + RAIL_POST_IN, length), 0.0,
+                                 RAIL_POST_IN, zl, zl + R))
+            inner = length - 2.0 * RAIL_POST_IN
+            if inner <= BALUSTER_IN:
+                continue
+            nb = baluster_count(inner)
+            b0 = GUARD_INSET_IN + (GUARD_RAIL_W_IN - BALUSTER_IN) / 2.0
+            for j in range(1, nb):
+                t = RAIL_POST_IN + inner * j / nb
+                out.append(level(t - BALUSTER_IN / 2.0, t + BALUSTER_IN / 2.0,
+                                 b0, b0 + BALUSTER_IN, zl, zl + R - RAIL_T_IN))
     return out
+
+
+def nosing_line(geom):
+    """The line headroom is measured above, UNFOLDED along the travel:
+    `[(s, z), ...]`, rising along each flight and level across the landing."""
+    pts, s = [], 0.0
+    h = geom.riser_height
+    for i, f in enumerate(geom.flights):
+        pts.append((s, f.z0 + h))
+        s += f.run
+        pts.append((s, f.z0 + (f.treads + 1) * h))
+        if i == 0 and geom.landing is not None:
+            s += geom.stair_width
+            pts.append((s, geom.landing_height))
+    return pts
+
+
+def required_opening(geom, headroom, floor_thickness=DEFAULT_FLOOR_T_IN):
+    """How far the floor above must be OPEN, measured back from the top of the
+    stair along its line of travel, for `headroom` clear above the nosing
+    line. Under the rest of the stair the floor above may be solid."""
+    limit = geom.total_rise - floor_thickness - headroom
+    pts = nosing_line(geom)
+    end = pts[-1][0]
+    for (s0, z0), (s1, z1) in zip(pts[:-1], pts[1:], strict=False):
+        if z1 > limit + _EPS:
+            if z0 > limit + _EPS or z1 - z0 <= _EPS:
+                return end - s0
+            return end - (s0 + (limit - z0) * (s1 - s0) / (z1 - z0))
+    return 0.0
 
 
 def developed_profile(geom):
@@ -399,6 +660,56 @@ def developed_profile(geom):
     return segs
 
 
+def opening_rects(geom, length):
+    """The plan quads of the STAIRWELL: the top `length` of the stair,
+    measured back from its head along the travel -- part or all of the upper
+    flight, then the landing, then the top of the lower flight. Natural
+    coordinates, `[[(x, y)] * 4, ...]`. The 3D viewer cuts these out of the
+    floor above (0338)."""
+    W = geom.stair_width
+    left = float(length)
+    out = []
+    flights = list(geom.flights)
+    for i in range(len(flights) - 1, -1, -1):
+        f = flights[i]
+        if left <= _EPS:
+            break
+        take = min(left, f.run)
+        if take > _EPS:
+            out.append([_pt(f, f.run - take, 0.0), _pt(f, f.run, 0.0),
+                        _pt(f, f.run, W), _pt(f, f.run - take, W)])
+        left -= f.run
+        if i > 0 and left > _EPS and geom.landing is not None:
+            x, y, w, hh = geom.landing
+            out.append([(x, y), (x + w, y), (x + w, y + hh), (x, y + hh)])
+            left -= W
+    return out
+
+
+def stairwell(state, this_elev=0.0, elevations=(),
+              floor_thickness=DEFAULT_FLOOR_T_IN):
+    """(rise, quads) for the opening a parametric stair needs in the floor
+    above: the STATED `well_opening_in` when there is one, else the length
+    the headroom rule requires. `(0.0, [])` for a state that makes no stair."""
+    if not is_parametric_state(state):
+        return 0.0, []
+    try:
+        geom, rise, _ok = geometry_from_state(state, this_elev, elevations)
+    except StairError:
+        return 0.0, []
+    if geom.tread_count < 1:
+        return 0.0, []
+    st = normalize_state(state)
+    length = st["well_opening_in"]
+    if length <= 0.0:
+        length = required_opening(geom, profile_for(st).min_headroom_in,
+                                  floor_thickness)
+    cx = (geom.bbox[0] + geom.bbox[2]) / 2.0
+    cy = (geom.bbox[1] + geom.bbox[3]) / 2.0
+    return rise, [[(x - cx, y - cy) for x, y in q]
+                  for q in opening_rects(geom, length)]
+
+
 # --------------------------------------------------------------------------
 # the stored state
 # --------------------------------------------------------------------------
@@ -414,6 +725,14 @@ STATE_DEFAULTS = {
     "riser_count": 14,
     "landing_mode": "half",
     "landing_height_in": DEFAULT_DETACHED_RISE_IN / 2.0,
+    "flight_gap_in": 0.0,
+    "left_side": "guard",
+    "right_side": "guard",
+    "handrail": "both",
+    "rail_height_in": DEFAULT_RAIL_HEIGHT_IN,
+    "well_opening_in": 0.0,
+    "bottom_landing_in": 0.0,
+    "top_landing_in": 0.0,
     "code_profile": DEFAULT_PROFILE,
 }
 
@@ -455,8 +774,13 @@ def normalize_state(state):
                         if src.get("rise_mode") in ("linked", "detached")
                         else d["rise_mode"])
     for key in ("total_rise_in", "tread_depth_in", "stair_width_in",
-                "landing_height_in"):
+                "landing_height_in", "flight_gap_in", "rail_height_in",
+                "well_opening_in", "bottom_landing_in", "top_landing_in"):
         out[key] = _num(src.get(key), d[key])
+    for key in ("left_side", "right_side"):
+        out[key] = src.get(key) if src.get(key) in SIDES else d[key]
+    out["handrail"] = (src.get("handrail") if src.get("handrail") in HANDRAILS
+                       else d["handrail"])
     out["riser_count_mode"] = (src.get("riser_count_mode")
                                if src.get("riser_count_mode") in ("auto", "manual")
                                else "auto")
@@ -522,7 +846,12 @@ def inputs_from_state(state, total_rise):
         stair_type=st["type"],
         turn_deg=st["turn_deg"],
         landing_height=(st["landing_height_in"]
-                        if st["landing_mode"] == "custom" else None))
+                        if st["landing_mode"] == "custom" else None),
+        flight_gap=st["flight_gap_in"] if st["type"] == "U" else 0.0,
+        left_side=st["left_side"], right_side=st["right_side"],
+        handrail=st["handrail"], rail_height=st["rail_height_in"],
+        well_opening=st["well_opening_in"], top_landing=st["top_landing_in"],
+        bottom_landing=st["bottom_landing_in"])
 
 
 def geometry_from_state(state, this_elev=0.0, elevations=()):

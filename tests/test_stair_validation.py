@@ -59,7 +59,8 @@ def test_the_passing_example_is_not_called_compliant():
     assert not F.blocks(fs)
     assert rules["headroom.min"].severity == F.NOT_EVALUATED       # 9.1 #12
     assert rules["landing.top_bottom"].severity == F.NOT_EVALUATED
-    assert rules["handrail.guard"].severity == F.NOT_EVALUATED
+    assert "handrail.guard" not in rules, "0335: rails are now checked"
+    assert rules["handrail.required"].severity == F.PASS
     assert rules["comfort.2r_plus_t"].severity == F.ADVISORY
     assert F.needs_ack(fs)                                          # 9.1 #11
     head = F.headline(fs)

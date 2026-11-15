@@ -53,7 +53,8 @@ class CabinetKind(ParametricKind):
         self.type = self.preset.get("type", "base")
         self.title = {"appliance": "Appliance Properties",
                       "island": "Island Properties",
-                      "light": "Light Properties"}.get(self.type,
+                      "light": "Light Properties",
+                      "fixture": "Fixture Properties"}.get(self.type,
                                                        "Cabinet Properties")
 
     # -- parameters ----------------------------------------------------------
@@ -85,6 +86,8 @@ class CabinetKind(ParametricKind):
                           d["floor_to_bottom_in"], unit="in", minimum=0.0,
                           maximum=144.0, step=1.0, enabled_fn=_is_sconce),
             ]
+        if t == "fixture":
+            return self._fixture_specs(d)
         if t == "appliance" and d.get("appliance") in ("washer", "dryer"):
             labels = {k: label for k, label, _h in cg.COLOURS}
             return [ParamSpec("colour", "Gloss finish", ENUM, d["colour"],
@@ -244,6 +247,59 @@ class CabinetKind(ParametricKind):
             ]
         return out
 
+    def _fixture_specs(self, d):
+        """0338: what a toilet, tub, bookshelf, fireplace or grab bar offers."""
+        model = d["model"]
+        labels = {k: label for k, label, _h in cg.COLOURS}
+        colour = ParamSpec("colour", "Colour", ENUM, d["colour"],
+                           choices=tuple((k, labels[k])
+                                         for k in cg.FIXTURE_COLOURS))
+
+        def size(key, label, lo, hi, step=1.0, tip=""):
+            return ParamSpec(key, label, FLOAT, d[key], unit="in", minimum=lo,
+                             maximum=hi, step=step, tooltip=tip)
+
+        if model == "toilet":
+            return [colour]
+        if model == "bathtub":
+            return [size("depth_in", "Length", 48.0, 84.0, 6.0),
+                    size("width_in", "Width", 26.0, 48.0),
+                    size("height_in", "Rim height", 12.0, 28.0), colour]
+        if model == "bookshelf":
+            return [
+                size("width_in", "Width", 12.0, 96.0, 3.0),
+                size("depth_in", "Depth", 6.0, 24.0),
+                size("height_in", "Height", 24.0, 120.0, 6.0),
+                ParamSpec("shelves", "Shelves", INT, d["shelves"], minimum=0,
+                          maximum=10, step=1,
+                          tooltip="Shelves between the bottom and the top."),
+                ParamSpec("books", "Books on it", BOOL, d["books"]),
+                ParamSpec("finish", "Finish", ENUM, d["finish"],
+                          choices=_choices(cg.FINISHES))]
+        if model == "fireplace":
+            return [
+                size("width_in", "Width", 30.0, 96.0, 6.0),
+                size("depth_in", "Depth", 12.0, 36.0),
+                size("height_in", "Mantel height", 30.0, 72.0),
+                ParamSpec("surround", "Surround", ENUM, d["surround"],
+                          choices=tuple((k, label) for k, label, _m
+                                        in cg.SURROUNDS)),
+                ParamSpec("finish", "Mantel finish", ENUM, d["finish"],
+                          choices=_choices(cg.FINISHES)),
+                ParamSpec("lit", "Lit", BOOL, d["lit"],
+                          tooltip="Flames show, and glow in the 3D view.")]
+        return [                                      # grab bar
+            ParamSpec("bar", "Mounted", ENUM, d["bar"],
+                      choices=(("horizontal", "Horizontal"),
+                               ("vertical", "Vertical"))),
+            size("length_in", "Length", 9.0, 60.0, 6.0,
+                 "Stock bars: 12, 18, 24, 36 and 42 in."),
+            size("floor_to_bottom_in", "Height from floor", 0.0, 96.0, 0.5,
+                 "Floor to the underside of the mounting flange. A horizontal "
+                 "bar's grip is about 2 in higher."),
+            ParamSpec("hardware", "Finish", ENUM, d["hardware"],
+                      choices=_choices(cg.HARDWARE))]
+
     def normalize(self, state):
         return cg.normalize_state(state, self.preset)
 
@@ -259,6 +315,11 @@ class CabinetKind(ParametricKind):
 
     def footprint(self, state):
         return cg.footprint(cg.normalize_state(state, self.preset))
+
+    def plan_symbol(self, state):
+        if self.type != "island":
+            return None
+        return cg.island_plan(cg.normalize_state(state, self.preset))
 
     # -- evaluation ----------------------------------------------------------
     def evaluate(self, values, context):
@@ -282,6 +343,21 @@ class CabinetKind(ParametricKind):
                    "footprint": cg.footprint(st),
                    "height": cg.overall_height(st), "code": cg.trade_code(st)}
         if st["type"] in ("appliance", "light"):
+            return derived, findings
+        if st["type"] == "fixture":
+            if st["model"] == "grab_bar" and st["bar"] == "horizontal":
+                grip = st["floor_to_bottom_in"] + 1.5 + cg.BAR_DIAMETER / 2.0
+                if not 33.0 - 1e-6 <= grip <= 36.0 + 1e-6:
+                    findings.append(Finding(
+                        "bar.height", ADVISORY,
+                        f"The top of the grip is {_fmt(grip)} in above the "
+                        f"floor; accessible grab bars are set at 33 to 36 in.",
+                        actual=grip, limit=36.0, field="floor_to_bottom_in"))
+            if st["model"] == "bathtub" and st["width_in"] > st["depth_in"]:
+                findings.append(Finding(
+                    "tub.proportion", ADVISORY,
+                    "The tub is wider than it is long; the filler stands at "
+                    "the end of its length.", field="width_in"))
             return derived, findings
         if st["type"] == "island":
             seats, w = int(st["seats"]), st["width_in"]
@@ -350,6 +426,26 @@ class CabinetKind(ParametricKind):
                     ("Source height", "\u2014" if not src
                      else f"{_fmt(src['pos'][2])} in above the floor"),
                     ("Ceiling here", f"{_fmt(derived['ceiling'])} in")]
+        if st["type"] == "fixture":
+            name = {"toilet": "Toilet", "bathtub": "Bathtub",
+                    "bookshelf": "Bookshelf", "fireplace": "Gas fireplace",
+                    "grab_bar": "Grab bar"}[st["model"]]
+            rows = [("Fixture", name),
+                    ("Size", f"{_fmt(w)} x {_fmt(d)} x {_fmt(st['height_in'])} in")]
+            if st["model"] in ("toilet", "bathtub"):
+                rows.append(("Colour", _material_label(mats["porcelain"])))
+            elif st["model"] == "bookshelf":
+                rows += [("Shelves", str(st["shelves"])),
+                         ("Finish", _material_label(mats["cabinet"]))]
+            elif st["model"] == "fireplace":
+                rows += [("Surround", dict((k, label) for k, label, _m
+                                           in cg.SURROUNDS)[st["surround"]]),
+                         ("Mantel", _material_label(mats["cabinet"]))]
+            else:
+                rows += [("Finish", _material_label(mats["hardware"])),
+                         ("Underside", f"{_fmt(st['floor_to_bottom_in'])} in "
+                                       f"above the floor")]
+            return rows
         if st["type"] == "appliance":
             rows = [("Finish", _material_label(mats["appliance"])),
                     ("Size", f"{_fmt(w)} x {_fmt(d)} x {_fmt(st['height_in'])} in")]
