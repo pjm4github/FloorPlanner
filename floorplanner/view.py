@@ -1323,7 +1323,7 @@ class PlanView(QGraphicsView):
         if e.mimeData().hasFormat(FURN_MIME):
             kind = bytes(e.mimeData().data(FURN_MIME)).decode("utf-8")
             sp = grid_snap(self.mapToScene(e.position().toPoint()))
-            item = make_furnishing(kind, sp)
+            item = make_furnishing(kind, sp, new=True)   # 0323: a fresh drop
             self.scene().addItem(item)
             if self.win._recorder is not None:
                 self.win._recorder.on_place(kind, sp)

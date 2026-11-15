@@ -188,3 +188,17 @@ risers; a code-profile editor; stair-aware camera elevations (the elevation
 camera keeps drawing a to-scale box); DXF/PDF stair detail beyond what those
 exporters draw today; stale-level detection while the dialog is open (the
 dialog is modal, so the levels cannot change under it).
+
+## 8. Decisions — Patrick, 2026-11-14 (supersedes §6 where they differ)
+
+| # | decision |
+|---|---|
+| D1 | Parameters live in the existing `state` object, for now. |
+| D2 | Existing stairs stay frozen on their old numbers until edited. |
+| D3 | A new stair links to the level above when there is one; otherwise a detached rise, 108 in. |
+| D4 | **Changed from the recommendation.** The stair types are straight, **L** and **U**. The turn is +90 / -90 (L) or +180 / -180 (U). The **landing height is adjustable**, default half way between the floors, and it changes the plan footprint — a flight may overhang, the L or the rectangle changes shape. |
+| D5 | No Apply button in the first release. |
+| D6 | The lane is widened to whatever the feature needs. |
+
+Built as decided: see `docs/handoff/0323-ruling.md` and
+[`STAIRS_STATE_AND_USAGE.md`](STAIRS_STATE_AND_USAGE.md).

@@ -1840,6 +1840,342 @@ KNOWN_FORMS = ("box", "slab", "seat", "bed", "basin", "enclosure", "vessel",
 BUILT_FORMS = ("box", "slab", "prism", "column")
 
 
+# --------------------------------------------------------------------------
+# vehicles -- lofted from a SIDE ELEVATION (0325)
+# --------------------------------------------------------------------------
+# A plan symbol is a top view, and a top view extruded is a block: the hood,
+# the windshield rake, the wheel arches and the daylight under the sills are
+# in the SIDE view. A vehicle may therefore carry `<id>.side.svg` (the
+# manifest's `side_file`), and this is where it becomes a solid. The format
+# is authored and documented in `_gen_assets.py` (SIDE_PROFILES); the short
+# form: viewBox "0 0 LENGTH HEIGHT" in inches, nose at x = 0, ground at the
+# bottom edge; each part a filled <polygon> or <circle> carrying
+# data-material, data-inset and, for a part that exists once at each side,
+# data-width.
+#
+# THE METHOD IS A LOFT BY STATIONS. Each part is cut by vertical lines along
+# the vehicle; at each one the part is the span from its lowest to its highest
+# point, and that span is given a WIDTH -- the vehicle's half-width, less the
+# part's inset, less the plan rounding at the nose and tail, less the
+# tumblehome above the beltline. Consecutive stations are joined. So one flat
+# drawing yields a body that narrows toward its ends and leans in above the
+# windows, with no second or third view to keep in agreement with it.
+VEHICLE_STATION_IN = 3.0        # the longest slice, inches along the vehicle
+_VEHICLE_EPS = 1e-3
+
+
+def load_side_profile(path):
+    """A vehicle side elevation as data, or None when the file is missing,
+    malformed, or carries a `transform` (which this reader does not apply --
+    the same refusal `svg_outlines` makes, for the same reason).
+
+    Returns {"length", "height", "belt", "roof", "tumble", "round_front",
+    "round_rear", "parts": [{"ring": [(s, z)], "material", "inset",
+    "width" or None, "name"}]} with `z` already measured UP from the ground."""
+    try:
+        root = ET.parse(path).getroot()
+    except (OSError, ET.ParseError):
+        return None
+    vb = _nums(root.get("viewBox") or "")
+    if len(vb) < 4 or vb[2] <= 0 or vb[3] <= 0:
+        return None
+    length, height = vb[2], vb[3]
+
+    def attr(el, name, default):
+        try:
+            return float(el.get(name))
+        except (TypeError, ValueError):
+            return default
+
+    parts = []
+    for el in root.iter():
+        if el.get("transform"):
+            return None
+        tag = el.tag.replace(SVG_NS, "")
+        if tag not in ("polygon", "circle") or not _is_filled(el):
+            continue
+        if tag == "polygon":
+            p = _nums(el.get("points", ""))
+            ring = [(x, height - y) for x, y in zip(p[0::2], p[1::2], strict=False)]
+        else:
+            r = attr(el, "r", 0.0)
+            ring = [(x, height - y) for x, y in
+                    _ellipse_ring(attr(el, "cx", 0.0), attr(el, "cy", 0.0), r, r)]
+        if len(ring) < 3 or _ring_area(ring) <= 1e-9:
+            continue
+        width = attr(el, "data-width", None)
+        parts.append({"ring": ring,
+                      "material": el.get("data-material") or "unknown",
+                      "inset": attr(el, "data-inset", 0.0),
+                      "width": width if width and width > 0 else None,
+                      "name": el.get("data-part") or tag})
+    if not parts:
+        return None
+    return {"length": length, "height": height,
+            "belt": attr(root, "data-belt", height),
+            "roof": attr(root, "data-roof", height),
+            "tumble": attr(root, "data-tumble", 0.0),
+            "round_front": attr(root, "data-round-front", 0.0),
+            "round_rear": attr(root, "data-round-rear", 0.0),
+            "parts": parts}
+
+
+def _span_at(ring, s):
+    """(lowest, highest) point of a side-view ring on the vertical line at
+    `s`, or None where the line misses it."""
+    lo = hi = None
+    n = len(ring)
+    for i in range(n):
+        (s0, z0), (s1, z1) = ring[i], ring[(i + 1) % n]
+        if (s0 - s) * (s1 - s) > 0:
+            continue                                  # both ends on one side
+        if abs(s1 - s0) < 1e-12:
+            cand = (z0, z1)
+        else:
+            t = (s - s0) / (s1 - s0)
+            cand = (z0 + t * (z1 - z0),)
+        for z in cand:
+            lo = z if lo is None or z < lo else lo
+            hi = z if hi is None or z > hi else hi
+    return None if lo is None else (lo, hi)
+
+
+def _vehicle_stations(ring, step):
+    """Where to cut a part: just inside each end, just either side of every
+    corner (so a step in the outline stays a step instead of smearing across
+    a slice), and never further apart than `step`."""
+    ss = sorted({p[0] for p in ring})
+    s_min, s_max = ss[0], ss[-1]
+    if s_max - s_min <= 4 * _VEHICLE_EPS:
+        return []
+    cuts = {s_min + _VEHICLE_EPS, s_max - _VEHICLE_EPS}
+    for v in ss[1:-1]:
+        cuts.add(v - _VEHICLE_EPS)
+        cuts.add(v + _VEHICLE_EPS)
+    n = max(1, int(math.ceil((s_max - s_min) / step)))
+    for i in range(1, n):
+        cuts.add(s_min + (s_max - s_min) * i / n)
+    return sorted(c for c in cuts if s_min < c < s_max)
+
+
+def _loft(sections):
+    """One closed solid through a run of quadrilateral sections, each four
+    `(x, y, z)` points in the same order. The sections share their vertices,
+    so there are no interior walls; the two ends are capped. Wound outward by
+    the sign of the enclosed volume -- the points come through `place`, which
+    mirrors, so no fixed order could be trusted."""
+    if len(sections) < 2:
+        return None
+    v = np.array([pt for sec in sections for pt in sec], dtype=float)
+    faces = []
+    for k in range(len(sections) - 1):
+        a, b = 4 * k, 4 * k + 4
+        for i in range(4):
+            j = (i + 1) % 4
+            faces.append((a + i, a + j, b + j))
+            faces.append((a + i, b + j, b + i))
+    last = 4 * (len(sections) - 1)
+    faces += [(0, 2, 1), (0, 3, 2), (last, last + 1, last + 2),
+              (last, last + 2, last + 3)]
+    f = np.array(faces, dtype=int)
+    tri = v[f]
+    n = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+    f = f[np.einsum("ij,ij->i", n, n) > 1e-16]          # drop collapsed slivers
+    if len(f) == 0:
+        return None
+    tri = v[f]
+    vol = float(np.einsum("ij,ij->i", tri[:, 0],
+                          np.cross(tri[:, 1], tri[:, 2])).sum())
+    if vol < 0.0:
+        f = f[:, ::-1]
+    return v, np.ascontiguousarray(f)
+
+
+def build_vehicle(place, w, d, h, z0, profile):
+    """{material: [(verts, faces), ...]} for one vehicle, lofted from its
+    side elevation; {} when nothing could be built (the caller then draws the
+    plan symbol, as before, and says so).
+
+    `d` runs along the vehicle and `w` across it, the catalog's own sense.
+    The profile is scaled to the catalog size rather than assumed equal to
+    it. The nose is at the plan symbol's TOP edge, which is local +y here --
+    the y flip `build_prism` documents."""
+    if not profile or not profile.get("parts"):
+        return {}
+    L, H = profile["length"], profile["height"]
+    if L <= 0 or H <= 0:
+        return {}
+    ks, kz = d / L, h / H
+    half = w / 2.0
+    belt, roof, tumble = profile["belt"], profile["roof"], profile["tumble"]
+    rf, rr = profile["round_front"], profile["round_rear"]
+
+    def rounding(s):
+        """How far the plan outline has drawn in at `s`: a quarter circle of
+        radius `rf` at the nose and `rr` at the tail, zero between."""
+        if rf > 0 and s < rf:
+            return rf - math.sqrt(max(rf * rf - (rf - s) ** 2, 0.0))
+        if rr > 0 and s > L - rr:
+            t = s - (L - rr)
+            return rr - math.sqrt(max(rr * rr - t * t, 0.0))
+        return 0.0
+
+    def lean(z):
+        if tumble <= 0 or roof - belt <= 1e-9:
+            return 0.0
+        return tumble * min(max((z - belt) / (roof - belt), 0.0), 1.0)
+
+    def at(s, z, x):
+        px, py = place(x, d / 2.0 - s * ks)
+        return (px, py, z0 + z * kz)
+
+    out = {}
+    for part in profile["parts"]:
+        ring = part["ring"]
+        cuts = _vehicle_stations(ring, VEHICLE_STATION_IN)
+        rows = []
+        for s in cuts:
+            span = _span_at(ring, s)
+            if span is None:
+                continue
+            lo, hi = span
+            edge_lo = half - part["inset"] - rounding(s) - lean(lo)
+            edge_hi = half - part["inset"] - rounding(s) - lean(hi)
+            rows.append((s, lo, hi, edge_lo, edge_hi))
+        if len(rows) < 2:
+            continue
+        if part["width"] is None:
+            sides = [(-1.0, 1.0)]                       # one solid, side to side
+        else:
+            sides = [(1.0, None), (-1.0, None)]         # a slab at each side
+        for sign, other in sides:
+            sections = []
+            for s, lo, hi, e_lo, e_hi in rows:
+                if other is None:
+                    o_lo, o_hi = sign * e_lo, sign * e_hi
+                    i_lo = sign * max(e_lo - part["width"], 0.0)
+                    i_hi = sign * max(e_hi - part["width"], 0.0)
+                else:
+                    o_lo, o_hi = max(e_lo, 0.0), max(e_hi, 0.0)
+                    i_lo, i_hi = -o_lo, -o_hi
+                sections.append([at(s, lo, i_lo), at(s, lo, o_lo),
+                                 at(s, hi, o_hi), at(s, hi, i_hi)])
+            solid = _loft(sections)
+            if solid is not None:
+                out.setdefault(part["material"], []).append(solid)
+    return out
+
+
+_SIDE_CACHE = {}
+
+
+def load_side(kind, specs, assets_dir=None):
+    """`load_side_profile()` for a catalog kind, memoised per build."""
+    if kind in _SIDE_CACHE:
+        return _SIDE_CACHE[kind]
+    spec = specs.get(kind) or {}
+    d = assets_dir or _assets_dir()
+    out = None
+    if d and spec.get("side_file"):
+        out = load_side_profile(os.path.join(d, str(spec["side_file"])))
+    _SIDE_CACHE[kind] = out
+    return out
+
+
+def _load_stair_geometry():
+    """0323: the stair calculator, `floorplanner/parametric/stair_geometry.py`,
+    loaded BY PATH for the reason `roofclip.py` is -- importing the package
+    would drag in the editor. That file imports nothing but `math` and
+    `dataclasses`, so the editor's plan symbol, its properties dialog and
+    this viewer's solid all come from ONE calculation. None when it cannot
+    be found: a parametric stair then falls back to the catalog box, and the
+    report says so. (Registered in `sys.modules` because `dataclasses`
+    looks its defining module up there.)"""
+    import importlib.util
+    here = os.path.dirname(os.path.abspath(__file__))
+    cand = os.path.join(os.path.dirname(here), "parametric", "stair_geometry.py")
+    name = "_fp_stair_geometry"
+    try:
+        spec = importlib.util.spec_from_file_location(name, cand)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+    except (OSError, AttributeError, ImportError, SyntaxError):
+        sys.modules.pop(name, None)
+        return None
+
+
+STAIRGEO = _load_stair_geometry()
+
+
+def _prism8(near, far):
+    """A solid between two matching quads -- `near` and `far` are four
+    `(x, y, z)` points each, corresponding in order. Used for a stair
+    stringer, which is a sloped slab and so not a plan-quad `_box`.
+
+    The winding is settled BY THE CENTROID rather than by trusting the
+    caller's point order: the solid is convex, so a face whose normal points
+    toward the centroid is simply flipped. The points arrive through
+    `place`, which mirrors y, so no fixed order would survive anyway."""
+    v = np.array(list(near) + list(far), dtype=float)
+    quads = [(0, 1, 2, 3), (4, 7, 6, 5)]
+    for i in range(4):
+        j = (i + 1) % 4
+        quads.append((i, i + 4, j + 4, j))
+    c = v.mean(axis=0)
+    faces = []
+    for a, b, cc, d in quads:
+        for tri in ((a, b, cc), (a, cc, d)):
+            p0, p1, p2 = v[tri[0]], v[tri[1]], v[tri[2]]
+            n = np.cross(p1 - p0, p2 - p0)
+            if float(np.dot(n, n)) < 1e-18:
+                continue                              # a degenerate sliver
+            if float(np.dot(n, (p0 + p1 + p2) / 3.0 - c)) < 0.0:
+                tri = (tri[0], tri[2], tri[1])
+            faces.append(tri)
+    return v, np.array(faces, dtype=int).reshape(-1, 3)
+
+
+def build_stair(state, place, z0, this_elev, elevations):
+    """[(verts, faces), ...] for a PARAMETRIC stair, or None when `state`
+    carries no stair parameters (a stair saved before 0323), the calculator
+    is missing, or the parameters do not make a stair -- the caller then
+    draws the catalog box, as it always did.
+
+    `place` takes the item's own local axes, centred on its footprint; the
+    calculator works from the foot of the first flight with y running DOWN
+    the plan, so a point is shifted to the footprint centre and its y
+    negated -- the same flip `build_prism` documents."""
+    sg = STAIRGEO
+    if sg is None or not sg.is_parametric_state(state):
+        return None
+    try:
+        geom, _rise, _ok = sg.geometry_from_state(state, this_elev, elevations)
+    except sg.StairError:
+        return None
+    if geom.tread_count < 1:
+        return None
+    cx = (geom.bbox[0] + geom.bbox[2]) / 2.0
+    cy = (geom.bbox[1] + geom.bbox[3]) / 2.0
+
+    def at(x, y):
+        return place(x - cx, -(y - cy))
+
+    parts = []
+    for solid in sg.solids(geom):
+        if solid[0] == "box":
+            _tag, quad, lo, hi = solid
+            if hi - lo <= 1e-9:
+                continue
+            parts.append(_box([at(x, y) for x, y in quad], z0 + lo, z0 + hi))
+        else:
+            _tag, near, far = solid
+            parts.append(_prism8([(*at(x, y), z0 + z) for x, y, z in near],
+                                 [(*at(x, y), z0 + z) for x, y, z in far]))
+    return parts
+
+
 def _plan_quad(place, x0, x1, y0, y1):
     """The four world corners of a local axis-aligned rectangle."""
     return [place(x0, y0), place(x1, y0), place(x1, y1), place(x0, y1)]
@@ -3024,8 +3360,13 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         unknown_kind, unknown_mat, unknown_form, pending_form = (
             set(), set(), set(), set())
         no_roof_posts = set()
+        n_param_stairs = 0
+        level_elevs = [float(L.get("elevation_in", 0.0) or 0.0)
+                       for L in doc.get("levels", [])]
         outline_dir = _assets_dir()
         _OUTLINE_CACHE.clear()      # per build, so a test can swap the catalog
+        _SIDE_CACHE.clear()
+        by_side, side_failed = set(), set()
         for fu in doc.get("furnishings", []):
             if fu.get("level") not in lv:
                 continue
@@ -3049,12 +3390,21 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             # is checked further down, this is the only place that still knows.
             catalog_form = form
             outline = None
+            # 0325: a vehicle's side elevation, when the catalog names one and
+            # it can be read. Looked up BEFORE the form is sorted, so a lofted
+            # vehicle is not also counted as a pending form drawn from its
+            # plan symbol.
+            side_profile = None
+            if spec.get("side_file"):
+                side_profile = load_side(kind, specs, outline_dir)
+                if side_profile is None:
+                    side_failed.add(kind)
             if form not in KNOWN_FORMS:
                 # A form nothing recognises is a catalog the viewer cannot
                 # read, so it is loud, exactly like an unknown kind.
                 unknown_form.add(form)
                 form, mat = "box", "unknown"
-            elif form not in BUILT_FORMS:
+            elif form not in BUILT_FORMS and side_profile is None:
                 # PRISM IS THE FALLBACK, in place of the box (handoff 0012's
                 # ruling). A form whose own generator is not written yet is
                 # drawn from the item's PLAN SYMBOL -- data that already exists
@@ -3098,6 +3448,35 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                     no_roof_posts.add(kind)
                 else:
                     fh = top - z
+            if side_profile is not None:
+                # 0325: a vehicle with a SIDE ELEVATION is lofted from it --
+                # paint, glass, tyres and trim each in their own material. One
+                # whose file cannot be read was sorted above like any other
+                # form (drawn from its plan symbol) and is NAMED in the report
+                # rather than quietly a block again.
+                lofted = build_vehicle(place, fw, fd, fh, z, side_profile)
+                if lofted:
+                    for part_mat, solids in lofted.items():
+                        if _colour(materials, part_mat) is None:
+                            unknown_mat.add(part_mat)
+                            part_mat = "unknown"
+                        parts.setdefault(part_mat, []).extend(solids)
+                    by_side.add(kind)
+                    n_furn += 1
+                    continue
+                side_failed.add(kind)        # read, but nothing to build: a box
+            if kind == "stairs":
+                # 0323: a stair that carries PARAMETERS is built from them --
+                # treads, risers, stringers, landing -- by the calculator the
+                # editor drew its plan symbol with. A stair without them (one
+                # saved before 0323) falls through to the catalog box below.
+                stair = build_stair(fu.get("state"), place, z,
+                                    base(fu.get("level")), level_elevs)
+                if stair:
+                    parts.setdefault(mat, []).extend(stair)
+                    n_param_stairs += 1
+                    n_furn += 1
+                    continue
             if form == "prism" and outline is None:      # an explicit `prism`
                 outline = load_outline(kind, specs, outline_dir)
             # THE PRISM IS ATTEMPTED HERE RATHER THAN INSIDE `build_solid`, so
@@ -3137,6 +3516,19 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             col = _colour(materials, mat) or UNKNOWN_C
             model.meshes.append(Mesh(f"furnishings:{mat}", v, f, col,
                                      translucent=col[3] < 1.0))
+        if by_side:
+            model.info.append(
+                f"{len(by_side)} vehicle kind(s) LOFTED FROM THEIR SIDE "
+                f"ELEVATION: " + ", ".join(sorted(by_side)))
+        if side_failed:
+            model.notes.append(
+                "vehicle side elevation(s) named in the catalog but unusable, "
+                "drawn without them: "
+                + ", ".join(sorted(side_failed)))
+        if n_param_stairs:
+            model.info.append(
+                f"{n_param_stairs} stair(s) built from their parameters "
+                f"(treads, risers, stringers)")
         if no_roof_posts:
             model.info.append(
                 "post kind(s) with no roof over them, drawn at the catalog "
@@ -3186,7 +3578,10 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                    # measured against ("a third of the catalog renders as a
                    # box") can only be falsified by a list
                    "prism_kinds": sorted(by_prism),
-                   "box_fallback_kinds": sorted(still_box)}
+                   "box_fallback_kinds": sorted(still_box),
+                   # 0325: the kinds lofted from a side elevation -- a third
+                   # list, so a vehicle is never counted as a prism it is not
+                   "side_profile_kinds": sorted(by_side) if furnishings else []}
     return model
 
 

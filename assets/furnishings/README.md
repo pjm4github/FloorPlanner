@@ -23,6 +23,13 @@ Top-view architectural symbols used by the Furnishings palette.
     a form falls back to `box` and **says so in its report**; an
     unrecognised one renders in the loud magenta.
   * `material` — a name only, resolved in `materials.json`.
+  * `side_file` — for a vehicle, its SIDE ELEVATION (`<id>.side.svg`),
+    or null.  viewBox `0 0 LENGTH HEIGHT` in inches, nose at x = 0,
+    ground at the bottom edge.  Each part is a filled `<polygon>` or
+    `<circle>` with `data-part`, `data-material`, `data-inset` and,
+    for a part that exists once at each side (a wheel, a pillar),
+    `data-width`.  The 3D viewer lofts the vehicle from it; the plan
+    still draws the top-view symbol.  Full contract: `_gen_assets.py`.
 * `materials.json` holds each material's `colour` (r, g, b, a in 0..1),
   `roughness` and `metalness` — **once**, so the properties are not
   repeated across 95 catalog entries.  `unknown` is the deliberate

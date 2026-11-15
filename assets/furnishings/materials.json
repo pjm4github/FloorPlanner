@@ -89,6 +89,76 @@
     "roughness": 0.15,
     "metalness": 0.2
   },
+  "auto_paint": {
+    "colour": [
+      0.16,
+      0.3,
+      0.5,
+      1.0
+    ],
+    "roughness": 0.3,
+    "metalness": 0.55
+  },
+  "auto_paint_light": {
+    "colour": [
+      0.74,
+      0.76,
+      0.78,
+      1.0
+    ],
+    "roughness": 0.3,
+    "metalness": 0.55
+  },
+  "auto_glass": {
+    "colour": [
+      0.09,
+      0.12,
+      0.16,
+      1.0
+    ],
+    "roughness": 0.08,
+    "metalness": 0.4
+  },
+  "auto_trim": {
+    "colour": [
+      0.11,
+      0.11,
+      0.12,
+      1.0
+    ],
+    "roughness": 0.7,
+    "metalness": 0.1
+  },
+  "rubber": {
+    "colour": [
+      0.05,
+      0.05,
+      0.06,
+      1.0
+    ],
+    "roughness": 0.92,
+    "metalness": 0.0
+  },
+  "lamp": {
+    "colour": [
+      0.96,
+      0.95,
+      0.86,
+      1.0
+    ],
+    "roughness": 0.2,
+    "metalness": 0.1
+  },
+  "tail_lamp": {
+    "colour": [
+      0.66,
+      0.05,
+      0.05,
+      1.0
+    ],
+    "roughness": 0.25,
+    "metalness": 0.1
+  },
   "unknown": {
     "colour": [
       0.85,

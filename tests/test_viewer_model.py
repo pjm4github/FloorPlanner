@@ -439,8 +439,15 @@ def test_every_catalog_symbol_either_extrudes_or_is_reported(fp3d, manifest):
     # are built directly -- everything else extrudes its symbol or falls back
     pending = {i["id"] for i in manifest
                if (i.get("form") or "box") not in ("box", "slab", "column")}
+    # 0325: a vehicle with a side elevation is LOFTED from it -- a third list,
+    # and it must be exactly the kinds the catalog gives a `side_file`, so a
+    # lofted vehicle is neither missed nor counted as a prism it is not
+    lofted = {i["id"] for i in manifest if i.get("side_file")}
+    assert set(model.stats["side_profile_kinds"]) == lofted
+    assert lofted <= pending, "PRECONDITION: side elevations belong to pending forms"
     got = set(model.stats["prism_kinds"]) | set(model.stats["box_fallback_kinds"])
-    assert got == pending, f"unaccounted: {pending ^ got}"
+    assert not (got & lofted), f"counted twice: {got & lofted}"
+    assert got == pending - lofted, f"unaccounted: {(pending - lofted) ^ got}"
     assert model.stats["furnishings"] == len(manifest)
 
 
