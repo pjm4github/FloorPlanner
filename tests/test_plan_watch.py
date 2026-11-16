@@ -14,12 +14,13 @@ import time
 
 import pytest
 from PyQt6.QtCore import QPointF
-from PyQt6.QtGui import QImage
+from PyQt6.QtGui import QFont, QFontInfo, QImage
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if os.path.join(ROOT, "tools") not in sys.path:
     sys.path.insert(0, os.path.join(ROOT, "tools"))
 import plan_watch                                   # noqa: E402
+import plan_validate                                # noqa: E402
 
 pytestmark = pytest.mark.slow
 
@@ -131,6 +132,34 @@ def test_converged_refuses_on_a_mismatch(tmp_path):
     assert os.path.exists(os.path.join(build, "conv.converged.refused"))
     assert os.path.exists(os.path.join(build, "conv.json")), "input wrongly moved"
     assert not os.path.exists(os.path.join(build, "done", "conv.final.json"))
+
+
+# -- the report text renders with the repo font, not .notdef boxes (0347 sec3) -
+def test_report_text_uses_the_repo_font_and_renders_real_glyphs():
+    from PyQt6.QtGui import QFontDatabase
+    # Load the repo fonts LOCALLY and remove them again after, so this test
+    # never leaves the shared QFontDatabase changed for other tests (the suite
+    # otherwise runs font-less and some tests assert on that).
+    ids = [QFontDatabase.addApplicationFont(str(p))
+           for p in sorted((plan_validate.FP.FONT_DIR).glob("*.ttf"))]
+    try:
+        # the family Qt actually resolves is the repo font, not a fallback box
+        assert QFontInfo(QFont(plan_validate.FONT)).family() == plan_validate.FONT, (
+            QFontInfo(QFont(plan_validate.FONT)).family(), plan_validate.FONT)
+        # two different same-length strings must render DIFFERENTLY; with no font
+        # every glyph is the same .notdef box, so they would be pixel-identical
+        a = plan_validate.render_text_strip("PASS")
+        b = plan_validate.render_text_strip("FAIL")
+        assert a.size() == b.size()
+        assert a != b, "two strings render identically -- font not loaded (boxes)"
+        # and the text is actually drawn (dark pixels present), not blank white
+        dark = sum(1 for x in range(0, a.width(), 3) for y in range(0, a.height(), 3)
+                   if (a.pixel(x, y) & 0xFFFFFF) < 0x808080)
+        assert dark > 0, "no glyph pixels drawn"
+    finally:
+        for i in ids:
+            if i != -1:
+                QFontDatabase.removeApplicationFont(i)
 
 
 # -- STOP stops the loop cleanly ----------------------------------------------

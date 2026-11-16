@@ -71,21 +71,25 @@ def _failure_card(path, name, pass_num, reason):
     Qt is imported lazily and offscreen so the watcher itself stays Qt-free."""
     try:
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        import FloorPlanner as FP
+        os.environ.setdefault("QT_QPA_FONTDIR", str(FP.FONT_DIR))   # repo font
         from PyQt6.QtGui import QColor, QFont, QImage, QPainter
         from PyQt6.QtWidgets import QApplication
         QApplication.instance() or QApplication([])
+        FP.load_fonts()
+        font = FP.FONT_FAMILY
         img = QImage(2400, 240, QImage.Format.Format_RGB32)
         img.fill(QColor(255, 255, 255))
         p = QPainter(img)
         p.fillRect(0, 0, 2400, 240, QColor(254, 242, 242))
         p.setPen(QColor(15, 23, 42))
-        p.setFont(QFont("Arial", 22, QFont.Weight.Bold))
-        p.drawText(24, 50, f"{name}   ·   pass {pass_num:04d}   ·   {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        p.setFont(QFont(font, 22, QFont.Weight.Bold))
+        p.drawText(24, 50, f"{name}   pass {pass_num:04d}   {time.strftime('%Y-%m-%d %H:%M:%S')}")
         p.setPen(QColor(185, 28, 28))
-        p.setFont(QFont("Arial", 30, QFont.Weight.Bold))
+        p.setFont(QFont(font, 30, QFont.Weight.Bold))
         p.drawText(24, 110, "FAIL")
         p.setPen(QColor(51, 65, 85))
-        p.setFont(QFont("Arial", 15))
+        p.setFont(QFont(font, 15))
         p.drawText(24, 150, reason[:260])
         p.end()
         img.save(path)

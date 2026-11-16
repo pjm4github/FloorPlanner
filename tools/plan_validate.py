@@ -1,4 +1,4 @@
-"""tools/plan_validate.py -- ONE plan, ONE validation pass (0345).
+"""tools/plan_validate.py -- ONE plan, ONE validation pass (0345; 0347 fixes).
 
 Invoked as a CHILD PROCESS by tools/plan_watch.py, which owns the 90 s timeout,
 the pass counter, the heartbeat and loop.log. This module validates a v5 plan
@@ -7,41 +7,67 @@ report PNG. It writes, into <out_dir>:
 
     <NNNN>.plan.json     a byte copy of the input this pass validated
     <NNNN>.result.json   the structured result (0345 sec2)
-    <NNNN>.report.png    the report image (0345 sec3)
+    <NNNN>.report.png    the report image (0345 sec3 / 0347 sec2)
 
 A raised exception is caught, its traceback recorded in the result, and a
-header+findings PNG is still written (0345 sec3: "a plan that fails to load
-still gets a PNG"). Exit code 0 means the pass completed and wrote its result
-(PASS or FAIL); a non-zero exit means the pass could not even write a result,
-and the watcher synthesises a FAIL.
+header+findings PNG is still written. Exit code 0 means the pass completed and
+wrote its result (PASS or FAIL); a non-zero exit means the watcher synthesises a
+FAIL.
 
 CLI:  python tools/plan_validate.py <plan.json> <out_dir> <pass_num> <git_head>
 
-Headless rules (CLAUDE.md): QT_QPA_PLATFORM=offscreen before PyQt; QApplication
-before FloorPlanner; interactive=False on every app call (0345 C2); the 3D panel
-is a SEPARATE process (fp3dq --shot), the only way D77 (offscreen Quick 3D draws
-blank) is worked around, and its result is pixel-tested for blankness.
+0347 fixes to the report PNG: text uses the font bundled in THIS repo (the
+offscreen platform has none, so the header/findings/labels were hollow boxes);
+each level plan is the SCENE rendered fitted to its content with the document's
+own Show settings (not a widget grab with scrollbars and forced-on callouts);
+and the 3D view frames the whole model.
 """
+import json          # noqa: E402
 import os
+import subprocess     # noqa: E402
 import sys
+import time           # noqa: E402
+import traceback      # noqa: E402
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-import json          # noqa: E402
-import subprocess     # noqa: E402
-import time           # noqa: E402
-import traceback      # noqa: E402
+import FloorPlanner as FP                        # noqa: E402  (before QApplication)
+# The report text uses the font bundled in this repo. Point the offscreen
+# platform at assets/fonts BEFORE QApplication -- but ONLY in the child process
+# (__main__). At a test's COLLECTION this module is imported, and setting
+# QT_QPA_FONTDIR process-wide there changes how the offscreen font engine
+# resolves text for EVERY other test (it flipped test_annotations' callout
+# pixel count). In-process callers register the font with addApplicationFont.
+if __name__ == "__main__":
+    os.environ.setdefault("QT_QPA_FONTDIR", str(FP.FONT_DIR))
 
 from PyQt6.QtCore import QRectF, Qt            # noqa: E402
 from PyQt6.QtGui import QColor, QFont, QImage, QPainter, QPixmap   # noqa: E402
 from PyQt6.QtWidgets import QApplication        # noqa: E402
 
 _app = QApplication.instance() or QApplication([])
+FONT = FP.FONT_FAMILY                            # "DejaVu Sans", from assets/fonts
+# Font loading is DEFERRED to _ensure_font() (called by run_pass, i.e. only in
+# the child process). Importing this module -- which pytest does at COLLECTION,
+# via tests/test_plan_watch.py -- must NOT touch the shared QFontDatabase or the
+# app default font, or it flips other tests' font-dependent pixel assertions
+# (the suite otherwise runs font-less).
+_FONT_READY = False
 
-import FloorPlanner as FP                       # noqa: E402,F401
+
+def _ensure_font():
+    """Register the bundled repo fonts (assets/fonts) and set the app default to
+    the repo family. Idempotent; call before rendering, in the child process."""
+    global _FONT_READY
+    if not _FONT_READY:
+        FP.load_fonts()
+        _app.setFont(QFont(FONT, 10))
+        _FONT_READY = True
+
+from floorplanner.config import SETTINGS         # noqa: E402
 from floorplanner.design import validate as dvalidate    # noqa: E402
 from floorplanner.design import verify as dverify        # noqa: E402
 from floorplanner.mainwindow import MainWindow           # noqa: E402
@@ -77,10 +103,11 @@ def _diff(a, b, path=""):
     return out
 
 
-# -- the 3D panel: a separate process, then a blankness pixel test -------------
+# -- the 3D panel: a separate process, framing the whole model, then a blank test
 def _shot_3d(plan_path, out_png):
-    """Render the whole-house 3D view the way docs/make_gallery.py does
-    (fp3dq --shot, own process). Returns (ok, reason)."""
+    """Render the whole-house 3D view (fp3dq --shot, own process). 0347 sec2.4:
+    a wide fov + home-plus distance so the whole model is framed, not cropped.
+    Returns (ok, reason)."""
     if os.environ.get("PLAN_WATCH_NO_3D"):
         return False, "skipped (PLAN_WATCH_NO_3D)"
     # fp3dq must render on the REAL platform, not inherit our offscreen (D77:
@@ -90,8 +117,8 @@ def _shot_3d(plan_path, out_png):
     try:
         r = subprocess.run(
             [sys.executable, "-m", "floorplanner.viewer.fp3dq", plan_path,
-             "--shot", out_png, "--yaw", "35", "--pitch", "-22", "--zoom",
-             "1.15", "--fov", "28", "--shot-delay", "1500"],
+             "--shot", out_png, "--yaw", "35", "--pitch", "-28", "--zoom",
+             "1.45", "--fov", "55", "--shot-delay", "1500"],
             cwd=ROOT, capture_output=True, text=True, timeout=60, env=env)
     except subprocess.TimeoutExpired:
         return False, "fp3dq timed out (60 s)"
@@ -126,88 +153,122 @@ def _is_blank(img, samples=40):
     return True
 
 
-# -- per-level plan grabs, by the app's own scene ------------------------------
-def _level_rect(win, level):
+# -- per-level plans, rendered from the SCENE with the doc's Show settings -----
+def _apply_show_settings(win, doc):
+    """0347 sec2.3: honour the DOCUMENT's own Show settings. `planio._finish_open`
+    forces `show_callouts` on at every open (0264), so push the doc's show_*
+    flags back over the globals, show one level at a time, and re-sync."""
+    settings = (doc or {}).get("settings") or {}
+    for k, v in settings.items():
+        if k.startswith("show"):
+            SETTINGS[k] = v
+    win.show_other_floors = False               # one level per panel, no ghosts
+    win._sync_floor_state()
+    _app.processEvents()
+
+
+def _level_content_rect(win, level):
     rects = [it.sceneBoundingRect() for it in win.scene.items()
-             if getattr(it, "floor", None) == level]
+             if getattr(it, "floor", None) == level and it.isVisible()]
     if not rects:
         return None
     r = rects[0]
     for extra in rects[1:]:
         r = r.united(extra)
-    return r.adjusted(-40, -40, 40, 40)
+    m = max(r.width(), r.height(), 1.0) * 0.04 + 12      # 0347 sec2.2: fit + margin
+    return r.adjusted(-m, -m, m, m)
 
 
-def _grab_level(win, level):
+def _render_level(win, level, w, h):
+    """The SCENE for `level`, fitted to its content (0347 sec2.2/2.3) -- not a
+    widget grab, so no scrollbars and the Show settings decide what is drawn."""
     win.switch_floor(level)
     _app.processEvents()
-    rect = _level_rect(win, level)
-    if rect is not None and rect.isValid():
-        win.view.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
-        _app.processEvents()
-    return win.view.grab()
+    rect = _level_content_rect(win, level) or win.scene.itemsBoundingRect()
+    img = QImage(w, h, QImage.Format.Format_RGB32)
+    img.fill(QColor(255, 255, 255))
+    p = QPainter(img)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    try:
+        if rect is not None and rect.isValid() and rect.width() > 0 and rect.height() > 0:
+            win.scene.render(p, QRectF(0, 0, w, h), rect, Qt.AspectRatioMode.KeepAspectRatio)
+    finally:
+        p.end()
+    return img
+
+
+# -- a text strip, for the 0347 text test -------------------------------------
+def render_text_strip(text, w=520, h=72, size=30):
+    """`text` drawn with the repo font on white. The text test renders two
+    different strings and asserts the pixels differ -- a no-font render makes
+    every glyph the same .notdef box, so two strings would be identical."""
+    img = QImage(w, h, QImage.Format.Format_RGB32)
+    img.fill(QColor(255, 255, 255))
+    p = QPainter(img)
+    p.setPen(QColor(0, 0, 0))
+    p.setFont(QFont(FONT, size))
+    p.drawText(12, h - 20, text)
+    p.end()
+    return img
 
 
 # -- the report PNG ------------------------------------------------------------
 def _draw_header(p, x, y, w, name, pass_num, verdict, findings, when):
-    band_h = 190
+    band_h = 210
     p.fillRect(x, y, w, band_h, QColor(248, 250, 252))
     green, red = QColor(21, 128, 61), QColor(185, 28, 28)
     p.setPen(QColor(15, 23, 42))
-    p.setFont(QFont("Arial", 22, QFont.Weight.Bold))
-    p.drawText(x + 24, y + 42, f"{name}   ·   pass {pass_num:04d}   ·   {when}")
-    p.setFont(QFont("Arial", 30, QFont.Weight.Bold))
+    p.setFont(QFont(FONT, 20, QFont.Weight.Bold))
+    p.drawText(x + 24, y + 44, f"{name}    pass {pass_num:04d}    {when}")
+    p.setFont(QFont(FONT, 30, QFont.Weight.Bold))
     p.setPen(green if verdict == PASS else red)
-    p.drawText(x + 24, y + 92, f"{verdict}   ({len(findings)} finding(s))")
+    p.drawText(x + 24, y + 96, f"{verdict}   ({len(findings)} finding(s))")
     p.setPen(QColor(51, 65, 85))
-    p.setFont(QFont("Arial", 13))
+    p.setFont(QFont(FONT, 13))
     for i, f in enumerate(findings[:3]):
-        p.drawText(x + 24, y + 124 + i * 22, ("• " + f)[:230])
+        p.drawText(x + 24, y + 132 + i * 24, ("- " + f)[:240])
     p.setPen(QColor(203, 213, 225))
     p.drawLine(x, y + band_h, x + w, y + band_h)
     return band_h
 
 
 def _render_report(path, name, pass_num, verdict, findings, when,
-                   level_pixmaps, shot_png, shot_reason):
-    plan_h = 900 if level_pixmaps else 0
-    shot_h = 1000
-    total_h = 190 + plan_h + shot_h + 40
+                   level_images, shot_png, shot_reason):
+    plan_h = 880 if level_images else 0
+    shot_h = 1040
+    header_h = 210
+    total_h = header_h + plan_h + shot_h + 40
     img = QImage(REPORT_W, total_h, QImage.Format.Format_RGB32)
     img.fill(QColor(255, 255, 255))
     p = QPainter(img)
     try:
-        y = 0
-        y += _draw_header(p, 0, y, REPORT_W, name, pass_num, verdict, findings, when)
-        if level_pixmaps:
-            n = len(level_pixmaps)
+        y = _draw_header(p, 0, 0, REPORT_W, name, pass_num, verdict, findings, when)
+        if level_images:
+            n = len(level_images)
             cw = REPORT_W // n
-            for i, (lvl, pm) in enumerate(level_pixmaps):
+            for i, (lvl, lim) in enumerate(level_images):
                 cx = i * cw
                 p.setPen(QColor(100, 116, 139))
-                p.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-                p.drawText(cx + 12, y + 26, f"level {lvl}")
-                if pm is not None and not pm.isNull():
-                    scaled = pm.scaled(cw - 24, plan_h - 56,
-                                       Qt.AspectRatioMode.KeepAspectRatio,
-                                       Qt.TransformationMode.SmoothTransformation)
-                    p.drawPixmap(cx + 12, y + 36, scaled)
+                p.setFont(QFont(FONT, 14, QFont.Weight.Bold))
+                p.drawText(cx + 14, y + 28, f"level {lvl}")
+                if lim is not None and not lim.isNull():
+                    p.drawImage(cx + 12, y + 40, lim)
             y += plan_h
         # the 3D band
         p.setPen(QColor(100, 116, 139))
-        p.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        p.drawText(12, y + 26, "3D view (whole house)")
+        p.setFont(QFont(FONT, 14, QFont.Weight.Bold))
+        p.drawText(14, y + 28, "3D view (whole house)")
         shot = QPixmap(shot_png) if shot_png and os.path.exists(shot_png) else QPixmap()
         if not shot.isNull():
             scaled = shot.scaled(REPORT_W - 24, shot_h - 56,
                                  Qt.AspectRatioMode.KeepAspectRatio,
                                  Qt.TransformationMode.SmoothTransformation)
-            p.drawPixmap(12, y + 36, scaled)
+            p.drawPixmap(12 + (REPORT_W - 24 - scaled.width()) // 2, y + 40, scaled)
         else:
-            p.fillRect(12, y + 36, REPORT_W - 24, shot_h - 56, QColor(241, 245, 249))
+            p.fillRect(12, y + 40, REPORT_W - 24, shot_h - 56, QColor(241, 245, 249))
             p.setPen(QColor(185, 28, 28))
-            p.setFont(QFont("Arial", 18))
-            p.drawText(QRectF(12, y + 36, REPORT_W - 24, shot_h - 56),
+            p.setFont(QFont(FONT, 18))
+            p.drawText(QRectF(12, y + 40, REPORT_W - 24, shot_h - 56),
                        Qt.AlignmentFlag.AlignCenter,
                        f"3D not rendered: {shot_reason}")
     finally:
@@ -218,6 +279,7 @@ def _render_report(path, name, pass_num, verdict, findings, when,
 # -- one pass ------------------------------------------------------------------
 def run_pass(plan_path, out_dir, pass_num, git_head):
     os.makedirs(out_dir, exist_ok=True)
+    _ensure_font()                               # repo font for header + labels
     stem = f"{pass_num:04d}"
     name = os.path.splitext(os.path.basename(plan_path))[0]
     t0 = time.time()
@@ -233,7 +295,7 @@ def run_pass(plan_path, out_dir, pass_num, git_head):
     def mark(label):
         _marks.append((label, time.time()))
     plan_copy = os.path.join(out_dir, f"{stem}.plan.json")
-    level_pixmaps, shot_png, shot_reason = [], None, "not attempted"
+    level_images, shot_png, shot_reason = [], None, "not attempted"
     try:
         with open(plan_path, "rb") as fh:
             raw = fh.read()
@@ -348,14 +410,17 @@ def run_pass(plan_path, out_dir, pass_num, git_head):
         result["verdict"] = PASS if (doc is not None and steps_1_4_clean) else FAIL
 
         # step 6 -- render (always; 3D in its own process)
-        if win is not None:
+        levels = [lv["name"] for lv in (doc.get("levels") or [])] if doc else []
+        if win is not None and levels:
             try:
-                levels = [lv["name"] for lv in (doc.get("levels") or [])] if doc else []
+                _apply_show_settings(win, doc)
+                n = len(levels)
+                cw, ch = REPORT_W // n - 24, 820
                 for lvl in levels:
                     try:
-                        level_pixmaps.append((lvl, _grab_level(win, lvl)))
+                        level_images.append((lvl, _render_level(win, lvl, cw, ch)))
                     except Exception as e:                # noqa: BLE001
-                        level_pixmaps.append((lvl, None))
+                        level_images.append((lvl, None))
                         result["step6_render"].append(f"level {lvl} plan: {e}")
             except Exception as e:                        # noqa: BLE001
                 result["step6_render"].append(f"plan render: {e}")
@@ -377,7 +442,7 @@ def run_pass(plan_path, out_dir, pass_num, git_head):
     when = time.strftime("%Y-%m-%d %H:%M:%S")
     try:
         _render_report(os.path.join(out_dir, f"{stem}.report.png"), name, pass_num,
-                       result["verdict"], findings, when, level_pixmaps,
+                       result["verdict"], findings, when, level_images,
                        shot_png, shot_reason)
     except Exception as e:                                 # noqa: BLE001
         result.setdefault("step6_render", []).append(f"report compose: {e}")

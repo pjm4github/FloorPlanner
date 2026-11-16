@@ -486,5 +486,8 @@ this table is not a second copy of it.
 | [`0344-report.md`](./0344-report.md) | report: the generated PNGs are in the repo — gallery regenerated on `main` and committed, the two reviewer previews and the gallery pushed (0343 §3) |
 | [`0345-ruling.md`](./0345-ruling.md) | ruling: build the PLAN WATCHER — a headless validator and report renderer the reviewer loops against. GREEN tooling; RED if it needs an app change |
 | [`0346-report.md`](./0346-report.md) | report: the plan watcher is STARTED and running — command, PID, heartbeat, C5 timing, first pass on a real plan |
+| [`0347-ruling.md`](./0347-ruling.md) | ruling: the watcher WORKS (four passes, one PASS, areas exact) — and its report PNG is not yet readable. Four fixes, GREEN |
+| [`0348-report.md`](./0348-report.md) | report: the four report-PNG defects fixed, the text test added, the watcher restarted (PID 27380) |
+| [`0349-ruling.md`](./0349-ruling.md) | ruling: 0348 accepted — the report reads. Two findings from the first design passes: I11 misfires on L-shaped rooms; the 3D panel is now too small |
 
 <!-- PAIRS:END -->

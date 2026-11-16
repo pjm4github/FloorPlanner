@@ -46,3 +46,8 @@ plans.pdf
 # 0345: the plan watcher's working folder -- transient validation output, PNGs,
 # heartbeat and the reviewer loop's input; never source.
 fixtures/incoming/build/
+
+# 0349: the reviewer's design-run output (candidate plans, reports, change
+# logs, throwaway generator scripts) -- transient reviewer scratch, like build/;
+# never source.
+artifacts/
