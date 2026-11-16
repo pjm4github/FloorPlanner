@@ -80,6 +80,98 @@
     "price": 80.0
   },
   {
+    "id": "sofa_table",
+    "name": "Sofa Table 4'",
+    "category": "Living",
+    "file": "sofa_table.svg",
+    "width_in": 48,
+    "depth_in": 14,
+    "height_in": 30,
+    "elevation_in": 0,
+    "form": "slab",
+    "material": "wood",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "sofa_table",
+      "width_in": 48,
+      "depth_in": 14,
+      "height_in": 30,
+      "shelves": 1
+    },
+    "price": 0.0
+  },
+  {
+    "id": "table_lamp",
+    "name": "Table Lamp",
+    "category": "Lighting",
+    "file": "table_lamp.svg",
+    "width_in": 12,
+    "depth_in": 12,
+    "height_in": 22,
+    "elevation_in": 30,
+    "form": "box",
+    "material": "metal",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "light",
+      "fixture": "table",
+      "width_in": 12,
+      "depth_in": 12,
+      "size_in": 12,
+      "floor_to_bottom_in": 30,
+      "drop_in": 22
+    },
+    "price": 0.0
+  },
+  {
+    "id": "dog_crate",
+    "name": "Dog Crate 36\"",
+    "category": "Living",
+    "file": "dog_crate.svg",
+    "width_in": 36,
+    "depth_in": 24,
+    "height_in": 26,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "dog_crate",
+      "width_in": 36,
+      "depth_in": 24,
+      "height_in": 26,
+      "colour": "slate"
+    },
+    "price": 0.0
+  },
+  {
+    "id": "pedal_bin",
+    "name": "Pedal Bin",
+    "category": "Kitchen",
+    "file": "pedal_bin.svg",
+    "width_in": 13,
+    "depth_in": 16,
+    "height_in": 24,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "metal",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "pedal_bin",
+      "width_in": 13,
+      "depth_in": 16,
+      "height_in": 24
+    },
+    "price": 0.0
+  },
+  {
     "id": "tv_stand",
     "name": "TV Stand",
     "category": "Living",
@@ -1532,7 +1624,13 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
-    "cabinet": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "desk",
+      "width_in": 60,
+      "depth_in": 30,
+      "height_in": 30
+    },
     "price": 350.0
   },
   {
@@ -1548,7 +1646,14 @@
     "material": "soft",
     "region_material": null,
     "side_file": null,
-    "cabinet": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "office_chair",
+      "width_in": 24,
+      "depth_in": 24,
+      "height_in": 40,
+      "colour": "black"
+    },
     "price": 120.0
   },
   {
@@ -1564,7 +1669,14 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
-    "cabinet": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "office_set",
+      "width_in": 54,
+      "depth_in": 36,
+      "height_in": 30,
+      "colour": "black"
+    },
     "price": 450.0
   },
   {

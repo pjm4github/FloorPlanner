@@ -476,7 +476,7 @@
     },
 
     "fixture_state": {
-      "description": "0338. DECLARED, NOT ENFORCED: the keys a fixture's `furnishing.state` may carry (kinds toilet, bathtub, bookshelf, gas_fireplace, grab_bar). Every key is optional; the application validates and falls back (cabinet_geometry.normalize_state).",
+      "description": "0338. DECLARED, NOT ENFORCED: the keys a fixture's `furnishing.state` may carry (kinds toilet, bathtub, bookshelf, gas_fireplace, grab_bar, desk, office_chair, office_set, pedal_bin, dog_crate, sofa_table). Every key is optional; the application validates and falls back (cabinet_geometry.normalize_state).",
       "type": "object",
       "additionalProperties": true,
       "properties": {
@@ -492,7 +492,13 @@
         "bar":                { "description": "Grab bar.", "enum": ["horizontal", "vertical"] },
         "length_in":          { "type": "number", "minimum": 9, "maximum": 60 },
         "floor_to_bottom_in": { "description": "Grab bar: floor to the underside of its flange.", "type": "number", "minimum": 0 },
-        "hardware":           { "description": "Grab bar: a hardware finish key, or `room`.", "type": "string" }
+        "hardware":           { "description": "Grab bar: a hardware finish key, or `room`.", "type": "string" },
+        "computer":           { "description": "0340. Desk, office_set: what stands on the desk.", "enum": ["desktop", "dual", "laptop", "none"] },
+        "pedestal":           { "description": "0340. Desk, office_set: where the drawers are.", "enum": ["right", "left", "both", "none"] },
+        "arms":               { "description": "0340. office_chair, office_set.", "type": "boolean" },
+        "bed":                { "description": "0341. dog_crate: a bed inside.", "type": "boolean" },
+        "finish_mode":        { "description": "0341. pedal_bin: stainless, or a colour.", "enum": ["standard", "custom"] },
+        "sheen":              { "enum": ["matte", "gloss", "gel_coat"] }
       }
     },
 

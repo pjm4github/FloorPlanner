@@ -272,7 +272,9 @@ def test_an_island_paints_its_own_symbol_and_the_seats_change_it(fp, qapp, scene
 
 
 @pytest.mark.parametrize("kind", ["toilet", "bathtub", "bookshelf",
-                                  "gas_fireplace", "grab_bar"])
+                                  "gas_fireplace", "grab_bar", "desk",
+                                  "office_chair", "office_set", "pedal_bin",
+                                  "dog_crate", "sofa_table"])
 def test_a_fixture_opens_a_dialog_and_accepts_unchanged(fp, qapp, kind):
     it = fp.make_furnishing(kind, QPointF(0, 0))
     assert it.is_parametric() and it.extra_state() == {}

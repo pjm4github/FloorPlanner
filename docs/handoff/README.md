@@ -479,5 +479,8 @@ this table is not a second copy of it.
 | [`0337-report.md`](./0337-report.md) | report: the stair delta (0335) re-gated — RED on ruff (5 errors in the lane, reviewer's to fix); tests GREEN; commit HELD; the Phase 2 record 0336 §2.4 paid; the icons / gallery named |
 | [`0338-ruling.md`](./0338-ruling.md) | ruling: 0337's five ruff errors fixed; fixtures in 3D, island slots and plan symbol, grab bars, the stairwell cut. Built in the lane, UN-GATED, AMBER |
 | [`0339-report.md`](./0339-report.md) | report: 0337's ruff fixed; the stair delta (0335) and the 0338 delta (fixtures, island slots + plan symbol, grab bars, the stairwell cut) gated and committed by path on one branch, AMBER |
+| [`0340-ruling.md`](./0340-ruling.md) | ruling: 0339 accepted (GREEN, on `stairs-0338`); desk, office chair and desk-and-chair set in 3D with a computer. Built in the lane, UN-GATED, AMBER |
+| [`0341-ruling.md`](./0341-ruling.md) | ruling: pedal bin, dog crate, sofa table and table lamp — four new kinds in 3D. Built in the lane, UN-GATED, AMBER. Lands with 0340 |
+| [`0342-report.md`](./0342-report.md) | report: the 0340 + 0341 furnishing delta (desk / office chair / office set, and pedal bin / dog crate / sofa table / table lamp) gated GREEN and landed by path on `main`, catalog 104→108 |
 
 <!-- PAIRS:END -->

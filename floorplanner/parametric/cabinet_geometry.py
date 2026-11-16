@@ -83,7 +83,8 @@ LIGHT_COLOURS = (
 )
 FIXTURES = (("recessed", "Recessed can"), ("flush", "Flush mount"),
             ("pendant", "Pendant"), ("linear", "Linear / strip"),
-            ("sconce", "Wall sconce"), ("globe", "Globe"))
+            ("sconce", "Wall sconce"), ("globe", "Globe"),
+            ("table", "Table lamp"))
 # What can stand under an island: (code, label, width, type, overrides).
 ISLAND_SLOTS = (
     ("none", "\u2014 empty \u2014", 0.0, None, {}),
@@ -113,7 +114,18 @@ ISLAND_SLOTS = (
      {"appliance": "microwave_drawer"}),
 )
 # 0338: fixtures built from parts -- what each is, and what its dialog offers.
-FIXTURE_MODELS = ("toilet", "bathtub", "bookshelf", "fireplace", "grab_bar")
+FIXTURE_MODELS = ("toilet", "bathtub", "bookshelf", "fireplace", "grab_bar",
+                  "desk", "office_chair", "office_set",
+                  "pedal_bin", "dog_crate", "sofa_table")
+COMPUTERS = (("desktop", "Monitor, keyboard and mouse"),
+             ("dual", "Two monitors, keyboard and mouse"),
+             ("laptop", "Laptop"), ("none", "None"))
+PEDESTALS = (("right", "Drawers on the right"), ("left", "Drawers on the left"),
+             ("both", "Drawers both sides"), ("none", "No drawers"))
+DESK_TOP_T = 1.5
+SET_DESK_D = 24.0              # the desk of a desk-and-chair set
+CHAIR = 24.0                   # an office chair's footprint, square
+CHAIR_SEAT_Z = 19.0
 FIXTURE_COLOURS = ("white", "cream", "black", "slate")
 SURROUNDS = (("stone", "Stone", "stone"), ("brick", "Brick", "fp_brick"),
              ("marble", "Marble", "ct_marble"), ("tile", "Tile", "ct_tile"),
@@ -174,6 +186,7 @@ MATERIALS = {
     "fp_hearth":     {"colour": [0.22, 0.22, 0.23, 1.0], "roughness": 0.60, "metalness": 0.0},
     "fp_firebox":    {"colour": [0.07, 0.07, 0.07, 1.0], "roughness": 0.90, "metalness": 0.0},
     "fp_log":        {"colour": [0.30, 0.20, 0.13, 1.0], "roughness": 0.90, "metalness": 0.0},
+    "screen_glass":  {"colour": [0.09, 0.13, 0.20, 1.0], "roughness": 0.10, "metalness": 0.1},
     "book_1":        {"colour": [0.55, 0.16, 0.14, 1.0], "roughness": 0.70, "metalness": 0.0},
     "book_2":        {"colour": [0.15, 0.27, 0.45, 1.0], "roughness": 0.70, "metalness": 0.0},
     "book_3":        {"colour": [0.20, 0.38, 0.26, 1.0], "roughness": 0.70, "metalness": 0.0},
@@ -273,6 +286,25 @@ PRESETS = {
     "grab_bar": {"type": "fixture", "model": "grab_bar", "wall_mounted": True,
                  "width_in": 24, "depth_in": 3.5, "height_in": 3,
                  "length_in": 24, "floor_to_bottom_in": 32},
+    # 0340: the office.  `height_in` is the DESK top; a chair's is its back.
+    "desk": {"type": "fixture", "model": "desk", "width_in": 60,
+             "depth_in": 30, "height_in": 30},
+    "office_chair": {"type": "fixture", "model": "office_chair",
+                     "width_in": 24, "depth_in": 24, "height_in": 40,
+                     "colour": "black"},
+    "office_set": {"type": "fixture", "model": "office_set", "width_in": 54,
+                   "depth_in": 36, "height_in": 30, "colour": "black"},
+    # 0341
+    "pedal_bin": {"type": "fixture", "model": "pedal_bin", "width_in": 13,
+                  "depth_in": 16, "height_in": 24},
+    "dog_crate": {"type": "fixture", "model": "dog_crate", "width_in": 36,
+                  "depth_in": 24, "height_in": 26, "colour": "slate"},
+    "sofa_table": {"type": "fixture", "model": "sofa_table", "width_in": 48,
+                   "depth_in": 14, "height_in": 30, "shelves": 1},
+    # a lamp STANDS ON something: `floor_to_bottom_in` is that surface
+    "table_lamp": {"type": "light", "fixture": "table", "width_in": 12,
+                   "depth_in": 12, "size_in": 12, "floor_to_bottom_in": 30,
+                   "drop_in": 22},
 }
 
 _TYPE_DEFAULTS = {
@@ -313,6 +345,8 @@ STATE_DEFAULTS = {
     # fixture
     "model": "toilet", "shelves": 4, "books": True, "surround": "stone",
     "lit": True, "bar": "horizontal", "length_in": 24.0,
+    "computer": "desktop", "pedestal": "right", "arms": True,
+    "bed": True,
 }
 FRONTS = ("doors", "drawer_over_doors", "drawers", "false_front")
 _ENUMS = {
@@ -332,6 +366,8 @@ _ENUMS = {
     "light_colour": tuple(k for k, _l, _h in LIGHT_COLOURS),
     "beam": ("wide", "spot"),
     "model": FIXTURE_MODELS, "bar": ("horizontal", "vertical"),
+    "computer": tuple(k for k, _l in COMPUTERS),
+    "pedestal": tuple(k for k, _l in PEDESTALS),
     "surround": tuple(k for k, _l, _m in SURROUNDS),
 }
 _ENUMS.update({key: tuple(row[0] for row in ISLAND_SLOTS)
@@ -386,7 +422,7 @@ def normalize_state(state, preset=None):
             value = str(value)
             if value not in _ENUMS[key]:
                 value = str(default)
-        elif key in ("top_on", "wall_mounted", "books", "lit"):
+        elif key in ("top_on", "wall_mounted", "books", "lit", "arms", "bed"):
             value = bool(value)
         elif key == "shelves":
             try:
@@ -410,9 +446,14 @@ def normalize_state(state, preset=None):
             out[fixed] = preset[fixed]
     if kind_type == "fixture":
         model = out["model"]
-        if model == "toilet":                     # one size
+        if model in ("toilet", "office_chair"):   # one size
             for key in ("width_in", "depth_in", "height_in"):
                 out[key] = float(preset.get(key, out[key]))
+        elif model == "pedal_bin":                # round, plus the pedal
+            out["depth_in"] = out["width_in"] + 3.0
+        elif model == "office_set":               # a desk, and room for the chair
+            out["width_in"] = max(out["width_in"], CHAIR + 12.0)
+            out["depth_in"] = SET_DESK_D + 12.0
         elif model == "grab_bar":
             length = min(max(out["length_in"], 9.0), 60.0)
             out["length_in"] = length
@@ -533,7 +574,9 @@ def resolve_materials(st, room_style=None):
     glow = {k: h for k, _l, h in LIGHT_COLOURS}.get(st["light_colour"], "#ffe4bf")
     china = "sheen_gloss" + {k: h for k, _l, h in COLOURS}.get(
         st["colour"], "#f2f2ee")
-    return {"porcelain": china,
+    return {"porcelain": china, "upholstery": "sheen_matte" + china[len(
+                "sheen_gloss"):],
+            "screen": "screen_glass", "device": "metal",
             "surround": _lookup(SURROUNDS, st.get("surround"), "stone"),
             "hearth": "fp_hearth", "firebox": "fp_firebox", "log": "fp_log",
             "flame": "light_emit#ff7a1a", "burner": "metal",
@@ -1297,9 +1340,248 @@ def _grab_bar(parts, st):
              1.5 - r, 1.5 + r)
 
 
+def _monitor(parts, name, cx, top, width=24.0):
+    """A flat monitor on a stand, facing the sitter (+f)."""
+    half = width / 2.0
+    _add(parts, f"{name}-foot", "appliance_dark", cx - 4.5, cx + 4.5, 4.5, 10.5,
+         top, top + 0.5)
+    _add(parts, f"{name}-neck", "appliance_dark", cx - 1.0, cx + 1.0, 6.2, 7.2,
+         top + 0.5, top + 9.0)
+    _add(parts, f"{name}-case", "appliance_dark", cx - half, cx + half, 7.2, 8.2,
+         top + 4.5, top + 4.5 + width * 0.6)
+    _add(parts, f"{name}-screen", "screen", cx - half + 0.6, cx + half - 0.6,
+         8.2, 8.3, top + 5.3, top + 3.9 + width * 0.6)
+
+
+def _computer(parts, st, top, depth):
+    """What stands on the desk: `computer` says which."""
+    kind = st["computer"]
+    if kind == "none":
+        return
+    if kind == "laptop":
+        _add(parts, "laptop-base", "device", -6.5, 6.5, depth - 17.0, depth - 8.0,
+             top, top + 0.6)
+        _add(parts, "laptop-keys", "appliance_dark", -5.5, 5.5, depth - 15.5,
+             depth - 11.5, top + 0.6, top + 0.65)
+        _add(parts, "laptop-lid", "device", -6.5, 6.5, depth - 17.6, depth - 17.0,
+             top, top + 9.0)
+        _add(parts, "laptop-screen", "screen", -6.0, 6.0, depth - 17.0,
+             depth - 16.92, top + 0.9, top + 8.5)
+        return
+    if kind == "dual":
+        _monitor(parts, "monitor-1", -11.5, top, 22.0)
+        _monitor(parts, "monitor-2", 11.5, top, 22.0)
+    else:
+        _monitor(parts, "monitor", 0.0, top)
+    _add(parts, "keyboard", "appliance_dark", -8.5, 8.5, depth - 12.0,
+         depth - 6.0, top, top + 0.7)
+    _oval(parts, "mouse", "appliance_dark", 13.0, depth - 9.0, 1.3, 2.1, top,
+          top + 1.2, n=10)
+
+
+def _desk_parts(parts, st, w, depth):
+    """A desk `w` x `depth`: a top on end panels, a modesty panel at the
+    back (f = 0), drawer pedestals facing the sitter, and the computer."""
+    h = st["height_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    top = h - DESK_TOP_T
+    _add(parts, "top", "cabinet", x0, x1, 0.0, depth, top, h)
+    side = st["pedestal"]
+    ped = min(16.0, (w - CHAIR - 2.0) / 2.0) if side == "both" else min(16.0, w / 3.0)
+    for tag, on, a, b in (("l", side in ("left", "both"), x0 + 1.0, x0 + 1.0 + ped),
+                          ("r", side in ("right", "both"), x1 - 1.0 - ped, x1 - 1.0)):
+        if on and ped >= 9.0:
+            _add(parts, f"pedestal-{tag}", "cabinet", a, b, 2.0, depth - 2.25,
+                 0.0, top)
+            zs = [1.0, 12.0, 20.0, top - 0.4]
+            for i in range(3):
+                _add(parts, f"drawer-{tag}-{i + 1}", "cabinet", a + 0.3, b - 0.3,
+                     depth - 2.25, depth - 1.5, zs[i] + 0.2, zs[i + 1] - 0.2)
+                mid = (zs[i] + zs[i + 1]) / 2.0
+                _add(parts, f"pull-{tag}-{i + 1}", "hardware", (a + b) / 2.0 - 2.5,
+                     (a + b) / 2.0 + 2.5, depth - 1.5, depth - 0.5,
+                     mid - 0.3, mid + 0.3)
+        else:
+            edge = x0 + 1.0 if tag == "l" else x1 - 2.5
+            _add(parts, f"panel-{tag}", "cabinet", edge, edge + 1.5, 2.0,
+                 depth - 2.0, 0.0, top)
+    _add(parts, "modesty", "cabinet", x0 + 2.5, x1 - 2.5, 3.0, 3.75, 9.0, top)
+    _computer(parts, st, h, depth)
+
+
+def _desk(parts, st):
+    _desk_parts(parts, st, st["width_in"], st["depth_in"])
+
+
+def _office_chair(parts, st):
+    """A task chair, its back at f = 0: a five-star base on casters, a gas
+    column, an upholstered seat and back, and arms."""
+    c = CHAIR / 2.0                             # the seat's centre, x and f
+    seat = CHAIR_SEAT_Z
+    for i in range(5):                          # the star, and a caster on each
+        ang = math.radians(90.0 + 72.0 * i)
+        ux, uf = math.cos(ang), math.sin(ang)
+        px, pf = -uf, ux
+        tip = (ux * 11.0, c + 0.3 + uf * 11.0)
+        root = (ux * 1.0, c + 0.3 + uf * 1.0)
+        _ring(parts, f"leg-{i + 1}", "appliance_dark",
+              [(root[0] + px * 1.0, root[1] + pf * 1.0),
+               (tip[0] + px * 0.7, tip[1] + pf * 0.7),
+               (tip[0] - px * 0.7, tip[1] - pf * 0.7),
+               (root[0] - px * 1.0, root[1] - pf * 1.0)], 2.2, 3.6)
+        _oval(parts, f"caster-{i + 1}", "appliance_dark", ux * 10.3,
+              c + 0.3 + uf * 10.3, 1.1, 1.1, 0.0, 2.2, n=8)
+    _oval(parts, "hub", "appliance_dark", 0.0, c + 0.3, 1.8, 1.8, 2.2, 4.2, n=10)
+    _oval(parts, "column", "hardware", 0.0, c + 0.3, 1.0, 1.0, 4.2, seat - 4.0, n=10)
+    _add(parts, "mechanism", "appliance_dark", -4.0, 4.0, c - 3.0, c + 5.0,
+         seat - 4.0, seat - 3.0)
+    _oval(parts, "seat", "upholstery", 0.0, c + 1.5, 9.5, 9.0, seat - 3.0, seat,
+          n=16)
+    _add(parts, "back-post", "appliance_dark", -1.2, 1.2, 1.5, 4.5, seat - 4.0,
+         seat + 6.0)
+    for name, ring in (
+            ("back-l", [(-9.0, 2.2), (-3.0, 0.0), (-3.0, 2.0), (-8.2, 4.0)]),
+            ("back-c", [(-3.0, 0.0), (3.0, 0.0), (3.0, 2.0), (-3.0, 2.0)]),
+            ("back-r", [(3.0, 0.0), (9.0, 2.2), (8.2, 4.0), (3.0, 2.0)])):
+        _ring(parts, name, "upholstery", ring, seat + 4.0, st["height_in"])
+    if st["arms"]:
+        _add(parts, "arm-bar", "appliance_dark", -c + 0.4, c - 0.4, c - 0.8,
+             c + 0.8, seat - 3.8, seat - 3.0)
+        for tag, a, b in (("l", -c, -c + 2.0), ("r", c - 2.0, c)):
+            _add(parts, f"arm-{tag}-post", "appliance_dark", a + 0.4, b - 0.4,
+                 c - 1.0, c + 1.0, seat - 3.8, seat + 6.2)
+            _add(parts, f"arm-{tag}-pad", "appliance_dark", a, b, c - 5.0, c + 5.0,
+                 seat + 6.2, seat + 7.2)
+
+
+def _office_set(parts, st):
+    """A desk with its chair drawn up to it, facing the desk."""
+    w, depth = st["width_in"], st["depth_in"]
+    _desk_parts(parts, st, w, SET_DESK_D)
+    chair = []
+    _office_chair(chair, dict(st, height_in=40.0))
+    # clear of a single drawer pedestal: slid just far enough the other way
+    side = st["pedestal"]
+    inner = w / 2.0 - 1.0 - min(16.0, w / 3.0)      # the pedestal's inside face
+    slide = max(0.0, CHAIR / 2.0 + 1.0 - inner)
+    dx = {"right": -slide, "left": slide}.get(side, 0.0)
+    named = [Part(f"chair-{p.name}", p.role, p.quad, p.z0, p.z1) for p in chair]
+    parts.extend(_moved(named, dx=dx, flip_depth=CHAIR, df=depth - CHAIR))
+
+
+def _pedal_bin(parts, st):
+    """A step bin: a round body on a dark base ring, a domed lid hinged at
+    the back (f = 0), and the pedal out at the front."""
+    w, d, h = st["width_in"], st["depth_in"], st["height_in"]
+    r = w / 2.0
+    cf = r                                      # the body stands at the back
+    _oval(parts, "base", "appliance_dark", 0.0, cf, r, r, 0.0, 1.4)
+    _oval(parts, "body", "appliance", 0.0, cf, r - 0.3, r - 0.3, 1.4, h - 2.4)
+    _oval(parts, "rim", "appliance_dark", 0.0, cf, r, r, h - 2.4, h - 1.9)
+    _oval(parts, "lid", "appliance", 0.0, cf, r - 0.1, r - 0.1, h - 1.9, h - 0.9)
+    _oval(parts, "lid-crown", "appliance", 0.0, cf, r * 0.72, r * 0.72, h - 0.9, h)
+    _add(parts, "hinge", "appliance_dark", -2.0, 2.0, 0.0, 0.9, h - 3.4, h - 1.2)
+    _add(parts, "pedal-arm", "appliance_dark", -0.6, 0.6, cf + r - 1.0, d - 2.5,
+         0.5, 1.1)
+    _add(parts, "pedal", "appliance_dark", -2.3, 2.3, d - 3.2, d, 0.5, 1.3)
+
+
+def _dog_crate(parts, st):
+    """A wire crate: a tube frame, wires up the sides and across the top, a
+    pan, a door in one end with its latch, and (when asked) a bed."""
+    w, d, h = st["width_in"], st["depth_in"], st["height_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    t, wire, role = 0.4, 0.14, "appliance_dark"
+    _add(parts, "pan", role, x0 + t, x1 - t, t, d - t, 0.0, 1.0)
+    if st["bed"]:
+        _add(parts, "bed", "upholstery", x0 + 2.0, x1 - 2.0, 2.0, d - 2.0, 1.0, 3.2)
+        _add(parts, "bolster", "upholstery", x0 + 2.0, x1 - 2.0, 2.0, 5.0, 3.2, 5.6)
+    for i, (px, pf) in enumerate(((x0, 0.0), (x1 - t, 0.0), (x0, d - t),
+                                  (x1 - t, d - t)), start=1):
+        _add(parts, f"post-{i}", role, px, px + t, pf, pf + t, 0.0, h)
+    for tag, z in (("low", 0.0), ("high", h - t)):
+        _add(parts, f"rail-back-{tag}", role, x0 + t, x1 - t, 0.0, t, z, z + t)
+        _add(parts, f"rail-front-{tag}", role, x0 + t, x1 - t, d - t, d, z, z + t)
+        _add(parts, f"rail-left-{tag}", role, x0, x0 + t, t, d - t, z, z + t)
+        _add(parts, f"rail-right-{tag}", role, x1 - t, x1, t, d - t, z, z + t)
+    pitch = 2.5
+    nx = max(2, int(round((w - 2 * t) / pitch)))
+    nf = max(2, int(round((d - 2 * t) / pitch)))
+    off = (t - wire) / 2.0
+    for i in range(1, nx):                      # the long sides and the top
+        x = x0 + t + (w - 2 * t) * i / nx - wire / 2.0
+        _add(parts, f"wire-back-{i}", role, x, x + wire, off, off + wire, t, h - t)
+        _add(parts, f"wire-front-{i}", role, x, x + wire, d - off - wire, d - off,
+             t, h - t)
+        _add(parts, f"wire-top-x-{i}", role, x, x + wire, t, d - t,
+             h - off - wire, h - off)
+    for i in range(1, nf):                      # the ends
+        f = t + (d - 2 * t) * i / nf - wire / 2.0
+        _add(parts, f"wire-left-{i}", role, x0 + off, x0 + off + wire, f, f + wire,
+             t, h - t)
+        _add(parts, f"wire-right-{i}", role, x1 - off - wire, x1 - off, f,
+             f + wire, t, h - t)
+    for j in range(1, 4):                       # three hoops round the sides
+        z = t + (h - 2 * t) * j / 4.0
+        _add(parts, f"hoop-back-{j}", role, x0 + t, x1 - t, off, off + wire,
+             z, z + wire)
+        _add(parts, f"hoop-front-{j}", role, x0 + t, x1 - t, d - off - wire,
+             d - off, z, z + wire)
+        _add(parts, f"hoop-left-{j}", role, x0 + off, x0 + off + wire, t, d - t,
+             z, z + wire)
+        _add(parts, f"hoop-right-{j}", role, x1 - off - wire, x1 - off, t, d - t,
+             z, z + wire)
+    for i in range(1, 4):
+        f = t + (d - 2 * t) * i / 4.0
+        _add(parts, f"wire-top-f-{i}", role, x0 + t, x1 - t, f, f + wire,
+             h - off - wire, h - off)
+    # the door, in the +x end: a frame just inside the end, and its latch
+    f0, f1 = d * 0.2, d * 0.8
+    z0, z1 = 2.0, h - 3.0
+    for name, r in (("door-jamb-1", (f0, f0 + 0.3, z0, z1)),
+                    ("door-jamb-2", (f1 - 0.3, f1, z0, z1)),
+                    ("door-sill", (f0, f1, z0, z0 + 0.3)),
+                    ("door-head", (f0, f1, z1 - 0.3, z1))):
+        _add(parts, name, role, x1 - t - 0.3, x1 - t, r[0], r[1], r[2], r[3])
+    _add(parts, "latch", "hardware", x1 - t - 0.6, x1 - t - 0.3, f1 - 2.5,
+         f1 + 1.0, (z0 + z1) / 2.0 - 0.3, (z0 + z1) / 2.0 + 0.3)
+    _add(parts, "handle", role, x0 + w * 0.35, x1 - w * 0.35, d / 2.0 - 0.3,
+         d / 2.0 + 0.3, h - t, h)
+
+
+def _sofa_table(parts, st):
+    """A console table: a top, an apron, four legs and low shelves."""
+    w, d, h = st["width_in"], st["depth_in"], st["height_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    leg, top_t, inset = 2.0, 1.25, 1.0
+    _add(parts, "top", "cabinet", x0, x1, 0.0, d, h - top_t, h)
+    a, b, f0, f1 = x0 + inset, x1 - inset, inset, d - inset
+    for i, (lx, lf) in enumerate(((a, f0), (b - leg, f0), (a, f1 - leg),
+                                  (b - leg, f1 - leg)), start=1):
+        _add(parts, f"leg-{i}", "cabinet", lx, lx + leg, lf, lf + leg, 0.0, h - top_t)
+    apron = min(3.5, h * 0.15)
+    z = h - top_t - apron
+    _add(parts, "apron-back", "cabinet", a + leg, b - leg, f0 + 0.4, f0 + 1.2,
+         z, h - top_t)
+    _add(parts, "apron-front", "cabinet", a + leg, b - leg, f1 - 1.2, f1 - 0.4,
+         z, h - top_t)
+    _add(parts, "apron-left", "cabinet", a + 0.4, a + 1.2, f0 + leg, f1 - leg,
+         z, h - top_t)
+    _add(parts, "apron-right", "cabinet", b - 1.2, b - 0.4, f0 + leg, f1 - leg,
+         z, h - top_t)
+    n = min(int(st["shelves"]), 3)
+    for i in range(1, n + 1):
+        sz = 5.0 + (z - 5.0) * (i - 1) / max(n, 1)
+        _add(parts, f"shelf-{i}", "cabinet", a + 0.3, b - 0.3, f0 + 0.3, f1 - 0.3,
+             sz, sz + 0.75)
+
+
 _FIXTURE_BUILDERS = {"toilet": _toilet, "bathtub": _bathtub,
                      "bookshelf": _bookshelf, "fireplace": _fireplace,
-                     "grab_bar": _grab_bar}
+                     "grab_bar": _grab_bar, "desk": _desk,
+                     "office_chair": _office_chair, "office_set": _office_set,
+                     "pedal_bin": _pedal_bin, "dog_crate": _dog_crate,
+                     "sofa_table": _sofa_table}
 
 
 def _light(parts, st, ceiling_in):
@@ -1340,6 +1622,24 @@ def _light(parts, st, ceiling_in):
         _add(parts, "housing", "fixture", -r, r, mid - w2, mid + w2, top - 2.0, top)
         _add(parts, "lens", "lens", -r + 0.5, r - 0.5, mid - w2 + 0.8,
              mid + w2 - 0.8, top - 2.6, top - 2.0)
+    elif fx == "table":
+        # stands on a table top at `floor_to_bottom_in`; `drop_in` is the
+        # lamp's own height, `size_in` its shade's width
+        z0 = max(st["floor_to_bottom_in"], 0.0)
+        tall = min(max(st["drop_in"], 10.0), 48.0)
+        shade = tall * 0.38
+        s0 = z0 + tall - shade
+        _oval(parts, "lens", "lens", 0.0, mid, r, r, s0, s0 + shade * 0.4)
+        _oval(parts, "lens-mid", "lens", 0.0, mid, r * 0.88, r * 0.88,
+              s0 + shade * 0.4, s0 + shade * 0.75)
+        _oval(parts, "lens-top", "lens", 0.0, mid, r * 0.76, r * 0.76,
+              s0 + shade * 0.75, z0 + tall)
+        _oval(parts, "foot", "fixture", 0.0, mid, min(r * 0.55, 3.2),
+              min(r * 0.55, 3.2), z0, z0 + 0.8, n=12)
+        _oval(parts, "body", "fixture", 0.0, mid, min(r * 0.38, 2.2),
+              min(r * 0.38, 2.2), z0 + 0.8, z0 + (tall - shade) * 0.7, n=12)
+        _oval(parts, "stem", "fixture", 0.0, mid, 0.4, 0.4,
+              z0 + (tall - shade) * 0.7, s0 + shade * 0.3, n=8)
     else:                                   # sconce
         z0 = st["floor_to_bottom_in"]
         _add(parts, "backplate", "fixture", -r, r, 0.0, 0.8, z0, z0 + size * 1.6)
@@ -1365,7 +1665,7 @@ def light_source(st, ceiling_in=96.0):
     f = sum(q[1] for q in lens.quad) / 4.0
     hexa = {k: h for k, _l, h in LIGHT_COLOURS}.get(st["light_colour"], "#ffe4bf")
     rgb = tuple(int(hexa[i:i + 2], 16) / 255.0 for i in (1, 3, 5))
-    spot = st["beam"] == "spot" and st["fixture"] != "sconce"
+    spot = st["beam"] == "spot" and st["fixture"] not in ("sconce", "table")
     return {"pos": (x, f, lens.z0 - 0.5), "colour": rgb,
             "lumens": float(st["lumens"]), "kind": "spot" if spot else "point",
             "cone_deg": 60.0 if spot else 180.0}

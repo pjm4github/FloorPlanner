@@ -549,6 +549,16 @@
     "roughness": 0.9,
     "metalness": 0.0
   },
+  "screen_glass": {
+    "colour": [
+      0.09,
+      0.13,
+      0.2,
+      1.0
+    ],
+    "roughness": 0.1,
+    "metalness": 0.1
+  },
   "book_1": {
     "colour": [
       0.55,

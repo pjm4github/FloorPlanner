@@ -39,7 +39,11 @@ def _is_pendant(values):
 
 
 def _is_sconce(values):
-    return values.get("fixture") == "sconce"
+    return values.get("fixture") in ("sconce", "table")
+
+
+def _has_drop(values):
+    return values.get("fixture") in ("pendant", "table")
 
 
 def _shown_width(_values, derived, _context):
@@ -78,10 +82,13 @@ class CabinetKind(ParametricKind):
                 ParamSpec("beam", "Beam", ENUM, d["beam"],
                           choices=(("wide", "Wide (all round)"),
                                    ("spot", "Spot (downward)")),
-                          enabled_fn=lambda v: v.get("fixture") != "sconce"),
-                ParamSpec("drop_in", "Drop below ceiling", FLOAT, d["drop_in"],
+                          enabled_fn=lambda v: v.get("fixture") not in (
+                              "sconce", "table")),
+                ParamSpec("drop_in", "Drop / lamp height", FLOAT, d["drop_in"],
                           unit="in", minimum=4.0, maximum=120.0, step=1.0,
-                          enabled_fn=_is_pendant),
+                          enabled_fn=_has_drop,
+                          tooltip="A pendant: how far it hangs below the "
+                                  "ceiling. A table lamp: how tall it is."),
                 ParamSpec("floor_to_bottom_in", "Height from floor", FLOAT,
                           d["floor_to_bottom_in"], unit="in", minimum=0.0,
                           maximum=144.0, step=1.0, enabled_fn=_is_sconce),
@@ -288,6 +295,60 @@ class CabinetKind(ParametricKind):
                           choices=_choices(cg.FINISHES)),
                 ParamSpec("lit", "Lit", BOOL, d["lit"],
                           tooltip="Flames show, and glow in the 3D view.")]
+        if model == "pedal_bin":
+            custom = _is_custom
+            return [
+                size("width_in", "Diameter", 8.0, 24.0),
+                size("height_in", "Height", 10.0, 40.0),
+                ParamSpec("finish_mode", "Finish", ENUM, d["finish_mode"],
+                          choices=(("standard", "Stainless"),
+                                   ("custom", "Colour"))),
+                ParamSpec("sheen", "Sheen", ENUM, d["sheen"],
+                          choices=cg.SHEENS, enabled_fn=custom),
+                ParamSpec("colour", "Colour", ENUM, d["colour"],
+                          choices=tuple((k, label) for k, label, _h in cg.COLOURS),
+                          enabled_fn=custom)]
+        if model == "dog_crate":
+            return [
+                size("width_in", "Length", 18.0, 60.0, 6.0,
+                     "Stock crates: 24, 30, 36, 42 and 48 in."),
+                size("depth_in", "Width", 12.0, 36.0),
+                size("height_in", "Height", 14.0, 40.0),
+                ParamSpec("bed", "Bed inside", BOOL, d["bed"]),
+                ParamSpec("colour", "Bed colour", ENUM, d["colour"],
+                          choices=tuple((k, label) for k, label, _h in cg.COLOURS),
+                          enabled_fn=lambda v: bool(v.get("bed")))]
+        if model == "sofa_table":
+            return [
+                size("width_in", "Length", 24.0, 96.0, 6.0),
+                size("depth_in", "Depth", 8.0, 24.0),
+                size("height_in", "Height", 20.0, 42.0, 0.5,
+                     "About the height of the sofa's back."),
+                ParamSpec("shelves", "Shelves", INT, d["shelves"], minimum=0,
+                          maximum=3, step=1),
+                ParamSpec("finish", "Finish", ENUM, d["finish"],
+                          choices=_choices(cg.FINISHES))]
+        if model in ("desk", "office_chair", "office_set"):
+            chair = [
+                ParamSpec("colour", "Chair colour", ENUM, d["colour"],
+                          choices=tuple((k, label) for k, label, _h in cg.COLOURS)),
+                ParamSpec("arms", "Chair arms", BOOL, d["arms"])]
+            if model == "office_chair":
+                return chair
+            desk = [
+                size("width_in", "Width", 36.0, 96.0, 6.0),
+                size("height_in", "Desk height", 24.0, 48.0, 0.5,
+                     "29 to 30 in seated; 38 to 46 in standing."),
+                ParamSpec("pedestal", "Drawers", ENUM, d["pedestal"],
+                          choices=cg.PEDESTALS),
+                ParamSpec("computer", "On the desk", ENUM, d["computer"],
+                          choices=cg.COMPUTERS),
+                ParamSpec("finish", "Finish", ENUM, d["finish"],
+                          choices=_choices(cg.FINISHES))]
+            if model == "desk":
+                desk.insert(1, size("depth_in", "Depth", 18.0, 42.0))
+                return desk
+            return desk + chair
         return [                                      # grab bar
             ParamSpec("bar", "Mounted", ENUM, d["bar"],
                       choices=(("horizontal", "Horizontal"),
@@ -429,7 +490,11 @@ class CabinetKind(ParametricKind):
         if st["type"] == "fixture":
             name = {"toilet": "Toilet", "bathtub": "Bathtub",
                     "bookshelf": "Bookshelf", "fireplace": "Gas fireplace",
-                    "grab_bar": "Grab bar"}[st["model"]]
+                    "grab_bar": "Grab bar", "desk": "Desk",
+                    "office_chair": "Office chair",
+                    "office_set": "Desk and chair",
+                    "pedal_bin": "Pedal bin", "dog_crate": "Dog crate",
+                    "sofa_table": "Sofa table"}[st["model"]]
             rows = [("Fixture", name),
                     ("Size", f"{_fmt(w)} x {_fmt(d)} x {_fmt(st['height_in'])} in")]
             if st["model"] in ("toilet", "bathtub"):
@@ -437,6 +502,20 @@ class CabinetKind(ParametricKind):
             elif st["model"] == "bookshelf":
                 rows += [("Shelves", str(st["shelves"])),
                          ("Finish", _material_label(mats["cabinet"]))]
+            elif st["model"] in ("desk", "office_chair", "office_set"):
+                if st["model"] != "office_chair":
+                    rows += [("On the desk",
+                              dict(cg.COMPUTERS)[st["computer"]]),
+                             ("Finish", _material_label(mats["cabinet"]))]
+                if st["model"] != "desk":
+                    rows.append(("Chair", _material_label(mats["upholstery"])))
+            elif st["model"] == "pedal_bin":
+                rows.append(("Finish", _material_label(mats["appliance"])))
+            elif st["model"] == "sofa_table":
+                rows += [("Shelves", str(st["shelves"])),
+                         ("Finish", _material_label(mats["cabinet"]))]
+            elif st["model"] == "dog_crate":
+                rows.append(("Bed", "yes" if st["bed"] else "no"))
             elif st["model"] == "fireplace":
                 rows += [("Surround", dict((k, label) for k, label, _m
                                            in cg.SURROUNDS)[st["surround"]]),

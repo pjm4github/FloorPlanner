@@ -7,6 +7,10 @@
       "armchair.svg",
       "coffee_table.svg",
       "side_table.svg",
+      "sofa_table.svg",
+      "table_lamp.svg",
+      "dog_crate.svg",
+      "pedal_bin.svg",
       "tv_stand.svg",
       "large_tv.svg",
       "gas_fireplace.svg",
@@ -119,7 +123,10 @@
       "tv_stand.svg",
       "large_tv.svg",
       "gas_fireplace.svg",
-      "bookshelf.svg"
+      "bookshelf.svg",
+      "sofa_table.svg",
+      "table_lamp.svg",
+      "dog_crate.svg"
     ]
   },
   {
@@ -154,6 +161,7 @@
       "pantry_36.svg",
       "range_hood.svg",
       "microwave_otr.svg",
+      "pedal_bin.svg",
       "dining_chair.svg"
     ]
   },
@@ -203,7 +211,8 @@
       "light_flush.svg",
       "light_pendant.svg",
       "light_linear.svg",
-      "light_sconce.svg"
+      "light_sconce.svg",
+      "table_lamp.svg"
     ]
   },
   {
