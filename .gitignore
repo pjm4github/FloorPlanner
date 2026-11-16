@@ -42,3 +42,7 @@ _to_delete/
 # fp2pdf's CLI defaults --out to "plans.pdf" relative to the cwd, so a hand-run
 # from inside the checkout drops one here. Never a source file.
 plans.pdf
+
+# 0345: the plan watcher's working folder -- transient validation output, PNGs,
+# heartbeat and the reviewer loop's input; never source.
+fixtures/incoming/build/
