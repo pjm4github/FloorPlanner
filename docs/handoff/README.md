@@ -485,5 +485,6 @@ this table is not a second copy of it.
 | [`0343-ruling.md`](./0343-ruling.md) | ruling: 0342 accepted; the generated PNGs — two are committed but not pushed, the gallery is regenerated but not committed |
 | [`0344-report.md`](./0344-report.md) | report: the generated PNGs are in the repo — gallery regenerated on `main` and committed, the two reviewer previews and the gallery pushed (0343 §3) |
 | [`0345-ruling.md`](./0345-ruling.md) | ruling: build the PLAN WATCHER — a headless validator and report renderer the reviewer loops against. GREEN tooling; RED if it needs an app change |
+| [`0346-report.md`](./0346-report.md) | report: the plan watcher is STARTED and running — command, PID, heartbeat, C5 timing, first pass on a real plan |
 
 <!-- PAIRS:END -->
