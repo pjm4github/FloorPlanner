@@ -482,5 +482,7 @@ this table is not a second copy of it.
 | [`0340-ruling.md`](./0340-ruling.md) | ruling: 0339 accepted (GREEN, on `stairs-0338`); desk, office chair and desk-and-chair set in 3D with a computer. Built in the lane, UN-GATED, AMBER |
 | [`0341-ruling.md`](./0341-ruling.md) | ruling: pedal bin, dog crate, sofa table and table lamp — four new kinds in 3D. Built in the lane, UN-GATED, AMBER. Lands with 0340 |
 | [`0342-report.md`](./0342-report.md) | report: the 0340 + 0341 furnishing delta (desk / office chair / office set, and pedal bin / dog crate / sofa table / table lamp) gated GREEN and landed by path on `main`, catalog 104→108 |
+| [`0343-ruling.md`](./0343-ruling.md) | ruling: 0342 accepted; the generated PNGs — two are committed but not pushed, the gallery is regenerated but not committed |
+| [`0344-report.md`](./0344-report.md) | report: the generated PNGs are in the repo — gallery regenerated on `main` and committed, the two reviewer previews and the gallery pushed (0343 §3) |
 
 <!-- PAIRS:END -->
