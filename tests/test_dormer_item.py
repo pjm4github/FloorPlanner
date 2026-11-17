@@ -12,7 +12,7 @@ import pytest
 from PyQt6.QtCore import QPointF
 
 from floorplanner.config import DEFAULT_FLOOR
-from floorplanner.items import DormerItem, make_furnishing
+from floorplanner.items import DormerGripItem, DormerItem, make_furnishing
 from floorplanner.parametric import dormer_geometry as dg
 from floorplanner.parametric.dormers import DORMER
 from floorplanner.roofs import RoofItem
@@ -144,3 +144,59 @@ def test_bounding_rect_is_finite_and_nonempty(scene):
     r = d.boundingRect()
     assert r.isValid() and r.width() > 0 and r.height() > 0
     assert all(abs(v) < 1e5 for v in (r.left(), r.right(), r.top(), r.bottom()))
+
+
+# -- the knobs A-G -----------------------------------------------------------
+def test_selecting_a_dormer_shows_the_knobs_and_deselecting_hides_them(scene):
+    d = _dormer(scene, new=True)
+    assert d._grips == []
+    d.setSelected(True)
+    kinds = {g.kind for g in d._grips}
+    assert kinds == set(DormerItem._GRIP_KINDS), kinds   # all 8 on a gable
+    assert all(isinstance(g, DormerGripItem) for g in d._grips)
+    d.setSelected(False)
+    assert d._grips == []
+
+
+def test_a_shed_has_no_right_side_knobs(scene):
+    d = _dormer(scene, state={"form": "shed"})
+    d.setSelected(True)
+    assert not any(g.kind.endswith("_r") for g in d._grips)
+
+
+def test_the_span_knob_resizes_and_symmetric_mirrors(scene):
+    # default symmetric: dragging the left span knob sets BOTH halves
+    d = _dormer(scene, pos=QPointF(150, 150))      # rotation 0
+    d._recompute()
+    d.begin_knob()
+    d.drag_knob("span_l", QPointF(230, 150))       # dg x = 80
+    assert d.params["span_left_in"] == pytest.approx(80.0)
+    assert d.params["span_right_in"] == pytest.approx(80.0), "symmetric mirror"
+    d.end_knob("span_l", QPointF(230, 150))
+
+
+def test_the_face_knob_sets_the_face_overhang(scene):
+    d = _dormer(scene, pos=QPointF(150, 150))
+    d._recompute()
+    d.begin_knob()
+    d.drag_knob("face", QPointF(150, 170))         # dg y = -20 -> overhang 20
+    assert d.params["face_overhang_in"] == pytest.approx(20.0)
+    d.end_knob("face", QPointF(150, 170))
+
+
+def test_the_knee_lines_are_held_during_a_knob_drag_and_settle_on_release(scene):
+    # a tall dormer over no roof so its planes cross the 96in ceiling
+    _room(scene, ceiling_in=96.0)
+    state = dg.normalize_state({"eaves_h_in": 60.0, "span_left_in": 60.0,
+                                "span_right_in": 60.0, "pitch_12": 10.0,
+                                "depth_in": 96.0, "symmetric": True})
+    d = _dormer(scene, pos=QPointF(150, 150), state=state)
+    d._recompute()
+    held = [tuple(seg) for seg in d._knees]
+    assert held, "precondition: there are knee lines to hold"
+    d.begin_knob()
+    d.drag_knob("span_l", QPointF(150 + 40, 150))   # reshape (span 40)
+    assert [tuple(seg) for seg in d._knees] == held, "knees must be HELD mid-drag"
+    d.end_knob("span_l", QPointF(150 + 40, 150))
+    # settled now: a valid (possibly changed) list, no crash
+    assert isinstance(d._knees, list)

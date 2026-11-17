@@ -803,10 +803,13 @@ class DormerItem(FurnishingItem):
         self.params = _dg.normalize_state(params or _dg.STATE_DEFAULTS)
         self._seed_defaults = new and not params   # host pitch on first rebuild
         self._geo = _dg.plan(self.params)
+        self._knees = []                            # orange knee lines, settled
+        self._depth = self.params["depth_in"]       # ridge length (host or stored)
         self._bbox = QRectF(-1, -1, 2, 2)
         self._sig = None
         self._recompute_pending = False
         self._frozen = False
+        self._grips = []                            # DormerGripItem children
         super().__init__("dormer", pos, rotation)
         self._recompute()
 
@@ -823,6 +826,7 @@ class DormerItem(FurnishingItem):
         self.params = _dg.normalize_state(state)
         self._seed_defaults = False
         self._recompute()
+        self._place_grips()
         self.update()
 
     # -- the host, found by height -------------------------------------------
@@ -865,17 +869,20 @@ class DormerItem(FurnishingItem):
                 None if ctx.get("ceiling_in") is None
                 else round(ctx["ceiling_in"], 3))
 
-    def _recompute(self):
-        ctx = self.param_context()
-        if self._seed_defaults and ctx.get("host_slope"):
-            self.params = _dg.default_state(ctx.get("ceiling_in"),
-                                            ctx.get("host_slope"))
-            self._seed_defaults = False
+    def _recompute_outline(self, ctx=None):
+        """The dormer's own lines (ridge, eaves, rake, valleys, guides) and
+        its extent -- the CHEAP part, recomputed LIVE while a knob drags. The
+        orange KNEE LINES are NOT touched here (0354 §2); they settle once on
+        release via `_recompute_knees`."""
+        if ctx is None:
+            ctx = self.param_context()
         z = ctx.get("host_z_face_in")
         slope = ctx.get("host_slope")
-        ceil = ctx.get("ceiling_in")
-        self._geo = _dg.plan(self.params, ceil, z, slope)
         depth, _met = _dg.ridge_depth(self.params, z, slope)
+        self._depth = depth
+        plan = _dg.plan(self.params, None, z, slope)   # None -> no knee work
+        plan["knees"] = self._knees                    # keep the settled ones
+        self._geo = plan
         pts = [self._q(p) for p in _dg.footprint(self.params, depth)]
         xs = [p.x() for p in pts]
         ys = [p.y() for p in pts]
@@ -885,12 +892,35 @@ class DormerItem(FurnishingItem):
         bbox = bbox.united(QRectF(c.x() - r, c.y() - r, 2 * r, 2 * r))
         self.prepareGeometryChange()
         self._bbox = bbox
+
+    def _recompute_knees(self, ctx=None):
+        """The orange knee lines -- where the dormer's planes cross the room
+        ceiling. Settled once, on release of a drag (and on a static change)."""
+        if ctx is None:
+            ctx = self.param_context()
+        ceil = ctx.get("ceiling_in")
+        self._knees = ([] if ceil is None else
+                       _dg.knee_lines(self.params, ceil,
+                                      ctx.get("host_z_face_in"),
+                                      ctx.get("host_slope")))
+        self._geo["knees"] = self._knees
+
+    def _recompute(self):
+        ctx = self.param_context()
+        if self._seed_defaults and ctx.get("host_slope"):
+            self.params = _dg.default_state(ctx.get("ceiling_in"),
+                                            ctx.get("host_slope"))
+            self._seed_defaults = False
+            ctx = self.param_context()
+        self._recompute_knees(ctx)
+        self._recompute_outline(ctx)
         self._sig = self._current_sig(ctx)
         self._recompute_pending = False
 
     def _deferred_recompute(self):
         if not sip.isdeleted(self):
             self._recompute()
+            self._place_grips()
             self.update()
 
     @staticmethod
@@ -993,7 +1023,113 @@ class DormerItem(FurnishingItem):
         if was:
             self._hold(False)
             self._recompute()       # settle once, now the drag is over
+            self._place_grips()
             self.update()
+
+    # -- the knobs A-G (grips) -----------------------------------------------
+    # dg-local positions of each grip, from the current parameters + depth.
+    _GRIP_KINDS = ("span_l", "span_r", "guide_l", "guide_r",
+                   "eave_l", "eave_r", "face", "apex")
+
+    def _grip_local(self, kind):
+        """A grip's position in ITEM-local coordinates (dg-local, y-flipped)."""
+        st = self.params
+        depth = max(self._depth, 1.0)
+        sl, sr = st["span_left_in"], st["span_right_in"]
+        gl = st["guide_left_in"] or sl
+        gr = st["guide_right_in"] or sr
+        pt = {
+            "span_l":  (sl, 0.50 * depth),
+            "span_r":  (-sr, 0.50 * depth),
+            "guide_l": (min(gl, sl), 0.30 * depth),
+            "guide_r": (-min(gr, sr), 0.30 * depth),
+            "eave_l":  (sl + st["eave_overhang_left_in"], 0.68 * depth),
+            "eave_r":  (-(sr + st["eave_overhang_right_in"]), 0.68 * depth),
+            "face":    (0.0, -st["face_overhang_in"]),
+            "apex":    (0.0, depth),
+        }[kind]
+        return self._q(pt)
+
+    def _grip_kinds(self):
+        shed = self.params["form"] == "shed"
+        return [k for k in self._GRIP_KINDS if not (shed and k.endswith("_r"))]
+
+    def _sync_grips(self):
+        """Create the grips when the dormer is selected, remove them when it is
+        not. They are Qt children, so they ride the item's move and rotation."""
+        want = self.isSelected() and self.group() is None
+        if want and not self._grips:
+            self._grips = [DormerGripItem(self, k) for k in self._grip_kinds()]
+            self._place_grips()
+        elif not want and self._grips:
+            sc = self.scene()
+            for g in self._grips:
+                if sc is not None and not sip.isdeleted(g):
+                    sc.removeItem(g)
+            self._grips = []
+
+    def _place_grips(self):
+        active = floor_display_mode(self.floor) == "active"
+        for g in self._grips:
+            if sip.isdeleted(g):
+                continue
+            g.setVisible(active)
+            g.setPos(self._grip_local(g.kind))
+
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+            self._sync_grips()
+        return super().itemChange(change, value)
+
+    # -- a knob drag ---------------------------------------------------------
+    def _to_dg_local(self, scene_pt):
+        p = self.mapFromScene(scene_pt)
+        return p.x(), -p.y()                 # item-local -> dg-local
+
+    def begin_knob(self):
+        self._hold(True)                     # freeze the knee lines (0354 §2)
+
+    def drag_knob(self, kind, scene_pt):
+        """Live while a knob is down: reshape the dormer, reposition the grips,
+        but DO NOT recompute the orange knee lines (they are held)."""
+        x, y = self._to_dg_local(scene_pt)
+        st = dict(self.params)
+        sym = st["symmetric"] and st["form"] != "shed"
+
+        def both(lkey, rkey, v):
+            st[lkey] = v
+            st[rkey] = v
+
+        if kind in ("span_l", "span_r"):
+            v = max(_dg.MIN_SPAN_IN, abs(x))
+            both("span_left_in", "span_right_in", v) if sym else st.__setitem__(
+                "span_left_in" if kind == "span_l" else "span_right_in", v)
+        elif kind in ("guide_l", "guide_r"):
+            side = st["span_left_in"] if kind == "guide_l" else st["span_right_in"]
+            v = min(max(abs(x), 0.0), side)
+            both("guide_left_in", "guide_right_in", v) if sym else st.__setitem__(
+                "guide_left_in" if kind == "guide_l" else "guide_right_in", v)
+        elif kind in ("eave_l", "eave_r"):
+            side = st["span_left_in"] if kind == "eave_l" else st["span_right_in"]
+            v = max(abs(x) - side, 0.0)
+            both("eave_overhang_left_in", "eave_overhang_right_in", v) if sym \
+                else st.__setitem__("eave_overhang_left_in" if kind == "eave_l"
+                                    else "eave_overhang_right_in", v)
+        elif kind == "face":
+            st["face_overhang_in"] = max(-y, 0.0)
+        elif kind == "apex":
+            st["depth_in"] = max(y, 1.0)     # the stored length (used off a roof)
+        self.params = _dg.normalize_state(st)
+        self._recompute_outline()
+        self._place_grips()
+        self.update()
+
+    def end_knob(self, kind, scene_pt):
+        self.drag_knob(kind, scene_pt)
+        self._hold(False)
+        self._recompute_knees()              # settle the knee lines, once
+        self._geo["knees"] = self._knees
+        self.update()
 
     def contextMenuEvent(self, e):
         menu = QMenu()
@@ -1022,6 +1158,111 @@ class DormerItem(FurnishingItem):
         elif chosen is a_del and self.scene() is not None:
             self.scene().removeItem(self)
         e.accept()
+
+
+class DormerGripItem(QGraphicsItem):
+    """One control knob on a selected `DormerItem` (0352 phase 2 -- the knobs
+    A-G of `docs/DORMER_CONROLS.md`, moved off `RoofGripItem` onto the
+    furnishing). A Qt CHILD of the dormer, so it rides its move and rotation;
+    its position is set by `DormerItem._place_grips`. Dragging it reshapes the
+    dormer LIVE and HOLDS the knee lines until release (0354 §2):
+
+        span_l / span_r   (B, blue)    the half-width to the eaves line
+        guide_l / guide_r (C, yellow)  the side guide line (draws no wall)
+        eave_l / eave_r   (E, green)   the eave overhang beyond the wall
+        face              (F, orange)  the face/rake overhang
+        apex              (A, white)   double-click opens the dialog (pitch)
+
+    Sized in VIEW PIXELS (like `FurnishingItem`'s rotator and `RoofGripItem`),
+    so it stays grabbable at any zoom."""
+
+    SIZE = 3.2            # the drawn glyph half-size, scene inches at 1:1
+    HIT_PX = 11.0         # the clickable half-size, view pixels
+    _COLORS = {
+        "span_l": QColor(0, 110, 255), "span_r": QColor(0, 110, 255),
+        "guide_l": QColor(214, 170, 0), "guide_r": QColor(214, 170, 0),
+        "eave_l": QColor(40, 160, 70), "eave_r": QColor(40, 160, 70),
+        "face": QColor(230, 90, 20), "apex": QColor(90, 90, 90),
+    }
+    _TIPS = {
+        "span_l": "Half-width (knob B)", "span_r": "Half-width (knob B)",
+        "guide_l": "Side guide (knob C) — draws no wall",
+        "guide_r": "Side guide (knob C) — draws no wall",
+        "eave_l": "Eave overhang (knob E)", "eave_r": "Eave overhang (knob E)",
+        "face": "Face overhang (knob F)",
+        "apex": "Apex (knob A) — double-click for properties / pitch",
+    }
+
+    def __init__(self, dormer, kind: str):
+        super().__init__(dormer)
+        self.dormer = dormer
+        self.kind = kind
+        self._dragging = False
+        self.setZValue(6)
+        self.setAcceptHoverEvents(True)
+        self.setToolTip(self._TIPS[kind])
+
+    def _view_scale(self) -> float:
+        sc = self.scene()
+        if sc and sc.views():
+            return max(sc.views()[0].transform().m11(), 1e-6)
+        return 1.0
+
+    def _half(self) -> float:
+        return max(self.SIZE, self.HIT_PX / self._view_scale())
+
+    def boundingRect(self) -> QRectF:
+        r = self._half() + 2.0
+        return QRectF(-r, -r, 2.0 * r, 2.0 * r)
+
+    def shape(self) -> QPainterPath:
+        path = QPainterPath()
+        h = self._half()
+        path.addRect(QRectF(-h, -h, 2.0 * h, 2.0 * h))
+        return path
+
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        s = self.SIZE
+        painter.setBrush(QBrush(QColor(255, 255, 255)))
+        painter.setPen(QPen(self._COLORS.get(self.kind, QColor(0, 120, 215)), 1.4))
+        if self.kind == "apex":
+            r = s * 1.5
+            painter.drawEllipse(QRectF(-r, -r, 2.0 * r, 2.0 * r))
+        else:
+            painter.drawRect(QRectF(-s, -s, 2.0 * s, 2.0 * s))
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.MouseButton.LeftButton:
+            self._dragging = True
+            self.dormer.begin_knob()
+            e.accept()
+        else:
+            super().mousePressEvent(e)
+
+    def mouseMoveEvent(self, e):
+        if self._dragging:
+            self.dormer.drag_knob(self.kind, e.scenePos())
+            e.accept()
+        else:
+            super().mouseMoveEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        if self._dragging and e.button() == Qt.MouseButton.LeftButton:
+            self._dragging = False
+            self.dormer.end_knob(self.kind, e.scenePos())
+            e.accept()
+        else:
+            super().mouseReleaseEvent(e)
+
+    def mouseDoubleClickEvent(self, e):
+        if self.kind == "apex" and e.button() == Qt.MouseButton.LeftButton:
+            self._dragging = False
+            self.dormer._hold(False)            # a press started a hold
+            self.dormer.open_properties()
+            e.accept()
+        else:
+            super().mouseDoubleClickEvent(e)
 
 
 def make_furnishing(kind: str, pos: QPointF, rotation: float = 0.0,
