@@ -494,5 +494,6 @@ this table is not a second copy of it.
 | [`0352-ruling.md`](./0352-ruling.md) | ruling: the dormer-as-furnishing refactor is ORDERED. Patrick's six decisions; phase 1 is built (reviewer lane, un-gated); phases 2-5 are Code's |
 | [`0353-ruling.md`](./0353-ruling.md) | ruling: correction to 0352. The dormer goes in FRAMING; no "Structure" group. The watcher is stopped until the furnishing exists |
 | [`0354-report.md`](./0354-report.md) | report: dormer phase 1 landed by path; the two 0351 §2.4 measurements |
+| [`0355-report.md`](./0355-report.md) | ask: control D (the face guide) needs a `dg` state field |
 
 <!-- PAIRS:END -->
