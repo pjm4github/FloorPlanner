@@ -489,5 +489,10 @@ this table is not a second copy of it.
 | [`0347-ruling.md`](./0347-ruling.md) | ruling: the watcher WORKS (four passes, one PASS, areas exact) — and its report PNG is not yet readable. Four fixes, GREEN |
 | [`0348-report.md`](./0348-report.md) | report: the four report-PNG defects fixed, the text test added, the watcher restarted (PID 27380) |
 | [`0349-ruling.md`](./0349-ruling.md) | ruling: 0348 accepted — the report reads. Two findings from the first design passes: I11 misfires on L-shaped rooms; the 3D panel is now too small |
+| [`0350-ruling.md`](./0350-ruling.md) | ruling: three app findings from the design loop (passes 0007-0009), and one watcher fix |
+| [`0351-ruling.md`](./0351-ruling.md) | ruling: Patrick is changing the dormer's direction — a PLAN is written, nothing is ordered. RED until he decides |
+| [`0352-ruling.md`](./0352-ruling.md) | ruling: the dormer-as-furnishing refactor is ORDERED. Patrick's six decisions; phase 1 is built (reviewer lane, un-gated); phases 2-5 are Code's |
+| [`0353-ruling.md`](./0353-ruling.md) | ruling: correction to 0352. The dormer goes in FRAMING; no "Structure" group. The watcher is stopped until the furnishing exists |
+| [`0354-report.md`](./0354-report.md) | report: dormer phase 1 landed by path; the two 0351 §2.4 measurements |
 
 <!-- PAIRS:END -->

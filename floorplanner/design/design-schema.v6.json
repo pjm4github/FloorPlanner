@@ -502,6 +502,28 @@
       }
     },
 
+    "dormer_state": {
+      "description": "0352. DECLARED, NOT ENFORCED: the keys a `dormer` furnishing's `state` carries (docs/furnishing-spec/DORMER_FURNISHING_PLAN.md). The furnishing's `pos` is the FACE end of the ridge; its `rotation` turns the ridge (0 = up the screen, the face looking down it). Heights are above the furnishing's own level. A dormer furnishing owns no wall and stores no host: the host is whatever roof is under it. Arithmetic: floorplanner/parametric/dormer_geometry.py.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "form":                   { "enum": ["gable", "shed"] },
+        "symmetric":              { "type": "boolean" },
+        "span_left_in":           { "description": "Ridge to the eaves-start line, on the ridge's left.", "type": "number", "exclusiveMinimum": 0 },
+        "span_right_in":          { "description": "0 for a shed.", "type": "number", "minimum": 0 },
+        "eaves_h_in":             { "type": "number" },
+        "pitch_12":               { "description": "Rise per 12 of run on the left plane; the ridge height is derived.", "type": "number", "exclusiveMinimum": 0 },
+        "eave_overhang_left_in":  { "type": "number", "minimum": 0 },
+        "eave_overhang_right_in": { "type": "number", "minimum": 0 },
+        "face_overhang_in":       { "type": "number", "minimum": 0 },
+        "guide_left_in":          { "description": "A guide line only (control C); 0 = on the eaves line.", "type": "number", "minimum": 0 },
+        "guide_right_in":         { "type": "number", "minimum": 0 },
+        "box_left_in":            { "description": "Control B's frame half-width; 0 = not set.", "type": "number", "minimum": 0 },
+        "box_right_in":           { "type": "number", "minimum": 0 },
+        "depth_in":               { "description": "Ridge length used only when no roof is under the dormer.", "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+
     "stair_state": {
       "description": "0323. DECLARED, NOT ENFORCED: the keys a parametric stair's `furnishing.state` carries. A stair with no `type` is a legacy stair (flight / turn / direction only). Full description: docs/furnishing-spec/STAIRS_STATE_AND_USAGE.md.",
       "type": "object",
@@ -576,7 +598,7 @@
 
         "pos":      { "description": "Plan coordinates of the symbol centre.", "$ref": "#/$defs/point" },
         "rotation": { "type": "number", "default": 0 },
-        "state":    { "description": "Per-kind extra state (stair flight/turn/direction, plant species, …). v4 spread these across the object; nesting keeps the base shape closed. The keys each parametric kind writes are DECLARED in $defs/stair_state, $defs/cabinet_state, $defs/appliance_state and $defs/fixture_state; this object stays open and the application validates it.", "type": "object", "additionalProperties": true },
+        "state":    { "description": "Per-kind extra state (stair flight/turn/direction, plant species, …). v4 spread these across the object; nesting keeps the base shape closed. The keys each parametric kind writes are DECLARED in $defs/stair_state, $defs/cabinet_state, $defs/appliance_state, $defs/fixture_state and $defs/dormer_state; this object stays open and the application validates it.", "type": "object", "additionalProperties": true },
         "uid":      { "$ref": "#/$defs/uid" }
       }
     },
