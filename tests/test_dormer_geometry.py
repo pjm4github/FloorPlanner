@@ -256,3 +256,189 @@ def test_the_roof_codes_own_reader_agrees_with_this_calculator():
         assert rc.surface_height(geom, rc.Pt(px, py)) == pytest.approx(
             dg.surface_height(st, x)), (x, y)
     assert math.isclose(geom.length(), depth)
+
+
+# -- control D, the face guide (0355) ----------------------------------------
+def test_the_face_guide_is_state_and_is_clamped_to_the_ridge_by_plan():
+    assert dg.guides(_st())[2] == 0.0
+    st = _st(guide_face_in=18.0)
+    assert dg.guides(st)[2] == 18.0
+    face_line = dg.plan(st, None, *HOST)["guides"][-1]
+    assert face_line == ((-60.0, 18.0), (60.0, 18.0))
+    side = dg.plan(st, None, *HOST)["guides"][0]
+    assert side[0] == (60.0, 18.0), "the side guides start on the face guide"
+    deep = dg.plan(_st(guide_face_in=5000.0), None, *HOST)["guides"][-1]
+    assert deep[0][1] == pytest.approx(dg.ridge_depth(_st(), *HOST)[0])
+    assert dg.normalize_state({"guide_face_in": -4.0})["guide_face_in"] == 0.0
+
+
+def test_the_face_guide_round_trips_through_the_roof_record():
+    rec = dg.to_roof_record(_st(guide_face_in=18.0), (0.0, 0.0), 0.0, 96.0)
+    assert rec["face_guide_in"] == 18.0
+    assert dg.from_roof_record(rec)[0]["guide_face_in"] == 18.0
+    assert "face_guide_in" not in dg.to_roof_record(_st(), (0.0, 0.0), 0.0, 96.0)
+
+
+# -- the gable end and its openings (0356) -----------------------------------
+def _op(x0, x1, sill, head, **more):
+    return dict(x0=x0, x1=x1, sill_in=sill, head_in=head, **more)
+
+
+def test_the_face_profile_is_the_gable_between_the_guides():
+    prof = dg.face_profile(_st())                    # eaves 60, ridge 110
+    assert prof["peak"] == (0.0, 110.0)
+    assert prof["roof"] == [(-72.0, 50.0), (0.0, 110.0), (72.0, 50.0)]
+    assert prof["wall"] == [(60.0, 0.0), (60.0, 60.0), (0.0, 110.0),
+                            (-60.0, 60.0), (-60.0, 0.0)]
+    shed = dg.face_profile(_st(form="shed"))
+    assert shed["roof"][0] == (0.0, 110.0) and shed["wall"][-1] == (0.0, 0.0)
+
+
+def test_a_window_above_the_ceiling_line_is_allowed_and_said():
+    """Patrick, 0356: the gable may be higher than the ceiling on that
+    floor, so a window up there is fine."""
+    (op,) = dg.face_openings(_st(), [_op(-12.0, 12.0, 84.0, 98.0)], ceiling_in=97.0)
+    assert op["above_ceiling"] is True and op["through_roof"] is False
+    (low,) = dg.face_openings(_st(), [_op(-12.0, 12.0, 30.0, 80.0)], ceiling_in=97.0)
+    assert low["above_ceiling"] is False
+
+
+def test_an_opening_the_roof_line_cuts_is_flagged():
+    st = _st()                                       # roof at x=30 is 85
+    (ok,) = dg.face_openings(st, [_op(-30.0, 30.0, 30.0, 85.0)])
+    assert ok["through_roof"] is False
+    (cut,) = dg.face_openings(st, [_op(-30.0, 30.0, 30.0, 86.0)])
+    assert cut["through_roof"] is True
+    (shed_side,) = dg.face_openings(_st(form="shed"), [_op(-20.0, 10.0, 30.0, 60.0)])
+    assert shed_side["through_roof"] is True, "a shed has no roof on its high side"
+
+
+def test_stacked_openings_do_not_overlap_but_crossing_ones_do():
+    """Patrick, 0356: an octagon at the peak with a window under it."""
+    lower = _op(-18.0, 18.0, 24.0, 72.0, id="o1", kind="window", code="3648")
+    upper = _op(-9.0, 9.0, 80.0, 98.0, id="o2", kind="window", shape="octagon")
+    ops = dg.face_openings(_st(), [upper, lower], ceiling_in=97.0)
+    assert [o["id"] for o in ops] == ["o1", "o2"], "bottom to top"
+    assert all(o["overlaps"] == [] and not o["through_roof"] for o in ops)
+    assert ops[1]["shape"] == "octagon" and ops[1]["above_ceiling"]
+    clash = dg.face_openings(_st(), [lower, _op(-9.0, 9.0, 60.0, 90.0, id="o3")])
+    assert clash[0]["overlaps"] == ["o3"] and clash[1]["overlaps"] == ["o1"]
+
+
+def test_an_octagon_fits_higher_than_its_box_would():
+    st = _st()
+    box = _op(-12.0, 12.0, 80.0, 104.0)             # roof at x=12 is 100
+    assert dg.face_openings(st, [box])[0]["through_roof"] is True
+    assert dg.face_openings(st, [dict(box, shape="octagon")])[0]["through_roof"] is False
+    assert dg.face_openings(st, [dict(box, shape="star")])[0]["shape"] == "rect"
+
+
+def test_an_opening_off_the_face_wall_is_flagged():
+    ops = dg.face_openings(_st(), [_op(30.0, 50.0, 30.0, 60.0)], wall_span=(-40.0, 40.0))
+    assert ops[0]["off_wall"] is True
+    assert dg.face_openings(_st(), [_op(30.0, 50.0, 30.0, 60.0)])[0]["off_wall"] is False
+
+
+def test_a_wall_under_the_face_projects_and_others_do_not():
+    pos, rot = (534.0, 816.0), 0.0                   # ridge up the screen
+    assert dg.project_wall(pos, rot, (474.0, 816.0), (594.0, 816.0)) == \
+        pytest.approx((-60.0, 60.0))
+    assert dg.project_wall(pos, rot, (594.0, 818.0), (474.0, 818.0)) == \
+        pytest.approx((60.0, -60.0)), "drawn the other way, 2 in off: still it"
+    assert dg.project_wall(pos, rot, (474.0, 780.0), (594.0, 780.0)) is None
+    assert dg.project_wall(pos, rot, (474.0, 780.0), (594.0, 780.0),
+                           guide_face=36.0) is not None, "on the face GUIDE"
+    assert dg.project_wall(pos, rot, (534.0, 816.0), (534.0, 700.0)) is None, \
+        "a side wall is not a face wall"
+
+
+def test_wall_openings_project_into_face_coordinates_either_way_round():
+    ops = [{"s0": 42.0, "s1": 78.0, "sill_in": 24.0, "head_in": 72.0, "code": "3648"}]
+    (a,) = dg.project_openings(-60.0, 60.0, 120.0, ops)
+    assert (a["x0"], a["x1"], a["code"]) == (-18.0, 18.0, "3648") and "s0" not in a
+    (b,) = dg.project_openings(60.0, -60.0, 120.0,
+                               [dict(ops[0], s0=30.0, s1=66.0)])
+    assert (b["x0"], b["x1"]) == (-6.0, 30.0)
+    assert dg.project_openings(0.0, 0.0, 0.0, ops) == []
+
+
+def test_the_kind_reports_the_face_and_its_findings():
+    ctx = {"ceiling_in": 97.0, "host_z_face_in": 30.0, "host_slope": 10.0 / 12.0,
+           "face_wall": (-60.0, 60.0),
+           "face_openings": [_op(-18.0, 18.0, 24.0, 72.0, id="o1", kind="window",
+                                 code="3648"),
+                             _op(-9.0, 9.0, 80.0, 98.0, id="o2", kind="window",
+                                 shape="octagon")]}
+    derived, fs = DORMER.evaluate({}, ctx)
+    assert fs == [], "stacked, one in the gable above the ceiling: no finding"
+    rows = dict(DORMER.summary({}, derived, ctx))
+    assert rows["Openings in the face"].startswith("2, 1 above the ceiling line")
+    ctx["face_openings"].append(_op(40.0, 58.0, 30.0, 90.0, id="o3", kind="window",
+                                    code="1860"))
+    _d, fs = DORMER.evaluate({}, ctx)
+    assert [f.rule_id for f in fs] == ["dormer.opening_through_roof"]
+    assert not F.blocks(fs)
+    _d, fs = DORMER.evaluate({}, {"face_wall": None})
+    assert "dormer.face_open" in {f.rule_id for f in fs}
+    _d, fs = DORMER.evaluate({}, {})
+    assert "dormer.face_open" not in {f.rule_id for f in fs}, "nobody looked"
+
+
+# -- the two sides (0356, Patrick: "gable end and both sides") ---------------
+def test_a_side_wall_runs_from_the_face_guide_to_where_the_host_reaches_its_top():
+    st = _st()                                   # side guide at 60: top = eaves 60
+    prof = dg.side_profile(st, "left", *HOST)
+    assert prof["top"] == 60.0 and dg.side_x(st, "left") == 60.0
+    assert prof["span"] == pytest.approx((0.0, (60.0 - 30.0) / (10.0 / 12.0)))
+    assert prof["host"][0] == (0.0, 30.0)
+    assert prof["host"][1] == pytest.approx((36.0, 60.0)), "the host meets the top"
+    assert prof["roof"][0] == (-12.0, 60.0), "the eave runs out over the face"
+    free = dg.side_profile(st, "left")
+    assert free["host"] is None and free["span"] == (0.0, 96.0)
+    inset = dg.side_profile(_st(guide_left_in=30.0, guide_face_in=10.0), "right", *HOST)
+    assert inset["top"] == pytest.approx(85.0) and inset["span"][0] == 10.0
+
+
+def test_a_sheds_high_side_is_a_wall_under_the_ridge():
+    st = _st(form="shed")
+    assert dg.side_x(st, "right") == 0.0
+    assert dg.side_top(st, "right") == dg.ridge_height(st)
+
+
+def test_a_wall_on_a_side_guide_projects_and_a_face_wall_does_not():
+    pos, rot = (534.0, 816.0), 0.0
+    assert dg.project_side_wall(pos, rot, (594.0, 816.0), (594.0, 780.0), 60.0) == \
+        pytest.approx((0.0, 36.0))
+    assert dg.project_side_wall(pos, rot, (474.0, 780.0), (474.0, 816.0), -60.0) == \
+        pytest.approx((36.0, 0.0))
+    assert dg.project_side_wall(pos, rot, (594.0, 816.0), (594.0, 780.0), -60.0) is None
+    assert dg.project_side_wall(pos, rot, (474.0, 816.0), (594.0, 816.0), 60.0) is None
+
+
+def test_side_openings_are_judged_against_the_eave_and_the_host():
+    st = _st(eaves_h_in=84.0)                    # side top 84; host 30 + 10/12 y
+    ops = dg.side_openings(st, "left", [_op(4.0, 28.0, 54.0, 80.0, id="s1"),
+                                        _op(40.0, 60.0, 54.0, 90.0, id="s2")],
+                           ceiling_in=97.0, host_z_face=30.0, host_slope=10.0 / 12.0)
+    by = {o["id"]: o for o in ops}
+    assert not by["s1"]["through_roof"] and not by["s1"]["behind_host"]
+    assert by["s2"]["through_roof"], "its head is above the eave"
+    assert by["s2"]["behind_host"], "the host is at 80 by y = 60: over its sill"
+    assert "behind_host" in dg.side_openings(st, "left", [_op(0, 10, 0, 10)])[0]
+
+
+def test_the_kind_reports_the_sides():
+    ctx = {"ceiling_in": 97.0, "host_z_face_in": 30.0, "host_slope": 10.0 / 12.0,
+           "face_wall": (-60.0, 60.0), "side_walls": {"left": (0.0, 36.0)},
+           "side_openings": {"left": [_op(4.0, 28.0, 20.0, 50.0, id="s1",
+                                          kind="window", code="2430")]}}
+    derived, fs = DORMER.evaluate({}, ctx)
+    assert derived["sides"]["left"]["wall"] == (0.0, 36.0)
+    assert derived["sides"]["right"]["wall"] is None
+    ids = [f.rule_id for f in fs]
+    assert "dormer.side_open.right" in ids and "dormer.side_open.left" not in ids
+    assert "dormer.opening_behind_roof" in ids, "sill 20 is under the host at y=28"
+    assert dict(DORMER.summary({}, derived, ctx))["Openings in the left side"] == "1"
+    derived, fs = DORMER.evaluate({}, {})
+    assert not [f for f in fs if f.rule_id.startswith("dormer.side_open")]
+    assert set(derived["sides"]) == {"left", "right"}

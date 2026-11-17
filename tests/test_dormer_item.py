@@ -17,7 +17,7 @@ from floorplanner.parametric import dormer_geometry as dg
 from floorplanner.parametric.dormers import DORMER
 from floorplanner.roofs import RoofItem
 from floorplanner.rooms import RoomItem
-from floorplanner.walls import WallItem
+from floorplanner.walls import OpeningItem, WallItem
 
 pytestmark = pytest.mark.rooms
 
@@ -152,7 +152,7 @@ def test_selecting_a_dormer_shows_the_knobs_and_deselecting_hides_them(scene):
     assert d._grips == []
     d.setSelected(True)
     kinds = {g.kind for g in d._grips}
-    assert kinds == set(DormerItem._GRIP_KINDS), kinds   # all 8 on a gable
+    assert kinds == set(DormerItem._GRIP_KINDS), kinds   # all 9 on a gable
     assert all(isinstance(g, DormerGripItem) for g in d._grips)
     d.setSelected(False)
     assert d._grips == []
@@ -182,6 +182,94 @@ def test_the_face_knob_sets_the_face_overhang(scene):
     d.drag_knob("face", QPointF(150, 170))         # dg y = -20 -> overhang 20
     assert d.params["face_overhang_in"] == pytest.approx(20.0)
     d.end_knob("face", QPointF(150, 170))
+
+
+# -- knob D (the face guide, 0356 §1, purple) --------------------------------
+def test_knob_D_slides_the_face_guide_along_the_ridge(scene):
+    d = _dormer(scene, pos=QPointF(150, 150))      # rotation 0
+    d._recompute()
+    d.setSelected(True)
+    assert "guide_face" in {g.kind for g in d._grips}
+    d.begin_knob()
+    # dg +y (into the dormer) is scene -y at rotation 0; dg y = 30 -> scene y = 120
+    d.drag_knob("guide_face", QPointF(150, 120))
+    assert d.params["guide_face_in"] == pytest.approx(30.0)
+    d.end_knob("guide_face", QPointF(150, 120))
+    assert d.params["guide_face_in"] == pytest.approx(30.0)
+
+
+def test_a_shed_keeps_the_face_guide_knob(scene):
+    d = _dormer(scene, state={"form": "shed"})
+    d.setSelected(True)
+    assert "guide_face" in {g.kind for g in d._grips}   # D is not a _r knob
+
+
+# -- F1: the walls under the face and the sides, with their openings ---------
+def _face_wall(scene, x0=100.0, x1=200.0, y=150.0, codes=()):
+    """A wall square to a rotation-0 dormer's ridge, at its face (y=150)."""
+    w = WallItem(QPointF(x0, y), QPointF(x1, y))
+    w.floor = DEFAULT_FLOOR
+    scene.addItem(w)
+    for s, code in codes:
+        op = OpeningItem(w, "window", code, s)
+        w.openings.append(op)
+    return w
+
+
+def test_F1_gathers_the_face_wall_and_its_openings(scene):
+    _room(scene)
+    d = _dormer(scene, pos=QPointF(150, 150),
+                state={"span_left_in": 60.0, "span_right_in": 60.0})
+    _face_wall(scene, codes=[(30.0, "3040"), (70.0, "3040")])
+    ctx = d.param_context()
+    lo, hi = ctx["face_wall"]
+    assert lo == pytest.approx(-50.0) and hi == pytest.approx(50.0)
+    ops = ctx["face_openings"]
+    assert len(ops) == 2
+    assert all("x0" in o and "x1" in o and "sill_in" in o and "head_in" in o
+               for o in ops)
+
+
+def test_F1_reports_None_when_it_looked_and_found_no_face_wall(scene):
+    _room(scene)
+    d = _dormer(scene, pos=QPointF(150, 150))      # a scene, but no wall drawn
+    ctx = d.param_context()
+    assert "face_wall" in ctx and ctx["face_wall"] is None     # looked, none
+    # and the kind raises the ADVISORY for it
+    _derived, findings = DORMER.evaluate(d.params, ctx)
+    assert any(f.rule_id == "dormer.face_open" for f in findings)
+
+
+def test_F1_is_absent_when_nobody_looked(scene):
+    d = make_furnishing("dormer", QPointF(0, 0), new=True)     # not in a scene
+    ctx = d.param_context()
+    assert "face_wall" not in ctx       # absent != None: nobody looked
+
+
+def test_F1_gathers_a_side_wall_on_a_side_guide(scene):
+    _room(scene)
+    d = _dormer(scene, pos=QPointF(150, 150),
+                state={"span_left_in": 60.0, "span_right_in": 60.0})
+    # the left side guide is at dg x=+60 -> scene x=210; a wall there runs
+    # along the ridge (dg +y is scene -y at rotation 0)
+    w = WallItem(QPointF(210, 150), QPointF(210, 70))
+    w.floor = DEFAULT_FLOOR
+    scene.addItem(w)
+    ctx = d.param_context()
+    assert ctx["side_walls"]["left"] is not None
+    assert ctx["side_walls"]["right"] is None
+
+
+def test_F1_does_not_gather_while_a_knob_is_held(scene):
+    # the gather must not run per-frame during a drag (0354 perf discipline)
+    _room(scene)
+    d = _dormer(scene, pos=QPointF(150, 150))
+    _face_wall(scene)
+    d.begin_knob()                       # freezes the item
+    ctx = d.param_context()
+    assert "face_wall" not in ctx, "F1 ran during a held drag"
+    d.end_knob("span_l", QPointF(150, 150))
+    assert "face_wall" in d.param_context()      # and resumes after release
 
 
 def test_the_knee_lines_are_held_during_a_knob_drag_and_settle_on_release(scene):

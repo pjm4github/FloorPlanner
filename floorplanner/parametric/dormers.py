@@ -13,6 +13,13 @@ double-click opens the generic dialog. Phase 1 built the kind but withheld
                        level's datum; absent = it is over no roof
     host_slope         the host's rise per inch along the dormer's ridge
     host_ridge_in      the host's ridge height, this level's datum
+    face_wall          (x1, x2): the across-extent of the wall the user drew
+                       under the face (`dg.project_wall`); None = looked, and
+                       there is none; absent = nobody looked
+    face_openings      that wall's openings (`dg.project_openings`)
+    side_walls         {"left": (y1, y2) | None, "right": ...}: the same for
+                       the walls on the two side guides (`dg.project_side_wall`)
+    side_openings      {"left": [...], "right": [...]}
 """
 from floorplanner.parametric import dormer_geometry as dg
 from floorplanner.parametric.findings import ADVISORY, ERROR, WARNING, Finding
@@ -87,6 +94,10 @@ class DormerKind(ParametricKind):
                      "stand. 0 = on the eaves line. It draws no wall."),
             size("guide_right_in", "Side guide, right", 0.0, 480.0,
                  enabled=_free_right),
+            size("guide_face_in", "Face guide set-back", 0.0, 600.0,
+                 tip="Knob D, as a guide line only: where the face wall "
+                     "would stand, back from the face. 0 = on the face. It "
+                     "draws no wall."),
             size("depth_in", "Length off a roof", 1.0, 600.0,
                  tip="The ridge length used only when no roof is under the "
                      "dormer; on a roof the ridge runs until it meets it."),
@@ -153,7 +164,70 @@ class DormerKind(ParametricKind):
                 f"The ridge ({_fmt(rh)} in) is not above the {_fmt(ceiling)} in "
                 "ceiling: this dormer adds no full-height floor.",
                 actual=rh, limit=ceiling, field="eaves_h_in"))
+        self._face(st, context or {}, ceiling, derived, findings)
         return derived, findings
+
+    @staticmethod
+    def _face(st, context, ceiling, derived, findings):
+        """The gable end and what stands in it (0356)."""
+        wall = context.get("face_wall")
+        derived["face_profile"] = dg.face_profile(st)
+        derived["face_wall"] = tuple(wall) if wall else None
+        derived["face_openings"] = dg.face_openings(
+            st, context.get("face_openings") or [], ceiling,
+            tuple(wall) if wall else None)
+        if "face_wall" in context and not wall:
+            findings.append(Finding(
+                "dormer.face_open", ADVISORY,
+                "No wall is drawn under this dormer's face. Draw one on the "
+                "face guide and it will rise to the gable; its windows and "
+                "doors will show here."))
+        z_face, slope = _host(context)
+        walls = context.get("side_walls") or {}
+        given = context.get("side_openings") or {}
+        derived["sides"] = {}
+        for side in dg.SIDES:
+            span = walls.get(side)
+            derived["sides"][side] = {
+                "profile": dg.side_profile(st, side, z_face, slope),
+                "wall": tuple(span) if span else None,
+                "openings": dg.side_openings(
+                    st, side, given.get(side) or [], ceiling,
+                    tuple(span) if span else None, z_face, slope)}
+            if "side_walls" in context and not span:
+                findings.append(Finding(
+                    f"dormer.side_open.{side}", ADVISORY,
+                    f"No wall is drawn under this dormer's {side} side."))
+        groups = [("face", derived["face_openings"],
+                   lambda op: min((dg.roof_height_at(st, x) or 0.0)
+                                  for x in (op["x0"], op["x1"])))]
+        groups += [(f"{side} side", derived["sides"][side]["openings"],
+                    lambda _op, side=side: dg.side_top(st, side))
+                   for side in dg.SIDES]
+        for where, ops, top_of in groups:
+            for op in ops:
+                name = f"{op.get('kind', 'opening')} {op.get('code', op['id'])}"
+                if op["through_roof"]:
+                    top = top_of(op)
+                    findings.append(Finding(
+                        "dormer.opening_through_roof", WARNING,
+                        f"The {name} in the {where} rises to "
+                        f"{_fmt(op['head_in'])} in, but the roof over it is at "
+                        f"{_fmt(top)} in. Lower it, narrow it, move it toward "
+                        "the ridge, or raise the dormer.",
+                        actual=op["head_in"], limit=top))
+                if op["overlaps"] and str(op["id"]) < str(op["overlaps"][0]):
+                    findings.append(Finding(
+                        "dormer.openings_overlap", WARNING,
+                        f"The {name} overlaps another opening in the {where}. "
+                        "Stacked openings need the lower one's head under the "
+                        "upper one's sill."))
+                if op.get("behind_host"):
+                    findings.append(Finding(
+                        "dormer.opening_behind_roof", ADVISORY,
+                        f"The {name} in the {where} is partly below the main "
+                        "roof's line: that part looks into the roof, not "
+                        "outdoors."))
 
     def summary(self, values, derived, context):
         if derived is None:
@@ -177,7 +251,25 @@ class DormerKind(ParametricKind):
                              f"{_fmt(y1)} in long"))
             if not derived["knees"] and derived["full_height_in"] > 0.0:
                 rows.append(("Knee lines", "none: full height to both sides"))
+        ops = derived.get("face_openings") or []
+        if ops:
+            high = sum(1 for o in ops if o["above_ceiling"])
+            rows.append(("Openings in the face",
+                         f"{len(ops)}" + (f", {high} above the ceiling line "
+                                          "(in the gable)" if high else "")))
+        elif derived.get("face_wall"):
+            rows.append(("Openings in the face", "none"))
+        for side in dg.SIDES:
+            info = (derived.get("sides") or {}).get(side) or {}
+            if info.get("openings"):
+                rows.append((f"Openings in the {side} side",
+                             str(len(info["openings"]))))
         return rows
+
+
+    def make_preview(self, parent=None):
+        from floorplanner.parametric.dormer_view import DormerFaceView  # late: Qt
+        return DormerFaceView(parent)
 
 
 DORMER = register(DormerKind())

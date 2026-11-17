@@ -37,6 +37,7 @@ STATE_DEFAULTS = {
     "face_overhang_in": 12.0,      # control F: the rake past the face
     "guide_left_in": 0.0,          # control C: side guide, 0 = on the eaves line
     "guide_right_in": 0.0,
+    "guide_face_in": 0.0,          # control D: face guide, set back from the face
     "box_left_in": 0.0,            # control B: frame half-width, 0 = not set
     "box_right_in": 0.0,
     "depth_in": 96.0,              # ridge length, used only when no roof is under it
@@ -83,7 +84,7 @@ def normalize_state(state):
                 out[b] = out[a]
     for key in ("eave_overhang_left_in", "eave_overhang_right_in",
                 "face_overhang_in", "guide_left_in", "guide_right_in",
-                "box_left_in", "box_right_in", "pitch_12"):
+                "guide_face_in", "box_left_in", "box_right_in", "pitch_12"):
         out[key] = max(out[key], 0.0)
     out["depth_in"] = max(out["depth_in"], 1.0)
     return out
@@ -237,10 +238,13 @@ def footprint(st, depth):
 def guides(st):
     """Controls C and D as GUIDES, not walls: the two side lines and the face
     line the user draws their own walls against. Local x of (left, right)
-    and the face's y (always 0)."""
+    and the face guide's y: `guide_face_in`, its set-back from the face INTO
+    the dormer (0 = on the face; 0355). `plan` clamps it to the ridge's
+    length, which only a caller that knows the host can."""
     left = st["guide_left_in"] if st["guide_left_in"] > _EPS else st["span_left_in"]
     right = st["guide_right_in"] if st["guide_right_in"] > _EPS else st["span_right_in"]
-    return min(left, st["span_left_in"]), min(right, st["span_right_in"]), 0.0
+    return (min(left, st["span_left_in"]), min(right, st["span_right_in"]),
+            max(float(st.get("guide_face_in", 0.0)), 0.0))
 
 
 def plan(st, ceiling_in=None, host_z_face=None, host_slope=None):
@@ -256,6 +260,7 @@ def plan(st, ceiling_in=None, host_z_face=None, host_slope=None):
     depth, _met = ridge_depth(st, host_z_face, host_slope)
     fp = footprint(st, depth)
     gl, gr, gf = guides(st)
+    gf = min(gf, depth)
     eaves = [(fp[1], fp[2])]
     lines = [((gl, gf), (gl, depth))]
     if st["form"] != "shed":
@@ -272,6 +277,208 @@ def plan(st, ceiling_in=None, host_z_face=None, host_slope=None):
         "knees": ([] if ceiling_in is None
                   else knee_lines(st, ceiling_in, host_z_face, host_slope)),
     }
+
+
+# --------------------------------------------------------------------------
+# the face: the gable end seen from outside, and the openings in it
+# --------------------------------------------------------------------------
+FACE_TOL_IN = 6.0        # how far off the face guide a wall may stand and count
+OPENING_SHAPES = ("rect", "octagon", "round")
+
+
+def roof_height_at(st, x):
+    """The roof's underside line over the face at across-coordinate `x`, or
+    None where there is no roof plane over it (a shed's high side, x < 0)."""
+    if x < -_EPS and st["span_right_in"] <= _EPS:
+        return None
+    return surface_height(st, x)
+
+
+def face_profile(st):
+    """The gable end in ELEVATION, seen from OUTSIDE: points `(x, z)`, x the
+    across-coordinate (the ridge's left is the viewer's RIGHT), z above the
+    dormer's level.
+
+        roof      the roof line, eave to peak to eave, overhangs included
+        wall      the outline a face wall fills between the side guides:
+                  floor, up each guide, along the roof line through the peak
+        peak      (x, z) of the ridge
+    """
+    rh = ridge_height(st)
+    sl, sr = slopes(st)
+    gl, gr, _gf = guides(st)
+    left = st["span_left_in"] + st["eave_overhang_left_in"]
+    roof = [(0.0, rh), (left, rh - sl * left)]
+    wall = [(gl, 0.0), (gl, rh - sl * gl), (0.0, rh)]
+    if st["span_right_in"] > _EPS:
+        right = st["span_right_in"] + st["eave_overhang_right_in"]
+        roof.insert(0, (-right, rh - sr * right))
+        wall += [(-gr, rh - sr * gr), (-gr, 0.0)]
+    else:
+        wall.append((0.0, 0.0))
+    return {"roof": roof, "wall": wall, "peak": (0.0, rh)}
+
+
+def project_wall(pos, rotation_deg, p1, p2, guide_face=0.0, tol=FACE_TOL_IN):
+    """A wall's two ends as across-coordinates `(x1, x2)` on the dormer's
+    face -- or None when the wall is not a FACE wall: not square to the ridge
+    (within `tol` over its length) or not within `tol` of the face guide."""
+    (x1, y1), (x2, y2) = to_local(pos, rotation_deg, p1), to_local(pos, rotation_deg, p2)
+    if abs(y1 - y2) > tol or abs(x1 - x2) <= _EPS:
+        return None
+    if abs((y1 + y2) / 2.0 - guide_face) > tol:
+        return None
+    return x1, x2
+
+
+def project_openings(x1, x2, wall_length, openings):
+    """A face wall's openings in across-coordinates. `x1`, `x2` are the
+    wall's ends from `project_wall`; each opening carries `s0`, `s1` (inches
+    from the wall's FIRST end to its two edges) and `sill_in`, `head_in`
+    above the dormer's level. Everything else on it (`id`, `kind`, `code`,
+    `shape`) is carried through."""
+    out = []
+    if wall_length <= _EPS:
+        return out
+    for op in openings:
+        a = x1 + (x2 - x1) * float(op["s0"]) / wall_length
+        b = x1 + (x2 - x1) * float(op["s1"]) / wall_length
+        rec = {k: v for k, v in op.items() if k not in ("s0", "s1")}
+        rec["x0"], rec["x1"] = min(a, b), max(a, b)
+        out.append(rec)
+    return out
+
+
+def _corners(op):
+    """The points of an opening that must stay under the roof. An octagon's
+    and a round window's top corners are cut back, so a small one fits
+    higher in a gable than its bounding box would."""
+    x0, x1, head = op["x0"], op["x1"], op["head_in"]
+    shape = op.get("shape", "rect")
+    if shape not in ("octagon", "round"):
+        return [(x0, head), (x1, head)]
+    w, h = x1 - x0, head - op["sill_in"]
+    cut = 0.2929                      # 1 - 1/sqrt(2): a regular octagon's corner
+    return [(x0 + w * cut, head), (x1 - w * cut, head),
+            (x0, head - h * cut), (x1, head - h * cut)]
+
+
+def _judge(openings, top_at, ceiling_in, wall_span):
+    out = []
+    for i, op in enumerate(openings):
+        rec = dict(op)
+        rec.setdefault("id", i)
+        rec["shape"] = op.get("shape") if op.get("shape") in OPENING_SHAPES else "rect"
+        through = False
+        for x, z in _corners(rec):
+            top = top_at(x)
+            if top is None or z > top + 1e-6:
+                through = True
+        rec["through_roof"] = through
+        rec["above_ceiling"] = (ceiling_in is not None
+                                and rec["head_in"] > ceiling_in + 1e-6)
+        rec["off_wall"] = (wall_span is not None
+                           and (rec["x0"] < min(wall_span) - 1e-6
+                                or rec["x1"] > max(wall_span) + 1e-6))
+        rec["overlaps"] = []
+        out.append(rec)
+    for a in out:
+        for b in out:
+            if a is not b and (a["x0"] < b["x1"] - 1e-6 and b["x0"] < a["x1"] - 1e-6
+                               and a["sill_in"] < b["head_in"] - 1e-6
+                               and b["sill_in"] < a["head_in"] - 1e-6):
+                a["overlaps"].append(b["id"])
+    out.sort(key=lambda r: (r["sill_in"], r["x0"]))
+    return out
+
+
+def face_openings(st, openings, ceiling_in=None, wall_span=None):
+    """Each opening in the face, judged against THIS dormer's gable. Input
+    records are `project_openings`' (x0, x1, sill_in, head_in, ...); each
+    comes back with:
+
+        through_roof    a top corner is above the roof line, or beside it
+        above_ceiling   its head is above `ceiling_in`. NOT a fault: the
+                        gable rises above the ceiling line and a window may
+                        sit up there -- reported so the drawing can say so
+        off_wall        it is outside `wall_span` (the face wall's x extent)
+        overlaps        ids (or indexes) of openings whose rectangles cross
+                        this one's. Two openings STACKED one above the other
+                        do not overlap
+
+    Sorted bottom to top, then left to right."""
+    return _judge(openings, lambda x: roof_height_at(st, x), ceiling_in, wall_span)
+
+
+# -- the two sides (the cheeks) ----------------------------------------------
+SIDES = ("left", "right")
+
+
+def side_x(st, side):
+    """The across-coordinate of a side guide. A shed's RIGHT side is its
+    high wall, under the ridge."""
+    gl, gr, _gf = guides(st)
+    return gl if side == "left" else -gr
+
+
+def side_top(st, side):
+    """Where the roof meets a wall standing on that side guide."""
+    if side == "right" and st["span_right_in"] <= _EPS:
+        return ridge_height(st)
+    return surface_height(st, side_x(st, side))
+
+
+def side_profile(st, side, host_z_face=None, host_slope=None):
+    """One side wall in ELEVATION, seen from outside: points `(y, z)`, y
+    along the ridge from the face.
+
+        wall    the rectangle a side wall fills: from the face guide back to
+                where the host roof climbs to the wall's top
+        roof    the dormer's eave line over it, face overhang included
+        host    the host roof's line across it, or None with no host. BELOW
+                this line the wall is inside the main roof, not outdoors
+        span    (y0, y1) of the wall;  top  its height
+    """
+    top = side_top(st, side)
+    depth, met = ridge_depth(st, host_z_face, host_slope)
+    y0 = min(guides(st)[2], depth)
+    y1 = depth
+    host = None
+    if met and depth > _EPS:
+        y1 = min(max(_meet_y(top, host_z_face, host_slope), y0), depth)
+        host = [(y0, host_z_face + host_slope * y0), (y1, host_z_face + host_slope * y1)]
+    return {"wall": [(y0, 0.0), (y0, top), (y1, top), (y1, 0.0)],
+            "roof": [(-st["face_overhang_in"], top), (y1, top)],
+            "host": host, "span": (y0, y1), "top": top}
+
+
+def project_side_wall(pos, rotation_deg, p1, p2, x_side, tol=FACE_TOL_IN):
+    """A wall's two ends as along-ridge coordinates `(y1, y2)` -- or None
+    when it is not a wall on that side guide: not parallel to the ridge
+    (within `tol`) or not within `tol` of `x_side`."""
+    (x1, y1), (x2, y2) = to_local(pos, rotation_deg, p1), to_local(pos, rotation_deg, p2)
+    if abs(x1 - x2) > tol or abs(y1 - y2) <= _EPS:
+        return None
+    if abs((x1 + x2) / 2.0 - x_side) > tol:
+        return None
+    return y1, y2
+
+
+def side_openings(st, side, openings, ceiling_in=None, wall_span=None,
+                  host_z_face=None, host_slope=None):
+    """`face_openings` for a side wall: records from `project_openings` fed
+    `project_side_wall`'s ends, so `x0`/`x1` here run ALONG THE RIDGE. Adds
+
+        behind_host    part of its sill is under the host roof's line: that
+                       part looks into the main roof, not outdoors
+    """
+    top = side_top(st, side)
+    out = _judge(openings, lambda _y: top, ceiling_in, wall_span)
+    for rec in out:
+        rec["behind_host"] = (
+            host_z_face is not None and host_slope is not None
+            and host_z_face + host_slope * rec["x1"] > rec["sill_in"] + 1e-6)
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -305,6 +512,7 @@ def to_roof_record(st, pos, rotation_deg, depth, datum_shift=0.0, **extra):
     composes in. `ridge[0]` is the FACE, as the roof code expects of a
     dormer. `extra` (an `id`, a `level`, a `host`) is merged in."""
     gl, gr, _gf = guides(st)
+    _gf = min(_gf, depth)
     rec = {
         "ridge": [list(pos), list(to_plan(pos, rotation_deg, (0.0, depth)))],
         "eaves_h_in": st["eaves_h_in"] + datum_shift,
@@ -317,6 +525,8 @@ def to_roof_record(st, pos, rotation_deg, depth, datum_shift=0.0, **extra):
         "form": st["form"],
         "dormer_walls": [],              # a furnishing dormer mints no wall
     }
+    if _gf > _EPS:
+        rec["face_guide_in"] = _gf
     if st["box_left_in"] > _EPS or st["box_right_in"] > _EPS:
         rec["box_half_in"] = [st["box_left_in"] or st["span_left_in"],
                               st["box_right_in"] or st["span_right_in"]]
@@ -357,5 +567,6 @@ def from_roof_record(rec, datum_shift=0.0):
           "face_overhang_in": face,
           "guide_left_in": 0.0 if abs(gl - sl) < 1e-6 else gl,
           "guide_right_in": 0.0 if abs(gr - sr) < 1e-6 else gr,
+          "guide_face_in": float(rec.get("face_guide_in", 0.0) or 0.0),
           "box_left_in": bl, "box_right_in": br, "depth_in": max(depth, 1.0)}
     return normalize_state(st), (float(x0), float(y0)), rotation, depth

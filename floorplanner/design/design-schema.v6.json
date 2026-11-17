@@ -518,6 +518,7 @@
         "face_overhang_in":       { "type": "number", "minimum": 0 },
         "guide_left_in":          { "description": "A guide line only (control C); 0 = on the eaves line.", "type": "number", "minimum": 0 },
         "guide_right_in":         { "type": "number", "minimum": 0 },
+        "guide_face_in":          { "description": "A guide line only (control D, 0355): the face guide's set-back from the face into the dormer; 0 = on the face.", "type": "number", "minimum": 0 },
         "box_left_in":            { "description": "Control B's frame half-width; 0 = not set.", "type": "number", "minimum": 0 },
         "box_right_in":           { "type": "number", "minimum": 0 },
         "depth_in":               { "description": "Ridge length used only when no roof is under the dormer.", "type": "number", "exclusiveMinimum": 0 }

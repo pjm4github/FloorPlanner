@@ -856,7 +856,62 @@ class DormerItem(FurnishingItem):
         if z_face is not None:
             ctx.update(host_z_face_in=z_face, host_slope=slope,
                        host_ridge_in=ridge)
+        if not self._frozen:                 # not per-frame while a knob drags
+            self._face_and_sides(ctx)
         return ctx
+
+    def _face_and_sides(self, ctx):
+        """F1 (0356): the user's walls on THIS level that stand under the
+        dormer's face and its two sides, with their openings handed to `dg`.
+        No geometry lives here -- `dg.project_wall` / `project_side_wall` /
+        `project_openings` do it; this only gathers and dispatches. `face_wall`
+        / `side_walls` are the joined extents (or None when it LOOKED and found
+        none); absent means it never looked (no scene)."""
+        sc = self.scene()
+        if sc is None:
+            return
+        from floorplanner.walls import WallItem
+        from floorplanner.model import DEFAULT_SILL_IN
+        pos, rot = (self.pos().x(), self.pos().y()), self.rotation()
+        gf = self.params.get("guide_face_in", 0.0)
+
+        def op_records(wall):
+            out = []
+            for op in wall.openings:
+                if sip.isdeleted(op):
+                    continue
+                sill = (op.sill_in if op.sill_in is not None
+                        else (DEFAULT_SILL_IN if op.kind == "window" else 0.0))
+                head = float(op._v5_extra.get("head_in", float(sill) + op.height))
+                out.append({"s0": op.s - op.width / 2.0,
+                            "s1": op.s + op.width / 2.0,
+                            "sill_in": float(sill), "head_in": head,
+                            "id": op._uid or op.code, "kind": op.kind,
+                            "code": op.code})
+            return out
+
+        walls = [w for w in sc.items()
+                 if isinstance(w, WallItem) and not sip.isdeleted(w)
+                 and getattr(w, "floor", None) == self.floor]
+
+        def gather(project, *pargs):
+            ext, ops = [], []
+            for w in walls:
+                e = project(pos, rot, (w.p1.x(), w.p1.y()),
+                            (w.p2.x(), w.p2.y()), *pargs)
+                if e is None:
+                    continue
+                a, b = e
+                ext += [a, b]
+                ops += _dg.project_openings(a, b, w.length(), op_records(w))
+            return ((min(ext), max(ext)) if ext else None), ops
+
+        ctx["face_wall"], ctx["face_openings"] = gather(_dg.project_wall, gf)
+        side_walls, side_openings = {}, {}
+        for side in _dg.SIDES:
+            span, ops = gather(_dg.project_side_wall, _dg.side_x(self.params, side))
+            side_walls[side], side_openings[side] = span, ops
+        ctx["side_walls"], ctx["side_openings"] = side_walls, side_openings
 
     # -- geometry ------------------------------------------------------------
     def _current_sig(self, ctx):
@@ -1029,7 +1084,7 @@ class DormerItem(FurnishingItem):
     # -- the knobs A-G (grips) -----------------------------------------------
     # dg-local positions of each grip, from the current parameters + depth.
     _GRIP_KINDS = ("span_l", "span_r", "guide_l", "guide_r",
-                   "eave_l", "eave_r", "face", "apex")
+                   "eave_l", "eave_r", "guide_face", "face", "apex")
 
     def _grip_local(self, kind):
         """A grip's position in ITEM-local coordinates (dg-local, y-flipped)."""
@@ -1045,6 +1100,7 @@ class DormerItem(FurnishingItem):
             "guide_r": (-min(gr, sr), 0.30 * depth),
             "eave_l":  (sl + st["eave_overhang_left_in"], 0.68 * depth),
             "eave_r":  (-(sr + st["eave_overhang_right_in"]), 0.68 * depth),
+            "guide_face": (0.0, min(st["guide_face_in"], depth)),
             "face":    (0.0, -st["face_overhang_in"]),
             "apex":    (0.0, depth),
         }[kind]
@@ -1115,6 +1171,8 @@ class DormerItem(FurnishingItem):
             both("eave_overhang_left_in", "eave_overhang_right_in", v) if sym \
                 else st.__setitem__("eave_overhang_left_in" if kind == "eave_l"
                                     else "eave_overhang_right_in", v)
+        elif kind == "guide_face":
+            st["guide_face_in"] = max(y, 0.0)   # D: slides along the ridge
         elif kind == "face":
             st["face_overhang_in"] = max(-y, 0.0)
         elif kind == "apex":
@@ -1170,6 +1228,7 @@ class DormerGripItem(QGraphicsItem):
         span_l / span_r   (B, blue)    the half-width to the eaves line
         guide_l / guide_r (C, yellow)  the side guide line (draws no wall)
         eave_l / eave_r   (E, green)   the eave overhang beyond the wall
+        guide_face        (D, purple)  the face guide, set back along the ridge
         face              (F, orange)  the face/rake overhang
         apex              (A, white)   double-click opens the dialog (pitch)
 
@@ -1182,6 +1241,7 @@ class DormerGripItem(QGraphicsItem):
         "span_l": QColor(0, 110, 255), "span_r": QColor(0, 110, 255),
         "guide_l": QColor(214, 170, 0), "guide_r": QColor(214, 170, 0),
         "eave_l": QColor(40, 160, 70), "eave_r": QColor(40, 160, 70),
+        "guide_face": QColor(150, 60, 200),         # D, purple
         "face": QColor(230, 90, 20), "apex": QColor(90, 90, 90),
     }
     _TIPS = {
@@ -1189,6 +1249,7 @@ class DormerGripItem(QGraphicsItem):
         "guide_l": "Side guide (knob C) — draws no wall",
         "guide_r": "Side guide (knob C) — draws no wall",
         "eave_l": "Eave overhang (knob E)", "eave_r": "Eave overhang (knob E)",
+        "guide_face": "Face guide (knob D) — draws no wall",
         "face": "Face overhang (knob F)",
         "apex": "Apex (knob A) — double-click for properties / pitch",
     }
