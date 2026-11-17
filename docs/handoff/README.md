@@ -495,5 +495,7 @@ this table is not a second copy of it.
 | [`0353-ruling.md`](./0353-ruling.md) | ruling: correction to 0352. The dormer goes in FRAMING; no "Structure" group. The watcher is stopped until the furnishing exists |
 | [`0354-report.md`](./0354-report.md) | report: dormer phase 1 landed by path; the two 0351 §2.4 measurements |
 | [`0355-report.md`](./0355-report.md) | ask: control D (the face guide) needs a `dg` state field |
+| [`0356-ruling.md`](./0356-ruling.md) | ruling: control D has its field; the dormer dialog shows the GABLE END and BOTH SIDES, with the openings in the walls under them |
+| [`0357-report.md`](./0357-report.md) | report: control D and F1 built; F2–F4 measured (0356) |
 
 <!-- PAIRS:END -->
