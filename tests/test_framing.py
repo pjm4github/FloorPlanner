@@ -10,12 +10,12 @@ pytestmark = pytest.mark.furnishings
 
 
 def test_framing_catalog_and_group(fp):
-    for fid in ("stairs", "elevator", "post"):      # post: 0258, plan E
+    for fid in ("stairs", "elevator", "post", "dormer"):  # dormer: 0352 phase 2
         spec = fp.furnishing_spec(fid)
         assert spec is not None and spec["category"] == "Framing"
     groups = {g["name"]: [s["id"] for s in g["specs"]]
               for g in fp.furnishing_groups()}
-    assert groups.get("Framing") == ["stairs", "elevator", "post"]
+    assert groups.get("Framing") == ["stairs", "elevator", "post", "dormer"]
 
 
 def test_factory_returns_right_types(fp):

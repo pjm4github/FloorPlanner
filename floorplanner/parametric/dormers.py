@@ -1,9 +1,10 @@
-"""The DORMER parametric kind (0352, phase 1): its parameters, what its
-dialog reports, and its findings. The arithmetic is `dormer_geometry.py`.
+"""The DORMER parametric kind (0352): its parameters, what its dialog
+reports, and its findings. The arithmetic is `dormer_geometry.py`.
 
-NOT REGISTERED YET. `DORMER` is built here and `register()`-ed in phase 2,
-with the item and the catalog entry, so that nothing in the app offers a
-dormer furnishing before one can be drawn.
+REGISTERED (0352 phase 2) now that `DormerItem` draws one and the catalog
+offers it in the Framing group: a drag from the palette places it, a
+double-click opens the generic dialog. Phase 1 built the kind but withheld
+`register()` so nothing offered a dormer before one could be drawn.
 
 `context` (all optional) is what the item knows about where it stands:
 
@@ -16,7 +17,7 @@ dormer furnishing before one can be drawn.
 from floorplanner.parametric import dormer_geometry as dg
 from floorplanner.parametric.findings import ADVISORY, ERROR, WARNING, Finding
 from floorplanner.parametric.params import BOOL, ENUM, FLOAT, ParamSpec
-from floorplanner.parametric.registry import ParametricKind
+from floorplanner.parametric.registry import ParametricKind, register
 
 
 def _fmt(x, places=2):
@@ -179,4 +180,4 @@ class DormerKind(ParametricKind):
         return rows
 
 
-DORMER = DormerKind()
+DORMER = register(DormerKind())

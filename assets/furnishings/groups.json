@@ -109,7 +109,8 @@
       "heat_exchanger.svg",
       "stairs.svg",
       "elevator.svg",
-      "post.svg"
+      "post.svg",
+      "dormer.svg"
     ]
   },
   {
@@ -296,7 +297,8 @@
     "items": [
       "stairs.svg",
       "elevator.svg",
-      "post.svg"
+      "post.svg",
+      "dormer.svg"
     ]
   }
 ]

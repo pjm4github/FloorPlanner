@@ -15,6 +15,7 @@ from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
 from floorplanner.parametric import registry as _param_registry
 from floorplanner.parametric import stair_geometry as _sg
+from floorplanner.parametric import dormer_geometry as _dg
 from floorplanner.walls import OpeningItem, WallItem, rebuild_all_walls
 from floorplanner.rooms import (
     RoomItem, report_self_intersections, room_owns_walls, walls_cover_room,
@@ -775,6 +776,254 @@ class StairItem(FurnishingItem):
         e.accept()
 
 
+class DormerItem(FurnishingItem):
+    """A DORMER furnishing (0352, phase 2).
+
+    Dropped on the level whose rooms it lights, like any furnishing -- but it
+    OWNS NO WALL. Editing it computes no wall; the only plan lines it draws are
+    its own outline (ridge, eaves, rake, valleys), the control GUIDES (C/D),
+    and the KNEE LINES where its planes cross the room's ceiling plane. The
+    walls under it are whatever the user draws on that level.
+
+    THE ITEM'S POSITION IS THE FACE END OF THE RIDGE and `rotation` turns the
+    ridge, exactly as `dormer_geometry` and the schema define a dormer
+    furnishing -- so a dg-local point `(x, y)` (x = the ridge's LEFT, y = along
+    the ridge from the face into the host) draws at ITEM-local `(x, -y)`, which
+    under Qt's own `setRotation(rotation)` reproduces `dg.to_plan` exactly.
+
+    THE HOST IS FOUND BY HEIGHT each rebuild and nothing about it is stored
+    (`host_roof_at` + `roofclip.surface_height`, shifted to this level's
+    datum): a dormer over no roof is drawn, reported and cuts nothing. The 3D
+    roof and the host cut are phase 3; this item is the plan side."""
+
+    _GUIDE_INK = QColor(120, 120, 120)
+
+    def __init__(self, pos: QPointF, rotation: float = 0.0, *,
+                 params: dict = None, new: bool = False):
+        self.params = _dg.normalize_state(params or _dg.STATE_DEFAULTS)
+        self._seed_defaults = new and not params   # host pitch on first rebuild
+        self._geo = _dg.plan(self.params)
+        self._bbox = QRectF(-1, -1, 2, 2)
+        self._sig = None
+        self._recompute_pending = False
+        self._frozen = False
+        super().__init__("dormer", pos, rotation)
+        self._recompute()
+
+    # -- state ---------------------------------------------------------------
+    def extra_state(self) -> dict:
+        return {k: self.params[k] for k in _dg.STATE_DEFAULTS}
+
+    def draft_state(self) -> dict:
+        return dict(self.params)
+
+    def apply_params(self, state: dict):
+        """Take an accepted parameter set and redraw. The FACE stays put (it is
+        the item's position / anchor), so unlike a stair nothing is shifted."""
+        self.params = _dg.normalize_state(state)
+        self._seed_defaults = False
+        self._recompute()
+        self.update()
+
+    # -- the host, found by height -------------------------------------------
+    def _host_plane(self):
+        """(height at the face, slope along the ridge, host ridge height) of
+        the roof under the dormer, in THIS level's datum -- or (None, None,
+        None) when no roof is under it. Nothing is stored."""
+        sc = self.scene()
+        if sc is None:
+            return None, None, None
+        from floorplanner.roofs import host_roof_at           # late: layer peer
+        from floorplanner.roofclip import surface_height
+        face = self.pos()
+        host = host_roof_at(sc, face, self.floor)
+        if host is None:
+            return None, None, None
+        shift = float(floor_elevation(host.floor)) - float(floor_elevation(self.floor))
+        direction = _dg.ridge_direction(self.rotation())
+        z_face, slope = _dg.host_plane(
+            lambda p: surface_height(host, QPointF(p[0], p[1])) + shift,
+            (face.x(), face.y()), direction)
+        return z_face, slope, float(host.ridge_h_in) + shift
+
+    def param_context(self) -> dict:
+        ctx = super().param_context()
+        z_face, slope, ridge = self._host_plane()
+        if z_face is not None:
+            ctx.update(host_z_face_in=z_face, host_slope=slope,
+                       host_ridge_in=ridge)
+        return ctx
+
+    # -- geometry ------------------------------------------------------------
+    def _current_sig(self, ctx):
+        return (round(self.pos().x(), 3), round(self.pos().y(), 3),
+                round(self.rotation(), 3), id(self.params),
+                None if ctx.get("host_z_face_in") is None
+                else round(ctx["host_z_face_in"], 3),
+                None if ctx.get("host_slope") is None
+                else round(ctx["host_slope"], 6),
+                None if ctx.get("ceiling_in") is None
+                else round(ctx["ceiling_in"], 3))
+
+    def _recompute(self):
+        ctx = self.param_context()
+        if self._seed_defaults and ctx.get("host_slope"):
+            self.params = _dg.default_state(ctx.get("ceiling_in"),
+                                            ctx.get("host_slope"))
+            self._seed_defaults = False
+        z = ctx.get("host_z_face_in")
+        slope = ctx.get("host_slope")
+        ceil = ctx.get("ceiling_in")
+        self._geo = _dg.plan(self.params, ceil, z, slope)
+        depth, _met = _dg.ridge_depth(self.params, z, slope)
+        pts = [self._q(p) for p in _dg.footprint(self.params, depth)]
+        xs = [p.x() for p in pts]
+        ys = [p.y() for p in pts]
+        bbox = QRectF(QPointF(min(xs), min(ys)),
+                      QPointF(max(xs), max(ys))).adjusted(-2, -2, 2, 2)
+        c, r = self._handle()
+        bbox = bbox.united(QRectF(c.x() - r, c.y() - r, 2 * r, 2 * r))
+        self.prepareGeometryChange()
+        self._bbox = bbox
+        self._sig = self._current_sig(ctx)
+        self._recompute_pending = False
+
+    def _deferred_recompute(self):
+        if not sip.isdeleted(self):
+            self._recompute()
+            self.update()
+
+    @staticmethod
+    def _q(pt) -> QPointF:
+        """A dg-local point as an item-local point (y flips; see the class
+        docstring)."""
+        return QPointF(pt[0], -pt[1])
+
+    def boundingRect(self) -> QRectF:
+        return QRectF(self._bbox)
+
+    def shape(self) -> QPainterPath:
+        path = QPainterPath()
+        path.addRect(self._bbox)
+        return path
+
+    def _handle(self) -> tuple:
+        """The rotator handle, in ITEM coordinates: in FRONT of the face
+        (local +y, down the ridge from the face), clear of the dormer body
+        which runs the other way."""
+        s = self._view_scale()
+        stem, r = 14.0 / s, 5.0 / s
+        front = self.params["face_overhang_in"]
+        return QPointF(0.0, front + stem + r), r
+
+    # -- painting ------------------------------------------------------------
+    def paint(self, painter, option, widget=None):
+        if not self._frozen and not self._recompute_pending \
+                and self._sig != self._current_sig(self.param_context()):
+            self._recompute_pending = True          # never change geo in paint
+            QTimer.singleShot(0, self._deferred_recompute)
+        ghost = floor_display_mode(self.floor) != "active"
+        geo = self._geo
+
+        def seg(a, b):
+            painter.drawLine(self._q(a), self._q(b))
+
+        if ghost:
+            painter.setPen(QPen(FLOOR_GHOST, 0))
+            seg(*geo["ridge"])
+            for a, b in geo["eaves"]:
+                seg(a, b)
+            seg(*geo["rake"])
+            return
+        ink = QColor(55, 65, 81)
+        painter.setPen(QPen(ink, 1.3))                  # ridge
+        seg(*geo["ridge"])
+        painter.setPen(QPen(ink, 0.9))                  # eaves + rake
+        for a, b in geo["eaves"]:
+            seg(a, b)
+        seg(*geo["rake"])
+        painter.setPen(QPen(ink, 1.0))                  # valleys
+        for v in geo["valleys"]:
+            seg(v[0], v[1])
+        painter.setPen(QPen(self._GUIDE_INK, 0.8, Qt.PenStyle.DashLine))
+        for a, b in geo["guides"]:                      # controls C / D
+            seg(a, b)
+        if geo["knees"]:                                # the knee lines
+            painter.setPen(QPen(ROOF_CLIP_INK, 1.6, Qt.PenStyle.DashLine))
+            for a, b in geo["knees"]:
+                seg(a, b)
+        if self._handle_visible():
+            self._paint_selection(painter)
+
+    def _paint_selection(self, painter):
+        blue = QColor(0, 110, 255)
+        painter.setPen(QPen(blue, 0, Qt.PenStyle.DashLine))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRect(self._bbox.adjusted(1, 1, -1, -1))
+        c, hr = self._handle()
+        painter.setPen(QPen(blue, 0))
+        painter.drawLine(QPointF(0.0, self.params["face_overhang_in"]),
+                         QPointF(c.x(), c.y() - hr))
+        painter.setBrush(QBrush(QColor(255, 255, 255)))
+        painter.drawEllipse(c, hr, hr)
+        painter.setBrush(QBrush(blue))
+        painter.drawEllipse(c, hr * 0.35, hr * 0.35)
+
+    # -- the drag hold (0354 §2, Patrick's decision) -------------------------
+    def _hold(self, on: bool):
+        """Hold the knee recompute for a whole drag and settle once at the
+        end: the orange knee lines are NOT redrawn while dragging (0354 §2).
+        Holds the HOST's knee (the rooms' `room_ceiling_break_lines`) too."""
+        sc = self.scene()
+        if sc is None:
+            return
+        from floorplanner.roofs import hold_roof_clips, hold_rooms
+        hold_roof_clips(sc, on)
+        hold_rooms(sc, on)
+        self._frozen = on
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.MouseButton.LeftButton:
+            self._hold(True)
+        super().mousePressEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        was = self._frozen
+        super().mouseReleaseEvent(e)
+        if was:
+            self._hold(False)
+            self._recompute()       # settle once, now the drag is over
+            self.update()
+
+    def contextMenuEvent(self, e):
+        menu = QMenu()
+        a_props = menu.addAction("Dormer properties…")
+        menu.addSeparator()
+        a_cw = menu.addAction("Rotate 90° CW")
+        a_ccw = menu.addAction("Rotate 90° CCW")
+        menu.addSeparator()
+        a_del = menu.addAction("Delete dormer")
+        a_front, a_back = add_front_back_actions(menu)
+        chosen = menu.exec(e.screenPos())
+        if chosen is None:
+            e.accept()
+            return
+        if handle_front_back(self, chosen, a_front, a_back):
+            e.accept()
+            return
+        if chosen is a_props:
+            self.open_properties()
+        elif chosen is a_cw:
+            self.setRotation((self.rotation() + 90.0) % 360.0)
+            self._recompute()
+        elif chosen is a_ccw:
+            self.setRotation((self.rotation() - 90.0) % 360.0)
+            self._recompute()
+        elif chosen is a_del and self.scene() is not None:
+            self.scene().removeItem(self)
+        e.accept()
+
+
 def make_furnishing(kind: str, pos: QPointF, rotation: float = 0.0,
                     state: dict = None, *, new: bool = False):
     """Create the right item for a catalog `kind`: a dynamic StairItem for
@@ -802,6 +1051,8 @@ def make_furnishing(kind: str, pos: QPointF, rotation: float = 0.0,
                          flight=state.get("flight", "full"),
                          turn=state.get("turn", "left"),
                          direction=state.get("direction", "up"))
+    if kind == "dormer":                              # 0352 phase 2
+        return DormerItem(pos, rotation, params=state or None, new=new)
     item = FurnishingItem(kind, pos, rotation)
     if state and _param_registry.is_parametric(kind):
         item.params = dict(state)

@@ -192,9 +192,11 @@ def test_host_plane_reads_a_surface_callable():
 
 
 # -- the kind ---------------------------------------------------------------
-def test_the_kind_is_built_but_not_yet_offered():
+def test_the_kind_is_registered_and_offered():
+    # phase 2 (0352): the kind is REGISTERED now that DormerItem draws one and
+    # the catalog offers it in the Framing group (was withheld in phase 1).
     assert DORMER.kind == "dormer" and DORMER.specs()
-    assert registry.get("dormer") is None, "registered in phase 2, with the item"
+    assert registry.get("dormer") is DORMER, "the DORMER kind must be registered"
     assert set(DORMER.to_state({})) == set(dg.STATE_DEFAULTS)
 
 

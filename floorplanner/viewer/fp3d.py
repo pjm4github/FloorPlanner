@@ -3654,6 +3654,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         _SIDE_CACHE.clear()
         by_side, side_failed = set(), set()
         by_parts = set()
+        by_dormer = set()                 # 0352: furnishing dormers (3D in phase 3)
         room_style_of = {r.get("id"): (r.get("properties") or {}).get("style")
                          for r in rooms}
         room_ceiling_of = {r.get("id"): (r.get("properties") or {}).get(
@@ -3664,6 +3665,15 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             pos = fu.get("pos") or [0, 0]
             cx, cy = float(pos[0]), -float(pos[1])
             kind = fu.get("kind", "")
+            if kind == "dormer":
+                # 0352 phase 2: a dormer furnishing's 3D is its ROOF, built
+                # from `dormer_geometry.to_roof_record` in PHASE 3 -- not a
+                # catalog box. Until then it is COUNTED and REPORTED (never
+                # silently vanished -- test_viewer_model's partition) but
+                # contributes no mesh; it still draws on the plan.
+                by_dormer.add(kind)
+                n_furn += 1
+                continue
             spec = specs.get(kind)
             if spec is None:
                 unknown_kind.add(kind or "?")
@@ -3840,6 +3850,11 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             model.info.append(
                 f"{len(by_side)} vehicle kind(s) LOFTED FROM THEIR SIDE "
                 f"ELEVATION: " + ", ".join(sorted(by_side)))
+        if by_dormer:
+            model.info.append(
+                f"{len(by_dormer)} dormer furnishing(s) NOT YET BUILT in 3D "
+                "(their roof comes from to_roof_record in phase 3, 0352): "
+                + ", ".join(sorted(by_dormer)))
         if side_failed:
             model.notes.append(
                 "vehicle side elevation(s) named in the catalog but unusable, "
@@ -3904,6 +3919,9 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                    "side_profile_kinds": sorted(by_side) if furnishings else [],
                    # 0329: the kinds built from cabinet PARTS
                    "cabinet_kinds": sorted(by_parts) if furnishings else [],
+                   # 0352: furnishing dormers, counted but not yet meshed
+                   # (their 3D roof is phase 3, via to_roof_record)
+                   "dormer_kinds": sorted(by_dormer) if furnishings else [],
                    "lights": len(model.lights)}
     return model
 
