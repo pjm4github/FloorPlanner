@@ -230,11 +230,40 @@ def test_only_a_flat_dormer_is_refused():
 
 
 def test_the_spec_keys_are_all_state_keys():
-    assert {s.key for s in DORMER.specs()} <= set(dg.STATE_DEFAULTS)
+    # every spec maps to a stored key, EXCEPT `ridge_h_in` -- a dialog input
+    # that floats the eaves; `to_state` drops it (test_..._floats_the_eaves).
+    assert {s.key for s in DORMER.specs()} <= set(dg.STATE_DEFAULTS) | {"ridge_h_in"}
     v = {"form": "shed"}
     by = {s.key: s for s in DORMER.specs()}
     assert not by["span_right_in"].enabled(v) and not by["symmetric"].enabled(v)
     assert by["span_right_in"].enabled({"form": "gable", "symmetric": False})
+
+
+def test_setting_the_ridge_height_floats_the_eaves():
+    base = dg.normalize_state({})             # eaves 60, span 60, pitch 10 -> ridge 110
+    assert dg.ridge_height(base) == pytest.approx(110.0)
+    norm = DORMER.normalize({**base, "ridge_h_in": 130.0})
+    assert norm["ridge_h_in"] == pytest.approx(130.0), "the field tracks the ridge"
+    assert norm["pitch_12"] == base["pitch_12"], "pitch held"
+    assert norm["span_left_in"] == base["span_left_in"], "half-width held"
+    assert norm["eaves_h_in"] == pytest.approx(80.0), "eaves took up the 20 in slack"
+    assert dg.ridge_height(norm) == pytest.approx(130.0)
+    # changing pitch holds the ridge and floats the eaves (ridge is the input)
+    norm2 = DORMER.normalize({**norm, "pitch_12": 12.0})
+    assert dg.ridge_height(norm2) == pytest.approx(130.0)
+    assert norm2["eaves_h_in"] == pytest.approx(130.0 - 60.0 * 12.0 / 12.0)  # 70
+    # to_state drops the virtual key and stores the floated eaves
+    st = DORMER.to_state(norm)
+    assert "ridge_h_in" not in st and set(st) == set(dg.STATE_DEFAULTS)
+    assert st["eaves_h_in"] == pytest.approx(80.0)
+
+
+def test_the_eaves_field_is_a_readout_of_the_floated_value():
+    by = {s.key: s for s in DORMER.specs()}
+    assert by["ridge_h_in"].enabled({}), "the ridge is editable"
+    assert not by["eaves_h_in"].enabled({}), "the eaves is a readout"
+    v = DORMER.normalize({"ridge_h_in": 130.0})
+    assert by["eaves_h_in"].shown_fn(v, None, None) == pytest.approx(80.0)
 
 
 def test_the_roof_codes_own_reader_agrees_with_this_calculator():

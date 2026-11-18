@@ -78,8 +78,18 @@ class DormerKind(ParametricKind):
                  tip="Ridge to the eaves line (knob B / G)."),
             size("span_right_in", "Half-width, right", dg.MIN_SPAN_IN, 480.0,
                  enabled=_free_right),
-            size("eaves_h_in", "Eaves height", 0.0, 360.0, 0.5,
-                 "The eaves line above THIS level's floor."),
+            ParamSpec("ridge_h_in", "Ridge height", FLOAT, dg.ridge_height(d),
+                      unit="in", minimum=0.0, maximum=600.0, step=0.5,
+                      tooltip="The ridge above THIS level's floor. Setting it "
+                              "FLOATS the eaves -- the pitch and the half-width "
+                              "hold, so the whole roof slides up or down."),
+            ParamSpec("eaves_h_in", "Eaves height", FLOAT, d["eaves_h_in"],
+                      unit="in", minimum=0.0, maximum=360.0, step=0.5,
+                      enabled_fn=lambda _v: False,
+                      shown_fn=lambda v, _d, _c: v.get("eaves_h_in"),
+                      tooltip="The eaves line above THIS level's floor. A "
+                              "readout now: it floats as you set the ridge, the "
+                              "pitch and the half-width held."),
             ParamSpec("pitch_12", "Pitch", FLOAT, d["pitch_12"], unit="in 12",
                       minimum=0.5, maximum=24.0, step=0.5,
                       tooltip="Rise per 12 in of run, on the left plane."),
@@ -104,7 +114,23 @@ class DormerKind(ParametricKind):
         ]
 
     def normalize(self, state):
-        return dg.normalize_state(state)
+        # `ridge_h_in` is a DIALOG input, not a stored key: setting it FLOATS
+        # the eaves (pitch + half-width held) so the roof slides up or down.
+        # The eaves stays the one free height in the state; `to_state` drops
+        # the virtual key. The ridge is exposed back so the field tracks it.
+        st = dict(state or {})
+        ridge = st.pop("ridge_h_in", None)
+        norm = dg.normalize_state(st)
+        if ridge is not None:
+            try:
+                eaves = float(ridge) - norm["span_left_in"] * norm["pitch_12"] / 12.0
+                norm["eaves_h_in"] = max(eaves, 0.0)
+                norm = dg.normalize_state(norm)
+            except (TypeError, ValueError):
+                pass
+        norm = dict(norm)
+        norm["ridge_h_in"] = dg.ridge_height(norm)
+        return norm
 
     def to_state(self, values):
         st = dg.normalize_state(values)
