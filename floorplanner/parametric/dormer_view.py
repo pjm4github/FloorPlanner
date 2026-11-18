@@ -1,15 +1,17 @@
-"""The dormer preview for the properties dialog (PyQt6): the GABLE END in
-elevation, seen from outside, drawn TO SCALE from the values in the dialog.
+"""The dormer preview for the properties dialog (PyQt6): the GABLE END in the
+CENTRE with a SIDE elevation on each flank -- the dormer's box unfolded about
+the gable -- all drawn TO SCALE at ONE shared scale, so the level's floor and
+the orange ceiling line run straight across all three panels.
 
-It shows the roof line, the level's floor and the ceiling line, the wall the
-user drew under the face (when there is one), and every window and door in
-that wall at its own sill and head -- and, under it, the two SIDE walls the
-same way, with the host roof's line across each. LOOK-ONLY (Patrick, 0356):
+The gable end shows the roof line, the floor, the ceiling line, the wall the
+user drew under the face (when there is one) and its windows and doors at their
+sill and head. Each SIDE shows that cheek wall with the host roof's line across
+it, and -- DASHED -- the dormer roof as a reference tent over it, so the short
+cheek wall reads against the full roof height. LOOK-ONLY (Patrick, 0356):
 openings are edited on the wall in the plan. An opening ABOVE the ceiling line is
-legitimate -- the gable rises above it -- and is drawn like any other; an
-opening the roof line cuts is drawn in red. Stacked openings are simply two
-openings. Every number is `dormer_geometry`'s: `face_profile` and
-`face_openings`, already computed by `DormerKind.evaluate`.
+legitimate (the gable rises above it) and is drawn like any other; one the roof
+line cuts is red. Every number is `dormer_geometry`'s (`face_profile`,
+`face_openings`, `side_profile`, `side_openings`), computed by `DormerKind`.
 """
 
 from PyQt6.QtCore import QPointF, QRectF, QSize, Qt
@@ -18,28 +20,34 @@ from PyQt6.QtWidgets import QWidget
 
 _INK = QColor(31, 41, 55)
 _DIM = QColor(71, 85, 105)
+_REF = QColor(150, 160, 175)           # the dashed dormer-roof reference
 _WALL = QColor(241, 245, 249)
 _GLASS = QColor(205, 225, 245)
 _DOOR = QColor(226, 214, 196)
 _BAD = QColor(185, 28, 28)
-_CEILING = QColor(234, 120, 20)       # the knee-line orange
+_CEILING = QColor(234, 120, 20)        # the knee-line orange
 
 
 def _fmt(x, places=1):
     return f"{x:.{places}f}".rstrip("0").rstrip(".")
 
 
+def _extent(points):
+    xs = [x for x, _z in points]
+    return (min(xs), max(xs)) if xs else (0.0, 1.0)
+
+
 class DormerFaceView(QWidget):
-    """Three elevations: the gable end on top, the two sides under it."""
+    """Three elevations in a row: the gable end centred, a side on each flank."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._derived = None
-        self.setMinimumSize(420, 380)
+        self.setMinimumSize(560, 360)
         self.setAccessibleName("Dormer gable end and side elevations")
 
     def sizeHint(self):
-        return QSize(520, 520)
+        return QSize(740, 420)
 
     def set_data(self, values, derived, context=None):
         del values, context
@@ -48,38 +56,40 @@ class DormerFaceView(QWidget):
 
     # -- what to draw --------------------------------------------------------
     def panels(self):
-        """[(title, panel)] -- plain data, so a test can read what would be
-        painted without painting it. A panel: `wall` and `roof` point lists
-        `(across, z)`, `host` (a line or None), `openings`, `has_wall`,
-        `flip` (draw across-coordinates right to left), `face_mark` (a side
-        panel, whose face/gable end is labelled)."""
+        """[(title, panel)] in ROW order (left | gable | right). A panel:
+        `wall` and `roof` point lists `(across, z)`, `host` (a line or None),
+        `openings`, `has_wall`, `flip` (draw across right-to-left),
+        `roof_ref` (the dashed dormer-roof tent for a side, else None),
+        `face_mark` (a side, whose face/gable end -- toward the centre -- is
+        labelled)."""
         d = self._derived
         if not d or not d.get("face_profile"):
             return []
         prof = d["face_profile"]
-        out = [("Gable end", {
+        gable = ("Gable end", {
             "wall": prof["wall"], "roof": prof["roof"], "host": None,
             "openings": d.get("face_openings") or [],
             "has_wall": bool(d.get("face_wall")), "flip": False,
-            "face_mark": False,
-            "label": f"ridge {_fmt(prof['peak'][1])} in"})]
-        # left cheek on the LEFT, right cheek on the RIGHT (Patrick, 0358)
+            "roof_ref": None, "face_mark": False,
+            "label": f"ridge {_fmt(prof['peak'][1])} in"})
+        sides = {}
         for side in ("left", "right"):
             info = (d.get("sides") or {}).get(side)
             if not info:
                 continue
             sp = info["profile"]
-            out.append((f"{side.capitalize()} side", {
+            sides[side] = (f"{side.capitalize()} side", {
                 "wall": sp["wall"], "roof": sp["roof"], "host": sp["host"],
                 "openings": info["openings"], "has_wall": bool(info["wall"]),
-                # each cheek is its OWN exterior view: the face/gable end sits
-                # at the panel's OUTER edge (left cheek's face at the left,
-                # right cheek's at the right), so the faces point outward and
-                # the host ends meet in the middle. `face_mark` labels it.
-                "flip": side == "right",
+                # the box unfolded about the gable: each cheek's face/gable end
+                # sits toward the CENTRE -- left cheek's face on its right (so
+                # flip), right cheek's on its left. Still each an exterior view.
+                "flip": side == "left",
+                "roof_ref": prof["roof"],      # the dormer roof, dashed
                 "face_mark": True,
-                "label": f"top {_fmt(sp['top'])} in"}))
-        return out
+                "label": f"top {_fmt(sp['top'])} in"})
+        return ([sides["left"]] if "left" in sides else []) + [gable] \
+            + ([sides["right"]] if "right" in sides else [])
 
     # -- drawing -------------------------------------------------------------
     def _text(self, p, size, bold=False):
@@ -88,12 +98,22 @@ class DormerFaceView(QWidget):
         f.setBold(bold)
         p.setFont(f)
 
+    def _panel_x_extent(self, pn):
+        pts = list(pn["wall"]) + list(pn["roof"])
+        pts += [(o[k], 0.0) for o in pn["openings"] for k in ("x0", "x1")]
+        lo, hi = _extent(pts)
+        if pn.get("roof_ref"):             # the dashed tent is centred on 0
+            rlo, rhi = _extent(pn["roof_ref"])
+            half = max(hi - lo, rhi - rlo) / 2.0
+            return -half, half             # width = the wider of wall / tent
+        return lo, hi
+
     def paintEvent(self, _event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.fillRect(self.rect(), QColor(255, 255, 255))
-        panels = self.panels()
-        if not panels:
+        row = self.panels()
+        if not row:
             p.setPen(QPen(_DIM))
             self._text(p, 10)
             p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
@@ -101,36 +121,72 @@ class DormerFaceView(QWidget):
             p.end()
             return
         ceiling = self._derived.get("ceiling_in")
-        z_hi = max([z for _t, pn in panels for _x, z in pn["roof"] + pn["wall"]]
-                   + [o["head_in"] for _t, pn in panels for o in pn["openings"]]
-                   + [1.0])
-        w, h = float(self.width()), float(self.height())
-        sides = panels[1:]
-        top_h = h * (0.58 if sides else 1.0)
-        self._panel(p, QRectF(0, 0, w, top_h), *panels[0], ceiling, z_hi)
-        for i, (title, pn) in enumerate(sides):
-            cell = QRectF(i * w / len(sides), top_h, w / len(sides), h - top_h)
-            self._panel(p, cell, title, pn, ceiling, z_hi)
+
+        def panel_zs(pn):
+            zs = [z for _x, z in list(pn["wall"]) + list(pn["roof"])]
+            if pn.get("roof_ref"):
+                zs += [z for _x, z in pn["roof_ref"]]
+            zs += [o["head_in"] for o in pn["openings"]]
+            return zs
+        z_hi = max([z for _t, pn in row for z in panel_zs(pn)] + [1.0])
+
+        W, H = float(self.width()), float(self.height())
+        m_t, m_b = 30.0, 26.0                  # title / foot labels
+        m_x = 10.0                             # a panel's side margin
+        H_use = max(H - m_t - m_b, 10.0)
+        oz = m_t + H_use                       # ONE floor baseline, all panels
+
+        n = len(row)
+        if n == 3:
+            fracs = [0.29, 0.42, 0.29]
+        elif n == 2:
+            fracs = [0.5, 0.5]
+        else:
+            fracs = [1.0]
+        lefts, widths, acc = [], [], 0.0
+        for fr in fracs:
+            lefts.append(acc * W)
+            widths.append(fr * W)
+            acc += fr
+
+        # ONE shared scale: fit the tallest panel vertically AND the widest
+        # panel horizontally, so every panel is to-scale and comparable.
+        exts = [self._panel_x_extent(pn) for _t, pn in row]
+        k = H_use / z_hi
+        for (lo, hi), cw in zip([e for e in exts], widths, strict=False):
+            usable = max(cw - 2 * m_x, 10.0)
+            if hi - lo > 1e-6:
+                k = min(k, usable / (hi - lo))
+
+        for i, (title, pn) in enumerate(row):
+            cell = QRectF(lefts[i], 0.0, widths[i], H)
+            self._panel(p, cell, title, pn, ceiling, k, oz, m_x, exts[i])
         p.end()
 
-    def _panel(self, p, cell, title, pn, ceiling, z_hi):
-        ops = pn["openings"]
-        xs = ([x for x, _z in pn["roof"] + pn["wall"]]
-              + [o[k] for o in ops for k in ("x0", "x1")])
-        x_lo, x_hi = min(xs), max(xs)
-        m_l, m_r, m_t, m_b = 12.0, 58.0, 26.0, 24.0
-        w = max(cell.width() - m_l - m_r, 10.0)
-        h = max(cell.height() - m_t - m_b, 10.0)
-        k = min(w / max(x_hi - x_lo, 1.0), h / max(z_hi, 1.0))
-        pad = (w - (x_hi - x_lo) * k) / 2.0
-        oz = cell.top() + m_t + h
+    def _panel(self, p, cell, title, pn, ceiling, k, oz, m_x, ext):
+        x_lo, x_hi = ext
+        usable = max(cell.width() - 2 * m_x, 10.0)
+        pad = (usable - (x_hi - x_lo) * k) / 2.0
+        x0 = cell.left() + m_x + pad
         flip = pn["flip"]
 
-        def q(x, z):
-            along = (x_hi - x) if flip else (x - x_lo)
-            return QPointF(cell.left() + m_l + pad + along * k, oz - z * k)
+        def q(x, z, lo=x_lo, hi=x_hi):
+            along = (hi - x) if flip else (x - lo)
+            return QPointF(x0 + along * k, oz - z * k)
 
-        right_edge = cell.left() + m_l + pad + (x_hi - x_lo) * k
+        # the dashed DORMER-ROOF reference tent (a side panel only), centred
+        if pn.get("roof_ref"):
+            rlo, rhi = _extent(pn["roof_ref"])
+            rpad = (usable - (rhi - rlo) * k) / 2.0
+            rx0 = cell.left() + m_x + rpad
+
+            def qr(x, z):
+                return QPointF(rx0 + (x - rlo) * k, oz - z * k)
+            p.setPen(QPen(_REF, 1.0, Qt.PenStyle.DashLine))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawPolyline(QPolygonF([qr(x, z) for x, z in pn["roof_ref"]]))
+
+        # the wall
         if pn["has_wall"]:
             p.setPen(QPen(_INK, 1.2))
             p.setBrush(QBrush(_WALL))
@@ -139,22 +195,27 @@ class DormerFaceView(QWidget):
             p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawPolygon(QPolygonF([q(x, z) for x, z in pn["wall"]]))
 
+        # the floor and the ceiling line (shared scale -> straight across)
         p.setPen(QPen(_INK, 1.6))
-        p.drawLine(q(x_lo, 0.0), q(x_hi, 0.0))
+        p.drawLine(QPointF(cell.left() + m_x, oz),
+                   QPointF(cell.right() - m_x, oz))
         self._text(p, 8)
-        if ceiling is not None and ceiling < z_hi:
+        if ceiling is not None and ceiling * k < oz - cell.top():
+            cy = oz - ceiling * k
             p.setPen(QPen(_CEILING, 1.2, Qt.PenStyle.DashLine))
-            p.drawLine(q(x_lo, ceiling), q(x_hi, ceiling))
-            y = q(x_lo, ceiling).y()
-            lx = right_edge + 4
-            p.drawText(QRectF(lx, y - 8, max(cell.right() - lx - 2, 40.0), 16),
-                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                       f"ceiling {_fmt(ceiling)}")
+            p.drawLine(QPointF(cell.left() + m_x, cy),
+                       QPointF(cell.right() - m_x, cy))
+            if title == "Gable end":
+                p.drawText(QRectF(cell.left() + m_x, cy - 15,
+                                  cell.width() - 2 * m_x, 13),
+                           Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom,
+                           f"ceiling {_fmt(ceiling)}")
+
         if pn["host"]:
             p.setPen(QPen(_DIM, 1.4, Qt.PenStyle.DashDotLine))
             p.drawLine(q(*pn["host"][0]), q(*pn["host"][1]))
 
-        for o in ops:
+        for o in pn["openings"]:
             bad = o["through_roof"] or o["overlaps"] or o["off_wall"]
             p.setPen(QPen(_BAD if bad else _INK, 1.6 if bad else 1.1))
             p.setBrush(QBrush(_DOOR if o.get("kind") in ("door", "gate", "cased")
@@ -184,21 +245,22 @@ class DormerFaceView(QWidget):
                     label += f"\nsill {_fmt(o['sill_in'])}"
                 p.drawText(box, Qt.AlignmentFlag.AlignCenter, label.strip())
 
+        # the wall's own roof line (the cheek eave / the gable rake), solid
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.setPen(QPen(_INK, 2.4))
         p.drawPolyline(QPolygonF([q(x, z) for x, z in pn["roof"]]))
 
+        # the title
         p.setPen(QPen(_INK if pn["has_wall"] else _DIM))
         self._text(p, 8.5, bold=True)
-        note = "" if pn["has_wall"] else "  (no wall drawn)"
+        note = "" if pn["has_wall"] else "  (no wall)"
         p.drawText(QRectF(cell.left(), cell.top() + 4, cell.width(), 18),
                    Qt.AlignmentFlag.AlignCenter,
                    f"{title}{note}  -  {pn['label']}")
 
-        # a side view's face/gable end, labelled so its exterior orientation
-        # reads without ambiguity (Patrick, 0358)
+        # a side's face/gable end (toward the centre), labelled
         if pn.get("face_mark"):
-            fxp = q(pn["wall"][0][0], 0.0).x()     # y0 of the cheek: its face
+            fxp = q(pn["wall"][0][0], 0.0).x()
             p.setPen(QPen(_DIM))
             self._text(p, 7.5, bold=True)
             p.drawText(QRectF(fxp - 24, oz + 3, 48, 13),

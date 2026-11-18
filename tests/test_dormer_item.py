@@ -290,10 +290,10 @@ def test_the_knee_lines_are_held_during_a_knob_drag_and_settle_on_release(scene)
     assert isinstance(d._knees, list)
 
 
-# -- the dialog preview: the sides laid left/right as exterior views (0358) ----
-def test_dialog_lays_the_sides_left_and_right_as_exterior_views(scene):
-    # left cheek on the LEFT panel, right on the RIGHT, each its OWN exterior
-    # view (the face/gable end at the panel's outer edge), the face labelled.
+# -- the dialog preview: the gable flanked by the two sides (0358) ------------
+def test_dialog_flanks_the_gable_with_the_two_side_views(scene):
+    # row order left cheek | gable end | right cheek; each cheek an exterior
+    # view with its face toward the CENTRE and a dashed dormer-roof reference.
     _room(scene)
     d = _dormer(scene, pos=QPointF(150, 150),
                 state={"span_left_in": 60.0, "span_right_in": 60.0})
@@ -305,12 +305,13 @@ def test_dialog_lays_the_sides_left_and_right_as_exterior_views(scene):
     derived, _findings = DORMER.evaluate(d.params, ctx)
     view = DORMER.make_preview(None)
     view.set_data(d.params, derived, ctx)
-    panels = view.panels()
-    assert [t for t, _pn in panels] == ["Gable end", "Left side", "Right side"]
-    gable, left, right = (pn for _t, pn in panels)
-    # only the sides carry the face marker
-    assert gable["face_mark"] is False
+    row = view.panels()
+    assert [t for t, _pn in row] == ["Left side", "Gable end", "Right side"]
+    left, gable, right = (pn for _t, pn in row)
+    # the gable carries no face mark and no dashed roof reference; sides carry both
+    assert gable["face_mark"] is False and gable["roof_ref"] is None
     assert left["face_mark"] is True and right["face_mark"] is True
-    # exterior orientation: left cheek unflipped (face at its left edge), right
-    # cheek flipped (face at its right edge) -- faces point OUTWARD
-    assert left["flip"] is False and right["flip"] is True
+    assert left["roof_ref"] and right["roof_ref"]
+    # faces toward the centre: left cheek flipped (face at its right edge),
+    # right cheek unflipped (face at its left edge)
+    assert left["flip"] is True and right["flip"] is False
