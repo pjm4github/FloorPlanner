@@ -290,28 +290,44 @@ def test_the_knee_lines_are_held_during_a_knob_drag_and_settle_on_release(scene)
     assert isinstance(d._knees, list)
 
 
-# -- the dialog preview: the gable flanked by the two sides (0358) ------------
-def test_dialog_flanks_the_gable_with_the_two_side_views(scene):
-    # row order left cheek | gable end | right cheek; each cheek an exterior
-    # view with its face toward the CENTRE and a dashed dormer-roof reference.
+# -- the dialog preview: gable centred, side reads against the host roof (0360)-
+def test_dialog_drops_the_symmetric_right_side_and_shows_the_host_roof(scene):
+    # A symmetric dormer's right side is the left mirrored, so it is dropped:
+    # the row reads [left side | gable end]. The side carries the HOST ROOF's
+    # line (dashed, labelled) as its reference -- not a dormer-roof tent.
+    _host(scene)
     _room(scene)
     d = _dormer(scene, pos=QPointF(150, 150),
                 state={"span_left_in": 60.0, "span_right_in": 60.0})
-    for sx in (210, 90):                 # side guides dg x=+-60 -> scene 210/90
-        w = WallItem(QPointF(sx, 150), QPointF(sx, 80))
-        w.floor = DEFAULT_FLOOR
-        scene.addItem(w)
+    ctx = d.param_context()
+    derived, _findings = DORMER.evaluate(d.params, ctx)
+    view = DORMER.make_preview(None)
+    view.set_data(d.params, derived, ctx)
+    row = view.panels()
+    assert [t for t, _pn in row] == ["Left side", "Gable end"]
+    left, gable = (pn for _t, pn in row)
+    # the old dashed dormer-roof tent is gone from every panel
+    assert "roof_ref" not in left and "roof_ref" not in gable
+    # the gable carries no face mark and no host line; the side carries both
+    assert gable["face_mark"] is False and gable["host"] is None
+    assert left["face_mark"] is True and left["flip"] is True
+    # the side's reference IS the host roof line: two points, a real rise
+    assert isinstance(left["host"], list) and len(left["host"]) == 2
+
+
+def test_dialog_keeps_the_right_side_when_the_dormer_is_asymmetric(scene):
+    _host(scene)
+    _room(scene)
+    d = _dormer(scene, pos=QPointF(150, 150),
+                state={"symmetric": False, "span_left_in": 72.0,
+                       "span_right_in": 48.0})
     ctx = d.param_context()
     derived, _findings = DORMER.evaluate(d.params, ctx)
     view = DORMER.make_preview(None)
     view.set_data(d.params, derived, ctx)
     row = view.panels()
     assert [t for t, _pn in row] == ["Left side", "Gable end", "Right side"]
-    left, gable, right = (pn for _t, pn in row)
-    # the gable carries no face mark and no dashed roof reference; sides carry both
-    assert gable["face_mark"] is False and gable["roof_ref"] is None
-    assert left["face_mark"] is True and right["face_mark"] is True
-    assert left["roof_ref"] and right["roof_ref"]
-    # faces toward the centre: left cheek flipped (face at its right edge),
-    # right cheek unflipped (face at its left edge)
+    left, _gable, right = (pn for _t, pn in row)
+    # faces toward the centre: left cheek flipped, right cheek unflipped
     assert left["flip"] is True and right["flip"] is False
+    assert right["face_mark"] is True

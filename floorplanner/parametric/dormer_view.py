@@ -1,13 +1,16 @@
 """The dormer preview for the properties dialog (PyQt6): the GABLE END in the
-CENTRE with a SIDE elevation on each flank -- the dormer's box unfolded about
-the gable -- all drawn TO SCALE at ONE shared scale, so the level's floor and
-the orange ceiling line run straight across all three panels.
+CENTRE with a SIDE elevation beside it -- the dormer's box unfolded about the
+gable -- all drawn TO SCALE at ONE shared scale, so the level's floor and the
+orange ceiling line run straight across the panels, and the row JUSTIFIED to the
+TOP of the canvas (Patrick, 0360).
 
 The gable end shows the roof line, the floor, the ceiling line, the wall the
 user drew under the face (when there is one) and its windows and doors at their
-sill and head. Each SIDE shows that cheek wall with the host roof's line across
-it, and -- DASHED -- the dormer roof as a reference tent over it, so the short
-cheek wall reads against the full roof height. LOOK-ONLY (Patrick, 0356):
+sill and head. Each SIDE shows that cheek wall against the host roof's line --
+DASHED and labelled "host roof" -- the plane the dormer sits on, so the short
+cheek reads against the roof it interrupts. The right side is drawn only when the
+dormer is NOT symmetric; a symmetric dormer's right side is the left's mirror, so
+it is dropped (Patrick, 0360). LOOK-ONLY (Patrick, 0356):
 openings are edited on the wall in the plan. An opening ABOVE the ceiling line is
 legitimate (the gable rises above it) and is drawn like any other; one the roof
 line cuts is red. Every number is `dormer_geometry`'s (`face_profile`,
@@ -56,12 +59,14 @@ class DormerFaceView(QWidget):
 
     # -- what to draw --------------------------------------------------------
     def panels(self):
-        """[(title, panel)] in ROW order (left | gable | right). A panel:
-        `wall` and `roof` point lists `(across, z)`, `host` (a line or None),
-        `openings`, `has_wall`, `flip` (draw across right-to-left),
-        `roof_ref` (the dashed dormer-roof tent for a side, else None),
-        `face_mark` (a side, whose face/gable end -- toward the centre -- is
-        labelled)."""
+        """[(title, panel)] in ROW order (left | gable | [right]). A panel:
+        `wall` and `roof` point lists `(across, z)`, `host` (the host roof's
+        line, dashed and labelled -- a side only, else None), `openings`,
+        `has_wall`, `flip` (draw across right-to-left), `face_mark` (a side,
+        whose face/gable end -- toward the centre -- is labelled).
+
+        The right side is dropped when the dormer is symmetric (its right is
+        the left mirrored), so a symmetric dormer reads as [left | gable]."""
         d = self._derived
         if not d or not d.get("face_profile"):
             return []
@@ -70,10 +75,12 @@ class DormerFaceView(QWidget):
             "wall": prof["wall"], "roof": prof["roof"], "host": None,
             "openings": d.get("face_openings") or [],
             "has_wall": bool(d.get("face_wall")), "flip": False,
-            "roof_ref": None, "face_mark": False,
+            "face_mark": False,
             "label": f"ridge {_fmt(prof['peak'][1])} in"})
+        symmetric = bool((d.get("state") or {}).get("symmetric", True))
+        want = ("left",) if symmetric else ("left", "right")
         sides = {}
-        for side in ("left", "right"):
+        for side in want:
             info = (d.get("sides") or {}).get(side)
             if not info:
                 continue
@@ -84,9 +91,7 @@ class DormerFaceView(QWidget):
                 # the box unfolded about the gable: each cheek's face/gable end
                 # sits toward the CENTRE -- left cheek's face on its right (so
                 # flip), right cheek's on its left. Still each an exterior view.
-                "flip": side == "left",
-                "roof_ref": prof["roof"],      # the dormer roof, dashed
-                "face_mark": True,
+                "flip": side == "left", "face_mark": True,
                 "label": f"top {_fmt(sp['top'])} in"})
         return ([sides["left"]] if "left" in sides else []) + [gable] \
             + ([sides["right"]] if "right" in sides else [])
@@ -101,12 +106,7 @@ class DormerFaceView(QWidget):
     def _panel_x_extent(self, pn):
         pts = list(pn["wall"]) + list(pn["roof"])
         pts += [(o[k], 0.0) for o in pn["openings"] for k in ("x0", "x1")]
-        lo, hi = _extent(pts)
-        if pn.get("roof_ref"):             # the dashed tent is centred on 0
-            rlo, rhi = _extent(pn["roof_ref"])
-            half = max(hi - lo, rhi - rlo) / 2.0
-            return -half, half             # width = the wider of wall / tent
-        return lo, hi
+        return _extent(pts)
 
     def paintEvent(self, _event):
         p = QPainter(self)
@@ -124,8 +124,8 @@ class DormerFaceView(QWidget):
 
         def panel_zs(pn):
             zs = [z for _x, z in list(pn["wall"]) + list(pn["roof"])]
-            if pn.get("roof_ref"):
-                zs += [z for _x, z in pn["roof_ref"]]
+            if pn.get("host"):                 # the host line is the reference
+                zs += [z for _x, z in pn["host"]]
             zs += [o["head_in"] for o in pn["openings"]]
             return zs
         z_hi = max([z for _t, pn in row for z in panel_zs(pn)] + [1.0])
@@ -134,7 +134,6 @@ class DormerFaceView(QWidget):
         m_t, m_b = 30.0, 26.0                  # title / foot labels
         m_x = 10.0                             # a panel's side margin
         H_use = max(H - m_t - m_b, 10.0)
-        oz = m_t + H_use                       # ONE floor baseline, all panels
 
         n = len(row)
         if n == 3:
@@ -158,6 +157,11 @@ class DormerFaceView(QWidget):
             if hi - lo > 1e-6:
                 k = min(k, usable / (hi - lo))
 
+        # JUSTIFY TO THE TOP: the drawing is k * z_hi tall; drop ONE floor
+        # baseline that far below the top margin (never past the foot margin),
+        # so a width-limited row rides the top of the canvas, not its middle.
+        oz = m_t + min(z_hi * k, H_use)
+
         for i, (title, pn) in enumerate(row):
             cell = QRectF(lefts[i], 0.0, widths[i], H)
             self._panel(p, cell, title, pn, ceiling, k, oz, m_x, exts[i])
@@ -173,18 +177,6 @@ class DormerFaceView(QWidget):
         def q(x, z, lo=x_lo, hi=x_hi):
             along = (hi - x) if flip else (x - lo)
             return QPointF(x0 + along * k, oz - z * k)
-
-        # the dashed DORMER-ROOF reference tent (a side panel only), centred
-        if pn.get("roof_ref"):
-            rlo, rhi = _extent(pn["roof_ref"])
-            rpad = (usable - (rhi - rlo) * k) / 2.0
-            rx0 = cell.left() + m_x + rpad
-
-            def qr(x, z):
-                return QPointF(rx0 + (x - rlo) * k, oz - z * k)
-            p.setPen(QPen(_REF, 1.0, Qt.PenStyle.DashLine))
-            p.setBrush(Qt.BrushStyle.NoBrush)
-            p.drawPolyline(QPolygonF([qr(x, z) for x, z in pn["roof_ref"]]))
 
         # the wall
         if pn["has_wall"]:
@@ -211,9 +203,18 @@ class DormerFaceView(QWidget):
                            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom,
                            f"ceiling {_fmt(ceiling)}")
 
+        # the host roof's line -- the plane the dormer sits on -- dashed and
+        # labelled, the reference the short cheek reads against (Patrick, 0360)
         if pn["host"]:
-            p.setPen(QPen(_DIM, 1.4, Qt.PenStyle.DashDotLine))
-            p.drawLine(q(*pn["host"][0]), q(*pn["host"][1]))
+            a, b = q(*pn["host"][0]), q(*pn["host"][1])
+            p.setPen(QPen(_REF, 1.4, Qt.PenStyle.DashLine))
+            p.drawLine(a, b)
+            mid = QPointF((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0)
+            p.setPen(QPen(_DIM))
+            self._text(p, 7)
+            p.drawText(QRectF(mid.x() - 44, mid.y() - 15, 88, 12),
+                       Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom,
+                       "host roof")
 
         for o in pn["openings"]:
             bad = o["through_roof"] or o["overlaps"] or o["off_wall"]
