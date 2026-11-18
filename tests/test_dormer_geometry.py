@@ -239,31 +239,46 @@ def test_the_spec_keys_are_all_state_keys():
     assert by["span_right_in"].enabled({"form": "gable", "symmetric": False})
 
 
-def test_setting_the_ridge_height_floats_the_eaves():
+def test_ridge_is_the_anchor_last_edited_of_eaves_pitch_is_pinned():
     base = dg.normalize_state({})             # eaves 60, span 60, pitch 10 -> ridge 110
     assert dg.ridge_height(base) == pytest.approx(110.0)
-    norm = DORMER.normalize({**base, "ridge_h_in": 130.0})
-    assert norm["ridge_h_in"] == pytest.approx(130.0), "the field tracks the ridge"
-    assert norm["pitch_12"] == base["pitch_12"], "pitch held"
-    assert norm["span_left_in"] == base["span_left_in"], "half-width held"
-    assert norm["eaves_h_in"] == pytest.approx(80.0), "eaves took up the 20 in slack"
-    assert dg.ridge_height(norm) == pytest.approx(130.0)
-    # changing pitch holds the ridge and floats the eaves (ridge is the input)
-    norm2 = DORMER.normalize({**norm, "pitch_12": 12.0})
-    assert dg.ridge_height(norm2) == pytest.approx(130.0)
-    assert norm2["eaves_h_in"] == pytest.approx(130.0 - 60.0 * 12.0 / 12.0)  # 70
-    # to_state drops the virtual key and stores the floated eaves
-    st = DORMER.to_state(norm)
-    assert "ridge_h_in" not in st and set(st) == set(dg.STATE_DEFAULTS)
-    assert st["eaves_h_in"] == pytest.approx(80.0)
+
+    # EDIT PITCH -> the eaves give way, the ridge held
+    p = DORMER.normalize({**base, "_edited": "pitch_12",
+                          "ridge_h_in": 110.0, "pitch_12": 12.0})
+    assert p["_pinned"] == "pitch_12" and p["pitch_12"] == pytest.approx(12.0)
+    assert p["eaves_h_in"] == pytest.approx(110.0 - 60.0 * 12.0 / 12.0)   # 50
+    assert dg.ridge_height(p) == pytest.approx(110.0), "ridge anchored"
+
+    # EDIT EAVES -> the pitch gives way, the ridge held
+    e = DORMER.normalize({**base, "_edited": "eaves_h_in",
+                          "ridge_h_in": 110.0, "eaves_h_in": 80.0})
+    assert e["_pinned"] == "eaves_h_in" and e["eaves_h_in"] == pytest.approx(80.0)
+    assert e["pitch_12"] == pytest.approx((110.0 - 80.0) * 12.0 / 60.0)   # 6
+    assert dg.ridge_height(e) == pytest.approx(110.0), "ridge anchored"
+
+    # EDIT RIDGE after pitch was pinned -> the eaves give way (pitch held)
+    r = DORMER.normalize({**p, "_edited": "ridge_h_in", "ridge_h_in": 134.0})
+    assert r["pitch_12"] == pytest.approx(12.0), "pitch still pinned, held"
+    assert r["eaves_h_in"] == pytest.approx(134.0 - 60.0 * 12.0 / 12.0)   # 74
+    assert dg.ridge_height(r) == pytest.approx(134.0)
+
+    # EDIT RIDGE after eaves was pinned -> the pitch gives way (eaves held)
+    r2 = DORMER.normalize({**e, "_edited": "ridge_h_in", "ridge_h_in": 128.0})
+    assert r2["eaves_h_in"] == pytest.approx(80.0), "eaves still pinned, held"
+    assert r2["pitch_12"] == pytest.approx((128.0 - 80.0) * 12.0 / 60.0)  # 9.6
+    assert dg.ridge_height(r2) == pytest.approx(128.0)
 
 
-def test_the_eaves_field_is_a_readout_of_the_floated_value():
+def test_all_three_height_fields_are_editable_and_the_virtual_key_is_dropped():
     by = {s.key: s for s in DORMER.specs()}
-    assert by["ridge_h_in"].enabled({}), "the ridge is editable"
-    assert not by["eaves_h_in"].enabled({}), "the eaves is a readout"
-    v = DORMER.normalize({"ridge_h_in": 130.0})
-    assert by["eaves_h_in"].shown_fn(v, None, None) == pytest.approx(80.0)
+    assert by["ridge_h_in"].enabled({}) and by["eaves_h_in"].enabled({})
+    assert by["pitch_12"].enabled({}), "ridge, eaves and pitch all editable"
+    norm = DORMER.normalize({"_edited": "pitch_12", "ridge_h_in": 110.0,
+                             "pitch_12": 12.0})
+    st = DORMER.to_state(norm)                 # the virtual keys never store
+    assert "ridge_h_in" not in st and "_pinned" not in st
+    assert set(st) == set(dg.STATE_DEFAULTS)
 
 
 def test_the_roof_codes_own_reader_agrees_with_this_calculator():

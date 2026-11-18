@@ -80,19 +80,16 @@ class DormerKind(ParametricKind):
                  enabled=_free_right),
             ParamSpec("ridge_h_in", "Ridge height", FLOAT, dg.ridge_height(d),
                       unit="in", minimum=0.0, maximum=600.0, step=0.5,
-                      tooltip="The ridge above THIS level's floor. Setting it "
-                              "FLOATS the eaves -- the pitch and the half-width "
-                              "hold, so the whole roof slides up or down."),
-            ParamSpec("eaves_h_in", "Eaves height", FLOAT, d["eaves_h_in"],
-                      unit="in", minimum=0.0, maximum=360.0, step=0.5,
-                      enabled_fn=lambda _v: False,
-                      shown_fn=lambda v, _d, _c: v.get("eaves_h_in"),
-                      tooltip="The eaves line above THIS level's floor. A "
-                              "readout now: it floats as you set the ridge, the "
-                              "pitch and the half-width held."),
+                      tooltip="The ridge above THIS level's floor -- the ANCHOR. "
+                              "Edit it and whichever of the eaves / pitch you did "
+                              "NOT set last gives way to hold the geometry."),
+            size("eaves_h_in", "Eaves height", 0.0, 360.0, 0.5,
+                 "The eaves line above THIS level's floor. Edit it and the PITCH "
+                 "gives way, the ridge held."),
             ParamSpec("pitch_12", "Pitch", FLOAT, d["pitch_12"], unit="in 12",
                       minimum=0.5, maximum=24.0, step=0.5,
-                      tooltip="Rise per 12 in of run, on the left plane."),
+                      tooltip="Rise per 12 in of run, on the left plane. Edit it "
+                              "and the EAVES give way, the ridge held."),
             size("eave_overhang_left_in", "Eave overhang, left", 0.0, 60.0,
                  tip="Knob E."),
             size("eave_overhang_right_in", "Eave overhang, right", 0.0, 60.0,
@@ -114,22 +111,37 @@ class DormerKind(ParametricKind):
         ]
 
     def normalize(self, state):
-        # `ridge_h_in` is a DIALOG input, not a stored key: setting it FLOATS
-        # the eaves (pitch + half-width held) so the roof slides up or down.
-        # The eaves stays the one free height in the state; `to_state` drops
-        # the virtual key. The ridge is exposed back so the field tracks it.
+        # Ridge, eaves and pitch are all editable; the RIDGE is the ANCHOR.
+        # Between eaves and pitch, whichever was edited LAST is pinned and the
+        # other FLOATS to hold the ridge (Patrick, 2026-11-18):
+        #   edit pitch -> eaves floats;  edit eaves -> pitch floats;
+        #   edit ridge -> the one NOT pinned floats.
+        # `ridge_h_in` is a dialog-only input `to_state` drops; `_pinned`
+        # remembers the last of {eaves, pitch} the user set. `_edited` is the
+        # dialog's hint of the field just changed.
         st = dict(state or {})
+        edited = st.pop("_edited", None)
         ridge = st.pop("ridge_h_in", None)
+        pinned = st.pop("_pinned", None)
+        if edited in ("eaves_h_in", "pitch_12"):
+            pinned = edited
+        if pinned not in ("eaves_h_in", "pitch_12"):
+            pinned = "pitch_12"             # default: pitch pinned, eaves floats
         norm = dg.normalize_state(st)
-        if ridge is not None:
+        span = norm["span_left_in"]
+        if ridge is not None and span > 1e-9:
             try:
-                eaves = float(ridge) - norm["span_left_in"] * norm["pitch_12"] / 12.0
-                norm["eaves_h_in"] = max(eaves, 0.0)
+                ridge = float(ridge)
+                if pinned == "pitch_12":    # pitch held, eaves takes the slack
+                    norm["eaves_h_in"] = max(ridge - span * norm["pitch_12"] / 12.0, 0.0)
+                else:                       # eaves held, pitch takes the slack
+                    norm["pitch_12"] = max((ridge - norm["eaves_h_in"]) * 12.0 / span, 0.5)
                 norm = dg.normalize_state(norm)
             except (TypeError, ValueError):
                 pass
         norm = dict(norm)
         norm["ridge_h_in"] = dg.ridge_height(norm)
+        norm["_pinned"] = pinned
         return norm
 
     def to_state(self, values):
