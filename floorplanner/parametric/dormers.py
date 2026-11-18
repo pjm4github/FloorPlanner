@@ -31,12 +31,10 @@ def _fmt(x, places=2):
     return f"{x:.{places}f}".rstrip("0").rstrip(".")
 
 
-def _gable(values):
-    return values.get("form") != "shed"
-
-
 def _free_right(values):
-    return _gable(values) and not values.get("symmetric")
+    # a shed and a gable both have two sides; the right follows the left until
+    # the dormer is made asymmetric (Patrick, 2026-11-18).
+    return not values.get("symmetric")
 
 
 def _host(context):
@@ -69,10 +67,11 @@ class DormerKind(ParametricKind):
         return [
             ParamSpec("form", "Form", ENUM, d["form"],
                       choices=(("gable", "Gable"), ("shed", "Shed")),
-                      tooltip="A shed has one plane: the ridge is its high "
-                              "edge and it falls to the left."),
+                      tooltip="A gable has two planes meeting at a ridge. A "
+                              "SHED has one plane rising from the face back to "
+                              "a high ridge at the back, where it meets the "
+                              "host roof -- shallower than the host."),
             ParamSpec("symmetric", "Symmetric", BOOL, d["symmetric"],
-                      enabled_fn=_gable,
                       tooltip="The right side takes the left side's numbers."),
             size("span_left_in", "Half-width, left", dg.MIN_SPAN_IN, 480.0,
                  tip="Ridge to the eaves line (knob B / G)."),
@@ -158,7 +157,7 @@ class DormerKind(ParametricKind):
             return None, findings
         z_face, slope = _host(context)
         ceiling = _ceiling(context)
-        rh = dg.ridge_height(st)
+        rh = dg.back_height(st, z_face, slope)   # a shed's ridge needs the host
         depth, met = dg.ridge_depth(st, z_face, slope)
         derived = {
             "state": st, "ridge_h_in": rh, "slopes": dg.slopes(st),
@@ -201,6 +200,13 @@ class DormerKind(ParametricKind):
                 f"{_fmt(fitted['span_left_in'])} in a side, lower the pitch, "
                 "or lower the eaves.", actual=rh, limit=float(host_ridge),
                 field="span_left_in"))
+        elif why == dg.TOO_STEEP:
+            findings.append(Finding(
+                "dormer.too_steep", ERROR,
+                f"This shed dormer's slope ({_fmt(st['pitch_12'])} in 12) is "
+                f"not shallower than the host roof ({_fmt(slope * 12.0)} in 12), "
+                "so its back never dies into the host. Lower the pitch.",
+                actual=st["pitch_12"], limit=slope * 12.0, field="pitch_12"))
         if ceiling is not None and derived["full_height_in"] <= 0.0:
             findings.append(Finding(
                 "dormer.no_full_height", ADVISORY,
@@ -212,9 +218,10 @@ class DormerKind(ParametricKind):
 
     @staticmethod
     def _face(st, context, ceiling, derived, findings):
-        """The gable end and what stands in it (0356)."""
+        """The gable end (or shed front) and what stands in it (0356)."""
+        z_face, slope = _host(context)
         wall = context.get("face_wall")
-        derived["face_profile"] = dg.face_profile(st)
+        derived["face_profile"] = dg.face_profile(st, z_face, slope)
         derived["face_wall"] = tuple(wall) if wall else None
         derived["face_openings"] = dg.face_openings(
             st, context.get("face_openings") or [], ceiling,

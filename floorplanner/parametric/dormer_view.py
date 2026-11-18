@@ -27,6 +27,7 @@ _INK = QColor(31, 41, 55)
 _DIM = QColor(71, 85, 105)
 _REF = QColor(150, 160, 175)           # the dashed dormer-roof reference
 _WALL = QColor(241, 245, 249)
+_ROOFBAND = QColor(224, 226, 230)      # a shed's roof seen end-on, filled
 _GLASS = QColor(205, 225, 245)
 _DOOR = QColor(226, 214, 196)
 _BAD = QColor(185, 28, 28)
@@ -73,13 +74,18 @@ class DormerFaceView(QWidget):
         if not d or not d.get("face_profile"):
             return []
         prof = d["face_profile"]
-        gable = ("Gable end", {
+        state = d.get("state") or {}
+        shed = state.get("form") == "shed"
+        gable = ("Front" if shed else "Gable end", {
             "wall": prof["wall"], "roof": prof["roof"], "host": None,
             "openings": d.get("face_openings") or [],
             "has_wall": bool(d.get("face_wall")), "flip": False,
-            "face_mark": False,
+            "face_mark": False, "roof_fill": shed,   # the shed's roof band, filled
             "label": f"ridge {_fmt(prof['peak'][1])} in"})
-        symmetric = bool((d.get("state") or {}).get("symmetric", True))
+        # ONE side beside the face: a symmetric gable's right is the left
+        # mirrored, and a symmetric SHED's two sides read the same trapezoid,
+        # so both drop to [left | front]; a free (asymmetric) dormer shows both.
+        symmetric = bool(state.get("symmetric", True))
         want = ("left",) if symmetric else ("left", "right")
         sides = {}
         for side in want:
@@ -264,7 +270,13 @@ class DormerFaceView(QWidget):
                     label += f"\nsill {_fmt(o['sill_in'])}"
                 p.drawText(box, Qt.AlignmentFlag.AlignCenter, label.strip())
 
-        # the wall's own roof line (the cheek eave / the gable rake), solid
+        # the wall's own roof line (the cheek eave / the gable rake), solid.
+        # A shed's FRONT draws its roof as a FILLED BAND (the single plane seen
+        # end-on, from the eaves up to the back ridge) behind the outline.
+        if pn.get("roof_fill"):
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(_ROOFBAND))
+            p.drawPolygon(QPolygonF([q(x, z) for x, z in pn["roof"]]))
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.setPen(QPen(_INK, 2.4))
         p.drawPolyline(QPolygonF([q(x, z) for x, z in pn["roof"]]))

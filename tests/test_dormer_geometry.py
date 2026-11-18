@@ -39,12 +39,25 @@ def test_symmetric_copies_the_left_side_and_free_keeps_both():
     assert sl * 72.0 == pytest.approx(sr * 40.0), "one ridge, one eaves height"
 
 
-def test_a_shed_has_one_plane():
-    st = _st(form="shed", span_right_in=50.0, symmetric=True)
-    assert st["span_right_in"] == 0.0 and st["symmetric"] is False
-    assert dg.slopes(st)[1] == 0.0
-    assert len(dg.plan(st)["eaves"]) == 1
-    assert len(dg.knee_lines(st, 90.0, *HOST)) <= 1
+def test_a_shed_rises_from_the_face_to_a_back_ridge_on_the_host():
+    # The new shed (Patrick, 2026-11-18): one plane LEVEL across the width,
+    # rising from the FACE back to a high ridge at the back where it meets the
+    # host; two symmetric side walls; the only host contact is the back ridge.
+    st = _st(form="shed", eaves_h_in=84.0, pitch_12=8.0, symmetric=True)
+    assert st["span_right_in"] == st["span_left_in"], "a shed keeps both sides"
+    assert dg.slopes(st) == pytest.approx((8.0 / 12.0, 8.0 / 12.0)), "one slope, along depth"
+    # it meets a steeper host at a single back depth; no side valleys
+    depth, back, met = dg.shed_back(st, 48.0, 0.79)
+    assert met and depth == pytest.approx((84.0 - 48.0) / (0.79 - 8.0 / 12.0))
+    assert back == pytest.approx(84.0 + (8.0 / 12.0) * depth)
+    assert dg.valley_lines(st, 48.0, 0.79) == {}
+    assert dg.back_height(st, 48.0, 0.79) == pytest.approx(back)
+    # one knee line, ACROSS the width, where the plane crosses the ceiling
+    knees = dg.knee_lines(st, 96.0, 48.0, 0.79)
+    assert len(knees) == 1
+    (x0, y), (x1, _y) = knees[0]
+    assert x0 == pytest.approx(-st["span_right_in"]) and x1 == pytest.approx(st["span_left_in"])
+    assert y == pytest.approx((96.0 - 84.0) / (8.0 / 12.0))
 
 
 def test_bad_values_fall_back_and_unknown_keys_survive():
@@ -233,9 +246,12 @@ def test_the_spec_keys_are_all_state_keys():
     # every spec maps to a stored key, EXCEPT `ridge_h_in` -- a dialog input
     # that floats the eaves; `to_state` drops it (test_..._floats_the_eaves).
     assert {s.key for s in DORMER.specs()} <= set(dg.STATE_DEFAULTS) | {"ridge_h_in"}
-    v = {"form": "shed"}
     by = {s.key: s for s in DORMER.specs()}
-    assert not by["span_right_in"].enabled(v) and not by["symmetric"].enabled(v)
+    # symmetric is editable for a shed too now; the right side follows the left
+    # until asymmetric, for BOTH forms (Patrick, 2026-11-18).
+    assert by["symmetric"].enabled({"form": "shed"})
+    assert not by["span_right_in"].enabled({"symmetric": True})
+    assert by["span_right_in"].enabled({"form": "shed", "symmetric": False})
     assert by["span_right_in"].enabled({"form": "gable", "symmetric": False})
 
 
@@ -331,8 +347,11 @@ def test_the_face_profile_is_the_gable_between_the_guides():
     assert prof["roof"] == [(-72.0, 50.0), (0.0, 110.0), (72.0, 50.0)]
     assert prof["wall"] == [(60.0, 0.0), (60.0, 60.0), (0.0, 110.0),
                             (-60.0, 60.0), (-60.0, 0.0)]
-    shed = dg.face_profile(_st(form="shed"))
-    assert shed["roof"][0] == (0.0, 110.0) and shed["wall"][-1] == (0.0, 0.0)
+    shed = dg.face_profile(_st(form="shed"))         # a rectangular face + roof band
+    back = dg.back_height(_st(form="shed"))          # 60 + (10/12)*96 = 140
+    assert shed["peak"] == (0.0, pytest.approx(back))
+    assert shed["wall"] == [(60.0, 0.0), (60.0, 60.0), (-60.0, 60.0), (-60.0, 0.0)]
+    assert shed["roof"][0] == (72.0, 60.0) and shed["roof"][1] == (72.0, pytest.approx(back))
 
 
 def test_a_window_above_the_ceiling_line_is_allowed_and_said():
@@ -350,8 +369,11 @@ def test_an_opening_the_roof_line_cuts_is_flagged():
     assert ok["through_roof"] is False
     (cut,) = dg.face_openings(st, [_op(-30.0, 30.0, 30.0, 86.0)])
     assert cut["through_roof"] is True
-    (shed_side,) = dg.face_openings(_st(form="shed"), [_op(-20.0, 10.0, 30.0, 60.0)])
-    assert shed_side["through_roof"] is True, "a shed has no roof on its high side"
+    # the shed FRONT caps at the eaves (60): a head above it cuts the roof band
+    (shed_cut,) = dg.face_openings(_st(form="shed"), [_op(-20.0, 10.0, 30.0, 70.0)])
+    assert shed_cut["through_roof"] is True, "the shed face caps at the eaves"
+    (shed_ok,) = dg.face_openings(_st(form="shed"), [_op(-20.0, 10.0, 30.0, 58.0)])
+    assert shed_ok["through_roof"] is False
 
 
 def test_stacked_openings_do_not_overlap_but_crossing_ones_do():
@@ -454,10 +476,19 @@ def test_the_side_shows_the_dormer_roof_as_a_hidden_true_projection():
     assert free["ridge"][2][0] == free["ridge"][3][0] == st["depth_in"]
 
 
-def test_a_sheds_high_side_is_a_wall_under_the_ridge():
-    st = _st(form="shed")
-    assert dg.side_x(st, "right") == 0.0
-    assert dg.side_top(st, "right") == dg.ridge_height(st)
+def test_a_shed_side_is_a_trapezoid_low_at_the_face_high_at_the_back():
+    # the new shed side (Patrick, 2026-11-18): a trapezoid, eaves at the face
+    # rising to the back ridge on the host; the roof is the visible sloping top
+    # (no hidden ridge line), the host diagonal the reference.
+    st = _st(form="shed", eaves_h_in=84.0, pitch_12=8.0)
+    sp = dg.side_profile(st, "left", 48.0, 0.79)
+    depth, back, _met = dg.shed_back(st, 48.0, 0.79)
+    assert sp["ridge"] is None, "the shed roof is visible, not a hidden line"
+    assert sp["wall"] == [(0.0, 0.0), (0.0, 84.0),
+                          (pytest.approx(depth), pytest.approx(back)), (pytest.approx(depth), 0.0)]
+    assert sp["roof"][1] == (pytest.approx(depth), pytest.approx(back))
+    assert sp["host"][0] == (0.0, 48.0)          # host below the eaves at the face
+    assert sp["host"][1] == (pytest.approx(depth), pytest.approx(back)), "meets at the back"
 
 
 def test_a_wall_on_a_side_guide_projects_and_a_face_wall_does_not():

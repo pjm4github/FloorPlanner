@@ -66,22 +66,20 @@ def normalize_state(state):
         except (TypeError, ValueError):
             v = STATE_DEFAULTS[key]
         out[key] = v if math.isfinite(v) else STATE_DEFAULTS[key]
+    # A shed and a gable SHARE their box: both have two side walls, symmetric
+    # by default (Patrick, 2026-11-18 -- the shed's left/right controls work on
+    # both sides). They differ only in the ROOF: a gable has two planes meeting
+    # at a ridge that runs along the depth; a SHED has ONE plane, level across
+    # the width, that rises from the FACE back along the depth to a high ridge
+    # at the back -- the only line that touches the host roof.
     out["span_left_in"] = max(out["span_left_in"], MIN_SPAN_IN)
-    if out["form"] == "shed":
-        # one plane: the ridge is the high edge, the roof falls to the LEFT
-        out["span_right_in"] = 0.0
-        out["eave_overhang_right_in"] = 0.0
-        out["guide_right_in"] = 0.0
-        out["box_right_in"] = 0.0
-        out["symmetric"] = False
-    else:
-        out["span_right_in"] = max(out["span_right_in"], MIN_SPAN_IN)
-        if out["symmetric"]:
-            for a, b in (("span_left_in", "span_right_in"),
-                         ("eave_overhang_left_in", "eave_overhang_right_in"),
-                         ("guide_left_in", "guide_right_in"),
-                         ("box_left_in", "box_right_in")):
-                out[b] = out[a]
+    out["span_right_in"] = max(out["span_right_in"], MIN_SPAN_IN)
+    if out["symmetric"]:
+        for a, b in (("span_left_in", "span_right_in"),
+                     ("eave_overhang_left_in", "eave_overhang_right_in"),
+                     ("guide_left_in", "guide_right_in"),
+                     ("box_left_in", "box_right_in")):
+            out[b] = out[a]
     for key in ("eave_overhang_left_in", "eave_overhang_right_in",
                 "face_overhang_in", "guide_left_in", "guide_right_in",
                 "guide_face_in", "box_left_in", "box_right_in", "pitch_12"):
@@ -133,24 +131,28 @@ def fit_under_ridge(state, host_ridge_in, clear=RIDGE_CLEAR_IN):
 
 
 # what stops a dormer being BUILT, as opposed to merely being worth a note
-OVER_RIDGE = "over_ridge"          # its ridge is above the host's ridge
+OVER_RIDGE = "over_ridge"          # a GABLE's ridge is above the host's ridge
 FACES_UPHILL = "faces_uphill"      # the host does not rise along its ridge
+TOO_STEEP = "too_steep"            # a SHED's plane is not shallower than the host
 
 
 def unbuildable(st, host_z_face=None, host_slope=None, host_ridge_in=None):
     """Why this dormer must NOT be built on this host -- `OVER_RIDGE`,
-    `FACES_UPHILL` -- or None. ONE RULE FOR THE DIALOG AND THE 3D BUILDER
-    (0359): what the dialog refuses, the builder skips.
+    `FACES_UPHILL`, `TOO_STEEP` -- or None. ONE RULE FOR THE DIALOG AND THE 3D
+    BUILDER (0359): what the dialog refuses, the builder skips.
 
-    A ridge AT the host's ridge height is allowed (ridge to ridge is an
-    ordinary cross gable). With no host there is nothing to be wrong about:
-    None. `OVER_RIDGE` is also the "dormer astride the main ridge" case: on a
-    plane rising at `host_slope`, a ridge higher than the host's meets it
-    only beyond the host's own ridge line."""
+    A GABLE's ridge AT the host's ridge height is allowed (ridge to ridge is an
+    ordinary cross gable); above it is `OVER_RIDGE` (also the astride-the-ridge
+    case). A SHED is different (Patrick, 2026-11-18): it touches the host only
+    along its back ridge, so it MAY sit above the host ridge -- but its plane
+    must be SHALLOWER than the host (`TOO_STEEP` otherwise) or it never dies
+    into the host. With no host there is nothing to be wrong about: None."""
     if host_z_face is None or host_slope is None:
         return None
     if host_slope <= _EPS:
         return FACES_UPHILL
+    if st["form"] == "shed":
+        return TOO_STEEP if _rise(st) >= host_slope - _EPS else None
     if host_ridge_in is not None and ridge_height(st) > float(host_ridge_in) + 1e-6:
         return OVER_RIDGE
     return None
@@ -163,14 +165,26 @@ def spans(st):
     return st["span_left_in"], st["span_right_in"]
 
 
+def _rise(st):
+    """Rise per inch of the dormer's own roof slope (pitch-12 as a ratio)."""
+    return st["pitch_12"] / 12.0
+
+
 def ridge_height(st):
-    """Above the dormer's level. The pitch is the LEFT plane's."""
+    """Above the dormer's level. For a gable the pitch is the LEFT plane's,
+    rising across the half-width; for a SHED the single plane rises along the
+    DEPTH, so its back ridge is host-free the stored `depth_in` away."""
+    if st["form"] == "shed":
+        return st["eaves_h_in"] + _rise(st) * st["depth_in"]
     return st["eaves_h_in"] + st["span_left_in"] * st["pitch_12"] / 12.0
 
 
 def slopes(st):
-    """(left, right) rise per inch of run. Both planes fall from one ridge
-    to one eaves height, so unequal spans mean unequal slopes."""
+    """(left, right) rise per inch of run. A SHED's single plane has the one
+    slope both sides; a gable's two planes fall from one ridge to one eaves
+    height, so unequal spans mean unequal slopes."""
+    if st["form"] == "shed":
+        return _rise(st), _rise(st)
     rise = ridge_height(st) - st["eaves_h_in"]
     left, right = spans(st)
     return (rise / left if left > _EPS else 0.0,
@@ -178,9 +192,34 @@ def slopes(st):
 
 
 def surface_height(st, x):
-    """The dormer roof's height at local across-coordinate `x` (left +)."""
+    """The dormer roof's height at local across-coordinate `x` (left +). A
+    SHED's roof is level across the width -- at the FACE it is the eaves."""
+    if st["form"] == "shed":
+        return st["eaves_h_in"]
     sl, sr = slopes(st)
     return ridge_height(st) - (sl * x if x >= 0.0 else sr * -x)
+
+
+def shed_back(st, host_z_face=None, host_slope=None):
+    """A SHED's single plane rises from the FACE back along the depth; its high
+    back edge -- the ridge -- meets the host as ONE line. Returns (depth,
+    ridge_height, met): where it meets (or the stored `depth_in` with no host),
+    the back height there, and whether it met a host. To meet, the dormer must
+    be SHALLOWER than the host (Patrick, 2026-11-18)."""
+    rise, eaves = _rise(st), st["eaves_h_in"]
+    if (host_z_face is not None and host_slope is not None
+            and host_slope - rise > _EPS and eaves - host_z_face > _EPS):
+        y = (eaves - host_z_face) / (host_slope - rise)
+        return y, eaves + rise * y, True
+    return st["depth_in"], eaves + rise * st["depth_in"], False
+
+
+def back_height(st, host_z_face=None, host_slope=None):
+    """The dormer's high edge above its level: a gable's ridge (host-free), or
+    a shed's back edge where it meets the host (or its stored depth)."""
+    if st["form"] == "shed":
+        return shed_back(st, host_z_face, host_slope)[1]
+    return ridge_height(st)
 
 
 # --------------------------------------------------------------------------
@@ -199,9 +238,13 @@ def host_plane(surface_height_at, pos, direction, step=12.0):
 
 
 def ridge_depth(st, host_z_face=None, host_slope=None):
-    """How far the ridge runs before it meets the host -- or the stored
-    `depth_in` when there is no host, or the host never rises to the ridge.
+    """How far the ridge runs (gable) / how deep the plane reaches (shed)
+    before it meets the host -- or the stored `depth_in` with no host. A
+    shed's back edge meets the host where the shallower plane catches it.
     Returns (depth, met)."""
+    if st["form"] == "shed":
+        y, _rh, met = shed_back(st, host_z_face, host_slope)
+        return y, met
     if host_z_face is None or host_slope is None or host_slope <= _EPS:
         return st["depth_in"], False
     gap = ridge_height(st) - host_z_face
@@ -220,7 +263,11 @@ def valley_lines(st, host_z_face=None, host_slope=None):
     `{"left": [(x, y), (x, y)], "right": [...]}`, each from its outer end to
     the ridge's end. A side whose eave stands ABOVE the host at the face has
     a CHEEK: the valley then starts back from the face, at the point the host
-    climbs to the dormer's eaves height. `{}` with no host."""
+    climbs to the dormer's eaves height. `{}` with no host, or for a SHED --
+    whose single plane touches the host only along its back ridge, not down
+    the sides (Patrick, 2026-11-18)."""
+    if st["form"] == "shed":
+        return {}
     depth, met = ridge_depth(st, host_z_face, host_slope)
     if not met or depth <= _EPS:
         return {}
@@ -246,10 +293,20 @@ def knee_lines(st, ceiling_in, host_z_face=None, host_slope=None):
     None on a side whose eaves-start line is already at or above the ceiling
     -- the room is full height right out to that side -- and none at all
     when the ceiling is at or above the ridge."""
-    rh = ridge_height(st)
+    rh = back_height(st, host_z_face, host_slope)
     if ceiling_in >= rh - _EPS:
         return []
     depth, met = ridge_depth(st, host_z_face, host_slope)
+    if st["form"] == "shed":
+        # the single plane rises along the depth; it crosses the ceiling on ONE
+        # line ACROSS the width, at the depth where z(y) reaches the ceiling.
+        rise = _rise(st)
+        if rise <= _EPS:
+            return []
+        y = (ceiling_in - st["eaves_h_in"]) / rise
+        if y <= _EPS or y >= depth - _EPS:
+            return []
+        return [((-st["span_right_in"], y), (st["span_left_in"], y))]
     out = []
     for sign, span, slope in ((1.0, st["span_left_in"], slopes(st)[0]),
                               (-1.0, st["span_right_in"], slopes(st)[1])):
@@ -267,10 +324,14 @@ def knee_lines(st, ceiling_in, host_z_face=None, host_slope=None):
 
 
 def full_height_width(st, ceiling_in):
-    """Width under the dormer where the roof is at or above `ceiling_in`."""
+    """Width under the dormer where the roof is at or above `ceiling_in`. A
+    SHED is full WIDTH behind its knee, so its full-height measure is the
+    whole width once the back rises above the ceiling."""
     rh = ridge_height(st)
     if ceiling_in >= rh - _EPS:
         return 0.0
+    if st["form"] == "shed":
+        return st["span_left_in"] + st["span_right_in"]
     total = 0.0
     for span, slope in zip(spans(st), slopes(st), strict=False):
         if span > _EPS and slope > _EPS:
@@ -349,16 +410,29 @@ def roof_height_at(st, x):
     return surface_height(st, x)
 
 
-def face_profile(st):
-    """The gable end in ELEVATION, seen from OUTSIDE: points `(x, z)`, x the
-    across-coordinate (the ridge's left is the viewer's RIGHT), z above the
-    dormer's level.
+def face_profile(st, host_z_face=None, host_slope=None):
+    """The gable end (or the shed FRONT) in ELEVATION, seen from OUTSIDE:
+    points `(x, z)`, x the across-coordinate (the ridge's left is the viewer's
+    RIGHT), z above the dormer's level.
 
         roof      the roof line, eave to peak to eave, overhangs included
         wall      the outline a face wall fills between the side guides:
                   floor, up each guide, along the roof line through the peak
         peak      (x, z) of the ridge
-    """
+
+    A SHED reads front-on as a RECTANGULAR face wall (to the eaves) with the
+    single roof plane behind it drawn as a band up to the back ridge, level
+    across the width (Patrick, 2026-11-18). The back ridge needs the host, so
+    a shed face takes the host plane; a gable ignores it."""
+    if st["form"] == "shed":
+        eaves = st["eaves_h_in"]
+        back = back_height(st, host_z_face, host_slope)
+        gl, gr, _gf = guides(st)
+        left = st["span_left_in"] + st["eave_overhang_left_in"]
+        right = st["span_right_in"] + st["eave_overhang_right_in"]
+        wall = [(gl, 0.0), (gl, eaves), (-gr, eaves), (-gr, 0.0)]
+        roof = [(left, eaves), (left, back), (-right, back), (-right, eaves)]
+        return {"roof": roof, "wall": wall, "peak": (0.0, back)}
     rh = ridge_height(st)
     sl, sr = slopes(st)
     gl, gr, _gf = guides(st)
@@ -497,7 +571,21 @@ def side_profile(st, side, host_z_face=None, host_slope=None):
                 overhang, the back dying into the host roof. A true left
                 projection, not just the cheek wall (Patrick, 0361)
         span    (y0, y1) of the wall;  top  its height
-    """
+
+    A SHED side is a TRAPEZOID -- low at the face, high at the back where the
+    single plane meets the host; its roof is the VISIBLE sloping top (no hidden
+    ridge line) and the host diagonal is the reference (Patrick, 2026-11-18)."""
+    if st["form"] == "shed":
+        eaves = st["eaves_h_in"]
+        fo = st["face_overhang_in"]
+        rise = _rise(st)
+        depth, back, met = shed_back(st, host_z_face, host_slope)
+        host = ([(0.0, host_z_face), (depth, host_z_face + host_slope * depth)]
+                if met else None)
+        return {
+            "wall": [(0.0, 0.0), (0.0, eaves), (depth, back), (depth, 0.0)],
+            "roof": [(-fo, eaves - rise * fo), (depth, back)],
+            "host": host, "ridge": None, "span": (0.0, depth), "top": back}
     top = side_top(st, side)
     rh = ridge_height(st)
     fo = st["face_overhang_in"]
