@@ -288,3 +288,29 @@ def test_the_knee_lines_are_held_during_a_knob_drag_and_settle_on_release(scene)
     d.end_knob("span_l", QPointF(150 + 40, 150))
     # settled now: a valid (possibly changed) list, no crash
     assert isinstance(d._knees, list)
+
+
+# -- the dialog preview: the sides laid left/right as exterior views (0358) ----
+def test_dialog_lays_the_sides_left_and_right_as_exterior_views(scene):
+    # left cheek on the LEFT panel, right on the RIGHT, each its OWN exterior
+    # view (the face/gable end at the panel's outer edge), the face labelled.
+    _room(scene)
+    d = _dormer(scene, pos=QPointF(150, 150),
+                state={"span_left_in": 60.0, "span_right_in": 60.0})
+    for sx in (210, 90):                 # side guides dg x=+-60 -> scene 210/90
+        w = WallItem(QPointF(sx, 150), QPointF(sx, 80))
+        w.floor = DEFAULT_FLOOR
+        scene.addItem(w)
+    ctx = d.param_context()
+    derived, _findings = DORMER.evaluate(d.params, ctx)
+    view = DORMER.make_preview(None)
+    view.set_data(d.params, derived, ctx)
+    panels = view.panels()
+    assert [t for t, _pn in panels] == ["Gable end", "Left side", "Right side"]
+    gable, left, right = (pn for _t, pn in panels)
+    # only the sides carry the face marker
+    assert gable["face_mark"] is False
+    assert left["face_mark"] is True and right["face_mark"] is True
+    # exterior orientation: left cheek unflipped (face at its left edge), right
+    # cheek flipped (face at its right edge) -- faces point OUTWARD
+    assert left["flip"] is False and right["flip"] is True

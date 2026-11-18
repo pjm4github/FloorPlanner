@@ -51,7 +51,8 @@ class DormerFaceView(QWidget):
         """[(title, panel)] -- plain data, so a test can read what would be
         painted without painting it. A panel: `wall` and `roof` point lists
         `(across, z)`, `host` (a line or None), `openings`, `has_wall`,
-        `flip` (draw across-coordinates right to left)."""
+        `flip` (draw across-coordinates right to left), `face_mark` (a side
+        panel, whose face/gable end is labelled)."""
         d = self._derived
         if not d or not d.get("face_profile"):
             return []
@@ -60,8 +61,10 @@ class DormerFaceView(QWidget):
             "wall": prof["wall"], "roof": prof["roof"], "host": None,
             "openings": d.get("face_openings") or [],
             "has_wall": bool(d.get("face_wall")), "flip": False,
+            "face_mark": False,
             "label": f"ridge {_fmt(prof['peak'][1])} in"})]
-        for side in ("right", "left"):
+        # left cheek on the LEFT, right cheek on the RIGHT (Patrick, 0358)
+        for side in ("left", "right"):
             info = (d.get("sides") or {}).get(side)
             if not info:
                 continue
@@ -69,8 +72,12 @@ class DormerFaceView(QWidget):
             out.append((f"{side.capitalize()} side", {
                 "wall": sp["wall"], "roof": sp["roof"], "host": sp["host"],
                 "openings": info["openings"], "has_wall": bool(info["wall"]),
-                # seen from outside, the face is toward the middle of the row
+                # each cheek is its OWN exterior view: the face/gable end sits
+                # at the panel's OUTER edge (left cheek's face at the left,
+                # right cheek's at the right), so the faces point outward and
+                # the host ends meet in the middle. `face_mark` labels it.
                 "flip": side == "right",
+                "face_mark": True,
                 "label": f"top {_fmt(sp['top'])} in"}))
         return out
 
@@ -187,3 +194,13 @@ class DormerFaceView(QWidget):
         p.drawText(QRectF(cell.left(), cell.top() + 4, cell.width(), 18),
                    Qt.AlignmentFlag.AlignCenter,
                    f"{title}{note}  -  {pn['label']}")
+
+        # a side view's face/gable end, labelled so its exterior orientation
+        # reads without ambiguity (Patrick, 0358)
+        if pn.get("face_mark"):
+            fxp = q(pn["wall"][0][0], 0.0).x()     # y0 of the cheek: its face
+            p.setPen(QPen(_DIM))
+            self._text(p, 7.5, bold=True)
+            p.drawText(QRectF(fxp - 24, oz + 3, 48, 13),
+                       Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
+                       "face")
