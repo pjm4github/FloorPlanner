@@ -396,6 +396,20 @@ def test_a_side_wall_runs_from_the_face_guide_to_where_the_host_reaches_its_top(
     assert inset["top"] == pytest.approx(85.0) and inset["span"][0] == 10.0
 
 
+def test_the_side_shows_the_dormer_roof_as_a_hidden_true_projection():
+    st = _st()                                   # ridge 110, eaves/top 60, overhang 12
+    prof = dg.side_profile(st, "left", *HOST)
+    rh, ridge = dg.ridge_height(st), prof["ridge"]
+    assert ridge[0] == (-12.0, 60.0), "front eave corner, out over the face"
+    assert ridge[1] == (-12.0, rh), "up the front rake to the ridge, over the face"
+    assert ridge[2] == pytest.approx((96.0, rh)), "ridge back to where it meets the host"
+    assert ridge[3] == pytest.approx((36.0, 60.0)), "down the host roof to the eave meet"
+    for y, z in (ridge[2], ridge[3]):            # the back two legs lie ON the host
+        assert z == pytest.approx(30.0 + (10.0 / 12.0) * y)
+    free = dg.side_profile(st, "left")           # no host: the back squares off
+    assert free["ridge"][2][0] == free["ridge"][3][0] == st["depth_in"]
+
+
 def test_a_sheds_high_side_is_a_wall_under_the_ridge():
     st = _st(form="shed")
     assert dg.side_x(st, "right") == 0.0

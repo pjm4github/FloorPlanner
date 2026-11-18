@@ -492,9 +492,15 @@ def side_profile(st, side, host_z_face=None, host_slope=None):
         roof    the dormer's eave line over it, face overhang included
         host    the host roof's line across it, or None with no host. BELOW
                 this line the wall is inside the main roof, not outdoors
+        ridge   the dormer's OWN roof in this projection, a HIDDEN line: the
+                ridge at the top, the front rake hanging over the face by the
+                overhang, the back dying into the host roof. A true left
+                projection, not just the cheek wall (Patrick, 0361)
         span    (y0, y1) of the wall;  top  its height
     """
     top = side_top(st, side)
+    rh = ridge_height(st)
+    fo = st["face_overhang_in"]
     depth, met = ridge_depth(st, host_z_face, host_slope)
     y0 = min(guides(st)[2], depth)
     y1 = depth
@@ -502,9 +508,14 @@ def side_profile(st, side, host_z_face=None, host_slope=None):
     if met and depth > _EPS:
         y1 = min(max(_meet_y(top, host_z_face, host_slope), y0), depth)
         host = [(y0, host_z_face + host_slope * y0), (y1, host_z_face + host_slope * y1)]
+    # the roof silhouette seen from the side: front eave corner (over the
+    # face) -> up the front rake to the ridge -> back along the ridge to where
+    # it meets the host -> down the host roof to where the eave meets it. The
+    # back two legs run ALONG the host roof; with no host the end squares off.
+    ridge = [(-fo, top), (-fo, rh), (depth, rh), (y1, top)]
     return {"wall": [(y0, 0.0), (y0, top), (y1, top), (y1, 0.0)],
-            "roof": [(-st["face_overhang_in"], top), (y1, top)],
-            "host": host, "span": (y0, y1), "top": top}
+            "roof": [(-fo, top), (y1, top)],
+            "host": host, "ridge": ridge, "span": (y0, y1), "top": top}
 
 
 def project_side_wall(pos, rotation_deg, p1, p2, x_side, tol=FACE_TOL_IN):

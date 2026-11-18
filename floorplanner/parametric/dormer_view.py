@@ -6,9 +6,11 @@ TOP of the canvas (Patrick, 0360).
 
 The gable end shows the roof line, the floor, the ceiling line, the wall the
 user drew under the face (when there is one) and its windows and doors at their
-sill and head. Each SIDE shows that cheek wall against the host roof's line --
-DASHED and labelled "host roof" -- the plane the dormer sits on, so the short
-cheek reads against the roof it interrupts. The right side is drawn only when the
+sill and head. Each SIDE is a TRUE left projection: the cheek wall solid, the
+host roof's line DASHED and labelled "host roof" -- the plane the dormer sits on
+-- and the dormer's OWN roof as a HIDDEN dashed line (ridge at the top, front
+rake hanging over the face by the overhang, back dying into the host roof). The
+right side is drawn only when the
 dormer is NOT symmetric; a symmetric dormer's right side is the left's mirror, so
 it is dropped (Patrick, 0360). LOOK-ONLY (Patrick, 0356):
 openings are edited on the wall in the plan. An opening ABOVE the ceiling line is
@@ -87,6 +89,7 @@ class DormerFaceView(QWidget):
             sp = info["profile"]
             sides[side] = (f"{side.capitalize()} side", {
                 "wall": sp["wall"], "roof": sp["roof"], "host": sp["host"],
+                "ridge": sp.get("ridge"),
                 "openings": info["openings"], "has_wall": bool(info["wall"]),
                 # the box unfolded about the gable: each cheek's face/gable end
                 # sits toward the CENTRE -- left cheek's face on its right (so
@@ -105,6 +108,8 @@ class DormerFaceView(QWidget):
 
     def _panel_x_extent(self, pn):
         pts = list(pn["wall"]) + list(pn["roof"])
+        if pn.get("ridge"):                    # the ridge runs back past the wall
+            pts += list(pn["ridge"])
         pts += [(o[k], 0.0) for o in pn["openings"] for k in ("x0", "x1")]
         return _extent(pts)
 
@@ -126,6 +131,8 @@ class DormerFaceView(QWidget):
             zs = [z for _x, z in list(pn["wall"]) + list(pn["roof"])]
             if pn.get("host"):                 # the host line is the reference
                 zs += [z for _x, z in pn["host"]]
+            if pn.get("ridge"):                # the dormer roof rises to the ridge
+                zs += [z for _x, z in pn["ridge"]]
             zs += [o["head_in"] for o in pn["openings"]]
             return zs
         z_hi = max([z for _t, pn in row for z in panel_zs(pn)] + [1.0])
@@ -164,7 +171,10 @@ class DormerFaceView(QWidget):
 
         for i, (title, pn) in enumerate(row):
             cell = QRectF(lefts[i], 0.0, widths[i], H)
+            p.save()
+            p.setClipRect(cell)                # a panel stays in its own cell
             self._panel(p, cell, title, pn, ceiling, k, oz, m_x, exts[i])
+            p.restore()
         p.end()
 
     def _panel(self, p, cell, title, pn, ceiling, k, oz, m_x, ext):
@@ -215,6 +225,14 @@ class DormerFaceView(QWidget):
             p.drawText(QRectF(mid.x() - 44, mid.y() - 15, 88, 12),
                        Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom,
                        "host roof")
+
+        # the dormer's OWN roof in this projection -- a HIDDEN line (dashed):
+        # up the front rake (over the face by the overhang), back along the
+        # ridge, down the host roof. The near cheek stands in front (Patrick).
+        if pn.get("ridge"):
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.setPen(QPen(_REF, 1.3, Qt.PenStyle.DashLine))
+            p.drawPolyline(QPolygonF([q(x, z) for x, z in pn["ridge"]]))
 
         for o in pn["openings"]:
             bad = o["through_roof"] or o["overlaps"] or o["off_wall"]
