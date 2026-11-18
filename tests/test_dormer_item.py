@@ -363,3 +363,18 @@ def test_dialog_keeps_the_right_side_when_the_dormer_is_asymmetric(scene):
     # faces toward the centre: left cheek flipped, right cheek unflipped
     assert left["flip"] is True and right["flip"] is False
     assert right["face_mark"] is True
+
+
+def test_number_fields_recalc_on_focus_out_not_each_keystroke(scene):
+    # a spinbox must not recalc mid-typing: a half-entered number would feed
+    # the ridge/eaves/pitch coupling partial values and lock a field out of
+    # range (Patrick, 2026-11-18). Keyboard tracking off => it signals on
+    # focus-out / Enter / arrow-step, not on every keystroke.
+    from floorplanner.parametric.dialog import ParametricDialog
+    d = _dormer(scene, pos=QPointF(150, 150))
+    dlg = ParametricDialog(DORMER, d.draft_state(), d.param_context())
+    try:
+        for key in ("ridge_h_in", "eaves_h_in", "pitch_12", "span_left_in"):
+            assert dlg._widgets[key].keyboardTracking() is False
+    finally:
+        dlg.deleteLater()

@@ -162,6 +162,12 @@ class ParametricDialog(QDialog):
             w.setDecimals(spec.decimals)
             w.setRange(float(spec.minimum), float(spec.maximum))
             w.setSingleStep(float(spec.step))
+            # Recalculate when editing FINISHES (focus-out / Enter / arrow-step),
+            # not on every keystroke: mid-typing a half-entered number would feed
+            # the coupling partial values and lock the coupled fields out of range
+            # (Patrick, 2026-11-18). Programmatic setValue still signals, so tests
+            # and the live preview on a committed value are unaffected.
+            w.setKeyboardTracking(False)
             if spec.unit:
                 w.setSuffix(" " + spec.unit)
             w.valueChanged.connect(self._on_changed)
@@ -169,6 +175,7 @@ class ParametricDialog(QDialog):
             w = QSpinBox()
             w.setRange(int(spec.minimum), int(spec.maximum))
             w.setSingleStep(max(1, int(spec.step)))
+            w.setKeyboardTracking(False)       # as FLOAT above
             w.valueChanged.connect(self._on_changed)
         elif spec.kind == ENUM:
             w = QComboBox()
