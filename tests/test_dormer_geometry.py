@@ -213,10 +213,7 @@ def test_on_a_roof_with_a_ceiling_it_reports_the_knee_lines_and_no_finding():
 
 @pytest.mark.parametrize("ctx,rule,severity", [
     ({}, "dormer.no_host", F.WARNING),
-    ({"host_z_face_in": 30.0, "host_slope": 0.0}, "dormer.level_host", F.WARNING),
     ({"host_z_face_in": 200.0, "host_slope": 0.8}, "dormer.buried", F.WARNING),
-    ({"host_z_face_in": 30.0, "host_slope": 0.8, "host_ridge_in": 100.0},
-     "dormer.above_host_ridge", F.ADVISORY),
     ({"host_z_face_in": 30.0, "host_slope": 0.8, "ceiling_in": 120.0},
      "dormer.no_full_height", F.ADVISORY),
 ])
@@ -442,3 +439,60 @@ def test_the_kind_reports_the_sides():
     derived, fs = DORMER.evaluate({}, {})
     assert not [f for f in fs if f.rule_id.startswith("dormer.side_open")]
     assert set(derived["sides"]) == {"left", "right"}
+
+
+# -- the ridge may not stand above the host's (0359) -------------------------
+@pytest.mark.parametrize("ctx,rule,why", [
+    ({"host_z_face_in": 30.0, "host_slope": 0.8, "host_ridge_in": 100.0},
+     "dormer.above_host_ridge", dg.OVER_RIDGE),
+    ({"host_z_face_in": 30.0, "host_slope": 0.0, "host_ridge_in": 140.0},
+     "dormer.level_host", dg.FACES_UPHILL),
+    ({"host_z_face_in": 30.0, "host_slope": -0.5}, "dormer.level_host",
+     dg.FACES_UPHILL),
+])
+def test_a_dormer_over_the_main_ridge_or_facing_uphill_is_refused(ctx, rule, why):
+    """Patrick, 2026-11-17: "The ridge of the roof is under the dormer (which
+    should be an error)"."""
+    derived, fs = DORMER.evaluate({}, ctx)
+    by = {f.rule_id: f for f in fs}
+    assert by[rule].severity == F.ERROR and F.blocks(fs)
+    assert derived is not None and derived["unbuildable"] == why, \
+        "still drawn, so the user can see what to fix"
+
+
+def test_ridge_to_ridge_is_allowed_and_no_host_is_not_an_error():
+    ctx = {"host_z_face_in": 30.0, "host_slope": 0.8, "host_ridge_in": 110.0}
+    derived, fs = DORMER.evaluate({}, ctx)            # its own ridge is 110
+    assert derived["unbuildable"] is None and not F.blocks(fs)
+    assert dg.unbuildable(_st()) is None
+    assert dg.unbuildable(_st(), 30.0, 0.8) is None, "host ridge unknown"
+
+
+def test_the_message_names_a_width_that_fits():
+    ctx = {"host_z_face_in": 30.0, "host_slope": 0.8, "host_ridge_in": 108.0}
+    _d, fs = DORMER.evaluate({"span_left_in": 104.0}, ctx)   # ridge 146.67
+    (f,) = [f for f in fs if f.rule_id == "dormer.above_host_ridge"]
+    assert "146.67 in" in f.message and "50.4 in a side" in f.message
+    fitted = dg.fit_under_ridge(_st(span_left_in=104.0), 108.0)
+    assert dg.unbuildable(fitted, 30.0, 0.8, 108.0) is None
+
+
+def test_fit_under_ridge_narrows_first_then_lowers_the_eaves():
+    st = dg.fit_under_ridge(_st(span_left_in=104.0), 108.0)
+    assert st["eaves_h_in"] == 60.0 and st["pitch_12"] == 10.0, "only narrowed"
+    assert dg.ridge_height(st) == pytest.approx(102.0)
+    assert st["span_right_in"] == st["span_left_in"] == pytest.approx(50.4)
+    low = dg.fit_under_ridge(_st(), 70.0)             # cannot narrow enough
+    assert low["span_left_in"] == 24.0 and dg.ridge_height(low) == pytest.approx(64.0)
+    same = dg.fit_under_ridge(_st(), 200.0)
+    assert same == _st(), "already fits: untouched"
+    free = dg.fit_under_ridge(_st(symmetric=False, span_left_in=100.0,
+                                  span_right_in=50.0), 108.0)
+    assert free["span_right_in"] == pytest.approx(free["span_left_in"] / 2.0)
+
+
+def test_a_new_dormer_is_born_under_the_host_ridge():
+    st = dg.default_state(ceiling_in=96.0, host_slope=10.0 / 12.0, host_ridge_in=108.0)
+    assert dg.ridge_height(st) <= 108.0 - dg.RIDGE_CLEAR_IN + 1e-9
+    assert dg.unbuildable(st, 30.0, 10.0 / 12.0, 108.0) is None
+    assert dg.default_state(96.0, 10.0 / 12.0)["span_left_in"] == 60.0

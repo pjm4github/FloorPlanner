@@ -90,15 +90,70 @@ def normalize_state(state):
     return out
 
 
-def default_state(ceiling_in=None, host_slope=None):
+def default_state(ceiling_in=None, host_slope=None, host_ridge_in=None):
     """A newly dropped dormer: its eaves a foot under the ceiling it lights,
-    and the host's own pitch when there is a host."""
+    the host's own pitch when there is a host -- and, given the host's ridge
+    height, fitted UNDER it (0359): a dormer is never born in error."""
     st = dict(STATE_DEFAULTS)
     if ceiling_in is not None:
         st["eaves_h_in"] = max(float(ceiling_in) - 12.0, 12.0)
     if host_slope is not None and host_slope > _EPS:
         st["pitch_12"] = round(host_slope * 12.0, 3)
+    if host_ridge_in is not None:
+        st = fit_under_ridge(st, float(host_ridge_in))
     return st
+
+
+RIDGE_CLEAR_IN = 6.0     # a newly fitted dormer's ridge stops this far under
+
+
+def fit_under_ridge(state, host_ridge_in, clear=RIDGE_CLEAR_IN):
+    """`state` changed as little as it takes to bring the ridge to `clear`
+    under `host_ridge_in`: first NARROWED (pitch kept, down to 2 ft a side),
+    then, if that is not enough, its eaves LOWERED. Unchanged when it
+    already fits."""
+    st = normalize_state(state)
+    limit = host_ridge_in - clear
+    if ridge_height(st) <= limit + _EPS:
+        return st
+    rise_per_in = st["pitch_12"] / 12.0
+    if rise_per_in > _EPS:
+        span = max((limit - st["eaves_h_in"]) / rise_per_in, 24.0)
+        if span < st["span_left_in"]:
+            scale = span / st["span_left_in"]
+            st["span_left_in"] = span
+            if st["span_right_in"] > _EPS:
+                st["span_right_in"] = max(st["span_right_in"] * scale, MIN_SPAN_IN)
+            st["guide_left_in"] = min(st["guide_left_in"], st["span_left_in"])
+            st["guide_right_in"] = min(st["guide_right_in"], st["span_right_in"])
+    over = ridge_height(st) - limit
+    if over > _EPS:
+        st["eaves_h_in"] = max(st["eaves_h_in"] - over, 0.0)
+    return normalize_state(st)
+
+
+# what stops a dormer being BUILT, as opposed to merely being worth a note
+OVER_RIDGE = "over_ridge"          # its ridge is above the host's ridge
+FACES_UPHILL = "faces_uphill"      # the host does not rise along its ridge
+
+
+def unbuildable(st, host_z_face=None, host_slope=None, host_ridge_in=None):
+    """Why this dormer must NOT be built on this host -- `OVER_RIDGE`,
+    `FACES_UPHILL` -- or None. ONE RULE FOR THE DIALOG AND THE 3D BUILDER
+    (0359): what the dialog refuses, the builder skips.
+
+    A ridge AT the host's ridge height is allowed (ridge to ridge is an
+    ordinary cross gable). With no host there is nothing to be wrong about:
+    None. `OVER_RIDGE` is also the "dormer astride the main ridge" case: on a
+    plane rising at `host_slope`, a ridge higher than the host's meets it
+    only beyond the host's own ridge line."""
+    if host_z_face is None or host_slope is None:
+        return None
+    if host_slope <= _EPS:
+        return FACES_UPHILL
+    if host_ridge_in is not None and ridge_height(st) > float(host_ridge_in) + 1e-6:
+        return OVER_RIDGE
+    return None
 
 
 # --------------------------------------------------------------------------

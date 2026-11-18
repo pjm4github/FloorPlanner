@@ -121,6 +121,38 @@ def test_over_no_roof_there_is_no_host_and_a_warning(scene):
     assert any(f.rule_id == "dormer.no_host" for f in findings)
 
 
+# -- 0359: born under the host ridge, and drawn red when over it -------------
+def test_a_new_dormer_on_a_low_roof_is_born_under_the_ridge(scene):
+    # The host ridge is 100 in; a default dormer would ride to 108, so the seed
+    # must fit it under the ridge -- which only happens if items.py passes
+    # host_ridge_in as the third arg to dg.default_state (0359).
+    rf = RoofItem(QPointF(50, 100), QPointF(250, 100), eaves_h_in=60.0,
+                  ridge_h_in=100.0, span_in=100.0)
+    rf.floor = DEFAULT_FLOOR
+    scene.addItem(rf)
+    _room(scene, ceiling_in=96.0)
+    d = _dormer(scene, pos=QPointF(150, 150), new=True)
+    d._recompute()
+    ctx = d.param_context()
+    assert ctx.get("host_ridge_in") == pytest.approx(100.0)
+    assert dg.ridge_height(d.params) <= 100.0 + 1e-6, "born over the host ridge"
+    assert d._unbuildable is None
+
+
+def test_an_over_ridge_dormer_is_flagged_unbuildable(scene):
+    _host(scene)                     # host ridge 132 in
+    _room(scene)
+    # a tall dormer whose ridge (240 in) stands well above the host's 132
+    d = _dormer(scene, pos=QPointF(150, 150),
+                state={"eaves_h_in": 120.0, "span_left_in": 120.0,
+                       "span_right_in": 120.0, "pitch_12": 12.0})
+    d._recompute()
+    assert dg.ridge_height(d.params) > 132.0
+    assert d._unbuildable == dg.OVER_RIDGE
+    # the host cut (valleys) is still computed in geo; paint drops it on the
+    # unbuildable flag -- the finding is Cowork's, pinned in test_dormer_geometry
+
+
 # -- knee lines where the planes cross the room ceiling ----------------------
 def test_draws_knee_lines_where_the_planes_cross_the_ceiling(scene):
     # a tall dormer over NO roof (ridge well above the 96in ceiling): each

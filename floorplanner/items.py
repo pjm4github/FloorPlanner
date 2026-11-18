@@ -804,6 +804,7 @@ class DormerItem(FurnishingItem):
         self._seed_defaults = new and not params   # host pitch on first rebuild
         self._geo = _dg.plan(self.params)
         self._knees = []                            # orange knee lines, settled
+        self._unbuildable = None                    # dg.unbuildable reason, or None
         self._depth = self.params["depth_in"]       # ridge length (host or stored)
         self._bbox = QRectF(-1, -1, 2, 2)
         self._sig = None
@@ -938,6 +939,10 @@ class DormerItem(FurnishingItem):
         plan = _dg.plan(self.params, None, z, slope)   # None -> no knee work
         plan["knees"] = self._knees                    # keep the settled ones
         self._geo = plan
+        # why this dormer cannot be BUILT on its host (0359), live on a knob
+        # drag: paint draws it error-red and drops its host cut + knee lines.
+        self._unbuildable = _dg.unbuildable(
+            self.params, z, slope, ctx.get("host_ridge_in"))
         pts = [self._q(p) for p in _dg.footprint(self.params, depth)]
         xs = [p.x() for p in pts]
         ys = [p.y() for p in pts]
@@ -964,7 +969,8 @@ class DormerItem(FurnishingItem):
         ctx = self.param_context()
         if self._seed_defaults and ctx.get("host_slope"):
             self.params = _dg.default_state(ctx.get("ceiling_in"),
-                                            ctx.get("host_slope"))
+                                            ctx.get("host_slope"),
+                                            ctx.get("host_ridge_in"))
             self._seed_defaults = False
             ctx = self.param_context()
         self._recompute_knees(ctx)
@@ -1020,20 +1026,25 @@ class DormerItem(FurnishingItem):
                 seg(a, b)
             seg(*geo["rake"])
             return
-        ink = QColor(55, 65, 81)
+        # an UNBUILDABLE dormer (ridge above the host's, or a non-rising host)
+        # still draws, but in error-red and WITHOUT its host cut or knee lines
+        # (0359): the dialog says why and refuses OK; the item is not deleted.
+        bad = self._unbuildable is not None
+        ink = QColor(185, 28, 28) if bad else QColor(55, 65, 81)
         painter.setPen(QPen(ink, 1.3))                  # ridge
         seg(*geo["ridge"])
         painter.setPen(QPen(ink, 0.9))                  # eaves + rake
         for a, b in geo["eaves"]:
             seg(a, b)
         seg(*geo["rake"])
-        painter.setPen(QPen(ink, 1.0))                  # valleys
-        for v in geo["valleys"]:
-            seg(v[0], v[1])
+        if not bad:                                     # valleys = the host cut
+            painter.setPen(QPen(ink, 1.0))
+            for v in geo["valleys"]:
+                seg(v[0], v[1])
         painter.setPen(QPen(self._GUIDE_INK, 0.8, Qt.PenStyle.DashLine))
         for a, b in geo["guides"]:                      # controls C / D
             seg(a, b)
-        if geo["knees"]:                                # the knee lines
+        if geo["knees"] and not bad:                    # the knee lines
             painter.setPen(QPen(ROOF_CLIP_INK, 1.6, Qt.PenStyle.DashLine))
             for a, b in geo["knees"]:
                 seg(a, b)

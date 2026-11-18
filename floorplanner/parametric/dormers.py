@@ -138,13 +138,7 @@ class DormerKind(ParametricKind):
                 "This dormer is not over a roof. It is drawn "
                 f"{_fmt(st['depth_in'])} in long and cuts nothing.",
                 field="depth_in"))
-        elif not met:
-            findings.append(Finding(
-                "dormer.level_host", WARNING,
-                "The roof under this dormer does not rise along its ridge, so "
-                "the ridge never meets it. Turn the dormer to face down the "
-                "slope."))
-        elif depth <= 0.0:
+        elif depth <= 0.0 and slope > 0.0:
             findings.append(Finding(
                 "dormer.buried", WARNING,
                 f"The roof here is already {_fmt(z_face)} in up, at or above "
@@ -152,12 +146,23 @@ class DormerKind(ParametricKind):
                 "Raise the eaves or the pitch, or move it down the slope.",
                 actual=rh, limit=z_face, field="eaves_h_in"))
         host_ridge = (context or {}).get("host_ridge_in")
-        if host_ridge is not None and rh > float(host_ridge) + 1e-6:
+        why = dg.unbuildable(st, z_face, slope, host_ridge)
+        derived["unbuildable"] = why
+        if why == dg.FACES_UPHILL:
             findings.append(Finding(
-                "dormer.above_host_ridge", ADVISORY,
-                f"The ridge ({_fmt(rh)} in) is above the main roof's "
-                f"({_fmt(float(host_ridge))} in).", actual=rh,
-                limit=float(host_ridge), field="pitch_12"))
+                "dormer.level_host", ERROR,
+                "The roof under this dormer does not rise along its ridge: it "
+                "is facing up the slope, or sitting over the main ridge. Turn "
+                "it to face down the slope, or move it down the roof."))
+        elif why == dg.OVER_RIDGE:
+            fitted = dg.fit_under_ridge(st, float(host_ridge))
+            findings.append(Finding(
+                "dormer.above_host_ridge", ERROR,
+                f"The dormer's ridge ({_fmt(rh)} in) is above the main roof's "
+                f"ridge ({_fmt(float(host_ridge))} in). Narrow it to "
+                f"{_fmt(fitted['span_left_in'])} in a side, lower the pitch, "
+                "or lower the eaves.", actual=rh, limit=float(host_ridge),
+                field="span_left_in"))
         if ceiling is not None and derived["full_height_in"] <= 0.0:
             findings.append(Finding(
                 "dormer.no_full_height", ADVISORY,
