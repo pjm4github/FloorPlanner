@@ -377,14 +377,18 @@ def plan(st, ceiling_in=None, host_z_face=None, host_slope=None):
     fp = footprint(st, depth)
     gl, gr, gf = guides(st)
     gf = min(gf, depth)
-    eaves = [(fp[1], fp[2])]
-    lines = [((gl, gf), (gl, depth))]
-    if st["form"] != "shed":
-        eaves.append((fp[0], fp[3]))
-        lines.append(((-gr, gf), (-gr, depth)))
-    lines.append(((-gr, gf), (gl, gf)))
+    shed = st["form"] == "shed"
+    # BOTH side eaves and BOTH side guides, for a gable and a shed alike
+    # (Patrick, 2026-11-18): the shed is a full box with two symmetric
+    # trapezoid sides, so it carries a left AND a right eave and side guide.
+    eaves = [(fp[1], fp[2]), (fp[0], fp[3])]
+    lines = [((gl, gf), (gl, depth)), ((-gr, gf), (-gr, depth)),
+             ((-gr, gf), (gl, gf))]
+    # the RIDGE: a gable's runs down the middle, from the face into the host;
+    # a shed's is its high BACK edge across the width -- its ONLY host contact.
+    ridge = (fp[2], fp[3]) if shed else ((0.0, 0.0), (0.0, depth))
     return {
-        "ridge": ((0.0, 0.0), (0.0, depth)),
+        "ridge": ridge,
         "eaves": eaves,
         "rake": (fp[0], fp[1]),
         "guides": lines,

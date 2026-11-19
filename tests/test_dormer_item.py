@@ -190,10 +190,14 @@ def test_selecting_a_dormer_shows_the_knobs_and_deselecting_hides_them(scene):
     assert d._grips == []
 
 
-def test_a_shed_has_no_right_side_knobs(scene):
+def test_a_shed_has_both_side_knobs(scene):
+    # the redesigned shed (2026-11-18) is a full box with two symmetric
+    # trapezoid sides, so it carries the B/C/E knobs on BOTH sides, like a gable
     d = _dormer(scene, state={"form": "shed"})
     d.setSelected(True)
-    assert not any(g.kind.endswith("_r") for g in d._grips)
+    kinds = {g.kind for g in d._grips}
+    for k in ("span_l", "span_r", "guide_l", "guide_r", "eave_l", "eave_r"):
+        assert k in kinds, k
 
 
 def test_the_span_knob_resizes_and_symmetric_mirrors(scene):

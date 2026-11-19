@@ -1118,8 +1118,9 @@ class DormerItem(FurnishingItem):
         return self._q(pt)
 
     def _grip_kinds(self):
-        shed = self.params["form"] == "shed"
-        return [k for k in self._GRIP_KINDS if not (shed and k.endswith("_r"))]
+        # Both sides for a gable AND a shed (Patrick, 2026-11-18): the shed's
+        # two trapezoid sides each take a B/C/E knob, mirrored when symmetric.
+        return list(self._GRIP_KINDS)
 
     def _sync_grips(self):
         """Create the grips when the dormer is selected, remove them when it is
@@ -1161,7 +1162,7 @@ class DormerItem(FurnishingItem):
         but DO NOT recompute the orange knee lines (they are held)."""
         x, y = self._to_dg_local(scene_pt)
         st = dict(self.params)
-        sym = st["symmetric"] and st["form"] != "shed"
+        sym = st["symmetric"]            # a symmetric shed mirrors too (2026-11-18)
 
         def both(lkey, rkey, v):
             st[lkey] = v
