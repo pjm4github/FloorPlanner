@@ -111,6 +111,24 @@ def test_finds_its_host_over_a_roof(scene):
     assert ctx["host_slope"] > 0.0
 
 
+def test_dragging_the_apex_slides_the_anchor_up_the_roof_clamped_at_the_ridge(scene):
+    # P2-core-2 (2026-11-18): knob A is the ANCHOR -- it slides along the fall
+    # line (the ridge rising with it) and may not cross the host ridge.
+    _host(scene)                     # ridge along x at y=100 (uphill -y), ridge 132
+    _room(scene)
+    d = _dormer(scene, pos=QPointF(150, 160), new=True)
+    d._recompute()
+    r0, y0 = dg.ridge_height(d.params), d.pos().y()
+    d.begin_knob()
+    d.drag_knob("apex", QPointF(150, 120))       # pull up toward the ridge
+    assert d.pos().y() < y0, "anchor slid up the roof"
+    assert dg.ridge_height(d.params) > r0, "ridge rose with the anchor"
+    d.drag_knob("apex", QPointF(150, 40))        # try to shove it over the ridge
+    assert d.pos().y() >= 100.0 - 1e-6, "anchor stops at the host ridge"
+    assert dg.ridge_height(d.params) <= 132.0 + 1e-6
+    d.end_knob("apex", QPointF(150, 40))
+
+
 def test_an_old_dormer_migrates_pos_from_face_to_anchor(scene):
     # P2 (2026-11-18): a record saved in the OLD frame (pos = face, no
     # 'anchored') moves pos UP the ridge to the anchor on the first rebuild in a
