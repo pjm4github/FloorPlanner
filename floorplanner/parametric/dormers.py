@@ -93,8 +93,9 @@ class DormerKind(ParametricKind):
                  tip="Knob E."),
             size("eave_overhang_right_in", "Eave overhang, right", 0.0, 60.0,
                  enabled=_free_right),
-            size("face_overhang_in", "Face overhang", 0.0, 60.0,
-                 tip="The rake past the face (knob F)."),
+            size("face_overhang_in", "Eave past the face", 0.0, 240.0,
+                 tip="The eave of the face, past the face wall — out to and "
+                     "beyond the host roof edge (knob F, orange)."),
             size("guide_left_in", "Side guide, left", 0.0, 480.0,
                  tip="Knob C, as a guide line only: where a side wall would "
                      "stand. 0 = on the eaves line. It draws no wall."),
@@ -104,9 +105,10 @@ class DormerKind(ParametricKind):
                  tip="Knob D, as a guide line only: where the face wall "
                      "would stand, back from the face. 0 = on the face. It "
                      "draws no wall."),
-            size("depth_in", "Length off a roof", 1.0, 600.0,
-                 tip="The ridge length used only when no roof is under the "
-                     "dormer; on a roof the ridge runs until it meets it."),
+            size("depth_in", "Face distance", 1.0, 600.0,
+                 tip="How far the FACE WALL stands down the roof from the anchor "
+                     "(knob D, purple). The anchor sits on the host; this is the "
+                     "roof's run from the ridge to the face."),
         ]
 
     def normalize(self, state):

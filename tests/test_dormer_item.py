@@ -290,18 +290,21 @@ def test_the_face_knob_sets_the_face_overhang(scene):
     d.end_knob("face", QPointF(150, 170))
 
 
-# -- knob D (the face guide, 0356 §1, purple) --------------------------------
-def test_knob_D_slides_the_face_guide_along_the_ridge(scene):
-    d = _dormer(scene, pos=QPointF(150, 150))      # rotation 0
+# -- knob D (the face wall, P3, purple) --------------------------------------
+def test_knob_D_sets_the_face_distance_holding_the_eave(scene):
+    # P3 (2026-11-18): knob D (purple) is the FACE WALL -- dragging it toward the
+    # anchor shortens the face distance (depth) while the EAVE is held, so the
+    # eave overhang grows by what the face gave up.
+    d = _dormer(scene, pos=QPointF(150, 150))      # no host: migrates, face at 150
     d._recompute()
     d.setSelected(True)
     assert "guide_face" in {g.kind for g in d._grips}
+    eave0 = d._depth + d.params["face_overhang_in"]
     d.begin_knob()
-    # dg +y (into the dormer) is scene -y at rotation 0; dg y = 30 -> scene y = 120
-    d.drag_knob("guide_face", QPointF(150, 120))
-    assert d.params["guide_face_in"] == pytest.approx(30.0)
+    d.drag_knob("guide_face", QPointF(150, 120))   # pull the face toward the anchor
+    assert d.params["depth_in"] < 96.0, "face distance shortened"
+    assert d._depth + d.params["face_overhang_in"] == pytest.approx(eave0), "eave held"
     d.end_knob("guide_face", QPointF(150, 120))
-    assert d.params["guide_face_in"] == pytest.approx(30.0)
 
 
 def test_a_shed_keeps_the_face_guide_knob(scene):

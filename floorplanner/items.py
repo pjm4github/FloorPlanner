@@ -1177,9 +1177,9 @@ class DormerItem(FurnishingItem):
             "guide_r": (-min(gr, sr), 0.30 * depth),
             "eave_l":  (sl + st["eave_overhang_left_in"], 0.68 * depth),
             "eave_r":  (-(sr + st["eave_overhang_right_in"]), 0.68 * depth),
-            "guide_face": (0.0, min(st["guide_face_in"], depth)),
-            "face":    (0.0, -st["face_overhang_in"]),
-            "apex":    (0.0, depth),
+            "guide_face": (0.0, 0.0),            # D (purple): the FACE wall
+            "face":    (0.0, -st["face_overhang_in"]),   # F (orange): the EAVE
+            "apex":    (0.0, depth),             # A (white): the ANCHOR on the roof
         }[kind]
         return self._q(pt)
 
@@ -1253,9 +1253,19 @@ class DormerItem(FurnishingItem):
                 else st.__setitem__("eave_overhang_left_in" if kind == "eave_l"
                                     else "eave_overhang_right_in", v)
         elif kind == "guide_face":
-            st["guide_face_in"] = max(y, 0.0)   # D: slides along the ridge
+            # D (purple) is the FACE WALL: slide it from the anchor out to the
+            # orange EAVE, the eave held fixed (P3, 2026-11-18). depth = how far
+            # the face is from the anchor; the overhang takes up the rest.
+            item_y = self.mapFromScene(scene_pt).y()
+            eave = self._depth + st["face_overhang_in"]
+            depth = max(min(item_y, eave), 1.0)
+            st["depth_in"] = depth
+            st["face_overhang_in"] = max(eave - depth, 0.0)
         elif kind == "face":
-            st["face_overhang_in"] = max(-y, 0.0)
+            # F (orange) is the EAVE: it reaches from the face (purple) out past
+            # the host roof edge (a cantilever). overhang = eave beyond the face.
+            item_y = self.mapFromScene(scene_pt).y()
+            st["face_overhang_in"] = max(item_y - self._depth, 0.0)
         self.params = _dg.normalize_state(st)
         self._recompute_outline()
         self._place_grips()
@@ -1383,9 +1393,9 @@ class DormerGripItem(QGraphicsItem):
         "guide_l": "Side guide (knob C) — draws no wall",
         "guide_r": "Side guide (knob C) — draws no wall",
         "eave_l": "Eave overhang (knob E)", "eave_r": "Eave overhang (knob E)",
-        "guide_face": "Face guide (knob D) — draws no wall",
-        "face": "Face overhang (knob F)",
-        "apex": "Apex (knob A) — double-click for properties / pitch",
+        "guide_face": "Face wall (knob D) — slide from the anchor to the eave",
+        "face": "Eave of the face (knob F) — reaches past the host roof edge",
+        "apex": "Anchor (knob A) — drag along the roof; double-click for properties",
     }
 
     def __init__(self, dormer, kind: str):
