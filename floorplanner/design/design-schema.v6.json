@@ -503,7 +503,7 @@
     },
 
     "dormer_state": {
-      "description": "0352. DECLARED, NOT ENFORCED: the keys a `dormer` furnishing's `state` carries (docs/furnishing-spec/DORMER_FURNISHING_PLAN.md). The furnishing's `pos` is the FACE end of the ridge; its `rotation` turns the ridge (0 = up the screen, the face looking down it). Heights are above the furnishing's own level. A dormer furnishing owns no wall and stores no host: the host is whatever roof is under it. Arithmetic: floorplanner/parametric/dormer_geometry.py.",
+      "description": "0352. DECLARED, NOT ENFORCED: the keys a `dormer` furnishing's `state` carries (docs/furnishing-spec/DORMER_FURNISHING_PLAN.md). The furnishing's `pos` is the ANCHOR (the apex where the ridge meets the host roof; P2, 2026-11-18) when `anchored`; its `rotation` turns the ridge (0 = up the screen, the face looking down it). Heights are above the furnishing's own level. A dormer furnishing owns no wall and stores no host: the host is whatever roof is under it. Arithmetic: floorplanner/parametric/dormer_geometry.py.",
       "type": "object",
       "additionalProperties": true,
       "properties": {
@@ -518,10 +518,10 @@
         "face_overhang_in":       { "type": "number", "minimum": 0 },
         "guide_left_in":          { "description": "A guide line only (control C); 0 = on the eaves line.", "type": "number", "minimum": 0 },
         "guide_right_in":         { "type": "number", "minimum": 0 },
-        "guide_face_in":          { "description": "A guide line only (control D, 0355): the face guide's set-back from the face into the dormer; 0 = on the face.", "type": "number", "minimum": 0 },
         "box_left_in":            { "description": "Control B's frame half-width; 0 = not set.", "type": "number", "minimum": 0 },
         "box_right_in":           { "type": "number", "minimum": 0 },
-        "depth_in":               { "description": "Ridge length used only when no roof is under the dormer.", "type": "number", "exclusiveMinimum": 0 }
+        "depth_in":               { "description": "Face distance: the run from the anchor (ridge) down to the face wall (control D, purple).", "type": "number", "exclusiveMinimum": 0 },
+        "anchored":               { "description": "P2: true when `pos` is the ANCHOR (not the face). Old records lack it and migrate on load.", "type": "boolean" }
       }
     },
 

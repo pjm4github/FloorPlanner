@@ -909,7 +909,6 @@ class DormerItem(FurnishingItem):
         ux, uy = _dg.ridge_direction(rot)                 # pos is the ANCHOR; the
         pos = (self.pos().x() - ux * depth,               # FACE is `depth` downhill
                self.pos().y() - uy * depth)
-        gf = self.params.get("guide_face_in", 0.0)
 
         def op_records(wall):
             out = []
@@ -942,7 +941,7 @@ class DormerItem(FurnishingItem):
                 ops += _dg.project_openings(a, b, w.length(), op_records(w))
             return ((min(ext), max(ext)) if ext else None), ops
 
-        ctx["face_wall"], ctx["face_openings"] = gather(_dg.project_wall, gf)
+        ctx["face_wall"], ctx["face_openings"] = gather(_dg.project_wall)
         side_walls, side_openings = {}, {}
         for side in _dg.SIDES:
             span, ops = gather(_dg.project_side_wall, _dg.side_x(self.params, side))
@@ -1369,12 +1368,14 @@ class DormerGripItem(QGraphicsItem):
     its position is set by `DormerItem._place_grips`. Dragging it reshapes the
     dormer LIVE and HOLDS the knee lines until release (0354 §2):
 
-        span_l / span_r   (B, blue)    the half-width to the eaves line
+        span_l / span_r   (B, teal)    the half-width to the eaves line
         guide_l / guide_r (C, yellow)  the side guide line (draws no wall)
         eave_l / eave_r   (E, green)   the eave overhang beyond the wall
-        guide_face        (D, purple)  the face guide, set back along the ridge
-        face              (F, orange)  the face/rake overhang
-        apex              (A, white)   double-click opens the dialog (pitch)
+        guide_face        (D, purple)  the FACE WALL: sets the face distance,
+                                       sliding from the anchor out to the eave
+        face              (F, orange)  the EAVE, past the host roof edge
+        apex              (A, white)   the ANCHOR: drag along the roof; double-
+                                       click opens the dialog
 
     Sized in VIEW PIXELS (like `FurnishingItem`'s rotator and `RoofGripItem`),
     so it stays grabbable at any zoom."""

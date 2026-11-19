@@ -159,7 +159,7 @@ def test_guides_default_to_the_eaves_line_and_never_pass_it():
     assert dg.guides(_st(guide_left_in=40.0))[:2] == (40.0, 40.0)
     assert dg.guides(_st(guide_left_in=400.0))[0] == 60.0
     p = dg.plan(_st(), 97.0, *HOST)
-    assert len(p["guides"]) == 3 and len(p["valleys"]) == 2 and len(p["knees"]) == 2
+    assert len(p["guides"]) == 2 and len(p["valleys"]) == 2 and len(p["knees"]) == 2
 
 
 def test_the_roof_record_round_trips_through_the_old_shape():
@@ -331,23 +331,15 @@ def test_the_roof_codes_own_reader_agrees_with_this_calculator():
 
 
 # -- control D, the face guide (0355) ----------------------------------------
-def test_the_face_guide_is_state_and_is_clamped_to_the_ridge_by_plan():
-    assert dg.guides(_st())[2] == 0.0
-    st = _st(guide_face_in=18.0)
-    assert dg.guides(st)[2] == 18.0
-    face_line = dg.plan(st, None, *HOST)["guides"][-1]
-    assert face_line == ((-60.0, 18.0), (60.0, 18.0))
-    side = dg.plan(st, None, *HOST)["guides"][0]
-    assert side[0] == (60.0, 18.0), "the side guides start on the face guide"
-    deep = dg.plan(_st(guide_face_in=5000.0), None, *HOST)["guides"][-1]
-    assert deep[0][1] == pytest.approx(dg.ridge_depth(_st(), *HOST)[0])
-    assert dg.normalize_state({"guide_face_in": -4.0})["guide_face_in"] == 0.0
-
-
-def test_the_face_guide_round_trips_through_the_roof_record():
-    rec = dg.to_roof_record(_st(guide_face_in=18.0), (0.0, 0.0), 0.0, 96.0)
-    assert rec["face_guide_in"] == 18.0
-    assert dg.from_roof_record(rec)[0]["guide_face_in"] == 18.0
+def test_the_side_guides_run_from_the_face_back_to_the_host():
+    # P3 retirement (2026-11-18): the face guide D is gone -- the two side
+    # guides (C) now start on the FACE (dg y = 0) and run to the depth.
+    st = _st()
+    assert len(dg.guides(st)) == 2, "guides() is (left, right) now"
+    lines = dg.plan(st, None, *HOST)["guides"]
+    assert len(lines) == 2, "two side guides, no face-guide line"
+    assert lines[0][0][1] == 0.0 and lines[1][0][1] == 0.0, "they start on the face"
+    assert "guide_face_in" not in dg.STATE_DEFAULTS
     assert "face_guide_in" not in dg.to_roof_record(_st(), (0.0, 0.0), 0.0, 96.0)
 
 
@@ -463,7 +455,7 @@ def test_the_kind_reports_the_face_and_its_findings():
 
 
 # -- the two sides (0356, Patrick: "gable end and both sides") ---------------
-def test_a_side_wall_runs_from_the_face_guide_to_where_the_host_reaches_its_top():
+def test_a_side_wall_runs_from_the_face_to_where_the_host_reaches_its_top():
     st = _st()                                   # side guide at 60: top = eaves 60
     prof = dg.side_profile(st, "left", *HOST)
     assert prof["top"] == 60.0 and dg.side_x(st, "left") == 60.0
@@ -473,8 +465,9 @@ def test_a_side_wall_runs_from_the_face_guide_to_where_the_host_reaches_its_top(
     assert prof["roof"][0] == (-12.0, 60.0), "the eave runs out over the face"
     free = dg.side_profile(st, "left")
     assert free["host"] is None and free["span"] == (0.0, 96.0)
-    inset = dg.side_profile(_st(guide_left_in=30.0, guide_face_in=10.0), "right", *HOST)
-    assert inset["top"] == pytest.approx(85.0) and inset["span"][0] == 10.0
+    # the side wall starts on the FACE now (the face guide D is retired)
+    inset = dg.side_profile(_st(guide_left_in=30.0), "right", *HOST)
+    assert inset["top"] == pytest.approx(85.0) and inset["span"][0] == 0.0
 
 
 def test_the_side_shows_the_dormer_roof_as_a_hidden_true_projection():

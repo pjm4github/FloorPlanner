@@ -37,7 +37,6 @@ STATE_DEFAULTS = {
     "face_overhang_in": 12.0,      # control F: the rake past the face
     "guide_left_in": 0.0,          # control C: side guide, 0 = on the eaves line
     "guide_right_in": 0.0,
-    "guide_face_in": 0.0,          # control D: face guide, set back from the face
     "box_left_in": 0.0,            # control B: frame half-width, 0 = not set
     "box_right_in": 0.0,
     "depth_in": 96.0,              # ridge length (anchor to face); the run off a roof
@@ -84,7 +83,7 @@ def normalize_state(state):
             out[b] = out[a]
     for key in ("eave_overhang_left_in", "eave_overhang_right_in",
                 "face_overhang_in", "guide_left_in", "guide_right_in",
-                "guide_face_in", "box_left_in", "box_right_in", "pitch_12"):
+                "box_left_in", "box_right_in", "pitch_12"):
         out[key] = max(out[key], 0.0)
     out["depth_in"] = max(out["depth_in"], 1.0)
     return out
@@ -409,15 +408,13 @@ def footprint(st, depth):
 
 
 def guides(st):
-    """Controls C and D as GUIDES, not walls: the two side lines and the face
-    line the user draws their own walls against. Local x of (left, right)
-    and the face guide's y: `guide_face_in`, its set-back from the face INTO
-    the dormer (0 = on the face; 0355). `plan` clamps it to the ridge's
-    length, which only a caller that knows the host can."""
+    """Control C as GUIDES, not walls: the two side lines the user draws their
+    own walls against. Local x of (left, right). The old face guide D is
+    RETIRED (P3, 2026-11-18) -- the purple knob now sets the face DISTANCE
+    (`depth_in`), so a face wall stands at the face itself."""
     left = st["guide_left_in"] if st["guide_left_in"] > _EPS else st["span_left_in"]
     right = st["guide_right_in"] if st["guide_right_in"] > _EPS else st["span_right_in"]
-    return (min(left, st["span_left_in"]), min(right, st["span_right_in"]),
-            max(float(st.get("guide_face_in", 0.0)), 0.0))
+    return (min(left, st["span_left_in"]), min(right, st["span_right_in"]))
 
 
 def plan(st, ceiling_in=None, host_z_face=None, host_slope=None):
@@ -432,15 +429,15 @@ def plan(st, ceiling_in=None, host_z_face=None, host_slope=None):
     """
     depth, _met = ridge_depth(st, host_z_face, host_slope)
     fp = footprint(st, depth)
-    gl, gr, gf = guides(st)
-    gf = min(gf, depth)
+    gl, gr = guides(st)
     shed = st["form"] == "shed"
     # BOTH side eaves and BOTH side guides, for a gable and a shed alike
     # (Patrick, 2026-11-18): the shed is a full box with two symmetric
     # trapezoid sides, so it carries a left AND a right eave and side guide.
+    # The side guides run from the FACE back to the host (the face guide D is
+    # retired -- the purple knob now sets the face distance).
     eaves = [(fp[1], fp[2]), (fp[0], fp[3])]
-    lines = [((gl, gf), (gl, depth)), ((-gr, gf), (-gr, depth)),
-             ((-gr, gf), (gl, gf))]
+    lines = [((gl, 0.0), (gl, depth)), ((-gr, 0.0), (-gr, depth))]
     # the RIDGE: a gable's runs down the middle, from the face into the host;
     # a shed's is its high BACK edge across the width -- its ONLY host contact.
     ridge = (fp[2], fp[3]) if shed else ((0.0, 0.0), (0.0, depth))
@@ -488,7 +485,7 @@ def face_profile(st, host_z_face=None, host_slope=None):
     if st["form"] == "shed":
         eaves = st["eaves_h_in"]
         back = back_height(st, host_z_face, host_slope)
-        gl, gr, _gf = guides(st)
+        gl, gr = guides(st)
         left = st["span_left_in"] + st["eave_overhang_left_in"]
         right = st["span_right_in"] + st["eave_overhang_right_in"]
         wall = [(gl, 0.0), (gl, eaves), (-gr, eaves), (-gr, 0.0)]
@@ -496,7 +493,7 @@ def face_profile(st, host_z_face=None, host_slope=None):
         return {"roof": roof, "wall": wall, "peak": (0.0, back)}
     rh = ridge_height(st)
     sl, sr = slopes(st)
-    gl, gr, _gf = guides(st)
+    gl, gr = guides(st)
     left = st["span_left_in"] + st["eave_overhang_left_in"]
     roof = [(0.0, rh), (left, rh - sl * left)]
     wall = [(gl, 0.0), (gl, rh - sl * gl), (0.0, rh)]
@@ -607,7 +604,7 @@ SIDES = ("left", "right")
 def side_x(st, side):
     """The across-coordinate of a side guide. A shed's RIGHT side is its
     high wall, under the ridge."""
-    gl, gr, _gf = guides(st)
+    gl, gr = guides(st)
     return gl if side == "left" else -gr
 
 
@@ -651,7 +648,7 @@ def side_profile(st, side, host_z_face=None, host_slope=None):
     rh = ridge_height(st)
     fo = st["face_overhang_in"]
     depth, met = ridge_depth(st, host_z_face, host_slope)
-    y0 = min(guides(st)[2], depth)
+    y0 = 0.0                             # the side wall runs from the FACE
     y1 = depth
     host = None
     if met and depth > _EPS:
@@ -726,8 +723,7 @@ def to_roof_record(st, pos, rotation_deg, depth, datum_shift=0.0, **extra):
     this level's elevation minus the elevation of whatever datum the caller
     composes in. `ridge[0]` is the FACE, as the roof code expects of a
     dormer. `extra` (an `id`, a `level`, a `host`) is merged in."""
-    gl, gr, _gf = guides(st)
-    _gf = min(_gf, depth)
+    gl, gr = guides(st)
     rec = {
         "ridge": [list(pos), list(to_plan(pos, rotation_deg, (0.0, depth)))],
         "eaves_h_in": st["eaves_h_in"] + datum_shift,
@@ -740,8 +736,6 @@ def to_roof_record(st, pos, rotation_deg, depth, datum_shift=0.0, **extra):
         "form": st["form"],
         "dormer_walls": [],              # a furnishing dormer mints no wall
     }
-    if _gf > _EPS:
-        rec["face_guide_in"] = _gf
     if st["box_left_in"] > _EPS or st["box_right_in"] > _EPS:
         rec["box_half_in"] = [st["box_left_in"] or st["span_left_in"],
                               st["box_right_in"] or st["span_right_in"]]
@@ -782,6 +776,5 @@ def from_roof_record(rec, datum_shift=0.0):
           "face_overhang_in": face,
           "guide_left_in": 0.0 if abs(gl - sl) < 1e-6 else gl,
           "guide_right_in": 0.0 if abs(gr - sr) < 1e-6 else gr,
-          "guide_face_in": float(rec.get("face_guide_in", 0.0) or 0.0),
           "box_left_in": bl, "box_right_in": br, "depth_in": max(depth, 1.0)}
     return normalize_state(st), (float(x0), float(y0)), rotation, depth

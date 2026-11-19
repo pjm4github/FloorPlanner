@@ -101,10 +101,6 @@ class DormerKind(ParametricKind):
                      "stand. 0 = on the eaves line. It draws no wall."),
             size("guide_right_in", "Side guide, right", 0.0, 480.0,
                  enabled=_free_right),
-            size("guide_face_in", "Face guide set-back", 0.0, 600.0,
-                 tip="Knob D, as a guide line only: where the face wall "
-                     "would stand, back from the face. 0 = on the face. It "
-                     "draws no wall."),
             size("depth_in", "Face distance", 1.0, 600.0,
                  tip="How far the FACE WALL stands down the roof from the anchor "
                      "(knob D, purple). The anchor sits on the host; this is the "
