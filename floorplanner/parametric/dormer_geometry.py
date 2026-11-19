@@ -41,7 +41,9 @@ STATE_DEFAULTS = {
     "box_right_in": 0.0,
     "depth_in": 96.0,              # ridge length (anchor to face); the run off a roof
     "anchored": False,             # P2: pos is the ANCHOR, not the face (migration flag)
+    "face_mode": "auto",           # P4: the user's face-type intent (see FACE_MODES)
 }
+FACE_MODES = ("auto", "plain_wall", "setback", "balcony")
 _NUMBERS = tuple(k for k, v in STATE_DEFAULTS.items() if isinstance(v, float))
 _EPS = 1e-9
 MIN_SPAN_IN = 12.0
@@ -61,6 +63,7 @@ def normalize_state(state):
     out["form"] = src.get("form") if src.get("form") in FORMS else "gable"
     out["symmetric"] = bool(src.get("symmetric", STATE_DEFAULTS["symmetric"]))
     out["anchored"] = bool(src.get("anchored", STATE_DEFAULTS["anchored"]))
+    out["face_mode"] = src.get("face_mode") if src.get("face_mode") in FACE_MODES else "auto"
     for key in _NUMBERS:
         try:
             v = float(src.get(key, STATE_DEFAULTS[key]))
@@ -297,31 +300,75 @@ def host_extent(host_z_face=None, host_slope=None, host_ridge_in=None,
 # the face type (P4, 2026-11-18): plain wall / setback / cantilever / balcony
 # --------------------------------------------------------------------------
 FACE_STANDARD = "standard"       # the face lands on the host roof, clear
-FACE_CANTILEVER = "cantilever"   # the eave projects PAST the host roof edge
+FACE_CANTILEVER = "cantilever"   # the FACE projects PAST the host roof edge
 FACE_WALL = "wall"               # flush with the wall below (needs a wall below)
 FACE_SETBACK = "setback"         # aligned with the wall below, roof strip in front
 FACE_BALCONY = "balcony"         # set back, the front roof cut away for a terrace
 FACE_TYPES = (FACE_STANDARD, FACE_CANTILEVER, FACE_WALL, FACE_SETBACK, FACE_BALCONY)
+FACE_ALIGN_TOL_IN = 6.0          # how near the host eave still counts as "at" it
 
 
-def eave_past_host(st, host_z_face=None, host_slope=None, host_eave_in=None):
-    """How far the dormer's EAVE (the orange knob, `face_overhang_in` past the
-    face) projects beyond the host roof's EAVE edge, along the slope: positive
-    is a CANTILEVER, <= 0 the eave lands on the roof. None with no host."""
+def face_vs_host_eave(st, host_z_face=None, host_slope=None, host_eave_in=None):
+    """Signed distance ALONG the roof from the FACE to the host eave edge:
+    > 0 the face is UP the roof (host roof shows in FRONT of it), ~0 at the
+    eave, < 0 the FACE is PAST the eave. None with no host."""
     if (host_z_face is None or host_slope is None or host_slope <= _EPS
             or host_eave_in is None):
         return None
-    # the face sits `host_z_face` up the roof; the host eave is this far DOWN it
-    eave_dist = (host_z_face - host_eave_in) / host_slope
-    return st["face_overhang_in"] - eave_dist
+    return (host_z_face - host_eave_in) / host_slope
+
+
+def face_past_eave(st, host_z_face=None, host_slope=None, host_eave_in=None):
+    """How far the FACE (the purple knob) projects PAST the host roof's eave
+    edge, along the slope: positive is a CANTILEVER (the face hangs off the
+    roof), <= 0 the face lands on it. The eave OVERHANG past the face is normal
+    -- it is the FACE past the edge that makes a cantilever (Patrick,
+    2026-11-18). None with no host."""
+    fv = face_vs_host_eave(st, host_z_face, host_slope, host_eave_in)
+    return None if fv is None else -fv
 
 
 def face_type(st, host_z_face=None, host_slope=None, host_eave_in=None):
-    """The face type from GEOMETRY alone (P4a): CANTILEVER when the eave
-    projects past the host eave, else STANDARD. Plain wall / setback / balcony
-    need the walls BELOW the face and the user's choice (P4b)."""
-    past = eave_past_host(st, host_z_face, host_slope, host_eave_in)
-    return FACE_CANTILEVER if (past is not None and past > _EPS) else FACE_STANDARD
+    """The face type from GEOMETRY alone (P4a): CANTILEVER when the FACE
+    projects past the host eave, else STANDARD. The full four-type reading
+    (which needs the wall BELOW and the user's choice) is `classify_face`."""
+    past = face_past_eave(st, host_z_face, host_slope, host_eave_in)
+    return FACE_CANTILEVER if (past is not None and past > FACE_ALIGN_TOL_IN) else FACE_STANDARD
+
+
+def classify_face(st, host_z_face=None, host_slope=None, host_eave_in=None,
+                  wall_below=False, choice="auto"):
+    """The EFFECTIVE face type (P4b) and whether the user's `choice` is
+    supported, as `(type, supported)`.
+
+    CANTILEVER wins when the FACE projects past the host eave (geometry). Else
+    the reading turns on where the FACE sits relative to the host eave and
+    whether an exterior wall stands BELOW it:
+      * face AT the host eave with a wall below  -> PLAIN WALL (needs a wall)
+      * face SET BACK (host roof shows in front) -> SETBACK, or BALCONY when
+        chosen (the front roof is cut away -- phase 3)
+      * no wall below, face on the roof          -> STANDARD / SETBACK
+    `choice` in `FACE_MODES`; "auto" derives it. `supported` is False when the
+    choice cannot apply to this geometry (the dialog flags it)."""
+    fv = face_vs_host_eave(st, host_z_face, host_slope, host_eave_in)
+    if fv is None:
+        return FACE_STANDARD, choice == "auto"
+    if fv < -FACE_ALIGN_TOL_IN:               # the FACE is past the host eave
+        return FACE_CANTILEVER, choice in ("auto",)
+    set_back = fv > FACE_ALIGN_TOL_IN         # host roof shows in front
+    at_eave = abs(fv) <= FACE_ALIGN_TOL_IN
+    if choice == "plain_wall":
+        return FACE_WALL, bool(wall_below) and not set_back
+    if choice == "setback":
+        return FACE_SETBACK, set_back or at_eave
+    if choice == "balcony":
+        return FACE_BALCONY, set_back
+    # auto
+    if wall_below and at_eave:
+        return FACE_WALL, True
+    if set_back:
+        return FACE_SETBACK, True
+    return FACE_STANDARD, True
 
 
 def ridge_depth(st, host_z_face=None, host_slope=None):

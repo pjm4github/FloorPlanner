@@ -73,6 +73,17 @@ class DormerKind(ParametricKind):
                               "host roof -- shallower than the host."),
             ParamSpec("symmetric", "Symmetric", BOOL, d["symmetric"],
                       tooltip="The right side takes the left side's numbers."),
+            ParamSpec("face_mode", "Face type", ENUM, d["face_mode"],
+                      choices=(("auto", "Auto (from geometry)"),
+                               ("plain_wall", "Plain wall"),
+                               ("setback", "Setback"),
+                               ("balcony", "Balcony")),
+                      tooltip="How the face meets the house below. AUTO reads it "
+                              "from the geometry: CANTILEVER when the eave is past "
+                              "the roof edge, SETBACK when host roof shows in "
+                              "front, PLAIN WALL when flush with a wall below. "
+                              "Pick one to force it; a note warns when the "
+                              "geometry cannot support the pick."),
             size("span_left_in", "Half-width, left", dg.MIN_SPAN_IN, 480.0,
                  tip="Ridge to the eaves line (knob B / G)."),
             size("span_right_in", "Half-width, right", dg.MIN_SPAN_IN, 480.0,
@@ -162,14 +173,28 @@ class DormerKind(ParametricKind):
             "footprint": dg.footprint(st, depth), "ceiling_in": ceiling,
         }
         eave_h = (context or {}).get("host_eave_in")
-        derived["face_type"] = dg.face_type(st, z_face, slope, eave_h)
-        past = dg.eave_past_host(st, z_face, slope, eave_h)
-        if past is not None and past > 0.0:
+        wall_below = bool((context or {}).get("wall_below"))
+        choice = st.get("face_mode", "auto")
+        ftype, supported = dg.classify_face(st, z_face, slope, eave_h, wall_below, choice)
+        derived["face_type"] = ftype
+        derived["wall_below"] = wall_below
+        if ftype == dg.FACE_CANTILEVER:
+            past = dg.face_past_eave(st, z_face, slope, eave_h)
             findings.append(Finding(
                 "dormer.cantilever", ADVISORY,
-                f"The eave projects {_fmt(past)} in past the host roof edge: "
+                f"The face stands {_fmt(past)} in past the host roof edge: "
                 "this is a cantilever (hanging) dormer.",
-                field="face_overhang_in"))
+                field="depth_in"))
+        if choice != "auto" and not supported:
+            why = {"plain_wall": "needs an exterior wall below the face and the "
+                                 "face at the roof edge",
+                   "setback": "needs the face set back up the roof",
+                   "balcony": "needs the face set back, with roof in front to cut"}
+            findings.append(Finding(
+                "dormer.face_unsupported", WARNING,
+                f"A {choice.replace('_', ' ')} dormer {why.get(choice, '')} here; "
+                f"the dormer reads as a {ftype.replace('_', ' ')} instead.",
+                field="face_mode"))
         if z_face is None:
             findings.append(Finding(
                 "dormer.no_host", WARNING,

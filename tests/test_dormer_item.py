@@ -179,6 +179,19 @@ def test_a_rotated_dormer_is_flagged_not_facing_downhill(scene):
     assert d._unbuildable == dg.NOT_DOWNHILL
 
 
+def test_the_context_carries_the_wall_below_probe_and_a_face_type(scene):
+    # P4b (2026-11-18): param_context runs the wall-below probe; with no floor
+    # below there is none, and the face type is classified from the geometry.
+    _host(scene)
+    _room(scene)
+    d = _dormer(scene, pos=QPointF(150, 150), new=True)
+    d._recompute()
+    ctx = d.param_context()
+    assert "wall_below" in ctx                        # the probe ran
+    derived, _fs = DORMER.evaluate(d.params, ctx)
+    assert derived["face_type"] in dg.FACE_TYPES
+
+
 def test_over_no_roof_there_is_no_host_and_a_warning(scene):
     _room(scene)
     d = _dormer(scene, pos=QPointF(1000, 1000), new=True)   # far from any roof

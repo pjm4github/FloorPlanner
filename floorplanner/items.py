@@ -890,6 +890,7 @@ class DormerItem(FurnishingItem):
                 ctx["host_offaxis_deg"] = offaxis
         if not self._frozen:                 # not per-frame while a knob drags
             self._face_and_sides(ctx)
+            self._wall_below(ctx)            # P4b: the wall below, for the face type
         return ctx
 
     def _face_and_sides(self, ctx):
@@ -947,6 +948,35 @@ class DormerItem(FurnishingItem):
             span, ops = gather(_dg.project_side_wall, _dg.side_x(self.params, side))
             side_walls[side], side_openings[side] = span, ops
         ctx["side_walls"], ctx["side_openings"] = side_walls, side_openings
+
+    def _wall_below(self, ctx):
+        """P4b (0352): is there an exterior wall on the floor BELOW, aligned
+        under the dormer FACE? The plain-wall / setback reading needs it. Like
+        F1 but on the level below, projected onto the face line. `wall_below` is
+        the across-extent (or None when there is no lower floor / no wall)."""
+        sc = self.scene()
+        if sc is None:
+            return
+        from floorplanner.walls import WallItem
+        from floorplanner.roofs import _floor_below
+        below = _floor_below(self.floor)
+        if below is None:
+            ctx["wall_below"] = None
+            return
+        rot = self.rotation()
+        depth = max(self.params["depth_in"], 1.0)
+        ux, uy = _dg.ridge_direction(rot)
+        face = (self.pos().x() - ux * depth, self.pos().y() - uy * depth)
+        ext = []
+        for w in sc.items():
+            if (not isinstance(w, WallItem) or sip.isdeleted(w)
+                    or getattr(w, "floor", None) != below):
+                continue
+            e = _dg.project_wall(face, rot, (w.p1.x(), w.p1.y()),
+                                 (w.p2.x(), w.p2.y()))
+            if e is not None:
+                ext += list(e)
+        ctx["wall_below"] = (min(ext), max(ext)) if ext else None
 
     # -- geometry ------------------------------------------------------------
     def _current_sig(self, ctx):

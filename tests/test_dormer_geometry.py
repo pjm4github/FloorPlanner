@@ -219,28 +219,39 @@ def test_host_extent_places_the_eave_and_ridge_along_the_ridge():
     assert dg.host_extent(host_z_face=60.0, host_slope=0.0) is None
 
 
-def test_face_type_detects_a_cantilever_past_the_host_eave():
-    # P4a (2026-11-18): the eave (orange) reaching past the host eave is a
-    # cantilever; landing on the roof is standard. host: face 60 up, slope 1,
-    # eave 48 -> the face is 12 in down the slope to the host eave edge.
-    st = _st(face_overhang_in=12.0)
-    assert dg.eave_past_host(st, 60.0, 1.0, 48.0) == pytest.approx(0.0)
+def test_face_type_cantilever_is_the_FACE_past_the_host_eave():
+    # P4 (2026-11-18): the FACE (not the eave overhang) past the host eave is a
+    # cantilever. host: slope 1, eave 48. face_vs_host_eave > 0 = roof in front.
+    st = _st()
+    assert dg.face_vs_host_eave(st, 60.0, 1.0, 48.0) == pytest.approx(12.0)
     assert dg.face_type(st, 60.0, 1.0, 48.0) == dg.FACE_STANDARD
-    far = _st(face_overhang_in=40.0)
-    assert dg.eave_past_host(far, 60.0, 1.0, 48.0) == pytest.approx(28.0)
-    assert dg.face_type(far, 60.0, 1.0, 48.0) == dg.FACE_CANTILEVER
-    assert dg.face_type(st) == dg.FACE_STANDARD          # no host -> standard
+    assert dg.face_past_eave(st, 40.0, 1.0, 48.0) == pytest.approx(8.0)
+    assert dg.face_type(st, 40.0, 1.0, 48.0) == dg.FACE_CANTILEVER
+    assert dg.face_type(st) == dg.FACE_STANDARD          # no host
+
+
+def test_classify_face_reads_the_four_types():
+    st = _st()
+    assert dg.classify_face(st, 40.0, 1.0, 48.0)[0] == dg.FACE_CANTILEVER   # past
+    assert dg.classify_face(st, 50.0, 1.0, 48.0, wall_below=True)[0] == dg.FACE_WALL
+    assert dg.classify_face(st, 90.0, 1.0, 48.0)[0] == dg.FACE_SETBACK      # roof in front
+    t, ok = dg.classify_face(st, 90.0, 1.0, 48.0, choice="balcony")
+    assert t == dg.FACE_BALCONY and ok
+    _t, ok2 = dg.classify_face(st, 50.0, 1.0, 48.0, wall_below=False, choice="plain_wall")
+    assert not ok2, "plain wall needs a wall below"
+    assert dg.classify_face(st)[0] == dg.FACE_STANDARD   # no host
 
 
 def test_a_cantilever_face_is_derived_and_noted():
-    ctx = {"host_z_face_in": 60.0, "host_slope": 1.0, "host_eave_in": 48.0,
-           "host_ridge_in": 240.0}
-    d, fs = DORMER.evaluate({"face_overhang_in": 40.0}, ctx)
+    # a short-run face (depth 40) with ridge 180 derives z_face = 180 - 40 = 140,
+    # which is UP the roof; push the face past the eave with a long run instead.
+    ctx = {"host_z_face_in": 40.0, "host_slope": 1.0, "host_eave_in": 48.0}
+    d, fs = DORMER.evaluate({}, ctx)
     assert d["face_type"] == dg.FACE_CANTILEVER
     assert any(f.rule_id == "dormer.cantilever" for f in fs) and not F.blocks(fs)
-    d2, fs2 = DORMER.evaluate({"face_overhang_in": 5.0}, ctx)
-    assert d2["face_type"] == dg.FACE_STANDARD
-    assert not any(f.rule_id == "dormer.cantilever" for f in fs2)
+    d2, _fs2 = DORMER.evaluate({}, {"host_z_face_in": 90.0, "host_slope": 1.0,
+                                    "host_eave_in": 48.0})
+    assert d2["face_type"] == dg.FACE_SETBACK
 
 
 # -- the kind ---------------------------------------------------------------
