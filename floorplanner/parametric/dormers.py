@@ -161,6 +161,15 @@ class DormerKind(ParametricKind):
                                else dg.full_height_width(st, ceiling)),
             "footprint": dg.footprint(st, depth), "ceiling_in": ceiling,
         }
+        eave_h = (context or {}).get("host_eave_in")
+        derived["face_type"] = dg.face_type(st, z_face, slope, eave_h)
+        past = dg.eave_past_host(st, z_face, slope, eave_h)
+        if past is not None and past > 0.0:
+            findings.append(Finding(
+                "dormer.cantilever", ADVISORY,
+                f"The eave projects {_fmt(past)} in past the host roof edge: "
+                "this is a cantilever (hanging) dormer.",
+                field="face_overhang_in"))
         if z_face is None:
             findings.append(Finding(
                 "dormer.no_host", WARNING,

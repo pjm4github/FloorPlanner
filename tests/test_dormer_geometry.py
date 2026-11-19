@@ -219,6 +219,30 @@ def test_host_extent_places_the_eave_and_ridge_along_the_ridge():
     assert dg.host_extent(host_z_face=60.0, host_slope=0.0) is None
 
 
+def test_face_type_detects_a_cantilever_past_the_host_eave():
+    # P4a (2026-11-18): the eave (orange) reaching past the host eave is a
+    # cantilever; landing on the roof is standard. host: face 60 up, slope 1,
+    # eave 48 -> the face is 12 in down the slope to the host eave edge.
+    st = _st(face_overhang_in=12.0)
+    assert dg.eave_past_host(st, 60.0, 1.0, 48.0) == pytest.approx(0.0)
+    assert dg.face_type(st, 60.0, 1.0, 48.0) == dg.FACE_STANDARD
+    far = _st(face_overhang_in=40.0)
+    assert dg.eave_past_host(far, 60.0, 1.0, 48.0) == pytest.approx(28.0)
+    assert dg.face_type(far, 60.0, 1.0, 48.0) == dg.FACE_CANTILEVER
+    assert dg.face_type(st) == dg.FACE_STANDARD          # no host -> standard
+
+
+def test_a_cantilever_face_is_derived_and_noted():
+    ctx = {"host_z_face_in": 60.0, "host_slope": 1.0, "host_eave_in": 48.0,
+           "host_ridge_in": 240.0}
+    d, fs = DORMER.evaluate({"face_overhang_in": 40.0}, ctx)
+    assert d["face_type"] == dg.FACE_CANTILEVER
+    assert any(f.rule_id == "dormer.cantilever" for f in fs) and not F.blocks(fs)
+    d2, fs2 = DORMER.evaluate({"face_overhang_in": 5.0}, ctx)
+    assert d2["face_type"] == dg.FACE_STANDARD
+    assert not any(f.rule_id == "dormer.cantilever" for f in fs2)
+
+
 # -- the kind ---------------------------------------------------------------
 def test_the_kind_is_registered_and_offered():
     # phase 2 (0352): the kind is REGISTERED now that DormerItem draws one and

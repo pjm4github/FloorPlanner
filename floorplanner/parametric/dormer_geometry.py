@@ -293,6 +293,37 @@ def host_extent(host_z_face=None, host_slope=None, host_ridge_in=None,
     return {"eave_y": eave_y, "ridge_y": ridge_y}
 
 
+# --------------------------------------------------------------------------
+# the face type (P4, 2026-11-18): plain wall / setback / cantilever / balcony
+# --------------------------------------------------------------------------
+FACE_STANDARD = "standard"       # the face lands on the host roof, clear
+FACE_CANTILEVER = "cantilever"   # the eave projects PAST the host roof edge
+FACE_WALL = "wall"               # flush with the wall below (needs a wall below)
+FACE_SETBACK = "setback"         # aligned with the wall below, roof strip in front
+FACE_BALCONY = "balcony"         # set back, the front roof cut away for a terrace
+FACE_TYPES = (FACE_STANDARD, FACE_CANTILEVER, FACE_WALL, FACE_SETBACK, FACE_BALCONY)
+
+
+def eave_past_host(st, host_z_face=None, host_slope=None, host_eave_in=None):
+    """How far the dormer's EAVE (the orange knob, `face_overhang_in` past the
+    face) projects beyond the host roof's EAVE edge, along the slope: positive
+    is a CANTILEVER, <= 0 the eave lands on the roof. None with no host."""
+    if (host_z_face is None or host_slope is None or host_slope <= _EPS
+            or host_eave_in is None):
+        return None
+    # the face sits `host_z_face` up the roof; the host eave is this far DOWN it
+    eave_dist = (host_z_face - host_eave_in) / host_slope
+    return st["face_overhang_in"] - eave_dist
+
+
+def face_type(st, host_z_face=None, host_slope=None, host_eave_in=None):
+    """The face type from GEOMETRY alone (P4a): CANTILEVER when the eave
+    projects past the host eave, else STANDARD. Plain wall / setback / balcony
+    need the walls BELOW the face and the user's choice (P4b)."""
+    past = eave_past_host(st, host_z_face, host_slope, host_eave_in)
+    return FACE_CANTILEVER if (past is not None and past > _EPS) else FACE_STANDARD
+
+
 def ridge_depth(st, host_z_face=None, host_slope=None):
     """How far the ridge runs (gable) / how deep the plane reaches (shed)
     before it meets the host -- or the stored `depth_in` with no host. A
