@@ -498,5 +498,6 @@ this table is not a second copy of it.
 | [`0356-ruling.md`](./0356-ruling.md) | ruling: control D has its field; the dormer dialog shows the GABLE END and BOTH SIDES, with the openings in the walls under them |
 | [`0357-report.md`](./0357-report.md) | report: control D and F1 built; F2–F4 measured (0356) |
 | [`0358-report.md`](./0358-report.md) | ask: should a dormer ridge above the host roof's ridge be an ERROR? |
+| [`0359-ruling.md`](./0359-ruling.md) | ruling: a dormer whose ridge is above the host's ridge is an ERROR, and is not built |
 
 <!-- PAIRS:END -->
