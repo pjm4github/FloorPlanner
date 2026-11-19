@@ -8,6 +8,9 @@ Layers, each usable without the one after it:
     stair_geometry        the stair calculator (no imports; the viewer loads
                           it by path)
     stairs                the STAIRS kind: parameters, validation, summary
+    dormer_geometry       the dormer calculator (no imports; the viewer loads
+                          it by path)
+    dormers               the DORMER kind (0352)
     cabinet_geometry      cabinets and appliances as parts, and the style
                           vocabulary (no imports; viewer and generator load
                           it by path)
@@ -18,6 +21,7 @@ Layers, each usable without the one after it:
 Importing this package imports NO Qt.
 """
 from floorplanner.parametric import (  # noqa: F401
-    cabinet_geometry, cabinets, registry, stair_geometry, stairs)
+    cabinet_geometry, cabinets, dormer_geometry, dormers, registry,
+    stair_geometry, stairs)
 from floorplanner.parametric.findings import Finding  # noqa: F401
 from floorplanner.parametric.registry import get, is_parametric  # noqa: F401

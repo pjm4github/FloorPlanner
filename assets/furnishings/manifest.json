@@ -1988,5 +1988,21 @@
     "side_file": null,
     "cabinet": null,
     "price": 0.0
+  },
+  {
+    "id": "dormer",
+    "name": "Dormer",
+    "category": "Framing",
+    "file": "dormer.svg",
+    "width_in": 120,
+    "depth_in": 96,
+    "height_in": 60,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": null,
+    "price": 0.0
   }
 ]

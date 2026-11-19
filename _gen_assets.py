@@ -771,6 +771,16 @@ FURNISHINGS = [
     ("post", "Post 6x6", "Framing", 6, 6,
      [R(0.5, 0.5, 5, 5, 0, sw=1.0),
       L(0.5, 0.5, 5.5, 5.5, 0.4), L(5.5, 0.5, 0.5, 5.5, 0.4)]),
+    # 0352 (dormer-as-furnishing): the palette icon for a gable dormer -- a
+    # ridge down the middle, two eaves, the face and the two valleys where it
+    # meets the host. The PLACED dormer is drawn live by the app (DormerItem)
+    # from its own parameters; this is only the thumbnail.
+    ("dormer", "Dormer", "Framing", 120, 96,
+     [R(0.75, 0.75, 118.5, 94.5, 0, sw=1.0),                    # footprint (filled)
+      L(60, 6, 60, 90, 1.3),                                    # ridge
+      L(6, 6, 114, 6, 0.8),                                     # face / rake
+      L(6, 6, 6, 90, 0.8), L(114, 6, 114, 90, 0.8),             # eaves
+      L(6, 90, 60, 72, 0.7), L(114, 90, 60, 72, 0.7)]),         # valleys
 ]
 
 # --------------------------------------------------------------- 3D solids
@@ -983,6 +993,11 @@ SOLIDS = {
     # level to the underside of the roof standing over it; 96 is only what
     # it is drawn at when no roof stands over it.
     "post":                   (96,      0, "column",    "wood"),
+    # 0352 (dormer-as-furnishing): a dormer's real 3D is its ROOF, built by
+    # fp3d from the furnishing's own geometry via `dormer_geometry.to_roof_record`
+    # (phase 3); the furnishing box is SKIPPED in 3D. This nominal exists only
+    # so the data-model gate is satisfied -- it is never extruded.
+    "dormer":                 (60,      0, "box",       "wood"),
 }
 
 # Material properties, ONCE.  Colour is (r, g, b, a) in 0..1.  These values are
@@ -1677,7 +1692,7 @@ def main():
                   "gas_water_heater", "electric_water_heater", "water_softener",
                   "gas_tank", "oil_tank", "electric_panel", "car_charger",
                   "battery_wall", "well_pump", "heat_exchanger"]),
-        ("Framing", ["stairs", "elevator", "post"]),
+        ("Framing", ["stairs", "elevator", "post", "dormer"]),
     ]
     groups_out = [{"name": "All",
                    "items": [f"{fid}.svg" for fid, *_ in FURNISHINGS]}]

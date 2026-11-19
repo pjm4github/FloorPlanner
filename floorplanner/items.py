@@ -15,6 +15,7 @@ from floorplanner.geometry import *  # noqa: F401
 from floorplanner.catalog import *  # noqa: F401
 from floorplanner.parametric import registry as _param_registry
 from floorplanner.parametric import stair_geometry as _sg
+from floorplanner.parametric import dormer_geometry as _dg
 from floorplanner.walls import OpeningItem, WallItem, rebuild_all_walls
 from floorplanner.rooms import (
     RoomItem, report_self_intersections, room_owns_walls, walls_cover_room,
@@ -775,6 +776,764 @@ class StairItem(FurnishingItem):
         e.accept()
 
 
+class DormerItem(FurnishingItem):
+    """A DORMER furnishing (0352, phase 2).
+
+    Dropped on the level whose rooms it lights, like any furnishing -- but it
+    OWNS NO WALL. Editing it computes no wall; the only plan lines it draws are
+    its own outline (ridge, eaves, rake, valleys), the control GUIDES (C/D),
+    and the KNEE LINES where its planes cross the room's ceiling plane. The
+    walls under it are whatever the user draws on that level.
+
+    THE ITEM'S POSITION IS THE ANCHOR (P2, 2026-11-18) -- the point on the host
+    roof where the ridge dies into it, the ridge's HIGH end. `rotation` turns
+    the ridge. `dormer_geometry` keeps its FACE frame (origin = face, +y up the
+    ridge), so the item draws a dg point `(x, y)` at ITEM-local `(x, depth - y)`
+    (`_q`): the anchor (dg y = depth) lands at the item origin and the face (dg
+    y = 0) sits `depth` DOWNHILL of it. The anchor's height on the roof IS the
+    ridge height, so the ridge rises as the anchor is moved up the slope; eaves
+    or pitch floats to hold it (`dg.couple_ridge`, `_recompute`). An OLD record
+    (pos = face) migrates once (`_migrate_to_anchor`).
+
+    THE HOST IS FOUND BY HEIGHT each rebuild and nothing about it is stored
+    (`host_roof_at` + `roofclip.surface_height`, shifted to this level's
+    datum): a dormer over no roof is drawn, reported and cuts nothing. The 3D
+    roof and the host cut are phase 3; this item is the plan side."""
+
+    _GUIDE_INK = QColor(120, 120, 120)
+
+    def __init__(self, pos: QPointF, rotation: float = 0.0, *,
+                 params: dict = None, new: bool = False):
+        self.params = _dg.normalize_state(params or _dg.STATE_DEFAULTS)
+        self._seed_defaults = new and not params   # host pitch on first rebuild
+        self._pinned = "pitch_12"                   # under the anchor, eaves floats
+        # P2: pos is the ANCHOR (ridge-on-roof), not the face. A fresh drop is
+        # already anchored (the user clicks the anchor); an OLD record (pos =
+        # face, no `anchored`) migrates once on the first rebuild in a scene.
+        if new:
+            self.params["anchored"] = True
+        self._migrate_anchor = not self.params.get("anchored")
+        self._geo = _dg.plan(self.params)
+        self._knees = []                            # orange knee lines, settled
+        self._unbuildable = None                    # dg.unbuildable reason, or None
+        self._depth = self.params["depth_in"]       # ridge length, anchor to face
+        self._bbox = QRectF(-1, -1, 2, 2)
+        self._sig = None
+        self._recompute_pending = False
+        self._frozen = False
+        self._grips = []                            # DormerGripItem children
+        super().__init__("dormer", pos, rotation)
+        self._recompute()
+
+    # -- state ---------------------------------------------------------------
+    def extra_state(self) -> dict:
+        return {k: self.params[k] for k in _dg.STATE_DEFAULTS}
+
+    def draft_state(self) -> dict:
+        return dict(self.params)
+
+    def apply_params(self, state: dict):
+        """Take an accepted parameter set and redraw. The FACE stays put (it is
+        the item's position / anchor), so unlike a stair nothing is shifted."""
+        self.params = _dg.normalize_state(state)
+        self._seed_defaults = False
+        self._recompute()
+        self._place_grips()
+        self.update()
+
+    # -- the host, found by height -------------------------------------------
+    def _host_plane(self):
+        """(height at the face, slope along the ridge, host ridge height, host
+        EAVE height, OFF-AXIS degrees) of the roof under the dormer, in THIS
+        level's datum -- or (None,)*5 when no roof is under it. Nothing is
+        stored. The ridge and eave heights bound the anchor's travel up the roof
+        (`dg.host_extent`); `offaxis_deg` is how far the ridge runs off the
+        host's fall line (straight downhill, `None` on the ridge line itself) --
+        past `dg.FACING_TOL_DEG` is `NOT_DOWNHILL` (Patrick, 2026-11-18, P1/P2
+        of the control redesign)."""
+        sc = self.scene()
+        if sc is None:
+            return None, None, None, None, None
+        from floorplanner.roofs import host_roof_at, upslope_direction
+        from floorplanner.roofclip import surface_height
+        face = self.pos()
+        host = host_roof_at(sc, face, self.floor)
+        if host is None:
+            return None, None, None, None, None
+        shift = float(floor_elevation(host.floor)) - float(floor_elevation(self.floor))
+        direction = _dg.ridge_direction(self.rotation())
+        z_face, slope = _dg.host_plane(
+            lambda p: surface_height(host, QPointF(p[0], p[1])) + shift,
+            (face.x(), face.y()), direction)
+        up = upslope_direction(host, face)       # unit toward the ridge, or None
+        offaxis = None
+        if up is not None:
+            dot = max(-1.0, min(1.0, direction[0] * up[0] + direction[1] * up[1]))
+            offaxis = math.degrees(math.acos(dot))
+        return (z_face, slope, float(host.ridge_h_in) + shift,
+                float(host.eaves_h_in) + shift, offaxis)
+
+    def param_context(self) -> dict:
+        ctx = super().param_context()
+        z_anchor, slope, ridge, eave, offaxis = self._host_plane()  # at pos=anchor
+        if z_anchor is not None:
+            # dg works in the FACE frame: the face is `depth` DOWNHILL of the
+            # anchor, so its host height is z_anchor - slope*depth. With the
+            # ridge held at the anchor (couple below), this makes dg.ridge_depth
+            # return `depth` and the whole face-frame geometry stays correct.
+            depth = max(self.params["depth_in"], 1.0)
+            z_face = _dg.ridge_height(self.params) - slope * depth
+            ctx.update(host_z_face_in=z_face, host_slope=slope,
+                       host_ridge_in=ridge, host_eave_in=eave,
+                       host_anchor_in=z_anchor)
+            if offaxis is not None:
+                ctx["host_offaxis_deg"] = offaxis
+        if not self._frozen:                 # not per-frame while a knob drags
+            self._face_and_sides(ctx)
+            self._wall_below(ctx)            # P4b: the wall below, for the face type
+            self._room_below(ctx)            # P5: the room below, for the warning
+        return ctx
+
+    def _face_and_sides(self, ctx):
+        """F1 (0356): the user's walls on THIS level that stand under the
+        dormer's face and its two sides, with their openings handed to `dg`.
+        No geometry lives here -- `dg.project_wall` / `project_side_wall` /
+        `project_openings` do it; this only gathers and dispatches. `face_wall`
+        / `side_walls` are the joined extents (or None when it LOOKED and found
+        none); absent means it never looked (no scene)."""
+        sc = self.scene()
+        if sc is None:
+            return
+        from floorplanner.walls import WallItem
+        from floorplanner.model import DEFAULT_SILL_IN
+        rot = self.rotation()
+        depth = max(self.params["depth_in"], 1.0)
+        ux, uy = _dg.ridge_direction(rot)                 # pos is the ANCHOR; the
+        pos = (self.pos().x() - ux * depth,               # FACE is `depth` downhill
+               self.pos().y() - uy * depth)
+
+        def op_records(wall):
+            out = []
+            for op in wall.openings:
+                if sip.isdeleted(op):
+                    continue
+                sill = (op.sill_in if op.sill_in is not None
+                        else (DEFAULT_SILL_IN if op.kind == "window" else 0.0))
+                head = float(op._v5_extra.get("head_in", float(sill) + op.height))
+                out.append({"s0": op.s - op.width / 2.0,
+                            "s1": op.s + op.width / 2.0,
+                            "sill_in": float(sill), "head_in": head,
+                            "id": op._uid or op.code, "kind": op.kind,
+                            "code": op.code})
+            return out
+
+        walls = [w for w in sc.items()
+                 if isinstance(w, WallItem) and not sip.isdeleted(w)
+                 and getattr(w, "floor", None) == self.floor]
+
+        def gather(project, *pargs):
+            ext, ops = [], []
+            for w in walls:
+                e = project(pos, rot, (w.p1.x(), w.p1.y()),
+                            (w.p2.x(), w.p2.y()), *pargs)
+                if e is None:
+                    continue
+                a, b = e
+                ext += [a, b]
+                ops += _dg.project_openings(a, b, w.length(), op_records(w))
+            return ((min(ext), max(ext)) if ext else None), ops
+
+        ctx["face_wall"], ctx["face_openings"] = gather(_dg.project_wall)
+        side_walls, side_openings = {}, {}
+        for side in _dg.SIDES:
+            span, ops = gather(_dg.project_side_wall, _dg.side_x(self.params, side))
+            side_walls[side], side_openings[side] = span, ops
+        ctx["side_walls"], ctx["side_openings"] = side_walls, side_openings
+
+    def _wall_below(self, ctx):
+        """P4b (0352): is there an exterior wall on the floor BELOW, aligned
+        under the dormer FACE? The plain-wall / setback reading needs it. Like
+        F1 but on the level below, projected onto the face line. `wall_below` is
+        the across-extent (or None when there is no lower floor / no wall)."""
+        sc = self.scene()
+        if sc is None:
+            return
+        from floorplanner.walls import WallItem
+        from floorplanner.roofs import _floor_below
+        below = _floor_below(self.floor)
+        if below is None:
+            ctx["wall_below"] = None
+            return
+        rot = self.rotation()
+        depth = max(self.params["depth_in"], 1.0)
+        ux, uy = _dg.ridge_direction(rot)
+        face = (self.pos().x() - ux * depth, self.pos().y() - uy * depth)
+        ext = []
+        for w in sc.items():
+            if (not isinstance(w, WallItem) or sip.isdeleted(w)
+                    or getattr(w, "floor", None) != below):
+                continue
+            e = _dg.project_wall(face, rot, (w.p1.x(), w.p1.y()),
+                                 (w.p2.x(), w.p2.y()))
+            if e is not None:
+                ext += list(e)
+        ctx["wall_below"] = (min(ext), max(ext)) if ext else None
+
+    def _room_below(self, ctx):
+        """P5 (0360): is a ROOM defined on the floor BELOW, under the dormer?
+        Patrick wants a prominent warning when the storey beneath the face is
+        undefined -- the 3D builder cannot otherwise tell how the face meets the
+        house. `room_below` is True when a room on the lower floor covers the
+        anchor or the face point, False when the lower floor has none there, and
+        None when there is no lower floor at all. Scene-coord `path.contains`,
+        the same frame `_wall_below` uses (rooms paint at pos 0,0)."""
+        sc = self.scene()
+        if sc is None:
+            return
+        from floorplanner.rooms import RoomItem
+        from floorplanner.roofs import _floor_below
+        below = _floor_below(self.floor)
+        if below is None:
+            ctx["room_below"] = None
+            return
+        rot = self.rotation()
+        depth = max(self.params["depth_in"], 1.0)
+        ux, uy = _dg.ridge_direction(rot)
+        anchor = self.pos()
+        face = QPointF(anchor.x() - ux * depth, anchor.y() - uy * depth)
+        found = False
+        for it in sc.items():
+            if (not isinstance(it, RoomItem) or sip.isdeleted(it)
+                    or getattr(it, "floor", None) != below):
+                continue
+            if it.path.contains(anchor) or it.path.contains(face):
+                found = True
+                break
+        ctx["room_below"] = found
+
+    # -- geometry ------------------------------------------------------------
+    def _current_sig(self, ctx):
+        return (round(self.pos().x(), 3), round(self.pos().y(), 3),
+                round(self.rotation(), 3), id(self.params),
+                None if ctx.get("host_z_face_in") is None
+                else round(ctx["host_z_face_in"], 3),
+                None if ctx.get("host_slope") is None
+                else round(ctx["host_slope"], 6),
+                None if ctx.get("ceiling_in") is None
+                else round(ctx["ceiling_in"], 3))
+
+    def _recompute_outline(self, ctx=None):
+        """The dormer's own lines (ridge, eaves, rake, valleys, guides) and
+        its extent -- the CHEAP part, recomputed LIVE while a knob drags. The
+        orange KNEE LINES are NOT touched here (0354 §2); they settle once on
+        release via `_recompute_knees`."""
+        if ctx is None:
+            ctx = self.param_context()
+        z = ctx.get("host_z_face_in")
+        slope = ctx.get("host_slope")
+        depth, _met = _dg.ridge_depth(self.params, z, slope)
+        self._depth = depth
+        plan = _dg.plan(self.params, None, z, slope)   # None -> no knee work
+        plan["knees"] = self._knees                    # keep the settled ones
+        self._geo = plan
+        # why this dormer cannot be BUILT on its host (0359), live on a knob
+        # drag: paint draws it error-red and drops its host cut + knee lines.
+        self._unbuildable = _dg.unbuildable(
+            self.params, z, slope, ctx.get("host_ridge_in"),
+            ctx.get("host_offaxis_deg"))
+        pts = [self._q(p) for p in _dg.footprint(self.params, depth)]
+        xs = [p.x() for p in pts]
+        ys = [p.y() for p in pts]
+        bbox = QRectF(QPointF(min(xs), min(ys)),
+                      QPointF(max(xs), max(ys))).adjusted(-2, -2, 2, 2)
+        c, r = self._handle()
+        bbox = bbox.united(QRectF(c.x() - r, c.y() - r, 2 * r, 2 * r))
+        self.prepareGeometryChange()
+        self._bbox = bbox
+
+    def _recompute_knees(self, ctx=None):
+        """The orange knee lines -- where the dormer's planes cross the room
+        ceiling. Settled once, on release of a drag (and on a static change)."""
+        if ctx is None:
+            ctx = self.param_context()
+        ceil = ctx.get("ceiling_in")
+        self._knees = ([] if ceil is None else
+                       _dg.knee_lines(self.params, ceil,
+                                      ctx.get("host_z_face_in"),
+                                      ctx.get("host_slope")))
+        self._geo["knees"] = self._knees
+
+    def _migrate_to_anchor(self):
+        """OLD frame -> NEW (P2, 2026-11-18): the record's `pos` was the FACE.
+        Sample the host there, find how far the ridge ran to MEET it, and move
+        `pos` up the ridge to that meeting point -- the ANCHOR -- keeping
+        `depth_in` as the run so the shape does not move. Runs once; marks the
+        state `anchored`. With no host, pos is left where it is."""
+        self._migrate_anchor = False
+        self.params["anchored"] = True
+        z_at, slope, _hr, _he, _off = self._host_plane()    # at pos = old face
+        if z_at is not None and slope is not None and slope > 0.0:
+            depth = _dg.ridge_depth(self.params, z_at, slope)[0]
+        else:                                 # no host: keep the stored run, so
+            depth = self.params["depth_in"]   # the face stays where it was drawn
+        depth = max(depth, 1.0)
+        ux, uy = _dg.ridge_direction(self.rotation())
+        self.params["depth_in"] = depth
+        self.setPos(QPointF(self.pos().x() + ux * depth,
+                            self.pos().y() + uy * depth))
+
+    def _recompute(self):
+        if self._migrate_anchor and self.scene() is not None:
+            self._migrate_to_anchor()
+        ctx = self.param_context()
+        if self._seed_defaults and ctx.get("host_slope"):
+            self.params = _dg.default_state(ctx.get("ceiling_in"),
+                                            ctx.get("host_slope"),
+                                            ctx.get("host_ridge_in"))
+            self.params["anchored"] = True
+            self._seed_defaults = False
+            ctx = self.param_context()
+        # on a roof the ANCHOR sets the ridge: hold ridge = host-at-anchor by
+        # floating whichever of eaves/pitch is not pinned (P2, 2026-11-18).
+        za, slope = ctx.get("host_anchor_in"), ctx.get("host_slope")
+        if za is not None and slope is not None and self.params.get("anchored"):
+            coupled = _dg.couple_ridge(self.params, za, self._pinned)
+            if coupled != self.params:
+                self.params = coupled
+                ctx = self.param_context()
+        self._recompute_knees(ctx)
+        self._recompute_outline(ctx)
+        self._sig = self._current_sig(ctx)
+        self._recompute_pending = False
+
+    def _deferred_recompute(self):
+        if not sip.isdeleted(self):
+            self._recompute()
+            self._place_grips()
+            self.update()
+
+    def _q(self, pt) -> QPointF:
+        """A dg-local point (dg's FACE frame) as an item-local point. With the
+        ANCHOR as the item's `pos` (P2, 2026-11-18), the face sits `depth`
+        DOWNHILL of it: dg y (uphill from the face) maps to item y = depth - y,
+        so the anchor (dg y = depth) lands at the item origin and the face
+        (dg y = 0) at item +depth."""
+        return QPointF(pt[0], self._depth - pt[1])
+
+    def boundingRect(self) -> QRectF:
+        return QRectF(self._bbox)
+
+    def shape(self) -> QPainterPath:
+        path = QPainterPath()
+        path.addRect(self._bbox)
+        return path
+
+    def _handle(self) -> tuple:
+        """The rotator handle, in ITEM coordinates: a BLUE RING just UPHILL of
+        the ANCHOR (local -y, toward the host), so 'move the anchor' (the apex
+        dot) and 'spin around it' (this ring) read as two distinct controls
+        (P2, 2026-11-18)."""
+        s = self._view_scale()
+        stem, r = 16.0 / s, 6.0 / s
+        return QPointF(0.0, -(stem + r)), r     # beyond the face
+
+    # -- painting ------------------------------------------------------------
+    def paint(self, painter, option, widget=None):
+        if not self._frozen and not self._recompute_pending \
+                and self._sig != self._current_sig(self.param_context()):
+            self._recompute_pending = True          # never change geo in paint
+            QTimer.singleShot(0, self._deferred_recompute)
+        ghost = floor_display_mode(self.floor) != "active"
+        geo = self._geo
+
+        def seg(a, b):
+            painter.drawLine(self._q(a), self._q(b))
+
+        if ghost:
+            painter.setPen(QPen(FLOOR_GHOST, 0))
+            seg(*geo["ridge"])
+            for a, b in geo["eaves"]:
+                seg(a, b)
+            seg(*geo["rake"])
+            return
+        # an UNBUILDABLE dormer (ridge above the host's, or a non-rising host)
+        # still draws, but in error-red and WITHOUT its host cut or knee lines
+        # (0359): the dialog says why and refuses OK; the item is not deleted.
+        bad = self._unbuildable is not None
+        ink = QColor(185, 28, 28) if bad else QColor(55, 65, 81)
+        painter.setPen(QPen(ink, 1.3))                  # ridge
+        seg(*geo["ridge"])
+        painter.setPen(QPen(ink, 0.9))                  # eaves + rake
+        for a, b in geo["eaves"]:
+            seg(a, b)
+        seg(*geo["rake"])
+        if not bad:                                     # valleys = the host cut
+            painter.setPen(QPen(ink, 1.0))
+            for v in geo["valleys"]:
+                seg(v[0], v[1])
+        painter.setPen(QPen(self._GUIDE_INK, 0.8, Qt.PenStyle.DashLine))
+        for a, b in geo["guides"]:                      # controls C / D
+            seg(a, b)
+        if geo["knees"] and not bad:                    # the knee lines
+            painter.setPen(QPen(ROOF_CLIP_INK, 1.6, Qt.PenStyle.DashLine))
+            for a, b in geo["knees"]:
+                seg(a, b)
+        if self._handle_visible():
+            self._paint_selection(painter)
+
+    def _paint_selection(self, painter):
+        blue = QColor(0, 110, 255)
+        painter.setPen(QPen(blue, 0, Qt.PenStyle.DashLine))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRect(self._bbox.adjusted(1, 1, -1, -1))
+        c, hr = self._handle()
+        painter.setPen(QPen(blue, 0))
+        painter.drawLine(QPointF(0.0, 0.0), QPointF(c.x(), c.y() + hr))  # stem from anchor
+        painter.setBrush(QBrush(QColor(255, 255, 255)))
+        painter.setPen(QPen(blue, max(1.4, hr * 0.5)))                   # a BLUE RING = spin
+        painter.drawEllipse(c, hr, hr)
+
+    # -- the drag hold (0354 §2, Patrick's decision) -------------------------
+    def _hold(self, on: bool):
+        """Hold the knee recompute for a whole drag and settle once at the
+        end: the orange knee lines are NOT redrawn while dragging (0354 §2).
+        Holds the HOST's knee (the rooms' `room_ceiling_break_lines`) too."""
+        sc = self.scene()
+        if sc is None:
+            return
+        from floorplanner.roofs import hold_roof_clips, hold_rooms
+        hold_roof_clips(sc, on)
+        hold_rooms(sc, on)
+        self._frozen = on
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.MouseButton.LeftButton:
+            self._hold(True)
+        super().mousePressEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        was = self._frozen
+        super().mouseReleaseEvent(e)
+        if was:
+            self._hold(False)
+            self._recompute()       # settle once, now the drag is over
+            self._place_grips()
+            self.update()
+
+    # -- the knobs A-G (grips) -----------------------------------------------
+    # dg-local positions of each grip, from the current parameters + depth.
+    _GRIP_KINDS = ("span_l", "span_r", "guide_l", "guide_r",
+                   "eave_l", "eave_r", "guide_face", "face", "apex")
+
+    def _grip_local(self, kind):
+        """A grip's position in ITEM-local coordinates (dg-local, y-flipped)."""
+        st = self.params
+        depth = max(self._depth, 1.0)
+        sl, sr = st["span_left_in"], st["span_right_in"]
+        gl = st["guide_left_in"] or sl
+        gr = st["guide_right_in"] or sr
+        pt = {
+            "span_l":  (sl, 0.50 * depth),
+            "span_r":  (-sr, 0.50 * depth),
+            "guide_l": (min(gl, sl), 0.30 * depth),
+            "guide_r": (-min(gr, sr), 0.30 * depth),
+            "eave_l":  (sl + st["eave_overhang_left_in"], 0.68 * depth),
+            "eave_r":  (-(sr + st["eave_overhang_right_in"]), 0.68 * depth),
+            "guide_face": (0.0, 0.0),            # D (purple): the FACE wall
+            "face":    (0.0, -st["face_overhang_in"]),   # F (orange): the EAVE
+            "apex":    (0.0, depth),             # A (white): the ANCHOR on the roof
+        }[kind]
+        return self._q(pt)
+
+    def _grip_kinds(self):
+        # Both sides for a gable AND a shed (Patrick, 2026-11-18): the shed's
+        # two trapezoid sides each take a B/C/E knob, mirrored when symmetric.
+        return list(self._GRIP_KINDS)
+
+    def _sync_grips(self):
+        """Create the grips when the dormer is selected, remove them when it is
+        not. They are Qt children, so they ride the item's move and rotation."""
+        want = self.isSelected() and self.group() is None
+        if want and not self._grips:
+            self._grips = [DormerGripItem(self, k) for k in self._grip_kinds()]
+            self._place_grips()
+        elif not want and self._grips:
+            sc = self.scene()
+            for g in self._grips:
+                if sc is not None and not sip.isdeleted(g):
+                    sc.removeItem(g)
+            self._grips = []
+
+    def _place_grips(self):
+        active = floor_display_mode(self.floor) == "active"
+        for g in self._grips:
+            if sip.isdeleted(g):
+                continue
+            g.setVisible(active)
+            g.setPos(self._grip_local(g.kind))
+
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+            self._sync_grips()
+        return super().itemChange(change, value)
+
+    # -- a knob drag ---------------------------------------------------------
+    def _to_dg_local(self, scene_pt):
+        p = self.mapFromScene(scene_pt)
+        return p.x(), self._depth - p.y()    # item-local -> dg-local (anchor frame)
+
+    def begin_knob(self):
+        self._hold(True)                     # freeze the knee lines (0354 §2)
+
+    def drag_knob(self, kind, scene_pt):
+        """Live while a knob is down: reshape the dormer, reposition the grips,
+        but DO NOT recompute the orange knee lines (they are held)."""
+        if kind == "apex":                   # A is the ANCHOR: it MOVES, not reshapes
+            self._drag_anchor(scene_pt)
+            return
+        x, y = self._to_dg_local(scene_pt)
+        st = dict(self.params)
+        sym = st["symmetric"]            # a symmetric shed mirrors too (2026-11-18)
+
+        def both(lkey, rkey, v):
+            st[lkey] = v
+            st[rkey] = v
+
+        if kind in ("span_l", "span_r"):
+            v = max(_dg.MIN_SPAN_IN, abs(x))
+            both("span_left_in", "span_right_in", v) if sym else st.__setitem__(
+                "span_left_in" if kind == "span_l" else "span_right_in", v)
+        elif kind in ("guide_l", "guide_r"):
+            side = st["span_left_in"] if kind == "guide_l" else st["span_right_in"]
+            v = min(max(abs(x), 0.0), side)
+            both("guide_left_in", "guide_right_in", v) if sym else st.__setitem__(
+                "guide_left_in" if kind == "guide_l" else "guide_right_in", v)
+        elif kind in ("eave_l", "eave_r"):
+            side = st["span_left_in"] if kind == "eave_l" else st["span_right_in"]
+            v = max(abs(x) - side, 0.0)
+            both("eave_overhang_left_in", "eave_overhang_right_in", v) if sym \
+                else st.__setitem__("eave_overhang_left_in" if kind == "eave_l"
+                                    else "eave_overhang_right_in", v)
+        elif kind == "guide_face":
+            # D (purple) is the FACE WALL: slide it from the anchor out to the
+            # orange EAVE, the eave held fixed (P3, 2026-11-18). depth = how far
+            # the face is from the anchor; the overhang takes up the rest.
+            item_y = self.mapFromScene(scene_pt).y()
+            eave = self._depth + st["face_overhang_in"]
+            depth = max(min(item_y, eave), 1.0)
+            st["depth_in"] = depth
+            st["face_overhang_in"] = max(eave - depth, 0.0)
+        elif kind == "face":
+            # F (orange) is the EAVE: it reaches from the face (purple) out past
+            # the host roof edge (a cantilever). overhang = eave beyond the face.
+            item_y = self.mapFromScene(scene_pt).y()
+            st["face_overhang_in"] = max(item_y - self._depth, 0.0)
+        self.params = _dg.normalize_state(st)
+        self._recompute_outline()
+        self._place_grips()
+        self.update()
+
+    def _drag_anchor(self, scene_pt):
+        """Knob A, on a roof: slide the ANCHOR along the host's fall line,
+        keeping it ON the roof and NO HIGHER than the host ridge (P2 R1a,
+        2026-11-18). `pos` moves and the ridge follows (host-at-anchor, via
+        `dg.couple_ridge`). Off a roof there is no fall line, so A sets the
+        stored run (`depth_in`) as before."""
+        sc = self.scene()
+        if sc is None:
+            return
+        from floorplanner.roofs import host_roof_at, upslope_direction
+        host = host_roof_at(sc, self.pos(), self.floor)
+        up = upslope_direction(host, self.pos()) if host is not None else None
+        if host is None or up is None:
+            _x, y = self._to_dg_local(scene_pt)     # no roof: old behaviour
+            st = dict(self.params)
+            st["depth_in"] = max(y, 1.0)
+            self.params = _dg.normalize_state(st)
+            self._recompute_outline()
+            self._place_grips()
+            self.update()
+            return
+        # project the mouse onto the fall line through the anchor, then clamp to
+        # a point that is still over THIS host and not above its ridge
+        d = scene_pt - self.pos()
+        t = d.x() * up[0] + d.y() * up[1]
+        cand = QPointF(self.pos().x() + up[0] * t, self.pos().y() + up[1] * t)
+        cand = self._anchor_on_roof(host, cand)
+        if cand is None:
+            return                                  # at the eave or the ridge
+        self.setPos(cand)
+        za, _slope, _hr, _he, _off = self._host_plane()
+        if za is not None:
+            self.params = _dg.couple_ridge(self.params, za, self._pinned)
+        self._recompute_outline()
+        self._place_grips()
+        self.update()
+
+    def _anchor_on_roof(self, host, cand):
+        """`cand` if the anchor may sit there -- still over `host` and on the
+        SAME side of its ridge as now -- else None, so the drag stops at the
+        eave (off the roof) and at the ridge (it may not cross to the far side,
+        where the dormer would face up the far slope)."""
+        sc = self.scene()
+        from floorplanner.roofs import host_roof_at
+        if host_roof_at(sc, cand, self.floor) is not host:
+            return None                             # off this roof (past the eave)
+        _ux, _uy, nx, ny = host._axis()
+
+        def perp(p):                                # signed distance from the ridge
+            return (p.x() - host.p1.x()) * nx + (p.y() - host.p1.y()) * ny
+
+        if perp(cand) * perp(self.pos()) < -1e-9:
+            return None                             # would cross the host ridge
+        return cand
+
+    def end_knob(self, kind, scene_pt):
+        self.drag_knob(kind, scene_pt)
+        self._hold(False)
+        self._recompute_knees()              # settle the knee lines, once
+        self._geo["knees"] = self._knees
+        self.update()
+
+    def contextMenuEvent(self, e):
+        menu = QMenu()
+        a_props = menu.addAction("Dormer properties…")
+        menu.addSeparator()
+        a_cw = menu.addAction("Rotate 90° CW")
+        a_ccw = menu.addAction("Rotate 90° CCW")
+        menu.addSeparator()
+        a_del = menu.addAction("Delete dormer")
+        a_front, a_back = add_front_back_actions(menu)
+        chosen = menu.exec(e.screenPos())
+        if chosen is None:
+            e.accept()
+            return
+        if handle_front_back(self, chosen, a_front, a_back):
+            e.accept()
+            return
+        if chosen is a_props:
+            self.open_properties()
+        elif chosen is a_cw:
+            self.setRotation((self.rotation() + 90.0) % 360.0)
+            self._recompute()
+        elif chosen is a_ccw:
+            self.setRotation((self.rotation() - 90.0) % 360.0)
+            self._recompute()
+        elif chosen is a_del and self.scene() is not None:
+            self.scene().removeItem(self)
+        e.accept()
+
+
+class DormerGripItem(QGraphicsItem):
+    """One control knob on a selected `DormerItem` (0352 phase 2 -- the knobs
+    A-G of `docs/DORMER_CONROLS.md`, moved off `RoofGripItem` onto the
+    furnishing). A Qt CHILD of the dormer, so it rides its move and rotation;
+    its position is set by `DormerItem._place_grips`. Dragging it reshapes the
+    dormer LIVE and HOLDS the knee lines until release (0354 §2):
+
+        span_l / span_r   (B, teal)    the half-width to the eaves line
+        guide_l / guide_r (C, yellow)  the side guide line (draws no wall)
+        eave_l / eave_r   (E, green)   the eave overhang beyond the wall
+        guide_face        (D, purple)  the FACE WALL: sets the face distance,
+                                       sliding from the anchor out to the eave
+        face              (F, orange)  the EAVE, past the host roof edge
+        apex              (A, white)   the ANCHOR: drag along the roof; double-
+                                       click opens the dialog
+
+    Sized in VIEW PIXELS (like `FurnishingItem`'s rotator and `RoofGripItem`),
+    so it stays grabbable at any zoom."""
+
+    SIZE = 3.2            # the drawn glyph half-size, scene inches at 1:1
+    HIT_PX = 11.0         # the clickable half-size, view pixels
+    _COLORS = {
+        "span_l": QColor(0, 160, 170), "span_r": QColor(0, 160, 170),  # teal (B off blue)
+        "guide_l": QColor(214, 170, 0), "guide_r": QColor(214, 170, 0),
+        "eave_l": QColor(40, 160, 70), "eave_r": QColor(40, 160, 70),
+        "guide_face": QColor(150, 60, 200),         # D, purple
+        "face": QColor(230, 90, 20), "apex": QColor(90, 90, 90),
+    }
+    _TIPS = {
+        "span_l": "Half-width (knob B)", "span_r": "Half-width (knob B)",
+        "guide_l": "Side guide (knob C) — draws no wall",
+        "guide_r": "Side guide (knob C) — draws no wall",
+        "eave_l": "Eave overhang (knob E)", "eave_r": "Eave overhang (knob E)",
+        "guide_face": "Face wall (knob D) — slide from the anchor to the eave",
+        "face": "Eave of the face (knob F) — reaches past the host roof edge",
+        "apex": "Anchor (knob A) — drag along the roof; double-click for properties",
+    }
+
+    def __init__(self, dormer, kind: str):
+        super().__init__(dormer)
+        self.dormer = dormer
+        self.kind = kind
+        self._dragging = False
+        self.setZValue(6)
+        self.setAcceptHoverEvents(True)
+        self.setToolTip(self._TIPS[kind])
+
+    def _view_scale(self) -> float:
+        sc = self.scene()
+        if sc and sc.views():
+            return max(sc.views()[0].transform().m11(), 1e-6)
+        return 1.0
+
+    def _half(self) -> float:
+        return max(self.SIZE, self.HIT_PX / self._view_scale())
+
+    def boundingRect(self) -> QRectF:
+        r = self._half() + 2.0
+        return QRectF(-r, -r, 2.0 * r, 2.0 * r)
+
+    def shape(self) -> QPainterPath:
+        path = QPainterPath()
+        h = self._half()
+        path.addRect(QRectF(-h, -h, 2.0 * h, 2.0 * h))
+        return path
+
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        s = self.SIZE
+        painter.setBrush(QBrush(QColor(255, 255, 255)))
+        painter.setPen(QPen(self._COLORS.get(self.kind, QColor(0, 120, 215)), 1.4))
+        if self.kind == "apex":
+            r = s * 1.5
+            painter.drawEllipse(QRectF(-r, -r, 2.0 * r, 2.0 * r))
+        else:
+            painter.drawRect(QRectF(-s, -s, 2.0 * s, 2.0 * s))
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.MouseButton.LeftButton:
+            self._dragging = True
+            self.dormer.begin_knob()
+            e.accept()
+        else:
+            super().mousePressEvent(e)
+
+    def mouseMoveEvent(self, e):
+        if self._dragging:
+            self.dormer.drag_knob(self.kind, e.scenePos())
+            e.accept()
+        else:
+            super().mouseMoveEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        if self._dragging and e.button() == Qt.MouseButton.LeftButton:
+            self._dragging = False
+            self.dormer.end_knob(self.kind, e.scenePos())
+            e.accept()
+        else:
+            super().mouseReleaseEvent(e)
+
+    def mouseDoubleClickEvent(self, e):
+        if self.kind == "apex" and e.button() == Qt.MouseButton.LeftButton:
+            self._dragging = False
+            self.dormer._hold(False)            # a press started a hold
+            self.dormer.open_properties()
+            e.accept()
+        else:
+            super().mouseDoubleClickEvent(e)
+
+
 def make_furnishing(kind: str, pos: QPointF, rotation: float = 0.0,
                     state: dict = None, *, new: bool = False):
     """Create the right item for a catalog `kind`: a dynamic StairItem for
@@ -802,6 +1561,8 @@ def make_furnishing(kind: str, pos: QPointF, rotation: float = 0.0,
                          flight=state.get("flight", "full"),
                          turn=state.get("turn", "left"),
                          direction=state.get("direction", "up"))
+    if kind == "dormer":                              # 0352 phase 2
+        return DormerItem(pos, rotation, params=state or None, new=new)
     item = FurnishingItem(kind, pos, rotation)
     if state and _param_registry.is_parametric(kind):
         item.params = dict(state)

@@ -48,6 +48,8 @@ class ParametricDialog(QDialog):
         self._initial = definition.normalize(state)
         self.values = dict(self._initial)
         self._widgets = {}
+        self._key_by_widget = {}
+        self._edited_key = None          # the field the user changed last
         self._combo_choices = {}
         self._derived = None
         self._findings = []
@@ -96,6 +98,7 @@ class ParametricDialog(QDialog):
         for spec in self._specs:
             w = self._make_widget(spec)
             self._widgets[spec.key] = w
+            self._key_by_widget[w] = spec.key
             label = QLabel(spec.label + ":")
             label.setBuddy(w)
             form.addRow(label, w)
@@ -159,6 +162,12 @@ class ParametricDialog(QDialog):
             w.setDecimals(spec.decimals)
             w.setRange(float(spec.minimum), float(spec.maximum))
             w.setSingleStep(float(spec.step))
+            # Recalculate when editing FINISHES (focus-out / Enter / arrow-step),
+            # not on every keystroke: mid-typing a half-entered number would feed
+            # the coupling partial values and lock the coupled fields out of range
+            # (Patrick, 2026-11-18). Programmatic setValue still signals, so tests
+            # and the live preview on a committed value are unaffected.
+            w.setKeyboardTracking(False)
             if spec.unit:
                 w.setSuffix(" " + spec.unit)
             w.valueChanged.connect(self._on_changed)
@@ -166,6 +175,7 @@ class ParametricDialog(QDialog):
             w = QSpinBox()
             w.setRange(int(spec.minimum), int(spec.maximum))
             w.setSingleStep(max(1, int(spec.step)))
+            w.setKeyboardTracking(False)       # as FLOAT above
             w.valueChanged.connect(self._on_changed)
         elif spec.kind == ENUM:
             w = QComboBox()
@@ -184,6 +194,9 @@ class ParametricDialog(QDialog):
     def _on_changed(self, *_args):
         if self._loading:
             return
+        # which field the user just changed, so a kind can tell edits apart
+        # (the dormer's ridge anchor: the last of eaves/pitch set is pinned).
+        self._edited_key = self._key_by_widget.get(self.sender())
         self._read_widgets()
         self._refresh()
 
@@ -203,7 +216,11 @@ class ParametricDialog(QDialog):
         for spec in self._specs:
             if spec.kind in (FLOAT, INT) and spec.enabled(v):
                 v[spec.key] = self._widgets[spec.key].value()
+        # a transient hint of the field just edited; the kind may use it and
+        # it is never stored (dropped from the draft right after normalize).
+        v["_edited"] = self._edited_key
         self.values = self.definition.normalize(v)
+        self.values.pop("_edited", None)
 
     def _refresh(self):
         self._derived, self._findings = self.definition.evaluate(
