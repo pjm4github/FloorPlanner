@@ -25,6 +25,13 @@ from floorplanner.walls import WallItem
 EAVES_SEARCH_ANGLE_TOL_DEG = 20.0
 # used only when no qualifying wall exists nearby (an isolated ridge sketch)
 DEFAULT_HALF_SPAN_IN = 144.0
+# A roof's eaves land on the building ENVELOPE, so only EXTERIOR walls are
+# automatic eaves candidates. An interior partition parallel to and near the
+# ridge used to collapse a drawn roof onto itself -- Patrick, 2026-11-18: "a
+# plain roof snaps to a narrow size on release; the footprint should stay as
+# drawn." A wall the user EXPLICITLY picks as the eaves is honored regardless
+# of type (that is their choice); only the automatic nearest-wall scan filters.
+EAVES_WALL_TYPES = ("exterior",)
 
 
 def eaves_span_from_wall(p1: QPointF, p2: QPointF, wall: WallItem) -> float:
@@ -243,6 +250,8 @@ def eaves_spans_per_side(scene, p1: QPointF, p2: QPointF, floor, picked=None):
         for w in scene.items():
             if not isinstance(w, WallItem) or w is picked or w.floor != floor:
                 continue
+            if w.wall_type not in EAVES_WALL_TYPES:
+                continue                  # an interior partition carries no eaves
             wang = heading_deg(w.p1, w.p2)
             if wang is None:
                 continue

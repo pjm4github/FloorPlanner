@@ -261,6 +261,45 @@ def test_cancelling_the_heights_dialog_drops_the_roof(fp, win, monkeypatch):
     assert win.view._roof_awaiting_eaves is None
 
 
+def test_an_interior_partition_across_the_ridge_is_not_taken_as_the_eaves(
+        fp, win, monkeypatch):
+    """Patrick (2026-11-18): a plain roof snapped to a narrow size on release.
+    Root cause: the automatic eaves scan took ANY parallel wall, so an interior
+    partition across the ridge, nearer than the real exterior eaves, collapsed
+    that side. Only the EXTERIOR envelope carries eaves now."""
+    win.prepare_headless()
+    monkeypatch.setattr(QDialog, "exec",
+                        lambda self: QDialog.DialogCode.Accepted)
+    # a 300 x 200 room of exterior walls, ridge across the middle (~y=100)
+    for a, b in (((0, 0), (300, 0)), ((300, 0), (300, 200)),
+                 ((300, 200), (0, 200)), ((0, 200), (0, 0))):
+        win.scene.addItem(fp.WallItem(QPointF(*a), QPointF(*b), "exterior"))
+    # an interior partition at y=140, ACROSS the ridge from the picked top wall
+    win.scene.addItem(fp.WallItem(QPointF(0, 140), QPointF(300, 140), "interior"))
+    win.set_tool(fp.TOOL_ROOF_RIDGE)
+    _drag_ridge(win, (20, 100), (280, 100))
+    _click(win, (150, 0))                       # pick the top exterior eaves
+    r = _roofs(win)[0]
+    # both sides reach the exterior walls (y=0 and y=200), ~100 each; the far
+    # side does NOT snap to the partition at y=140 (which would be ~40)
+    assert min(r.span_in) > 90.0, r.span_in
+
+
+def test_a_plain_roof_over_only_interior_walls_keeps_its_drawn_span(fp, win):
+    """The reported 'plain roof' case: a ridge sketched where the only nearby
+    parallel walls are interior partitions must NOT collapse onto them -- it
+    keeps the default footprint (DEFAULT_HALF_SPAN_IN) it was drawn with."""
+    from floorplanner.roofs import DEFAULT_HALF_SPAN_IN
+    win.prepare_headless()
+    win.scene.addItem(fp.WallItem(QPointF(0, 70), QPointF(300, 70), "interior"))
+    win.scene.addItem(fp.WallItem(QPointF(0, 130), QPointF(300, 130), "partition"))
+    win.set_tool(fp.TOOL_ROOF_RIDGE)
+    _drag_ridge(win, (20, 100), (280, 100))
+    win.set_tool(fp.TOOL_SELECT)                # auto-complete, no eaves pick
+    r = _roofs(win)[0]
+    assert r.span_in == pytest.approx([DEFAULT_HALF_SPAN_IN, DEFAULT_HALF_SPAN_IN])
+
+
 def test_roof_menu_offers_sketch_ridge(fp, win):
     from PyQt6.QtWidgets import QMenu
     m_roof = next(m for m in win.menuBar().findChildren(QMenu)
