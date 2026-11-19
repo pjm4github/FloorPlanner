@@ -265,3 +265,19 @@ def test_a_furnishing_dormer_cantilevered_past_the_eave_hangs(fp3d):
     assert walls is not None
     ys = -walls.verts[:, 1]
     assert np.any(ys > 205.0), "the cantilevered face hangs past the host eave (y=200)"
+
+
+def test_a_balcony_dormer_cuts_the_host_and_lays_a_deck(fp3d):
+    """P3.2a (Patrick, 2026-11-19): a balcony dormer cuts the host roof in front
+    of its face and lays a flat deck at the dormer level's floor (the attic
+    floor) -- the user's railing walls stand on it."""
+    doc = _furnishing_doc(True)
+    doc["furnishings"][0]["state"]["face_mode"] = "balcony"
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    deck = next((m for m in model.meshes if m.name == "balcony"), None)
+    assert deck is not None and len(deck.verts) > 0, "a balcony deck is laid"
+    assert deck.verts[:, 2].max() == pytest.approx(0.0, abs=1.1), "flat at the floor"
+    plain = fp3d.build_model(_furnishing_doc(True), furnishings=False, floors=False)
+    roof_b = next(m for m in model.meshes if m.name == "roofs")
+    roof_p = next(m for m in plain.meshes if m.name == "roofs")
+    assert len(roof_b.verts) < len(roof_p.verts), "the host roof is cut for the terrace"

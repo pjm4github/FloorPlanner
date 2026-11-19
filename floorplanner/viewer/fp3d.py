@@ -160,6 +160,7 @@ FLOOR_C = {                      # by room category
 }
 FLOATING_C = (0.95, 0.72, 0.28, 1.0)     # a room that is not placed
 CEILING_C = (0.86, 0.84, 0.80, 1.0)      # a room's ceiling / the attic floor over it
+DECK_C = (0.72, 0.56, 0.40, 1.0)         # a balcony deck where the host roof is cut (0352 P3)
 ROOF_C = (0.52, 0.30, 0.06, 1.0)         # roof-brown -- matches roofs.py's
                                           # 2D ink (QColor(133, 77, 14)), so
                                           # plan and 3D read as the same roof
@@ -2865,6 +2866,43 @@ def _ceiling_pieces(tri_world, cz, lifts, RC, dormer_lf_ids=frozenset()):
     return out
 
 
+def _balcony_terraces(doc, base, RC):
+    """0352 phase 3 (Patrick, 2026-11-19): for each BALCONY dormer, a terrace
+    strip in FRONT of its face -- (host_id, face_pt, u, n, wl, wr, deck_z). The
+    host roof over the strip is cut away and a flat deck is laid at the dormer
+    level's floor (the attic floor). The face is the terrace's back edge; the
+    user's railing walls stand on the deck. The strip is unbounded forward, so
+    only the host pieces that actually exist out to the eave are cut."""
+    checks = []
+    by_id = {r.get("id"): r for r in doc.get("roofs", [])}
+    for rf in doc.get("roofs", []):
+        if rf.get("face_mode") != "balcony":
+            continue
+        hid = rf.get("host")
+        ridge = rf.get("ridge") or []
+        if hid not in by_id or len(ridge) != 2:
+            continue
+        fx, fy = float(ridge[0][0]), float(ridge[0][1])
+        ax, ay = float(ridge[1][0]), float(ridge[1][1])
+        du, dv = ax - fx, ay - fy
+        ln = math.hypot(du, dv) or 1.0
+        u = (du / ln, dv / ln)
+        n = (-u[1], u[0])
+        wl, wr = (rf.get("wall_span_in") or [40.0, 40.0])[:2]
+        checks.append((hid, (fx, fy), u, n, float(wl), float(wr),
+                       base(rf.get("level"))))
+    return checks
+
+
+def _in_terrace(c, face, u, n, wl, wr):
+    """`c` (a roofclip Pt, plan coords) is in the balcony strip: in FRONT of the
+    face (downhill) and within the dormer's cheek-wall width."""
+    dx, dy = c.x() - face[0], c.y() - face[1]
+    along = dx * u[0] + dy * u[1]       # + toward the apex (uphill)
+    perp = dx * n[0] + dy * n[1]
+    return along < -1e-6 and -wr - 1.0 <= perp <= wl + 1.0
+
+
 def _pick_dormer_host(hosts, anchor, lid, base, RC):
     """The real roof whose footprint holds the dormer ANCHOR, on the dormer's
     level or one below it; the highest such wins. `hosts` is
@@ -2925,6 +2963,7 @@ def _dormer_roof_records(doc, lv, base, nearest_span, RC, DG):
         out.append(DG.to_roof_record(
             st, face, rot, depth, datum_shift=base(lid) - base(hlid),
             id=f"_dormer_{n}", level=lid, host=hid,
+            face_mode=st.get("face_mode", "auto"),
             openings=fu.get("openings") or []))
         n += 1
     return out
@@ -3564,6 +3603,10 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     n_roof = n_overhang = 0
     if roofs:
         roof_parts = list(riser_parts)
+        # 0352 phase 3 balcony: the host roof in FRONT of a balcony dormer's face
+        # is cut away and a flat deck laid at the dormer level's floor.
+        terrace_checks = _balcony_terraces(doc, base, ROOFCLIP) if ROOFCLIP else []
+        balcony_deck_rings = []
         # P3 (0293 §2c): a dormer's roof SECTION is anchored to the HOST's level
         # base, not its own -- the same base the clip's `_lift_base` used -- so
         # re-levelling the dormer does not move it (the byte-identical
@@ -3610,6 +3653,16 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                     pieces = [q for cell in pieces
                               for q in ROOFCLIP._split_by_line(cell, pt, d)]
                 for piece in pieces:
+                    c0 = ROOFCLIP._centroid(piece)
+                    deck_z = next((dz for hid, fc, u, nn, wl, wr, dz
+                                   in terrace_checks
+                                   if hid == rid and _in_terrace(c0, fc, u, nn, wl, wr)),
+                                  None)
+                    if deck_z is not None:
+                        # BALCONY: cut the host here, lay the deck at the attic floor
+                        balcony_deck_rings.append(
+                            [(c.x(), -c.y(), deck_z) for c in piece])
+                        continue
                     ring = [(c.x(), -c.y(), z0 + ROOFCLIP.surface_height(geom, c))
                             for c in piece]
                     roof_parts.append(_prism_slab(ring, ROOF_T))
@@ -3745,6 +3798,9 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         if roof_parts:
             v, f = _merge(roof_parts)
             model.meshes.append(Mesh("roofs", v, f, ROOF_C))
+        if balcony_deck_rings:
+            v, f = _merge([_prism_slab(ring, SLAB_T) for ring in balcony_deck_rings])
+            model.meshes.append(Mesh("balcony", v, f, DECK_C))
 
     # ---- furnishings -----------------------------------------------------
     if furnishings:
