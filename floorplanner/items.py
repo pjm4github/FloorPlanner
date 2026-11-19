@@ -1432,8 +1432,9 @@ class DormerGripItem(QGraphicsItem):
     dormer LIVE and HOLDS the knee lines until release (0354 §2):
 
         span_l / span_r   (B, teal)    the half-width to the eaves line
-        guide_l / guide_r (C, yellow)  the side guide line (draws no wall)
-        eave_l / eave_r   (E, green)   the eave overhang beyond the wall
+        guide_l / guide_r (C, yellow)  the KNEE WALL guide: where the side wall
+                                       drops to the attic floor (draws no wall)
+        eave_l / eave_r   (E, green)   the dormer eave overhang beyond the wall
         guide_face        (D, purple)  the FACE WALL: sets the face distance,
                                        sliding from the anchor out to the eave
         face              (F, orange)  the EAVE, past the host roof edge
@@ -1453,11 +1454,18 @@ class DormerGripItem(QGraphicsItem):
         "face": QColor(230, 90, 20), "apex": QColor(90, 90, 90),
     }
     _TIPS = {
-        "span_l": "Half-width (knob B)", "span_r": "Half-width (knob B)",
-        "guide_l": "Side guide (knob C) — draws no wall",
-        "guide_r": "Side guide (knob C) — draws no wall",
-        "eave_l": "Eave overhang (knob E)", "eave_r": "Eave overhang (knob E)",
-        "guide_face": "Face wall (knob D) — slide from the anchor to the eave",
+        "span_l": "Half-width (knob B) — ridge to the eaves line on this side",
+        "span_r": "Half-width (knob B) — ridge to the eaves line on this side",
+        "guide_l": "Knee wall (knob C) — where the side wall drops from the "
+                   "dormer roof to the attic floor. A guide; draws no wall.",
+        "guide_r": "Knee wall (knob C) — where the side wall drops from the "
+                   "dormer roof to the attic floor. A guide; draws no wall.",
+        "eave_l": "Dormer eave (knob E) — the roof's overhang past the dormer "
+                  "wall on this side",
+        "eave_r": "Dormer eave (knob E) — the roof's overhang past the dormer "
+                  "wall on this side",
+        "guide_face": "Face wall (knob D) — the dormer's front wall; slide it "
+                      "from the anchor out toward the eave",
         "face": "Eave of the face (knob F) — reaches past the host roof edge",
         "apex": "Anchor (knob A) — drag along the roof; double-click for properties",
     }

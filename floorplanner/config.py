@@ -39,6 +39,7 @@ __all__ = [
     "DEFAULT_FLOOR", "FLOOR_GHOST", "ROOF_CLIP_INK", "active_floor", "set_floor_state",
     "floor_elevation", "floor_elevations",
     "floor_display_mode", "apply_floor_visibility",
+    "pitch_units", "set_pitch_units",
 ]
 
 # repo root (this file lives in floorplanner/, assets/ sits one level up)
@@ -572,6 +573,25 @@ _FLOOR_STATE = {
     "show_others": False,                # ghost the rest in gray (else hidden)
     "elevations": {},                    # R6.b: floor name -> elevation_in
 }
+
+
+# The pitch DISPLAY preference, remembered across dialogs within a session
+# (Patrick, 2026-11-19: "I could select either degrees or rise/run"). A dict +
+# accessors, not a rebindable global and not a `SETTINGS` key -- the latter is
+# serialized into the plan and schema-validated, and this is a view preference,
+# not a plan datum. "in12" = rise per 12 in; "deg" = degrees; "" = unset, so
+# each dialog opens in its OWN native unit (dormer in 12, roof in degrees) until
+# the user picks one anywhere -- then the choice is remembered and shared.
+_PITCH_STATE = {"units": ""}
+
+
+def pitch_units() -> str:
+    return _PITCH_STATE["units"]
+
+
+def set_pitch_units(units: str) -> None:
+    if units in ("in12", "deg", ""):      # "" = back to unset (each dialog native)
+        _PITCH_STATE["units"] = units
 
 
 def active_floor() -> str:

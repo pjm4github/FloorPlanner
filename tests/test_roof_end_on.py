@@ -272,6 +272,34 @@ def _dialog_for(roof, parent=None):
     return RoofEndOnDialog(roof, parent)
 
 
+def test_the_pitch_field_switches_between_degrees_and_rise_run(fp, win):
+    """Patrick (2026-11-19): a dropdown to show the pitch as degrees OR rise/run,
+    the choice remembered across dialogs. The spinbox holds whichever unit is
+    picked; the recompute stays in degrees."""
+    from floorplanner import config
+    config.set_pitch_units("")                       # unset -> the roof's native degrees
+    roof = RoofItem(QPointF(0, 0), QPointF(200, 0), ridge_h_in=132.0,
+                    eaves_h_in=96.0, span_in=100.0)
+    dlg = _dialog_for(roof)
+    assert dlg._pitch_unit == "deg"
+    deg = dlg.sp_pitch.value()
+    assert deg == pytest.approx(math.degrees(math.atan2(36.0, 100.0)), abs=0.05)
+    # flip to rise/run: the shown value converts, the stored geometry does not
+    dlg.cb_pitch_unit.setCurrentIndex(dlg.cb_pitch_unit.findData("in12"))
+    assert dlg.sp_pitch.suffix().strip() == "in 12"
+    assert dlg.sp_pitch.value() == pytest.approx(
+        12.0 * math.tan(math.radians(deg)), abs=0.02)
+    assert config.pitch_units() == "in12"            # remembered
+    # editing in rise/run drives the same three-way recompute (12 in 12 = 45 deg)
+    dlg.sp_ridge.setValue(150.0)
+    dlg.sp_pitch.setValue(12.0)
+    assert dlg.sp_eaves.value() == pytest.approx(
+        150.0 - 100.0 * math.tan(math.radians(45.0)), abs=0.1)
+    # the choice carries to the next dialog opened
+    dlg2 = _dialog_for(roof)
+    assert dlg2._pitch_unit == "in12"
+
+
 def test_at_first_open_pitch_is_the_derived_field(fp, win):
     roof = RoofItem(QPointF(0, 0), QPointF(200, 0), ridge_h_in=132.0,
                     eaves_h_in=96.0, span_in=100.0)

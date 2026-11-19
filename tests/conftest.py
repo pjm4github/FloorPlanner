@@ -66,6 +66,7 @@ def _reset_settings():
         _fp.SETTINGS.update(_fp.DEFAULT_SETTINGS)
         _fp.set_floor_state(active=_fp.DEFAULT_FLOOR, reference=set(),
                             show_others=False, elevations={})
+        _fp.set_pitch_units("")          # the pitch display pref: back to unset
     _reset()
     yield
     _reset()

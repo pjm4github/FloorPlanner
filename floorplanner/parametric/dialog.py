@@ -22,8 +22,14 @@ from PyQt6.QtWidgets import (
     QListWidgetItem, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
 )
 
+from floorplanner import config as _config
 from floorplanner.parametric import findings as F
 from floorplanner.parametric.params import BOOL, ENUM, FLOAT, INT
+
+# Session preferences a FLOAT field's unit dropdown may remember, keyed by
+# `ParamSpec.unit_setting`: (getter, setter). Flipping the unit in one dialog
+# is remembered for the next (Patrick, 2026-11-19).
+_UNIT_PREFS = {"pitch_units": (_config.pitch_units, _config.set_pitch_units)}
 
 _SEVERITY_INK = {
     F.ERROR: QColor(185, 28, 28),
@@ -51,6 +57,8 @@ class ParametricDialog(QDialog):
         self._key_by_widget = {}
         self._edited_key = None          # the field the user changed last
         self._combo_choices = {}
+        self._unit_combos = {}           # key -> the unit QComboBox (unit_modes)
+        self._unit_mode = {}             # key -> the active UnitMode
         self._derived = None
         self._findings = []
         self._loading = False
@@ -101,7 +109,7 @@ class ParametricDialog(QDialog):
             self._key_by_widget[w] = spec.key
             label = QLabel(spec.label + ":")
             label.setBuddy(w)
-            form.addRow(label, w)
+            form.addRow(label, self._row_widget(spec, w))
         side.addWidget(box)
 
         calc = QGroupBox("Calculated")
@@ -159,17 +167,20 @@ class ParametricDialog(QDialog):
     def _make_widget(self, spec):
         if spec.kind == FLOAT:
             w = QDoubleSpinBox()
-            w.setDecimals(spec.decimals)
-            w.setRange(float(spec.minimum), float(spec.maximum))
-            w.setSingleStep(float(spec.step))
             # Recalculate when editing FINISHES (focus-out / Enter / arrow-step),
             # not on every keystroke: mid-typing a half-entered number would feed
             # the coupling partial values and lock the coupled fields out of range
             # (Patrick, 2026-11-18). Programmatic setValue still signals, so tests
             # and the live preview on a committed value are unaffected.
             w.setKeyboardTracking(False)
-            if spec.unit:
-                w.setSuffix(" " + spec.unit)
+            if spec.unit_modes:
+                self._init_unit_field(spec, w)   # range/suffix per the active mode
+            else:
+                w.setDecimals(spec.decimals)
+                w.setRange(float(spec.minimum), float(spec.maximum))
+                w.setSingleStep(float(spec.step))
+                if spec.unit:
+                    w.setSuffix(" " + spec.unit)
             w.valueChanged.connect(self._on_changed)
         elif spec.kind == INT:
             w = QSpinBox()
@@ -189,6 +200,83 @@ class ParametricDialog(QDialog):
         if spec.tooltip:
             w.setToolTip(spec.tooltip)
         return w
+
+    # -- unit dropdowns (a FLOAT field shown in either of two units) ----------
+    def _active_unit_key(self, spec):
+        get = _UNIT_PREFS.get(spec.unit_setting, (None, None))[0]
+        pref = get() if get is not None else None
+        if pref and any(m.key == pref for m in spec.unit_modes):
+            return pref                      # a remembered choice
+        return spec.unit_modes[0].key        # else this field's native unit
+
+    def _mode_by_key(self, spec, key):
+        return next((m for m in spec.unit_modes if m.key == key),
+                    spec.unit_modes[0])
+
+    @staticmethod
+    def _apply_mode_to_spin(spin, mode):
+        spin.setDecimals(mode.decimals)
+        spin.setRange(float(mode.minimum), float(mode.maximum))
+        spin.setSingleStep(float(mode.step))
+        spin.setSuffix(mode.suffix)
+
+    def _init_unit_field(self, spec, spin):
+        mode = self._mode_by_key(spec, self._active_unit_key(spec))
+        self._unit_mode[spec.key] = mode
+        self._apply_mode_to_spin(spin, mode)
+        combo = QComboBox()
+        for m in spec.unit_modes:
+            combo.addItem(m.label, m.key)
+        idx = combo.findData(mode.key)
+        combo.setCurrentIndex(idx if idx >= 0 else 0)
+        combo.setAccessibleName(spec.label + " unit")
+        combo.setToolTip("Show this pitch as rise per 12 in, or in degrees.")
+        combo.currentIndexChanged.connect(lambda _i, s=spec: self._on_unit_changed(s))
+        self._unit_combos[spec.key] = combo
+
+    def _row_widget(self, spec, w):
+        """The field cell: the spinbox alone, or the spinbox + its unit combo."""
+        combo = self._unit_combos.get(spec.key)
+        if combo is None:
+            return w
+        cell = QWidget()
+        lay = QHBoxLayout(cell)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+        lay.addWidget(w, 1)
+        lay.addWidget(combo)
+        return cell
+
+    def _on_unit_changed(self, spec):
+        if self._loading:
+            return
+        combo = self._unit_combos[spec.key]
+        old_mode = self._unit_mode[spec.key]
+        new_mode = self._mode_by_key(spec, combo.currentData())
+        if new_mode.key == old_mode.key:
+            return
+        spin = self._widgets[spec.key]
+        # keep the field's CANONICAL value across the flip. Prefer the stored
+        # one (no round-trip drift) unless the user typed a new display value.
+        stored = self.values.get(spec.key)
+        shown = spin.value()
+        tol = 0.5 * 10 ** (-old_mode.decimals) + 1e-9
+        if stored is not None and abs(old_mode.to_display(float(stored)) - shown) <= tol:
+            canonical = float(stored)
+        else:
+            canonical = float(old_mode.from_display(shown))
+        self._unit_mode[spec.key] = new_mode
+        setter = _UNIT_PREFS.get(spec.unit_setting, (None, None))[1]
+        if setter is not None:
+            setter(new_mode.key)
+        self.values[spec.key] = canonical
+        self._loading = True
+        try:
+            self._apply_mode_to_spin(spin, new_mode)
+            spin.setValue(new_mode.to_display(canonical))
+        finally:
+            self._loading = False
+        self._refresh()
 
     # -- the draft -----------------------------------------------------------
     def _on_changed(self, *_args):
@@ -215,7 +303,10 @@ class ParametricDialog(QDialog):
                 v[spec.key] = w.isChecked()
         for spec in self._specs:
             if spec.kind in (FLOAT, INT) and spec.enabled(v):
-                v[spec.key] = self._widgets[spec.key].value()
+                val = self._widgets[spec.key].value()
+                if spec.unit_modes:                 # display unit -> canonical
+                    val = float(self._unit_mode[spec.key].from_display(val))
+                v[spec.key] = val
         # a transient hint of the field just edited; the kind may use it and
         # it is never stored (dropped from the draft right after normalize).
         v["_edited"] = self._edited_key
@@ -260,6 +351,8 @@ class ParametricDialog(QDialog):
                             shown = calc
                     if shown is not None:
                         shown = int(shown) if spec.kind == INT else float(shown)
+                        if spec.unit_modes:         # canonical -> display unit
+                            shown = self._unit_mode[spec.key].to_display(shown)
                         if abs(w.value() - shown) > 1e-9:
                             w.setValue(shown)
                 w.setEnabled(enabled)

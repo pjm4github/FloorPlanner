@@ -15,6 +15,7 @@ from floorplanner.walls import *  # noqa: F401
 from floorplanner.rooms import *  # noqa: F401
 from floorplanner.roofs import RoofItem
 from floorplanner.items import *  # noqa: F401
+from floorplanner.parametric.params import deg_to_pitch12, pitch12_to_deg
 
 class GapReviewDialog(QDialog):
     """DEFECT 34's review (P4.2): LIST the document's near-vertex gaps in the
@@ -1932,12 +1933,27 @@ class RoofEndOnDialog(QDialog):
         self.lab_eaves = QLabel("Eaves height (H)")
         form.addRow(self.lab_eaves, self.sp_eaves)
 
+        # Pitch, shown in degrees OR rise-per-12, the user's remembered choice
+        # (Patrick, 2026-11-19). The spinbox holds whichever unit is selected;
+        # `_pitch_deg()` / `_set_field("pitch", <deg>)` convert, so the recompute
+        # stays in degrees. The combo sits beside the field.
         self.sp_pitch = QDoubleSpinBox()
-        self.sp_pitch.setRange(0.0, 80.0)
-        self.sp_pitch.setDecimals(1)
-        self.sp_pitch.setSuffix(" deg")
+        self.cb_pitch_unit = QComboBox()
+        self.cb_pitch_unit.addItem("degrees", "deg")
+        self.cb_pitch_unit.addItem("in 12", "in12")
+        self._apply_pitch_unit(pitch_units())
+        self.cb_pitch_unit.setToolTip("Show the pitch in degrees, or as rise "
+                                      "per 12 in of run.")
+        pitch_cell = QWidget()
+        pitch_row = QHBoxLayout(pitch_cell)
+        pitch_row.setContentsMargins(0, 0, 0, 0)
+        pitch_row.setSpacing(4)
+        pitch_row.addWidget(self.sp_pitch, 1)
+        pitch_row.addWidget(self.cb_pitch_unit)
         self.lab_pitch = QLabel("Pitch (P)")
-        form.addRow(self.lab_pitch, self.sp_pitch)
+        form.addRow(self.lab_pitch, pitch_cell)
+        self.cb_pitch_unit.currentIndexChanged.connect(
+            lambda _i: self._on_pitch_unit())
 
         # -- R4b: the room-top binding (0154-ruling.md sec2, item 5) --
         self.ck_bind = QCheckBox("Bind eaves to the room top")
@@ -2275,8 +2291,50 @@ class RoofEndOnDialog(QDialog):
         return {"ridge_h": self.sp_ridge, "eaves_h": self.sp_eaves,
                 "pitch": self.sp_pitch}[field]
 
+    def _apply_pitch_unit(self, unit):
+        """Set the pitch spinbox's range/suffix for `unit` and sync the combo.
+        Does NOT convert the current value -- `_on_pitch_unit` does that."""
+        self._pitch_unit = unit if unit in ("deg", "in12") else "deg"
+        idx = self.cb_pitch_unit.findData(self._pitch_unit)
+        if idx >= 0 and idx != self.cb_pitch_unit.currentIndex():
+            self.cb_pitch_unit.setCurrentIndex(idx)
+        self.sp_pitch.setSingleStep(0.5)
+        if self._pitch_unit == "deg":
+            self.sp_pitch.setRange(0.0, 80.0)
+            self.sp_pitch.setDecimals(1)
+            self.sp_pitch.setSuffix(" deg")
+        else:
+            self.sp_pitch.setRange(0.0, 72.0)
+            self.sp_pitch.setDecimals(2)
+            self.sp_pitch.setSuffix(" in 12")
+
+    def _pitch_deg(self) -> float:
+        """The pitch the spinbox holds, ALWAYS in degrees (the recompute's unit)."""
+        v = self.sp_pitch.value()
+        return v if self._pitch_unit == "deg" else pitch12_to_deg(v)
+
+    def _pitch_display_from_deg(self, deg: float) -> float:
+        """A degree pitch in the spinbox's current unit."""
+        return deg if self._pitch_unit == "deg" else deg_to_pitch12(deg)
+
+    def _on_pitch_unit(self):
+        new = self.cb_pitch_unit.currentData()
+        if new == self._pitch_unit:
+            return
+        deg = self._pitch_deg()                   # preserve the pitch across units
+        set_pitch_units(new)
+        self._programmatic = True
+        try:
+            self._apply_pitch_unit(new)
+            self.sp_pitch.setValue(self._pitch_display_from_deg(deg))
+        finally:
+            self._programmatic = False
+        self._redraw()
+
     def _set_field(self, field, value, redraw=True):
         self._programmatic = True
+        if field == "pitch":                      # `value` arrives in degrees
+            value = self._pitch_display_from_deg(value)
         self._spin(field).setValue(value)
         self._programmatic = False
         if redraw:
@@ -2453,7 +2511,7 @@ class RoofEndOnDialog(QDialog):
         span = self.canvas.span_in
         ridge_h = self.sp_ridge.value()
         eaves_h = self.sp_eaves.value()
-        pitch_rad = math.radians(self.sp_pitch.value())
+        pitch_rad = math.radians(self._pitch_deg())
         if derived == "pitch":
             pitch_rad = math.atan2(max(0.0, ridge_h - eaves_h), span)
             self._set_field("pitch", math.degrees(pitch_rad), redraw=False)

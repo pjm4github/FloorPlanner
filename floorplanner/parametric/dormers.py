@@ -29,7 +29,8 @@ double-click opens the generic dialog. Phase 1 built the kind but withheld
 """
 from floorplanner.parametric import dormer_geometry as dg
 from floorplanner.parametric.findings import ADVISORY, ERROR, WARNING, Finding
-from floorplanner.parametric.params import BOOL, ENUM, FLOAT, ParamSpec
+from floorplanner.parametric.params import (
+    BOOL, ENUM, FLOAT, ParamSpec, pitch_unit_modes)
 from floorplanner.parametric.registry import ParametricKind, register
 
 
@@ -104,8 +105,11 @@ class DormerKind(ParametricKind):
                  "gives way, the ridge held."),
             ParamSpec("pitch_12", "Pitch", FLOAT, d["pitch_12"], unit="in 12",
                       minimum=0.5, maximum=24.0, step=0.5,
-                      tooltip="Rise per 12 in of run, on the left plane. Edit it "
-                              "and the EAVES give way, the ridge held."),
+                      unit_modes=pitch_unit_modes(0.5, 24.0),
+                      unit_setting="pitch_units",
+                      tooltip="Rise per 12 in of run on the left plane, OR in "
+                              "degrees -- pick the unit from the dropdown. Edit "
+                              "it and the EAVES give way, the ridge held."),
             size("eave_overhang_left_in", "Eave overhang, left", 0.0, 60.0,
                  tip="Knob E."),
             size("eave_overhang_right_in", "Eave overhang, right", 0.0, 60.0,

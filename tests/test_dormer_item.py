@@ -519,6 +519,42 @@ def test_nothing_below_warns_when_the_storey_is_undefined(scene):
         restore()
 
 
+def test_the_dormer_pitch_field_offers_degrees_or_rise_run(scene):
+    # Patrick (2026-11-19): a per-field unit dropdown, degrees or rise/run,
+    # the choice remembered. The stored pitch_12 never changes on a unit flip.
+    import math as _m
+    from floorplanner import config
+    from floorplanner.parametric.dialog import ParametricDialog
+    config.set_pitch_units("")                        # unset -> the dormer's native in 12
+    d = _dormer(scene, pos=QPointF(150, 150))
+    dlg = ParametricDialog(DORMER, d.draft_state(), d.param_context())
+    try:
+        combo = dlg._unit_combos.get("pitch_12")
+        spin = dlg._widgets["pitch_12"]
+        assert combo is not None
+        assert {combo.itemData(i) for i in range(combo.count())} == {"in12", "deg"}
+        assert dlg._unit_mode["pitch_12"].key == "in12"      # native
+        canonical = float(dlg.values["pitch_12"])
+        combo.setCurrentIndex(combo.findData("deg"))
+        assert spin.suffix().strip() == "deg"
+        assert dlg.values["pitch_12"] == pytest.approx(canonical, abs=1e-6)
+        assert spin.value() == pytest.approx(
+            _m.degrees(_m.atan2(canonical, 12.0)), abs=0.05)
+        assert config.pitch_units() == "deg"             # remembered
+        combo.setCurrentIndex(combo.findData("in12"))    # flip back, no drift
+        assert dlg.values["pitch_12"] == pytest.approx(canonical, abs=1e-6)
+    finally:
+        dlg.deleteLater()
+
+
+def test_the_knob_tooltips_name_the_face_wall_knee_wall_and_dormer_eave(scene):
+    # Patrick (2026-11-19): hover tooltips explaining the knobs.
+    tips = DormerGripItem._TIPS
+    assert "face wall" in tips["guide_face"].lower()
+    assert "knee wall" in tips["guide_l"].lower() and "knee wall" in tips["guide_r"].lower()
+    assert "dormer eave" in tips["eave_l"].lower() and "dormer eave" in tips["eave_r"].lower()
+
+
 def test_number_fields_recalc_on_focus_out_not_each_keystroke(scene):
     # a spinbox must not recalc mid-typing: a half-entered number would feed
     # the ridge/eaves/pitch coupling partial values and lock a field out of
