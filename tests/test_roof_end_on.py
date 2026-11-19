@@ -300,6 +300,29 @@ def test_the_pitch_field_switches_between_degrees_and_rise_run(fp, win):
     assert dlg2._pitch_unit == "in12"
 
 
+def test_typing_a_unit_in_the_roof_pitch_switches_and_recomputes(fp, win):
+    # Patrick (2026-11-19): a typed "d"/"deg" means degrees, else rise/run; the
+    # three-way recompute runs on the typed pitch.
+    from PyQt6.QtWidgets import QApplication
+    from floorplanner import config
+    config.set_pitch_units("")
+    roof = RoofItem(QPointF(0, 0), QPointF(200, 0), span_in=100.0)
+    dlg = _dialog_for(roof)
+    dlg.sp_ridge.setValue(150.0)
+    dlg.sp_pitch.lineEdit().setText("12 in 12")
+    dlg.sp_pitch.interpretText()
+    QApplication.processEvents()                       # deferred unitTyped
+    assert dlg._pitch_unit == "in12"                   # 12 in 12 = 45 deg
+    assert dlg.sp_eaves.value() == pytest.approx(50.0, abs=0.3)
+    dlg.sp_pitch.lineEdit().setText("30d")
+    dlg.sp_pitch.interpretText()
+    QApplication.processEvents()
+    assert dlg._pitch_unit == "deg"
+    assert dlg.sp_pitch.value() == pytest.approx(30.0, abs=0.02)
+    assert dlg.sp_eaves.value() == pytest.approx(
+        150.0 - 100.0 * math.tan(math.radians(30.0)), abs=0.3)
+
+
 def test_at_first_open_pitch_is_the_derived_field(fp, win):
     roof = RoofItem(QPointF(0, 0), QPointF(200, 0), ridge_h_in=132.0,
                     eaves_h_in=96.0, span_in=100.0)

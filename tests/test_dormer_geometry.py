@@ -582,12 +582,16 @@ def test_the_kind_reports_the_sides():
     ({"host_z_face_in": 30.0, "host_slope": -0.5}, "dormer.level_host",
      dg.FACES_UPHILL),
 ])
-def test_a_dormer_over_the_main_ridge_or_facing_uphill_is_refused(ctx, rule, why):
+def test_a_dormer_over_the_main_ridge_or_facing_uphill_is_an_overridable_error(
+        ctx, rule, why):
     """Patrick, 2026-11-17: "The ridge of the roof is under the dormer (which
-    should be an error)"."""
+    should be an error)". 2026-11-19: and OVERRIDABLE -- it is fixed out on the
+    plan (turn or move the dormer, change the host), so the user may acknowledge
+    it and keep the red dormer on the plan rather than being trapped."""
     derived, fs = DORMER.evaluate({}, ctx)
     by = {f.rule_id: f for f in fs}
-    assert by[rule].severity == F.ERROR and F.blocks(fs)
+    assert by[rule].severity == F.ERROR and by[rule].overridable
+    assert not F.blocks(fs) and F.needs_ack(fs)      # acknowledge, not hard-block
     assert derived is not None and derived["unbuildable"] == why, \
         "still drawn, so the user can see what to fix"
 
@@ -623,7 +627,10 @@ def test_a_dormer_off_the_host_fall_line_is_not_downhill():
     ctx = {"host_z_face_in": 60.0, "host_slope": 1.0, "host_ridge_in": 240.0,
            "host_offaxis_deg": 30.0}
     _d, fs = DORMER.evaluate({}, ctx)
-    assert any(f.rule_id == "dormer.not_downhill" for f in fs) and F.blocks(fs)
+    nd = next(f for f in fs if f.rule_id == "dormer.not_downhill")
+    # an error, but OVERRIDABLE (fixed by rotating on the plan) -- not a hard block
+    assert nd.severity == F.ERROR and nd.overridable
+    assert not F.blocks(fs) and F.needs_ack(fs)
 
 
 def test_the_message_names_a_width_that_fits():

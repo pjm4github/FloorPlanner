@@ -16,6 +16,7 @@ from floorplanner.rooms import *  # noqa: F401
 from floorplanner.roofs import RoofItem
 from floorplanner.items import *  # noqa: F401
 from floorplanner.parametric.params import deg_to_pitch12, pitch12_to_deg
+from floorplanner.parametric.dialog import PitchSpinBox
 
 class GapReviewDialog(QDialog):
     """DEFECT 34's review (P4.2): LIST the document's near-vertex gaps in the
@@ -1937,7 +1938,9 @@ class RoofEndOnDialog(QDialog):
         # (Patrick, 2026-11-19). The spinbox holds whichever unit is selected;
         # `_pitch_deg()` / `_set_field("pitch", <deg>)` convert, so the recompute
         # stays in degrees. The combo sits beside the field.
-        self.sp_pitch = QDoubleSpinBox()
+        self.sp_pitch = PitchSpinBox()               # accepts a typed "d"/"deg"
+        self.sp_pitch.unitTyped.connect(
+            lambda key, num: self._on_pitch_typed(key, num))
         self.cb_pitch_unit = QComboBox()
         self.cb_pitch_unit.addItem("degrees", "deg")
         self.cb_pitch_unit.addItem("in 12", "in12")
@@ -2316,6 +2319,24 @@ class RoofEndOnDialog(QDialog):
     def _pitch_display_from_deg(self, deg: float) -> float:
         """A degree pitch in the spinbox's current unit."""
         return deg if self._pitch_unit == "deg" else deg_to_pitch12(deg)
+
+    def _on_pitch_typed(self, unit, number):
+        """The user typed a unit in the pitch field (e.g. "30 deg"): adopt that
+        unit, take the number as-typed, and recompute as a fresh pitch edit."""
+        set_pitch_units(unit)
+        self._programmatic = True
+        try:
+            self._apply_pitch_unit(unit)
+            self.sp_pitch.setValue(number)
+        finally:
+            self._programmatic = False
+        if "pitch" in self._recent:
+            self._recent.remove("pitch")
+        self._recent.append("pitch")
+        self._recompute()
+        self._refresh_labels()
+        if self._dormer:
+            self._refresh_dormer_note()
 
     def _on_pitch_unit(self):
         new = self.cb_pitch_unit.currentData()

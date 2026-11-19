@@ -243,7 +243,8 @@ class DormerKind(ParametricKind):
                 "dormer.level_host", ERROR,
                 "The roof under this dormer does not rise along its ridge: it "
                 "is facing up the slope, or sitting over the main ridge. Turn "
-                "it to face down the slope, or move it down the roof."))
+                "it to face down the slope, or move it down the roof.",
+                overridable=True))
         elif why == dg.OVER_RIDGE:
             fitted = dg.fit_under_ridge(st, float(host_ridge))
             findings.append(Finding(
@@ -252,20 +253,21 @@ class DormerKind(ParametricKind):
                 f"ridge ({_fmt(float(host_ridge))} in). Narrow it to "
                 f"{_fmt(fitted['span_left_in'])} in a side, lower the pitch, "
                 "or lower the eaves.", actual=rh, limit=float(host_ridge),
-                field="span_left_in"))
+                field="span_left_in", overridable=True))
         elif why == dg.TOO_STEEP:
             findings.append(Finding(
                 "dormer.too_steep", ERROR,
                 f"This shed dormer's slope ({_fmt(st['pitch_12'])} in 12) is "
                 f"not shallower than the host roof ({_fmt(slope * 12.0)} in 12), "
                 "so its back never dies into the host. Lower the pitch.",
-                actual=st["pitch_12"], limit=slope * 12.0, field="pitch_12"))
+                actual=st["pitch_12"], limit=slope * 12.0, field="pitch_12",
+                overridable=True))
         elif why == dg.NOT_DOWNHILL:
             findings.append(Finding(
                 "dormer.not_downhill", ERROR,
                 f"This dormer faces {_fmt(offaxis)} deg off straight down the "
                 "slope. Turn it to face down the fall line of the roof it sits "
-                "on."))
+                "on.", overridable=True))
         if ceiling is not None and derived["full_height_in"] <= 0.0:
             findings.append(Finding(
                 "dormer.no_full_height", ADVISORY,

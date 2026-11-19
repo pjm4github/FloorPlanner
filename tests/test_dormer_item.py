@@ -547,6 +547,57 @@ def test_the_dormer_pitch_field_offers_degrees_or_rise_run(scene):
         dlg.deleteLater()
 
 
+def test_typing_a_unit_in_the_dormer_pitch_sets_degrees_or_rise_run(scene):
+    # Patrick (2026-11-19): "d"/"deg" after the number -> degrees, else rise/run.
+    import math as _m
+    from PyQt6.QtWidgets import QApplication
+    from floorplanner import config
+    from floorplanner.parametric.dialog import ParametricDialog
+    config.set_pitch_units("")
+    d = _dormer(scene, pos=QPointF(150, 150))
+    dlg = ParametricDialog(DORMER, d.draft_state(), d.param_context())
+    try:
+        spin = dlg._widgets["pitch_12"]
+        assert dlg._unit_mode["pitch_12"].key == "in12"           # native
+        spin.lineEdit().setText("40 deg")
+        spin.interpretText()
+        QApplication.processEvents()                              # deferred unitTyped
+        assert dlg._unit_mode["pitch_12"].key == "deg"
+        assert spin.value() == pytest.approx(40.0, abs=0.02)
+        assert dlg.values["pitch_12"] == pytest.approx(
+            12.0 * _m.tan(_m.radians(40.0)), abs=0.02)
+        assert config.pitch_units() == "deg"
+        spin.lineEdit().setText("8")                              # bare -> rise/run
+        spin.interpretText()
+        QApplication.processEvents()
+        assert dlg._unit_mode["pitch_12"].key == "in12"
+        assert dlg.values["pitch_12"] == pytest.approx(8.0, abs=0.02)
+    finally:
+        dlg.deleteLater()
+
+
+def test_a_too_steep_shed_can_be_accepted_to_fix_on_the_plan(scene):
+    # Patrick (2026-11-19): switching to a shed can leave it too steep for the
+    # host (the shed's back never dies in). That ERROR must not TRAP the user --
+    # it is overridable, so OK (with the ack) keeps the red dormer on the plan to
+    # fix there. A pure input error (zero pitch) still hard-blocks.
+    from floorplanner.parametric.dialog import ParametricDialog
+    _host(scene)                                   # host slope ~6.24 in 12
+    d = _dormer(scene, pos=QPointF(150, 115),
+                state={"form": "shed", "depth_in": 20.0}, new=True)
+    d._recompute()
+    dlg = ParametricDialog(DORMER, d.draft_state(), d.param_context())
+    try:
+        assert "dormer.too_steep" in [f.rule_id for f in dlg.findings()]
+        assert not dlg.try_accept()                # needs the acknowledgement
+        dlg.ack.setChecked(True)
+        assert dlg.try_accept()                    # overridable -> accepted
+        dlg.set_value("pitch_12", 0.0)             # a zero pitch: a hard block
+        assert not dlg.try_accept()
+    finally:
+        dlg.deleteLater()
+
+
 def test_the_knob_tooltips_name_the_face_wall_knee_wall_and_dormer_eave(scene):
     # Patrick (2026-11-19): hover tooltips explaining the knobs.
     tips = DormerGripItem._TIPS

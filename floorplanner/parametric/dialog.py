@@ -14,8 +14,10 @@ THE DIALOG EDITS A DRAFT. It never touches the furnishing: the caller reads
 cancelled dialog leaves the document, and the undo stack, exactly as they
 were.
 """
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QBrush, QColor, QGuiApplication
+import re
+
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QBrush, QColor, QGuiApplication, QValidator
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
     QFormLayout, QFrame, QGroupBox, QHBoxLayout, QLabel, QListWidget,
@@ -25,6 +27,68 @@ from PyQt6.QtWidgets import (
 from floorplanner import config as _config
 from floorplanner.parametric import findings as F
 from floorplanner.parametric.params import BOOL, ENUM, FLOAT, INT
+
+
+# Typing a unit in a pitch field: a "d"/"deg" suffix means degrees, anything
+# else is read as rise/run -- "XXX in 12" (Patrick, 2026-11-19). Shared by the
+# generic dialog (dormer) and the roof End-On dialog.
+_PITCH_INPUT_RE = re.compile(
+    r"^\s*([+-]?\d*\.?\d*)\s*(d|deg|deg\.|°|in|in12|in 12|/12)?\s*$", re.I)
+
+
+def pitch_unit_from_text(text):
+    """(unit_key, number) for a typed pitch, or (None, None) if not a number.
+    `unit_key` is 'deg' when a d/deg suffix is typed, else 'in12'."""
+    m = _PITCH_INPUT_RE.match(text or "")
+    if m is None or m.group(1) in ("", "+", "-", "."):
+        return None, None
+    try:
+        num = float(m.group(1))
+    except (TypeError, ValueError):
+        return None, None
+    tok = (m.group(2) or "").lower().strip().rstrip(".")
+    return ("deg" if tok in ("d", "deg", "°") else "in12"), num
+
+
+class PitchSpinBox(QDoubleSpinBox):
+    """A pitch spinbox that accepts a typed unit. `unitTyped(key, number)` fires
+    (deferred, so the dialog may safely re-range the box) when the text carries a
+    recognised unit; `textFromValue` keeps the usual suffix for display."""
+    unitTyped = pyqtSignal(str, float)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._pending = None
+
+    def _core(self, text):
+        """Drop the field's CURRENT suffix (e.g. " deg"), which Qt re-appends to
+        whatever the user types, so a bare number is read in neither unit -- it
+        is the typed token, if any, that decides (Patrick, 2026-11-19)."""
+        s = self.suffix()
+        if s and text.endswith(s):
+            text = text[:-len(s)]
+        return text
+
+    def validate(self, text, pos):
+        m = _PITCH_INPUT_RE.match(self._core(text))
+        if m is None:
+            return (QValidator.State.Invalid, text, pos)
+        if m.group(1) in ("", "+", "-", "."):
+            return (QValidator.State.Intermediate, text, pos)
+        return (QValidator.State.Acceptable, text, pos)
+
+    def valueFromText(self, text):
+        unit, num = pitch_unit_from_text(self._core(text))
+        if unit is None:
+            return self.value()
+        self._pending = (unit, num)
+        QTimer.singleShot(0, self._emit_pending)
+        return num
+
+    def _emit_pending(self):
+        if self._pending is not None:
+            pend, self._pending = self._pending, None
+            self.unitTyped.emit(*pend)
 
 # Session preferences a FLOAT field's unit dropdown may remember, keyed by
 # `ParamSpec.unit_setting`: (getter, setter). Flipping the unit in one dialog
@@ -43,6 +107,8 @@ _SEVERITY_WORD = {
     F.ADVISORY: "ADVISORY", F.PASS: "pass",
 }
 ACK_TEXT = "I understand these checks are unresolved / warnings remain"
+ACK_OVERRIDE_TEXT = ("I understand this cannot be built as drawn — keep it on "
+                     "the plan (drawn red) so I can fix it there")
 
 
 class ParametricDialog(QDialog):
@@ -166,7 +232,8 @@ class ParametricDialog(QDialog):
 
     def _make_widget(self, spec):
         if spec.kind == FLOAT:
-            w = QDoubleSpinBox()
+            typed_units = bool(spec.unit_modes) and spec.unit_setting == "pitch_units"
+            w = PitchSpinBox() if typed_units else QDoubleSpinBox()
             # Recalculate when editing FINISHES (focus-out / Enter / arrow-step),
             # not on every keystroke: mid-typing a half-entered number would feed
             # the coupling partial values and lock the coupled fields out of range
@@ -175,6 +242,9 @@ class ParametricDialog(QDialog):
             w.setKeyboardTracking(False)
             if spec.unit_modes:
                 self._init_unit_field(spec, w)   # range/suffix per the active mode
+                if typed_units:
+                    w.unitTyped.connect(
+                        lambda key, num, s=spec: self._on_unit_typed(s, key, num))
             else:
                 w.setDecimals(spec.decimals)
                 w.setRange(float(spec.minimum), float(spec.maximum))
@@ -246,6 +316,30 @@ class ParametricDialog(QDialog):
         lay.addWidget(w, 1)
         lay.addWidget(combo)
         return cell
+
+    def _on_unit_typed(self, spec, unit_key, number):
+        """The user TYPED a unit (e.g. "30 deg") -- set that unit and take the
+        number AS-TYPED in it (no conversion: it is a fresh value, not a flip)."""
+        mode = self._mode_by_key(spec, unit_key)
+        self._unit_mode[spec.key] = mode
+        setter = _UNIT_PREFS.get(spec.unit_setting, (None, None))[1]
+        if setter is not None:
+            setter(mode.key)
+        self.values[spec.key] = float(mode.from_display(number))
+        self._loading = True
+        try:
+            combo = self._unit_combos.get(spec.key)
+            if combo is not None:
+                i = combo.findData(mode.key)
+                if i >= 0:
+                    combo.setCurrentIndex(i)
+            spin = self._widgets[spec.key]
+            self._apply_mode_to_spin(spin, mode)
+            spin.setValue(number)
+        finally:
+            self._loading = False
+        self._read_widgets()
+        self._refresh()
 
     def _on_unit_changed(self, spec):
         if self._loading:
@@ -385,6 +479,9 @@ class ParametricDialog(QDialog):
             # a DIFFERENT set of open checks is a different thing to agree to
             self._ack_ids = ids
             self.ack.setChecked(False)
+        # a plain warnings ack, or the stronger "keep it on the plan to fix"
+        # when an overridable error is open (Patrick, 2026-11-19)
+        self.ack.setText(ACK_OVERRIDE_TEXT if F.overridable_errors(fs) else ACK_TEXT)
         self.ack.setVisible(bool(ids))
         self.ack.setEnabled(not F.blocks(fs))
         self.ack.setStyleSheet("")

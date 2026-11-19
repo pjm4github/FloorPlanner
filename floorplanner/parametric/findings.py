@@ -25,6 +25,11 @@ class Finding:
     actual: float | None = None
     limit: float | None = None
     field: str | None = None       # the parameter to focus, when there is one
+    # An ERROR the user may ACKNOWLEDGE and accept anyway, because resolving it
+    # needs a change OUT ON THE PLAN, not in this dialog -- e.g. a dormer whose
+    # host roof is too steep or faces the wrong way. The item draws red until
+    # fixed; committing it keeps it on the plan to work on (Patrick, 2026-11-19).
+    overridable: bool = False
 
 
 def sort_findings(findings):
@@ -36,14 +41,26 @@ def errors(findings):
     return [f for f in findings if f.severity == ERROR]
 
 
+def hard_errors(findings):
+    """Errors that genuinely block OK -- an overridable error does not."""
+    return [f for f in findings if f.severity == ERROR and not f.overridable]
+
+
+def overridable_errors(findings):
+    return [f for f in findings if f.severity == ERROR and f.overridable]
+
+
 def unresolved(findings):
-    """What must be acknowledged before a commit: warnings and anything not
-    evaluated."""
-    return [f for f in findings if f.severity in (WARNING, NOT_EVALUATED)]
+    """What must be acknowledged before a commit: warnings, anything not
+    evaluated, and errors the user may override to fix out on the plan."""
+    return [f for f in findings
+            if f.severity in (WARNING, NOT_EVALUATED)
+            or (f.severity == ERROR and f.overridable)]
 
 
 def blocks(findings):
-    return bool(errors(findings))
+    """True only when an error cannot be overridden -- a hard block on OK."""
+    return bool(hard_errors(findings))
 
 
 def needs_ack(findings):
@@ -54,9 +71,13 @@ def headline(findings):
     """One honest status line. It never says 'compliant': with any check
     unresolved the most it says is that the BASIC dimensions pass (spec sec
     6.1, the important rule)."""
-    n_err = len(errors(findings))
-    if n_err:
-        return f"{n_err} error(s) -- cannot be accepted"
+    n_hard = len(hard_errors(findings))
+    if n_hard:
+        return f"{n_hard} error(s) -- cannot be accepted"
+    n_over = len(overridable_errors(findings))
+    if n_over:
+        return (f"{n_over} issue(s) to fix on the plan; acknowledge to keep the "
+                f"dormer on the plan and work on it there")
     n_open = len(unresolved(findings))
     if n_open:
         return (f"Basic dimensions pass; {n_open} additional check(s) pending "
