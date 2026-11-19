@@ -204,6 +204,21 @@ def test_host_plane_reads_a_surface_callable():
     assert (z, slope) == pytest.approx((30.0, 0.75))
 
 
+def test_host_extent_places_the_eave_and_ridge_along_the_ridge():
+    # P1 (2026-11-18): the host's eave and ridge as signed Y from the face.
+    # face 60 above this level, host rises 1 in / in, ridge 120, eave 48.
+    ext = dg.host_extent(host_z_face=60.0, host_slope=1.0,
+                         host_ridge_in=120.0, host_eave_in=48.0)
+    assert ext["ridge_y"] == pytest.approx(60.0)   # 60 up to the host ridge
+    assert ext["eave_y"] == pytest.approx(-12.0)   # 12 down to the host eave
+    # a face already below the eave height hangs past it -> eave_y > 0
+    hang = dg.host_extent(host_z_face=40.0, host_slope=1.0, host_eave_in=48.0)
+    assert hang["eave_y"] == pytest.approx(8.0) and hang["ridge_y"] is None
+    # no host, or a host that does not rise along the ridge -> None
+    assert dg.host_extent() is None
+    assert dg.host_extent(host_z_face=60.0, host_slope=0.0) is None
+
+
 # -- the kind ---------------------------------------------------------------
 def test_the_kind_is_registered_and_offered():
     # phase 2 (0352): the kind is REGISTERED now that DormerItem draws one and
@@ -555,6 +570,19 @@ def test_ridge_to_ridge_is_allowed_and_no_host_is_not_an_error():
     assert derived["unbuildable"] is None and not F.blocks(fs)
     assert dg.unbuildable(_st()) is None
     assert dg.unbuildable(_st(), 30.0, 0.8) is None, "host ridge unknown"
+
+
+def test_a_dormer_off_the_host_fall_line_is_not_downhill():
+    # P2 (2026-11-18): more than FACING_TOL_DEG off straight-downhill is refused.
+    st = _st()                                        # ridge 110, host ridge 240
+    assert dg.unbuildable(st, 60.0, 1.0, 240.0, 0.0) is None    # straight downhill
+    assert dg.unbuildable(st, 60.0, 1.0, 240.0, dg.FACING_TOL_DEG) is None
+    assert dg.unbuildable(st, 60.0, 1.0, 240.0, 30.0) == dg.NOT_DOWNHILL
+    # the finding carries through evaluate
+    ctx = {"host_z_face_in": 60.0, "host_slope": 1.0, "host_ridge_in": 240.0,
+           "host_offaxis_deg": 30.0}
+    _d, fs = DORMER.evaluate({}, ctx)
+    assert any(f.rule_id == "dormer.not_downhill" for f in fs) and F.blocks(fs)
 
 
 def test_the_message_names_a_width_that_fits():

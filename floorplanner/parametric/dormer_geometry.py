@@ -134,23 +134,33 @@ def fit_under_ridge(state, host_ridge_in, clear=RIDGE_CLEAR_IN):
 OVER_RIDGE = "over_ridge"          # a GABLE's ridge is above the host's ridge
 FACES_UPHILL = "faces_uphill"      # the host does not rise along its ridge
 TOO_STEEP = "too_steep"            # a SHED's plane is not shallower than the host
+NOT_DOWNHILL = "not_downhill"      # the ridge is off the host's fall line
+FACING_TOL_DEG = 1.5               # how far off straight-downhill still counts
 
 
-def unbuildable(st, host_z_face=None, host_slope=None, host_ridge_in=None):
+def unbuildable(st, host_z_face=None, host_slope=None, host_ridge_in=None,
+                offaxis_deg=None):
     """Why this dormer must NOT be built on this host -- `OVER_RIDGE`,
-    `FACES_UPHILL`, `TOO_STEEP` -- or None. ONE RULE FOR THE DIALOG AND THE 3D
-    BUILDER (0359): what the dialog refuses, the builder skips.
+    `FACES_UPHILL`, `TOO_STEEP`, `NOT_DOWNHILL` -- or None. ONE RULE FOR THE
+    DIALOG AND THE 3D BUILDER (0359): what the dialog refuses, the builder
+    skips.
 
     A GABLE's ridge AT the host's ridge height is allowed (ridge to ridge is an
     ordinary cross gable); above it is `OVER_RIDGE` (also the astride-the-ridge
     case). A SHED is different (Patrick, 2026-11-18): it touches the host only
     along its back ridge, so it MAY sit above the host ridge -- but its plane
     must be SHALLOWER than the host (`TOO_STEEP` otherwise) or it never dies
-    into the host. With no host there is nothing to be wrong about: None."""
+    into the host. A dormer must also face STRAIGHT DOWN the slope: more than
+    `FACING_TOL_DEG` off the host's fall line is `NOT_DOWNHILL` (Patrick,
+    2026-11-18, P2). `offaxis_deg` is the angle between the ridge and the fall
+    line, which only the item knows. With no host there is nothing to be wrong
+    about: None."""
     if host_z_face is None or host_slope is None:
         return None
     if host_slope <= _EPS:
         return FACES_UPHILL
+    if offaxis_deg is not None and abs(offaxis_deg) > FACING_TOL_DEG:
+        return NOT_DOWNHILL
     if st["form"] == "shed":
         return TOO_STEEP if _rise(st) >= host_slope - _EPS else None
     if host_ridge_in is not None and ridge_height(st) > float(host_ridge_in) + 1e-6:
@@ -235,6 +245,25 @@ def host_plane(surface_height_at, pos, direction, step=12.0):
     z1 = float(surface_height_at((pos[0] + direction[0] * step,
                                   pos[1] + direction[1] * step)))
     return z0, (z1 - z0) / step
+
+
+def host_extent(host_z_face=None, host_slope=None, host_ridge_in=None,
+                host_eave_in=None):
+    """Along the dormer's ridge direction (local +Y runs uphill into the host),
+    where the host roof's EAVE and RIDGE fall, as signed distances from the
+    face: `ridge_y` the host ridge (uphill, >= 0), `eave_y` the host eave
+    (downhill, <= 0 when the face is above the eave, > 0 once the face hangs
+    past it). The ANCHOR may travel between them -- past the ridge is
+    OVER_RIDGE, past the eave the face hangs off the roof (P1 of the 2026-11-18
+    control redesign). None with no host or one that does not rise along the
+    ridge; a missing ridge/eave height leaves that entry None."""
+    if host_z_face is None or host_slope is None or host_slope <= _EPS:
+        return None
+    ridge_y = (None if host_ridge_in is None
+               else (float(host_ridge_in) - host_z_face) / host_slope)
+    eave_y = (None if host_eave_in is None
+              else -(host_z_face - float(host_eave_in)) / host_slope)
+    return {"eave_y": eave_y, "ridge_y": ridge_y}
 
 
 def ridge_depth(st, host_z_face=None, host_slope=None):

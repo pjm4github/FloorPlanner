@@ -832,31 +832,44 @@ class DormerItem(FurnishingItem):
 
     # -- the host, found by height -------------------------------------------
     def _host_plane(self):
-        """(height at the face, slope along the ridge, host ridge height) of
-        the roof under the dormer, in THIS level's datum -- or (None, None,
-        None) when no roof is under it. Nothing is stored."""
+        """(height at the face, slope along the ridge, host ridge height, host
+        EAVE height, OFF-AXIS degrees) of the roof under the dormer, in THIS
+        level's datum -- or (None,)*5 when no roof is under it. Nothing is
+        stored. The ridge and eave heights bound the anchor's travel up the roof
+        (`dg.host_extent`); `offaxis_deg` is how far the ridge runs off the
+        host's fall line (straight downhill, `None` on the ridge line itself) --
+        past `dg.FACING_TOL_DEG` is `NOT_DOWNHILL` (Patrick, 2026-11-18, P1/P2
+        of the control redesign)."""
         sc = self.scene()
         if sc is None:
-            return None, None, None
-        from floorplanner.roofs import host_roof_at           # late: layer peer
+            return None, None, None, None, None
+        from floorplanner.roofs import host_roof_at, upslope_direction
         from floorplanner.roofclip import surface_height
         face = self.pos()
         host = host_roof_at(sc, face, self.floor)
         if host is None:
-            return None, None, None
+            return None, None, None, None, None
         shift = float(floor_elevation(host.floor)) - float(floor_elevation(self.floor))
         direction = _dg.ridge_direction(self.rotation())
         z_face, slope = _dg.host_plane(
             lambda p: surface_height(host, QPointF(p[0], p[1])) + shift,
             (face.x(), face.y()), direction)
-        return z_face, slope, float(host.ridge_h_in) + shift
+        up = upslope_direction(host, face)       # unit toward the ridge, or None
+        offaxis = None
+        if up is not None:
+            dot = max(-1.0, min(1.0, direction[0] * up[0] + direction[1] * up[1]))
+            offaxis = math.degrees(math.acos(dot))
+        return (z_face, slope, float(host.ridge_h_in) + shift,
+                float(host.eaves_h_in) + shift, offaxis)
 
     def param_context(self) -> dict:
         ctx = super().param_context()
-        z_face, slope, ridge = self._host_plane()
+        z_face, slope, ridge, eave, offaxis = self._host_plane()
         if z_face is not None:
             ctx.update(host_z_face_in=z_face, host_slope=slope,
-                       host_ridge_in=ridge)
+                       host_ridge_in=ridge, host_eave_in=eave)
+            if offaxis is not None:
+                ctx["host_offaxis_deg"] = offaxis
         if not self._frozen:                 # not per-frame while a knob drags
             self._face_and_sides(ctx)
         return ctx
@@ -942,7 +955,8 @@ class DormerItem(FurnishingItem):
         # why this dormer cannot be BUILT on its host (0359), live on a knob
         # drag: paint draws it error-red and drops its host cut + knee lines.
         self._unbuildable = _dg.unbuildable(
-            self.params, z, slope, ctx.get("host_ridge_in"))
+            self.params, z, slope, ctx.get("host_ridge_in"),
+            ctx.get("host_offaxis_deg"))
         pts = [self._q(p) for p in _dg.footprint(self.params, depth)]
         xs = [p.x() for p in pts]
         ys = [p.y() for p in pts]
@@ -1250,7 +1264,7 @@ class DormerGripItem(QGraphicsItem):
     SIZE = 3.2            # the drawn glyph half-size, scene inches at 1:1
     HIT_PX = 11.0         # the clickable half-size, view pixels
     _COLORS = {
-        "span_l": QColor(0, 110, 255), "span_r": QColor(0, 110, 255),
+        "span_l": QColor(0, 160, 170), "span_r": QColor(0, 160, 170),  # teal (B off blue)
         "guide_l": QColor(214, 170, 0), "guide_r": QColor(214, 170, 0),
         "eave_l": QColor(40, 160, 70), "eave_r": QColor(40, 160, 70),
         "guide_face": QColor(150, 60, 200),         # D, purple

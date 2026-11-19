@@ -183,7 +183,8 @@ class DormerKind(ParametricKind):
                 "Raise the eaves or the pitch, or move it down the slope.",
                 actual=rh, limit=z_face, field="eaves_h_in"))
         host_ridge = (context or {}).get("host_ridge_in")
-        why = dg.unbuildable(st, z_face, slope, host_ridge)
+        offaxis = (context or {}).get("host_offaxis_deg")
+        why = dg.unbuildable(st, z_face, slope, host_ridge, offaxis)
         derived["unbuildable"] = why
         if why == dg.FACES_UPHILL:
             findings.append(Finding(
@@ -207,6 +208,12 @@ class DormerKind(ParametricKind):
                 f"not shallower than the host roof ({_fmt(slope * 12.0)} in 12), "
                 "so its back never dies into the host. Lower the pitch.",
                 actual=st["pitch_12"], limit=slope * 12.0, field="pitch_12"))
+        elif why == dg.NOT_DOWNHILL:
+            findings.append(Finding(
+                "dormer.not_downhill", ERROR,
+                f"This dormer faces {_fmt(offaxis)} deg off straight down the "
+                "slope. Turn it to face down the fall line of the roof it sits "
+                "on."))
         if ceiling is not None and derived["full_height_in"] <= 0.0:
             findings.append(Finding(
                 "dormer.no_full_height", ADVISORY,

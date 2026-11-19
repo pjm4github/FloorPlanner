@@ -111,6 +111,37 @@ def test_finds_its_host_over_a_roof(scene):
     assert ctx["host_slope"] > 0.0
 
 
+def test_param_context_exposes_the_host_eave(scene):
+    # P1 (2026-11-18): the host eave height rides the context beside the ridge,
+    # so dg.host_extent can bound the anchor's travel up the roof.
+    _host(scene)                                   # eave 80, ridge 132
+    d = _dormer(scene, pos=QPointF(150, 150), new=True)
+    d._recompute()
+    ctx = d.param_context()
+    assert ctx.get("host_eave_in") == pytest.approx(80.0)
+    ext = dg.host_extent(ctx["host_z_face_in"], ctx["host_slope"],
+                         ctx["host_ridge_in"], ctx["host_eave_in"])
+    assert ext is not None and ext["ridge_y"] > 0.0 and ext["eave_y"] < 0.0
+
+
+def test_a_rotated_dormer_is_flagged_not_facing_downhill(scene):
+    # P2 (2026-11-18): the host ridge runs along x, so the fall line is +/- y;
+    # a rotation-0 dormer faces straight downhill, a turned one does not.
+    _host(scene)
+    _room(scene)
+    d0 = _dormer(scene, pos=QPointF(150, 150), rotation=0.0, new=True)
+    d0._recompute()
+    assert d0.param_context().get("host_offaxis_deg") == pytest.approx(0.0, abs=0.5)
+    assert d0._unbuildable is None
+    d = _dormer(scene, pos=QPointF(150, 150), rotation=40.0, new=True)
+    d._recompute()
+    ctx = d.param_context()
+    assert ctx.get("host_offaxis_deg") > dg.FACING_TOL_DEG
+    _derived, findings = DORMER.evaluate(d.params, ctx)
+    assert any(f.rule_id == "dormer.not_downhill" for f in findings)
+    assert d._unbuildable == dg.NOT_DOWNHILL
+
+
 def test_over_no_roof_there_is_no_host_and_a_warning(scene):
     _room(scene)
     d = _dormer(scene, pos=QPointF(1000, 1000), new=True)   # far from any roof
