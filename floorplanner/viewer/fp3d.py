@@ -110,6 +110,32 @@ def _load_roofclip():
 
 ROOFCLIP = _load_roofclip()
 
+
+def _load_dormer_geometry():
+    """0352 phase 3: the dormer calculator, `parametric/dormer_geometry.py`,
+    loaded BY PATH for the same reason `roofclip.py` is -- it is plain Python
+    (imports only `math`), so the furnishing dormer's 3D reuses the ONE
+    calculation the editor draws from. `to_roof_record` turns a dormer
+    furnishing into a `roofs[]` record the existing roof/host machinery already
+    renders. None when it cannot be found: a dormer then contributes no mesh and
+    a note says so, exactly as in phase 2."""
+    import importlib.util
+    here = os.path.dirname(os.path.abspath(__file__))
+    cand = os.path.join(os.path.dirname(here), "parametric", "dormer_geometry.py")
+    name = "_fp_dormer_geometry"
+    try:
+        spec = importlib.util.spec_from_file_location(name, cand)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+    except (OSError, AttributeError, ImportError, SyntaxError):
+        sys.modules.pop(name, None)
+        return None
+
+
+DORMERGEO = _load_dormer_geometry()
+
 WALL_T = _load_wall_thickness()  # thickness by type, inches -- the MODEL's
 WALL_H = {                       # height by type; None = full level height
     "exterior": None, "interior": None, "partition": None,
@@ -2830,6 +2856,71 @@ def _ceiling_pieces(tri_world, cz, lifts, RC, dormer_lf_ids=frozenset()):
     return out
 
 
+def _pick_dormer_host(hosts, anchor, lid, base, RC):
+    """The real roof whose footprint holds the dormer ANCHOR, on the dormer's
+    level or one below it; the highest such wins. `hosts` is
+    `[(id, level, footprint_polygon), ...]`. None when the dormer sits over no
+    roof -- it then contributes no 3D, as phase 2 already reported."""
+    here = base(lid)
+    best = None
+    ap = RC.Pt(anchor[0], anchor[1])
+    for hid, hlid, fp in hosts:
+        if base(hlid) > here + 1e-6:
+            continue                        # a roof ABOVE the dormer is no host
+        if RC._contains(fp, ap) and (best is None or base(hlid) > base(best[1])):
+            best = (hid, hlid)
+    return best
+
+
+def _dormer_roof_records(doc, lv, base, nearest_span, RC, DG):
+    """0352 phase 3: each furnishing dormer, turned into a `roofs[]` record the
+    existing roof/host machinery already renders (`to_roof_record`). The host is
+    resolved by the anchor (derive-at-build, DORMER_CONTROL_SPEC.md §7); the
+    dormer's own-level heights are shifted to the host's datum so `fp3d` lifts it
+    where the editor drew it. Returns [] when there is nothing to add."""
+    if DG is None or RC is None:
+        return []
+    hosts = []
+    for rf in doc.get("roofs", []):
+        if rf.get("host") is not None:
+            continue                        # an existing dormer is not a host
+        lid, ridge = rf.get("level"), (rf.get("ridge") or [])
+        if lid not in lv or len(ridge) != 2:
+            continue
+        try:
+            p1 = (float(ridge[0][0]), float(ridge[0][1]))
+            p2 = (float(ridge[1][0]), float(ridge[1][1]))
+            geom = RC.RoofGeom.from_record(rf, span_fallback=nearest_span(lid, p1, p2))
+            hosts.append((rf.get("id"), lid, RC.footprint_polygon(geom)))
+        except (KeyError, ValueError, TypeError, IndexError):
+            continue
+    out, n = [], 0
+    for fu in doc.get("furnishings", []):
+        if fu.get("kind") != "dormer" or fu.get("level") not in lv:
+            continue
+        lid = fu.get("level")
+        try:
+            st = DG.normalize_state(fu.get("state") or {})
+            pos = fu.get("pos") or [0.0, 0.0]
+            anchor = (float(pos[0]), float(pos[1]))
+            rot = float(fu.get("rotation", 0.0) or 0.0)
+            depth = max(float(st["depth_in"]), 1.0)
+            ux, uy = DG.ridge_direction(rot)
+            face = (anchor[0] - ux * depth, anchor[1] - uy * depth)
+        except (KeyError, ValueError, TypeError):
+            continue
+        host = _pick_dormer_host(hosts, anchor, lid, base, RC)
+        if host is None:
+            continue                        # over no roof: no 3D
+        hid, hlid = host
+        out.append(DG.to_roof_record(
+            st, face, rot, depth, datum_shift=base(lid) - base(hlid),
+            id=f"_dormer_{n}", level=lid, host=hid,
+            openings=fu.get("openings") or []))
+        n += 1
+    return out
+
+
 def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 floors=True, openings=True, catalog=None, roofs=True):
     """v5 design dict -> Model.  Pure numpy; no Qt, no floorplanner import.
@@ -3034,6 +3125,15 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         clips = {}
         riser_parts = []
         if ROOFCLIP is not None:
+            # 0352 phase 3: fold each furnishing dormer in as a roof record (its
+            # host resolved by the anchor) so everything below -- the clip, the
+            # host cut, the cheeks and the face -- renders it like any dormer.
+            _dormer_recs = _dormer_roof_records(
+                doc, lv, base, nearest_span, ROOFCLIP, DORMERGEO)
+            if _dormer_recs:
+                doc = {**doc, "roofs": list(doc.get("roofs", [])) + _dormer_recs}
+                model.notes.append(
+                    f"{len(_dormer_recs)} dormer furnishing(s) built as roofs")
             geoms_by_level = {}
             for rf in doc.get("roofs", []):
                 rid, lid = rf.get("id", "?"), rf.get("level")
@@ -3666,11 +3766,11 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             cx, cy = float(pos[0]), -float(pos[1])
             kind = fu.get("kind", "")
             if kind == "dormer":
-                # 0352 phase 2: a dormer furnishing's 3D is its ROOF, built
-                # from `dormer_geometry.to_roof_record` in PHASE 3 -- not a
-                # catalog box. Until then it is COUNTED and REPORTED (never
-                # silently vanished -- test_viewer_model's partition) but
-                # contributes no mesh; it still draws on the plan.
+                # 0352 phase 3: a dormer furnishing's 3D is its ROOF -- it was
+                # folded into `doc["roofs"]` above (`_dormer_roof_records`,
+                # host resolved by the anchor) and the roof/host machinery has
+                # already meshed it. Here it is only COUNTED as a furnishing (its
+                # mesh is not a catalog box), never drawn twice.
                 by_dormer.add(kind)
                 n_furn += 1
                 continue

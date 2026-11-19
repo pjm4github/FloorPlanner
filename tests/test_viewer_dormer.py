@@ -217,3 +217,37 @@ def test_nothing_of_roof_closes_the_dormer_below_its_eaves(fp3d, monkeypatch):
     # word of 2026-10-11 on the set-back dormer: "the dormer face needs
     # to climb up from the roof itself")
     assert wall_hits["front, at the ridge"] > 0 and wall_hits["front, near a corner"] > 0, wall_hits
+
+
+# -- 0352 phase 3: a FURNISHING dormer is built as a roof on its host ---------
+def _furnishing_doc(over_host=True):
+    """A host roof + a dormer FURNISHING (not a roof record). The dormer's
+    anchor (pos) sits on the host's south slope; `fp3d` resolves the host by the
+    anchor and folds the dormer in as a roof record (`_dormer_roof_records`)."""
+    host = {"id": "rf1", "level": "L1", "ridge": [[0, 100], [400, 100]],
+            "eaves_h_in": 96.0, "ridge_h_in": 150.0, "overhang_in": [12, 12],
+            "span_in": [100, 100], "gable": [True, True]}
+    state = {"form": "gable", "span_left_in": 30.0, "span_right_in": 30.0,
+             "symmetric": True, "pitch_12": 6.0, "eaves_h_in": 110.0,
+             "depth_in": 40.0, "eave_overhang_left_in": 0.0,
+             "eave_overhang_right_in": 0.0, "face_overhang_in": 0.0}
+    return {"levels": [{"id": "L1", "elevation_in": 0.0, "height_in": 96.0}],
+            "vertices": [], "walls": [], "rooms": [],
+            "roofs": [host] if over_host else [],
+            "furnishings": [{"kind": "dormer", "level": "L1", "pos": [200, 130],
+                             "rotation": 0.0, "state": state}]}
+
+
+def test_a_furnishing_dormer_is_built_as_a_roof_on_its_host(fp3d):
+    model = fp3d.build_model(_furnishing_doc(True), furnishings=False, floors=False)
+    assert any("dormer furnishing" in n for n in model.notes), model.notes
+    roof = next((m for m in model.meshes if m.name == "roofs"), None)
+    cheeks = [m for m in model.meshes if m.name.startswith("walls:")]
+    assert roof is not None and len(roof.verts) > 16, "host + the dormer's planes"
+    assert cheeks, "the dormer's cheeks stand on the host"
+
+
+def test_a_furnishing_dormer_over_no_roof_contributes_no_mesh(fp3d):
+    model = fp3d.build_model(_furnishing_doc(False), furnishings=False, floors=False)
+    assert not any("dormer furnishing" in n for n in model.notes)
+    assert not any(m.name == "roofs" for m in model.meshes)
