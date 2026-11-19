@@ -11,10 +11,11 @@ and the "no host" finding is raised over none). The pure arithmetic is
 import pytest
 from PyQt6.QtCore import QPointF
 
-from floorplanner.config import DEFAULT_FLOOR
+from floorplanner.config import DEFAULT_FLOOR, floor_elevations, set_floor_state
 from floorplanner.items import DormerGripItem, DormerItem, make_furnishing
 from floorplanner.parametric import dormer_geometry as dg
 from floorplanner.parametric.dormers import DORMER
+from floorplanner.parametric.findings import WARNING
 from floorplanner.roofs import RoofItem
 from floorplanner.rooms import RoomItem
 from floorplanner.walls import OpeningItem, WallItem
@@ -454,6 +455,68 @@ def test_dialog_keeps_the_right_side_when_the_dormer_is_asymmetric(scene):
     # faces toward the centre: left cheek flipped, right cheek unflipped
     assert left["flip"] is True and right["flip"] is False
     assert right["face_mark"] is True
+
+
+# -- P5: the room/wall below the dormer, and the "nothing below" warning -----
+def _with_floor_below():
+    """Register a storey 'L0' below DEFAULT_FLOOR; returns a restore callable
+    (the floor cache is a module global, so each test must put it back)."""
+    prior = floor_elevations()
+    set_floor_state(elevations={DEFAULT_FLOOR: 120.0, "L0": 0.0})
+    return lambda: set_floor_state(elevations=prior)
+
+
+def _room_on(scene, floor, rect=(-300.0, -300.0, 900.0, 900.0)):
+    from PyQt6.QtGui import QPainterPath
+    path = QPainterPath()
+    path.addRect(*rect)
+    room = RoomItem("Below", QPointF(150, 150), path, 100.0)
+    room.floor = floor
+    scene.addItem(room)
+    return room
+
+
+def test_room_below_probe_sees_a_room_on_the_floor_below(scene):
+    restore = _with_floor_below()
+    try:
+        _host(scene)
+        d = _dormer(scene, pos=QPointF(150, 150), new=True)
+        d._recompute()
+        assert d.param_context().get("room_below") is False   # looked, none yet
+        _room_on(scene, "L0")
+        assert d.param_context().get("room_below") is True
+    finally:
+        restore()
+
+
+def test_room_below_is_none_with_no_lower_floor(scene):
+    _host(scene)
+    d = _dormer(scene, pos=QPointF(150, 150), new=True)
+    d._recompute()
+    assert d.param_context().get("room_below") is None   # DEFAULT_FLOOR is lowest
+
+
+def test_nothing_below_warns_when_the_storey_is_undefined(scene):
+    # P5 (Patrick, 2026-11-19): a prominent WARNING when neither room nor wall
+    # is defined below a non-cantilever dormer; it clears once a room is drawn.
+    restore = _with_floor_below()
+    try:
+        _host(scene)
+        # anchor near the ridge with a modest depth so the face sits ON the
+        # host roof (a setback), not past the eave (a cantilever, which is the
+        # one face that rightly has nothing below it).
+        d = _dormer(scene, pos=QPointF(150, 115), state={"depth_in": 20.0},
+                    new=True)
+        d._recompute()
+        derived, findings = DORMER.evaluate(d.params, d.param_context())
+        assert derived["face_type"] != dg.FACE_CANTILEVER
+        assert any(f.rule_id == "dormer.nothing_below" and f.severity == WARNING
+                   for f in findings)
+        _room_on(scene, "L0")
+        _d2, cleared = DORMER.evaluate(d.params, d.param_context())
+        assert not any(f.rule_id == "dormer.nothing_below" for f in cleared)
+    finally:
+        restore()
 
 
 def test_number_fields_recalc_on_focus_out_not_each_keystroke(scene):

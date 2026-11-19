@@ -891,6 +891,7 @@ class DormerItem(FurnishingItem):
         if not self._frozen:                 # not per-frame while a knob drags
             self._face_and_sides(ctx)
             self._wall_below(ctx)            # P4b: the wall below, for the face type
+            self._room_below(ctx)            # P5: the room below, for the warning
         return ctx
 
     def _face_and_sides(self, ctx):
@@ -977,6 +978,38 @@ class DormerItem(FurnishingItem):
             if e is not None:
                 ext += list(e)
         ctx["wall_below"] = (min(ext), max(ext)) if ext else None
+
+    def _room_below(self, ctx):
+        """P5 (0360): is a ROOM defined on the floor BELOW, under the dormer?
+        Patrick wants a prominent warning when the storey beneath the face is
+        undefined -- the 3D builder cannot otherwise tell how the face meets the
+        house. `room_below` is True when a room on the lower floor covers the
+        anchor or the face point, False when the lower floor has none there, and
+        None when there is no lower floor at all. Scene-coord `path.contains`,
+        the same frame `_wall_below` uses (rooms paint at pos 0,0)."""
+        sc = self.scene()
+        if sc is None:
+            return
+        from floorplanner.rooms import RoomItem
+        from floorplanner.roofs import _floor_below
+        below = _floor_below(self.floor)
+        if below is None:
+            ctx["room_below"] = None
+            return
+        rot = self.rotation()
+        depth = max(self.params["depth_in"], 1.0)
+        ux, uy = _dg.ridge_direction(rot)
+        anchor = self.pos()
+        face = QPointF(anchor.x() - ux * depth, anchor.y() - uy * depth)
+        found = False
+        for it in sc.items():
+            if (not isinstance(it, RoomItem) or sip.isdeleted(it)
+                    or getattr(it, "floor", None) != below):
+                continue
+            if it.path.contains(anchor) or it.path.contains(face):
+                found = True
+                break
+        ctx["room_below"] = found
 
     # -- geometry ------------------------------------------------------------
     def _current_sig(self, ctx):

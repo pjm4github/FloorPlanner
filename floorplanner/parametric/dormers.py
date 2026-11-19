@@ -20,6 +20,12 @@ double-click opens the generic dialog. Phase 1 built the kind but withheld
     side_walls         {"left": (y1, y2) | None, "right": ...}: the same for
                        the walls on the two side guides (`dg.project_side_wall`)
     side_openings      {"left": [...], "right": [...]}
+    wall_below         (x1, x2): the across-extent of an exterior wall on the
+                       floor BELOW, under the face (`dg.project_wall`); None =
+                       looked and found none / no lower floor; absent = nobody
+                       looked. Drives the plain-wall / setback reading.
+    room_below         True/False: a room is defined on the floor below under
+                       the dormer; None = no lower floor. Drives the P5 warning.
 """
 from floorplanner.parametric import dormer_geometry as dg
 from floorplanner.parametric.findings import ADVISORY, ERROR, WARNING, Finding
@@ -195,6 +201,22 @@ class DormerKind(ParametricKind):
                 f"A {choice.replace('_', ' ')} dormer {why.get(choice, '')} here; "
                 f"the dormer reads as a {ftype.replace('_', ' ')} instead.",
                 field="face_mode"))
+        # P5 (Patrick, 2026-11-19): a prominent warning when the storey beneath
+        # the face is undefined. The face-type reading and the 3D build both
+        # need to know the house is there; a CANTILEVER is the one face that
+        # SHOULD have nothing below, so it is exempt. `looked_below` is set once
+        # the item's probe has run (absent = nobody looked, e.g. a bare state).
+        room_below = (context or {}).get("room_below")
+        looked_below = "wall_below" in (context or {})
+        if (z_face is not None and looked_below and ftype != dg.FACE_CANTILEVER
+                and not wall_below and not room_below):
+            findings.append(Finding(
+                "dormer.nothing_below", WARNING,
+                "No room or exterior wall is defined on the floor below this "
+                "dormer, so the storey under its face is undefined. The 3D model "
+                "cannot tell how the face meets the house (plain wall, setback or "
+                "balcony). Draw the room and its walls below, or set the face "
+                "type.", field="face_mode"))
         if z_face is None:
             findings.append(Finding(
                 "dormer.no_host", WARNING,
