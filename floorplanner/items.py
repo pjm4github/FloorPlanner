@@ -785,11 +785,15 @@ class DormerItem(FurnishingItem):
     and the KNEE LINES where its planes cross the room's ceiling plane. The
     walls under it are whatever the user draws on that level.
 
-    THE ITEM'S POSITION IS THE FACE END OF THE RIDGE and `rotation` turns the
-    ridge, exactly as `dormer_geometry` and the schema define a dormer
-    furnishing -- so a dg-local point `(x, y)` (x = the ridge's LEFT, y = along
-    the ridge from the face into the host) draws at ITEM-local `(x, -y)`, which
-    under Qt's own `setRotation(rotation)` reproduces `dg.to_plan` exactly.
+    THE ITEM'S POSITION IS THE ANCHOR (P2, 2026-11-18) -- the point on the host
+    roof where the ridge dies into it, the ridge's HIGH end. `rotation` turns
+    the ridge. `dormer_geometry` keeps its FACE frame (origin = face, +y up the
+    ridge), so the item draws a dg point `(x, y)` at ITEM-local `(x, depth - y)`
+    (`_q`): the anchor (dg y = depth) lands at the item origin and the face (dg
+    y = 0) sits `depth` DOWNHILL of it. The anchor's height on the roof IS the
+    ridge height, so the ridge rises as the anchor is moved up the slope; eaves
+    or pitch floats to hold it (`dg.couple_ridge`, `_recompute`). An OLD record
+    (pos = face) migrates once (`_migrate_to_anchor`).
 
     THE HOST IS FOUND BY HEIGHT each rebuild and nothing about it is stored
     (`host_roof_at` + `roofclip.surface_height`, shifted to this level's
@@ -802,10 +806,17 @@ class DormerItem(FurnishingItem):
                  params: dict = None, new: bool = False):
         self.params = _dg.normalize_state(params or _dg.STATE_DEFAULTS)
         self._seed_defaults = new and not params   # host pitch on first rebuild
+        self._pinned = "pitch_12"                   # under the anchor, eaves floats
+        # P2: pos is the ANCHOR (ridge-on-roof), not the face. A fresh drop is
+        # already anchored (the user clicks the anchor); an OLD record (pos =
+        # face, no `anchored`) migrates once on the first rebuild in a scene.
+        if new:
+            self.params["anchored"] = True
+        self._migrate_anchor = not self.params.get("anchored")
         self._geo = _dg.plan(self.params)
         self._knees = []                            # orange knee lines, settled
         self._unbuildable = None                    # dg.unbuildable reason, or None
-        self._depth = self.params["depth_in"]       # ridge length (host or stored)
+        self._depth = self.params["depth_in"]       # ridge length, anchor to face
         self._bbox = QRectF(-1, -1, 2, 2)
         self._sig = None
         self._recompute_pending = False
@@ -864,10 +875,17 @@ class DormerItem(FurnishingItem):
 
     def param_context(self) -> dict:
         ctx = super().param_context()
-        z_face, slope, ridge, eave, offaxis = self._host_plane()
-        if z_face is not None:
+        z_anchor, slope, ridge, eave, offaxis = self._host_plane()  # at pos=anchor
+        if z_anchor is not None:
+            # dg works in the FACE frame: the face is `depth` DOWNHILL of the
+            # anchor, so its host height is z_anchor - slope*depth. With the
+            # ridge held at the anchor (couple below), this makes dg.ridge_depth
+            # return `depth` and the whole face-frame geometry stays correct.
+            depth = max(self.params["depth_in"], 1.0)
+            z_face = _dg.ridge_height(self.params) - slope * depth
             ctx.update(host_z_face_in=z_face, host_slope=slope,
-                       host_ridge_in=ridge, host_eave_in=eave)
+                       host_ridge_in=ridge, host_eave_in=eave,
+                       host_anchor_in=z_anchor)
             if offaxis is not None:
                 ctx["host_offaxis_deg"] = offaxis
         if not self._frozen:                 # not per-frame while a knob drags
@@ -886,7 +904,11 @@ class DormerItem(FurnishingItem):
             return
         from floorplanner.walls import WallItem
         from floorplanner.model import DEFAULT_SILL_IN
-        pos, rot = (self.pos().x(), self.pos().y()), self.rotation()
+        rot = self.rotation()
+        depth = max(self.params["depth_in"], 1.0)
+        ux, uy = _dg.ridge_direction(rot)                 # pos is the ANCHOR; the
+        pos = (self.pos().x() - ux * depth,               # FACE is `depth` downhill
+               self.pos().y() - uy * depth)
         gf = self.params.get("guide_face_in", 0.0)
 
         def op_records(wall):
@@ -979,14 +1001,44 @@ class DormerItem(FurnishingItem):
                                       ctx.get("host_slope")))
         self._geo["knees"] = self._knees
 
+    def _migrate_to_anchor(self):
+        """OLD frame -> NEW (P2, 2026-11-18): the record's `pos` was the FACE.
+        Sample the host there, find how far the ridge ran to MEET it, and move
+        `pos` up the ridge to that meeting point -- the ANCHOR -- keeping
+        `depth_in` as the run so the shape does not move. Runs once; marks the
+        state `anchored`. With no host, pos is left where it is."""
+        self._migrate_anchor = False
+        self.params["anchored"] = True
+        z_at, slope, _hr, _he, _off = self._host_plane()    # at pos = old face
+        if z_at is not None and slope is not None and slope > 0.0:
+            depth = _dg.ridge_depth(self.params, z_at, slope)[0]
+        else:                                 # no host: keep the stored run, so
+            depth = self.params["depth_in"]   # the face stays where it was drawn
+        depth = max(depth, 1.0)
+        ux, uy = _dg.ridge_direction(self.rotation())
+        self.params["depth_in"] = depth
+        self.setPos(QPointF(self.pos().x() + ux * depth,
+                            self.pos().y() + uy * depth))
+
     def _recompute(self):
+        if self._migrate_anchor and self.scene() is not None:
+            self._migrate_to_anchor()
         ctx = self.param_context()
         if self._seed_defaults and ctx.get("host_slope"):
             self.params = _dg.default_state(ctx.get("ceiling_in"),
                                             ctx.get("host_slope"),
                                             ctx.get("host_ridge_in"))
+            self.params["anchored"] = True
             self._seed_defaults = False
             ctx = self.param_context()
+        # on a roof the ANCHOR sets the ridge: hold ridge = host-at-anchor by
+        # floating whichever of eaves/pitch is not pinned (P2, 2026-11-18).
+        za, slope = ctx.get("host_anchor_in"), ctx.get("host_slope")
+        if za is not None and slope is not None and self.params.get("anchored"):
+            coupled = _dg.couple_ridge(self.params, za, self._pinned)
+            if coupled != self.params:
+                self.params = coupled
+                ctx = self.param_context()
         self._recompute_knees(ctx)
         self._recompute_outline(ctx)
         self._sig = self._current_sig(ctx)
@@ -998,11 +1050,13 @@ class DormerItem(FurnishingItem):
             self._place_grips()
             self.update()
 
-    @staticmethod
-    def _q(pt) -> QPointF:
-        """A dg-local point as an item-local point (y flips; see the class
-        docstring)."""
-        return QPointF(pt[0], -pt[1])
+    def _q(self, pt) -> QPointF:
+        """A dg-local point (dg's FACE frame) as an item-local point. With the
+        ANCHOR as the item's `pos` (P2, 2026-11-18), the face sits `depth`
+        DOWNHILL of it: dg y (uphill from the face) maps to item y = depth - y,
+        so the anchor (dg y = depth) lands at the item origin and the face
+        (dg y = 0) at item +depth."""
+        return QPointF(pt[0], self._depth - pt[1])
 
     def boundingRect(self) -> QRectF:
         return QRectF(self._bbox)
@@ -1019,7 +1073,7 @@ class DormerItem(FurnishingItem):
         s = self._view_scale()
         stem, r = 14.0 / s, 5.0 / s
         front = self.params["face_overhang_in"]
-        return QPointF(0.0, front + stem + r), r
+        return QPointF(0.0, self._depth + front + stem + r), r     # beyond the face
 
     # -- painting ------------------------------------------------------------
     def paint(self, painter, option, widget=None):
@@ -1072,7 +1126,7 @@ class DormerItem(FurnishingItem):
         painter.drawRect(self._bbox.adjusted(1, 1, -1, -1))
         c, hr = self._handle()
         painter.setPen(QPen(blue, 0))
-        painter.drawLine(QPointF(0.0, self.params["face_overhang_in"]),
+        painter.drawLine(QPointF(0.0, self._depth + self.params["face_overhang_in"]),
                          QPointF(c.x(), c.y() - hr))
         painter.setBrush(QBrush(QColor(255, 255, 255)))
         painter.drawEllipse(c, hr, hr)
@@ -1166,7 +1220,7 @@ class DormerItem(FurnishingItem):
     # -- a knob drag ---------------------------------------------------------
     def _to_dg_local(self, scene_pt):
         p = self.mapFromScene(scene_pt)
-        return p.x(), -p.y()                 # item-local -> dg-local
+        return p.x(), self._depth - p.y()    # item-local -> dg-local (anchor frame)
 
     def begin_knob(self):
         self._hold(True)                     # freeze the knee lines (0354 §2)

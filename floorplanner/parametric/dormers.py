@@ -127,15 +127,9 @@ class DormerKind(ParametricKind):
         if pinned not in ("eaves_h_in", "pitch_12"):
             pinned = "pitch_12"             # default: pitch pinned, eaves floats
         norm = dg.normalize_state(st)
-        span = norm["span_left_in"]
-        if ridge is not None and span > 1e-9:
+        if ridge is not None:
             try:
-                ridge = float(ridge)
-                if pinned == "pitch_12":    # pitch held, eaves takes the slack
-                    norm["eaves_h_in"] = max(ridge - span * norm["pitch_12"] / 12.0, 0.0)
-                else:                       # eaves held, pitch takes the slack
-                    norm["pitch_12"] = max((ridge - norm["eaves_h_in"]) * 12.0 / span, 0.5)
-                norm = dg.normalize_state(norm)
+                norm = dg.couple_ridge(norm, float(ridge), pinned)
             except (TypeError, ValueError):
                 pass
         norm = dict(norm)

@@ -111,17 +111,36 @@ def test_finds_its_host_over_a_roof(scene):
     assert ctx["host_slope"] > 0.0
 
 
-def test_param_context_exposes_the_host_eave(scene):
-    # P1 (2026-11-18): the host eave height rides the context beside the ridge,
-    # so dg.host_extent can bound the anchor's travel up the roof.
+def test_an_old_dormer_migrates_pos_from_face_to_anchor(scene):
+    # P2 (2026-11-18): a record saved in the OLD frame (pos = face, no
+    # 'anchored') moves pos UP the ridge to the anchor on the first rebuild in a
+    # scene, keeping its shape -- the face stays where it was drawn.
+    _host(scene)                     # ridge along x at y=100 (uphill is -y)
+    _room(scene)
+    d = _dormer(scene, pos=QPointF(150, 150),
+                state={"span_left_in": 60.0, "span_right_in": 60.0})
+    assert d._migrate_anchor and not d.params.get("anchored")
+    d._recompute()                               # settle -> migrate
+    assert d.params["anchored"] and not d._migrate_anchor
+    assert d.pos().y() < 150.0, "anchor moved uphill toward the host ridge"
+    ux, uy = dg.ridge_direction(d.rotation())    # the face is pos shifted downhill
+    face_y = d.pos().y() - uy * d._depth
+    assert face_y == pytest.approx(150.0, abs=1.0), "the face stays where it was"
+
+
+def test_param_context_exposes_the_host_eave_and_anchor(scene):
+    # P1/P2 (2026-11-18): the host eave rides the context beside the ridge, and
+    # the anchor's own host height (pos is the anchor) sits between them.
     _host(scene)                                   # eave 80, ridge 132
     d = _dormer(scene, pos=QPointF(150, 150), new=True)
     d._recompute()
     ctx = d.param_context()
     assert ctx.get("host_eave_in") == pytest.approx(80.0)
+    za = ctx.get("host_anchor_in")                 # the host height at the anchor
+    assert za is not None and 80.0 <= za <= 132.0
     ext = dg.host_extent(ctx["host_z_face_in"], ctx["host_slope"],
                          ctx["host_ridge_in"], ctx["host_eave_in"])
-    assert ext is not None and ext["ridge_y"] > 0.0 and ext["eave_y"] < 0.0
+    assert ext is not None and ext["ridge_y"] > 0.0
 
 
 def test_a_rotated_dormer_is_flagged_not_facing_downhill(scene):
@@ -170,18 +189,20 @@ def test_a_new_dormer_on_a_low_roof_is_born_under_the_ridge(scene):
     assert d._unbuildable is None
 
 
-def test_an_over_ridge_dormer_is_flagged_unbuildable(scene):
-    _host(scene)                     # host ridge 132 in
+def test_an_anchored_dormer_ridge_equals_the_host_at_the_anchor(scene):
+    # P2 (2026-11-18): on a roof the ridge IS the host height at the anchor
+    # (pos). It is pinned there, under the host ridge; eaves/pitch float to hold
+    # it -- so the over-ridge case is structurally prevented (the rule itself is
+    # pinned in test_dormer_geometry).
+    _host(scene)                     # eave 80, ridge 132
     _room(scene)
-    # a tall dormer whose ridge (240 in) stands well above the host's 132
-    d = _dormer(scene, pos=QPointF(150, 150),
-                state={"eaves_h_in": 120.0, "span_left_in": 120.0,
-                       "span_right_in": 120.0, "pitch_12": 12.0})
+    d = _dormer(scene, pos=QPointF(150, 150), new=True)
     d._recompute()
-    assert dg.ridge_height(d.params) > 132.0
-    assert d._unbuildable == dg.OVER_RIDGE
-    # the host cut (valleys) is still computed in geo; paint drops it on the
-    # unbuildable flag -- the finding is Cowork's, pinned in test_dormer_geometry
+    za = d.param_context().get("host_anchor_in")
+    assert za is not None
+    assert dg.ridge_height(d.params) == pytest.approx(za, abs=0.5), "ridge = anchor"
+    assert dg.ridge_height(d.params) <= 132.0 + 1e-6, "pinned under the host ridge"
+    assert d._unbuildable is None
 
 
 # -- knee lines where the planes cross the room ceiling ----------------------
@@ -288,6 +309,7 @@ def test_F1_gathers_the_face_wall_and_its_openings(scene):
     d = _dormer(scene, pos=QPointF(150, 150),
                 state={"span_left_in": 60.0, "span_right_in": 60.0})
     _face_wall(scene, codes=[(30.0, "3040"), (70.0, "3040")])
+    d._recompute()                               # settle (migrate pos -> anchor)
     ctx = d.param_context()
     lo, hi = ctx["face_wall"]
     assert lo == pytest.approx(-50.0) and hi == pytest.approx(50.0)

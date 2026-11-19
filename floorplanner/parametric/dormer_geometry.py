@@ -40,7 +40,8 @@ STATE_DEFAULTS = {
     "guide_face_in": 0.0,          # control D: face guide, set back from the face
     "box_left_in": 0.0,            # control B: frame half-width, 0 = not set
     "box_right_in": 0.0,
-    "depth_in": 96.0,              # ridge length, used only when no roof is under it
+    "depth_in": 96.0,              # ridge length (anchor to face); the run off a roof
+    "anchored": False,             # P2: pos is the ANCHOR, not the face (migration flag)
 }
 _NUMBERS = tuple(k for k, v in STATE_DEFAULTS.items() if isinstance(v, float))
 _EPS = 1e-9
@@ -60,6 +61,7 @@ def normalize_state(state):
     out = dict(src)
     out["form"] = src.get("form") if src.get("form") in FORMS else "gable"
     out["symmetric"] = bool(src.get("symmetric", STATE_DEFAULTS["symmetric"]))
+    out["anchored"] = bool(src.get("anchored", STATE_DEFAULTS["anchored"]))
     for key in _NUMBERS:
         try:
             v = float(src.get(key, STATE_DEFAULTS[key]))
@@ -187,6 +189,32 @@ def ridge_height(st):
     if st["form"] == "shed":
         return st["eaves_h_in"] + _rise(st) * st["depth_in"]
     return st["eaves_h_in"] + st["span_left_in"] * st["pitch_12"] / 12.0
+
+
+def _ridge_run(st):
+    """The run the pitch climbs to reach the ridge: a gable's HALF-WIDTH (the
+    left plane), a SHED's DEPTH (its one plane rises along the depth)."""
+    return st["depth_in"] if st["form"] == "shed" else st["span_left_in"]
+
+
+def couple_ridge(st, ridge, pinned):
+    """Hold the ridge at `ridge` by floating whichever of eaves/pitch is NOT
+    `pinned` (the 3-way anchor: the ridge is the anchor, the last-edited of
+    eaves/pitch is pinned, the other gives way). Form-aware -- a gable climbs
+    over the half-width, a shed over the depth. Returns a normalized state;
+    `ridge` None leaves it unchanged."""
+    out = normalize_state(st)
+    if ridge is None:
+        return out
+    run = _ridge_run(out)
+    if run <= _EPS:
+        return out
+    ridge = float(ridge)
+    if pinned == "eaves_h_in":          # eaves held, pitch takes the slack
+        out["pitch_12"] = max((ridge - out["eaves_h_in"]) * 12.0 / run, 0.5)
+    else:                               # pitch held (default), eaves gives way
+        out["eaves_h_in"] = max(ridge - run * out["pitch_12"] / 12.0, 0.0)
+    return normalize_state(out)
 
 
 def slopes(st):

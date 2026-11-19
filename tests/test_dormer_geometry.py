@@ -572,6 +572,19 @@ def test_ridge_to_ridge_is_allowed_and_no_host_is_not_an_error():
     assert dg.unbuildable(_st(), 30.0, 0.8) is None, "host ridge unknown"
 
 
+def test_couple_ridge_floats_the_unpinned_side_per_form():
+    # P2 (2026-11-18): hold the ridge by floating the non-pinned of eaves/pitch;
+    # a gable climbs over the HALF-WIDTH, a shed over the DEPTH.
+    g = dg.couple_ridge(_st(span_left_in=60.0, pitch_12=6.0), 120.0, "pitch_12")
+    assert dg.ridge_height(g) == pytest.approx(120.0)
+    assert g["eaves_h_in"] == pytest.approx(90.0)        # 120 - 60*6/12
+    e = dg.couple_ridge(_st(span_left_in=60.0, eaves_h_in=84.0), 120.0, "eaves_h_in")
+    assert dg.ridge_height(e) == pytest.approx(120.0)    # pitch floated instead
+    s = dg.couple_ridge(_st(form="shed", depth_in=80.0, pitch_12=6.0), 130.0, "pitch_12")
+    assert dg.ridge_height(s) == pytest.approx(130.0)
+    assert s["eaves_h_in"] == pytest.approx(90.0)        # 130 - 80*6/12 (depth, not span)
+
+
 def test_a_dormer_off_the_host_fall_line_is_not_downhill():
     # P2 (2026-11-18): more than FACING_TOL_DEG off straight-downhill is refused.
     st = _st()                                        # ridge 110, host ridge 240
