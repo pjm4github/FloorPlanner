@@ -251,3 +251,17 @@ def test_a_furnishing_dormer_over_no_roof_contributes_no_mesh(fp3d):
     model = fp3d.build_model(_furnishing_doc(False), furnishings=False, floors=False)
     assert not any("dormer furnishing" in n for n in model.notes)
     assert not any(m.name == "roofs" for m in model.meshes)
+
+
+def test_a_furnishing_dormer_cantilevered_past_the_eave_hangs(fp3d):
+    """P3.2b (Patrick, 2026-11-19): a furnishing dormer whose face is pushed PAST
+    the host eave hangs free -- its gable face is generated past the host extent,
+    down to the dormer's eave line, open below (not clipped at the wall)."""
+    import numpy as np
+    doc = _furnishing_doc(True)
+    doc["furnishings"][0]["state"]["depth_in"] = 90.0   # face at y=230, past eave y=200
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    walls = next((m for m in model.meshes if m.name.startswith("walls:")), None)
+    assert walls is not None
+    ys = -walls.verts[:, 1]
+    assert np.any(ys > 205.0), "the cantilevered face hangs past the host eave (y=200)"

@@ -1046,12 +1046,16 @@ def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=
                 if math.hypot(b.x() - a.x(), b.y() - a.y()) <= RC.EPS:
                     continue
                 mid = Pt((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0)
-                if not RC._contains(host_fp, mid):
-                    continue                                      # nothing to stand on
+                in_host = RC._contains(host_fp, mid)
                 if _on_a_wall(a, b, walls, RC):
                     continue                                      # plan C: the wall climbs
                 ring = [a, b, Pt(b.x() + ix, b.y() + iy), Pt(a.x() + ix, a.y() + iy)]
-                base = [RC.surface_height(host, v) - 1.0 for v in ring]   # an inch into the host slab
+                if in_host:
+                    base = [RC.surface_height(host, v) - 1.0 for v in ring]  # an inch into the host slab
+                else:
+                    # CANTILEVER (0352 phase 3): past the host eave the cheek
+                    # hangs to the dormer's eave line, matching the face.
+                    base = [dormer.eaves_h_in] * 4
                 parts.extend(_face_pieces(ring, [top_z] * 4, base, band))
     return parts
 
@@ -1224,20 +1228,25 @@ def _dormer_face(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.
                     if math.hypot(b.x() - a.x(), b.y() - a.y()) <= RC.EPS:
                         continue
                     mid = Pt((a.x() + b.x()) / 2.0, (a.y() + b.y()) / 2.0)
-                    if not RC._contains(host_fp, mid):
-                        continue                                  # nothing to stand on
+                    in_host = RC._contains(host_fp, mid)
                     if _on_a_wall(a, b, walls, RC):
-                        # plan C: the wall climbs. P5 §3 (0294 §3): the dormer's
-                        # face opening over this sub-segment is cut into THAT
-                        # climbing wall instead of the (absent) generated face --
-                        # record its plan segment and band (sill_z/head_z absolute)
-                        # for the wall loop. One projection, shared arithmetic.
+                        # plan C: a wall below this sub-segment climbs (a plain-wall
+                        # dormer), whether on the host or at/past the eave -- no
+                        # generated face. P5 §3 (0294 §3): the dormer's face opening
+                        # here is cut into THAT climbing wall; record it for the
+                        # wall loop (sill_z/head_z absolute). One projection.
                         if face_cuts_out is not None and band is not None:
                             face_cuts_out.append((a, b, band))
                         continue
                     ring = [a, b, Pt(b.x() + ix, b.y() + iy), Pt(a.x() + ix, a.y() + iy)]
                     top = [RC.surface_height(dormer, v) - 0.5 for v in ring]
-                    base = [RC.surface_height(host, v) - 1.0 for v in ring]
+                    if in_host:
+                        base = [RC.surface_height(host, v) - 1.0 for v in ring]
+                    else:
+                        # CANTILEVER (0352 phase 3): past the host eave, with NO
+                        # wall below, the face HANGS from the dormer surface down to
+                        # the dormer's own eave line, open below.
+                        base = [dormer.eaves_h_in] * 4
                     parts.extend(_face_pieces(ring, top, base, band))
     return parts
 

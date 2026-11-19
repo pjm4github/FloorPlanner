@@ -466,14 +466,16 @@ def test_r3_is_r2_with_the_dormer_set_back_onto_the_roof():
     assert [r for r in r2["roofs"] if r["id"] != "rf5"] == [r for r in r3["roofs"] if r["id"] != "rf5"]
 
 
-def test_a_set_back_dormers_face_is_generated_on_the_roof_and_a_face_past_the_eave_is_not(fp3d):
+def test_a_set_back_dormers_face_is_on_the_roof_and_a_face_past_the_eave_hangs(fp3d):
     """R3: the face at y=336 stands on rf4 (its surface there 180in; the
     dormer's rake 264 at the ridge, 216 at the sides), so a wall is
     generated across it, x 186..282, t inward (y 330..336), from an inch
     into rf4 up to half an inch under the rake -- rays through the face
     plane inside the gap hit wall, not roof: the hole closed. R2: the
-    face at y=366 stands past rf4's eave (y=360); nothing is generated
-    there, and w28 beneath it climbs into the dormer instead."""
+    face at y=366 stands past rf4's eave (y=360); 0352 phase 3 (Patrick,
+    2026-11-19) it now HANGS as a cantilever -- the gable face is generated
+    from the dormer's eave line up to its rake, open below -- and w28
+    beneath it still climbs into the dormer."""
     t = fp3d.WALL_T.get("exterior", 6.0)
     model = fp3d.build_model(_doc("short-angle-roofR3.json"), furnishings=False, floors=False)
     walls = next(m for m in model.meshes if m.name == "walls:exterior")
@@ -489,11 +491,15 @@ def test_a_set_back_dormers_face_is_generated_on_the_roof_and_a_face_past_the_ea
     assert face[:, 0].min() == pytest.approx(186.0) and face[:, 0].max() == pytest.approx(282.0)
     assert face[:, 2].max() == pytest.approx(264.0 - 0.5)
     assert {round(float(y), 3) for y in -w[(abs(w[:, 0] - 234.0) < 1e-3) & (w[:, 2] > 250.0)][:, 1]} == {336.0, 336.0 - t}
-    # R2: nothing generated on the face line; w28 climbs there
+    # R2: the face past the eave now HANGS (a cantilever) -- a gable face from
+    # the dormer's eave line (216) up to its rake, open below; w28 still climbs
     model2 = fp3d.build_model(_doc("short-angle-roofR2.json"), furnishings=False, floors=False)
     walls2 = next(m for m in model2.meshes if m.name == "walls:exterior")
     w2 = walls2.verts
-    assert not len(w2[(abs(-w2[:, 1] - 366.0) < 1e-3) & (w2[:, 2] > 150.0)
-                      & (w2[:, 0] > 150.0) & (w2[:, 0] < 320.0)])
+    face2 = w2[(abs(-w2[:, 1] - 366.0) < 1e-3) & (w2[:, 2] > 150.0)
+               & (w2[:, 0] > 150.0) & (w2[:, 0] < 320.0)]
+    assert len(face2), "the cantilevered face hangs past the eave"
+    assert face2[:, 2].min() == pytest.approx(216.0 - 0.5, abs=1.0), "hangs to the eave line"
+    assert face2[:, 2].max() == pytest.approx(264.0 - 0.5, abs=1.0), "up to the rake"
     assert _seg_hits(walls2, (234.0, -364.0, 240.0), (234.0, -356.0, 240.0)) > 0   # w28, climbed
 
