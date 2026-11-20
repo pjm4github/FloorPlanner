@@ -303,3 +303,61 @@ def test_a_shed_balcony_cuts_the_host_in_front_of_the_face_not_sideways(fp3d):
     plan_y = -deck.verts[:, 1]     # world (x, -y, z) -> plan y
     assert plan_y.min() > 170.0 - 1.0, "the terrace is in FRONT of the face, not sideways"
     assert plan_y.max() <= 200.0 + 12.0 + 1e-6, "no deeper than the host south eave"
+
+
+def test_a_front_wall_bounds_the_balcony_deck_short_of_the_eave(fp3d):
+    """DORMER_CONTROL_SPEC.md sec 8.1 (Patrick, 2026-11-19): the balcony deck and
+    the host cut stop at the wall the user draws in front of the face, not out at
+    the eave. Face ~y=170, host south eave y=200; a railing wall at y=185 across
+    the width must pull the deck's forward edge back to ~185."""
+    doc = _furnishing_doc(True)
+    doc["furnishings"][0]["state"]["face_mode"] = "balcony"
+    doc["vertices"] = [{"id": "ra", "x": 152, "y": 185}, {"id": "rb", "x": 248, "y": 185}]
+    doc["walls"] = [{"id": "rail", "level": "L1", "v1": "ra", "v2": "rb", "type": "railing"}]
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    deck = next((m for m in model.meshes if m.name == "balcony"), None)
+    assert deck is not None and len(deck.verts) > 0, "a deck is still laid"
+    plan_y = -deck.verts[:, 1]
+    assert plan_y.max() <= 185.0 + 6.0, "the deck stops at the front wall, not the eave"
+    # the control: no wall -> the deck runs out toward the eave (y ~ 200)
+    plain = dict(doc, walls=[], vertices=[])
+    pdeck = next(m for m in fp3d.build_model(plain, furnishings=False, floors=False).meshes
+                 if m.name == "balcony")
+    assert (-pdeck.verts[:, 1]).max() > 190.0, "unbounded, the deck reaches the eave"
+
+
+def _shed_balcony_doc_with_wall(wtype, face_mode="balcony"):
+    """A shed balcony on a host, ceiling raised to 120 so a wall standing in the
+    terrace (an INTERIOR one, which the dormer never generates) would poke above
+    the low host roofline near the eave unless the balcony frees it."""
+    doc = _furnishing_doc(True)
+    doc["levels"][0]["height_in"] = 120.0
+    st = doc["furnishings"][0]["state"]
+    st.update(form="shed", pitch_12=4.0, eaves_h_in=112.0, face_mode=face_mode)
+    doc["vertices"] = [{"id": "ra", "x": 152, "y": 190}, {"id": "rb", "x": 248, "y": 190}]
+    doc["walls"] = [{"id": "bw", "level": "L1", "v1": "ra", "v2": "rb", "type": wtype}]
+    return doc
+
+
+def test_a_balcony_wall_rises_free_of_the_cut_host_roof(fp3d):
+    """DORMER_CONTROL_SPEC.md sec 8.2 (Patrick, 2026-11-19): a wall in the
+    balcony rises to the attic ceiling, not capped by the cut-away host roof.
+    An interior wall at plan y=190 (host roofline ~101 there) reaches the 120"
+    ceiling as a balcony; as a plain set-back dormer the host roof caps it."""
+    free = fp3d.build_model(_shed_balcony_doc_with_wall("interior"),
+                            furnishings=False, floors=False)
+    w = next(m for m in free.meshes if m.name == "walls:interior")
+    assert w.verts[:, 2].max() == pytest.approx(120.0, abs=2.0), "rises to the ceiling"
+    capped = fp3d.build_model(_shed_balcony_doc_with_wall("interior", "setback"),
+                              furnishings=False, floors=False)
+    w2 = next(m for m in capped.meshes if m.name == "walls:interior")
+    assert w2.verts[:, 2].max() < 110.0, "no balcony -> the host roof caps it"
+
+
+def test_a_balcony_railing_stands_at_railing_height(fp3d):
+    """sec 8.3: a railing-type wall in the balcony rises only to railing height
+    (36"), not the ceiling."""
+    model = fp3d.build_model(_shed_balcony_doc_with_wall("railing"),
+                             furnishings=False, floors=False)
+    rail = next(m for m in model.meshes if m.name == "walls:railing")
+    assert rail.verts[:, 2].max() == pytest.approx(fp3d.WALL_H["railing"], abs=1.0)

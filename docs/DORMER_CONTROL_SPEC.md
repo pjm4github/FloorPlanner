@@ -371,6 +371,11 @@ Each increment is gate-able and viewable on a saved plan with `fp3d … --shot`.
 
 ## 8. The balcony model, in full (Patrick, 2026-11-19)
 
+**Build status:** 8.1–8.3 BUILT (deck/cut bounded by the front wall; balcony
+walls rise free of the cut host roof, railings to 36"). 8.4–8.5 (cantilever)
+pending.
+
+
 Phase-3 first laid a balcony deck as a *geometric default* — face forward to the
 host eave, across the dormer's cheek width. Patrick's full model makes the
 **user's own walls** define the balcony. When a dormer's `face_mode` is

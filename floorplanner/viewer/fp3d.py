@@ -2866,13 +2866,50 @@ def _ceiling_pieces(tri_world, cz, lifts, RC, dormer_lf_ids=frozenset()):
     return out
 
 
+def _front_wall_limit(doc, lid, face, fwd, n, wl, wr):
+    """DORMER_CONTROL_SPEC.md sec 8.1: the forward distance to the nearest wall
+    on level `lid` that crosses the balcony strip IN FRONT of the face (within
+    the dormer width `[-wr, wl]` across `n`). The deck and the host cut stop
+    there -- the wall is the balcony's outer edge. `inf` when no wall stands in
+    the strip, so the strip then runs to the eave (the default)."""
+    verts = {v.get("id"): v for v in doc.get("vertices", [])}
+    lo, hi = -wr - 1.0, wl + 1.0
+    best = math.inf
+    for w in doc.get("walls", []):
+        if w.get("level") != lid:
+            continue
+        a, b = verts.get(w.get("v1")), verts.get(w.get("v2"))
+        if not a or not b:
+            continue
+        ax, ay = float(a["x"]) - face[0], float(a["y"]) - face[1]
+        bx, by = float(b["x"]) - face[0], float(b["y"]) - face[1]
+        pa, pb = ax * n[0] + ay * n[1], bx * n[0] + by * n[1]      # across width
+        fa, fb = ax * fwd[0] + ay * fwd[1], bx * fwd[0] + by * fwd[1]   # forward
+        t0, t1 = 0.0, 1.0                     # clip the segment to the width band
+        dp = pb - pa
+        if abs(dp) < 1e-9:
+            if not lo <= pa <= hi:
+                continue
+        else:
+            ta, tb = (lo - pa) / dp, (hi - pa) / dp
+            t0, t1 = max(0.0, min(ta, tb)), min(1.0, max(ta, tb))
+            if t0 > t1:
+                continue                      # the wall misses the width band
+        d = min(fa + (fb - fa) * t0, fa + (fb - fa) * t1)     # near edge, forward
+        if d < -1.0:
+            continue                          # the wall is behind the face
+        best = min(best, max(d, 0.0))
+    return best
+
+
 def _balcony_terraces(doc, base, RC):
     """0352 phase 3 (Patrick, 2026-11-19): for each BALCONY dormer, a terrace
-    strip in FRONT of its face -- (host_id, face_pt, u, n, wl, wr, deck_z). The
-    host roof over the strip is cut away and a flat deck is laid at the dormer
-    level's floor (the attic floor). The face is the terrace's back edge; the
-    user's railing walls stand on the deck. The strip is unbounded forward, so
-    only the host pieces that actually exist out to the eave are cut."""
+    strip in FRONT of its face -- (host_id, face_pt, u, n, wl, wr, deck_z,
+    fwd_limit). The host roof over the strip is cut away and a flat deck laid at
+    the dormer level's floor (the attic floor). The face is the terrace's back
+    edge; the user's walls stand on the deck. The strip runs forward to the
+    nearest front wall (`fwd_limit`, DORMER_CONTROL_SPEC.md sec 8.1) or, with no
+    wall, to the eave (the host pieces that exist out there)."""
     checks = []
     by_id = {r.get("id"): r for r in doc.get("roofs", [])}
     for rf in doc.get("roofs", []):
@@ -2897,25 +2934,71 @@ def _balcony_terraces(doc, base, RC):
             mx, my = (r0x + r1x) / 2.0, (r0y + r1y) / 2.0
             face = (mx + fwd[0] * depth, my + fwd[1] * depth)
             half = ln / 2.0
-            # u = -fwd so `_in_terrace`'s `along < 0` is the forward half-plane
-            checks.append((hid, face, (-fwd[0], -fwd[1]), uw,
-                           half, half, base(rf.get("level"))))
-            continue
-        u = (dx / ln, dy / ln)                       # face -> apex (uphill)
-        n = (-u[1], u[0])
-        wl, wr = (rf.get("wall_span_in") or [40.0, 40.0])[:2]
-        checks.append((hid, (r0x, r0y), u, n, float(wl), float(wr),
-                       base(rf.get("level"))))
+            n, wl, wr = uw, half, half
+            u = (-fwd[0], -fwd[1])          # u = -fwd so `along < 0` is forward
+        else:
+            u = (dx / ln, dy / ln)                   # face -> apex (uphill)
+            n = (-u[1], u[0])
+            face = (r0x, r0y)
+            wl, wr = (float(v) for v in (rf.get("wall_span_in") or [40.0, 40.0])[:2])
+            fwd = (-u[0], -u[1])                      # downhill, toward the eave
+        lim = _front_wall_limit(doc, rf.get("level"), face, fwd, n, wl, wr)
+        checks.append((hid, face, u, n, wl, wr, base(rf.get("level")), lim))
     return checks
 
 
-def _in_terrace(c, face, u, n, wl, wr):
+def _in_terrace(c, face, u, n, wl, wr, fwd_limit=math.inf):
     """`c` (a roofclip Pt, plan coords) is in the balcony strip: in FRONT of the
-    face (downhill) and within the dormer's cheek-wall width."""
+    face (downhill), within the dormer width, and no farther forward than the
+    front wall (`fwd_limit`; `inf` = out to the eave)."""
     dx, dy = c.x() - face[0], c.y() - face[1]
-    along = dx * u[0] + dy * u[1]       # + toward the apex (uphill)
+    along = dx * u[0] + dy * u[1]       # + toward the apex (uphill); front is < 0
     perp = dx * n[0] + dy * n[1]
-    return along < -1e-6 and -wr - 1.0 <= perp <= wl + 1.0
+    return (-fwd_limit - 1e-6 <= along < -1e-6
+            and -wr - 1.0 <= perp <= wl + 1.0)
+
+
+def _terrace_boundary_lines(terr, RC, bounded=True):
+    """The infinite lines bounding a balcony terrace -- the face (back edge), the
+    two sides, and (when `bounded`) the front at the user's wall -- as (point,
+    direction) pairs for `RC._split_by_line`. Splitting a host cell by these
+    before the centroid test cuts the host EXACTLY at the terrace, so a thin
+    strip is cut cleanly instead of missed cell-by-cell. `bounded=False` drops
+    the front line, for the open (to-the-eave) footprint that frees the walls."""
+    _hid, face, u, n, wl, wr, _dz, lim = terr
+    fx, fy = face
+    lines = [(RC.Pt(fx, fy), RC.Pt(n[0], n[1])),                       # face
+             (RC.Pt(fx + n[0] * wl, fy + n[1] * wl), RC.Pt(u[0], u[1])),   # left
+             (RC.Pt(fx - n[0] * wr, fy - n[1] * wr), RC.Pt(u[0], u[1]))]   # right
+    if bounded and math.isfinite(lim):                     # fwd = -u (downhill)
+        lines.append((RC.Pt(fx - u[0] * lim, fy - u[1] * lim),
+                      RC.Pt(n[0], n[1])))                  # front (the wall)
+    return lines
+
+
+def _cells_minus_terraces(cells, rid, terrace_checks, RC):
+    """A host roof's territory `cells` with the balcony FOOTPRINT (face -> eave,
+    not merely face -> wall) removed, so a wall standing in the balcony is NOT
+    capped by the host roof but rises to its own top (DORMER_CONTROL_SPEC.md sec
+    8.2/8.3: balcony walls reach the attic ceiling, railings their 36"). The
+    host MESH beyond the deck wall still renders; only the WALL-CAP territory is
+    opened. Each cell is split at the open terrace boundary and the inside
+    dropped."""
+    my = [t for t in terrace_checks if t[0] == rid]
+    if not my:
+        return cells
+    out = []
+    for cell in cells:
+        subs = [cell]
+        for t in my:
+            for a, d in _terrace_boundary_lines(t, RC, bounded=False):
+                subs = [q for s in subs for q in RC._split_by_line(s, a, d)]
+        for s in subs:
+            c0 = RC._centroid(s)
+            if not any(_in_terrace(c0, fc, u, nn, wl, wr)   # unbounded, to eave
+                       for _h, fc, u, nn, wl, wr, _dz, _lim in my):
+                out.append(s)
+    return out
 
 
 def _pick_dormer_host(hosts, anchor, lid, base, RC):
@@ -3130,6 +3213,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     # so the walls need every roof's territory and surface before any wall
     # prism is built. The roof section below reuses `clips`/`riser_parts`.
     clips, riser_parts, terr_all, hidden_of, lifted_of = {}, [], [], {}, {}
+    terrace_checks = []
     cheek_parts = []
     # P5 §3 (0294 §3): where a dormer's face yields to a climbing wall, the
     # face openings are collected here (plan segment + band, sill_z/head_z
@@ -3271,6 +3355,16 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 if hidden_of:
                     terr_all = [
                         (lf, cells + hidden_of.get(rid, []), dm, lid)
+                        for (lf, cells, dm, lid), (rid, _l, _g, _lf)
+                        in zip(terr_all, every, strict=True)]
+                # BALCONY (sec 8.2): drop each balcony terrace from its host's
+                # wall-capping territory, so a wall in the balcony rises to its
+                # own top instead of being capped by the cut-away host roof.
+                terrace_checks = _balcony_terraces(doc, base, ROOFCLIP)
+                if terrace_checks:
+                    terr_all = [
+                        (lf, _cells_minus_terraces(cells, rid, terrace_checks,
+                                                   ROOFCLIP), dm, lid)
                         for (lf, cells, dm, lid), (rid, _l, _g, _lf)
                         in zip(terr_all, every, strict=True)]
                 # THE DORMER'S SIDES AND FACE, projected up to the dormer
@@ -3620,7 +3714,8 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         roof_parts = list(riser_parts)
         # 0352 phase 3 balcony: the host roof in FRONT of a balcony dormer's face
         # is cut away and a flat deck laid at the dormer level's floor.
-        terrace_checks = _balcony_terraces(doc, base, ROOFCLIP) if ROOFCLIP else []
+        # `terrace_checks` was computed with the clips above (also used to free
+        # the balcony walls from the host cap).
         balcony_deck_rings = []
         # P3 (0293 §2c): a dormer's roof SECTION is anchored to the HOST's level
         # base, not its own -- the same base the clip's `_lift_base` used -- so
@@ -3667,11 +3762,19 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 for pt, d in ROOFCLIP._cut_lines(geom):
                     pieces = [q for cell in pieces
                               for q in ROOFCLIP._split_by_line(cell, pt, d)]
+                # cut each cell EXACTLY at any balcony terrace on this host, so a
+                # thin strip is removed cleanly rather than by whole-cell centroid
+                _my_terrs = [t for t in terrace_checks if t[0] == rid]
+                for t in _my_terrs:
+                    for a, dd in _terrace_boundary_lines(t, ROOFCLIP):
+                        pieces = [q for cell in pieces
+                                  for q in ROOFCLIP._split_by_line(cell, a, dd)]
                 for piece in pieces:
                     c0 = ROOFCLIP._centroid(piece)
-                    deck_z = next((dz for hid, fc, u, nn, wl, wr, dz
+                    deck_z = next((dz for hid, fc, u, nn, wl, wr, dz, lim
                                    in terrace_checks
-                                   if hid == rid and _in_terrace(c0, fc, u, nn, wl, wr)),
+                                   if hid == rid
+                                   and _in_terrace(c0, fc, u, nn, wl, wr, lim)),
                                   None)
                     if deck_z is not None:
                         # BALCONY: cut the host here, lay the deck at the attic floor
