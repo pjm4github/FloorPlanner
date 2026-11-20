@@ -253,10 +253,11 @@ def test_a_furnishing_dormer_over_no_roof_contributes_no_mesh(fp3d):
     assert not any(m.name == "roofs" for m in model.meshes)
 
 
-def test_a_furnishing_dormer_cantilevered_past_the_eave_hangs(fp3d):
-    """P3.2b (Patrick, 2026-11-19): a furnishing dormer whose face is pushed PAST
-    the host eave hangs free -- its gable face is generated past the host extent,
-    down to the dormer's eave line, open below (not clipped at the wall)."""
+def test_a_cantilevered_dormer_floor_is_closed_underneath(fp3d):
+    """DORMER_CONTROL_SPEC.md sec 8.4 (Patrick, 2026-11-19): a furnishing dormer
+    pushed PAST the host eave no longer hangs open below -- its face drops to the
+    attic floor (base(level)=0 here) and a floor slab closes the overhang
+    underneath. P3.2b's open hang at the eave line is superseded."""
     import numpy as np
     doc = _furnishing_doc(True)
     doc["furnishings"][0]["state"]["depth_in"] = 90.0   # face at y=230, past eave y=200
@@ -264,7 +265,16 @@ def test_a_furnishing_dormer_cantilevered_past_the_eave_hangs(fp3d):
     walls = next((m for m in model.meshes if m.name.startswith("walls:")), None)
     assert walls is not None
     ys = -walls.verts[:, 1]
-    assert np.any(ys > 205.0), "the cantilevered face hangs past the host eave (y=200)"
+    assert np.any(ys > 205.0), "the cantilevered face is generated past the host eave"
+    # the face now reaches DOWN to the attic floor (0), not just the eave line (110+)
+    past = walls.verts[ys > 205.0]
+    assert past[:, 2].min() < 5.0, "the cantilever face drops to the attic floor"
+    # and the floor is closed underneath
+    floor = next((m for m in model.meshes if m.name == "dormer_floor"), None)
+    assert floor is not None and len(floor.verts) > 0, "a floor slab closes the overhang"
+    assert -floor.verts[:, 1].min() > 200.0 or (-floor.verts[:, 1]).max() > 200.0, \
+        "the floor sits under the overhang, past the host eave"
+    assert floor.verts[:, 2].max() < 5.0, "the floor is at the attic level"
 
 
 def test_a_balcony_dormer_cuts_the_host_and_lays_a_deck(fp3d):
@@ -361,3 +371,20 @@ def test_a_balcony_railing_stands_at_railing_height(fp3d):
                              furnishings=False, floors=False)
     rail = next(m for m in model.meshes if m.name == "walls:railing")
     assert rail.verts[:, 2].max() == pytest.approx(fp3d.WALL_H["railing"], abs=1.0)
+
+
+def test_a_cantilevered_balcony_deck_reaches_past_the_host_to_the_wall(fp3d):
+    """DORMER_CONTROL_SPEC.md sec 8.5 (Patrick, 2026-11-19): when the railing is
+    PAST the host eave the balcony is cantilevered -- its deck must still reach
+    the wall, over the overhang where there is no host roof to cut. Face ~y=170,
+    host south eave y=200, railing y=230: the deck must reach ~230."""
+    doc = _furnishing_doc(True)
+    doc["furnishings"][0]["state"]["face_mode"] = "balcony"
+    doc["vertices"] = [{"id": "ra", "x": 152, "y": 230}, {"id": "rb", "x": 248, "y": 230}]
+    doc["walls"] = [{"id": "rail", "level": "L1", "v1": "ra", "v2": "rb", "type": "railing"}]
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    deck = next((m for m in model.meshes if m.name == "balcony"), None)
+    assert deck is not None and len(deck.verts) > 0
+    plan_y = -deck.verts[:, 1]
+    assert plan_y.max() > 225.0, "the deck reaches out past the host eave to the wall"
+    assert deck.verts[:, 2].max() < 5.0, "the deck lies flat at the attic floor"

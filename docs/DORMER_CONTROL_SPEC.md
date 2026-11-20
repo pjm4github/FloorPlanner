@@ -371,9 +371,12 @@ Each increment is gate-able and viewable on a saved plan with `fp3d … --shot`.
 
 ## 8. The balcony model, in full (Patrick, 2026-11-19)
 
-**Build status:** 8.1–8.3 BUILT (deck/cut bounded by the front wall; balcony
-walls rise free of the cut host roof, railings to 36"). 8.4–8.5 (cantilever)
-pending.
+**Build status:** 8.1–8.5 BUILT. 8.1–8.3: deck/cut bounded by the front wall;
+balcony walls rise free of the cut host roof, railings to 36". 8.4: a
+cantilevered dormer's walls drop to the attic floor, which is closed underneath
+by a floor slab (`_cantilever_floor`) — the P3.2b open hang is superseded. 8.5:
+a cantilevered balcony's deck reaches past the host out to the front wall
+(`_balcony_overhang_deck`).
 
 
 Phase-3 first laid a balcony deck as a *geometric default* — face forward to the

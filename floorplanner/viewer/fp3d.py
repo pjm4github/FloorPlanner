@@ -977,7 +977,8 @@ def _prism_slab(corners_xyz, drop, bottom_z=None, bottom_zs=None):
 DORMER_CHEEK_STEP_IN = 3.0   # the cheek follows the host's slope in pieces this long
 
 
-def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.0):
+def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.0,
+                   floor_z=None):
     """THE DORMER'S SIDES, PROJECTED UP TO THE DORMER (Patrick, 2026-10-11,
     after the cheek risers went: *"the dormer sides should be generated so
     that they are projected up to the dormer."*). Along each side of the
@@ -1054,9 +1055,10 @@ def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=
                 if in_host:
                     base = [RC.surface_height(host, v) - 1.0 for v in ring]  # an inch into the host slab
                 else:
-                    # CANTILEVER (0352 phase 3): past the host eave the cheek
-                    # hangs to the dormer's eave line, matching the face.
-                    base = [dormer.eaves_h_in] * 4
+                    # CANTILEVER (sec 8.4, Patrick 2026-11-19): past the host eave
+                    # the cheek drops to the attic FLOOR, which is closed
+                    # underneath (`_cantilever_floor`) -- it no longer hangs open.
+                    base = [floor_z if floor_z is not None else dormer.eaves_h_in] * 4
                 parts.extend(_face_pieces(ring, [top_z] * 4, base, band))
     return parts
 
@@ -1155,7 +1157,7 @@ def _face_pieces(ring, top, base, band):
 
 
 def _dormer_face(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.0,
-                 face_cuts_out=None):
+                 face_cuts_out=None, floor_z=None):
     """THE DORMER'S FACE, WHEN IT STANDS ON THE ROOF (Patrick, 2026-10-11,
     on his `short-angle-roofR3.json`, the dormer set back from the eaves:
     *"the dormer ends look good when the outside wall beneath it is
@@ -1244,12 +1246,57 @@ def _dormer_face(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.
                     if in_host:
                         base = [RC.surface_height(host, v) - 1.0 for v in ring]
                     else:
-                        # CANTILEVER (0352 phase 3): past the host eave, with NO
-                        # wall below, the face HANGS from the dormer surface down to
-                        # the dormer's own eave line, open below.
-                        base = [dormer.eaves_h_in] * 4
+                        # CANTILEVER (sec 8.4, Patrick 2026-11-19): past the host
+                        # eave, with NO wall below, the face drops to the attic
+                        # FLOOR, which is closed underneath (`_cantilever_floor`)
+                        # -- it no longer hangs open at the dormer's eave line.
+                        base = [floor_z if floor_z is not None else dormer.eaves_h_in] * 4
                     parts.extend(_face_pieces(ring, top, base, band))
     return parts
+
+
+def _cantilever_floor(dormer, host, roofclip_mod):
+    """DORMER_CONTROL_SPEC.md sec 8.4 (Patrick, 2026-11-19): the part of a
+    dormer's footprint that reaches PAST its host -- over open air -- as plan
+    polygons, so a flat floor can close the attic underneath a cantilevered
+    dormer. Empty for a dormer that sits wholly on the host (no overhang). The
+    host footprint is the convex eave rectangle, so splitting the dormer
+    footprint by its edges and keeping the pieces whose centroid is outside it
+    is exactly the overhang."""
+    RC = roofclip_mod
+    d_fp = RC.footprint_polygon(dormer)
+    h_fp = RC.footprint_polygon(host)
+    pieces = [d_fp]
+    n = len(h_fp)
+    for i in range(n):
+        a, b = h_fp[i], h_fp[(i + 1) % n]
+        pieces = [q for p in pieces
+                  for q in RC._split_by_line(p, a, RC.Pt(b.x() - a.x(), b.y() - a.y()))]
+    return [p for p in pieces if not RC._contains(h_fp, RC._centroid(p))]
+
+
+def _balcony_overhang_deck(terr, host, RC):
+    """DORMER_CONTROL_SPEC.md sec 8.5 (Patrick, 2026-11-19): the part of a BOUNDED
+    balcony terrace (face -> front wall, across the width) that lies PAST the host
+    footprint -- the cantilever, where there is no host roof to cut into a deck.
+    Returns plan rings, so a cantilevered balcony's floor still reaches the walls.
+    Empty when the terrace is unbounded (no wall) or sits wholly on the host."""
+    _hid, face, u, n, wl, wr, _dz, lim = terr
+    if not math.isfinite(lim):
+        return []
+    fwd = (-u[0], -u[1])
+    bl = RC.Pt(face[0] + n[0] * wl, face[1] + n[1] * wl)
+    br = RC.Pt(face[0] - n[0] * wr, face[1] - n[1] * wr)
+    rect = [bl, RC.Pt(bl.x() + fwd[0] * lim, bl.y() + fwd[1] * lim),
+            RC.Pt(br.x() + fwd[0] * lim, br.y() + fwd[1] * lim), br]
+    h_fp = RC.footprint_polygon(host)
+    pieces = [rect]
+    nn = len(h_fp)
+    for i in range(nn):
+        a, b = h_fp[i], h_fp[(i + 1) % nn]
+        pieces = [q for p in pieces
+                  for q in RC._split_by_line(p, a, RC.Pt(b.x() - a.x(), b.y() - a.y()))]
+    return [p for p in pieces if not RC._contains(h_fp, RC._centroid(p))]
 
 
 def _wall_loops(walls, rooms, vx, level):
@@ -3214,6 +3261,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     # prism is built. The roof section below reuses `clips`/`riser_parts`.
     clips, riser_parts, terr_all, hidden_of, lifted_of = {}, [], [], {}, {}
     terrace_checks = []
+    cantilever_floor_rings = []
     cheek_parts = []
     # P5 §3 (0294 §3): where a dormer's face yields to a climbing wall, the
     # face openings are collected here (plan segment + band, sill_z/head_z
@@ -3385,6 +3433,8 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                         (ROOFCLIP.Pt(float(a["x"]), float(a["y"])),
                          ROOFCLIP.Pt(float(b["x"]), float(b["y"])), wt))
                 opens_of = {rf.get("id"): rf.get("openings") or [] for rf in doc.get("roofs", [])}
+                face_mode_of = {rf.get("id"): rf.get("face_mode")
+                                for rf in doc.get("roofs", [])}
                 # P3 (0293 §2c): the generated cheek/face yields to a house wall
                 # on its line from ANY level, not the dormer's own `level` -- a
                 # wall on any floor climbs into the dormer by absolute height (P1),
@@ -3398,9 +3448,20 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                         # the face openings lift in the dormer's frame, which is
                         # its HOST's level (the dormer is anchored there)
                         ops, zb = opens_of.get(rid, []), _lift_base(rid, lid)
-                        cheek_parts.extend(_dormer_cheeks(lf, host_lf, ROOFCLIP, cheek_t, near, ops, zb))
-                        cheek_parts.extend(_dormer_face(lf, host_lf, ROOFCLIP, cheek_t, near, ops, zb,
-                                                        face_cuts_out=wall_face_cuts))
+                        # sec 8.4: a cantilevered dormer's walls drop to the attic
+                        # floor (base(lid)), which is then CLOSED underneath. A
+                        # BALCONY's own deck already floors its overhang (sec 8.5),
+                        # so it takes no separate cantilever floor.
+                        fz = base(lid)
+                        cheek_parts.extend(_dormer_cheeks(lf, host_lf, ROOFCLIP, cheek_t,
+                                                          near, ops, zb, floor_z=fz))
+                        cheek_parts.extend(_dormer_face(lf, host_lf, ROOFCLIP, cheek_t,
+                                                        near, ops, zb,
+                                                        face_cuts_out=wall_face_cuts, floor_z=fz))
+                        if face_mode_of.get(rid) != "balcony":
+                            for ring in _cantilever_floor(lf, host_lf, ROOFCLIP):
+                                cantilever_floor_rings.append(
+                                    [(c.x(), -c.y(), fz) for c in ring])
             if every:
                 # 0174-report.md's own honestly-measured residual, closed
                 # here rather than in roofclip.py: the joining-end
@@ -3784,6 +3845,11 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                     ring = [(c.x(), -c.y(), z0 + ROOFCLIP.surface_height(geom, c))
                             for c in piece]
                     roof_parts.append(_prism_slab(ring, ROOF_T))
+                # sec 8.5: a cantilevered balcony reaches PAST the host, where no
+                # host cell exists to deck -- lay its floor out to the front wall.
+                for t in _my_terrs:
+                    for ring in _balcony_overhang_deck(t, geom, ROOFCLIP):
+                        balcony_deck_rings.append([(c.x(), -c.y(), t[6]) for c in ring])
                 # THE LOWER ROOF RUNS UNDER THE OVERHANG (0240-report.md
                 # sec1): the cells of this roof's own footprint the clip
                 # hid, built at its own surface wherever the roof covering
@@ -3919,6 +3985,10 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         if balcony_deck_rings:
             v, f = _merge([_prism_slab(ring, SLAB_T) for ring in balcony_deck_rings])
             model.meshes.append(Mesh("balcony", v, f, DECK_C))
+        # sec 8.4: the attic floor closed under a cantilevered (non-balcony) dormer
+        if cantilever_floor_rings:
+            v, f = _merge([_prism_slab(ring, SLAB_T) for ring in cantilever_floor_rings])
+            model.meshes.append(Mesh("dormer_floor", v, f, FLOOR_C["interior"]))
 
     # ---- furnishings -----------------------------------------------------
     if furnishings:
