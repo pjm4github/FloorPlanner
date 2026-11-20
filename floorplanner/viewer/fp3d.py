@@ -2882,14 +2882,29 @@ def _balcony_terraces(doc, base, RC):
         ridge = rf.get("ridge") or []
         if hid not in by_id or len(ridge) != 2:
             continue
-        fx, fy = float(ridge[0][0]), float(ridge[0][1])
-        ax, ay = float(ridge[1][0]), float(ridge[1][1])
-        du, dv = ax - fx, ay - fy
-        ln = math.hypot(du, dv) or 1.0
-        u = (du / ln, dv / ln)
+        r0x, r0y = float(ridge[0][0]), float(ridge[0][1])
+        r1x, r1y = float(ridge[1][0]), float(ridge[1][1])
+        dx, dy = r1x - r0x, r1y - r0y
+        ln = math.hypot(dx, dy) or 1.0
+        if rf.get("form") == "shed":
+            # A SHED's `ridge` is its high edge ACROSS the width, not face->back:
+            # the width axis is along it, the downhill (toward-face) axis is its
+            # +normal, and the face lies `span_in[0]` (the depth) forward of the
+            # high edge's midpoint. The strip is in FRONT of that face.
+            uw = (dx / ln, dy / ln)                 # across the width
+            fwd = (-uw[1], uw[0])                    # toward the face (downhill)
+            depth = float((rf.get("span_in") or [40.0, 0.0])[0])
+            mx, my = (r0x + r1x) / 2.0, (r0y + r1y) / 2.0
+            face = (mx + fwd[0] * depth, my + fwd[1] * depth)
+            half = ln / 2.0
+            # u = -fwd so `_in_terrace`'s `along < 0` is the forward half-plane
+            checks.append((hid, face, (-fwd[0], -fwd[1]), uw,
+                           half, half, base(rf.get("level"))))
+            continue
+        u = (dx / ln, dy / ln)                       # face -> apex (uphill)
         n = (-u[1], u[0])
         wl, wr = (rf.get("wall_span_in") or [40.0, 40.0])[:2]
-        checks.append((hid, (fx, fy), u, n, float(wl), float(wr),
+        checks.append((hid, (r0x, r0y), u, n, float(wl), float(wr),
                        base(rf.get("level"))))
     return checks
 

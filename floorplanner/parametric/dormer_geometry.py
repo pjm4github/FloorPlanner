@@ -802,6 +802,33 @@ def to_roof_record(st, pos, rotation_deg, depth, datum_shift=0.0, **extra):
     composes in. `ridge[0]` is the FACE, as the roof code expects of a
     dormer. `extra` (an `id`, a `level`, a `host`) is merged in."""
     gl, gr = guides(st)
+    if st["form"] == "shed":
+        # A SHED is ONE plane whose RIDGE is its high BACK edge, running ACROSS
+        # the width, and whose span is the DEPTH it falls over to the low face
+        # eave -- NOT the gable encoding (ridge down the depth, span across the
+        # width), which `RoofGeom`'s shed path reads as a plane 90 deg rotated.
+        # The high edge runs right-end -> left-end so its +normal -- the side
+        # `span_in[0]` falls over, `-ridge_direction` -- points at the face.
+        # The two ENDS of this ridge are the shed's sides.
+        left = st["span_left_in"]
+        right = st["span_right_in"]
+        rise = st["pitch_12"] / 12.0
+        rec = {
+            "ridge": [list(to_plan(pos, rotation_deg, (-right, depth))),
+                      list(to_plan(pos, rotation_deg, (left, depth)))],
+            "eaves_h_in": st["eaves_h_in"] + datum_shift,
+            "ridge_h_in": st["eaves_h_in"] + rise * depth + datum_shift,
+            "span_in": [depth, 0.0],
+            "overhang_in": [st["face_overhang_in"], 0.0],
+            "end_overhang_in": [st["eave_overhang_left_in"],
+                                st["eave_overhang_right_in"]],
+            "wall_span_in": [depth, 0.0],
+            "eaves_bind": "manual", "gable": [True, True], "marker_end": 0,
+            "form": "shed",
+            "dormer_walls": [],
+        }
+        rec.update(extra)
+        return rec
     rec = {
         "ridge": [list(pos), list(to_plan(pos, rotation_deg, (0.0, depth)))],
         "eaves_h_in": st["eaves_h_in"] + datum_shift,

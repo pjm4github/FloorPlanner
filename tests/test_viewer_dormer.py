@@ -281,3 +281,25 @@ def test_a_balcony_dormer_cuts_the_host_and_lays_a_deck(fp3d):
     roof_b = next(m for m in model.meshes if m.name == "roofs")
     roof_p = next(m for m in plain.meshes if m.name == "roofs")
     assert len(roof_b.verts) < len(roof_p.verts), "the host roof is cut for the terrace"
+
+
+def test_a_shed_balcony_cuts_the_host_in_front_of_the_face_not_sideways(fp3d):
+    """Patrick, 2026-11-19: a SHED balcony was cutting the host 90 deg off --
+    sideways across the width instead of downhill in front of the face. The
+    shed's roof record carries its ridge ACROSS the width, so `_balcony_terraces`
+    has to read the forward (toward-face) axis as the high edge's normal. Here
+    the dormer anchor is at plan y=130, its face ~y=170; the cut terrace and its
+    deck must lie IN FRONT of the face (plan y > 170, toward the south eave at
+    y=200), never beside it."""
+    doc = _furnishing_doc(True)
+    st = doc["furnishings"][0]["state"]
+    st["form"] = "shed"
+    st["pitch_12"] = 4.0            # shallower than the host (0.54) so it meets
+    st["eaves_h_in"] = 112.0
+    st["face_mode"] = "balcony"
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    deck = next((m for m in model.meshes if m.name == "balcony"), None)
+    assert deck is not None and len(deck.verts) > 0, "a shed balcony lays a deck"
+    plan_y = -deck.verts[:, 1]     # world (x, -y, z) -> plan y
+    assert plan_y.min() > 170.0 - 1.0, "the terrace is in FRONT of the face, not sideways"
+    assert plan_y.max() <= 200.0 + 12.0 + 1e-6, "no deeper than the host south eave"

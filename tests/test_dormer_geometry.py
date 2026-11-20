@@ -365,6 +365,36 @@ def test_the_roof_codes_own_reader_agrees_with_this_calculator():
     assert math.isclose(geom.length(), depth)
 
 
+def test_a_shed_dormers_roof_record_falls_along_the_depth_not_the_width():
+    """A SHED is ONE plane: its high ridge is the back edge ACROSS the width,
+    its slope falls along the DEPTH to the low face eave. `to_roof_record` once
+    encoded every dormer the gable way (ridge down the depth, span across the
+    width), which `RoofGeom`'s shed reader built 90 deg rotated (Patrick,
+    2026-11-19). So the record's ridge must run across the width, its span be
+    the depth, and the surface fall with the depth -- level across the width."""
+    spec = importlib.util.spec_from_file_location(
+        "roofclip_shed_test", ROOT / "floorplanner" / "roofclip.py")
+    rc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rc)
+    st = _st(form="shed", symmetric=False, span_left_in=48.0, span_right_in=36.0,
+             eaves_h_in=100.0, pitch_12=6.0)
+    pos, rot, depth = (400.0, 600.0), 0.0, 90.0
+    rise = 6.0 / 12.0
+    rec = dg.to_roof_record(st, pos, rot, depth)
+    (x0, y0), (x1, y1) = rec["ridge"]
+    assert abs(y1 - y0) < 1e-6, "the high ridge runs across the width (flat in y at rot 0)"
+    assert abs(x1 - x0) == pytest.approx(48.0 + 36.0), "the full width"
+    assert rec["span_in"] == [90.0, 0.0], "the span is the DEPTH, right plane gone"
+    assert rec["ridge_h_in"] == pytest.approx(100.0 + rise * depth)
+    geom = rc.RoofGeom.from_record(rec)
+    assert math.isclose(geom.length(), 48.0 + 36.0), "the ridge spans the width"
+    # RoofGeom's own surface: it falls along the depth (y), level across x
+    for x, y in ((0.0, 0.0), (30.0, 0.0), (-20.0, 45.0), (10.0, 90.0)):
+        px, py = dg.to_plan(pos, rot, (x, y))
+        assert rc.surface_height(geom, rc.Pt(px, py)) == pytest.approx(
+            100.0 + rise * y), (x, y)
+
+
 # -- control D, the face guide (0355) ----------------------------------------
 def test_the_side_guides_run_from_the_face_back_to_the_host():
     # P3 retirement (2026-11-18): the face guide D is gone -- the two side
