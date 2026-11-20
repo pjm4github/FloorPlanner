@@ -688,6 +688,15 @@ class CameraItem(QGraphicsItem):
 
         roofs = [it for it in sc.items()
                  if isinstance(it, RoofItem) and not sip.isdeleted(it)]
+        # P3.3 (0352, 2026-11-19): a dormer FURNISHING draws in the elevation as
+        # a transient roof-dormer (its host resolved by the anchor), so it shows
+        # like a roof-dormer -- face gable, windows and all.
+        from floorplanner.items import DormerItem
+        for it in sc.items():
+            if isinstance(it, DormerItem) and not sip.isdeleted(it):
+                rr = it.as_camera_roof()
+                if rr is not None:
+                    roofs.append(rr)
         main_roofs = [r for r in roofs if not r.is_dormer()]  # these clip the walls
         ext_walls = [it for it in sc.items() if isinstance(it, WallItem)
                      and not sip.isdeleted(it)

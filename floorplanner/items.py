@@ -1011,6 +1011,39 @@ class DormerItem(FurnishingItem):
                 break
         ctx["room_below"] = found
 
+    def as_camera_roof(self):
+        """P3.3 (0352, 2026-11-19): a TRANSIENT RoofItem for the 2D elevation
+        camera, so a dormer FURNISHING draws in an elevation like a roof-dormer.
+        The host is resolved by the anchor; the heights are shifted to the host's
+        datum (which the camera reads via `_roof_datum_floor`) -- the same record
+        `fp3d` builds the 3D from (`dg.to_roof_record`). None when over no roof.
+        The item is not added to any scene; the camera only reads its geometry."""
+        sc = self.scene()
+        if sc is None:
+            return None
+        from floorplanner.roofs import RoofItem, host_roof_at
+        host = host_roof_at(sc, self.pos(), self.floor)
+        if host is None or sip.isdeleted(host):
+            return None
+        rot = self.rotation()
+        depth = max(self.params["depth_in"], 1.0)
+        ux, uy = _dg.ridge_direction(rot)
+        face = (self.pos().x() - ux * depth, self.pos().y() - uy * depth)
+        shift = floor_elevation(self.floor) - floor_elevation(host.floor)
+        rec = _dg.to_roof_record(_dg.normalize_state(self.params), face, rot,
+                                 depth, datum_shift=shift)
+        (x0, y0), (x1, y1) = rec["ridge"]
+        rr = RoofItem(QPointF(x0, y0), QPointF(x1, y1),
+                      eaves_h_in=rec["eaves_h_in"], ridge_h_in=rec["ridge_h_in"],
+                      overhang_in=rec["overhang_in"], gable=rec["gable"],
+                      span_in=rec["span_in"], marker_end=rec["marker_end"],
+                      host=host, form=rec["form"],
+                      end_overhang_in=rec["end_overhang_in"],
+                      wall_span_in=rec["wall_span_in"],
+                      openings=rec.get("openings"))
+        rr.floor = self.floor
+        return rr
+
     # -- geometry ------------------------------------------------------------
     def _current_sig(self, ctx):
         return (round(self.pos().x(), 3), round(self.pos().y(), 3),

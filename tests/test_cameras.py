@@ -584,3 +584,58 @@ def test_a_bound_3d_view_is_fed_the_new_pose_on_move_and_turn(scene):
     cam._pose_sink = None                         # unbound: a move is silent, no crash
     cam.setPos(QPointF(10, 10))
     QApplication.processEvents()
+
+
+def test_a_furnishing_dormer_exposes_a_camera_roof(fp, scene):
+    """P3.3 (2026-11-19): a dormer furnishing gives the elevation camera a
+    transient RoofItem (host resolved by the anchor), so it draws like a
+    roof-dormer; None when it sits over no roof."""
+    from PyQt6.QtCore import QPointF
+    from floorplanner.items import make_furnishing
+    from floorplanner.roofs import RoofItem
+    rf = RoofItem(QPointF(50, 100), QPointF(250, 100), eaves_h_in=80.0,
+                  ridge_h_in=132.0, span_in=100.0)
+    rf.floor = fp.DEFAULT_FLOOR
+    scene.addItem(rf)
+    d = make_furnishing("dormer", QPointF(150, 115), 0.0, {"depth_in": 20.0},
+                        new=True)
+    d.floor = fp.DEFAULT_FLOOR
+    scene.addItem(d)
+    d._recompute()
+    rr = d.as_camera_roof()
+    assert rr is not None and isinstance(rr, RoofItem)
+    assert rr.is_dormer() and rr.host is rf
+    far = make_furnishing("dormer", QPointF(1000, 1000), 0.0, {}, new=True)
+    far.floor = fp.DEFAULT_FLOOR
+    scene.addItem(far)
+    far._recompute()
+    assert far.as_camera_roof() is None
+
+
+def test_a_furnishing_dormer_adds_to_the_house_elevation(fp, scene):
+    """P3.3: a dormer furnishing shows in the whole-house-side elevation, like a
+    roof-dormer -- it adds roof faces to the composited pieces."""
+    from floorplanner.config import active_floor, floor_elevations, set_floor_state
+    from floorplanner.items import make_furnishing
+    saved_active, saved_elevs = active_floor(), floor_elevations()
+    try:
+        _two_storey_house(fp, scene)
+        set_floor_state(active="L2")
+        # a dormer on the WEST slope, facing west (rotation 90)
+        d = make_furnishing("dormer", QPointF(90, 90), 90.0,
+                            {"span_left_in": 30.0, "span_right_in": 30.0,
+                             "pitch_12": 7.0, "depth_in": 36.0}, new=True)
+        d.floor = "L2"
+        scene.addItem(d)
+        d._recompute()
+        assert d.as_camera_roof() is not None, "the dormer couples to the L2 roof"
+        set_floor_state(active="L1")
+        cam = CameraItem(QPointF(-90, 90), rotation=0.0, floor="L1",
+                         show_house_side=True)                 # west, aimed east
+        scene.addItem(cam)
+        n_with = sum(1 for pc in cam.elevation()["pieces"] if pc["kind"] == "roof")
+        scene.removeItem(d)
+        n_without = sum(1 for pc in cam.elevation()["pieces"] if pc["kind"] == "roof")
+        assert n_with > n_without, (n_with, n_without)
+    finally:
+        set_floor_state(active=saved_active, elevations=saved_elevs)

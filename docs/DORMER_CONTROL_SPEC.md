@@ -368,3 +368,43 @@ already loads — no editor state required. The only durable fields are `host`
    below" rather than failing to find it.
 
 Each increment is gate-able and viewable on a saved plan with `fp3d … --shot`.
+
+## 8. The balcony model, in full (Patrick, 2026-11-19)
+
+**Build status:** 8.1–8.5 BUILT. 8.1–8.3: deck/cut bounded by the front wall;
+balcony walls rise free of the cut host roof, railings to 36". 8.4: a
+cantilevered dormer's walls drop to the attic floor, which is closed underneath
+by a floor slab (`_cantilever_floor`) — the P3.2b open hang is superseded. 8.5:
+a cantilevered balcony's deck reaches past the host out to the front wall
+(`_balcony_overhang_deck`).
+
+
+Phase-3 first laid a balcony deck as a *geometric default* — face forward to the
+host eave, across the dormer's cheek width. Patrick's full model makes the
+**user's own walls** define the balcony. When a dormer's `face_mode` is
+**balcony**:
+
+1. **The deck.** The floor of the room the dormer sits on (the attic, the
+   dormer's own level) is projected OUT past the face — downhill, toward the
+   eave — to the **wall on the eave side of the face wall**, or to the **eave
+   itself** when there is no such wall. The host roof over that strip is cut
+   away. (Today's build stops at the eave always; the refinement is to stop at
+   the front wall when one is drawn.)
+2. **The balcony walls.** The walls the user draws OUTSIDE the dormer face (in
+   front of it, between the face and the eave) ARE the balcony's walls. They
+   rise to the **ceiling height of the attic floor** (the level's `height_in`).
+3. **Railings.** A wall of type **railing** instead rises only to **railing
+   height** (36", `fp3d.WALL_H["railing"]`) — not the ceiling.
+4. **Cantilever, no front wall.** When the dormer is cantilevered (face past the
+   footprint below), the attic floor is **closed underneath the dormer** — a
+   soffit/floor so the overhang is solid, not open.
+5. **Cantilevered balcony (cantilever + front walls).** When walls stand outside
+   the face AND the dormer is cantilevered, the floor **extends out to those
+   walls**, and the walls rise to the **ceiling height of that floor**; railings
+   render at railing height.
+
+So points 2/3 largely reuse walls the user already draws at their existing type
+heights; the build's new work is (a) bound the deck/host-cut to the front wall
+rather than the eave, (b) close the attic floor under a cantilever, and (c)
+extend the floor to the walls on a cantilevered balcony. The deck sits at the
+dormer level's floor (`base(level)`), where the railing/walls stand.

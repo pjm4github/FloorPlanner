@@ -217,3 +217,174 @@ def test_nothing_of_roof_closes_the_dormer_below_its_eaves(fp3d, monkeypatch):
     # word of 2026-10-11 on the set-back dormer: "the dormer face needs
     # to climb up from the roof itself")
     assert wall_hits["front, at the ridge"] > 0 and wall_hits["front, near a corner"] > 0, wall_hits
+
+
+# -- 0352 phase 3: a FURNISHING dormer is built as a roof on its host ---------
+def _furnishing_doc(over_host=True):
+    """A host roof + a dormer FURNISHING (not a roof record). The dormer's
+    anchor (pos) sits on the host's south slope; `fp3d` resolves the host by the
+    anchor and folds the dormer in as a roof record (`_dormer_roof_records`)."""
+    host = {"id": "rf1", "level": "L1", "ridge": [[0, 100], [400, 100]],
+            "eaves_h_in": 96.0, "ridge_h_in": 150.0, "overhang_in": [12, 12],
+            "span_in": [100, 100], "gable": [True, True]}
+    state = {"form": "gable", "span_left_in": 30.0, "span_right_in": 30.0,
+             "symmetric": True, "pitch_12": 6.0, "eaves_h_in": 110.0,
+             "depth_in": 40.0, "eave_overhang_left_in": 0.0,
+             "eave_overhang_right_in": 0.0, "face_overhang_in": 0.0}
+    return {"levels": [{"id": "L1", "elevation_in": 0.0, "height_in": 96.0}],
+            "vertices": [], "walls": [], "rooms": [],
+            "roofs": [host] if over_host else [],
+            "furnishings": [{"kind": "dormer", "level": "L1", "pos": [200, 130],
+                             "rotation": 0.0, "state": state}]}
+
+
+def test_a_furnishing_dormer_is_built_as_a_roof_on_its_host(fp3d):
+    model = fp3d.build_model(_furnishing_doc(True), furnishings=False, floors=False)
+    assert any("dormer furnishing" in n for n in model.notes), model.notes
+    roof = next((m for m in model.meshes if m.name == "roofs"), None)
+    cheeks = [m for m in model.meshes if m.name.startswith("walls:")]
+    assert roof is not None and len(roof.verts) > 16, "host + the dormer's planes"
+    assert cheeks, "the dormer's cheeks stand on the host"
+
+
+def test_a_furnishing_dormer_over_no_roof_contributes_no_mesh(fp3d):
+    model = fp3d.build_model(_furnishing_doc(False), furnishings=False, floors=False)
+    assert not any("dormer furnishing" in n for n in model.notes)
+    assert not any(m.name == "roofs" for m in model.meshes)
+
+
+def test_a_cantilevered_dormer_floor_is_closed_underneath(fp3d):
+    """DORMER_CONTROL_SPEC.md sec 8.4 (Patrick, 2026-11-19): a furnishing dormer
+    pushed PAST the host eave no longer hangs open below -- its face drops to the
+    attic floor (base(level)=0 here) and a floor slab closes the overhang
+    underneath. P3.2b's open hang at the eave line is superseded."""
+    import numpy as np
+    doc = _furnishing_doc(True)
+    doc["furnishings"][0]["state"]["depth_in"] = 90.0   # face at y=230, past eave y=200
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    walls = next((m for m in model.meshes if m.name.startswith("walls:")), None)
+    assert walls is not None
+    ys = -walls.verts[:, 1]
+    assert np.any(ys > 205.0), "the cantilevered face is generated past the host eave"
+    # the face now reaches DOWN to the attic floor (0), not just the eave line (110+)
+    past = walls.verts[ys > 205.0]
+    assert past[:, 2].min() < 5.0, "the cantilever face drops to the attic floor"
+    # and the floor is closed underneath
+    floor = next((m for m in model.meshes if m.name == "dormer_floor"), None)
+    assert floor is not None and len(floor.verts) > 0, "a floor slab closes the overhang"
+    assert -floor.verts[:, 1].min() > 200.0 or (-floor.verts[:, 1]).max() > 200.0, \
+        "the floor sits under the overhang, past the host eave"
+    assert floor.verts[:, 2].max() < 5.0, "the floor is at the attic level"
+
+
+def test_a_balcony_dormer_cuts_the_host_and_lays_a_deck(fp3d):
+    """P3.2a (Patrick, 2026-11-19): a balcony dormer cuts the host roof in front
+    of its face and lays a flat deck at the dormer level's floor (the attic
+    floor) -- the user's railing walls stand on it."""
+    doc = _furnishing_doc(True)
+    doc["furnishings"][0]["state"]["face_mode"] = "balcony"
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    deck = next((m for m in model.meshes if m.name == "balcony"), None)
+    assert deck is not None and len(deck.verts) > 0, "a balcony deck is laid"
+    assert deck.verts[:, 2].max() == pytest.approx(0.0, abs=1.1), "flat at the floor"
+    plain = fp3d.build_model(_furnishing_doc(True), furnishings=False, floors=False)
+    roof_b = next(m for m in model.meshes if m.name == "roofs")
+    roof_p = next(m for m in plain.meshes if m.name == "roofs")
+    assert len(roof_b.verts) < len(roof_p.verts), "the host roof is cut for the terrace"
+
+
+def test_a_shed_balcony_cuts_the_host_in_front_of_the_face_not_sideways(fp3d):
+    """Patrick, 2026-11-19: a SHED balcony was cutting the host 90 deg off --
+    sideways across the width instead of downhill in front of the face. The
+    shed's roof record carries its ridge ACROSS the width, so `_balcony_terraces`
+    has to read the forward (toward-face) axis as the high edge's normal. Here
+    the dormer anchor is at plan y=130, its face ~y=170; the cut terrace and its
+    deck must lie IN FRONT of the face (plan y > 170, toward the south eave at
+    y=200), never beside it."""
+    doc = _furnishing_doc(True)
+    st = doc["furnishings"][0]["state"]
+    st["form"] = "shed"
+    st["pitch_12"] = 4.0            # shallower than the host (0.54) so it meets
+    st["eaves_h_in"] = 112.0
+    st["face_mode"] = "balcony"
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    deck = next((m for m in model.meshes if m.name == "balcony"), None)
+    assert deck is not None and len(deck.verts) > 0, "a shed balcony lays a deck"
+    plan_y = -deck.verts[:, 1]     # world (x, -y, z) -> plan y
+    assert plan_y.min() > 170.0 - 1.0, "the terrace is in FRONT of the face, not sideways"
+    assert plan_y.max() <= 200.0 + 12.0 + 1e-6, "no deeper than the host south eave"
+
+
+def test_a_front_wall_bounds_the_balcony_deck_short_of_the_eave(fp3d):
+    """DORMER_CONTROL_SPEC.md sec 8.1 (Patrick, 2026-11-19): the balcony deck and
+    the host cut stop at the wall the user draws in front of the face, not out at
+    the eave. Face ~y=170, host south eave y=200; a railing wall at y=185 across
+    the width must pull the deck's forward edge back to ~185."""
+    doc = _furnishing_doc(True)
+    doc["furnishings"][0]["state"]["face_mode"] = "balcony"
+    doc["vertices"] = [{"id": "ra", "x": 152, "y": 185}, {"id": "rb", "x": 248, "y": 185}]
+    doc["walls"] = [{"id": "rail", "level": "L1", "v1": "ra", "v2": "rb", "type": "railing"}]
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    deck = next((m for m in model.meshes if m.name == "balcony"), None)
+    assert deck is not None and len(deck.verts) > 0, "a deck is still laid"
+    plan_y = -deck.verts[:, 1]
+    assert plan_y.max() <= 185.0 + 6.0, "the deck stops at the front wall, not the eave"
+    # the control: no wall -> the deck runs out toward the eave (y ~ 200)
+    plain = dict(doc, walls=[], vertices=[])
+    pdeck = next(m for m in fp3d.build_model(plain, furnishings=False, floors=False).meshes
+                 if m.name == "balcony")
+    assert (-pdeck.verts[:, 1]).max() > 190.0, "unbounded, the deck reaches the eave"
+
+
+def _shed_balcony_doc_with_wall(wtype, face_mode="balcony"):
+    """A shed balcony on a host, ceiling raised to 120 so a wall standing in the
+    terrace (an INTERIOR one, which the dormer never generates) would poke above
+    the low host roofline near the eave unless the balcony frees it."""
+    doc = _furnishing_doc(True)
+    doc["levels"][0]["height_in"] = 120.0
+    st = doc["furnishings"][0]["state"]
+    st.update(form="shed", pitch_12=4.0, eaves_h_in=112.0, face_mode=face_mode)
+    doc["vertices"] = [{"id": "ra", "x": 152, "y": 190}, {"id": "rb", "x": 248, "y": 190}]
+    doc["walls"] = [{"id": "bw", "level": "L1", "v1": "ra", "v2": "rb", "type": wtype}]
+    return doc
+
+
+def test_a_balcony_wall_rises_free_of_the_cut_host_roof(fp3d):
+    """DORMER_CONTROL_SPEC.md sec 8.2 (Patrick, 2026-11-19): a wall in the
+    balcony rises to the attic ceiling, not capped by the cut-away host roof.
+    An interior wall at plan y=190 (host roofline ~101 there) reaches the 120"
+    ceiling as a balcony; as a plain set-back dormer the host roof caps it."""
+    free = fp3d.build_model(_shed_balcony_doc_with_wall("interior"),
+                            furnishings=False, floors=False)
+    w = next(m for m in free.meshes if m.name == "walls:interior")
+    assert w.verts[:, 2].max() == pytest.approx(120.0, abs=2.0), "rises to the ceiling"
+    capped = fp3d.build_model(_shed_balcony_doc_with_wall("interior", "setback"),
+                              furnishings=False, floors=False)
+    w2 = next(m for m in capped.meshes if m.name == "walls:interior")
+    assert w2.verts[:, 2].max() < 110.0, "no balcony -> the host roof caps it"
+
+
+def test_a_balcony_railing_stands_at_railing_height(fp3d):
+    """sec 8.3: a railing-type wall in the balcony rises only to railing height
+    (36"), not the ceiling."""
+    model = fp3d.build_model(_shed_balcony_doc_with_wall("railing"),
+                             furnishings=False, floors=False)
+    rail = next(m for m in model.meshes if m.name == "walls:railing")
+    assert rail.verts[:, 2].max() == pytest.approx(fp3d.WALL_H["railing"], abs=1.0)
+
+
+def test_a_cantilevered_balcony_deck_reaches_past_the_host_to_the_wall(fp3d):
+    """DORMER_CONTROL_SPEC.md sec 8.5 (Patrick, 2026-11-19): when the railing is
+    PAST the host eave the balcony is cantilevered -- its deck must still reach
+    the wall, over the overhang where there is no host roof to cut. Face ~y=170,
+    host south eave y=200, railing y=230: the deck must reach ~230."""
+    doc = _furnishing_doc(True)
+    doc["furnishings"][0]["state"]["face_mode"] = "balcony"
+    doc["vertices"] = [{"id": "ra", "x": 152, "y": 230}, {"id": "rb", "x": 248, "y": 230}]
+    doc["walls"] = [{"id": "rail", "level": "L1", "v1": "ra", "v2": "rb", "type": "railing"}]
+    model = fp3d.build_model(doc, furnishings=False, floors=False)
+    deck = next((m for m in model.meshes if m.name == "balcony"), None)
+    assert deck is not None and len(deck.verts) > 0
+    plan_y = -deck.verts[:, 1]
+    assert plan_y.max() > 225.0, "the deck reaches out past the host eave to the wall"
+    assert deck.verts[:, 2].max() < 5.0, "the deck lies flat at the attic floor"
