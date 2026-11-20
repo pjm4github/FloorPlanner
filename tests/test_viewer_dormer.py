@@ -388,3 +388,73 @@ def test_a_cantilevered_balcony_deck_reaches_past_the_host_to_the_wall(fp3d):
     plan_y = -deck.verts[:, 1]
     assert plan_y.max() > 225.0, "the deck reaches out past the host eave to the wall"
     assert deck.verts[:, 2].max() < 5.0, "the deck lies flat at the attic floor"
+
+
+def _shed_setback_window_doc(with_window=True):
+    """A SHED dormer SET BACK from a house exterior wall that carries a window
+    under the shed eaves (Patrick 2026-11-20, `twoGableOneShed.json`). The shed
+    face is at plan y=170; the house wall at y=200 is under the shed overhang
+    (face_overhang 50 -> reaches y=220), in front of the face; the shed is raised
+    (eaves 140) so it pokes above the host and its face is generated."""
+    doc = _furnishing_doc(True)
+    st = doc["furnishings"][0]["state"]
+    st.update(form="shed", pitch_12=4.0, eaves_h_in=140.0, face_overhang_in=50.0)
+    opening = ([{"id": "ow", "kind": "window", "code": "3030",
+                 "anchor": {"from": "v1", "offset_in": 35.0}}] if with_window else [])
+    doc["vertices"] = [{"id": "fa", "x": 150, "y": 200}, {"id": "fb", "x": 250, "y": 200}]
+    doc["walls"] = [{"id": "fw", "level": "L1", "v1": "fa", "v2": "fb",
+                     "type": "exterior", "openings": opening}]
+    return doc
+
+
+def test_a_shed_face_window_on_the_wall_under_it_is_cut_through_the_setback_face(fp3d):
+    """Patrick, 2026-11-20 (`twoGableOneShed.json`): a SHED dormer set back from
+    the house wall covered the window the user put on that wall -- the generated
+    set-back face floated as a panel in front of it. His ruling: keep the set-back,
+    but the face should grow the wall up to the roof and CUT the window through it,
+    so you see out. The window (3030, sill 36 -> head 66) is on the wall at y=200,
+    under the shed eaves; the face is at y=170."""
+    import numpy as np
+    model = fp3d.build_model(_shed_setback_window_doc(), furnishings=False, floors=False)
+    C = np.vstack([np.asarray(m.verts)[np.asarray(m.faces)].mean(axis=1)
+                   for m in model.meshes if m.name == "walls:exterior"])
+    face = C[(-C[:, 1] > 163) & (-C[:, 1] < 171)]       # the set-back face at plan y=170
+    assert len(face) > 0, "the shed face is generated"
+    assert face[:, 2].min() < 5.0, "the set-back face grows DOWN to the floor"
+    col = face[(face[:, 0] > 192) & (face[:, 0] < 208)]  # the window column (x~185-215)
+    assert not ((col[:, 2] > 40) & (col[:, 2] < 62)).any(), \
+        "the window (z 36-66) is cut THROUGH the face -- a void you see out of"
+    beside = face[(face[:, 0] > 155) & (face[:, 0] < 180)]
+    assert ((beside[:, 2] > 40) & (beside[:, 2] < 62)).any(), \
+        "beside the window the face is solid at the same height"
+
+    # CONTROL: with no window on that wall, the face is NOT pulled to the floor --
+    # it stands on the host plane as before (no `extra_bands`, no grow).
+    plain = fp3d.build_model(_shed_setback_window_doc(with_window=False),
+                             furnishings=False, floors=False)
+    Cp = np.vstack([np.asarray(m.verts)[np.asarray(m.faces)].mean(axis=1)
+                    for m in plain.meshes if m.name == "walls:exterior"])
+    facep = Cp[(-Cp[:, 1] > 163) & (-Cp[:, 1] < 171)]
+    assert len(facep) > 0 and facep[:, 2].min() > 50.0, \
+        "no window under it -> the set-back face stays on the host plane"
+
+
+def test_the_host_roof_under_a_shed_face_overhang_is_cut(fp3d):
+    """Patrick, 2026-11-20 (`twoGableOneShed.json`): "the roof under the shed
+    dormer must be cut in a similar manner as the gable end dormer". The host
+    roof under the shed's FACE overhang -- the alcove between the set-back face
+    (y=170) and the house wall (y=200) -- was projected back in by
+    `_hidden_overhang_pieces` and rose across the window, a brown wedge burying
+    it. A gable's own face has no such overhang, so its front is clean. The host
+    is now cut under the whole face overhang; only the shed's OWN roof (high,
+    near its 140 eaves) stands over the alcove -- the host wedge (which would
+    descend toward the host eave ~z100) is gone."""
+    import numpy as np
+    model = fp3d.build_model(_shed_setback_window_doc(), furnishings=False, floors=False)
+    roof = next(m for m in model.meshes if m.name == "roofs")
+    C = np.asarray(roof.verts)[np.asarray(roof.faces)].mean(axis=1)
+    alcove = C[(C[:, 0] > 175) & (C[:, 0] < 225)
+               & (-C[:, 1] > 172) & (-C[:, 1] < 198)]
+    assert len(alcove) > 0, "the shed's own roof still stands over the alcove"
+    assert not (alcove[:, 2] < 120.0).any(), \
+        "the host roof under the shed face overhang is CUT -- no wedge across the window"
