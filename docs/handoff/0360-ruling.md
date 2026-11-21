@@ -73,6 +73,15 @@ Patrick's words:
   above the host ridge, [`0359`](0359-ruling.md); the dialog's caps). Say what
   you chose and why.
 
+**Amendment (Patrick, 2026-11-21).** The dormer is placed on the SECOND level
+**LV2** — a furnishing on the upper storey it lights — with the host roof and
+the house walls on **LV1** a storey below; the dormer finds that host by looking
+one level down (`host_roof_at`). In addition the **face wall and the two cheek
+walls are drawn on LV2** to match the dormer's face and cheeks — the user's
+upper-level walls that rise into the gable. The four distances are unchanged by
+the level (the datum cancels in `host_extent`). Dimensions in
+[`0361`](0361-report.md) §2.
+
 ## 4. The four distances
 
 - All four are measured in plan from the anchor, along the dormer's ridge

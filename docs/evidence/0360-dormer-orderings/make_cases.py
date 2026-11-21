@@ -50,14 +50,24 @@ FloorPlanner.load_fonts()
 _app.setFont(QFont(FloorPlanner.FONT_FAMILY, 10))
 FONT = FloorPlanner.FONT_FAMILY
 
-from floorplanner.config import DEFAULT_FLOOR             # noqa: E402
+from floorplanner.config import set_floor_state           # noqa: E402
 from floorplanner.design.bridge import design_from_scene  # noqa: E402
 from floorplanner.items import make_furnishing            # noqa: E402
+from floorplanner.model import Floor                      # noqa: E402
 from floorplanner.parametric import dormer_geometry as dg  # noqa: E402
 from floorplanner.roofs import RoofItem                   # noqa: E402
 from floorplanner.rooms import RoomItem                   # noqa: E402
 from floorplanner.walls import WallItem                   # noqa: E402
 from PyQt6.QtGui import QPainterPath                       # noqa: E402
+
+# Two levels (Patrick, 2026-11-21): the dormer is a furnishing on the UPPER
+# level LV2; the host roof + the house walls are on LV1 a storey below, and the
+# dormer finds that host by looking one level down (`host_roof_at`).
+LV1, LV2 = "LV1", "LV2"
+LV1_ELEV, LV2_ELEV = 0.0, 108.0
+# LV2 active so the dormer's own walls draw solid; LV1 shown as a ghost below.
+set_floor_state(elevations={LV1: LV1_ELEV, LV2: LV2_ELEV},
+                active=LV2, show_others=True)
 
 TABLE = os.path.join(ROOT, "docs", "DORMER_EDGE_ORDERINGS.md")
 STAGE1 = ("W01", "W05", "W09", "W75")
@@ -65,14 +75,18 @@ STAGE1 = ("W01", "W05", "W09", "W75")
 # --- base host dimensions (chosen once; sec3) ------------------------------
 # A 12:12 gable: slope 1.0, so a plan inch along the fall line is an inch of
 # height -- the distances read straight off the surface. The half-span (ridge
-# to the eave wall) is 192 in; every stage-1 distance (<= 120) and anchor
-# (>= 72 in below the ridge) sits well inside it, and the ridge (288 in) clears
-# every dormer ridge. The plan is 600 in along the ridge.
-EAVES_H = 96.0                 # height at the EAVE WALL line (perp = span)
-SPAN = 192.0                   # ridge -> eave wall, plan
-RIDGE_H = EAVES_H + SPAN       # 12:12
+# to the eave wall) is 144 in; every buildable distance (<= 120, and D <= 96)
+# sits inside it, so the anchor (perp = 144 - D >= 48) stays on the roof. The
+# EAVE WALL height is the LV2 floor (108), so the roof bears on the LV1 walls
+# and the dormer's own walls rise from the LV2 floor. The plan is 360 in along
+# the ridge so the dormer reads large.
+EAVES_H = 108.0                # height at the EAVE WALL line (perp = span) = LV2 floor
+SPAN = 144.0                   # ridge -> eave wall, plan
+RIDGE_H = EAVES_H + SPAN       # 12:12 -> 252
 RIDGE_X0, RIDGE_X1 = 0.0, 360.0   # a short ridge so the dormer reads large
 RIDGE_Y = 0.0                  # ridge runs along x at y = 0; +y is downhill
+DORMER_PITCH = 7.0             # shallower than the host, so the dormer's eaves
+#                                stay above the LV2 floor even low on the roof
 CEIL = 96.0
 
 # distance ladder (sec4): tied edges EXACTLY equal, separated edges >= 12 in.
@@ -112,9 +126,17 @@ def distances(ordering):
 # --------------------------------------------------------------------------
 # build one case in a bare scene
 # --------------------------------------------------------------------------
+def _wall(sc, floor, a, b):
+    w = WallItem(QPointF(*a), QPointF(*b))
+    w.floor = floor
+    sc.addItem(w)
+    return w
+
+
 def build_scene(tgt):
-    """A scene holding the base house + the dormer for target distances `tgt`.
-    Returns (scene, dormer, overhang, anchor_pt, face_pt)."""
+    """A scene holding the base house (LV1) + the dormer on LV2 + the dormer's
+    own face and cheek walls on LV2. Returns (scene, dormer, overhang,
+    anchor_pt, face_pt)."""
     oh = tgt["A"] - tgt["D"]            # host eave overhang, faced side
     depth = tgt["C"]
     fo = tgt["B"] - tgt["C"]
@@ -122,37 +144,49 @@ def build_scene(tgt):
 
     sc = QGraphicsScene()
 
-    # the LV1 room + its four exterior walls (the eave walls at perp = span)
+    # LV1: the room + four exterior walls (the eave walls at perp = span) + the
+    # host roof. D (the wall below) is the faced LV1 wall at perp = span.
     x0, x1, y0, y1 = RIDGE_X0, RIDGE_X1, RIDGE_Y - SPAN, RIDGE_Y + SPAN
     path = QPainterPath()
     path.addRect(x0, y0, x1 - x0, y1 - y0)
     room = RoomItem("LV1", QPointF((x0 + x1) / 2.0, (y0 + y1) / 2.0), path, 100.0)
-    room.floor = DEFAULT_FLOOR
-    room.properties["ceiling_height_in"] = CEIL
+    room.floor = LV1
+    room.properties["ceiling_height_in"] = LV2_ELEV - LV1_ELEV
     sc.addItem(room)
     for a, b in (((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)),
                  ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))):
-        w = WallItem(QPointF(*a), QPointF(*b))
-        w.floor = DEFAULT_FLOOR
-        sc.addItem(w)
+        _wall(sc, LV1, a, b)
 
     rf = RoofItem(QPointF(RIDGE_X0, RIDGE_Y), QPointF(RIDGE_X1, RIDGE_Y),
                   eaves_h_in=EAVES_H, ridge_h_in=RIDGE_H,
                   overhang_in=[oh, 0.0], span_in=SPAN)
-    rf.floor = DEFAULT_FLOOR
+    rf.floor = LV1
     sc.addItem(rf)
 
+    # LV2: the dormer furnishing (its host is the LV1 roof, a storey below).
     st = {"form": "gable", "symmetric": True, "span_left_in": 60.0,
-          "span_right_in": 60.0, "pitch_12": 10.0, "depth_in": depth,
+          "span_right_in": 60.0, "pitch_12": DORMER_PITCH, "depth_in": depth,
           "face_overhang_in": fo, "anchored": True}
     ax, ay = (RIDGE_X0 + RIDGE_X1) / 2.0, RIDGE_Y + p_anchor
     d = make_furnishing("dormer", QPointF(ax, ay), 0.0, st, new=False)
-    d.floor = DEFAULT_FLOOR
+    d.floor = LV2
     sc.addItem(d)
     d._recompute()
 
     ux, uy = dg.ridge_direction(d.rotation())
     face_pt = (ax - ux * depth, ay - uy * depth)
+
+    # LV2: the dormer's OWN walls, drawn to match its face and cheeks (Patrick,
+    # 2026-11-21) -- the user's upper-level walls that rise into the gable. The
+    # face wall spans the side guides at the face; each cheek runs from the face
+    # back along a guide to the anchor.
+    gl, gr = dg.guides(d.params)
+    def L(xl, yl):
+        return tuple(dg.to_plan(face_pt, d.rotation(), (xl, yl)))
+    _wall(sc, LV2, L(-gr, 0.0), L(gl, 0.0))            # face wall
+    _wall(sc, LV2, L(gl, 0.0), L(gl, depth))           # left cheek
+    _wall(sc, LV2, L(-gr, 0.0), L(-gr, depth))         # right cheek
+
     return sc, d, oh, (ax, ay), face_pt
 
 
@@ -342,8 +376,11 @@ def run(ids):
         rb, host = readback(d, oh)
         got = ordering_from_rb(rb)
         ok = (got.replace(" ", "") == r["ordering"].replace(" ", ""))
-        # save the design json (loadable in the app)
-        doc = design_from_scene(sc).to_dict()
+        # save the design json (loadable in the app), with the two levels
+        floors = [Floor(name=LV1, elevation_in=LV1_ELEV,
+                        height_in=LV2_ELEV - LV1_ELEV),
+                  Floor(name=LV2, elevation_in=LV2_ELEV, height_in=96.0)]
+        doc = design_from_scene(sc, floors=floors).to_dict()
         json_path = os.path.join(HERE, f"{wid}.json")
         with open(json_path, "w", encoding="utf-8") as fh:
             json.dump(doc, fh, indent=2)

@@ -28,8 +28,16 @@
   "levels": [
     {
       "id": "L1",
-      "name": "default",
+      "name": "LV1",
       "elevation_in": 0.0,
+      "height_in": 108.0,
+      "kind": "storey",
+      "reference": false
+    },
+    {
+      "id": "L2",
+      "name": "LV2",
+      "elevation_in": 108.0,
       "height_in": 96.0,
       "kind": "storey",
       "reference": false
@@ -40,25 +48,49 @@
       "id": "v1",
       "level": "L1",
       "x": 0.0,
-      "y": -192.0
+      "y": -144.0
     },
     {
       "id": "v2",
       "level": "L1",
       "x": 0.0,
-      "y": 192.0
+      "y": 144.0
     },
     {
       "id": "v3",
       "level": "L1",
       "x": 360.0,
-      "y": -192.0
+      "y": -144.0
     },
     {
       "id": "v4",
       "level": "L1",
       "x": 360.0,
-      "y": 192.0
+      "y": 144.0
+    },
+    {
+      "id": "v5",
+      "level": "L2",
+      "x": 120.0,
+      "y": 96.0
+    },
+    {
+      "id": "v6",
+      "level": "L2",
+      "x": 120.0,
+      "y": 168.0
+    },
+    {
+      "id": "v7",
+      "level": "L2",
+      "x": 240.0,
+      "y": 96.0
+    },
+    {
+      "id": "v8",
+      "level": "L2",
+      "x": 240.0,
+      "y": 168.0
     }
   ],
   "walls": [
@@ -101,18 +133,48 @@
       "left": null,
       "right": null,
       "openings": []
+    },
+    {
+      "id": "w5",
+      "level": "L2",
+      "v1": "v6",
+      "v2": "v5",
+      "type": "exterior",
+      "left": null,
+      "right": null,
+      "openings": []
+    },
+    {
+      "id": "w6",
+      "level": "L2",
+      "v1": "v6",
+      "v2": "v8",
+      "type": "exterior",
+      "left": null,
+      "right": null,
+      "openings": []
+    },
+    {
+      "id": "w7",
+      "level": "L2",
+      "v1": "v8",
+      "v2": "v7",
+      "type": "exterior",
+      "left": null,
+      "right": null,
+      "openings": []
     }
   ],
   "rooms": [],
   "furnishings": [
     {
       "id": "f1",
-      "level": "L1",
+      "level": "L2",
       "kind": "dormer",
       "room": null,
       "pos": [
         180.0,
-        144.0
+        96.0
       ],
       "rotation": 0.0,
       "state": {
@@ -120,8 +182,8 @@
         "symmetric": true,
         "span_left_in": 60.0,
         "span_right_in": 60.0,
-        "eaves_h_in": 94.0,
-        "pitch_12": 10.0,
+        "eaves_h_in": 13.0,
+        "pitch_12": 7.0,
         "eave_overhang_left_in": 12.0,
         "eave_overhang_right_in": 12.0,
         "face_overhang_in": 24.0,
@@ -150,15 +212,15 @@
           0.0
         ]
       ],
-      "eaves_h_in": 96.0,
-      "ridge_h_in": 288.0,
+      "eaves_h_in": 108.0,
+      "ridge_h_in": 252.0,
       "overhang_in": [
         72.0,
         0.0
       ],
       "span_in": [
-        192.0,
-        192.0
+        144.0,
+        144.0
       ],
       "eaves_bind": "manual",
       "gable": [

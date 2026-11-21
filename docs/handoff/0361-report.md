@@ -35,23 +35,37 @@ The app's face classification (`dg.classify_face`) is recorded as a FACT, not
 judged (that is stage 2): W01 cantilever, W05 setback, W09 cantilever, W75
 standard. See §4 for what drives it — it matters for the mapping.
 
-## 2. The base design (0360 §3)
+## 2. The base design — TWO levels (0360 §3 + Patrick's 2026-11-21 addition)
 
-Same for every case; only the four distances change.
+Same for every case; only the four distances change. **Patrick's 2026-11-21
+addition:** the dormer is a furnishing on the UPPER level **LV2**, with the host
+roof and house a storey below on **LV1**, and the dormer's own **face wall and
+two cheek walls are drawn on LV2** to match its face and cheeks — the real
+furnishing-dormer model, where the user's upper-level walls rise into the gable.
 
-- **One level LV1**, a plain rectangle **360 × 384 in**, four exterior walls,
-  ceiling 96 in.
-- **One 12:12 gable host roof**, ridge down the middle along the 360-in axis.
-  Slope 1.0, so a plan inch along the fall line is an inch of height — the
-  distances read straight off the surface. **Half-span (ridge → eave wall) 192
-  in**; eave-wall height 96 in; ridge height 288 in.
-- **One symmetric gable dormer**, square to the host eave (no rotation),
-  everything not listed at its default (span 60/60, dormer pitch 10:12).
-- **Why these fit all 26** (not just the four): with the ladder in §3, every
-  distance is ≤ 120 in and every `D` is ≤ 120 in. `D ≤ 120 < 192` keeps the
-  anchor on the roof (its perp from the ridge is `192 − D ≥ 72`), and the dormer
-  ridge is pinned to the host surface at the anchor, so it is always below the
-  host ridge — `OVER_RIDGE` cannot fire. No dialog cap is reached.
+- **LV1** (elevation 0, storey height 108 in): a plain rectangle **360 × 288
+  in**, four exterior walls, and the **12:12 gable host roof** — ridge down the
+  middle along the 360-in axis, slope 1.0 (a plan inch along the fall line is an
+  inch of height, so the distances read straight off the surface). **Half-span
+  (ridge → eave wall) 144 in; eave-wall height 108 in** (= the LV2 floor, so the
+  roof bears on the LV1 walls); ridge height 252 in. **D (the wall below)** is
+  the faced LV1 wall.
+- **LV2** (elevation 108 in): the **symmetric gable dormer**, square to the host
+  eave (no rotation), span 60/60. Its host is the LV1 roof, found a storey down
+  (`host_roof_at` looks one level below). Its pitch is **7:12** — shallower than
+  the host so its eaves stay above the LV2 floor even when the case puts it low
+  on the roof. The **face wall** (across the side guides at the face) and the
+  **two cheek walls** (each from the face back along a guide to the anchor) are
+  drawn on LV2.
+- **The level does not change the distances.** The four edges are plan
+  distances; the datum shift between LV1 and LV2 cancels in `host_extent`, so
+  every read-back below is identical whether the dormer sits on LV1 or LV2
+  (verified — `reproduces=True` unchanged).
+- **Why it fits all 26** (not just the four): every `D` is ≤ 96 in, and
+  `D < 144` (the half-span) keeps the anchor on the roof (its perp from the
+  ridge is `144 − D ≥ 48`). The dormer ridge is pinned to the host surface at
+  the anchor, so it is always below the host ridge — `OVER_RIDGE` cannot fire.
+  No dialog cap is reached.
 
 ## 3. How the distances are set, and read back
 
@@ -121,7 +135,9 @@ Each `Wnn.png` stacks three bands, drawn with the repo font (`assets/fonts`):
 1. **Plan** — the scene rendered by its own items, then an overlay: each of
    A/B/C/D a coloured line across the dormer at its edge, a bold letter, a
    legend giving the edge name and its distance, the anchor as a dot, and a
-   dashed fall-line from the anchor through the marks.
+   dashed fall-line from the anchor through the marks. **LV2 is the active
+   floor, so the dormer's own face and cheek walls draw solid; LV1 (the house
+   and host roof) ghosts below.**
 2. **3D** — the whole house via `fp3dq --shot` (its own process, real platform),
    **yaw 25 / pitch −14**, looking at the DORMER (faced) side so the face, its
    eave, the host eave and the LV1 wall read together (plan +y is world −y, so
