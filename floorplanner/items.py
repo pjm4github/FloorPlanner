@@ -931,7 +931,16 @@ class DormerItem(FurnishingItem):
                  if isinstance(w, WallItem) and not sip.isdeleted(w)
                  and getattr(w, "floor", None) == self.floor]
 
-        def gather(project, *pargs):
+        def gather(project, *pargs, clip=None):
+            # `clip` (lo, hi): only the stretch of each wall WITHIN this
+            # across-range counts, and an opening outside it is dropped. The
+            # FACE passes the dormer's own face width (its side guides / knee
+            # walls) so a collinear house wall running on past the dormer -- a
+            # NEIGHBOUR dormer's wall, say -- does not hand this dormer that
+            # neighbour's windows (Patrick, 2026-11-20, `twoGableOneShed.json`:
+            # "when I look at the left dormer I see the windows under the other
+            # 2 dormers"). The sides take no clip: a side wall is bounded along
+            # the ridge by its own run, not across.
             ext, ops = [], []
             for w in walls:
                 e = project(pos, rot, (w.p1.x(), w.p1.y()),
@@ -939,11 +948,22 @@ class DormerItem(FurnishingItem):
                 if e is None:
                     continue
                 a, b = e
+                wops = _dg.project_openings(a, b, w.length(), op_records(w))
+                if clip is not None:
+                    lo, hi = clip
+                    e0, e1 = min(a, b), max(a, b)
+                    if e1 <= lo + 1e-6 or e0 >= hi - 1e-6:
+                        continue                      # the wall is wholly to one side
+                    a, b = max(e0, lo), min(e1, hi)
+                    wops = [o for o in wops
+                            if o["x1"] > lo + 1e-6 and o["x0"] < hi - 1e-6]
                 ext += [a, b]
-                ops += _dg.project_openings(a, b, w.length(), op_records(w))
+                ops += wops
             return ((min(ext), max(ext)) if ext else None), ops
 
-        ctx["face_wall"], ctx["face_openings"] = gather(_dg.project_wall)
+        gl, gr = _dg.guides(self.params)
+        ctx["face_wall"], ctx["face_openings"] = gather(_dg.project_wall,
+                                                        clip=(-gr, gl))
         side_walls, side_openings = {}, {}
         for side in _dg.SIDES:
             span, ops = gather(_dg.project_side_wall, _dg.side_x(self.params, side))
