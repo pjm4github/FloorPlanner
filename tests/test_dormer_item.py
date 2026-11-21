@@ -354,6 +354,26 @@ def test_F1_gathers_the_face_wall_and_its_openings(scene):
                for o in ops)
 
 
+def test_F1_face_is_bounded_to_the_dormer_width_not_a_neighbours_wall(scene):
+    # Patrick, 2026-11-20 (`twoGableOneShed.json`): three dormers in a row, each
+    # over its own window on the SAME collinear wall line. The left dormer's
+    # face must gather ONLY the window under it -- not the neighbours' windows
+    # further along the line ("I see the windows under the other 2 dormers").
+    _room(scene)
+    d = _dormer(scene, pos=QPointF(150, 150),
+                state={"span_left_in": 60.0, "span_right_in": 60.0})
+    _face_wall(scene, x0=100.0, x1=200.0, codes=[(50.0, "3040")])   # under it, x=0
+    # a neighbour's wall + window, collinear, well past the right side guide
+    _face_wall(scene, x0=240.0, x1=340.0, codes=[(50.0, "3040")])   # x=+140
+    d._recompute()
+    ctx = d.param_context()
+    ops = ctx["face_openings"]
+    assert len(ops) == 1
+    assert ops[0]["x0"] == pytest.approx(-15.0) and ops[0]["x1"] == pytest.approx(15.0)
+    lo, hi = ctx["face_wall"]                       # clipped to the face width
+    assert lo >= -60.0 - 1e-6 and hi <= 60.0 + 1e-6
+
+
 def test_F1_reports_None_when_it_looked_and_found_no_face_wall(scene):
     _room(scene)
     d = _dormer(scene, pos=QPointF(150, 150))      # a scene, but no wall drawn
