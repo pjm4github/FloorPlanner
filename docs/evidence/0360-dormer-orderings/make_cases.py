@@ -56,6 +56,7 @@ from floorplanner.design.bridge import design_from_scene  # noqa: E402
 from floorplanner.items import make_furnishing            # noqa: E402
 from floorplanner.model import Floor                      # noqa: E402
 from floorplanner.parametric import dormer_geometry as dg  # noqa: E402
+from floorplanner.parametric.dormers import DORMER        # noqa: E402
 from floorplanner.roofs import RoofItem                   # noqa: E402
 from floorplanner.rooms import RoomItem                   # noqa: E402
 from floorplanner.walls import WallItem                   # noqa: E402
@@ -212,10 +213,12 @@ def readback(d, oh):
     dD = depth - eave_y
     rb = {"A": dD + oh, "B": depth + fo, "C": depth, "D": dD}
     cls, _ok = dg.classify_face(d.params, z, s, eh)
+    _derived, findings = DORMER.evaluate(d.params, ctx)
+    fids = sorted({f.rule_id for f in findings})
     return rb, {"host_z_face": z, "host_slope": s, "host_eave_h": eh,
                 "host_ridge_h": hr, "eave_y": eave_y,
                 "dormer_ridge_h": dg.ridge_height(d.params),
-                "face_class": cls}
+                "face_class": cls, "findings": fids}
 
 
 def relations(rb):
@@ -382,6 +385,49 @@ def compose(plan_img, d3_img, cap_img, out_png):
     img.save(out_png)
 
 
+def write_index(all_rows, results, path):
+    """INDEX.md: every one of the 75 rows. Buildable rows carry the four
+    read-back distances, the app's face classification and any findings, and a
+    link to the PNG; unbuildable rows carry the table's reason and no link. The
+    last column, `Patrick's check`, is left EMPTY for him."""
+    by_id = {r["id"]: r for r in results if r.get("built")}
+    out = [
+        "# 0360 dormer edge-orderings — INDEX (all 75 rows)",
+        "",
+        "Read-back distances (plan inches from the anchor) for every BUILDABLE",
+        "row, with the app's own face classification (`dg.classify_face`) and any",
+        "findings the dormer raised; unbuildable rows show the table's reason and",
+        "no image. Built on the LV2 base design (0361 §2). `Patrick's check` is",
+        "left empty for him.",
+        "",
+        "| ID | Ordering | Build | A | B | C | D | Face (app) | Findings | Image | Patrick's check |",
+        "| -- | -------- | ----- | -: | -: | -: | -: | ---------- | -------- | ----- | --------------- |",
+    ]
+    for r in all_rows:
+        wid = r["id"]
+        if not r["buildable"]:
+            out.append(f"| {wid} | {r['ordering']} | no | | | | | | "
+                       f"{r['reason']} | | |")
+            continue
+        res = by_id.get(wid)
+        if res is None:
+            out.append(f"| {wid} | {r['ordering']} | yes | | | | | | "
+                       f"(not built this run) | | |")
+            continue
+        rb, host = res["rb"], res["host"]
+        fnd = ", ".join(host["findings"]) or "—"
+        ok = "" if res["reproduces"] else " ⚠REPRO"
+        out.append(f"| {wid} | {r['ordering']}{ok} | yes | {rb['A']:.0f} | "
+                   f"{rb['B']:.0f} | {rb['C']:.0f} | {rb['D']:.0f} | "
+                   f"{host['face_class']} | {fnd} | [{wid}.png]({wid}.png) | |")
+    io_open(path, "\n".join(out) + "\n")
+
+
+def io_open(path, text):
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(text)
+
+
 def run(ids):
     rows = {r["id"]: r for r in parse_table(TABLE)}
     results = []
@@ -433,6 +479,15 @@ def run(ids):
               f"host z_face={host['host_z_face']:.0f} slope={host['host_slope']:.2f}")
         results.append({**r, "built": True, "rb": rb, "host": host,
                         "reproduces": ok, "got": got})
+    # write INDEX.md only when this run covered EVERY buildable row, so a
+    # partial run (e.g. one id) never clobbers the full index
+    all_rows = parse_table(TABLE)
+    buildable = {r["id"] for r in all_rows if r["buildable"]}
+    built = {r["id"] for r in results if r.get("built")}
+    if buildable <= built:
+        write_index(all_rows, results, os.path.join(HERE, "INDEX.md"))
+        print(f"wrote INDEX.md ({len(built)} built, "
+              f"{len(all_rows) - len(buildable)} unbuildable)")
     return results
 
 

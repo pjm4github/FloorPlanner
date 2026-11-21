@@ -74,28 +74,28 @@
       "level": "L2",
       "x": 120.0,
       "y": 96.0,
-      "uid": "V18"
+      "uid": "V36"
     },
     {
       "id": "v6",
       "level": "L2",
       "x": 120.0,
       "y": 192.0,
-      "uid": "V17"
+      "uid": "V35"
     },
     {
       "id": "v7",
       "level": "L2",
       "x": 240.0,
       "y": 96.0,
-      "uid": "V16"
+      "uid": "V34"
     },
     {
       "id": "v8",
       "level": "L2",
       "x": 240.0,
       "y": 192.0,
-      "uid": "V15"
+      "uid": "V33"
     }
   ],
   "walls": [
@@ -148,7 +148,7 @@
       "left": null,
       "right": null,
       "openings": [],
-      "uid": "W9"
+      "uid": "W18"
     },
     {
       "id": "w6",
@@ -159,7 +159,7 @@
       "left": null,
       "right": null,
       "openings": [],
-      "uid": "W7"
+      "uid": "W16"
     },
     {
       "id": "w7",
@@ -170,7 +170,7 @@
       "left": null,
       "right": null,
       "openings": [],
-      "uid": "W8"
+      "uid": "W17"
     }
   ],
   "rooms": [],
