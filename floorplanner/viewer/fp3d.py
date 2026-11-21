@@ -977,8 +977,76 @@ def _prism_slab(corners_xyz, drop, bottom_z=None, bottom_zs=None):
 DORMER_CHEEK_STEP_IN = 3.0   # the cheek follows the host's slope in pieces this long
 
 
+def _shed_face_wall_bands(dormer, walls, vx, base, roofclip_mod):
+    """Window/door bands from the house exterior walls that stand UNDER a
+    SHED dormer's eaves, in FRONT of its setback face and PARALLEL to it --
+    so the generated setback face can be cut to see through to the opening
+    in that wall (Patrick, 2026-11-20, on `twoGableOneShed.json`: a shed
+    dormer set back from the house wall covered the window on it; his ruling
+    -- keep the setback, cut the window through the panel). Mirrors the
+    balcony wall-scan rule he set earlier: the wall "can be anywhere outside
+    the face and under the dormer eaves".
+
+    Returns `[(u0, u1, sill_z, head_z)]` in the face's own `u`-frame (from
+    `ridge[0]` along the ridge, the same frame `_dormer_cheeks` side 0 uses)
+    with ABSOLUTE z, so they drop straight into that side's bands. Empty for a
+    non-shed dormer, or when no such wall carries an opening. `walls` is the
+    document's wall list (with openings), `vx` its vertices, `base(level)` the
+    level's floor elevation."""
+    RC = roofclip_mod
+    if RC is None or getattr(dormer, "form", "gable") != "shed":
+        return []
+    ux, uy, nx, ny = dormer._axis()
+    p1 = dormer.p1
+    depth = float(dormer.wall_span_in[0])                 # the face's offset from the ridge
+    overhang = float((getattr(dormer, "overhang_in", None) or [0.0, 0.0])[0] or 0.0)
+    length = dormer.length()
+    bands = []
+    for w in walls or ():
+        if w.get("type") != "exterior":
+            continue
+        ops = w.get("openings") or []
+        if not ops:
+            continue
+        a, b = vx.get(w.get("v1")), vx.get(w.get("v2"))
+        if a is None or b is None:
+            continue
+        ax, ay = float(a["x"]), float(a["y"])
+        wdx, wdy = float(b["x"]) - ax, float(b["y"]) - ay
+        wl = math.hypot(wdx, wdy)
+        if wl < 1e-6:
+            continue
+        wux, wuy = wdx / wl, wdy / wl
+        if abs(wux * ux + wuy * uy) < math.cos(math.radians(10.0)):
+            continue                                      # not parallel to the face
+        nd = (ax - p1.x()) * nx + (ay - p1.y()) * ny      # along the face normal
+        if not (depth - 1.0 <= nd <= depth + overhang + 1.0):
+            continue                                      # not outside the face, under the eave
+        z0 = base(w.get("level"))
+        for o in ops:
+            try:
+                ow, oh = parse_wwhh(o["code"])
+            except (KeyError, ValueError):
+                continue
+            s0, s1 = opening_span(o.get("anchor", {}), ow, wl)
+            s0, s1 = max(0.0, s0), min(wl, s1)
+            if s1 - s0 <= 1e-6:
+                continue
+            u0 = (ax + wux * s0 - p1.x()) * ux + (ay + wuy * s0 - p1.y()) * uy
+            u1 = (ax + wux * s1 - p1.x()) * ux + (ay + wuy * s1 - p1.y()) * uy
+            u0, u1 = sorted((u0, u1))
+            u0, u1 = max(0.0, u0), min(length, u1)
+            if u1 - u0 <= 1e-6:
+                continue
+            sill = float(o.get("sill_in",
+                               0.0 if o.get("kind") != "window" else DEFAULT_SILL))
+            head = float(o.get("head_in", sill + oh))
+            bands.append((u0, u1, z0 + sill, z0 + head))
+    return bands
+
+
 def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.0,
-                   floor_z=None):
+                   floor_z=None, extra_bands=()):
     """THE DORMER'S SIDES, PROJECTED UP TO THE DORMER (Patrick, 2026-10-11,
     after the cheek risers went: *"the dormer sides should be generated so
     that they are projected up to the dormer."*). Along each side of the
@@ -1013,6 +1081,11 @@ def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=
     # cut into the side-0 cheek, `u` along the ridge from `ridge[0]`
     shed = getattr(dormer, "form", "gable") == "shed"
     bands = _face_openings(openings, length, z_base) if shed else []
+    if shed and extra_bands:
+        # a house wall standing under the shed eaves, in front of the setback
+        # face, carries the real window -- cut it through the generated face
+        # (`_shed_face_wall_bands`, Patrick 2026-11-20)
+        bands = list(bands) + list(extra_bands)
     parts = []
     n_seg = max(1, int(math.ceil(length / DORMER_CHEEK_STEP_IN)))
     stations = [length * k / n_seg for k in range(n_seg + 1)]
@@ -1052,7 +1125,20 @@ def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=
                 if _on_a_wall(a, b, walls, RC):
                     continue                                      # plan C: the wall climbs
                 ring = [a, b, Pt(b.x() + ix, b.y() + iy), Pt(a.x() + ix, a.y() + iy)]
-                if in_host:
+                if shed and side == 0 and extra_bands and floor_z is not None:
+                    # THE SET-BACK SHED FACE IS A FULL WALL (Patrick, 2026-11-20,
+                    # on `twoGableOneShed.json`: "the face of the dormer should
+                    # grow the wall up to the dormer roof"). When a house wall
+                    # under the shed eaves carries a window (`extra_bands`, so the
+                    # face is SET BACK from that wall, over cut-away host), the face
+                    # must grow DOWN to the dormer FLOOR -- not stop on the phantom
+                    # host plane and float as a panel above the window. Grown to the
+                    # floor it covers the window, which `extra_bands` then cuts
+                    # through so you see out (his ruling: keep the set-back, cut the
+                    # window). Gated on `extra_bands` so an eave-line face with no
+                    # wall below is untouched.
+                    base = [floor_z] * 4
+                elif in_host:
                     base = [RC.surface_height(host, v) - 1.0 for v in ring]  # an inch into the host slab
                 else:
                     # CANTILEVER (sec 8.4, Patrick 2026-11-19): past the host eave
@@ -1542,6 +1628,19 @@ def _hidden_overhang_pieces(geom, lifted, clip, terr, loops_of, roofclip_mod):
             _, _, nx, ny = cover._axis()
             p1, p2 = cover.p1, cover.p2
             wl, wr = cover.wall_span_in
+            # A SHED's FACE overhang hangs in front of its face, over the alcove
+            # down to the house wall -- and the host under it, projected here,
+            # rose right across that wall's window and buried it (Patrick,
+            # 2026-11-20, `twoGableOneShed.json`: "the roof under the shed dormer
+            # must be cut in a similar manner as the gable end dormer"). A gable's
+            # own face has no such overhang, so its front is clean. Extend the
+            # removed box forward by the shed's FACE overhang (`overhang_in[0]`,
+            # the +normal side), so the host is CUT under the whole face the way
+            # it is cut under the gable's footprint -- the cheek (side) overhangs,
+            # off the ridge ENDS, are untouched, so their soffit still projects.
+            if getattr(cover, "form", "gable") == "shed":
+                wl = wl + float((getattr(cover, "overhang_in", None)
+                                 or [0.0, 0.0])[0] or 0.0)
             wall_fp = [RC.Pt(p1.x() + nx * wl, p1.y() + ny * wl),
                        RC.Pt(p2.x() + nx * wl, p2.y() + ny * wl),
                        RC.Pt(p2.x() - nx * wr, p2.y() - ny * wr),
@@ -3453,8 +3552,13 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                         # BALCONY's own deck already floors its overhang (sec 8.5),
                         # so it takes no separate cantilever floor.
                         fz = base(lid)
+                        # a house wall under the shed eaves carries the real
+                        # window -- cut it through the generated setback face so
+                        # it is not buried (Patrick 2026-11-20, twoGableOneShed)
+                        shed_bands = _shed_face_wall_bands(lf, walls, vx, base, ROOFCLIP)
                         cheek_parts.extend(_dormer_cheeks(lf, host_lf, ROOFCLIP, cheek_t,
-                                                          near, ops, zb, floor_z=fz))
+                                                          near, ops, zb, floor_z=fz,
+                                                          extra_bands=shed_bands))
                         cheek_parts.extend(_dormer_face(lf, host_lf, ROOFCLIP, cheek_t,
                                                         near, ops, zb,
                                                         face_cuts_out=wall_face_cuts, floor_z=fz))

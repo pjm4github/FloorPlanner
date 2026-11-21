@@ -499,5 +499,6 @@ this table is not a second copy of it.
 | [`0357-report.md`](./0357-report.md) | report: control D and F1 built; F2–F4 measured (0356) |
 | [`0358-report.md`](./0358-report.md) | ask: should a dormer ridge above the host roof's ridge be an ERROR? |
 | [`0359-ruling.md`](./0359-ruling.md) | ruling: a dormer whose ridge is above the host's ridge is an ERROR, and is not built |
+| [`0360-ruling.md`](./0360-ruling.md) | ruling: the dormer edge-ordering table is the case list; build one review image per BUILDABLE row, keyed by its ID |
 
 <!-- PAIRS:END -->
