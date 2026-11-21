@@ -23,7 +23,8 @@
       "auto_coalesce": true,
       "auto_weld": true,
       "auto_bind": true
-    }
+    },
+    "active_floor": "LV2"
   },
   "levels": [
     {
@@ -72,25 +73,29 @@
       "id": "v5",
       "level": "L2",
       "x": 120.0,
-      "y": 96.0
+      "y": 96.0,
+      "uid": "V24"
     },
     {
       "id": "v6",
       "level": "L2",
       "x": 120.0,
-      "y": 144.0
+      "y": 144.0,
+      "uid": "V23"
     },
     {
       "id": "v7",
       "level": "L2",
       "x": 240.0,
-      "y": 96.0
+      "y": 96.0,
+      "uid": "V22"
     },
     {
       "id": "v8",
       "level": "L2",
       "x": 240.0,
-      "y": 144.0
+      "y": 144.0,
+      "uid": "V21"
     }
   ],
   "walls": [
@@ -142,7 +147,8 @@
       "type": "exterior",
       "left": null,
       "right": null,
-      "openings": []
+      "openings": [],
+      "uid": "W12"
     },
     {
       "id": "w6",
@@ -152,7 +158,8 @@
       "type": "exterior",
       "left": null,
       "right": null,
-      "openings": []
+      "openings": [],
+      "uid": "W10"
     },
     {
       "id": "w7",
@@ -162,7 +169,8 @@
       "type": "exterior",
       "left": null,
       "right": null,
-      "openings": []
+      "openings": [],
+      "uid": "W11"
     }
   ],
   "rooms": [],
@@ -198,6 +206,28 @@
     }
   ],
   "groups": [],
+  "annotations": [
+    {
+      "id": "an1",
+      "level": "L2",
+      "kind": "text",
+      "pos": [
+        20.0,
+        -114.0
+      ],
+      "text": "W75   A=B=C=D"
+    },
+    {
+      "id": "an2",
+      "level": "L2",
+      "kind": "text",
+      "pos": [
+        20.0,
+        -90.0
+      ],
+      "text": "closest -> farthest:  A=B=C=D"
+    }
+  ],
   "roofs": [
     {
       "id": "rf1",

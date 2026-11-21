@@ -100,6 +100,11 @@ scene, then from `DormerItem.param_context()` take `host_z_face_in`,
 The read-back reproduces the set numbers to the inch in all four cases, because
 the surface is analytic and the ridge is pinned to the host at the anchor.
 
+**In the plan file itself.** Each `Wnn.json` carries the case ID + table
+ordering and the closest→farthest ordering as two **text annotations** (kind
+`text`, the T tool) on LV2, and opens with LV2 active — so the labels show in
+the app, not only on the review PNG (Patrick, 2026-11-21).
+
 ## 4. The edge mapping (0360 §4) — confirmed and CORRECTED
 
 0360 §4 gave an unverified reading. Measuring the built designs:

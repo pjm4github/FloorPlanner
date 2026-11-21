@@ -50,6 +50,7 @@ FloorPlanner.load_fonts()
 _app.setFont(QFont(FloorPlanner.FONT_FAMILY, 10))
 FONT = FloorPlanner.FONT_FAMILY
 
+from floorplanner.annotations import TextAnnotationItem   # noqa: E402
 from floorplanner.config import set_floor_state           # noqa: E402
 from floorplanner.design.bridge import design_from_scene  # noqa: E402
 from floorplanner.items import make_furnishing            # noqa: E402
@@ -121,6 +122,15 @@ def distances(ordering):
         for edge in g.split("="):
             d[edge.strip()] = val
     return d
+
+
+def closest_to_farthest(rb):
+    """The ordering string CLOSEST -> farthest (e.g. 'C < B < D < A') from the
+    read-back distances, ties joined with '='."""
+    uniq = sorted({round(rb[e], 3) for e in "ABCD"})          # ascending = closest
+    groups = ["=".join(sorted(e for e in "ABCD" if abs(rb[e] - v) < 1e-6))
+              for v in uniq]
+    return " < ".join(groups)
 
 
 # --------------------------------------------------------------------------
@@ -298,10 +308,7 @@ def plan_png(wid, sc, d, rb, oh, anchor_pt, face_pt, w=760, h=560):
     p.drawText(QPointF(ap.x() + 8, ap.y() - 6), "anchor")
 
     # the top band: the case ID, the ordering CLOSEST -> FARTHEST, and the legend
-    uniq = sorted({round(rb[e], 3) for e in "ABCD"})      # ascending = closest first
-    groups = ["=".join(sorted(e for e in "ABCD" if abs(rb[e] - v) < 1e-6))
-              for v in uniq]
-    close_far = " < ".join(groups)
+    close_far = closest_to_farthest(rb)
     lx = 12
     p.setPen(QColor("#000000"))
     ft = QFont(FONT, 16)
@@ -389,16 +396,28 @@ def run(ids):
         rb, host = readback(d, oh)
         got = ordering_from_rb(rb)
         ok = (got.replace(" ", "") == r["ordering"].replace(" ", ""))
+        # render the plan picture FIRST, before the annotations go in, so its
+        # top band is the only in-image label; the annotations then ride the json.
+        plan_img = plan_png(wid, sc, d, rb, oh, anchor_pt, face_pt)
+        # text annotations (kind "text", the T tool) on LV2, so the plan FILE
+        # itself carries the case id and the ordering -- not only the review PNG
+        # (Patrick, 2026-11-21).
+        cf = closest_to_farthest(rb)
+        tx = RIDGE_X0 + 20.0
+        sc.addItem(TextAnnotationItem(QPointF(tx, RIDGE_Y - SPAN + 30.0),
+                                      f"{wid}   {r['ordering']}", 0.0, LV2))
+        sc.addItem(TextAnnotationItem(QPointF(tx, RIDGE_Y - SPAN + 54.0),
+                                      f"closest -> farthest:  {cf}", 0.0, LV2))
         # save the design json (loadable in the app), with the two levels
         floors = [Floor(name=LV1, elevation_in=LV1_ELEV,
                         height_in=LV2_ELEV - LV1_ELEV),
                   Floor(name=LV2, elevation_in=LV2_ELEV, height_in=96.0)]
         doc = design_from_scene(sc, floors=floors).to_dict()
+        doc.setdefault("settings", {})["active_floor"] = LV2
         json_path = os.path.join(HERE, f"{wid}.json")
         with open(json_path, "w", encoding="utf-8") as fh:
             json.dump(doc, fh, indent=2)
-        # the picture
-        plan_img = plan_png(wid, sc, d, rb, oh, anchor_pt, face_pt)
+        # the 3D view and the composite
         d3_png = os.path.join(HERE, f"{wid}_3d.png")
         okd, msg = shot_3d(json_path, d3_png)
         d3_img = QImage(d3_png) if okd else None
