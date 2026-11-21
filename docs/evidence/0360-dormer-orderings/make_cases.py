@@ -227,7 +227,8 @@ def ordering_from_rb(rb):
 # --------------------------------------------------------------------------
 # the plan picture (scene render + the A/B/C/D overlay)
 # --------------------------------------------------------------------------
-def plan_png(sc, d, rb, oh, anchor_pt, face_pt, w=760, h=560):
+def plan_png(wid, sc, d, rb, oh, anchor_pt, face_pt, w=760, h=560):
+    TOP = 150                      # a white band at the top for title + legend
     fx, fy = face_pt
     ax, ay = anchor_pt
     # local y of each edge in dg's FACE frame (+y uphill toward the anchor)
@@ -250,8 +251,9 @@ def plan_png(sc, d, rb, oh, anchor_pt, face_pt, w=760, h=560):
     M = 36.0                                   # a margin so nothing hugs the edge
     src = QRectF(min(xs) - M, min(ys) - M,
                  (max(xs) - min(xs)) + 2 * M, (max(ys) - min(ys)) + 2 * M)
-    # expand to the image aspect so the render does not letterbox
-    ar = w / h
+    # expand to the render area's aspect (below the top band) so it does not
+    # letterbox
+    ar = w / (h - TOP)
     if src.width() / src.height() < ar:
         nw = src.height() * ar
         src.adjust(-(nw - src.width()) / 2.0, 0, (nw - src.width()) / 2.0, 0)
@@ -261,13 +263,14 @@ def plan_png(sc, d, rb, oh, anchor_pt, face_pt, w=760, h=560):
     scale = w / src.width()
 
     def px(pt):
-        return QPointF((pt[0] - src.left()) * scale, (pt[1] - src.top()) * scale)
+        return QPointF((pt[0] - src.left()) * scale,
+                       TOP + (pt[1] - src.top()) * scale)
 
     img = QImage(w, h, QImage.Format.Format_RGB32)
     img.fill(QColor("#ffffff"))
     p = QPainter(img)
     p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-    sc.render(p, QRectF(0, 0, w, h), src, Qt.AspectRatioMode.IgnoreAspectRatio)
+    sc.render(p, QRectF(0, TOP, w, h - TOP), src, Qt.AspectRatioMode.IgnoreAspectRatio)
 
     # a dashed fall-line from the anchor through the marks, so the distances read
     ap = px((ax, ay))
@@ -294,10 +297,20 @@ def plan_png(sc, d, rb, oh, anchor_pt, face_pt, w=760, h=560):
     p.setFont(QFont(FONT, 11))
     p.drawText(QPointF(ap.x() + 8, ap.y() - 6), "anchor")
 
-    # a legend: edge name + distance from the anchor, color-keyed
-    lx, ly, lh = 12, 14, 22
-    p.fillRect(QRectF(4, 2, 220, 4 * lh + 6), QColor(255, 255, 255, 220))
+    # the top band: the case ID, the ordering CLOSEST -> FARTHEST, and the legend
+    uniq = sorted({round(rb[e], 3) for e in "ABCD"})      # ascending = closest first
+    groups = ["=".join(sorted(e for e in "ABCD" if abs(rb[e] - v) < 1e-6))
+              for v in uniq]
+    close_far = " < ".join(groups)
+    lx = 12
+    p.setPen(QColor("#000000"))
+    ft = QFont(FONT, 16)
+    ft.setBold(True)
+    p.setFont(ft)
+    p.drawText(QPointF(lx, 26), wid)
     p.setFont(QFont(FONT, 12))
+    p.drawText(QPointF(lx, 48), f"order, closest -> farthest:   {close_far}")
+    ly, lh = 68, 20
     for i, e in enumerate("DCBA"):          # closest to farthest
         yy = ly + i * lh
         p.setPen(QPen(QColor(EDGE_COLOR[e]), 4))
@@ -385,7 +398,7 @@ def run(ids):
         with open(json_path, "w", encoding="utf-8") as fh:
             json.dump(doc, fh, indent=2)
         # the picture
-        plan_img = plan_png(sc, d, rb, oh, anchor_pt, face_pt)
+        plan_img = plan_png(wid, sc, d, rb, oh, anchor_pt, face_pt)
         d3_png = os.path.join(HERE, f"{wid}_3d.png")
         okd, msg = shot_3d(json_path, d3_png)
         d3_img = QImage(d3_png) if okd else None

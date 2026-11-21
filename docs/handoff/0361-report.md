@@ -135,9 +135,11 @@ Each `Wnn.png` stacks three bands, drawn with the repo font (`assets/fonts`):
 1. **Plan** — the scene rendered by its own items, then an overlay: each of
    A/B/C/D a coloured line across the dormer at its edge, a bold letter, a
    legend giving the edge name and its distance, the anchor as a dot, and a
-   dashed fall-line from the anchor through the marks. **LV2 is the active
-   floor, so the dormer's own face and cheek walls draw solid; LV1 (the house
-   and host roof) ghosts below.**
+   dashed fall-line from the anchor through the marks. A top band carries the
+   **case ID** and the **ordering closest → farthest** (e.g. W05 is
+   `C < B < D < A`) above the legend. **LV2 is the active floor, so the dormer's
+   own face and cheek walls draw solid; LV1 (the house and host roof) ghosts
+   below.**
 2. **3D** — the whole house via `fp3dq --shot` (its own process, real platform),
    **yaw 25 / pitch −14**, looking at the DORMER (faced) side so the face, its
    eave, the host eave and the LV1 wall read together (plan +y is world −y, so
