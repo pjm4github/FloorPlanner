@@ -521,7 +521,9 @@
         "box_left_in":            { "description": "Control B's frame half-width; 0 = not set.", "type": "number", "minimum": 0 },
         "box_right_in":           { "type": "number", "minimum": 0 },
         "depth_in":               { "description": "Face distance: the run from the anchor (ridge) down to the face wall (control D, purple).", "type": "number", "exclusiveMinimum": 0 },
-        "anchored":               { "description": "P2: true when `pos` is the ANCHOR (not the face). Old records lack it and migrate on load.", "type": "boolean" }
+        "anchored":               { "description": "P2: true when `pos` is the ANCHOR (not the face). Old records lack it and migrate on load.", "type": "boolean" },
+        "face_mode":              { "description": "P4: the user's face-type intent. auto derives it from geometry.", "enum": ["auto", "plain_wall", "setback", "balcony"] },
+        "skirt_mode":             { "description": "0360 stage 3: the roof-skirt switch -- a strip of roof in front of the face joining the dormer to the host eave. auto = on where the geometry allows.", "enum": ["auto", "on", "off"] }
       }
     },
 

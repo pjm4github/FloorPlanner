@@ -91,6 +91,14 @@ class DormerKind(ParametricKind):
                               "front, PLAIN WALL when flush with a wall below. "
                               "Pick one to force it; a note warns when the "
                               "geometry cannot support the pick."),
+            ParamSpec("skirt_mode", "Roof skirt", ENUM, d["skirt_mode"],
+                      choices=(("auto", "Auto (where available)"),
+                               ("on", "On"), ("off", "Off")),
+                      tooltip="A strip of roof in FRONT of the face, joining the "
+                              "dormer to the host eave. AUTO draws it where the "
+                              "geometry allows (host roof in front, or the eave "
+                              "below a cantilever); ON forces it where available; "
+                              "OFF never draws it. (0360)"),
             size("span_left_in", "Half-width, left", dg.MIN_SPAN_IN, 480.0,
                  tip="Ridge to the eaves line (knob B / G)."),
             size("span_right_in", "Half-width, right", dg.MIN_SPAN_IN, 480.0,
@@ -183,13 +191,15 @@ class DormerKind(ParametricKind):
             "footprint": dg.footprint(st, depth), "ceiling_in": ceiling,
         }
         eave_h = (context or {}).get("host_eave_in")
+        oh = float((context or {}).get("host_overhang_in") or 0.0)   # fascia = wall + oh
         wall_below = bool((context or {}).get("wall_below"))
         choice = st.get("face_mode", "auto")
-        ftype, supported = dg.classify_face(st, z_face, slope, eave_h, wall_below, choice)
+        ftype, supported = dg.classify_face(st, z_face, slope, eave_h, wall_below,
+                                            choice, host_overhang_in=oh)
         derived["face_type"] = ftype
         derived["wall_below"] = wall_below
         if ftype == dg.FACE_CANTILEVER:
-            past = dg.face_past_eave(st, z_face, slope, eave_h)
+            past = dg.face_past_eave(st, z_face, slope, eave_h, oh)
             findings.append(Finding(
                 "dormer.cantilever", ADVISORY,
                 f"The face stands {_fmt(past)} in past the host roof edge: "

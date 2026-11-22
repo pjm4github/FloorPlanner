@@ -242,6 +242,41 @@ def test_classify_face_reads_the_four_types():
     assert dg.classify_face(st)[0] == dg.FACE_STANDARD   # no host
 
 
+def test_the_cantilever_boundary_is_the_fascia_not_the_wall():
+    # 0360 stage 3 (Patrick 2026-11-22): a cantilever is the face PAST the host
+    # roof EDGE, not the wall. host_eave_in is the WALL line; the fascia is
+    # host_overhang_in farther downhill, so a face past the wall but short of the
+    # fascia is NOT a cantilever once the overhang is known.
+    st = _st()
+    assert dg.classify_face(st, 40.0, 1.0, 48.0)[0] == dg.FACE_CANTILEVER  # past the wall
+    # with a 20in host overhang the fascia is 20in farther out: the same face
+    # now reads as host-roof-in-front (setback), not a cantilever.
+    assert dg.classify_face(st, 40.0, 1.0, 48.0, host_overhang_in=20.0)[0] == dg.FACE_SETBACK
+    assert dg.face_past_eave(st, 40.0, 1.0, 48.0, 20.0) == pytest.approx(-12.0)  # lands on
+
+
+def test_skirt_available_is_the_A_vs_C_axis_with_a_vertical_check():
+    # Table 2 notes 4/7b: available when host roof is in front in plan (A>C);
+    # at A==C a zero-width edge (no); at A<C only if the fascia is below the
+    # dormer eave so a skirt can bridge (an elevation the ordering lacks).
+    st = _st()
+    assert dg.skirt_available(st, 90.0, 1.0, 48.0) is True          # A > C: roof in front
+    assert dg.skirt_available(st, 48.0, 1.0, 48.0) is False         # A == C: zero width
+    assert dg.skirt_available(st, 40.0, 1.0, 48.0) is False         # A < C, no elevation known
+    # A < C, fascia (48) below the dormer eave (100) -> a skirt can bridge
+    assert dg.skirt_available(st, 40.0, 1.0, 48.0, dormer_eave_z=100.0) is True
+    # A < C, fascia (48) NOT below the dormer eave (40) -> no skirt
+    assert dg.skirt_available(st, 40.0, 1.0, 48.0, dormer_eave_z=40.0) is False
+    assert dg.skirt_available(st) is False                          # no host
+
+
+def test_skirt_mode_normalises_to_the_enum():
+    assert _st()["skirt_mode"] == "auto"
+    assert _st(skirt_mode="on")["skirt_mode"] == "on"
+    assert _st(skirt_mode="off")["skirt_mode"] == "off"
+    assert _st(skirt_mode="banana")["skirt_mode"] == "auto"   # unknown -> auto
+
+
 def test_a_cantilever_face_is_derived_and_noted():
     # a short-run face (depth 40) with ridge 180 derives z_face = 180 - 40 = 140,
     # which is UP the roof; push the face past the eave with a long run instead.
