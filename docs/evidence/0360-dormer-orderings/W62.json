@@ -201,7 +201,8 @@
         "box_right_in": 0.0,
         "depth_in": 48.0,
         "anchored": true,
-        "face_mode": "auto"
+        "face_mode": "auto",
+        "skirt_mode": "auto"
       }
     }
   ],
