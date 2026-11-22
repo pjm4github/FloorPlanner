@@ -3208,6 +3208,7 @@ def _dormer_roof_records(doc, lv, base, nearest_span, RC, DG):
             st, face, rot, depth, datum_shift=base(lid) - base(hlid),
             id=f"_dormer_{n}", level=lid, host=hid,
             face_mode=st.get("face_mode", "auto"),
+            skirt_mode=st.get("skirt_mode", "auto"),   # 0360 stage 3: render reads it
             openings=fu.get("openings") or []))
         n += 1
     return out

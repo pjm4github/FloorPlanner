@@ -205,6 +205,18 @@ class DormerKind(ParametricKind):
                 f"The face stands {_fmt(past)} in past the host roof edge: "
                 "this is a cantilever (hanging) dormer.",
                 field="depth_in"))
+        # 0360 stage 3: the roof-skirt's availability (Table 2 notes 4/7b) --
+        # host roof in front (A > C), or past the eave (A < C) with the fascia
+        # below the dormer eave so a skirt can bridge down to it.
+        skirt_avail = dg.skirt_available(st, z_face, slope, eave_h, oh,
+                                         dormer_eave_z=st.get("eaves_h_in"))
+        derived["skirt_available"] = skirt_avail
+        if st.get("skirt_mode") == "on" and not skirt_avail:
+            findings.append(Finding(
+                "dormer.skirt_unavailable", WARNING,
+                "No roof-skirt is possible here: the face sits at the host eave, "
+                "or past it with nothing below to bridge to. The skirt is off.",
+                field="skirt_mode"))
         if choice != "auto" and not supported:
             why = {"plain_wall": "needs an exterior wall below the face and the "
                                  "face at the roof edge",

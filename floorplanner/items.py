@@ -844,22 +844,24 @@ class DormerItem(FurnishingItem):
     # -- the host, found by height -------------------------------------------
     def _host_plane(self):
         """(height at the face, slope along the ridge, host ridge height, host
-        EAVE height, OFF-AXIS degrees) of the roof under the dormer, in THIS
-        level's datum -- or (None,)*5 when no roof is under it. Nothing is
-        stored. The ridge and eave heights bound the anchor's travel up the roof
+        EAVE height, OFF-AXIS degrees, host EAVE OVERHANG) of the roof under the
+        dormer, in THIS level's datum -- or (None,)*6 when no roof is under it.
+        The overhang (plan inches, on the eave the face falls toward) locates the
+        FASCIA where a cantilever begins (0360 stage 3). Nothing is stored. The
+        ridge and eave heights bound the anchor's travel up the roof
         (`dg.host_extent`); `offaxis_deg` is how far the ridge runs off the
         host's fall line (straight downhill, `None` on the ridge line itself) --
         past `dg.FACING_TOL_DEG` is `NOT_DOWNHILL` (Patrick, 2026-11-18, P1/P2
         of the control redesign)."""
         sc = self.scene()
         if sc is None:
-            return None, None, None, None, None
+            return None, None, None, None, None, None
         from floorplanner.roofs import host_roof_at, upslope_direction
         from floorplanner.roofclip import surface_height
         face = self.pos()
         host = host_roof_at(sc, face, self.floor)
         if host is None:
-            return None, None, None, None, None
+            return None, None, None, None, None, None
         shift = float(floor_elevation(host.floor)) - float(floor_elevation(self.floor))
         direction = _dg.ridge_direction(self.rotation())
         z_face, slope = _dg.host_plane(
@@ -870,12 +872,17 @@ class DormerItem(FurnishingItem):
         if up is not None:
             dot = max(-1.0, min(1.0, direction[0] * up[0] + direction[1] * up[1]))
             offaxis = math.degrees(math.acos(dot))
+        # the eave the face falls toward -- its overhang locates the FASCIA (A),
+        # where a cantilever begins; same side index as dormer_defaults' span
+        _, _, nx, ny = host._axis()
+        perp = (face.x() - host.p1.x()) * nx + (face.y() - host.p1.y()) * ny
+        oh = host.overhang_in[0] if perp >= 0 else host.overhang_in[1]
         return (z_face, slope, float(host.ridge_h_in) + shift,
-                float(host.eaves_h_in) + shift, offaxis)
+                float(host.eaves_h_in) + shift, offaxis, float(oh))
 
     def param_context(self) -> dict:
         ctx = super().param_context()
-        z_anchor, slope, ridge, eave, offaxis = self._host_plane()  # at pos=anchor
+        z_anchor, slope, ridge, eave, offaxis, overhang = self._host_plane()  # at pos=anchor
         if z_anchor is not None:
             # dg works in the FACE frame: the face is `depth` DOWNHILL of the
             # anchor, so its host height is z_anchor - slope*depth. With the
@@ -885,7 +892,7 @@ class DormerItem(FurnishingItem):
             z_face = _dg.ridge_height(self.params) - slope * depth
             ctx.update(host_z_face_in=z_face, host_slope=slope,
                        host_ridge_in=ridge, host_eave_in=eave,
-                       host_anchor_in=z_anchor)
+                       host_overhang_in=overhang, host_anchor_in=z_anchor)
             if offaxis is not None:
                 ctx["host_offaxis_deg"] = offaxis
         if not self._frozen:                 # not per-frame while a knob drags
@@ -1124,7 +1131,7 @@ class DormerItem(FurnishingItem):
         state `anchored`. With no host, pos is left where it is."""
         self._migrate_anchor = False
         self.params["anchored"] = True
-        z_at, slope, _hr, _he, _off = self._host_plane()    # at pos = old face
+        z_at, slope, _hr, _he, _off, _oh = self._host_plane()    # at pos = old face
         if z_at is not None and slope is not None and slope > 0.0:
             depth = _dg.ridge_depth(self.params, z_at, slope)[0]
         else:                                 # no host: keep the stored run, so
@@ -1416,7 +1423,7 @@ class DormerItem(FurnishingItem):
         if cand is None:
             return                                  # at the eave or the ridge
         self.setPos(cand)
-        za, _slope, _hr, _he, _off = self._host_plane()
+        za, _slope, _hr, _he, _off, _oh = self._host_plane()
         if za is not None:
             self.params = _dg.couple_ridge(self.params, za, self._pinned)
         self._recompute_outline()
