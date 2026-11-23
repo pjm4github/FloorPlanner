@@ -502,5 +502,6 @@ this table is not a second copy of it.
 | [`0360-ruling.md`](./0360-ruling.md) | ruling: the dormer edge-ordering table is the case list; build one review image per BUILDABLE row, keyed by its ID |
 | [`0361-report.md`](./0361-report.md) | report: dormer edge-ordering cases, stage 1 (four read-back cases) |
 | [`0362-report.md`](./0362-report.md) | report: dormer edge-ordering cases, stage 1 COMPLETE (all 26 + INDEX) |
+| [`0364-report.md`](./0364-report.md) | report: 0360 stage 3 (dormer render rules) + knob grid-snap merged to main |
 
 <!-- PAIRS:END -->
