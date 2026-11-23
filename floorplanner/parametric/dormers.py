@@ -91,6 +91,14 @@ class DormerKind(ParametricKind):
                               "front, PLAIN WALL when flush with a wall below. "
                               "Pick one to force it; a note warns when the "
                               "geometry cannot support the pick."),
+            ParamSpec("skirt_mode", "Roof skirt", ENUM, d["skirt_mode"],
+                      choices=(("auto", "Auto (where available)"),
+                               ("on", "On"), ("off", "Off")),
+                      tooltip="A strip of roof in FRONT of the face, joining the "
+                              "dormer to the host eave. AUTO draws it where the "
+                              "geometry allows (host roof in front, or the eave "
+                              "below a cantilever); ON forces it where available; "
+                              "OFF never draws it. (0360)"),
             size("span_left_in", "Half-width, left", dg.MIN_SPAN_IN, 480.0,
                  tip="Ridge to the eaves line (knob B / G)."),
             size("span_right_in", "Half-width, right", dg.MIN_SPAN_IN, 480.0,
@@ -183,18 +191,32 @@ class DormerKind(ParametricKind):
             "footprint": dg.footprint(st, depth), "ceiling_in": ceiling,
         }
         eave_h = (context or {}).get("host_eave_in")
+        oh = float((context or {}).get("host_overhang_in") or 0.0)   # fascia = wall + oh
         wall_below = bool((context or {}).get("wall_below"))
         choice = st.get("face_mode", "auto")
-        ftype, supported = dg.classify_face(st, z_face, slope, eave_h, wall_below, choice)
+        ftype, supported = dg.classify_face(st, z_face, slope, eave_h, wall_below,
+                                            choice, host_overhang_in=oh)
         derived["face_type"] = ftype
         derived["wall_below"] = wall_below
         if ftype == dg.FACE_CANTILEVER:
-            past = dg.face_past_eave(st, z_face, slope, eave_h)
+            past = dg.face_past_eave(st, z_face, slope, eave_h, oh)
             findings.append(Finding(
                 "dormer.cantilever", ADVISORY,
                 f"The face stands {_fmt(past)} in past the host roof edge: "
                 "this is a cantilever (hanging) dormer.",
                 field="depth_in"))
+        # 0360 stage 3: the roof-skirt's availability (Table 2 notes 4/7b) --
+        # host roof in front (A > C), or past the eave (A < C) with the fascia
+        # below the dormer eave so a skirt can bridge down to it.
+        skirt_avail = dg.skirt_available(st, z_face, slope, eave_h, oh,
+                                         dormer_eave_z=st.get("eaves_h_in"))
+        derived["skirt_available"] = skirt_avail
+        if st.get("skirt_mode") == "on" and not skirt_avail:
+            findings.append(Finding(
+                "dormer.skirt_unavailable", WARNING,
+                "No roof-skirt is possible here: the face sits at the host eave, "
+                "or past it with nothing below to bridge to. The skirt is off.",
+                field="skirt_mode"))
         if choice != "auto" and not supported:
             why = {"plain_wall": "needs an exterior wall below the face and the "
                                  "face at the roof edge",

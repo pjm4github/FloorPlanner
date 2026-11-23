@@ -1046,7 +1046,7 @@ def _shed_face_wall_bands(dormer, walls, vx, base, roofclip_mod):
 
 
 def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.0,
-                   floor_z=None, extra_bands=()):
+                   floor_z=None, extra_bands=(), skirt_z=None):
     """THE DORMER'S SIDES, PROJECTED UP TO THE DORMER (Patrick, 2026-10-11,
     after the cheek risers went: *"the dormer sides should be generated so
     that they are projected up to the dormer."*). Along each side of the
@@ -1140,6 +1140,12 @@ def _dormer_cheeks(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=
                     base = [floor_z] * 4
                 elif in_host:
                     base = [RC.surface_height(host, v) - 1.0 for v in ring]  # an inch into the host slab
+                elif skirt_z is not None:
+                    # 0360 stage 3 (inc 3), notes 7b/7c: a roof-skirt REPLACES the
+                    # flat sec 8.4 floor, so the cheek sits on the SLOPED skirt
+                    # here (bridging the dormer down to the host eave), not the
+                    # flat attic floor -- no open strip under the cheek.
+                    base = [skirt_z(v) for v in ring]
                 else:
                     # CANTILEVER (sec 8.4, Patrick 2026-11-19): past the host eave
                     # the cheek drops to the attic FLOOR, which is closed
@@ -1243,7 +1249,7 @@ def _face_pieces(ring, top, base, band):
 
 
 def _dormer_face(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.0,
-                 face_cuts_out=None, floor_z=None):
+                 face_cuts_out=None, floor_z=None, skirt_z=None):
     """THE DORMER'S FACE, WHEN IT STANDS ON THE ROOF (Patrick, 2026-10-11,
     on his `short-angle-roofR3.json`, the dormer set back from the eaves:
     *"the dormer ends look good when the outside wall beneath it is
@@ -1331,6 +1337,11 @@ def _dormer_face(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.
                     top = [RC.surface_height(dormer, v) - 0.5 for v in ring]
                     if in_host:
                         base = [RC.surface_height(host, v) - 1.0 for v in ring]
+                    elif skirt_z is not None:
+                        # 0360 stage 3 (inc 3), notes 7b/7c: with a roof-skirt the
+                        # face sits on the SLOPED skirt (the dormer bridges down to
+                        # the host eave) instead of hanging to the flat attic floor.
+                        base = [skirt_z(v) for v in ring]
                     else:
                         # CANTILEVER (sec 8.4, Patrick 2026-11-19): past the host
                         # eave, with NO wall below, the face drops to the attic
@@ -3208,6 +3219,7 @@ def _dormer_roof_records(doc, lv, base, nearest_span, RC, DG):
             st, face, rot, depth, datum_shift=base(lid) - base(hlid),
             id=f"_dormer_{n}", level=lid, host=hid,
             face_mode=st.get("face_mode", "auto"),
+            skirt_mode=st.get("skirt_mode", "auto"),   # 0360 stage 3: render reads it
             openings=fu.get("openings") or []))
         n += 1
     return out
@@ -3361,6 +3373,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     clips, riser_parts, terr_all, hidden_of, lifted_of = {}, [], [], {}, {}
     terrace_checks = []
     cantilever_floor_rings = []
+    skirt_rings = []   # 0360 stage 3 (inc 3): S deg roof-skirts replacing a sec 8.4 floor
     cheek_parts = []
     # P5 §3 (0294 §3): where a dormer's face yields to a climbing wall, the
     # face openings are collected here (plan segment + band, sill_z/head_z
@@ -3534,6 +3547,8 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 opens_of = {rf.get("id"): rf.get("openings") or [] for rf in doc.get("roofs", [])}
                 face_mode_of = {rf.get("id"): rf.get("face_mode")
                                 for rf in doc.get("roofs", [])}
+                skirt_mode_of = {rf.get("id"): rf.get("skirt_mode")
+                                 for rf in doc.get("roofs", [])}
                 # P3 (0293 §2c): the generated cheek/face yields to a house wall
                 # on its line from ANY level, not the dormer's own `level` -- a
                 # wall on any floor climbs into the dormer by absolute height (P1),
@@ -3556,14 +3571,55 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                         # window -- cut it through the generated setback face so
                         # it is not buried (Patrick 2026-11-20, twoGableOneShed)
                         shed_bands = _shed_face_wall_bands(lf, walls, vx, base, ROOFCLIP)
+                        # 0360 stage 3 (inc 3), DORMER_EDGE_ORDERINGS notes 7b/7c:
+                        # decide the roof-skirt (S deg) FIRST -- a skirt REPLACES the
+                        # flat sec 8.4 floor when the host eave sits BELOW the
+                        # dormer, so the face/cheeks that hang into the overhang
+                        # must sit on the SLOPED skirt (a ramp from the host fascia,
+                        # low and continuous with the host roof, up to the attic
+                        # floor at the overhang's outer edge), not the flat floor.
+                        # `skirt_mode` off keeps the flat floor; `auto` draws the
+                        # ramp only where that rise exists; `on` forces it.
+                        skirt_z = None
+                        rings = (_cantilever_floor(lf, host_lf, ROOFCLIP)
+                                 if face_mode_of.get(rid) != "balcony" else [])
+                        if rings and (skirt_mode_of.get(rid) or "auto") != "off":
+                            # note 7c scopes this S deg skirt to the true-overhang
+                            # (A < C) rows: the face itself stands PAST the host
+                            # fascia (outside the host footprint). The A >= C rows
+                            # (eave past the fascia but the face at/behind it) are
+                            # the separate "S" strip-of-host-roof skirt, specified
+                            # later -- they keep the flat floor for now.
+                            ends = (lf.p1, lf.p2)
+                            rise = [lf.ridge_h_in - ROOFCLIP.surface_height(host_lf, e)
+                                    for e in ends]
+                            face_end = ends[0] if rise[0] >= rise[1] else ends[1]
+                            host_fp = ROOFCLIP.footprint_polygon(host_lf)
+                            hz = {(c.x(), c.y()): ROOFCLIP.surface_height(host_lf, c)
+                                  for ring in rings for c in ring}
+                            h_max, den = max(hz.values()), max(hz.values()) - min(hz.values())
+                            # ... and only where the host eave actually sits BELOW
+                            # the dormer floor, so the ramp rises (note 7b).
+                            if (den > 1e-6 and fz - h_max > 0.5
+                                    and not ROOFCLIP._contains(host_fp, face_end)):
+                                def skirt_z(pt, host_lf=host_lf, h_max=h_max,
+                                            den=den, fz=fz):
+                                    return h_max + (fz - h_max) * (
+                                        h_max - ROOFCLIP.surface_height(host_lf, pt)) / den
                         cheek_parts.extend(_dormer_cheeks(lf, host_lf, ROOFCLIP, cheek_t,
                                                           near, ops, zb, floor_z=fz,
-                                                          extra_bands=shed_bands))
+                                                          extra_bands=shed_bands,
+                                                          skirt_z=skirt_z))
                         cheek_parts.extend(_dormer_face(lf, host_lf, ROOFCLIP, cheek_t,
                                                         near, ops, zb,
-                                                        face_cuts_out=wall_face_cuts, floor_z=fz))
-                        if face_mode_of.get(rid) != "balcony":
-                            for ring in _cantilever_floor(lf, host_lf, ROOFCLIP):
+                                                        face_cuts_out=wall_face_cuts,
+                                                        floor_z=fz, skirt_z=skirt_z))
+                        if skirt_z is not None:
+                            for ring in rings:
+                                skirt_rings.append([(c.x(), -c.y(), skirt_z(c))
+                                                    for c in ring])
+                        elif rings:
+                            for ring in rings:
                                 cantilever_floor_rings.append(
                                     [(c.x(), -c.y(), fz) for c in ring])
             if every:
@@ -4093,6 +4149,11 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         if cantilever_floor_rings:
             v, f = _merge([_prism_slab(ring, SLAB_T) for ring in cantilever_floor_rings])
             model.meshes.append(Mesh("dormer_floor", v, f, FLOOR_C["interior"]))
+        # 0360 stage 3 (inc 3), notes 7b/7c: the roof-skirt (S deg) that REPLACES
+        # that flat floor -- a sloped roof surface, so it carries the roof material
+        if skirt_rings:
+            v, f = _merge([_prism_slab(ring, ROOF_T) for ring in skirt_rings])
+            model.meshes.append(Mesh("roofs", v, f, ROOF_C))
 
     # ---- furnishings -----------------------------------------------------
     if furnishings:

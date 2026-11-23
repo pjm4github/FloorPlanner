@@ -212,13 +212,17 @@ def readback(d, oh):
     depth, fo = d.params["depth_in"], d.params["face_overhang_in"]
     dD = depth - eave_y
     rb = {"A": dD + oh, "B": depth + fo, "C": depth, "D": dD}
-    cls, _ok = dg.classify_face(d.params, z, s, eh)
-    _derived, findings = DORMER.evaluate(d.params, ctx)
+    # the face class is the app's own reading -- DORMER.evaluate's derived
+    # face_type, which threads host_overhang_in (the fascia boundary, 0360 stage
+    # 3) + wall_below + the face_mode choice from the context, so this column
+    # matches the dialog and its own findings column (a bare classify_face call
+    # here would read the WALL line, not the fascia, and contradict both).
+    derived, findings = DORMER.evaluate(d.params, ctx)
     fids = sorted({f.rule_id for f in findings})
     return rb, {"host_z_face": z, "host_slope": s, "host_eave_h": eh,
                 "host_ridge_h": hr, "eave_y": eave_y,
                 "dormer_ridge_h": dg.ridge_height(d.params),
-                "face_class": cls, "findings": fids}
+                "face_class": derived["face_type"], "findings": fids}
 
 
 def relations(rb):

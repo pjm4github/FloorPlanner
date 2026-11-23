@@ -42,8 +42,10 @@ STATE_DEFAULTS = {
     "depth_in": 96.0,              # ridge length (anchor to face); the run off a roof
     "anchored": False,             # P2: pos is the ANCHOR, not the face (migration flag)
     "face_mode": "auto",           # P4: the user's face-type intent (see FACE_MODES)
+    "skirt_mode": "auto",          # 0360 stage 3: the roof-skirt switch (SKIRT_MODES)
 }
 FACE_MODES = ("auto", "plain_wall", "setback", "balcony")
+SKIRT_MODES = ("auto", "on", "off")   # 0360 stage 3: auto = on where available
 _NUMBERS = tuple(k for k, v in STATE_DEFAULTS.items() if isinstance(v, float))
 _EPS = 1e-9
 MIN_SPAN_IN = 12.0
@@ -64,6 +66,7 @@ def normalize_state(state):
     out["symmetric"] = bool(src.get("symmetric", STATE_DEFAULTS["symmetric"]))
     out["anchored"] = bool(src.get("anchored", STATE_DEFAULTS["anchored"]))
     out["face_mode"] = src.get("face_mode") if src.get("face_mode") in FACE_MODES else "auto"
+    out["skirt_mode"] = src.get("skirt_mode") if src.get("skirt_mode") in SKIRT_MODES else "auto"
     for key in _NUMBERS:
         try:
             v = float(src.get(key, STATE_DEFAULTS[key]))
@@ -308,36 +311,44 @@ FACE_TYPES = (FACE_STANDARD, FACE_CANTILEVER, FACE_WALL, FACE_SETBACK, FACE_BALC
 FACE_ALIGN_TOL_IN = 6.0          # how near the host eave still counts as "at" it
 
 
-def face_vs_host_eave(st, host_z_face=None, host_slope=None, host_eave_in=None):
-    """Signed distance ALONG the roof from the FACE to the host eave edge:
-    > 0 the face is UP the roof (host roof shows in FRONT of it), ~0 at the
-    eave, < 0 the FACE is PAST the eave. None with no host."""
+def face_vs_host_eave(st, host_z_face=None, host_slope=None, host_eave_in=None,
+                      host_overhang_in=0.0):
+    """Signed distance ALONG the roof from the FACE to the host roof's EAVE
+    EDGE (the fascia): > 0 the face is UP the roof (host roof shows in FRONT of
+    it), ~0 at the edge, < 0 the FACE is PAST it. `host_eave_in` is the surface
+    height at the host's WALL line; the fascia is `host_overhang_in` farther
+    DOWNHILL, so the overhang is added here -- a cantilever is the face past the
+    ROOF EDGE, not the wall (0360 stage 3, Patrick 2026-11-22). `0.0` (the
+    default) leaves a caller that does not know the overhang reading the WALL
+    line as before. None with no host."""
     if (host_z_face is None or host_slope is None or host_slope <= _EPS
             or host_eave_in is None):
         return None
-    return (host_z_face - host_eave_in) / host_slope
+    return (host_z_face - host_eave_in) / host_slope + float(host_overhang_in)
 
 
-def face_past_eave(st, host_z_face=None, host_slope=None, host_eave_in=None):
+def face_past_eave(st, host_z_face=None, host_slope=None, host_eave_in=None,
+                   host_overhang_in=0.0):
     """How far the FACE (the purple knob) projects PAST the host roof's eave
-    edge, along the slope: positive is a CANTILEVER (the face hangs off the
-    roof), <= 0 the face lands on it. The eave OVERHANG past the face is normal
-    -- it is the FACE past the edge that makes a cantilever (Patrick,
+    EDGE (the fascia), along the slope: positive is a CANTILEVER (the face hangs
+    off the roof), <= 0 the face lands on it. The eave OVERHANG past the face is
+    normal -- it is the FACE past the edge that makes a cantilever (Patrick,
     2026-11-18). None with no host."""
-    fv = face_vs_host_eave(st, host_z_face, host_slope, host_eave_in)
+    fv = face_vs_host_eave(st, host_z_face, host_slope, host_eave_in, host_overhang_in)
     return None if fv is None else -fv
 
 
-def face_type(st, host_z_face=None, host_slope=None, host_eave_in=None):
+def face_type(st, host_z_face=None, host_slope=None, host_eave_in=None,
+              host_overhang_in=0.0):
     """The face type from GEOMETRY alone (P4a): CANTILEVER when the FACE
-    projects past the host eave, else STANDARD. The full four-type reading
+    projects past the host eave EDGE, else STANDARD. The full four-type reading
     (which needs the wall BELOW and the user's choice) is `classify_face`."""
-    past = face_past_eave(st, host_z_face, host_slope, host_eave_in)
+    past = face_past_eave(st, host_z_face, host_slope, host_eave_in, host_overhang_in)
     return FACE_CANTILEVER if (past is not None and past > FACE_ALIGN_TOL_IN) else FACE_STANDARD
 
 
 def classify_face(st, host_z_face=None, host_slope=None, host_eave_in=None,
-                  wall_below=False, choice="auto"):
+                  wall_below=False, choice="auto", host_overhang_in=0.0):
     """The EFFECTIVE face type (P4b) and whether the user's `choice` is
     supported, as `(type, supported)`.
 
@@ -349,8 +360,10 @@ def classify_face(st, host_z_face=None, host_slope=None, host_eave_in=None,
         chosen (the front roof is cut away -- phase 3)
       * no wall below, face on the roof          -> STANDARD / SETBACK
     `choice` in `FACE_MODES`; "auto" derives it. `supported` is False when the
-    choice cannot apply to this geometry (the dialog flags it)."""
-    fv = face_vs_host_eave(st, host_z_face, host_slope, host_eave_in)
+    choice cannot apply to this geometry (the dialog flags it). "eave" here is
+    the host roof EDGE (the fascia), `host_overhang_in` past the wall line
+    (0360 stage 3)."""
+    fv = face_vs_host_eave(st, host_z_face, host_slope, host_eave_in, host_overhang_in)
     if fv is None:
         return FACE_STANDARD, choice == "auto"
     if fv < -FACE_ALIGN_TOL_IN:               # the FACE is past the host eave
@@ -369,6 +382,32 @@ def classify_face(st, host_z_face=None, host_slope=None, host_eave_in=None,
     if set_back:
         return FACE_SETBACK, True
     return FACE_STANDARD, True
+
+
+def skirt_available(st, host_z_face=None, host_slope=None, host_eave_in=None,
+                    host_overhang_in=0.0, dormer_eave_z=None):
+    """Whether a ROOF-SKIRT is possible for this dormer -- the `skirt_mode`
+    switch's availability (DORMER_EDGE_ORDERINGS.md Table 2, notes 4/7b). True
+    when host roof lies in FRONT of the face in plan (the fascia A is downhill
+    of the face, `A > C`); or, when the face is PAST the fascia in plan
+    (`A < C`), only if the host fascia sits BELOW the dormer's eave line, so a
+    skirt can bridge down to it -- an elevation the plan ordering cannot carry
+    (note 7b), passed as `dormer_eave_z` (same datum as `host_eave_in`). False
+    at `A == C` (a zero-width edge), with no host, or when `A < C` and the
+    bridging elevation is unknown or does not hold."""
+    fv = face_vs_host_eave(st, host_z_face, host_slope, host_eave_in, host_overhang_in)
+    if fv is None:
+        return False
+    if fv > FACE_ALIGN_TOL_IN:                 # A > C: host roof shows in front
+        return True
+    if fv >= -FACE_ALIGN_TOL_IN:               # A == C: a zero-width edge
+        return False
+    # A < C: the face is past the fascia -- a skirt bridges only if the fascia
+    # sits below the dormer eave (needs elevations, not the plan ordering)
+    if dormer_eave_z is None:
+        return False
+    fascia_z = float(host_eave_in) - host_slope * float(host_overhang_in)
+    return fascia_z < float(dormer_eave_z) - FACE_ALIGN_TOL_IN
 
 
 def ridge_depth(st, host_z_face=None, host_slope=None):

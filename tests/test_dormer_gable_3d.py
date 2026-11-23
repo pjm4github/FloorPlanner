@@ -150,3 +150,34 @@ def test_a_cross_level_dormer_renders_and_shows_the_floor_below_window(fp3d):
     tt = np.einsum("ij,ij->i", e2, q) * inv
     hit = ok & (u >= -1e-9) & (w >= -1e-9) & (u + w <= 1 + 1e-9) & (tt >= 0) & (tt <= 1)
     assert int(hit.sum()) == 0, "the floor-below window is covered in the cross-level gable"
+
+
+def test_a_cantilever_roof_skirt_replaces_the_flat_floor(fp3d):
+    """0360 stage 3 (inc 3), DORMER_EDGE_ORDERINGS notes 7b/7c: on a cantilever
+    whose host eave sits BELOW the dormer (an S° row -- W09 is B > C > A > D, so
+    the face is past the eave in plan and the overhang drops to the fascia 24in
+    below the attic floor), the roof-skirt REPLACES the flat sec 8.4 cantilever
+    floor with a sloped roof surface. `skirt_mode` off keeps the flat floor;
+    `auto` (the default) and `on` draw the skirt. Loads the committed W09
+    evidence fixture, built the same way the app builds a furnishing dormer."""
+    import json
+    w09 = ROOT / "docs" / "evidence" / "0360-dormer-orderings" / "W09.json"
+    base = json.loads(w09.read_text(encoding="utf-8"))
+
+    def names(mode):
+        doc = json.loads(json.dumps(base))
+        if mode is not None:
+            doc["furnishings"][0]["state"]["skirt_mode"] = mode
+        model = fp3d.build_model(doc, furnishings=True, floors=True)
+        return [m.name for m in model.meshes]
+
+    # default (auto) + explicit auto/on: the skirt stands in for the flat floor
+    # (a second `roofs` mesh, no `dormer_floor`)
+    for mode in (None, "auto", "on"):
+        ns = names(mode)
+        assert "dormer_floor" not in ns, mode
+        assert ns.count("roofs") == 2, (mode, ns)
+    # off: the flat sec 8.4 floor returns, and there is no skirt
+    off = names("off")
+    assert "dormer_floor" in off
+    assert off.count("roofs") == 1
