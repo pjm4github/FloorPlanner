@@ -289,19 +289,41 @@ def test_the_span_knob_resizes_and_symmetric_mirrors(scene):
     d = _dormer(scene, pos=QPointF(150, 150))      # rotation 0
     d._recompute()
     d.begin_knob()
-    d.drag_knob("span_l", QPointF(230, 150))       # dg x = 80
+    # free=True: test the raw reshape math, not the grid snap (dg x = 80 is not
+    # a 6" multiple; the snap is covered by its own test below)
+    d.drag_knob("span_l", QPointF(230, 150), free=True)   # dg x = 80
     assert d.params["span_left_in"] == pytest.approx(80.0)
     assert d.params["span_right_in"] == pytest.approx(80.0), "symmetric mirror"
-    d.end_knob("span_l", QPointF(230, 150))
+    d.end_knob("span_l", QPointF(230, 150), free=True)
 
 
 def test_the_face_knob_sets_the_face_overhang(scene):
     d = _dormer(scene, pos=QPointF(150, 150))
     d._recompute()
     d.begin_knob()
-    d.drag_knob("face", QPointF(150, 170))         # dg y = -20 -> overhang 20
+    d.drag_knob("face", QPointF(150, 170), free=True)   # dg y = -20 -> overhang 20
     assert d.params["face_overhang_in"] == pytest.approx(20.0)
-    d.end_knob("face", QPointF(150, 170))
+    d.end_knob("face", QPointF(150, 170), free=True)
+
+
+def test_a_knob_snaps_its_dimension_to_the_grid_unless_shift(scene):
+    """0360 (Patrick, 2026-11-22): a dormer control knob lands its dimension on
+    the on-centre grid (`SETTINGS["wall_snap_in"]`, 6") by DEFAULT; holding Shift
+    (`free=True`) drags free. dg x = 80 is not a 6" multiple, so it snaps to 78."""
+    from floorplanner.config import SETTINGS
+    from floorplanner.geometry import wall_snap_len
+    d = _dormer(scene, pos=QPointF(150, 150))      # rotation 0, symmetric
+    d._recompute()
+    d.begin_knob()
+    d.drag_knob("span_l", QPointF(230, 150))               # dg x = 80, default snaps
+    step = SETTINGS["wall_snap_in"]
+    snapped = d.params["span_left_in"]
+    assert snapped == pytest.approx(wall_snap_len(80.0))   # 78 at the 6" grid
+    assert round(snapped / step) * step == pytest.approx(snapped), "on the grid"
+    assert snapped == d.params["span_right_in"], "symmetric mirror keeps up"
+    d.drag_knob("span_l", QPointF(230, 150), free=True)    # Shift: exact, no snap
+    assert d.params["span_left_in"] == pytest.approx(80.0)
+    d.end_knob("span_l", QPointF(230, 150), free=True)
 
 
 # -- knob D (the face wall, P3, purple) --------------------------------------

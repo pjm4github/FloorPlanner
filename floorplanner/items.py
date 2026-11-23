@@ -1345,13 +1345,18 @@ class DormerItem(FurnishingItem):
     def begin_knob(self):
         self._hold(True)                     # freeze the knee lines (0354 §2)
 
-    def drag_knob(self, kind, scene_pt):
+    def drag_knob(self, kind, scene_pt, free=False):
         """Live while a knob is down: reshape the dormer, reposition the grips,
-        but DO NOT recompute the orange knee lines (they are held)."""
+        but DO NOT recompute the orange knee lines (they are held). Each knob's
+        dimension lands on the on-centre grid (`SETTINGS["wall_snap_in"]`) unless
+        `free` (the Shift key is held) -- the knob is measured along the dormer's
+        own axis, so the snap rounds that local inch distance."""
         if kind == "apex":                   # A is the ANCHOR: it MOVES, not reshapes
-            self._drag_anchor(scene_pt)
+            self._drag_anchor(scene_pt, free)
             return
         x, y = self._to_dg_local(scene_pt)
+        if not free:
+            x = wall_snap_len(x)             # B/C/E measure |x| across the ridge
         st = dict(self.params)
         sym = st["symmetric"]            # a symmetric shed mirrors too (2026-11-18)
 
@@ -1379,6 +1384,8 @@ class DormerItem(FurnishingItem):
             # orange EAVE, the eave held fixed (P3, 2026-11-18). depth = how far
             # the face is from the anchor; the overhang takes up the rest.
             item_y = self.mapFromScene(scene_pt).y()
+            if not free:
+                item_y = wall_snap_len(item_y)
             eave = self._depth + st["face_overhang_in"]
             depth = max(min(item_y, eave), 1.0)
             st["depth_in"] = depth
@@ -1387,18 +1394,22 @@ class DormerItem(FurnishingItem):
             # F (orange) is the EAVE: it reaches from the face (purple) out past
             # the host roof edge (a cantilever). overhang = eave beyond the face.
             item_y = self.mapFromScene(scene_pt).y()
+            if not free:
+                item_y = wall_snap_len(item_y)
             st["face_overhang_in"] = max(item_y - self._depth, 0.0)
         self.params = _dg.normalize_state(st)
         self._recompute_outline()
         self._place_grips()
         self.update()
 
-    def _drag_anchor(self, scene_pt):
+    def _drag_anchor(self, scene_pt, free=False):
         """Knob A, on a roof: slide the ANCHOR along the host's fall line,
         keeping it ON the roof and NO HIGHER than the host ridge (P2 R1a,
         2026-11-18). `pos` moves and the ridge follows (host-at-anchor, via
         `dg.couple_ridge`). Off a roof there is no fall line, so A sets the
-        stored run (`depth_in`) as before."""
+        stored run (`depth_in`) as before. The anchor lands on the on-centre
+        grid unless `free` (Shift): on a roof it snaps ALONG the fall line (so
+        it stays on the slide); off a roof the run `depth_in` snaps."""
         sc = self.scene()
         if sc is None:
             return
@@ -1407,6 +1418,8 @@ class DormerItem(FurnishingItem):
         up = upslope_direction(host, self.pos()) if host is not None else None
         if host is None or up is None:
             _x, y = self._to_dg_local(scene_pt)     # no roof: old behaviour
+            if not free:
+                y = wall_snap_len(y)
             st = dict(self.params)
             st["depth_in"] = max(y, 1.0)
             self.params = _dg.normalize_state(st)
@@ -1419,6 +1432,15 @@ class DormerItem(FurnishingItem):
         d = scene_pt - self.pos()
         t = d.x() * up[0] + d.y() * up[1]
         cand = QPointF(self.pos().x() + up[0] * t, self.pos().y() + up[1] * t)
+        if not free:
+            # land the dominant plan axis on the grid, STAYING on the fall line
+            # (re-derive t from the snapped coordinate so cand never drifts off
+            # the slide direction)
+            if abs(up[0]) >= abs(up[1]):
+                t = (wall_snap_len(cand.x()) - self.pos().x()) / up[0]
+            else:
+                t = (wall_snap_len(cand.y()) - self.pos().y()) / up[1]
+            cand = QPointF(self.pos().x() + up[0] * t, self.pos().y() + up[1] * t)
         cand = self._anchor_on_roof(host, cand)
         if cand is None:
             return                                  # at the eave or the ridge
@@ -1448,8 +1470,8 @@ class DormerItem(FurnishingItem):
             return None                             # would cross the host ridge
         return cand
 
-    def end_knob(self, kind, scene_pt):
-        self.drag_knob(kind, scene_pt)
+    def end_knob(self, kind, scene_pt, free=False):
+        self.drag_knob(kind, scene_pt, free)
         self._hold(False)
         self._recompute_knees()              # settle the knee lines, once
         self._geo["knees"] = self._knees
@@ -1579,7 +1601,8 @@ class DormerGripItem(QGraphicsItem):
 
     def mouseMoveEvent(self, e):
         if self._dragging:
-            self.dormer.drag_knob(self.kind, e.scenePos())
+            free = bool(e.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+            self.dormer.drag_knob(self.kind, e.scenePos(), free)
             e.accept()
         else:
             super().mouseMoveEvent(e)
@@ -1587,7 +1610,8 @@ class DormerGripItem(QGraphicsItem):
     def mouseReleaseEvent(self, e):
         if self._dragging and e.button() == Qt.MouseButton.LeftButton:
             self._dragging = False
-            self.dormer.end_knob(self.kind, e.scenePos())
+            free = bool(e.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+            self.dormer.end_knob(self.kind, e.scenePos(), free)
             e.accept()
         else:
             super().mouseReleaseEvent(e)
