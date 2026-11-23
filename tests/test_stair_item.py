@@ -3,8 +3,10 @@
 Three things are pinned here: a stair saved before parameters existed is
 UNTOUCHED until it is edited; a parametric stair's footprint, save, load and
 undo all follow its parameters; and the dialog's acceptance checkpoint --
-errors block, unresolved checks need the acknowledgement, Cancel changes
-nothing (STAIRS_FURNISHING_SPECIFICATION.md sec 6.3, sec 9.2).
+errors block; suggestive checks (warnings / not-evaluated) accept without a
+box (0365, Patrick: the settings are only suggestive), with the one remaining
+acknowledgement reserved for a buildability override; Cancel changes nothing
+(STAIRS_FURNISHING_SPECIFICATION.md sec 6.3, sec 9.2).
 
 The dialog is never `exec()`-ed: a modal loop hangs headless. Its checkpoint
 is `try_accept()`, which is exactly what OK calls.
@@ -125,22 +127,30 @@ def test_only_parametric_kinds_offer_a_dialog(fp, qapp):
     dlg.deleteLater()
 
 
-def test_ok_needs_the_acknowledgement_and_errors_cannot_be_ticked_away(fp, qapp):
+def test_suggestive_checks_accept_without_a_box_but_errors_still_block(fp, qapp):
+    """0365 (Patrick): "it's understood the settings are only suggestive" --
+    a WARNING / NOT_EVALUATED check no longer carries an acknowledgement box,
+    so OK commits with it open (the box is kept only for the buildability
+    override, which stairs don't raise). A hard ERROR still blocks and
+    cannot be ticked away."""
     st = fp.StairItem(QPointF(0, 0), params=_state())
     dlg = st.make_properties_dialog()
+    # the default draft is suggestive, not blocking, no overridable error
     assert F.needs_ack(dlg.findings()) and not F.blocks(dlg.findings())
-    assert not dlg.try_accept(), "unresolved checks, box not ticked"
-    assert dlg.result_state() is None
+    assert not F.overridable_errors(dlg.findings())
 
+    # a hard error blocks and cannot be ticked away (the box is irrelevant)
     dlg.set_value("tread_depth_in", 9.5)
     dlg.ack.setChecked(True)
     assert F.blocks(dlg.findings())
-    assert not dlg.try_accept(), "an error is not something to acknowledge"
+    assert not dlg.try_accept(), "a hard error cannot be ticked away"
     assert dlg.result_state() is None
 
+    # back to a suggestive-only draft: no box, OK commits, and the open check
+    # is still recorded in the audit trail
     dlg.set_value("tread_depth_in", 11.0)
-    dlg.ack.setChecked(True)
-    assert dlg.try_accept()
+    assert F.needs_ack(dlg.findings()) and not F.blocks(dlg.findings())
+    assert dlg.try_accept(), "a suggestive check must not gate the commit"
     result = dlg.result_state()
     assert result["tread_depth_in"] == 11.0
     assert "headroom.min" in result["acknowledged"]

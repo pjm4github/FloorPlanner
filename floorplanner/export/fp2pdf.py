@@ -41,6 +41,7 @@ Usage:
     python fp2pdf.py design.json [-o out.pdf] [--title "Wiscaway Crest"]
         [--assembly-note "2x6 exterior / 2x4 interior, conventional framing"]
         [--level ID ...] [--set exterior=6.5 ...] [--include-concept]
+        [--include-furnishings]
 """
 from __future__ import annotations
 
@@ -102,6 +103,9 @@ SCALE_NAMES = {1 / 48: '1/4" = 1\'-0"', 1 / 64: '3/16" = 1\'-0"',
 
 GRAY_POCHE = 0.82
 GRAY_LT = 0.55
+GRAY_PARTITION = 0.62   # 0365: a partition is a light, non-structural divider
+                         # -- a faint dashed plan line, not a solid poche body
+                         # (matches walls.py's own dashed on-screen treatment)
 def _load_annot_module():
     """`_annot.py` -- the drawn dimensions' geometry and the ft-in label, a
     leaf shared with `fp2dxf.py` (0285), loaded BY PATH as `_stdt.py` is.
@@ -119,6 +123,37 @@ _ANNOT = _load_annot_module()
 DRAWN_TICK_IN = _ANNOT.DRAWN_TICK_IN
 DRAWN_EXT_GAP_IN = _ANNOT.DRAWN_EXT_GAP_IN
 ftin = _ANNOT.ftin
+
+
+_furnishing_sizes_cache = None
+
+
+def _furnishing_sizes() -> dict:
+    """`{kind: (name, width_in, depth_in)}` from the bundled furnishing
+    library (`assets/furnishings/manifest.json`), read BY PATH and cached --
+    the same discipline `_default_thickness` uses for the wall table, and for
+    the same reason: `floorplanner.catalog`, which owns this library, imports
+    PyQt6 (`QtSvg`), and nothing in `export/` loads from `floorplanner` (the
+    package's own docstring). Only the name and the true footprint are read;
+    the PDF draws a reference footprint box, not the SVG symbol."""
+    global _furnishing_sizes_cache
+    if _furnishing_sizes_cache is None:
+        path = (Path(__file__).resolve().parent.parent.parent
+                / "assets" / "furnishings" / "manifest.json")
+        out = {}
+        try:
+            entries = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            entries = []
+        for ent in entries if isinstance(entries, list) else []:
+            try:
+                out[str(ent["id"])] = (str(ent.get("name", ent["id"])),
+                                       float(ent["width_in"]),
+                                       float(ent["depth_in"]))
+            except (KeyError, TypeError, ValueError):
+                continue
+        _furnishing_sizes_cache = out
+    return _furnishing_sizes_cache
 
 
 def parse_code(code: str) -> tuple[float, float]:
@@ -256,9 +291,11 @@ class Sheet:
     """One storey plan sheet. Plan coords in inches (y already flipped up);
     self.k = points per plan-inch."""
 
-    def __init__(self, c, doc, level, thickness, include_concept, meta):
+    def __init__(self, c, doc, level, thickness, include_concept, meta,
+                 include_furnishings=False):
         self.c, self.doc, self.level = c, doc, level
         self.th, self.inc_concept, self.meta = thickness, include_concept, meta
+        self.inc_furnishings = include_furnishings
         self.vx = {v["id"]: v for v in doc["vertices"]}
         self.rooms = {r["id"]: r for r in doc["rooms"]}
         self.walls = [w for w in doc["walls"] if w["level"] == level["id"]
@@ -277,6 +314,12 @@ class Sheet:
         self.show_annotations = bool(settings.get("show_annotations", True))
         self.show_dimensions = bool(settings.get("show_dimensions", True))
         self.dimension_units = settings.get("dimension_units", "ftin")
+        # 0365: this level's furnishings, drawn as reference footprints only
+        # when the export opts in (the transmittal to the architect is
+        # structure, not furniture). Gathered regardless of the switch so
+        # `draw_furnishings` is the only place that reads it.
+        self.furnishings = [f for f in (doc.get("furnishings") or [])
+                            if f.get("level") == level["id"]]
         self._frame()
 
     def warn(self, msg: str) -> None:
@@ -386,6 +429,11 @@ class Sheet:
             concept = self.is_concept(w)
             if concept and not self.inc_concept:
                 continue
+            # 0365: a PARTITION is a light, non-structural divider -- drawn
+            # as a faint dashed outline, not a solid poche body, the same way
+            # the editor draws it (walls.py) and the same unfilled-dashed path
+            # concept walls already take here.
+            partition = w.get("type") == "partition"
             p1, p2 = self.pt(w["v1"]), self.pt(w["v2"])
             dx, dy = p2[0] - p1[0], p2[1] - p1[1]
             L = math.hypot(dx, dy)
@@ -412,18 +460,20 @@ class Sheet:
                     continue
                 poly = [P(a, 1), P(b, 1), P(b, -1), P(a, -1)]
                 c.saveState()
-                if concept:
-                    c.setStrokeGray(GRAY_LT)
+                faint = concept or partition          # dashed outline, no fill
+                if faint:
+                    c.setStrokeGray(GRAY_LT if concept else GRAY_PARTITION)
                     c.setDash([3, 2])
+                    c.setLineWidth(0.6 if partition else 0.9)
                 else:
                     c.setFillGray(GRAY_POCHE)
+                    c.setLineWidth(0.9)
                 p = c.beginPath()
                 p.moveTo(self.X(poly[0][0]), self.Y(poly[0][1]))
                 for q in poly[1:]:
                     p.lineTo(self.X(q[0]), self.Y(q[1]))
                 p.close()
-                c.setLineWidth(0.9)
-                c.drawPath(p, stroke=1, fill=0 if concept else 1)
+                c.drawPath(p, stroke=1, fill=0 if faint else 1)
                 c.restoreState()
             for (s0, s1), op in spans:
                 self._host_wall_left = bool(w.get("left"))
@@ -596,6 +646,70 @@ class Sheet:
                 sub_y[side] = max(sub_y[side], t2)
         return (max(xs) - min(xs) - sub_x[0] - sub_x[1],
                 max(ys) - min(ys) - sub_y[0] - sub_y[1])
+
+    # ---------- furnishings (0365) ----------
+    def draw_furnishings(self):
+        """Each furnishing on this level as a FULLY ANNOTATED reference
+        footprint -- a light dashed rectangle at the catalog's true width x
+        depth, centred on the record's `pos` and spun by its `rotation`, and
+        labelled inside with its NAME and its clear size (W x D in the
+        sheet's own feet-and-inches), the annotation rotating with the box.
+        Off unless the export opts in: a transmittal is structure, and
+        furniture drawn solid would fight the walls and openings it must not
+        obscure -- but when it IS drawn the architect redraws from this
+        sheet, so the furnishing carries its full callout, not just a name
+        (Patrick, 0365: "the framing furnishing MUST be fully annotated").
+
+        The footprint is the catalog NOMINAL size (a parametric furnishing
+        that resizes itself via `state` is drawn at its nominal box, named,
+        not silently sized wrong); an unknown kind draws at a 24x24 nominal
+        box and is named in a warning, the way an unrecognized `door_type`
+        is -- never absorbed silently."""
+        if not self.inc_furnishings:
+            return
+        sizes = _furnishing_sizes()
+        for f in self.furnishings:
+            kind = f.get("kind")
+            known = sizes.get(kind)
+            if known is None:
+                self.warn(f"furnishing {kind!r}: not in the catalog, drawn "
+                          f"at a nominal 24x24 footprint")
+                name, w_in, d_in = str(kind or "?"), 24.0, 24.0
+            else:
+                name, w_in, d_in = known
+            try:
+                px, py = float(f["pos"][0]), float(f["pos"][1])
+            except (KeyError, IndexError, TypeError, ValueError):
+                continue
+            theta = math.radians(float(f.get("rotation", 0.0) or 0.0))
+            cos_t, sin_t = math.cos(theta), math.sin(theta)
+
+            def to_plan(lx, ly, cos_t=cos_t, sin_t=sin_t, px=px, py=py):
+                # local (centre origin) -> scene (Qt rotation, y-down) ->
+                # the sheet's own plan frame (y flipped up, as `pt()` does)
+                sx = lx * cos_t - ly * sin_t
+                sy = lx * sin_t + ly * cos_t
+                return px + sx, -(py + sy)
+
+            corners = [to_plan(lx, ly) for lx, ly in
+                       ((-w_in / 2, -d_in / 2), (w_in / 2, -d_in / 2),
+                        (w_in / 2, d_in / 2), (-w_in / 2, d_in / 2))]
+            for (ax, ay), (bx, by) in zip(
+                    corners, corners[1:] + corners[:1], strict=True):
+                self.line(ax, ay, bx, by, w=0.5, gray=0.45, dash=[2, 2])
+            rot = -math.degrees(theta)        # the y-flip turns CW into CCW
+            if rot > 90 or rot <= -90:
+                rot += 180
+            # NAME over size, stacked along the item's own (rotated) depth
+            # axis so the callout reads with the footprint; the size is the
+            # architect's redraw reference, in the sheet's feet-and-inches
+            lines = [name.upper(), f"{ftin(w_in)} x {ftin(d_in)}"]
+            lh = 8.0 / self.k                 # 8 pt line pitch, in plan inches
+            top = -(len(lines) - 1) * lh / 2
+            for i, s in enumerate(lines):
+                lxp, lyp = to_plan(0.0, top + i * lh)
+                self.text(lxp, lyp, s, size=5.5 if i == 0 else 5.0,
+                          rot=rot, gray=0.3)
 
     # ---------- dimensions ----------
     def _features(self):
@@ -1025,6 +1139,7 @@ class Sheet:
     def render(self, sheet_no, total):
         self.draw_walls()
         self.draw_rooms()
+        self.draw_furnishings()
         self.draw_extras()
         if self.drawn_dims():                 # 0268: the plan's own, no auto rows
             self.draw_drawn_dims()
@@ -1053,7 +1168,8 @@ SUPPORTED_VERSIONS = (5, 6)
 
 
 def convert(doc, out: Path, meta, only_levels=None,
-            thickness_overrides=None, include_concept=False) -> ConvertResult:
+            thickness_overrides=None, include_concept=False,
+            include_furnishings=False) -> ConvertResult:
     if doc.get("format") != "floorplanner-design" or doc.get("version") not in SUPPORTED_VERSIONS:
         # VERSION 6 IS VERSION 5 PLUS AN OPTIONAL `roofs` BLOCK (the schema's
         # own enum, R-B; `design_document()` writes 6 the moment a plan has a
@@ -1090,7 +1206,8 @@ def convert(doc, out: Path, meta, only_levels=None,
     c.setTitle(f"{meta['title']} - floor plans")
     c.setAuthor(meta["author"])
     for i, lv in enumerate(levels):
-        sheet = Sheet(c, doc, lv, th, include_concept, meta)
+        sheet = Sheet(c, doc, lv, th, include_concept, meta,
+                      include_furnishings=include_furnishings)
         sheet.render(i + 1, len(levels))
         n_drawn = len(sheet.drawn_dims())
         result.sheets.append(
@@ -1115,6 +1232,7 @@ def main(argv=None):
     ap.add_argument("--level", action="append", dest="levels")
     ap.add_argument("--set", action="append", default=[], metavar="TYPE=IN")
     ap.add_argument("--include-concept", action="store_true")
+    ap.add_argument("--include-furnishings", action="store_true")
     a = ap.parse_args(argv)
     overrides = {}
     for kv in a.set:
@@ -1124,7 +1242,8 @@ def main(argv=None):
             "assembly_note": a.assembly_note, "dim_note": a.dim_note}
     doc = json.loads(a.design.read_text(encoding="utf-8"))
     print(f"fp2pdf: {a.design}")
-    result = convert(doc, a.out, meta, a.levels, overrides, a.include_concept)
+    result = convert(doc, a.out, meta, a.levels, overrides, a.include_concept,
+                     include_furnishings=a.include_furnishings)
     for line in result.sheets:
         print(f"  {line}")
     for msg in result.warnings:

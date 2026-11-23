@@ -106,7 +106,12 @@ _SEVERITY_WORD = {
     F.ERROR: "ERROR", F.WARNING: "WARNING", F.NOT_EVALUATED: "NOT CHECKED",
     F.ADVISORY: "ADVISORY", F.PASS: "pass",
 }
-ACK_TEXT = "I understand these checks are unresolved / warnings remain"
+# 0365 (Patrick): a WARNING / NOT_EVALUATED check is advisory -- "it's
+# understood the settings are only suggestive" -- so it no longer carries an
+# acknowledgement box; the dialog accepts those without a gate. The ONLY
+# acknowledgement left is the buildability override below: an ERROR the user
+# may keep on the plan (drawn red) to fix out there, which is a real decision,
+# not a suggestion, and still needs an explicit tick.
 ACK_OVERRIDE_TEXT = ("I understand this cannot be built as drawn — keep it on "
                      "the plan (drawn red) so I can fix it there")
 
@@ -203,7 +208,7 @@ class ParametricDialog(QDialog):
         self.findings_list.setMinimumHeight(120)
         self.findings_list.setAccessibleName("Validation findings")
         val_lay.addWidget(self.findings_list)
-        self.ack = QCheckBox(ACK_TEXT)
+        self.ack = QCheckBox(ACK_OVERRIDE_TEXT)
         val_lay.addWidget(self.ack)
         body.addWidget(val)
 
@@ -474,14 +479,16 @@ class ParametricDialog(QDialog):
             item.setForeground(QBrush(_SEVERITY_INK.get(f.severity, QColor(0, 0, 0))))
             item.setData(Qt.ItemDataRole.UserRole, f.rule_id)
             self.findings_list.addItem(item)
-        ids = tuple(sorted(f.rule_id for f in F.unresolved(fs)))
+        # 0365: the box is ONLY for an overridable error (the "keep it on the
+        # plan drawn red to fix there" decision). Warnings / not-evaluated
+        # checks are suggestive and carry no box.
+        over = F.overridable_errors(fs)
+        ids = tuple(sorted(f.rule_id for f in over))
         if ids != self._ack_ids:
-            # a DIFFERENT set of open checks is a different thing to agree to
+            # a DIFFERENT overridable error is a different thing to agree to
             self._ack_ids = ids
             self.ack.setChecked(False)
-        # a plain warnings ack, or the stronger "keep it on the plan to fix"
-        # when an overridable error is open (Patrick, 2026-11-19)
-        self.ack.setText(ACK_OVERRIDE_TEXT if F.overridable_errors(fs) else ACK_TEXT)
+        self.ack.setText(ACK_OVERRIDE_TEXT)
         self.ack.setVisible(bool(ids))
         self.ack.setEnabled(not F.blocks(fs))
         self.ack.setStyleSheet("")
@@ -510,7 +517,9 @@ class ParametricDialog(QDialog):
             else:
                 self.findings_list.setFocus()
             return False
-        if F.needs_ack(fs) and not self.ack.isChecked():
+        # 0365: only an overridable error still gates on the box; warnings and
+        # not-evaluated checks accept without one (they are suggestive).
+        if F.overridable_errors(fs) and not self.ack.isChecked():
             self.ack.setStyleSheet("color: #b91c1c; font-weight: bold;")
             self.ack.setFocus()
             return False

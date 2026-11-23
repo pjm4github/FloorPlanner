@@ -2938,6 +2938,13 @@ class PDFExportOptionsDialog(QDialog):
         self.ck_concept.setChecked(False)
         form.addRow("", self.ck_concept)
 
+        # Furnishings are omitted by default -- the plan set is a structural
+        # transmittal to the architect -- but can be drawn as reference
+        # footprints when the user wants a furnished set.
+        self.ck_furnish = QCheckBox("Include furnishings")
+        self.ck_furnish.setChecked(False)
+        form.addRow("", self.ck_furnish)
+
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
                                    | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
@@ -2945,11 +2952,11 @@ class PDFExportOptionsDialog(QDialog):
         form.addRow(buttons)
 
     def values(self):
-        """(meta, only_levels, include_concept). `only_levels` is `None`
-        for "every level" (every checkbox checked, or none exist to
-        choose), else the checked level ids -- possibly `[]` if the user
-        unchecked every one, which the caller refuses rather than exports
-        an empty PDF."""
+        """(meta, only_levels, include_concept, include_furnishings).
+        `only_levels` is `None` for "every level" (every checkbox checked,
+        or none exist to choose), else the checked level ids -- possibly
+        `[]` if the user unchecked every one, which the caller refuses
+        rather than exports an empty PDF."""
         meta = {"title": self.ed_title.text().strip() or "Untitled",
                 "subtitle": self.ed_subtitle.text().strip(),
                 "author": self.ed_author.text().strip() or "Owner",
@@ -2959,7 +2966,8 @@ class PDFExportOptionsDialog(QDialog):
                   if cb.isChecked()]
         only_levels = None if len(checked) == len(self.level_checks) \
             else checked
-        return meta, only_levels, self.ck_concept.isChecked()
+        return (meta, only_levels, self.ck_concept.isChecked(),
+                self.ck_furnish.isChecked())
 
 
 class ImageImportDialog(QDialog):

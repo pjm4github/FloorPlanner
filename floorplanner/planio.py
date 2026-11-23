@@ -759,7 +759,7 @@ class PlanIOMixin:
         dlg = PDFExportOptionsDialog(doc, default_title, self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
-        meta, only_levels, include_concept = dlg.values()
+        meta, only_levels, include_concept, include_furnishings = dlg.values()
         if only_levels == []:
             self.status("No levels selected -- nothing to export.")
             return
@@ -768,11 +768,13 @@ class PlanIOMixin:
         path, _ = QFileDialog.getSaveFileName(
             self, "Export PDF plan set", start, "PDF (*.pdf);;All files (*)")
         if path:
-            self.export_pdf_path(path, meta, only_levels, include_concept)
+            self.export_pdf_path(path, meta, only_levels, include_concept,
+                                 include_furnishings=include_furnishings)
 
     def export_pdf_path(self, path: str, meta: dict, only_levels=None,
                         include_concept: bool = False,
-                        interactive: bool = True):
+                        interactive: bool = True,
+                        include_furnishings: bool = False):
         """Non-interactive PDF export (the `export_dxf_path` convention:
         scripted/test callers pass `interactive=False` and read the return
         value). Same document, same failure handling as `export_dxf_path` --
@@ -786,7 +788,8 @@ class PlanIOMixin:
         doc = self.design_document()
         try:
             result = convert_to_pdf(doc, Path(path), meta, only_levels,
-                                    include_concept=include_concept)
+                                    include_concept=include_concept,
+                                    include_furnishings=include_furnishings)
         except (ValueError, OSError) as ex:
             if interactive:
                 QMessageBox.critical(self, "Export PDF plan set", str(ex))
