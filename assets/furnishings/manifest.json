@@ -969,6 +969,48 @@
     "price": 950.0
   },
   {
+    "id": "medicine_cabinet",
+    "name": "Medicine Cabinet 30\"",
+    "category": "Bathroom",
+    "file": "medicine_cabinet.svg",
+    "width_in": 30,
+    "depth_in": 4.5,
+    "height_in": 36,
+    "elevation_in": 40,
+    "form": "box",
+    "material": "wood",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "mirror",
+      "width_in": 30,
+      "has_cabinet": true,
+      "light_style": "bar"
+    },
+    "price": 0.0
+  },
+  {
+    "id": "vanity_mirror",
+    "name": "Lit Vanity Mirror 36\"",
+    "category": "Bathroom",
+    "file": "vanity_mirror.svg",
+    "width_in": 36,
+    "depth_in": 1.5,
+    "height_in": 36,
+    "elevation_in": 40,
+    "form": "box",
+    "material": "glass",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "mirror",
+      "width_in": 36,
+      "has_cabinet": false,
+      "light_style": "backlit"
+    },
+    "price": 0.0
+  },
+  {
     "id": "washer",
     "name": "Washer",
     "category": "Laundry",

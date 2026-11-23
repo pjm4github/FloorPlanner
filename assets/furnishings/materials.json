@@ -319,6 +319,16 @@
     "roughness": 0.08,
     "metalness": 0.2
   },
+  "mirror_glass": {
+    "colour": [
+      0.78,
+      0.82,
+      0.85,
+      1.0
+    ],
+    "roughness": 0.04,
+    "metalness": 0.95
+  },
   "ct_marble": {
     "colour": [
       0.91,

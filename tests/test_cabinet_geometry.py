@@ -126,6 +126,144 @@ def test_a_sink_is_let_into_the_top():
             if p.name == "false-front-1"] == ["cabinet"]
 
 
+def _bowl_cx(parts):
+    floor = next(p for p in parts if p.name.endswith("-floor"))
+    return sum(x for x, _f in floor.quad) / 4.0
+
+
+def _faucet_cx(parts):
+    post = next(p for p in parts if p.name == "faucet-post")
+    return sum(x for x, _f in post.quad) / 4.0
+
+
+def test_a_single_sink_slides_to_its_chosen_side():
+    """0366: a single bowl honours `sink_side` -- it sits left, centred or
+    right on the vanity top, and the faucet rides its centre. A double bowl
+    stays centred whatever the side says."""
+    centre = cg.cabinet_parts(_st("vanity_48", sink="single", sink_side="center"))
+    left = cg.cabinet_parts(_st("vanity_48", sink="single", sink_side="left"))
+    right = cg.cabinet_parts(_st("vanity_48", sink="single", sink_side="right"))
+    assert _bowl_cx(centre) == pytest.approx(0.0, abs=0.5)
+    assert _bowl_cx(left) < -4.0 and _bowl_cx(right) > 4.0
+    assert _bowl_cx(left) == pytest.approx(-_bowl_cx(right), abs=1e-6)
+    # the faucet follows the bowl, not the cabinet centre
+    assert _faucet_cx(left) == pytest.approx(_bowl_cx(left), abs=0.1)
+    assert _faucet_cx(right) == pytest.approx(_bowl_cx(right), abs=0.1)
+    # the offset bowl still sits inside the cabinet
+    w = cg.footprint(_st("vanity_48"))[0]
+    assert all(-w / 2 <= x <= w / 2
+               for p in left if p.name.endswith("-floor") for x, _f in p.quad)
+    # a double bowl ignores the side
+    da = cg.cabinet_parts(_st("vanity_48", sink="double", sink_side="left"))
+    db = cg.cabinet_parts(_st("vanity_48", sink="double", sink_side="right"))
+    assert _faucet_cx(da) == pytest.approx(0.0, abs=0.5)
+    assert _faucet_cx(db) == pytest.approx(0.0, abs=0.5)
+
+
+def test_sink_side_is_offered_only_for_a_single_bowl():
+    """The dialog shows Sink position, enabled for a single bowl and greyed
+    for none/double."""
+    kind = registry.get("vanity_36")
+    spec = next(s for s in kind.specs() if s.key == "sink_side")
+    assert spec.enabled_fn({"sink": "single"})
+    assert not spec.enabled_fn({"sink": "double"})
+    assert not spec.enabled_fn({"sink": "none"})
+
+
+def test_a_medicine_cabinet_is_a_mounted_mirrored_box():
+    """0366: a medicine cabinet hangs at floor_to_bottom, a mirrored door on a
+    carcass, and its default bar light glows."""
+    st = _st("medicine_cabinet")
+    parts = cg.cabinet_parts(st)
+    assert cg.footprint(st) == (30.0, 4.5)
+    assert cg.is_mounted(st)
+    z0, _z1 = _extent(parts, "z")
+    assert z0 == pytest.approx(40.0)                 # hung, not on the floor
+    assert any(p.role == "cabinet" for p in parts)   # the box
+    assert any(p.role == "mirror" for p in parts)    # the door
+    assert any(p.role == "lens" for p in parts)      # the bar
+    light = cg.light_source(st)
+    assert light is not None and light["lumens"] == 800.0
+
+
+def test_a_plain_mirror_has_no_box_and_its_depth_is_thin():
+    st = _st("vanity_mirror")                         # has_cabinet off, backlit
+    parts = cg.cabinet_parts(st)
+    assert cg.footprint(st) == (36.0, 1.5)
+    assert any(p.role == "mirror" for p in parts)
+    assert len([p for p in parts if p.role == "lens"]) == 4   # the LED ring
+    # a cabinet toggled on makes it a deeper box
+    deep = _st("vanity_mirror", has_cabinet=True)
+    assert cg.footprint(deep)[1] == 4.5
+
+
+@pytest.mark.parametrize("style,lit", [("none", False), ("bar", True),
+                                       ("sconces", True), ("backlit", True)])
+def test_mirror_light_styles_light_or_not(style, lit):
+    st = _st("medicine_cabinet", light_style=style)
+    has_lens = any(p.role == "lens" for p in cg.cabinet_parts(st))
+    assert has_lens is lit
+    assert (cg.light_source(st) is not None) is lit
+    # zero output keeps the fixture but casts no light
+    assert cg.light_source(_st("medicine_cabinet", lumens=0)) is None
+
+
+def test_mirror_units_are_parametric_with_their_own_controls():
+    """The two bathroom wall units register as parametric kinds and offer the
+    mirror controls (storage, light style), not the base-cabinet door fields."""
+    for kind_id in ("medicine_cabinet", "vanity_mirror"):
+        assert registry.is_parametric(kind_id)
+        kind = registry.get(kind_id)
+        keys = {s.key for s in kind.specs()}
+        assert {"has_cabinet", "light_style", "light_colour"} <= keys
+        assert "front" not in keys and "drawers" not in keys
+        # the light colour only matters when it is lit
+        colour = next(s for s in kind.specs() if s.key == "light_colour")
+        assert colour.enabled_fn({"light_style": "bar"})
+        assert not colour.enabled_fn({"light_style": "none"})
+
+
+def _bowls(prims):
+    return [p for p in prims if p[0] == "bowl"]
+
+
+def test_the_vanity_plan_symbol_shows_the_sink_on_its_side():
+    """0366: the drawn icon matches the unit -- a single bowl appears on its
+    chosen side, not a stretched generic vanity."""
+    left = cg.sink_base_plan(_st("vanity_48", sink="single", sink_side="left"))
+    right = cg.sink_base_plan(_st("vanity_48", sink="single", sink_side="right"))
+    lb, rb = _bowls(left), _bowls(right)
+    assert len(lb) == len(rb) == 1
+    assert (lb[0][1] + lb[0][3]) / 2.0 < -4.0        # bowl centre, left
+    assert (rb[0][1] + rb[0][3]) / 2.0 > 4.0         # bowl centre, right
+    assert _bowls(cg.sink_base_plan(_st("vanity_48", sink="none"))) == []
+    assert len(_bowls(cg.sink_base_plan(_st("vanity_48", sink="double")))) == 2
+
+
+def test_the_mirror_plan_symbol_shows_its_lights_and_storage():
+    def bulbs(prims):
+        return sum(p[0] == "bulb" for p in prims)
+    assert bulbs(cg.mirror_plan(_st("medicine_cabinet", light_style="bar"))) >= 2
+    assert bulbs(cg.mirror_plan(_st("medicine_cabinet", light_style="sconces"))) == 2
+    assert bulbs(cg.mirror_plan(_st("medicine_cabinet", light_style="none"))) == 0
+    # backlit adds ONE inner dashed border (a storage cabinet's box is solid)
+    backlit = cg.mirror_plan(_st("medicine_cabinet", light_style="backlit"))
+    assert sum(p[0] == "dashed" for p in backlit) == 1
+    # a storage cabinet is a solid box with a door pull; a plain mirror is dashed
+    cab = cg.mirror_plan(_st("medicine_cabinet"))
+    assert cab[0][0] == "outline" and any(p[0] == "dot" for p in cab)
+    assert cg.mirror_plan(_st("vanity_mirror"))[0][0] == "dashed"
+
+
+def test_parametric_plan_symbols_route_through_the_registry():
+    sym = registry.get("vanity_36").plan_symbol({"sink": "single",
+                                                 "sink_side": "left"})
+    assert "prims" in sym and any(p[0] == "bowl" for p in sym["prims"])
+    assert "prims" in registry.get("medicine_cabinet").plan_symbol({})
+    # a plain base keeps the catalog symbol (no parametric override)
+    assert registry.get("base_cab_24").plan_symbol({}) is None
+
+
 @pytest.mark.parametrize("corner", ["diagonal", "l_shape", "blind"])
 def test_corner_types_build_and_stay_in_their_footprint(corner):
     st = _st("corner_base_36", corner_type=corner, depth_in=24.0)

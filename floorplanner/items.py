@@ -303,7 +303,13 @@ class FurnishingItem(QGraphicsItem):
     def _paint_plan_symbol(self, painter, symbol):
         """0338: a plan symbol drawn from the item's PARAMETERS -- an island
         with its own slots, sink, cooktop and one stool per seat. `symbol`
-        is in the cabinet frame (x across, f down from the top edge)."""
+        is in the cabinet frame (x across, f down from the top edge).
+
+        0366: a `{"prims": [...]}` symbol (a vanity's offset sink, a mirror's
+        lights) is a generic primitive list; the island keeps its own dict."""
+        if isinstance(symbol, dict) and "prims" in symbol:
+            self._paint_plan_prims(painter, symbol["prims"])
+            return
         top = -self.d / 2.0
         ink = QColor(55, 65, 81)
 
@@ -338,6 +344,52 @@ class FurnishingItem(QGraphicsItem):
             painter.drawRoundedRect(box(sx0, sf0, sx1, sf1), 2.5, 2.5)
             painter.drawLine(QPointF(sx0 + 1.5, top + sf1 - 1.6),
                              QPointF(sx1 - 1.5, top + sf1 - 1.6))
+
+    def _paint_plan_prims(self, painter, prims):
+        """0366: draw a generic plan-symbol primitive list (cabinet frame, f
+        down from the back edge). Ops: outline/panel/dashed rectangles, bowl
+        (rounded white), line/dline, dot (small outline circle), bulb (a lit
+        mark). Shared by the vanity and the mirror so each draws as its type."""
+        top = -self.d / 2.0
+        ink = QColor(55, 65, 81)
+
+        def pt(x, f):
+            return QPointF(x, top + f)
+
+        def box(x0, f0, x1, f1):
+            return QRectF(pt(x0, f0), pt(x1, f1))
+
+        for prim in prims:
+            op = prim[0]
+            if op in ("outline", "panel", "dashed"):
+                _o, x0, f0, x1, f1 = prim
+                style = (Qt.PenStyle.DashLine if op == "dashed"
+                         else Qt.PenStyle.SolidLine)
+                painter.setPen(QPen(ink, 1.0, style))
+                painter.setBrush(QBrush(QColor(248, 250, 252))
+                                 if op == "panel" else Qt.BrushStyle.NoBrush)
+                painter.drawRect(box(x0, f0, x1, f1))
+            elif op == "bowl":
+                _o, x0, f0, x1, f1 = prim
+                painter.setPen(QPen(ink, 0.7))
+                painter.setBrush(QBrush(QColor(255, 255, 255)))
+                painter.drawRoundedRect(box(x0, f0, x1, f1), 1.5, 1.5)
+            elif op in ("line", "dline"):
+                _o, x0, f0, x1, f1 = prim
+                style = (Qt.PenStyle.DashLine if op == "dline"
+                         else Qt.PenStyle.SolidLine)
+                painter.setPen(QPen(ink, 0.6, style))
+                painter.drawLine(pt(x0, f0), pt(x1, f1))
+            elif op == "dot":
+                _o, cx, cf, r = prim
+                painter.setPen(QPen(ink, 0.6))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawEllipse(pt(cx, cf), r, r)
+            elif op == "bulb":
+                _o, cx, cf, r = prim
+                painter.setPen(QPen(ink, 0.6))
+                painter.setBrush(QBrush(QColor(255, 243, 205)))
+                painter.drawEllipse(pt(cx, cf), r, r)
 
     def draft_state(self) -> dict:
         """The state a properties dialog starts editing -- a COPY."""

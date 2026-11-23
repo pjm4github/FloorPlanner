@@ -158,6 +158,7 @@ MATERIALS = {
     "cab_sage":     {"colour": [0.54, 0.60, 0.49, 1.0], "roughness": 0.50, "metalness": 0.0},
     "cabinet_kick": {"colour": [0.10, 0.10, 0.10, 1.0], "roughness": 0.80, "metalness": 0.0},
     "cabinet_glass": {"colour": [0.70, 0.80, 0.84, 1.0], "roughness": 0.08, "metalness": 0.2},
+    "mirror_glass":  {"colour": [0.78, 0.82, 0.85, 1.0], "roughness": 0.04, "metalness": 0.95},
     "ct_marble":    {"colour": [0.91, 0.91, 0.89, 1.0], "roughness": 0.20, "metalness": 0.0},
     "ct_tile":      {"colour": [0.80, 0.77, 0.70, 1.0], "roughness": 0.35, "metalness": 0.0},
     "ct_quartz":    {"colour": [0.84, 0.84, 0.82, 1.0], "roughness": 0.25, "metalness": 0.0},
@@ -208,7 +209,7 @@ WALL_UNDERSIDE = 54.0          # 36 in counter + 18 in backsplash
 CORNER_LEG = 24.0
 
 TYPES = ("base", "sink_base", "corner_base", "wall", "tall", "appliance",
-         "island", "light", "fixture")
+         "island", "light", "fixture", "mirror")
 
 # Every catalog kind this file builds, with what it is born as. The generator
 # writes each into the manifest (`cabinet`), refusing if a size here disagrees
@@ -235,6 +236,10 @@ PRESETS = {
                   "height_in": 32.5, "sink": "single", "sink_material": "porcelain"},
     "vanity_48": {"type": "sink_base", "width_in": 48, "depth_in": 21,
                   "height_in": 32.5, "sink": "double", "sink_material": "porcelain"},
+    "medicine_cabinet": {"type": "mirror", "width_in": 30, "has_cabinet": True,
+                         "light_style": "bar"},
+    "vanity_mirror": {"type": "mirror", "width_in": 36, "has_cabinet": False,
+                      "light_style": "backlit"},
     "refrigerator": {"type": "appliance", "appliance": "refrigerator",
                      "width_in": 36, "depth_in": 30, "height_in": 70},
     "range": {"type": "appliance", "appliance": "range",
@@ -321,6 +326,9 @@ _TYPE_DEFAULTS = {
                "top_on": True},
     "light": {"height_in": 6.0, "top_on": False},
     "fixture": {"height_in": 30.0, "top_on": False},
+    # a bathroom mirror / medicine cabinet, hung over a vanity
+    "mirror": {"height_in": 36.0, "depth_in": 4.5, "top_on": False,
+               "floor_to_bottom_in": 40.0},
 }
 
 STATE_DEFAULTS = {
@@ -332,7 +340,7 @@ STATE_DEFAULTS = {
     "top_on": True, "top_thickness_in": TOP_T, "top_overhang_in": 1.0,
     "top_material": ROOM, "backsplash_in": 0.0,
     "floor_to_bottom_in": WALL_UNDERSIDE,
-    "sink": "none", "sink_material": "metal",
+    "sink": "none", "sink_material": "metal", "sink_side": "center",
     "corner_type": "diagonal", "hand": "left",
     "appliance": "generic", "finish_mode": "standard", "sheen": "gloss",
     "colour": "white", "wall_mounted": False,
@@ -347,6 +355,8 @@ STATE_DEFAULTS = {
     "lit": True, "bar": "horizontal", "length_in": 24.0,
     "computer": "desktop", "pedestal": "right", "arms": True,
     "bed": True,
+    # mirror / wall unit
+    "has_cabinet": True, "light_style": "bar",
 }
 FRONTS = ("doors", "drawer_over_doors", "drawers", "false_front")
 _ENUMS = {
@@ -358,6 +368,7 @@ _ENUMS = {
     "top_material": (ROOM,) + tuple(k for k, _l, _m in COUNTERTOPS),
     "sink": ("none", "single", "double"),
     "sink_material": ("metal", "porcelain"),
+    "sink_side": ("left", "center", "right"),
     "corner_type": ("diagonal", "l_shape", "blind"), "hand": ("left", "right"),
     "finish_mode": ("standard", "match", "custom"),
     "sheen": tuple(k for k, _l in SHEENS),
@@ -369,6 +380,7 @@ _ENUMS = {
     "computer": tuple(k for k, _l in COMPUTERS),
     "pedestal": tuple(k for k, _l in PEDESTALS),
     "surround": tuple(k for k, _l, _m in SURROUNDS),
+    "light_style": ("none", "bar", "sconces", "backlit"),
 }
 _ENUMS.update({key: tuple(row[0] for row in ISLAND_SLOTS)
                for key in ISLAND_SLOT_KEYS})
@@ -422,7 +434,8 @@ def normalize_state(state, preset=None):
             value = str(value)
             if value not in _ENUMS[key]:
                 value = str(default)
-        elif key in ("top_on", "wall_mounted", "books", "lit", "arms", "bed"):
+        elif key in ("top_on", "wall_mounted", "books", "lit", "arms", "bed",
+                     "has_cabinet"):
             value = bool(value)
         elif key == "shelves":
             try:
@@ -472,6 +485,13 @@ def normalize_state(state, preset=None):
         out["width_in"] = island_width(out)       # the slots ARE the length
         out["depth_in"] = max(out["depth_in"],
                               ISLAND_CABINET_D + ISLAND_FRONT_SETBACK + 1.0)
+    if kind_type == "mirror":
+        # a medicine cabinet stands proud of the wall; a plain mirror is thin.
+        # the depth is the KIND's, never the file's, so the symbol and the 3D
+        # agree with what `has_cabinet` says.
+        out["depth_in"] = 4.5 if out["has_cabinet"] else 1.5
+        out["top_on"] = False
+        out["lumens"] = min(max(out["lumens"], 0.0), 20000.0)
     if kind_type == "light":
         out["size_in"] = min(max(out["size_in"], 2.0), 120.0)
         out["lumens"] = min(max(out["lumens"], 0.0), 20000.0)
@@ -504,7 +524,7 @@ def island_width(st):
 
 def is_mounted(st):
     """True for anything hung on a wall at `floor_to_bottom_in`."""
-    return st["type"] == "wall" or bool(st.get("wall_mounted"))
+    return st["type"] in ("wall", "mirror") or bool(st.get("wall_mounted"))
 
 
 def footprint(st):
@@ -585,6 +605,7 @@ def resolve_materials(st, room_style=None):
             "cabinet": cabinet, "countertop": counter, "backsplash": backsplash,
             "hardware": _lookup(HARDWARE, hardware, DEFAULT_STYLE["hardware"]),
             "kick": "cabinet_kick", "glass": "cabinet_glass",
+            "mirror": "mirror_glass",
             "sink": st["sink_material"], "appliance": appliance,
             "appliance_dark": "auto_trim", "stool": "stool_seat",
             "fixture": "light_fixture", "lens": f"light_emit{glow}"}
@@ -715,40 +736,113 @@ def _front(parts, st, style, x0, x1, z0, z1, face, pulls_low=False,
         doors(lo, hi)
 
 
-def _sink(parts, st, x0, x1, depth, top):
-    """Bowls let into the top (returned as the plan rectangles the top must
-    leave open), each a floor and four walls, with a faucet behind."""
+def _sink_layout(st, x0, x1, depth):
+    """Where a sink's bowls sit, as `([(a, f0, b, f1), ...], faucet_cx)` in the
+    cabinet frame -- the ONE placement the 3D parts (`_sink`) and the plan
+    symbol (`sink_base_plan`) both read, so a sink drawn on the plan can never
+    disagree with the one built in 3D on its side. `([], None)` for no sink."""
     bowls = {"none": 0, "single": 1, "double": 2}[st["sink"]]
     if not bowls:
-        return []
+        return [], None
     span = x1 - x0
     bw = min((span - 6.0 - (bowls - 1) * 1.5) / bowls, 30.0)
     bd = min(depth - 8.5, 18.0)
     if bw < 6.0 or bd < 6.0:
-        return []
+        return [], None
     f0 = min(4.5, depth - bd - 2.5)
     total = bowls * bw + (bowls - 1) * 1.5
-    left = (x0 + x1) / 2.0 - total / 2.0
+    # A SINGLE bowl honours `sink_side`: it slides to the left or right of the
+    # top, inset from the end, the faucet riding its new centre. A double bowl
+    # stays centred -- "the side of the sink" only means something for one.
+    side = st.get("sink_side", "center")
+    if bowls == 1 and side in ("left", "right"):
+        bw = min(bw, max(span - 14.0, 10.0))   # keep counter on the open side
+        total = bw
+        inset = 3.0
+        left = x0 + inset if side == "left" else x1 - inset - total
+        left = max(x0 + 1.0, min(left, x1 - total - 1.0))
+    else:
+        left = (x0 + x1) / 2.0 - total / 2.0
+    rects = [(left + i * (bw + 1.5), f0, left + i * (bw + 1.5) + bw, f0 + bd)
+             for i in range(bowls)]
+    return rects, left + total / 2.0
+
+
+def _sink(parts, st, x0, x1, depth, top):
+    """Bowls let into the top (returned as the plan rectangles the top must
+    leave open), each a floor and four walls, with a faucet behind."""
+    rects, cx = _sink_layout(st, x0, x1, depth)
+    if not rects:
+        return []
     drop, wall = 7.0, 0.4
+    f0 = rects[0][1]
     holes = []
-    for i in range(bowls):
-        a = left + i * (bw + 1.5)
-        b = a + bw
-        holes.append((a, b, f0, f0 + bd))
-        _add(parts, f"bowl-{i + 1}-floor", "sink", a, b, f0, f0 + bd,
+    for i, (a, _f0, b, f1) in enumerate(rects):
+        holes.append((a, b, f0, f1))
+        _add(parts, f"bowl-{i + 1}-floor", "sink", a, b, f0, f1,
              top - drop, top - drop + wall)
-        for tag, r in (("l", (a, a + wall, f0, f0 + bd)),
-                       ("r", (b - wall, b, f0, f0 + bd)),
+        for tag, r in (("l", (a, a + wall, f0, f1)),
+                       ("r", (b - wall, b, f0, f1)),
                        ("b", (a, b, f0, f0 + wall)),
-                       ("f", (a, b, f0 + bd - wall, f0 + bd))):
+                       ("f", (a, b, f1 - wall, f1))):
             _add(parts, f"bowl-{i + 1}-wall-{tag}", "sink", *r,
                  top - drop + wall, top - 0.05)
-    cx = (x0 + x1) / 2.0
     _add(parts, "faucet-post", "hardware", cx - 0.7, cx + 0.7, f0 - 2.6, f0 - 1.2,
          top, top + 9.0)
     _add(parts, "faucet-spout", "hardware", cx - 0.5, cx + 0.5, f0 - 2.6, f0 + 5.0,
          top + 8.0, top + 9.0)
     return holes
+
+
+def sink_base_plan(st):
+    """The plan symbol for a sink base / vanity, from its parameters: the top
+    outline, the bowl(s) WHERE THEY ACTUALLY SIT (so an offset single sink
+    shows on its side), the faucet, and door dividers along the front. A list
+    of drawing primitives in the cabinet frame (x across centred, f down from
+    the back edge); `items._paint_plan_prims` renders them."""
+    w, d = st["width_in"], st["depth_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    prims = [("outline", x0 + 0.75, 0.75, x1 - 0.75, d - 0.75)]
+    rects, cx = _sink_layout(st, x0, x1, d)
+    for a, f0, b, f1 in rects:
+        prims.append(("bowl", a, f0, b, f1))
+    if cx is not None:
+        prims.append(("dot", cx, max(rects[0][1] - 2.0, 1.2), 1.1))
+    doors = max(2, len(rects) * 2)
+    fw = (w - 1.5) / doors
+    for i in range(1, doors):
+        xx = x0 + 0.75 + fw * i
+        prims.append(("line", xx, d - 8.0, xx, d - 0.75))
+    for i in range(doors):
+        prims.append(("dot", x0 + 0.75 + fw * (i + 0.5), d - 3.0, 0.7))
+    return prims
+
+
+def mirror_plan(st):
+    """The plan symbol for a mirror / medicine cabinet: a box (solid for a
+    storage cabinet, dashed for a plain overhead mirror), the mirror diagonal,
+    and the lights drawn per `light_style` -- a bar of bulbs, a sconce each
+    side, or a backlit inner border. Primitives in the cabinet frame."""
+    w, d = st["width_in"], st["depth_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    f1 = max(d - 0.3, 0.6)
+    prims = [("outline" if st["has_cabinet"] else "dashed", x0 + 0.4, 0.3,
+              x1 - 0.4, f1),
+             ("line", x0 + 0.6, f1, x1 - 0.6, 0.4)]          # mirror diagonal
+    style = st["light_style"]
+    if style == "bar":
+        prims.append(("line", x0 + 2.0, 0.5, x1 - 2.0, 0.5))
+        n = max(2, round(w / 12))
+        for k in range(n):
+            prims.append(("bulb", x0 + w * (k + 0.5) / n, min(0.9, d * 0.5), 0.5))
+    elif style == "sconces":
+        for cx in (x0 + 0.5, x1 - 0.5):
+            prims.append(("bulb", cx, d * 0.5, 0.7))
+    elif style == "backlit":
+        prims.append(("dashed", x0 + 1.0, 0.8, x1 - 1.0, max(d - 0.8, 1.0)))
+    if st["has_cabinet"]:
+        prims.append(("dot", x1 - 1.5, d * 0.5, 0.6))        # the door pull
+    return prims
 
 
 def _top(parts, st, x0, x1, depth, z, holes=(), front=None):
@@ -808,6 +902,47 @@ def _wall(parts, st, style):
     x0, x1 = -w / 2.0, w / 2.0
     _add(parts, "carcass", "cabinet", x0, x1, 0.0, d - DOOR_T, z0, z0 + h)
     _front(parts, st, style, x0, x1, z0, z0 + h, d, pulls_low=True, front="doors")
+
+
+def _mirror(parts, st, _style=None):
+    """A bathroom mirror / medicine cabinet hung on the wall at
+    `floor_to_bottom_in`. `has_cabinet` makes it a storage box behind a
+    mirrored door; otherwise it is a plain mirror panel. `light_style` adds a
+    fixture over it, a sconce each side, or a backlit edge -- the lit parts
+    carry the "lens" role so they glow and `light_source` can find them."""
+    w, h, d = st["width_in"], st["height_in"], st["depth_in"]
+    z0 = max(st["floor_to_bottom_in"], 0.0)
+    z1 = z0 + h
+    x0, x1 = -w / 2.0, w / 2.0
+    if st["has_cabinet"]:
+        _add(parts, "carcass", "cabinet", x0, x1, 0.0, max(d - 0.5, 0.25), z0, z1)
+        _add(parts, "mirror-door", "mirror", x0 + 0.5, x1 - 0.5,
+             max(d - 0.5, 0.25), d, z0 + 0.5, z1 - 0.5)
+        _pull(parts, "door-pull", st["pulls"], x1 - 1.5, (z0 + z1) / 2.0, d, True)
+    else:
+        _add(parts, "frame", "cabinet", x0, x1, 0.0, max(d - 0.4, 0.2), z0, z1)
+        _add(parts, "mirror-panel", "mirror", x0 + 0.5, x1 - 0.5,
+             max(d - 0.4, 0.2), d, z0 + 0.5, z1 - 0.5)
+    style = st["light_style"]
+    if style == "bar":
+        bx0, bx1 = -w / 4.0, w / 4.0
+        _add(parts, "light-bar", "fixture", bx0, bx1, 0.0, 3.0, z1 + 1.0, z1 + 3.0)
+        _add(parts, "light-bar-lens", "lens", bx0 + 0.5, bx1 - 0.5, 0.5, 2.5,
+             z1 + 1.1, z1 + 1.4)
+    elif style == "sconces":
+        zc = (z0 + z1) / 2.0
+        for tag, a, b in (("l", x0 - 3.0, x0 - 0.5), ("r", x1 + 0.5, x1 + 3.0)):
+            _add(parts, f"sconce-{tag}", "fixture", a, b, 0.0, 3.0,
+                 zc - 6.0, zc + 6.0)
+            _add(parts, f"sconce-{tag}-lens", "lens", a + 0.4, b - 0.4, 0.4, 2.6,
+                 zc - 5.0, zc + 5.0)
+    elif style == "backlit":
+        f0, f1 = d, d + 0.2                 # a glowing ring just proud of the glass
+        t = 1.0
+        _add(parts, "backlit-top", "lens", x0, x1, f0, f1, z1 - t, z1)
+        _add(parts, "backlit-bottom", "lens", x0, x1, f0, f1, z0, z0 + t)
+        _add(parts, "backlit-left", "lens", x0, x0 + t, f0, f1, z0, z1)
+        _add(parts, "backlit-right", "lens", x1 - t, x1, f0, f1, z0, z1)
 
 
 def _corner(parts, st, style):
@@ -1654,19 +1789,34 @@ def light_source(st, ceiling_in=96.0):
     (x, f, z in the cabinet frame), `colour` (r, g, b in 0..1), `lumens`,
     `kind` ("point" or "spot", a spot aims straight down) and `cone_deg`.
     None for anything that is not a light, or is switched to zero output."""
-    if st["type"] != "light" or st["lumens"] <= 0:
+    if st["lumens"] <= 0:
         return None
-    parts = []
-    _light(parts, st, ceiling_in)
-    lens = next((p for p in parts if p.role == "lens"), None)
-    if lens is None:
+    if st["type"] == "light":
+        parts = []
+        _light(parts, st, ceiling_in)
+        lens = next((p for p in parts if p.role == "lens"), None)
+        if lens is None:
+            return None
+        x = sum(q[0] for q in lens.quad) / 4.0
+        f = sum(q[1] for q in lens.quad) / 4.0
+        z = lens.z0 - 0.5
+    elif st["type"] == "mirror" and st["light_style"] != "none":
+        parts = []
+        _mirror(parts, st)
+        lenses = [p for p in parts if p.role == "lens"]
+        if not lenses:
+            return None
+        pts = [q for p in lenses for q in p.quad]
+        x = sum(q[0] for q in pts) / len(pts)
+        f = sum(q[1] for q in pts) / len(pts) + 2.0        # cast into the room
+        z = sum((p.z0 + p.z1) / 2.0 for p in lenses) / len(lenses)
+    else:
         return None
-    x = sum(q[0] for q in lens.quad) / 4.0
-    f = sum(q[1] for q in lens.quad) / 4.0
     hexa = {k: h for k, _l, h in LIGHT_COLOURS}.get(st["light_colour"], "#ffe4bf")
     rgb = tuple(int(hexa[i:i + 2], 16) / 255.0 for i in (1, 3, 5))
-    spot = st["beam"] == "spot" and st["fixture"] not in ("sconce", "table")
-    return {"pos": (x, f, lens.z0 - 0.5), "colour": rgb,
+    spot = (st["type"] == "light" and st["beam"] == "spot"
+            and st["fixture"] not in ("sconce", "table"))
+    return {"pos": (x, f, z), "colour": rgb,
             "lumens": float(st["lumens"]), "kind": "spot" if spot else "point",
             "cone_deg": 60.0 if spot else 180.0}
 
@@ -1696,6 +1846,8 @@ def cabinet_parts(st, room_style=None, ceiling_in=96.0):
         _tall(parts, st, style)
     elif kind == "corner_base":
         _corner(parts, st, style)
+    elif kind == "mirror":
+        _mirror(parts, st, style)
     else:
         _base_like(parts, st, style)
     return parts

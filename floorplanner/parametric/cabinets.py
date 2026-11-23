@@ -34,6 +34,14 @@ def _never(_values):
     return False
 
 
+def _is_lit(values):
+    return values.get("light_style", "none") != "none"
+
+
+def _has_storage(values):
+    return bool(values.get("has_cabinet"))
+
+
 def _is_pendant(values):
     return values.get("fixture") == "pendant"
 
@@ -58,7 +66,8 @@ class CabinetKind(ParametricKind):
         self.title = {"appliance": "Appliance Properties",
                       "island": "Island Properties",
                       "light": "Light Properties",
-                      "fixture": "Fixture Properties"}.get(self.type,
+                      "fixture": "Fixture Properties",
+                      "mirror": "Mirror / Wall Unit"}.get(self.type,
                                                        "Cabinet Properties")
 
     # -- parameters ----------------------------------------------------------
@@ -93,6 +102,8 @@ class CabinetKind(ParametricKind):
                           d["floor_to_bottom_in"], unit="in", minimum=0.0,
                           maximum=144.0, step=1.0, enabled_fn=_is_sconce),
             ]
+        if t == "mirror":
+            return self._mirror_specs(d)
         if t == "fixture":
             return self._fixture_specs(d)
         if t == "appliance" and d.get("appliance") in ("washer", "dryer"):
@@ -215,6 +226,13 @@ class CabinetKind(ParametricKind):
             out.append(ParamSpec("sink", "Sink", ENUM, d["sink"],
                                  choices=(("none", "None"), ("single", "Single bowl"),
                                           ("double", "Double bowl"))))
+            out.append(ParamSpec(
+                "sink_side", "Sink position", ENUM, d["sink_side"],
+                choices=(("left", "Left"), ("center", "Centre"),
+                         ("right", "Right")),
+                enabled_fn=lambda v: v.get("sink") == "single",
+                tooltip="Which side a single bowl sits on. A double bowl stays "
+                        "centred."))
         out += [
             ParamSpec("doors", "Doors", ENUM, d["doors"],
                       choices=(("auto", "Auto (one up to 21 in)"), ("1", "One"),
@@ -253,6 +271,43 @@ class CabinetKind(ParametricKind):
                           step=1.0, enabled_fn=on),
             ]
         return out
+
+    def _mirror_specs(self, d):
+        """0366: a bathroom mirror / medicine cabinet with lights."""
+        return [
+            ParamSpec("width_in", "Width", FLOAT, d["width_in"], unit="in",
+                      minimum=12.0, maximum=72.0, step=3.0,
+                      tooltip="Stock widths step by 3 in."),
+            ParamSpec("height_in", "Height", FLOAT, d["height_in"], unit="in",
+                      minimum=18.0, maximum=48.0, step=1.0),
+            ParamSpec("has_cabinet", "Storage behind the mirror", BOOL,
+                      d["has_cabinet"],
+                      tooltip="On: a medicine cabinet -- a box with shelves "
+                              "behind a mirrored door. Off: a plain wall mirror."),
+            ParamSpec("light_style", "Lights", ENUM, d["light_style"],
+                      choices=(("none", "None"), ("bar", "Bar above"),
+                               ("sconces", "Sconces each side"),
+                               ("backlit", "Backlit (LED edge)"))),
+            ParamSpec("light_colour", "Light colour", ENUM, d["light_colour"],
+                      choices=tuple((k, label) for k, label, _h in cg.LIGHT_COLOURS),
+                      enabled_fn=_is_lit),
+            ParamSpec("lumens", "Output", FLOAT, d["lumens"], unit="lm",
+                      minimum=0.0, maximum=20000.0, step=100.0, decimals=0,
+                      enabled_fn=_is_lit,
+                      tooltip="800 lm is about a 60 W bulb. 0 switches the lights "
+                              "off and keeps the fixture."),
+            ParamSpec("floor_to_bottom_in", "Height from floor", FLOAT,
+                      d["floor_to_bottom_in"], unit="in", minimum=24.0,
+                      maximum=72.0, step=1.0,
+                      tooltip="Floor to the bottom of the mirror."),
+            ParamSpec("finish", "Frame / cabinet finish", ENUM, d["finish"],
+                      choices=_choices(cg.FINISHES)),
+            ParamSpec("pulls", "Pull", ENUM, d["pulls"],
+                      choices=(("bar", "Bar"), ("knob", "Knob"), ("none", "None")),
+                      enabled_fn=_has_storage),
+            ParamSpec("hardware", "Hardware", ENUM, d["hardware"],
+                      choices=_choices(cg.HARDWARE), enabled_fn=_has_storage),
+        ]
 
     def _fixture_specs(self, d):
         """0338: what a toilet, tub, bookshelf, fireplace or grab bar offers."""
@@ -378,9 +433,18 @@ class CabinetKind(ParametricKind):
         return cg.footprint(cg.normalize_state(state, self.preset))
 
     def plan_symbol(self, state):
-        if self.type != "island":
-            return None
-        return cg.island_plan(cg.normalize_state(state, self.preset))
+        """The plan icon DRAWN FROM THE PARAMETERS, so it matches the unit --
+        an island's slots, a vanity's sink on its chosen side, a mirror's
+        lights -- instead of the catalog symbol stretched to the footprint.
+        None keeps the catalog symbol (a plain base, a wall cabinet)."""
+        st = cg.normalize_state(state, self.preset)
+        if self.type == "island":
+            return cg.island_plan(st)
+        if self.type == "sink_base":
+            return {"prims": cg.sink_base_plan(st)}
+        if self.type == "mirror":
+            return {"prims": cg.mirror_plan(st)}
+        return None
 
     # -- evaluation ----------------------------------------------------------
     def evaluate(self, values, context):
@@ -404,6 +468,14 @@ class CabinetKind(ParametricKind):
                    "footprint": cg.footprint(st),
                    "height": cg.overall_height(st), "code": cg.trade_code(st)}
         if st["type"] in ("appliance", "light"):
+            return derived, findings
+        if st["type"] == "mirror":
+            w = st["width_in"]
+            if abs(w / 3.0 - round(w / 3.0)) > 1e-6:
+                findings.append(Finding(
+                    "width.module", ADVISORY,
+                    f"{_fmt(w)} in is not a stock width; mirror units step by "
+                    f"3 in.", actual=w, field="width_in"))
             return derived, findings
         if st["type"] == "fixture":
             if st["model"] == "grab_bar" and st["bar"] == "horizontal":
@@ -525,6 +597,24 @@ class CabinetKind(ParametricKind):
                          ("Underside", f"{_fmt(st['floor_to_bottom_in'])} in "
                                        f"above the floor")]
             return rows
+        if st["type"] == "mirror":
+            lights = {"none": "None", "bar": "Bar above",
+                      "sconces": "Sconces each side",
+                      "backlit": "Backlit (LED edge)"}[st["light_style"]]
+            light_label = dict((k, name) for k, name, _h in cg.LIGHT_COLOURS)
+            rows = [("Unit", "Medicine cabinet" if st["has_cabinet"]
+                     else "Wall mirror"),
+                    ("Size", f"{_fmt(w)} x {_fmt(d)} in"),
+                    ("Bottom", f"{_fmt(st['floor_to_bottom_in'])} in "
+                               f"above the floor"),
+                    ("Lights", lights)]
+            if st["light_style"] != "none":
+                rows.append(("Light", f"{light_label[st['light_colour']]}, "
+                                      f"{_fmt(st['lumens'])} lm"
+                                      + ("" if st["lumens"] > 0 else " (off)")))
+            if st["has_cabinet"]:
+                rows.append(("Frame", _material_label(mats["cabinet"])))
+            return rows
         if st["type"] == "appliance":
             rows = [("Finish", _material_label(mats["appliance"])),
                     ("Size", f"{_fmt(w)} x {_fmt(d)} x {_fmt(st['height_in'])} in")]
@@ -551,6 +641,12 @@ class CabinetKind(ParametricKind):
                 ("Hardware", _material_label(mats["hardware"]))]
         if st["top_on"]:
             rows.append(("Countertop", _material_label(mats["countertop"])))
+        if st["type"] == "sink_base" and st["sink"] != "none":
+            label = {"single": "Single bowl", "double": "Double bowl"}[st["sink"]]
+            pos = {"left": "left", "center": "centred", "right": "right"}[
+                st["sink_side"]]
+            rows.append(("Sink", label if st["sink"] == "double"
+                         else f"{label}, {pos}"))
         if st["type"] == "wall":
             rows.append(("Top of cabinet",
                          f"{_fmt(st['floor_to_bottom_in'] + st['height_in'])} in"))

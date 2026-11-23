@@ -198,6 +198,20 @@ def vanity_unit(w, d, sinks):
     return parts
 
 
+def mirror_unit(w, d, lit=True):
+    """Top view of a wall-hung mirror / medicine cabinet: a DASHED box (it sits
+    overhead, above the plan cut, like a wall cabinet), a diagonal 'glass'
+    stroke, and small bulb marks along the front when it is lit."""
+    parts = [R(0.75, 0.3, w - 1.5, max(d - 0.6, 0.6), 0.6, sw=1.0, dash="3,2"),
+             L(0.75, max(d - 0.3, 0.3), w - 0.75, 0.3, 0.4)]     # mirror diagonal
+    if lit:
+        n = max(2, round(w / 12))
+        for k in range(n):
+            parts.append(Ci(w * (k + 0.5) / n, max(d - 0.5, 0.3), 0.4,
+                            "none", 0.5))
+    return parts
+
+
 def island(w, d, doors, cab=24, sink=False):
     """Top view of a kitchen island: a countertop, a base-cabinet block along
     the back (door fronts + knobs, optional sink) and a seating overhang at
@@ -448,6 +462,12 @@ FURNISHINGS = [
     ("vanity_36", "Vanity Base 36\"", "Bathroom", 36, 21, vanity_unit(36, 21, 1)),
     ("vanity_48", "Double Vanity 48\"", "Bathroom", 48, 21,
      vanity_unit(48, 21, 2)),
+    # wall units: a medicine cabinet (box behind a mirrored door) and a plain
+    # lit mirror -- both parametric, hung over the vanity
+    ("medicine_cabinet", "Medicine Cabinet 30\"", "Bathroom", 30, 4.5,
+     mirror_unit(30, 4.5, lit=True)),
+    ("vanity_mirror", "Lit Vanity Mirror 36\"", "Bathroom", 36, 1.5,
+     mirror_unit(36, 1.5, lit=True)),
 
     ("washer", "Washer", "Laundry", 27, 30,
      [R(0.75, 0.75, 25.5, 28.5, 1, sw=1.2),
@@ -918,6 +938,8 @@ SOLIDS = {
     "vanity_24":              (34,      0, "box",       "wood"),
     "vanity_36":              (34,      0, "box",       "wood"),
     "vanity_48":              (34,      0, "box",       "wood"),
+    "medicine_cabinet":       (36,     40, "box",       "wood"),
+    "vanity_mirror":          (36,     40, "box",       "glass"),
     # -- Laundry
     "washer":                 (38,      0, "box",       "metal"),
     "dryer":                  (38,      0, "box",       "metal"),
@@ -1673,7 +1695,7 @@ def main():
                      "tv_stand", "desk", "office_chair", "bookshelf"]),
         ("Bathroom", ["bathtub", "shower", "walk_in_shower", "glass_shower",
                       "toilet", "vanity", "vanity_24", "vanity_36", "vanity_48",
-                      "grab_bar"]),
+                      "medicine_cabinet", "vanity_mirror", "grab_bar"]),
         ("Laundry", ["washer", "dryer"]),
         ("Lighting", ["light_recessed", "light_flush", "light_pendant",
                       "light_linear", "light_sconce", "table_lamp"]),
