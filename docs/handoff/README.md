@@ -506,5 +506,7 @@ this table is not a second copy of it.
 | [`0367-ruling.md`](./0367-ruling.md) | ruling: a PYRAMID ROOF structure furnishing (gazebo / many-sided roof) is ORDERED. Four stages, AMBER; plus the wicker set to gate and commit |
 | [`0368-ruling.md`](./0368-ruling.md) | ruling: four kitchen casework kinds are IN THE TREE (furnishings lane). Gate, test and commit them by path. AMBER. |
 | [`0369-report.md`](./0369-report.md) | report: 0368 kitchen casework, gated and committed (O1–O6) |
+| [`0370-ruling.md`](./0370-ruling.md) | ruling: a wall does not climb THROUGH a roof to reach a dormer above it. AMBER. |
+| [`0371-ruling.md`](./0371-ruling.md) | ruling: 0370 widened to the dormer's EAVE overhang (the cheek-wall posts). Same rule, one fix. AMBER. |
 
 <!-- PAIRS:END -->
