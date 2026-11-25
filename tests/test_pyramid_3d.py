@@ -254,3 +254,37 @@ def test_weld_cuts_the_pyramid_where_the_roof_is_higher(fp3d):
     off = _top_surfaces_over(fp3d.build_model(_astride_doc("off"), floors=False), x, y)
     assert len(auto) == 1 and auto[0] == pytest.approx(150.0, abs=3.0)   # gable only
     assert len(off) == 2            # weld off: pyramid still drawn below the gable
+
+
+# -- the arc: a partial gazebo (a pie wedge left open) ------------------------
+def test_an_arc_builds_only_its_present_facets(fp3d):
+    # 180 arc in 3 sections -> three facet slabs, not the whole six
+    model = fp3d.build_model(_doc([_pyramid({"sides": 3, "arc_deg": 180.0})]),
+                             floors=False)
+    faces = sum(len(m.faces) for m in model.meshes if m.name == "roofs")
+    assert faces == 3 * 8, f"an arc of 3 facets should be 3 slabs, got {faces // 8}"
+    v = _roof_verts(model)
+    assert v[:, 2].max() == pytest.approx(APEX_Z)        # apex still over the centre
+
+
+def test_a_post_in_the_open_wedge_does_not_rise_but_one_under_a_facet_does(fp3d):
+    # C4 fail-first for the arc: the bulge is UP (doc -y); DOWN (+y) is the open
+    # wedge, where there is no roof, so a post there stays at its own height.
+    st = {"sides": 3, "arc_deg": 180.0}
+    wedge = fp3d.build_model(_doc([_pyramid(st), _post((200.0, 260.0))]), floors=False)
+    facet = fp3d.build_model(_doc([_pyramid(st), _post((200.0, 140.0))]), floors=False)
+    assert _post_top(facet) > _post_top(wedge) + 5.0, \
+        "the post under a facet must rise to the pyramid; the one in the wedge must not"
+
+
+def test_an_arc_welds_into_the_roof_under_it(fp3d):
+    # an arc astride a gable still cuts the roof where the pyramid is higher:
+    # over the apex (just up-screen of centre, under a facet) weld:auto leaves
+    # ONE surface where weld:off leaves two.
+    doc_auto = _astride_doc("auto")
+    doc_auto["furnishings"][0]["state"].update({"sides": 3, "arc_deg": 180.0})
+    doc_off = _astride_doc("off")
+    doc_off["furnishings"][0]["state"].update({"sides": 3, "arc_deg": 180.0})
+    auto = _top_surfaces_over(fp3d.build_model(doc_auto, floors=False), 200.0, 190.0)
+    off = _top_surfaces_over(fp3d.build_model(doc_off, floors=False), 200.0, 190.0)
+    assert len(auto) == 1 and len(off) == 2

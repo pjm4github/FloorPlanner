@@ -42,10 +42,18 @@ class PyramidRoofKind(ParametricKind):
     def specs(self):
         d = pg.STATE_DEFAULTS
         return [
-            ParamSpec("sides", "Sides", INT, d["sides"],
+            ParamSpec("sides", "Sides / sections", INT, d["sides"],
                       minimum=pg.MIN_SIDES, maximum=pg.MAX_SIDES, step=1,
-                      tooltip="A regular polygon of 3 to 12 sides; the pyramid "
-                              "has one face per side."),
+                      tooltip="The number of facets (sections). At a full 360 "
+                              "arc this is the regular polygon's side count; "
+                              "below 360 it is how many sections fill the arc."),
+            ParamSpec("arc_deg", "Arc", FLOAT, d["arc_deg"],
+                      unit="deg", minimum=pg.MIN_ARC_DEG,
+                      maximum=pg.FULL_ARC_DEG, step=15.0,
+                      tooltip="The angular sweep. 360 is a whole gazebo; below "
+                              "it the facets fan about the up direction and a "
+                              "pie wedge is left open to the peak. Each section "
+                              "spans arc / sections degrees."),
             ParamSpec("inradius_in", "Inradius", FLOAT, d["inradius_in"],
                       unit="in", minimum=pg.MIN_INRADIUS_IN, maximum=600.0,
                       step=1.0,
@@ -156,10 +164,17 @@ class PyramidRoofKind(ParametricKind):
         if derived is None:
             return [("Result", "cannot be built")]
         st = derived["state"]
+        if pg.is_full(st):
+            plan_txt = (f"{st['sides']}-sided, {_fmt(st['inradius_in'])} in to "
+                        f"the wall line ({_fmt(derived['circumradius_in'])} in "
+                        "to a corner)")
+        else:
+            per = st["arc_deg"] / st["sides"]
+            plan_txt = (f"{_fmt(st['arc_deg'])} deg arc in {st['sides']} "
+                        f"sections ({_fmt(per)} deg each), "
+                        f"{_fmt(st['inradius_in'])} in to the wall line")
         rows = [
-            ("Plan", f"{st['sides']}-sided, {_fmt(st['inradius_in'])} in to the "
-                     f"wall line ({_fmt(derived['circumradius_in'])} in to a "
-                     "corner)"),
+            ("Plan", plan_txt),
             ("Eaves height", f"{_fmt(derived['eaves_h_in'])} in above this floor"
                              + (" (from the room ceiling)" if derived["eaves_bound"]
                                 else " (set by hand)")),
@@ -176,20 +191,25 @@ class PyramidRoofKind(ParametricKind):
 
     def plan_symbol(self, state):
         """The plan symbol drawn from the parameters (C1: `pyramid_geometry`):
-        the eave polygon (solid), the wall-line polygon (dashed), the hips
+        the eave outline (solid), the wall-line outline (dashed), the hips
         (apex to each eave corner) and the apex dot. A generic `{"prims": ...}`
         list in the item's frame -- x across, `f` DOWN from the top edge, as
-        `FurnishingItem._paint_plan_prims` reads it. The eave bbox is symmetric
-        about the centre, so the item's `pos` (the apex in plan) sits at
-        `f = depth / 2` and the local point `(x, y)` is `(x, y + depth / 2)`."""
+        `FurnishingItem._paint_plan_prims` reads it. The bbox is centred on the
+        apex, so the item's `pos` (the apex in plan) sits at `f = depth / 2` and
+        the local point `(x, y)` is `(x, y + depth / 2)`. For an arc the solid
+        and dashed outlines are the FANS (apex plus the eave/wall corners), so
+        the open pie wedge is not drawn."""
         st = pg.normalize_state(state)
-        half = pg.bbox(st)[1] / 2.0          # the eave bbox depth, halved
+        half = pg.bbox(st)[1] / 2.0          # the bbox depth, halved
 
         def f(y):
             return y + half
 
-        prims = [("poly", "solid", [(x, f(y)) for x, y in pg.eaves_polygon(st)]),
-                 ("poly", "dashed", [(x, f(y)) for x, y in pg.wall_polygon(st)])]
+        def fan(ring):
+            return ring if pg.is_full(st) else [(0.0, 0.0), *ring]
+
+        prims = [("poly", "solid", [(x, f(y)) for x, y in fan(pg.eaves_polygon(st))]),
+                 ("poly", "dashed", [(x, f(y)) for x, y in fan(pg.wall_polygon(st))])]
         prims += [("line", 0.0, half, cx, f(cy))
                   for (_apex, (cx, cy)) in pg.hips(st)]
         prims.append(("dot", 0.0, half, 2.0))

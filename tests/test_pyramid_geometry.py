@@ -180,3 +180,65 @@ def test_summary_reports_the_plan_apex_and_pitch():
 def test_footprint_is_the_eave_bounding_box():
     assert PYRAMID_ROOF.footprint({"sides": 4, "inradius_in": 72.0, "overhang_in": 12.0}) \
         == pytest.approx(pg.bbox(_st(sides=4, inradius_in=72.0, overhang_in=12.0)))
+
+
+# -- the arc (a partial gazebo) ---------------------------------------------
+def test_default_is_a_whole_gazebo_and_arc_clamps():
+    assert _st()["arc_deg"] == 360.0 and pg.is_full(_st())
+    assert pg.normalize_state({"arc_deg": 500})["arc_deg"] == 360.0     # <= 360
+    assert pg.normalize_state({"arc_deg": 1})["arc_deg"] == pg.MIN_ARC_DEG
+    assert pg.normalize_state({"arc_deg": "x"})["arc_deg"] == 360.0
+    assert "arc_deg" in pg.STATE_DEFAULTS                                # carried in state
+    assert not pg.is_full(_st(arc_deg=180.0))
+
+
+def test_arc_180_in_3_sections_is_60_degrees_each_and_fans_about_up():
+    st = _st(sides=3, arc_deg=180.0, inradius_in=72.0, overhang_in=0.0)
+    assert len(pg.face_planes(st)) == 3                    # three facets present
+    corners = pg.wall_polygon(st)
+    assert len(corners) == 4                               # n + 1 corners, open
+    # the fan is centred on up: the middle facet's normal points straight up
+    assert pg.face_normals(st)[1] == pytest.approx((0.0, -1.0))
+    # the two end corners sit on the x-axis (the flat cut back), bulge upward
+    R = pg.circumradius(st)
+    assert corners[0] == pytest.approx((-R, 0.0))
+    assert corners[-1] == pytest.approx((R, 0.0))
+    assert all(y <= 1e-6 for _, y in corners)              # nothing below the back
+
+
+def test_the_open_wedge_has_no_surface():
+    st = _st(sides=3, arc_deg=180.0)
+    assert pg.surface_height(st, (0.0, -10.0)) is not None  # up: under a facet
+    assert pg.surface_height(st, (0.0, 10.0)) is None       # down: the open wedge
+    assert pg.surface_height(st, (0.0, 0.0)) is not None    # the apex is roofed
+    # plane_height is still DEFINED everywhere (never None): the weld and the
+    # wall-climb read it, but only within the present facets, where it is the
+    # real surface. Behind a facet the continued plane simply rises past the apex.
+    assert math.isfinite(pg.plane_height(st, (0.0, 10.0)))
+    # in front of a facet (up) it is the true surface, at or below the apex
+    assert pg.plane_height(st, (0.0, -10.0)) <= pg.apex_height(st) + 1e-9
+
+
+def test_convex_cells_are_the_polygon_whole_and_facet_triangles_for_an_arc():
+    assert len(pg.convex_cells(_st(sides=6))) == 1                     # one n-gon
+    cells = pg.convex_cells(_st(sides=5, arc_deg=200.0))
+    assert len(cells) == 5 and all(len(c) == 3 for c in cells)         # fan of tris
+    assert all(c[0] == (0.0, 0.0) for c in cells)                      # apex-anchored
+
+
+def test_bbox_stays_centred_on_the_apex_for_an_arc():
+    st = _st(sides=3, arc_deg=180.0, inradius_in=72.0, overhang_in=0.0)
+    w, d = pg.bbox(st)
+    pts = pg.footprint(st)                        # apex + eave corners (the fan)
+    assert w == pytest.approx(2.0 * max(abs(x) for x, _ in pts))
+    assert d == pytest.approx(2.0 * max(abs(y) for _, y in pts))
+
+
+def test_summary_and_plan_symbol_reflect_an_arc():
+    derived, _ = PYRAMID_ROOF.evaluate({"sides": 3, "arc_deg": 180.0},
+                                       {"room_present": True, "ceiling_in": 96.0})
+    plan = dict(PYRAMID_ROOF.summary({"sides": 3, "arc_deg": 180.0}, derived, {}))["Plan"]
+    assert "arc" in plan and "3 sections" in plan and "60" in plan
+    # the plan symbol draws one hip per eave corner: sides + 1 for an open arc
+    sym = PYRAMID_ROOF.plan_symbol({"sides": 3, "arc_deg": 180.0})
+    assert [p[0] for p in sym["prims"]].count("line") == 4

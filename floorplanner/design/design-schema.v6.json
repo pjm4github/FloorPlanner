@@ -539,7 +539,8 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "sides":       { "description": "3 to 12; one face per side.", "type": "integer", "minimum": 3, "maximum": 12 },
+        "sides":       { "description": "3 to 12; the number of facets (sections). At a 360 arc this is the regular polygon's side count.", "type": "integer", "minimum": 3, "maximum": 12 },
+        "arc_deg":     { "description": "The angular sweep. 360 (default) is a whole gazebo; below it the facets fan symmetrically about the up direction and the rest is an open pie wedge. Each section spans arc_deg / sides degrees.", "type": "number", "minimum": 15, "maximum": 360, "default": 360 },
         "inradius_in": { "description": "Centre to the WALL line (the eaves-start line); the run the pitch climbs to the apex.", "type": "number", "exclusiveMinimum": 0 },
         "eaves_h_in":  { "description": "The eaves-start line above this level. Under room_top it follows the room's ceiling.", "type": "number" },
         "eaves_bind":  { "description": "room_top: the eaves follow the room's ceiling_height_in. manual: set by hand.", "enum": ["room_top", "manual"] },

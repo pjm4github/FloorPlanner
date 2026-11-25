@@ -791,8 +791,9 @@ def _roof_underside_at(lifted_of, x, y, above_z, pyramids=()):
     for py in pyramids:
         if PYRAMIDGEO is None:
             break
-        if not ROOFCLIP._contains([ROOFCLIP.Pt(fx, fy) for fx, fy in py["fp"]], pt):
-            continue
+        # `surface_height` is None past the eave AND (for an arc) in the open
+        # pie wedge, so it alone decides whether a pyramid stands over the post
+        # -- the eave-polygon test would wrongly close an arc fan's cut edge.
         local = PYRAMIDGEO.to_local(py["pos"], py["rot"], (x, y))
         h = PYRAMIDGEO.surface_height(py["st"], local)
         if h is None:
@@ -3378,6 +3379,12 @@ def _pyramid_surfaces(doc, lv, base):
             "id": fu.get("id") or f"pyramid_{n}", "lid": lid,
             "pos": (cx, cy), "rot": rot, "st": st, "z0": base(lid),
             "fp": [PG.to_plan((cx, cy), rot, v) for v in PG.eaves_polygon(st)],
+            # convex plan cells (0367 arc): one eave n-gon when whole, one
+            # triangle per facet for an arc -- the wall-climb and the weld split
+            # on these so a partial (even reflex) fan stays convex.
+            "cells": [[PG.to_plan((cx, cy), rot, v) for v in cell]
+                      for cell in PG.convex_cells(st)],
+            "full": PG.is_full(st),
             "buildable": st["pitch_12"] > 0.0})
     return out
 
@@ -3424,10 +3431,13 @@ def _pyramid_face_meshes(surfaces, model, roof_comps=()):
 
 def _pyramid_terr(surfaces, Pt):
     """0367 stage 2: buildable pyramids as wall-climb territories for
-    `_wall_under_roofs` -- `(surface, [eave cell], is_dormer=False, level)`. The
-    eave polygon is convex (a regular n-gon), so it is one territory cell."""
+    `_wall_under_roofs` -- `(surface, cells, is_dormer=False, level)`. A whole
+    gazebo's eave polygon is convex, so it is one cell; an arc is a fan of
+    convex facet triangles (its `cells`), so only walls under a present facet
+    climb and none climbs under the open wedge."""
     return [(_PyramidSurface(s["pos"], s["rot"], s["st"], s["z0"]),
-             [[Pt(x, y) for x, y in s["fp"]]], False, s["lid"])
+             [[Pt(x, y) for x, y in cell] for cell in s["cells"]],
+             False, s["lid"])
             for s in surfaces if s["buildable"]]
 
 
@@ -3489,11 +3499,18 @@ def _emit_welded(parts, ring3d, plan_poly, h_fn, comps):
         parts.append(_prism_slab([(c.x(), -c.y(), h_fn(c)) for c in poly], ROOF_T))
 
 
-def _pyr_competitor(s):
-    """A buildable, welding pyramid as a competitor to the roofs under it."""
+def _pyr_competitors(s):
+    """A buildable, welding pyramid as competitor(s) to the roofs under it.
+    A whole gazebo is ONE competitor -- its convex eave polygon, split into
+    single planes by its hip cut-lines, exactly as before (byte-identical). An
+    arc is ONE competitor PER facet triangle: each is a single plane over a
+    convex cell, so no cut-lines are needed and a reflex fan stays convex."""
     surf = _PyramidSurface(s["pos"], s["rot"], s["st"], s["z0"])
-    return {"fp": [ROOFCLIP.Pt(x, y) for x, y in s["fp"]],
-            "h": surf.height_at, "cuts": surf.cut_lines(ROOFCLIP.Pt)}
+    if s["full"]:
+        return [{"fp": [ROOFCLIP.Pt(x, y) for x, y in s["cells"][0]],
+                 "h": surf.height_at, "cuts": surf.cut_lines(ROOFCLIP.Pt)}]
+    return [{"fp": [ROOFCLIP.Pt(x, y) for x, y in cell],
+             "h": surf.height_at, "cuts": []} for cell in s["cells"]]
 
 
 def build_model(doc, levels=None, furnishings=True, wall_height=None,
@@ -4218,8 +4235,9 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         roof_parts = list(riser_parts)
         # 0367 stage 3: the welding pyramids, as competitors that CUT the roofs
         # under them -- a roof is drawn only where it is higher than the pyramid.
-        _pyr_weld = [_pyr_competitor(s) for s in pyramid_up
-                     if s["st"].get("weld", "auto") == "auto"]
+        _pyr_weld = [c for s in pyramid_up
+                     if s["st"].get("weld", "auto") == "auto"
+                     for c in _pyr_competitors(s)]
         # 0352 phase 3 balcony: the host roof in FRONT of a balcony dormer's face
         # is cut away and a flat deck laid at the dormer level's floor.
         # `terrace_checks` was computed with the clips above (also used to free

@@ -27,6 +27,25 @@ of Patrick's gitignored `fixtures/incoming/` plans). The weld is proven on E2/E4
 and timed on the three-roof junction (C2); E3 renders the moment the file is
 dropped in. E5 here stands in for E3-with-`weld:off` as the whole-both contrast.
 
+## Arc (a partial gazebo — a pie wedge left open)
+
+`arc_deg` is the angular sweep and `sides` the number of facets in it, so each
+facet spans `arc_deg / sides` degrees. At 360 (the default) the facets close
+into the regular polygon above, **byte-identical** to before. Below 360 the
+facets fan **symmetrically about up** (face 0's direction at rotation 0) and the
+rest is an **open** pie wedge — no vertical cut face, no gable wall. Everything
+downstream (plan symbol, 3D faces, walls, posts, weld) reads the present facets
+only, so a `sides`-facet arc builds `sides` faces.
+
+| ID | Case | sides | arc | Plan | Image (3D) | Patrick's check |
+| -- | ---- | ----- | --- | ----- | ---------- | --------------- |
+| E6 | a half-gazebo — 180° in 3 sections (60° each), the back half open to the peak, a post under each present eave corner | 3 | 180 | [json](E6-half-gazebo-arc.json) | [png](E6-half-gazebo-arc.png) | |
+
+Patrick's check: open `E6-half-gazebo-arc.json`, 3D view — three facets rise to
+the central peak, the back half is open (no roof, no wall), the posts rise to
+the eave; in plan the symbol is the fan (the open wedge is not drawn). A whole
+gazebo (E1) is unchanged.
+
 ## Conditions
 
 - **C1 — one geometry.** The plan symbol, the dialog, the 3D faces, the
