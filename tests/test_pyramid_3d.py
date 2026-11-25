@@ -176,3 +176,81 @@ def test_a_flat_pyramid_does_not_cap_the_walls(fp3d):
                                   "eaves_bind": "manual", "eaves_h_in": 120.0,
                                   "pitch_12": 0.0})]}, floors=False)
     assert _ext_wall_top(fp3d, model) == pytest.approx(96.0, abs=0.5)
+
+
+# -- R4: the weld (stage 3) ---------------------------------------------------
+# a gable (ridge along x at y=200, eaves 96, ridge 150) with a square pyramid
+# astride the ridge: apex 170 above the ridge, so the pyramid pokes up at the
+# centre and dies into the gable toward its corners. E4.
+def _astride_doc(weld="auto"):
+    roof = {"id": "rf1", "level": "L1", "ridge": [[100, 200], [300, 200]],
+            "eaves_h_in": 96.0, "ridge_h_in": 150.0, "span_in": [100, 100],
+            "overhang_in": [12, 12], "gable": [True, True]}
+    pyr = _pyramid({"sides": 4, "inradius_in": 60.0, "eaves_bind": "manual",
+                    "eaves_h_in": 110.0, "pitch_12": 12.0, "overhang_in": 10.0,
+                    "weld": weld})
+    return {"levels": [{"id": "L1", "elevation_in": 0.0, "height_in": 96.0}],
+            "vertices": [], "walls": [], "rooms": [], "furnishings": [pyr],
+            "roofs": [roof]}
+
+
+def _top_surfaces_over(model, x, y):
+    """The distinct UPWARD roof surfaces (interpolated z) standing over plan
+    point (x, y) -- one per real surface, so a welded point has ONE and an
+    un-welded overlap has two. Mesh frame is (x, -y)."""
+    import numpy as np
+    my = -y
+    zs = []
+    for m in model.meshes:
+        if m.name not in ("roofs", "pyramid_error"):
+            continue
+        v, faces = m.verts, m.faces
+        for a, b, c in faces:
+            pa, pb, pc = v[a], v[b], v[c]
+            # upward-facing only (prism-slab top caps), so bottoms/sides drop out
+            n = np.cross(pb - pa, pc - pa)
+            if n[2] <= 1e-6:
+                continue
+            d = ((pb[1] - pc[1]) * (pa[0] - pc[0]) + (pc[0] - pb[0]) * (pa[1] - pc[1]))
+            if abs(d) < 1e-9:
+                continue
+            wa = ((pb[1] - pc[1]) * (x - pc[0]) + (pc[0] - pb[0]) * (my - pc[1])) / d
+            wb = ((pc[1] - pa[1]) * (x - pc[0]) + (pa[0] - pc[0]) * (my - pc[1])) / d
+            wc = 1 - wa - wb
+            if wa < -1e-6 or wb < -1e-6 or wc < -1e-6:
+                continue
+            zs.append(float(wa * pa[2] + wb * pb[2] + wc * pc[2]))
+    zs.sort(reverse=True)
+    out = []
+    for z in zs:
+        if not out or abs(out[-1] - z) > 1.0:
+            out.append(z)
+    return out
+
+
+def test_weld_off_leaves_both_surfaces_whole(fp3d):
+    # over the apex, the pyramid (170) AND the gable (150) are both drawn
+    levels = _top_surfaces_over(fp3d.build_model(_astride_doc("off"), floors=False),
+                                200.0, 200.0)
+    assert len(levels) == 2
+    assert levels[0] == pytest.approx(170.0, abs=1.0)   # pyramid apex
+    assert levels[1] == pytest.approx(150.0, abs=2.0)   # gable ridge, under it
+
+
+def test_weld_cuts_the_roof_under_the_pyramid(fp3d):
+    # C4 fail-first: the cut removes the gable under the apex, leaving ONE
+    # surface -- the higher pyramid. (weld off above leaves two.)
+    levels = _top_surfaces_over(fp3d.build_model(_astride_doc("auto"), floors=False),
+                                200.0, 200.0)
+    assert len(levels) == 1
+    assert levels[0] == pytest.approx(170.0, abs=1.0)
+
+
+def test_weld_cuts_the_pyramid_where_the_roof_is_higher(fp3d):
+    # near a pyramid corner (x=200+42,y=200) the gable is higher than the
+    # pyramid, so the pyramid is cut there and only the gable stands
+    x, y = 245.0, 200.0
+    auto = _top_surfaces_over(fp3d.build_model(_astride_doc("auto"), floors=False), x, y)
+    off = _top_surfaces_over(fp3d.build_model(_astride_doc("off"), floors=False), x, y)
+    assert len(auto) == 1 and auto[0] == pytest.approx(150.0, abs=3.0)   # gable only
+    assert len(off) == 2            # weld off: pyramid still drawn below the gable

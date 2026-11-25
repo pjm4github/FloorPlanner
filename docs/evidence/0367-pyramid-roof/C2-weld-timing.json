@@ -1,0 +1,25 @@
+{
+  "note": "pairwise pyramid weld; no compute_roof_clips",
+  "cases": {
+    "one roof + pyramid": {
+      "ms_per_weld": 0.4092,
+      "iters": 2000,
+      "overlaps": 1,
+      "cells": 10,
+      "boundaries": 8,
+      "pyramid_pieces": 10,
+      "roof_pieces": 8,
+      "returned": true
+    },
+    "three-roof junction + pyramid (0350 \u00a71)": {
+      "ms_per_weld": 0.9346,
+      "iters": 2000,
+      "overlaps": 3,
+      "cells": 22,
+      "boundaries": 16,
+      "pyramid_pieces": 22,
+      "roof_pieces": 16,
+      "returned": true
+    }
+  }
+}

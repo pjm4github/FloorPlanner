@@ -1,0 +1,145 @@
+{
+  "format": "floorplanner-design",
+  "version": 6,
+  "units": "inches",
+  "levels": [
+    {
+      "id": "L1",
+      "name": "Main",
+      "elevation_in": 0.0,
+      "height_in": 96.0
+    }
+  ],
+  "vertices": [
+    {
+      "id": "a",
+      "level": "L1",
+      "x": 80,
+      "y": 120
+    },
+    {
+      "id": "b",
+      "level": "L1",
+      "x": 320,
+      "y": 120
+    },
+    {
+      "id": "c",
+      "level": "L1",
+      "x": 320,
+      "y": 280
+    },
+    {
+      "id": "d",
+      "level": "L1",
+      "x": 80,
+      "y": 280
+    }
+  ],
+  "walls": [
+    {
+      "id": "w0",
+      "level": "L1",
+      "v1": "a",
+      "v2": "b",
+      "type": "exterior"
+    },
+    {
+      "id": "w1",
+      "level": "L1",
+      "v1": "b",
+      "v2": "c",
+      "type": "exterior"
+    },
+    {
+      "id": "w2",
+      "level": "L1",
+      "v1": "c",
+      "v2": "d",
+      "type": "exterior"
+    },
+    {
+      "id": "w3",
+      "level": "L1",
+      "v1": "d",
+      "v2": "a",
+      "type": "exterior"
+    }
+  ],
+  "rooms": [
+    {
+      "id": "r",
+      "level": "L1",
+      "name": "Room",
+      "category": "interior",
+      "outline": [
+        {
+          "v": "a"
+        },
+        {
+          "v": "b"
+        },
+        {
+          "v": "c"
+        },
+        {
+          "v": "d"
+        }
+      ],
+      "placement": {
+        "state": "placed"
+      }
+    }
+  ],
+  "roofs": [
+    {
+      "id": "rf1",
+      "level": "L1",
+      "ridge": [
+        [
+          110,
+          200
+        ],
+        [
+          290,
+          200
+        ]
+      ],
+      "eaves_h_in": 96.0,
+      "ridge_h_in": 150.0,
+      "span_in": [
+        80,
+        80
+      ],
+      "overhang_in": [
+        14,
+        14
+      ],
+      "gable": [
+        true,
+        true
+      ]
+    }
+  ],
+  "furnishings": [
+    {
+      "id": "bay",
+      "level": "L1",
+      "kind": "pyramid_roof",
+      "pos": [
+        200,
+        280
+      ],
+      "rotation": 0.0,
+      "state": {
+        "sides": 8,
+        "inradius_in": 44.0,
+        "eaves_bind": "manual",
+        "eaves_h_in": 104.0,
+        "pitch_12": 9.0,
+        "overhang_in": 10.0,
+        "weld": "auto"
+      }
+    }
+  ]
+}
