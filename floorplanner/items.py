@@ -16,6 +16,7 @@ from floorplanner.catalog import *  # noqa: F401
 from floorplanner.parametric import registry as _param_registry
 from floorplanner.parametric import stair_geometry as _sg
 from floorplanner.parametric import dormer_geometry as _dg
+from floorplanner.parametric import pyramid_geometry as _pg
 from floorplanner.walls import OpeningItem, WallItem, rebuild_all_walls
 from floorplanner.rooms import (
     RoomItem, report_self_intersections, room_owns_walls, walls_cover_room,
@@ -300,6 +301,12 @@ class FurnishingItem(QGraphicsItem):
                 "room_style": self._room_style(),
                 "ceiling_in": self._room_ceiling()}
 
+    def _plan_ink(self):
+        """The ink a parameter-driven plan symbol is drawn in -- the standard
+        slate. 0367 (C5): a furnishing that cannot be built as drawn overrides
+        this to RED, so a broken pyramid roof still draws and reads as broken."""
+        return QColor(55, 65, 81)
+
     def _paint_plan_symbol(self, painter, symbol):
         """0338: a plan symbol drawn from the item's PARAMETERS -- an island
         with its own slots, sink, cooktop and one stool per seat. `symbol`
@@ -311,7 +318,7 @@ class FurnishingItem(QGraphicsItem):
             self._paint_plan_prims(painter, symbol["prims"])
             return
         top = -self.d / 2.0
-        ink = QColor(55, 65, 81)
+        ink = self._plan_ink()
 
         def box(x0, f0, x1, f1):
             return QRectF(QPointF(x0, top + f0), QPointF(x1, top + f1))
@@ -351,7 +358,7 @@ class FurnishingItem(QGraphicsItem):
         (rounded white), line/dline, dot (small outline circle), bulb (a lit
         mark). Shared by the vanity and the mirror so each draws as its type."""
         top = -self.d / 2.0
-        ink = QColor(55, 65, 81)
+        ink = self._plan_ink()
 
         def pt(x, f):
             return QPointF(x, top + f)
@@ -361,7 +368,18 @@ class FurnishingItem(QGraphicsItem):
 
         for prim in prims:
             op = prim[0]
-            if op in ("outline", "panel", "dashed"):
+            if op == "poly":
+                # 0367: a CLOSED polygon (the pyramid roof's wall-line and eave
+                # outlines). `("poly", style, [(x, f), ...])`; style solid /
+                # dashed / panel (panel fills). Points in the same (x, f) frame.
+                _o, style, points = prim
+                pen_style = (Qt.PenStyle.DashLine if style == "dashed"
+                             else Qt.PenStyle.SolidLine)
+                painter.setPen(QPen(ink, 1.0, pen_style))
+                painter.setBrush(QBrush(QColor(248, 250, 252))
+                                 if style == "panel" else Qt.BrushStyle.NoBrush)
+                painter.drawPolygon(QPolygonF([pt(x, f) for x, f in points]))
+            elif op in ("outline", "panel", "dashed"):
                 _o, x0, f0, x1, f1 = prim
                 style = (Qt.PenStyle.DashLine if op == "dashed"
                          else Qt.PenStyle.SolidLine)
@@ -1678,6 +1696,198 @@ class DormerGripItem(QGraphicsItem):
             super().mouseDoubleClickEvent(e)
 
 
+def _dist_point_seg(px, py, ax, ay, bx, by):
+    """Distance from the point (px, py) to the segment (ax, ay)-(bx, by)."""
+    dx, dy = bx - ax, by - ay
+    d2 = dx * dx + dy * dy
+    if d2 <= 1e-12:
+        return math.hypot(px - ax, py - ay)
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / d2))
+    return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+
+
+class PyramidRadiusGrip(QGraphicsItem):
+    """The one control knob on a selected `PyramidRoofItem` (0367 stage 2): the
+    INRADIUS -- centre to the wall line. A Qt CHILD of the pyramid, so it rides
+    its move and rotation; `PyramidRoofItem._place_grips` sets its position on
+    the wall line, up the screen at rotation 0. Dragging it resizes the pyramid
+    live, snapping the radius to the grid unless Shift is held. Sized in VIEW
+    PIXELS so it stays grabbable at any zoom (like the dormer's knobs)."""
+
+    SIZE = 3.2            # drawn glyph half-size, scene inches at 1:1
+    HIT_PX = 11.0         # clickable half-size, view pixels
+    _COLOR = QColor(0, 160, 170)       # teal, as the dormer's half-width knob
+
+    def __init__(self, pyramid):
+        super().__init__(pyramid)
+        self.pyramid = pyramid
+        self._dragging = False
+        self.setZValue(6)
+        self.setAcceptHoverEvents(True)
+        self.setToolTip("Inradius (knob) — centre to the wall line. Drag to "
+                        "resize; snaps to the grid unless Shift is held.")
+
+    def _view_scale(self) -> float:
+        sc = self.scene()
+        if sc and sc.views():
+            return max(sc.views()[0].transform().m11(), 1e-6)
+        return 1.0
+
+    def _half(self) -> float:
+        return max(self.SIZE, self.HIT_PX / self._view_scale())
+
+    def boundingRect(self) -> QRectF:
+        r = self._half() + 2.0
+        return QRectF(-r, -r, 2.0 * r, 2.0 * r)
+
+    def shape(self) -> QPainterPath:
+        path = QPainterPath()
+        h = self._half()
+        path.addRect(QRectF(-h, -h, 2.0 * h, 2.0 * h))
+        return path
+
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        s = self.SIZE
+        painter.setBrush(QBrush(QColor(255, 255, 255)))
+        painter.setPen(QPen(self._COLOR, 1.4))
+        painter.drawRect(QRectF(-s, -s, 2.0 * s, 2.0 * s))
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.MouseButton.LeftButton:
+            self._dragging = True
+            e.accept()
+        else:
+            super().mousePressEvent(e)
+
+    def mouseMoveEvent(self, e):
+        if self._dragging:
+            free = bool(e.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+            self.pyramid.drag_radius(e.scenePos(), free)
+            e.accept()
+        else:
+            super().mouseMoveEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        if self._dragging and e.button() == Qt.MouseButton.LeftButton:
+            self._dragging = False
+            free = bool(e.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+            self.pyramid.drag_radius(e.scenePos(), free)
+            e.accept()
+        else:
+            super().mouseReleaseEvent(e)
+
+
+class PyramidRoofItem(FurnishingItem):
+    """A PYRAMID-ROOF furnishing (0367 stage 2).
+
+    Dropped on a ceiling to roof a bump-out -- a pyramid over a regular polygon
+    (a bay / gazebo / turret). Like the dormer it OWNS NO WALL: the walls under
+    it are whatever the user draws, and in 3D they rise to its surface. Its
+    POSITION is the CENTRE (the apex in plan); `rotation` turns it, face 0's
+    outward normal up the screen at 0. The plan symbol -- the wall-line and eave
+    polygons, the hips and the apex -- is drawn by the base item from
+    `PyramidRoofKind.plan_symbol`, which reads `pyramid_geometry` (C1). One knob
+    sets the inradius, snapping to the grid unless Shift is held.
+
+    THE ROOM IT SITS ON is the room under its centre, found at use (R3):
+    `param_context` hands the kind that room's presence and ceiling, so under
+    the `room_top` bind the eaves follow the ceiling. A pyramid that cannot be
+    built (a flat pitch) still loads and draws, RED (C5)."""
+
+    def __init__(self, pos: QPointF, rotation: float = 0.0, *,
+                 params: dict = None, new: bool = False):
+        self.params = _pg.normalize_state(params or _pg.STATE_DEFAULTS)
+        self._radius_grip = None
+        super().__init__("pyramid_roof", pos, rotation)
+        self._apply_footprint()
+        self._place_grips()
+
+    # -- state ---------------------------------------------------------------
+    def extra_state(self) -> dict:
+        return {k: self.params[k] for k in _pg.STATE_DEFAULTS}
+
+    def draft_state(self) -> dict:
+        return dict(self.params)
+
+    def apply_params(self, state: dict):
+        """Take an accepted (or dragged) parameter set and redraw. The CENTRE
+        stays put (it is the item's position), so nothing is shifted."""
+        self.params = _pg.normalize_state(state)
+        self._apply_footprint()
+        self._place_grips()
+        self.update()
+
+    # -- the room it sits on (R3) --------------------------------------------
+    def param_context(self) -> dict:
+        ctx = super().param_context()
+        room = self._owning_room()
+        ctx["room_present"] = room is not None
+        off = self._off_room_in(room)
+        if off is not None:
+            ctx["off_room_in"] = off
+        return ctx
+
+    def _off_room_in(self, room):
+        """How far the wall-line polygon stands off the room's outline, in
+        inches -- the greatest distance from a wall-line corner (in plan) to the
+        room's boundary (feeds `pyramid.off_room`, advisory). None with no
+        room, so the finding only fires when there is a room to be off."""
+        if room is None:
+            return None
+        edges = []
+        for poly in room.path.toSubpathPolygons():
+            pts = [poly.at(i) for i in range(poly.count())]
+            edges += list(zip(pts, pts[1:], strict=False))
+        if not edges:
+            return None
+        pos = (self.pos().x(), self.pos().y())
+        rot = self.rotation()
+        worst = 0.0
+        for v in _pg.wall_polygon(self.params):
+            px, py = _pg.to_plan(pos, rot, v)
+            d = min(_dist_point_seg(px, py, a.x(), a.y(), b.x(), b.y())
+                    for a, b in edges)
+            worst = max(worst, d)
+        return worst
+
+    # -- C5: a broken pyramid draws red --------------------------------------
+    def _buildable(self) -> bool:
+        return float(self.params.get("pitch_12", 0.0)) > 0.0
+
+    def _plan_ink(self):
+        return (QColor(185, 28, 28) if not self._buildable()
+                else super()._plan_ink())
+
+    # -- the radius knob -----------------------------------------------------
+    def _place_grips(self):
+        if self._radius_grip is None:
+            self._radius_grip = PyramidRadiusGrip(self)
+        self._radius_grip.setPos(QPointF(0.0, -float(self.params["inradius_in"])))
+        self._radius_grip.setVisible(self._handle_visible())
+
+    def itemChange(self, change, value):
+        if (change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged
+                and self._radius_grip is not None):
+            self._radius_grip.setVisible(self._handle_visible())
+        return super().itemChange(change, value)
+
+    def drag_radius(self, scene_pt: QPointF, free: bool):
+        """Resize to the dragged inradius, snapped to the grid unless Shift
+        (`free`). The knob rides the rotation, so the distance from the centre
+        in the item frame is the inradius whichever way it is turned."""
+        local = self.mapFromScene(scene_pt)
+        r = math.hypot(local.x(), local.y())
+        step = SNAP_STEP if free else SETTINGS["wall_snap_in"]
+        r = round(r / step) * step
+        r = max(_pg.MIN_INRADIUS_IN, min(600.0, r))
+        if abs(r - float(self.params["inradius_in"])) < 1e-9:
+            return
+        st = dict(self.params)
+        st["inradius_in"] = r
+        self.apply_params(st)
+
+
 def make_furnishing(kind: str, pos: QPointF, rotation: float = 0.0,
                     state: dict = None, *, new: bool = False):
     """Create the right item for a catalog `kind`: a dynamic StairItem for
@@ -1707,6 +1917,8 @@ def make_furnishing(kind: str, pos: QPointF, rotation: float = 0.0,
                          direction=state.get("direction", "up"))
     if kind == "dormer":                              # 0352 phase 2
         return DormerItem(pos, rotation, params=state or None, new=new)
+    if kind == "pyramid_roof":                        # 0367 stage 2
+        return PyramidRoofItem(pos, rotation, params=state or None, new=new)
     item = FurnishingItem(kind, pos, rotation)
     if state and _param_registry.is_parametric(kind):
         item.params = dict(state)

@@ -824,6 +824,17 @@ FURNISHINGS = [
       L(6, 6, 114, 6, 0.8),                                     # face / rake
       L(6, 6, 6, 90, 0.8), L(114, 6, 114, 90, 0.8),             # eaves
       L(6, 90, 60, 72, 0.7), L(114, 90, 60, 72, 0.7)]),         # valleys
+    # 0367 (pyramid-roof furnishing): the palette icon -- a regular hexagon
+    # (the default side count), its hips running from each corner in to the
+    # apex, and the apex dot. The PLACED pyramid is drawn live by the app
+    # (PyramidRoofItem) from its own parameters; this is only the thumbnail.
+    ("pyramid_roof", "Pyramid Roof", "Framing", 168, 168,
+     [Pth("M 162 84 L 123 16.5 L 45 16.5 L 6 84 L 45 151.5 L 123 151.5 Z",
+          fill=FILL, sw=1.4),                                   # eave hexagon
+      L(84, 84, 162, 84, 0.7), L(84, 84, 123, 16.5, 0.7),       # hips
+      L(84, 84, 45, 16.5, 0.7), L(84, 84, 6, 84, 0.7),
+      L(84, 84, 45, 151.5, 0.7), L(84, 84, 123, 151.5, 0.7),
+      Ci(84, 84, 2.6, "#1f2937", 0.6)]),                        # apex
 ]
 
 # --------------------------------------------------------------- 3D solids
@@ -1046,6 +1057,11 @@ SOLIDS = {
     # (phase 3); the furnishing box is SKIPPED in 3D. This nominal exists only
     # so the data-model gate is satisfied -- it is never extruded.
     "dormer":                 (60,      0, "box",       "wood"),
+    # 0367 (pyramid-roof furnishing): a pyramid roof's real 3D is its ROOF,
+    # built by fp3d from the furnishing's own geometry
+    # (pyramid_geometry.face_planes), not from this box; the nominal exists
+    # only so the data-model gate is satisfied -- it is never extruded.
+    "pyramid_roof":           (60,      0, "box",       "wood"),
 }
 
 # Material properties, ONCE.  Colour is (r, g, b, a) in 0..1.  These values are
@@ -1744,7 +1760,7 @@ def main():
                   "gas_water_heater", "electric_water_heater", "water_softener",
                   "gas_tank", "oil_tank", "electric_panel", "car_charger",
                   "battery_wall", "well_pump", "heat_exchanger"]),
-        ("Framing", ["stairs", "elevator", "post", "dormer"]),
+        ("Framing", ["stairs", "elevator", "post", "dormer", "pyramid_roof"]),
     ]
     groups_out = [{"name": "All",
                    "items": [f"{fid}.svg" for fid, *_ in FURNISHINGS]}]

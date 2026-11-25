@@ -162,14 +162,30 @@ def face_at(st, p):
     return bi
 
 
+def _max_proj(st, p):
+    """The FARTHEST local point `p` reaches along any face's outward normal --
+    the one quantity the pyramid's height is a function of."""
+    n = st["sides"]
+    return max(p[0] * math.sin(_angle(k, n)) + p[1] * -math.cos(_angle(k, n))
+               for k in range(n))
+
+
+def plane_height(st, p):
+    """The height of the pyramid's planes CONTINUED to local point `p` -- `apex_h`
+    minus the pitch times `_max_proj`. Unlike `surface_height` it NEVER returns
+    None: past the eave the planes simply continue, as a ridge roof's side
+    planes do. The wall-climb and the weld read here, so there is ONE height
+    formula (condition C1)."""
+    return apex_height(st) - _rise(st) * _max_proj(st, p)
+
+
 def surface_height(st, p):
     """The roof's height at local point `p`, or None past the eave. Every face
     is the plane `apex_h - (pitch/12) * (p . normal)`; the pyramid surface at
     `p` is the governing face's, so it is `apex_h` minus the pitch times the
-    FARTHEST the point reaches along any face normal."""
-    n = st["sides"]
-    m = max(p[0] * math.sin(_angle(k, n)) + p[1] * -math.cos(_angle(k, n))
-            for k in range(n))
+    FARTHEST the point reaches along any face normal (`plane_height`). Returns
+    None once `p` is past the eave edge -- there is no roof there."""
+    m = _max_proj(st, p)
     reach = st["inradius_in"] + st["overhang_in"]
     if m > reach + 1e-6:
         return None

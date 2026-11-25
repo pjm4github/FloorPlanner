@@ -115,7 +115,8 @@
       "stairs.svg",
       "elevator.svg",
       "post.svg",
-      "dormer.svg"
+      "dormer.svg",
+      "pyramid_roof.svg"
     ]
   },
   {
@@ -308,7 +309,8 @@
       "stairs.svg",
       "elevator.svg",
       "post.svg",
-      "dormer.svg"
+      "dormer.svg",
+      "pyramid_roof.svg"
     ]
   }
 ]

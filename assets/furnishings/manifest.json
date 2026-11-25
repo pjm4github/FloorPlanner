@@ -2094,5 +2094,21 @@
     "side_file": null,
     "cabinet": null,
     "price": 0.0
+  },
+  {
+    "id": "pyramid_roof",
+    "name": "Pyramid Roof",
+    "category": "Framing",
+    "file": "pyramid_roof.svg",
+    "width_in": 168,
+    "depth_in": 168,
+    "height_in": 60,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": null,
+    "price": 0.0
   }
 ]

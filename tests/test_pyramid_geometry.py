@@ -123,10 +123,11 @@ def test_to_local_inverts_to_plan():
 
 
 # -- the kind ---------------------------------------------------------------
-def test_the_kind_is_built_but_not_registered():
+def test_the_kind_is_registered():
+    # stage 2 registers it (stage 1 withheld `register()`)
     assert PYRAMID_ROOF.kind == "pyramid_roof"
-    assert registry.get("pyramid_roof") is None
-    assert not registry.is_parametric("pyramid_roof")
+    assert registry.get("pyramid_roof") is PYRAMID_ROOF
+    assert registry.is_parametric("pyramid_roof")
 
 
 def test_specs_cover_the_state_and_eaves_height_is_manual_only():

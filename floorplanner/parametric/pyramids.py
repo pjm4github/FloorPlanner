@@ -1,10 +1,13 @@
-"""The PYRAMID-ROOF parametric kind (0367 stage 1): its parameters, what its
-dialog reports, and its findings. The arithmetic is `pyramid_geometry.py`.
+"""The PYRAMID-ROOF parametric kind (0367): its parameters, what its dialog
+reports, its plan symbol and its findings. The arithmetic is
+`pyramid_geometry.py`.
 
-BUILT, NOT REGISTERED. Stage 1 withholds `register()` -- nothing offers a
-pyramid roof in the palette or draws one until stage 2 gives it an item, a
-symbol and a dialog (exactly as the dormer's phase 1 built `DormerKind` before
-`DormerItem` could draw it). Import `PYRAMID_ROOF` to exercise the contract.
+REGISTERED (stage 2) now that `PyramidRoofItem` draws one and the catalog
+offers it in the Framing group: a drag from the palette places it on the room
+under the drop, a double-click opens the generic dialog, and the plan symbol is
+drawn from the parameters (the wall-line and eave polygons, the hips and the
+apex). Stage 1 built the kind but withheld `register()`, exactly as the
+dormer's phase 1 built `DormerKind` before `DormerItem` could draw it.
 
 `context` (all optional) is what the item will know about where it stands:
 
@@ -21,7 +24,7 @@ from floorplanner.parametric import pyramid_geometry as pg
 from floorplanner.parametric.findings import ADVISORY, ERROR, WARNING, Finding
 from floorplanner.parametric.params import (
     ENUM, FLOAT, INT, ParamSpec, pitch_unit_modes)
-from floorplanner.parametric.registry import ParametricKind
+from floorplanner.parametric.registry import ParametricKind, register
 
 
 def _fmt(x, places=1):
@@ -171,7 +174,28 @@ class PyramidRoofKind(ParametricKind):
     def footprint(self, state):
         return pg.bbox(pg.normalize_state(state))
 
+    def plan_symbol(self, state):
+        """The plan symbol drawn from the parameters (C1: `pyramid_geometry`):
+        the eave polygon (solid), the wall-line polygon (dashed), the hips
+        (apex to each eave corner) and the apex dot. A generic `{"prims": ...}`
+        list in the item's frame -- x across, `f` DOWN from the top edge, as
+        `FurnishingItem._paint_plan_prims` reads it. The eave bbox is symmetric
+        about the centre, so the item's `pos` (the apex in plan) sits at
+        `f = depth / 2` and the local point `(x, y)` is `(x, y + depth / 2)`."""
+        st = pg.normalize_state(state)
+        half = pg.bbox(st)[1] / 2.0          # the eave bbox depth, halved
 
-# Built, NOT registered (stage 1). Stage 2 adds `register(PyramidRoofKind())`
-# once the item, the catalog symbol and the plan drawing exist.
-PYRAMID_ROOF = PyramidRoofKind()
+        def f(y):
+            return y + half
+
+        prims = [("poly", "solid", [(x, f(y)) for x, y in pg.eaves_polygon(st)]),
+                 ("poly", "dashed", [(x, f(y)) for x, y in pg.wall_polygon(st)])]
+        prims += [("line", 0.0, half, cx, f(cy))
+                  for (_apex, (cx, cy)) in pg.hips(st)]
+        prims.append(("dot", 0.0, half, 2.0))
+        return {"prims": prims}
+
+
+# Registered (stage 2): the item, the catalog symbol and the plan drawing now
+# exist, so the palette offers a pyramid roof and a double-click edits it.
+PYRAMID_ROOF = register(PyramidRoofKind())
