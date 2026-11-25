@@ -503,5 +503,6 @@ this table is not a second copy of it.
 | [`0361-report.md`](./0361-report.md) | report: dormer edge-ordering cases, stage 1 (four read-back cases) |
 | [`0362-report.md`](./0362-report.md) | report: dormer edge-ordering cases, stage 1 COMPLETE (all 26 + INDEX) |
 | [`0364-report.md`](./0364-report.md) | report: 0360 stage 3 (dormer render rules) + knob grid-snap merged to main |
+| [`0367-ruling.md`](./0367-ruling.md) | ruling: a PYRAMID ROOF structure furnishing (gazebo / many-sided roof) is ORDERED. Four stages, AMBER; plus the wicker set to gate and commit |
 
 <!-- PAIRS:END -->
