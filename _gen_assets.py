@@ -141,6 +141,20 @@ def seat(w, d, cushions, arm=7.0, seat_h=17, arm_h=24, back_h=32):
     return parts
 
 
+def wicker_seat(w, d, arm, seat_h, arm_h, back_h):
+    """A wicker (rattan) chair: `seat`'s body, BACK and ARMS -- closed regions,
+    so the chair has a back and arms in 3D -- with thinner arms, and the loose
+    cushion and the weave drawn as 2D-ONLY detail (`fill="none"` and bare lines
+    extrude nothing)."""
+    parts = seat(w, d, 1, arm=arm, seat_h=seat_h, arm_h=arm_h, back_h=back_h)
+    parts.append(R(arm + 1.5, 8.5, w - 2 * arm - 3, d - 11, 2.5, "none", 0.6))   # cushion
+    n = max(int((w - 4) // 3), 3)
+    for i in range(n):                                   # the weave, on the back band
+        x = round(2.5 + (w - 5) * i / (n - 1), 2)
+        parts.append(L(x, 1.6, x, 6.2, 0.35))
+    return parts
+
+
 def base_unit(w, d, doors=2):
     """Top view of a base cabinet: box, a counter-nosing line near the front
     (bottom), vertical door dividers and a knob on each door."""
@@ -657,6 +671,15 @@ FURNISHINGS = [
       R(4, 3.5, 19, 9, 2.5, "#ffffff", 0.8, top=30),   # headrest
       L(2, 28, 25, 28, 0.8),                           # backrest hinge
       L(2, 56, 25, 56, 0.6)]),                         # leg hinge
+    # Wicker sunroom set (Patrick, 2026-11-24): chairs SMALLER than the 33 in
+    # armchair, and the round table that goes between two of them
+    ("wicker_chair", "Wicker Chair", "Sunroom", 27, 28,
+     wicker_seat(27, 28, arm=4, seat_h=16, arm_h=23, back_h=33)),
+    ("wicker_chair_small", "Wicker Chair, Small", "Sunroom", 23, 24,
+     wicker_seat(23, 24, arm=3.5, seat_h=16, arm_h=21, back_h=31)),
+    ("wicker_table", "Wicker Table 20\"", "Sunroom", 20, 20,
+     [Ci(10, 10, 9.4, FILL, 1.2), Ci(10, 10, 7.4, "none", 0.5),
+      Ci(10, 10, 5.2, "none", 0.35)]),
     ("sauna", "Sauna 6'", "Sunroom", 72, 72,
      [R(0.75, 0.75, 70.5, 70.5, 1.5, sw=1.5),
       R(4, 4, 64, 14, 1, "none", 0.7),                 # bench (back)
@@ -970,6 +993,9 @@ SOLIDS = {
     # -- Sunroom.  umbrella_table is the TABLE's height; the umbrella above it
     # is not modelled, and a 96" box would be a lie about a shade.
     "lounge_chair":           (30,      0, "seat",      "soft"),
+    "wicker_chair":           (33,      0, "seat",      "wicker"),
+    "wicker_chair_small":     (31,      0, "seat",      "wicker"),
+    "wicker_table":           (20,      0, "slab",      "wicker"),
     # sauna is an ENCLOSURE (0018): the stove is a solid standing on the
     # floor, and it gains its own region_material (metal) -- the body stays
     # wood, which was already right.
@@ -1073,6 +1099,9 @@ MATERIALS = {
                          "roughness": 0.40, "metalness": 0.30},
     "gelcoat":          {"colour": [0.92, 0.93, 0.94, 1.00],
                          "roughness": 0.22, "metalness": 0.05},
+    # natural rattan, for the wicker sunroom set
+    "wicker":    {"colour": [0.72, 0.58, 0.38, 1.00],
+                  "roughness": 0.90, "metalness": 0.00},
     # Loud on purpose, and the ONLY entry a viewer may fall back to: an item
     # whose kind, form or material the catalog does not define must LOOK wrong.
     "unknown":   {"colour": [0.85, 0.35, 0.55, 1.00],
@@ -1706,7 +1735,8 @@ def main():
         ("Shop", ["toolchest", "table_saw", "lathe", "jointer", "drill_press",
                   "cutoff_saw", "bandsaw", "planer", "workbench",
                   "storage_shelves"]),
-        ("Sunroom", ["lounge_chair", "sauna", "umbrella_table", "swim_spa",
+        ("Sunroom", ["lounge_chair", "wicker_chair", "wicker_chair_small",
+                     "wicker_table", "sauna", "umbrella_table", "swim_spa",
                      "whirlpool", "armchair", "side_table"]),
         ("Office", ["desk", "office_chair", "office_set", "corner_desk",
                     "bookshelf", "armchair", "side_table"]),

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 27 28" width="27" height="28">
+<rect x="0.75" y="0.75" width="25.5" height="26.5" rx="3" fill="#f8fafc" stroke="#374151" stroke-width="1.2" data-h="16"/>
+<rect x="0.75" y="0.75" width="25.5" height="6.25" rx="3" fill="#f8fafc" stroke="#374151" stroke-width="0.7" data-h="33"/>
+<rect x="0.75" y="7" width="3.25" height="20.25" rx="2" fill="#f8fafc" stroke="#374151" stroke-width="0.7" data-h="23"/>
+<rect x="23" y="7" width="3.25" height="20.25" rx="2" fill="#f8fafc" stroke="#374151" stroke-width="0.7" data-h="23"/>
+<rect x="5.5" y="8.5" width="16" height="17" rx="2.5" fill="none" stroke="#374151" stroke-width="0.6"/>
+<line x1="2.5" y1="1.6" x2="2.5" y2="6.2" stroke="#374151" stroke-width="0.35"/>
+<line x1="6.17" y1="1.6" x2="6.17" y2="6.2" stroke="#374151" stroke-width="0.35"/>
+<line x1="9.83" y1="1.6" x2="9.83" y2="6.2" stroke="#374151" stroke-width="0.35"/>
+<line x1="13.5" y1="1.6" x2="13.5" y2="6.2" stroke="#374151" stroke-width="0.35"/>
+<line x1="17.17" y1="1.6" x2="17.17" y2="6.2" stroke="#374151" stroke-width="0.35"/>
+<line x1="20.83" y1="1.6" x2="20.83" y2="6.2" stroke="#374151" stroke-width="0.35"/>
+<line x1="24.5" y1="1.6" x2="24.5" y2="6.2" stroke="#374151" stroke-width="0.35"/>
+</svg>

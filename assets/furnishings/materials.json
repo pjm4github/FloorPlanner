@@ -199,6 +199,16 @@
     "roughness": 0.22,
     "metalness": 0.05
   },
+  "wicker": {
+    "colour": [
+      0.72,
+      0.58,
+      0.38,
+      1.0
+    ],
+    "roughness": 0.9,
+    "metalness": 0.0
+  },
   "unknown": {
     "colour": [
       0.85,
