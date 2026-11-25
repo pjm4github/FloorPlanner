@@ -527,6 +527,21 @@
       }
     },
 
+    "pyramid_roof_state": {
+      "description": "0367. DECLARED, NOT ENFORCED: the keys a `pyramid_roof` furnishing's `state` carries (docs/handoff/0367-ruling.md). A pyramid over a regular polygon, dropped on a ceiling to roof a bump-out. The furnishing's `pos` is the CENTRE (the apex in plan); its `rotation` turns it (0 = one face's outward normal up the screen). Heights are above the furnishing's own level; the apex height is DERIVED (eaves + inradius x pitch / 12). It owns no wall and stores no host. Arithmetic: floorplanner/parametric/pyramid_geometry.py.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "sides":       { "description": "3 to 12; one face per side.", "type": "integer", "minimum": 3, "maximum": 12 },
+        "inradius_in": { "description": "Centre to the WALL line (the eaves-start line); the run the pitch climbs to the apex.", "type": "number", "exclusiveMinimum": 0 },
+        "eaves_h_in":  { "description": "The eaves-start line above this level. Under room_top it follows the room's ceiling.", "type": "number" },
+        "eaves_bind":  { "description": "room_top: the eaves follow the room's ceiling_height_in. manual: set by hand.", "enum": ["room_top", "manual"] },
+        "pitch_12":    { "description": "Rise per 12 of run, on every face; the apex height is derived.", "type": "number", "exclusiveMinimum": 0 },
+        "overhang_in": { "description": "Eave past the wall line, in plan.", "type": "number", "minimum": 0 },
+        "weld":        { "description": "auto: drawn only where it is the higher surface, cut into the surrounding roof (stage 3). off: drawn whole, ignoring every roof.", "enum": ["auto", "off"] }
+      }
+    },
+
     "stair_state": {
       "description": "0323. DECLARED, NOT ENFORCED: the keys a parametric stair's `furnishing.state` carries. A stair with no `type` is a legacy stair (flight / turn / direction only). Full description: docs/furnishing-spec/STAIRS_STATE_AND_USAGE.md.",
       "type": "object",
@@ -601,7 +616,7 @@
 
         "pos":      { "description": "Plan coordinates of the symbol centre.", "$ref": "#/$defs/point" },
         "rotation": { "type": "number", "default": 0 },
-        "state":    { "description": "Per-kind extra state (stair flight/turn/direction, plant species, …). v4 spread these across the object; nesting keeps the base shape closed. The keys each parametric kind writes are DECLARED in $defs/stair_state, $defs/cabinet_state, $defs/appliance_state, $defs/fixture_state and $defs/dormer_state; this object stays open and the application validates it.", "type": "object", "additionalProperties": true },
+        "state":    { "description": "Per-kind extra state (stair flight/turn/direction, plant species, …). v4 spread these across the object; nesting keeps the base shape closed. The keys each parametric kind writes are DECLARED in $defs/stair_state, $defs/cabinet_state, $defs/appliance_state, $defs/fixture_state, $defs/dormer_state and $defs/pyramid_roof_state; this object stays open and the application validates it.", "type": "object", "additionalProperties": true },
         "uid":      { "$ref": "#/$defs/uid" }
       }
     },
