@@ -15,6 +15,7 @@ from floorplanner.config import DEFAULT_FLOOR, floor_elevations, set_floor_state
 from floorplanner.items import DormerGripItem, DormerItem, make_furnishing
 from floorplanner.parametric import dormer_geometry as dg
 from floorplanner.parametric.dormers import DORMER
+from floorplanner.parametric import findings as F
 from floorplanner.parametric.findings import WARNING
 from floorplanner.roofs import RoofItem
 from floorplanner.rooms import RoomItem
@@ -631,11 +632,16 @@ def test_a_too_steep_shed_can_be_accepted_to_fix_on_the_plan(scene):
     dlg = ParametricDialog(DORMER, d.draft_state(), d.param_context())
     try:
         assert "dormer.too_steep" in [f.rule_id for f in dlg.findings()]
-        assert not dlg.try_accept()                # needs the acknowledgement
+        assert not dlg.try_accept()                # the override needs the ack
         dlg.ack.setChecked(True)
         assert dlg.try_accept()                    # overridable -> accepted
-        dlg.set_value("pitch_12", 0.0)             # a zero pitch: a hard block
-        assert not dlg.try_accept()
+        # a pure input error (zero pitch) is a HARD block -- not an override,
+        # not a suggestive check -- so it blocks regardless of the ack. The
+        # pitch spinbox clamps 0 back to its minimum on a widget read, so the
+        # zero lands at the findings level; that a hard block stops OK is
+        # proven directly in test_stair_item (tread 9.5, which the spinbox keeps).
+        dlg.set_value("pitch_12", 0.0)
+        assert F.blocks(dlg.findings())            # dormer.flat, non-overridable
     finally:
         dlg.deleteLater()
 

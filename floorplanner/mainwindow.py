@@ -457,6 +457,23 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         a_ortho_repair = QAction("Repair wall orthogonality…", self)  # 0066/0082 item C
         a_ortho_repair.triggered.connect(self.repair_wall_orthogonality)
         m_edit.addAction(a_ortho_repair)
+        # Check plan (2026-11): box every design problem on the active floor at
+        # once -- the at-a-glance half of the unwelded-end console warning. Show
+        # and Clear start disabled; a scan enables them (plancheck.py).
+        m_edit.addSeparator()
+        a_check = QAction("Check plan for problems", self)
+        a_check.triggered.connect(self.check_plan)
+        m_edit.addAction(a_check)
+        self.a_plan_show = QAction("Show/hide plan problems", self)
+        self.a_plan_show.setCheckable(True)
+        self.a_plan_show.setChecked(False)
+        self.a_plan_show.setEnabled(False)
+        self.a_plan_show.toggled.connect(self.toggle_plan_problems)
+        m_edit.addAction(self.a_plan_show)
+        self.a_plan_clear = QAction("Clear plan problems", self)
+        self.a_plan_clear.setEnabled(False)
+        self.a_plan_clear.triggered.connect(self.clear_plan_problems)
+        m_edit.addAction(self.a_plan_clear)
         m_edit.addSeparator()
         # 0316: Find item -- locate an annotated item by its W/O/... number (or
         # name) and zoom to it. Ctrl+F, freed by moving floor Select to Ctrl+L.
@@ -1940,6 +1957,63 @@ class MainWindow(QMainWindow, PlanIOMixin, CsvIOMixin,
         unblocked by 0082-ruling.md. Previews, applies as one undoable
         operation on Apply, never runs automatically (0066 sec5)."""
         OrthogonalityRepairDialog(self).exec()
+
+    def check_plan(self, interactive=True):
+        """Edit ▸ Check plan for problems -- box every placeable design problem
+        on the ACTIVE floor in red (the fifteen invariants plus the near-vertex
+        gaps). A re-run rescans; the status line reports anything on other
+        floors or that could not be placed. Enables Show/hide and Clear.
+
+        Returns the ProblemSpots boxed, so a test or macro reads the result
+        without a modal (`interactive` is accepted for call-site symmetry; the
+        method shows nothing modal)."""
+        from floorplanner.plancheck import PlanCheckOverlay, problem_spots
+        if getattr(self, "_plan_overlay", None) is None:
+            self._plan_overlay = PlanCheckOverlay(self.scene)
+        spots, other, unplaceable = problem_spots(self)
+        self._plan_overlay.set_visible(True)
+        self._plan_overlay.show_spots(spots)
+
+        self.a_plan_show.blockSignals(True)      # reflect, don't re-toggle
+        self.a_plan_show.setChecked(True)
+        self.a_plan_show.blockSignals(False)
+        self.a_plan_show.setEnabled(bool(spots))
+        self.a_plan_clear.setEnabled(bool(spots))
+
+        if spots:
+            msg = (f"{len(spots)} problem(s) boxed on floor "
+                   f"'{self.active_floor}'")
+        else:
+            msg = f"No problems to box on floor '{self.active_floor}'"
+        tail = []
+        if other:
+            tail.append(f"{other} on other floor(s)")
+        if unplaceable:
+            tail.append(f"{unplaceable} could not be placed on the design")
+        if tail:
+            msg += " (" + "; ".join(tail) + ")"
+        self.status(msg + ".")
+        return spots
+
+    def toggle_plan_problems(self, on):
+        """Edit ▸ Show/hide plan problems -- toggle the boxes' visibility
+        without recomputing them."""
+        ov = getattr(self, "_plan_overlay", None)
+        if ov is not None:
+            ov.set_visible(bool(on))
+
+    def clear_plan_problems(self):
+        """Edit ▸ Clear plan problems -- take every box down and disable the
+        Show/hide and Clear items until the next scan."""
+        ov = getattr(self, "_plan_overlay", None)
+        if ov is not None:
+            ov.clear()
+        self.a_plan_show.blockSignals(True)
+        self.a_plan_show.setChecked(False)
+        self.a_plan_show.blockSignals(False)
+        self.a_plan_show.setEnabled(False)
+        self.a_plan_clear.setEnabled(False)
+        self.status("Cleared the plan-check problems.")
 
     def _selection_spec(self):
         """Selected walls/furnishings (groups expand to their members)

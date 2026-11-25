@@ -1081,3 +1081,167 @@ def test_convert_writes_a_pdf_with_drawn_dimensions_and_says_so(tmp_path):
     result = convert(_annotated_doc(), out, _MINIMAL_META)
     assert out.exists() and out.stat().st_size > 0
     assert result.sheets == ["sheet P1: Main (2 dimensions as drawn)"]
+
+
+# ---------------------------------------------------------------------------
+# 0365 -- the furnishings switch: a transmittal omits furniture by default,
+# but draws each furnishing as a reference footprint when the export opts in
+# ---------------------------------------------------------------------------
+
+def _furnished_doc(kind="sofa", level="L1", rotation=0.0, pos=(120.0, 100.0)):
+    """`_rect_doc` with one furnishing of `kind` on `level`, centred on
+    `pos`, spun by `rotation` degrees."""
+    doc = _rect_doc()
+    doc["furnishings"] = [{"id": "f1", "level": level, "kind": kind,
+                           "pos": list(pos), "rotation": rotation,
+                           "state": {}}]
+    return doc
+
+
+def _furnish_sheet(doc, include_furnishings):
+    rec = _Recorder()
+    sheet = fp2pdf.Sheet(rec, doc, _MINIMAL_LEVEL, fp2pdf._default_thickness(),
+                         False, _MINIMAL_META,
+                         include_furnishings=include_furnishings)
+    sheet.draw_furnishings()
+    return sheet, rec
+
+
+def test_furnishing_sizes_reads_the_real_catalog_footprint():
+    """The loader reads the bundled manifest BY PATH (no PyQt6), keyed by
+    id -> (name, width_in, depth_in) -- the sofa's own true footprint, so a
+    future manifest edit that drops the field is caught here, not silently
+    drawn at a nominal box."""
+    sizes = fp2pdf._furnishing_sizes()
+    assert sizes["sofa"] == ("Sofa", 84.0, 36.0)
+
+
+def test_furnishings_are_omitted_from_the_sheet_by_default():
+    """Default off: a transmittal to the architect is structure, not
+    furniture -- the furnishing's name is nowhere on the sheet."""
+    _sheet_obj, rec = _furnish_sheet(_furnished_doc(), include_furnishings=False)
+    assert "SOFA" not in rec.strings()
+    assert not any(n == "line" for n, _ in rec.calls), (
+        "a footprint was drawn although furnishings were off")
+
+
+def test_furnishings_draw_as_fully_annotated_dashed_footprints():
+    """Opted in: the footprint is a dashed rectangle (dash [2, 2], this
+    doc's only dashed linework -- no concept walls, no open edges, no
+    pocket/doorway) and it is FULLY ANNOTATED (Patrick, 0365) -- the
+    furnishing's name AND its clear W x D size in feet-and-inches, so the
+    architect can redraw it from the sheet alone."""
+    _sheet_obj, rec = _furnish_sheet(_furnished_doc(), include_furnishings=True)
+    strings = rec.strings()
+    assert "SOFA" in strings
+    assert '7\'-0" x 3\'-0"' in strings, (
+        "the sofa's 84x36 footprint is not dimensioned for the architect")
+    assert any(n == "setDash" and a == ([2, 2],) for n, a in rec.calls)
+    # a closed quad: four footprint edges (text is drawString, not line)
+    assert sum(1 for n, _ in rec.calls if n == "line") == 4
+
+
+def test_an_unknown_furnishing_kind_warns_but_still_draws():
+    """The door-`"unknown"` precedent (0118-ruling.md sec3), rotated onto
+    furnishings: a kind absent from the catalog is drawn at a nominal box
+    AND named in `warnings`, never silently absorbed."""
+    sheet, rec = _furnish_sheet(_furnished_doc(kind="no_such_kind"),
+                                include_furnishings=True)
+    assert "NO_SUCH_KIND" in rec.strings()
+    assert len(sheet.warnings) == 1 and "no_such_kind" in sheet.warnings[0]
+
+
+def test_an_unknown_kind_is_silent_when_furnishings_are_off():
+    """`draw_furnishings` returns before reading anything when the switch
+    is off, so an unknown kind in the document raises no warning unless the
+    user actually asked for furnishings."""
+    sheet, _rec = _furnish_sheet(_furnished_doc(kind="no_such_kind"),
+                                 include_furnishings=False)
+    assert sheet.warnings == []
+
+
+def test_furnishings_on_another_level_are_not_on_this_sheet():
+    """A sheet is one level; a furnishing placed on `L2` is not drawn on
+    the `L1` sheet even with the switch on."""
+    _sheet_obj, rec = _furnish_sheet(_furnished_doc(level="L2"),
+                                     include_furnishings=True)
+    assert "SOFA" not in rec.strings()
+
+
+def test_a_rotated_furnishing_keeps_its_footprint_area():
+    """The footprint is the catalog's true width x depth however the item
+    is spun: a 90-degrees sofa covers the same page area as an unrotated
+    one, so the rotation math preserves the box (not a bug that collapses
+    or inflates it). Page-space area via the shoelace on the four drawn
+    footprint corners, read back from the recorder."""
+    def footprint_area(rotation):
+        _s, rec = _furnish_sheet(_furnished_doc(rotation=rotation),
+                                 include_furnishings=True)
+        # each self.line records c.line(X1, Y1, X2, Y2); the four edges
+        # share corners, so the first point of each edge is a corner
+        corners = [(a[0], a[1]) for n, a in rec.calls if n == "line"]
+        area = 0.0
+        for (x1, y1), (x2, y2) in zip(corners, corners[1:] + corners[:1],
+                                      strict=True):
+            area += x1 * y2 - x2 * y1
+        return abs(area) / 2
+
+    assert footprint_area(90.0) == pytest.approx(footprint_area(0.0))
+    assert footprint_area(0.0) > 0.0
+
+
+def test_convert_with_furnishings_writes_a_pdf(tmp_path):
+    pytest.importorskip("reportlab")
+    out = tmp_path / "furnished.pdf"
+    result = convert(_furnished_doc(), out, _MINIMAL_META,
+                     include_furnishings=True)
+    assert out.exists() and out.stat().st_size > 0
+    assert result.warnings == []
+
+
+# ---------------------------------------------------------------------------
+# 0365 -- a PARTITION wall draws as a faint dashed outline, not a solid poche
+# body (the same unfilled-dashed treatment the editor and concept walls use)
+# ---------------------------------------------------------------------------
+
+def _one_wall_doc(wall_type):
+    """A single horizontal wall of `wall_type` -- isolates how `draw_walls`
+    renders that one body (an open wall is enough; `_frame` needs a wall,
+    not a closed loop)."""
+    return {
+        "format": "floorplanner-design", "version": 5,
+        "levels": [_MINIMAL_LEVEL],
+        "vertices": [{"id": "v1", "x": 0, "y": 0}, {"id": "v2", "x": 200, "y": 0}],
+        "walls": [{"id": "w1", "level": "L1", "v1": "v1", "v2": "v2",
+                   "type": wall_type, "openings": []}],
+        "rooms": [], "furnishings": [],
+    }
+
+
+def _draw_walls_calls(doc):
+    rec = _Recorder()
+    sheet = fp2pdf.Sheet(rec, doc, _MINIMAL_LEVEL, fp2pdf._default_thickness(),
+                         False, _MINIMAL_META)
+    sheet.draw_walls()
+    return rec
+
+
+def test_a_partition_wall_draws_faint_dashed_and_unfilled():
+    """Patrick, 0365: "the walls that are partitions should be faint dashed
+    lines." A partition body is stroked dashed in the faint partition ink
+    with NO fill -- never the solid gray poche a structural wall gets."""
+    rec = _draw_walls_calls(_one_wall_doc("partition"))
+    assert any(n == "setDash" for n, _ in rec.calls), "the partition body is not dashed"
+    assert any(n == "setStrokeGray" and a == (fp2pdf.GRAY_PARTITION,)
+               for n, a in rec.calls), "not drawn in the faint partition ink"
+    assert any(n == "drawPath" for n, _ in rec.calls), "the body was never drawn"
+    assert not any(n == "setFillGray" and a == (fp2pdf.GRAY_POCHE,)
+                   for n, a in rec.calls), "a partition must not take the solid poche fill"
+
+
+def test_a_structural_wall_still_draws_solid_poche():
+    """The control: an exterior wall keeps its solid gray poche fill -- the
+    partition change does not bleed onto structural walls."""
+    rec = _draw_walls_calls(_one_wall_doc("exterior"))
+    assert any(n == "setFillGray" and a == (fp2pdf.GRAY_POCHE,)
+               for n, a in rec.calls), "the exterior wall lost its poche fill"

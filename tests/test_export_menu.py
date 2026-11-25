@@ -128,7 +128,7 @@ def test_options_dialog_values_reports_None_when_every_level_is_checked(fp, qapp
     doc = {"levels": [{"id": "L1", "name": "Main", "kind": "storey"}]}
     dlg = fp.PDFExportOptionsDialog(doc, "T")
     try:
-        _meta, only_levels, _concept = dlg.values()
+        _meta, only_levels, _concept, _furnish = dlg.values()
         assert only_levels is None
     finally:
         dlg.close()
@@ -140,8 +140,23 @@ def test_options_dialog_values_names_only_the_checked_levels(fp, qapp):
     dlg = fp.PDFExportOptionsDialog(doc, "T")
     try:
         dlg.level_checks[1].setChecked(False)
-        _meta, only_levels, _concept = dlg.values()
+        _meta, only_levels, _concept, _furnish = dlg.values()
         assert only_levels == ["L1"]
+    finally:
+        dlg.close()
+
+
+def test_options_dialog_furnishings_default_off_and_reported(fp, qapp):
+    """The furnishings switch: present, off by default (a structural
+    transmittal omits furniture), and reflected in `values()`' fourth
+    element when the user ticks it."""
+    doc = {"levels": [{"id": "L1", "name": "Main", "kind": "storey"}]}
+    dlg = fp.PDFExportOptionsDialog(doc, "T")
+    try:
+        assert not dlg.ck_furnish.isChecked()
+        assert dlg.values()[3] is False
+        dlg.ck_furnish.setChecked(True)
+        assert dlg.values()[3] is True
     finally:
         dlg.close()
 
@@ -202,6 +217,24 @@ def test_export_pdf_path_only_levels_restricts_the_sheets(fp, win, tmp_path,
                                  interactive=False)
     assert result is not None
     assert len(result.sheets) == 1
+
+
+def test_export_pdf_path_threads_include_furnishings(fp, win, tmp_path,
+                                                     make_room):
+    """0365: the switch reaches `convert()` end to end. A sofa placed on
+    the plan's own level exports cleanly with furnishings on -- a known
+    catalog kind, so no warning."""
+    pytest.importorskip("reportlab")
+    from PyQt6.QtCore import QPointF
+    make_room(win.scene, 0, 0, 240, 120, name="Den")
+    win.scene.addItem(fp.make_furnishing("sofa", QPointF(120, 60)))
+    assert win.design_document()["furnishings"], "the sofa is in the document"
+    out = tmp_path / "furnished.pdf"
+    result = win.export_pdf_path(str(out), _META, interactive=False,
+                                 include_furnishings=True)
+    assert result is not None
+    assert out.exists() and out.stat().st_size > 0
+    assert result.warnings == []
 
 
 # ---------------------------------------------------------------------------
