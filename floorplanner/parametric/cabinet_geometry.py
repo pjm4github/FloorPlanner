@@ -207,9 +207,15 @@ DRAWER_H = 6.0                 # the top drawer front, over doors
 REVEAL = {"full": 0.125, "partial": 1.0}
 WALL_UNDERSIDE = 54.0          # 36 in counter + 18 in backsplash
 CORNER_LEG = 24.0
+# 0368
+COUNTER_H = BASE_BOX_H + TOP_T  # 36: where a unit standing on a base unit starts
+DESK_BOX_H = 28.5              # a kitchen desk: 30 in to the top of its counter
+DESK_DRAWER_H = 4.5            # the one shallow drawer under a desk's top
+PANEL_T = 0.75                 # an end panel, a cap, a light rail
 
 TYPES = ("base", "sink_base", "corner_base", "wall", "tall", "appliance",
-         "island", "light", "fixture", "mirror")
+         "island", "light", "fixture", "mirror",
+         "kitchen_desk", "corner_wall", "suspended")
 
 # Every catalog kind this file builds, with what it is born as. The generator
 # writes each into the manifest (`cabinet`), refusing if a size here disagrees
@@ -228,6 +234,20 @@ PRESETS = {
     "wall_cab_24": {"type": "wall", "width_in": 24, "depth_in": 12, "height_in": 30},
     "wall_cab_30": {"type": "wall", "width_in": 30, "depth_in": 12, "height_in": 30},
     "wall_cab_36": {"type": "wall", "width_in": 36, "depth_in": 12, "height_in": 30},
+    # 0368. A tall unit of any width, one to four doors across: 84 in, the top
+    # of a wall cabinet. `stands` puts it on the floor or on a base unit's
+    # counter; either way it tops out with the wall cabinets.
+    "tall_cab": {"type": "tall", "width_in": 24, "depth_in": 24, "height_in": 84},
+    # the room's countertop at desk height, one shallow full-width drawer
+    "kitchen_desk": {"type": "kitchen_desk", "width_in": 48, "depth_in": 24,
+                     "height_in": DESK_BOX_H},
+    # a corner WALL cabinet: two wings, `width_in` along the wall behind and
+    # `wing_in` along the side wall, each `depth_in` deep
+    "corner_wall_cab": {"type": "corner_wall", "width_in": 24, "wing_in": 24,
+                        "depth_in": 12, "height_in": 30},
+    # hung from the ceiling over an island: its height is its room's ceiling
+    "ceiling_cab": {"type": "suspended", "width_in": 48, "depth_in": 15,
+                    "height_in": 24},
     "vanity": {"type": "sink_base", "width_in": 30, "depth_in": 21,
                "height_in": 32.5, "sink": "single", "sink_material": "porcelain"},
     "vanity_24": {"type": "sink_base", "width_in": 24, "depth_in": 21,
@@ -329,6 +349,13 @@ _TYPE_DEFAULTS = {
     # a bathroom mirror / medicine cabinet, hung over a vanity
     "mirror": {"height_in": 36.0, "depth_in": 4.5, "top_on": False,
                "floor_to_bottom_in": 40.0},
+    # 0368
+    "kitchen_desk": {"height_in": DESK_BOX_H, "front": "drawers", "top_on": True,
+                     "toe_kick_h_in": 0.0, "toe_kick_d_in": 0.0},
+    "corner_wall": {"height_in": 30.0, "depth_in": 12.0, "front": "doors",
+                    "top_on": False, "floor_to_bottom_in": WALL_UNDERSIDE},
+    "suspended": {"height_in": 24.0, "depth_in": 15.0, "front": "doors",
+                  "top_on": False, "drop_in": 0.0},
 }
 
 STATE_DEFAULTS = {
@@ -342,6 +369,10 @@ STATE_DEFAULTS = {
     "floor_to_bottom_in": WALL_UNDERSIDE,
     "sink": "none", "sink_material": "metal", "sink_side": "center",
     "corner_type": "diagonal", "hand": "left",
+    # 0368: a tall unit's footing; a corner wall cabinet's second wing; a
+    # ceiling cabinet's door sides and the light under it
+    "stands": "floor", "wing_in": CORNER_LEG, "door_sides": "both",
+    "under_light": True,
     "appliance": "generic", "finish_mode": "standard", "sheen": "gloss",
     "colour": "white", "wall_mounted": False,
     # island
@@ -360,7 +391,9 @@ STATE_DEFAULTS = {
 }
 FRONTS = ("doors", "drawer_over_doors", "drawers", "false_front")
 _ENUMS = {
-    "front": FRONTS, "doors": ("auto", "1", "2"), "hinge": ("left", "right"),
+    "front": FRONTS, "doors": ("auto", "1", "2", "3", "4"),
+    "hinge": ("left", "right"),
+    "stands": ("floor", "counter"), "door_sides": ("both", "one"),
     "door_style": (ROOM,) + tuple(k for k, _l in DOOR_STYLES),
     "overlay": ("full", "partial"), "pulls": ("bar", "knob", "none"),
     "finish": (ROOM,) + tuple(k for k, _l, _m in FINISHES),
@@ -387,7 +420,7 @@ _ENUMS.update({key: tuple(row[0] for row in ISLAND_SLOTS)
 _NUMBERS = ("width_in", "depth_in", "height_in", "toe_kick_h_in",
             "toe_kick_d_in", "top_thickness_in", "top_overhang_in",
             "backsplash_in", "floor_to_bottom_in", "lumens", "size_in",
-            "drop_in", "length_in")
+            "drop_in", "length_in", "wing_in")
 
 
 @dataclass(frozen=True)
@@ -435,7 +468,7 @@ def normalize_state(state, preset=None):
             if value not in _ENUMS[key]:
                 value = str(default)
         elif key in ("top_on", "wall_mounted", "books", "lit", "arms", "bed",
-                     "has_cabinet"):
+                     "has_cabinet", "under_light"):
             value = bool(value)
         elif key == "shelves":
             try:
@@ -481,6 +514,22 @@ def normalize_state(state, preset=None):
         out["finish_mode"], out["sheen"] = "custom", "gloss"
         if out["colour"] not in LAUNDRY_COLOURS:
             out["colour"] = "white"
+    if kind_type == "kitchen_desk":               # always a top, one drawer
+        out["top_on"], out["front"] = True, "drawers"
+        out["toe_kick_h_in"] = out["toe_kick_d_in"] = 0.0
+    if kind_type == "corner_wall":
+        if out["corner_type"] == "blind":         # a base cabinet's, not a wall's
+            out["corner_type"] = "diagonal"
+        out["depth_in"] = max(out["depth_in"], 6.0)
+        reach = out["depth_in"] + 6.0             # room for a door past the corner
+        out["width_in"] = max(out["width_in"], reach)
+        out["wing_in"] = max(out["wing_in"], reach)
+        out["top_on"] = False
+    if kind_type == "suspended":
+        out["depth_in"] = max(out["depth_in"], 9.0)
+        out["drop_in"] = min(max(out["drop_in"], 0.0), 48.0)
+        out["lumens"] = min(max(out["lumens"], 0.0), 20000.0)
+        out["top_on"] = False
     if kind_type == "island":
         out["width_in"] = island_width(out)       # the slots ARE the length
         out["depth_in"] = max(out["depth_in"],
@@ -523,8 +572,10 @@ def island_width(st):
 
 
 def is_mounted(st):
-    """True for anything hung on a wall at `floor_to_bottom_in`."""
-    return st["type"] in ("wall", "mirror") or bool(st.get("wall_mounted"))
+    """True for anything hung on a wall at `floor_to_bottom_in` -- or, a
+    `suspended` cabinet, from the ceiling: nothing of it stands on the floor."""
+    return (st["type"] in ("wall", "mirror", "corner_wall", "suspended")
+            or bool(st.get("wall_mounted")))
 
 
 def footprint(st):
@@ -532,12 +583,17 @@ def footprint(st):
     w = max(st["width_in"], 1.0)
     if st["type"] == "corner_base" and st["corner_type"] != "blind":
         return w, w
+    if st["type"] == "corner_wall":               # one wing by the other
+        return w, max(st["wing_in"], 1.0)
     return w, max(st["depth_in"], 1.0)
 
 
-def overall_height(st):
-    """Floor to the highest point, countertop and backsplash included."""
+def overall_height(st, ceiling_in=96.0):
+    """Floor to the highest point, countertop and backsplash included. A
+    `suspended` cabinet's is its room's ceiling less its drop."""
     top = st["height_in"]
+    if st["type"] == "suspended":
+        return float(ceiling_in) - max(st["drop_in"], 0.0)
     if is_mounted(st):
         return st["floor_to_bottom_in"] + top
     if st["top_on"]:
@@ -681,7 +737,7 @@ def _pull(parts, name, kind, cx, cz, face, vertical):
 
 def door_count(st, width=None):
     width = st["width_in"] if width is None else width
-    if st["doors"] in ("1", "2"):
+    if st["doors"] in ("1", "2", "3", "4"):
         return int(st["doors"])
     return 1 if width <= 21.0 else 2
 
@@ -702,8 +758,8 @@ def _front(parts, st, style, x0, x1, z0, z1, face, pulls_low=False,
             _leaf(parts, f"{tag}door-{i + 1}", a, b, lo, hi, face, style)
             if n == 1:
                 inner = b - 2.2 if st["hinge"] == "left" else a + 2.2
-            else:
-                inner = b - 2.2 if i == 0 else a + 2.2
+            else:                      # in pairs; an odd last door hinges left
+                inner = b - 2.2 if i % 2 == 0 else a + 2.2
             cz = (lo + 5.0) if pulls_low else (hi - 5.0)
             cz = min(max(cz, lo + 3.0), hi - 3.0)
             _pull(parts, f"{tag}pull-{i + 1}", st["pulls"], inner, cz, face, True)
@@ -884,6 +940,13 @@ def _base_like(parts, st, style):
 def _tall(parts, st, style):
     w, d, h = st["width_in"], st["depth_in"], st["height_in"]
     x0, x1 = -w / 2.0, w / 2.0
+    if st["stands"] == "counter":
+        # 0368: on a base unit's counter -- no toe kick, one run of doors from
+        # the counter to the top, which is still `height_in` above the FLOOR
+        z0 = min(COUNTER_H, h - 6.0)
+        _add(parts, "carcass", "cabinet", x0, x1, 0.0, d - DOOR_T, z0, h)
+        _front(parts, st, style, x0, x1, z0, h, d, pulls_low=True, front="doors")
+        return
     kick = min(max(st["toe_kick_h_in"], 0.0), h - 6.0)
     _add(parts, "toe-kick", "kick", x0, x1, 0.0, d - st["toe_kick_d_in"], 0.0, kick)
     _add(parts, "carcass", "cabinet", x0, x1, 0.0, d - DOOR_T, kick, h)
@@ -902,6 +965,188 @@ def _wall(parts, st, style):
     x0, x1 = -w / 2.0, w / 2.0
     _add(parts, "carcass", "cabinet", x0, x1, 0.0, d - DOOR_T, z0, z0 + h)
     _front(parts, st, style, x0, x1, z0, z0 + h, d, pulls_low=True, front="doors")
+
+
+def tall_plan(st):
+    """0368: the plan symbol for a tall cabinet, from its parameters -- a box
+    with its shelves, or DASHED when it stands on a counter (it is above the
+    plan cut, like a wall cabinet), and one knob per door across."""
+    w, d = st["width_in"], st["depth_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    over = st["stands"] == "counter"
+    prims = [("dashed" if over else "outline", x0 + 0.75, 0.75, x1 - 0.75, d - 0.75)]
+    if not over:
+        for j in range(1, 4):
+            f = 0.75 + (d - 1.5) * j / 4.0
+            prims.append(("dline", x0 + 2.5, f, x1 - 2.5, f))
+    n = door_count(st)
+    fw = (w - 1.5) / n
+    for i in range(1, n):
+        xx = x0 + 0.75 + fw * i
+        prims.append(("dline" if over else "line", xx, 0.75, xx, d - 0.75))
+    for i in range(n):
+        prims.append(("dot", x0 + 0.75 + fw * (i + 0.5), d - 3.5, 0.8))
+    return prims
+
+
+def _kitchen_desk(parts, st, style):
+    """0368: a kitchen desk -- the room's countertop on two end panels, one
+    shallow full-width drawer under it, knee space below. `height_in` is the
+    underside of the top, as a base cabinet's is."""
+    w, d, h = st["width_in"], st["depth_in"], st["height_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    t, g = PANEL_T, REVEAL[st["overlay"]]
+    dh = min(DESK_DRAWER_H, max(h - 20.0, 2.0))
+    apron = h - dh
+    _add(parts, "end-panel-l", "cabinet", x0, x0 + t, 0.0, d - DOOR_T, 0.0, h)
+    _add(parts, "end-panel-r", "cabinet", x1 - t, x1, 0.0, d - DOOR_T, 0.0, h)
+    _add(parts, "back-rail", "cabinet", x0 + t, x1 - t, 0.0, t, apron, h)
+    _add(parts, "drawer-box", "cabinet", x0 + t, x1 - t, t, d - DOOR_T, apron, h)
+    _leaf(parts, "drawer-1", x0 + g, x1 - g, apron + g, h - g, d,
+          "slab" if style == "glass" else style)
+    _pull(parts, "drawer-pull-1", st["pulls"], 0.0, apron + dh / 2.0, d, False)
+    _top(parts, st, x0, x1, d, h)
+
+
+def kitchen_desk_plan(st):
+    """0368: the plan symbol for a kitchen desk: its top, the drawer front
+    along the open edge, and the drawer's pull."""
+    w, d = st["width_in"], st["depth_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    return [("panel", x0 + 0.5, 0.5, x1 - 0.5, d - 0.5),
+            ("line", x0 + 1.5, d - 3.0, x1 - 1.5, d - 3.0),
+            ("line", -4.0, d - 1.6, 4.0, d - 1.6)]
+
+
+def _corner_wall(parts, st, style):
+    """0368: a corner WALL cabinet, hung at `floor_to_bottom_in`, its back
+    corner at the plan symbol's top-left (top-right for a right hand). One
+    wing runs `width_in` along the wall behind, the other `wing_in` along the
+    side wall, each `depth_in` deep. `diagonal` has one door across the cut
+    corner; `l_shape` has a door on each wing's inside face."""
+    wa, wb, d, h = st["width_in"], st["wing_in"], st["depth_in"], st["height_in"]
+    z0 = max(st["floor_to_bottom_in"], 0.0)
+    z1 = z0 + h
+    sign = 1.0 if st["hand"] == "left" else -1.0
+    t, g = DOOR_T, REVEAL[st["overlay"]]
+
+    def add_quad(name, role, pts, a=z0, b=z1):
+        parts.append(Part(name, role,
+                          tuple((sign * (u - wa / 2.0), f) for u, f in pts), a, b))
+
+    def add_rect(name, role, u0, u1, f0, f1, a=z0, b=z1):
+        if u1 - u0 > 1e-6 and f1 - f0 > 1e-6 and b - a > 1e-6:
+            add_quad(name, role, [(u0, f0), (u1, f0), (u1, f1), (u0, f1)], a, b)
+
+    pz = min(z0 + 5.0, z1 - 3.0)             # pulls low, as on a wall cabinet
+    grip = 0.6 if st["pulls"] == "knob" else 2.5
+    if st["corner_type"] == "l_shape":
+        add_rect("carcass", "cabinet", 0.0, wa, 0.0, d - t)
+        add_rect("carcass-leg", "cabinet", 0.0, d - t, d - t, wb)
+        add_rect("door-1", "cabinet", d + g, wa - g, d - t, d, z0 + g, z1 - g)
+        add_rect("door-2", "cabinet", d - t, d, d + g, wb - g, z0 + g, z1 - g)
+        if st["pulls"] != "none":
+            add_rect("pull-1", "hardware", d + 1.9, d + 2.5, d, d + 1.2,
+                     pz - grip, pz + grip)
+            add_rect("pull-2", "hardware", d, d + 1.2, d + 1.9, d + 2.5,
+                     pz - grip, pz + grip)
+        return
+    a, b = wa - d, wb - d                    # the door runs (wa, d) -> (d, wb)
+    run = math.hypot(a, b)
+    k = min(t * run / b, d - 0.5)            # the door's thickness, along the wall
+    add_rect("carcass", "cabinet", 0.0, wa, 0.0, d)
+    add_quad("carcass-leg", "cabinet",
+             [(0.0, d), (wa - k, d), (d - k, wb), (0.0, wb)])
+    add_quad("door-1", "cabinet",
+             [(wa - k, d), (wa, d), (d, wb), (d - k, wb)], z0 + g, z1 - g)
+    if st["pulls"] != "none":
+        mu = (wa + d) / 2.0 + 0.6 * b / run  # just proud of the door's middle
+        mf = (d + wb) / 2.0 + 0.6 * a / run
+        add_rect("pull-1", "hardware", mu - 0.45, mu + 0.45, mf - 0.45, mf + 0.45,
+                 pz - grip, pz + grip)
+
+
+def corner_wall_plan(st):
+    """0368: the plan symbol for a corner wall cabinet: its outline DASHED (it
+    is overhead), and a knob on each door."""
+    wa, wb, d = st["width_in"], st["wing_in"], st["depth_in"]
+    sign = 1.0 if st["hand"] == "left" else -1.0
+
+    def at(u, f):
+        return sign * (u - wa / 2.0), f
+
+    if st["corner_type"] == "l_shape":
+        ring = [(0.0, 0.0), (wa, 0.0), (wa, d), (d, d), (d, wb), (0.0, wb)]
+        knobs = [((wa + d) / 2.0, d - 2.5), (d - 2.5, (wb + d) / 2.0)]
+    else:
+        ring = [(0.0, 0.0), (wa, 0.0), (wa, d), (d, wb), (0.0, wb)]
+        a, b = wa - d, wb - d
+        run = math.hypot(a, b)
+        knobs = [((wa + d) / 2.0 - 2.5 * b / run, (d + wb) / 2.0 - 2.5 * a / run)]
+    prims = [("poly", "dashed", [at(u, f) for u, f in ring])]
+    for u, f in knobs:
+        x, ff = at(u, f)
+        prims.append(("dot", x, ff, 0.7))
+    return prims
+
+
+def _suspended(parts, st, style, ceiling_in):
+    """0368: a cabinet hung from the ceiling over an island or a peninsula.
+    Its top is `drop_in` below the ceiling -- 0 is tight to it, more hangs it
+    on four rods -- so its underside follows the room. A cap and a light rail
+    span the whole footprint; the doors sit back under them, on one long side
+    or on both, and the rail hides an optional light strip. The strip carries
+    the "lens" role, so it glows and `light_source` finds it."""
+    w, d, h = st["width_in"], st["depth_in"], st["height_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    top = float(ceiling_in) - st["drop_in"]
+    z0 = top - h
+    t = PANEL_T
+    both = st["door_sides"] == "both"
+    face = d - ISLAND_FRONT_SETBACK
+    back = (ISLAND_FRONT_SETBACK + DOOR_T) if both else 0.0
+    _add(parts, "cap", "cabinet", x0, x1, 0.0, d, top - t, top)
+    _add(parts, "light-rail", "cabinet", x0, x1, 0.0, d, z0, z0 + t)
+    _add(parts, "carcass", "cabinet", x0, x1, back, face - DOOR_T, z0 + t, top - t)
+    _front(parts, st, style, x0, x1, z0 + t, top - t, face, pulls_low=True,
+           front="doors")
+    if both:
+        sub = []
+        _front(sub, st, style, x0, x1, z0 + t, top - t, face, pulls_low=True,
+               tag="back-", front="doors")
+        for p in sub:                    # the same doors, turned to face away
+            parts.append(Part(p.name, p.role,
+                              tuple((-x, d - f) for x, f in p.quad), p.z0, p.z1))
+    if st["drop_in"] > 0.5:
+        for i, (rx, rf) in enumerate(((x0 + 2.0, 2.0), (x1 - 2.0, 2.0),
+                                      (x1 - 2.0, d - 2.0), (x0 + 2.0, d - 2.0))):
+            _add(parts, f"rod-{i + 1}", "hardware", rx - 0.3, rx + 0.3,
+                 rf - 0.3, rf + 0.3, top, float(ceiling_in))
+    if st["under_light"]:
+        _add(parts, "light-strip", "lens", x0 + 1.5, x1 - 1.5, d / 2.0 - 1.0,
+             d / 2.0 + 1.0, z0 - 0.3, z0)
+
+
+def suspended_plan(st):
+    """0368: the plan symbol for a ceiling cabinet: a DASHED box (overhead), a
+    knob per door on each door side, and the light under it as bulbs."""
+    w, d = st["width_in"], st["depth_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    prims = [("dashed", x0 + 0.5, 0.5, x1 - 0.5, d - 0.5)]
+    n = door_count(st)
+    fw = (w - 1.0) / n
+    for i in range(1, n):
+        xx = x0 + 0.5 + fw * i
+        prims.append(("dline", xx, 0.5, xx, d - 0.5))
+    rows = (d - 2.5, 2.5) if st["door_sides"] == "both" else (d - 2.5,)
+    for f in rows:
+        for i in range(n):
+            prims.append(("dot", x0 + 0.5 + fw * (i + 0.5), f, 0.7))
+    if st["under_light"] and st["lumens"] > 0:
+        m = max(2, round(w / 16.0))
+        for k in range(m):
+            prims.append(("bulb", x0 + w * (k + 0.5) / m, d / 2.0, 0.6))
+    return prims
 
 
 def _mirror(parts, st, _style=None):
@@ -1810,21 +2055,28 @@ def light_source(st, ceiling_in=96.0):
         x = sum(q[0] for q in pts) / len(pts)
         f = sum(q[1] for q in pts) / len(pts) + 2.0        # cast into the room
         z = sum((p.z0 + p.z1) / 2.0 for p in lenses) / len(lenses)
+    elif st["type"] == "suspended" and st["under_light"]:
+        # 0368: the strip under a ceiling cabinet, aimed at the counter below
+        x, f = 0.0, st["depth_in"] / 2.0
+        z = float(ceiling_in) - st["drop_in"] - st["height_in"] - 0.8
     else:
         return None
     hexa = {k: h for k, _l, h in LIGHT_COLOURS}.get(st["light_colour"], "#ffe4bf")
     rgb = tuple(int(hexa[i:i + 2], 16) / 255.0 for i in (1, 3, 5))
     spot = (st["type"] == "light" and st["beam"] == "spot"
             and st["fixture"] not in ("sconce", "table"))
+    cone = 60.0 if spot else 180.0
+    if st["type"] == "suspended":            # a downlight, wider than a can's
+        spot, cone = True, 110.0
     return {"pos": (x, f, z), "colour": rgb,
             "lumens": float(st["lumens"]), "kind": "spot" if spot else "point",
-            "cone_deg": 60.0 if spot else 180.0}
+            "cone_deg": cone}
 
 
 def cabinet_parts(st, room_style=None, ceiling_in=96.0):
     """The parts of one cabinet, appliance, island or light, from a
     NORMALIZED state. `ceiling_in` is the room's ceiling, for a ceiling
-    light; everything else ignores it."""
+    light or a cabinet hung from it; everything else ignores it."""
     parts = []
     style = door_style_of(st, room_style)
     kind = st["type"]
@@ -1848,6 +2100,12 @@ def cabinet_parts(st, room_style=None, ceiling_in=96.0):
         _corner(parts, st, style)
     elif kind == "mirror":
         _mirror(parts, st, style)
+    elif kind == "kitchen_desk":
+        _kitchen_desk(parts, st, style)
+    elif kind == "corner_wall":
+        _corner_wall(parts, st, style)
+    elif kind == "suspended":
+        _suspended(parts, st, style, ceiling_in)
     else:
         _base_like(parts, st, style)
     return parts
@@ -1872,4 +2130,8 @@ def trade_code(st):
         return ("DB" if st["front"] == "drawers" else "B") + width
     if kind == "island":
         return "+".join(code for code, _w, _k, _o in island_slots(st))
+    if kind == "corner_wall":
+        return {"l_shape": "WLS", "diagonal": "DCW"}[st["corner_type"]] + f"{width}{h}"
+    if kind == "kitchen_desk":
+        return f"KD{width}"
     return ""

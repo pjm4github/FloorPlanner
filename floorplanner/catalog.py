@@ -30,7 +30,9 @@ _FURN_RENDERERS = {}
 # sink/corner cabinets, pantries, vanities, and the kitchen islands. The camera's
 # "Show cabinetry" / "Show furnishings" toggles split the items on this.
 _CASEWORK_PREFIX = ("base_cab", "wall_cab", "drawer_base", "sink_base",
-                    "corner_base", "pantry", "vanity")
+                    "corner_base", "pantry", "vanity",
+                    # 0368
+                    "tall_cab", "kitchen_desk", "corner_wall_cab", "ceiling_cab")
 _CASEWORK_EXACT = frozenset({"kitchen_island", "island_sink"})
 
 

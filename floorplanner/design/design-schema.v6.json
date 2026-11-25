@@ -434,7 +434,7 @@
     },
 
     "cabinet_state": {
-      "description": "0329. DECLARED, NOT ENFORCED: the keys a cabinet's `furnishing.state` may carry (kinds base_cab_*, drawer_base_*, sink_base_*, corner_base_*, wall_cab_*, pantry_*, vanity*). Every key is optional -- an absent one takes the kind's preset, then the type's default. `furnishing.state` itself stays open; the application validates and falls back (cabinet_geometry.normalize_state).",
+      "description": "0329 (0368 adds the four kitchen-casework kinds). DECLARED, NOT ENFORCED: the keys a cabinet's `furnishing.state` may carry (kinds base_cab_*, drawer_base_*, sink_base_*, corner_base_*, wall_cab_*, pantry_*, vanity*, tall_cab, kitchen_desk, corner_wall_cab, ceiling_cab). Every key is optional -- an absent one takes the kind's preset, then the type's default. `furnishing.state` itself stays open; the application validates and falls back (cabinet_geometry.normalize_state).",
       "type": "object",
       "additionalProperties": true,
       "properties": {
@@ -445,7 +445,7 @@
         "toe_kick_d_in":      { "type": "number", "minimum": 0 },
         "floor_to_bottom_in": { "description": "Wall cabinets: the height of the underside above the floor (54 by default).", "type": "number", "minimum": 0 },
         "front":              { "enum": ["doors", "drawer_over_doors", "drawers", "false_front"] },
-        "doors":              { "enum": ["auto", "1", "2"] },
+        "doors":              { "enum": ["auto", "1", "2", "3", "4"] },
         "drawers":            { "type": "integer", "minimum": 2, "maximum": 5 },
         "hinge":              { "enum": ["left", "right"] },
         "door_style":         { "description": "`room`, or a room_style door_style key.", "type": "string" },
@@ -460,7 +460,14 @@
         "backsplash_in":      { "type": "number", "minimum": 0 },
         "sink":               { "enum": ["none", "single", "double"] },
         "corner_type":        { "enum": ["diagonal", "l_shape", "blind"] },
-        "hand":               { "enum": ["left", "right"] }
+        "hand":               { "enum": ["left", "right"] },
+        "stands":             { "description": "0368 tall cabinet: `floor` (born on the floor) or `counter` (stands on a base unit, 36 in up).", "enum": ["floor", "counter"] },
+        "wing_in":            { "description": "0368 corner wall cabinet: each wing's length along the wall.", "type": "number", "exclusiveMinimum": 0 },
+        "door_sides":         { "description": "0368 corner / ceiling cabinet: doors on `both` sides or `one`.", "enum": ["both", "one"] },
+        "under_light":        { "description": "0368 ceiling cabinet: under-cabinet lighting on.", "type": "boolean" },
+        "drop_in":            { "description": "0368 ceiling cabinet: how far its top hangs below the room ceiling; rods show over 0.5 in.", "type": "number", "minimum": 0 },
+        "light_colour":       { "description": "0368 ceiling cabinet: the under-cabinet light colour.", "type": "string" },
+        "lumens":             { "description": "0368 ceiling cabinet: the under-cabinet light output.", "type": "number", "minimum": 0 }
       }
     },
 

@@ -275,6 +275,41 @@ def pantry_unit(w, d, doors=2):
     return parts
 
 
+def desk_unit(w, d):
+    """Top view of a kitchen desk: its top, the drawer front along the open
+    edge and the drawer's pull."""
+    return [R(0.75, 0.75, w - 1.5, d - 1.5, 0.8, sw=1.1),
+            L(1.5, d - 3, w - 1.5, d - 3, 0.4),
+            L(w / 2 - 4, d - 1.7, w / 2 + 4, d - 1.7, 0.8)]
+
+
+def corner_wall_unit(w, wing, depth):
+    """Top view of a corner WALL cabinet with a diagonal front: a DASHED
+    outline -- it sits overhead, above the plan cut -- the corner at the top
+    left, and a knob behind the door."""
+    return [Pth(f"M0.75 0.75 L{w - 0.75} 0.75 L{w - 0.75} {depth} "
+                f"L{depth} {wing - 0.75} L0.75 {wing - 0.75} Z", FILL, 1.0
+                ).replace("/>", ' stroke-dasharray="3,2"/>'),
+            Ci((w + depth) / 2 - 2, (wing + depth) / 2 - 2, 0.7, "none", 0.5)]
+
+
+def ceiling_unit(w, d, doors=2):
+    """Top view of a cabinet hung from the ceiling over an island: a DASHED
+    box -- overhead -- with a knob per door on BOTH long sides and the light
+    under it as a row of small bulbs."""
+    parts = [R(0.5, 0.5, w - 1, d - 1, 0.6, sw=1.0, dash="3,2")]
+    fw = (w - 1) / doors
+    for i in range(1, doors):
+        parts.append(L(0.5 + fw * i, 0.5, 0.5 + fw * i, d - 0.5, 0.4, "3,2"))
+    for i in range(doors):
+        parts.append(Ci(0.5 + fw * (i + 0.5), 2.5, 0.7, "none", 0.5))
+        parts.append(Ci(0.5 + fw * (i + 0.5), d - 2.5, 0.7, "none", 0.5))
+    n = max(2, round(w / 16))
+    for k in range(n):
+        parts.append(Ci(w * (k + 0.5) / n, d / 2, 0.5, "none", 0.5))
+    return parts
+
+
 FURNISHINGS = [
     # (id, name, category, width", depth", body parts)
     ("sofa", "Sofa", "Living", 84, 36, seat(84, 36, 3)),
@@ -379,6 +414,13 @@ FURNISHINGS = [
     ("wall_cab_24", "Wall Cabinet 24\"", "Kitchen", 24, 12, wall_unit(24, 12)),
     ("wall_cab_30", "Wall Cabinet 30\"", "Kitchen", 30, 12, wall_unit(30, 12)),
     ("wall_cab_36", "Wall Cabinet 36\"", "Kitchen", 36, 12, wall_unit(36, 12)),
+    # 0368: parametric casework -- the size here is only what each is born as
+    ("tall_cab", "Tall Cabinet", "Kitchen", 24, 24, pantry_unit(24, 24, 2)),
+    ("kitchen_desk", "Kitchen Desk", "Kitchen", 48, 24, desk_unit(48, 24)),
+    ("corner_wall_cab", "Corner Wall Cabinet", "Kitchen", 24, 24,
+     corner_wall_unit(24, 24, 12)),
+    ("ceiling_cab", "Ceiling Cabinet (over an island)", "Kitchen", 48, 15,
+     ceiling_unit(48, 15)),
     # kitchen islands: base cabinets + a seating overhang with stools
     ("kitchen_island", "Kitchen Island 6'", "Kitchen", 72, 39,
      island(72, 39, doors=3)),
@@ -946,6 +988,11 @@ SOLIDS = {
     "wall_cab_24":            (30,     54, "box",       "wood"),
     "wall_cab_30":            (30,     54, "box",       "wood"),
     "wall_cab_36":            (30,     54, "box",       "wood"),
+    # 0368.  ceiling_cab hangs from its room's ceiling: 72 is under an 8 ft one
+    "tall_cab":               (84,      0, "box",       "wood"),
+    "kitchen_desk":           (30,      0, "box",       "wood"),
+    "corner_wall_cab":        (30,     54, "box",       "wood"),
+    "ceiling_cab":            (24,     72, "box",       "wood"),
     "kitchen_island":         (36,      0, "box",       "wood"),
     "island_sink":            (36,      0, "box",       "wood"),
     # -- Bedroom
@@ -1646,8 +1693,9 @@ def main():
         if CABINETS.footprint(_st) != (float(_w), float(_d)):
             _bad_cab.append(f"{_cid}: preset footprint {CABINETS.footprint(_st)}, "
                             f"catalog {_w} x {_d}")
-        if _st["type"] == "light":
+        if _st["type"] in ("light", "suspended"):
             continue        # a light's height is its room's ceiling, not a constant
+                            # -- and so is a cabinet's that hangs from it (0368)
         if abs(_top - _h) > 1e-6 or abs(_at - _elev) > 1e-6:
             _bad_cab.append(f"{_cid}: preset stands {_at} + {_top}, catalog "
                             f"{_elev} + {_h}")
@@ -1733,7 +1781,8 @@ def main():
                      "base_cab_24", "base_cab_36", "drawer_base_18",
                      "sink_base_36", "corner_base_36", "wall_cab_24",
                      "wall_cab_30", "wall_cab_36", "kitchen_island", "island_sink",
-                     "pantry_18", "pantry_24", "pantry_36", "range_hood",
+                     "pantry_18", "pantry_24", "pantry_36", "tall_cab",
+                     "corner_wall_cab", "ceiling_cab", "kitchen_desk", "range_hood",
                      "microwave_otr", "pedal_bin", "dining_chair"]),
         ("Bedroom", ["bed_king", "bed_queen", "bed_full", "bed_twin",
                      "nightstand", "dresser", "wardrobe", "armchair",

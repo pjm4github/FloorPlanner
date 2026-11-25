@@ -617,6 +617,91 @@
     "price": 425.0
   },
   {
+    "id": "tall_cab",
+    "name": "Tall Cabinet",
+    "category": "Kitchen",
+    "file": "tall_cab.svg",
+    "width_in": 24,
+    "depth_in": 24,
+    "height_in": 84,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "tall",
+      "width_in": 24,
+      "depth_in": 24,
+      "height_in": 84
+    },
+    "price": 680.0
+  },
+  {
+    "id": "kitchen_desk",
+    "name": "Kitchen Desk",
+    "category": "Kitchen",
+    "file": "kitchen_desk.svg",
+    "width_in": 48,
+    "depth_in": 24,
+    "height_in": 30,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "wood",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "kitchen_desk",
+      "width_in": 48,
+      "depth_in": 24,
+      "height_in": 28.5
+    },
+    "price": 480.0
+  },
+  {
+    "id": "corner_wall_cab",
+    "name": "Corner Wall Cabinet",
+    "category": "Kitchen",
+    "file": "corner_wall_cab.svg",
+    "width_in": 24,
+    "depth_in": 24,
+    "height_in": 30,
+    "elevation_in": 54,
+    "form": "box",
+    "material": "wood",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "corner_wall",
+      "width_in": 24,
+      "wing_in": 24,
+      "depth_in": 12,
+      "height_in": 30
+    },
+    "price": 480.0
+  },
+  {
+    "id": "ceiling_cab",
+    "name": "Ceiling Cabinet (over an island)",
+    "category": "Kitchen",
+    "file": "ceiling_cab.svg",
+    "width_in": 48,
+    "depth_in": 15,
+    "height_in": 24,
+    "elevation_in": 72,
+    "form": "box",
+    "material": "wood",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "suspended",
+      "width_in": 48,
+      "depth_in": 15,
+      "height_in": 24
+    },
+    "price": 650.0
+  },
+  {
     "id": "kitchen_island",
     "name": "Kitchen Island 6'",
     "category": "Kitchen",
