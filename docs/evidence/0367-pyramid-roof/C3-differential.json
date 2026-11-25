@@ -1,0 +1,27 @@
+{
+  "base": "24601ac",
+  "metric": "per-mesh triangle count + rounded bounds",
+  "verdict": "PASS -- every no-pyramid build is identical",
+  "files": {
+    "gable+walls": {
+      "identical": true,
+      "meshes": 2,
+      "diffs": []
+    },
+    "gable+dormer+walls": {
+      "identical": true,
+      "meshes": 2,
+      "diffs": []
+    },
+    "cross-gable+walls": {
+      "identical": true,
+      "meshes": 2,
+      "diffs": []
+    },
+    "walls-no-roof": {
+      "identical": true,
+      "meshes": 1,
+      "diffs": []
+    }
+  }
+}

@@ -15,13 +15,16 @@ Layers, each usable without the one after it:
                           vocabulary (no imports; viewer and generator load
                           it by path)
     cabinets              the cabinet and appliance kinds
+    pyramid_geometry      the pyramid-roof calculator (no imports; the viewer
+                          loads it by path)
+    pyramids              the PYRAMID-ROOF kind (0367)
     dialog, stair_view,   PyQt6 -- imported only when a dialog is opened
     cabinet_view
 
 Importing this package imports NO Qt.
 """
 from floorplanner.parametric import (  # noqa: F401
-    cabinet_geometry, cabinets, dormer_geometry, dormers, registry,
-    stair_geometry, stairs)
+    cabinet_geometry, cabinets, dormer_geometry, dormers, pyramid_geometry,
+    pyramids, registry, stair_geometry, stairs)
 from floorplanner.parametric.findings import Finding  # noqa: F401
 from floorplanner.parametric.registry import get, is_parametric  # noqa: F401

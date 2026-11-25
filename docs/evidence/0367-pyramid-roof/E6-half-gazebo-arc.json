@@ -1,0 +1,160 @@
+{
+  "format": "floorplanner-design",
+  "version": 6,
+  "units": "inches",
+  "levels": [
+    {
+      "id": "L1",
+      "name": "Main",
+      "elevation_in": 0.0,
+      "height_in": 96.0
+    }
+  ],
+  "vertices": [
+    {
+      "id": "v0",
+      "level": "L1",
+      "x": 156.862,
+      "y": 240.0
+    },
+    {
+      "id": "v1",
+      "level": "L1",
+      "x": 198.431,
+      "y": 168.0
+    },
+    {
+      "id": "v2",
+      "level": "L1",
+      "x": 281.569,
+      "y": 168.0
+    },
+    {
+      "id": "v3",
+      "level": "L1",
+      "x": 323.138,
+      "y": 240.0
+    },
+    {
+      "id": "f0",
+      "level": "L1",
+      "x": 240.0,
+      "y": 240.0
+    },
+    {
+      "id": "f1",
+      "level": "L1",
+      "x": 143.005,
+      "y": 240.0
+    },
+    {
+      "id": "f2",
+      "level": "L1",
+      "x": 191.503,
+      "y": 156.0
+    },
+    {
+      "id": "f3",
+      "level": "L1",
+      "x": 288.497,
+      "y": 156.0
+    },
+    {
+      "id": "f4",
+      "level": "L1",
+      "x": 336.995,
+      "y": 240.0
+    }
+  ],
+  "walls": [],
+  "rooms": [
+    {
+      "id": "half_gazebo",
+      "level": "L1",
+      "name": "Half gazebo",
+      "category": "exterior",
+      "outline": [
+        {
+          "v": "f0"
+        },
+        {
+          "v": "f1"
+        },
+        {
+          "v": "f2"
+        },
+        {
+          "v": "f3"
+        },
+        {
+          "v": "f4"
+        }
+      ],
+      "placement": {
+        "state": "floating"
+      }
+    }
+  ],
+  "furnishings": [
+    {
+      "id": "post0",
+      "level": "L1",
+      "kind": "post",
+      "pos": [
+        156.862,
+        240.0
+      ],
+      "rotation": 0.0
+    },
+    {
+      "id": "post1",
+      "level": "L1",
+      "kind": "post",
+      "pos": [
+        198.431,
+        168.0
+      ],
+      "rotation": 0.0
+    },
+    {
+      "id": "post2",
+      "level": "L1",
+      "kind": "post",
+      "pos": [
+        281.569,
+        168.0
+      ],
+      "rotation": 0.0
+    },
+    {
+      "id": "post3",
+      "level": "L1",
+      "kind": "post",
+      "pos": [
+        323.138,
+        240.0
+      ],
+      "rotation": 0.0
+    },
+    {
+      "id": "roof",
+      "level": "L1",
+      "kind": "pyramid_roof",
+      "pos": [
+        240.0,
+        240.0
+      ],
+      "rotation": 0.0,
+      "state": {
+        "sides": 3,
+        "arc_deg": 180.0,
+        "inradius_in": 72.0,
+        "eaves_bind": "manual",
+        "eaves_h_in": 96.0,
+        "pitch_12": 10.0,
+        "overhang_in": 12.0,
+        "weld": "auto"
+      }
+    }
+  ]
+}

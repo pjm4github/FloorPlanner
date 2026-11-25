@@ -86,12 +86,15 @@ def _furn_mesh(model):
 def test_every_catalog_entry_carries_a_solid(manifest):
     """height_in, elevation_in, form and material on all 96 -- height_in most
     of all, because it is the one field with no safe default."""
-    assert len(manifest) == 114, ("catalog size changed; check this on purpose "
+    assert len(manifest) == 119, ("catalog size changed; check this on purpose "
                                   "(108: pedal bin, dog crate, sofa table, "
                                   "table lamp, 0341; 109: dormer, 0352 phase 2; "
                                   "111: medicine cabinet + lit vanity mirror, 0366; "
                                   "114: wicker chair, small wicker chair, "
-                                  "wicker table -- the sunroom set, 2026-11-24)")
+                                  "wicker table -- the sunroom set, 2026-11-24; "
+                                  "115: pyramid roof, 0367 stage 2; "
+                                  "119: tall cabinet, kitchen desk, corner wall "
+                                  "cabinet, ceiling cabinet, 0368)")
     missing = {}
     for e in manifest:
         absent = [f for f in ("height_in", "elevation_in", "form", "material")

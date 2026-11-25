@@ -54,6 +54,10 @@ def _has_drop(values):
     return values.get("fixture") in ("pendant", "table")
 
 
+def _under_lit(values):
+    return bool(values.get("under_light"))
+
+
 def _shown_width(_values, derived, _context):
     return None if derived is None else derived["footprint"][0]
 
@@ -106,6 +110,8 @@ class CabinetKind(ParametricKind):
             return self._mirror_specs(d)
         if t == "fixture":
             return self._fixture_specs(d)
+        if t in ("kitchen_desk", "corner_wall", "suspended"):
+            return self._casework_specs(d)
         if t == "appliance" and d.get("appliance") in ("washer", "dryer"):
             labels = {k: label for k, label, _h in cg.COLOURS}
             return [ParamSpec("colour", "Gloss finish", ENUM, d["colour"],
@@ -203,6 +209,13 @@ class CabinetKind(ParametricKind):
                           d["toe_kick_d_in"], unit="in", minimum=0.0, maximum=6.0,
                           step=0.5),
             ]
+        if t == "tall":
+            out.append(ParamSpec(
+                "stands", "Stands on", ENUM, d["stands"],
+                choices=(("floor", "The floor (full height)"),
+                         ("counter", "A base unit's counter")),
+                tooltip="On the counter it starts 36 in up; its top stays "
+                        "at the box height, level with the wall cabinets."))
         if t == "corner_base":
             out += [
                 ParamSpec("corner_type", "Corner type", ENUM, d["corner_type"],
@@ -236,7 +249,7 @@ class CabinetKind(ParametricKind):
         out += [
             ParamSpec("doors", "Doors", ENUM, d["doors"],
                       choices=(("auto", "Auto (one up to 21 in)"), ("1", "One"),
-                               ("2", "Two"))),
+                               ("2", "Two"), ("3", "Three"), ("4", "Four"))),
             ParamSpec("hinge", "Hinge side", ENUM, d["hinge"],
                       choices=(("left", "Left"), ("right", "Right")),
                       enabled_fn=lambda v: cg.door_count(
@@ -271,6 +284,87 @@ class CabinetKind(ParametricKind):
                           step=1.0, enabled_fn=on),
             ]
         return out
+
+    def _casework_specs(self, d):
+        """0368: a kitchen desk, a corner wall cabinet, a ceiling cabinet."""
+        t = self.type
+        look = [
+            ParamSpec("door_style", "Door style", ENUM, d["door_style"],
+                      choices=_choices(cg.DOOR_STYLES)),
+            ParamSpec("overlay", "Overlay", ENUM, d["overlay"],
+                      choices=(("full", "Full overlay"),
+                               ("partial", "Partial (frame shows)"))),
+            ParamSpec("pulls", "Pulls", ENUM, d["pulls"],
+                      choices=(("bar", "Bar"), ("knob", "Knob"), ("none", "None"))),
+            ParamSpec("finish", "Cabinet finish", ENUM, d["finish"],
+                      choices=_choices(cg.FINISHES)),
+            ParamSpec("hardware", "Hardware", ENUM, d["hardware"],
+                      choices=_choices(cg.HARDWARE)),
+        ]
+
+        def size(key, label, lo, hi, step=1.0, tip=""):
+            return ParamSpec(key, label, FLOAT, d[key], unit="in", minimum=lo,
+                             maximum=hi, step=step, tooltip=tip)
+
+        if t == "kitchen_desk":
+            return [
+                size("width_in", "Width", 24.0, 96.0, 3.0),
+                size("depth_in", "Depth", 15.0, 36.0),
+                size("height_in", "Height under the top", 22.0, 40.0, 0.5,
+                     "The top's underside. 28.5 in puts a 1.5 in top at desk "
+                     "height, 30 in; 34.5 in matches the counters."),
+            ] + look + [
+                ParamSpec("top_material", "Top material", ENUM, d["top_material"],
+                          choices=_choices(cg.COUNTERTOPS),
+                          tooltip="From the room's style, it matches the "
+                                  "kitchen's countertops."),
+                size("top_thickness_in", "Top thickness", 0.25, 4.0, 0.25),
+                size("top_overhang_in", "Front overhang", 0.0, 18.0, 0.25),
+                size("backsplash_in", "Backsplash height", 0.0, 24.0),
+            ]
+        if t == "corner_wall":
+            return [
+                size("width_in", "Wing along the wall behind", 12.0, 60.0, 3.0,
+                     "From the corner, along the wall the symbol's top is on."),
+                size("wing_in", "Wing along the side wall", 12.0, 60.0, 3.0,
+                     "From the corner, along the other wall."),
+                size("depth_in", "Depth", 6.0, 24.0, 1.0,
+                     "Each wing's depth; wall cabinets are 12 in."),
+                size("height_in", "Box height", 12.0, 60.0, 0.5),
+                size("floor_to_bottom_in", "Height from floor", 0.0, 120.0, 1.0,
+                     "Floor to the cabinet's underside. 54 in is 18 in above a "
+                     "36 in counter."),
+                ParamSpec("corner_type", "Corner type", ENUM, d["corner_type"],
+                          choices=(("diagonal", "Diagonal front (one door)"),
+                                   ("l_shape", "L-shape (two doors)"))),
+                ParamSpec("hand", "Corner at", ENUM, d["hand"],
+                          choices=(("left", "Back left"), ("right", "Back right"))),
+            ] + look
+        return [                                      # suspended
+            size("width_in", "Width", 12.0, 120.0, 3.0),
+            size("depth_in", "Depth", 9.0, 36.0),
+            size("height_in", "Cabinet height", 9.0, 48.0, 0.5,
+                 "Cap to light rail. The underside follows the room's ceiling."),
+            size("drop_in", "Gap below the ceiling", 0.0, 48.0, 1.0,
+                 "0 fixes it tight to the ceiling; more hangs it on rods."),
+            ParamSpec("doors", "Doors (each side)", ENUM, d["doors"],
+                      choices=(("auto", "Auto (one up to 21 in)"), ("1", "One"),
+                               ("2", "Two"), ("3", "Three"), ("4", "Four"))),
+            ParamSpec("door_sides", "Doors on", ENUM, d["door_sides"],
+                      choices=(("both", "Both long sides"),
+                               ("one", "One side (a finished back)"))),
+        ] + look + [
+            ParamSpec("under_light", "Light under the cabinet", BOOL,
+                      d["under_light"]),
+            ParamSpec("light_colour", "Light colour", ENUM, d["light_colour"],
+                      choices=tuple((k, label) for k, label, _h in cg.LIGHT_COLOURS),
+                      enabled_fn=_under_lit),
+            ParamSpec("lumens", "Output", FLOAT, d["lumens"], unit="lm",
+                      minimum=0.0, maximum=20000.0, step=100.0, decimals=0,
+                      enabled_fn=_under_lit,
+                      tooltip="800 lm is about a 60 W bulb. 0 switches the "
+                              "strip off and keeps it."),
+        ]
 
     def _mirror_specs(self, d):
         """0366: a bathroom mirror / medicine cabinet with lights."""
@@ -444,6 +538,16 @@ class CabinetKind(ParametricKind):
             return {"prims": cg.sink_base_plan(st)}
         if self.type == "mirror":
             return {"prims": cg.mirror_plan(st)}
+        # 0368: the new casework draws from its parameters; the pantries keep
+        # their catalog symbol
+        if self.kind == "tall_cab":
+            return {"prims": cg.tall_plan(st)}
+        if self.type == "kitchen_desk":
+            return {"prims": cg.kitchen_desk_plan(st)}
+        if self.type == "corner_wall":
+            return {"prims": cg.corner_wall_plan(st)}
+        if self.type == "suspended":
+            return {"prims": cg.suspended_plan(st)}
         return None
 
     # -- evaluation ----------------------------------------------------------
@@ -466,7 +570,8 @@ class CabinetKind(ParametricKind):
                    "materials": cg.resolve_materials(st, style),
                    "style": cg.effective_style(style),
                    "footprint": cg.footprint(st),
-                   "height": cg.overall_height(st), "code": cg.trade_code(st)}
+                   "height": cg.overall_height(st, ceiling),
+                   "code": cg.trade_code(st)}
         if st["type"] in ("appliance", "light"):
             return derived, findings
         if st["type"] == "mirror":
@@ -513,6 +618,35 @@ class CabinetKind(ParametricKind):
                     "island.empty", ADVISORY,
                     "Nothing stands under this island; it is drawn 48 in long "
                     "on a plain base.", field="slot_1"))
+            return derived, findings
+        if st["type"] == "suspended":
+            under = ceiling - st["drop_in"] - st["height_in"]
+            if under < cg.COUNTER_H + 24.0 - 1e-6:
+                findings.append(Finding(
+                    "suspended.clearance", ADVISORY,
+                    f"The underside is {_fmt(under)} in above the floor, "
+                    f"{_fmt(under - cg.COUNTER_H)} in over a 36 in counter; "
+                    f"allow 24 in or more over an island, 30 in to see across "
+                    f"it.", actual=under, limit=cg.COUNTER_H + 24.0,
+                    field="height_in"))
+            return derived, findings
+        if st["type"] == "corner_wall":
+            if 36.0 < st["floor_to_bottom_in"] < 51.0 - 1e-6:
+                findings.append(Finding(
+                    "wall.clearance", ADVISORY,
+                    f"The underside is {_fmt(st['floor_to_bottom_in'] - 36.0)} "
+                    f"in above a 36 in counter; 15 in is the usual minimum, "
+                    f"18 in standard.", actual=st["floor_to_bottom_in"],
+                    limit=51.0, field="floor_to_bottom_in"))
+            return derived, findings
+        if st["type"] == "kitchen_desk":
+            knee = st["height_in"] - cg.DESK_DRAWER_H
+            if knee < 24.0 - 1e-6:
+                findings.append(Finding(
+                    "desk.knee", ADVISORY,
+                    f"The knee space under the drawer is {_fmt(knee)} in high; "
+                    f"24 in is the usual minimum for a seated desk.",
+                    actual=knee, limit=24.0, field="height_in"))
             return derived, findings
         w = st["width_in"]
         if abs(w / 3.0 - round(w / 3.0)) > 1e-6:
@@ -630,6 +764,43 @@ class CabinetKind(ParametricKind):
                     ("Seats", str(st["seats"])),
                     ("Cabinet finish", _material_label(mats["cabinet"])),
                     ("Countertop", _material_label(mats["countertop"]))]
+        if st["type"] == "kitchen_desk":
+            return [("Unit", "Kitchen desk"),
+                    ("Trade code", derived["code"] or "—"),
+                    ("Footprint", f"{_fmt(w)} x {_fmt(d)} in"),
+                    ("Top of the desk", f"{_fmt(derived['height'])} in"),
+                    ("Drawer", "one, full width"),
+                    ("Cabinet finish", _material_label(mats["cabinet"])),
+                    ("Top", _material_label(mats["countertop"]))]
+        if st["type"] == "corner_wall":
+            diagonal = st["corner_type"] == "diagonal"
+            return [("Unit", "Corner wall cabinet, "
+                             + ("diagonal front" if diagonal else "L-shape")),
+                    ("Trade code", derived["code"] or "—"),
+                    ("Wings", f"{_fmt(w)} and {_fmt(d)} in, "
+                              f"{_fmt(st['depth_in'])} in deep"),
+                    ("Doors", "1" if diagonal else "2"),
+                    ("Underside", f"{_fmt(st['floor_to_bottom_in'])} in "
+                                  f"above the floor"),
+                    ("Top of cabinet", f"{_fmt(derived['height'])} in"),
+                    ("Cabinet finish", _material_label(mats["cabinet"])),
+                    ("Hardware", _material_label(mats["hardware"]))]
+        if st["type"] == "suspended":
+            src = derived.get("light")
+            label = dict((k, name) for k, name, _h in cg.LIGHT_COLOURS)
+            under = derived["height"] - st["height_in"]
+            sides = 2 if st["door_sides"] == "both" else 1
+            return [("Unit", "Ceiling cabinet"),
+                    ("Footprint", f"{_fmt(w)} x {_fmt(d)} in"),
+                    ("Ceiling here", f"{_fmt(derived['ceiling'])} in"),
+                    ("Underside", f"{_fmt(under)} in above the floor"),
+                    ("Doors", f"{cg.door_count(st)} a side, {sides} "
+                              f"side{'s' if sides == 2 else ''}"),
+                    ("Light under it", "none" if not st["under_light"] else
+                     f"{label[st['light_colour']]}, {_fmt(st['lumens'])} lm"
+                     + ("" if src else " (off)")),
+                    ("Cabinet finish", _material_label(mats["cabinet"])),
+                    ("Hardware", _material_label(mats["hardware"]))]
         rows = [("Trade code", derived["code"] or "—"),
                 ("Footprint", f"{_fmt(w)} x {_fmt(d)} in"),
                 ("Overall height", f"{_fmt(derived['height'])} in"),

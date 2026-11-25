@@ -136,6 +136,31 @@ def _load_dormer_geometry():
 
 DORMERGEO = _load_dormer_geometry()
 
+
+def _load_pyramid_geometry():
+    """0367 stage 2: the pyramid-roof calculator, `parametric/pyramid_geometry.py`,
+    loaded BY PATH for the same reason the dormer's and `roofclip.py` are -- it
+    is plain Python (imports only `math`), so the furnishing's 3D faces read the
+    ONE geometry the editor and the plan symbol draw from (condition C1). None
+    when it cannot be found: a pyramid then contributes no mesh and a note says
+    so."""
+    import importlib.util
+    here = os.path.dirname(os.path.abspath(__file__))
+    cand = os.path.join(os.path.dirname(here), "parametric", "pyramid_geometry.py")
+    name = "_fp_pyramid_geometry"
+    try:
+        spec = importlib.util.spec_from_file_location(name, cand)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+    except (OSError, AttributeError, ImportError, SyntaxError):
+        sys.modules.pop(name, None)
+        return None
+
+
+PYRAMIDGEO = _load_pyramid_geometry()
+
 WALL_T = _load_wall_thickness()  # thickness by type, inches -- the MODEL's
 WALL_H = {                       # height by type; None = full level height
     "exterior": None, "interior": None, "partition": None,
@@ -737,24 +762,43 @@ class Model:
     lights: list = field(default_factory=list)
 
 
-def _roof_underside_at(lifted_of, x, y, above_z):
+def _roof_underside_at(lifted_of, x, y, above_z, pyramids=()):
     """0258 (plan E): the height of the underside of the LOWEST roof standing
     over PLAN point `(x, y)` (the document's frame) higher than `above_z` -- `lifted_of` is
     `build_model`'s `{id: Lifted}` of every roof in absolute height; a
     roof counts when its footprint (hip ends and overhangs included) holds
     the point. None when no roof stands over it. The underside is the
-    surface less `ROOF_T`, the thickness the roof slab is drawn with."""
-    if ROOFCLIP is None or not lifted_of:
+    surface less `ROOF_T`, the thickness the roof slab is drawn with.
+
+    0367 stage 2: a PYRAMID-ROOF furnishing is a roof too, so a post under one
+    rises to its underside. `pyramids` is `_pyramid_meshes`'s surface list; each
+    reads its own `pyramid_geometry.surface_height` (C1) -- the pyramid is NOT a
+    ridge-roof record and does not fit `roofclip`'s surface, so it is consulted
+    separately here."""
+    if ROOFCLIP is None:
         return None
     pt = ROOFCLIP.Pt(x, y)
     best = None
-    for lf in lifted_of.values():
+    for lf in (lifted_of or {}).values():
         try:
             if not ROOFCLIP._contains(ROOFCLIP.footprint_polygon(lf), pt):
                 continue
             z = float(ROOFCLIP.surface_height(lf, pt)) - ROOF_T
         except Exception:                 # a degenerate roof: not a post's problem
             continue
+        if z > above_z and (best is None or z < best):
+            best = z
+    for py in pyramids:
+        if PYRAMIDGEO is None:
+            break
+        # `surface_height` is None past the eave AND (for an arc) in the open
+        # pie wedge, so it alone decides whether a pyramid stands over the post
+        # -- the eave-polygon test would wrongly close an arc fan's cut edge.
+        local = PYRAMIDGEO.to_local(py["pos"], py["rot"], (x, y))
+        h = PYRAMIDGEO.surface_height(py["st"], local)
+        if h is None:
+            continue
+        z = py["z0"] + float(h) - ROOF_T
         if z > above_z and (best is None or z < best):
             best = z
     return best
@@ -1758,6 +1802,26 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         return [_box(corners_xy, z_lo, z_hi)]
     RC = roofclip_mod
     Pt = RC.Pt
+
+    # 0367 stage 2: a territory may be a PYRAMID-ROOF surface, which does not fit
+    # `roofclip`'s ridge-roof `surface_height` / `_cut_lines` / gable test. These
+    # dispatch by type; for a ridge roof they are exactly the calls as before, so
+    # a plan with no pyramid builds byte-identically (C3).
+    def _surf(geom, c):
+        return (geom.height_at(c) if isinstance(geom, _PyramidSurface)
+                else RC.surface_height(geom, c))
+
+    def _cuts(geom):
+        return (geom.cut_lines(Pt) if isinstance(geom, _PyramidSurface)
+                else RC._cut_lines(geom))
+
+    def _climbs(geom):
+        # a wall climbs into a pyramid when it is EXTERIOR (gable_dir set); a
+        # pyramid has no single ridge, so the gable-perpendicular test is moot.
+        if isinstance(geom, _PyramidSurface):
+            return gable_dir is not None
+        return gable_wall_of(geom)
+
     quad = [Pt(x, -y) for x, y in corners_xy]         # world -> plan
     xs = [q.x() for q in quad]
     ys = [q.y() for q in quad]
@@ -1802,7 +1866,7 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         best, best_h = (None, False, False), None
         for geom, cells, dm, same in nearby:
             if any(RC._contains(cell, c) for cell in cells):
-                h = RC.surface_height(geom, c)
+                h = _surf(geom, c)
                 if best_h is None or h < best_h:
                     best, best_h = (geom, dm, same), h
         if best[0] is not None:
@@ -1815,7 +1879,7 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
                         for i in range(n))
                 if d > t:
                     continue
-                h = RC.surface_height(geom, c)
+                h = _surf(geom, c)
                 if (best_d is None or d < best_d - RC.EPS
                         or (abs(d - best_d) <= RC.EPS and h < best_h)):
                     best, best_d, best_h = (geom, dm, same), d, h
@@ -1851,7 +1915,7 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         best, best_h = None, None
         for geom, cells, dm, _same in nearby:
             if dm and any(RC._contains(cell, c) for cell in cells):
-                h = RC.surface_height(geom, c)
+                h = _surf(geom, c)
                 if best_h is None or h > best_h:
                     best, best_h = geom, h
         return best
@@ -1879,9 +1943,9 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         # 0254's fix (an L1 gable no longer climbs through L2 to an L2 roof) by
         # the bound rather than by the level: L1 stops at L2's base and L2 closes
         # the gable with its own wall and window (0290 §3 item 2, 0293 §2a).
-        climb = to_top and (dormer or gable_wall_of(geom))
+        climb = to_top and (dormer or _climbs(geom))
         def cap_z(v, geom=geom):
-            return z_base + RC.surface_height(geom, v) - WALL_CAP_BELOW_ROOF_IN
+            return z_base + _surf(geom, v) - WALL_CAP_BELOW_ROOF_IN
 
         def climb_top(v, cap=climb_cap):
             tz = cap_z(v)
@@ -1909,7 +1973,7 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
             return None
 
         planar = [pc]
-        for pt, d in RC._cut_lines(geom):
+        for pt, d in _cuts(geom):
             planar = [q for cell in planar for q in RC._split_by_line(cell, pt, d)]
         # Split, too, at the edge of the storey above, so a climb piece never
         # STRADDLES where that storey begins or ends. `above_bounds` judges a
@@ -3225,6 +3289,230 @@ def _dormer_roof_records(doc, lv, base, nearest_span, RC, DG):
     return out
 
 
+def _pyramid_room_ceiling(doc, lid, cx, cy):
+    """The ceiling of the room a pyramid roof sits on (its centre `(cx, cy)` in
+    the document plan frame, on level `lid`) -- the smallest room on that level
+    holding the point. Read from `ceiling_in` or `properties.ceiling_height_in`,
+    whichever the record carries. None when no room holds it (an open site)."""
+    vx = {v["id"]: v for v in doc.get("vertices", [])}
+    best = None
+    for r in doc.get("rooms", []):
+        if r.get("level") != lid:
+            continue
+        ring, ok = [], True
+        for e in r.get("outline", []):
+            v = vx.get(e.get("v"))
+            if v is None:
+                ok = False
+                break
+            ring.append((float(v["x"]), float(v["y"])))
+        if not ok or len(ring) < 3 or not _pip((cx, cy), ring):
+            continue
+        cin = r.get("ceiling_in")
+        if cin is None:
+            cin = (r.get("properties") or {}).get("ceiling_height_in")
+        if cin is None:
+            continue
+        area = _ring_area(ring)
+        if best is None or area < best[0]:
+            best = (area, float(cin))
+    return None if best is None else best[1]
+
+
+class _PyramidSurface:
+    """0367 stage 2: a pyramid-roof furnishing seen as a wall-climb / underside
+    SURFACE -- the small subset of the roof API `_wall_under_roofs` reads: an
+    ABSOLUTE surface height at a plan point, and the hip lines a wall piece over
+    it is split into planes by. Backed by `pyramid_geometry` (condition C1: one
+    height formula, `plane_height`). It is NOT a ridge-roof `RoofGeom` and does
+    not fit `roofclip.surface_height`; the dispatchers in `_wall_under_roofs`
+    consult it on its own."""
+    __slots__ = ("pos", "rot", "st", "z0")
+
+    def __init__(self, pos, rot, st, z0):
+        self.pos, self.rot, self.st, self.z0 = pos, rot, st, float(z0)
+
+    def height_at(self, pt):
+        local = PYRAMIDGEO.to_local(self.pos, self.rot, (pt.x(), pt.y()))
+        return self.z0 + PYRAMIDGEO.plane_height(self.st, local)
+
+    def cut_lines(self, Pt):
+        """The hips, as lines through the apex (the centre in plan) toward each
+        eave corner -- where the surface changes face (the pyramid's version of
+        a roof's `_cut_lines`), so each wall piece is split into single planes."""
+        out, (cx, cy) = [], self.pos
+        for v in PYRAMIDGEO.eaves_polygon(self.st):
+            wx, wy = PYRAMIDGEO.to_plan(self.pos, self.rot, v)
+            out.append((Pt(cx, cy), Pt(wx - cx, wy - cy)))
+        return out
+
+
+def _pyramid_surfaces(doc, lv, base):
+    """0367 stage 2: every pyramid-roof furnishing as a surface descriptor --
+    its eave footprint (plan, y DOWN, the document frame), centre, rotation,
+    state (eaves re-bound to the room ceiling under room_top, R3) and level
+    base, plus whether it can be built. Pure data; the faces, the posts' rise
+    and the walls' climb all read it. [] when the geometry cannot be loaded."""
+    PG = PYRAMIDGEO
+    out = []
+    if PG is None:
+        return out
+    n = 0
+    for fu in doc.get("furnishings", []):
+        if fu.get("kind") != "pyramid_roof" or fu.get("level") not in lv:
+            continue
+        lid = fu.get("level")
+        try:
+            pos = fu.get("pos") or [0.0, 0.0]
+            cx, cy = float(pos[0]), float(pos[1])
+            rot = float(fu.get("rotation", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            continue
+        st = PG.normalize_state(fu.get("state") or {})
+        if st.get("eaves_bind", "room_top") == "room_top":        # R3
+            ceiling = _pyramid_room_ceiling(doc, lid, cx, cy)
+            if ceiling is not None:
+                st = dict(st)
+                st["eaves_h_in"] = ceiling
+        n += 1
+        out.append({
+            "id": fu.get("id") or f"pyramid_{n}", "lid": lid,
+            "pos": (cx, cy), "rot": rot, "st": st, "z0": base(lid),
+            "fp": [PG.to_plan((cx, cy), rot, v) for v in PG.eaves_polygon(st)],
+            # convex plan cells (0367 arc): one eave n-gon when whole, one
+            # triangle per facet for an arc -- the wall-climb and the weld split
+            # on these so a partial (even reflex) fan stays convex.
+            "cells": [[PG.to_plan((cx, cy), rot, v) for v in cell]
+                      for cell in PG.convex_cells(st)],
+            "full": PG.is_full(st),
+            "buildable": st["pitch_12"] > 0.0})
+    return out
+
+
+def _pyramid_face_meshes(surfaces, model, roof_comps=()):
+    """0367: the pyramid faces, each a ROOF_T slab over a triangle (as a dormer
+    plane is). Stage 3 -- the WELD: a buildable `weld: auto` pyramid is drawn
+    only where it is the HIGHER surface, each face cut at the equal-height line
+    against the roofs under it (`roof_comps`); `weld: off`, and an unbuildable
+    pyramid, are drawn WHOLE. C5: an unbuildable pyramid is drawn RED and said in
+    `model.notes`; the build never aborts."""
+    PG = PYRAMIDGEO
+    if PG is None:
+        if surfaces:
+            model.notes.append("pyramid-roof geometry not found -- not built")
+        return
+    good, bad = [], []
+    for s in surfaces:
+        st, (cx, cy), rot, z0 = s["st"], s["pos"], s["rot"], s["z0"]
+        parts = good if s["buildable"] else bad
+        welds = s["buildable"] and st.get("weld", "auto") == "auto" and roof_comps
+
+        def h_fn(pt, cx=cx, cy=cy, rot=rot, st=st, z0=z0):
+            return z0 + PG.plane_height(st, PG.to_local((cx, cy), rot, (pt.x(), pt.y())))
+
+        for face in PG.face_planes(st):
+            plan = [ROOFCLIP.Pt(*PG.to_plan((cx, cy), rot, (lx, ly)))
+                    for lx, ly, _lz in face["tri"]]
+            kept = (_weld_keep(plan, h_fn, roof_comps) if welds else [plan])
+            for poly in kept:
+                parts.append(_prism_slab(
+                    [(c.x(), -c.y(), h_fn(c)) for c in poly], ROOF_T))
+        if not s["buildable"]:
+            model.notes.append(
+                f"pyramid roof {s['id']}: pitch {st['pitch_12']:.3g} in 12 is not "
+                "above zero -- it cannot be built as drawn, shown red")
+    if good:
+        v, f = _merge(good)
+        model.meshes.append(Mesh("roofs", v, f, ROOF_C))
+    if bad:
+        v, f = _merge(bad)
+        model.meshes.append(Mesh("pyramid_error", v, f, (0.85, 0.11, 0.11, 1.0)))
+
+
+def _pyramid_terr(surfaces, Pt):
+    """0367 stage 2: buildable pyramids as wall-climb territories for
+    `_wall_under_roofs` -- `(surface, cells, is_dormer=False, level)`. A whole
+    gazebo's eave polygon is convex, so it is one cell; an arc is a fan of
+    convex facet triangles (its `cells`), so only walls under a present facet
+    climb and none climbs under the open wedge."""
+    return [(_PyramidSurface(s["pos"], s["rot"], s["st"], s["z0"]),
+             [[Pt(x, y) for x, y in cell] for cell in s["cells"]],
+             False, s["lid"])
+            for s in surfaces if s["buildable"]]
+
+
+# ---------------------------------------------------------------------------
+# the weld (0367 stage 3). Where a pyramid and a roof overlap in plan, each is
+# drawn only where it is the HIGHER surface; the boundary is the equal-height
+# line, exact. A pairwise pass built from roofclip's convex leaf tools -- NEVER
+# `compute_roof_clips` (0350 §1's non-returning roof-roof walk). See the C2
+# read-back, docs/evidence/0367-pyramid-roof/C2-weld-readback.md.
+# ---------------------------------------------------------------------------
+def _edges_as_lines(poly):
+    """A convex polygon's edges as (point, direction) lines, for splitting."""
+    n = len(poly)
+    return [(poly[i], ROOFCLIP.Pt(poly[(i + 1) % n].x() - poly[i].x(),
+                                  poly[(i + 1) % n].y() - poly[i].y()))
+            for i in range(n)]
+
+
+def _weld_keep(cell, this_h, comps):
+    """The convex sub-cells of plan `cell` (Pt, doc frame) where `this_h(pt)`
+    (absolute height) is >= every competitor present there. Each competitor is
+    `{fp, h, cuts}` -- a convex footprint, an absolute height, its plane-change
+    lines. `cell` must already be ONE plane of `this` surface, so `this_h - h`
+    is affine on every sub-cell and the equal-height boundary is one exact line
+    (`_clip_by_values`). `comps` empty -> `[cell]`."""
+    RC = ROOFCLIP
+    cells = [list(cell)]
+    for comp in comps:
+        for a, d in _edges_as_lines(comp["fp"]) + comp["cuts"]:
+            cells = [q for c in cells for q in RC._split_by_line(c, a, d)]
+    out = []
+    for sub in cells:
+        if len(sub) < 3 or RC._area(sub) <= RC.MIN_CELL_AREA:
+            continue
+        c = RC._centroid(sub)
+        poly, alive = sub, True
+        for comp in comps:
+            if not RC._contains(comp["fp"], c):
+                continue                      # this surface alone stands here
+            poly, _ = RC._clip_by_values(poly, [this_h(v) - comp["h"](v) for v in poly])
+            if len(poly) < 3 or RC._area(poly) <= RC.MIN_CELL_AREA:
+                alive = False
+                break
+        if alive:
+            out.append(poly)
+    return out
+
+
+def _emit_welded(parts, ring3d, plan_poly, h_fn, comps):
+    """Emit a roof surface slab. With no competing pyramid it appends the
+    ORIGINAL `ring3d` unchanged, so a plan with no weld builds byte-identically
+    (C3). With competitors it keeps only where this roof is the higher surface
+    (`_weld_keep`), re-lifting each kept piece by `h_fn` (doc-frame Pt -> abs z);
+    the pyramid draws the rest."""
+    if not comps:
+        parts.append(_prism_slab(ring3d, ROOF_T))
+        return
+    for poly in _weld_keep(plan_poly, h_fn, comps):
+        parts.append(_prism_slab([(c.x(), -c.y(), h_fn(c)) for c in poly], ROOF_T))
+
+
+def _pyr_competitors(s):
+    """A buildable, welding pyramid as competitor(s) to the roofs under it.
+    A whole gazebo is ONE competitor -- its convex eave polygon, split into
+    single planes by its hip cut-lines, exactly as before (byte-identical). An
+    arc is ONE competitor PER facet triangle: each is a single plane over a
+    convex cell, so no cut-lines are needed and a reflex fan stays convex."""
+    surf = _PyramidSurface(s["pos"], s["rot"], s["st"], s["z0"])
+    if s["full"]:
+        return [{"fp": [ROOFCLIP.Pt(x, y) for x, y in s["cells"][0]],
+                 "h": surf.height_at, "cuts": surf.cut_lines(ROOFCLIP.Pt)}]
+    return [{"fp": [ROOFCLIP.Pt(x, y) for x, y in cell],
+             "h": surf.height_at, "cuts": []} for cell in s["cells"]]
+
+
 def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 floors=True, openings=True, catalog=None, roofs=True):
     """v5 design dict -> Model.  Pure numpy; no Qt, no floorplanner import.
@@ -3700,6 +3988,15 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             v, f = _merge(ceil_parts)
             model.meshes.append(Mesh("ceilings", v, f, CEILING_C))
 
+    # 0367 stage 2: the pyramid-roof furnishings' surfaces, computed once --
+    # the walls below climb to them (added to the wall territory), the posts
+    # rise to them, and their faces are meshed in the furnishings section. Only
+    # when furnishings are drawn (a pyramid is a furnishing).
+    pyramid_surfaces = _pyramid_surfaces(doc, lv, base) if furnishings else []
+    pyramid_up = [s for s in pyramid_surfaces if s["buildable"]]
+    pyramid_terr = (_pyramid_terr(pyramid_up, ROOFCLIP.Pt)
+                    if ROOFCLIP is not None else [])
+
     # ---- walls -----------------------------------------------------------
     # P1 (0297 §2): per level, the storey DIRECTLY ABOVE it -- its base
     # (absolute), its plan walls (for `_on_a_wall`) and its enclosing loops
@@ -3846,8 +4143,11 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                     (p1[0] + ux * a - nx * t / 2, p1[1] + uy * a - ny * t / 2)]
 
         # each solid piece of the wall, capped at the roof surface where a
-        # roof on this level is lower than the piece's top (`_wall_under_roofs`)
-        terr = terr_all
+        # roof on this level is lower than the piece's top (`_wall_under_roofs`).
+        # 0367 stage 2: pyramid-roof territories join the ridge roofs, so a wall
+        # under a pyramid rises to it (R3) -- exterior to the surface, interior
+        # to the lower of surface and ceiling.
+        terr = terr_all + pyramid_terr
 
         # the gable climb (`_wall_under_roofs`): an exterior wall's plan
         # direction, in PLAN space (the y-flip undone, as the roofs are)
@@ -3933,6 +4233,11 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
     n_roof = n_overhang = 0
     if roofs:
         roof_parts = list(riser_parts)
+        # 0367 stage 3: the welding pyramids, as competitors that CUT the roofs
+        # under them -- a roof is drawn only where it is higher than the pyramid.
+        _pyr_weld = [c for s in pyramid_up
+                     if s["st"].get("weld", "auto") == "auto"
+                     for c in _pyr_competitors(s)]
         # 0352 phase 3 balcony: the host roof in FRONT of a balcony dormer's face
         # is cut away and a flat deck laid at the dormer level's floor.
         # `terrace_checks` was computed with the clips above (also used to free
@@ -3967,6 +4272,10 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             nx, ny = -uy, ux
 
             geom, clip = clips.get(rid, (None, None))
+            pyr_comps = ([c for c in _pyr_weld
+                          if ROOFCLIP._convex_intersection(
+                              ROOFCLIP.footprint_polygon(geom), c["fp"])]
+                         if _pyr_weld and geom is not None else [])
             if clip is not None and clip.region is not None:
                 # CLIPPED: build the mesh from the visible region's cells.
                 # Each cell is split by this roof's own plane boundaries
@@ -4002,9 +4311,12 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                         balcony_deck_rings.append(
                             [(c.x(), -c.y(), deck_z) for c in piece])
                         continue
-                    ring = [(c.x(), -c.y(), z0 + ROOFCLIP.surface_height(geom, c))
-                            for c in piece]
-                    roof_parts.append(_prism_slab(ring, ROOF_T))
+                    _emit_welded(
+                        roof_parts,
+                        [(c.x(), -c.y(), z0 + ROOFCLIP.surface_height(geom, c))
+                         for c in piece], piece,
+                        (lambda c, z0=z0, geom=geom:
+                         z0 + ROOFCLIP.surface_height(geom, c)), pyr_comps)
                 # sec 8.5: a cantilevered balcony reaches PAST the host, where no
                 # host cell exists to deck -- lay its floor out to the front wall.
                 for t in _my_terrs:
@@ -4017,9 +4329,12 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 # seam where this surface would rise above the cover's
                 # (computed with the clips above, so the walls saw them).
                 for piece in hidden_of.get(rid, []):
-                    ring = [(c.x(), -c.y(), z0 + ROOFCLIP.surface_height(geom, c))
-                            for c in piece]
-                    roof_parts.append(_prism_slab(ring, ROOF_T))
+                    _emit_welded(
+                        roof_parts,
+                        [(c.x(), -c.y(), z0 + ROOFCLIP.surface_height(geom, c))
+                         for c in piece], piece,
+                        (lambda c, z0=z0, geom=geom:
+                         z0 + ROOFCLIP.surface_height(geom, c)), pyr_comps)
                     n_overhang += 1
                 # A GABLE END IS OPEN (Patrick, 2026-10-06; 0223-report.md
                 # sec3): no roof-material triangle closes it -- the wall
@@ -4123,10 +4438,18 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             # the two roof planes -- one on each side of the ridge; a
             # SHED (0248 plan A) has only the left one, its right reach 0,
             # and a zero-width slab is not built (a degenerate ring)
+            def _wh(c, z0=z0, geom=geom):
+                return z0 + ROOFCLIP.surface_height(geom, c)
             if reach_pos > 1e-6:
-                roof_parts.append(_prism_slab([r1, r2, e_pos2, e_pos1], ROOF_T))
+                _emit_welded(
+                    roof_parts, [r1, r2, e_pos2, e_pos1],
+                    [ROOFCLIP.Pt(p[0], -p[1]) for p in (r1, r2, e_pos2, e_pos1)],
+                    _wh, pyr_comps)
             if reach_neg > 1e-6:
-                roof_parts.append(_prism_slab([r1, e_neg1, e_neg2, r2], ROOF_T))
+                _emit_welded(
+                    roof_parts, [r1, e_neg1, e_neg2, r2],
+                    [ROOFCLIP.Pt(p[0], -p[1]) for p in (r1, e_neg1, e_neg2, r2)],
+                    _wh, pyr_comps)
 
             # the end faces: (R4b) a hip end's sloped face, one triangle
             # with its apex at the ridge end. A GABLE END IS OPEN (Patrick,
@@ -4136,7 +4459,10 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
             for end, (apex, ep, en) in enumerate(ends):
                 if end < len(gable) and gable[end]:
                     continue
-                roof_parts.append(_prism_slab([apex, ep, en], ROOF_T))
+                _emit_welded(
+                    roof_parts, [apex, ep, en],
+                    [ROOFCLIP.Pt(p[0], -p[1]) for p in (apex, ep, en)],
+                    _wh, pyr_comps)
             n_roof += 1
 
         if roof_parts:
@@ -4160,6 +4486,24 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
         specs, materials, problems = (catalog if catalog is not None
                                       else load_catalog())
         model.notes.extend(problems)
+        # 0367 stage 2/3: build the pyramid-roof face slabs. Stage 3 welds a
+        # `weld: auto` pyramid against the roofs under it -- each roof's TERRITORY
+        # cells (the clip region, or its footprint when unclipped) and its
+        # surface are the competitors, so the pyramid is drawn only where it is
+        # the higher surface.
+        roof_comps_for_pyr = []
+        if ROOFCLIP is not None and pyramid_up:
+            for _rid, _lf in lifted_of.items():
+                _g, _clip = clips.get(_rid, (None, None))
+                _cells = (list(_clip.region.cells)
+                          if _clip is not None and _clip.region is not None
+                          else [ROOFCLIP.footprint_polygon(_lf)])
+                _cuts = ROOFCLIP._cut_lines(_lf)
+                for _cell in _cells:
+                    roof_comps_for_pyr.append({
+                        "fp": _cell, "cuts": _cuts,
+                        "h": (lambda pt, lf=_lf: ROOFCLIP.surface_height(lf, pt))})
+        _pyramid_face_meshes(pyramid_surfaces, model, roof_comps_for_pyr)
         parts = {}
         unknown_kind, unknown_mat, unknown_form, pending_form = (
             set(), set(), set(), set())
@@ -4189,6 +4533,13 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 # host resolved by the anchor) and the roof/host machinery has
                 # already meshed it. Here it is only COUNTED as a furnishing (its
                 # mesh is not a catalog box), never drawn twice.
+                by_dormer.add(kind)
+                n_furn += 1
+                continue
+            if kind == "pyramid_roof":
+                # 0367 stage 2: a pyramid roof's 3D is its FACE SLAB, already
+                # built by `_pyramid_meshes` above (its own geometry, not a
+                # catalog box). Counted here, never drawn as a box.
                 by_dormer.add(kind)
                 n_furn += 1
                 continue
@@ -4262,7 +4613,8 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 # when no roof stands over it (said in the report)
                 # (the lifted geoms are in the DOCUMENT's plan frame, y down,
                 # as `from_record` builds them -- not this mesh's world frame)
-                top = _roof_underside_at(lifted_of, float(pos[0]), float(pos[1]), z + 12.0)
+                top = _roof_underside_at(lifted_of, float(pos[0]), float(pos[1]),
+                                         z + 12.0, pyramids=pyramid_up)
                 if top is None:
                     no_roof_posts.add(kind)
                 else:

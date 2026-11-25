@@ -34,6 +34,10 @@
       "wall_cab_24.svg",
       "wall_cab_30.svg",
       "wall_cab_36.svg",
+      "tall_cab.svg",
+      "kitchen_desk.svg",
+      "corner_wall_cab.svg",
+      "ceiling_cab.svg",
       "kitchen_island.svg",
       "island_sink.svg",
       "bed_king.svg",
@@ -115,7 +119,8 @@
       "stairs.svg",
       "elevator.svg",
       "post.svg",
-      "dormer.svg"
+      "dormer.svg",
+      "pyramid_roof.svg"
     ]
   },
   {
@@ -165,6 +170,10 @@
       "pantry_18.svg",
       "pantry_24.svg",
       "pantry_36.svg",
+      "tall_cab.svg",
+      "corner_wall_cab.svg",
+      "ceiling_cab.svg",
+      "kitchen_desk.svg",
       "range_hood.svg",
       "microwave_otr.svg",
       "pedal_bin.svg",
@@ -308,7 +317,8 @@
       "stairs.svg",
       "elevator.svg",
       "post.svg",
-      "dormer.svg"
+      "dormer.svg",
+      "pyramid_roof.svg"
     ]
   }
 ]
