@@ -1396,24 +1396,87 @@ def _dormer_face(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.
     return parts
 
 
-def _cantilever_floor(dormer, host, roofclip_mod):
+def _cantilever_floor(dormer, host, roofclip_mod, others=(), floor_z=None):
     """DORMER_CONTROL_SPEC.md sec 8.4 (Patrick, 2026-11-19): the part of a
     dormer's footprint that reaches PAST its host -- over open air -- as plan
     polygons, so a flat floor can close the attic underneath a cantilevered
     dormer. Empty for a dormer that sits wholly on the host (no overhang). The
     host footprint is the convex eave rectangle, so splitting the dormer
     footprint by its edges and keeping the pieces whose centroid is outside it
-    is exactly the overhang."""
+    is exactly the overhang.
+
+    THE FLOOR CLOSES OPEN AIR ONLY (0372 item B). Where ANOTHER roof is drawn
+    under the overhang -- a lower roof whose footprint covers the piece and whose
+    surface there is at or below the dormer floor `floor_z` -- the floor is NOT
+    laid: that roof already closes the attic, and a flat slab over it stands
+    proud (0372 §3 measured a hipped skirt 12 in below the floor, the slab proud
+    at its corners and hanging in air past the hips). `others` are the building's
+    other roofs (absolute geometry); only those dipping to or below `floor_z` are
+    considered, so a plan with no lower roof under the overhang -- every design
+    before this -- splits and keeps exactly as before (byte-identical)."""
     RC = roofclip_mod
     d_fp = RC.footprint_polygon(dormer)
     h_fp = RC.footprint_polygon(host)
-    pieces = [d_fp]
-    n = len(h_fp)
-    for i in range(n):
-        a, b = h_fp[i], h_fp[(i + 1) % n]
-        pieces = [q for p in pieces
-                  for q in RC._split_by_line(p, a, RC.Pt(b.x() - a.x(), b.y() - a.y()))]
-    return [p for p in pieces if not RC._contains(h_fp, RC._centroid(p))]
+
+    def _split_all(polys, cutter):
+        out = polys
+        n = len(cutter)
+        for i in range(n):
+            a, b = cutter[i], cutter[(i + 1) % n]
+            d = RC.Pt(b.x() - a.x(), b.y() - a.y())
+            if math.hypot(d.x(), d.y()) <= RC.EPS:
+                continue
+            out = [q for p in out for q in RC._split_by_line(p, a, d)]
+        return out
+
+    overhang = [p for p in _split_all([d_fp], h_fp)
+                if not RC._contains(h_fp, RC._centroid(p))]
+    if floor_z is None or not others:
+        return overhang
+    other_fps = [(g, RC.footprint_polygon(g)) for g in others]
+
+    def _trim(piece, g, fp):
+        """Keep the parts of `piece` where roof `g` is NOT a lower roof drawn
+        beneath the floor: outside `g`'s footprint, or where its surface is at
+        or ABOVE the floor. Where `g` is drawn BELOW the floor (the slab would
+        stand proud) the part is dropped -- cut at the exact equal-height line
+        (`surface(g) == floor_z`), split first by `g`'s own plane-change lines
+        so each cell is affine, as the weld and territory cuts are."""
+        kept = []
+        for q in _split_all([piece], fp):
+            if not RC._contains(fp, RC._centroid(q)):
+                kept.append(q)                 # outside this roof: unaffected
+                continue
+            cells = [q]
+            for pt, d in RC._cut_lines(g):
+                cells = [c for cell in cells for c in RC._split_by_line(cell, pt, d)]
+            for cell in cells:
+                vals = [RC.surface_height(g, v) - floor_z for v in cell]
+                if min(vals) >= -RC.EPS:
+                    kept.append(cell)          # roof at/above the floor: keep
+                    continue
+                if max(vals) <= RC.EPS:
+                    continue                   # roof below the floor: drop (proud)
+                above, _ = RC._clip_by_values(cell, vals)   # keep surface >= floor
+                if len(above) >= 3 and RC._area(above) > RC.MIN_CELL_AREA:
+                    kept.append(above)
+        return kept
+
+    out = []
+    for p in overhang:
+        # a lower roof matters to THIS piece only if its footprint meets the
+        # piece and it dips to or below the floor somewhere on it -- a roof
+        # wholly ABOVE the floor over the piece (the common case) leaves the
+        # piece untouched, so a plan with nothing truly beneath is unchanged.
+        relevant = [(g, fp) for g, fp in other_fps
+                    if (RC._contains(fp, RC._centroid(p))
+                        or any(RC._contains(fp, v) for v in p))
+                    and min(RC.surface_height(g, v) for v in p) <= floor_z + RC.EPS]
+        pieces = [p]
+        for g, fp in relevant:
+            pieces = [k for q in pieces for k in _trim(q, g, fp)]
+        out.extend(pieces)
+    return out
 
 
 def _balcony_overhang_deck(terr, host, RC):
@@ -3869,7 +3932,14 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                         # `skirt_mode` off keeps the flat floor; `auto` draws the
                         # ramp only where that rise exists; `on` forces it.
                         skirt_z = None
-                        rings = (_cantilever_floor(lf, host_lf, ROOFCLIP)
+                        # 0372 item B: the flat floor closes OPEN AIR only, so a
+                        # roof drawn under the overhang (a lower wing or skirt,
+                        # the hipped `rf4` of his plan) is dropped from it. Pass
+                        # every OTHER roof of the building and the floor height.
+                        other_roofs = [olf for _r, _l, _og, olf in every
+                                       if olf is not lf and olf is not host_lf]
+                        rings = (_cantilever_floor(lf, host_lf, ROOFCLIP,
+                                                   others=other_roofs, floor_z=fz)
                                  if face_mode_of.get(rid) != "balcony" else [])
                         if rings and (skirt_mode_of.get(rid) or "auto") != "off":
                             # note 7c scopes this S deg skirt to the true-overhang
