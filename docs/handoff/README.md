@@ -510,5 +510,6 @@ this table is not a second copy of it.
 | [`0371-ruling.md`](./0371-ruling.md) | ruling: 0370 widened to the dormer's EAVE overhang (the cheek-wall posts). Same rule, one fix. AMBER. |
 | [`0372-ruling.md`](./0372-ruling.md) | ruling: the dormer fixes, realigned to `main` at `ab8aad8`. One workstream, five items, in this order. |
 | [`0373-report.md`](./0373-report.md) | report on 0372 item A: the hypothesized cause is disproven. The real cause, the fix direction, and why I paused before touching shared roof code. AMBER. |
+| [`0374-report.md`](./0374-report.md) | report on 0372 item B: the §8.4 cantilever floor now closes open air only. Fix done on the branch; one corner left for your eye. AMBER. |
 
 <!-- PAIRS:END -->
