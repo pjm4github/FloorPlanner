@@ -509,5 +509,6 @@ this table is not a second copy of it.
 | [`0370-ruling.md`](./0370-ruling.md) | ruling: a wall does not climb THROUGH a roof to reach a dormer above it. AMBER. |
 | [`0371-ruling.md`](./0371-ruling.md) | ruling: 0370 widened to the dormer's EAVE overhang (the cheek-wall posts). Same rule, one fix. AMBER. |
 | [`0372-ruling.md`](./0372-ruling.md) | ruling: the dormer fixes, realigned to `main` at `ab8aad8`. One workstream, five items, in this order. |
+| [`0373-report.md`](./0373-report.md) | report on 0372 item A: the hypothesized cause is disproven. The real cause, the fix direction, and why I paused before touching shared roof code. AMBER. |
 
 <!-- PAIRS:END -->
