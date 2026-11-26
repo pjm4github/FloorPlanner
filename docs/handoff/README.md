@@ -508,5 +508,6 @@ this table is not a second copy of it.
 | [`0369-report.md`](./0369-report.md) | report: 0368 kitchen casework, gated and committed (O1–O6) |
 | [`0370-ruling.md`](./0370-ruling.md) | ruling: a wall does not climb THROUGH a roof to reach a dormer above it. AMBER. |
 | [`0371-ruling.md`](./0371-ruling.md) | ruling: 0370 widened to the dormer's EAVE overhang (the cheek-wall posts). Same rule, one fix. AMBER. |
+| [`0372-ruling.md`](./0372-ruling.md) | ruling: the dormer fixes, realigned to `main` at `ab8aad8`. One workstream, five items, in this order. |
 
 <!-- PAIRS:END -->
