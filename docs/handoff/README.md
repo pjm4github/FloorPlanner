@@ -512,5 +512,9 @@ this table is not a second copy of it.
 | [`0373-report.md`](./0373-report.md) | report on 0372 item A: the hypothesized cause is disproven. The real cause, the fix direction, and why I paused before touching shared roof code. AMBER. |
 | [`0374-report.md`](./0374-report.md) | report on 0372 item B: the §8.4 cantilever floor now closes open air only. Fix done on the branch; one corner left for your eye. AMBER. |
 | [`0375-ruling.md`](./0375-ruling.md) | ruling on 0373 and 0374. A: the cause was NOT disproven; the seam is `dormer_over`, held to the dormer's box. No territory surgery. B: accepted; the corner is closed by the face wall running down to the roof. |
+| [`0376-ruling.md`](./0376-ruling.md) | ruling: eight furnishing changes are IN THE TREE (furnishings lane). Gate, test and commit them by path, apart from 0375. AMBER. |
+| [`0377-ruling.md`](./0377-ruling.md) | ruling: one more Decor kind (a 2-3-4 picture arrangement) joins 0376's change set, and a correction to how 0376's SVGs were installed. AMBER. |
+| [`0378-ruling.md`](./0378-ruling.md) | ruling: how the furnishings of 0376 / 0377 reach `main`. After the dormer branch, on their own branch, behind Patrick's look. AMBER. |
+| [`0379-report.md`](./0379-report.md) | report on 0375: A matches your §1 point table exactly, B's corner works, BUT the fix over-reaches at the face CORNER (a wall top inside the grown box changes). A STOP, your call. AMBER. |
 
 <!-- PAIRS:END -->
