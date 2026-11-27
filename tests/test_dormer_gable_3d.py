@@ -241,36 +241,41 @@ def test_a_cheek_wall_uphill_of_the_valley_stands_to_the_host(fp3d):
     assert at(120.0, 98.0)[1] == pytest.approx(149.5, abs=0.2)
 
 
-FROZEN = (Path.home() / "OneDrive" / "Documents" / "FloorPlanner"
-          / "wiscaway-roof-build" / "readback-BR3-dormer-rake12.json")
+# A committed reduction of Patrick's frozen BR3 plan (0382 §3): only the walls
+# the case needs (the BR3 cluster), the two roofs it turns on -- the host `rf2`
+# the dormer anchors to and the lean-to skirt `rf4` drawn over its face -- and
+# the dormer `f135`. Rooms, the other 140 furnishings, annotations, cameras and
+# provenance are stripped; the geometry of the kept items is the plan's,
+# untouched. Reproduces the frozen numbers exactly (lean-to 134; hipped 124.0 /
+# 128.7 / 123.7), and is RED on 0379's `roof_beneath` (112.9). Dropping EITHER
+# roof breaks it: without `rf2` the dormer builds no piers; without `rf4` the
+# base drops to the host strip (112.9) with nothing to close it.
+LEAN_TO = ROOT / "tests" / "data" / "dormer_lean_to_face_base_0383.json"
 
 
-@pytest.mark.skipif(not FROZEN.exists(),
-                    reason="Patrick's frozen BR3 plan (a user file, never "
-                           "committed); the lean-to corner of 0380 §4 lives on it")
 def test_a_face_wall_over_a_lean_to_keeps_its_base(fp3d):
     """0380 §4, O1/O2: the base-drop (0375 §4 B) runs a face/cheek wall DOWN to
     the first roof BELOW its base only where the base stands over open air or a
     lower roof. Where any roof drawn over the piece is AT OR ABOVE the base, that
     roof already buries it: the base is closed and nothing drops. 0379's
     `roof_beneath` took the highest roof at-or-below the base and so skipped the
-    roof burying it, dropping through. On Patrick's frozen BR3 plan, `rf4` is a
-    lean-to drawn over the face strip at 139-143, above the wall base 134: the
-    outer half of the face wall must KEEP its base at 134 (0379 dropped it to
-    112.9). Given a HIPPED `rf4` instead, the hip is BELOW the base over the
-    outer half, so there the base DOES drop (124.0 / 128.7 / 123.7) while the
-    inner half, where the hip is above the base, stays -- the same rule, read
-    both ways. The plan is a user file (skipped when absent); fail-first against
-    0379's `roof_beneath`."""
+    roof burying it, dropping through. On this plan `rf4` is a lean-to drawn over
+    the face strip at 139-143, above the wall base 134: the outer half of the
+    face wall must KEEP its base at 134 (0379 dropped it to 112.9). Given a
+    HIPPED `rf4` instead, the hip is BELOW the base over the outer half, so there
+    the base DOES drop (124.0 / 128.7 / 123.7) while the inner half, where the
+    hip is above the base, stays -- the same rule, read both ways. A committed
+    reduction of the BR3 plan (0382 §3); fail-first against 0379's
+    `roof_beneath`."""
     import json
     cols = [(803.0, 805.5), (810.0, 805.5), (942.0, 805.5)]
-    base = json.loads(FROZEN.read_text(encoding="utf-8"))
+    base = json.loads(LEAN_TO.read_text(encoding="utf-8"))
 
     # lean-to (the plan as drawn): rf4 buries the base; nothing drops
     at = _wall_col_z(fp3d.build_model(base, furnishings=True, floors=True))
     for x, y in cols:
         assert at(x, y)[0] == pytest.approx(134.0, abs=0.3), (x, y, at(x, y))
-    # the O2 pin: the frozen cheek at (799, 640) reads the host, 211.2
+    # the O2 pin: the cheek at (799, 640) reads the host, 211.2
     assert at(799.0, 640.0)[1] == pytest.approx(211.2, abs=0.3)
 
     # hipped rf4: the outer half drops to the hip below the base

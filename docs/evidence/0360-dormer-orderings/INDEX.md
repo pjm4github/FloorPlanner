@@ -83,3 +83,35 @@ left empty for him.
 | W73 | C > A=B=D | no | | | | | | C > B: dormer eave inside face wall | | |
 | W74 | D > A=B=C | no | | | | | | D > A: host eave inside LV1 wall | | |
 | W75 | A=B=C=D | yes | 48 | 48 | 48 | 48 | wall | dormer.no_full_height | [W75.png](W75.png) | |
+
+## 0382 §2 census — what the territory-gated climb changed (`c2b4c33` vs `2f39c90`)
+
+Wall tops, measured by **barycentric z at the column** on a 2-inch grid (robust at 1 in / 0.1 in). The old territory-only `dormer_over` let a wall fin climb into the dormer; the box+territory gate removes it, so every change is a **reduction** — **0 tops are raised, anywhere**. `Δtop` is the max column fall (the fin's height). Class 1 = an LV1 wall under the eave overhang beside a cheek; class 2 = an LV1 wall in front of the face, under the rake. `below-base` is the B base-drop (0375 §4): wall material added BELOW a face/cheek base where a roof genuinely lies beneath it — 8 cases, by the same column instrument (a min-vertex read over-counts; see 0383 §2).
+
+| ID | class | Δtop (in) | below-base (in) |
+| -- | :---: | --------: | --------------: |
+| W02 | 2 | 74.0 | — |
+| W08 | 2 | 74.0 | — |
+| W26 | 2 | 74.0 | — |
+| W38 | 2 | 72.0 | — |
+| W41 | 2 | 70.0 | — |
+| W62 | 2 | 72.0 | — |
+| W01 | 1 | 12.7 | 26 |
+| W07 | 1 | 12.7 | 26 |
+| W09 | 1 | 12.7 | 24 |
+| W25 | 1 | 12.7 | 26 |
+| W31 | 1 | 12.7 | 24 |
+| W37 | 1 | 13.7 | 23 |
+| W40 | 1 | 12.7 | 24 |
+| W49 | 1 | 12.7 | — |
+| W52 | 1 | 12.7 | — |
+| W53 | 1 | 8.7 | — |
+| W61 | 1 | 12.7 | 24 |
+| W65 | 1 | 12.7 | — |
+| W68 | 1 | 8.7 | — |
+| W71 | 1 | 10.7 | — |
+| W72 | 1 | 8.7 | — |
+| W75 | 1 | 10.7 | — |
+
+22 cases changed (6 class 2, 16 class 1); 8 carry below-base material. The other 4 evidence cases (W05, W29, W51, W67) are unchanged.
+
