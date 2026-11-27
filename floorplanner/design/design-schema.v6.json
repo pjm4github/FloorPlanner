@@ -467,7 +467,15 @@
         "under_light":        { "description": "0368 ceiling cabinet: under-cabinet lighting on.", "type": "boolean" },
         "drop_in":            { "description": "0368 ceiling cabinet: how far its top hangs below the room ceiling; rods show over 0.5 in.", "type": "number", "minimum": 0 },
         "light_colour":       { "description": "0368 ceiling cabinet: the under-cabinet light colour.", "type": "string" },
-        "lumens":             { "description": "0368 ceiling cabinet: the under-cabinet light output.", "type": "number", "minimum": 0 }
+        "lumens":             { "description": "0368 ceiling cabinet: the under-cabinet light output.", "type": "number", "minimum": 0 },
+        "tub_style":          { "description": "0376 bathtub: the tub form.", "enum": ["alcove", "insert", "walk_in", "clawfoot"] },
+        "shower":             { "description": "0376 bathtub: the shower fitting.", "enum": ["none", "single", "multi"] },
+        "enclosure":          { "description": "0376 bathtub: how the tub is enclosed.", "enum": ["none", "glass", "curtain"] },
+        "art":                { "description": "0376 Decor: the picture subject (wall_art, table_picture, picture_trio).", "enum": ["abstract", "landscape", "botanical", "mono"] },
+        "vase_fill":          { "description": "0376 floor_vase: what stands in it.", "enum": ["branches", "empty"] },
+        "trio_order":         { "description": "0377 picture_trio: 2-3-4 ascending (smallest left) or descending.", "enum": ["ascending", "descending"] },
+        "trio_shape":         { "description": "0377 picture_trio: one height (widths 2:3:4) or stepped (widths and heights 2:3:4).", "enum": ["row", "stepped"] },
+        "gap_in":             { "description": "0377 picture_trio: the gap between pictures.", "type": "number", "minimum": 0 }
       }
     },
 
