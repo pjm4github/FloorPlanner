@@ -110,7 +110,10 @@ def test_a_wall_under_a_dormer_climbs_into_its_roof(fp3d):
     for x, y, z in under:
         assert z == pytest.approx(136.0 - DORMER_SLOPE * abs(x - 200.0) - c, abs=1e-6), (x, y, z)
     assert v[:, 2].max() == pytest.approx(136.0 - c)
-    outside = v[v[:, 0] < 170.0 - 1e-6]
+    # 0375 §2: the climb reaches the dormer's wall box grown by HALF the wall's
+    # thickness (interior t=4.5 -> 2.25), so the last climbing vertex is at
+    # x=167.75; clear of that grown box the wall keeps its 96in top.
+    outside = v[v[:, 0] < 167.0]
     assert outside[:, 2].max() == pytest.approx(96.0)
     # the control: the same wall with no dormer never rises above its top
     plain = fp3d.build_model(_doc(with_host=False, walls=[WALL]), furnishings=False,

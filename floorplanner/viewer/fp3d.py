@@ -1396,24 +1396,87 @@ def _dormer_face(dormer, host, roofclip_mod, t, walls=(), openings=(), z_base=0.
     return parts
 
 
-def _cantilever_floor(dormer, host, roofclip_mod):
+def _cantilever_floor(dormer, host, roofclip_mod, others=(), floor_z=None):
     """DORMER_CONTROL_SPEC.md sec 8.4 (Patrick, 2026-11-19): the part of a
     dormer's footprint that reaches PAST its host -- over open air -- as plan
     polygons, so a flat floor can close the attic underneath a cantilevered
     dormer. Empty for a dormer that sits wholly on the host (no overhang). The
     host footprint is the convex eave rectangle, so splitting the dormer
     footprint by its edges and keeping the pieces whose centroid is outside it
-    is exactly the overhang."""
+    is exactly the overhang.
+
+    THE FLOOR CLOSES OPEN AIR ONLY (0372 item B). Where ANOTHER roof is drawn
+    under the overhang -- a lower roof whose footprint covers the piece and whose
+    surface there is at or below the dormer floor `floor_z` -- the floor is NOT
+    laid: that roof already closes the attic, and a flat slab over it stands
+    proud (0372 §3 measured a hipped skirt 12 in below the floor, the slab proud
+    at its corners and hanging in air past the hips). `others` are the building's
+    other roofs (absolute geometry); only those dipping to or below `floor_z` are
+    considered, so a plan with no lower roof under the overhang -- every design
+    before this -- splits and keeps exactly as before (byte-identical)."""
     RC = roofclip_mod
     d_fp = RC.footprint_polygon(dormer)
     h_fp = RC.footprint_polygon(host)
-    pieces = [d_fp]
-    n = len(h_fp)
-    for i in range(n):
-        a, b = h_fp[i], h_fp[(i + 1) % n]
-        pieces = [q for p in pieces
-                  for q in RC._split_by_line(p, a, RC.Pt(b.x() - a.x(), b.y() - a.y()))]
-    return [p for p in pieces if not RC._contains(h_fp, RC._centroid(p))]
+
+    def _split_all(polys, cutter):
+        out = polys
+        n = len(cutter)
+        for i in range(n):
+            a, b = cutter[i], cutter[(i + 1) % n]
+            d = RC.Pt(b.x() - a.x(), b.y() - a.y())
+            if math.hypot(d.x(), d.y()) <= RC.EPS:
+                continue
+            out = [q for p in out for q in RC._split_by_line(p, a, d)]
+        return out
+
+    overhang = [p for p in _split_all([d_fp], h_fp)
+                if not RC._contains(h_fp, RC._centroid(p))]
+    if floor_z is None or not others:
+        return overhang
+    other_fps = [(g, RC.footprint_polygon(g)) for g in others]
+
+    def _trim(piece, g, fp):
+        """Keep the parts of `piece` where roof `g` is NOT a lower roof drawn
+        beneath the floor: outside `g`'s footprint, or where its surface is at
+        or ABOVE the floor. Where `g` is drawn BELOW the floor (the slab would
+        stand proud) the part is dropped -- cut at the exact equal-height line
+        (`surface(g) == floor_z`), split first by `g`'s own plane-change lines
+        so each cell is affine, as the weld and territory cuts are."""
+        kept = []
+        for q in _split_all([piece], fp):
+            if not RC._contains(fp, RC._centroid(q)):
+                kept.append(q)                 # outside this roof: unaffected
+                continue
+            cells = [q]
+            for pt, d in RC._cut_lines(g):
+                cells = [c for cell in cells for c in RC._split_by_line(cell, pt, d)]
+            for cell in cells:
+                vals = [RC.surface_height(g, v) - floor_z for v in cell]
+                if min(vals) >= -RC.EPS:
+                    kept.append(cell)          # roof at/above the floor: keep
+                    continue
+                if max(vals) <= RC.EPS:
+                    continue                   # roof below the floor: drop (proud)
+                above, _ = RC._clip_by_values(cell, vals)   # keep surface >= floor
+                if len(above) >= 3 and RC._area(above) > RC.MIN_CELL_AREA:
+                    kept.append(above)
+        return kept
+
+    out = []
+    for p in overhang:
+        # a lower roof matters to THIS piece only if its footprint meets the
+        # piece and it dips to or below the floor somewhere on it -- a roof
+        # wholly ABOVE the floor over the piece (the common case) leaves the
+        # piece untouched, so a plan with nothing truly beneath is unchanged.
+        relevant = [(g, fp) for g, fp in other_fps
+                    if (RC._contains(fp, RC._centroid(p))
+                        or any(RC._contains(fp, v) for v in p))
+                    and min(RC.surface_height(g, v) for v in p) <= floor_z + RC.EPS]
+        pieces = [p]
+        for g, fp in relevant:
+            pieces = [k for q in pieces for k in _trim(q, g, fp)]
+        out.extend(pieces)
+    return out
 
 
 def _balcony_overhang_deck(terr, host, RC):
@@ -1511,6 +1574,33 @@ def _wall_loops(walls, rooms, vx, level):
         if len(ring) >= 3:
             loops.append(ring)
     return loops
+
+
+def _dormer_wall_box(cover, roofclip_mod, grow=0.0):
+    """The dormer's CHEEK-WALL BOX in plan: +/-`wall_span` off the ridge, face
+    wall at p1 to the apex at p2 -- the ground where `_hidden_overhang_pieces`
+    leaves the host unbuilt (a shed's FACE overhang extends the +normal side, as
+    there). `grow` pushes every edge out by that much (0375 §2: a wall climbs
+    into a dormer only inside this box grown by HALF the wall's own thickness;
+    outside it the wall stops under the roof below). `grow=0.0` reproduces
+    `_hidden_overhang_pieces`' own `wall_fp` exactly."""
+    RC = roofclip_mod
+    _, _, nx, ny = cover._axis()
+    p1, p2 = cover.p1, cover.p2
+    wl, wr = cover.wall_span_in
+    if getattr(cover, "form", "gable") == "shed":
+        wl = wl + float((getattr(cover, "overhang_in", None) or [0.0, 0.0])[0] or 0.0)
+    if grow:
+        ux, uy = p2.x() - p1.x(), p2.y() - p1.y()
+        ln = math.hypot(ux, uy) or 1.0
+        ux, uy = ux / ln, uy / ln
+        p1 = RC.Pt(p1.x() - ux * grow, p1.y() - uy * grow)   # extend along the ridge
+        p2 = RC.Pt(p2.x() + ux * grow, p2.y() + uy * grow)
+        wl, wr = wl + grow, wr + grow                        # and across it
+    return [RC.Pt(p1.x() + nx * wl, p1.y() + ny * wl),
+            RC.Pt(p2.x() + nx * wl, p2.y() + ny * wl),
+            RC.Pt(p2.x() - nx * wr, p2.y() - ny * wr),
+            RC.Pt(p1.x() - nx * wr, p1.y() - ny * wr)]
 
 
 def _hidden_overhang_pieces(geom, lifted, clip, terr, loops_of, roofclip_mod):
@@ -1680,26 +1770,17 @@ def _hidden_overhang_pieces(geom, lifted, clip, terr, loops_of, roofclip_mod):
             # walls ... the cheek wall eaves are truncating the host roof under
             # the eaves") -- then `_below_dormer_eaves` cuts back whatever of
             # that would rise above the dormer's own eaves.
-            _, _, nx, ny = cover._axis()
-            p1, p2 = cover.p1, cover.p2
-            wl, wr = cover.wall_span_in
             # A SHED's FACE overhang hangs in front of its face, over the alcove
             # down to the house wall -- and the host under it, projected here,
             # rose right across that wall's window and buried it (Patrick,
             # 2026-11-20, `twoGableOneShed.json`: "the roof under the shed dormer
             # must be cut in a similar manner as the gable end dormer"). A gable's
-            # own face has no such overhang, so its front is clean. Extend the
-            # removed box forward by the shed's FACE overhang (`overhang_in[0]`,
-            # the +normal side), so the host is CUT under the whole face the way
-            # it is cut under the gable's footprint -- the cheek (side) overhangs,
-            # off the ridge ENDS, are untouched, so their soffit still projects.
-            if getattr(cover, "form", "gable") == "shed":
-                wl = wl + float((getattr(cover, "overhang_in", None)
-                                 or [0.0, 0.0])[0] or 0.0)
-            wall_fp = [RC.Pt(p1.x() + nx * wl, p1.y() + ny * wl),
-                       RC.Pt(p2.x() + nx * wl, p2.y() + ny * wl),
-                       RC.Pt(p2.x() - nx * wr, p2.y() - ny * wr),
-                       RC.Pt(p1.x() - nx * wr, p1.y() - ny * wr)]
+            # own face has no such overhang, so its front is clean. The box
+            # extends forward by the shed's FACE overhang (`_dormer_wall_box`),
+            # so the host is CUT under the whole face the way it is cut under the
+            # gable's footprint -- the cheek (side) overhangs, off the ridge ENDS,
+            # are untouched, so their soffit still projects.
+            wall_fp = _dormer_wall_box(cover, RC)
             if RC._contains(wall_fp, c):
                 continue                            # the dormer box stands here
         else:
@@ -1721,7 +1802,7 @@ def _hidden_overhang_pieces(geom, lifted, clip, terr, loops_of, roofclip_mod):
 
 def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
                       to_top=False, level=None, gable_dir=None, storey_above=None,
-                      climb_cap=None):
+                      climb_cap=None, base_drop=False):
     """The solid piece of a wall over plan quad `corners_xy` (this file's
     world frame) between `z_lo` and `z_hi`, CAPPED AT THE ROOF SURFACE
     wherever a roof on its level is lower than `z_hi` -- Patrick's own
@@ -1897,28 +1978,70 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         cos = abs(gable_dir[0] * rx + gable_dir[1] * ry) / ln
         return cos <= math.sin(math.radians(GABLE_WALL_ANGLE_TOL_DEG))
 
-    def dormer_over(pc):
-        """A WALL UNDER A DORMER RISES TO THE DORMER (Patrick, 2026-11: the
-        gable ends of his front dormers were open). `owner_of` caps a wall at
-        the LOWEST roof over it; where a dormer stands on a host, that lowest
-        roof is the HOST, so the wall stopped at the host surface and the
-        dormer gable above it was left open -- and `_dormer_face` yields the
-        gable to `_on_a_wall` expecting this very climb. A piece inside a
-        dormer's territory must instead climb to THAT dormer's surface, closing
-        the gable (the wall's own window stays a void, so the 0248 invariant
-        holds -- no dormer face is generated). P1 (0297 §2): the dormer may be on
-        ANY level, not only the wall's -- an upper-floor wall climbs into a
-        dormer hosted a floor below; the storey-above bound stops it where a
-        higher storey stands. Returns the covering dormer whose surface is
-        highest here, or None."""
+    # 0375 §2: a wall climbs INTO a dormer only where it stands inside the
+    # dormer's wall box (`_dormer_wall_box`, the ground the host is left unbuilt)
+    # grown by HALF the wall's own thickness; outside it, under the overhangs,
+    # `owner_of` -- the host/skirt really drawn below -- caps the wall as for any
+    # wall (0370/0371 §3). The pieces are split at those grown-box edges below,
+    # so a straddling piece is cut at the edge, never half-climbed as a whole.
+    dormer_boxes = ([(g, cells, _dormer_wall_box(g, RC, t * 0.5))
+                     for g, cells, dm, _s in nearby if dm] if to_top else [])
+
+    def climb_dormer(pc):
+        """A WALL UNDER A DORMER RISES TO IT, but only where it lies in the
+        dormer's TERRITORY CELLS *and* inside its grown wall box (Patrick,
+        2026-11: the gable ends of his front dormers were open; 0375 §2: and NOT
+        the house walls that merely pass under its overhangs; 0380 §3: the box
+        alone was not enough -- `dormer_over` at 2f39c90 also required the
+        territory, and dropping it let a cheek wall uphill of the valley be cut
+        at the dormer plane buried in the host. BOTH conditions hold). Where a
+        dormer stands on a host, `owner_of` caps a wall at the HOST, leaving the
+        dormer gable open; inside the box the wall must instead climb to the
+        DORMER, closing the gable (its own window stays a void -- the 0248
+        invariant, no dormer face generated). P1 (0297 §2): the dormer may be on
+        ANY level. Returns the covering dormer whose surface is highest here, or
+        None outside every box (or outside its territory)."""
         c = RC._centroid(pc)
         best, best_h = None, None
-        for geom, cells, dm, _same in nearby:
-            if dm and any(RC._contains(cell, c) for cell in cells):
-                h = _surf(geom, c)
+        for g, cells, box in dormer_boxes:
+            if (any(RC._contains(cell, c) for cell in cells)
+                    and RC._contains(box, c)):
+                h = _surf(g, c)
                 if best_h is None or h > best_h:
-                    best, best_h = geom, h
+                    best, best_h = g, h
         return best
+
+    def roof_beneath(sub):
+        """The FIRST roof drawn beneath this piece's base (0375 §4 B): the
+        highest NON-dormer roof whose territory covers the piece and whose
+        surface is below the wall's base `z_lo`. None when the base stands over
+        open air, OR when any roof drawn over the piece is AT OR ABOVE the base
+        (0380 §4: that roof already buries the base, so the base is closed and
+        nothing drops -- this is why the hipped CENTRE, where the hip is above
+        the base, does not drop while the outer corners do, and why the lean-to
+        face wall, with `rf4` drawn above the base across its whole width, drops
+        nowhere). The old `h <= z_lo` test took the highest roof below and so
+        skipped the one burying the base, dropping through it."""
+        c = RC._centroid(sub)
+        best, best_h = None, None
+        for g, cells, dm, _s in nearby:
+            if dm or not any(RC._contains(cell, c) for cell in cells):
+                continue
+            h = _surf(g, c)
+            if h >= z_lo - RC.EPS:
+                return None
+            if best_h is None or h > best_h:
+                best, best_h = g, h
+        return best
+
+    for _g, _cells, box in dormer_boxes:
+        n = len(box)
+        for i in range(n):
+            a, b = box[i], box[(i + 1) % n]
+            d = Pt(b.x() - a.x(), b.y() - a.y())
+            if math.hypot(d.x(), d.y()) <= RC.EPS:
+                continue
+            pieces = [q for pc in pieces for q in RC._split_by_line(pc, a, d)]
 
     out, touched = [], False
     for pc in pieces:
@@ -1927,7 +2050,7 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
         # host it caps against (above) -- only for the pieces that climb
         # (`to_top`); an under-sill band is unaffected
         if to_top:
-            d_over = dormer_over(pc)
+            d_over = climb_dormer(pc)
             if d_over is not None:
                 geom, dormer = d_over, True
         if geom is None:
@@ -2020,6 +2143,20 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
                 if len(kept) >= 3 and RC._area(kept) > RC.MIN_CELL_AREA:
                     touched = True
                     out.append(("capped", [(v.x(), -v.y(), climb_top(v)) for v in kept]))
+                # 0375 §4 B (option b): a wall on a dormer's face/cheek line (it
+                # climbed INTO the dormer, `dormer`) takes the generated piece's
+                # BASE too -- it runs DOWN to the first roof drawn beneath its
+                # base, only downward (where that roof is below `z_lo`), no infill
+                # of another material: the same exterior wall, continued to meet
+                # the skirt/host so no gap hangs under the face wall at the corner.
+                if base_drop and dormer:
+                    bg = roof_beneath(sub)
+                    if bg is not None:
+                        below, _ = RC._clip_by_values(
+                            sub, [z_lo - _surf(bg, v) for v in sub])
+                        if len(below) >= 3 and RC._area(below) > RC.MIN_CELL_AREA:
+                            touched = True
+                            out.append(("basedrop", (below, bg)))
                 continue
             if min(hs) >= z_hi - RC.EPS:            # roof clear of the top
                 out.append(("flat", sub))
@@ -2061,6 +2198,13 @@ def _wall_under_roofs(corners_xy, z_lo, z_hi, terr, z_base, roofclip_mod, t,
             solid = _extrude(world, z_lo, top_z)
             if solid is not None:
                 parts.append(solid)
+        elif kind == "basedrop":
+            # 0375 §4 B: the face/cheek wall run DOWN to the roof below -- a flat
+            # top at the wall base `z_lo`, a sloped bottom on the roof surface.
+            below, bg = ring
+            top_ring = [(v.x(), -v.y(), z_lo) for v in below]
+            bottom_zs = [_surf(bg, v) for v in below]
+            parts.append(_prism_slab(top_ring, 0.0, bottom_zs=bottom_zs))
         else:
             parts.append(_prism_slab(ring, 0.0, bottom_z=z_lo))
     return parts
@@ -3869,7 +4013,14 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                         # `skirt_mode` off keeps the flat floor; `auto` draws the
                         # ramp only where that rise exists; `on` forces it.
                         skirt_z = None
-                        rings = (_cantilever_floor(lf, host_lf, ROOFCLIP)
+                        # 0372 item B: the flat floor closes OPEN AIR only, so a
+                        # roof drawn under the overhang (a lower wing or skirt,
+                        # the hipped `rf4` of his plan) is dropped from it. Pass
+                        # every OTHER roof of the building and the floor height.
+                        other_roofs = [olf for _r, _l, _og, olf in every
+                                       if olf is not lf and olf is not host_lf]
+                        rings = (_cantilever_floor(lf, host_lf, ROOFCLIP,
+                                                   others=other_roofs, floor_z=fz)
                                  if face_mode_of.get(rid) != "balcony" else [])
                         if rings and (skirt_mode_of.get(rid) or "auto") != "off":
                             # note 7c scopes this S deg skirt to the true-overhang
@@ -4155,18 +4306,20 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
 
         storey_above = above_cache.get(w["level"])
 
-        def piece(corners, za, zb, to_top, climb_cap=None, terr=terr, t=t,
+        def piece(corners, za, zb, to_top, climb_cap=None, base_drop=False, terr=terr, t=t,
                   level=w["level"], gable_dir=gable_dir, storey_above=storey_above):
             # R6.b: the territories carry ABSOLUTE surfaces, so the base
             # the cap is measured from is the building's datum, 0
             return _wall_under_roofs(corners, za, zb, terr, 0.0, ROOFCLIP, t,
                                      to_top, level, gable_dir, storey_above,
-                                     climb_cap=climb_cap)
+                                     climb_cap=climb_cap, base_drop=base_drop)
 
         parts, cursor = [], 0.0
         for (s0, s1, sill, head, climb_band) in cuts:
             if s0 - cursor > 1e-6:
-                parts += piece(quad(cursor, s0), z0, z1, True)     # solid pier
+                # solid pier: full height from the wall's floor base -- the one
+                # piece whose base may run DOWN to the roof below (0375 §4 B)
+                parts += piece(quad(cursor, s0), z0, z1, True, base_drop=True)
             if sill > 1e-6:
                 if climb_band:
                     # P5 §3 (2026-11-08): the wall below a dormer FACE window is
@@ -4209,7 +4362,7 @@ def build_model(doc, levels=None, furnishings=True, wall_height=None,
                 parts += piece(quad(s0, s1), z0 + head, z1, True)  # header
             cursor = max(cursor, s1)
         if L - cursor > 1e-6:
-            parts += piece(quad(cursor, L), z0, z1, True)
+            parts += piece(quad(cursor, L), z0, z1, True, base_drop=True)
         if parts:
             by_type.setdefault(wtype, []).extend(parts)
             n_wall += 1

@@ -181,3 +181,110 @@ def test_a_cantilever_roof_skirt_replaces_the_flat_floor(fp3d):
     off = names("off")
     assert "dormer_floor" in off
     assert off.count("roofs") == 1
+
+
+# --- 0380: the climb is gated on the dormer's TERRITORY, not its box alone,
+# and the base-drop stops at a roof that already buries the base -------------
+
+def _wall_col_z(model):
+    """A function z(px, plan_y) -> (lowest, highest) wall surface at that column,
+    by BARYCENTRIC interpolation at the column over every walls:* triangle that
+    projects onto it (0380: NOT nearby-vertex, NOT max-z of a containing
+    triangle, which over-reads a slanted triangle's far corner). World y =
+    -plan y."""
+    tris = []
+    for m in model.meshes:
+        if not m.name.startswith("walls:"):
+            continue
+        vv, ff = np.asarray(m.verts, float), np.asarray(m.faces, int)
+        for a, b, c in ff:
+            tris.append((vv[a], vv[b], vv[c]))
+
+    def at(px, py):
+        wy, zs = -py, []
+        for p0, p1, p2 in tris:
+            det = (p1[1] - p2[1]) * (p0[0] - p2[0]) + (p2[0] - p1[0]) * (p0[1] - p2[1])
+            if abs(det) < 1e-9:
+                continue
+            u = ((p1[1] - p2[1]) * (px - p2[0]) + (p2[0] - p1[0]) * (wy - p2[1])) / det
+            v = ((p2[1] - p0[1]) * (px - p2[0]) + (p0[0] - p2[0]) * (wy - p2[1])) / det
+            w = 1.0 - u - v
+            if u < -1e-6 or v < -1e-6 or w < -1e-6:
+                continue
+            zs.append(u * p0[2] + v * p1[2] + w * p2[2])
+        return (min(zs), max(zs)) if zs else (None, None)
+
+    return at
+
+
+def test_a_cheek_wall_uphill_of_the_valley_stands_to_the_host(fp3d):
+    """0380 §3, O1/O2: `climb_dormer` returns a dormer only where a piece lies in
+    its TERRITORY cells AND inside its grown wall box. Gating on the box alone
+    (0379's tree) let a cheek wall UPHILL of the dormer's valley -- inside the
+    box but past the roof's footprint -- be cut at the dormer plane buried in the
+    host, leaving open air above it under the main roof. On W01 the cheek at
+    x=120 must follow the HOST (149.5 at y=98, falling to the eave 116.5 at
+    y=134), not flatten to the dormer eave (116.5, the box-alone fault). The
+    committed W01 evidence fixture, built as the app builds a furnishing dormer;
+    fail-first against 0379's box-only `climb_dormer`."""
+    import json
+    w01 = ROOT / "docs" / "evidence" / "0360-dormer-orderings" / "W01.json"
+    doc = json.loads(w01.read_text(encoding="utf-8"))
+    at = _wall_col_z(fp3d.build_model(doc, furnishings=True, floors=True))
+    # 0380 §2 point table, x=120: the host underside, falling to the eave
+    want = {98: 149.5, 104: 143.5, 110: 137.5, 116: 131.5,
+            122: 125.5, 128: 119.5, 134: 116.5}
+    for y, z in want.items():
+        _lo, hi = at(120.0, float(y))
+        assert hi == pytest.approx(z, abs=0.2), (y, hi, z)
+    # the O2 pin: the uphill end stands to the host, NOT the dormer eave
+    assert at(120.0, 98.0)[1] == pytest.approx(149.5, abs=0.2)
+
+
+# A committed reduction of Patrick's frozen BR3 plan (0382 §3): only the walls
+# the case needs (the BR3 cluster), the two roofs it turns on -- the host `rf2`
+# the dormer anchors to and the lean-to skirt `rf4` drawn over its face -- and
+# the dormer `f135`. Rooms, the other 140 furnishings, annotations, cameras and
+# provenance are stripped; the geometry of the kept items is the plan's,
+# untouched. Reproduces the frozen numbers exactly (lean-to 134; hipped 124.0 /
+# 128.7 / 123.7), and is RED on 0379's `roof_beneath` (112.9). Dropping EITHER
+# roof breaks it: without `rf2` the dormer builds no piers; without `rf4` the
+# base drops to the host strip (112.9) with nothing to close it.
+LEAN_TO = ROOT / "tests" / "data" / "dormer_lean_to_face_base_0383.json"
+
+
+def test_a_face_wall_over_a_lean_to_keeps_its_base(fp3d):
+    """0380 §4, O1/O2: the base-drop (0375 §4 B) runs a face/cheek wall DOWN to
+    the first roof BELOW its base only where the base stands over open air or a
+    lower roof. Where any roof drawn over the piece is AT OR ABOVE the base, that
+    roof already buries it: the base is closed and nothing drops. 0379's
+    `roof_beneath` took the highest roof at-or-below the base and so skipped the
+    roof burying it, dropping through. On this plan `rf4` is a lean-to drawn over
+    the face strip at 139-143, above the wall base 134: the outer half of the
+    face wall must KEEP its base at 134 (0379 dropped it to 112.9). Given a
+    HIPPED `rf4` instead, the hip is BELOW the base over the outer half, so there
+    the base DOES drop (124.0 / 128.7 / 123.7) while the inner half, where the
+    hip is above the base, stays -- the same rule, read both ways. A committed
+    reduction of the BR3 plan (0382 §3); fail-first against 0379's
+    `roof_beneath`."""
+    import json
+    cols = [(803.0, 805.5), (810.0, 805.5), (942.0, 805.5)]
+    base = json.loads(LEAN_TO.read_text(encoding="utf-8"))
+
+    # lean-to (the plan as drawn): rf4 buries the base; nothing drops
+    at = _wall_col_z(fp3d.build_model(base, furnishings=True, floors=True))
+    for x, y in cols:
+        assert at(x, y)[0] == pytest.approx(134.0, abs=0.3), (x, y, at(x, y))
+    # the O2 pin: the cheek at (799, 640) reads the host, 211.2
+    assert at(799.0, 640.0)[1] == pytest.approx(211.2, abs=0.3)
+
+    # hipped rf4: the outer half drops to the hip below the base
+    doc = json.loads(json.dumps(base))
+    for r in doc["roofs"]:
+        if r["id"] == "rf4":
+            r["ridge"] = [[833.0, 804.0], [911.5, 804.0]]
+            r["hip_run_in"] = [36.0, 36.0]
+            r["gable"] = [False, False]
+    at2 = _wall_col_z(fp3d.build_model(doc, furnishings=True, floors=True))
+    for (x, y), want in zip(cols, (124.0, 128.7, 123.7), strict=True):
+        assert at2(x, y)[0] == pytest.approx(want, abs=0.5), (x, y, at2(x, y))

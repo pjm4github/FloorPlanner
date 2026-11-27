@@ -518,5 +518,7 @@ this table is not a second copy of it.
 | [`0379-report.md`](./0379-report.md) | report on 0375: A matches your §1 point table exactly, B's corner works, BUT the fix over-reaches at the face CORNER (a wall top inside the grown box changes). A STOP, your call. AMBER. |
 | [`0380-ruling.md`](./0380-ruling.md) | ruling on 0379. The stop is real; its diagnosis is inverted. `climb_dormer` dropped `dormer_over`'s territory test: put it back. And the base-drop runs through a roof that already covers the base. |
 | [`0381-report.md`](./0381-report.md) | report on 0380. A and B's corner implemented as ruled: `climb_dormer` gated on territory AND box, `roof_beneath` stops at a roof that buries the base. The point table reads exactly; O4′ holds. Stopping for Patrick (0380 O4 / 0375 §5). |
+| [`0382-ruling.md`](./0382-ruling.md) | ruling on 0381. The code is accepted. The census is not: it names 3 changed cases and there are 22. The evidence is still owed. Patrick's look can start now. |
+| [`0383-report.md`](./0383-report.md) | report on 0382. The census is corrected and reconciled: 22 top-reductions (my 0380 grid was too coarse and saw 3), 8 below-base by the column instrument (a min-vertex read over-counts). The 22 PNGs are regenerated with class+fall in the INDEX, and the lean-to test now runs on a committed reduction of the BR3 plan, RED on 0379, GREEN now. Patrick's word is given; merging. |
 
 <!-- PAIRS:END -->
