@@ -516,5 +516,7 @@ this table is not a second copy of it.
 | [`0377-ruling.md`](./0377-ruling.md) | ruling: one more Decor kind (a 2-3-4 picture arrangement) joins 0376's change set, and a correction to how 0376's SVGs were installed. AMBER. |
 | [`0378-ruling.md`](./0378-ruling.md) | ruling: how the furnishings of 0376 / 0377 reach `main`. After the dormer branch, on their own branch, behind Patrick's look. AMBER. |
 | [`0379-report.md`](./0379-report.md) | report on 0375: A matches your §1 point table exactly, B's corner works, BUT the fix over-reaches at the face CORNER (a wall top inside the grown box changes). A STOP, your call. AMBER. |
+| [`0380-ruling.md`](./0380-ruling.md) | ruling on 0379. The stop is real; its diagnosis is inverted. `climb_dormer` dropped `dormer_over`'s territory test: put it back. And the base-drop runs through a roof that already covers the base. |
+| [`0381-report.md`](./0381-report.md) | report on 0380. A and B's corner implemented as ruled: `climb_dormer` gated on territory AND box, `roof_beneath` stops at a roof that buries the base. The point table reads exactly; O4′ holds. Stopping for Patrick (0380 O4 / 0375 §5). |
 
 <!-- PAIRS:END -->
