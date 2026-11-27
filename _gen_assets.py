@@ -141,13 +141,19 @@ def seat(w, d, cushions, arm=7.0, seat_h=17, arm_h=24, back_h=32):
     return parts
 
 
-def wicker_seat(w, d, arm, seat_h, arm_h, back_h):
+def wicker_seat(w, d, arm, seat_h, arm_h, back_h, cushions=1):
     """A wicker (rattan) chair: `seat`'s body, BACK and ARMS -- closed regions,
     so the chair has a back and arms in 3D -- with thinner arms, and the loose
     cushion and the weave drawn as 2D-ONLY detail (`fill="none"` and bare lines
     extrude nothing)."""
     parts = seat(w, d, 1, arm=arm, seat_h=seat_h, arm_h=arm_h, back_h=back_h)
-    parts.append(R(arm + 1.5, 8.5, w - 2 * arm - 3, d - 11, 2.5, "none", 0.6))   # cushion
+    if cushions == 1:
+        parts.append(R(arm + 1.5, 8.5, w - 2 * arm - 3, d - 11, 2.5, "none", 0.6))   # cushion
+    else:
+        cw = (w - 2 * arm - 3) / cushions
+        for i in range(cushions):                        # the loose cushions
+            parts.append(R(round(arm + 1.5 + cw * i, 2), 8.5, round(cw, 2), d - 11,
+                           2.5, "none", 0.6))
     n = max(int((w - 4) // 3), 3)
     for i in range(n):                                   # the weave, on the back band
         x = round(2.5 + (w - 5) * i / (n - 1), 2)
@@ -340,7 +346,7 @@ FURNISHINGS = [
     ("tv_stand", "TV Stand", "Living", 60, 16,
      [R(0.6, 0.6, 58.8, 14.8, 1), L(20, 0.6, 20, 15.4, 0.5),
       L(40, 0.6, 40, 15.4, 0.5)]),
-    ("large_tv", "Large Screen TV 75\"", "Living", 66, 4,
+    ("large_tv", "Wall TV 75\"", "Living", 66, 4,
      [R(0.5, 0.5, 65, 3, 0.4, sw=1.3),                          # flat panel
       L(2, 3, 64, 3, 0.3),                                      # screen face
       R(29, 0.5, 8, 1.2, 0.3, FILL, 0.7)]),                     # wall bracket
@@ -719,6 +725,8 @@ FURNISHINGS = [
      wicker_seat(27, 28, arm=4, seat_h=16, arm_h=23, back_h=33)),
     ("wicker_chair_small", "Wicker Chair, Small", "Sunroom", 23, 24,
      wicker_seat(23, 24, arm=3.5, seat_h=16, arm_h=21, back_h=31)),
+    ("wicker_loveseat", "Wicker Loveseat", "Sunroom", 50, 29,
+     wicker_seat(50, 29, arm=4.5, seat_h=16, arm_h=23, back_h=33, cushions=2)),
     ("wicker_table", "Wicker Table 20\"", "Sunroom", 20, 20,
      [Ci(10, 10, 9.4, FILL, 1.2), Ci(10, 10, 7.4, "none", 0.5),
       Ci(10, 10, 5.2, "none", 0.35)]),
@@ -734,7 +742,7 @@ FURNISHINGS = [
       'stroke-width="0.9" stroke-dasharray="5,4"/>',   # canopy overhead
       L(48, 1.5, 48, 17, 0.5, "5,4"), L(48, 79, 48, 94.5, 0.5, "5,4"),
       L(1.5, 48, 17, 48, 0.5, "5,4"), L(79, 48, 94.5, 48, 0.5, "5,4"),
-      Ci(48, 48, 21, FILL, 1.2),                       # table
+      R(27, 27, 42, 42, 1.5, FILL, 1.2),               # the square table
       Ci(48, 48, 1.8, "#374151", 0.5),                 # pole
       R(39, 17, 18, 14, 3, FILL, 0.9), R(39, 65, 18, 14, 3, FILL, 0.9),
       R(17, 41, 14, 18, 3, FILL, 0.9), R(65, 41, 14, 18, 3, FILL, 0.9)]),
@@ -753,6 +761,32 @@ FURNISHINGS = [
       Ci(22.5, 22.5, 2, "none", 0.7), Ci(61.5, 61.5, 2, "none", 0.7),
       Ci(42, 42, 2.2, "none", 0.6)]),                  # drain
 
+    # Decor (Patrick, 2026-11-26): artwork and plants.  Built from parts in 3D
+    # (cabinet_geometry); these are the plan symbols.
+    ("wall_art", "Wall Painting 36\"", "Decor", 36, 1.5,
+     [R(0.2, 0.2, 35.6, 1.1, 0.2, sw=0.8), L(2, 0.75, 34, 0.75, 0.3)]),
+    ("picture_trio", "Picture Arrangement 2-3-4", "Decor", 72, 1.5,
+     [R(0.2, 0.2, 71.6, 0.4, 0.1, sw=0.5),                 # the wall they hang on
+      R(0.2, 0.2, 14.27, 1.1, 0.2, sw=0.8), R(17.87, 0.2, 21.6, 1.1, 0.2, sw=0.8),
+      R(42.87, 0.2, 28.93, 1.1, 0.2, sw=0.8)]),            # 2 : 3 : 4
+    ("table_picture", "Table Picture 8x10", "Decor", 8, 4,
+     [R(0.3, 2.9, 7.4, 0.8, 0.2, sw=0.7), L(4, 0.3, 4, 2.9, 0.5)]),
+    ("plant_floor", "Floor Plant, Large", "Decor", 24, 24,
+     ['<circle cx="12" cy="12" r="11.4" fill="none" stroke="#374151" '
+      'stroke-width="0.6" stroke-dasharray="3,2.5"/>',     # the head overhead
+      Ci(12, 12, 7.2, FILL, 1.0),                          # the pot
+      El(12, 6.2, 2.6, 4.6, "none", 0.5), El(17.2, 14.4, 4.6, 2.6, "none", 0.5),
+      El(7, 15.2, 4.4, 2.6, "none", 0.5), Ci(12, 12, 1.2, "#374151", 0.4)]),
+    ("plant_small", "Potted Plant, Small", "Decor", 10, 10,
+     [Ci(5, 5, 4.7, "none", 0.5), Ci(5, 5, 3.4, FILL, 0.9),
+      El(5, 3.2, 1.2, 2.0, "none", 0.4), El(6.8, 6, 2.0, 1.2, "none", 0.4)]),
+    ("table_arrangement", "Table Arrangement", "Decor", 10, 10,
+     [Ci(5, 5, 4.7, "none", 0.5), Ci(5, 5, 2.4, FILL, 0.8),
+      Ci(5, 2.6, 1.2, "none", 0.4), Ci(7.4, 5.6, 1.2, "none", 0.4),
+      Ci(3, 6.6, 1.2, "none", 0.4)]),
+    ("floor_vase", "Floor Vase", "Decor", 12, 12,
+     [Ci(6, 6, 5.6, FILL, 1.0), Ci(6, 6, 2.6, "none", 0.6)]),
+
     ("desk", "Desk 5'", "Office / Storage", 60, 30,
      [R(0.75, 0.75, 58.5, 28.5, 1, sw=1.2), L(2, 4, 58, 4, 0.5)]),
     ("office_chair", "Office Chair", "Office / Storage", 24, 24,
@@ -768,9 +802,9 @@ FURNISHINGS = [
       Ci(27, 30, 5.5, FILL, 1), Ci(27, 30, 2.2, "none", 0.5)]),  # seat + post
     ("corner_desk", "Corner Desk 5'", "Office / Storage", 60, 60,
      [Pth("M0.75 0.75 H59.25 V23.25 H23.25 V59.25 H0.75 Z", FILL, 1.2),  # L top
-      L(44, 3, 44, 20.5, 0.5), L(3, 44, 20.5, 44, 0.5),     # drawer lines
-      Ci(36, 36, 6.5, FILL, 1), Ci(36, 36, 2.2, "none", 0.5),  # task chair
-      Pth("M41.5 30.5 a8 8 0 0 1 0 11", "none", 0.8)]),     # chair back arc
+      L(0.75, 23.25, 23.25, 23.25, 0.5),                    # where the boards meet
+      Ci(54, 12, 1.4, "#374151", 0.5), Ci(12, 12, 1.4, "#374151", 0.5),
+      Ci(12, 54, 1.4, "#374151", 0.5)]),                    # the three legs
     ("bookshelf", "Bookshelf 3'", "Office / Storage", 36, 12,
      [R(0.6, 0.6, 34.8, 10.8, 0.5, sw=1),
       L(12, 0.6, 12, 11.4, 0.5), L(24, 0.6, 24, 11.4, 0.5)]),
@@ -1053,12 +1087,23 @@ SOLIDS = {
     "lounge_chair":           (30,      0, "seat",      "soft"),
     "wicker_chair":           (33,      0, "seat",      "wicker"),
     "wicker_chair_small":     (31,      0, "seat",      "wicker"),
+    "wicker_loveseat":        (33,      0, "seat",      "wicker"),
     "wicker_table":           (20,      0, "slab",      "wicker"),
     # sauna is an ENCLOSURE (0018): the stove is a solid standing on the
     # floor, and it gains its own region_material (metal) -- the body stays
     # wood, which was already right.
     "sauna":                  (84,      0, "enclosure", "wood", "metal"),
     "umbrella_table":         (30,      0, "slab",      "wood"),
+    # -- Decor (0376).  What stands on a table is born 30 in up, on one; a
+    # picture hangs with its bottom edge 48 in off the floor.  All are built
+    # from parts (cabinet_geometry); these rows are the box fallback.
+    "wall_art":               (24,     48, "box",       "wood"),
+    "picture_trio":           (30,     44, "box",       "wood"),
+    "table_picture":          (10,     30, "box",       "wood"),
+    "plant_floor":            (60,      0, "box",       "foliage"),
+    "plant_small":            (14,     30, "box",       "foliage"),
+    "table_arrangement":      (18,     30, "box",       "foliage"),
+    "floor_vase":             (30,      0, "box",       "porcelain"),
     # swim_spa and whirlpool are VESSELS (0018): each BODY MATERIAL changes
     # from "water" -- which made the whole tub translucent, surround
     # included, because one column was carrying both "what surrounds the
@@ -1801,10 +1846,12 @@ def main():
                   "cutoff_saw", "bandsaw", "planer", "workbench",
                   "storage_shelves"]),
         ("Sunroom", ["lounge_chair", "wicker_chair", "wicker_chair_small",
-                     "wicker_table", "sauna", "umbrella_table", "swim_spa",
+                     "wicker_loveseat", "wicker_table", "sauna", "umbrella_table", "swim_spa",
                      "whirlpool", "armchair", "side_table"]),
         ("Office", ["desk", "office_chair", "office_set", "corner_desk",
                     "bookshelf", "armchair", "side_table"]),
+        ("Decor", ["wall_art", "picture_trio", "table_picture", "plant_floor", "plant_small",
+                   "table_arrangement", "floor_vase", "table_lamp", "large_tv"]),
         ("HVAC", ["gas_furnace", "electric_furnace", "oil_furnace",
                   "gas_water_heater", "electric_water_heater", "water_softener",
                   "gas_tank", "oil_tank", "electric_panel", "car_charger",

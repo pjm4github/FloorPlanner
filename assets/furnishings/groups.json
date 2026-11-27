@@ -92,11 +92,19 @@
       "lounge_chair.svg",
       "wicker_chair.svg",
       "wicker_chair_small.svg",
+      "wicker_loveseat.svg",
       "wicker_table.svg",
       "sauna.svg",
       "umbrella_table.svg",
       "swim_spa.svg",
       "whirlpool.svg",
+      "wall_art.svg",
+      "picture_trio.svg",
+      "table_picture.svg",
+      "plant_floor.svg",
+      "plant_small.svg",
+      "table_arrangement.svg",
+      "floor_vase.svg",
       "desk.svg",
       "office_chair.svg",
       "office_set.svg",
@@ -272,6 +280,7 @@
       "lounge_chair.svg",
       "wicker_chair.svg",
       "wicker_chair_small.svg",
+      "wicker_loveseat.svg",
       "wicker_table.svg",
       "sauna.svg",
       "umbrella_table.svg",
@@ -291,6 +300,20 @@
       "bookshelf.svg",
       "armchair.svg",
       "side_table.svg"
+    ]
+  },
+  {
+    "name": "Decor",
+    "items": [
+      "wall_art.svg",
+      "picture_trio.svg",
+      "table_picture.svg",
+      "plant_floor.svg",
+      "plant_small.svg",
+      "table_arrangement.svg",
+      "floor_vase.svg",
+      "table_lamp.svg",
+      "large_tv.svg"
     ]
   },
   {

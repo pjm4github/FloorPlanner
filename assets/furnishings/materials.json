@@ -628,5 +628,145 @@
     ],
     "roughness": 0.7,
     "metalness": 0.0
+  },
+  "wicker_dark": {
+    "colour": [
+      0.5,
+      0.38,
+      0.23,
+      1.0
+    ],
+    "roughness": 0.92,
+    "metalness": 0.0
+  },
+  "wicker_light": {
+    "colour": [
+      0.84,
+      0.72,
+      0.52,
+      1.0
+    ],
+    "roughness": 0.88,
+    "metalness": 0.0
+  },
+  "foliage": {
+    "colour": [
+      0.25,
+      0.47,
+      0.22,
+      1.0
+    ],
+    "roughness": 0.85,
+    "metalness": 0.0
+  },
+  "foliage_dark": {
+    "colour": [
+      0.14,
+      0.33,
+      0.16,
+      1.0
+    ],
+    "roughness": 0.85,
+    "metalness": 0.0
+  },
+  "terracotta": {
+    "colour": [
+      0.72,
+      0.4,
+      0.26,
+      1.0
+    ],
+    "roughness": 0.85,
+    "metalness": 0.0
+  },
+  "soil": {
+    "colour": [
+      0.2,
+      0.14,
+      0.1,
+      1.0
+    ],
+    "roughness": 0.95,
+    "metalness": 0.0
+  },
+  "curtain": {
+    "colour": [
+      0.9,
+      0.92,
+      0.93,
+      1.0
+    ],
+    "roughness": 0.8,
+    "metalness": 0.0
+  },
+  "art_cream": {
+    "colour": [
+      0.93,
+      0.9,
+      0.82,
+      1.0
+    ],
+    "roughness": 0.8,
+    "metalness": 0.0
+  },
+  "art_blue": {
+    "colour": [
+      0.17,
+      0.33,
+      0.55,
+      1.0
+    ],
+    "roughness": 0.8,
+    "metalness": 0.0
+  },
+  "art_sky": {
+    "colour": [
+      0.6,
+      0.76,
+      0.88,
+      1.0
+    ],
+    "roughness": 0.8,
+    "metalness": 0.0
+  },
+  "art_ochre": {
+    "colour": [
+      0.83,
+      0.62,
+      0.2,
+      1.0
+    ],
+    "roughness": 0.8,
+    "metalness": 0.0
+  },
+  "art_red": {
+    "colour": [
+      0.7,
+      0.19,
+      0.16,
+      1.0
+    ],
+    "roughness": 0.8,
+    "metalness": 0.0
+  },
+  "art_green": {
+    "colour": [
+      0.33,
+      0.5,
+      0.28,
+      1.0
+    ],
+    "roughness": 0.8,
+    "metalness": 0.0
+  },
+  "art_charcoal": {
+    "colour": [
+      0.16,
+      0.16,
+      0.17,
+      1.0
+    ],
+    "roughness": 0.8,
+    "metalness": 0.0
   }
 }

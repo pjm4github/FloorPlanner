@@ -44,7 +44,14 @@
     "material": "soft",
     "region_material": null,
     "side_file": null,
-    "cabinet": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "armchair",
+      "width_in": 33,
+      "depth_in": 33,
+      "height_in": 32,
+      "colour": "slate"
+    },
     "price": 300.0
   },
   {
@@ -189,7 +196,7 @@
   },
   {
     "id": "large_tv",
-    "name": "Large Screen TV 75\"",
+    "name": "Wall TV 75\"",
     "category": "Living",
     "file": "large_tv.svg",
     "width_in": 66,
@@ -200,7 +207,16 @@
     "material": "screen",
     "region_material": null,
     "side_file": null,
-    "cabinet": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "wall_tv",
+      "wall_mounted": true,
+      "width_in": 66,
+      "depth_in": 4,
+      "height_in": 38,
+      "size_in": 75,
+      "floor_to_bottom_in": 42
+    },
     "price": 300.0
   },
   {
@@ -1687,7 +1703,15 @@
     "material": "wicker",
     "region_material": null,
     "side_file": null,
-    "cabinet": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "wicker_seat",
+      "width_in": 27,
+      "depth_in": 28,
+      "height_in": 33,
+      "seats": 1,
+      "colour": "cream"
+    },
     "price": 0.0
   },
   {
@@ -1703,8 +1727,40 @@
     "material": "wicker",
     "region_material": null,
     "side_file": null,
-    "cabinet": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "wicker_seat",
+      "width_in": 23,
+      "depth_in": 24,
+      "height_in": 31,
+      "seats": 1,
+      "colour": "cream"
+    },
     "price": 0.0
+  },
+  {
+    "id": "wicker_loveseat",
+    "name": "Wicker Loveseat",
+    "category": "Sunroom",
+    "file": "wicker_loveseat.svg",
+    "width_in": 50,
+    "depth_in": 29,
+    "height_in": 33,
+    "elevation_in": 0,
+    "form": "seat",
+    "material": "wicker",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "wicker_seat",
+      "width_in": 50,
+      "depth_in": 29,
+      "height_in": 33,
+      "seats": 2,
+      "colour": "cream"
+    },
+    "price": 420.0
   },
   {
     "id": "wicker_table",
@@ -1719,7 +1775,13 @@
     "material": "wicker",
     "region_material": null,
     "side_file": null,
-    "cabinet": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "wicker_table",
+      "width_in": 20,
+      "depth_in": 20,
+      "height_in": 20
+    },
     "price": 0.0
   },
   {
@@ -1751,7 +1813,16 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
-    "cabinet": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "umbrella_table",
+      "width_in": 96,
+      "depth_in": 96,
+      "height_in": 30,
+      "size_in": 42,
+      "colour": "navy",
+      "finish": "oak"
+    },
     "price": 1500.0
   },
   {
@@ -1785,6 +1856,177 @@
     "side_file": null,
     "cabinet": null,
     "price": 6500.0
+  },
+  {
+    "id": "wall_art",
+    "name": "Wall Painting 36\"",
+    "category": "Decor",
+    "file": "wall_art.svg",
+    "width_in": 36,
+    "depth_in": 1.5,
+    "height_in": 24,
+    "elevation_in": 48,
+    "form": "box",
+    "material": "wood",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "wall_art",
+      "wall_mounted": true,
+      "width_in": 36,
+      "depth_in": 1.5,
+      "height_in": 24,
+      "floor_to_bottom_in": 48,
+      "art": "abstract",
+      "finish": "walnut"
+    },
+    "price": 90.0
+  },
+  {
+    "id": "picture_trio",
+    "name": "Picture Arrangement 2-3-4",
+    "category": "Decor",
+    "file": "picture_trio.svg",
+    "width_in": 72,
+    "depth_in": 1.5,
+    "height_in": 30,
+    "elevation_in": 44,
+    "form": "box",
+    "material": "wood",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "picture_trio",
+      "wall_mounted": true,
+      "width_in": 72,
+      "depth_in": 1.5,
+      "height_in": 30,
+      "floor_to_bottom_in": 44,
+      "art": "abstract",
+      "finish": "walnut"
+    },
+    "price": 240.0
+  },
+  {
+    "id": "table_picture",
+    "name": "Table Picture 8x10",
+    "category": "Decor",
+    "file": "table_picture.svg",
+    "width_in": 8,
+    "depth_in": 4,
+    "height_in": 10,
+    "elevation_in": 30,
+    "form": "box",
+    "material": "wood",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "table_picture",
+      "wall_mounted": true,
+      "width_in": 8,
+      "depth_in": 4,
+      "height_in": 10,
+      "floor_to_bottom_in": 30,
+      "art": "landscape",
+      "finish": "espresso"
+    },
+    "price": 35.0
+  },
+  {
+    "id": "plant_floor",
+    "name": "Floor Plant, Large",
+    "category": "Decor",
+    "file": "plant_floor.svg",
+    "width_in": 24,
+    "depth_in": 24,
+    "height_in": 60,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "foliage",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "plant_floor",
+      "width_in": 24,
+      "depth_in": 24,
+      "height_in": 60
+    },
+    "price": 120.0
+  },
+  {
+    "id": "plant_small",
+    "name": "Potted Plant, Small",
+    "category": "Decor",
+    "file": "plant_small.svg",
+    "width_in": 10,
+    "depth_in": 10,
+    "height_in": 14,
+    "elevation_in": 30,
+    "form": "box",
+    "material": "foliage",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "plant_small",
+      "wall_mounted": true,
+      "width_in": 10,
+      "depth_in": 10,
+      "height_in": 14,
+      "floor_to_bottom_in": 30
+    },
+    "price": 35.0
+  },
+  {
+    "id": "table_arrangement",
+    "name": "Table Arrangement",
+    "category": "Decor",
+    "file": "table_arrangement.svg",
+    "width_in": 10,
+    "depth_in": 10,
+    "height_in": 18,
+    "elevation_in": 30,
+    "form": "box",
+    "material": "foliage",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "table_arrangement",
+      "wall_mounted": true,
+      "width_in": 10,
+      "depth_in": 10,
+      "height_in": 18,
+      "floor_to_bottom_in": 30
+    },
+    "price": 60.0
+  },
+  {
+    "id": "floor_vase",
+    "name": "Floor Vase",
+    "category": "Decor",
+    "file": "floor_vase.svg",
+    "width_in": 12,
+    "depth_in": 12,
+    "height_in": 30,
+    "elevation_in": 0,
+    "form": "box",
+    "material": "porcelain",
+    "region_material": null,
+    "side_file": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "floor_vase",
+      "width_in": 12,
+      "depth_in": 12,
+      "height_in": 30,
+      "colour": "navy"
+    },
+    "price": 90.0
   },
   {
     "id": "desk",
@@ -1867,7 +2109,16 @@
     "material": "wood",
     "region_material": null,
     "side_file": null,
-    "cabinet": null,
+    "cabinet": {
+      "type": "fixture",
+      "model": "corner_desk",
+      "width_in": 60,
+      "depth_in": 60,
+      "wing_in": 24,
+      "height_in": 30,
+      "computer": "none",
+      "finish": "maple"
+    },
     "price": 400.0
   },
   {

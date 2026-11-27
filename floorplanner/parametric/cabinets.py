@@ -418,9 +418,117 @@ class CabinetKind(ParametricKind):
         if model == "toilet":
             return [colour]
         if model == "bathtub":
-            return [size("depth_in", "Length", 48.0, 84.0, 6.0),
-                    size("width_in", "Width", 26.0, 48.0),
-                    size("height_in", "Rim height", 12.0, 28.0), colour]
+            return [
+                ParamSpec("tub_style", "Tub", ENUM, d["tub_style"],
+                          choices=cg.TUB_STYLES,
+                          tooltip="A walk-in tub is at least 38 in deep; a tub "
+                                  "on feet stands clear of the walls."),
+                ParamSpec("shower", "Shower", ENUM, d["shower"],
+                          choices=cg.SHOWERS,
+                          tooltip="Multiple: a wall head, a rain head, a hand "
+                                  "shower and body sprays."),
+                ParamSpec("enclosure", "Enclosure", ENUM, d["enclosure"],
+                          choices=cg.ENCLOSURES),
+                ParamSpec("hand", "Wall along the", ENUM, d["hand"],
+                          choices=(("left", "Left side"), ("right", "Right side")),
+                          tooltip="The long side that stands against a wall. The "
+                                  "doors, the curtain and a walk-in tub's door "
+                                  "are on the other."),
+                size("depth_in", "Length", 48.0, 84.0, 6.0),
+                size("width_in", "Width", 26.0, 48.0),
+                size("height_in", "Rim height", 12.0, 48.0), colour]
+        all_colours = tuple((k, label) for k, label, _h in cg.COLOURS)
+        finish = ParamSpec("finish", "Finish", ENUM, d["finish"],
+                           choices=_choices(cg.FINISHES))
+        if model == "corner_desk":
+            return [
+                size("width_in", "Side along the wall", 36.0, 96.0, 1.0,
+                     "The FlexiSpot E7L top is 63 by 47 in, boards 24 in deep."),
+                size("depth_in", "Return side", 36.0, 96.0, 1.0),
+                size("wing_in", "Board depth", 18.0, 36.0),
+                size("height_in", "Desk height", 23.5, 49.5, 0.5,
+                     "29 to 30 in seated; 38 to 46 in standing."),
+                ParamSpec("hand", "Return on the", ENUM, d["hand"],
+                          choices=(("left", "Left"), ("right", "Right"))),
+                ParamSpec("computer", "On the desk", ENUM, d["computer"],
+                          choices=cg.COMPUTERS),
+                finish]
+        if model == "armchair":
+            return [size("width_in", "Width", 26.0, 44.0),
+                    size("depth_in", "Depth", 28.0, 42.0),
+                    size("height_in", "Back height", 28.0, 44.0),
+                    ParamSpec("colour", "Upholstery", ENUM, d["colour"],
+                              choices=all_colours)]
+        if model == "wicker_seat":
+            return [size("width_in", "Width", 20.0, 84.0),
+                    size("depth_in", "Depth", 22.0, 36.0),
+                    size("height_in", "Back height", 26.0, 40.0),
+                    ParamSpec("seats", "Cushions", INT, d["seats"], minimum=1,
+                              maximum=3, step=1),
+                    ParamSpec("colour", "Cushion colour", ENUM, d["colour"],
+                              choices=all_colours)]
+        if model == "wicker_table":
+            return [size("width_in", "Diameter", 14.0, 48.0),
+                    size("height_in", "Height", 14.0, 32.0)]
+        if model == "umbrella_table":
+            return [size("size_in", "Table size", 30.0, 72.0, 1.0,
+                         "The square table's side. The footprint is the table "
+                         "plus a chair each side."),
+                    size("height_in", "Table height", 26.0, 32.0, 0.5),
+                    ParamSpec("colour", "Canopy and cushions", ENUM, d["colour"],
+                              choices=all_colours),
+                    finish]
+        if model == "wall_tv":
+            return [size("size_in", "Screen diagonal", 19.0, 110.0, 1.0,
+                         "The set is drawn 16:9 with its bezel."),
+                    size("floor_to_bottom_in", "Height from floor", 0.0, 96.0, 0.5,
+                         "Floor to the bottom edge of the set.")]
+        if model in ("wall_art", "table_picture"):
+            wall = model == "wall_art"
+            return [size("width_in", "Width", 4.0, 96.0 if wall else 20.0),
+                    size("height_in", "Height", 4.0, 72.0 if wall else 20.0),
+                    ParamSpec("art", "Picture", ENUM, d["art"],
+                              choices=cg.ART_STYLES),
+                    ParamSpec("finish", "Frame", ENUM, d["finish"],
+                              choices=_choices(cg.FINISHES)),
+                    size("floor_to_bottom_in",
+                         "Height from floor" if wall else "Stands on a surface at",
+                         0.0, 120.0, 0.5,
+                         "Floor to the bottom of the frame." if wall else
+                         "The height of the table or shelf it stands on.")]
+        if model == "picture_trio":
+            return [size("width_in", "Width of the arrangement", 24.0, 180.0, 1.0,
+                         "Outside to outside. The three pictures share it, less "
+                         "the two gaps, in the ratio 2 : 3 : 4."),
+                    size("height_in", "Height", 8.0, 72.0, 1.0,
+                         "The tallest picture."),
+                    size("gap_in", "Gap between pictures", 0.0, 12.0, 0.5),
+                    ParamSpec("trio_order", "Order", ENUM, d["trio_order"],
+                              choices=cg.TRIO_ORDERS),
+                    ParamSpec("trio_shape", "Shape", ENUM, d["trio_shape"],
+                              choices=cg.TRIO_SHAPES),
+                    ParamSpec("art", "Pictures", ENUM, d["art"],
+                              choices=cg.ART_STYLES,
+                              tooltip="Three pictures that belong together."),
+                    ParamSpec("finish", "Frames", ENUM, d["finish"],
+                              choices=_choices(cg.FINISHES)),
+                    size("floor_to_bottom_in", "Height from floor", 0.0, 120.0,
+                         0.5, "Floor to the bottom of the tallest frame.")]
+        if model in ("plant_floor", "plant_small", "table_arrangement",
+                     "floor_vase"):
+            rows = [size("width_in", "Spread", 4.0, 60.0),
+                    size("height_in", "Height", 6.0, 108.0)]
+            if model == "floor_vase":
+                rows[0] = size("width_in", "Diameter", 6.0, 30.0)
+                rows += [ParamSpec("colour", "Colour", ENUM, d["colour"],
+                                   choices=all_colours),
+                         ParamSpec("vase_fill", "In it", ENUM, d["vase_fill"],
+                                   choices=cg.VASE_FILLS)]
+            if model in ("plant_small", "table_arrangement"):
+                rows.append(size("floor_to_bottom_in", "Stands on a surface at",
+                                 0.0, 96.0, 0.5,
+                                 "The height of the table or shelf it stands on."))
+            return rows
         if model == "bookshelf":
             return [
                 size("width_in", "Width", 12.0, 96.0, 3.0),
@@ -548,6 +656,13 @@ class CabinetKind(ParametricKind):
             return {"prims": cg.corner_wall_plan(st)}
         if self.type == "suspended":
             return {"prims": cg.suspended_plan(st)}
+        # 0376: the L turns with its hand; the table's square grows with it
+        if self.type == "fixture" and st["model"] == "corner_desk":
+            return {"prims": cg.corner_desk_plan(st)}
+        if self.type == "fixture" and st["model"] == "umbrella_table":
+            return {"prims": cg.umbrella_table_plan(st)}
+        if self.type == "fixture" and st["model"] == "picture_trio":
+            return {"prims": cg.picture_trio_plan(st)}
         return None
 
     # -- evaluation ----------------------------------------------------------
@@ -700,9 +815,34 @@ class CabinetKind(ParametricKind):
                     "office_chair": "Office chair",
                     "office_set": "Desk and chair",
                     "pedal_bin": "Pedal bin", "dog_crate": "Dog crate",
-                    "sofa_table": "Sofa table"}[st["model"]]
+                    "sofa_table": "Sofa table",
+                    "corner_desk": "Corner desk", "armchair": "Armchair",
+                    "wicker_seat": "Wicker seat", "wicker_table": "Wicker table",
+                    "umbrella_table": "Umbrella table", "wall_tv": "Wall TV",
+                    "wall_art": "Wall art", "table_picture": "Table picture",
+                    "plant_floor": "Floor plant", "plant_small": "Potted plant",
+                    "table_arrangement": "Table arrangement",
+                    "floor_vase": "Floor vase",
+                    "picture_trio": "Picture arrangement"}[st["model"]]
             rows = [("Fixture", name),
                     ("Size", f"{_fmt(w)} x {_fmt(d)} x {_fmt(st['height_in'])} in")]
+            if st["model"] == "bathtub":
+                rows += [("Tub", dict(cg.TUB_STYLES)[st["tub_style"]]),
+                         ("Shower", dict(cg.SHOWERS)[st["shower"]]),
+                         ("Enclosure", dict(cg.ENCLOSURES)[st["enclosure"]])]
+            if st["model"] == "umbrella_table":
+                rows.append(("Table", f"{_fmt(st['size_in'])} in square, 4 chairs"))
+            if st["model"] == "picture_trio":
+                sizes = ", ".join(f"{_fmt(x1 - x0)} x {_fmt(z1 - z0)}"
+                                  for x0, x1, z0, z1, _k in cg.trio_frames(st))
+                rows.append(("Pictures", sizes + " in"))
+            if st["model"] == "wall_tv":
+                rows.append(("Screen", f"{_fmt(st['size_in'])} in diagonal"))
+            if st["model"] in ("armchair", "wicker_seat", "umbrella_table"):
+                rows.append(("Fabric", _material_label(mats["upholstery"])))
+            if st["model"] == "corner_desk":
+                rows += [("Return", st["hand"]),
+                         ("Finish", _material_label(mats["cabinet"]))]
             if st["model"] in ("toilet", "bathtub"):
                 rows.append(("Colour", _material_label(mats["porcelain"])))
             elif st["model"] == "bookshelf":
@@ -726,10 +866,13 @@ class CabinetKind(ParametricKind):
                 rows += [("Surround", dict((k, label) for k, label, _m
                                            in cg.SURROUNDS)[st["surround"]]),
                          ("Mantel", _material_label(mats["cabinet"]))]
-            else:
+            elif st["model"] == "grab_bar":
                 rows += [("Finish", _material_label(mats["hardware"])),
                          ("Underside", f"{_fmt(st['floor_to_bottom_in'])} in "
                                        f"above the floor")]
+            elif st.get("wall_mounted"):
+                rows.append(("Underside", f"{_fmt(st['floor_to_bottom_in'])} in "
+                                          f"above the floor"))
             return rows
         if st["type"] == "mirror":
             lights = {"none": "None", "bar": "Bar above",

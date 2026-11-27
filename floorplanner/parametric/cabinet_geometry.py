@@ -116,7 +116,27 @@ ISLAND_SLOTS = (
 # 0338: fixtures built from parts -- what each is, and what its dialog offers.
 FIXTURE_MODELS = ("toilet", "bathtub", "bookshelf", "fireplace", "grab_bar",
                   "desk", "office_chair", "office_set",
-                  "pedal_bin", "dog_crate", "sofa_table")
+                  "pedal_bin", "dog_crate", "sofa_table",
+                  # 0376
+                  "corner_desk", "armchair", "wicker_seat", "wicker_table",
+                  "umbrella_table", "wall_tv", "wall_art", "table_picture",
+                  "plant_floor", "plant_small", "table_arrangement", "floor_vase",
+                  "picture_trio")
+# 0376: a tub's style, what closes it in, and its shower; a picture's subject;
+# what stands in a floor vase; how three pictures are hung as one arrangement
+TRIO_ORDERS = (("ascending", "2 - 3 - 4, smallest on the left"),
+               ("descending", "4 - 3 - 2, largest on the left"))
+TRIO_SHAPES = (("row", "One height, widths 2 : 3 : 4"),
+               ("stepped", "Stepped: widths and heights 2 : 3 : 4"))
+TRIO_RATIO = (2.0, 3.0, 4.0)
+TUB_STYLES = (("alcove", "Alcove tub"), ("insert", "Fiberglass wall insert"),
+              ("walk_in", "Walk-in tub"), ("clawfoot", "Tub on feet"))
+ENCLOSURES = (("none", "Open"), ("glass", "Glass doors"), ("curtain", "Curtain"))
+SHOWERS = (("none", "No shower"), ("single", "Showerhead"),
+           ("multi", "Multiple showerheads"))
+ART_STYLES = (("abstract", "Abstract"), ("landscape", "Landscape"),
+              ("botanical", "Botanical"), ("mono", "Black and white"))
+VASE_FILLS = (("branches", "Branches"), ("empty", "Empty"))
 COMPUTERS = (("desktop", "Monitor, keyboard and mouse"),
              ("dual", "Two monitors, keyboard and mouse"),
              ("laptop", "Laptop"), ("none", "None"))
@@ -193,6 +213,22 @@ MATERIALS = {
     "book_3":        {"colour": [0.20, 0.38, 0.26, 1.0], "roughness": 0.70, "metalness": 0.0},
     "book_4":        {"colour": [0.80, 0.72, 0.52, 1.0], "roughness": 0.70, "metalness": 0.0},
     "book_5":        {"colour": [0.28, 0.24, 0.24, 1.0], "roughness": 0.70, "metalness": 0.0},
+    # 0376: the two tones a weave needs beside the generator's "wicker"; plants
+    # and pots; a shower curtain; the colours a picture is painted in
+    "wicker_dark":   {"colour": [0.50, 0.38, 0.23, 1.0], "roughness": 0.92, "metalness": 0.0},
+    "wicker_light":  {"colour": [0.84, 0.72, 0.52, 1.0], "roughness": 0.88, "metalness": 0.0},
+    "foliage":       {"colour": [0.25, 0.47, 0.22, 1.0], "roughness": 0.85, "metalness": 0.0},
+    "foliage_dark":  {"colour": [0.14, 0.33, 0.16, 1.0], "roughness": 0.85, "metalness": 0.0},
+    "terracotta":    {"colour": [0.72, 0.40, 0.26, 1.0], "roughness": 0.85, "metalness": 0.0},
+    "soil":          {"colour": [0.20, 0.14, 0.10, 1.0], "roughness": 0.95, "metalness": 0.0},
+    "curtain":       {"colour": [0.90, 0.92, 0.93, 1.0], "roughness": 0.80, "metalness": 0.0},
+    "art_cream":     {"colour": [0.93, 0.90, 0.82, 1.0], "roughness": 0.80, "metalness": 0.0},
+    "art_blue":      {"colour": [0.17, 0.33, 0.55, 1.0], "roughness": 0.80, "metalness": 0.0},
+    "art_sky":       {"colour": [0.60, 0.76, 0.88, 1.0], "roughness": 0.80, "metalness": 0.0},
+    "art_ochre":     {"colour": [0.83, 0.62, 0.20, 1.0], "roughness": 0.80, "metalness": 0.0},
+    "art_red":       {"colour": [0.70, 0.19, 0.16, 1.0], "roughness": 0.80, "metalness": 0.0},
+    "art_green":     {"colour": [0.33, 0.50, 0.28, 1.0], "roughness": 0.80, "metalness": 0.0},
+    "art_charcoal":  {"colour": [0.16, 0.16, 0.17, 1.0], "roughness": 0.80, "metalness": 0.0},
 }
 
 # --------------------------------------------------------------------------
@@ -326,6 +362,54 @@ PRESETS = {
                   "depth_in": 24, "height_in": 26, "colour": "slate"},
     "sofa_table": {"type": "fixture", "model": "sofa_table", "width_in": 48,
                    "depth_in": 14, "height_in": 30, "shelves": 1},
+    # 0376.  A corner desk: `width_in` along the wall, `depth_in` the return's
+    # reach, `wing_in` each board's depth.  An umbrella table's footprint is its
+    # table (`size_in`) plus a chair each side; a TV's is its diagonal.
+    "corner_desk": {"type": "fixture", "model": "corner_desk", "width_in": 60,
+                    "depth_in": 60, "wing_in": 24, "height_in": 30,
+                    "computer": "none", "finish": "maple"},
+    "armchair": {"type": "fixture", "model": "armchair", "width_in": 33,
+                 "depth_in": 33, "height_in": 32, "colour": "slate"},
+    "wicker_chair": {"type": "fixture", "model": "wicker_seat", "width_in": 27,
+                     "depth_in": 28, "height_in": 33, "seats": 1, "colour": "cream"},
+    "wicker_chair_small": {"type": "fixture", "model": "wicker_seat",
+                           "width_in": 23, "depth_in": 24, "height_in": 31,
+                           "seats": 1, "colour": "cream"},
+    "wicker_loveseat": {"type": "fixture", "model": "wicker_seat", "width_in": 50,
+                        "depth_in": 29, "height_in": 33, "seats": 2,
+                        "colour": "cream"},
+    "wicker_table": {"type": "fixture", "model": "wicker_table", "width_in": 20,
+                     "depth_in": 20, "height_in": 20},
+    "umbrella_table": {"type": "fixture", "model": "umbrella_table",
+                       "width_in": 96, "depth_in": 96, "height_in": 30,
+                       "size_in": 42, "colour": "navy", "finish": "oak"},
+    "large_tv": {"type": "fixture", "model": "wall_tv", "wall_mounted": True,
+                 "width_in": 66, "depth_in": 4, "height_in": 38, "size_in": 75,
+                 "floor_to_bottom_in": 42},
+    # decor.  What stands on a table says how high that table is, the way a
+    # table lamp does: `floor_to_bottom_in`.
+    "wall_art": {"type": "fixture", "model": "wall_art", "wall_mounted": True,
+                 "width_in": 36, "depth_in": 1.5, "height_in": 24,
+                 "floor_to_bottom_in": 48, "art": "abstract", "finish": "walnut"},
+    "table_picture": {"type": "fixture", "model": "table_picture",
+                      "wall_mounted": True, "width_in": 8, "depth_in": 4,
+                      "height_in": 10, "floor_to_bottom_in": 30,
+                      "art": "landscape", "finish": "espresso"},
+    "plant_floor": {"type": "fixture", "model": "plant_floor", "width_in": 24,
+                    "depth_in": 24, "height_in": 60},
+    "plant_small": {"type": "fixture", "model": "plant_small",
+                    "wall_mounted": True, "width_in": 10, "depth_in": 10,
+                    "height_in": 14, "floor_to_bottom_in": 30},
+    "table_arrangement": {"type": "fixture", "model": "table_arrangement",
+                          "wall_mounted": True, "width_in": 10, "depth_in": 10,
+                          "height_in": 18, "floor_to_bottom_in": 30},
+    "floor_vase": {"type": "fixture", "model": "floor_vase", "width_in": 12,
+                   "depth_in": 12, "height_in": 30, "colour": "navy"},
+    # three pictures hung as one: `width_in` is the whole arrangement
+    "picture_trio": {"type": "fixture", "model": "picture_trio",
+                     "wall_mounted": True, "width_in": 72, "depth_in": 1.5,
+                     "height_in": 30, "floor_to_bottom_in": 44,
+                     "art": "abstract", "finish": "walnut"},
     # a lamp STANDS ON something: `floor_to_bottom_in` is that surface
     "table_lamp": {"type": "light", "fixture": "table", "width_in": 12,
                    "depth_in": 12, "size_in": 12, "floor_to_bottom_in": 30,
@@ -386,6 +470,10 @@ STATE_DEFAULTS = {
     "lit": True, "bar": "horizontal", "length_in": 24.0,
     "computer": "desktop", "pedestal": "right", "arms": True,
     "bed": True,
+    # 0376
+    "tub_style": "alcove", "enclosure": "none", "shower": "none",
+    "art": "abstract", "vase_fill": "branches",
+    "trio_order": "ascending", "trio_shape": "row", "gap_in": 3.0,
     # mirror / wall unit
     "has_cabinet": True, "light_style": "bar",
 }
@@ -414,13 +502,20 @@ _ENUMS = {
     "pedestal": tuple(k for k, _l in PEDESTALS),
     "surround": tuple(k for k, _l, _m in SURROUNDS),
     "light_style": ("none", "bar", "sconces", "backlit"),
+    "tub_style": tuple(k for k, _l in TUB_STYLES),
+    "enclosure": tuple(k for k, _l in ENCLOSURES),
+    "shower": tuple(k for k, _l in SHOWERS),
+    "art": tuple(k for k, _l in ART_STYLES),
+    "vase_fill": tuple(k for k, _l in VASE_FILLS),
+    "trio_order": tuple(k for k, _l in TRIO_ORDERS),
+    "trio_shape": tuple(k for k, _l in TRIO_SHAPES),
 }
 _ENUMS.update({key: tuple(row[0] for row in ISLAND_SLOTS)
                for key in ISLAND_SLOT_KEYS})
 _NUMBERS = ("width_in", "depth_in", "height_in", "toe_kick_h_in",
             "toe_kick_d_in", "top_thickness_in", "top_overhang_in",
             "backsplash_in", "floor_to_bottom_in", "lumens", "size_in",
-            "drop_in", "length_in", "wing_in")
+            "drop_in", "length_in", "wing_in", "gap_in")
 
 
 @dataclass(frozen=True)
@@ -500,6 +595,27 @@ def normalize_state(state, preset=None):
         elif model == "office_set":               # a desk, and room for the chair
             out["width_in"] = max(out["width_in"], CHAIR + 12.0)
             out["depth_in"] = SET_DESK_D + 12.0
+        elif model == "corner_desk":              # room for a board and a leg
+            out["wing_in"] = min(max(out["wing_in"], 18.0), 36.0)
+            out["width_in"] = max(out["width_in"], out["wing_in"] + 18.0)
+            out["depth_in"] = max(out["depth_in"], out["wing_in"] + 18.0)
+        elif model == "umbrella_table":           # the table decides the square
+            out["size_in"] = min(max(out["size_in"], 30.0), 72.0)
+            out["width_in"] = out["depth_in"] = umbrella_side(out)
+        elif model == "wall_tv":                  # the diagonal decides the set
+            out["size_in"] = min(max(out["size_in"], 19.0), 110.0)
+            out["width_in"], out["height_in"] = tv_size(out["size_in"])
+            out["depth_in"] = float(preset.get("depth_in", 4.0))
+        elif model in ("wicker_table", "plant_floor", "plant_small",
+                       "table_arrangement", "floor_vase"):          # round
+            out["depth_in"] = out["width_in"]
+        elif model == "wicker_seat":
+            out["seats"] = min(max(out["seats"], 1), 3)
+        elif model == "picture_trio":             # room for three frames
+            out["gap_in"] = min(max(out["gap_in"], 0.0), 12.0)
+            out["width_in"] = max(out["width_in"], 2.0 * out["gap_in"] + 18.0)
+        elif model == "bathtub" and out["tub_style"] == "walk_in":
+            out["height_in"] = max(out["height_in"], WALK_IN_H)
         elif model == "grab_bar":
             length = min(max(out["length_in"], 9.0), 60.0)
             out["length_in"] = length
@@ -664,7 +780,12 @@ def resolve_materials(st, room_style=None):
             "mirror": "mirror_glass",
             "sink": st["sink_material"], "appliance": appliance,
             "appliance_dark": "auto_trim", "stool": "stool_seat",
-            "fixture": "light_fixture", "lens": f"light_emit{glow}"}
+            "fixture": "light_fixture", "lens": f"light_emit{glow}",
+            # 0376: roles that ARE their material
+            **{name: name for name in (
+                "wicker", "wicker_dark", "wicker_light", "foliage", "foliage_dark",
+                "terracotta", "soil", "curtain", "fp_log", "art_cream", "art_blue",
+                "art_sky", "art_ochre", "art_red", "art_green", "art_charcoal")}}
 
 
 # --------------------------------------------------------------------------
@@ -1582,37 +1703,6 @@ def _toilet(parts, st):
     _add(parts, "hinge", "hardware", -3.5, 3.5, 8.0, 9.2, 14.5, 15.6)
 
 
-def _bathtub(parts, st):
-    """An alcove tub: a shell with a rim, an open well with eased corners, a
-    drain, and a filler at the wall end (f = 0)."""
-    w, length, h = st["width_in"], st["depth_in"], st["height_in"]
-    x0, x1 = -w / 2.0, w / 2.0
-    rim, floor = 3.0, min(4.0, h * 0.3)       # 4 in: the symbol's own well floor
-    _add(parts, "floor", "porcelain", x0, x1, 0.0, length, 0.0, floor)
-    _add(parts, "wall-l", "porcelain", x0, x0 + rim, 0.0, length, floor, h)
-    _add(parts, "wall-r", "porcelain", x1 - rim, x1, 0.0, length, floor, h)
-    _add(parts, "wall-head", "porcelain", x0 + rim, x1 - rim, 0.0, rim + 1.5,
-         floor, h)
-    _add(parts, "wall-foot", "porcelain", x0 + rim, x1 - rim, length - rim,
-         length, floor, h)
-    e = 4.0                                     # the well's eased corners
-    a, b, f0, f1 = x0 + rim, x1 - rim, rim + 1.5, length - rim
-    for name, ring in (
-            ("ease-1", [(a, f0), (a + e, f0), (a, f0 + e)]),
-            ("ease-2", [(b, f0), (b, f0 + e), (b - e, f0)]),
-            ("ease-3", [(b, f1), (b - e, f1), (b, f1 - e)]),
-            ("ease-4", [(a, f1), (a, f1 - e), (a + e, f1)])):
-        _ring(parts, name, "porcelain", ring, floor, h)
-    _oval(parts, "drain", "hardware", 0.0, f0 + 6.0, 1.1, 1.1, floor,
-          floor + 0.12, n=10)
-    _add(parts, "overflow", "hardware", -1.0, 1.0, f0, f0 + 0.15, h - 7.0, h - 5.0)
-    _add(parts, "filler-post", "hardware", -0.7, 0.7, 1.2, 2.6, h, h + 5.0)
-    _add(parts, "filler-spout", "hardware", -0.55, 0.55, 1.2, f0 + 3.0,
-         h + 4.0, h + 5.0)
-    for name, cx in (("tap-l", -4.5), ("tap-r", 4.5)):
-        _add(parts, name, "hardware", cx - 0.9, cx + 0.9, 1.0, 2.8, h, h + 2.2)
-
-
 def _bookshelf(parts, st):
     """Two sides, a top, a plinth and a back; shelves spaced evenly; and,
     when asked, a deterministic run of books on each."""
@@ -1956,7 +2046,698 @@ def _sofa_table(parts, st):
              sz, sz + 0.75)
 
 
+# --------------------------------------------------------------------------
+# 0376 (Patrick, 2026-11-26): a corner desk that IS one, a sized armchair, the
+# umbrella table with its chairs and parasol, tub styles and showers, wicker
+# that is woven, a wall TV by its diagonal, and the decor.
+# --------------------------------------------------------------------------
+def _mirrored(parts):
+    """`parts` mirrored left for right (x -> -x)."""
+    return [Part(p.name, p.role, tuple((-x, f) for x, f in p.quad), p.z0, p.z1)
+            for p in parts]
+
+
+def _turned(parts, quarters, cx, cf, prefix=""):
+    """Copies of `parts` turned `quarters` quarter turns about (0, 0) and set
+    down at (cx, cf)."""
+    out = []
+    for p in parts:
+        quad = []
+        for x, f in p.quad:
+            for _ in range(quarters % 4):
+                x, f = -f, x
+            quad.append((x + cx, f + cf))
+        out.append(Part(prefix + p.name, p.role, tuple(quad), p.z0, p.z1))
+    return out
+
+
+def _stack(parts, name, role, cx, cf, profile, n=12):
+    """A turned shape -- a pot, a vase -- as stacked ovals: `profile` is
+    [(z, radius), ...] bottom to top, one oval per step at the larger radius."""
+    for i, ((za, ra), (zb, rb)) in enumerate(zip(profile, profile[1:], strict=False)):
+        r = max(ra, rb)
+        _oval(parts, f"{name}-{i + 1}", role, cx, cf, r, r, za, zb, n=n)
+
+
+# -- the corner desk ---------------------------------------------------------
+def _corner_desk(parts, st):
+    """An L-shaped standing desk (FlexiSpot E7L pattern): two boards meeting
+    in the corner on a three-leg frame, the legs two-stage columns on feet.
+    `width_in` is the side along the wall behind, `depth_in` the return's
+    reach, `wing_in` how deep each board is. `hand` puts the return left or
+    right."""
+    w, ret, wd, h = st["width_in"], st["depth_in"], st["wing_in"], st["height_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    top = h - 1.0
+    own = []
+    _add(own, "top-main", "cabinet", x0, x1, 0.0, wd, top, h)
+    _add(own, "top-return", "cabinet", x0, x0 + wd, wd, ret, top, h)
+    legs = (("main", x1 - 6.0, wd / 2.0, True),
+            ("corner", x0 + wd / 2.0, wd / 2.0, True),
+            ("return", x0 + wd / 2.0, ret - 6.0, False))
+    for tag, cx, cf, along_f in legs:
+        if along_f:                                # the foot runs front to back
+            _add(own, f"foot-{tag}", "appliance_dark", cx - 1.6, cx + 1.6,
+                 1.0, wd - 1.0, 0.0, 1.2)
+        else:
+            _add(own, f"foot-{tag}", "appliance_dark", x0 + 1.0, x0 + wd - 1.0,
+                 cf - 1.6, cf + 1.6, 0.0, 1.2)
+        mid = 1.2 + (top - 2.7) * 0.55
+        _add(own, f"column-{tag}-lower", "appliance_dark", cx - 1.7, cx + 1.7,
+             cf - 1.3, cf + 1.3, 1.2, mid)
+        _add(own, f"column-{tag}-upper", "hardware", cx - 1.3, cx + 1.3,
+             cf - 1.0, cf + 1.0, mid, top - 1.5)
+    _add(own, "beam-main", "appliance_dark", x0 + wd / 2.0, x1 - 6.0,
+         wd / 2.0 - 1.0, wd / 2.0 + 1.0, top - 1.5, top)
+    _add(own, "beam-return", "appliance_dark", x0 + wd / 2.0 - 1.0,
+         x0 + wd / 2.0 + 1.0, wd / 2.0, ret - 6.0, top - 1.5, top)
+    _add(own, "keypad", "appliance_dark", x1 - 16.0, x1 - 9.0, wd - 1.2, wd + 0.3,
+         top - 0.9, top)
+    if st["hand"] == "right":
+        own = _mirrored(own)
+    parts.extend(own)
+    desk = []
+    _computer(desk, st, h, wd)                     # on the board along the wall
+    shift = (wd / 2.0) * (1.0 if st["hand"] == "left" else -1.0)
+    parts.extend(_moved(desk, dx=shift))
+
+
+def corner_desk_plan(st):
+    """The L from above, return on the chosen hand, and the three legs."""
+    w, ret, wd = st["width_in"], st["depth_in"], st["wing_in"]
+    sign = 1.0 if st["hand"] == "left" else -1.0
+
+    def at(u, f):
+        return sign * (u - w / 2.0), f
+
+    ring = [(0.5, 0.5), (w - 0.5, 0.5), (w - 0.5, wd), (wd, wd), (wd, ret - 0.5),
+            (0.5, ret - 0.5)]
+    prims = [("poly", "panel", [at(u, f) for u, f in ring]),
+             ("line", *at(wd, wd), *at(0.5, wd))]
+    for u, f in ((w - 6.0, wd / 2.0), (wd / 2.0, wd / 2.0), (wd / 2.0, ret - 6.0)):
+        x, ff = at(u, f)
+        prims.append(("dot", x, ff, 1.2))
+    return prims
+
+
+# -- the armchair ------------------------------------------------------------
+ARM_SEAT_Z = 17.0             # the catalog symbol's own seat height
+
+
+def _armchair(parts, st):
+    """An upholstered armchair, its back at f = 0: feet, a base, a seat
+    cushion between two arms, and a back with its own cushion."""
+    w, d, h = st["width_in"], st["depth_in"], st["height_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    arm = min(max(w * 0.18, 4.0), 8.0)
+    back = min(max(d * 0.2, 5.0), 8.0)
+    arm_h = min(max(h - 8.0, ARM_SEAT_Z + 3.0), 25.0)
+    for i, (lx, lf) in enumerate(((x0 + 1.0, 1.0), (x1 - 3.0, 1.0),
+                                  (x0 + 1.0, d - 3.0), (x1 - 3.0, d - 3.0)), start=1):
+        _add(parts, f"foot-{i}", "appliance_dark", lx, lx + 2.0, lf, lf + 2.0, 0.0, 4.0)
+    _add(parts, "base", "upholstery", x0, x1, 0.0, d - 0.5, 4.0, 11.0)
+    _add(parts, "back", "upholstery", x0, x1, 0.0, back, 11.0, h)
+    _add(parts, "arm-l", "upholstery", x0, x0 + arm, back, d - 0.5, 11.0, arm_h)
+    _add(parts, "arm-r", "upholstery", x1 - arm, x1, back, d - 0.5, 11.0, arm_h)
+    _add(parts, "seat-cushion", "upholstery", x0 + arm + 0.3, x1 - arm - 0.3,
+         back + 0.3, d, 11.0, ARM_SEAT_Z)
+    _add(parts, "back-cushion", "upholstery", x0 + arm + 0.3, x1 - arm - 0.3,
+         back, back + 3.5, ARM_SEAT_Z, h - 1.5)
+
+
+# -- wicker ------------------------------------------------------------------
+def _weave(parts, name, x0, x1, f0, f1, z0, z1):
+    """A WOVEN panel standing between z0 and z1 -- thin whichever way the
+    rectangle is thin. A dark core, horizontal strands standing proud of it in
+    alternating rows and two tones, and stakes proud of the strands: it reads
+    as wicker from either face and from across a room."""
+    along_x = (x1 - x0) >= (f1 - f0)
+    length = (x1 - x0) if along_x else (f1 - f0)
+    _add(parts, f"{name}-core", "wicker_dark", x0, x1, f0, f1, z0, z1)
+    rows = max(int((z1 - z0) / 1.5), 2)
+    step = (z1 - z0) / rows
+    for i in range(rows):
+        e = 0.28 if i % 2 == 0 else 0.12
+        role = "wicker" if i % 2 == 0 else "wicker_light"
+        za, zb = z0 + i * step + 0.12, z0 + (i + 1) * step - 0.12
+        if along_x:
+            _add(parts, f"{name}-strand-{i + 1}", role, x0, x1, f0 - e, f1 + e, za, zb)
+        else:
+            _add(parts, f"{name}-strand-{i + 1}", role, x0 - e, x1 + e, f0, f1, za, zb)
+    n = max(int(length / 3.4), 2)
+    for i in range(n + 1):
+        c = (x0 if along_x else f0) + length * i / n
+        c = min(max(c, (x0 if along_x else f0) + 0.4), (x1 if along_x else f1) - 0.4)
+        if along_x:
+            _add(parts, f"{name}-stake-{i + 1}", "wicker_dark", c - 0.4, c + 0.4,
+                 f0 - 0.45, f1 + 0.45, z0, z1)
+        else:
+            _add(parts, f"{name}-stake-{i + 1}", "wicker_dark", x0 - 0.45, x1 + 0.45,
+                 c - 0.4, c + 0.4, z0, z1)
+
+
+WICKER_SEAT_Z = 16.0
+
+
+def _wicker_seat(parts, st):
+    """A wicker chair or loveseat, back at f = 0: woven skirt, back and arms
+    with a rolled rim, on short feet, with loose cushions (`seats` of them)."""
+    w, d, h = st["width_in"], st["depth_in"], st["height_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    arm = min(max(w * 0.14, 3.2), 4.5) if w < 40.0 else 4.5
+    deck = WICKER_SEAT_Z - 4.0
+    arm_h = min(max(h - 10.0, WICKER_SEAT_Z + 3.0), 24.0)
+    e = 0.5                                    # the weave stands this proud
+    for i, (lx, lf) in enumerate(((x0 + e, e), (x1 - e - 1.6, e),
+                                  (x0 + e, d - e - 1.6), (x1 - e - 1.6, d - e - 1.6)),
+                                 start=1):
+        _add(parts, f"foot-{i}", "wicker_dark", lx, lx + 1.6, lf, lf + 1.6, 0.0, 2.0)
+    _weave(parts, "skirt-front", x0 + e, x1 - e, d - e - 1.0, d - e, 2.0, deck)
+    _weave(parts, "skirt-left", x0 + e, x0 + e + 1.0, 3.0, d - e - 1.0, 2.0, deck)
+    _weave(parts, "skirt-right", x1 - e - 1.0, x1 - e, 3.0, d - e - 1.0, 2.0, deck)
+    _add(parts, "deck", "wicker_dark", x0 + e, x1 - e, e, d - e, deck - 1.0, deck)
+    _weave(parts, "back", x0 + e, x1 - e, e, e + 2.0, 2.0, h - 1.6)
+    _add(parts, "back-rim", "wicker", x0, x1, 0.0, 3.0, h - 1.6, h)
+    for tag, a, b in (("l", x0 + e, x0 + arm - e), ("r", x1 - arm + e, x1 - e)):
+        _weave(parts, f"arm-{tag}", a, b, 3.0, d - e, deck, arm_h - 1.4)
+        _add(parts, f"arm-{tag}-rim", "wicker", a - e, b + e, 2.5, d, arm_h - 1.4, arm_h)
+    n = max(int(st["seats"]), 1)
+    a, b = x0 + arm + 0.4, x1 - arm - 0.4
+    for i in range(n):
+        ca, cb = a + (b - a) * i / n + 0.2, a + (b - a) * (i + 1) / n - 0.2
+        _add(parts, f"cushion-{i + 1}", "upholstery", ca, cb, 3.2, d - 0.8,
+             deck, WICKER_SEAT_Z)
+        _add(parts, f"back-cushion-{i + 1}", "upholstery", ca, cb, 2.9, 6.4,
+             WICKER_SEAT_Z, h - 3.0)
+
+
+def _wicker_table(parts, st):
+    """A round wicker side table: a drum woven in rings, on a foot ring, under
+    a glass top."""
+    r, h = st["width_in"] / 2.0, st["height_in"]
+    c = r
+    _oval(parts, "foot", "wicker_dark", 0.0, c, r - 1.2, r - 1.2, 0.0, 1.5, n=16)
+    rows = max(int((h - 3.0) / 1.5), 2)
+    step = (h - 3.0) / rows
+    for i in range(rows):
+        rr = r - (0.6 if i % 2 == 0 else 0.9)
+        _oval(parts, f"ring-{i + 1}", "wicker" if i % 2 == 0 else "wicker_light",
+              0.0, c, rr, rr, 1.5 + i * step, 1.5 + (i + 1) * step, n=16)
+    for i in range(12):                             # the stakes round the drum
+        ang = 2.0 * math.pi * i / 12
+        px, pf = (r - 0.5) * math.cos(ang), c + (r - 0.5) * math.sin(ang)
+        _oval(parts, f"stake-{i + 1}", "wicker_dark", px, pf, 0.45, 0.45, 1.5,
+              h - 1.5, n=6)
+    _oval(parts, "rim", "wicker", 0.0, c, r, r, h - 1.5, h - 0.5, n=16)
+    _oval(parts, "top", "glass", 0.0, c, r - 0.8, r - 0.8, h - 0.5, h, n=16)
+
+
+# -- the umbrella table ------------------------------------------------------
+PATIO_CHAIR_W = 20.0
+PATIO_CHAIR_D = 22.0
+PATIO_REACH = 27.0             # table edge to the back of a chair drawn up
+PARASOL_Z = 84.0               # the canopy's rim: headroom under it
+PARASOL_RISE = 18.0
+
+
+def umbrella_side(st):
+    """The side of the square an umbrella table takes: table, and a chair's
+    reach each side."""
+    return st["size_in"] + 2.0 * PATIO_REACH
+
+
+def _patio_chair(tag):
+    """One dining chair about its own centre, facing +f (its back at -f)."""
+    parts = []
+    hw, hd = PATIO_CHAIR_W / 2.0, PATIO_CHAIR_D / 2.0
+    for i, (lx, lf) in enumerate(((-hw, -hd), (hw - 1.4, -hd), (-hw, hd - 1.4),
+                                  (hw - 1.4, hd - 1.4)), start=1):
+        _add(parts, f"{tag}-leg-{i}", "cabinet", lx, lx + 1.4, lf, lf + 1.4, 0.0,
+             16.0 if lf > 0 else 34.0)
+    _add(parts, f"{tag}-seat", "cabinet", -hw, hw, -hd + 1.0, hd, 16.0, 17.2)
+    _add(parts, f"{tag}-cushion", "upholstery", -hw + 1.2, hw - 1.2, -hd + 2.6,
+         hd - 0.8, 17.2, 19.0)
+    for i, z in enumerate((22.0, 26.5, 31.0), start=1):
+        _add(parts, f"{tag}-slat-{i}", "cabinet", -hw + 1.4, hw - 1.4, -hd + 0.2,
+             -hd + 1.0, z, z + 3.0)
+    for side, a in (("l", -hw), ("r", hw - 1.4)):
+        _add(parts, f"{tag}-arm-{side}", "cabinet", a, a + 1.4, -hd + 1.4, hd - 2.0,
+             24.0, 25.2)
+        _add(parts, f"{tag}-arm-post-{side}", "cabinet", a, a + 1.4, hd - 3.4,
+             hd - 2.0, 17.2, 24.0)
+    return parts
+
+
+def _umbrella_table(parts, st):
+    """A square patio table of `size_in`, four chairs drawn up to it, and a
+    parasol on a pole through its middle."""
+    t, h = st["size_in"], st["height_in"]
+    side = umbrella_side(st)
+    c = side / 2.0                                  # the pole, in f
+    ht = t / 2.0
+    _add(parts, "top", "cabinet", -ht, ht, c - ht, c + ht, h - 1.5, h)
+    for i, (lx, lf) in enumerate(((-ht + 2.0, c - ht + 2.0), (ht - 4.0, c - ht + 2.0),
+                                  (-ht + 2.0, c + ht - 4.0), (ht - 4.0, c + ht - 4.0)),
+                                 start=1):
+        _add(parts, f"leg-{i}", "cabinet", lx, lx + 2.0, lf, lf + 2.0, 0.0, h - 1.5)
+    _add(parts, "apron-back", "cabinet", -ht + 4.0, ht - 4.0, c - ht + 2.4,
+         c - ht + 3.4, h - 5.0, h - 1.5)
+    _add(parts, "apron-front", "cabinet", -ht + 4.0, ht - 4.0, c + ht - 3.4,
+         c + ht - 2.4, h - 5.0, h - 1.5)
+    reach = ht + PATIO_REACH - PATIO_CHAIR_D / 2.0   # a chair's centre, off the pole
+    for k, (dx, df) in enumerate(((0.0, -1.0), (1.0, 0.0), (0.0, 1.0), (-1.0, 0.0))):
+        # quarter turns: 0 faces +f, so the chair BEHIND the table (df = -1) is 0
+        parts.extend(_turned(_patio_chair("chair"), k, dx * reach, c + df * reach,
+                             prefix=f"{k + 1}-"))
+    _oval(parts, "base", "appliance_dark", 0.0, c, 9.0, 9.0, 0.0, 2.5, n=12)
+    top = PARASOL_Z + PARASOL_RISE
+    _oval(parts, "pole", "hardware", 0.0, c, 0.9, 0.9, 2.5, top + 1.0, n=8)
+    r = c                                           # the canopy shades the chairs
+    tiers = 9
+    for i in range(tiers):
+        rr = r * (1.0 - i / tiers)
+        z = PARASOL_Z + PARASOL_RISE * i / tiers
+        _oval(parts, f"canopy-{i + 1}", "upholstery", 0.0, c, rr, rr, z,
+              z + PARASOL_RISE / tiers + 0.4, n=8)
+    for i in range(8):                              # the ribs under the canopy
+        ang = 2.0 * math.pi * (i + 0.5) / 8
+        ux, uf = math.cos(ang), math.sin(ang)
+        px, pf = -uf * 0.35, ux * 0.35
+        _ring(parts, f"rib-{i + 1}", "hardware",
+              [(ux * 2.0 + px, c + uf * 2.0 + pf), (ux * (r - 1.0) + px, c + uf * (r - 1.0) + pf),
+               (ux * (r - 1.0) - px, c + uf * (r - 1.0) - pf), (ux * 2.0 - px, c + uf * 2.0 - pf)],
+              PARASOL_Z - 0.7, PARASOL_Z)
+    _oval(parts, "finial", "hardware", 0.0, c, 1.6, 1.6, top + 1.0, top + 3.0, n=8)
+
+
+def umbrella_table_plan(st):
+    """The table, its four chairs, the pole, and the canopy overhead, dashed."""
+    t = st["size_in"]
+    c, ht = umbrella_side(st) / 2.0, t / 2.0
+    r = c - 0.5
+    prims = [("poly", "dashed", [(r * math.cos(2.0 * math.pi * i / 16),
+                                  c + r * math.sin(2.0 * math.pi * i / 16))
+                                 for i in range(16)]),
+             ("panel", -ht, c - ht, ht, c + ht), ("dot", 0.0, c, 1.8)]
+    hw, hd = PATIO_CHAIR_W / 2.0, PATIO_CHAIR_D / 2.0
+    reach = ht + PATIO_REACH - hd
+    for dx, df in ((0.0, -1.0), (1.0, 0.0), (0.0, 1.0), (-1.0, 0.0)):
+        a, b = (hw, hd) if dx == 0.0 else (hd, hw)
+        cx, cf = dx * reach, c + df * reach
+        prims.append(("outline", cx - a, cf - b, cx + a, cf + b))
+    return prims
+
+
+# -- the tub -----------------------------------------------------------------
+SURROUND_Z = 78.0              # the top of a wall insert, a door, a curtain rod
+WALK_IN_H = 38.0
+
+
+def _tub_shell(parts, st, h):
+    """The alcove shell: floor, four walls, eased corners, drain, filler."""
+    w, length = st["width_in"], st["depth_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    rim, floor = 3.0, min(4.0, h * 0.3)       # 4 in: the symbol's own well floor
+    _add(parts, "floor", "porcelain", x0, x1, 0.0, length, 0.0, floor)
+    _add(parts, "wall-l", "porcelain", x0, x0 + rim, 0.0, length, floor, h)
+    _add(parts, "wall-r", "porcelain", x1 - rim, x1, 0.0, length, floor, h)
+    _add(parts, "wall-head", "porcelain", x0 + rim, x1 - rim, 0.0, rim + 1.5,
+         floor, h)
+    _add(parts, "wall-foot", "porcelain", x0 + rim, x1 - rim, length - rim,
+         length, floor, h)
+    e = 4.0                                     # the well's eased corners
+    a, b, f0, f1 = x0 + rim, x1 - rim, rim + 1.5, length - rim
+    for name, ring in (
+            ("ease-1", [(a, f0), (a + e, f0), (a, f0 + e)]),
+            ("ease-2", [(b, f0), (b, f0 + e), (b - e, f0)]),
+            ("ease-3", [(b, f1), (b - e, f1), (b, f1 - e)]),
+            ("ease-4", [(a, f1), (a, f1 - e), (a + e, f1)])):
+        _ring(parts, name, "porcelain", ring, floor, h)
+    _oval(parts, "drain", "hardware", 0.0, f0 + 6.0, 1.1, 1.1, floor,
+          floor + 0.12, n=10)
+    _add(parts, "overflow", "hardware", -1.0, 1.0, f0, f0 + 0.15, h - 7.0, h - 5.0)
+    _add(parts, "filler-post", "hardware", -0.7, 0.7, 1.2, 2.6, h, h + 5.0)
+    _add(parts, "filler-spout", "hardware", -0.55, 0.55, 1.2, f0 + 3.0,
+         h + 4.0, h + 5.0)
+    for name, cx in (("tap-l", -4.5), ("tap-r", 4.5)):
+        _add(parts, name, "hardware", cx - 0.9, cx + 0.9, 1.0, 2.8, h, h + 2.2)
+
+
+def _tub_clawfoot(parts, st, h):
+    """A freestanding tub on four feet: an oval shell built as a ring of wall
+    segments round an oval floor, and a floor-standing filler at its head."""
+    w, length = st["width_in"], st["depth_in"]
+    feet = 6.0
+    cf, rx, rf = (length + 3.0) / 2.0, w / 2.0, (length - 3.0) / 2.0
+    _oval(parts, "floor", "porcelain", 0.0, cf, rx - 1.0, rf - 1.0, feet, feet + 3.0)
+    n = 16
+    for i in range(n):
+        a0, a1 = 2.0 * math.pi * i / n, 2.0 * math.pi * (i + 1) / n
+        ring = [(rx * math.cos(a0), cf + rf * math.sin(a0)),
+                (rx * math.cos(a1), cf + rf * math.sin(a1)),
+                ((rx - 1.8) * math.cos(a1), cf + (rf - 1.8) * math.sin(a1)),
+                ((rx - 1.8) * math.cos(a0), cf + (rf - 1.8) * math.sin(a0))]
+        _ring(parts, f"shell-{i + 1}", "porcelain", ring, feet + 3.0, h)
+    for i, (sx, sf) in enumerate(((-1, -1), (1, -1), (-1, 1), (1, 1)), start=1):
+        _oval(parts, f"claw-{i}", "hardware", sx * rx * 0.55, cf + sf * rf * 0.62,
+              1.8, 1.8, 0.0, feet, n=8)
+    _oval(parts, "drain", "hardware", 0.0, cf - rf * 0.6, 1.1, 1.1, feet + 3.0,
+          feet + 3.12, n=10)
+    _add(parts, "filler-riser", "hardware", -0.7, 0.7, 0.0, 1.4, 0.0, h + 8.0)
+    _add(parts, "filler-spout", "hardware", -0.55, 0.55, 0.6, 7.0, h + 7.0, h + 8.0)
+    for name, cx in (("tap-l", -3.5), ("tap-r", 3.5)):
+        _add(parts, name, "hardware", cx - 0.9, cx + 0.9, 0.4, 2.2, h + 3.0, h + 5.2)
+
+
+def _tub_walk_in(parts, st, h, open_sign):
+    """A walk-in tub: a deep shell, a door through its open side, a seat at
+    the foot end and a grab bar."""
+    w, length = st["width_in"], st["depth_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    rim, floor = 3.0, 4.0
+    _add(parts, "floor", "porcelain", x0, x1, 0.0, length, 0.0, floor)
+    _add(parts, "wall-head", "porcelain", x0, x1, 0.0, rim + 1.5, floor, h)
+    _add(parts, "wall-foot", "porcelain", x0, x1, length - rim, length, floor, h)
+    wa, wb = (x0, x0 + rim) if open_sign > 0 else (x1 - rim, x1)     # the wall side
+    oa, ob = (x1 - rim, x1) if open_sign > 0 else (x0, x0 + rim)     # the door side
+    _add(parts, "wall-back", "porcelain", wa, wb, rim + 1.5, length - rim, floor, h)
+    d0, d1 = rim + 6.0, rim + 6.0 + min(20.0, length * 0.36)         # the doorway
+    _add(parts, "wall-door-a", "porcelain", oa, ob, rim + 1.5, d0, floor, h)
+    _add(parts, "wall-door-b", "porcelain", oa, ob, d1, length - rim, floor, h)
+    _add(parts, "door-sill", "porcelain", oa, ob, d0, d1, floor, floor + 3.0)
+    edge = x1 if open_sign > 0 else x0
+    back = -open_sign                           # from the open face, into the tub
+    la, lb = sorted((edge + back * 1.0, edge + back * 2.2))
+    _add(parts, "door", "porcelain", la, lb, d0 + 0.2, d1 - 0.2, floor + 3.0, h - 1.0)
+    ha, hb = sorted((edge + back * 0.3, edge + back * 1.0))
+    _add(parts, "door-hinge", "hardware", ha, hb, d0 + 0.2, d0 + 1.4, floor + 3.0, h - 1.0)
+    _add(parts, "door-lever", "hardware", ha, hb, d1 - 4.5, d1 - 1.6,
+         floor + 18.0, floor + 19.4)
+    _add(parts, "seat", "porcelain", x0 + rim, x1 - rim, length - rim - 16.0,
+         length - rim, floor, 17.0)
+    ga, gb = (wa + rim, wa + rim + 1.2) if open_sign > 0 else (wb - rim - 1.2, wb - rim)
+    _add(parts, "grab-bar", "hardware", ga, gb, length * 0.3, length * 0.3 + 18.0,
+         h - 8.0, h - 6.8)
+    _oval(parts, "drain", "hardware", 0.0, rim + 8.0, 1.1, 1.1, floor, floor + 0.12, n=10)
+    _add(parts, "filler-post", "hardware", -0.7, 0.7, 1.2, 2.6, h, h + 5.0)
+    _add(parts, "filler-spout", "hardware", -0.55, 0.55, 1.2, rim + 4.5, h + 4.0, h + 5.0)
+
+
+def _bathtub(parts, st):
+    """A tub by its `tub_style`, with whatever `shower` and `enclosure` say.
+    The head (the filler) is at f = 0; `hand` is the long side that stands
+    against a wall -- the other long side is the open one."""
+    w, length, h = st["width_in"], st["depth_in"], st["height_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    style = st["tub_style"]
+    open_sign = 1.0 if st["hand"] == "left" else -1.0     # the open side's x sign
+    if style == "clawfoot":
+        _tub_clawfoot(parts, st, h)
+    elif style == "walk_in":
+        _tub_walk_in(parts, st, h, open_sign)
+    else:
+        _tub_shell(parts, st, h)
+    wall_x = x0 if open_sign > 0 else x1
+    if style == "insert":                       # the three-wall fiberglass surround
+        _add(parts, "surround-head", "porcelain", x0, x1, 0.0, 0.75, h, SURROUND_Z)
+        _add(parts, "surround-foot", "porcelain", x0, x1, length - 0.75, length,
+             h, SURROUND_Z)
+        a, b = (wall_x, wall_x + 0.75) if open_sign > 0 else (wall_x - 0.75, wall_x)
+        _add(parts, "surround-back", "porcelain", a, b, 0.75, length - 0.75, h,
+             SURROUND_Z)
+        for i, z in enumerate((h + 24.0, h + 40.0), start=1):       # moulded shelves
+            sa, sb = (a + 0.75, a + 4.75) if open_sign > 0 else (b - 4.75, b - 0.75)
+            _add(parts, f"shelf-{i}", "porcelain", sa, sb, length - 9.0,
+                 length - 0.75, z, z + 0.8)
+    if st["shower"] != "none":
+        _add(parts, "shower-valve", "hardware", -2.5, 2.5, 0.75, 1.3, 44.0, 49.0)
+        _add(parts, "shower-riser", "hardware", -0.45, 0.45, 0.75, 1.5, 49.0, 77.0)
+        _add(parts, "shower-arm", "hardware", -0.45, 0.45, 1.5, 9.0, 76.0, 77.0)
+        _oval(parts, "shower-head", "hardware", 0.0, 9.0, 2.6, 2.6, 74.4, 76.0, n=12)
+    if st["shower"] == "multi":
+        _add(parts, "rain-arm", "hardware", -0.45, 0.45, 9.0, length * 0.42,
+             77.0, 78.0)
+        _oval(parts, "rain-head", "hardware", 0.0, length * 0.42, 5.0, 5.0, 76.0,
+              77.0, n=14)
+        sx = 8.0 * open_sign                    # the hand shower, on a slide bar
+        _add(parts, "slide-bar", "hardware", sx - 0.4, sx + 0.4, 0.75, 1.5, 40.0, 68.0)
+        _add(parts, "hand-shower", "hardware", sx - 0.9, sx + 0.9, 1.5, 4.5, 60.0, 62.0)
+        bx = -8.0 * open_sign                   # body sprays up the head wall
+        for i, z in enumerate((30.0, 42.0, 54.0), start=1):
+            _add(parts, f"body-spray-{i}", "hardware", bx - 1.4, bx + 1.4, 0.75,
+                 1.4, z, z + 2.8)
+    edge = x1 if open_sign > 0 else x0          # the open long side
+    inward = -open_sign
+    if st["enclosure"] != "none":
+        ra, rb = sorted((edge + inward * 0.4, edge + inward * 1.6))
+        _add(parts, "enclosure-rail", "hardware", ra, rb, 0.0, length,
+             SURROUND_Z - 2.0, SURROUND_Z - 0.8)
+    if st["enclosure"] == "glass":
+        ga, gb = sorted((edge + inward * 0.5, edge + inward * 0.9))
+        _add(parts, "glass-fixed", "glass", ga, gb, length / 2.0 - 1.5, length - 0.8,
+             h, SURROUND_Z - 2.0)
+        sa, sb = sorted((edge + inward * 1.1, edge + inward * 1.5))
+        _add(parts, "glass-sliding", "glass", sa, sb, 0.8, length / 2.0 + 1.5, h,
+             SURROUND_Z - 2.0)
+        _add(parts, "glass-pull", "hardware", sb, sb + 0.6, length / 2.0 - 2.0,
+             length / 2.0 - 0.8, h + 22.0, h + 30.0)
+    elif st["enclosure"] == "curtain":
+        folds = max(int(length * 0.55 / 3.0), 3)
+        for i in range(folds):
+            off = 0.9 + (0.5 if i % 2 else 0.0)
+            ca, cb = sorted((edge + inward * off, edge + inward * (off + 0.35)))
+            _add(parts, f"curtain-{i + 1}", "curtain", ca, cb, 0.8 + 3.0 * i,
+                 0.8 + 3.0 * (i + 1) + 0.3, max(h - 6.0, 4.0), SURROUND_Z - 2.0)
+
+
+# -- the wall TV -------------------------------------------------------------
+def tv_size(diagonal):
+    """(width, height) of a 16:9 set with its bezel, to the whole inch."""
+    return (float(round(diagonal * 0.8716 + 0.6)),
+            float(round(diagonal * 0.4903 + 1.2)))
+
+
+def _wall_tv(parts, st):
+    """A flat panel hung on the wall: a bracket, the case, the screen."""
+    w, d, h = st["width_in"], st["depth_in"], st["height_in"]
+    x0, x1 = -w / 2.0, w / 2.0
+    _add(parts, "bracket", "hardware", -min(8.0, w / 4.0), min(8.0, w / 4.0), 0.0,
+         d - 1.6, h * 0.3, h * 0.7)
+    _add(parts, "case", "appliance_dark", x0, x1, d - 1.6, d - 0.15, 0.0, h)
+    _add(parts, "screen", "screen", x0 + 0.5, x1 - 0.5, d - 0.15, d, 0.9, h - 0.5)
+
+
+# -- decor -------------------------------------------------------------------
+# each: [(x0, x1, z0, z1, role)] in fractions of the canvas, painted back to front
+_ART = {
+    "abstract": (("art_cream", 0.0, 1.0, 0.0, 1.0), ("art_blue", 0.08, 0.55, 0.42, 0.92),
+                 ("art_ochre", 0.38, 0.9, 0.12, 0.6), ("art_red", 0.62, 0.84, 0.66, 0.88),
+                 ("art_charcoal", 0.1, 0.3, 0.1, 0.16)),
+    "landscape": (("art_sky", 0.0, 1.0, 0.45, 1.0), ("art_cream", 0.62, 0.78, 0.68, 0.86),
+                  ("art_blue", 0.0, 1.0, 0.36, 0.5), ("art_green", 0.0, 1.0, 0.0, 0.38),
+                  ("art_ochre", 0.0, 1.0, 0.0, 0.12)),
+    "botanical": (("art_cream", 0.0, 1.0, 0.0, 1.0), ("art_green", 0.47, 0.53, 0.08, 0.8),
+                  ("art_green", 0.24, 0.47, 0.5, 0.62), ("art_green", 0.53, 0.78, 0.36, 0.48),
+                  ("art_green", 0.3, 0.47, 0.22, 0.32), ("art_red", 0.4, 0.6, 0.78, 0.92)),
+    "mono": (("art_cream", 0.0, 1.0, 0.0, 1.0), ("art_charcoal", 0.0, 1.0, 0.0, 0.34),
+             ("art_charcoal", 0.14, 0.4, 0.34, 0.74), ("art_charcoal", 0.55, 0.7, 0.34, 0.6)),
+}
+
+
+def _picture(parts, st, x0, x1, f_face, z0, z1, frame, tag="", layers=None):
+    """A framed picture facing +f at `f_face`: four frame bars, then the
+    composition `art` names (or the `layers` given), each colour a hair proud
+    of the one behind. `tag` prefixes the part names."""
+    for name, a, b, za, zb in ((f"{tag}frame-top", x0, x1, z1 - frame, z1),
+                               (f"{tag}frame-bottom", x0, x1, z0, z0 + frame),
+                               (f"{tag}frame-left", x0, x0 + frame, z0 + frame,
+                                z1 - frame),
+                               (f"{tag}frame-right", x1 - frame, x1, z0 + frame,
+                                z1 - frame)):
+        _add(parts, name, "cabinet", a, b, f_face - 1.0, f_face + 0.5, za, zb)
+    ax, az = x0 + frame, z0 + frame
+    aw, ah = (x1 - x0) - 2.0 * frame, (z1 - z0) - 2.0 * frame
+    for i, (role, u0, u1, v0, v1) in enumerate(layers or _ART[st["art"]]):
+        _add(parts, f"{tag}art-{i + 1}", role, ax + aw * u0, ax + aw * u1,
+             f_face - 0.6, f_face - 0.3 + 0.12 * i, az + ah * v0, az + ah * v1)
+
+
+def _wall_art(parts, st):
+    """A painting on the wall, `width_in` by `height_in`."""
+    w, h = st["width_in"], st["height_in"]
+    _picture(parts, st, -w / 2.0, w / 2.0, 1.0, 0.0, h, min(1.5, w * 0.08))
+
+
+# Three pictures that belong together: one palette, three compositions. The
+# abstract runs from blue through to its complement, ochre; the landscape is
+# one view across all three, the sun in the middle; the botanical is three
+# stems; the black and white is three pieces of one skyline.
+_ART_TRIO = {
+    "abstract": (
+        (("art_cream", 0.0, 1.0, 0.0, 1.0), ("art_blue", 0.12, 0.88, 0.34, 0.9),
+         ("art_ochre", 0.3, 0.7, 0.1, 0.26)),
+        (("art_cream", 0.0, 1.0, 0.0, 1.0), ("art_blue", 0.08, 0.52, 0.4, 0.92),
+         ("art_ochre", 0.4, 0.92, 0.1, 0.6), ("art_red", 0.62, 0.84, 0.68, 0.88)),
+        (("art_cream", 0.0, 1.0, 0.0, 1.0), ("art_ochre", 0.1, 0.9, 0.1, 0.64),
+         ("art_blue", 0.28, 0.72, 0.72, 0.9), ("art_charcoal", 0.1, 0.3, 0.76, 0.82))),
+    "landscape": (
+        (("art_sky", 0.0, 1.0, 0.45, 1.0), ("art_blue", 0.0, 1.0, 0.36, 0.58),
+         ("art_green", 0.0, 1.0, 0.0, 0.38), ("art_ochre", 0.0, 1.0, 0.0, 0.12)),
+        (("art_sky", 0.0, 1.0, 0.45, 1.0), ("art_cream", 0.42, 0.58, 0.7, 0.86),
+         ("art_blue", 0.0, 1.0, 0.36, 0.5), ("art_green", 0.0, 1.0, 0.0, 0.38),
+         ("art_ochre", 0.0, 1.0, 0.0, 0.12)),
+        (("art_sky", 0.0, 1.0, 0.45, 1.0), ("art_blue", 0.0, 1.0, 0.36, 0.46),
+         ("art_green", 0.0, 1.0, 0.0, 0.38), ("art_green", 0.55, 0.8, 0.38, 0.62),
+         ("art_ochre", 0.0, 1.0, 0.0, 0.12))),
+    "botanical": (
+        (("art_cream", 0.0, 1.0, 0.0, 1.0), ("art_green", 0.46, 0.54, 0.08, 0.74),
+         ("art_green", 0.2, 0.46, 0.3, 0.42), ("art_ochre", 0.36, 0.64, 0.72, 0.9)),
+        (("art_cream", 0.0, 1.0, 0.0, 1.0), ("art_green", 0.47, 0.53, 0.08, 0.8),
+         ("art_green", 0.24, 0.47, 0.5, 0.62), ("art_green", 0.53, 0.78, 0.36, 0.48),
+         ("art_red", 0.4, 0.6, 0.78, 0.92)),
+        (("art_cream", 0.0, 1.0, 0.0, 1.0), ("art_green", 0.46, 0.54, 0.08, 0.7),
+         ("art_green", 0.54, 0.8, 0.44, 0.56), ("art_blue", 0.38, 0.62, 0.68, 0.86))),
+    "mono": (
+        (("art_cream", 0.0, 1.0, 0.0, 1.0), ("art_charcoal", 0.0, 1.0, 0.0, 0.3),
+         ("art_charcoal", 0.3, 0.7, 0.3, 0.62)),
+        (("art_cream", 0.0, 1.0, 0.0, 1.0), ("art_charcoal", 0.0, 1.0, 0.0, 0.34),
+         ("art_charcoal", 0.14, 0.4, 0.34, 0.74), ("art_charcoal", 0.55, 0.7, 0.34, 0.6)),
+        (("art_cream", 0.0, 1.0, 0.0, 1.0), ("art_charcoal", 0.0, 1.0, 0.0, 0.26),
+         ("art_charcoal", 0.5, 0.86, 0.26, 0.8), ("art_charcoal", 0.12, 0.34, 0.26, 0.44))),
+}
+
+
+def trio_frames(st):
+    """The three pictures of an arrangement, left to right as hung:
+    [(x0, x1, z0, z1, composition index)]. The widths share the arrangement's
+    width less two gaps in the ratio 2 : 3 : 4; `stepped` scales the heights
+    the same way about one centre line."""
+    w, h, gap = st["width_in"], st["height_in"], st["gap_in"]
+    unit = (w - 2.0 * gap) / sum(TRIO_RATIO)
+    order = (0, 1, 2) if st["trio_order"] == "ascending" else (2, 1, 0)
+    out, x = [], -w / 2.0
+    for k in order:
+        pw = unit * TRIO_RATIO[k]
+        ph = h * TRIO_RATIO[k] / TRIO_RATIO[-1] if st["trio_shape"] == "stepped" else h
+        out.append((x, x + pw, (h - ph) / 2.0, (h + ph) / 2.0, k))
+        x += pw + gap
+    return out
+
+
+def _picture_trio(parts, st):
+    """Three framed pictures hung as one arrangement, 2 - 3 - 4."""
+    for x0, x1, z0, z1, k in trio_frames(st):
+        _picture(parts, st, x0, x1, 1.0, z0, z1, min(1.25, (x1 - x0) * 0.08),
+                 tag=f"p{k + 1}-", layers=_ART_TRIO[st["art"]][k])
+
+
+def picture_trio_plan(st):
+    """Three thin frames along the wall."""
+    return [("panel", x0, 0.2, x1, st["depth_in"] - 0.2)
+            for x0, x1, _z0, _z1, _k in trio_frames(st)]
+
+
+def _table_picture(parts, st):
+    """A framed photograph standing on a table, on its easel back."""
+    w, d, h = st["width_in"], st["depth_in"], st["height_in"]
+    _picture(parts, st, -w / 2.0, w / 2.0, d - 0.5, 0.0, h, min(0.8, w * 0.1))
+    _add(parts, "easel", "appliance_dark", -0.6, 0.6, 0.0, d - 1.5, 0.0, h * 0.55)
+
+
+# (dx, df, radius, bottom, top): fractions of the head's radius and height.
+# A crown in layers -- widest at the middle, where it fills the footprint --
+# with a few clumps off-centre so it does not read as a turned post.
+_FOLIAGE = ((0.0, 0.0, 0.34, 0.0, 0.14), (0.0, 0.0, 0.62, 0.12, 0.3),
+            (0.0, 0.0, 0.86, 0.28, 0.46), (0.0, 0.0, 1.0, 0.44, 0.6),
+            (0.0, 0.0, 0.86, 0.58, 0.76), (0.0, 0.0, 0.6, 0.74, 0.9),
+            (0.0, 0.0, 0.34, 0.88, 1.0), (0.46, 0.2, 0.4, 0.5, 0.82),
+            (-0.42, -0.3, 0.42, 0.34, 0.68), (0.1, 0.5, 0.36, 0.2, 0.5),
+            (-0.3, 0.42, 0.32, 0.62, 0.9))
+
+
+def _foliage(parts, cx, cf, r, z0, z1):
+    """A plant's head as overlapping clumps in two greens."""
+    for i, (dx, df, rr, a, b) in enumerate(_FOLIAGE):
+        _oval(parts, f"leaves-{i + 1}", "foliage" if i % 2 == 0 else "foliage_dark",
+              cx + dx * r, cf + df * r, rr * r, rr * r, z0 + (z1 - z0) * a,
+              z0 + (z1 - z0) * b, n=8)
+
+
+def _plant_floor(parts, st):
+    """A large potted floor plant: a tapered pot, soil, a trunk, a head."""
+    w, h = st["width_in"], st["height_in"]
+    c = w / 2.0
+    pot_r, pot_h = max(w * 0.3, 5.0), min(max(h * 0.24, 9.0), 20.0)
+    _stack(parts, "pot", "terracotta", 0.0, c,
+           [(0.0, pot_r * 0.72), (pot_h * 0.5, pot_r * 0.86), (pot_h - 1.2, pot_r),
+            (pot_h, pot_r + 0.6)])
+    _oval(parts, "soil", "soil", 0.0, c, pot_r - 0.8, pot_r - 0.8, pot_h - 1.0,
+          pot_h + 0.1, n=12)
+    _oval(parts, "trunk", "fp_log", 0.0, c, 0.9, 0.9, pot_h, h * 0.5, n=8)
+    _foliage(parts, 0.0, c, w / 2.0, h * 0.36, h)
+
+
+def _plant_small(parts, st):
+    """A small potted plant for a table or a sill."""
+    w, h = st["width_in"], st["height_in"]
+    c = w / 2.0
+    pot_r, pot_h = w * 0.34, h * 0.38
+    _stack(parts, "pot", "terracotta", 0.0, c,
+           [(0.0, pot_r * 0.75), (pot_h * 0.6, pot_r), (pot_h, pot_r + 0.3)], n=10)
+    _oval(parts, "soil", "soil", 0.0, c, pot_r - 0.5, pot_r - 0.5, pot_h - 0.6,
+          pot_h + 0.05, n=10)
+    _foliage(parts, 0.0, c, w / 2.0, pot_h * 0.8, h)
+
+
+def _table_arrangement(parts, st):
+    """Cut flowers in a glass vase."""
+    w, h = st["width_in"], st["height_in"]
+    c = w / 2.0
+    vase_h = h * 0.5
+    _stack(parts, "vase", "glass", 0.0, c,
+           [(0.0, w * 0.2), (vase_h * 0.5, w * 0.26), (vase_h, w * 0.18)], n=10)
+    blooms = ((0.0, 0.0, "art_red"), (0.3, 0.12, "art_ochre"), (-0.28, 0.2, "art_cream"),
+              (0.1, -0.32, "art_red"), (-0.14, -0.26, "art_ochre"), (0.26, -0.2, "art_cream"))
+    for i, (dx, df, role) in enumerate(blooms, start=1):
+        px, pf = dx * w, c + df * w
+        top = h - (i % 3) * h * 0.07
+        _add(parts, f"stem-{i}", "foliage_dark", px - 0.15, px + 0.15, pf - 0.15,
+             pf + 0.15, vase_h, top - 1.2)
+        _oval(parts, f"bloom-{i}", role, px, pf, w * 0.16, w * 0.16, top - 1.6, top, n=8)
+    _oval(parts, "greens", "foliage", 0.0, c, w / 2.0, w / 2.0, vase_h,
+          vase_h + h * 0.14, n=8)
+
+
+VASE_BRANCH = 20.0             # how far the branches stand above the lip
+
+
+def _floor_vase(parts, st):
+    """A tall floor vase, turned -- foot, belly, shoulder, neck and lip --
+    with tall branches standing in it or not (`vase_fill`)."""
+    w, h = st["width_in"], st["height_in"]
+    r, c = w / 2.0, w / 2.0
+    _stack(parts, "vase", "porcelain", 0.0, c,
+           [(0.0, r * 0.5), (h * 0.08, r * 0.62), (h * 0.3, r * 0.92), (h * 0.5, r),
+            (h * 0.68, r * 0.84), (h * 0.84, r * 0.52), (h * 0.95, r * 0.42), (h, r * 0.56)])
+    if st["vase_fill"] == "branches":
+        for i, (dx, df, extra) in enumerate(((0.0, 0.0, 1.0), (0.3, 0.1, 0.8),
+                                             (-0.26, 0.16, 0.9), (0.08, -0.3, 0.7),
+                                             (-0.18, -0.22, 0.6)), start=1):
+            px, pf = dx * r, c + df * r
+            _add(parts, f"branch-{i}", "fp_log", px - 0.25, px + 0.25, pf - 0.25,
+                 pf + 0.25, h * 0.9, h + VASE_BRANCH * extra)
+            _oval(parts, f"tuft-{i}", "foliage_dark", px, pf, 1.6, 1.6,
+                  h + VASE_BRANCH * extra - 3.0, h + VASE_BRANCH * extra, n=6)
+
+
 _FIXTURE_BUILDERS = {"toilet": _toilet, "bathtub": _bathtub,
+                     "corner_desk": _corner_desk, "armchair": _armchair,
+                     "wicker_seat": _wicker_seat, "wicker_table": _wicker_table,
+                     "umbrella_table": _umbrella_table, "wall_tv": _wall_tv,
+                     "wall_art": _wall_art, "table_picture": _table_picture,
+                     "plant_floor": _plant_floor, "plant_small": _plant_small,
+                     "table_arrangement": _table_arrangement,
+                     "floor_vase": _floor_vase, "picture_trio": _picture_trio,
                      "bookshelf": _bookshelf, "fireplace": _fireplace,
                      "grab_bar": _grab_bar, "desk": _desk,
                      "office_chair": _office_chair, "office_set": _office_set,
