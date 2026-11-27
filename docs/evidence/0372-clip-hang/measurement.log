@@ -1,0 +1,31 @@
+### opposed-dormers, all 6 roofs, 30s window
+
+=== RESULT  (tripped: deadline, elapsed 30.2s) ===
+envelope rounds observed : 76
+_adjacent calls          : 1,660,000
+_reach calls             : 1,503
+_reach total visits      : 175,620
+piece count per round    : first=113 min=113 max=565 last=565
+round / pieces / adj_cumulative / t:
+     0  pieces=  113  adj=           0  t=0.03
+     1  pieces=  121  adj=         454  t=0.06
+     2  pieces=  127  adj=       1,008  t=0.1
+     3  pieces=  133  adj=       1,673  t=0.14
+     4  pieces=  139  adj=       2,469  t=0.18
+     5  pieces=  145  adj=       3,416  t=0.23
+   ...
+    70  pieces=  535  adj=   1,346,966  t=24.92
+    71  pieces=  541  adj=   1,402,099  t=25.87
+    72  pieces=  547  adj=   1,458,723  t=26.86
+    73  pieces=  553  adj=   1,516,858  t=27.84
+    74  pieces=  559  adj=   1,576,524  t=28.81
+    75  pieces=  565  adj=   1,637,741  t=29.82
+
+### opposed-dormers, minimal hanging subset rf1+rf2, 12s window
+roofs in doc: 2  ids=['rf1', 'rf2']
+=== RESULT  (tripped: deadline, elapsed 12.1s) ===
+envelope rounds observed : 82
+_adjacent calls          : 880,000
+_reach calls             : 975
+_reach total visits      : 48,588
+piece count per round    : first=44 min=44 max=368 last=368

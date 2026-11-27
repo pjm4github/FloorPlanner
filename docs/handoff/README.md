@@ -521,5 +521,6 @@ this table is not a second copy of it.
 | [`0382-ruling.md`](./0382-ruling.md) | ruling on 0381. The code is accepted. The census is not: it names 3 changed cases and there are 22. The evidence is still owed. Patrick's look can start now. |
 | [`0383-report.md`](./0383-report.md) | report on 0382. The census is corrected and reconciled: 22 top-reductions (my 0380 grid was too coarse and saw 3), 8 below-base by the column instrument (a min-vertex read over-counts). The 22 PNGs are regenerated with class+fall in the INDEX, and the lean-to test now runs on a committed reduction of the BR3 plan, RED on 0379, GREEN now. Patrick's word is given; merging. |
 | [`0384-report.md`](./0384-report.md) | report on 0376 / 0377 / 0378 (the furnishings lane). The schema keys declared, the kinds priced, the Qt-side editor tests written, the gallery brought current, the drop-on-save defect filed (D90). Gate GREEN. Patrick looked ("it looks very good") and gave the word; LANDED on `main`. |
+| [`0385-report.md`](./0385-report.md) | report on 0372 item C: `compute_roof_clips` does not return. The defect record opened (D91), the hang measured, a fix proposed. No fix made — the fix is RED until this report is ruled. |
 
 <!-- PAIRS:END -->
